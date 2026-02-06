@@ -1,0 +1,339 @@
+# .gitignore file created for free with Tower (https://www.git-tower.com/)
+# For suggestions or improvements please contact us using support@git-tower.com
+# Generated on 2026-02-06
+# Includes: rust, node, python, pnpm, react, vue, go
+
+### Universal ###
+# Common files that should be ignored in all projects
+
+# Logs
+*.log
+# Temporary files
+*.tmp
+*~
+
+*.bak
+# Environment files (containing secrets, API keys, credentials)
+.env
+*.env
+.env.*
+
+# Local configuration that shouldn't be shared
+*.local
+
+### Rust ###
+# rust specific files
+
+/target/
+**/*.rs.bk
+debug/
+target/debug/
+target/release/
+
+### Node ###
+# Node.js dependency directory, logs, and environment files
+
+# Dependencies
+node_modules/
+jspm_packages/
+bower_components/
+web_modules/
+
+# Logs
+logs
+*.log
+*.launch
+connect.lock/
+
+libpeerconnection.log
+.history/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+lerna-debug.log*
+.pnpm-debug.log*
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+# Runtime data
+
+pids
+*.pid
+*.seed
+*.pid.lock
+# Environment
+
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+# Package management
+
+.npm
+package-lock.json
+yarn.lock
+.yarn-integrity
+.yarn/cache
+
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+# Coverage & Test
+
+coverage/
+lib-cov
+*.lcov
+.nyc_output
+# Build output
+
+dist/
+build/
+.next/
+out/
+.nuxt
+
+.output
+# Cache & Temporary
+.cache/
+.temp/
+.grunt
+
+.lock-wscript
+.fusebox/
+.dynamodb/
+.tern-port
+.vscode-test
+
+.node_repl_history
+.webpack/
+# TypeScript
+*.tsbuildinfo
+# Optional REPL history
+
+.node_repl_history
+# Additional caches
+.eslintcache
+.stylelintcache
+.parcel-cache
+
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+# Misc
+
+*.tgz
+.serverless/
+.vuepress/dist
+.temp
+.docusaurus
+
+.svelte-kit
+
+### Python ###
+# Python compiled files, virtual environments, and cache
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+pypackages/
+build/
+develop-eggs/
+dist/
+downloads/
+
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+
+.installed.cfg
+*.egg
+MANIFEST
+.venv
+env/
+
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# PyInstaller
+*.manifest
+*.spec
+# Installer logs
+pip-log.txt
+
+pip-delete-this-directory.txt
+# Unit test / coverage reports
+.tox/
+.nox/
+.coverage.*
+
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+cover/
+# Translations
+*.mo
+*.pot
+# Django
+
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+# Flask
+instance/
+
+.webassets-cache
+# Scrapy
+.scrapy
+# Sphinx
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+# pyenv
+#.python-version
+
+# pipenv
+#Pipfile.lock
+# poetry
+#poetry.lock
+# pdm
+
+.pdm.toml
+__pypackages__/
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+# mkdocs
+/site
+# mypy
+
+.mypy_cache/
+.dmypy.json
+dmypy.json
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+# Cython
+cython_debug/
+# Poetry
+
+poetry.toml
+# ruff
+.ruff_cache/
+# LSP
+pyrightconfig.json
+
+*.sage.py
+.pdm.toml
+profile_default/
+.nox/
+.spyproject
+
+site/
+
+### Pnpm ###
+# pnpm package manager specific files
+
+# PNPM
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.pnpm/
+.pnpm-debug.log
+
+.pnpm-store/
+pnpm-lock.yaml.bak
+.pnpmfile.cjs
+node_modules/
+.pnpm-cache/
+
+### React ###
+# React build directory and environment files
+
+build/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_*
+**/*.backup.*
+
+**/*.back.*
+*.sublime*
+psd
+thumb
+sketch
+
+coverage/
+
+### Vue ###
+# Vue.js build files and development artifacts
+
+.DS_Store
+node_modules
+dist
+dist-ssr
+coverage
+
+*.local
+.output
+storybook-static/
+.vuepress/dist
+/cypress/videos/
+
+/cypress/screenshots/
+.env.local
+.env.*.local
+*.log
+
+### Go ###
+# go specific files
+
+*.exe
+*.test
+vendor/
+*.out
+go.work
+
+go.sum
+
