@@ -1,0 +1,7 @@
+type_id,type_name,type_code,discount_rate
+0,普通订单,NORMAL,0.00
+1,VIP订单,VIP,0.10
+2,团购订单,GROUP,0.15
+3,预售订单,PRESALE,0.05
+4,秒杀订单,FLASH,0.20
+
