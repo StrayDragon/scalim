@@ -268,6 +268,10 @@ profile_default/
 
 site/
 
+# marimo export artifacts
+**/__marimo__/
+docs/notebooks/**/*.html
+
 ### Pnpm ###
 # pnpm package manager specific files
 
