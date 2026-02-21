@@ -1,13 +1,28 @@
 [project]
 name = "scalim"
 version = "0.1.0"
-description = "Add your description here"
+description = "Scalim: a Python-first compute runtime (IR / planning / execution / sinks / observability)."
 readme = "README.md"
-authors = [
-    { name = "straydragon", email = "straydragonl@foxmail.com" }
+authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: Apache Software License",
 ]
-requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "typing-extensions>=4.1.1",
+]
+
+[project.optional-dependencies]
+pandas = ["pandas>=2.0.3"]
+excel = ["openpyxl>=3.1.5"]
+notebooks = ["marimo[recommended]"]
 
 [build-system]
 requires = ["uv_build>=0.9.30,<0.10.0"]
@@ -15,5 +30,114 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "maturin>=1.11.5",
+    "basedpyright",
+    "marimo[recommended]",
+    "mkdocs",
+    "mkdocs-material",
+    "openpyxl>=3.1.5",
+    "pandas>=2.0.3",
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "rich",
+    "ruff",
+]
+
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "**/*.ipynb",
+]
+line-length = 140
+indent-width = 4
+target-version = "py310"
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+select = ["ALL"]
+ignore = [
+    "D",
+    "COM812",
+    "TID252",
+    "PERF401",
+    "SIM108",
+    "ERA001",
+    "ARG002",
+    "ANN401",
+]
+
+[tool.ruff.lint.pylint]
+max-args = 16
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["ALL"]
+"**/notebooks/marimo/*.py" = ["ALL"]
+"tests/**/*.py" = ["ALL"]
+"src/scalim/vendor/compact/typing_extensionsx.py" = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing_extensions".msg = "Use src/scalim/vendor/compact/typing_extensionsx.py instead."
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+addopts = "-rs -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100 -p no:benchmark"
+testpaths = ["tests"]
+norecursedirs = ["docker", ".venv", ".git", "node_modules", "*.egg-info"]
+pythonpath = ["src"]
+markers = [
+    "bench: benchmark suites (kept for compatibility)",
+    "slow: long-running integration tests",
+]
+
+[tool.coverage.run]
+omit = [
+    "*/scalim/vendor/*",
+    "*/scalim/vendor/**",
+    "*/scalim/misc/*",
+    "*/scalim/misc/**",
+]
+
+[tool.basedpyright]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    ".venv/**",
+    "src/scalim/misc/**",
+    "src/scalim/vendor/**",
+]
+ignore = [
+    "notebooks",
+    "tests",
 ]
