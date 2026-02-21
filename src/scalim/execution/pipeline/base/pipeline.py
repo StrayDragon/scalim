@@ -7,9 +7,7 @@ Kept out of package `__init__.py` to keep import surfaces thin.
 
 import contextlib
 import gc
-import sys
 import time
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Hashable, Iterable, Iterator, Sequence
 from concurrent.futures import Executor
@@ -239,8 +237,6 @@ class SeqPipeline(Pipeline):
                     runtime=self.runtime,
                     overrides=self._overrides,
                     stack=stack,
-                    sys_module=sys,
-                    warnings_module=warnings,
                 )
 
                 for row_ids, batch_rows in self._iter_row_batches(main_rows):

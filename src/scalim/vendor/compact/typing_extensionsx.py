@@ -22,7 +22,7 @@ __all__ = ["Literal", "Self", "TypedDict", "override"]
 
 # region Self compat (stdlib: 3.11+)
 try:
-    from typing import Self  # pyright: ignore[reportUnusedImport]  # noqa: PLC0414
+    from typing import Self  # pyright: ignore[reportUnusedImport]
 except ImportError:  # pragma: no cover
     if TYPE_CHECKING:
         from typing_extensions import Self  # pyright: ignore[reportUnusedImport]

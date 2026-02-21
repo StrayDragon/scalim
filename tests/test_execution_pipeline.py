@@ -4,7 +4,6 @@ from typing import Any, Dict, List
 
 import pytest
 
-import scalim.execution.pipeline.base.pipeline as pipeline_impl
 from scalim.events.catalog import EVENT_STAGE_SPAN
 from scalim.events.event import Event
 from scalim.execution.adaptive.policy import ADAPTIVE_BACKEND_ASYNC, ADAPTIVE_BACKEND_PROCESS, AdaptivePolicy
@@ -150,8 +149,6 @@ def test_maybe_create_adaptive_pool_returns_none_when_workers_le_1() -> None:
             runtime=runtime,
             overrides=overrides,
             stack=stack,
-            sys_module=object(),
-            warnings_module=object(),
         )
 
     assert pool is None
@@ -221,63 +218,6 @@ def test_seq_pipeline_adaptive_selects_async_executor_class() -> None:
     pipeline = _make_pipeline(overrides=overrides)
     assert list(pipeline.run(main_rows=[])) == []
     assert calls == [2]
-
-
-def test_seq_pipeline_adaptive_async_warns_and_falls_back_to_thread_on_py36(monkeypatch) -> None:
-    class _AsyncPolicy(AdaptivePolicy):
-        def choose_backend(self, *, plan, runtime, tuning):  # type: ignore[override]
-            _ = plan
-            _ = runtime
-            _ = tuning
-            return ADAPTIVE_BACKEND_ASYNC
-
-    thread_calls = []
-    async_calls = []
-
-    class _DummyThreadExecutor:
-        def __init__(self, *, max_workers):  # type: ignore[no-untyped-def]
-            thread_calls.append(int(max_workers))
-
-        def __enter__(self):  # type: ignore[no-untyped-def]
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
-            _ = exc_type
-            _ = exc
-            _ = tb
-            return False
-
-    class _DummyAsyncExecutor:
-        def __init__(self, *, max_workers):  # type: ignore[no-untyped-def]
-            async_calls.append(int(max_workers))
-
-        def __enter__(self):  # type: ignore[no-untyped-def]
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
-            _ = exc_type
-            _ = exc
-            _ = tb
-            return False
-
-    overrides = PipelineOverrides(
-        adaptive_policy=_AsyncPolicy(),
-        adaptive_tuning=AdaptiveTuning(max_workers=2),
-        adaptive_executor_cls=_DummyThreadExecutor,
-        adaptive_async_executor_cls=_DummyAsyncExecutor,
-    )
-    pipeline = _make_pipeline(overrides=overrides)
-
-    class _FakeSys:
-        version_info = (3, 6, 0, "final", 0)
-
-    monkeypatch.setattr(pipeline_impl, "sys", _FakeSys(), raising=True)
-
-    with pytest.warns(RuntimeWarning, match="Python 3\\.6"):
-        assert list(pipeline.run(main_rows=[])) == []
-
-    assert thread_calls == [2]
-    assert async_calls == []
 
 
 def test_seq_pipeline_adaptive_invalid_backend_raises() -> None:

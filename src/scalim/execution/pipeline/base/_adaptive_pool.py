@@ -14,8 +14,6 @@ def maybe_create_adaptive_pool(
     runtime: ExecutionRuntime,
     overrides: PipelineOverrides,
     stack: ExitStack,
-    sys_module: object,
-    warnings_module: object,
 ) -> Executor | None:
     if runtime.parallel_mode != "adaptive":
         return None
