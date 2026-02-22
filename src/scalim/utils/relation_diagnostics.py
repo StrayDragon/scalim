@@ -181,11 +181,9 @@ class RelationDiagnostics:
             left_key_info, left_transform = RelationDiagnostics._format_field_ref(left)
             right_key_info, right_transform = RelationDiagnostics._format_field_ref(right)
 
-            lines.append(
-                f"  Step {i + 1}: "
-                f"{left.source.source_id}.{left.field_name}{left_key_info}{left_transform} == "
-                f"{right.source.source_id}.{right.field_name}{right_key_info}{right_transform}"
-            )
+            left_ref = f"{left.source.source_id}.{left.field_name}{left_key_info}{left_transform}"
+            right_ref = f"{right.source.source_id}.{right.field_name}{right_key_info}{right_transform}"
+            lines.append(f"  Step {i + 1}: {left_ref} == {right_ref}")
 
         lines.append("-" * 40)
         return "\n".join(lines)

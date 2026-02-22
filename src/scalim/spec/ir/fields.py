@@ -110,7 +110,7 @@ class FieldIr:
             if isinstance(self.relation, JoinConditionIr):
                 # 单个条件,提取左侧字段
                 deps.add(self.relation.left.field_name)
-            elif isinstance(self.relation, RelationIr):
+            else:
                 # 多个条件,提取所有左侧字段
                 for condition in self.relation.conditions:
                     deps.add(condition.left.field_name)

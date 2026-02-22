@@ -1,7 +1,7 @@
 # region imports
 
 from collections.abc import Hashable, Mapping, Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import Self, override
@@ -171,7 +171,7 @@ class InMemoryColumnSink(IColumnSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 

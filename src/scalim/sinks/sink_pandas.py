@@ -1,7 +1,7 @@
 # region imports
 
 from collections.abc import Hashable, Mapping, Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..vendor.compact.importlibx import require_optional_dependency
 
@@ -62,7 +62,7 @@ class PandasRowSink(IRowSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 
@@ -139,7 +139,7 @@ class PandasColumnSink(IColumnSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 

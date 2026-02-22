@@ -21,18 +21,6 @@ else:
             "values must already be of type `str`"
             if len(values) > 3:  # noqa: PLR2004
                 raise TypeError(f"too many arguments for str(): {values!r}")  # noqa: EM102, TRY003
-            if len(values) == 1:  # noqa: SIM102
-                # it must be a string
-                if not isinstance(values[0], str):
-                    raise TypeError(f"{values[0]!r} is not a string")  # noqa: EM102, TRY003
-            if len(values) >= 2:  # noqa: PLR2004, SIM102
-                # check that encoding argument is a string
-                if not isinstance(values[1], str):
-                    raise TypeError(f"encoding must be a string, not {values[1]!r}")  # noqa: EM102, TRY003
-            if len(values) == 3:  # noqa: PLR2004, SIM102
-                # check that errors argument is a string
-                if not isinstance(values[2], str):
-                    raise TypeError(f"errors must be a string, not {values[2]!r}")  # noqa: EM102, TRY003
             value = str(*values)
             member = str.__new__(cls, value)
             member._value_ = value

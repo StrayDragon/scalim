@@ -5,7 +5,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Hashable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import Self, override
@@ -249,7 +249,7 @@ class BaseSink(ISink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 
@@ -280,7 +280,7 @@ class BaseRowSink(IRowSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 
@@ -311,7 +311,7 @@ class BaseColumnSink(IColumnSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 

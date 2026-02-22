@@ -85,7 +85,7 @@ def _viz_collect_fields(
                 },
             )
             continue
-        if isinstance(field_spec, FieldIr):
+        try:
             source = field_spec.source
             source_id = source.source_id
             sources[source_id] = source
@@ -100,8 +100,8 @@ def _viz_collect_fields(
                     "is_ref": field_spec.is_ref_field(),
                 },
             )
-            continue
-        add_node(node_id, "field", {"label": field_key, "field_key": field_key})
+        except AttributeError:
+            add_node(node_id, "field", {"label": field_key, "field_key": field_key})
     return sources, fields_by_source
 
 

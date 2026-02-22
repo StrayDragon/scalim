@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from ..vendor.compact.importlibx import require_optional_dependency
 
@@ -266,7 +266,7 @@ class ColumnExcelSink(IColumnSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 

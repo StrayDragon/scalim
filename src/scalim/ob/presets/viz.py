@@ -234,7 +234,7 @@ class VizObserver(EventDispatchObserver):
         self._emitter = VizEventEmitter(self.config)
 
     def _attach_viz_metadata(self) -> None:
-        if not self.snapshot or not isinstance(self.snapshot, dict):
+        if self.snapshot is None:
             return
         meta = self.snapshot.get("meta")
         if not isinstance(meta, dict):
@@ -416,7 +416,7 @@ class VizObserver(EventDispatchObserver):
             return
         if self._emitter is None:
             return
-        context = event.context if isinstance(event.context, dict) else {}
+        context = event.context
         field_key = context.get("field_key") or context.get("field_id") or context.get("field")
         loader_name = context.get("loader_name") or context.get("loader")
         source_id = context.get("source_id") or context.get("source")

@@ -49,7 +49,7 @@ def to_int_tuple(value: ConvertibleToIntTuple) -> tuple[int, ...]:
     return tuple(int(v) for v in value)
 
 
-def get_seps_values_first_int(value: SeparatedValues, sep: str = ",") -> int:
+def get_seps_values_first_int(value: object, sep: str = ",") -> int:
     """从分割字符串提取第一个值并转换为 int: 会抛异常哦!"""
     if isinstance(value, (int, float)):
         return int(value)
@@ -59,7 +59,7 @@ def get_seps_values_first_int(value: SeparatedValues, sep: str = ",") -> int:
             msg = f"Empty first value in CSV string: {value!r}"
             raise ValueError(msg)
         return int(first)
-    msg = f"Unsupported type for CSV conversion: {type(value).__name__}"  # pyright: ignore[reportUnreachable]
+    msg = f"Unsupported type for CSV conversion: {type(value).__name__}"
     raise TypeError(msg)
 
 
@@ -93,21 +93,21 @@ def must_to_int_tuple(value: ConvertibleToIntTuple | None) -> tuple[int, ...] | 
         return None
 
 
-def must_get_seps_values_first_int(value: SeparatedValues | None, sep: str = ",") -> int | None:
+def must_get_seps_values_first_int(value: object | None, sep: str = ",") -> int | None:
     """强制从分割字符串提取第一个值并转换为 int: 抑制异常,异常时为None"""
     if value is None:
         return None
     if isinstance(value, (int, float)):
         return int(value)
-    if isinstance(value, str):
-        first = value.split(sep)[0].strip()
-        if not first:
-            return None
-        try:
-            return int(first)
-        except ValueError:
-            return None
-    return None  # pyright: ignore[reportUnreachable]
+    if not isinstance(value, str):
+        return None
+    first = value.split(sep)[0].strip()
+    if not first:
+        return None
+    try:
+        return int(first)
+    except ValueError:
+        return None
 
 
 def _format_decimal_no_exponent(d: Decimal) -> str:

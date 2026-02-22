@@ -32,7 +32,7 @@ class FieldRefIr:
     字段名
     """
 
-    def join(self, other: "FieldRefIr") -> "JoinConditionIr":
+    def join(self, other: object) -> "JoinConditionIr":
         """构建关联条件 - 推荐方式
 
         Example:
@@ -41,11 +41,11 @@ class FieldRefIr:
             relation = source_a["f1"].join(source_b["f1"]).and_(source_a["f2"].join(source_b["f2"]))
         """
         if not isinstance(other, FieldRefIr):
-            msg = f"join() requires a FieldRefIr, got {type(other).__name__}"  # pyright: ignore[reportUnreachable]
+            msg = f"join() requires a FieldRefIr, got {type(other).__name__}"
             raise TypeError(msg)
         return JoinConditionIr(left=self, right=other)
 
-    def eq(self, other: "FieldRefIr") -> "JoinConditionIr":
+    def eq(self, other: object) -> "JoinConditionIr":
         """构建关联条件 - join() 的别名,语义更清晰
 
         Example:

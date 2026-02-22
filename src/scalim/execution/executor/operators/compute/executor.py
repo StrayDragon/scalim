@@ -224,7 +224,7 @@ class ComputeOperatorExecutor(OperatorExecutor):
         compute_mode = guardrails.effective_compute_mode()
         wants_field_compute = runtime.instrumentation.wants(EVENT_FIELD_COMPUTE)
 
-        if isinstance(field_spec, DerivedFieldIr) and field_spec.is_constant_compute:
+        if field_spec.is_constant_compute:
             _execute_constant_compute(
                 field_spec,
                 context,
@@ -235,11 +235,7 @@ class ComputeOperatorExecutor(OperatorExecutor):
             )
             return
 
-        if (
-            isinstance(field_spec, DerivedFieldIr)
-            and not field_spec.call_ctx_key
-            and bool(getattr(field_spec.calculator, "_scalim_secure_compute", False))
-        ):
+        if not field_spec.call_ctx_key and bool(getattr(field_spec.calculator, "_scalim_secure_compute", False)):
             _execute_secure_compute(
                 field_spec,
                 context,

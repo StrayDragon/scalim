@@ -246,7 +246,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         loader_fn = source.loader_spec.callable
 
         loader_start = time.perf_counter()
-        result = call_loader_with_binding(binding, loader_context, loader_fn)
+        result: Any = call_loader_with_binding(binding, loader_context, loader_fn)
         loader_duration = time.perf_counter() - loader_start
 
         call_kwargs = self._build_loader_call_kwargs(runtime, binding, loader_context)

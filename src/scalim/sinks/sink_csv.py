@@ -6,7 +6,7 @@ import logging
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Optional
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import Self, override
@@ -291,7 +291,7 @@ class ColumnCSVSink(IColumnSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 
@@ -504,7 +504,7 @@ class BlockColumnCSVSink(IColumnSink):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+        exc_tb: "types.TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
 

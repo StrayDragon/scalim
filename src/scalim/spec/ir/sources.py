@@ -1,6 +1,6 @@
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from ...typedefs import SourceSpecIrCacheMode
 from ...vendor.compact.typing_extensionsx import override
@@ -184,4 +184,4 @@ class OrderByKeyIr:
     """
 
 
-SourceRefIr = Union["SourceIr", "MainSourceIr"]
+SourceRefIr = SourceIr | MainSourceIr

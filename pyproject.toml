@@ -140,3 +140,7 @@ ignore = [
     "notebooks",
     "tests",
 ]
+pythonVersion = "3.10"
+reportAny = "none"
+reportExplicitAny = "none"
+reportMissingTypeStubs = "none"

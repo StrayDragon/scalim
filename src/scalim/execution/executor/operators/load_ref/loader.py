@@ -80,7 +80,7 @@ def _call_ref_loader(
     cache_status: str,
 ) -> dict[Hashable, Any]:
     loader_start = time.perf_counter()
-    result = call_loader_with_binding(binding, loader_context, source.loader_spec.callable)
+    result: Any = call_loader_with_binding(binding, loader_context, source.loader_spec.callable)
     loader_duration = time.perf_counter() - loader_start
 
     _trigger_ref_loader_call(
@@ -104,7 +104,7 @@ def _call_ref_loader(
             context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result, is_ref_loader=True),
             action_mode="fast_fail",
         )
-    return result
+    return cast("dict[Hashable, Any]", result)
 
 
 def _get_cached_ref_result(

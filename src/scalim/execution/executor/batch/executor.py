@@ -8,7 +8,7 @@ Kept out of package `__init__.py` to keep import surfaces thin.
 import time
 from collections.abc import Callable, Hashable, Sequence
 from concurrent.futures import Executor
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 from ....planning.operators import LoadRefOperatorIr as LoadRefOp
 from ....planning.operators import OperatorType, SupportedOperatorIr
@@ -49,7 +49,7 @@ class BatchExecutor:
         plan: ExecutionPlan,
         runtime: ExecutionRuntime,
         *,
-        overrides: Optional["PipelineOverrides"] = None,
+        overrides: "PipelineOverrides | None" = None,
     ) -> None:
         self.plan = plan
         self.runtime = runtime

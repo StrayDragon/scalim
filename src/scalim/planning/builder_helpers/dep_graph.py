@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from ...spec.ir.demand import DemandIr
-from ...spec.ir.fields import DerivedFieldIr, FieldIr
+from ...spec.ir.fields import DerivedFieldIr
 from ...utils import graph
 from .resolver import LookupStepsResolver, extract_relation_dependency_keys
 
@@ -14,19 +14,22 @@ def build_dependency_graph(
     """Build planning dependency graph for the given demand."""
     dep_graph: graph.DependencyGraph[str] = graph.DependencyGraph()
 
-    for field_key, field in demand.fields.items():
-        if isinstance(field, DerivedFieldIr):
-            dep_graph.add_node(field_key, field.dependencies)
-            continue
-        if isinstance(field, FieldIr):
-            if field.lookup_steps or field.relation:
-                deps = extract_relation_dependency_keys(demand=demand, field_spec=field, resolver=resolver, field_key=field_key)
-                dep_graph.add_node(field_key, deps)
-            else:
-                dep_graph.add_node(field_key)
+    for field_key, field_spec in demand.fields.items():
+        if isinstance(field_spec, DerivedFieldIr):
+            dep_graph.add_node(field_key, field_spec.dependencies)
             continue
 
-        dep_graph.add_node(field_key)
+        try:
+            has_relation_deps = bool(field_spec.lookup_steps or field_spec.relation)
+        except AttributeError:
+            dep_graph.add_node(field_key)
+            continue
+
+        if has_relation_deps:
+            deps = extract_relation_dependency_keys(demand=demand, field_spec=field_spec, resolver=resolver, field_key=field_key)
+            dep_graph.add_node(field_key, deps)
+        else:
+            dep_graph.add_node(field_key)
 
     return dep_graph
 

@@ -6,7 +6,7 @@ import logging
 import threading
 from collections.abc import Callable
 from concurrent.futures import Executor, Future
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from ...vendor.compact.typing_extensionsx import override
 
@@ -51,7 +51,7 @@ class ThreadLoopExecutor(Executor):
     _loop: "asyncio.AbstractEventLoop"
     _thread: threading.Thread
     _shutdown: bool
-    _sem: Optional["asyncio.Semaphore"]
+    _sem: "asyncio.Semaphore | None"
     _warned_sync_submit: bool
 
     def __init__(self, max_workers: int = 1) -> None:
