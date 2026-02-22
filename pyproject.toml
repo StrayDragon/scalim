@@ -135,7 +135,6 @@ exclude = [
     "**/__pycache__",
     ".venv/**",
     "src/scalim/misc/**",
-    "src/scalim/vendor/**",
 ]
 ignore = [
     "notebooks",

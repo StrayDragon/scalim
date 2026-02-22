@@ -49,7 +49,7 @@ class PandasRowSink(IRowSink):
 
     def to_dataframe(self) -> "pd.DataFrame":
         if self.field_names:
-            return pd.DataFrame(self._rows, columns=self.field_names)
+            return pd.DataFrame(self._rows, columns=pd.Index(self.field_names))
         return pd.DataFrame(self._rows)
 
     def get_rows(self) -> list[RowData]:
@@ -115,7 +115,7 @@ class PandasColumnSink(IColumnSink):
 
     def to_dataframe(self) -> "pd.DataFrame":
         if not self._row_ids:
-            return pd.DataFrame(columns=self.field_names or [])
+            return pd.DataFrame(columns=pd.Index(self.field_names or []))
 
         fields = self.field_names or list(self._columns.keys())
         data: dict[str, list[FieldValue | None]] = {}
@@ -124,7 +124,7 @@ class PandasColumnSink(IColumnSink):
             col_data = self._columns.get(field_key, {})
             data[field_key] = [col_data.get(pk) for pk in self._row_ids]
 
-        return pd.DataFrame(data, columns=fields)
+        return pd.DataFrame(data, columns=pd.Index(fields))
 
     def get_columns(self) -> dict[str, dict[Hashable, FieldValue]]:
         return self._columns
