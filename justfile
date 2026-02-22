@@ -9,7 +9,7 @@ sync:
 
 # Type checking
 type-check:
-    uv run basedpyright src/scalim --level error
+    uv run basedpyright --level error src/scalim
 
 # Formatting + lint (tests are ruff-ignored by config, but included for consistency)
 fmt:
