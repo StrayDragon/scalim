@@ -115,7 +115,7 @@ class CSVSink(BaseRowSink):
         # 使用临时文件,确保在同一目录以支持原子重命名
         self._temp_path = create_temp_path(output_path, ".csv.tmp")
 
-        self._file = Path(self._temp_path).open("w", encoding=encoding, newline="")  # noqa: SIM115
+        self._file = io.open(self._temp_path, "w", encoding=encoding, newline="")  # noqa: SIM115, UP020
         self._writer = csv.writer(self._file, delimiter=self.delimiter)
         if self.include_header:
             self._write_header()
@@ -263,7 +263,7 @@ class ColumnCSVSink(IColumnSink):
         temp_path_obj = Path(temp_path)
 
         try:
-            with temp_path_obj.open("w", encoding=self.encoding, newline="") as f:
+            with io.open(temp_path, "w", encoding=self.encoding, newline="") as f:  # noqa: UP020
                 writer = csv.writer(f, delimiter=self.delimiter)
                 if self.include_header:
                     writer.writerow(self.header_names)
