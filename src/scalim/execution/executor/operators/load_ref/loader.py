@@ -82,7 +82,7 @@ def _call_ref_loader(
 ) -> dict[Hashable, Any]:
     loader_start = time.perf_counter()
     policy = runtime.loader_retry.resolve(source.source_id)
-    result = call_with_loader_retry(
+    result: Any = call_with_loader_retry(
         call=lambda: call_loader_with_binding(binding, loader_context, source.loader_spec.callable),
         instrumentation=runtime.instrumentation,
         policy=policy,
