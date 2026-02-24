@@ -13,6 +13,7 @@ from .events import (
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,
+    LoaderRetryEvent,
     LoaderSlimEvent,
     PipelineEndEvent,
     PipelineStartEvent,
@@ -29,6 +30,7 @@ EVENT_PIPELINE_END = "pipeline_end"
 EVENT_BATCH_START = "batch_start"
 EVENT_BATCH_END = "batch_end"
 EVENT_LOADER_CALL = "loader_call"
+EVENT_LOADER_RETRY = "loader_retry"
 EVENT_FIELD_COMPUTE = "field_compute"
 EVENT_ERROR = "error"
 EVENT_DIAGNOSTIC_WARNING = "diagnostic_warning"
@@ -92,6 +94,14 @@ _EVENT_CATALOG: list[EventDescriptor] = [
         volume="full",
         payload_policy="summary|sample|full|none",
         payload_type=LoaderCallEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_LOADER_RETRY,
+        summary="loader 重试",
+        key_fields=("loader_name", "attempt_num", "sleep_seconds"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=LoaderRetryEvent.__name__,
     ),
     EventDescriptor(
         name=EVENT_FIELD_COMPUTE,
@@ -202,6 +212,7 @@ __all__ = [
     "EVENT_FIELD_COMPUTE",
     "EVENT_FIELD_SLIM",
     "EVENT_LOADER_CALL",
+    "EVENT_LOADER_RETRY",
     "EVENT_LOADER_SLIM",
     "EVENT_PIPELINE_END",
     "EVENT_PIPELINE_START",

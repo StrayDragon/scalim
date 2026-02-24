@@ -13,6 +13,7 @@ from ..events.catalog import (
     EVENT_FIELD_COMPUTE,
     EVENT_FIELD_SLIM,
     EVENT_LOADER_CALL,
+    EVENT_LOADER_RETRY,
     EVENT_LOADER_SLIM,
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
@@ -31,6 +32,7 @@ from ..events.events import (
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,
+    LoaderRetryEvent,
     LoaderSlimEvent,
     PipelineEndEvent,
     PipelineStartEvent,
@@ -226,6 +228,38 @@ class InstrumentationHub:
         event = self.observer_manager.emit_event(EVENT_LOADER_CALL, event_payload, meta=meta)
         if self.observer_manager.mode != "capture":
             self.hook_manager.emit_on_event(event)
+
+    def emit_loader_retry(
+        self,
+        *,
+        loader_name: str,
+        callsite: str,
+        attempt_num: int,
+        max_attempts: int,
+        elapsed_seconds: float,
+        sleep_seconds: float,
+        error_type: str,
+        error_message: str | None,
+        batch_num: int | None = None,
+        meta: dict[str, Any] | None = None,
+    ) -> None:
+        if not self.wants(EVENT_LOADER_RETRY):
+            return
+        _ = self._emit_assume_wanted(
+            EVENT_LOADER_RETRY,
+            LoaderRetryEvent(
+                loader_name=loader_name,
+                callsite=callsite,
+                attempt_num=int(attempt_num),
+                max_attempts=int(max_attempts),
+                elapsed_seconds=float(elapsed_seconds),
+                sleep_seconds=float(sleep_seconds),
+                error_type=str(error_type),
+                error_message=error_message,
+                batch_num=batch_num,
+            ),
+            meta=meta,
+        )
 
     def emit_field_compute(
         self,

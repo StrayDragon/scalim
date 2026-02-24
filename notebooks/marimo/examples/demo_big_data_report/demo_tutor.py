@@ -18,10 +18,12 @@ def _(mo):
     - Sinks（memory / csv / excel / pandas）
     - Observability（Performance/Memory/Trace/Relation + 可选 Viz）
     - Runtime Guardrails（quiet / fast_fail）
+    - Resilience：Loader Retry（可重试恢复）
     - **对拍验证**：
       - scalim vs python（逐行逐字段）
       - seq vs adaptive（同输入输出一致）
       - run_ir vs direct engine（同输出一致）
+      - loader_retry（故障注入：启用 retry 后输出应与基线一致）
 
     说明：本 notebook 以默认配置会自动跑一遍（用于 `marimo export`），也可通过 UI 交互调整参数。
     """)
@@ -70,14 +72,15 @@ def _():
         verify_scalim_output,
     )
 
-    from scalim.events.catalog import EVENT_ERROR  # noqa: PLC0415
-    from scalim.events.events import BatchEndEvent, LoaderCallEvent  # noqa: PLC0415
+    from scalim.events.catalog import EVENT_ERROR, EVENT_LOADER_RETRY  # noqa: PLC0415
+    from scalim.events.events import BatchEndEvent, LoaderCallEvent, LoaderRetryEvent  # noqa: PLC0415
     from scalim.execution.engine import ScalimEngine  # noqa: PLC0415
     from scalim.execution.guardrails import (  # noqa: PLC0415
         GuardrailViolation,
         GuardrailsLoaderPolicy,
         GuardrailsPolicy,
     )
+    from scalim.execution.loader_retry import LoaderRetryPolicies, LoaderRetryPolicy  # noqa: PLC0415
     from scalim.execution.run_ir import (  # noqa: PLC0415
         ExecutionRequest,
         ExportLayout,
@@ -100,10 +103,11 @@ def _():
     from scalim.sinks.sink_csv import ColumnCSVSink  # noqa: PLC0415
     from scalim.sinks.sink_pandas import PandasColumnSink, PandasRowSink  # noqa: PLC0415
     from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink  # noqa: PLC0415
-    from scalim.spec.ir.binding import LoaderIr  # noqa: PLC0415
+    from scalim.spec.ir.binding import BindingIr, LoaderIr  # noqa: PLC0415
     from scalim.spec.ir.demand import DemandIr  # noqa: PLC0415
     from scalim.spec.ir.fields import DerivedFieldIr, FieldIr  # noqa: PLC0415
     from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr  # noqa: PLC0415
+    from scalim.typedefs import SourceSpecIrCacheMode  # noqa: PLC0415
 
     return (
         BaseHook,
@@ -113,6 +117,7 @@ def _():
         DerivedFieldIr,
         ECommerceConfig,
         EVENT_ERROR,
+        EVENT_LOADER_RETRY,
         EventDispatchObserver,
         ExecutionRequest,
         ExecutionTraceObserver,
@@ -127,6 +132,10 @@ def _():
         KeyIr,
         List,
         LoaderCallEvent,
+        LoaderRetryEvent,
+        LoaderRetryPolicies,
+        LoaderRetryPolicy,
+        BindingIr,
         LoaderIr,
         MainSourceIr,
         MemoryOptimizationObserver,
@@ -148,6 +157,7 @@ def _():
         Tuple,
         VizObserver,
         VizObserverConfig,
+        SourceSpecIrCacheMode,
         build_ecommerce_model,
         build_target_sets,
         compare_csv_files,
@@ -191,6 +201,23 @@ def _(build_target_sets, mo):
     write_viz = mo.ui.checkbox(label="写出 Viz 可视化产物（jsonl/snapshot）", value=False)
     output_dir = mo.ui.text(label="产物目录（可选，留空写到 /tmp/scalim-demo-tutor）", value="")
 
+    loader_retry_demo = mo.ui.checkbox(label="演示：Loader Retry（可重试恢复）", value=True)
+    loader_retry_case = mo.ui.dropdown(
+        options=[
+            "load_ref",
+            "main_source",
+            "preload_forever",
+            "load",
+            "all",
+        ],
+        value="load_ref",
+        label="故障注入场景（哪个 callsite 先失败）",
+    )
+    loader_retry_fail_times = mo.ui.slider(start=0, stop=3, value=1, step=1, label="每个 flaky loader 的失败次数")
+    loader_retry_max_attempts = mo.ui.slider(start=1, stop=5, value=3, step=1, label="retry max_attempts")
+    loader_retry_demo_run_ir = mo.ui.checkbox(label="对拍：retry demo 也跑一遍 run_ir", value=False)
+    loader_retry_demo_give_up = mo.ui.checkbox(label="也演示 give-up（超过 max_attempts）", value=False)
+
     mo.vstack(
         [
             mo.hstack([order_count, batch_size], gap=2),
@@ -199,6 +226,10 @@ def _(build_target_sets, mo):
             mo.hstack([adaptive_max_workers, run_ir_demo], gap=2),
             mo.hstack([write_viz], gap=2),
             output_dir,
+            mo.hstack([loader_retry_demo, loader_retry_demo_give_up], gap=2),
+            loader_retry_case,
+            mo.hstack([loader_retry_fail_times, loader_retry_max_attempts], gap=2),
+            loader_retry_demo_run_ir,
         ],
         gap=1,
     )
@@ -206,6 +237,12 @@ def _(build_target_sets, mo):
         adaptive_max_workers,
         batch_size,
         compare_pipelines,
+        loader_retry_case,
+        loader_retry_demo,
+        loader_retry_demo_give_up,
+        loader_retry_demo_run_ir,
+        loader_retry_fail_times,
+        loader_retry_max_attempts,
         order_count,
         output_dir,
         run_ir_demo,
@@ -222,6 +259,12 @@ def _(
     adaptive_max_workers,
     batch_size,
     compare_pipelines,
+    loader_retry_case,
+    loader_retry_demo,
+    loader_retry_demo_give_up,
+    loader_retry_demo_run_ir,
+    loader_retry_fail_times,
+    loader_retry_max_attempts,
     order_count,
     output_dir,
     run_ir_demo,
@@ -240,6 +283,13 @@ def _(
     DO_RUN_IR_DEMO = bool(run_ir_demo.value)
     DO_VIZ_ARTIFACTS = bool(write_viz.value)
 
+    DO_LOADER_RETRY_DEMO = bool(loader_retry_demo.value)
+    LOADER_RETRY_CASE = str(loader_retry_case.value)
+    LOADER_RETRY_FAIL_TIMES = int(loader_retry_fail_times.value)
+    LOADER_RETRY_MAX_ATTEMPTS = int(loader_retry_max_attempts.value)
+    DO_LOADER_RETRY_DEMO_RUN_IR = bool(loader_retry_demo_run_ir.value)
+    DO_LOADER_RETRY_DEMO_GIVE_UP = bool(loader_retry_demo_give_up.value)
+
     out_dir = str(output_dir.value).strip()
     if out_dir:
         artifacts_dir = Path(out_dir).expanduser().resolve()
@@ -253,9 +303,15 @@ def _(
         ADAPTIVE_MAX_WORKERS,
         BATCH_SIZE,
         DO_CSV_COMPARE,
+        DO_LOADER_RETRY_DEMO,
+        DO_LOADER_RETRY_DEMO_GIVE_UP,
+        DO_LOADER_RETRY_DEMO_RUN_IR,
         DO_PIPELINE_COMPARE,
         DO_RUN_IR_DEMO,
         DO_VIZ_ARTIFACTS,
+        LOADER_RETRY_CASE,
+        LOADER_RETRY_FAIL_TIMES,
+        LOADER_RETRY_MAX_ATTEMPTS,
         ORDER_COUNT,
         TARGET_SET_ID,
         artifacts_dir,
@@ -288,9 +344,15 @@ def _(TARGET_SET_ID, build_target_sets):
 def _(
     ADAPTIVE_MAX_WORKERS,
     DO_CSV_COMPARE,
+    DO_LOADER_RETRY_DEMO,
+    DO_LOADER_RETRY_DEMO_GIVE_UP,
+    DO_LOADER_RETRY_DEMO_RUN_IR,
     DO_PIPELINE_COMPARE,
     DO_RUN_IR_DEMO,
     DO_VIZ_ARTIFACTS,
+    LOADER_RETRY_CASE,
+    LOADER_RETRY_FAIL_TIMES,
+    LOADER_RETRY_MAX_ATTEMPTS,
     ORDER_COUNT,
     TARGET_SET_ID,
     artifacts_dir,
@@ -306,6 +368,7 @@ def _(
       - oracle(csv): `{"ON" if DO_CSV_COMPARE else "OFF"}`
       - pipeline(seq vs adaptive): `{"ON" if DO_PIPELINE_COMPARE else "OFF"}` (max_workers=`{ADAPTIVE_MAX_WORKERS}`)
       - run_ir(csv/excel row/column): `{"ON" if DO_RUN_IR_DEMO else "OFF"}`
+      - loader_retry: `{"ON" if DO_LOADER_RETRY_DEMO else "OFF"}` (case=`{LOADER_RETRY_CASE}`, fail_times=`{LOADER_RETRY_FAIL_TIMES}`, max_attempts=`{LOADER_RETRY_MAX_ATTEMPTS}`, run_ir=`{DO_LOADER_RETRY_DEMO_RUN_IR}`, give_up=`{DO_LOADER_RETRY_DEMO_GIVE_UP}`)
     - viz artifacts: `{"ON" if DO_VIZ_ARTIFACTS else "OFF"}`
     - artifacts_dir: `{artifacts_dir}`
     """)
@@ -1135,6 +1198,480 @@ def _(codes, fast_fail_code, mo, quiet_rows):
 @app.cell
 def _(mo, quiet_rows):
     mo.ui.table(quiet_rows)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ---
+    ## 9) Resilience：Loader Retry（可重试恢复）
+
+    目标：演示当 loader 出现**瞬时失败**（如网络抖动、临时超时）时：
+
+    - 未启用 retry：执行会直接失败（可能在 preload / main_source / load / load_ref 的任意阶段）
+    - 启用 retry：在策略允许的范围内自动重试并恢复，最终输出与无故障基线一致
+
+    说明：
+    - Loader Retry 默认关闭，需要显式传入 `LoaderRetryPolicies` 才会启用。
+    - `loader_retry` 事件是 wants-gated：只有订阅了 `EVENT_LOADER_RETRY` 才会发出（避免热路径额外开销）。
+    """)
+    return
+
+
+@app.cell
+def _(BindingIr, DemandIr, FieldIr, KeyIr, LoaderIr, MainSourceIr, SourceIr, SourceSpecIrCacheMode):
+    class TransientLoaderError(RuntimeError):
+        pass
+
+    def make_flaky_loader(*, name: str, fn, fail_times: int):  # type: ignore[no-untyped-def]
+        state = {"calls": 0}
+
+        def _wrapped(*args, **kwargs):  # type: ignore[no-untyped-def]
+            state["calls"] += 1
+            if state["calls"] <= int(fail_times):
+                raise TransientLoaderError("[{}] transient failure #{}".format(name, state["calls"]))
+            return fn(*args, **kwargs)
+
+        return _wrapped, state
+
+    RETRY_DEMO_MAIN_ROWS = [
+        {"order_id": 1, "customer_id": 101, "promotion_id": 201},
+        {"order_id": 2, "customer_id": 102, "promotion_id": 202},
+        {"order_id": 3, "customer_id": 101, "promotion_id": 201},
+        {"order_id": 4, "customer_id": 103, "promotion_id": 201},
+        {"order_id": 5, "customer_id": 102, "promotion_id": 202},
+    ]
+    RETRY_DEMO_CUSTOMERS = {
+        101: {"customer_name": "Alice"},
+        102: {"customer_name": "Bob"},
+        103: {"customer_name": "Carol"},
+    }
+    RETRY_DEMO_PROMOTIONS = {
+        201: {"promotion_name": "P1"},
+        202: {"promotion_name": "P2"},
+    }
+    RETRY_DEMO_TARGETS = ["order_id", "customer_name", "promotion_name", "is_even_row"]
+
+    def build_retry_demo_demand(*, main_loader, customers_loader, promotions_loader, flags_loader):  # type: ignore[no-untyped-def]
+        main_source = MainSourceIr(source_id="orders", loader=main_loader)
+
+        customers_source = SourceIr(
+            source_id="customers",
+            key=KeyIr("customer_id"),
+            loader_spec=LoaderIr(
+                callable=customers_loader,
+                bindings={
+                    "customer_id": BindingIr(
+                        key_field="customer_id",
+                        params_builder=lambda ctx: ((), {"customer_ids": ctx.lookup_keys_list}),
+                        as_="list",
+                        param_name="customer_ids",
+                    ),
+                },
+            ),
+        )
+
+        promotions_source = SourceIr(
+            source_id="promotions",
+            key=KeyIr("promotion_id"),
+            loader_spec=LoaderIr(callable=promotions_loader),
+            cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
+        )
+
+        flags_source = SourceIr(
+            source_id="order_flags",
+            key=KeyIr("row_nth"),
+            loader_spec=LoaderIr(
+                callable=flags_loader,
+                bindings={
+                    "row_nth": BindingIr(
+                        key_field="row_nth",
+                        params_builder=lambda ctx: ((), {"row_nth": list(ctx.batch_row_nth)}),
+                        param_name="row_nth",
+                    ),
+                },
+            ),
+        )
+
+        rel_customer = main_source["customer_id"].join(customers_source["customer_id"])
+        rel_promo = main_source["promotion_id"].join(promotions_source["promotion_id"])
+
+        fields = [
+            FieldIr(field_id="order_id", name="order_id", source=main_source),
+            FieldIr(field_id="customer_id", name="customer_id", source=main_source),
+            FieldIr(field_id="promotion_id", name="promotion_id", source=main_source),
+            FieldIr(
+                field_id="customer_name",
+                name="customer_name",
+                source=customers_source,
+                data_key="customer_name",
+                relation=rel_customer,
+            ),
+            FieldIr(
+                field_id="promotion_name",
+                name="promotion_name",
+                source=promotions_source,
+                data_key="promotion_name",
+                relation=rel_promo,
+            ),
+            FieldIr(field_id="is_even_row", name="is_even_row", source=flags_source, data_key="is_even_row"),
+        ]
+
+        demand = DemandIr.from_irs(
+            sources=[customers_source, promotions_source, flags_source],
+            fields=fields,
+            main_source=main_source,
+            name="loader_retry_demo",
+            batch_size_hint=3,
+        )
+        return demand
+
+    def build_retry_demo_expected_rows():  # type: ignore[no-untyped-def]
+        rows = []
+        for row_nth, row in enumerate(RETRY_DEMO_MAIN_ROWS):
+            customer = RETRY_DEMO_CUSTOMERS.get(row["customer_id"])
+            promo = RETRY_DEMO_PROMOTIONS.get(row["promotion_id"])
+            rows.append(
+                {
+                    "order_id": row["order_id"],
+                    "customer_name": None if customer is None else customer.get("customer_name"),
+                    "promotion_name": None if promo is None else promo.get("promotion_name"),
+                    "is_even_row": bool(row_nth % 2 == 0),
+                }
+            )
+        return rows
+
+    return (
+        RETRY_DEMO_CUSTOMERS,
+        RETRY_DEMO_MAIN_ROWS,
+        RETRY_DEMO_PROMOTIONS,
+        RETRY_DEMO_TARGETS,
+        TransientLoaderError,
+        build_retry_demo_demand,
+        build_retry_demo_expected_rows,
+        make_flaky_loader,
+    )
+
+
+@app.cell
+def _(EVENT_ERROR, EVENT_LOADER_RETRY, EventDispatchObserver, LoaderRetryEvent, TransientLoaderError):
+    class RetryDemoCollector(EventDispatchObserver):
+        event_types = {EVENT_LOADER_RETRY, EVENT_ERROR}
+
+        def __init__(self) -> None:
+            self.retries: list[LoaderRetryEvent] = []
+            self.errors: list[object] = []
+
+        def on_loader_retry(self, payload: LoaderRetryEvent) -> None:
+            self.retries.append(payload)
+
+        def on_error(self, payload: object) -> None:
+            self.errors.append(payload)
+
+    def retry_demo_should_retry(exc: Exception, _ctx) -> bool:  # type: ignore[no-untyped-def]
+        return isinstance(exc, TransientLoaderError)
+
+    return RetryDemoCollector, retry_demo_should_retry
+
+
+@app.cell
+def _(
+    DO_LOADER_RETRY_DEMO,
+    DO_LOADER_RETRY_DEMO_GIVE_UP,
+    DO_LOADER_RETRY_DEMO_RUN_IR,
+    InMemoryRowSink,
+    LOADER_RETRY_CASE,
+    LOADER_RETRY_FAIL_TIMES,
+    LOADER_RETRY_MAX_ATTEMPTS,
+    LoaderRetryPolicies,
+    LoaderRetryPolicy,
+    ObserverManager,
+    PlanBuilder,
+    RETRY_DEMO_CUSTOMERS,
+    RETRY_DEMO_MAIN_ROWS,
+    RETRY_DEMO_PROMOTIONS,
+    RETRY_DEMO_TARGETS,
+    RetryDemoCollector,
+    ScalimEngine,
+    build_retry_demo_demand,
+    build_retry_demo_expected_rows,
+    compare_rows_by_pk,
+    make_flaky_loader,
+    retry_demo_should_retry,
+    run_ir,
+    ExecutionRequest,
+    ExportLayout,
+    OutputSpec,
+):
+    retry_demo = {
+        "status": "disabled",
+        "case": LOADER_RETRY_CASE,
+        "fail_times": int(LOADER_RETRY_FAIL_TIMES),
+        "max_attempts": int(LOADER_RETRY_MAX_ATTEMPTS),
+        "baseline_rows": 0,
+        "retry_rows": 0,
+        "retry_error": None,
+        "error_events": 0,
+        "no_retry_failed": False,
+        "no_retry_error": None,
+        "retry_events": [],
+        "give_up": {"enabled": False, "failed": False, "error": None, "error_events": 0, "retry_events": 0},
+        "run_ir": {"enabled": False, "failed": False, "error": None, "rows": 0, "retry_events": 0, "error_events": 0},
+    }
+
+    if DO_LOADER_RETRY_DEMO:
+        demo_targets = list(RETRY_DEMO_TARGETS)
+
+        def _stable_main_loader():  # type: ignore[no-untyped-def]
+            return list(RETRY_DEMO_MAIN_ROWS)
+
+        def _stable_promotions_loader():  # type: ignore[no-untyped-def]
+            return dict(RETRY_DEMO_PROMOTIONS)
+
+        def _stable_customers_loader(*, customer_ids):  # type: ignore[no-untyped-def]
+            if not customer_ids:
+                return dict(RETRY_DEMO_CUSTOMERS)
+            return {cid: RETRY_DEMO_CUSTOMERS[cid] for cid in customer_ids if cid in RETRY_DEMO_CUSTOMERS}
+
+        def _stable_flags_loader(*, row_nth):  # type: ignore[no-untyped-def]
+            return {int(n): {"is_even_row": bool(int(n) % 2 == 0)} for n in row_nth}
+
+        baseline_demand = build_retry_demo_demand(
+            main_loader=_stable_main_loader,
+            customers_loader=_stable_customers_loader,
+            promotions_loader=_stable_promotions_loader,
+            flags_loader=_stable_flags_loader,
+        )
+        baseline_plan = PlanBuilder(baseline_demand).build(targets=demo_targets)
+        baseline_engine = ScalimEngine(demand=baseline_demand, plan=baseline_plan, batch_size=3)
+        baseline_rows = list(baseline_engine.run())
+        retry_demo_expected_rows = build_retry_demo_expected_rows()
+
+        matched, diff = compare_rows_by_pk(baseline_rows, retry_demo_expected_rows, pk_field="order_id", fields=demo_targets)
+        if not matched:
+            raise AssertionError("LoaderRetry demo baseline 对拍失败（scalim vs python-expected）：\n{}".format(diff))
+
+        retry_demo["baseline_rows"] = len(baseline_rows)
+
+        def _build_flaky_demand_and_states(*, fail_times: int):  # type: ignore[no-untyped-def]
+            case = str(LOADER_RETRY_CASE)
+            main_fail = fail_times if case in {"main_source", "all"} else 0
+            preload_fail = fail_times if case in {"preload_forever", "all"} else 0
+            load_fail = fail_times if case in {"load", "all"} else 0
+            loadref_fail = fail_times if case in {"load_ref", "all"} else 0
+
+            main_loader, main_state = make_flaky_loader(name="main_source", fn=_stable_main_loader, fail_times=main_fail)
+            promotions_loader, promotions_state = make_flaky_loader(
+                name="preload_forever", fn=_stable_promotions_loader, fail_times=preload_fail
+            )
+            flags_loader, flags_state = make_flaky_loader(name="load", fn=_stable_flags_loader, fail_times=load_fail)
+            customers_loader, customers_state = make_flaky_loader(name="load_ref", fn=_stable_customers_loader, fail_times=loadref_fail)
+
+            demand = build_retry_demo_demand(
+                main_loader=main_loader,
+                customers_loader=customers_loader,
+                promotions_loader=promotions_loader,
+                flags_loader=flags_loader,
+            )
+            states = {
+                "main_source": dict(main_state),
+                "preload_forever": dict(promotions_state),
+                "load": dict(flags_state),
+                "load_ref": dict(customers_state),
+            }
+            return demand, states
+
+        # 1) Without retry: should fail when injected fail_times > 0.
+        flaky_demand_no_retry, _states_no_retry = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
+        flaky_plan_no_retry = PlanBuilder(flaky_demand_no_retry).build(targets=demo_targets)
+        flaky_engine_no_retry = ScalimEngine(demand=flaky_demand_no_retry, plan=flaky_plan_no_retry, batch_size=3)
+        try:
+            _ = list(flaky_engine_no_retry.run())
+            retry_demo["no_retry_failed"] = False
+            retry_demo["no_retry_error"] = None
+        except Exception as exc:
+            retry_demo["no_retry_failed"] = True
+            retry_demo["no_retry_error"] = "{}: {}".format(type(exc).__name__, str(exc))
+
+        # 2) With retry: should recover and match baseline output.
+        flaky_demand_retry, _states_retry = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
+        flaky_plan_retry = PlanBuilder(flaky_demand_retry).build(targets=demo_targets)
+        collector = RetryDemoCollector()
+        retry_demo_observer_manager = ObserverManager(observers=[collector])
+        policy = LoaderRetryPolicy(
+            enabled=True,
+            should_retry=retry_demo_should_retry,
+            max_attempts=int(LOADER_RETRY_MAX_ATTEMPTS),
+            max_elapsed_seconds=10.0,
+            backoff="fixed",
+            base_delay_seconds=0.0,
+            max_delay_seconds=0.0,
+            jitter=False,
+        )
+        engine_retry = ScalimEngine(
+            demand=flaky_demand_retry,
+            plan=flaky_plan_retry,
+            observer_manager=retry_demo_observer_manager,
+            loader_retry=LoaderRetryPolicies(default=policy),
+            batch_size=3,
+        )
+        retry_rows = []
+        try:
+            retry_rows = list(engine_retry.run())
+            retry_demo["retry_rows"] = len(retry_rows)
+
+            matched, diff = compare_rows_by_pk(baseline_rows, retry_rows, pk_field="order_id", fields=demo_targets)
+            if not matched:
+                raise AssertionError("LoaderRetry demo 对拍失败（baseline vs retry-run）：\n{}".format(diff))
+
+            retry_demo["status"] = "matched"
+            retry_demo["retry_error"] = None
+        except Exception as exc:
+            retry_demo["status"] = "failed"
+            retry_demo["retry_error"] = "{}: {}".format(type(exc).__name__, str(exc))
+            retry_demo["retry_rows"] = 0
+
+        retry_demo["error_events"] = len(collector.errors)
+        retry_demo["retry_events"] = [
+            {
+                "loader_name": e.loader_name,
+                "callsite": e.callsite,
+                "attempt_num": e.attempt_num,
+                "max_attempts": e.max_attempts,
+                "elapsed_seconds": e.elapsed_seconds,
+                "sleep_seconds": e.sleep_seconds,
+                "error_type": e.error_type,
+                "error_message": e.error_message,
+            }
+            for e in collector.retries
+        ]
+
+        # 3) Optional: run_ir path (also exercises main_source loader callsite).
+        if DO_LOADER_RETRY_DEMO_RUN_IR:
+            retry_demo["run_ir"]["enabled"] = True
+            flaky_demand_run_ir, _states_run_ir = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
+            run_ir_collector = RetryDemoCollector()
+            retry_demo_sink = InMemoryRowSink()
+            request = ExecutionRequest(
+                export_layout=ExportLayout(field_ids=tuple(demo_targets), header_names=None),
+                output=OutputSpec(path=None),
+                sink=retry_demo_sink,
+                components=[run_ir_collector],
+                loader_retry=LoaderRetryPolicies(default=policy),
+                batch_size=3,
+                parallel_mode="seq",
+            )
+            try:
+                _ = run_ir(flaky_demand_run_ir, request)
+                run_ir_rows = retry_demo_sink.get_data()
+                retry_demo["run_ir"]["rows"] = len(run_ir_rows)
+                retry_demo["run_ir"]["retry_events"] = len(run_ir_collector.retries)
+                retry_demo["run_ir"]["error_events"] = len(run_ir_collector.errors)
+                retry_demo["run_ir"]["failed"] = False
+                retry_demo["run_ir"]["error"] = None
+
+                matched, diff = compare_rows_by_pk(baseline_rows, run_ir_rows, pk_field="order_id", fields=demo_targets)
+                if not matched:
+                    raise AssertionError("LoaderRetry demo 对拍失败（baseline vs run_ir）：\n{}".format(diff))
+            except Exception as exc:
+                retry_demo["run_ir"]["failed"] = True
+                retry_demo["run_ir"]["error"] = "{}: {}".format(type(exc).__name__, str(exc))
+                retry_demo["run_ir"]["rows"] = 0
+                retry_demo["run_ir"]["retry_events"] = len(run_ir_collector.retries)
+                retry_demo["run_ir"]["error_events"] = len(run_ir_collector.errors)
+
+        # 4) Optional: give-up demo (exceed max_attempts -> emits single error event).
+        if DO_LOADER_RETRY_DEMO_GIVE_UP:
+            retry_demo["give_up"]["enabled"] = True
+            give_up_fail_times = max(int(LOADER_RETRY_MAX_ATTEMPTS), 1)
+            give_up_demand, _states_give_up = _build_flaky_demand_and_states(fail_times=give_up_fail_times)
+            give_up_plan = PlanBuilder(give_up_demand).build(targets=demo_targets)
+            give_up_collector = _RetryDemoCollector()
+            give_up_engine = ScalimEngine(
+                demand=give_up_demand,
+                plan=give_up_plan,
+                observer_manager=ObserverManager(observers=[give_up_collector]),
+                loader_retry=LoaderRetryPolicies(default=policy),
+                batch_size=3,
+            )
+            try:
+                _ = list(give_up_engine.run())
+                retry_demo["give_up"]["failed"] = False
+            except Exception as exc:
+                retry_demo["give_up"]["failed"] = True
+                retry_demo["give_up"]["error"] = "{}: {}".format(type(exc).__name__, str(exc))
+            retry_demo["give_up"]["retry_events"] = len(give_up_collector.retries)
+            retry_demo["give_up"]["error_events"] = len(give_up_collector.errors)
+
+            if retry_demo["give_up"]["failed"] and retry_demo["give_up"]["error_events"] != 1:
+                raise AssertionError(
+                    "Expected give-up path to emit exactly one error event, got {}".format(retry_demo["give_up"]["error_events"])
+                )
+
+    return (retry_demo,)
+
+
+@app.cell(hide_code=True)
+def _(DO_LOADER_RETRY_DEMO, mo, retry_demo):
+    if not DO_LOADER_RETRY_DEMO:
+        mo.md("Loader Retry demo 已关闭（可在配置中启用）。")
+    else:
+        no_retry_line = (
+            "未启用 retry：`FAILED` ({})".format(retry_demo["no_retry_error"])
+            if retry_demo["no_retry_failed"]
+            else "未启用 retry：`OK`（本次未触发故障注入）"
+        )
+
+        run_ir_meta = retry_demo["run_ir"]
+        run_ir_line = (
+            "- run_ir: `ON` failed=`{}` rows=`{}` retry_events=`{}` error_events=`{}` error=`{}`".format(
+                run_ir_meta.get("failed", False),
+                run_ir_meta.get("rows", 0),
+                run_ir_meta.get("retry_events", 0),
+                run_ir_meta.get("error_events", 0),
+                run_ir_meta.get("error"),
+            )
+            if run_ir_meta.get("enabled")
+            else "- run_ir: `OFF`"
+        )
+
+        give_up_meta = retry_demo["give_up"]
+        give_up_line = (
+            "- give-up: `ON` failed=`{}` retry_events=`{}` error_events=`{}` error=`{}`".format(
+                give_up_meta.get("failed"),
+                give_up_meta.get("retry_events"),
+                give_up_meta.get("error_events"),
+                give_up_meta.get("error"),
+            )
+            if give_up_meta.get("enabled")
+            else "- give-up: `OFF`"
+        )
+
+        lines = [
+            "**Loader Retry demo**",
+            "",
+            "- case: `{}`".format(retry_demo["case"]),
+            "- fail_times: `{}` max_attempts: `{}`".format(retry_demo["fail_times"], retry_demo["max_attempts"]),
+            "- baseline_rows: `{}` retry_rows: `{}` status: `{}`".format(
+                retry_demo["baseline_rows"], retry_demo["retry_rows"], retry_demo["status"]
+            ),
+            "- retry_events: `{}` error_events: `{}`".format(len(retry_demo.get("retry_events", [])), retry_demo.get("error_events", 0)),
+        ]
+        if retry_demo.get("retry_error") is not None:
+            lines.append("- retry_error: `{}`".format(retry_demo["retry_error"]))
+        lines.extend(["- " + no_retry_line, run_ir_line, give_up_line])
+        mo.md("\n".join(lines))
+
+    return
+
+
+@app.cell
+def _(DO_LOADER_RETRY_DEMO, mo, retry_demo):
+    if DO_LOADER_RETRY_DEMO:
+        events = retry_demo.get("retry_events", [])
+        if events:
+            mo.ui.table(events[:20])
     return
 
 

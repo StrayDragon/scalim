@@ -11,6 +11,7 @@ from ..typedefs import RowData
 from .executor.batch.executor import BatchExecutor
 from .executor.runtime.runtime import ExecutionRuntime
 from .guardrails import GuardrailsPolicy
+from .loader_retry import LoaderRetryPolicies
 from .pipeline.base.pipeline import Pipeline, SeqPipeline
 from .pipeline.overrides import PipelineOverrides
 
@@ -43,6 +44,7 @@ class ScalimEngine:
         max_workers: int = 0,
         pipeline_overrides: PipelineOverrides | None = None,
         guardrails: GuardrailsPolicy | None = None,
+        loader_retry: LoaderRetryPolicies | None = None,
     ) -> None:
         """初始化 Scalim 计算引擎
 
@@ -80,6 +82,7 @@ class ScalimEngine:
             observer_manager=self.observer_manager,
             main_source=self.demand.main_source,
             guardrails=guardrails,
+            loader_retry=loader_retry,
             parallel_mode=parallel_mode,
             max_workers=max_workers,
         )

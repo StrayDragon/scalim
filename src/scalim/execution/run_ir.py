@@ -20,6 +20,7 @@ from ..typedefs import ParallelMode, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
 from .engine import ScalimEngine
 from .guardrails import GuardrailsPolicy
+from .loader_retry import LoaderRetryPolicies
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,7 @@ class ExecutionRequest:
     parallel_mode: ParallelMode = "seq"
     max_workers: int = 0
     guardrails: GuardrailsPolicy | None = None
+    loader_retry: LoaderRetryPolicies | None = None
 
 
 @dataclass(frozen=True)
@@ -427,6 +429,7 @@ def run_ir(demand_ir: DemandIr, request: ExecutionRequest) -> ExecutionResult:
             hook_manager=hook_manager,
             observer_manager=observer_manager,
             guardrails=request.guardrails,
+            loader_retry=request.loader_retry,
             batch_size=request.batch_size or demand_ir.batch_size_hint,
             parallel_mode=request.parallel_mode,
             max_workers=request.max_workers,

@@ -26,6 +26,7 @@ from ...context import BatchContext
 from ...executor.batch.executor import BatchExecutor
 from ...executor.helpers.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
 from ...executor.runtime.runtime import ExecutionRuntime
+from ...loader_retry import CALLSITE_MAIN_SOURCE, CALLSITE_PRELOAD_FOREVER, call_with_loader_retry
 from ..overrides import PipelineOverrides, chunk_iterable
 from ._adaptive_pool import maybe_create_adaptive_pool
 from ._row_emission import RowEmissionCoordinator
@@ -156,7 +157,15 @@ class Pipeline(ABC):
         for source in self.plan.preload_sources:
             if source.is_preload_forever():
                 loader_start = time.perf_counter()
-                result = source.loader_spec.callable()
+                policy = self.runtime.loader_retry.resolve(source.source_id)
+                result = call_with_loader_retry(
+                    call=source.loader_spec.callable,
+                    instrumentation=self.runtime.instrumentation,
+                    policy=policy,
+                    loader_name=source.source_id,
+                    callsite=CALLSITE_PRELOAD_FOREVER,
+                    batch_num=self.runtime.batch_num,
+                )
                 loader_duration = time.perf_counter() - loader_start
 
                 self.runtime.preloaded_cache[source.source_id] = result
@@ -175,10 +184,15 @@ class Pipeline(ABC):
         params = dict(main_source.params or {})
 
         loader_start = time.perf_counter()
-        if params:
-            result = loader_fn(**params)
-        else:
-            result = loader_fn()
+        policy = self.runtime.loader_retry.resolve(main_source.source_id)
+        result = call_with_loader_retry(
+            call=(lambda: loader_fn(**params)) if params else loader_fn,
+            instrumentation=self.runtime.instrumentation,
+            policy=policy,
+            loader_name=main_source.source_id,
+            callsite=CALLSITE_MAIN_SOURCE,
+            batch_num=self.runtime.batch_num,
+        )
         loader_duration = time.perf_counter() - loader_start
 
         self.runtime.instrumentation.emit_loader_call(

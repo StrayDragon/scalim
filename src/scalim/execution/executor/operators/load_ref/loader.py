@@ -9,6 +9,7 @@ from .....spec.ir.helpers import call_loader_with_binding
 from .....spec.ir.relations import LookupStepIr
 from .....spec.ir.sources import SourceIr
 from .....typedefs import RowData
+from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
 from ...helpers.relation_signature import build_step_signature, normalize_key_field
 from ...runtime.runtime import ExecutionRuntime, LoadRefCacheEntry
@@ -80,7 +81,15 @@ def _call_ref_loader(
     cache_status: str,
 ) -> dict[Hashable, Any]:
     loader_start = time.perf_counter()
-    result: Any = call_loader_with_binding(binding, loader_context, source.loader_spec.callable)
+    policy = runtime.loader_retry.resolve(source.source_id)
+    result = call_with_loader_retry(
+        call=lambda: call_loader_with_binding(binding, loader_context, source.loader_spec.callable),
+        instrumentation=runtime.instrumentation,
+        policy=policy,
+        loader_name=source.source_id,
+        callsite=CALLSITE_LOAD_REF,
+        batch_num=runtime.batch_num,
+    )
     loader_duration = time.perf_counter() - loader_start
 
     _trigger_ref_loader_call(

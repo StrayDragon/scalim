@@ -99,6 +99,24 @@ class LoaderCallEvent:
 
 
 @dataclass(frozen=True)
+class LoaderRetryEvent:
+    """Loader retry attempt event.
+
+    Emitted when a loader call fails and Scalim decides to retry (before sleeping).
+    """
+
+    loader_name: str
+    callsite: str
+    attempt_num: int
+    max_attempts: int
+    elapsed_seconds: float
+    sleep_seconds: float
+    error_type: str
+    error_message: str | None = None
+    batch_num: int | None = None
+
+
+@dataclass(frozen=True)
 class FieldComputeEvent:
     """字段计算事件.
 
@@ -268,6 +286,7 @@ __all__ = [
     "FieldComputeEvent",
     "FieldSlimEvent",
     "LoaderCallEvent",
+    "LoaderRetryEvent",
     "LoaderSlimEvent",
     "PipelineEndEvent",
     "PipelineStartEvent",

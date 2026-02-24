@@ -16,6 +16,7 @@ from ....spec.ir.relations import LookupStepIr
 from ....spec.ir.sources import MainSourceIr
 from ....typedefs import ParallelMode, RowData
 from ...guardrails import GuardrailsPolicy
+from ...loader_retry import LoaderRetryPolicies
 from ..helpers.relation_signature import build_relation_signature
 from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
 
@@ -46,6 +47,7 @@ class ExecutionRuntime:
     observer_manager: ObserverManager
     instrumentation: InstrumentationHub
     guardrails: GuardrailsPolicy
+    loader_retry: LoaderRetryPolicies
     field_specs: dict[str, SupportedFieldIr]
     key_fields: frozenset[str]
     reverse_deps: dict[str, set[str]]
@@ -65,6 +67,7 @@ class ExecutionRuntime:
         observer_manager: ObserverManager,
         main_source: MainSourceIr | None,
         guardrails: GuardrailsPolicy | None = None,
+        loader_retry: LoaderRetryPolicies | None = None,
         *,
         parallel_mode: ParallelMode = "seq",
         max_workers: int = 0,
@@ -76,6 +79,7 @@ class ExecutionRuntime:
         self.observer_manager = observer_manager
         self.instrumentation = InstrumentationHub(hook_manager=self.hook_manager, observer_manager=self.observer_manager)
         self.guardrails = guardrails or GuardrailsPolicy.disabled()
+        self.loader_retry = loader_retry or LoaderRetryPolicies.disabled()
         self.field_specs = plan.field_specs
         self.key_fields = plan.key_fields
         self.target_fields = plan.target_fields

@@ -7,6 +7,7 @@ from scalim.events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_ERROR,
     EVENT_LOADER_CALL,
+    EVENT_LOADER_RETRY,
     EVENT_LOADER_SLIM,
 )
 from scalim.ob.hub import InstrumentationHub
@@ -68,6 +69,17 @@ def test_hub_register_unregister_clear_and_emit_gating() -> None:
     hub.emit_field_compute("f", 1, {}, 1)
     hub.emit_stage_span("stage", batch_num=1, duration=0.0)
     hub.emit_loader_slim(loader_name="loader", original_keys=1, extracted_fields=[], batch_num=1)
+    hub.emit_loader_retry(
+        loader_name="loader",
+        callsite="load",
+        attempt_num=1,
+        max_attempts=3,
+        elapsed_seconds=0.1,
+        sleep_seconds=0.0,
+        error_type="RuntimeError",
+        error_message="boom",
+        batch_num=1,
+    )
 
 
 def test_hub_emit_error_emits_when_subscribed() -> None:
@@ -142,3 +154,34 @@ def test_hub_emit_loader_slim_return_and_emit_paths() -> None:
     hub2 = InstrumentationHub(observer_manager=ObserverManager(observers=[observer]))
     hub2.emit_loader_slim(loader_name="loader", original_keys=1, extracted_fields=[], batch_num=1)
     assert observer.events
+
+
+def test_hub_emit_loader_retry_return_and_emit_paths() -> None:
+    hub = InstrumentationHub()
+    hub.emit_loader_retry(
+        loader_name="loader",
+        callsite="load",
+        attempt_num=1,
+        max_attempts=3,
+        elapsed_seconds=0.1,
+        sleep_seconds=0.0,
+        error_type="RuntimeError",
+        error_message="boom",
+        batch_num=1,
+    )
+
+    observer = _CaptureObserver(event_types={EVENT_LOADER_RETRY})
+    hub2 = InstrumentationHub(observer_manager=ObserverManager(observers=[observer]))
+    hub2.emit_loader_retry(
+        loader_name="loader",
+        callsite="load",
+        attempt_num=1,
+        max_attempts=3,
+        elapsed_seconds=0.1,
+        sleep_seconds=0.0,
+        error_type="RuntimeError",
+        error_message="boom",
+        batch_num=1,
+    )
+    assert observer.events
+    assert observer.events[-1].event_type == EVENT_LOADER_RETRY

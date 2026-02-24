@@ -11,6 +11,7 @@ from ....spec.ir.sources import SourceIr
 from ....typedefs import FieldValue
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
+from ...loader_retry import CALLSITE_LOAD, call_with_loader_retry
 from ..guardrails import build_loader_result_guardrail_payload, fail_guardrail
 from ..helpers.field_access import extract_field
 from ..runtime.runtime import ExecutionRuntime
@@ -246,7 +247,15 @@ class LoadOperatorExecutor(OperatorExecutor):
         loader_fn = source.loader_spec.callable
 
         loader_start = time.perf_counter()
-        result: Any = call_loader_with_binding(binding, loader_context, loader_fn)
+        policy = runtime.loader_retry.resolve(source.source_id)
+        result = call_with_loader_retry(
+            call=lambda: call_loader_with_binding(binding, loader_context, loader_fn),
+            instrumentation=runtime.instrumentation,
+            policy=policy,
+            loader_name=source.source_id,
+            callsite=CALLSITE_LOAD,
+            batch_num=runtime.batch_num,
+        )
         loader_duration = time.perf_counter() - loader_start
 
         call_kwargs = self._build_loader_call_kwargs(runtime, binding, loader_context)
