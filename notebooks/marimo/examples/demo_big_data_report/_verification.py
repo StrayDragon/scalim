@@ -1,6 +1,6 @@
-"""对照组验证库 - 用于验证 Scalim 框架输出的正确性
+"""对照组验证库 - 用于验证 Scalim 框架输出的正确性。
 
-这个模块提供纯 Python 实现的数据关联和计算逻辑,作为对照组验证 Scalim 输出.
+这个模块提供纯 Python 实现的数据关联和计算逻辑,作为对照组验证 Scalim 输出。
 
 功能:
 1. 完整的纯 Python JOIN 引擎实现
@@ -9,22 +9,24 @@
 4. 详细的统计分析和诊断报告
 5. 可作为集成测试使用
 
-使用方法:
-    from _verification import verify_scalim_output, DetailedVerification
+使用示例:
+```python
+from _verification import verify_scalim_output, DetailedVerification
 
-    # 基础验证
-    result = verify_scalim_output(scales_results, target_fields)
-    assert result.passed, result.summary
+# 基础验证
+result = verify_scalim_output(scales_results, target_fields)
+assert result.passed, result.summary
 
-    # 多次对拍（推荐：缓存 expected，适合 notebook 里跑多条 pipeline/sink）
-    oracle = PythonOracle()
-    result = verify_scalim_output(scales_results, target_fields, oracle=oracle)
-    assert result.passed, result.summary
+# 多次对拍（推荐：缓存期望输出，适合在笔记本里跑多条流水线/输出端）
+oracle = PythonOracle()
+result = verify_scalim_output(scales_results, target_fields, oracle=oracle)
+assert result.passed, result.summary
 
-    # 详细验证 (推荐用于集成测试)
-    detailed = DetailedVerification(scales_results, target_fields)
-    report = detailed.run_full_verification()
-    assert report.all_passed, report.summary
+# 详细验证（推荐用于集成测试）
+detailed = DetailedVerification(scales_results, target_fields)
+report = detailed.run_full_verification()
+assert report.all_passed, report.summary
+```
 """
 
 from __future__ import annotations
@@ -162,7 +164,7 @@ class DetailedVerificationReport:
 
 
 class _PythonJoinEngine:
-    """纯 Python 实现的 Join 引擎(对照组)
+    """纯 Python 实现的关联引擎(对照组)
 
     完整实现了 Scalim 框架的关联逻辑,作为对照组验证:
     - 单级关联 (FK -> PK)
@@ -256,10 +258,10 @@ class _PythonJoinEngine:
         # 单级关联 - 仓库
         r["warehouse_name"] = self._lookup(order, "warehouse_id", warehouses, "warehouse_name")
 
-        # 多级关联 - 分类 (orders -> products -> categories)
+        # 多级关联 - 分类 (`orders -> products -> categories`)
         r["category_name"] = self._lookup_multi(order, [("product_id", products), ("category_id", categories)], "category_name")
 
-        # 多级关联 - 区域 (orders -> warehouses -> regions)
+        # 多级关联 - 区域 (`orders -> warehouses -> regions`)
         r["region_name"] = self._lookup_multi(order, [("warehouse_id", warehouses), ("region_id", regions)], "region_name")
         r["region_name_display"] = r["region_name"]
         r["region_manager"] = self._lookup_multi(order, [("warehouse_id", warehouses), ("region_id", regions)], "region_manager")
@@ -322,11 +324,11 @@ def _values_equal(expected: Any, actual: Any, tolerance: float = 0.01) -> bool:
 
 
 class PythonOracle:
-    """纯 Python oracle（对照组）缓存。
+    """纯 Python 对照缓存（`oracle`）。
 
     `verify_scalim_output()` / `python_build_order_report()` 是一次性的便捷 API。
-    当 notebook / 测试需要跑多条 pipeline / sink 并分别对拍时，反复构建 expected
-    会成为可见的开销。此类会先把“完整报表”的 expected 只算一次，然后复用它做多次校验。
+    当在笔记本/测试中需要跑多条流水线/输出端并分别对拍时，反复构建期望结果会带来可见开销。
+    此类会先把“完整报表”的期望结果只算一次，然后复用它做多次校验。
     """
 
     def __init__(self) -> None:
@@ -423,15 +425,16 @@ def verify_scalim_output(
 ) -> VerificationResult:
     """验证 Scalim 输出结果
 
-    Args:
-        scales_output: Scalim 框架输出的结果列表
-        fields_to_check: 要检查的字段列表(None 表示检查所有可验证字段)
-        tolerance: 浮点数比较容差
-        max_mismatches: 最大记录的不匹配数量
-        collect_field_stats: 是否收集字段级统计信息
+    参数:
+        `scales_output`: Scalim 框架输出的结果列表
+        `fields_to_check`: 要检查的字段列表 (`None` 表示检查所有可验证字段)
+        `tolerance`: 浮点数比较容差
+        `max_mismatches`: 最大记录的不匹配数量
+        `collect_field_stats`: 是否收集字段级统计信息
+        `oracle`: 可选的对照缓存 (`PythonOracle`)
 
-    Returns:
-        VerificationResult 对象
+    返回:
+        `VerificationResult` 对象
     """
     if oracle is not None:
         return oracle.verify(
@@ -726,10 +729,10 @@ def python_build_order_report(target_fields: List[str], oracle: Optional[PythonO
     这个函数用纯 Python 代码实现与 Scalim 相同的数据关联和计算逻辑.
     可以用于对照验证 Scalim 输出的正确性.
 
-    Args:
-        target_fields: 目标字段列表
+    参数:
+        `target_fields`: 目标字段列表
 
-    Returns:
+    返回:
         报表数据列表
     """
     if oracle is not None:
@@ -755,8 +758,8 @@ def export_to_csv(data: List[Dict[str, Any]], filepath: str, fields: List[str]) 
 def compare_csv_files(file1: str, file2: str) -> Tuple[bool, str]:
     """对比两个 CSV 文件
 
-    Returns:
-        (是否相同, 差异描述)
+    返回:
+        `(是否相同, 差异描述)`
     """
     import csv
 
@@ -797,7 +800,7 @@ def compare_rows_by_pk(
 ) -> Tuple[bool, str]:
     """按主键 + 字段值对比两份输出行集合。
 
-    适用于“对拍”的场景（例如 seq vs adaptive、sink vs sink、run_ir vs direct engine）：
+    适用于“对拍”的场景（例如 `seq` vs `adaptive`、`sink` vs `sink`、`run_ir` vs 直接引擎）：
     同一套输入/字段集合下，两边应产出完全一致的结果。
     """
     left_by_pk = {r.get(pk_field): r for r in left_rows if pk_field in r}
@@ -908,12 +911,12 @@ def run_parallel_comparison(target_fields: List[str], output_dir: str = "/tmp") 
     同时用 Scalim 框架和纯 Python 实现处理相同数据,
     将结果导出为 CSV 文件,然后对比两个文件.
 
-    Args:
-        target_fields: 目标字段列表
-        output_dir: 输出目录
+    参数:
+        `target_fields`: 目标字段列表
+        `output_dir`: 输出目录
 
-    Returns:
-        FileComparisonResult 对象
+    返回:
+        `FileComparisonResult` 对象
     """
     import os
 

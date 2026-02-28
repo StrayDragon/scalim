@@ -37,15 +37,15 @@ if TYPE_CHECKING:
 
 
 def resolve_adaptive_max_workers(max_workers: int) -> int:
-    """Resolve `max_workers` for adaptive mode.
+    """解析自适应模式下的 `max_workers`。
 
-    - 0/negative means auto.
-    - The resolved value MUST be >= 1.
+    - 0 或负数表示自动。
+    - 解析后的值必须 `>= 1`。
     """
     if max_workers and max_workers > 0:
         return max(1, int(max_workers))
     cpu = os.cpu_count() or 1
-    # Align with Python's ThreadPoolExecutor default heuristic.
+    # 与 Python 的 `ThreadPoolExecutor` 默认启发式保持一致。
     return max(1, min(32, cpu + 4))
 
 
@@ -88,7 +88,7 @@ def _run_task_in_process(
     *,
     group_enabled: bool,
 ) -> _AdaptiveTaskResult:
-    # Note: process backend is experimental; hooks/observers are intentionally not executed cross-process.
+    # 注意：进程后端仍属实验性质；钩子与观察者事件不会跨进程执行。
     from ...hooks.base import HookManager  # noqa: PLC0415
     from ...ob.manager import ObserverManager  # noqa: PLC0415
 
@@ -134,7 +134,7 @@ def _build_layers(
     done: set[str] = set()
     layers: list[list[str]] = []
 
-    # Deterministic O(n^2) layering aligned with the plan/operator order.
+    # 与执行计划/算子顺序一致的确定性 `O(n^2)` 分层。
     while remaining:
         ready: list[str] = []
         for key in field_keys:
@@ -145,7 +145,7 @@ def _build_layers(
                 ready.append(key)
 
         if not ready:
-            # Cycle or missing signals: fall back to serial execution in operator order.
+            # 出现环或信号缺失时：按算子顺序退回到串行执行。
             layers.append([k for k in field_keys if k in remaining])
             break
 
@@ -549,8 +549,8 @@ class AdaptiveLoadRefScheduler:
         for layer_index, layer_field_keys in enumerate(layers):
             layer_ops = [op_by_field_key[key] for key in layer_field_keys]
 
-            # Preserve seq semantics: if a relation group was already executed earlier in this batch,
-            # treat subsequent LoadRef operators as no-ops (but still invoke after_operator for sinks).
+            # 保持 `seq` 语义：如果某个“关联签名分组”在本批次更早已执行过，
+            # 则后续的 `LoadRef` 算子视为“空操作”（但仍会为 `sink` 调用 `after_operator`）。
             skipped_field_keys, executable_ops = self._collect_layer_executable_ops(
                 layer_ops,
                 runtime=runtime,
@@ -560,7 +560,7 @@ class AdaptiveLoadRefScheduler:
             if not executable_ops:
                 continue
 
-            # rows binding is a layer-level barrier: run serially to preserve batch_rows semantics and avoid implicit deps.
+            # `rows` 绑定是层级屏障：为保持 `batch_rows` 语义并避免隐式依赖，需要串行执行。
             if any(has_rows_binding(op.lookup_steps) for op in executable_ops):
                 if wants_scheduler_decisions:
                     backend = self._policy.choose_backend(plan=self._plan, runtime=runtime, tuning=self._tuning)
@@ -605,7 +605,7 @@ class AdaptiveLoadRefScheduler:
                 )
                 continue
 
-            # Deduplicate tasks by relation signature when safe (preserves "relation reuse" semantics).
+            # 在安全的前提下按关联签名去重任务（保持“关联复用”语义）。
             task_order, task_specs, op_task_key = self._build_task_specs(executable_ops)
             task_ops = [task_specs[task_key].op for task_key in task_order]
 

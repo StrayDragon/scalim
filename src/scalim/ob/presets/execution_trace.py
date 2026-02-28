@@ -26,7 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class LoaderCallStep:
-    """Loader 调用步骤元信息"""
+    """加载器调用步骤元信息"""
 
     step_type: str = "loader_call"
     loader_name: str = ""
@@ -105,7 +105,7 @@ class BatchTrace:
 
 
 class ExecutionTraceObserver(EventDispatchObserver):
-    """执行追踪 Observer - 记录详细的执行步骤"""
+    """执行追踪观察者 - 记录详细的执行步骤"""
 
     def __init__(self) -> None:
         self.batches: list[BatchTrace] = []

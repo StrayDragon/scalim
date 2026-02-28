@@ -10,9 +10,9 @@ InferLookupStepsFn = Callable[[object, SourceRefIr, SourceIr], tuple[LookupStepI
 
 
 class LookupStepsResolver:
-    """Resolve and cache lookup steps for planning-time dependency/operator construction.
+    """在规划阶段解析并缓存 `lookup_steps`,用于依赖/算子构建。
 
-    Cache is an internal optimization: tests MUST NOT assert on cache hits/misses.
+    缓存仅是内部优化: 测试不得对缓存命中/未命中进行断言。
     """
 
     _cache: dict[str, tuple[LookupStepIr, ...] | None]
@@ -55,7 +55,7 @@ def extract_relation_dependency_keys(
     resolver: LookupStepsResolver,
     field_key: str,
 ) -> list[str]:
-    """Extract dependency field keys for a FieldIr (lookup_steps or relation)."""
+    """提取 `FieldIr` 的依赖字段键（来自 `lookup_steps` 或 `relation`）。"""
     if field_spec.lookup_steps:
         steps = resolver.resolve(field_spec, field_spec.source, field_key=field_key)
         return list(extract_from_fields(steps)) if steps else []

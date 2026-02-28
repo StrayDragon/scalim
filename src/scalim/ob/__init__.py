@@ -1,7 +1,7 @@
-"""Observability system.
+"""可观测性系统.
 
-This package intentionally does not re-export symbols.
-Import concrete implementations from modules under `scalim.ob.*`.
+该包刻意不在包级重导出符号.
+请从 `scalim.ob.*` 下的模块导入具体实现。
 """
 
 __all__ = []

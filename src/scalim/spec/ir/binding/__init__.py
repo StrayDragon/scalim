@@ -14,11 +14,11 @@ def _stable_lookup_key_sort_key(value: Any) -> Any:
 
 
 def stable_lookup_keys_list(lookup_keys: set[Hashable]) -> list[Hashable]:
-    """稳定序列化 lookup keys 为 list.
+    """稳定序列化 `lookup_keys` 为 `list`.
 
     用途:
-    - `use_keys.as=list` 需要 list 容器形态;
-    - lookup keys 在执行路径中常以 set 去重,其迭代顺序受 `PYTHONHASHSEED` 影响;
+    - `use_keys.as=list` 需要 `list` 容器形态;
+    - `lookup_keys` 在执行路径中常以 `set` 去重,其迭代顺序受 `PYTHONHASHSEED` 影响;
     - 本函数提供确定性的输出顺序,提升回归可重复性与外部缓存命中可预测性.
     """
 
@@ -28,7 +28,7 @@ def stable_lookup_keys_list(lookup_keys: set[Hashable]) -> list[Hashable]:
 @dataclass(frozen=True)
 class LoaderCallContextIr:
     """
-    加载器调用上下文(IR): 框架在调用 loader 前构建此对象,传递给用户的 params_builder 回调函数
+    加载器调用上下文(IR): 框架在调用加载器前构建此对象,传递给用户的 params_builder 回调函数
     """
 
     batch_row_nth: list[Hashable] = field(default_factory=list)
@@ -43,49 +43,44 @@ class LoaderCallContextIr:
 
     field_keys: list[str] = field(default_factory=list)
     """
-    需要从此 loader 加载的字段列表
+    需要从此加载器加载的字段列表
     """
 
     is_ref_loader: bool = False
     """
-    是否是 ref loader (外键关联加载)
+    是否为引用加载器 (外键关联加载)
     """
 
     lookup_keys: set[Hashable] | None = None
     """
-    Ref loader 的 lookup key 集合 (已去重)
+    引用加载器的查找键集合 (已去重)
     """
 
     lookup_keys_list: list[Hashable] | None = None
     """
-    Ref loader 的 lookup key 列表 (由 lookup_keys 生成)
+    引用加载器的查找键列表 (由 lookup_keys 生成)
     """
 
     batch_rows: list[RowData] | None = None
     """
-    rows 模式下的当前批次行上下文 (主源 + 已 join)
+    行模式下的当前批次行上下文 (主源 + 已关联)
     """
 
 
 @dataclass(frozen=True)
 class BindingIr:
-    """参数绑定(IR): 定义如何根据运行时上下文构建 loader 调用参数.
+    """参数绑定(IR): 定义如何根据运行时上下文构建加载器调用参数.
 
-    params_builder: 返回调用参数, 返回 (args, kwargs) 元组
-       lambda ctx: ((), {"order_ids": ctx.lookup_keys})
+    `params_builder` 需要返回调用参数,形式为 (`args`, `kwargs`) 元组.
 
-    Example:
-        Binding(
-            key_field="order_id",
-            params_builder=lambda ctx: ((), {"order_ids": list(ctx.lookup_keys)})
-        )
+    示例:
 
-    Example (带元信息):
-        Binding(
-            key_field="order_id",
-            params_builder=lambda ctx: ((), {"order_ids": list(ctx.lookup_keys)}),
-            meta=BindingFieldMeta(field_name="order_id", field_type=int)
-        )
+    ```python
+    BindingIr(
+        key_field="order_id",
+        params_builder=lambda ctx: ((), {"order_ids": list(ctx.lookup_keys or set())}),
+    )
+    ```
     """
 
     key_field: str | tuple[str, ...]
@@ -95,22 +90,22 @@ class BindingIr:
 
     params_builder: Callable[["LoaderCallContextIr"], tuple[tuple[Any, ...], dict[str, Any]]]
     """
-    参数构建器类型: (context) -> (args, kwargs)
+    参数构建器类型: `(context) -> (args, kwargs)`
     """
 
     mode: str = "keys"
     """
-    绑定模式: keys 或 rows
+    绑定模式: `keys` 或 `rows`
     """
 
     as_: str = "set"
     """
-    keys 模式下的容器形态: set 或 list
+    `keys` 模式下的容器形态: `set` 或 `list`
     """
 
     cache_mode: str = "none"
     """
-    rows 模式缓存策略: none 或 batch. (YAML/DSL 未配置时 rows 默认 batch)
+    行模式缓存策略: `none` 或 `batch`. (YAML/DSL 未配置时行模式默认 `batch`)
     """
 
     param_name: str | None = None
@@ -140,12 +135,12 @@ class LoaderIr:
 
     extractor: Callable[[Any, Any], dict[Hashable, Any]] | None = None
     """
-    数据提取器类型: (key, loader_result) -> extracted_data
+    数据提取器类型: `(key, loader_result) -> extracted_data`
     """
 
     bindings: Mapping[str | tuple[str, ...], BindingIr] = field(default_factory=_empty_bindings)
     """
-    参数绑定映射 (key_field -> Binding). 使用 Mapping 确保不可变性.
+    参数绑定映射 (`key_field` -> `BindingIr`). 使用 `Mapping` 确保不可变性.
     """
 
     def __post_init__(self) -> None:

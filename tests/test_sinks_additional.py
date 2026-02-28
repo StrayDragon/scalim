@@ -104,13 +104,13 @@ def test_base_sinks_raise_not_implemented() -> None:
     base_sink = BaseSink()
     with pytest.raises(NotImplementedError):
         base_sink.write_batch([])
-    # close() now has default empty implementation
+    # `close()` 现在有默认的空实现
     base_sink.close()
 
     base_row_sink = BaseRowSink()
     with pytest.raises(NotImplementedError):
         base_row_sink.write_row({})
-    # close() now has default empty implementation
+    # `close()` 现在有默认的空实现
     base_row_sink.close()
 
 
@@ -123,9 +123,9 @@ def test_base_column_sink_raises_not_implemented() -> None:
         base_column_sink.write_column("id", {})
     with pytest.raises(NotImplementedError):
         base_column_sink.write_columns({})
-    # close() now has default empty implementation
+    # `close()` 现在有默认的空实现
     base_column_sink.close()
-    # __exit__ calls close(), which now has default empty implementation
+    # `__exit__` 会调用 `close()`,且 `close()` 现在有默认的空实现
     base_column_sink.__exit__(None, None, None)
 
 

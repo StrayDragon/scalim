@@ -1,7 +1,7 @@
-"""Hook system.
+"""钩子系统。
 
-This package intentionally does not re-export symbols.
-Import hook implementations from `scalim.hooks.base`.
+该包刻意不在包级重导出符号.
+请从 `scalim.hooks.base` 导入钩子实现。
 """
 
 __all__ = []

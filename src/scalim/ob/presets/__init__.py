@@ -1,7 +1,7 @@
-"""Observer presets.
+"""观察者预设集合.
 
-This package intentionally does not re-export symbols.
-Import presets from concrete modules under `scalim.ob.presets.*`.
+该包刻意不在包级重导出符号.
+请从 `scalim.ob.presets.*` 下的具体模块导入预设。
 """
 
 __all__ = []

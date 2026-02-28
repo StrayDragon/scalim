@@ -1,7 +1,7 @@
-"""IR (intermediate representation) models.
+"""IR(中间表示)模型.
 
-This package intentionally does not re-export symbols.
-Import concrete IR models from modules under `scalim.spec.ir.*`.
+该包刻意不在包级重导出符号.
+请从 `scalim.spec.ir.*` 下的模块导入具体 IR 模型。
 """
 
 __all__ = []

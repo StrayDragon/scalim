@@ -1,4 +1,4 @@
-"""IREngine 和 BatchContext 行为测试.
+"""`ScalimEngine` 与 `BatchContext` 行为测试.
 
 测试执行引擎的输入输出契约,不测试内部实现细节.
 """
@@ -62,7 +62,7 @@ class MockDataLoader:
 
 @pytest.fixture
 def mock_loader() -> MockDataLoader:
-    """创建 Mock 数据加载器"""
+    """创建模拟数据加载器"""
     return MockDataLoader()
 
 
@@ -198,7 +198,7 @@ def relation_model(mock_loader: MockDataLoader) -> DemandIr:
 
 @pytest.fixture
 def chained_derived_model(mock_loader: MockDataLoader) -> DemandIr:
-    """派生字段链模型: C 依赖 B, B 依赖 A (amount)
+    """派生字段链模型: C 依赖 B, B 依赖 A (`amount`)
 
     用于测试 _compute_required_fields 是否正确收集完整依赖闭包
     """
@@ -298,7 +298,7 @@ class TestBatchContext:
         """测试 required_fields 过滤"""
         ctx: BatchContext = BatchContext(required_fields={"amount"})
 
-        # 只有 amount 会被存储
+        # 只有 `amount` 会被存储
         ctx.set_field_value("amount", 1, 100)
         ctx.set_field_value("cost", 1, 60)  # 应该被忽略
 
@@ -382,7 +382,7 @@ class TestBatchContext:
 
 
 class TestIREngineBatching:
-    """IREngine 批处理测试"""
+    """`ScalimEngine` 批处理测试"""
 
     def test_batch_processing(
         self,
@@ -401,7 +401,7 @@ class TestIREngineBatching:
 
         results = engine.run()
 
-        # 主数据源 loader 仅调用一次
+        # 主数据源加载器仅调用一次
         assert mock_loader.call_count["orders"] == 1
 
         # 结果应该完整
@@ -455,7 +455,7 @@ class TestRelationDependencyDirection:
             loader_spec=customers_loader,
         )
 
-        # 反向关联: customers.customer_id = orders.customer_id
+        # 反向关联: `customers.customer_id` = `orders.customer_id`
         reversed_relation = customers_source["customer_id"].join(orders_source["customer_id"])
 
         fields = [
@@ -510,7 +510,7 @@ class TestRelationDependencyDirection:
 
 
 class TestAdaptiveExecution:
-    """Adaptive 执行模式测试"""
+    """自适应执行模式测试"""
 
     @pytest.mark.parametrize(
         "model_fixture,targets,expected_field,expected_values",
@@ -600,8 +600,8 @@ class TestAdaptiveExecution:
 class TestChainedDerivedFields:
     """测试派生字段链的依赖收集和计算
 
-    验证 pipeline._compute_required_fields 正确收集完整依赖闭包
-    场景: C 依赖 B, B 依赖 A (amount), 目标只有 C
+    验证 `pipeline._compute_required_fields` 正确收集完整依赖闭包
+    场景: C 依赖 B, B 依赖 A (`amount`), 目标只有 C
     期望: A, B 都应该被包含在 required_fields 中
     """
 
@@ -646,7 +646,7 @@ class TestChainedDerivedFields:
         builder = PlanBuilder(chained_derived_model)
         plan = builder.build(targets=["c_triple_b"])
 
-        # field_order 应该包含完整依赖链: amount, b_double_amount, c_triple_b
+        # field_order 应该包含完整依赖链: `amount`, `b_double_amount`, `c_triple_b`
         assert "amount" in plan.field_order
         assert "b_double_amount" in plan.field_order
         assert "c_triple_b" in plan.field_order

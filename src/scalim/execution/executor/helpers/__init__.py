@@ -1,4 +1,4 @@
-"""Executor helper modules (internal).
+"""执行器辅助模块（内部）。
 
-Avoid relying on package-level re-exports; import from explicit submodules.
+避免依赖包级重导出；请从明确的子模块直接导入。
 """

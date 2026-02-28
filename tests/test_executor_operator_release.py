@@ -1,4 +1,4 @@
-"""Executor operator tests: release."""
+"""执行器算子测试：`release`。"""
 
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.release import ReleaseOperatorExecutor

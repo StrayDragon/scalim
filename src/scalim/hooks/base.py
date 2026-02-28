@@ -94,27 +94,27 @@ _CATALOG_EVENT_TYPES: tuple[str, ...] = (
 
 
 class IExecutionHook(ABC):
-    """执行 hook 接口"""
+    """执行钩子接口"""
 
     @abstractmethod
     def on_pipeline_start(self, event: PipelineStartEvent) -> None:
-        """当 pipeline 开始时调用"""
+        """当流水线开始时调用"""
 
     @abstractmethod
     def on_pipeline_end(self, event: PipelineEndEvent) -> None:
-        """当 pipeline 结束时调用"""
+        """当流水线结束时调用"""
 
     @abstractmethod
     def on_batch_start(self, event: BatchStartEvent) -> None:
-        """当 batch 开始时调用"""
+        """当批次开始时调用"""
 
     @abstractmethod
     def on_batch_end(self, event: BatchEndEvent) -> None:
-        """当 batch 结束时调用"""
+        """当批次结束时调用"""
 
     @abstractmethod
     def on_loader_call(self, event: LoaderCallEvent) -> None:
-        """当 loader 被调用时调用"""
+        """当加载器被调用时调用"""
 
     @abstractmethod
     def on_field_compute(self, event: FieldComputeEvent) -> None:
@@ -134,7 +134,7 @@ class IExecutionHook(ABC):
 
     @abstractmethod
     def on_row_write(self, event: RowWriteEvent) -> None:
-        """当行被写入流式 sink 时调用 (FR023)"""
+        """当行被写入流式写出端时调用 (FR023)"""
 
     @abstractmethod
     def on_row_release(self, event: RowReleaseEvent) -> None:
@@ -142,23 +142,23 @@ class IExecutionHook(ABC):
 
     @abstractmethod
     def on_loader_slim(self, event: LoaderSlimEvent) -> None:
-        """当 loader 结果被压缩时调用 (FR022)"""
+        """当加载器结果被压缩时调用 (FR022)"""
 
     @abstractmethod
     def on_column_write(self, event: ColumnWriteEvent) -> None:
-        """当列被写入基于列的 sink 时调用 (FR023)"""
+        """当列被写入列式写出端时调用 (FR023)"""
 
 
 Hook = IExecutionHook
 
 
 class BaseHook(IExecutionHook):
-    """带有空操作方法的基础 hook 实现"""
+    """带有空操作方法的基础钩子实现"""
 
     event_types: set[str] | None = None
 
     def on_event(self, event: Event) -> None:
-        """Optional unified event hook (for subscribing to all catalog events)."""
+        """可选的统一事件钩子 (用于订阅 `events.catalog` 中定义的全部事件)."""
         _ = event
 
     @override
@@ -215,9 +215,9 @@ class BaseHook(IExecutionHook):
 
 
 class HookManager:
-    """Hook 管理器 - 管理并触发所有 hooks.
+    """钩子管理器 - 管理并触发所有钩子.
 
-    注意: 请使用 register/unregister/clear 管理 hooks,不要直接修改 hooks 列表,否则 fastpath 缓存可能失效.
+    注意: 请使用 `register`/`unregister`/`clear` 管理钩子,不要直接修改钩子列表,否则快速路径缓存可能失效.
     """
 
     hooks: list[IExecutionHook]
@@ -318,7 +318,7 @@ class HookManager:
             if hook_handler is None:
                 continue
             base_handler = getattr(BaseHook, handler_name, None)
-            # If the hook inherits BaseHook's no-op handler, do not subscribe.
+            # 如果钩子继承了 BaseHook 的空操作实现,则无需订阅该事件.
             if base_handler is not None and hook_handler is base_handler:
                 continue
             subscribed.append(event_type)
@@ -434,9 +434,9 @@ class HookManager:
             self._rebuild_subscription_cache()
 
     def emit_typed(self, event_type: str, payload: Any) -> None:
-        """Emit a typed hook callback based on the event_type->handler mapping.
+        """根据 event_type 到处理器的映射触发一次类型化钩子回调.
 
-        Note: this does NOT build payloads; it only dispatches when a payload is already available.
+        注意: 该方法不会构建负载,仅在负载已准备好时进行分发.
         """
         if not self._has_hooks:
             return

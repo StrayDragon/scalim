@@ -48,7 +48,7 @@ class DemandIr:
     """
 
     def __post_init__(self) -> None:
-        # 验证主数据源与 sources 无冲突
+        # 验证主数据源与 `sources` 无冲突
         if self.main_source.source_id in self.sources:
             msg = f"主数据源 {self.main_source.source_id!r} 不应出现在 sources 中"
             raise ValueError(msg)
@@ -74,13 +74,13 @@ class DemandIr:
     ) -> "DemandIr":
         """从列表构造(推荐方式): 自动转换为字典并检测重名冲突
 
-        Args:
-            sources: 数据源列表
-            fields: 字段列表
-            main_source: 主数据源对象
-            batch_size_hint: 批次大小提示
-            name: 模型名称
-            export_profile: 导出元信息配置
+        参数：
+            `sources`: 数据源列表
+            `fields`: 字段列表
+            `main_source`: 主数据源对象
+            `batch_size_hint`: 批次大小提示
+            `name`: 模型名称
+            `export_profile`: 导出元信息配置
         """
         # 转换sources为字典并检测重名
         sources_dict: dict[str, SourceIr] = {}

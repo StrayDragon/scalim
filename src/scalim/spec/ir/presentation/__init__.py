@@ -53,7 +53,7 @@ class SpreadsheetPresentationIr:
 
     alignment: str | None = None
     """
-    对齐方式 (如 "left", "center", "right")
+    对齐方式 (如 `left`, `center`, `right`)
     """
 
     width: int | None = None
@@ -75,7 +75,7 @@ class PandasPresentationIr:
 
     dtype: str | None = None
     """
-    数据类型 (如 "int64", "float64", "str")
+    数据类型 (如 `int64`, `float64`, `str`)
     """
 
     category: bool | None = None
@@ -92,7 +92,7 @@ class FieldPresentationIr:
 
     kind: FieldPresentationKind = "generic"
     """
-    展示类型 (generic/csv/excel/pandas)
+    展示类型 (`generic`/`csv`/`excel`/`pandas`)
     """
 
     label: str | None = None

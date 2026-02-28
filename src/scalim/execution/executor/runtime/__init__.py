@@ -1,4 +1,4 @@
-"""Execution runtime package (internal).
+"""执行运行时包（内部）。
 
-Implementation lives in `scalim.execution.executor.runtime.runtime`.
+实现位于 `scalim.execution.executor.runtime.runtime`。
 """

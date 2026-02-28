@@ -65,7 +65,7 @@ def test_hub_register_unregister_clear_and_emit_gating() -> None:
     assert called is False
     assert hub.emit(EVENT_ERROR, {"x": 1}) is None
 
-    # typed helpers should early-return without subscribers
+    # 类型化辅助方法在无订阅者时应直接返回
     hub.emit_field_compute("f", 1, {}, 1)
     hub.emit_stage_span("stage", batch_num=1, duration=0.0)
     hub.emit_loader_slim(loader_name="loader", original_keys=1, extracted_fields=[], batch_num=1)

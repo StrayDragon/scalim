@@ -1,5 +1,5 @@
-"""LoadRef operator package (internal).
+"""`LoadRef` 算子包（内部）。
 
-Implementation lives in `scalim.execution.executor.operators.load_ref.executor`.
-This package intentionally does not re-export implementation symbols.
+实现位于 `scalim.execution.executor.operators.load_ref.executor`。
+本包刻意不重导出实现符号。
 """

@@ -15,7 +15,7 @@ from ...helpers.relation_signature import build_step_signature, normalize_key_fi
 from ...runtime.runtime import ExecutionRuntime, LoadRefCacheEntry
 from .context import LoadRefExecutionContext
 
-# module logger
+# 模块级日志记录器
 _logger = logging.getLogger(__name__.rsplit(".", 1)[0])
 
 

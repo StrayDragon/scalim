@@ -6,8 +6,8 @@ from ....typedefs import FieldValue
 
 def extract_field(data: Any, field_key: str) -> FieldValue:
     if isinstance(data, Mapping):
-        # NOTE: `isinstance(data, Mapping)` narrows to `Mapping[Unknown, Unknown]` in basedpyright,
-        # which makes `get()` partially-unknown. We intentionally treat mapping keys as strings here.
+        # NOTE: `isinstance(data, Mapping)` 在 `basedpyright` 中会收窄为 `Mapping[Unknown, Unknown]`,
+        # 从而导致 `get()` 的类型变为部分未知。这里我们刻意把映射键视为字符串。
         mapping = cast("Mapping[str, Any]", data)
         return cast("FieldValue", mapping.get(field_key))
 

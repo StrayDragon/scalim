@@ -72,16 +72,16 @@ def test_build_ref_field_ordering_deps_handles_edge_cases() -> None:
 
     fields = [
         FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        # 1) no steps -> early return
+        # 1) 无步骤 -> 直接返回
         FieldIr(field_id="empty_steps", name="Empty", source=src_a, lookup_steps=()),
-        # 2) self dep -> skipped
+        # 2) 自依赖 -> 跳过
         FieldIr(
             field_id="self_dep",
             name="Self",
             source=src_a,
             lookup_steps=(LookupStepIr(from_field="self_dep", to_source=src_a),),
         ),
-        # 3) dep source not SourceIr -> skipped
+        # 3) 依赖字段的数据源不是 `SourceIr` -> 跳过
         FieldIr(field_id="dep_fake", name="DepFake", source=_FakeSource("fake")),
         FieldIr(
             field_id="uses_fake",
@@ -89,7 +89,7 @@ def test_build_ref_field_ordering_deps_handles_edge_cases() -> None:
             source=src_a,
             lookup_steps=(LookupStepIr(from_field="dep_fake", to_source=src_a),),
         ),
-        # 4) dep is not a ref field -> skipped
+        # 4) 依赖字段不是引用字段 -> 跳过
         FieldIr(field_id="dep_non_ref", name="DepNonRef", source=src_b),
         FieldIr(
             field_id="uses_non_ref",
@@ -97,7 +97,7 @@ def test_build_ref_field_ordering_deps_handles_edge_cases() -> None:
             source=src_a,
             lookup_steps=(LookupStepIr(from_field="dep_non_ref", to_source=src_a),),
         ),
-        # 5) duplicate dep -> dedupe
+        # 5) 重复依赖 -> 去重
         FieldIr(
             field_id="dep_ref",
             name="DepRef",

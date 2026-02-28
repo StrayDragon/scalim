@@ -28,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class LoggingObserver(EventDispatchObserver):
-    """日志 Observer - 记录执行进度到日志系统"""
+    """日志观察者 - 记录执行进度到日志系统"""
 
     logger: logging.Logger
 

@@ -14,16 +14,17 @@ if TYPE_CHECKING:
 
 
 class InMemoryRowSink(BaseRowSink):
-    """内存行式 Sink - 支持行级流式写入并存储在内存中 (FR023).
+    """内存行式输出端 - 支持行级流式写入并存储在内存中 (FR023).
 
     主要用于测试和调试.
 
-    示例::
-
+    示例：
+        ```python
         sink = InMemoryRowSink()
         sink.write_row({"id": 1, "name": "Alice"})
         sink.write_batch([{"id": 2, "name": "Bob"}])
         data = sink.get_data()
+        ```
     """
 
     def __init__(self) -> None:
@@ -51,18 +52,18 @@ InMemoryListSink = InMemoryRowSink
 
 
 class InMemoryColumnSink(IColumnSink):
-    """内存列式 Sink - 支持按列追加写入并存储在内存中 (FR023).
+    """内存列式输出端 - 支持按列追加写入并存储在内存中 (FR023).
 
     主要用于测试、调试和需要在内存中进一步处理数据的场景.
 
     数据访问方式:
-    - get_columns(): 获取列式数据 (Dict[field_key, Dict[pk, value]])
-    - get_rows(): 获取行式数据 (List[Dict[field_key, value]])
-    - get_2d_list(): 获取二维列表 (List[List[value]])
-    - get_column(field_key): 获取单列数据
+    - `get_columns()`: 获取列式数据 (`dict[field_key, dict[pk, value]]`)
+    - `get_rows()`: 获取行式数据 (`list[dict[field_key, value]]`)
+    - `get_2d_list()`: 获取二维列表 (`list[list[value]]`)
+    - `get_column(field_key)`: 获取单列数据
 
-    示例::
-
+    示例：
+        ```python
         sink = InMemoryColumnSink(["order_id", "name"])
         sink.set_row_ids([1, 2, 3])
         sink.write_column("order_id", {1: 1, 2: 2, 3: 3})
@@ -71,6 +72,7 @@ class InMemoryColumnSink(IColumnSink):
 
         columns = sink.get_columns()
         rows = sink.get_rows()
+        ```
     """
 
     field_names: list[str]

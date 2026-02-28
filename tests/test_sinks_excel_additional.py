@@ -107,15 +107,15 @@ def test_column_excel_sink_handles_missing_active(monkeypatch, tmp_path: Path) -
     ids=["row-sink", "column-sink"],
 )
 def test_excel_sink_with_header_names(tmp_path: Path, sink_cls) -> None:
-    """Test that Excel sinks correctly use header_names for header and field_names for values."""
+    """测试 `Excel` 输出端能正确使用 `header_names` 作为表头，使用 `field_names` 作为取值键。"""
     output_path = tmp_path / "output.xlsx"
     rows = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
 
     _write_excel_rows(output_path, sink_cls, rows, header_names=["编号", "姓名"])
 
     loaded_rows = _read_excel_rows(output_path)
-    assert loaded_rows[0] == ("编号", "姓名")  # Header uses header_names
-    assert loaded_rows[1] == (1, "Alice")  # Values from field_names keys
+    assert loaded_rows[0] == ("编号", "姓名")  # 表头使用 `header_names`
+    assert loaded_rows[1] == (1, "Alice")  # 值来自 `field_names` 的键
     assert loaded_rows[2] == (2, "Bob")
 
 

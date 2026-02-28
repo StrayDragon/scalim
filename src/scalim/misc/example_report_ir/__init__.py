@@ -3,16 +3,16 @@
 这个模块展示了如何使用 Scalim IR 层来定义数据报表需求.
 
 FR 需求覆盖:
-- FR002: 字段转换与派生 (profit 计算, order_source 枚举转换)
+- FR002: 字段转换与派生 (`profit` 计算, `order_source` 枚举转换)
 - FR011: 数据源多种关联方式 (单字段/多表级联/复合主键)
-- FR013: 外键类型转换 (KeyIr.cast, lookup_cast)
-  - 多级关联: orders → small_groups → big_groups
+- FR013: 外键类型转换 (`KeyIr.cast`, `lookup_cast`)
+  - 多级关联: `orders` → `small_groups` → `big_groups`
   - CSV 多值字段: small_group_ids = "10,20,30" 取第一个值
 - FR021: 依赖字段剪枝 (PlanBuilder 自动分析)
 - FR022: 字段瘦身 (中间字段用完即删)
 - FR023: 流式写入 (行级/列级)
 - FR031: 事件与钩子系统 (LoggingHook, MetricsHook, TraceHook)
-- FR032: 可视化数据流转 (Mermaid 图生成)
+- FR032: 可视化数据流转 (`Mermaid` 图生成)
 """
 
 import logging
@@ -34,7 +34,7 @@ from ...spec.ir.sources import KeyIr, MainSourceIr, SourceIr
 from ...typedefs import SourceSpecIrCacheMode
 from ...utils.converters import must_get_seps_values_first_int
 
-# 配置 logger
+# 配置日志
 FORMAT = "%(asctime)s | %(message)s"
 try:
     from rich.logging import RichHandler
@@ -71,7 +71,7 @@ class PandasDataLoader:
     def __init__(self, data_dir: Path = _DATA_DIR, random_delay: float = 0.0) -> None:
         """初始化数据加载器.
 
-        Args:
+        参数:
             data_dir: CSV数据文件目录
             random_delay: 随机延迟时间(秒),用于模拟网络延迟
         """
@@ -98,12 +98,12 @@ class PandasDataLoader:
     def _df_to_dict(self, df: pd.DataFrame | Any, pk_field_name: str) -> dict[int, dict[str, Any]]:
         """将DataFrame转换为字典格式.
 
-        Args:
+        参数:
             df: pandas DataFrame
             pk_field_name: 主键字段名
 
-        Returns:
-            以主键为key的字典
+        返回:
+            以主键为键的字典
         """
         result: dict[int, dict[str, Any]] = {}
         for _, row in df.iterrows():
@@ -130,14 +130,14 @@ class PandasDataLoader:
     ) -> list[dict[str, Any]]:
         """获取订单数据.
 
-        Args:
+        参数:
             begin_time: 开始时间
             end_time: 结束时间
-            page: 页码
+            `page`: 页码
             page_size: 每页大小
             order_ids: 订单ID列表(可选)
 
-        Returns:
+        返回:
             订单数据行列表
         """
         self._add_delay()
@@ -154,11 +154,11 @@ class PandasDataLoader:
     def get_customers(self, customer_ids_set: set[int] | None = None, **extra_params: Any) -> dict[int, dict[str, Any]]:  # pyright: ignore[reportUnusedParameter]
         """获取客户数据.
 
-        Args:
+        参数:
             customer_ids_set: 客户ID集合
             **extra_params: 额外参数(未使用)
 
-        Returns:
+        返回:
             客户数据字典
         """
         self._add_delay()
@@ -173,10 +173,10 @@ class PandasDataLoader:
     def get_pays(self, pay_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取支付数据.
 
-        Args:
+        参数:
             pay_ids_set: 支付ID集合
 
-        Returns:
+        返回:
             支付数据字典
         """
         self._add_delay()
@@ -191,10 +191,10 @@ class PandasDataLoader:
     def get_countries(self, country_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取国家数据.
 
-        Args:
+        参数:
             country_ids_set: 国家ID集合
 
-        Returns:
+        返回:
             国家数据字典
         """
         self._add_delay()
@@ -214,10 +214,10 @@ class PandasDataLoader:
         - 高频访问 (每个订单都需要关联)
         - 数据稳定 (枚举类型不会频繁变化)
 
-        Args:
+        参数:
             type_ids_set: 类型ID集合
 
-        Returns:
+        返回:
             订单类型数据字典
         """
         self._add_delay()
@@ -232,10 +232,10 @@ class PandasDataLoader:
     def get_region_institution_mapping(self, composite_keys: set[tuple[int, int]] | None = None) -> dict[tuple[int, int], dict[str, Any]]:
         """获取区域机构映射数据.
 
-        Args:
+        参数:
             composite_keys: 复合键集合 (region_id, institution_id)
 
-        Returns:
+        返回:
             映射数据字典,键为(region_id, institution_id)元组
         """
         self._add_delay()
@@ -269,10 +269,10 @@ class PandasDataLoader:
     def get_small_groups(self, group_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取小组数据 - FR013 多级关联示例.
 
-        Args:
+        参数:
             group_ids_set: 小组ID集合
 
-        Returns:
+        返回:
             小组数据字典
         """
         self._add_delay()
@@ -287,10 +287,10 @@ class PandasDataLoader:
     def get_big_groups(self, group_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取大组数据 - FR013 多级关联示例.
 
-        Args:
+        参数:
             group_ids_set: 大组ID集合
 
-        Returns:
+        返回:
             大组数据字典
         """
         self._add_delay()
@@ -318,10 +318,10 @@ class Dal:
     ) -> list[dict[str, Any]]:
         """分页获取订单列表.
 
-        NOTE: 这是一个典型的分页 API,参数由业务决定,框架不应假设
+        注意: 这是一个典型的分页 API,参数由业务决定,框架不应假设
         支持两种模式:
-        1. 分页模式: 使用 page 和 page_size 参数
-        2. 指定 ID 模式: 使用 order_ids 参数直接获取指定订单
+        1. 分页模式: 使用 `page` 和 `page_size` 参数
+        2. 指定 ID 模式: 使用 `order_ids` 参数直接获取指定订单
         """
         return data_loader.get_orders(
             begin_time,
@@ -334,7 +334,7 @@ class Dal:
     def get_country_info_of_concrete_params(self, country_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取国家信息.
 
-        NOTE: 参数名 country_ids_set 是这个 API 的约定,框架不应假设
+        注意: 参数名 `country_ids_set` 是这个 API 的约定,框架不应假设
         """
         return data_loader.get_countries(country_ids_set)
 
@@ -348,7 +348,7 @@ class Bll:
     def get_pay_info_from_api_of_concrete_params(self, pay_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取支付信息.
 
-        NOTE: 参数名 pay_ids_set 是这个 API 的约定,框架不应假设
+        注意: 参数名 `pay_ids_set` 是这个 API 的约定,框架不应假设
         """
         return data_loader.get_pays(pay_ids_set)
 
@@ -357,7 +357,7 @@ class Bll:
     ) -> dict[int, dict[str, Any]]:
         """获取客户信息.
 
-        NOTE: 使用 **kwargs 模式,参数名 customer_ids_set 是这个 API 的约定
+        注意: 使用 `**kwargs` 模式,参数名 `customer_ids_set` 是这个 API 的约定
         """
         return data_loader.get_customers(customer_ids_set=customer_ids_set, **extra_params)
 
@@ -374,8 +374,8 @@ BLL = Bll()
 def build_order_report_model() -> DemandIr:
     """构建订单报表的 IR 模型.
 
-    NOTE: 这里展示了如何使用 IR 层直接定义数据需求
-    所有参数构建逻辑都通过 Binding 提供,框架不做任何假设
+    注意: 这里展示了如何使用 IR 层直接定义数据需求
+    所有参数构建逻辑都通过 `BindingIr` 提供,框架不做任何假设
     """
 
     # region 定义数据源
@@ -447,13 +447,13 @@ def build_order_report_model() -> DemandIr:
     # FR003: 订单类型数据源 - 小数据集全局缓存示例
     # 订单类型表数据量小(5条)、高频访问、数据稳定,适合预加载缓存
     # cache_mode=SourceDefCacheMode.PRELOAD_FOREVER 表示:
-    # - 在 pipeline 开始前无参数调用 loader 加载全部数据
-    # - 缓存数据在整个 pipeline 生命周期内有效
+    # - 在流水线开始前无参数调用加载器加载全部数据
+    # - 缓存数据在整个流水线生命周期内有效
     # - 不参与内存优化剪枝
     order_types_loader = LoaderIr(
         callable=data_loader.get_order_types,
         bindings={
-            # NOTE: 预加载模式下此 binding 不会被使用,但保留以支持回退到普通模式
+            # 注意: 预加载模式下此绑定不会被使用,但保留以支持回退到普通模式
             "type_id": BindingIr(
                 key_field="type_id",
                 params_builder=lambda ctx: ((), {"type_ids_set": ctx.lookup_keys or set()}),
@@ -468,7 +468,7 @@ def build_order_report_model() -> DemandIr:
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,  # FR003: 预加载永久缓存
     )
 
-    # 区域机构映射数据源 - 展示复合 key 和多字段 JOIN
+    # 区域机构映射数据源 - 展示复合键和多字段联结
     region_institution_mapping_loader = LoaderIr(
         callable=data_loader.get_region_institution_mapping,
         bindings={
@@ -487,7 +487,7 @@ def build_order_report_model() -> DemandIr:
     )
 
     # FR013: 小组数据源 - 多级关联中间表
-    # 用于演示: orders → small_groups → big_groups
+    # 用于演示: `orders` → `small_groups` → `big_groups`
     small_groups_loader = LoaderIr(
         callable=data_loader.get_small_groups,
         bindings={
@@ -532,7 +532,7 @@ def build_order_report_model() -> DemandIr:
     orders_to_customers = orders_source["customer_id"].join(customers_source["customer_id"])
     orders_to_pays = orders_source["pay_id"].join(pays_source["pay_id"])
 
-    # FR011: 多表级联关联 (orders → pays → countries)
+    # FR011: 多表级联关联 (`orders` → `pays` → `countries`)
     orders_to_countries = (
         orders_source["pay_id"].join(pays_source["pay_id"]).and_(pays_source["country_id"].join(countries_source["country_id"]))
     )
@@ -549,13 +549,13 @@ def build_order_report_model() -> DemandIr:
 
     # FR013: 多级关联 (订单 → 小组 → 大组) + CSV 多值字段
     # 数据示例:
-    #   orders.small_group_ids = "10,20" (CSV 多值字段,取第一个值)
+    #   `orders.small_group_ids` = "10,20" (CSV 多值字段,取第一个值)
     #   → small_groups[10].big_group_id = 100
     #   → big_groups[100].big_group_name = "大组甲"
     #
     # 转换机制:
     #   1. 第一级: LookupStep.lookup_cast 处理 CSV 多值字段 "10,20" → 10
-    #   2. 第二级: 无需转换,数据都是 int 类型
+    #   2. 第二级: 无需转换,数据都是 `int` 类型
     orders_to_small_groups = orders_source["small_group_ids"].join(small_groups_source["small_group_id"])
     orders_to_big_groups = (
         orders_source["small_group_ids"]
@@ -711,7 +711,7 @@ def build_order_report_model() -> DemandIr:
 
     # FR013: 大组名称 - 多级关联 + CSV 多值字段
     # 第一级: lookup_cast 从 "10,20" 提取第一个值 10
-    # 第二级: 数据都是 int,无需转换
+    # 第二级: 数据都是 `int`,无需转换
     big_group_name_field = FieldIr(
         field_id="big_group_name",
         name="大组名称",

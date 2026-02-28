@@ -21,7 +21,7 @@ from .pipeline.overrides import PipelineOverrides
 class ScalimEngine:
     """计算引擎
 
-    engine: (execution) plan -> pipeline(executor) -> sink
+    执行链路: 执行计划 -> 流水线(执行器) -> 输出端
     """
 
     demand: DemandIr
@@ -48,16 +48,16 @@ class ScalimEngine:
     ) -> None:
         """初始化 Scalim 计算引擎
 
-        Args:
-            demand: 统计需求数据结构
-            plan: 执行计划
-            hook_manager: 可选的钩子管理器,用于流程定制
-            observer_manager: 可选的观测管理器,用于事件监听
-            batch_size: 每个批次的记录数
-            gc_interval: 每隔 N 个批次运行 GC
-            parallel_mode: 执行模式 (seq: 顺序, adaptive: 自适应并发)
-            max_workers: adaptive 并发上限 (0 = 自动; seq 下忽略)
-            pipeline_overrides: 可选的 pipeline 扩展点覆盖对象
+        参数：
+            `demand`: 统计需求数据结构
+            `plan`: 执行计划
+            `hook_manager`: 可选的钩子管理器,用于流程定制
+            `observer_manager`: 可选的观测管理器,用于事件监听
+            `batch_size`: 每个批次的记录数
+            `gc_interval`: 每隔 N 个批次运行 GC
+            `parallel_mode`: 执行模式 (`seq`: 顺序, `adaptive`: 自适应并发)
+            `max_workers`: `adaptive` 并发上限 (0 = 自动; `seq` 下忽略)
+            `pipeline_overrides`: 可选的流水线扩展点覆盖对象
         """
         self.demand = demand
         self.plan = plan
@@ -107,11 +107,11 @@ class ScalimEngine:
     ) -> Sequence[RowData]:
         """执行流水线
 
-        Args:
-            main_rows: 可选的主数据行流,如果不提供则从主数据源加载
-            sink: 可选的输出 sink
+        参数：
+            `main_rows`: 可选的主数据行流,如果不提供则从主数据源加载
+            `sink`: 可选的输出端(`sink`)
 
-        Returns:
-            结果行列表 (如果提供了 sink 则返回空列表)
+        返回：
+            结果行列表 (如果提供了 `sink` 则返回空列表)
         """
         return self._pipeline.run(main_rows, sink)

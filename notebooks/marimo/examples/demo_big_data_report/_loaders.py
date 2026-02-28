@@ -3,6 +3,8 @@
 这个模块提供具有业务意义的合成数据,用于展示 Scalim 框架的关联能力.
 
 业务场景: 电商平台订单报表
+
+```text
 - 订单表 (orders): 主表,包含订单基本信息
 - 客户表 (customers): 客户信息
 - 产品表 (products): 产品信息
@@ -21,6 +23,7 @@
 4. 多级关联: orders -> warehouses -> regions (2级链路)
 5. 复合键关联: orders -> region_pricing (region_id, product_category_id)
 6. 小表关联: orders -> promotions, payment_methods, logistics
+```
 """
 
 from __future__ import annotations
@@ -45,7 +48,7 @@ DEFAULT_LOGISTICS_COUNT = 10
 
 # 预定义配置规模
 SCALE_SMALL = "small"  # 100 订单 - 快速测试
-SCALE_MEDIUM = "medium"  # 500 订单 - 常规 demo
+SCALE_MEDIUM = "medium"  # 500 订单 - 常规演示
 SCALE_LARGE = "large"  # 2000 订单 - 完整测试
 SCALE_STRESS = "stress"  # 10000 订单 - 压力测试
 
@@ -55,10 +58,10 @@ class ECommerceConfig:
     """电商数据配置
 
     预定义规模:
-    - small: 100 订单, 适合快速测试
-    - medium: 500 订单, 适合常规 demo
-    - large: 2000 订单, 适合完整集成测试
-    - stress: 10000 订单, 适合压力测试
+    - `small`: 100 订单, 适合快速测试
+    - `medium`: 500 订单, 适合常规演示
+    - `large`: 2000 订单, 适合完整集成测试
+    - `stress`: 10000 订单, 适合压力测试
     """
 
     order_count: int = DEFAULT_ORDER_COUNT
@@ -281,7 +284,7 @@ def load_customers_by_rows(
     field_keys: Optional[List[str]] = None,
     is_ref_loader: bool = False,
 ) -> Dict[int, Dict[str, Any]]:
-    """rows 模式示例: 从 batch_rows 中提取 customer_id 后复用 load_customers."""
+    """`rows` 模式示例: 从 `batch_rows` 中提取 `customer_id` 后复用 `load_customers`."""
     _ = field_keys
     _ = is_ref_loader
 

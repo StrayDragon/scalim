@@ -877,7 +877,7 @@ def _(
                 )
             )
 
-        # 1) Excel (row sink) + PandasRowSink
+        # 1) `Excel`（行式 `sink`） + `PandasRowSink`
         run_ir_excel_row = artifacts_dir / "demo_tutor_run_ir.xlsx"
         excel_row_sink = PandasRowSink(field_names=list(selected_targets))
         excel_row_request = ExecutionRequest(
@@ -915,7 +915,7 @@ def _(
             "output_path": excel_row_exec.output_path,
         }
 
-        # 2) CSV (row sink) + PandasRowSink
+        # 2) `CSV`（行式 `sink`） + `PandasRowSink`
         run_ir_csv_row = artifacts_dir / "demo_tutor_run_ir.csv"
         csv_row_sink = PandasRowSink(field_names=list(selected_targets))
         csv_row_request = ExecutionRequest(
@@ -951,7 +951,7 @@ def _(
             "output_path": csv_row_exec.output_path,
         }
 
-        # 3) Excel (column sink) + PandasColumnSink
+        # 3) `Excel`（列式 `sink`） + `PandasColumnSink`
         run_ir_excel_col = artifacts_dir / "demo_tutor_run_ir_column.xlsx"
         excel_col_sink = PandasColumnSink(field_names=list(selected_targets))
         excel_col_request = ExecutionRequest(
@@ -1482,7 +1482,7 @@ def _(
             }
             return demand, states
 
-        # 1) Without retry: should fail when injected fail_times > 0.
+        # 1) 不启用重试：注入 `fail_times > 0` 时应失败。
         flaky_demand_no_retry, _states_no_retry = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
         flaky_plan_no_retry = PlanBuilder(flaky_demand_no_retry).build(targets=demo_targets)
         flaky_engine_no_retry = ScalimEngine(demand=flaky_demand_no_retry, plan=flaky_plan_no_retry, batch_size=3)
@@ -1494,7 +1494,7 @@ def _(
             retry_demo["no_retry_failed"] = True
             retry_demo["no_retry_error"] = "{}: {}".format(type(exc).__name__, str(exc))
 
-        # 2) With retry: should recover and match baseline output.
+        # 2) 启用重试：应恢复并与基线输出一致。
         flaky_demand_retry, _states_retry = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
         flaky_plan_retry = PlanBuilder(flaky_demand_retry).build(targets=demo_targets)
         collector = RetryDemoCollector()
@@ -1547,7 +1547,7 @@ def _(
             for e in collector.retries
         ]
 
-        # 3) Optional: run_ir path (also exercises main_source loader callsite).
+        # 3) 可选：`run_ir` 路径（也会覆盖 `main_source` 加载器的调用点）。
         if DO_LOADER_RETRY_DEMO_RUN_IR:
             retry_demo["run_ir"]["enabled"] = True
             flaky_demand_run_ir, _states_run_ir = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
@@ -1581,7 +1581,7 @@ def _(
                 retry_demo["run_ir"]["retry_events"] = len(run_ir_collector.retries)
                 retry_demo["run_ir"]["error_events"] = len(run_ir_collector.errors)
 
-        # 4) Optional: give-up demo (exceed max_attempts -> emits single error event).
+        # 4) 可选：放弃演示（超过 `max_attempts` -> 仅发出一次 `error` 事件）。
         if DO_LOADER_RETRY_DEMO_GIVE_UP:
             retry_demo["give_up"]["enabled"] = True
             give_up_fail_times = max(int(LOADER_RETRY_MAX_ATTEMPTS), 1)

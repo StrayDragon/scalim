@@ -22,7 +22,7 @@ def test_monkeypatch_policy_forbids_private_and_global_import_patching() -> None
             if not isinstance(func, ast.Attribute):
                 continue
 
-            # Only enforce policy for pytest's `monkeypatch` fixture.
+            # 仅对 `pytest` 的 `monkeypatch` 夹具执行该策略。
             if not (isinstance(func.value, ast.Name) and func.value.id == "monkeypatch" and func.attr == "setattr"):
                 continue
 

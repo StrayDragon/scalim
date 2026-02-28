@@ -52,7 +52,7 @@ class PlanMetadata:
 
     total_loaders: int = 0
     """
-    总 loader 调用数
+    总加载器调用数
     """
 
     pruned_fields: int = 0
@@ -84,15 +84,15 @@ class PlanMetadata:
 @dataclass
 class ExecutionPlan:
     """
-    执行计划(物理执行计划): planning 核心算子序列 (计算 required fields 的执行编排).
+    执行计划(物理执行计划): 规划核心算子序列 (计算所需字段的执行编排).
 
     说明:
     - `PlanBuilder` 仅生成 `load` / `load_ref` / `compute` 三类核心算子。
-    - 输出写入与释放等操作属于 execution pipeline 的编排职责,不由 `PlanBuilder` 生成。
+    - 输出写入与释放等操作属于执行流水线的编排职责,不由 `PlanBuilder` 生成。
     """
 
     operators: tuple[PlanOperatorIr, ...] = field(default_factory=tuple)
-    """Planning 核心算子序列 (按执行顺序).
+    """规划核心算子序列 (按执行顺序).
 
     仅包含 `load` / `load_ref` / `compute`.
     """
@@ -114,21 +114,23 @@ class ExecutionPlan:
     """
 
     loader_sequence: "list[tuple[SourceIr, list[str]]]" = field(default_factory=list)
-    """普通 loader 调用序列 [(source, [field_keys])]"""
+    """普通加载器调用序列：`[(source, [field_keys])]`"""
 
     ref_loader_sequence: "list[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]]" = field(default_factory=list)
-    """关联 loader 调用序列 [(source, [(field_key, dep_ref_field_keys)])].
+    """关联加载器调用序列：`[(source, [(field_key, dep_ref_field_keys)])]`。
 
     说明:
-    - `dep_ref_field_keys` 是计划阶段的“依赖字段键(用于排序)”信号, 来源于 lookup steps 的 `from_field`.
-      这里仅保留那些也对应到 **另一个 ref 字段** 的 key, 以便映射到某个 ref loader 并推断 loader 依赖图.
-    - 它与运行时传入 loader callable 的 `lookup_keys`(值集合)无关.
+    - `dep_ref_field_keys` 是计划阶段的“依赖字段键(用于排序)”信号, 来源于 `lookup_steps` 的 `from_field`.
+      这里仅保留那些也对应到 **另一个引用字段(`ref`)** 的字段键, 以便映射到某个引用加载器并推断加载器依赖图.
+    - 它与运行时传入加载器可调用对象的 `lookup_keys`(值集合)无关.
 
-    Example:
+    示例：
+        ```text
         # field: region_name (source=regions)
         # steps: from_field="region_id" -> regions
         # 且 demand 里存在 region_id 这个 ref 字段(source=customers)
         # => dep_ref_field_keys == ("region_id",)
+        ```
     """
 
     stages: list[Stage] = field(default_factory=list)
@@ -156,8 +158,8 @@ class ExecutionPlan:
     ) -> dict[str, Any]:
         """生成 VizGraphSnapshot(用于可视化).
 
-        Returns:
-            包含 nodes/edges/meta 的字典结构
+        返回：
+            包含 `nodes`/`edges`/`meta` 的字典结构
         """
         from .viz import build_viz_graph_snapshot  # noqa: PLC0415
 

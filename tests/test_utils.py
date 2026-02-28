@@ -1,4 +1,4 @@
-"""utils 模块测试"""
+"""`utils` 模块测试"""
 
 import pytest
 from typing import Dict, List
@@ -164,9 +164,9 @@ class TestGroupByLevel:
         result = group_by_level(["a", "b", "c", "d"], lambda x: deps.get(x, []))
 
         assert len(result) == 3
-        assert set(result[0]) == {"c", "d"}  # level 0
-        assert result[1] == ["b"]  # level 1
-        assert result[2] == ["a"]  # level 2
+        assert set(result[0]) == {"c", "d"}  # 层级 0
+        assert result[1] == ["b"]  # 层级 1
+        assert result[2] == ["a"]  # 层级 2
 
 
 # endregion

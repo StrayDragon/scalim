@@ -105,7 +105,7 @@ class BigDataDemoConfig:
         self.preload_mapping = preload_mapping
 
     def clamp(self) -> "BigDataDemoConfig":
-        """兼容旧接口的 clamp 方法"""
+        """兼容旧接口的 `clamp` 方法"""
         return self
 
     def to_ecommerce_config(self) -> ECommerceConfig:
@@ -122,8 +122,8 @@ def build_big_data_demo_model(
 ) -> Tuple[DemandIr, Any]:
     """兼容旧接口的模型构建函数
 
-    Returns:
-        (DemandIr, loader_func) 元组,其中 loader_func 为 load_orders
+    返回:
+        (`DemandIr`, `loader_func`) 元组,其中 `loader_func` 为 `load_orders`
     """
     ecommerce_config = config.to_ecommerce_config()
     set_config(ecommerce_config)
@@ -132,7 +132,7 @@ def build_big_data_demo_model(
 
 
 # ============================================================================
-# Binding 参数构建器
+# `Binding` 参数构建器
 # ============================================================================
 
 
@@ -202,11 +202,11 @@ TARGET_FIELDS_FULL = TARGET_FIELDS_BASIC + TARGET_FIELDS_RELATIONS + TARGET_FIEL
 def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
     """构建电商订单报表 IR 模型
 
-    Args:
-        config: 数据配置,None 则使用全局配置
+    参数:
+        `config`: 数据配置,None 则使用全局配置
 
-    Returns:
-        DemandIr 模型
+    返回:
+        `DemandIr` 模型
     """
     if config is not None:
         set_config(config)
@@ -325,21 +325,21 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
     rel_to_logistics = main_source["logistics_id"].join(logistics_source["logistics_id"])
     rel_to_warehouses = main_source["warehouse_id"].join(warehouses_source["warehouse_id"])
 
-    # 多级关联: orders -> products -> categories
+    # 多级关联: `orders -> products -> categories`
     rel_to_categories = (
         main_source["product_id"]
         .join(products_source["product_id"])
         .and_(products_source["category_id"].join(categories_source["category_id"]))
     )
 
-    # 多级关联: orders -> warehouses -> regions
+    # 多级关联: `orders -> warehouses -> regions`
     rel_to_regions = (
         main_source["warehouse_id"]
         .join(warehouses_source["warehouse_id"])
         .and_(warehouses_source["region_id"].join(regions_source["region_id"]))
     )
 
-    # 复合键关联: orders -> region_pricing
+    # 复合键关联: `orders -> region_pricing`
     rel_to_region_pricing = (
         main_source["region_id"]
         .join(region_pricing_source["region_id"])

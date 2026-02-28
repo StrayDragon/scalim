@@ -9,7 +9,7 @@ def test_metadata_fields_count() -> None:
     demand = build_derived_model()
     plan = PlanBuilder(demand).build(targets=["profit"])
 
-    assert plan.metadata.total_fields == 4  # order_id, amount, cost, profit
+    assert plan.metadata.total_fields == 4  # `order_id`, `amount`, `cost`, `profit`
     assert plan.metadata.has_derived_fields is True
 
 

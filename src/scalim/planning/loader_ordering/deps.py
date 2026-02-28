@@ -10,11 +10,11 @@ _logger = logging.getLogger(__name__)
 
 
 def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: FieldIr) -> tuple[str, ...]:
-    """Build dependency signals for ordering ref fields.
+    """为引用字段的排序构建依赖信号。
 
-    Returns a tuple of **field keys** derived from lookup steps `from_field` that
-    can be mapped back to other ref loaders. This is planning-time ordering
-    signal (not runtime `lookup_keys`).
+    返回一个字段键元组,来源于 `lookup_steps` 的 `from_field`:
+    这些字段键可以映射回其他引用加载器.该信号属于规划阶段
+    (而非运行时的 `lookup_keys`).
     """
     steps = field.lookup_steps
     if steps is None and field.relation and demand.main_source and isinstance(field.source, SourceIr):
@@ -41,7 +41,7 @@ def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: Fie
             continue
         deps.append(dep_key)
 
-    # Deduplicate while preserving order (Py3.6+ dict order is insertion order).
+    # 在保持顺序的前提下去重（Py3.6+ 的 `dict` 按插入顺序保序）。
     return tuple(OrderedDict.fromkeys(deps))
 
 

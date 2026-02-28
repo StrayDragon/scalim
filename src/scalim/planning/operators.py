@@ -17,8 +17,8 @@ class OperatorType(StrEnum):
     """算子类型.
 
     说明:
-    - `PlanBuilder` 仅生成 planning 核心算子: `LOAD` / `LOAD_REF` / `COMPUTE`.
-    - 写出/释放等算子类型 (`WRITE_*` / `RELEASE`) 属于 execution 编排范畴, 不由 `PlanBuilder` 产出。
+    - `PlanBuilder` 仅生成规划核心算子: `LOAD` / `LOAD_REF` / `COMPUTE`.
+    - 写出/释放等算子类型 (`WRITE_*` / `RELEASE`) 属于执行编排范畴, 不由 `PlanBuilder` 产出。
     """
 
     LOAD = "load"

@@ -1,4 +1,4 @@
-"""Reusable test scenarios (case registry).
+"""可复用的测试场景（用例注册表）。
 
-This package is intentionally test-only and may use Python 3.10 features if needed.
+该包仅用于测试；如有需要，可以使用 Python 3.10 的特性。
 """

@@ -12,22 +12,22 @@ class Event:
     """观察事件统一封装.
 
     说明:
-        - seq 在同一个 ObserverManager/run_id 内单调递增,不是全局顺序.
-        - 在线程/进程/异步并发中,seq 仅保证局部有序,事件可能交错.
-        - 需要并发上下文时,请通过 meta 传递 worker_id、batch_num 等信息.
+        - `seq` 在同一个 `ObserverManager`/`run_id` 内单调递增,不是全局顺序.
+        - 在线程/进程/异步并发中,`seq` 仅保证局部有序,事件可能交错.
+        - 需要并发上下文时,请通过 `meta` 传递 `worker_id`、`batch_num` 等信息.
     """
 
     event_type: str
-    """事件类型名称 (来自 events/catalog.py 的稳定标识)."""
+    """事件类型名称 (来自 `events/catalog.py` 的稳定标识)."""
 
     timestamp: float
-    """事件发出时的 Unix 时间戳 (秒)."""
+    """事件发出时的 UNIX 时间戳 (秒)."""
 
     run_id: str
     """一次执行的运行标识."""
 
     payload: Any
-    """事件负载 (dataclass 或原始数据)."""
+    """事件负载 (数据类或原始数据)."""
 
     meta: dict[str, Any] = field(default_factory=dict)
     """可选元数据,用于传输/调试/并发上下文提示."""

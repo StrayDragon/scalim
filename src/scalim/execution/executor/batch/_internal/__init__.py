@@ -1,1 +1,1 @@
-"""Batch executor internal helpers."""
+"""批次执行器内部辅助模块。"""

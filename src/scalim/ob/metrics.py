@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class LoaderMetrics:
-    """Loader 性能指标"""
+    """加载器性能指标"""
 
     name: str
     call_count: int = field(default=0, init=False)

@@ -35,7 +35,7 @@ _JITTER_MAX = float(1 << _JITTER_BITS)
 
 @dataclass(frozen=True)
 class LoaderRetryContext:
-    """Context passed to user-provided `should_retry(exc, ctx)` callback."""
+    """传递给用户提供的 `should_retry(exc, ctx)` 回调的上下文。"""
 
     loader_name: str
     callsite: str
@@ -49,9 +49,9 @@ ShouldRetryFn = Callable[[Exception, LoaderRetryContext], bool]
 
 @dataclass(frozen=True)
 class LoaderRetryPolicySpec:
-    """Partial retry policy overlay.
+    """重试策略的“部分覆盖”配置。
 
-    All fields are optional. When merged into a base policy, non-None values override base.
+    所有字段都是可选的；与基础策略合并时，非 `None` 的值会覆盖基础策略。
     """
 
     enabled: bool | None = None
@@ -66,7 +66,7 @@ class LoaderRetryPolicySpec:
 
 @dataclass(frozen=True)
 class LoaderRetryPolicy:
-    """Effective retry policy for one loader invocation."""
+    """单次加载器调用的生效重试策略。"""
 
     enabled: bool = False
     should_retry: ShouldRetryFn | None = None
@@ -95,7 +95,7 @@ class LoaderRetryPolicy:
         if backoff == "fixed":
             delay = self.base_delay_seconds
         else:
-            # attempt_num is 1-based; on attempt 1 failure, use base_delay * 2**0.
+            # `attempt_num` 从 1 开始；第 1 次失败使用 `base_delay * 2**0`。
             delay = self.base_delay_seconds * (2 ** max(0, int(attempt_num) - 1))
 
         delay = min(delay, self.max_delay_seconds)
@@ -110,7 +110,7 @@ class LoaderRetryPolicy:
 
 @dataclass(frozen=True)
 class LoaderRetryPolicies:
-    """Effective retry policies for a run: default + per-loader overrides."""
+    """一次运行的生效重试策略：默认策略 + 按加载器覆盖。"""
 
     default: LoaderRetryPolicy = field(default_factory=LoaderRetryPolicy.disabled)
     by_loader: dict[str, LoaderRetryPolicy] = field(default_factory=dict)
@@ -125,9 +125,9 @@ class LoaderRetryPolicies:
 
 @dataclass(frozen=True)
 class LoaderRetryPoliciesSpec:
-    """Driver-provided retry policy overrides (partial).
+    """驱动侧提供的重试策略覆盖（部分）。
 
-    This is intended for DSL adapters to merge with config-derived policies.
+    用于 DSL 适配器与配置派生出的策略进行合并。
     """
 
     default: LoaderRetryPolicySpec | None = None
@@ -166,7 +166,7 @@ def _truncate_message(message: str, *, max_len: int) -> str:
 
 
 def _secure_unit_random() -> float:
-    # 53-bit random fraction for IEEE-754 double precision mantissa.
+    # 为 IEEE-754 双精度浮点尾数生成 53 位随机小数。
     return float(secrets.randbits(_JITTER_BITS)) / _JITTER_MAX
 
 
@@ -330,12 +330,12 @@ def call_with_loader_retry(
     callsite: str,
     batch_num: int | None = None,
 ) -> _T:
-    """Call a loader with retry policy.
+    """按重试策略调用加载器。
 
-    Notes:
-    - Only catches `Exception` (never `BaseException`).
-    - Emits `loader_retry` event on each retry attempt.
-    - Emits `error` event exactly once when giving up, then re-raises original exception.
+    注意：
+    - 只捕获 `Exception`（不会捕获 `BaseException`）。
+    - 每次重试都会发出 `loader_retry` 事件。
+    - 放弃重试时只发出一次 `error` 事件，然后重新抛出原始异常。
     """
     if not policy.enabled:
         return call()

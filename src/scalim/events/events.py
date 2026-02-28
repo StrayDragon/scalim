@@ -15,9 +15,9 @@ class PipelineStartEvent:
 
     当管道开始执行时触发.
 
-    Attributes:
-        targets: 目标字段键列表
-        batch_size: 配置的批处理大小
+    属性:
+        `targets`: 目标字段键列表
+        `batch_size`: 配置的批处理大小
     """
 
     targets: list[str]
@@ -30,7 +30,7 @@ class PipelineEndEvent:
 
     当管道完成执行时触发.
 
-    Attributes:
+    属性:
         total_batches: 处理的批处理总数
         total_duration: 总执行时间(秒)
     """
@@ -45,7 +45,7 @@ class BatchStartEvent:
 
     当批处理开始处理时触发.
 
-    Attributes:
+    属性:
         batch_num: 批处理编号(从1开始)
         row_ids: 此批处理中行标识列表
     """
@@ -60,9 +60,9 @@ class BatchEndEvent:
 
     当批处理完成处理时触发.
 
-    Attributes:
+    属性:
         batch_num: 批处理编号(从1开始)
-        duration: 批处理时间(秒)
+        `duration`: 批处理时间(秒)
     """
 
     batch_num: int
@@ -75,16 +75,16 @@ class LoaderCallEvent:
 
     当数据加载器被调用时触发.
 
-    Attributes:
-        loader_name: 加载器名称
-        params: 传递给加载器的参数
-        result: 加载器返回的结果或摘要/样本
-        duration: 加载器执行时间(秒)
-        batch_num: 批次编号(可选)
-        cache_status: 缓存命中状态(hit/miss,可选)
-        cache_scope: 缓存作用域(例如 batch,可选)
-        lookup_key_count: lookup_keys 数量(可选)
-        field_keys: loader 关联字段列表(可选)
+    属性:
+        `loader_name`: 加载器名称
+        `params`: 传递给加载器的参数
+        `result`: 加载器返回的结果或摘要/样本
+        `duration`: 加载器执行时间(秒)
+        `batch_num`: 批次编号(可选)
+        `cache_status`: 缓存命中状态(`hit`/`miss`,可选)
+        `cache_scope`: 缓存作用域(例如 `batch`,可选)
+        `lookup_key_count`: lookup_keys 数量(可选)
+        `field_keys`: 加载器关联字段列表(可选)
     """
 
     loader_name: str
@@ -100,9 +100,9 @@ class LoaderCallEvent:
 
 @dataclass(frozen=True)
 class LoaderRetryEvent:
-    """Loader retry attempt event.
+    """加载器重试事件.
 
-    Emitted when a loader call fails and Scalim decides to retry (before sleeping).
+    当加载器调用失败且框架决定重试时触发 (进入重试等待前).
     """
 
     loader_name: str
@@ -122,11 +122,11 @@ class FieldComputeEvent:
 
     当派生字段被计算时触发.
 
-    Attributes:
+    属性:
         field_key: 字段键
         row_id: 行标识
-        dependencies: 依赖字段值
-        result: 计算结果
+        `dependencies`: 依赖字段值
+        `result`: 计算结果
     """
 
     field_key: str
@@ -141,9 +141,9 @@ class ErrorEvent:
 
     当执行过程中发生错误时触发.
 
-    Attributes:
-        error: 发生的异常
-        context: 额外的上下文信息
+    属性:
+        `error`: 发生的异常
+        `context`: 额外的上下文信息
     """
 
     error: Exception
@@ -156,8 +156,8 @@ class DiagnosticWarningEvent:
 
     用于记录非阻断性问题,提示用户检查数据或配置.
 
-    Attributes:
-        message: 可读告警说明
+    属性:
+        `message`: 可读告警说明
         source_id: 关联目标数据源
         field_id: 当前计算字段
         lookup_key: 外键值/关联键
@@ -224,13 +224,13 @@ class ColumnWriteEvent:
 class RelationLookupEvent:
     """关联查找事件.
 
-    Attributes:
+    属性:
         field_key: 当前字段
         row_id: 行标识
         fk_raw: 原始外键
         fk_normalized: 归一化外键
         target_source: 目标源
-        result: 关联结果类型
+        `result`: 关联结果类型
         fk_type: 原始外键类型(可选)
         expected_type: 期望类型(可选)
         error_message: 错误说明(可选)
@@ -249,7 +249,7 @@ class RelationLookupEvent:
 
 @dataclass(frozen=True)
 class StageSpanEvent:
-    """阶段耗时事件 (loader/compute/write)."""
+    """阶段耗时事件 (加载/计算/写出)."""
 
     stage: str
     batch_num: int
@@ -258,9 +258,9 @@ class StageSpanEvent:
 
 @dataclass(frozen=True)
 class AdaptiveSchedulerDecisionEvent:
-    """Adaptive scheduler decision event.
+    """自适应调度决策事件.
 
-    Emitted only in `parallel_mode="adaptive"` when subscribed (wants-gated).
+    仅在 `parallel_mode=\"adaptive\"` 且订阅者 `wants` 该事件时触发.
     """
 
     batch_num: int

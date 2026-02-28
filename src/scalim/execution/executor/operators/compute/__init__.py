@@ -1,5 +1,5 @@
-"""Compute operator package (internal).
+"""计算算子包（内部）。
 
-Implementation lives in `scalim.execution.executor.operators.compute.executor`.
-This package intentionally does not re-export implementation symbols.
+实现位于 `scalim.execution.executor.operators.compute.executor`。
+本包刻意不重导出实现符号。
 """

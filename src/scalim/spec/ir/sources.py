@@ -14,18 +14,18 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class KeyIr:
     """
-    Key(IR): 描述数据源返回映射的 key 结构
+    键(IR): 描述数据源返回映射的键结构
     """
 
     key: str | tuple[str, ...]
     """
-    key 定义
+    键定义
     """
 
     cast: Callable[[Any], Hashable | None] | None = None
     """
-    key 归一化转换: 用于 lookup key 类型对齐
-    例如: cast=int 将 str("123") 转换为 int(123)
+    键归一化转换: 用于查找键类型对齐
+    例如: `cast=int` 将 `str("123")` 转换为 `int(123)`
     """
 
     def __post_init__(self) -> None:
@@ -57,7 +57,7 @@ class SourceIr:
 
     key: KeyIr
     """
-    key 信息
+    键信息
     """
 
     loader_spec: LoaderIr
@@ -77,12 +77,12 @@ class SourceIr:
 
     lookup_chunk_size: int | None = None
     """
-    keys 模式 LoadRef 的 lookup_keys 分片大小; None/0 表示不分片
+    `keys` 模式下 LoadRef 的 lookup_keys 分片大小; `None`/0 表示不分片
     """
 
     bindings: dict[str | tuple[str, ...], BindingIr] = field(default_factory=dict, compare=False, hash=False)
     """
-    参数绑定映射 (key_field -> Binding)
+    参数绑定映射 (`key_field` -> `BindingIr`)
     """
 
     bind: BindingIr | None = None
@@ -93,7 +93,7 @@ class SourceIr:
     def get_binding(self, key_field: str | tuple[str, ...]) -> BindingIr | None:
         """获取指定键字段的绑定.
 
-        Args:
+        参数:
             key_field: 键字段名(字符串或字符串元组,用于复合主键)
         """
         binding = self.loader_spec.get_binding(key_field)
@@ -105,15 +105,15 @@ class SourceIr:
         return self.cache_mode == SourceSpecIrCacheMode.PRELOAD_FOREVER
 
     def __getitem__(self, field_name: str) -> "FieldRefIr":
-        """支持 Source["field"] 语法创建字段引用.
+        """支持 `SourceIr["field"]` 语法创建字段引用.
 
-        Args:
+        参数:
             field_name: 字段名
 
-        Example:
-            orders_source["customer_id"].join(customers_source["customer_id"])
+        示例:
+            `orders_source["customer_id"].join(customers_source["customer_id"])`
 
-        Note:
+        注意:
             使用字符串类型注解避免前向引用问题
         """
         from .relations import FieldRefIr  # noqa: PLC0415
@@ -138,12 +138,12 @@ class MainSourceIr:
 
     loader: MainSourceLoaderCallable
     """
-    主数据源加载器 (返回 Iterable[RowData])
+    主数据源加载器 (返回 `Iterable[RowData]`)
     """
 
     params: dict[str, Any] = field(default_factory=dict)
     """
-    Loader 静态参数 (直接透传给 loader)
+    加载器静态参数 (直接透传给加载器)
     """
 
     order_by: tuple["OrderByKeyIr", ...] = field(default_factory=tuple)
@@ -157,7 +157,7 @@ class MainSourceIr:
     """
 
     def __getitem__(self, field_name: str) -> "FieldRefIr":
-        """支持 MainSource["field"] 语法创建字段引用."""
+        """支持 `MainSourceIr["field"]` 语法创建字段引用."""
         from .relations import FieldRefIr  # noqa: PLC0415
 
         return FieldRefIr(source=self, field_name=field_name)
@@ -175,12 +175,12 @@ class OrderByKeyIr:
 
     field_key: str
     """
-    排序字段 key (主数据源字段)
+    排序字段键 (主数据源字段)
     """
 
     direction: str = "asc"
     """
-    排序方向: asc/desc
+    排序方向: `asc`/`desc`
     """
 
 

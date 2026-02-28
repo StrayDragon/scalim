@@ -1,5 +1,5 @@
-"""Internal helper modules for operator executors.
+"""算子执行器的内部辅助模块。
 
-This package is intentionally internal and does not provide a stable import surface.
-Keep this `__init__` lightweight and avoid re-exporting implementation symbols.
+该包刻意作为内部实现，不承诺稳定的导入接口。
+保持此 `__init__` 轻量，避免重导出实现符号。
 """

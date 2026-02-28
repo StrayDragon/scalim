@@ -1,6 +1,6 @@
-"""Pipeline implementations.
+"""`Pipeline` 的实现。
 
-Kept out of package `__init__.py` to keep import surfaces thin.
+之所以不放在包的 `__init__.py` 中，是为了让包级导出保持精简，避免扩大导入面。
 """
 
 # region imports
@@ -45,10 +45,10 @@ class _ReverseSortValue:
 
 
 class Pipeline(ABC):
-    """Pipeline 抽象基类
+    """流水线（`Pipeline`）抽象基类。
 
-    用于继承后实现 Pipeline 抽象和不同执行策略, 比如
-    - SeqPipeline: 顺序执行
+    用于继承后实现不同执行策略, 例如：
+    - `SeqPipeline`: 顺序执行
     """
 
     plan: ExecutionPlan
@@ -86,10 +86,10 @@ class Pipeline(ABC):
         self._required_fields = self._compute_required_fields()
 
     def _compute_required_fields(self) -> set[str]:
-        """Compute set of fields that need to be stored (with transitive closure).
+        """计算需要存储的字段集合（包含递归依赖的传递闭包）。
 
-        使用 plan.field_dependencies 而不是 field_spec.get_dependencies(),
-        因为 field_dependencies 是基于主数据源方向正确推断的依赖.
+        使用 `ExecutionPlan.field_dependencies` 而不是 `field_spec.get_dependencies()`,
+        因为 `field_dependencies` 是基于主数据源方向正确推断的依赖.
         """
         required: set[str] = set()
         visited: set[str] = set()
@@ -99,7 +99,7 @@ class Pipeline(ABC):
                 return
             visited.add(field_key)
             required.add(field_key)
-            # 使用 plan.field_dependencies 获取正确的依赖
+            # 使用 `ExecutionPlan.field_dependencies` 获取正确的依赖
             deps = self.plan.field_dependencies.get(field_key, ())
             for dep in deps:
                 collect(dep)
@@ -150,7 +150,7 @@ class Pipeline(ABC):
         main_rows: Iterable[RowData] | None = None,
         sink: ISink | None = None,
     ) -> Sequence[RowData]:
-        """执行 pipeline"""
+        """执行流水线。"""
 
     def _preload_cached_sources(self) -> None:
         """预加载缓存数据源"""
@@ -178,7 +178,7 @@ class Pipeline(ABC):
                 )
 
     def _load_main_rows(self) -> Iterable[RowData]:
-        """Load main source rows (row stream)."""
+        """加载主数据源的行（行流）。"""
         main_source = self.demand.main_source
         loader_fn = main_source.loader
         params = dict(main_source.params or {})
@@ -208,7 +208,7 @@ class Pipeline(ABC):
         self,
         main_rows: Iterable[RowData],
     ) -> Iterator[tuple[list[Hashable], dict[Hashable, RowData]]]:
-        """Yield batches of (row_ids, row_map) preserving row order."""
+        """按原始行顺序产出批次 `(row_ids, row_map)`。"""
         row_iter = iter(main_rows)
         next_row_id = 0
 
@@ -222,7 +222,7 @@ class Pipeline(ABC):
 
 
 class SeqPipeline(Pipeline):
-    """顺序执行 Pipeline"""
+    """顺序执行流水线。"""
 
     @override
     def run(
@@ -306,7 +306,7 @@ class SeqPipeline(Pipeline):
         self,
         sink: ISink | None,
     ) -> "tuple[IColumnSink | None, IRowSink | None]":
-        """分类 sink 类型"""
+        """分类输出端（`sink`）类型。"""
         column_sink: IColumnSink | None = None
         streaming_sink: IRowSink | None = None
         if sink is not None:
@@ -496,7 +496,7 @@ class SeqPipeline(Pipeline):
         *,
         adaptive_pool: Executor | None = None,
     ) -> list[RowData]:
-        """流式模式执行批次 (true row streaming)"""
+        """流式模式执行批次（真正的逐行流式）。"""
         self.runtime.sink = streaming_sink
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()

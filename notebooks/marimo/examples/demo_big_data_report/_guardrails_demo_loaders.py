@@ -1,8 +1,8 @@
-"""Guardrails 演示用 loaders（数据加载器）。
+"""运行时护栏演示用数据加载器。
 
 用于演示：
-- runtime guardrails（quiet / fast_fail）
-- extract_field 合同：支持不同“行对象”形态（dict / Mapping / attribute object / __getitem__ 等）
+- 运行时护栏模式（`quiet` / `fast_fail`）
+- `extract_field` 合同：支持不同“行对象”形态（`dict` / `Mapping` / 属性对象 / `__getitem__` 等）
 """
 
 from dataclasses import dataclass
@@ -33,13 +33,13 @@ class _RefRowObj:
 
 
 def load_guardrails_demo_main_rows() -> List[Any]:
-    """运行时 guardrails + extract_field 合同演示的主表数据。
+    """运行时护栏 + `extract_field` 合同演示的主表数据。
 
     刻意混用多种“行对象”形态，验证框架对输入数据形态的兼容性：
-    - dict
-    - Mapping（非 dict）：UserDict / MappingProxyType
-    - 属性对象：SimpleNamespace / dataclass
-    - __getitem__ duck typing
+    - `dict`
+    - `Mapping`（非 `dict`）：`UserDict` / `MappingProxyType`
+    - 属性对象：`SimpleNamespace` / `dataclass`
+    - `__getitem__` 鸭子类型
     """
     return [
         {"ref_id": 1, "a": "1", "b": 2},
@@ -54,9 +54,9 @@ def load_guardrails_demo_main_rows() -> List[Any]:
 
 
 def load_guardrails_demo_ref_table(ids: Optional[List[int]] = None) -> Dict[int, Any]:
-    """演示用引用表 loader（用于 relation 字段）。
+    """演示用引用表加载器（用于 `relation` 字段）。
 
-    返回映射：ref_id -> row_data，其中 row_data 同样混用多种形态。
+    返回映射：`ref_id` -> `row_data`，其中 `row_data` 同样混用多种形态。
     """
     full: Dict[int, Any] = {
         1: UserDict({"value": "U1"}),

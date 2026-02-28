@@ -1,5 +1,5 @@
-"""Base pipeline package.
+"""基础流水线包.
 
-Intentionally does not re-export implementation symbols.
-Import implementations from `scalim.execution.pipeline.base.pipeline`.
+刻意不在包级重导出实现符号.
+请从 `scalim.execution.pipeline.base.pipeline` 导入实现。
 """

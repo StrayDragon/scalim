@@ -14,12 +14,15 @@ from .sources import MainSourceIr, SourceIr, SourceRefIr
 class FieldRefIr:
     """字段引用 - 用于构建关联条件.
 
-    表达 Source["field_name"] 语法,支持方法调用构建关联表达式.
+    表达 `source["field_name"]` 语法,支持方法调用构建关联表达式.
 
-    Example (推荐):
-        orders_source["customer_id"].join(customers_source["customer_id"])
-        # 或
-        orders_source["customer_id"].eq(customers_source["customer_id"])
+    示例 (推荐):
+
+    ```python
+    orders_source["customer_id"].join(customers_source["customer_id"])
+    # 或
+    orders_source["customer_id"].eq(customers_source["customer_id"])
+    ```
     """
 
     source: SourceRefIr
@@ -35,10 +38,13 @@ class FieldRefIr:
     def join(self, other: object) -> "JoinConditionIr":
         """构建关联条件 - 推荐方式
 
-        Example:
-            relation = source_a["field_a"].join(source_b["field_b"])
-            # 多条件组合
-            relation = source_a["f1"].join(source_b["f1"]).and_(source_a["f2"].join(source_b["f2"]))
+        示例:
+
+        ```python
+        relation = source_a["field_a"].join(source_b["field_b"])
+        # 多条件组合
+        relation = source_a["f1"].join(source_b["f1"]).and_(source_a["f2"].join(source_b["f2"]))
+        ```
         """
         if not isinstance(other, FieldRefIr):
             msg = f"join() requires a FieldRefIr, got {type(other).__name__}"
@@ -46,10 +52,13 @@ class FieldRefIr:
         return JoinConditionIr(left=self, right=other)
 
     def eq(self, other: object) -> "JoinConditionIr":
-        """构建关联条件 - join() 的别名,语义更清晰
+        """构建关联条件 - `join()` 的别名,语义更清晰
 
-        Example:
-            relation = source_a["field_a"].eq(source_b["field_b"])
+        示例:
+
+        ```python
+        relation = source_a["field_a"].eq(source_b["field_b"])
+        ```
         """
         return self.join(other)
 
@@ -63,8 +72,11 @@ class JoinConditionIr:
     """
     联结条件(IR): 表达两个表达式之间的相等关系,支持通过方法组合多个条件.
 
-    Example:
-        orders["customer_id"].join(customers["customer_id"])
+    示例:
+
+    ```python
+    orders["customer_id"].join(customers["customer_id"])
+    ```
     """
 
     left: FieldRefIr
@@ -98,19 +110,22 @@ class RelationIr:
     """
     关联关系(IR): 可复用的多表多字段关联定义
 
-    Example:
-        # 1 - 单表单字段:
-        orders["customer_id"].join(customers["customer_id"])
+    示例:
 
-        # 2 - 单表多字段:
-        orders["region_id"].join(mapping["region_id"]).and_(
-            orders["institution_id"].join(mapping["institution_id"])
-        )
+    ```python
+    # 1 - 单表单字段:
+    orders["customer_id"].join(customers["customer_id"])
 
-        # 3 - 多表级联:
-        orders["pay_id"].join(pays["pay_id"]).and_(
-            pays["country_id"].join(countries["country_id"])
-        )
+    # 2 - 单表多字段:
+    orders["region_id"].join(mapping["region_id"]).and_(
+        orders["institution_id"].join(mapping["institution_id"])
+    )
+
+    # 3 - 多表级联:
+    orders["pay_id"].join(pays["pay_id"]).and_(
+        pays["country_id"].join(countries["country_id"])
+    )
+    ```
     """
 
     conditions: tuple[JoinConditionIr, ...]
@@ -170,7 +185,7 @@ class RelationIr:
         """
         推断从 from_source 到 to_source 的查找路径, 返回 LookupStepIr 序列
         """
-        # 构建邻接表: source_id -> [(field, next_source, next_field)]
+        # 构建邻接表: source_id -> [(from_field, next_source, to_field)]
         adjacency = self._build_adjacency()
 
         # BFS 查找路径
@@ -233,21 +248,24 @@ class LookupStepIr:
     """
     关联步骤(IR): 描述从一个或多个字段到另一个数据源的关联关系, 这是多级关联链的基本单元, 表达完全无歧义地指定关联路径
 
-    Example
-        # 1 - 单字段关联:
-        # orders.pay_id -> pays.id
-        LookupStepIr(
-            from_field="pay_id",
-            to_source=pays_source,
-        )
+    示例:
 
-        # 2 - 多字段关联:
-        # orders.(region_id, institution_id) -> mapping.(region_id, institution_id)
-        LookupStepIr(
-            from_field=["region_id", "institution_id"],
-            to_source=mapping_source,
-            to_field=["region_id", "institution_id"],
-        )
+    ```python
+    # 1 - 单字段关联:
+    # orders.pay_id -> pays.id
+    LookupStepIr(
+        from_field="pay_id",
+        to_source=pays_source,
+    )
+
+    # 2 - 多字段关联:
+    # orders.(region_id, institution_id) -> mapping.(region_id, institution_id)
+    LookupStepIr(
+        from_field=["region_id", "institution_id"],
+        to_source=mapping_source,
+        to_field=["region_id", "institution_id"],
+    )
+    ```
     """
 
     from_field: LookupFieldKey
@@ -262,17 +280,17 @@ class LookupStepIr:
 
     to_field: LookupFieldKey | None = None
     """
-    目标字段名或字段名列表(可选,默认使用to_source.key)
+    目标字段名或字段名列表(可选,默认使用 `to_source.key`)
     """
 
     lookup_cast: Callable[[Any], Hashable | None] | None = None
     """
-    lookup key 归一化转换(仅当前 step)
+    查找键归一化转换(仅当前步骤)
     """
 
     bind: BindingIr | None = None
     """
-    下游 loader 参数绑定(仅当前 step)
+    下游加载器参数绑定(仅当前步骤)
     """
 
     def __post_init__(self) -> None:
@@ -310,11 +328,11 @@ class LookupStepIr:
 
     def get_to_fields_or_source_key(self) -> tuple[str, ...]:
         """
-        获取目标字段列表: 如果未指定to_field,则使用to_source的 key
+        获取目标字段列表: 如果未指定 to_field,则使用 to_source 的键
         """
         if self.to_field is not None:
             return self._normalize_fields(self.to_field)
-        # 默认使用 source key
+        # 默认使用数据源键
         key = self.to_source.key.key
         if isinstance(key, (list, tuple)):
             return tuple(key)
@@ -322,7 +340,7 @@ class LookupStepIr:
 
     def get_to_key_or_source_key(self) -> LookupFieldKey:
         """
-        获取目标键: 如果未指定to_field,则使用to_source的 key
+        获取目标键: 如果未指定 to_field,则使用 to_source 的键
         """
         if self.to_field is not None:
             return self.to_field

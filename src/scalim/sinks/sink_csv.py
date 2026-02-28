@@ -36,25 +36,25 @@ def _normalize_csv_value(value: Any) -> str:
 
 
 class CSVSink(BaseRowSink):
-    """CSV 写入 Sink - 支持流式行写入.
+    """CSV 行式输出端 - 支持流式按行写入.
 
     支持自定义分隔符和编码.
-    实现 IRowSink 接口, 支持单行流式写入以优化内存使用 (FR023).
+    实现 `IRowSink` 接口, 支持单行流式写入以优化内存使用 (FR023).
 
-    使用临时文件写入,close() 时原子重命名到目标路径,避免 IO 异常导致半截文件.
+    使用临时文件写入, `close()` 时原子重命名到目标路径,避免 I/O 异常导致半截文件.
 
-    Args:
-        output_path: 输出文件路径
-        delimiter: 分隔符, 默认逗号
-        encoding: 编码, 默认 utf-8
-        field_names: 字段 ID 列表, 用于从 row 中取值
-        header_names: 表头名称列表 (可选), 用于输出表头. 默认等于 field_names
-        include_header: 是否包含表头, 默认 True
-        flush_policy: 刷新策略, 默认 "every_n_rows"
-        flush_every_rows: 按行数刷新阈值 (flush_policy="every_n_rows" 时生效)
+    参数：
+        `output_path`: 输出文件路径
+        `delimiter`: 分隔符, 默认逗号
+        `encoding`: 编码, 默认 `utf-8`
+        `field_names`: 字段 ID 列表, 用于从 `row` 中取值
+        `header_names`: 表头名称列表 (可选), 用于输出表头. 默认等于 `field_names`
+        `include_header`: 是否包含表头, 默认 `True`
+        `flush_policy`: 刷新策略, 默认 `"every_n_rows"`
+        `flush_every_rows`: 按行数刷新阈值 (当 `flush_policy=\"every_n_rows\"` 时生效)
 
-    示例::
-
+    示例：
+        ```python
         with CSVSink("report.csv", field_names=["id", "name"]) as sink:
             sink.write_row({"id": 1, "name": "Alice"})
             sink.write_batch([{"id": 2, "name": "Bob"}])
@@ -62,6 +62,7 @@ class CSVSink(BaseRowSink):
         # 使用不同的表头名称
         with CSVSink("report.csv", field_names=["id", "name"], header_names=["编号", "姓名"]) as sink:
             sink.write_row({"id": 1, "name": "Alice"})
+        ```
     """
 
     output_path: str
@@ -171,27 +172,27 @@ class CSVSink(BaseRowSink):
 
 
 class ColumnCSVSink(IColumnSink):
-    """列式 CSV Sink - 生产环境使用的高性能列式写入 (FR023).
+    """CSV 列式输出端 - 生产环境使用的高性能列式写入 (FR023).
 
     工作原理:
     1. 在内存中按列缓存数据
-    2. close() 时一次性将所有数据写入 CSV 文件
+    2. `close()` 时一次性将所有数据写入 CSV 文件
 
     优点:
     - 性能高: 只需一次文件 I/O
-    - 调用方可在 write_column() 后立即释放该列的源数据
+    - 调用方可在 `write_column()` 后立即释放该列的源数据
     - 适合宽表场景 (200+ 列)
 
-    Args:
-        output_path: 输出文件路径
-        field_names: 字段 ID 列表, 用于从列数据中取值
-        header_names: 表头名称列表 (可选), 用于输出表头. 默认等于 field_names
-        delimiter: 分隔符, 默认逗号
-        encoding: 编码, 默认 utf-8
-        include_header: 是否包含表头, 默认 True
+    参数：
+        `output_path`: 输出文件路径
+        `field_names`: 字段 ID 列表, 用于从列数据中取值
+        `header_names`: 表头名称列表 (可选), 用于输出表头. 默认等于 `field_names`
+        `delimiter`: 分隔符, 默认逗号
+        `encoding`: 编码, 默认 `utf-8`
+        `include_header`: 是否包含表头, 默认 `True`
 
-    示例::
-
+    示例：
+        ```python
         with ColumnCSVSink("/tmp/report.csv", ["id", "name"]) as sink:
             sink.set_row_ids([1, 2, 3])
             sink.write_column("id", {1: 1, 2: 2, 3: 3})
@@ -201,6 +202,7 @@ class ColumnCSVSink(IColumnSink):
         with ColumnCSVSink("/tmp/report.csv", ["id", "name"], header_names=["编号", "姓名"]) as sink:
             sink.set_row_ids([1, 2, 3])
             sink.write_column("id", {1: 1, 2: 2, 3: 3})
+        ```
     """
 
     output_path: str
@@ -297,16 +299,16 @@ class ColumnCSVSink(IColumnSink):
 
 
 class BlockColumnCSVSink(IColumnSink):
-    """块列写入 CSV Sink - 真正的实时列写入 (FR023).
+    """块列写入 CSV 输出端 - 真正的实时列写入 (FR023).
 
     与 RealtimeColumnCSVSink 的区别:
     - RealtimeColumnCSVSink: 每列写入时重写整个文件
-    - BlockColumnCSVSink: 预分配空间,每列写入时 seek 到对应位置直接写入
+    - BlockColumnCSVSink: 预分配空间,每列写入时通过 `seek` 定位到对应位置直接写入
 
     工作原理:
-    1. set_row_ids 时预分配整个文件空间 (固定宽度列)
-    2. write_column 时 seek 到每个单元格位置直接写入
-    3. 写入后 flush, 观察者可实时看到列被填充
+    1. `set_row_ids` 时预分配整个文件空间 (固定宽度列)
+    2. `write_column` 时通过 `seek` 定位到每个单元格位置直接写入
+    3. 写入后刷新 (`flush`), 观察者可实时看到列被填充
 
     文件格式 (col_width=12):
     ```
@@ -316,7 +318,7 @@ class BlockColumnCSVSink(IColumnSink):
     (3,)
     ```
 
-    写入 name 列后:
+    写入 `name` 列后:
     ```
     order_id, name
     1, Alice
@@ -324,17 +326,18 @@ class BlockColumnCSVSink(IColumnSink):
     3, Charlie
     ```
 
-    示例::
-
+    示例：
+        ```python
         with BlockColumnCSVSink("/tmp/demo.csv", ["id", "name"], col_width=16) as sink:
             sink.set_row_ids([1, 2, 3])  # 预分配空间
             sink.write_column("id", {1: 1, 2: 2, 3: 3})  # seek + write
             sink.write_column("name", {1: "A", 2: "B", 3: "C"})  # seek + write
+        ```
 
     限制:
     - 值会被截断到 col_width - 1 字节 (保留分隔符/换行位置)
-    - 必须在 write_column 之前调用 set_row_ids
-    - 仅用于演示, 生产环境请使用 ColumnCSVSink
+    - 必须在 `write_column` 之前调用 `set_row_ids`
+    - 仅用于演示, 生产环境请使用 `ColumnCSVSink`
     """
 
     output_path: str

@@ -1,8 +1,8 @@
-"""Event models and helpers.
+"""事件模型与辅助工具.
 
-This package intentionally does not re-export symbols.
-Import concrete event types from `scalim.events.events`, the base `Event` from
-`scalim.events.event`, and catalog helpers from `scalim.events.catalog`.
+本包刻意不在包级重导出符号.
+请从 `scalim.events.events` 导入具体事件类型,从 `scalim.events.event` 导入基础 `Event`,
+并从 `scalim.events.catalog` 导入事件目录相关的辅助对象.
 """
 
 __all__ = []

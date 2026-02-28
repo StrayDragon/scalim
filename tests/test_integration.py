@@ -1,6 +1,6 @@
-"""集成测试 - 使用真实 demo 数据进行端到端测试.
+"""集成测试 - 使用真实示例数据进行端到端测试.
 
-这些测试使用 examples/demo_report_ir 中的真实数据,
+这些测试使用 `scalim.misc.example_report_ir` 中的真实数据,
 验证整个数据处理流程的正确性.
 """
 
@@ -23,7 +23,7 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture(scope="module")
 def demo_model():
-    """加载 demo 模型 (模块级别缓存)"""
+    """加载示例模型 (模块级别缓存)"""
 
     return build_order_report_model()
 
@@ -75,7 +75,7 @@ class TestPlanBuilderRealData:
         """测试包含派生字段的构建"""
         plan = plan_builder.build(targets=["order_id", "profit"])
 
-        # profit 依赖 amount 和 cost
+        # `profit` 依赖 `amount` 和 `cost`
         assert "profit" in plan.target_fields
         assert "amount" in plan.field_order
         assert "cost" in plan.field_order
@@ -95,14 +95,14 @@ class TestPlanBuilderRealData:
         assert "customer_name" in plan.target_fields
         assert "customer_id" in plan.field_order
 
-        # 验证有关联 loader
+        # 验证有关联加载器
         assert len(plan.ref_loader_sequence) >= 1
 
     def test_build_with_multi_level_relation(self, plan_builder) -> None:
         """测试多级关联字段构建"""
         plan = plan_builder.build(targets=["order_id", "country_name"])
 
-        # country_name 通过 orders -> pays -> countries 关联
+        # `country_name` 通过 `orders` -> `pays` -> `countries` 关联
         assert "country_name" in plan.target_fields
         assert "pay_id" in plan.field_order
         # country_id 是中间路径的外键
@@ -134,7 +134,7 @@ class TestPlanBuilderRealData:
 
 
 class TestIREngineRealExecution:
-    """IREngine 真实数据执行测试"""
+    """`ScalimEngine` 真实数据执行测试"""
 
     def test_execute_simple_fields(self, demo_model) -> None:
         """测试简单字段执行"""
@@ -162,7 +162,7 @@ class TestIREngineRealExecution:
 
         assert len(results) == 5
 
-        # 验证 profit = amount - cost (格式化为字符串)
+        # 验证 `profit` = `amount` - `cost` (格式化为字符串)
         for row in results:
             amount = row["amount"] or 0
             cost = row["cost"] or 0
@@ -256,10 +256,10 @@ class TestIREngineRealExecution:
 
 
 class TestSinkModes:
-    """不同 Sink 模式测试"""
+    """不同写出端模式测试"""
 
     def test_normal_sink(self, demo_model) -> None:
-        """测试普通 Sink"""
+        """测试普通写出端"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit"])
 
@@ -268,12 +268,12 @@ class TestSinkModes:
 
         results = engine.run(main_rows=_get_main_rows(demo_model, 6), sink=sink)
 
-        assert results == []  # 使用 sink 时返回空
+        assert results == []  # 使用写出端时返回空
         assert sink.closed is True
         assert len(sink.rows) == 6
 
     def test_streaming_sink(self, demo_model) -> None:
-        """测试流式 Sink"""
+        """测试流式写出端"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit"])
 
@@ -287,7 +287,7 @@ class TestSinkModes:
         assert len(sink.rows) == 6
 
     def test_column_sink(self, demo_model) -> None:
-        """测试列式 Sink"""
+        """测试列式写出端"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit"])
 
@@ -302,7 +302,7 @@ class TestSinkModes:
         assert "profit" in sink.columns
 
     def test_sink_modes_consistency(self, demo_model) -> None:
-        """测试不同 Sink 模式结果一致性"""
+        """测试不同写出端模式结果一致性"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit", "customer_name"])
         main_rows = _get_main_rows(demo_model, 5)

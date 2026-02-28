@@ -1,7 +1,6 @@
-"""Adaptive execution components.
+"""自适应执行组件.
 
-This package hosts the intrabatch fan-out/fan-in scheduler and its supporting
-utilities (capture/replay, overlay contexts, tuning/policy).
+该包包含批次内的扇出/扇入调度器及其配套能力（捕获/回放、覆盖上下文、调参/策略）。
 """
 
 __all__ = []

@@ -171,7 +171,7 @@ class VizEventEmitter:
 
 
 class VizObserver(EventDispatchObserver):
-    """Viz 可视化事件 Observer."""
+    """可视化事件观察者。"""
 
     config: VizObserverConfig
     snapshot: dict[str, Any] | None

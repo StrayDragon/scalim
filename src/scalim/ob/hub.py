@@ -53,9 +53,9 @@ _PayloadT = TypeVar("_PayloadT")
 
 
 class InstrumentationHub:
-    """Unified instrumentation hub for hooks + observers.
+    """统一的埋点中心：同时支持钩子与观察者。
 
-    Execution hotpaths SHOULD call hub once, and use `wants(event_type)` to gate any heavy payload preparation.
+    执行热路径应尽量只调用 `InstrumentationHub` 一次，并通过 `wants(event_type)` 来避免构建较重的载荷。
     """
 
     hook_manager: HookManager
@@ -102,7 +102,7 @@ class InstrumentationHub:
         self.observer_manager.clear()
 
     def wants(self, event_type: str) -> bool:
-        # O(1) wants check; used by hotpaths to avoid building payloads/kwargs when nothing is subscribed.
+        # `O(1)` 的 `wants` 检查：用于热路径，在无人订阅时避免构建 `payload`/`kwargs`。
         return self.hook_manager.wants(event_type) or self.observer_manager.wants(event_type)
 
     def _emit_assume_wanted(
@@ -138,21 +138,21 @@ class InstrumentationHub:
         payload: Any,
         meta: dict[str, Any] | None = None,
     ) -> Event | None:
-        """Emit an event to typed hooks, observers, and `hook.on_event(Event)` subscribers.
+        """向类型化钩子、观察者以及 `hook.on_event(Event)` 的订阅者发出事件。
 
-        Returns the built `Event` envelope when emitted to observer/on_event paths; otherwise returns None.
+        若事件走到观察者/`on_event` 路径，则返回构建出的 `Event` 封装；否则返回 `None`。
         """
         if not self.wants(event_type):
             return None
         return self._emit_assume_wanted(event_type, payload, meta=meta)
 
     def emit_recorded_event(self, event: Event) -> None:
-        """Replay a previously recorded event (e.g. from parallel capture mode)."""
+        """回放先前记录的事件（例如来自并行捕获模式）。"""
         self.observer_manager.emit(event)
         if self.observer_manager.mode != "capture":
             self.hook_manager.emit_on_event(event)
 
-    # ---- typed helpers (preferred in execution hotpaths) ----
+    # ---- 类型化辅助方法（执行热路径优先使用）----
 
     def emit_pipeline_start(self, targets: list[str], batch_size: int) -> None:
         if not self.wants(EVENT_PIPELINE_START):
@@ -188,7 +188,7 @@ class InstrumentationHub:
         field_keys: list[str] | None = None,
         meta: dict[str, Any] | None = None,
     ) -> None:
-        # Typed hooks may have a different loader_result_policy than the observer/event path.
+        # 类型化钩子的 `loader_result_policy` 可能与观察者/事件路径不同。
         if self.hook_manager.wants_typed(EVENT_LOADER_CALL):
             self.hook_manager.trigger_loader_call(
                 loader_name=loader_name,
@@ -300,7 +300,7 @@ class InstrumentationHub:
 
         if not hooks_want and not event_want:
             if self.hook_manager.fallback_logger_enabled or self.observer_manager.fallback_logger_enabled:
-                # Use ObserverManager logger for consistency.
+                # 为保持一致性，使用 `ObserverManager` 的日志记录器（`logger`）。
                 self.observer_manager.emit_diagnostic_warning(
                     message=message,
                     source_id=source_id,

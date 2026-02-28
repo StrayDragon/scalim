@@ -1,5 +1,5 @@
-"""Execution executor package.
+"""执行器包.
 
-Intentionally does not re-export implementation symbols.
-Import from concrete modules under `scalim.execution.executor.*`.
+刻意不在包级重导出实现符号.
+请从 `scalim.execution.executor.*` 下的具体模块导入。
 """

@@ -1,5 +1,5 @@
-"""Operator executors package.
+"""算子执行器包.
 
-Intentionally does not re-export implementation symbols.
-Import executors from concrete modules under `scalim.execution.executor.operators.*`.
+刻意不在包级重导出实现符号.
+请从 `scalim.execution.executor.operators.*` 下的具体模块导入执行器。
 """

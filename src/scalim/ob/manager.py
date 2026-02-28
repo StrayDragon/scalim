@@ -87,9 +87,9 @@ class ObserverCaptureOverflowError(RuntimeError):
 
 
 class ObserverManager:
-    """Observer manager - register observers and dispatch events.
+    """观察者管理器：注册观察者并分发事件。
 
-    Note: manage observers via register/unregister/clear; direct mutation of the observers list can desync subscription caches.
+    注意：请通过 `register`/`unregister`/`clear` 管理观察者；直接修改 `observers` 列表可能导致订阅缓存不同步。
     """
 
     observers: list[Observer]
@@ -308,7 +308,7 @@ class ObserverManager:
 
     def _rebuild_subscription_cache(self) -> None:
         observers_by_event_type: dict[str, list[Observer]] = {event_type: [] for event_type in _CATALOG_EVENT_TYPES}
-        # Observers that should receive unknown event types (explicit opt-in).
+        # 用于接收未知事件类型的观察者（需要显式开启）。
         unknown_observers: list[Observer] = []
 
         for observer in self.observers:
@@ -475,7 +475,7 @@ class ObserverManager:
         capture._capture_unknown_event_types = bool(self._observers_for_unknown_event_type)
         return capture
 
-    # ---- typed emit helpers ----
+    # ---- 类型化发送辅助方法 ----
 
     def emit_pipeline_start(self, targets: list[str], batch_size: int) -> None:
         if not self._should_emit_event_type(EVENT_PIPELINE_START):

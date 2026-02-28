@@ -87,15 +87,15 @@ def test_csv_sink_requires_field_names(tmp_path):
 
 
 def test_csv_sink_supports_field_mapping(tmp_path):
-    """Test that CSVSink correctly handles field_names vs header_names.
+    """验证 `CSVSink` 能正确处理 `field_names` 与 `header_names`。
 
-    This test verifies that field_names is used to extract values from rows,
-    while header_names is used for the CSV header output.
+    - `field_names` 用于从行数据中取值
+    - `header_names` 用于输出 CSV 表头
     """
     output_path = tmp_path / "mapped.csv"
 
-    # field_names=["id"] means we extract value using key "id" from the row
-    # header_names=["identifier"] means the CSV header shows "identifier"
+    # `field_names=["id"]` 表示从行中使用键 `"id"` 取值
+    # `header_names=["identifier"]` 表示 CSV 表头显示 `"identifier"`
     sink = CSVSink(str(output_path), field_names=["id"], header_names=["identifier"])
     sink.write_row({"id": 7})
     sink.close()
@@ -159,7 +159,7 @@ def test_default_column_sink_write_batch_converts_rows():
     ids=["row-sink", "column-sink"],
 )
 def test_csv_sink_with_header_names(tmp_path, sink_cls):
-    """Test that CSV sinks correctly use header_names for header and field_names for values."""
+    """验证 CSV 写出端能正确使用 `header_names` 输出表头, 使用 `field_names` 输出值。"""
     output_path = tmp_path / "output.csv"
     rows = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
 
@@ -171,8 +171,8 @@ def test_csv_sink_with_header_names(tmp_path, sink_cls):
     )
 
     lines = output_path.read_text(encoding="utf-8").strip().splitlines()
-    assert lines[0] == "编号,姓名"  # Header uses header_names
-    assert lines[1] == "1,Alice"  # Values from field_names keys
+    assert lines[0] == "编号,姓名"  # 表头使用 `header_names`
+    assert lines[1] == "1,Alice"  # 值使用 `field_names` 对应的键
     assert lines[2] == "2,Bob"
 
 
@@ -197,35 +197,35 @@ def test_csv_sink_escapes_special_chars(tmp_path, sink_cls):
 
 
 def test_csv_sink_atomic_write(tmp_path):
-    """Test that CSVSink uses atomic write (temp file + rename)."""
+    """验证 `CSVSink` 使用原子写入（临时文件 + 重命名）。"""
     import os
 
     output_path = tmp_path / "output.csv"
 
     with CSVSink(str(output_path), field_names=["id", "name"]) as sink:
-        # During write, temp file should exist
+        # 写入过程中应存在临时文件
         sink.write_row({"id": 1, "name": "Alice"})
-        # Final file should not exist yet (written on close)
-        # Note: With atomic write, the final file exists only after close()
+        # 最终文件在 `close` 前不应存在（调用 `close` 时才写入/替换）
+        # 注意: 原子写入下,最终文件仅会在 `close()` 后出现
 
-    # After close, final file should exist
+    # `close` 后最终文件应存在
     assert output_path.exists()
     lines = output_path.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 2  # header + 1 row
+    assert len(lines) == 2  # 表头 + 1 行数据
 
 
 def test_column_csv_sink_atomic_write_on_error(tmp_path):
-    """Test that ColumnCSVSink cleans up temp file on error."""
+    """验证 `ColumnCSVSink` 在发生错误时能清理临时文件。"""
     import os
 
     output_path = tmp_path / "output.csv"
 
-    # Create a sink and intentionally don't close it properly
+    # 创建写出端,并刻意不正确关闭
     sink = ColumnCSVSink(str(output_path), field_names=["id", "name"])
     sink.set_row_ids([1, 2])
     sink.write_column("id", {1: 1, 2: 2})
-    # Don't close - no file should be written
+    # 不调用 `close`: 不应写出最终文件
 
-    # After proper close, file should exist
+    # 正常调用 `close` 后应写出最终文件
     sink.close()
     assert output_path.exists()

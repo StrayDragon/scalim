@@ -1,7 +1,7 @@
-"""Planning-time builder helpers (internal).
+"""规划阶段的构建辅助模块（内部）。
 
-Import from concrete modules under `scalim.planning.builder_helpers.*`.
-This package intentionally avoids re-exporting implementation symbols.
+请从 `scalim.planning.builder_helpers.*` 下的具体模块导入。
+本包刻意避免重导出实现符号。
 """
 
 __all__ = []

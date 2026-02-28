@@ -6,11 +6,11 @@ from ..context import BatchContext
 
 
 class OverlayBatchContext(BatchContext):
-    """A BatchContext overlay used for intrabatch parallelism.
+    """用于批次内并行的 `BatchContext` 覆盖层。
 
-    - Reads fall back to the base context (read-only).
-    - Writes go to an overlay buffer only.
-    - Deletes never affect the base context.
+    - 读取会回退到基础上下文（只读）。
+    - 写入只进入覆盖缓冲区。
+    - 删除不会影响基础上下文。
     """
 
     _base: BatchContext

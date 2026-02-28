@@ -1,4 +1,4 @@
-"""Executor operator tests: load."""
+"""执行器算子测试：`load`。"""
 
 from scalim.execution.context import BatchContext
 from scalim.events.catalog import EVENT_LOADER_CALL, EVENT_LOADER_SLIM

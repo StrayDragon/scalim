@@ -25,7 +25,7 @@ def _viz_add_node(
             "id": node_id,
             "type": node_type,
             "data": data,
-            # XYFlow 需要 position,这里使用占位
+            # `XYFlow` 需要 `position`,这里使用占位
             "position": {"x": 0, "y": 0},
         }
     )
@@ -214,9 +214,9 @@ def build_viz_graph_snapshot(
     include_loader_nodes: bool = True,
     include_source_nodes: bool = True,
 ) -> dict[str, Any]:
-    """Generate VizGraphSnapshot (for visualization).
+    """生成用于可视化的 `VizGraphSnapshot`.
 
-    Returns a dict with nodes/edges/meta and stable ordering rules.
+    返回包含 `nodes`/`edges`/`meta` 的字典结构,并提供稳定的排序规则.
     """
 
     nodes: list[dict[str, Any]] = []

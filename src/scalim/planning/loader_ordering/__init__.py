@@ -1,10 +1,9 @@
-"""Loader ordering helpers.
+"""加载器排序辅助模块.
 
-This package contains internal helpers used by the planning layer to build and
-order loader/ref-loader sequences.
+该包包含规划层用于构建并排序加载器/引用加载器序列的内部辅助函数。
 
-Intentionally does not re-export implementation symbols.
-Import helpers from the concrete modules under `scalim.planning.loader_ordering.*`.
+刻意不重导出实现符号.
+请从 `scalim.planning.loader_ordering.*` 下的具体模块导入辅助函数。
 """
 
 __all__ = []

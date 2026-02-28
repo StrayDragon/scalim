@@ -67,7 +67,7 @@ def iter_row_values(row_ids: "SinkRowKeySeq", field_names: Sequence[str], column
 
 
 class ISink(ABC):
-    """输出 Sink 接口.
+    """输出端接口.
 
     框架通过此接口输出数据,不关心输出格式和目标.
     """
@@ -76,30 +76,30 @@ class ISink(ABC):
     def write_batch(self, rows: Sequence[RowData]) -> None:
         """写入一批数据.
 
-        Args:
-            rows: 数据行列表 (每行是从字段键到字段值的映射)
+        参数:
+            `rows`: 数据行列表 (每行是从字段键到字段值的映射)
         """
 
     @abstractmethod
     def close(self) -> None:
-        """关闭 Sink, 完成输出"""
+        """关闭输出端, 完成输出"""
 
 
 class IRowSink(ISink, ABC):
-    """流式 Sink 接口 - 支持行级流式写入.
+    """行式写出端接口 - 支持行级流式写入.
 
-    此接口扩展 ISink 以支持逐行写入,实现更激进的内存优化 (FR023).
+    此接口扩展 `ISink` 以支持逐行写入,实现更激进的内存优化 (FR023).
 
-    使用 IStreamingSink 时:
+    使用 IRowSink 时:
     - 引擎通常可以在每行的所有目标字段就绪后立即写入
     - 该行的内存通常可以在写入后立即释放(若存在 batch_rows 绑定/use_rows 依赖,释放可能被推迟到屏障完成)
     - 比批量写入更节省内存
 
-    何时使用行式写入 (IStreamingSink):
+    何时使用行式写入 (IRowSink):
     --------------------------------
     1. 目标字段数量较少 (< 50 个字段)
     2. 每行的字段计算有依赖关系,需要等待所有字段完成
-    3. 输出格式是行导向的 (如 CSV, JSON Lines)
+    3. 输出格式是行导向的 (如 CSV, JSONL)
     4. 需要保持行的完整性 (所有字段一起写入)
 
     与列式写入 (IColumnSink) 的区别:
@@ -114,10 +114,10 @@ class IRowSink(ISink, ABC):
     def write_row(self, row: RowData) -> None:
         """写入单行数据.
 
-        Args:
-            row: 单行数据 (从字段键到字段值的映射)
+        参数:
+            `row`: 单行数据 (从字段键到字段值的映射)
 
-        NOTE: 内存优化 - 写入后调用方通常可以立即释放该行的内存;若上层执行存在 batch_rows 绑定/use_rows 屏障,释放可能被推迟
+        注意: 内存优化 - 写入后调用方通常可以立即释放该行的内存;若上层执行存在 batch_rows 绑定/use_rows 屏障,释放可能被推迟
         """
 
     def write_batch(self, rows: Sequence[RowData]) -> None:  # pyright: ignore[reportImplicitOverride]
@@ -126,15 +126,15 @@ class IRowSink(ISink, ABC):
         默认实现为每行调用 write_row.
         子类可以重写以实现更高效的批量写入.
 
-        Args:
-            rows: 数据行列表
+        参数:
+            `rows`: 数据行列表
         """
         for row in rows:
             self.write_row(row)
 
 
 class IColumnSink(ISink, ABC):
-    """列式 Sink 接口 - 支持列级流式写入 (FR023).
+    """列式写出端接口 - 支持列级流式写入 (FR023).
 
     此接口支持 FR023 中描述的"区块列写入"模式:
     1. 处理完每个数据源后,立即写入其目标列
@@ -148,16 +148,16 @@ class IColumnSink(ISink, ABC):
     何时使用列式写入 (IColumnSink):
     -----------------------------
     1. 目标字段数量非常多 (> 50 个字段,尤其是 200+ 列的宽表)
-    2. 数据源字段分散在多个 loader 中,每个 loader 提供一部分字段
+    2. 数据源字段分散在多个加载器中,每个加载器提供一部分字段
     3. 希望尽早释放内存,不等待整行完成
-    4. 输出格式支持列式追加 (如 Parquet, 或可以重组的 CSV)
+    4. 输出格式支持列式追加 (如 `Parquet`, 或可以重组的 CSV)
 
     与行式写入 (IStreamingSink) 的区别:
     - 列式写入: 每列完成 -> 写入该列 -> 释放该列内存
     - 行式写入: 等待一行的所有字段都计算完成 -> 写入整行 -> 释放该行内存
 
     典型场景:
-    - 订单宽表: 200+ 列,来自 orders, customers, payments, items 等多个数据源
+    - 订单宽表: 200+ 列,来自 `orders`, `customers`, `payments`, `items` 等多个数据源
     - 用户画像: 100+ 特征列,来自不同的特征计算模块
     - 报表生成: 大量指标列,需要分阶段计算和写入
 
@@ -176,33 +176,33 @@ class IColumnSink(ISink, ABC):
 
         必须在任何 write_column 调用之前调用.
 
-        Args:
-            row_ids: 行标识序列 (确定行顺序)
+        参数:
+            `row_ids`: 行标识序列 (确定行顺序)
 
-        NOTE:
-            row_ids 是输出行顺序的唯一依据, 可能来自真实业务 key/lookup_key,
-            也可能是批次内行号 batch_row_nth (0-based). Sink 应将其视为不透明 row_id.
+        注意:
+            row_ids 是输出行顺序的唯一依据,可能来自真实业务键/lookup_key,
+            也可能是批次内行号 batch_row_nth (从 0 开始). 写出端应将其视为不透明 row_id.
         """
 
     @abstractmethod
     def write_column(self, field_key: str, values: ColumnValues) -> None:
         """写入单列数据.
 
-        Args:
+        参数:
             field_key: 字段/列名
-            values: 从 row_id 到字段值的字典
+            `values`: 从 row_id 到字段值的字典
 
-        NOTE: 内存优化 - 写入后调用方可以立即释放该列的内存
+        注意: 内存优化 - 写入后调用方可以立即释放该列的内存
         """
 
     @abstractmethod
     def write_columns(self, columns: ColumnBatch) -> None:
         """一次写入多列.
 
-        Args:
-            columns: 从字段键到 (pk -> value) 字典的字典
+        参数:
+            `columns`: 从字段键到 (`pk` -> 值) 字典的字典
 
-        NOTE: 批量写入多列,比逐列写入更高效
+        注意: 批量写入多列,比逐列写入更高效
         """
 
     def write_batch(self, rows: Sequence[RowData]) -> None:  # pyright: ignore[reportImplicitOverride]
@@ -210,10 +210,10 @@ class IColumnSink(ISink, ABC):
 
         默认实现将基于行的数据转换为基于列的数据.
 
-        Args:
-            rows: 数据行列表
+        参数:
+            `rows`: 数据行列表
         """
-        # Convert rows to columns
+        # 将行数据转换为列数据
         if not rows:
             return
 
@@ -222,16 +222,16 @@ class IColumnSink(ISink, ABC):
             for field_key, value in row.items():
                 if field_key not in columns:
                     columns[field_key] = {}
-                # Use row index as pseudo row_id (batch_row_nth) for column organization.
+                # 使用行号作为伪 `row_id`（`batch_row_nth`）,用于列式组织.
                 columns[field_key][row_idx] = value
 
         self.write_columns(columns)
 
 
 class BaseSink(ISink):
-    """Sink 基类.
+    """写出端基类.
 
-    实现 ISink 接口, 支持批量写入.
+    实现 `ISink` 接口, 支持批量写入.
     """
 
     @override
@@ -255,7 +255,7 @@ class BaseSink(ISink):
 
 
 class BaseRowSink(IRowSink):
-    """行式 Sink 基类.
+    """行式写出端基类.
 
     实现 IRowSink 接口, 支持单行流式写入 (FR023).
     """
@@ -286,7 +286,7 @@ class BaseRowSink(IRowSink):
 
 
 class BaseColumnSink(IColumnSink):
-    """列式 Sink 基类."""
+    """列式写出端基类."""
 
     @override
     def set_row_ids(self, row_ids: "SinkRowKeySeq") -> None:

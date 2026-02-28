@@ -25,14 +25,14 @@ class AdaptiveLayerDecision:
 
 
 class AdaptivePolicy:
-    """Adaptive scheduling policy.
+    """自适应调度策略。
 
-    Users MAY subclass this type and override the decision methods to customize:
-    - layer/task parallelism
-    - task pool selection
-    - backend selection (thread/process/async)
+    用户可以继承该类型并覆盖决策方法，以自定义：
+    - 层/任务并行度
+    - 任务池选择
+    - 后端选择（`thread`/`process`/`async`）
 
-    When both `AdaptiveTuning` and `AdaptivePolicy` are provided, policy decisions take precedence; tuning is treated as defaults.
+    当同时提供 `AdaptiveTuning` 和 `AdaptivePolicy` 时，以策略决策为准；`tuning` 仅作为默认值。
     """
 
     def resolve_tuning(self, tuning: AdaptiveTuning) -> AdaptiveTuning:
@@ -56,7 +56,7 @@ class AdaptivePolicy:
             pools.add(tuning.pool_for_source(step.to_source.source_id))
         if len(pools) == 1:
             return next(iter(pools))
-        # Multi-source chains default to the default pool to keep "one pool per task" and avoid multi-token deadlocks.
+        # 多数据源链路默认使用默认池：保持“每个任务一个池”，避免多令牌死锁。
         return DEFAULT_ADAPTIVE_POOL
 
     def decide_layer_parallelism(
@@ -93,7 +93,7 @@ class AdaptivePolicy:
 
 
 class DefaultAdaptivePolicy(AdaptivePolicy):
-    """Default policy: thread backend + tuning-based thresholds."""
+    """默认策略：`thread` 后端 + 基于 `tuning` 的阈值判断。"""
 
 
 __all__ = [

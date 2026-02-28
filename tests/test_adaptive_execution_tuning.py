@@ -473,7 +473,7 @@ def test_adaptive_scheduler_process_backend_pickle_fail_fast_raises_typeerror() 
             _ = tuning
             return PROCESS_FAILURE_FAIL_FAST
 
-    # Unpicklable plan via lambda loader.
+    # 通过 `lambda` 加载器构造一个无法 `pickle` 的执行计划。
     source_a = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
     source_b = _make_source("s2")
 
@@ -712,11 +712,11 @@ def test_estimate_first_step_lookup_key_count_handles_unhashable_values() -> Non
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
 
     ctx = BatchContext()
-    ctx.set_field_value("id", 0, [1])  # unhashable
+    ctx.set_field_value("id", 0, [1])  # 不可哈希
     assert scheduler._estimate_first_step_lookup_key_count(op_single, context=ctx, batch_row_nth=[0]) == 0  # noqa: SLF001
 
     ctx = BatchContext()
-    ctx.set_field_value("a", 0, [1])  # unhashable
+    ctx.set_field_value("a", 0, [1])  # 不可哈希
     ctx.set_field_value("b", 0, 2)
     assert scheduler._estimate_first_step_lookup_key_count(op_multi, context=ctx, batch_row_nth=[0]) == 0  # noqa: SLF001
 
@@ -1135,7 +1135,7 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     assert perf.metrics.adaptive_scheduler is not None
     assert perf.metrics.adaptive_scheduler.serial_reasons.get("rows_binding_barrier") == 1
 
-    # No pool branch.
+    # 无线程池分支。
     scheduler.execute_segment(
         [op_keys],
         context=BatchContext(),
@@ -1148,7 +1148,7 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     )
     assert perf.metrics.adaptive_scheduler.serial_reasons.get("no_pool") == 1
 
-    # Single worker branch.
+    # 单工作线程分支。
     scheduler.execute_segment(
         [op_keys],
         context=BatchContext(),

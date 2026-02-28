@@ -9,29 +9,29 @@ DEFAULT_ADAPTIVE_POOL = "default"
 
 @dataclass(frozen=True)
 class AdaptiveTuning:
-    """Tuning knobs for `parallel_mode="adaptive"`.
+    """`parallel_mode=\"adaptive\"` 的调优参数.
 
-    This object is intentionally DSL-agnostic: it is injected via Python/IR entrypoints (e.g. `PipelineOverrides`).
+    该对象刻意保持 DSL 无关: 通过 Python/IR 入口注入 (例如 `PipelineOverrides`).
     """
 
-    # Global concurrency cap for the adaptive executor.
-    # - 0/negative means "auto" (aligned with `ScalimEngine(max_workers=0)` semantics).
+    # 自适应执行器的全局并发上限.
+    # - 0/负数表示自动 (与 `ScalimEngine(max_workers=0)` 语义对齐).
     max_workers: int = 0
 
-    # Resource pools: pool_name -> concurrency limit (MUST be >= 1).
+    # 资源池: pool_name -> 并发上限 (必须 >= 1).
     pools: dict[str, int] = field(default_factory=dict)
 
-    # Source binding: source_id -> pool_name. Unmapped sources fall back to DEFAULT_ADAPTIVE_POOL.
+    # 数据源绑定: source_id -> pool_name. 未映射的数据源回退到 DEFAULT_ADAPTIVE_POOL.
     source_pools: dict[str, str] = field(default_factory=dict)
 
-    # Thresholds to avoid parallel overhead for tiny workloads.
-    # Note: parallelizing a layer with <2 tasks is never useful; the scheduler clamps this accordingly.
+    # 阈值: 用于避免小工作量时的并发开销.
+    # 注意: 对 <2 个任务的层做并发没有意义; 调度器会据此进行限制.
     min_parallel_tasks_per_layer: int = 2
 
-    # If >0, total first-step lookup key count per layer below this threshold will run serially.
+    # 若 >0: 当某层的“第一步查找键总数”低于该阈值时,该层串行执行.
     min_total_lookup_keys_per_layer: int = 0
 
-    # If >0, any task whose first-step lookup key count is below this threshold will run serially.
+    # 若 >0: 当某个任务的“第一步查找键数量”低于该阈值时,该任务串行执行.
     min_lookup_keys_per_task: int = 0
 
     def validate(self) -> None:
@@ -78,13 +78,13 @@ class AdaptiveTuning:
         if pool_name in self.pools:
             return max(1, int(self.pools[pool_name]))
         if pool_name == DEFAULT_ADAPTIVE_POOL:
-            # Default pool limit is implementation-defined when absent; we align it with global concurrency.
+            # 未配置默认池上限时,其行为依赖具体实现;这里将其对齐到全局并发上限.
             return max(1, int(resolved_max_workers))
-        # Unknown pool names should be prevented by validation; fall back defensively.
+        # 未知池名应由校验提前阻止;这里做防御性回退.
         return max(1, int(resolved_max_workers))
 
     def effective_min_parallel_tasks_per_layer(self) -> int:
-        # Parallelizing a layer with <2 tasks is meaningless; clamp for safety and determinism.
+        # 对 <2 个任务的层做并发没有意义;为安全与确定性进行限制.
         return max(2, int(self.min_parallel_tasks_per_layer or 2))
 
 

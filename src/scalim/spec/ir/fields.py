@@ -79,7 +79,7 @@ class FieldIr:
 
     lookup_steps: tuple[LookupStepIr, ...] | None = None
     """
-    显式 lookup steps (有序),优先于 relation 推断
+    显式 `lookup_steps`（有序），优先于 `relation` 推断。
     """
 
     def __post_init__(self) -> None:
@@ -87,24 +87,24 @@ class FieldIr:
             object.__setattr__(self, "data_key", self.field_id)
 
     def is_ref_field(self) -> bool:
-        """是否是关联字段: 关联字段通过 relation 定义."""
+        """是否是关联字段: 关联字段通过 `relation` 定义."""
         return self.relation is not None or bool(self.lookup_steps)
 
     def get_dependencies(self) -> tuple[str, ...]:
-        """获取字段依赖的简化版本(仅返回 relation 左侧字段).
+        """获取字段依赖的简化版本（仅返回 `relation` 左侧字段）。
 
-        WARNING: 此方法只提取 relation 条件的左侧字段作为依赖,当 DSL 中主表在右侧时
-        (如 "customers.id = orders.customer_id")会返回错误的依赖.
+        警告：此方法只提取 `relation` 条件的左侧字段作为依赖；当 DSL 中主表在右侧时
+        （如 `"customers.id = orders.customer_id"`）会返回错误的依赖。
 
-        推荐使用 PlanBuilder 或 ExecutionPlan.field_dependencies 获取正确的依赖,
-        它们会根据主数据源方向使用 infer_lookup_steps() 正确推断依赖.
+        推荐使用 `PlanBuilder` 或 `ExecutionPlan.field_dependencies` 获取正确的依赖，
+        它们会根据主数据源方向使用 `infer_lookup_steps()` 正确推断依赖。
 
-        Returns:
-            relation 条件中左侧字段名的元组
+        返回：
+            `relation` 条件中左侧字段名的元组。
         """
         if self.lookup_steps:
             return extract_from_fields(self.lookup_steps)
-        # 如果有 relation,提取依赖的字段
+        # 如果有 `relation`,提取依赖的字段
         if self.relation:
             deps: set[str] = set()
             if isinstance(self.relation, JoinConditionIr):
@@ -120,12 +120,12 @@ class FieldIr:
     def apply_transform(self, value: Any) -> Any:
         """应用转换函数(结果侧)
 
-        Args:
-            value: 原始值
+        参数：
+            `value`: 原始值
 
-        NOTE: 类型安全说明:
-        - 如果有 transform 函数,返回类型由 transform 决定
-        - 如果没有 transform,返回原始值 (类型为 Any,需要调用方处理)
+        注意：类型安全说明：
+        - 如果提供了 `transform` 函数，返回类型由 `transform` 决定。
+        - 如果未提供 `transform`，则返回原始值（类型为 `Any`，需要调用方处理）。
         """
         if self.transform is not None:
             value = self.transform(value)
@@ -138,14 +138,17 @@ class FieldIr:
 class DerivedFieldIr:
     """派生字段(IR): 通过其他依赖字段计算(转换)得出的字段
 
-    Example:
-        # 利润 = 金额 - 成本
-        DerivedFieldSpec(
-            field_key="profit",
-            name="利润",
-            dependencies=("amount", "cost"),
-            calculator=lambda amount, cost: amount - cost,
-        )
+    示例：
+
+    ```python
+    # 利润 = 金额 - 成本
+    DerivedFieldSpec(
+        field_key="profit",
+        name="利润",
+        dependencies=("amount", "cost"),
+        calculator=lambda amount, cost: amount - cost,
+    )
+    ```
     """
 
     field_id: str
@@ -185,10 +188,10 @@ class DerivedFieldIr:
 
     is_constant_compute: bool = False
     """
-    是否为常量 compute: 批次内只计算一次并复用结果.
+    是否为常量计算：批次内只计算一次并复用结果。
 
-    NOTE:
-    - 常量 compute 必须没有任何依赖字段,且不得使用 call_by 上下文.
+    注意：
+    - 常量计算必须没有任何依赖字段，且不得使用 `call_by` 上下文。
     """
 
     def __post_init__(self) -> None:
@@ -212,8 +215,8 @@ class DerivedFieldIr:
         """
         执行计算: 通过依赖字段的值计算得出新的值
 
-        Args:
-            **field_values: 依赖字段的值
+        参数：
+            `field_values`: 依赖字段的值
         """
         result = self.calculator(**field_values)
         if self.value_formatter is not None:

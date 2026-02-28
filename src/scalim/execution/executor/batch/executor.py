@@ -1,6 +1,6 @@
-"""Batch executor implementation.
+"""批次执行器实现。
 
-Kept out of package `__init__.py` to keep import surfaces thin.
+之所以不放在包的 `__init__.py` 中，是为了保持包级导出精简，避免扩大导入面。
 """
 
 # region imports
@@ -192,7 +192,7 @@ class BatchExecutor:
         max_workers: int,
         after_operator: Callable[[object], None] | None,
     ) -> None:
-        # seq mode: execute in operator order using the existing executor.
+        # `seq` 模式：按算子顺序使用现有执行器执行。
         if runtime.parallel_mode != "adaptive":
             executor = self._executors.get(OperatorType.LOAD_REF.value)
             if executor is None:
@@ -203,8 +203,8 @@ class BatchExecutor:
                     after_operator(op)
             return
 
-        # adaptive mode: fan-out/fan-in intrabatch LoadRef(keys) with capture+replay at commit time.
-        # When no pool is provided, fall back to serial behavior (equivalent to seq).
+        # `adaptive` 模式：批次内对 `LoadRef(keys)` 做扇出/扇入，并在提交阶段做捕获/回放。
+        # 未提供线程池时，退回到串行行为（等同于 `seq`）。
         pool = adaptive_pool
         if pool is None:
             executor = self._executors.get(OperatorType.LOAD_REF.value)

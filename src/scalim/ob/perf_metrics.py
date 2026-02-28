@@ -97,7 +97,7 @@ class LoaderStats:
 
 @dataclass
 class StageMetrics:
-    """Per-stage wall time aggregated across batches."""
+    """按阶段汇总的批次墙钟耗时。"""
 
     loader_duration: float = 0.0
     compute_duration: float = 0.0
@@ -181,11 +181,11 @@ class AdaptiveSchedulerMetrics:
 
 @dataclass
 class PerformanceMetrics:
-    """Structured performance metrics collected by PerformanceObserver.
+    """由 `PerformanceObserver` 收集的结构化性能指标。
 
-    Note:
-    - `total_rows` counts input `row_ids` (sum of `BatchStartEvent.row_ids`) to avoid per-row overhead. It may differ from
-      `ExecutionResult.total_rows` (rows emitted to the effective sink).
+    注意：
+    - `total_rows` 统计输入 `row_ids`（`BatchStartEvent.row_ids` 的累加），以避免逐行开销；
+      它可能不同于 `ExecutionResult.total_rows`（写入到最终输出端 `sink` 的行数）。
     """
 
     total_duration: float = 0.0

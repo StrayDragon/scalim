@@ -22,7 +22,7 @@ from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
 
 # endregion
 
-# module logger
+# 模块级日志记录器
 _logger = logging.getLogger(__name__)
 
 
@@ -129,7 +129,7 @@ class ExecutionRuntime:
         return {key: tuple(sorted(fields)) for key, fields in groups.items()}
 
     def reset_load_ref_cache(self) -> None:
-        """重置批次级缓存,在每次 batch 执行时释放内存占用."""
+        """重置批次级缓存,在每次批次执行时释放内存占用."""
         if self.load_ref_cache:
             _logger.info(
                 "LoadRef batch cache cleared: %d entries (batch=%s)",
@@ -157,7 +157,7 @@ class ExecutionRuntime:
         raw_key: Any,
         step: LookupStepIr,
     ) -> tuple[Hashable | None, str, str | None]:
-        """将外键值规范化为目标源 key 类型,并返回状态信息"""
+        """将外键值规范化为目标源的键类型,并返回状态信息"""
         normalized, status, error_message = self._normalize_lookup_key_status(raw_key, step)
         maybe_enforce_relation_guardrails(self, step, status=status, error_message=error_message)
         return normalized, status, error_message
@@ -200,7 +200,7 @@ class ExecutionRuntime:
         raw_key: Any,
         step: LookupStepIr,
     ) -> Hashable | None:
-        """将外键值规范化为目标源 key 类型"""
+        """将外键值规范化为目标源的键类型"""
         normalized, status, _ = self.normalize_lookup_key_with_status(raw_key, step)
         if status != "ok":
             return None

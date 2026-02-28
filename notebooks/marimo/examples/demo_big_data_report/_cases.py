@@ -1,8 +1,8 @@
-"""demo_big_data_report 的 case 注册表。
+"""`demo_big_data_report` 的用例注册表。
 
-集中管理 demo 场景的配置与执行方式，以便：
-- tests 复用同一套场景定义（避免重复写 config/targets/verification wiring）
-- demos 维持“case 是什么”的单一事实来源
+集中管理演示场景的配置与执行方式，以便：
+- 测试复用同一套场景定义（避免重复写 `config`/`targets`/`verification` 的组装逻辑）
+- 演示维持“用例是什么”的单一事实来源
 
 同时兼容两种导入方式：
 - 包导入：`notebooks.marimo.examples.demo_big_data_report._cases`
@@ -75,7 +75,7 @@ def run_case(
     row_limit_override: Optional[int] = None,
     fields_to_check: Optional[Sequence[str]] = None,
 ) -> Tuple[List[Dict[str, Any]], VerificationResult]:
-    """运行一个 demo case，并通过纯 Python oracle 对拍验证输出正确性。
+    """运行一个演示用例，并通过纯 Python 对照实现对拍验证输出正确性。
 
     返回 `(results, verification)`。
     """

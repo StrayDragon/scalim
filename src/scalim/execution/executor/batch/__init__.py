@@ -1,5 +1,5 @@
-"""Batch executor package.
+"""批次执行器包.
 
-Intentionally does not re-export implementation symbols.
-Import `BatchExecutor` from `scalim.execution.executor.batch.executor`.
+刻意不在包级重导出实现符号.
+请从 `scalim.execution.executor.batch.executor` 导入 `BatchExecutor`。
 """

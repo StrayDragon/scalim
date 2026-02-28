@@ -25,11 +25,11 @@ from .loader_retry import LoaderRetryPolicies
 
 @dataclass(frozen=True)
 class ExportLayout:
-    """DSL-agnostic export layout.
+    """与 DSL 无关的导出布局。
 
-    This object defines:
-    - which fields are targeted (and their order)
-    - optional header names aligned with the field order
+    该对象定义：
+    - 需要导出的字段（及其顺序）
+    - 与字段顺序对齐的可选表头名称
     """
 
     field_ids: tuple[str, ...]
@@ -43,9 +43,9 @@ class ExportLayout:
 
 @dataclass(frozen=True)
 class OutputSpec:
-    """DSL-agnostic output strategy.
+    """与 DSL 无关的输出策略。
 
-    When `path` is falsy (None/""), no file sink will be created.
+    当 `path` 为假值（`None`/`\"\"`）时，不会创建文件输出 `sink`。
     """
 
     format: str = "csv"
@@ -57,9 +57,9 @@ class OutputSpec:
 
 @dataclass(frozen=True)
 class ObservabilitySpec:
-    """DSL-agnostic observability request for run orchestration.
+    """用于运行编排的可观测性请求（与 DSL 无关）。
 
-    - `viz_config` is optional and will be materialized to a `VizObserver` after plan is built.
+    - `viz_config` 为可选项；在执行计划构建完成后，会实体化为 `VizObserver`。
     """
 
     fallback_logger_enabled: bool = False
@@ -82,12 +82,11 @@ class ExecutionRequest:
 
 @dataclass(frozen=True)
 class ExecutionResult:
-    """DSL-agnostic execution result.
+    """与 DSL 无关的执行结果。
 
-    Note:
-    - `total_rows` counts rows emitted to the effective sink (including `NullSink`). This is an output/emit row count.
-    - Observability metrics may use a different definition for low-overhead throughput estimates
-      (e.g. `PerformanceMetrics.total_rows` counts input `row_ids`).
+    注意：
+    - `total_rows` 统计的是写入到最终输出端的数据行数（包含 `NullSink`），即“输出/发出”的行数。
+    - 可观测性指标为了低开销的吞吐估算，可能采用不同口径（例如 `PerformanceMetrics.total_rows` 统计的是输入 `row_ids`）。
     """
 
     output_path: str | None
@@ -172,9 +171,9 @@ class _NullSink(BaseSink):
 
 
 class InternalStatsCollector:
-    """Internal execution stats collector.
+    """内部执行统计收集器。
 
-    This object is intentionally lightweight and DSL-agnostic.
+    该对象刻意保持轻量，并与 DSL 无关。
     """
 
     def __init__(self) -> None:
@@ -274,7 +273,7 @@ def export_layout_from_demand_ir(
     *,
     header_fields_output_by: str = "field_id",
 ) -> ExportLayout:
-    """Helper for adapters to build an ExportLayout from effective IR."""
+    """供适配器使用：从生效的 IR 构建 `ExportLayout`。"""
     normalized_ids = tuple(str(item) for item in field_ids)
     if header_fields_output_by != "name":
         return ExportLayout(field_ids=normalized_ids, header_names=None)
@@ -444,7 +443,7 @@ def run_ir(demand_ir: DemandIr, request: ExecutionRequest) -> ExecutionResult:
     try:
         _ = engine.run(sink=counting_sink)
     finally:
-        # Best-effort cleanup even if engine/pipeline fails before closing.
+        # 尽最大努力做清理：即使执行过程中在关闭前失败也要收尾。
         with contextlib.suppress(Exception):
             counting_sink.close()
         with contextlib.suppress(Exception):

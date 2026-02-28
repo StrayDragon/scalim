@@ -11,7 +11,7 @@ def build_dependency_graph(
     demand: DemandIr,
     resolver: LookupStepsResolver,
 ) -> "graph.DependencyGraph[str]":
-    """Build planning dependency graph for the given demand."""
+    """为给定需求构建规划阶段依赖图。"""
     dep_graph: graph.DependencyGraph[str] = graph.DependencyGraph()
 
     for field_key, field_spec in demand.fields.items():
@@ -39,7 +39,7 @@ def build_field_dependencies(
     field_order: Sequence[str],
     dep_graph: "graph.DependencyGraph[str]",
 ) -> dict[str, tuple[str, ...]]:
-    """Build field dependency map from the dependency graph."""
+    """根据依赖图构建字段依赖映射。"""
     field_dependencies: dict[str, tuple[str, ...]] = {}
     for field_key in field_order:
         field_dependencies[field_key] = tuple(dep_graph.get_deps(field_key))

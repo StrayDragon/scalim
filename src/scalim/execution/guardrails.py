@@ -8,7 +8,7 @@ GuardrailMode = Literal["quiet", "fast_fail"]
 
 
 class GuardrailViolationError(RuntimeError):
-    """Raised (or recorded) when a runtime guardrail is triggered."""
+    """当触发运行时护栏时抛出（或记录）该异常。"""
 
     code: str
     context: dict[str, Any]
@@ -25,7 +25,7 @@ class GuardrailViolationError(RuntimeError):
         self.context = dict(context or {})
 
 
-# Backward-compatible alias. (Historical name kept for stability.)
+# 向后兼容的别名（为稳定性保留历史命名）。
 GuardrailViolation = GuardrailViolationError
 
 

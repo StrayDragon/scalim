@@ -1,11 +1,11 @@
-"""Lookup key normalization tests.
+"""关联键规范化测试。
 
-Coverage:
-- key.cast (source-level) normalization
-- lookup_cast (step-level) normalization
-- multi-field composite keys
-- multi-level lookup chains
-- lookup_cast overrides key.cast
+覆盖范围:
+- `key.cast`（数据源级）规范化
+- `lookup_cast`（步骤级）规范化
+- 多字段复合键
+- 多级查找链路
+- `lookup_cast` 覆盖 `key.cast`
 """
 
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -138,7 +138,7 @@ class MockCSVFieldLoader:
 
 
 class MockFloatKeyLoader:
-    """测试用数据加载器 - float 关联键告警场景"""
+    """测试用数据加载器 - 浮点关联键告警场景"""
 
     def __init__(self) -> None:
         self.orders: List[Dict[str, Any]] = [
@@ -403,7 +403,7 @@ def test_lookup_cast_auto_multi_field_float_warns(mock_loader_with_types: MockDa
     hook_manager.register(hook)
     engine = ScalimEngine(demand=demand, plan=plan, hook_manager=hook_manager, batch_size=2)
 
-    # 注入 float 复合键,确保触发 tuple 分支
+    # 注入浮点复合键,确保触发元组分支
     results = engine.run(
         main_rows=[
             {"order_id": 0, "region_id": 1.0, "institution_id": 10},

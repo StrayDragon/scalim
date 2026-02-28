@@ -110,7 +110,7 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     derived = DerivedFieldIr(field_id="derived", name="Derived", dependencies=("order_id",), calculator=lambda v: v)
     demand.fields["derived"] = derived
 
-    # 1) not FieldIr -> skipped
+    # 1) 不是 `FieldIr` -> 跳过
     ops = build_plan_operators(
         demand=demand,
         resolver=LookupStepsResolver(),
@@ -121,7 +121,7 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     )
     assert ops == ()
 
-    # 2) missing main_source -> skipped
+    # 2) 缺少 `main_source` -> 跳过
     relation_field = FieldIr(
         field_id="ref",
         name="Ref",
@@ -140,7 +140,7 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     )
     assert ops == ()
 
-    # 3) no inferred steps -> skipped
+    # 3) 未推断出步骤 -> 跳过
     object.__setattr__(demand, "main_source", main_source)
     resolver = LookupStepsResolver(infer_lookup_steps_fn=_no_steps)
     ops = build_plan_operators(
@@ -153,7 +153,7 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     )
     assert ops == ()
 
-    # 4) field_spec.source is not SourceIr -> skipped
+    # 4) `field_spec.source` 不是 `SourceIr` -> 跳过
     class _FakeSource:
         def __init__(self, source_id: str) -> None:
             self.source_id = source_id
