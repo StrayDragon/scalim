@@ -320,7 +320,7 @@ sequenceDiagram
 本仓库用 MkDocs 构建文档，并在 CI 中导出 marimo notebooks 到 `docs/notebooks/`，最后发布到 GitHub Pages：
 
 - CI：`.github/workflows/ci.yaml`（格式化/检查/测试）
-- CD：`.github/workflows/cd.yaml`（构建文档 + deploy-pages）
+- Deploy Pages：`.github/workflows/deploy-pages.yaml`（构建文档 + 部署 GitHub Pages）
 
 如果需要启用 GitHub Pages：到仓库 Settings → Pages，把 Source 设为 “GitHub Actions”。
 
