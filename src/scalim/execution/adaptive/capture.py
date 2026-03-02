@@ -14,10 +14,10 @@ class HookRecordedEvent:
 
 
 class HookCaptureManager(HookManager):
-    """`HookManager` 的捕获适配器：用于捕获并在提交阶段回放。
+    """`HookManager` 的捕获适配器:用于捕获并在提交阶段回放.
 
-    该管理器会记录类型化钩子的载荷,但不会调用用户钩子。
-    `hook.on_event(Event)` 由 `ObserverManager` 的捕获模式负责捕获,并在提交阶段回放。
+    该管理器会记录类型化钩子的载荷,但不会调用用户钩子.
+    `hook.on_event(Event)` 由 `ObserverManager` 的捕获模式负责捕获,并在提交阶段回放.
     """
 
     hooks: list[IExecutionHook]
@@ -30,7 +30,7 @@ class HookCaptureManager(HookManager):
             loader_result_policy=source.loader_result_policy,
             loader_result_sample_size=source.loader_result_sample_size,
         )
-        # 仅复用原始钩子实例用于订阅发现；在捕获模式下不进行分发。
+        # 仅复用原始钩子实例用于订阅发现;在捕获模式下不进行分发.
         self.hooks = list(source.hooks)
         self._rebuild_subscription_cache()
         self._recorded_events = []

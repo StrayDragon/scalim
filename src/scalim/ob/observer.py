@@ -50,7 +50,7 @@ _DISPATCH_MAP = {
 
 
 class Observer(ABC):
-    """观察者插件基类。"""
+    """观察者插件基类."""
 
     event_types: set[str] | None = None
     supports_unknown_event_types: bool = False
@@ -62,14 +62,14 @@ class Observer(ABC):
 
     @abstractmethod
     def on_event(self, event: Event) -> None:
-        """处理统一事件。"""
+        """处理统一事件."""
 
     def close(self) -> None:  # noqa: B027
-        """可选的清理钩子。"""
+        """可选的清理钩子."""
 
 
 class EventDispatchObserver(Observer):
-    """若定义了类型化处理方法，则将事件分发给对应处理方法。"""
+    """若定义了类型化处理方法,则将事件分发给对应处理方法."""
 
     dispatch_map: dict[str, str] = _DISPATCH_MAP
     _handler_cache: dict[str, Callable[[Any], Any] | None]

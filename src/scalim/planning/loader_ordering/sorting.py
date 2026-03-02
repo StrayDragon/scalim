@@ -11,12 +11,12 @@ _UNMAPPED_DEPS_PREVIEW_LIMIT = 10
 def sort_ref_loaders(  # noqa: C901, PLR0912
     ref_loaders: list[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]],
 ) -> list[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]]:
-    """基于引用字段依赖信号对引用加载器做拓扑排序。
+    """基于引用字段依赖信号对引用加载器做拓扑排序.
 
     排序约定:
-    - 依赖信号来自引用字段的 `lookup_steps`（即 `from_field` 的字段键）。
-    - 排序器会把这些字段键映射回其所属的引用加载器，构建加载器依赖图并执行拓扑排序。
-    - 若部分依赖键无法映射，将只告警一次，并退回到稳定的并列打破规则（按 `source_id` 字典序）。
+    - 依赖信号来自引用字段的 `lookup_steps`(即 `from_field` 的字段键).
+    - 排序器会把这些字段键映射回其所属的引用加载器,构建加载器依赖图并执行拓扑排序.
+    - 若部分依赖键无法映射,将只告警一次,并退回到稳定的并列打破规则(按 `source_id` 字典序).
     """
     if len(ref_loaders) <= 1:
         return ref_loaders

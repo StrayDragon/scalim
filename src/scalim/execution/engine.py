@@ -48,7 +48,7 @@ class ScalimEngine:
     ) -> None:
         """初始化 Scalim 计算引擎
 
-        参数：
+        参数:
             `demand`: 统计需求数据结构
             `plan`: 执行计划
             `hook_manager`: 可选的钩子管理器,用于流程定制
@@ -107,11 +107,11 @@ class ScalimEngine:
     ) -> Sequence[RowData]:
         """执行流水线
 
-        参数：
+        参数:
             `main_rows`: 可选的主数据行流,如果不提供则从主数据源加载
             `sink`: 可选的输出端(`sink`)
 
-        返回：
+        返回:
             结果行列表 (如果提供了 `sink` 则返回空列表)
         """
         return self._pipeline.run(main_rows, sink)

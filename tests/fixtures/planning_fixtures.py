@@ -7,7 +7,7 @@ from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
 
 
 def make_loader(name: str = "test") -> LoaderIr:
-    """为测试创建最小 `LoaderIr`。"""
+    """为测试创建最小 `LoaderIr`."""
     return LoaderIr(
         callable=lambda: {},
         bindings={
@@ -24,7 +24,7 @@ def make_source(
     key_field: str = "id",
     fk_fields: Optional[List[str]] = None,
 ) -> SourceIr:
-    """为测试创建最小 `SourceIr`。"""
+    """为测试创建最小 `SourceIr`."""
     return SourceIr(
         source_id=source_id,
         key=KeyIr(key=key_field),
@@ -41,7 +41,7 @@ def make_main_source(source_id: str) -> MainSourceIr:
 
 
 def build_simple_model() -> DemandIr:
-    """简单模型：单一主数据源，无关联。"""
+    """简单模型:单一主数据源,无关联."""
     source = make_main_source("orders")
 
     fields = [
@@ -58,7 +58,7 @@ def build_simple_model() -> DemandIr:
 
 
 def build_derived_model() -> DemandIr:
-    """派生模型：包含计算字段。"""
+    """派生模型:包含计算字段."""
     source = make_main_source("orders")
 
     fields = [
@@ -81,7 +81,7 @@ def build_derived_model() -> DemandIr:
 
 
 def build_relation_model() -> DemandIr:
-    """关联模型：跨数据源关联。"""
+    """关联模型:跨数据源关联."""
     orders_source = make_main_source("orders")
     customers_source = make_source("customers", key_field="customer_id")
 
@@ -107,7 +107,7 @@ def build_relation_model() -> DemandIr:
 
 
 def build_multi_level_model() -> DemandIr:
-    """多级关联模型：`orders -> pays -> countries`。"""
+    """多级关联模型:`orders -> pays -> countries`."""
     orders_source = make_main_source("orders")
     pays_source = make_source("pays", key_field="pay_id", fk_fields=["country_id"])
     countries_source = make_source("countries", key_field="country_id")
@@ -135,7 +135,7 @@ def build_multi_level_model() -> DemandIr:
 
 
 def build_multi_field_model() -> DemandIr:
-    """复合键关联模型。"""
+    """复合键关联模型."""
     orders_source = make_main_source("orders")
     mapping_source = SourceIr(
         source_id="mapping",

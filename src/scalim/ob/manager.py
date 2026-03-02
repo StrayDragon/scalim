@@ -87,9 +87,9 @@ class ObserverCaptureOverflowError(RuntimeError):
 
 
 class ObserverManager:
-    """观察者管理器：注册观察者并分发事件。
+    """观察者管理器:注册观察者并分发事件.
 
-    注意：请通过 `register`/`unregister`/`clear` 管理观察者；直接修改 `observers` 列表可能导致订阅缓存不同步。
+    注意:请通过 `register`/`unregister`/`clear` 管理观察者;直接修改 `observers` 列表可能导致订阅缓存不同步.
     """
 
     observers: list[Observer]
@@ -308,7 +308,7 @@ class ObserverManager:
 
     def _rebuild_subscription_cache(self) -> None:
         observers_by_event_type: dict[str, list[Observer]] = {event_type: [] for event_type in _CATALOG_EVENT_TYPES}
-        # 用于接收未知事件类型的观察者（需要显式开启）。
+        # 用于接收未知事件类型的观察者(需要显式开启).
         unknown_observers: list[Observer] = []
 
         for observer in self.observers:

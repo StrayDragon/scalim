@@ -1,4 +1,4 @@
-"""执行器算子测试：`load_ref`。"""
+"""执行器算子测试:`load_ref`."""
 
 from typing import Dict, List
 

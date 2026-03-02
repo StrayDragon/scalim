@@ -74,7 +74,7 @@ class DemandIr:
     ) -> "DemandIr":
         """从列表构造(推荐方式): 自动转换为字典并检测重名冲突
 
-        参数：
+        参数:
             `sources`: 数据源列表
             `fields`: 字段列表
             `main_source`: 主数据源对象

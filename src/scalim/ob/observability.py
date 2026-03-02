@@ -8,7 +8,7 @@ from .observer import Observer
 
 
 class Observability:
-    """可观测性门面：负责注册观察者并构建 `ObserverManager`。"""
+    """可观测性门面:负责注册观察者并构建 `ObserverManager`."""
 
     observers: list[Observer]
     enable_debugging: bool

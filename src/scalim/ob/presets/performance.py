@@ -235,8 +235,8 @@ class PerformanceObserver(EventDispatchObserver):
     def on_batch_start(self, event: BatchStartEvent) -> None:
         self._current_batch_num = event.batch_num
         _ = self._get_batch_stage_entry(event.batch_num)
-        # `PerformanceMetrics.total_rows` 统计的是输入 `row_ids`,用于低开销的吞吐估算。
-        # 它可能不同于输出端（`sink`）实际发出的行数。
+        # `PerformanceMetrics.total_rows` 统计的是输入 `row_ids`,用于低开销的吞吐估算.
+        # 它可能不同于输出端(`sink`)实际发出的行数.
         self.metrics.total_rows += len(event.row_ids)
 
     def on_batch_end(self, event: BatchEndEvent) -> None:

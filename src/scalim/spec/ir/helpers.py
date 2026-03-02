@@ -13,23 +13,23 @@ def infer_lookup_steps(
     to_source: SourceIr,
 ) -> tuple[LookupStepIr, ...] | None:
     """
-    从 `relation` 推断 `LookupStepIr` 序列。
+    从 `relation` 推断 `LookupStepIr` 序列.
 
-    这是一个统一的辅助函数,处理 `JoinConditionIr` 和 `RelationIr` 到 `LookupStepIr` 的转换。
+    这是一个统一的辅助函数,处理 `JoinConditionIr` 和 `RelationIr` 到 `LookupStepIr` 的转换.
 
-    参数：
-        `relation`: 关联关系（`JoinConditionIr` 或 `RelationIr`）
+    参数:
+        `relation`: 关联关系(`JoinConditionIr` 或 `RelationIr`)
         `from_source`: 起始数据源
         `to_source`: 目标数据源
 
-    注意：
+    注意:
         关联依赖方向与主数据源选择有关.推荐通过 `PlanBuilder`/`ExecutionPlan` 使用该推断逻辑,
-        避免在 IR 层手工拼装导致方向不一致。
+        避免在 IR 层手工拼装导致方向不一致.
 
-    返回：
-        `LookupStepIr` 序列；无法推断时返回 `None`。
+    返回:
+        `LookupStepIr` 序列;无法推断时返回 `None`.
 
-    示例：
+    示例:
         ```python
         # 单字段关联
         relation = orders["customer_id"].join(customers["customer_id"])
@@ -60,15 +60,15 @@ def extract_from_fields(
     steps: tuple[LookupStepIr, ...],
 ) -> tuple[str, ...]:
     """
-    从 `LookupStepIr` 序列中收集所有步骤的 `from_fields`,用于依赖分析。
+    从 `LookupStepIr` 序列中收集所有步骤的 `from_fields`,用于依赖分析.
 
-    参数：
+    参数:
         `steps`: `LookupStepIr` 序列
 
-    返回：
+    返回:
         所有 `from_fields` 的扁平化元组
 
-    示例：
+    示例:
         ```python
         # 单级单字段
         steps = (LookupStepIr(from_field="customer_id", to_source=...),)

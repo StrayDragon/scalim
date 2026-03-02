@@ -211,11 +211,11 @@ def main() -> int:
     if not hits:
         return 0
 
-    print("检测到英文注释/Docstring（请改为中文，或将代码/术语放入反引号 `...` 中）：", file=sys.stderr)
+    print("检测到英文注释/Docstring(请改为中文,或将代码/术语放入反引号 `...` 中):", file=sys.stderr)
     for hit in hits:
         rel = hit.path.relative_to(repo_root)
         print(f"{rel}:{hit.line}:{hit.col}  [{hit.kind}]  {hit.sample}", file=sys.stderr)
-    print(f"\n总计：{len(hits)} 处", file=sys.stderr)
+    print(f"\n总计:{len(hits)} 处", file=sys.stderr)
     return 1
 
 

@@ -10,7 +10,7 @@ _logger = logging.getLogger(__name__)
 
 
 def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: FieldIr) -> tuple[str, ...]:
-    """为引用字段的排序构建依赖信号。
+    """为引用字段的排序构建依赖信号.
 
     返回一个字段键元组,来源于 `lookup_steps` 的 `from_field`:
     这些字段键可以映射回其他引用加载器.该信号属于规划阶段
@@ -41,7 +41,7 @@ def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: Fie
             continue
         deps.append(dep_key)
 
-    # 在保持顺序的前提下去重（Py3.6+ 的 `dict` 按插入顺序保序）。
+    # 在保持顺序的前提下去重(Py3.6+ 的 `dict` 按插入顺序保序).
     return tuple(OrderedDict.fromkeys(deps))
 
 

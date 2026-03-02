@@ -9,7 +9,7 @@ def compute_key_fields(
     resolver: LookupStepsResolver,
     required_fields: set[str],
 ) -> frozenset[str]:
-    """计算关键字段（来自 `lookup_steps` 信号）。"""
+    """计算关键字段(来自 `lookup_steps` 信号)."""
     key_fields: set[str] = set()
 
     main_source = demand.main_source

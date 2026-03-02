@@ -22,7 +22,7 @@ SeparatedValues = str | int | float
 
 
 class NamedLookupCast:
-    """用于 `lookup_cast` 标注的可调用包装器，提供稳定的名称。"""
+    """用于 `lookup_cast` 标注的可调用包装器,提供稳定的名称."""
 
     scales_lookup_cast_name: str
 

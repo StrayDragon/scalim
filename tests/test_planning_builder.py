@@ -1,7 +1,7 @@
-"""`PlanBuilder` 的高层契约测试。
+"""`PlanBuilder` 的高层契约测试.
 
-这些测试关注 `PlanBuilder.build()` 的可观察输出与错误契约，
-并刻意避免对内部辅助函数/缓存行为做断言。
+这些测试关注 `PlanBuilder.build()` 的可观察输出与错误契约,
+并刻意避免对内部辅助函数/缓存行为做断言.
 """
 
 import pytest

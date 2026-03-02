@@ -473,7 +473,7 @@ def test_adaptive_scheduler_process_backend_pickle_fail_fast_raises_typeerror() 
             _ = tuning
             return PROCESS_FAILURE_FAIL_FAST
 
-    # 通过 `lambda` 加载器构造一个无法 `pickle` 的执行计划。
+    # 通过 `lambda` 加载器构造一个无法 `pickle` 的执行计划.
     source_a = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
     source_b = _make_source("s2")
 
@@ -1135,7 +1135,7 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     assert perf.metrics.adaptive_scheduler is not None
     assert perf.metrics.adaptive_scheduler.serial_reasons.get("rows_binding_barrier") == 1
 
-    # 无线程池分支。
+    # 无线程池分支.
     scheduler.execute_segment(
         [op_keys],
         context=BatchContext(),
@@ -1148,7 +1148,7 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     )
     assert perf.metrics.adaptive_scheduler.serial_reasons.get("no_pool") == 1
 
-    # 单工作线程分支。
+    # 单工作线程分支.
     scheduler.execute_segment(
         [op_keys],
         context=BatchContext(),

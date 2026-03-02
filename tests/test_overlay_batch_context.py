@@ -10,16 +10,16 @@ def test_overlay_batch_context_reads_writes_and_deletes_and_drains() -> None:
 
     overlay = OverlayBatchContext(base, required_fields={"a", "c"})
 
-    # 写入会被 `required_fields` 过滤。
+    # 写入会被 `required_fields` 过滤.
     overlay.set_field_value("b", 0, 999)
     assert overlay.drain_overlay() == {}
 
-    # 覆盖层中不存在时，读取会回退到基础上下文。
+    # 覆盖层中不存在时,读取会回退到基础上下文.
     assert overlay.get_field_value("b", 0) == 10
     assert overlay.has_field("b") is True
     assert overlay.has_field("missing") is False
 
-    # 写入只进入覆盖层。
+    # 写入只进入覆盖层.
     overlay.set_field_value("c", 0, 3)
     overlay.set_field_value("a", 0, 100)
     assert overlay.get_field_value("a", 0) == 100
@@ -29,7 +29,7 @@ def test_overlay_batch_context_reads_writes_and_deletes_and_drains() -> None:
 
     assert overlay.get_field_values_for_row(0, ["a", "b", "c"]) == {"a": 100, "b": 10, "c": 3}
 
-    # 删除行项不会影响基础上下文。
+    # 删除行项不会影响基础上下文.
     overlay.delete_row_from_field("a", 0)
     assert overlay.get_field_value("a", 0) == 1
 
@@ -44,7 +44,7 @@ def test_overlay_batch_context_reads_writes_and_deletes_and_drains() -> None:
     assert overlay.get_field_value("a", 1) == 2
     assert overlay.get_field_value("c", 1, default=None) is None
 
-    # `delete_field` 只会移除覆盖层状态。
+    # `delete_field` 只会移除覆盖层状态.
     overlay.delete_field("c")
     assert overlay.get_field_value("c", 0, default=None) is None
 

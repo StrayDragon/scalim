@@ -2,10 +2,10 @@
 
 提供拓扑排序、循环检测、依赖收集等通用图算法.
 
-注意：Python 3.9+ 提供了 `graphlib.TopologicalSorter`。
+注意:Python 3.9+ 提供了 `graphlib.TopologicalSorter`.
 scalim 目前面向 Python 3.10+,但仍保留本模块用于:
-- 稳定的“并列打破”输出（可重复的确定性排序）
-- 更易于定位的环诊断产物（见 `CyclicDependencyError.cycles`）
+- 稳定的“并列打破”输出(可重复的确定性排序)
+- 更易于定位的环诊断产物(见 `CyclicDependencyError.cycles`)
 
 参考: https://docs.python.org/3/library/graphlib.html
 
@@ -50,15 +50,15 @@ def collect_dependencies(
 ) -> set[T]:
     """从目标节点递归收集所有依赖.
 
-    参数：
+    参数:
         `targets`: 目标节点列表
         `get_deps`: 获取节点依赖的函数
         `include_target`: 是否包含目标节点本身
 
-    返回：
+    返回:
         所有依赖节点的集合
 
-    示例：
+    示例:
         ```python
         deps = {"a": ["b", "c"], "b": ["d"], "c": [], "d": []}
         collect_dependencies(["a"], lambda x: deps.get(x, []))
@@ -127,21 +127,21 @@ def topological_sort(
 ) -> list[T]:
     """拓扑排序.
 
-    使用卡恩（`Kahn`）算法实现, 预先构建反向依赖图以获得 O(n+e) 复杂度.
+    使用卡恩(`Kahn`)算法实现, 预先构建反向依赖图以获得 O(n+e) 复杂度.
     依赖在前,被依赖者在后.依赖方向约定为: A 依赖 B 表示 A -> B.
 
-    参数：
+    参数:
         `nodes`: 要排序的节点集合
-        `get_deps`: 获取节点依赖的函数（返回当前节点依赖的节点）
+        `get_deps`: 获取节点依赖的函数(返回当前节点依赖的节点)
 
-    返回：
-        拓扑排序后的节点列表。同层级节点的相对顺序保证稳定：
-        当多个节点在同一层级同时就绪时,会按稳定的并列打破规则输出（默认使用节点的稳定字符串表示）。
+    返回:
+        拓扑排序后的节点列表.同层级节点的相对顺序保证稳定:
+        当多个节点在同一层级同时就绪时,会按稳定的并列打破规则输出(默认使用节点的稳定字符串表示).
 
-    异常：
+    异常:
         `CyclicDependencyError`: 检测到循环依赖
 
-    示例：
+    示例:
         ```python
         deps = {"a": ["b", "c"], "b": ["d"], "c": [], "d": []}
         topological_sort(["a", "b", "c", "d"], lambda x: deps.get(x, []))
@@ -164,7 +164,7 @@ def topological_sort(
     for node in ordered_nodes:
         for dep in get_deps(node):
             if dep in node_set:
-                # 当前节点依赖 `dep`，因此当前节点入度 +1；同时把当前节点加入 `dep` 的反向依赖列表。
+                # 当前节点依赖 `dep`,因此当前节点入度 +1;同时把当前节点加入 `dep` 的反向依赖列表.
                 in_degree[node] += 1
                 reverse_deps[dep].append(node)
 
@@ -199,15 +199,15 @@ def compute_levels(
 
     层级 0 表示无依赖,层级 N 表示最长依赖链长度为 N.
 
-    参数：
+    参数:
         `nodes`: 节点集合
         `get_deps`: 获取节点依赖的函数
-        `sorted_nodes`: 可选的已排序节点列表（避免重复排序）
+        `sorted_nodes`: 可选的已排序节点列表(避免重复排序)
 
-    返回：
+    返回:
         节点到层级的映射
 
-    示例：
+    示例:
         ```python
         deps = {"a": ["b", "c"], "b": ["d"], "c": [], "d": []}
         compute_levels(["a", "b", "c", "d"], lambda x: deps.get(x, []))
@@ -238,16 +238,16 @@ def group_by_level(
     """按依赖层级分组节点.
 
     同一层级的节点可以并行处理.
-    分组内节点顺序与 `topological_sort` 的稳定性一致（同层按稳定的并列打破规则），保证可重复.
+    分组内节点顺序与 `topological_sort` 的稳定性一致(同层按稳定的并列打破规则),保证可重复.
 
-    参数：
+    参数:
         `nodes`: 节点集合
         `get_deps`: 获取节点依赖的函数
 
-    返回：
-        按层级分组的节点列表，索引即为层级
+    返回:
+        按层级分组的节点列表,索引即为层级
 
-    示例：
+    示例:
         ```python
         deps = {"a": ["b", "c"], "b": ["d"], "c": [], "d": []}
         group_by_level(["a", "b", "c", "d"], lambda x: deps.get(x, []))
@@ -281,7 +281,7 @@ class DependencyGraph(Generic[T]):
     def add_node(self, node: T, deps: Iterable[T] | None = None) -> None:
         """添加节点及其依赖.
 
-        参数：
+        参数:
             `node`: 节点
             `deps`: 该节点依赖的节点列表
         """

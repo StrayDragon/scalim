@@ -15,9 +15,9 @@ def resolve_adaptive_policy_tuning_and_workers(
     runtime: "ExecutionRuntime",
     overrides: "PipelineOverrides",
 ) -> tuple["AdaptivePolicy", AdaptiveTuning, int]:
-    """解析自适应执行所需的 `(policy, tuning, resolved_max_workers)`。
+    """解析自适应执行所需的 `(policy, tuning, resolved_max_workers)`.
 
-    该辅助函数用于避免流水线与批次执行器在解析/校验自适应配置时出现语义漂移。
+    该辅助函数用于避免流水线与批次执行器在解析/校验自适应配置时出现语义漂移.
     """
     policy = overrides.adaptive_policy or DefaultAdaptivePolicy()
     tuning = overrides.adaptive_tuning

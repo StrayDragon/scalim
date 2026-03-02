@@ -38,19 +38,19 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class ExcelSink(BaseRowSink):
-    """`Excel` 行式输出端：支持流式按行写入.
+    """`Excel` 行式输出端:支持流式按行写入.
 
     在内存中缓存数据, `close()` 时一次性写入 `Excel` 文件.
     实现 `IRowSink` 接口, 支持单行流式写入以优化内存使用 (FR023).
 
-    参数：
+    参数:
         `output_path`: 输出文件路径
         `field_names`: 字段 ID 列表, 用于从 `row` 中取值
         `header_names`: 表头名称列表 (可选), 用于输出表头. 默认等于 `field_names`
         `sheet_name`: 工作表名称, 默认 `"Sheet1"`
         `include_header`: 是否包含表头, 默认 `True`
 
-    示例：
+    示例:
         ```python
         with ExcelSink("report.xlsx", field_names=["id", "name"]) as sink:
             sink.write_row({"id": 1, "name": "Alice"})
@@ -140,7 +140,7 @@ class ExcelSink(BaseRowSink):
 
 
 class ColumnExcelSink(IColumnSink):
-    """`Excel` 列式输出端：面向生产环境的高性能列式写入 (FR023).
+    """`Excel` 列式输出端:面向生产环境的高性能列式写入 (FR023).
 
     工作原理:
     1. 在内存中按列缓存数据
@@ -150,14 +150,14 @@ class ColumnExcelSink(IColumnSink):
     - 调用方可在 `write_column()` 后立即释放该列的源数据
     - 适合宽表场景 (200+ 列)
 
-    参数：
+    参数:
         `output_path`: 输出文件路径
         `field_names`: 字段 ID 列表, 用于从列数据中取值
         `header_names`: 表头名称列表 (可选), 用于输出表头. 默认等于 `field_names`
         `sheet_name`: 工作表名称, 默认 `"Sheet1"`
         `include_header`: 是否包含表头, 默认 `True`
 
-    示例：
+    示例:
         ```python
         with ColumnExcelSink("/tmp/report.xlsx", ["id", "name"]) as sink:
             sink.set_row_ids([1, 2, 3])

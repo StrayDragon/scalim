@@ -183,7 +183,7 @@ def test_create_output_plan_closes_file_sink_on_incompatible_tee(tmp_path: Path)
             memory_column_sink,
         )
 
-    # 如果文件输出端（`sink`）未关闭，临时文件会保持未完成状态，`output_path` 将不会存在。
+    # 如果文件输出端(`sink`)未关闭,临时文件会保持未完成状态,`output_path` 将不会存在.
     assert output_path.exists()
 
 

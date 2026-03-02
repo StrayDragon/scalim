@@ -6,11 +6,11 @@ from ..context import BatchContext
 
 
 class OverlayBatchContext(BatchContext):
-    """用于批次内并行的 `BatchContext` 覆盖层。
+    """用于批次内并行的 `BatchContext` 覆盖层.
 
-    - 读取会回退到基础上下文（只读）。
-    - 写入只进入覆盖缓冲区。
-    - 删除不会影响基础上下文。
+    - 读取会回退到基础上下文(只读).
+    - 写入只进入覆盖缓冲区.
+    - 删除不会影响基础上下文.
     """
 
     _base: BatchContext

@@ -43,7 +43,7 @@ class CSVSink(BaseRowSink):
 
     使用临时文件写入, `close()` 时原子重命名到目标路径,避免 I/O 异常导致半截文件.
 
-    参数：
+    参数:
         `output_path`: 输出文件路径
         `delimiter`: 分隔符, 默认逗号
         `encoding`: 编码, 默认 `utf-8`
@@ -53,7 +53,7 @@ class CSVSink(BaseRowSink):
         `flush_policy`: 刷新策略, 默认 `"every_n_rows"`
         `flush_every_rows`: 按行数刷新阈值 (当 `flush_policy=\"every_n_rows\"` 时生效)
 
-    示例：
+    示例:
         ```python
         with CSVSink("report.csv", field_names=["id", "name"]) as sink:
             sink.write_row({"id": 1, "name": "Alice"})
@@ -183,7 +183,7 @@ class ColumnCSVSink(IColumnSink):
     - 调用方可在 `write_column()` 后立即释放该列的源数据
     - 适合宽表场景 (200+ 列)
 
-    参数：
+    参数:
         `output_path`: 输出文件路径
         `field_names`: 字段 ID 列表, 用于从列数据中取值
         `header_names`: 表头名称列表 (可选), 用于输出表头. 默认等于 `field_names`
@@ -191,7 +191,7 @@ class ColumnCSVSink(IColumnSink):
         `encoding`: 编码, 默认 `utf-8`
         `include_header`: 是否包含表头, 默认 `True`
 
-    示例：
+    示例:
         ```python
         with ColumnCSVSink("/tmp/report.csv", ["id", "name"]) as sink:
             sink.set_row_ids([1, 2, 3])
@@ -326,7 +326,7 @@ class BlockColumnCSVSink(IColumnSink):
     3, Charlie
     ```
 
-    示例：
+    示例:
         ```python
         with BlockColumnCSVSink("/tmp/demo.csv", ["id", "name"], col_width=16) as sink:
             sink.set_row_ids([1, 2, 3])  # 预分配空间

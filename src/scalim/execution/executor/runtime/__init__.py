@@ -1,4 +1,4 @@
-"""执行运行时包（内部）。
+"""执行运行时包(内部).
 
-实现位于 `scalim.execution.executor.runtime.runtime`。
+实现位于 `scalim.execution.executor.runtime.runtime`.
 """

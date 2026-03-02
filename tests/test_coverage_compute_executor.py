@@ -231,7 +231,7 @@ def test_compute_executor_secure_compute_success_and_expected_error_payload_rule
     ComputeOperatorExecutor().execute(op_ok, context_ok, batch_row_nth=[0], runtime=runtime_ok)
     assert context_ok.get_field_value("sum", 0) == "5"
 
-    # 护栏关闭时: 错误载荷会包含依赖值（由 `build_field_compute_dependencies_payload` 构建）。
+    # 护栏关闭时: 错误载荷会包含依赖值(由 `build_field_compute_dependencies_payload` 构建).
     runtime_err, _ = _make_runtime(
         field_specs={"ratio": field_err},
         field_dependencies={"ratio": ("a", "b")},
@@ -249,7 +249,7 @@ def test_compute_executor_secure_compute_success_and_expected_error_payload_rule
     ComputeOperatorExecutor().execute(op_err, context_err, batch_row_nth=[0], runtime=runtime_err)
     assert context_err.get_field_value("ratio", 0) is None
 
-    # 护栏开启（`quiet`）时: 错误载荷会抑制依赖值（`deps_payload` 保持为空）。
+    # 护栏开启(`quiet`)时: 错误载荷会抑制依赖值(`deps_payload` 保持为空).
     runtime_guarded, _ = _make_runtime(
         field_specs={"ratio": field_err},
         field_dependencies={"ratio": ("a", "b")},

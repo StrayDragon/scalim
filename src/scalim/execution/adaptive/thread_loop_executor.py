@@ -37,14 +37,14 @@ _logger = logging.getLogger(__name__)
 
 
 class ThreadLoopExecutor(Executor):
-    """异步后端适配器：在独立线程承载的事件循环上运行可等待对象。
+    """异步后端适配器:在独立线程承载的事件循环上运行可等待对象.
 
-    语义：
-    - 如果 `fn(*args, **kwargs)` 返回协程对象,则在事件循环中等待其完成。
-    - 如果返回非协程对象,则在事件循环线程中直接执行（可能阻塞事件循环）。
-    - 并发度通过 `asyncio.Semaphore` 结合 `max_workers` 进行限制。
+    语义:
+    - 如果 `fn(*args, **kwargs)` 返回协程对象,则在事件循环中等待其完成.
+    - 如果返回非协程对象,则在事件循环线程中直接执行(可能阻塞事件循环).
+    - 并发度通过 `asyncio.Semaphore` 结合 `max_workers` 进行限制.
 
-    该执行器为实验性能力,需要通过 `AdaptivePolicy.choose_backend()` 显式启用。
+    该执行器为实验性能力,需要通过 `AdaptivePolicy.choose_backend()` 显式启用.
     """
 
     _max_workers: int
@@ -69,7 +69,7 @@ class ThreadLoopExecutor(Executor):
         self._sem = asyncio.Semaphore(self._max_workers)
         self._loop.run_forever()
 
-        # 尽最大努力清理。
+        # 尽最大努力清理.
         pending = _best_effort_all_tasks(self._loop)
         for task in pending:
             task.cancel()

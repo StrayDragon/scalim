@@ -18,11 +18,11 @@ from .stages import build_stages
 
 class PlanBuilder:
     """
-    执行计划构建器。
+    执行计划构建器.
 
-    从需求模型构建物理执行计划。
+    从需求模型构建物理执行计划.
 
-    示例（关联路径与依赖字段）：
+    示例(关联路径与依赖字段):
     ```text
     1. 单级单字段关联:
     orders.customer_id -> customers.customer_id

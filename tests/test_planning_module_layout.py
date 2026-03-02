@@ -30,18 +30,18 @@ def _find_execution_imports(source: str, *, path: Path) -> List[str]:
         module: Optional[str] = node.module
         level = node.level
 
-        # 绝对导入：`from scalim.execution... import ...`
+        # 绝对导入:`from scalim.execution... import ...`
         if level == 0:
             if module and (module == "scalim.execution" or module.startswith("scalim.execution.")):
                 findings.append("{}:{}: from {}".format(path, getattr(node, "lineno", "?"), module))
             continue
 
-        # 相对导入：`from ..execution... import ...`（当 `level>=2` 时，可从 `scalim.planning.*` 内部回到 `scalim.*`）
+        # 相对导入:`from ..execution... import ...`(当 `level>=2` 时,可从 `scalim.planning.*` 内部回到 `scalim.*`)
         if module and (module == "execution" or module.startswith("execution.")) and level >= 2:
             findings.append("{}:{}: from {}{}".format(path, getattr(node, "lineno", "?"), "." * level, module))
             continue
 
-        # 无模块名的相对导入：`from .. import execution`
+        # 无模块名的相对导入:`from .. import execution`
         if module is None and level >= 2:
             for alias in node.names:
                 if alias.name == "execution":

@@ -1,12 +1,12 @@
-"""`demo_big_data_report` 的用例注册表。
+"""`demo_big_data_report` 的用例注册表.
 
-集中管理演示场景的配置与执行方式，以便：
-- 测试复用同一套场景定义（避免重复写 `config`/`targets`/`verification` 的组装逻辑）
+集中管理演示场景的配置与执行方式,以便:
+- 测试复用同一套场景定义(避免重复写 `config`/`targets`/`verification` 的组装逻辑)
 - 演示维持“用例是什么”的单一事实来源
 
-同时兼容两种导入方式：
-- 包导入：`notebooks.marimo.examples.demo_big_data_report._cases`
-- 目录脚本式导入：运行本目录文件时通过 `sys.path` 注入
+同时兼容两种导入方式:
+- 包导入:`notebooks.marimo.examples.demo_big_data_report._cases`
+- 目录脚本式导入:运行本目录文件时通过 `sys.path` 注入
 """
 
 from dataclasses import dataclass
@@ -31,7 +31,7 @@ class CaseSpec:
 
 
 def build_test_config_small() -> ECommerceConfig:
-    # 与 `tests/conftest.py:ecommerce_config_small` 对齐，保证 CI 稳定且快速。
+    # 与 `tests/conftest.py:ecommerce_config_small` 对齐,保证 CI 稳定且快速.
     return ECommerceConfig(
         order_count=30,
         customer_count=10,
@@ -75,9 +75,9 @@ def run_case(
     row_limit_override: Optional[int] = None,
     fields_to_check: Optional[Sequence[str]] = None,
 ) -> Tuple[List[Dict[str, Any]], VerificationResult]:
-    """运行一个演示用例，并通过纯 Python 对照实现对拍验证输出正确性。
+    """运行一个演示用例,并通过纯 Python 对照实现对拍验证输出正确性.
 
-    返回 `(results, verification)`。
+    返回 `(results, verification)`.
     """
     case = get_case(case_id)
     prev = get_config()

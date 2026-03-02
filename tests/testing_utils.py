@@ -54,7 +54,7 @@ def missing_optional_dependency(monkeypatch, module_name: str):
 
 
 class ListSink(ISink):
-    """将结果收集到内存列表中（批量模式）。"""
+    """将结果收集到内存列表中(批量模式)."""
 
     def __init__(self) -> None:
         self.rows = []  # type: ignore[var-annotated]
@@ -68,7 +68,7 @@ class ListSink(ISink):
 
 
 class StreamingListSink(IRowSink):
-    """将结果收集到内存列表中（流式逐行模式）。"""
+    """将结果收集到内存列表中(流式逐行模式)."""
 
     def __init__(self) -> None:
         self.rows = []  # type: ignore[var-annotated]
@@ -82,7 +82,7 @@ class StreamingListSink(IRowSink):
 
 
 class ColumnListSink(IColumnSink):
-    """将结果收集为列式的内存表示。"""
+    """将结果收集为列式的内存表示."""
 
     def __init__(self) -> None:
         self.row_ids = []  # type: ignore[var-annotated]

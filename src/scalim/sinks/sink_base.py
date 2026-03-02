@@ -222,7 +222,7 @@ class IColumnSink(ISink, ABC):
             for field_key, value in row.items():
                 if field_key not in columns:
                     columns[field_key] = {}
-                # 使用行号作为伪 `row_id`（`batch_row_nth`）,用于列式组织.
+                # 使用行号作为伪 `row_id`(`batch_row_nth`),用于列式组织.
                 columns[field_key][row_idx] = value
 
         self.write_columns(columns)

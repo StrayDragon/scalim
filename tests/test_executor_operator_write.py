@@ -1,4 +1,4 @@
-"""执行器算子测试：`write`。"""
+"""执行器算子测试:`write`."""
 
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.write import WriteColumnOperatorExecutor, WriteRowOperatorExecutor

@@ -9,23 +9,23 @@ def _(mo):
     mo.md(r"""
     # demo_tutor
 
-    一个单文件的 **marimo 笔记本**，用来快速理解 Scalim 的核心能力（无需 YAML DSL）：
+    一个单文件的 **marimo 笔记本**,用来快速理解 Scalim 的核心能力(无需 YAML DSL):
 
-    - IR（Demand/Source/Field/Relation）
-    - Planning（PlanBuilder → ExecutionPlan）
-    - Execution（ScalimEngine：seq / adaptive）
-    - 编排（`run_ir`：与 DSL 无关的执行编排）
-    - Sinks（memory / csv / excel / pandas）
-    - Observability（Performance/Memory/Trace/Relation + 可选 Viz）
-    - Runtime Guardrails（quiet / fast_fail）
-    - Resilience：Loader Retry（可重试恢复）
-    - **对拍验证**：
-      - scalim vs python（逐行逐字段）
-      - seq vs adaptive（同输入输出一致）
-      - run_ir vs direct engine（同输出一致）
-      - loader_retry（故障注入：启用 retry 后输出应与基线一致）
+    - IR(Demand/Source/Field/Relation)
+    - Planning(PlanBuilder → ExecutionPlan)
+    - Execution(ScalimEngine:seq / adaptive)
+    - 编排(`run_ir`:与 DSL 无关的执行编排)
+    - Sinks(memory / csv / excel / pandas)
+    - Observability(Performance/Memory/Trace/Relation + 可选 Viz)
+    - Runtime Guardrails(quiet / fast_fail)
+    - Resilience:Loader Retry(可重试恢复)
+    - **对拍验证**:
+      - scalim vs python(逐行逐字段)
+      - seq vs adaptive(同输入输出一致)
+      - run_ir vs direct engine(同输出一致)
+      - loader_retry(故障注入:启用 retry 后输出应与基线一致)
 
-    说明：本 notebook 以默认配置会自动跑一遍（用于 `marimo export`），也可通过 UI 交互调整参数。
+    说明:本 notebook 以默认配置会自动跑一遍(用于 `marimo export`),也可通过 UI 交互调整参数.
     """)
     return
 
@@ -181,7 +181,7 @@ def _():
 def _(mo):
     mo.md(r"""
     ---
-    ## 1) 配置（可交互）
+    ## 1) 配置(可交互)
     """)
     return
 
@@ -194,14 +194,14 @@ def _(build_target_sets, mo):
     batch_size = mo.ui.slider(start=10, stop=500, value=100, step=10, label="批次大小")
     scenario = mo.ui.dropdown(options=list(_target_sets.keys()), value="full", label="目标字段集")
 
-    compare_pipelines = mo.ui.checkbox(label="对拍：seq vs adaptive（同输入输出一致）", value=True)
+    compare_pipelines = mo.ui.checkbox(label="对拍:seq vs adaptive(同输入输出一致)", value=True)
     write_csv = mo.ui.checkbox(label="写出 CSV 并与 Python 对照组对拍", value=True)
-    adaptive_max_workers = mo.ui.slider(start=0, stop=32, value=0, step=1, label="adaptive max_workers（0=auto）")
-    run_ir_demo = mo.ui.checkbox(label="对拍：run_ir（csv/excel 的 row/column + pandas sinks）", value=True)
-    write_viz = mo.ui.checkbox(label="写出 Viz 可视化产物（jsonl/snapshot）", value=False)
-    output_dir = mo.ui.text(label="产物目录（可选，留空写到 /tmp/scalim-demo-tutor）", value="")
+    adaptive_max_workers = mo.ui.slider(start=0, stop=32, value=0, step=1, label="adaptive max_workers(0=auto)")
+    run_ir_demo = mo.ui.checkbox(label="对拍:run_ir(csv/excel 的 row/column + pandas sinks)", value=True)
+    write_viz = mo.ui.checkbox(label="写出 Viz 可视化产物(jsonl/snapshot)", value=False)
+    output_dir = mo.ui.text(label="产物目录(可选,留空写到 /tmp/scalim-demo-tutor)", value="")
 
-    loader_retry_demo = mo.ui.checkbox(label="演示：Loader Retry（可重试恢复）", value=True)
+    loader_retry_demo = mo.ui.checkbox(label="演示:Loader Retry(可重试恢复)", value=True)
     loader_retry_case = mo.ui.dropdown(
         options=[
             "load_ref",
@@ -211,12 +211,12 @@ def _(build_target_sets, mo):
             "all",
         ],
         value="load_ref",
-        label="故障注入场景（哪个 callsite 先失败）",
+        label="故障注入场景(哪个 callsite 先失败)",
     )
     loader_retry_fail_times = mo.ui.slider(start=0, stop=3, value=1, step=1, label="每个 flaky loader 的失败次数")
     loader_retry_max_attempts = mo.ui.slider(start=1, stop=5, value=3, step=1, label="retry max_attempts")
-    loader_retry_demo_run_ir = mo.ui.checkbox(label="对拍：retry demo 也跑一遍 run_ir", value=False)
-    loader_retry_demo_give_up = mo.ui.checkbox(label="也演示 give-up（超过 max_attempts）", value=False)
+    loader_retry_demo_run_ir = mo.ui.checkbox(label="对拍:retry demo 也跑一遍 run_ir", value=False)
+    loader_retry_demo_give_up = mo.ui.checkbox(label="也演示 give-up(超过 max_attempts)", value=False)
 
     mo.vstack(
         [
@@ -363,7 +363,7 @@ def _(
     **当前配置**
 
     - orders: `{ORDER_COUNT}`
-    - target_set: `{TARGET_SET_ID}`（字段数 `{len(selected_targets)}`）
+    - target_set: `{TARGET_SET_ID}`(字段数 `{len(selected_targets)}`)
     - 对拍:
       - oracle(csv): `{"ON" if DO_CSV_COMPARE else "OFF"}`
       - pipeline(seq vs adaptive): `{"ON" if DO_PIPELINE_COMPARE else "OFF"}` (max_workers=`{ADAPTIVE_MAX_WORKERS}`)
@@ -422,7 +422,7 @@ def _(plan_snapshot):
 @app.cell(hide_code=True)
 def _(edges, mo, nodes):
     mo.md(f"""
-    Plan snapshot: nodes=`{len(nodes)}` edges=`{len(edges)}`（用于可视化/诊断）
+    Plan snapshot: nodes=`{len(nodes)}` edges=`{len(edges)}`(用于可视化/诊断)
     """)
     return
 
@@ -575,7 +575,7 @@ def _(
         - elapsed: `{elapsed:.4f}s`
         - throughput: `{throughput:.0f} rows/s`
         - order_by(order_id): `{"PASSED" if order_check.passed else "FAILED"}`
-        - oracle verification: `{"PASSED" if verification.passed else "FAILED"}`（checked_rows=`{verification.checked_rows}`）
+        - oracle verification: `{"PASSED" if verification.passed else "FAILED"}`(checked_rows=`{verification.checked_rows}`)
         - hook: batches=`{len(tutor_stats.batch_durations)}` loader_calls=`{len(tutor_stats.loader_calls)}`
         - perf: total_duration=`{perf_metrics.total_duration:.4f}s` avg_batch_duration=`{perf_metrics.avg_batch_duration:.4f}s`
         """
@@ -601,7 +601,7 @@ def _(results_col):
 @app.cell(hide_code=True)
 def _(mo, promotion_hit_rate, promotion_hits, total):
     mo.md(f"""
-    **数据质量（示例）** promotion_name hit-rate: `{promotion_hits}/{total}` = `{100 * promotion_hit_rate:.1f}%`
+    **数据质量(示例)** promotion_name hit-rate: `{promotion_hits}/{total}` = `{100 * promotion_hit_rate:.1f}%`
     """)
     return
 
@@ -610,7 +610,7 @@ def _(mo, promotion_hit_rate, promotion_hits, total):
 def _(mo):
     mo.md(r"""
     ---
-    ## 4) 执行策略对比：seq vs adaptive（对拍 + 性能）
+    ## 4) 执行策略对比:seq vs adaptive(对拍 + 性能)
     """)
     return
 
@@ -656,7 +656,7 @@ def _(
 
         seq_ver = verify_scalim_output(pipeline_seq_rows, fields_to_check=list(selected_targets), max_mismatches=20, oracle=oracle)
         if not seq_ver.passed:
-            raise AssertionError("seq 执行策略对拍失败（oracle）：\n{}\n\n{}".format(seq_ver.summary, seq_ver.get_mismatch_summary()))
+            raise AssertionError("seq 执行策略对拍失败(oracle):\n{}\n\n{}".format(seq_ver.summary, seq_ver.get_mismatch_summary()))
 
         adaptive_ver = verify_scalim_output(
             pipeline_adaptive_rows,
@@ -666,7 +666,7 @@ def _(
         )
         if not adaptive_ver.passed:
             raise AssertionError(
-                "adaptive 执行策略对拍失败（oracle）：\n{}\n\n{}".format(adaptive_ver.summary, adaptive_ver.get_mismatch_summary())
+                "adaptive 执行策略对拍失败(oracle):\n{}\n\n{}".format(adaptive_ver.summary, adaptive_ver.get_mismatch_summary())
             )
 
         pipeline_matched, pipeline_diff = compare_rows_by_pk(
@@ -675,7 +675,7 @@ def _(
             fields=list(selected_targets),
         )
         if not pipeline_matched:
-            raise AssertionError("执行策略对比失败（seq vs adaptive）：\n{}".format(pipeline_diff))
+            raise AssertionError("执行策略对比失败(seq vs adaptive):\n{}".format(pipeline_diff))
 
         speedup = (seq_s / adaptive_s) if adaptive_s else 0.0
         pipeline_compare = {
@@ -691,7 +691,7 @@ def _(
 @app.cell(hide_code=True)
 def _(ADAPTIVE_MAX_WORKERS, DO_PIPELINE_COMPARE, mo, pipeline_compare):
     if not DO_PIPELINE_COMPARE:
-        pipeline_md_text = "执行策略对拍已关闭（可在配置中启用）。"
+        pipeline_md_text = "执行策略对拍已关闭(可在配置中启用)."
     else:
         pipeline_md_text = "\n".join(
             [
@@ -709,7 +709,7 @@ def _(ADAPTIVE_MAX_WORKERS, DO_PIPELINE_COMPARE, mo, pipeline_compare):
 def _(mo):
     mo.md(r"""
     ---
-    ## 5) Sink 对比：Row sink（基础字段集）
+    ## 5) Sink 对比:Row sink(基础字段集)
     """)
     return
 
@@ -749,7 +749,7 @@ def _(
 def _(basic_targets, basic_verification, mo):
     mo.md(f"""
     - targets: `{len(basic_targets)}`
-    - verification: `{"PASSED" if basic_verification.passed else "FAILED"}`（checked_rows=`{basic_verification.checked_rows}`）
+    - verification: `{"PASSED" if basic_verification.passed else "FAILED"}`(checked_rows=`{basic_verification.checked_rows}`)
     """)
     return
 
@@ -758,7 +758,7 @@ def _(basic_targets, basic_verification, mo):
 def _(mo):
     mo.md(r"""
     ---
-    ## 6) CSV 文件对拍（scalim vs python）
+    ## 6) CSV 文件对拍(scalim vs python)
     """)
     return
 
@@ -803,9 +803,7 @@ def _(
 
 @app.cell(hide_code=True)
 def _(DO_CSV_COMPARE, mo):
-    csv_note_text = (
-        "CSV 对拍已启用：将写出两份 CSV 并进行逐行比对。" if DO_CSV_COMPARE else "CSV 对拍已关闭（避免写文件）。如需启用请勾选。"
-    )
+    csv_note_text = "CSV 对拍已启用:将写出两份 CSV 并进行逐行比对." if DO_CSV_COMPARE else "CSV 对拍已关闭(避免写文件).如需启用请勾选."
     csv_note = mo.md(csv_note_text)
     csv_note
     return
@@ -813,7 +811,7 @@ def _(DO_CSV_COMPARE, mo):
 
 @app.cell(hide_code=True)
 def _(DO_CSV_COMPARE, mo, python_csv, scalim_csv):
-    csv_paths = mo.md(f"CSV 输出路径：`{scalim_csv}` / `{python_csv}`") if DO_CSV_COMPARE else None
+    csv_paths = mo.md(f"CSV 输出路径:`{scalim_csv}` / `{python_csv}`") if DO_CSV_COMPARE else None
     csv_paths
     return
 
@@ -822,7 +820,7 @@ def _(DO_CSV_COMPARE, mo, python_csv, scalim_csv):
 def _(mo):
     mo.md(r"""
     ---
-    ## 7) 编排：run_ir（csv/excel 的 row/column + pandas sinks）
+    ## 7) 编排:run_ir(csv/excel 的 row/column + pandas sinks)
     """)
     return
 
@@ -877,7 +875,7 @@ def _(
                 )
             )
 
-        # 1) `Excel`（行式 `sink`） + `PandasRowSink`
+        # 1) `Excel`(行式 `sink`) + `PandasRowSink`
         run_ir_excel_row = artifacts_dir / "demo_tutor_run_ir.xlsx"
         excel_row_sink = PandasRowSink(field_names=list(selected_targets))
         excel_row_request = ExecutionRequest(
@@ -897,15 +895,15 @@ def _(
         )
         if not excel_row_ver.passed:
             raise AssertionError(
-                "run_ir(excel row) 对拍失败（oracle）：\n{}\n\n{}".format(excel_row_ver.summary, excel_row_ver.get_mismatch_summary())
+                "run_ir(excel row) 对拍失败(oracle):\n{}\n\n{}".format(excel_row_ver.summary, excel_row_ver.get_mismatch_summary())
             )
 
         excel_row_matched, excel_row_diff = compare_rows_by_pk(results_col, run_ir_excel_row_rows, fields=list(selected_targets))
         if not excel_row_matched:
-            raise AssertionError("run_ir(excel row) vs direct engine 不一致：\n{}".format(excel_row_diff))
+            raise AssertionError("run_ir(excel row) vs direct engine 不一致:\n{}".format(excel_row_diff))
 
         if not run_ir_excel_row.exists():
-            raise AssertionError("run_ir 未写出 excel(row) 产物：{}".format(run_ir_excel_row))
+            raise AssertionError("run_ir 未写出 excel(row) 产物:{}".format(run_ir_excel_row))
 
         run_ir_excel_row_result = {
             "status": "matched",
@@ -915,7 +913,7 @@ def _(
             "output_path": excel_row_exec.output_path,
         }
 
-        # 2) `CSV`（行式 `sink`） + `PandasRowSink`
+        # 2) `CSV`(行式 `sink`) + `PandasRowSink`
         run_ir_csv_row = artifacts_dir / "demo_tutor_run_ir.csv"
         csv_row_sink = PandasRowSink(field_names=list(selected_targets))
         csv_row_request = ExecutionRequest(
@@ -933,15 +931,15 @@ def _(
         csv_row_ver = verify_scalim_output(run_ir_csv_row_rows, fields_to_check=list(selected_targets), max_mismatches=20, oracle=oracle)
         if not csv_row_ver.passed:
             raise AssertionError(
-                "run_ir(csv row) 对拍失败（oracle）：\n{}\n\n{}".format(csv_row_ver.summary, csv_row_ver.get_mismatch_summary())
+                "run_ir(csv row) 对拍失败(oracle):\n{}\n\n{}".format(csv_row_ver.summary, csv_row_ver.get_mismatch_summary())
             )
 
         csv_row_matched, csv_row_diff = compare_rows_by_pk(results_col, run_ir_csv_row_rows, fields=list(selected_targets))
         if not csv_row_matched:
-            raise AssertionError("run_ir(csv row) vs direct engine 不一致：\n{}".format(csv_row_diff))
+            raise AssertionError("run_ir(csv row) vs direct engine 不一致:\n{}".format(csv_row_diff))
 
         if not run_ir_csv_row.exists():
-            raise AssertionError("run_ir 未写出 csv(row) 产物：{}".format(run_ir_csv_row))
+            raise AssertionError("run_ir 未写出 csv(row) 产物:{}".format(run_ir_csv_row))
 
         run_ir_csv_row_result = {
             "status": "matched",
@@ -951,7 +949,7 @@ def _(
             "output_path": csv_row_exec.output_path,
         }
 
-        # 3) `Excel`（列式 `sink`） + `PandasColumnSink`
+        # 3) `Excel`(列式 `sink`) + `PandasColumnSink`
         run_ir_excel_col = artifacts_dir / "demo_tutor_run_ir_column.xlsx"
         excel_col_sink = PandasColumnSink(field_names=list(selected_targets))
         excel_col_request = ExecutionRequest(
@@ -980,15 +978,15 @@ def _(
         )
         if not excel_col_ver.passed:
             raise AssertionError(
-                "run_ir(excel column) 对拍失败（oracle）：\n{}\n\n{}".format(excel_col_ver.summary, excel_col_ver.get_mismatch_summary())
+                "run_ir(excel column) 对拍失败(oracle):\n{}\n\n{}".format(excel_col_ver.summary, excel_col_ver.get_mismatch_summary())
             )
 
         excel_col_matched, excel_col_diff = compare_rows_by_pk(results_col, run_ir_excel_col_rows, fields=list(selected_targets))
         if not excel_col_matched:
-            raise AssertionError("run_ir(excel column) vs direct engine 不一致：\n{}".format(excel_col_diff))
+            raise AssertionError("run_ir(excel column) vs direct engine 不一致:\n{}".format(excel_col_diff))
 
         if not run_ir_excel_col.exists():
-            raise AssertionError("run_ir 未写出 excel(column) 产物：{}".format(run_ir_excel_col))
+            raise AssertionError("run_ir 未写出 excel(column) 产物:{}".format(run_ir_excel_col))
 
         run_ir_excel_col_result = {
             "status": "matched",
@@ -1016,25 +1014,25 @@ def _(
     run_ir_excel_row_result,
 ):
     if not DO_RUN_IR_DEMO:
-        run_ir_md_text = "run_ir 对拍已关闭（可在配置中启用）。"
+        run_ir_md_text = "run_ir 对拍已关闭(可在配置中启用)."
     else:
         run_ir_md_text = "\n".join(
             [
-                "**run_ir 产物（均已对拍：oracle + vs direct engine）**",
+                "**run_ir 产物(均已对拍:oracle + vs direct engine)**",
                 "",
-                "- CSV（row, streaming=True）: `{}` rows=`{}` elapsed=`{:.4f}s` status=`{}`".format(
+                "- CSV(row, streaming=True): `{}` rows=`{}` elapsed=`{:.4f}s` status=`{}`".format(
                     run_ir_csv_row_result["path"],
                     run_ir_csv_row_result["rows"],
                     run_ir_csv_row_result["duration_s"],
                     run_ir_csv_row_result["status"],
                 ),
-                "- Excel（row, streaming=True）: `{}` rows=`{}` elapsed=`{:.4f}s` status=`{}`".format(
+                "- Excel(row, streaming=True): `{}` rows=`{}` elapsed=`{:.4f}s` status=`{}`".format(
                     run_ir_excel_row_result["path"],
                     run_ir_excel_row_result["rows"],
                     run_ir_excel_row_result["duration_s"],
                     run_ir_excel_row_result["status"],
                 ),
-                "- Excel（column, streaming=False）: `{}` rows=`{}` elapsed=`{:.4f}s` status=`{}`".format(
+                "- Excel(column, streaming=False): `{}` rows=`{}` elapsed=`{:.4f}s` status=`{}`".format(
                     run_ir_excel_col_result["path"],
                     run_ir_excel_col_result["rows"],
                     run_ir_excel_col_result["duration_s"],
@@ -1073,7 +1071,7 @@ def _(
 def _(mo):
     mo.md(r"""
     ---
-    ## 8) Runtime Guardrails（quiet / fast_fail）
+    ## 8) Runtime Guardrails(quiet / fast_fail)
     """)
     return
 
@@ -1185,12 +1183,12 @@ def _(codes, fast_fail_code, mo, quiet_rows):
     mo.md(f"""
     **quiet 模式**
 
-    - 输出行数：`{len(quiet_rows)}`
-    - 记录到的 guardrail codes：`{", ".join(codes) if codes else "(none)"}`
+    - 输出行数:`{len(quiet_rows)}`
+    - 记录到的 guardrail codes:`{", ".join(codes) if codes else "(none)"}`
 
     **fast_fail 模式**
 
-    - raise code：`{fast_fail_code}`
+    - raise code:`{fast_fail_code}`
     """)
     return
 
@@ -1205,16 +1203,16 @@ def _(mo, quiet_rows):
 def _(mo):
     mo.md(r"""
     ---
-    ## 9) Resilience：Loader Retry（可重试恢复）
+    ## 9) Resilience:Loader Retry(可重试恢复)
 
-    目标：演示当 loader 出现**瞬时失败**（如网络抖动、临时超时）时：
+    目标:演示当 loader 出现**瞬时失败**(如网络抖动、临时超时)时:
 
-    - 未启用 retry：执行会直接失败（可能在 preload / main_source / load / load_ref 的任意阶段）
-    - 启用 retry：在策略允许的范围内自动重试并恢复，最终输出与无故障基线一致
+    - 未启用 retry:执行会直接失败(可能在 preload / main_source / load / load_ref 的任意阶段)
+    - 启用 retry:在策略允许的范围内自动重试并恢复,最终输出与无故障基线一致
 
-    说明：
-    - Loader Retry 默认关闭，需要显式传入 `LoaderRetryPolicies` 才会启用。
-    - `loader_retry` 事件是 wants-gated：只有订阅了 `EVENT_LOADER_RETRY` 才会发出（避免热路径额外开销）。
+    说明:
+    - Loader Retry 默认关闭,需要显式传入 `LoaderRetryPolicies` 才会启用.
+    - `loader_retry` 事件是 wants-gated:只有订阅了 `EVENT_LOADER_RETRY` 才会发出(避免热路径额外开销).
     """)
     return
 
@@ -1450,7 +1448,7 @@ def _(
 
         matched, diff = compare_rows_by_pk(baseline_rows, retry_demo_expected_rows, pk_field="order_id", fields=demo_targets)
         if not matched:
-            raise AssertionError("LoaderRetry demo baseline 对拍失败（scalim vs python-expected）：\n{}".format(diff))
+            raise AssertionError("LoaderRetry demo baseline 对拍失败(scalim vs python-expected):\n{}".format(diff))
 
         retry_demo["baseline_rows"] = len(baseline_rows)
 
@@ -1482,7 +1480,7 @@ def _(
             }
             return demand, states
 
-        # 1) 不启用重试：注入 `fail_times > 0` 时应失败。
+        # 1) 不启用重试:注入 `fail_times > 0` 时应失败.
         flaky_demand_no_retry, _states_no_retry = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
         flaky_plan_no_retry = PlanBuilder(flaky_demand_no_retry).build(targets=demo_targets)
         flaky_engine_no_retry = ScalimEngine(demand=flaky_demand_no_retry, plan=flaky_plan_no_retry, batch_size=3)
@@ -1494,7 +1492,7 @@ def _(
             retry_demo["no_retry_failed"] = True
             retry_demo["no_retry_error"] = "{}: {}".format(type(exc).__name__, str(exc))
 
-        # 2) 启用重试：应恢复并与基线输出一致。
+        # 2) 启用重试:应恢复并与基线输出一致.
         flaky_demand_retry, _states_retry = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
         flaky_plan_retry = PlanBuilder(flaky_demand_retry).build(targets=demo_targets)
         collector = RetryDemoCollector()
@@ -1523,7 +1521,7 @@ def _(
 
             matched, diff = compare_rows_by_pk(baseline_rows, retry_rows, pk_field="order_id", fields=demo_targets)
             if not matched:
-                raise AssertionError("LoaderRetry demo 对拍失败（baseline vs retry-run）：\n{}".format(diff))
+                raise AssertionError("LoaderRetry demo 对拍失败(baseline vs retry-run):\n{}".format(diff))
 
             retry_demo["status"] = "matched"
             retry_demo["retry_error"] = None
@@ -1547,7 +1545,7 @@ def _(
             for e in collector.retries
         ]
 
-        # 3) 可选：`run_ir` 路径（也会覆盖 `main_source` 加载器的调用点）。
+        # 3) 可选:`run_ir` 路径(也会覆盖 `main_source` 加载器的调用点).
         if DO_LOADER_RETRY_DEMO_RUN_IR:
             retry_demo["run_ir"]["enabled"] = True
             flaky_demand_run_ir, _states_run_ir = _build_flaky_demand_and_states(fail_times=int(LOADER_RETRY_FAIL_TIMES))
@@ -1573,7 +1571,7 @@ def _(
 
                 matched, diff = compare_rows_by_pk(baseline_rows, run_ir_rows, pk_field="order_id", fields=demo_targets)
                 if not matched:
-                    raise AssertionError("LoaderRetry demo 对拍失败（baseline vs run_ir）：\n{}".format(diff))
+                    raise AssertionError("LoaderRetry demo 对拍失败(baseline vs run_ir):\n{}".format(diff))
             except Exception as exc:
                 retry_demo["run_ir"]["failed"] = True
                 retry_demo["run_ir"]["error"] = "{}: {}".format(type(exc).__name__, str(exc))
@@ -1581,7 +1579,7 @@ def _(
                 retry_demo["run_ir"]["retry_events"] = len(run_ir_collector.retries)
                 retry_demo["run_ir"]["error_events"] = len(run_ir_collector.errors)
 
-        # 4) 可选：放弃演示（超过 `max_attempts` -> 仅发出一次 `error` 事件）。
+        # 4) 可选:放弃演示(超过 `max_attempts` -> 仅发出一次 `error` 事件).
         if DO_LOADER_RETRY_DEMO_GIVE_UP:
             retry_demo["give_up"]["enabled"] = True
             give_up_fail_times = max(int(LOADER_RETRY_MAX_ATTEMPTS), 1)
@@ -1615,12 +1613,12 @@ def _(
 @app.cell(hide_code=True)
 def _(DO_LOADER_RETRY_DEMO, mo, retry_demo):
     if not DO_LOADER_RETRY_DEMO:
-        mo.md("Loader Retry demo 已关闭（可在配置中启用）。")
+        mo.md("Loader Retry demo 已关闭(可在配置中启用).")
     else:
         no_retry_line = (
-            "未启用 retry：`FAILED` ({})".format(retry_demo["no_retry_error"])
+            "未启用 retry:`FAILED` ({})".format(retry_demo["no_retry_error"])
             if retry_demo["no_retry_failed"]
-            else "未启用 retry：`OK`（本次未触发故障注入）"
+            else "未启用 retry:`OK`(本次未触发故障注入)"
         )
 
         run_ir_meta = retry_demo["run_ir"]

@@ -1,6 +1,6 @@
-"""对照组验证库 - 用于验证 Scalim 框架输出的正确性。
+"""对照组验证库 - 用于验证 Scalim 框架输出的正确性.
 
-这个模块提供纯 Python 实现的数据关联和计算逻辑,作为对照组验证 Scalim 输出。
+这个模块提供纯 Python 实现的数据关联和计算逻辑,作为对照组验证 Scalim 输出.
 
 功能:
 1. 完整的纯 Python JOIN 引擎实现
@@ -17,12 +17,12 @@ from _verification import verify_scalim_output, DetailedVerification
 result = verify_scalim_output(scales_results, target_fields)
 assert result.passed, result.summary
 
-# 多次对拍（推荐：缓存期望输出，适合在笔记本里跑多条流水线/输出端）
+# 多次对拍(推荐:缓存期望输出,适合在笔记本里跑多条流水线/输出端)
 oracle = PythonOracle()
 result = verify_scalim_output(scales_results, target_fields, oracle=oracle)
 assert result.passed, result.summary
 
-# 详细验证（推荐用于集成测试）
+# 详细验证(推荐用于集成测试)
 detailed = DetailedVerification(scales_results, target_fields)
 report = detailed.run_full_verification()
 assert report.all_passed, report.summary
@@ -324,11 +324,11 @@ def _values_equal(expected: Any, actual: Any, tolerance: float = 0.01) -> bool:
 
 
 class PythonOracle:
-    """纯 Python 对照缓存（`oracle`）。
+    """纯 Python 对照缓存(`oracle`).
 
-    `verify_scalim_output()` / `python_build_order_report()` 是一次性的便捷 API。
-    当在笔记本/测试中需要跑多条流水线/输出端并分别对拍时，反复构建期望结果会带来可见开销。
-    此类会先把“完整报表”的期望结果只算一次，然后复用它做多次校验。
+    `verify_scalim_output()` / `python_build_order_report()` 是一次性的便捷 API.
+    当在笔记本/测试中需要跑多条流水线/输出端并分别对拍时,反复构建期望结果会带来可见开销.
+    此类会先把“完整报表”的期望结果只算一次,然后复用它做多次校验.
     """
 
     def __init__(self) -> None:
@@ -396,7 +396,7 @@ class PythonOracle:
 
         passed = len(mismatches) == 0
         if passed:
-            summary = "已成功校验 {} 行。".format(checked)
+            summary = "已成功校验 {} 行.".format(checked)
         else:
             lines = ["发现 {} 处不匹配:".format(len(mismatches))]
             for m in mismatches[:5]:
@@ -493,7 +493,7 @@ def verify_scalim_output(
 
     passed = len(mismatches) == 0
     if passed:
-        summary = "已成功校验 {} 行。".format(checked)
+        summary = "已成功校验 {} 行.".format(checked)
     else:
         lines = ["发现 {} 处不匹配:".format(len(mismatches))]
         for m in mismatches[:5]:
@@ -798,10 +798,10 @@ def compare_rows_by_pk(
     tolerance: float = 0.01,
     max_differences: int = 10,
 ) -> Tuple[bool, str]:
-    """按主键 + 字段值对比两份输出行集合。
+    """按主键 + 字段值对比两份输出行集合.
 
-    适用于“对拍”的场景（例如 `seq` vs `adaptive`、`sink` vs `sink`、`run_ir` vs 直接引擎）：
-    同一套输入/字段集合下，两边应产出完全一致的结果。
+    适用于“对拍”的场景(例如 `seq` vs `adaptive`、`sink` vs `sink`、`run_ir` vs 直接引擎):
+    同一套输入/字段集合下,两边应产出完全一致的结果.
     """
     left_by_pk = {r.get(pk_field): r for r in left_rows if pk_field in r}
     right_by_pk = {r.get(pk_field): r for r in right_rows if pk_field in r}
@@ -813,9 +813,9 @@ def compare_rows_by_pk(
         missing_right = sorted(left_pks - right_pks)
         parts = []
         if missing_left:
-            parts.append("left 缺少 {} 个 PK（示例: {}）".format(len(missing_left), missing_left[:5]))
+            parts.append("left 缺少 {} 个 PK(示例: {})".format(len(missing_left), missing_left[:5]))
         if missing_right:
-            parts.append("right 缺少 {} 个 PK（示例: {}）".format(len(missing_right), missing_right[:5]))
+            parts.append("right 缺少 {} 个 PK(示例: {})".format(len(missing_right), missing_right[:5]))
         return False, "PK 集合不一致: {}".format("; ".join(parts) if parts else "未知")
 
     differences: List[str] = []

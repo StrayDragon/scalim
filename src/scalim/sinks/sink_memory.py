@@ -18,7 +18,7 @@ class InMemoryRowSink(BaseRowSink):
 
     主要用于测试和调试.
 
-    示例：
+    示例:
         ```python
         sink = InMemoryRowSink()
         sink.write_row({"id": 1, "name": "Alice"})
@@ -62,7 +62,7 @@ class InMemoryColumnSink(IColumnSink):
     - `get_2d_list()`: 获取二维列表 (`list[list[value]]`)
     - `get_column(field_key)`: 获取单列数据
 
-    示例：
+    示例:
         ```python
         sink = InMemoryColumnSink(["order_id", "name"])
         sink.set_row_ids([1, 2, 3])

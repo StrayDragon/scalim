@@ -87,7 +87,7 @@ def test_csv_sink_requires_field_names(tmp_path):
 
 
 def test_csv_sink_supports_field_mapping(tmp_path):
-    """验证 `CSVSink` 能正确处理 `field_names` 与 `header_names`。
+    """验证 `CSVSink` 能正确处理 `field_names` 与 `header_names`.
 
     - `field_names` 用于从行数据中取值
     - `header_names` 用于输出 CSV 表头
@@ -159,7 +159,7 @@ def test_default_column_sink_write_batch_converts_rows():
     ids=["row-sink", "column-sink"],
 )
 def test_csv_sink_with_header_names(tmp_path, sink_cls):
-    """验证 CSV 写出端能正确使用 `header_names` 输出表头, 使用 `field_names` 输出值。"""
+    """验证 CSV 写出端能正确使用 `header_names` 输出表头, 使用 `field_names` 输出值."""
     output_path = tmp_path / "output.csv"
     rows = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
 
@@ -197,7 +197,7 @@ def test_csv_sink_escapes_special_chars(tmp_path, sink_cls):
 
 
 def test_csv_sink_atomic_write(tmp_path):
-    """验证 `CSVSink` 使用原子写入（临时文件 + 重命名）。"""
+    """验证 `CSVSink` 使用原子写入(临时文件 + 重命名)."""
     import os
 
     output_path = tmp_path / "output.csv"
@@ -205,7 +205,7 @@ def test_csv_sink_atomic_write(tmp_path):
     with CSVSink(str(output_path), field_names=["id", "name"]) as sink:
         # 写入过程中应存在临时文件
         sink.write_row({"id": 1, "name": "Alice"})
-        # 最终文件在 `close` 前不应存在（调用 `close` 时才写入/替换）
+        # 最终文件在 `close` 前不应存在(调用 `close` 时才写入/替换)
         # 注意: 原子写入下,最终文件仅会在 `close()` 后出现
 
     # `close` 后最终文件应存在
@@ -215,7 +215,7 @@ def test_csv_sink_atomic_write(tmp_path):
 
 
 def test_column_csv_sink_atomic_write_on_error(tmp_path):
-    """验证 `ColumnCSVSink` 在发生错误时能清理临时文件。"""
+    """验证 `ColumnCSVSink` 在发生错误时能清理临时文件."""
     import os
 
     output_path = tmp_path / "output.csv"

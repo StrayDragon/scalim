@@ -117,14 +117,10 @@ class RelationIr:
     orders["customer_id"].join(customers["customer_id"])
 
     # 2 - 单表多字段:
-    orders["region_id"].join(mapping["region_id"]).and_(
-        orders["institution_id"].join(mapping["institution_id"])
-    )
+    orders["region_id"].join(mapping["region_id"]).and_(orders["institution_id"].join(mapping["institution_id"]))
 
     # 3 - 多表级联:
-    orders["pay_id"].join(pays["pay_id"]).and_(
-        pays["country_id"].join(countries["country_id"])
-    )
+    orders["pay_id"].join(pays["pay_id"]).and_(pays["country_id"].join(countries["country_id"]))
     ```
     """
 

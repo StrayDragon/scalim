@@ -107,7 +107,7 @@ def test_column_excel_sink_handles_missing_active(monkeypatch, tmp_path: Path) -
     ids=["row-sink", "column-sink"],
 )
 def test_excel_sink_with_header_names(tmp_path: Path, sink_cls) -> None:
-    """测试 `Excel` 输出端能正确使用 `header_names` 作为表头，使用 `field_names` 作为取值键。"""
+    """测试 `Excel` 输出端能正确使用 `header_names` 作为表头,使用 `field_names` 作为取值键."""
     output_path = tmp_path / "output.xlsx"
     rows = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
 

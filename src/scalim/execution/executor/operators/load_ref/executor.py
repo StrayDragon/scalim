@@ -1,6 +1,6 @@
-"""`LoadRef` 算子执行器实现（内部）。
+"""`LoadRef` 算子执行器实现(内部).
 
-请从 `scalim.execution.executor.operators.load_ref.executor` 导入 `LoadRefOperatorExecutor`。
+请从 `scalim.execution.executor.operators.load_ref.executor` 导入 `LoadRefOperatorExecutor`.
 """
 
 from collections.abc import Hashable
