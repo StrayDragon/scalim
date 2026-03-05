@@ -1,0 +1,359 @@
+[project]
+name = "scalim"
+version = "0.2.1"
+description = "NOT USE, WIP"
+readme = "README.md"
+authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
+requires-python = ">=3.6"
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    # Python 3.6 兼容依赖 (通过 PyPI API 确认的版本边界)
+    "dataclasses;python_version<'3.7'",
+    # pyyaml: 对 py3.6 扩大到5.4.1+, 这样老 pip(如 18.x) 也能拿到 manylinux1 wheel,避免回退源码构建
+    "pyyaml>=5.4.1,<6.0.2;python_version<'3.8'",
+    "pyyaml>=6.0.2;python_version>='3.8'",
+    # typing-extensions: 4.1.1 是最后支持 3.6 的版本, 4.2.0+ 需要 >=3.7
+    "typing-extensions>=4.1.1,<4.2;python_version<'3.7'",
+    "typing-extensions>=4.1.1;python_version>='3.7'",
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+scalim-benchlib = { workspace = true }
+scalim-misc = { workspace = true }
+scalim = { workspace = true }
+
+[project.optional-dependencies]
+cli = [
+    "jsonschema>=3.2,<4;python_version<'3.7'",
+    "jsonschema>=4.0.0;python_version>='3.7'",
+]
+pandas = [
+    # numpy: 1.19.5 是最后支持 3.6 的版本, 1.20.0+ 需要 >=3.7
+    "numpy>=1.19.0,<1.20;python_version<'3.7'",
+    "numpy>=1.24.4;python_version>='3.7'",
+    # pandas: 1.1.5 是最后支持 3.6 的版本, 1.2.0+ 需要 >=3.7.1
+    "pandas>=1.0.0,<1.2;python_version<'3.7'",
+    "pandas>=2.0.3;python_version>='3.7'",
+]
+excel = [
+    # openpyxl: 3.1.3 是最后支持 3.6 的版本, 3.1.4+ 需要 >=3.8
+    "openpyxl>=3.0.0,<3.1.4;python_version<'3.8'",
+    "openpyxl>=3.1.5;python_version>='3.8'",
+]
+
+[project.scripts]
+scalim-cli = "scalim.cli.main:main"
+
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.10" }
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pyzmq>=27.1.0",
+    "pytest-xdist",
+    "pytest-benchmark>=4.0.0",
+    "rich",
+    "pymdown-extensions",
+    "pandas-stubs",
+    "basedpyright",
+    "com2ann",
+    "sqlalchemy",
+    "pymysql",
+    "python-dotenv",
+    "marimo[recommended]",
+    "types-dataclasses>=0.6.6",
+    "memray>=1.19.1",           # 3.7+
+    "memory-profiler>=0.61.0",  # 3.6+
+    "matplotlib>=3.10.8",
+    "psutil>=5.9.0",
+    "scalim-benchlib",
+    "scalim-misc",
+    "pandas>=2.0.3",
+    "openpyxl>=3.1.5",
+    "pytest-memray>=1.8.0",
+    "zensical>=0.0.23",
+    "tomli>=2.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.7,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.scalim.identity]
+# NOTE: 这里是项目对外身份的“唯一真相”(除 `[project].name/version` 外).
+import_root = "scalim"
+cli_name = "scalim-cli"
+
+[tool.scalim.viz]
+dir_name = "scalim-viz"
+artifacts_root = "artifacts/scalim-viz"
+replay_route = "/__scalim_viz__/replay"
+
+[tool.scalim.env.bench]
+scale = "SCALIM_BENCH_SCALE"
+scope = "SCALIM_BENCH_SCOPE"
+max_workers = "SCALIM_BENCH_MAX_WORKERS"
+
+[tool.scalim.env.sync]
+remote_host = "SCALIM_REMOTE_HOST"
+tmp_remote_dir = "SCALIM_TMP_REMOTE_DIR"
+log_remote_dir = "SCALIM_LOG_REMOTE_DIR"
+log_dest_dir = "SCALIM_LOG_DEST_DIR"
+dest_dir = "SCALIM_DEST_DIR"
+report_root_dir = "SCALIM_REPORT_ROOT_DIR"
+analysis_script = "SCALIM_ANALYSIS_SCRIPT"
+analyze_args = "SCALIM_ANALYZE_ARGS"
+analyze_args_prefix = "SCALIM_ANALYZE_ARGS_"
+
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "artifacts/skills/**",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "**/*.ipynb",
+]
+
+line-length = 140
+indent-width = 4
+
+target-version = "py37" # NOTE: 实际需要需要支持到3.6, 但是uv不支持
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+unfixable = [
+    "UP", # 因为ruff仅最低支持py37 为了避免不兼容 所以禁用 pyupgrade
+]
+
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+select = ["ALL"]
+ignore = [
+    "D",
+    "UP",
+    "FA100",   # 默认使用老的typing导入List Dict方式, 避免 py36不兼容
+    "COM812",
+    "TID252",  # 相对导入相关
+    "PERF401", # 推荐列表推导式
+    "SIM108",  # 推荐用ifelse表达式
+    "ERA001",
+    "ARG002",  # pyright也会检查
+    "ANN401",
+]
+
+
+[tool.ruff.lint.pylint]
+max-args = 16
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["S101", "DTZ005"]
+"**/notebooks/marimo/*.py" = ["ALL"]
+"{tests,bench}/*.py" = ["ALL"]
+"tests/**/*.py" = ["ALL"]
+"docs/snippets/*.py" = ["ALL"]
+"scripts/*.py" = ["ALL"]
+"packages/scalim-misc/src/scalim_misc/agent_skill_gen.py" = ["ALL"]
+"src/scalim/vendor/compact/typing_extensionsx.py" = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing_extensions".msg = "Use src/scalim/vendor/compact/typing_extensionsx.py instead (Python 3.6 + old typing_extensions compat)."
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.pytest]
+[tool.pytest.ini_options]
+addopts = "-rs -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100 -p no:benchmark -m \"not bench\""
+# asyncio_mode = "auto"
+# asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+# pythonpath = [".."]
+norecursedirs = ["docker", ".venv", ".git", "node_modules", "*.egg-info"]
+markers = [
+    "bench: pytest-benchmark suites (select with '-m \"bench\"')",
+    "benchmark: pytest-benchmark marker (bench-only)",
+    "slow: long-running integration tests",
+]
+
+[tool.coverage.run]
+omit = [
+    "src/scalim/vendor/*",
+    "src/scalim/vendor/**",
+    "src/scalim/cli/*",
+    "src/scalim/cli/**",
+    "packages/scalim-misc/*",
+    "packages/scalim-misc/**",
+]
+
+[tool.basedpyright]
+# include = ["src/scalim", "tests", "notebooks"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    "src/scalim/typestubs",
+    ".devcontainer/**",
+]
+ignore = [
+    "scripts",
+    "artifacts/skills/scalim-yaml-dsl/scripts/**",
+    "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py",
+    ".devcontainer/**",
+]
+defineConstant = { DEBUG = true }
+pythonVersion = "3.6"
+pythonPlatform = "Linux"
+
+# executionEnvironments = [
+#   { root = "tests", reportPrivateUsage = false ]},
+#   { root = "src/scalim", extraPaths = [".."] }
+# ]
+
+reportExplicitAny = false
+reportUnnecessaryIsInstance = false
+reportAny = false
+reportPrivateLocalImportUsage = false
+reportDeprecated = false
+
+[[tool.basedpyright.executionEnvironments]]
+root = "notebooks"
+reportImplicitRelativeImport = false       # marimo 脚本通过 sys.path 动态导入 _shared 模块
+reportUntypedFunctionDecorator = false     # 不报告未类型化的函数装饰器
+reportArgumentType = false                 # 不报告参数类型错误
+reportCallIssue = false                    # 不报告函数调用问题
+reportGeneralTypeIssues = false            # 不报告泛型相关错误
+reportImplicitAbstractClass = false        # 不报告抽象类问题
+reportImplicitOverride = false             # 不报告隐式方法重写问题
+reportIndexIssue = false                   # 不报告索引访问问题
+reportUnknownLambdaType = false            # 不报告 Lambda 表达式类型错误
+reportUnknownMemberType = false            # 不报告属性/方法访问的类型错误
+reportMissingParameterType = false         # 不报告函数参数类型错误
+reportUnknownParameterType = false         # 不报告未知参数类型
+reportOptionalMemberAccess = false         # 不报告对可选成员的安全访问警告
+reportAttributeAccessIssue = "none"        # 不报告属性访问相关错误
+reportOperatorIssue = false                # 不报告操作符使用问题
+reportReturnType = false                   # 不报告返回值类型错误
+reportMissingTypeArgument = false          # 不报告泛型类型参数缺失
+reportMissingImports = false               # 不报告模块导入缺失
+reportTypedDictNotRequiredAccess = false   # 不报告 TypedDict 访问要求
+reportUnknownArgumentType = false          # 不报告函数调用参数类型错误
+reportUnknownVariableType = false          # 不报告变量类型推断失败
+reportUnusedCallResult = false             # 允许忽略函数返回值
+reportPrivateUsage = false                 # 不报告私有成员使用
+reportUnusedClass = false                  # 允许存在未使用的类定义
+reportUnusedFunction = false               # 允许存在未使用的函数定义
+reportUnusedImport = false                 # 允许存在未使用的导入语句
+reportUnusedParameter = false              # 允许存在未使用的函数参数
+reportUnusedVariable = false               # 允许存在未使用的局部变量
+reportAny = "none"                         # 不报告 Any 类型使用
+reportExplicitAny = "none"                 # 不报告显式声明的 Any 类型
+reportIncompatibleMethodOverride = false   # 不报告子类方法与父类方法不兼容问题
+reportIncompatibleVariableOverride = false # 不报告子类变量与父类变量不兼容问题
+reportUnnecessaryTypeIgnoreComment = false # 不报告 # type: ignore 是否必要
+reportAbstractUsage = false                # 不报告抽象类实例化问题
+reportUndefinedVariable = false            # 不报告未定义的变量
+reportPossiblyUnboundVariable = false      # 不报告可能未绑定的变量
+reportMissingSuperCall = false             # 不报告缺少父类方法调用
+reportInvalidTypeForm = false              # 不报告无效的类型格式
+
+[[tool.basedpyright.executionEnvironments]]
+root = "src/scalim/cli"
+reportArgumentType = false               # 不报告参数类型错误
+reportPrivateUsage = false               # 不报告私有成员使用
+reportCallIssue = false                  # 不报告函数调用问题
+reportGeneralTypeIssues = false          # 不报告泛型相关错误
+reportImplicitAbstractClass = false      # 不报告抽象类问题
+reportImplicitOverride = false           # 不报告隐式方法重写问题
+reportIndexIssue = false                 # 不报告索引访问问题
+reportUnknownLambdaType = false          # 不报告 Lambda 表达式类型错误
+reportUnknownMemberType = false          # 不报告属性/方法访问的类型错误
+reportMissingParameterType = false       # 不报告函数参数类型错误
+reportUnknownParameterType = false       # 不报告未知参数类型
+reportOptionalMemberAccess = false       # 不报告对可选成员的安全访问警告
+reportAttributeAccessIssue = "none"      # 不报告属性访问相关错误
+reportOperatorIssue = false              # 不报告操作符使用问题
+reportReturnType = false                 # 不报告返回值类型错误
+reportMissingTypeArgument = false        # 不报告泛型类型参数缺失
+reportMissingImports = false             # 不报告模块导入缺失
+reportTypedDictNotRequiredAccess = false # 不报告 TypedDict 访问要求
+reportUnknownArgumentType = false        # 不报告函数调用参数类型错误
+reportUnknownVariableType = false        # 不报告变量类型推断失败
+reportUnusedCallResult = false           # 允许忽略函数返回值
+
+[tool.vulture]
+exclude = []
+ignore_decorators = []
+ignore_names = []
+make_whitelist = true
+min_confidence = 80
+paths = ["src/scalim"]
+sort_by_size = true
+verbose = false
+
+[tool.marimo.runtime]
+# pythonpath = [".."]
+# 禁用自动执行,类似 Jupyter 的手动执行模式
+# 当 cell 改变时,只标记依赖 cell 为 stale 而不自动运行
+on_cell_change = "lazy"
+# 启动时不自动实例化(运行)所有 cell
+auto_instantiate = false
+# 文件保存时不自动运行,类似 Jupyter
+watcher_on_save = "lazy"
+
+[tool.marimo.display]
+# 默认显示宽度
+default_width = "medium"
+# cell 输出显示在 cell 下方(类似 Jupyter)
+cell_output = "below"
+
+[tool.marimo.formatting]
+# 代码格式化行长度,与项目 ruff 配置保持一致
+line_length = 140
+
+[tool.marimo.save]
+# 自动保存(延迟 1 秒)
+autosave = "after_delay"
+autosave_delay = 1000

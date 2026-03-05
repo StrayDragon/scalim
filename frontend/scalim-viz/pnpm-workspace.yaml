@@ -1,0 +1,2 @@
+onlyBuiltDependencies:
+  - esbuild@0.25.12

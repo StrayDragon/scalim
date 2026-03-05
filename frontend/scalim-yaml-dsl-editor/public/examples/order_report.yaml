@@ -1,0 +1,196 @@
+# yaml-language-server: $schema=../schema/demand.gen.json
+
+name: order_report
+description: 订单报表 - 展示客户、支付、国家等关联信息
+
+batch_size: 3
+
+main_source:
+  source_id: orders
+  loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+  params:
+    begin_time: "2024-01-01"
+    end_time: "2024-01-07"
+  fields:
+    # region 主键和基础字段
+
+    order_id: &order_id
+      field: order_id
+      name: 订单ID
+
+    amount: &amount
+      field: amount
+      name: 金额
+
+    cost: &cost
+      field: cost
+      name: 成本
+
+    # endregion
+
+    # region 外键字段
+
+    customer_id:
+      field: customer_id
+      name: 客户ID
+
+    pay_id:
+      field: pay_id
+      name: 支付ID
+
+    order_type_id:
+      field: order_type_id
+      name: 订单类型ID
+
+    small_group_ids:
+      field: small_group_ids
+      name: 小组ID列表
+
+    # endregion
+
+relations:
+  # 单级关联
+  orders_to_customers: &orders_to_customers
+    steps:
+      - from: orders.customer_id
+        to: customers.customer_id
+
+  orders_to_pays: &orders_to_pays
+    steps:
+      - from: orders.pay_id
+        to: pays.pay_id
+
+  orders_to_order_types: &orders_to_order_types
+    steps:
+      - from: orders.order_type_id
+        to: order_types.type_id
+
+  # 多级关联: orders → pays → countries
+  orders_to_countries: &orders_to_countries
+    steps:
+      - from: orders.pay_id
+        to: pays.pay_id
+      - from: pays.country_id
+        to: countries.country_id
+
+  # 单级关联 + CSV 多值字段
+  orders_to_small_groups: &orders_to_small_groups
+    steps:
+      - from: orders.small_group_ids
+        to: small_groups.small_group_id
+        lookup_cast:
+          name: sep_first
+          sep: ","
+
+  # 多级关联 + CSV 多值字段
+  orders_to_big_groups: &orders_to_big_groups
+    steps:
+      - from: orders.small_group_ids
+        to: small_groups.small_group_id
+        lookup_cast:
+          name: sep_first
+          sep: ","
+      - from: small_groups.big_group_id
+        to: big_groups.big_group_id
+
+sources:
+  customers:
+    loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
+    key: customer_id
+    bind: {use_keys: {param: customer_ids_set}}
+    fields:
+      customer_name: &customer_name
+        field: customer_name
+        name: 客户名称
+        relation: *orders_to_customers
+
+  pays:
+    loader: "scalim_misc.example_report_ir:BLL.get_pay_info_from_api_of_concrete_params"
+    key: pay_id
+    bind: {use_keys: {param: pay_ids_set}}
+    fields:
+      country_id:
+        field: country_id
+        name: 国家ID
+        relation: *orders_to_pays
+
+      pay_method:
+        field: pay_name
+        name: 支付方式
+        relation: *orders_to_pays
+
+  countries:
+    loader: "scalim_misc.example_report_ir:DAL.get_country_info_of_concrete_params"
+    key: country_id
+    bind: {use_keys: {param: country_ids_set}}
+    fields:
+      country_name: &country_name
+        field: country_name
+        name: 国家名称
+        relation: *orders_to_countries
+
+  order_types:
+    loader: "scalim_misc.example_report_ir:data_loader.get_order_types"
+    key: type_id
+    cache_mode: preload_forever
+    bind: {use_keys: {param: type_ids_set}}
+    fields:
+      order_type_name:
+        field: type_name
+        name: 订单类型
+        relation: *orders_to_order_types
+
+  small_groups:
+    loader: "scalim_misc.example_report_ir:data_loader.get_small_groups"
+    key: small_group_id
+    cache_mode: preload_forever
+    bind: {use_keys: {param: group_ids_set}}
+    fields:
+      big_group_id:
+        field: big_group_id
+        name: 大组ID
+        relation: *orders_to_small_groups
+
+      small_group_name:
+        field: small_group_name
+        name: 小组名称
+        relation: *orders_to_small_groups
+
+  big_groups:
+    loader: "scalim_misc.example_report_ir:data_loader.get_big_groups"
+    key: big_group_id
+    cache_mode: preload_forever
+    bind: {use_keys: {param: group_ids_set}}
+    lookup_cast: {name: int}
+    fields:
+      big_group_name:
+        field: big_group_name
+        name: 大组名称
+        relation: *orders_to_big_groups
+
+fields:
+  # region 派生字段
+
+  profit: &profit
+    name: 利润
+    compute: "amount - cost"
+
+  profit_margin:
+    name: 利润率
+    compute: "(amount - cost) / amount * 100 if amount > 0 else 0"
+
+  # endregion
+
+output:
+  format: csv
+  path: ./.tmp/output/order_report.csv
+  encoding: utf-8
+  streaming: true
+  include_header: true
+  fields:
+    - *order_id
+    - *customer_name
+    - *amount
+    - *cost
+    - *profit
+    - *country_name

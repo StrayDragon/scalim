@@ -1,0 +1,14 @@
+export const MINIMAL_TEMPLATE = `# yaml-language-server: $schema=../schema/demand.gen.json
+
+name: minimal_order_report
+
+main_source:
+  source_id: orders
+  loader: "myapp.loaders:load_orders"
+  fields:
+    order_id:
+      name: 订单ID
+
+output:
+  path: ./output/minimal_order_report.csv
+`;

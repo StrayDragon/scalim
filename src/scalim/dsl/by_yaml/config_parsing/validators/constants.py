@@ -1,0 +1,74 @@
+# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false
+
+import logging
+
+from ...schema_dsl.constants import DEMAND_FIELDS_KEY
+from ...schema_dsl.models import (
+    BIND_KEY_CONFIG_KEYS,
+    BIND_KEYS,
+    BIND_ROWS_KEYS,
+    DEMAND_KEYS,
+    DERIVED_FIELD_KEYS,
+    LOOKUP_CAST_KEYS,
+    MAIN_SOURCE_KEYS,
+    RELATION_CONFIG_KEYS,
+    RELATION_STEP_KEYS,
+    SOURCE_FIELD_KEYS,
+    SOURCE_KEYS,
+)
+
+MIN_PARTS_COUNT = 2
+
+_VALIDATOR_LOGGER = logging.getLogger("scalim.dsl.by_yaml.validator")
+
+
+class _FieldNames:
+    NAME: str = DEMAND_KEYS["name"]
+    BATCH_SIZE: str = DEMAND_KEYS["batch_size"]
+    MAIN_SOURCE: str = DEMAND_KEYS["main_source"]
+    SOURCES: str = DEMAND_KEYS["sources"]
+    FIELDS: str = DEMAND_FIELDS_KEY
+    RELATIONS: str = DEMAND_KEYS["relations"]
+    LOADER: str = SOURCE_KEYS["loader"]
+    KEY: str = SOURCE_KEYS["key"]
+    CACHE_MODE: str = SOURCE_KEYS["cache_mode"]
+    BIND: str = SOURCE_KEYS["bind"]
+    USE_ROWS: str = BIND_KEYS["use_rows"]
+    USE_KEYS: str = BIND_KEYS["use_keys"]
+    PARAM: str = BIND_ROWS_KEYS["param"]
+    AS: str = BIND_KEY_CONFIG_KEYS["as_"]
+    ROWS_CACHE_MODE: str = BIND_ROWS_KEYS["cache_mode"]
+    LOOKUP_CAST: str = SOURCE_KEYS["lookup_cast"]
+    LOOKUP_CHUNK_SIZE: str = SOURCE_KEYS["lookup_chunk_size"]
+    NAME_KEY: str = LOOKUP_CAST_KEYS["name"]
+    SEP: str = LOOKUP_CAST_KEYS["sep"]
+    SOURCE: str = SOURCE_FIELD_KEYS["source"]
+    FIELD: str = SOURCE_FIELD_KEYS["field"]
+    RELATION: str = SOURCE_FIELD_KEYS["relation"]
+    FROM: str = RELATION_STEP_KEYS["from_"]
+    STEPS: str = RELATION_CONFIG_KEYS["steps"]
+    TO: str = RELATION_STEP_KEYS["to"]
+    TO_BIND: str = RELATION_STEP_KEYS["to_bind"]
+    VALUE_CAST: str = SOURCE_FIELD_KEYS["value_cast"]
+    COMPUTE: str = DERIVED_FIELD_KEYS["compute"]
+    CALL_BY: str = DERIVED_FIELD_KEYS["call_by"]
+    DEPENDS_ON: str = "depends_on"
+    SOURCE_ID: str = MAIN_SOURCE_KEYS["source_id"]
+    ORDER_BY: str = MAIN_SOURCE_KEYS["order_by"]
+
+
+F = _FieldNames
+
+
+LEGACY_FIELDS = {
+    "relations_sql_like",
+    "relations_graph",
+    "foreign_key",
+    "target",
+    "from",
+    "via",
+    "column",
+    "pk",
+    "pk_transform",
+    "derived",
+}

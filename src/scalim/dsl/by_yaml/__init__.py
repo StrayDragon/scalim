@@ -1,0 +1,30 @@
+"""`YAML` `DSL` 官方入口.
+
+普通用户建议仅从此处导入最常用的运行入口与运行期契约,避免误用内部实现路径.
+
+更底层的能力(解析/校验/编译/可视化/自省等)请从子模块显式导入,例如:
+- `scalim.dsl.by_yaml.config_parsing.*`
+- `scalim.dsl.by_yaml.runtime.*`
+"""
+
+from .runtime.contracts import (
+    UNSET,
+    Compilation,
+    OutputOverrides,
+    RunOptions,
+    RunOverrides,
+    RunResult,
+)
+from .runtime.entrypoints import compile as compile  # noqa: A004
+from .runtime.entrypoints import run as run
+
+__all__ = (
+    "UNSET",
+    "Compilation",
+    "OutputOverrides",
+    "RunOptions",
+    "RunOverrides",
+    "RunResult",
+    "compile",
+    "run",
+)

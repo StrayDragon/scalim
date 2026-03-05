@@ -1,0 +1,135 @@
+from dataclasses import dataclass, field as dataclass_field
+from pathlib import Path
+from typing import Tuple
+from types import SimpleNamespace
+
+import pytest
+
+from scalim.dsl.by_yaml.schema_dsl import constants as yaml_constants
+from scalim.dsl.by_yaml.schema_dsl.builder import (
+    SchemaBuilder,
+    build_demand_schema,
+    load_schema,
+    normalize_schema,
+    schemas_equivalent,
+    write_demand_schema,
+)
+from scalim.dsl.by_yaml.schema_dsl.models import LOOKUP_CAST_KEYS
+
+
+def _schema_path(name: str) -> Path:
+    repo_root = Path(__file__).resolve().parents[1]
+    return repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema" / name
+
+
+def test_generator_matches_generated_file() -> None:
+    generated = build_demand_schema()
+    file_schema = load_schema(_schema_path("demand.gen.json"))
+
+    assert schemas_equivalent(generated, file_schema)
+
+
+def test_generated_schema_has_comment() -> None:
+    generated = load_schema(_schema_path("demand.gen.json"))
+
+    assert "$comment" in generated
+
+
+def test_write_demand_schema_creates_file(tmp_path: Path) -> None:
+    output_path = tmp_path / "schema.json"
+    write_demand_schema(output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert content.endswith("\n")
+
+
+def test_build_field_definition_schema_mismatch() -> None:
+    @dataclass
+    class _SourceFieldConfig:
+        name: str = dataclass_field(metadata={yaml_constants.SCHEMA_META_KEY: {"schema": {"type": "string"}}})
+
+    @dataclass
+    class _DerivedFieldConfig:
+        name: str = dataclass_field(metadata={yaml_constants.SCHEMA_META_KEY: {"schema": {"type": "number"}}})
+
+    dummy_types = SimpleNamespace(
+        SourceFieldConfig=_SourceFieldConfig,
+        DerivedFieldConfig=_DerivedFieldConfig,
+        FIELD_DERIVED_CONDITIONS=[],
+        SCHEMA_OMIT_KEY=yaml_constants.SCHEMA_OMIT_KEY,
+    )
+
+    builder = SchemaBuilder(dummy_types)
+    with pytest.raises(ValueError, match="Field schema mismatch"):
+        builder._build_field_definition()
+
+
+def test_normalize_schema_tuple_and_refs() -> None:
+    class _Dummy:
+        SCHEMA_NAME = "dummy"
+
+    builder = SchemaBuilder()
+    assert builder.normalize_schema((1, 2)) == [1, 2]
+    assert builder._expand_additional_props("dummy") == {"$ref": "#/definitions/dummy"}
+    assert builder._schema_for_type(_Dummy) == {"$ref": "#/definitions/dummy"}
+
+
+def test_key_map_helpers() -> None:
+    assert LOOKUP_CAST_KEYS["name"] == "name"
+    assert LOOKUP_CAST_KEYS.get("missing") is None
+    items = dict(LOOKUP_CAST_KEYS.items())
+    assert items["name"] == "name"
+
+
+def test_normalize_schema_wrapper_matches_builder() -> None:
+    builder = SchemaBuilder()
+    schema = {"anyOf": [{"type": "string"}, {"type": "number"}]}
+    assert normalize_schema(schema) == builder.normalize_schema(schema)
+
+
+def test_schema_for_type_tuples() -> None:
+    builder = SchemaBuilder()
+    tuple_schema = builder._schema_for_type(tuple)
+    assert tuple_schema == {"type": "array"}
+
+    typed_schema = builder._schema_for_type(Tuple[int, str])
+    assert typed_schema["minItems"] == 2
+    assert typed_schema["maxItems"] == 2
+
+
+def test_schema_omit_with_meta() -> None:
+    meta = yaml_constants._schema_omit(desc="demo")
+    assert meta[yaml_constants.SCHEMA_OMIT_KEY] is True
+    assert yaml_constants.SCHEMA_META_KEY in meta
+
+
+def test_expand_meta_wraps_scalar_examples() -> None:
+    builder = SchemaBuilder()
+    expanded = builder._expand_meta({"example": "demo"})
+
+    assert expanded["examples"] == ["demo"]
+
+
+def test_observability_logging_schema_has_renderer_enum() -> None:
+    schema = build_demand_schema()
+    logging_schema = schema["definitions"]["logging"]
+    renderer = logging_schema["properties"]["renderer"]
+
+    assert renderer["type"] == "string"
+    assert set(renderer["enum"]) == {"logger", "pretty"}
+
+
+def test_generated_schema_main_source_order_by_has_hover_meta() -> None:
+    schema = load_schema(_schema_path("demand.gen.json"))
+    order_by = schema["definitions"]["main_source"]["properties"]["order_by"]
+
+    assert ("description" in order_by) or ("markdownDescription" in order_by)
+
+
+def test_generated_schema_batch_size_supports_null_or_positive_integer() -> None:
+    schema = build_demand_schema()
+    batch_size = schema["properties"]["batch_size"]
+
+    one_of = batch_size["oneOf"]
+    assert {"type": "null"} in one_of
+    assert {"type": "integer", "minimum": 1} in one_of

@@ -1,0 +1,529 @@
+# region imports
+
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from scalim.events.events import (
+    AdaptiveSchedulerDecisionEvent,
+    BatchEndEvent,
+    BatchStartEvent,
+    ColumnWriteEvent,
+    DiagnosticWarningEvent,
+    ErrorEvent,
+    FieldComputeEvent,
+    FieldSlimEvent,
+    LoaderCallEvent,
+    LoaderSlimEvent,
+    PipelineEndEvent,
+    PipelineStartEvent,
+    RelationLookupEvent,
+    RowReleaseEvent,
+    RowWriteEvent,
+    StageSpanEvent,
+)
+from scalim.ob.presets import viz as viz_module
+from scalim.ob.presets.viz import VizEventEmitter, VizObserver, VizObserverConfig
+
+# endregion
+
+
+class DummyLogger:
+    def __init__(self) -> None:
+        self.messages = []
+
+    def warning(self, msg: str, *args: Any) -> None:
+        self.messages.append(msg % args)
+
+
+class BrokenLen:
+    def __len__(self) -> int:
+        raise AttributeError("no len")
+
+
+class BrokenHandle:
+    def write(self, _: str) -> None:
+        raise OSError("write failed")
+
+    def flush(self) -> None:
+        raise OSError("flush failed")
+
+
+def test_viz_helpers_and_config_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(viz_module.platform, "system", lambda: "Windows")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    win_dir = viz_module._default_viz_dir()
+    assert win_dir.endswith(os.path.join("appdata", "scalim-viz"))
+
+    monkeypatch.setattr(viz_module.platform, "system", lambda: "Darwin")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    darwin_dir = viz_module._default_viz_dir()
+    assert "Application Support" in darwin_dir
+    assert darwin_dir.endswith(os.path.join("Application Support", "scalim-viz"))
+
+    monkeypatch.setattr(viz_module.platform, "system", lambda: "Linux")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    linux_dir = viz_module._default_viz_dir()
+    assert linux_dir.endswith(os.path.join("xdg", "scalim-viz"))
+
+    assert viz_module._normalize_output_dir(str(tmp_path / "run-root")).endswith("scalim-viz")
+    assert viz_module._normalize_output_dir(str(tmp_path / "scalim-viz")) == os.path.normpath(str(tmp_path / "scalim-viz"))
+    assert viz_module._normalize_output_dir(str(tmp_path / "scalim-viz" / "run1")) == os.path.normpath(
+        str(tmp_path / "scalim-viz" / "run1")
+    )
+
+    assert viz_module._safe_len([1, 2]) == 2
+    assert viz_module._safe_len(5) == 0
+    assert viz_module._safe_len(BrokenLen()) == 0
+
+    assert viz_module._sample_value(None, 1) is None
+    assert viz_module._sample_value([1, 2, 3], 2) == [1, 2]
+    assert viz_module._sample_value((1, 2, 3), 2) == [1, 2]
+    assert viz_module._sample_value({"a": 1, "b": 2}, 1) == {"a": 1}
+    assert viz_module._sample_value({"a": {"b": 1}}, 1) == {"a": {"b": 1}}
+    assert viz_module._sample_value(set([1, 2, 3]), 1)
+    assert viz_module._sample_value("abc", 2) == "abc"
+    assert viz_module._sample_value([1, 2, 3], 0) is None
+
+    local = VizObserverConfig.default_local()
+    assert local.output_dir
+
+    monkeypatch.setattr(viz_module.platform, "system", lambda: "Linux")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "default"))
+    config = VizObserverConfig(use_default_output_dir=True)
+    events_path, snapshot_path, trace_path = config.resolve_output_paths()
+    assert events_path.endswith(os.path.join("scalim-viz", "viz_events.jsonl"))
+    assert snapshot_path.endswith(os.path.join("scalim-viz", "viz_snapshot.json"))
+    assert trace_path.endswith(os.path.join("scalim-viz", "viz_trace.jsonl"))
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    config = VizObserverConfig(output_path="~/events.jsonl", snapshot_path="~/snapshot.json")
+    events_path, snapshot_path, trace_path = config.resolve_output_paths()
+    assert str(tmp_path) in events_path
+    assert str(tmp_path) in snapshot_path
+    assert trace_path.endswith(os.path.join(str(tmp_path), "viz_trace.jsonl"))
+
+    config = VizObserverConfig(output_dir=str(tmp_path / "runs"), events_filename="evt.jsonl", snapshot_filename="snap.json")
+    events_path, snapshot_path, trace_path = config.resolve_output_paths()
+    assert events_path.endswith(os.path.join("scalim-viz", "evt.jsonl"))
+    assert snapshot_path.endswith(os.path.join("scalim-viz", "snap.json"))
+    assert trace_path.endswith(os.path.join("scalim-viz", "viz_trace.jsonl"))
+
+
+def test_viz_event_emitter_success_and_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    logger = DummyLogger()
+    out_path = tmp_path / "events" / "viz_events.jsonl"
+    config = VizObserverConfig(output_path=str(out_path), logger=logger)
+
+    emitter = VizEventEmitter(VizObserverConfig())
+    assert emitter._output_handle is None
+
+    emitter = VizEventEmitter(config)
+    emitter.emit({"ok": True})
+    emitter.close()
+    text = out_path.read_text(encoding="utf-8").strip()
+    assert '"ok": true' in text
+    assert emitter._output_handle is None
+
+    emitter = VizEventEmitter(config)
+    emitter._output_handle = BrokenHandle()
+    emitter.emit({"ok": True})
+    assert logger.messages
+    emitter._output_handle = None
+    emitter.close()
+
+    def boom(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("fail open")
+
+    monkeypatch.setattr(Path, "open", boom)
+    emitter = VizEventEmitter(config)
+    assert emitter._output_handle is None
+
+
+def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
+    output_path = tmp_path / "viz_events.jsonl"
+    snapshot_path = tmp_path / "viz_snapshot.json"
+    trace_path = tmp_path / "viz_trace.jsonl"
+    snapshot = {"meta": "invalid"}
+    config = VizObserverConfig(
+        output_path=str(output_path),
+        snapshot_path=str(snapshot_path),
+        trace_enabled=True,
+        payload_policy="sample",
+        sample_size=1,
+        run_name="demo",
+        env="dev",
+    )
+    hook = VizObserver(config=config, snapshot=snapshot)
+
+    hook.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=10))
+    hook.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2, 3]))
+    hook.on_loader_call(
+        LoaderCallEvent(
+            loader_name="orders",
+            params={},
+            result={"order": {"order_id": 1}, "status": "ok"},
+            duration=0.01,
+            batch_num=1,
+            cache_status="miss",
+            lookup_key_count=2,
+            field_keys=["order_id"],
+        )
+    )
+    hook.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={"a": 1}, result=10))
+    hook.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit", "row_id": 1}))
+    hook.on_diagnostic_warning(
+        DiagnosticWarningEvent(
+            message="float lookup key",
+            source_id="orders",
+            field_id="profit",
+            lookup_key="1001.0",
+            row_id=1,
+        )
+    )
+    hook.on_column_write(ColumnWriteEvent(field_key="profit", row_count=2, batch_num=1))
+    hook.on_row_write(RowWriteEvent(row_id=1, field_count=2, batch_num=1, row_index=0))
+    hook.on_row_release(RowReleaseEvent(row_id=1, released_fields=["a"], retained_fields=["b"], batch_num=1))
+    hook.on_field_slim(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0))
+    hook.on_loader_slim(LoaderSlimEvent(loader_name="orders", original_keys=2, extracted_fields=["order_id"], batch_num=1))
+    hook.on_batch_end(BatchEndEvent(batch_num=1, duration=0.02))
+    hook.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.3))
+
+    assert snapshot_path.exists()
+    assert output_path.exists()
+    assert trace_path.exists()
+
+    events = [json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    event_types = {evt["event_type"] for evt in events}
+    assert {"run_started", "run_finished", "error", "diagnostic_warning"} <= event_types
+    assert "row_written" not in event_types
+    assert "field_computed" not in event_types
+
+    trace_events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    trace_event_types = {evt["event_type"] for evt in trace_events}
+    assert {"row_written", "row_released", "field_computed"} <= trace_event_types
+
+
+def test_viz_observer_hook_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _ = VizObserver()
+
+    class DummyPlan:
+        def to_viz_graph_snapshot(self) -> dict:
+            return {"meta": {}, "nodes": [], "edges": []}
+
+    _ = VizObserver.from_plan(DummyPlan(), VizObserverConfig(output_path=str(tmp_path / "plan.jsonl")))
+
+    disabled = VizObserver(config=VizObserverConfig())
+    disabled.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    disabled.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    disabled.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
+    disabled.on_batch_end(BatchEndEvent(batch_num=1, duration=0.1))
+    disabled.on_loader_call(LoaderCallEvent(loader_name="orders", params={}, result=[], duration=0.0))
+    disabled.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None))
+    disabled.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit"}))
+    disabled.on_diagnostic_warning(DiagnosticWarningEvent(message="warn", source_id="orders", field_id="profit", lookup_key="k", row_id=1))
+    disabled.on_column_write(ColumnWriteEvent(field_key="profit", row_count=1, batch_num=1))
+    disabled.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0))
+    disabled.on_row_release(RowReleaseEvent(row_id=1, released_fields=[], retained_fields=[], batch_num=1))
+    disabled.on_field_slim(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0))
+    disabled.on_loader_slim(LoaderSlimEvent(loader_name="orders", original_keys=0, extracted_fields=[], batch_num=1))
+
+    config = VizObserverConfig(output_dir=str(tmp_path))
+    hook = VizObserver(config=config, snapshot={"meta": {}})
+    hook.run_id = "run_1"
+    hook.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    assert hook.config.output_dir is not None
+    assert hook.config.output_dir.endswith(os.path.join("scalim-viz", "run_1"))
+    events_path = Path(hook.config.output_dir) / "viz_events.jsonl"
+    snapshot_path = Path(hook.config.output_dir) / "viz_snapshot.json"
+    assert events_path.exists()
+    assert snapshot_path.exists()
+
+    hook = VizObserver(config=VizObserverConfig(output_dir=None, use_default_output_dir=False))
+    hook.run_id = "run_2"
+    hook._apply_run_output_dir()
+    assert hook.config.output_dir is None
+
+    monkeypatch.setattr(viz_module.platform, "system", lambda: "Linux")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "default"))
+    hook = VizObserver(config=VizObserverConfig(output_dir=None, use_default_output_dir=True))
+    hook.run_id = "run_3"
+    hook._apply_run_output_dir()
+    assert hook.config.output_dir is not None
+    assert hook.config.output_dir.endswith(os.path.join("scalim-viz", "run_3"))
+
+    hook = VizObserver(config=VizObserverConfig(output_path=str(tmp_path / "events_path.jsonl")))
+    hook.run_id = "run_4"
+    hook._apply_run_output_dir()
+    assert hook.config.output_dir is None
+
+    config = VizObserverConfig(output_path=str(tmp_path / "events.jsonl"))
+    hook = VizObserver(config=config, snapshot={"meta": {}})
+    hook.run_id = "run_5"
+    hook._ensure_emitters()
+    assert hook._events_emitter is not None
+    assert hook._trace_emitter is None
+    hook.close()
+
+    config = VizObserverConfig(output_path=str(tmp_path / "events_trace.jsonl"), trace_enabled=True)
+    hook = VizObserver(config=config, snapshot={"meta": {}})
+    hook.run_id = "run_6"
+    hook._ensure_emitters()
+    assert hook._events_emitter is not None
+    assert hook._trace_emitter is not None
+    hook.close()
+
+    def boom(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("fail write")
+
+    monkeypatch.setattr(Path, "open", boom)
+    hook = VizObserver(
+        config=VizObserverConfig(output_path=str(tmp_path / "events5.jsonl"), snapshot_path=str(tmp_path / "snap.json")),
+        snapshot={"meta": {}},
+    )
+    hook._write_snapshot_if_needed()
+
+
+def test_viz_output_path_truncates_by_default_and_append_is_opt_in(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.jsonl"
+    snapshot_path = tmp_path / "snapshot.json"
+
+    config = VizObserverConfig(output_path=str(events_path), snapshot_path=str(snapshot_path))
+    observer = VizObserver(config=config, snapshot={"meta": {}})
+    observer.run_id = "run_a"
+    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    text = events_path.read_text(encoding="utf-8")
+    assert "run_a" in text
+
+    observer2 = VizObserver(config=config, snapshot={"meta": {}})
+    observer2.run_id = "run_b"
+    observer2.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer2.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    text = events_path.read_text(encoding="utf-8")
+    assert "run_b" in text
+    assert "run_a" not in text
+
+    events_path_append = tmp_path / "events_append.jsonl"
+    snapshot_path_append = tmp_path / "snapshot_append.json"
+    config_append = VizObserverConfig(output_path=str(events_path_append), snapshot_path=str(snapshot_path_append), append=True)
+    observer3 = VizObserver(config=config_append, snapshot={"meta": {}})
+    observer3.run_id = "run_c"
+    observer3.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer3.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer4 = VizObserver(config=config_append, snapshot={"meta": {}})
+    observer4.run_id = "run_d"
+    observer4.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer4.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    text = events_path_append.read_text(encoding="utf-8")
+    assert "run_c" in text
+    assert "run_d" in text
+
+
+def test_viz_node_ref_normalization_and_loader_display_name(tmp_path: Path) -> None:
+    events_path = tmp_path / "viz_events.jsonl"
+    trace_path = tmp_path / "viz_trace.jsonl"
+    snapshot_path = tmp_path / "viz_snapshot.json"
+
+    snapshot = {
+        "meta": {"target_fields": ["profit"]},
+        "nodes": [
+            {"id": "loader:orders", "type": "loader", "data": {"label": "orders"}},
+            {"id": "field:profit_value", "type": "field", "data": {"label": "profit"}},
+        ],
+        "edges": [],
+    }
+    config = VizObserverConfig(output_path=str(events_path), snapshot_path=str(snapshot_path), trace_enabled=True, payload_policy="summary")
+    observer = VizObserver(config=config, snapshot=snapshot)
+    observer.run_id = "run_norm"
+    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.on_loader_call(LoaderCallEvent(loader_name="orders [preload_forever]", params={}, result=[], duration=0.0))
+    observer.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None))
+    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    loader_events = [evt for evt in events if evt["event_type"] == "loader_called"]
+    assert loader_events
+    assert loader_events[0]["node_ref"]["id"] == "loader:orders"
+    assert loader_events[0]["payload"].get("loader_display_name") == "orders [preload_forever]"
+
+    trace_events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    compute_events = [evt for evt in trace_events if evt["event_type"] == "field_computed"]
+    assert compute_events
+    assert compute_events[0]["node_ref"]["id"] == "field:profit_value"
+
+
+def test_viz_payload_policy_none_and_full(tmp_path: Path) -> None:
+    events_path = tmp_path / "events_none.jsonl"
+    config = VizObserverConfig(output_path=str(events_path), payload_policy="none")
+    observer = VizObserver(config=config, snapshot={"meta": {}})
+    observer.run_id = "run_payload_none"
+    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert events
+    assert events[0]["payload"] == {}
+
+    events_path_full = tmp_path / "events_full.jsonl"
+    config_full = VizObserverConfig(output_path=str(events_path_full), payload_policy="full")
+    observer_full = VizObserver(config=config_full, snapshot={"meta": {}})
+    observer_full.run_id = "run_payload_full"
+    observer_full.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    events = [json.loads(line) for line in events_path_full.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert events
+    assert "data" in events[0]["payload"]
+
+
+def test_viz_observer_additional_coverage(tmp_path: Path) -> None:
+    config = VizObserverConfig(snapshot_path=str(tmp_path / "snapshot_only.json"))
+    events_path, snapshot_path, trace_path = config.resolve_output_paths()
+    assert events_path is None
+    assert snapshot_path.endswith("snapshot_only.json")
+    assert trace_path.endswith("viz_trace.jsonl")
+
+    config = VizObserverConfig(output_path=str(tmp_path / "events.jsonl"), trace_path=str(tmp_path / "trace_explicit.jsonl"))
+    _, _, trace_path = config.resolve_output_paths()
+    assert trace_path.endswith("trace_explicit.jsonl")
+
+    config_disabled = VizObserverConfig()
+    observer_disabled = VizObserver(config=config_disabled, snapshot={"meta": {}})
+    observer_disabled._emit_to(None, "noop", {"type": "pipeline", "id": "pipeline"}, {})
+    observer_disabled._emit_trace("noop", {"type": "pipeline", "id": "pipeline"}, {})
+    observer_disabled.on_relation_lookup(
+        RelationLookupEvent(
+            field_key="profit",
+            row_id=1,
+            fk_raw="1",
+            fk_normalized=1,
+            target_source="orders",
+            result="hit",
+            fk_type="str",
+            expected_type="int",
+            error_message="bad key",
+        )
+    )
+    observer_disabled.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.1))
+    observer_disabled.on_adaptive_scheduler_decision(
+        AdaptiveSchedulerDecisionEvent(
+            batch_num=1,
+            layer_index=0,
+            decision="process",
+            backend="multiprocessing",
+            reason="because",
+            layer_task_count=1,
+            process_failure_mode="fail_fast",
+        )
+    )
+
+    config_enabled = VizObserverConfig(output_path=str(tmp_path / "enabled.jsonl"))
+    observer = VizObserver(config=config_enabled, snapshot={"meta": {}})
+    observer.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
+    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
+    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.0))
+    observer.on_loader_call(LoaderCallEvent(loader_name="orders", params={}, result=[], duration=0.0))
+    observer.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit"}))
+    observer.on_diagnostic_warning(DiagnosticWarningEvent(message="warn", source_id="orders", field_id="profit", lookup_key="k", row_id=1))
+    observer.on_column_write(ColumnWriteEvent(field_key="profit", row_count=1, batch_num=1))
+    observer.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None))
+    observer.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0))
+    observer.on_row_release(RowReleaseEvent(row_id=1, released_fields=[], retained_fields=[], batch_num=1))
+    observer.on_field_slim(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0))
+    observer.on_loader_slim(LoaderSlimEvent(loader_name="orders", original_keys=0, extracted_fields=[], batch_num=1))
+    observer.on_relation_lookup(
+        RelationLookupEvent(
+            field_key="profit",
+            row_id=1,
+            fk_raw="1",
+            fk_normalized=1,
+            target_source="orders",
+            result="hit",
+        )
+    )
+    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.1))
+    observer.on_adaptive_scheduler_decision(
+        AdaptiveSchedulerDecisionEvent(batch_num=1, layer_index=0, decision="process", backend="multiprocessing")
+    )
+
+    class DummyEmitter:
+        def emit(self, _: Any) -> None:
+            raise AssertionError("should not emit")
+
+    observer._emit_to(None, "noop", {"type": "pipeline", "id": "pipeline"}, {})
+    observer._emit_to(DummyEmitter(), "noop", {"type": "pipeline", "id": "pipeline"}, {})
+
+    observer_without_run = VizObserver(config=config_enabled, snapshot={"meta": {}})
+    observer_without_run._emit_to(DummyEmitter(), "noop", {"type": "pipeline", "id": "pipeline"}, {})
+
+    assert VizObserver._canonical_loader_name(None) == ""
+    assert observer._normalize_node_ref_id("") == ""
+    assert observer._normalize_node_ref({"type": "pipeline"}) == {"type": "pipeline"}
+
+    snapshot = {
+        "meta": {},
+        "nodes": [
+            {"id": "loader:orders", "type": "loader", "data": {}},
+            {"id": "field:profit_value", "type": "field", "data": {}},
+        ],
+        "edges": [],
+    }
+    config_paths = VizObserverConfig(
+        output_dir=str(tmp_path / "runs"),
+        output_path=str(tmp_path / "explicit_events.jsonl"),
+        snapshot_path=str(tmp_path / "explicit_snapshot.json"),
+        trace_enabled=True,
+    )
+    observer_paths = VizObserver(config=config_paths, snapshot=snapshot)
+    observer_paths._apply_run_output_dir()
+    observer_paths.run_id = "run_paths"
+    observer_paths._apply_run_output_dir()
+    observer_paths._apply_run_output_dir()
+
+    config_active = VizObserverConfig(
+        output_path=str(tmp_path / "events_active.jsonl"),
+        snapshot_path=str(tmp_path / "snapshot_active.json"),
+        trace_enabled=True,
+        payload_policy="summary",
+    )
+    observer_active = VizObserver(config=config_active, snapshot=snapshot)
+    observer_active.run_id = "run_active"
+    observer_active._ensure_emitters()
+    observer_active._ensure_emitters()
+    observer_active._write_snapshot_if_needed()
+    observer_active._write_snapshot_if_needed()
+    observer_active.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer_active.on_loader_slim(
+        LoaderSlimEvent(loader_name="orders [preload_forever]", original_keys=1, extracted_fields=["order_id"], batch_num=1)
+    )
+    observer_active.on_relation_lookup(
+        RelationLookupEvent(
+            field_key="profit",
+            row_id=1,
+            fk_raw="1",
+            fk_normalized=1,
+            target_source="orders",
+            result="hit",
+            fk_type="str",
+            expected_type="int",
+            error_message="bad key",
+        )
+    )
+    observer_active.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.1))
+    observer_active.on_adaptive_scheduler_decision(
+        AdaptiveSchedulerDecisionEvent(
+            batch_num=1,
+            layer_index=0,
+            decision="process",
+            backend="multiprocessing",
+            reason="because",
+            layer_task_count=1,
+            process_failure_mode="fail_fast",
+            pool_limits={"process": 1},
+            pool_wait_ms_total={"process": 10.0},
+            pool_wait_ms_max={"process": 10.0},
+            pool_wait_count={"process": 1},
+        )
+    )
+    assert observer_active._normalize_node_ref_id("loader:orders [preload_forever]") == "loader:orders"
+    observer_active.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
