@@ -1,0 +1,184 @@
+# region imports
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
+
+from ..planning.operators import PlanOperatorIr
+from ..spec.ir.fields import SupportedFieldIr
+
+# endregion
+
+if TYPE_CHECKING:
+    from ..spec.ir.sources import SourceIr
+
+
+@dataclass
+class Stage:
+    """
+    执行阶段: 将可并行执行的字段分组到同一阶段, 通常每个阶段包含一个或多个字段, 并且这些字段之间没有依赖关系
+    """
+
+    stage_id: str
+    """
+    阶段标识
+    """
+
+    field_keys: List[str] = field(default_factory=list)
+    """
+    该阶段包含的字段键名列表
+    """
+
+    level: int = 0
+    """
+    依赖层级 (0 表示无依赖)
+    """
+
+
+@dataclass
+class PlanMetadata:
+    """
+    计划元数据: 用于可视化和监控的元数据信息.
+    """
+
+    total_fields: int = 0
+    """
+    总字段数
+    """
+
+    total_sources: int = 0
+    """
+    总数据源数
+    """
+
+    total_loaders: int = 0
+    """
+    总加载器调用数
+    """
+
+    pruned_fields: int = 0
+    """
+    被剪枝的字段数
+    """
+
+    max_depth: int = 0
+    """
+    最大依赖深度
+    """
+
+    has_derived_fields: bool = False
+    """
+    是否有派生字段
+    """
+
+    has_ref_fields: bool = False
+    """
+    是否有关联字段
+    """
+
+    cached_sources: List[str] = field(default_factory=list)
+    """
+    预加载缓存的数据源名称列表 (FR003)
+    """
+
+
+@dataclass
+class ExecutionPlan:
+    """
+    执行计划(物理执行计划):规划层核心算子序列(用于计算“必需字段”的执行编排).
+
+    说明:
+    - `PlanBuilder` 仅生成 `load` / `load_ref` / `compute` 三类核心算子.
+    - 输出写入与释放等操作属于执行流水线的编排职责,不由 `PlanBuilder` 生成.
+    """
+
+    operators: Tuple[PlanOperatorIr, ...] = field(default_factory=tuple)
+    """规划层核心算子序列(按执行顺序).
+
+    仅包含 `load` / `load_ref` / `compute`.
+    """
+
+    primary_field: Optional[str] = None
+    """主键字段名(从 `DemandIr` 预计算)."""
+
+    key_fields: FrozenSet[str] = field(default_factory=frozenset)
+    """关键字段(主键 + 外键,不可提前释放)."""
+
+    preload_sources: "Tuple[SourceIr, ...]" = field(default_factory=tuple)
+    """预加载数据源 (FR003)"""
+
+    field_order: List[str] = field(default_factory=list)
+    """拓扑排序后的字段顺序,包含中间依赖字段.
+
+    仅用于执行顺序,不代表最终输出字段顺序.
+    如需输出字段列表,请结合 `target_fields` 或 `resolve_required_field_ids`.
+    """
+
+    loader_sequence: "List[Tuple[SourceIr, List[str]]]" = field(default_factory=list)
+    """普通加载调用序列(形如 `(source, [field_keys])`)."""
+
+    ref_loader_sequence: "List[Tuple[SourceIr, List[Tuple[str, Union[str, Tuple[str, ...]]]]]]" = field(default_factory=list)
+    """关联加载调用序列(形如 `(source, [(field_key, dep_ref_field_keys)])`).
+
+    说明:
+    - `dep_ref_field_keys` 是规划阶段用于排序的“依赖字段键”信号,来源于关联步骤的 `from_field`.
+      这里仅保留那些也对应到另一个关联字段的键,以便映射到某个引用加载器并推断加载器依赖图.
+    - 它与运行时传入加载器函数的 `lookup_keys`(值集合)无关.
+
+    示例:
+        - 字段 `region_name`(来源 `regions`)的步骤包含 `from_field=\"region_id\"`;
+          且需求中存在 `region_id` 这个关联字段(来源 `customers`);
+          则 `dep_ref_field_keys == (\"region_id\",)`.
+    """
+
+    stages: List[Stage] = field(default_factory=list)
+    """执行阶段列表-并行预留"""
+
+    metadata: PlanMetadata = field(default_factory=PlanMetadata)
+    """计划元数据"""
+
+    field_specs: Dict[str, SupportedFieldIr] = field(default_factory=dict)
+    """字段规格映射(`field_key` -> `SupportedFieldIr`)."""
+
+    target_fields: List[str] = field(default_factory=list)
+    """目标字段列表"""
+
+    field_dependencies: "Dict[str, Tuple[str, ...]]" = field(default_factory=dict)
+    """字段依赖映射(`field_key` -> 依赖字段列表),基于主数据源方向推断."""
+
+    def to_viz_graph_snapshot(
+        self,
+        *,
+        schema_version: str = "vizgraph/v1",
+        include_stage_nodes: bool = True,
+        include_loader_nodes: bool = True,
+        include_source_nodes: bool = True,
+    ) -> Dict[str, Any]:
+        """生成 `VizGraphSnapshot`(用于可视化).
+
+        返回:
+            包含 `nodes`/`edges`/`meta` 的字典结构
+        """
+        from .viz import build_viz_graph_snapshot  # noqa: PLC0415
+
+        return build_viz_graph_snapshot(
+            self,
+            schema_version=schema_version,
+            include_stage_nodes=include_stage_nodes,
+            include_loader_nodes=include_loader_nodes,
+            include_source_nodes=include_source_nodes,
+        )
+
+    def to_viz_schedule_plan(
+        self,
+    ) -> Dict[str, Any]:
+        """生成 `viz_schedule_plan.json` (用于 `adaptive` 计划视角可视化)."""
+        from .viz_schedule import build_viz_schedule_plan  # noqa: PLC0415
+
+        return build_viz_schedule_plan(self)
+
+
+__all__ = [
+    "ExecutionPlan",
+    "PlanMetadata",
+    "Stage",
+]

@@ -1,0 +1,27 @@
+from typing import Iterator, List, Sequence, Tuple, cast
+
+from .....planning.operators import LoadRefOperatorIr as LoadRefOp
+from .....planning.operators import SupportedOperatorIr
+
+
+def iter_operator_segments(
+    operators: Sequence[SupportedOperatorIr],
+) -> Iterator[Tuple[bool, object]]:
+    idx = 0
+    while idx < len(operators):
+        operator = operators[idx]
+        if isinstance(operator, LoadRefOp):
+            segment: List[LoadRefOp] = []
+            while idx < len(operators) and isinstance(operators[idx], LoadRefOp):
+                segment.append(cast("LoadRefOp", operators[idx]))
+                idx += 1
+            yield True, segment
+            continue
+
+        yield False, operator
+        idx += 1
+
+
+__all__ = [
+    "iter_operator_segments",
+]

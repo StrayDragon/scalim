@@ -1,0 +1,17 @@
+[project]
+name = "scalim-benchlib"
+version = "0.1.0"
+description = "Benchmark utilities for scalim"
+readme = "README.md"
+requires-python = ">=3.10"
+
+authors = [
+    { name = "scalim-dev" },
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+sources = ["src"]

@@ -1,0 +1,64 @@
+{
+  "name": "scalim-devenv", // (debian12 + py3.10 + uv + node lts)
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "SCALIM_APT_DEBIAN_MIRROR": "https://mirrors.tuna.tsinghua.edu.cn/debian",
+      "SCALIM_PYPI_INDEX_URL": "https://mirrors.aliyun.com/pypi/simple/",
+    },
+    "timeout": 1200,
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts",
+    },
+  },
+  "mounts": [
+    "source=scalim-venv,target=${containerWorkspaceFolder}/.venv,type=volume",
+    "source=scalim-uv-cache,target=/home/vscode/.cache/uv,type=volume",
+  ],
+  "containerEnv": {
+    "PIP_INDEX_URL": "http://mirrors.aliyun.com/pypi/simple/",
+    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
+    "UV_DEFAULT_INDEX": "http://mirrors.aliyun.com/pypi/simple/",
+    "UV_INDEX_URL": "http://mirrors.aliyun.com/pypi/simple/",
+    "UV_LINK_MODE": "copy",
+    "npm_config_registry": "http://registry.npmmirror.com",
+    "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0",
+    "UV_HTTP_TIMEOUT": "600",
+  },
+  "postCreateCommand": "bash .devcontainer/postCreateCommand.sh",
+  "forwardPorts": [2718, 5173],
+  "portsAttributes": {
+    "2718": {
+      "label": "marimo",
+      "onAutoForward": "notify",
+    },
+    "5173": {
+      "label": "scalim-viz (vite)",
+      "onAutoForward": "notify",
+    },
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "ruff.importStrategy": "fromEnvironment",
+        "basedpyright.importStrategy": "fromEnvironment",
+        "basedpyright.preferDaemon": true,
+      },
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "detachhead.basedpyright",
+        "redhat.vscode-yaml",
+        "marimo-team.vscode-marimo",
+        "tamasfe.even-better-toml",
+      ],
+    },
+  },
+}

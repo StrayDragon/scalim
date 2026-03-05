@@ -1,0 +1,88 @@
+{
+  "coverage_index": {
+    "definitions": [
+      "field",
+      "guardrails",
+      "guardrails_compute",
+      "guardrails_loader",
+      "guardrails_relations",
+      "loader_retry",
+      "logging",
+      "main_source",
+      "memory_opt",
+      "observability",
+      "output",
+      "performance",
+      "performance_report",
+      "performance_thresholds",
+      "relation",
+      "relation_report",
+      "relations",
+      "row_gap",
+      "source",
+      "source_field_inline",
+      "trace",
+      "viz"
+    ],
+    "top_level_fields": [
+      "name",
+      "_templates",
+      "description",
+      "batch_size",
+      "retry",
+      "main_source",
+      "sources",
+      "fields",
+      "relations",
+      "guardrails",
+      "output",
+      "observability"
+    ]
+  },
+  "inputs": [
+    {
+      "path": "notebooks/marimo/examples/demo_big_data_report/README.md",
+      "sha256": "ffaeafb8aa9daf64fdbe1cfb05830f537fc22a0ed51a0c3d8a39de84bb06118a"
+    },
+    {
+      "path": "notebooks/marimo/examples/demo_big_data_report/_loaders.py",
+      "sha256": "a2a195f948a008912fd1fb5295606016c779ee9c0fa259ce70963002e85a8428"
+    },
+    {
+      "path": "notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
+      "sha256": "33a179ac289eedf1dbcdfd7fbf781ca272b5b4e5976f9fa4cb9375f1e4a9f617"
+    },
+    {
+      "path": "notebooks/marimo/examples/demo_big_data_report/demo_a0_tutor.py",
+      "sha256": "0f4752ebdb014ac011053984abbdcf85160e7a9c422620ec525d7e06c3d74d67"
+    },
+    {
+      "path": "notebooks/marimo/examples/skill_examples.md",
+      "sha256": "0c3dfa2e02617db7b7d74fe7b98be18fe3e8e71ad4a69c0b5ec2574ff33d19a1"
+    },
+    {
+      "path": "src/scalim/dsl/by_yaml/schema_dsl/constants.py",
+      "sha256": "ab78ccb162721a73ab4fe593c4f5a3b0b1d51e4433ae0a05542b4505874f1edc"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "SKILL.md",
+      "sha256": "5c594b7dd60f1f851b7399e25faf3500975816d0542ced6e6c4922c231765fb3"
+    },
+    {
+      "path": "references/dsl-reference.md",
+      "sha256": "55716529e95d2c8e93c3115834712167ec2f669b305d253ebf9344cd9e32aa9c"
+    },
+    {
+      "path": "references/example-full/README.md",
+      "sha256": "9d392202390a227edba86868ebbf91f8b487e6c539823d00d43f474b9820cc93"
+    },
+    {
+      "path": "references/example-full/ecommerce_report.yaml",
+      "sha256": "f2fb26dac14a8882a98168495161dcc56e5d83b4acf6a93fe646315bc4f584eb"
+    }
+  ],
+  "path_normalization": [],
+  "skill_name": "scalim-yaml-dsl"
+}

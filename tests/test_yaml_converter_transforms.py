@@ -1,0 +1,209 @@
+import pytest
+
+from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
+from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
+from scalim.spec.ir.binding import LoaderCallContextIr
+from tests.yaml_fixtures import make_yaml_config
+
+
+def _load_config(yaml_content: str):
+    loader = YamlDemandLoader()
+    return loader.load_string(yaml_content)
+
+
+def test_to_bind_as_list_builds_list_params() -> None:
+    yaml_content = make_yaml_config(
+        name="binding_as_list",
+        main_source="""
+source_id: orders
+loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+fields:
+  order_id:
+    field: order_id
+  customer_id:
+    field: customer_id
+""",
+        sources="""
+customers:
+  loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
+  key: customer_id
+  fields:
+    customer_name:
+      field: customer_name
+      relation: *orders_to_customers
+""",
+        relations="""
+orders_to_customers: &orders_to_customers
+  steps:
+    - from: orders.customer_id
+      to: customers.customer_id
+      to_bind:
+        use_keys:
+          param: ids
+          as: list
+    """,
+    )
+    config = _load_config(yaml_content)
+    converter = ConfigToIRConverter(
+        resolver=PythonReferenceResolver(allowed_modules=frozenset(["scalim_misc.example_report_ir"])),
+    )
+    demand_ir = converter.convert(config)
+
+    field = demand_ir.fields["customer_name"]
+    bind = field.lookup_steps[0].bind
+    assert bind is not None
+
+    ctx = LoaderCallContextIr(lookup_keys={1, 2, 3})
+    _, kwargs = bind.params_builder(ctx)
+    assert set(kwargs["ids"]) == {1, 2, 3}
+
+
+def test_to_bind_rows_mode_passes_batch_rows() -> None:
+    yaml_content = make_yaml_config(
+        name="binding_rows",
+        main_source="""
+source_id: orders
+loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+fields:
+  order_id:
+    field: order_id
+  region_id:
+    field: region_id
+""",
+        sources="""
+regions:
+  loader: "scalim_misc.example_report_ir:DAL.get_country_info_of_concrete_params"
+  key: region_id
+  fields:
+    region_name:
+      field: name
+      relation: *orders_to_regions
+""",
+        relations="""
+orders_to_regions: &orders_to_regions
+  steps:
+    - from: orders.region_id
+      to: regions.region_id
+      to_bind:
+        use_rows:
+          param: rows
+    """,
+    )
+    config = _load_config(yaml_content)
+    converter = ConfigToIRConverter(
+        resolver=PythonReferenceResolver(allowed_modules=frozenset(["scalim_misc.example_report_ir"])),
+    )
+    demand_ir = converter.convert(config)
+
+    field = demand_ir.fields["region_name"]
+    bind = field.lookup_steps[0].bind
+    assert bind is not None
+
+    ctx = LoaderCallContextIr(batch_rows=[{"region_id": 1}, {"region_id": 2}])
+    _, kwargs = bind.params_builder(ctx)
+    assert kwargs["rows"] == [{"region_id": 1}, {"region_id": 2}]
+
+
+def test_unknown_value_cast_raises() -> None:
+    yaml_content = make_yaml_config(
+        name="value_cast_invalid",
+        main_source="""
+source_id: orders
+loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+fields:
+  order_id:
+    field: order_id
+    value_cast: not_supported
+""",
+        sources="{}",
+    )
+    loader = YamlDemandLoader()
+    with pytest.raises(ConfigValidationError) as exc:
+        loader.load_string(yaml_content)
+
+    assert any("invalid value_cast" in msg for msg in exc.value.errors)
+
+
+@pytest.mark.parametrize(
+    "value_cast,input_value,expected",
+    [
+        ("int", "3", 3),
+        ("str", 3, "3"),
+    ],
+    ids=["int-cast", "str-cast"],
+)
+def test_converter_value_cast_applies(value_cast: str, input_value, expected) -> None:
+    yaml_content = make_yaml_config(
+        name="value_cast_valid",
+        main_source="""
+source_id: orders
+loader: "tests.conftest.mock_loader"
+fields:
+  order_id:
+    field: order_id
+    value_cast: {value_cast}
+""".format(value_cast=value_cast),
+        sources="{}",
+    )
+    loader = YamlDemandLoader()
+    config = loader.load_string(yaml_content)
+    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
+    demand_ir = converter.convert(config)
+
+    field = demand_ir.fields["order_id"]
+    assert field.transform is not None
+    assert field.transform(input_value) == expected
+
+
+def test_converter_private_value_cast_raises() -> None:
+    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
+
+    with pytest.raises(ConversionError, match="Unknown value_cast"):
+        converter._get_value_cast_fn("bad")
+
+
+def test_unknown_lookup_cast_raises() -> None:
+    yaml_content = make_yaml_config(
+        name="lookup_cast_invalid",
+        main_source="""
+source_id: orders
+loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+fields:
+  order_id:
+    field: order_id
+""",
+        sources="""
+customers:
+  loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
+  key: customer_id
+  fields:
+    customer_name:
+      field: customer_name
+      relation: *orders_to_customers
+""",
+        relations="""
+orders_to_customers: &orders_to_customers
+  steps:
+    - from: orders.customer_id
+      to: customers.customer_id
+      lookup_cast:
+        name: bad
+""",
+    )
+    loader = YamlDemandLoader()
+    with pytest.raises(ConfigValidationError) as exc:
+        loader.load_string(yaml_content)
+
+    assert any("lookup_cast has invalid name" in msg for msg in exc.value.errors)
+
+
+def test_converter_private_lookup_cast_raises() -> None:
+    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
+    lookup_cast = LookupCastConfig(name="bad", sep=None)
+
+    with pytest.raises(ConversionError, match="Unknown lookup_cast"):
+        converter._get_lookup_cast_fn(lookup_cast, is_multi=False)

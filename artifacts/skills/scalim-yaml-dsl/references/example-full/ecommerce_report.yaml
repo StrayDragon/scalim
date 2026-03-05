@@ -1,0 +1,498 @@
+name: ecommerce_order_report
+description: |
+  电商订单报表 - YAML DSL 配置
+
+  关联类型:
+  - 单级关联: 订单 -> 客户、产品、促销、支付、物流
+  - 多级关联: 订单 -> 产品 -> 分类 (2级)
+  - 多级关联: 订单 -> 仓库 -> 区域 (2级)
+  - 复合键关联: 订单 -> 区域定价 (region_id, product_category_id)
+  - 派生字段: 订单金额、利润、最终价格
+
+batch_size: 100
+
+# ==============================================================================
+# 模板/别名示例 (YAML anchors)
+# ==============================================================================
+
+_templates:
+  # 输出字段模板: 用于 output.fields 的显式条目/merge 覆盖
+  output_field_product_name: &output_field_product_name
+    field_id: product_name
+    source: products
+    name: 产品名称(模板)
+
+  output_field_customer_level: &output_field_customer_level
+    field_id: customer_level
+    source: customers
+    name: 会员等级(模板)
+
+  # 关系步骤模板: 复用/merge 展示
+  step_orders_to_customers: &step_orders_to_customers
+    from: orders.customer_id
+    to: customers.customer_id
+
+  step_orders_to_customers_with_bind: &step_orders_to_customers_with_bind
+    <<: *step_orders_to_customers
+    to_bind:
+      use_keys:
+        param: ids
+        as: list
+
+  step_orders_to_products: &step_orders_to_products
+    from: orders.product_id
+    to: products.product_id
+
+  step_orders_to_products_cast: &step_orders_to_products_cast
+    <<: *step_orders_to_products
+    lookup_cast:
+      name: int
+
+  perf_metrics_all: &perf_metrics_all [duration, memory, cpu]
+
+# ==============================================================================
+# 主数据源
+# ==============================================================================
+
+main_source:
+  source_id: orders
+  loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_orders"
+  params:
+    field_keys:
+      - order_id
+      - order_date
+      - quantity
+      - unit_price
+      - discount_rate
+      - customer_id
+      - product_id
+      - warehouse_id
+      - promotion_id
+      - payment_method_id
+      - logistics_id
+      - region_id
+      - product_category_id
+  order_by:
+    - order_id
+  fields:
+    # 主键
+    order_id: &order_id
+      name: 订单ID
+
+    # 基础字段
+    quantity: &quantity
+      name: 数量
+      value_cast: int
+
+    unit_price: &unit_price
+      name: 单价
+
+    discount_rate: &discount_rate
+      name: 折扣率
+
+    order_date: &order_date
+      name: 订单日期
+
+    # 外键/关联 key 字段 (relation.steps 引用必须声明)
+    customer_id:
+      name: 客户ID
+
+    product_id:
+      name: 产品ID
+
+    warehouse_id:
+      name: 仓库ID
+
+    promotion_id:
+      name: 促销ID
+
+    payment_method_id:
+      name: 支付方式ID
+
+    logistics_id:
+      name: 物流ID
+
+    region_id:
+      name: 区域ID
+
+    product_category_id:
+      name: 产品分类ID
+
+# ==============================================================================
+# 关联定义
+# ==============================================================================
+
+relations:
+  # 单级关联
+  orders_to_customers: &orders_to_customers
+    steps:
+      - *step_orders_to_customers_with_bind
+
+  # rows 模式关联(默认复用/显式禁用对拍)
+  orders_to_customers_rows_cache: &orders_to_customers_rows_cache
+    steps:
+      - from: orders.customer_id
+        to: customers_rows.customer_id
+        to_bind:
+          use_rows:
+            param: rows
+            # cache_mode 省略 => 默认 batch
+
+  orders_to_customers_rows_nocache: &orders_to_customers_rows_nocache
+    steps:
+      - from: orders.customer_id
+        to: customers_rows.customer_id
+        to_bind:
+          use_rows:
+            param: rows
+            cache_mode: none
+
+  orders_to_products: &orders_to_products
+    steps:
+      - *step_orders_to_products_cast
+
+  orders_to_warehouses: &orders_to_warehouses
+    steps:
+      - from: orders.warehouse_id
+        to: warehouses.warehouse_id
+
+  orders_to_promotions: &orders_to_promotions
+    steps:
+      - from: orders.promotion_id
+        to: promotions.promotion_id
+
+  orders_to_payment_methods: &orders_to_payment_methods
+    steps:
+      - from: orders.payment_method_id
+        to: payment_methods.payment_method_id
+
+  orders_to_logistics: &orders_to_logistics
+    steps:
+      - from: orders.logistics_id
+        to: logistics.logistics_id
+
+  # 多级关联
+  orders_to_categories: &orders_to_categories
+    steps:
+      - *step_orders_to_products
+      - from: products.product_category_id
+        to: categories.category_id
+
+  orders_to_regions: &orders_to_regions
+    steps:
+      - from: orders.warehouse_id
+        to: warehouses.warehouse_id
+      - from: warehouses.region_id
+        to: regions.region_id
+
+  # 复合键关联
+  orders_to_region_pricing: &orders_to_region_pricing
+    steps:
+      - from: [orders.region_id, orders.product_category_id]
+        to: [region_pricing.region_id, region_pricing.product_category_id]
+        lookup_cast:
+          name: int
+
+# ==============================================================================
+# 数据源定义
+# ==============================================================================
+
+sources:
+  customers:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers"
+    key: customer_id
+    lookup_chunk_size: 5
+    bind: {use_keys: {param: ids}}
+    fields:
+      # 单级关联 - 客户
+      customer_name: &customer_name
+        name: 客户姓名
+        relation: *orders_to_customers
+
+      customer_level: &customer_level
+        name: 会员等级
+        relation: *orders_to_customers
+
+      customer_phone: &customer_phone
+        name: 客户电话
+        relation: *orders_to_customers
+
+      registration_date: &registration_date
+        name: 注册日期
+        relation: *orders_to_customers
+
+  customers_rows:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers_by_rows"
+    key: customer_id
+    fields:
+      # rows 模式对拍字段
+      customer_name_rows_cached: &customer_name_rows_cached
+        name: 客户姓名(rows缓存)
+        relation: *orders_to_customers_rows_cache
+
+      customer_level_rows_cached: &customer_level_rows_cached
+        name: 会员等级(rows缓存)
+        relation: *orders_to_customers_rows_cache
+
+      customer_name_rows_nocache: &customer_name_rows_nocache
+        name: 客户姓名(rows不缓存)
+        relation: *orders_to_customers_rows_nocache
+
+      customer_level_rows_nocache: &customer_level_rows_nocache
+        name: 会员等级(rows不缓存)
+        relation: *orders_to_customers_rows_nocache
+
+  products:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_products"
+    key: product_id
+    lookup_cast:
+      name: int
+    bind:
+      use_keys:
+        param: ids
+        as: list
+    params:
+      field_keys:
+        - product_id
+        - product_name
+        - product_brand
+        - product_cost
+        - category_id
+    fields:
+      # 单级关联 - 产品
+      product_name: &product_name
+        name: 产品名称
+        relation: *orders_to_products
+
+      product_brand: &product_brand
+        name: 产品品牌
+        relation: *orders_to_products
+
+      product_cost: &product_cost
+        name: 产品成本
+        relation: *orders_to_products
+      product_category_id: &product_category_id
+        name: 产品分类ID
+        field: category_id
+        relation: *orders_to_products
+
+  categories:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_categories"
+    key: category_id
+    bind: {use_keys: {param: ids}}
+    fields:
+      # 多级关联 - 分类
+      category_name: &category_name
+        name: 产品分类
+        relation: *orders_to_categories
+
+  warehouses:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_warehouses"
+    key: warehouse_id
+    bind: {use_keys: {param: ids}}
+    fields:
+      region_id:
+        name: 区域ID
+        field: region_id
+        relation: *orders_to_warehouses
+
+      # 多级关联 - 仓库
+      warehouse_name: &warehouse_name
+        name: 仓库名称
+        relation: *orders_to_warehouses
+
+  regions:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_regions"
+    key: region_id
+    bind: {use_keys: {param: ids}}
+    fields:
+      # 多级关联 - 区域
+      region_name_value: &region_name_value
+        name: 区域名称
+        field: region_name
+        relation: *orders_to_regions
+
+      # 复用同一 field 值: 通过不同字段名/展示名表达不同语义
+      region_name_display: &region_name_display
+        name: 区域名称(展示)
+        field: region_name
+        relation: *orders_to_regions
+
+      region_manager: &region_manager
+        name: 区域经理
+        relation: *orders_to_regions
+
+  region_pricing:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_region_pricing"
+    key: [region_id, product_category_id]
+    cache_mode: preload_forever
+    bind: {use_keys: {param: ids}}
+    fields:
+      # 复合键关联 - 区域定价
+      price_adjustment: &price_adjustment
+        name: 价格调整系数
+        relation: *orders_to_region_pricing
+
+      shipping_fee: &shipping_fee
+        name: 运费
+        relation: *orders_to_region_pricing
+
+      tax_rate: &tax_rate
+        name: 税率
+        relation: *orders_to_region_pricing
+
+  promotions:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_promotions"
+    key: promotion_id
+    cache_mode: preload_forever
+    bind: {use_keys: {param: ids}}
+    fields:
+      # 单级关联 - 促销 (可能为空)
+      promotion_name: &promotion_name
+        name: 促销名称
+        relation:
+          steps:
+            - from: orders.promotion_id
+              to: promotions.promotion_id
+
+      promotion_discount: &promotion_discount
+        name: 促销折扣
+        relation: *orders_to_promotions
+
+  payment_methods:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_payment_methods"
+    key: payment_method_id
+    cache_mode: preload_forever
+    bind: {use_keys: {param: ids}}
+    fields:
+      # 单级关联 - 支付方式
+      payment_method_name: &payment_method_name
+        name: 支付方式
+        relation: *orders_to_payment_methods
+
+  logistics:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_logistics"
+    key: logistics_id
+    cache_mode: preload_forever
+    bind: {use_keys: {param: ids}}
+    fields:
+      # 单级关联 - 物流
+      logistics_name: &logistics_name
+        name: 物流公司
+        relation: *orders_to_logistics
+
+      logistics_speed: &logistics_speed
+        name: 配送时效
+        relation: *orders_to_logistics
+
+# ==============================================================================
+# 派生字段定义
+# ==============================================================================
+fields:
+  # 派生字段
+  order_amount: &order_amount
+    name: 订单金额
+    compute: "round(quantity * unit_price * discount_rate, 2)"
+
+  profit: &profit
+    name: 利润
+    call_by: "notebooks.marimo.examples.demo_big_data_report._loaders:calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)"
+
+  tax_amount: &tax_amount
+    name: 税费
+    compute: "round(order_amount * tax_rate, 2)"
+
+  final_price: &final_price
+    name: 最终价格
+    call_by: "notebooks.marimo.examples.demo_big_data_report._loaders:calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)"
+
+  no_promotion: &no_promotion
+    name: 无促销
+    compute: "not promotion_name"
+
+  rows_name_match: &rows_name_match
+    name: rows对拍-姓名一致
+    compute: "customer_name_rows_cached == customer_name_rows_nocache"
+
+  rows_level_match: &rows_level_match
+    name: rows对拍-等级一致
+    compute: "customer_level_rows_cached == customer_level_rows_nocache"
+
+# ==============================================================================
+# 输出配置
+# ==============================================================================
+
+output:
+  format: csv
+  path: ./.tmp/output/ecommerce_report.csv
+  encoding: utf-8
+  streaming: true
+  include_header: true
+  header_fields_output_by: name
+  fields:
+    - *order_id
+    - {field_id: order_date}
+    - field_id: quantity
+      name: 数量(输出覆写)
+    - *unit_price
+    - *discount_rate
+    - field_id: customer_name
+      source: customers
+    - *customer_phone
+    - *registration_date
+    - *output_field_customer_level
+    - *customer_name_rows_cached
+    - *customer_level_rows_cached
+    - *customer_name_rows_nocache
+    - *customer_level_rows_nocache
+    - *rows_name_match
+    - *rows_level_match
+    - {<<: *output_field_product_name, name: 产品名称(输出覆写)}
+    - *product_brand
+    - *product_cost
+    # data_key 选择器示例: 按 loader data_key(category_id) + source 定位到 products.product_category_id
+    - field: category_id
+      source: products
+    - *category_name
+    - *warehouse_name
+    - *region_name_value
+    - *region_name_display
+    - *region_manager
+    - *promotion_name
+    - *promotion_discount
+    - *no_promotion
+    - *payment_method_name
+    - *logistics_name
+    - *logistics_speed
+    - *price_adjustment
+    - *shipping_fee
+    - *tax_rate
+    - *order_amount
+    - *profit
+    - *tax_amount
+    - *final_price
+
+# ==============================================================================
+# 可观测性配置
+# ==============================================================================
+
+observability:
+  performance:
+    enabled: true
+    metrics: *perf_metrics_all
+    sampling_interval: 2
+    report:
+      format: csv
+      output: ./.tmp/output/ecommerce_perf_report.csv
+      include_details: true
+    thresholds:
+      batch_duration_warn: 1.5
+      memory_increase_warn: 256
+  relations:
+    enabled: true
+    sampling_rate: 0.05
+    log_type_mismatch: true
+    max_samples: 500
+    report:
+      format: json
+      output: ./.tmp/output/ecommerce_relations_report.json

@@ -6,12 +6,12 @@ on:
   pull_request:
 
 jobs:
-  test:
+  qa:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12", "3.14"]
+        python-version: ["3.10"]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -22,20 +22,45 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: |
+            frontend/scalim-yaml-dsl-editor/pnpm-lock.yaml
+            frontend/scalim-viz/pnpm-lock.yaml
+
+      - name: Set up justfile
+        uses: extractions/setup-just@v3
+
       - name: Install dependencies
         run: uv sync --dev --locked
 
-      - name: Format (ruff)
-        run: uv run ruff format --check .
+      - name: Check
+        run: just check
 
-      - name: Lint (ruff)
-        run: uv run ruff check src/scalim tests
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts
+          path: .tmp/artifacts/
+          if-no-files-found: warn
 
-      - name: Language check (docstring/comments)
-        run: uv run python scripts/check_py_doc_language.py
+  py36-compat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - name: Type check (basedpyright)
-        run: uv run basedpyright --level error src/scalim
+      - name: Set up just
+        uses: extractions/setup-just@v3
 
-      - name: Tests (pytest)
-        run: uv run pytest
+      - name: Python 3.6 语法兼容性检查 (仅 `src/scalim/`)
+        run: just py36-compat-check

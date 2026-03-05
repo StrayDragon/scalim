@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "useDefineForClassFields": true,
+    "allowJs": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["svelte"],
+    "paths": {
+      "*": ["./*"],
+      "$lib/*": ["./src/libs/*"],
+      "$components/*": ["./src/libs/components/*"],
+      "$ui/*": ["./src/libs/components/ui/*"],
+      "$hooks/*": ["./src/libs/hooks/*"],
+      "$utils/*": ["./src/libs/utils/*"],
+      "$nodes/*": ["./src/components/*"],
+      "$panels/*": ["./src/ui/panels/*"],
+      "$app/*": ["./src/app/*"],
+      "$domain/*": ["./src/domain/*"],
+      "$services/*": ["./src/services/*"]
+    }
+  },
+  "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.svelte"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

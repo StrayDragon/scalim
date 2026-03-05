@@ -1,0 +1,387 @@
+import copy
+import json
+from dataclasses import Field, dataclass
+from dataclasses import fields as dataclass_fields
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union, cast
+
+from . import constants as schema_constants
+from . import models as schema_models
+from .constants import SCHEMA_META_KEY
+
+
+def _build_default_types_module() -> Any:
+    merged: Dict[str, Any] = {}
+    # 仅复制公开名称.这样可以保持默认模块显式化,并避免动态属性回退.
+    for name, value in vars(schema_constants).items():
+        if name.startswith("_"):
+            continue
+        merged[name] = value
+    for name, value in vars(schema_models).items():
+        if name.startswith("_"):
+            continue
+        merged[name] = value
+    return SimpleNamespace(**merged)
+
+
+_DEFAULT_TYPES_MODULE = _build_default_types_module()
+
+
+@dataclass(frozen=True)
+class SchemaMeta:
+    schema_name: Optional[str]
+    meta: Dict[str, Any]
+
+    @classmethod
+    def from_field(cls, dc_field: "Field[Any]") -> "SchemaMeta":
+        raw_meta = dict(dc_field.metadata.get(SCHEMA_META_KEY, {}))
+        schema_name = raw_meta.pop("schema_name", None)
+        if not isinstance(schema_name, str):
+            schema_name = None
+        return cls(schema_name=schema_name, meta=raw_meta)
+
+
+class SchemaBuilder:
+    META_KEY_MAP: ClassVar[Dict[str, str]] = {
+        "desc": "description",
+        "md": "markdownDescription",
+        "markdown": "markdownDescription",
+        "choices": "enum",
+        "min": "minimum",
+        "max": "maximum",
+        "min_items": "minItems",
+        "max_items": "maxItems",
+        "min_props": "minProperties",
+        "max_props": "maxProperties",
+        "pattern": "pattern",
+        "default": "default",
+        "type": "type",
+        "items": "items",
+        "one_of": "oneOf",
+        "any_of": "anyOf",
+        "all_of": "allOf",
+        "additional_props": "additionalProperties",
+        "const": "const",
+        "deprecated": "deprecated",
+        "items_choices": "items_choices",
+        "example": "examples",
+    }
+    ORDER_INSENSITIVE_KEYS: ClassVar[Set[str]] = {"required", "enum", "oneOf", "anyOf", "allOf"}
+    IGNORED_KEYS: ClassVar[Set[str]] = {"$comment"}
+    ELLIPSIS_TUPLE_LEN: ClassVar[int] = 2
+    GENERATED_SCHEMA_COMMENT: ClassVar[str] = "自动生成, 请勿手动修改. 生成脚本: scripts/gen-yaml-dsl-schema.py"
+    PRIMITIVE_TYPE_MAP: ClassVar[Dict[Type[Any], str]] = {
+        bool: "boolean",
+        int: "integer",
+        str: "string",
+    }
+    _types: Any
+
+    def __init__(self, types_module: Optional[Any] = None) -> None:
+        if types_module is None:
+            types_module = _DEFAULT_TYPES_MODULE
+        self._types = types_module
+
+    def build_demand_schema(self) -> Dict[str, Any]:
+        types_mod = self._types
+        definitions = {
+            "main_source": self._build_definition(types_mod.MainSourceConfig),
+            "source": self._build_definition(types_mod.SourceConfig),
+            "source_field_inline": self._build_definition(types_mod.SourceFieldConfig),
+            "field": self._build_field_definition(),
+            "relation": self._build_definition(types_mod.RelationConfig),
+            "output": self._build_definition(types_mod.OutputConfig),
+            "logging": self._build_definition(types_mod.LoggingConfig),
+            "performance_thresholds": self._build_definition(types_mod.PerformanceThresholdsConfig),
+            "performance_report": self._build_definition(types_mod.PerformanceReportConfig),
+            "performance": self._build_definition(types_mod.PerformanceConfig),
+            "relation_report": self._build_definition(types_mod.RelationReportConfig),
+            "relations": self._build_definition(types_mod.RelationsConfig),
+            "viz": self._build_definition(types_mod.VizConfig),
+            "trace": self._build_definition(types_mod.TraceConfig),
+            "row_gap": self._build_definition(types_mod.RowGapConfig),
+            "memory_opt": self._build_definition(types_mod.MemoryOptimizationConfig),
+            "observability": self._build_definition(types_mod.ObservabilityConfig),
+            "guardrails_loader": self._build_definition(types_mod.GuardrailsLoaderConfig),
+            "guardrails_relations": self._build_definition(types_mod.GuardrailsRelationsConfig),
+            "guardrails_compute": self._build_definition(types_mod.GuardrailsComputeConfig),
+            "guardrails": self._build_definition(types_mod.GuardrailsConfig),
+            "loader_retry": self._build_definition(types_mod.LoaderRetryConfig),
+        }
+
+        schema: Dict[str, Any] = {
+            "$schema": types_mod.DEMAND_SCHEMA_META["$schema"],
+            "$id": types_mod.DEMAND_SCHEMA_META["$id"],
+            "title": types_mod.DEMAND_SCHEMA_META["title"],
+            "description": types_mod.DEMAND_SCHEMA_META["description"],
+            "$comment": self.GENERATED_SCHEMA_COMMENT,
+            "type": "object",
+            "required": list(types_mod.DEMAND_SCHEMA_REQUIRED),
+            "properties": self._build_demand_properties(),
+            "definitions": definitions,
+        }
+        if "markdownDescription" in types_mod.DEMAND_SCHEMA_META:
+            schema["markdownDescription"] = types_mod.DEMAND_SCHEMA_META["markdownDescription"]
+        additional_props = getattr(types_mod.DemandConfig, "SCHEMA_ADDITIONAL_PROPERTIES", None)
+        if additional_props is not None:
+            schema["additionalProperties"] = bool(additional_props)
+        return schema
+
+    def _build_definition(self, cls: type) -> Dict[str, Any]:
+        properties = self._build_class_properties(cls)
+        schema: Dict[str, Any] = {
+            "type": "object",
+            "properties": properties,
+        }
+
+        required = getattr(cls, "SCHEMA_REQUIRED", ())
+        if required:
+            schema["required"] = list(required)
+
+        additional_props = getattr(cls, "SCHEMA_ADDITIONAL_PROPERTIES", None)
+        if additional_props is not None:
+            schema["additionalProperties"] = bool(additional_props)
+
+        all_of = getattr(cls, "SCHEMA_ALL_OF", None)
+        if all_of is not None:
+            schema["allOf"] = copy.deepcopy(all_of)
+
+        return schema
+
+    def _build_demand_properties(self) -> Dict[str, Any]:
+        types_mod = self._types
+        base_properties = self._build_class_properties(types_mod.DemandConfig)
+        ordered: Dict[str, Any] = {}
+        for name in types_mod.DEMAND_SCHEMA_PROPERTIES_ORDER:
+            if name == "_templates":
+                ordered[name] = {
+                    "type": "object",
+                    "description": "YAML anchor 模板集合(_templates), 供 fields/relations 复用",
+                    "markdownDescription": (
+                        "YAML anchor 模板集合.\n\n- 仅用于 YAML 复用(anchors)\n- 常用于 `fields` / `relations` / `retry`"
+                    ),
+                    "properties": {
+                        "retry": {
+                            "type": "object",
+                            "description": "可复用的 retry 策略模板集合",
+                            "markdownDescription": "可复用的 retry 策略模板集合.\n\n- key 为模板名\n- value 为 retry policy 对象",
+                            "additionalProperties": {"$ref": "#/definitions/loader_retry"},
+                        }
+                    },
+                    "additionalProperties": True,
+                }
+                continue
+            if name == "fields":
+                ordered[name] = {
+                    "type": "object",
+                    "description": "字段配置映射, key 为 field_id; 仅用于派生字段",
+                    "markdownDescription": (
+                        "字段配置映射(仅用于派生字段).\n\n"
+                        "- 必须包含 `compute` 或 `call_by`\n"
+                        "- 不能与源字段同名(避免 source/derived 重名)\n"
+                        "- 支持 YAML anchor 复用"
+                    ),
+                    "additionalProperties": {"$ref": "#/definitions/field"},
+                }
+                continue
+            ordered[name] = base_properties[name]
+        return ordered
+
+    def _build_field_definition(self) -> Dict[str, Any]:
+        types_mod = self._types
+        source_props = self._build_class_properties(types_mod.SourceFieldConfig)
+        derived_props = self._build_class_properties(types_mod.DerivedFieldConfig)
+
+        properties = dict(source_props)
+        for name, schema in derived_props.items():
+            if name in properties:
+                if properties[name] != schema:
+                    msg = "Field schema mismatch for '{}'".format(name)
+                    raise ValueError(msg)
+                continue
+            properties[name] = schema
+
+        return {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": properties,
+            "allOf": copy.deepcopy(types_mod.FIELD_DERIVED_CONDITIONS),
+        }
+
+    def _build_class_properties(self, cls: type) -> Dict[str, Any]:
+        types_mod = self._types
+        properties: Dict[str, Any] = {}
+        for dc_field in dataclass_fields(cls):
+            if dc_field.metadata.get(types_mod.SCHEMA_OMIT_KEY):
+                continue
+            meta = SchemaMeta.from_field(dc_field)
+            prop_name = meta.schema_name or dc_field.name
+            properties[prop_name] = self._build_field_schema(dc_field, meta)
+        return properties
+
+    def _build_field_schema(self, dc_field: "Field[Any]", meta: SchemaMeta) -> Dict[str, Any]:
+        meta_payload = dict(meta.meta)
+        if "ref" in meta_payload:
+            ref_name = meta_payload.pop("ref")
+            if not meta_payload:
+                return {"$ref": "#/definitions/{}".format(ref_name)}
+            expanded = self._expand_meta(meta_payload)
+            expanded["allOf"] = [{"$ref": "#/definitions/{}".format(ref_name)}]
+            return expanded
+        if "schema" in meta_payload:
+            schema = cast("Dict[str, Any]", copy.deepcopy(meta_payload.pop("schema")))
+            schema.update(self._expand_meta(meta_payload))
+            return schema
+
+        schema = self._schema_for_type(dc_field.type)
+        schema.update(self._expand_meta(meta_payload))
+        return schema
+
+    def schemas_equivalent(self, left: Any, right: Any) -> bool:
+        return self.normalize_schema(left) == self.normalize_schema(right)
+
+    def normalize_schema(self, value: Any, key: str = "") -> Any:
+        if isinstance(value, dict):
+            typed = cast("Dict[str, Any]", value)
+            return {k: self.normalize_schema(v, k) for k, v in typed.items() if k not in self.IGNORED_KEYS}
+        if isinstance(value, list):
+            items = cast("List[Any]", value)
+            normalized = [self.normalize_schema(item) for item in items]
+            if key in self.ORDER_INSENSITIVE_KEYS:
+                return sorted(normalized, key=self._sort_key)
+            return normalized
+        if isinstance(value, tuple):
+            items = cast("Tuple[Any, ...]", value)
+            return self.normalize_schema(list(items), key)
+        return value
+
+    def _sort_key(self, value: Any) -> str:
+        return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+
+    def _expand_meta(self, meta: Dict[str, Any]) -> Dict[str, Any]:
+        expanded: Dict[str, Any] = {}
+        items_choices = None
+        for key, value in meta.items():
+            mapped_key = self.META_KEY_MAP.get(key, key)
+            if mapped_key == "additionalProperties":
+                expanded[mapped_key] = self._expand_additional_props(value)
+            elif mapped_key == "items_choices":
+                items_choices = value
+            else:
+                expanded[mapped_key] = copy.deepcopy(value)
+
+        if items_choices is not None:
+            if "items" not in expanded:
+                expanded["items"] = {}
+            if isinstance(expanded["items"], dict):
+                items_schema = cast("Dict[str, Any]", expanded["items"])
+                items_schema["enum"] = copy.deepcopy(items_choices)
+
+        if "examples" in expanded and not isinstance(expanded["examples"], list):
+            expanded["examples"] = [expanded["examples"]]
+        if "markdownDescription" not in expanded and "description" in expanded:
+            expanded["markdownDescription"] = expanded["description"]
+
+        return expanded
+
+    def _expand_additional_props(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"$ref": "#/definitions/{}".format(value)}
+        return copy.deepcopy(value)
+
+    def _schema_for_type(self, tp: Any) -> Dict[str, Any]:
+        tp = self._strip_optional(tp)
+        origin = getattr(tp, "__origin__", None)
+        primitive = self._primitive_schema(tp)
+        if primitive:
+            return primitive
+
+        container = self._container_schema(tp, origin)
+        if container:
+            return container
+
+        ref_schema = self._ref_schema(tp)
+        if ref_schema:
+            return ref_schema
+
+        return {}
+
+    def _strip_optional(self, tp: Any) -> Any:
+        origin = getattr(tp, "__origin__", None)
+        if origin is Union:
+            args = [arg for arg in getattr(tp, "__args__", ()) if arg is not type(None)]
+            if len(args) == 1:
+                return args[0]
+        return tp
+
+    def _primitive_schema(self, tp: Any) -> Dict[str, Any]:
+        if isinstance(tp, type) and tp in self.PRIMITIVE_TYPE_MAP:
+            return {"type": self.PRIMITIVE_TYPE_MAP[tp]}
+        return {}
+
+    def _container_schema(self, tp: Any, origin: Any) -> Dict[str, Any]:
+        if origin is list or tp is list:
+            args = getattr(tp, "__args__", ())
+            item_type = args[0] if args else object
+            return {"type": "array", "items": self._schema_for_type(item_type)}
+
+        if origin is dict or tp is dict:
+            return {"type": "object"}
+
+        if origin is tuple or tp is tuple:
+            return self._tuple_schema(tp)
+
+        return {}
+
+    def _tuple_schema(self, tp: Any) -> Dict[str, Any]:
+        args = cast("Tuple[Any, ...]", getattr(tp, "__args__", ()))
+        if len(args) == self.ELLIPSIS_TUPLE_LEN and args[1] is Ellipsis:
+            return {"type": "array", "items": self._schema_for_type(args[0])}
+
+        if args:
+            items = [self._schema_for_type(arg) for arg in args]
+            return {
+                "type": "array",
+                "items": items,
+                "minItems": len(items),
+                "maxItems": len(items),
+                "additionalItems": False,
+            }
+
+        return {"type": "array"}
+
+    def _ref_schema(self, tp: Any) -> Dict[str, Any]:
+        if isinstance(tp, type):
+            schema_name = getattr(tp, "SCHEMA_NAME", None)
+            if isinstance(schema_name, str):
+                return {"$ref": "#/definitions/{}".format(schema_name)}
+        return {}
+
+
+_DEFAULT_BUILDER = SchemaBuilder()
+
+
+def build_demand_schema() -> Dict[str, Any]:
+    return _DEFAULT_BUILDER.build_demand_schema()
+
+
+def load_schema(path: Path) -> Dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def write_demand_schema(output_path: Path) -> None:
+    schema = build_demand_schema()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(schema, handle, ensure_ascii=False, indent=2, sort_keys=False)
+        _ = handle.write("\n")
+
+
+def schemas_equivalent(left: Any, right: Any) -> bool:
+    return _DEFAULT_BUILDER.schemas_equivalent(left, right)
+
+
+def normalize_schema(value: Any, key: str = "") -> Any:
+    return _DEFAULT_BUILDER.normalize_schema(value, key)
