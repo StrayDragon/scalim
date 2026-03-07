@@ -1,0 +1,37 @@
+schema: spec-driven
+
+context: |
+  # Public placeholders (sanitized for release)
+  # - PROJECT_NAME: project display name
+  # - PROJECT_DIST_NAME: package/distribution name
+  # - PROJECT_CLI_NAME: CLI command name
+  # - IMPL_ROOT: Python import root
+  # - REPO_ROOT: repository root path
+  # - COMPANY_NAME: company name placeholder
+  # - INTEGRATION_APP: downstream integration system/app
+  # - INTEGRATION_DIR: downstream integration sample/config dir
+
+  PROJECT_NAME 是高性能报表生成框架:,核心为 YAML DSL + IR 驱动执行.
+  目标能力: 多数据源关联、流式输出、可观测性与可视化事件流.
+  运行时需兼容 Python 3.6(开发通常 3.10+).
+  主要依赖: PyYAML、typing-extensions 兼容层;jsonschema/rich 为可选.
+  工程风格: Python-only:,4 空格缩进:,140 行宽:,双引号.
+  命名规范: 函数/变量 snake_case:,类 PascalCase.
+  `src/IMPL_ROOT/` 内优先相对导入:,避免 `from __future__ import annotations` 于核心运行时.
+  核心领域概念: Demand、Source、Field、Relation、Observability.
+  架构模式: Hook/Event 扩展机制 + Sink 抽象输出层.
+  测试基线: pytest + xdist;慢测使用 `@pytest.mark.slow`.
+  行为变更需同步 `openspec/specs/*/spec.md`.
+  规范校验命令: `openspec validate --all --strict --no-interactive`.
+  提交前缀建议: `fix:`、`tests:`、`doc:`、`PROJECT_DIST_NAME:`、`sync`、`tmp`.
+  示例策略: 优先扩展现有 demo/YAML:,再新增文件.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours

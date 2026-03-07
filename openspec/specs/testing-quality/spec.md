@@ -1,0 +1,207 @@
+# testing-quality Specification
+
+**状态: ✅ 已实现**
+## Purpose
+定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现.
+## Related Code (as implemented)
+- `pyproject.toml` (`[tool.pytest.ini_options]` addopts/cov gate + `[tool.coverage.run]` omit)
+- `justfile` (`test`/`bench`/`schema-drift-check`/`lintfix` quality gates)
+- `tests/test_yaml_schema_generation.py` (YAML schema generation drift guard)
+- `tests/test_et_yaml_parse_regression.py` (INTEGRATION_APP YAML parse regression; parser-only, no business loaders)
+- `notebooks/marimo/examples/demo_big_data_report/_verification.py` (demo verification logic reused by pytest)
+- `tests/bench/` (bench-only suite; marker `bench`)
+
+## Implementation Notes (Current Behavior)
+- 默认 pytest 配置由 `pyproject.toml` 的 `addopts` 提供(含 `--cov-fail-under=100` 与 `-p no:benchmark`),因此直接运行 `pytest`/`just test` 会默认执行非 bench 测试并进行覆盖率门禁.
+- bench 入口通过 `-o addopts=""` + `--no-cov` 显式关闭默认 addopts(避免覆盖率/xdist 干扰),并启用 pytest-benchmark 的 `--benchmark-only` 工作流.
+## Requirements
+### Requirement: 测试分类与默认执行
+- 测试套件 MUST 使用 `bench` marker 标识基准用例.
+- 默认测试入口 MUST 运行所有非 bench 测试.
+- 非 bench 测试 MUST 参与覆盖率统计.
+
+#### Scenario: 默认执行非 bench 测试
+- **WHEN** 使用默认测试命令执行 pytest
+- **THEN** 运行所有非 bench 测试且不包含 bench
+
+### Requirement: 覆盖率保持 100%
+- 使用覆盖率统计时,核心模块的覆盖率 MUST 保持 100%.
+- 核心模块定义为 `src/IMPL_ROOT/` 排除 `src/IMPL_ROOT/cli/**` 与 `packages/scalim-misc/**`.
+- 覆盖率低于 100% 时 MUST 视为失败(例如通过 `--cov-fail-under=100` 强制).
+
+#### Scenario: 覆盖率低于 100% 时失败
+- **WHEN** 执行带覆盖率统计的非 bench 测试套件
+- **THEN** 若核心模块覆盖率低于 100% 则执行失败
+
+#### Scenario: 边缘模块被覆盖率忽略
+- **WHEN** 生成覆盖率报告
+- **THEN** `src/IMPL_ROOT/cli/**` 与 `packages/scalim-misc/**` 不参与覆盖率统计
+
+### Requirement: 小规模数据与共享夹具
+- 非 bench 测试 MUST 使用小规模、可重复的数据集与共享 fixture,避免重复构建高成本模型.
+- 大规模数据集 MAY 使用,但必须通过配置显式控制且不作为默认规模.
+
+#### Scenario: 非 bench 测试数据规模可控
+- **WHEN** 非 bench 测试需要示例数据集
+- **THEN** 使用可配置的小规模数据与共享 fixture
+
+### Requirement: Notebook 对拍验证纳入默认测试
+- 对于 `notebooks/marimo/examples` 下包含 `_verification.py` 的 demo,pytest MUST 至少提供一个非 bench 测试用例复用该对拍验证逻辑(小规模数据).
+
+#### Scenario: demo 对拍验证被 pytest 覆盖
+- **WHEN** 运行默认测试命令(非 bench)
+- **THEN** 至少执行一个使用 `_verification.py` 的对拍验证用例并通过
+
+### Requirement: `monkeypatch` 使用必须受控且可替换
+测试套件 MUST 优先验证可观察行为与稳定契约,并将动态边界集中到显式 seam(overrides/provider/factory)中.
+测试套件 MUST 遵循以下约束:
+
+- 测试 MUST 优先通过公开 API、显式注入 seam 来进入边界路径,而不是 patch 生产代码内部实现细节.
+- 测试 MUST NOT 通过 patch 私有方法/内部函数(例如 `_foo`)仅为了断言调用次数或缓存命中.
+- 测试 MUST NOT patch 全局 import 机制(例如 `builtins.__import__`)来模拟可选依赖缺失;可选依赖缺失 MUST 通过受控 seam 进行模拟.
+- 测试 MAY 使用 `monkeypatch` 注入受控边界故障(例如文件 I/O 失败、平台/环境差异、时间相关行为),但 patch MUST 限定在最小作用域并具备明确断言.
+
+#### Scenario: 边界故障注入不影响实现解耦
+- **WHEN** 测试需要覆盖文件写入失败等边界错误路径
+- **THEN** 测试仅在该边界点注入失败(例如 patch 写入函数/文件句柄行为)
+- **AND** 测试断言面向可观察行为(错误被捕获、日志/返回值符合约定),而不是依赖内部调用细节
+
+### Requirement: 禁止以 re-export 稳定性作为测试护栏
+当执行层(`execution/executor`/`execution/pipeline`)发生重构或模块拆分时,测试套件 MUST 不以 `__init__.py` re-export、`__all__` 列表或 import path 稳定性作为回归护栏.
+测试 MUST 以稳定入口与可观察行为为准(例如 `run_ir` / `ScalesEngine` / 显式 overrides / 输出与事件顺序).
+
+#### Scenario: 移除 re-export 不应导致“导出稳定性测试”失败
+- **WHEN** `execution/executor/pipeline` 的 `__init__.py` 移除或调整 re-export
+- **THEN** pytest 套件不应因为断言 `__all__` 或包级导入路径稳定性而失败
+- **AND** 相关回归 MUST 通过行为断言(输出/事件/guardrails/可观察状态)覆盖
+
+### Requirement: 结构重构必须具备行为等价回归护栏
+系统 MUST 为核心可维护性重构提供行为等价回归护栏,至少覆盖:输出结果一致性、事件顺序一致性、错误语义一致性.
+这些护栏 MUST 在默认非 bench 测试流程中可执行.
+
+#### Scenario: 结构调整后输出与事件语义不变
+- **WHEN** 对核心模块进行职责拆分或内部重组
+- **THEN** 对应回归用例 MUST 证明输出结果与事件顺序保持一致
+- **AND** 错误类型与关键错误语义 MUST 保持兼容
+
+### Requirement: 可维护性边界必须由自动化测试守护
+系统 MUST 提供自动化测试来守护关键架构边界,至少包括:
+- 核心依赖方向约束(如 `planning` 不依赖 `execution`)
+- 热点模块体量防膨胀约束(基于明确阈值)
+- 稳定入口导入可用性约束
+
+#### Scenario: 边界被破坏时测试失败并可定位
+- **WHEN** 新增变更引入反向依赖或突破热点模块体量阈值
+- **THEN** 边界护栏测试 MUST 失败
+- **AND** 失败信息 MUST 指向具体模块路径与违规类型
+
+### Requirement: process backend 测试必须反映真实 pickling 约束
+当测试覆盖 adaptive process backend 的调度决策与退化路径时,测试 MUST 以真实 pickling 约束为准:
+
+- 不可 picklable 时,系统 MUST 按 policy 选择 fail-fast 或 fallback-serial 的既定语义.
+- 测试 MUST NOT 通过 patch `pickle.dumps` 伪造“可 picklable”来覆盖成功路径.
+
+#### Scenario: 不可 picklable 触发正确退化
+- **WHEN** adaptive process backend 需要处理不可 picklable 的任务负载
+- **THEN** 系统按 policy 正确 fail-fast 或 fallback 到 serial 执行
+- **AND** 测试通过真实不可 picklable 构造验证该行为(而非 patch `pickle.dumps`)
+
+### Requirement: 缓存/性能类验证以契约或 bench 为基准
+测试套件 MUST 将缓存/性能类验证从“实现快照断言”迁移为稳定基准:
+
+- 若验证内容是功能正确性(重复调用不改变结果/不重复产生副作用),测试 MUST 通过输出、事件或可观察状态断言.
+- 若验证内容是性能/开销(避免重复昂贵计算),测试 SHOULD 使用 bench 或稳定的度量指标,而不是通过 patch 内部函数统计调用次数.
+
+#### Scenario: 缓存命中不以 call-count 断言
+- **WHEN** 测试需要验证某缓存策略不会改变对外结果
+- **THEN** 测试断言输出/事件/可观察状态保持一致
+- **AND** 测试不依赖 patch 私有函数来统计调用次数
+
+### Requirement: `just` 质量门禁命令使用 `uv run`
+项目的质量门禁相关 `just` 任务 MUST 使用 `uv run` 执行 Python 工具链入口(例如 `ruff`、`basedpyright`、`pytest`),以保证依赖来源一致且不依赖激活虚拟环境.
+
+#### Scenario: 未激活 venv 仍可运行 lintfix
+- **WHEN** 开发者未激活任何 venv 且已执行 `uv sync --dev`
+- **THEN** `just lintfix` MUST 成功运行并通过 `uv run ruff ...` 执行格式化与修复
+
+### Requirement: dev 依赖组去重与重复声明约束
+项目的 `pyproject.toml [dependency-groups].dev` MUST 不包含同一包的重复声明(按规范化包名视为同一项),以减少维护噪声并避免约束漂移.
+对已在 `[project].dependencies` 中声明的 runtime 依赖,dev 组 SHOULD 不再重复声明;若 dev-only 需要更严格的版本约束,dev 组 MAY 额外声明但 MUST 以注释说明原因.
+
+#### Scenario: dev 依赖来源单一且无重复
+- **WHEN** 审阅者检查 `pyproject.toml` 的 dev 依赖组
+- **THEN** 不存在重复包声明,且 runtime 依赖不会在 dev 组中无理由重复出现
+
+### Requirement: YAML DSL schema drift 质量门禁
+项目 MUST 提供 `just schema-drift-check` 作为质量门禁的一部分,用于检测 YAML DSL JSON Schema 生成物是否与生成器保持一致且为 canonical 文本形式.
+该命令 MUST 在 drift 存在时失败并提示开发者提交更新后的 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`.
+
+#### Scenario: drift 检测失败并给出提示
+- **GIVEN** 开发者修改了 `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/` 中的 schema 元数据但未提交生成物
+- **WHEN** 运行 `just schema-drift-check`
+- **THEN** 命令 MUST 失败并提示运行 `just gen-yaml-dsl-schema` 并提交 `demand.gen.json`
+
+### Requirement: INTEGRATION_APP YAML DSL configs must remain parseable
+
+默认(非 bench) pytest 套件 MUST 覆盖仓内 INTEGRATION_APP 集成目录 `INTEGRATION_APP/INTEGRATION_APP/execute_batch_tasks/INTEGRATION_DIR/**` 下的 YAML DSL 配置,以确保其在 PROJECT_NAME 变更后仍可被 YAML DSL 的 parser/validator 成功解析.
+
+该回归验证 MUST 仅做“配置可解析/可校验”检查,不得导入业务 loader 或触发 Django/DB 依赖.
+
+#### Scenario: INTEGRATION_DIR configs stay parseable
+- **WHEN** 运行默认(非 bench) pytest 套件
+- **THEN** 回归列表中的每个 YAML 配置都能被 `YamlDemandLoader().load(...)` 成功解析
+- **AND** 解析过程不会触发任何业务模块导入与执行副作用
+
+### Requirement: planning 测试不得依赖 PlanBuilder 私有实现细节
+测试套件 MUST NOT 直接调用 `PlanBuilder._*` 私有方法或断言其内部缓存状态来覆盖分支.
+当需要覆盖 planning 的边界逻辑时,测试 MUST 通过以下方式之一完成:
+
+- 通过 `PlanBuilder(...).build(...)` 的可观察输出断言(field_order/operators/stages/metadata/异常等).
+- 将边界逻辑提取为纯 helper,并对该 helper 编写单元测试.
+
+#### Scenario: 内部分支覆盖迁移为可观察行为断言
+- **WHEN** 原有测试为覆盖边界分支而调用 `PlanBuilder._build_dependency_graph()` / `_extract_dependencies_from_relation()` 等私有方法
+- **THEN** 测试 MUST 迁移为对 `build()` 输出或纯 helper 的断言
+- **AND** 测试不以缓存命中/私有调用次数作为护栏
+
+### Requirement: executor/planning 测试必须合并重复并保持命名规律
+当调整 `src/IMPL_ROOT/execution/executor/**` 与 `src/IMPL_ROOT/planning/**` 的实现或测试时,测试套件 MUST 通过参数化与共用 helper/fixture 减少重复用例数量,并保持测试模块命名可预测:
+
+- executor 相关测试文件前缀 MUST 使用 `test_executor_*.py`.
+- planning 相关测试文件前缀 MUST 使用 `test_planning_*.py`.
+- 跨 execution 子模块的集成/回归测试文件前缀 MUST 使用 `test_execution_*.py`.
+- 新增/迁移测试 MUST 避免创建仅为覆盖率而存在的 `*_coverage.py` 文件;需要的覆盖 MUST 合并到语义更清晰的测试模块中.
+
+#### Scenario: tests 目录不包含 `_coverage.py` 模块
+- **WHEN** 维护者审阅 `tests/` 下的测试模块命名
+- **THEN** 不应存在以 `_coverage.py` 结尾的测试文件
+
+#### Scenario: 合并覆盖率驱动的重复用例
+- **WHEN** 发现同一路径存在多个仅差输入变体/断言形式的重复用例
+- **THEN** 测试 MUST 通过参数化合并为更少的测试函数
+- **AND** 断言 MUST 聚焦可观察行为(输出/事件/guardrails/可观察状态),避免依赖私有实现细节
+
+### Requirement: executor operators 测试模块按 operator 拆分
+测试套件 MUST 将 executor operators 的行为回归测试按 operator 主题拆分为多个测试模块,以降低单文件体积并提高可维护性与可定位性.
+拆分后的测试模块命名 MUST 使用 `test_executor_operator_*.py` 前缀(例如 `test_executor_operator_compute.py`).
+
+#### Scenario: operator 测试可定位
+- **WHEN** 维护者需要定位 compute operator 的测试覆盖
+- **THEN** 应在 `tests/test_executor_operator_compute.py`(或同前缀的模块)中找到主要行为测试
+
+#### Scenario: 避免单文件聚合多 operator
+- **WHEN** 新增或迁移 executor operators 的测试用例
+- **THEN** 不应将多个不同 operator 的测试持续聚合到同一个大文件中
+
+### Requirement: planning 测试模块命名规律与重复用例合并
+测试套件 MUST 将 planning 相关行为回归测试按主题组织为 `tests/test_planning_*.py` 模块,以降低单文件体积并提高可维护性与可定位性.
+当用例仅输入变体不同且断言结构一致时,测试套件 MUST 使用 `pytest.mark.parametrize` 合并重复用例,并为 case 提供清晰 `id`.
+
+#### Scenario: PlanBuilder 测试可定位
+- **WHEN** 维护者需要定位 `PlanBuilder` 的回归护栏
+- **THEN** 应在 `tests/test_planning_builder.py`(或同前缀模块)中找到主要行为测试
+
+#### Scenario: 重复变体通过参数化表达
+- **WHEN** 多个测试仅在输入模型/targets/期望字段集合上存在变体差异
+- **THEN** 这些变体 MUST 通过参数化收敛到更少的测试函数中
+- **AND** 失败输出 SHOULD 可通过 case id 快速定位变体

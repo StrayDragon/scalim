@@ -1,0 +1,259 @@
+# demand-dsl Specification
+
+**状态: ✅ 已实现**
+## Purpose
+实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
+
+## Context
+**FR001: 用户侧代码DSL**
+
+用户侧配置需要有一种简单且符合直觉的用户侧代码配置,能清楚明白的表达数据源之间的血缘关系等元信息.
+
+框架需要这些元信息:
+- 怎么获取数据(数据源函数、查询条件)
+- 数据间的联系:数据源们的血缘关系
+- 数据源自身数量大小信息
+
+核心概念:Demand(需求)、Source(数据源)、Field(字段)、Relation(关系).
+## Related Code (as implemented)
+- `src/IMPL_ROOT/dsl/by_yaml/runtime/entrypoints.py` (`run`, `compile`)
+- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/loader.py` (`YamlDemandLoader`)
+- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validator.py` (`ConfigValidator`)
+- `src/IMPL_ROOT/dsl/by_yaml/runtime/conversion.py` (`ConfigToIRConverter`)
+- `src/IMPL_ROOT/dsl/by_yaml/runtime/compiler.py` (YAML → execution request)
+## Requirements
+### Requirement: 顶层结构与 IR 转换规则
+系统 SHALL 在加载 YAML 时解析 `name`、`main_source`、`sources`、`fields`,并可选解析 `relations`、`output` 与 `guardrails`.
+- `dsl_version` 字段不再支持;配置中出现 `dsl_version` MUST 被视为未知字段并在校验中失败.
+- legacy 字段(`relations_sql_like`、`relations_graph`、`foreign_key`、`target`、`from`、`via`、`column`、`pk`、`pk_transform`、`derived`)一律拒绝.
+- `name`、`main_source` 为必填项;`sources` 可缺省(缺省视为 `{}`)且允许为空对象;顶层 `fields` 可缺省.
+- `main_source` 为对象结构(至少包含 `source_id` 与 `loader`);`sources` 仅包含非主源数据源.
+- 源字段在 `main_source.fields` 与 `sources.*.fields` 内声明;顶层 `fields` 仅用于派生字段.
+ - `guardrails` 为可选对象结构,用于启用运行时护栏配置;未提供时默认关闭.
+系统 SHALL 将 `guardrails.enabled`、`guardrails.mode`、`guardrails.loader.validate_result`、`guardrails.loader.required_fields`、`guardrails.relations.*_max_rate`、`guardrails.loader.on_transform_error`、`guardrails.compute.on_error` 等配置映射到运行时策略模型.
+系统 SHALL 支持使用 `_templates` 中的 YAML anchor/alias 复用 `guardrails.*` 下的字段列表配置(例如 `guardrails.loader.required_fields`).
+系统 SHALL 将 YAML 配置转换为 DemandIr,验证 `main_source.source_id` 不与 sources 冲突且字段引用的数据源存在.
+
+#### Scenario: sources 缺省视为 {}
+- **WHEN** YAML 配置未提供顶层 `sources`
+- **THEN** 配置校验应通过且系统应将 `sources` 视为 `{}` 继续解析与转换
+
+#### Scenario: dsl_version 被拒绝
+- **WHEN** YAML 配置包含 `dsl_version`
+- **THEN** 校验失败并报告未知字段路径
+
+#### Scenario: legacy 字段被拒绝
+- **WHEN** YAML 配置包含任一 legacy 字段
+- **THEN** 校验失败并报告字段路径
+
+#### Scenario: main_source 与 sources 冲突
+- **WHEN** `main_source.source_id` 与 `sources` 中某个 `source_id` 重复
+- **THEN** IR 转换应失败并报告冲突错误
+
+#### Scenario: guardrails 缺省
+- **WHEN** YAML 未声明 `guardrails`
+- **THEN** 运行时护栏保持关闭
+
+#### Scenario: guardrails 解析
+- **WHEN** YAML 包含 `guardrails.enabled: true`
+- **THEN** IR/运行期配置应启用护栏
+
+### Requirement: unknown fields 诊断提供 suggestions(CLI/库一致)
+系统 SHALL 在 YAML DSL 校验阶段识别 unknown fields,并在 `validate_report` 的 issues 中报告其 path 与可读消息.
+系统 MUST 为 unknown fields 提供 1~3 个 suggestions(基于 JSON Schema properties 的近似匹配),且 suggestions 输出顺序 MUST 稳定(deterministic).
+系统 MUST 忽略以 `_` 开头的字段(例如 `_templates`)的 unknown-field 检测.
+系统 MUST 支持 strict 模式:当 strict 启用时 unknown-field issues 以 error 级别报告;否则以 warning 级别报告.
+
+#### Scenario: root unknown field 提示建议
+- **WHEN** 配置根节点包含 unknown field `main_sorce`
+- **THEN** `validate_report` MUST 报告 path 为 `main_sorce` 的 issue
+- **THEN** 该 issue MUST 包含 suggestions 且包含 `main_source`
+
+#### Scenario: nested unknown field 提示建议
+- **WHEN** `main_source` 对象包含 unknown field `sourceid`
+- **THEN** `validate_report` MUST 报告 path 为 `main_source.sourceid` 的 issue
+- **THEN** 该 issue MUST 包含 suggestions 且包含 `source_id`
+
+### Requirement: Loader 引用解析与 allowlist
+系统 SHALL 支持 `module.path.function` 与 `module.path:obj.method` 两种 loader 引用格式,并在加载阶段校验格式、在 IR 转换阶段解析引用.
+系统 MUST 在所有可能解析 Python 引用的 YAML DSL 入口上默认启用 allowlist 安全边界(包括但不限于 `run/compile` 与对外导出的 `ConfigToIRConverter`);缺失 allowlist 时必须报错,提供 allowlist 时必须拒绝名单外模块或函数.
+系统 MUST 支持对 class-style 引用在 `allowed_functions` 中精确到完整 attr 链的匹配(例如 `pkg.mod:Obj.safe`),不得仅因为允许了入口对象就允许其所有可调用属性.
+
+#### Scenario: loader 引用非法
+- **WHEN** loader 引用不符合 dotted/class-style 格式
+- **THEN** 配置加载应报校验错误并拒绝转换
+
+#### Scenario: allowlist missing(run/compile)
+- **WHEN** 调用 `run/compile` 且未提供 allowlist(allowed_modules/allowed_functions 均为 None)
+- **THEN** 解析应失败并提示必须提供 allowlist
+
+#### Scenario: allowlist missing(ConfigToIRConverter 默认安全)
+- **WHEN** 调用方使用对外导出的 `ConfigToIRConverter` 且未显式提供 allowlist(例如未提供带 allowlist 的 resolver)
+- **THEN** 系统 MUST 拒绝解析并提示必须提供 allowlist(除非调用方显式 opt-in 不安全模式)
+
+> NOTE: 显式 opt-in 的不安全模式仅用于测试/演示场景(例如兼容旧代码或本地快速验证).对于不可信 YAML/配置输入,不安全模式属于高风险 footgun,必须避免启用.
+
+#### Scenario: class-style allowlist 精确到方法
+- **GIVEN** allowlist 仅允许 `pkg.mod:Obj.safe`
+- **WHEN** YAML loader/call_by 引用解析尝试解析 `pkg.mod:Obj.safe`
+- **THEN** 解析通过
+- **WHEN** 引用解析尝试解析 `pkg.mod:Obj.unsafe`
+- **THEN** 解析 MUST 失败并报告 allowlist 拒绝
+
+### Requirement: Source/Bind 结构与 keys 分片参数
+系统 SHALL 支持为数据源定义 `key`、`lookup_cast`、`cache_mode`、`params` 与 `bind`,并在运行时构造绑定参数.
+`bind` 必须且仅允许包含 `use_rows` 或 `use_keys` 之一;`use_rows.cache_mode` 仅允许 `none|batch`(默认 batch),`use_keys.as` 仅允许 `set|list`(默认 set).
+系统 MUST 支持在 source 配置中声明 `lookup_chunk_size`,用于 keys 模式 LoadRef 的 lookup_keys 分片.
+当 `use_keys.as=list` 时,从 YAML 转换到运行时参数构建器的行为 MUST 产生稳定顺序列表.
+
+#### Scenario: binding 构造参数
+- **WHEN** source 配置 `bind: {use_keys: {param: ids}}`
+- **THEN** loader 调用参数应包含 `ids=set(lookup_keys)`
+
+#### Scenario: bind 缺少 use 分支
+- **WHEN** 配置 `bind: {param: ids}` (旧语法)
+- **THEN** 校验失败并提示需使用 `use_rows` 或 `use_keys`
+
+#### Scenario: YAML list 绑定顺序可重复
+- **WHEN** source 配置 `bind: {use_keys: {param: ids, as: list}}` 且 lookup_keys 集合相同
+- **THEN** 运行时传给 loader 的 `ids` 列表顺序必须稳定
+
+系统 MUST 使用语义清晰且无歧义的 key 常量公开命名,并在解析器/校验器中统一使用该命名.
+
+以下命名 MUST 生效:
+- `BIND_KEY_CONFIG_KEYS`
+- `MEMORY_OPTIMIZATION_KEYS`
+- `RELATION_CONFIG_KEYS`
+- `RELATIONS_CONFIG_KEYS`
+
+旧命名(`BIND_KEYS_KEYS`、`MEMORY_OPT_KEYS`、`RELATION_KEYS`、`RELATIONS_KEYS`)MUST NOT 继续作为公开常量提供.
+
+#### Scenario: 解析器使用新常量
+- **WHEN** 执行 YAML `bind/observability/relations` 解析
+- **THEN** 解析路径应使用新常量命名
+
+#### Scenario: 旧常量不可导入
+- **WHEN** 调用方尝试导入旧常量名
+- **THEN** 导入 MUST 失败
+
+### Requirement: 字段/关系表达式默认行为
+系统 SHALL 支持 relations.steps 中 `source.field` 点号表达式(含同源列表),并在字段定义中当 `field` 未声明时默认使用 field_id.
+系统 MUST 将 `relations.steps` 的 `source.<name>` 视为字段的 `field_id`(YAML key),并映射为其 `field`(data_key) 供运行时使用.
+系统 SHALL 允许在 steps 中引用非主源 `sources.<id>.key` 中声明的 key 字段,即使该 key 未显式声明在 `sources.<id>.fields`.
+系统 MUST 在 `<name>` 不存在于该 source 的声明字段(field_id)且也不在 `sources.<id>.key` 时,视为配置错误并在校验阶段失败.
+系统 MUST 在同一 source 内禁止 field_id 与其他 field_id 的 data_key 重名;一旦出现即视为配置错误并在校验阶段失败.
+系统 SHALL 允许同一 source 内多个 field_id 指向同一 data_key,且此情况不应触发歧义失败.
+
+#### Scenario: 使用点号表达式定义 step
+- **WHEN** step 定义为 `from: orders.customer_id` 与 `to: customers.customer_id`
+- **THEN** 系统应正确解析为 from=(orders, customer_id) 与 to=(customers, customer_id)
+
+#### Scenario: field 未声明时使用默认值
+- **WHEN** 源字段定义为 `user_id: { name: 用户ID }` 且未声明 `field`
+- **THEN** 系统应将 `field` 默认设置为 `user_id`
+
+#### Scenario: step 优先使用 field_id 映射
+- **GIVEN** source `products` 定义字段 `product_category_id: {field: category_id}`
+- **WHEN** step 使用 `to: products.product_category_id`
+- **THEN** 系统应解析为 data_key `category_id`
+
+#### Scenario: step 使用 data_key 时校验失败
+- **GIVEN** source `products` 定义字段 `product_category_id: {field: category_id}`
+- **WHEN** step 使用 `to: products.category_id`
+- **THEN** 校验必须失败并提示 steps 只能使用 field_id
+
+#### Scenario: field_id 与其他 data_key 重名时校验失败
+- **GIVEN** source `products` 定义 `category_id: {field: category_id_v2}` 且 `product_category_id: {field: category_id}`
+- **WHEN** 配置被校验
+- **THEN** 校验必须失败并提示 field_id/data_key 命名冲突
+
+#### Scenario: step 引用未知字段校验失败
+- **GIVEN** source `products` 定义字段 `product_category_id: {field: category_id}`
+- **WHEN** step 使用 `to: products.unknown_field`
+- **THEN** 校验必须失败并提示引用未知字段
+
+#### Scenario: 多个 field_id 映射同一 data_key 不视为歧义
+- **GIVEN** source `products` 定义 `a: {field: id}` 与 `b: {field: id}` 与 `c: {field: id}`
+- **WHEN** step 使用 `to: products.a`
+- **THEN** 系统应解析为 data_key `id` 且不报歧义错误
+
+### Requirement: main_source 批次排序配置
+系统 SHALL 支持在 `main_source` 中声明 `order_by`,其值为字符串列表;每项为字段 id,可使用前缀 `-` 表示 `desc`,不带前缀表示 `asc`.
+`order_by` 为可选配置;未声明时不启用排序.
+系统 SHALL 校验 `order_by` 每项为非空字符串,且去除前缀 `-` 后必须匹配主数据源字段 id.
+系统 SHALL 将 `order_by` 转换为 IR 的排序键列表(字段 id + 方向),保持声明顺序作为排序优先级.
+
+#### Scenario: 解析 asc/desc 列表
+- **WHEN** `main_source.order_by: ["order_id", "-created_at"]` 且两字段均定义于 `main_source.fields`
+- **THEN** IR 排序键应为 `(order_id, asc) -> (created_at, desc)`
+
+#### Scenario: 非法条目被拒绝
+- **WHEN** `main_source.order_by` 包含非字符串、空字符串或仅 "-" 的条目
+- **THEN** 校验失败并报告对应字段路径
+
+#### Scenario: 非主数据源字段被拒绝
+- **WHEN** `main_source.order_by` 引用仅存在于 `sources.*.fields` 或派生字段的 field_id
+- **THEN** 校验失败并提示仅允许主数据源字段
+
+### Requirement: 顶层 batch_size 语义统一且可显式禁用分批
+系统 MUST 支持在 YAML 顶层声明 `batch_size`,其语义如下:
+- `batch_size: null` 表示禁用分批(no-chunking).
+- `batch_size: <int>=1` 表示按固定批大小分批.
+- 未声明 `batch_size` 时沿用系统默认分批策略.
+
+系统 MUST 在解析阶段保留 `null` 语义,不得将显式 `null` 静默替换为默认批大小.
+
+#### Scenario: 显式 null 被保留
+- **WHEN** YAML 声明 `batch_size: null`
+- **THEN** 解析后的配置对象 MUST 保留 `batch_size=None` 并进入后续编译链路
+
+#### Scenario: 未声明 batch_size 使用默认
+- **WHEN** YAML 未声明 `batch_size`
+- **THEN** 系统 MUST 使用默认分批策略并保持与历史默认行为一致
+
+### Requirement: batch_size 校验在不同入口语义一致
+系统 MUST 在 YAML DSL 的 schema-only 校验与 runtime semantic 校验入口对 `batch_size` 提供一致结论:
+- 仅允许 `null` 或整数且 `>=1`.
+- 非法值必须在校验阶段失败,并报告 `batch_size` 路径.
+
+#### Scenario: 非法类型被一致拒绝
+- **WHEN** `batch_size` 为 `true` 或 `1.5` 或 `"oops"`
+- **THEN** schema-only 与 runtime semantic 校验 MUST 均失败,且 issue 路径包含 `batch_size`
+
+#### Scenario: 非法取值被一致拒绝
+- **WHEN** `batch_size` 为 `0` 或负数
+- **THEN** schema-only 与 runtime semantic 校验 MUST 均失败,且 issue 路径包含 `batch_size`
+
+### Requirement: YAML DSL 增加 loader retry 配置入口
+系统 SHALL 在 YAML DSL 中支持声明 loader retry policy:
+- 顶层可选对象 `retry` 作为全局默认 policy
+- `main_source.retry` 作为主数据源 loader 的覆盖 policy
+- `sources.*.retry` 作为各非主数据源 loader 的覆盖 policy
+
+上述 policy 对象字段语义 MUST 与 `loader-retry-policy` 规范一致.
+
+#### Scenario: 顶层 retry 缺省
+- **WHEN** YAML 未提供顶层 `retry`
+- **THEN** YAML 校验与 IR 转换 MUST 继续通过,且执行期默认不启用重试
+
+### Requirement: `_templates.retry` 用于复用通用策略
+系统 SHALL 支持用户在 `_templates.retry` 下声明可复用的 retry policy 片段,并允许使用 YAML anchor/alias/merge(`&`/`*`/`<<`)在 `retry` / `main_source.retry` / `sources.*.retry` 中复用.
+
+#### Scenario: anchor/merge 复用并禁用单个 loader
+- **GIVEN** `_templates.retry.db_default` 被声明为 anchor
+- **WHEN** 顶层 `retry` 通过 merge 复用该 anchor,且 `sources.customers.retry.enabled=false`
+- **THEN** 解析与转换 MUST 成功,且 customers loader 的 effective policy 为 disabled
+
+### Requirement: `should_retry` 引用解析与 allowlist
+系统 MUST 支持在 YAML 的 retry policy 中以安全引用字符串声明 `should_retry`(格式与 loader 引用一致:dotted/class-style).
+系统 MUST 通过与 loader 引用相同的 allowlist 安全边界解析该引用(allowed_modules/allowed_functions).
+
+#### Scenario: allowlist 缺失时 should_retry 被拒绝
+- **WHEN** YAML 配置包含 `retry.should_retry`(或任一 `*.retry.should_retry`)
+- **AND** 调用 `compile/run` 未提供 allowlist(allowed_modules/allowed_functions 均为空)
+- **THEN** 系统 MUST 拒绝执行并提示必须提供 allowlist
+
+## Notes
+- 当前仅支持 YAML DSL 与 IR 类构造(`DemandIr.from_irs`);类式 Python DSL 尚未实现.
+- rows 模式默认批次内复用;若 loader 依赖可变的 batch_rows 或有副作用,应显式配置 `bind.use_rows.cache_mode=none`.
+- 字段 transform、派生字段、关系与输出行为详见 `field-compute`、`source-relations`、`streaming-output`.

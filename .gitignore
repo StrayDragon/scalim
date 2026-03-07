@@ -272,3 +272,6 @@ docs/doc/notebooks/**/*.html
 # Keep lockfiles committed (template previously ignored these)
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
+
+# Local openspec sanitization rules
+openspec/sanitize_rules.local.yaml

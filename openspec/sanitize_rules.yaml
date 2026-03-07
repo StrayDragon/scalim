@@ -1,0 +1,52 @@
+version: 1
+
+# Ordered rules: more-specific first.
+# Keep repository rules narrow and deterministic to avoid accidental rewrites.
+# Organization/project-private literals belong in `openspec/sanitize_rules.local.yaml`.
+rules:
+  # --- Doc examples: api_key / token values (avoid leaking real values) ---
+  - name: example_api_key_value
+    pattern: "(?m)^(\\s*api_key\\s*:\\s*)\"[^\"]*\"\\s*$"
+    replace: "\\1\"API_KEY_PLACEHOLDER\""
+
+  - name: example_cli_token_value
+    pattern: "(?m)(\\s--token\\s+)(\\S+)"
+    replace: "\\1TOKEN_PLACEHOLDER"
+
+  - name: example_doc_token_inline
+    pattern: "(?m)^(\\s*-\\s*token\\s*:\\s*)`[^`]+`\\s*$"
+    replace: "\\1`TOKEN_PLACEHOLDER`"
+
+  # --- CLI naming ---
+  - name: cli_scalim_cli
+    pattern: "\\bscalim-cli\\b"
+    replace: "PROJECT_CLI_NAME"
+
+  # --- Code pointers / imports / src paths ---
+  - name: src_scalim_dir
+    pattern: "src/scalim/"
+    replace: "src/IMPL_ROOT/"
+
+  # Python import statements (keep line-anchored to avoid prose rewrites)
+  - name: py_from_scalim
+    pattern: "(?m)^(\\s*from\\s+)scalim(\\.|\\s+)"
+    replace: "\\1IMPL_ROOT\\2"
+
+  - name: py_import_scalim
+    pattern: "(?m)^(\\s*import\\s+)scalim(\\b|\\s|$)"
+    replace: "\\1IMPL_ROOT\\2"
+
+  # Dotted references commonly inside backticks / code spans
+  - name: dotted_scalim_prefix
+    pattern: "\\bscalim\\."
+    replace: "IMPL_ROOT."
+
+  # --- Project display name (titles/prose) ---
+  - name: display_scalim
+    pattern: "\\bScalim\\b"
+    replace: "PROJECT_NAME"
+
+  # --- Dist/package name in prose/commands (standalone token) ---
+  - name: dist_scalim_token
+    pattern: "(?<![A-Za-z0-9_\\-])scalim(?![A-Za-z0-9_\\-])"
+    replace: "PROJECT_DIST_NAME"
