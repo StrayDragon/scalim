@@ -126,7 +126,7 @@ just notebook
 
 - 100% 核心测试覆盖率 (低于 100% 强制 CI 失败)
 - 基于 pyright 的类型检查
-- `src/scalim/` 主框架路径使用更严格的类型检查;脚本/前端/notebooks 等辅助区域按场景定向豁免
+- `src/scalim/` 默认走更严格的 `basedpyright` 规则,已启用 `Phase 1` + `Phase 2` 核心规则;`notebooks` 与 `src/scalim/cli` 等边界区域按分层策略定向放宽
 - `Python 3.6` 兼容除语法检查外,还额外验证隔离环境中的 `typing-extensions==4.1.1`
 - Ruff 全量规则通过
 

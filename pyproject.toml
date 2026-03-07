@@ -258,12 +258,22 @@ reportAny = false
 reportPrivateLocalImportUsage = false
 reportDeprecated = false
 
+# 默认将 `src/scalim` 视为 `strict-core`; 只有显式边界目录才允许放宽.
 [[tool.basedpyright.executionEnvironments]]
 root = "src/scalim"
 reportArgumentType = true
 reportReturnType = true
 reportUnknownMemberType = true
+reportMissingParameterType = true
+reportUnknownParameterType = true
+reportUnknownArgumentType = true
+reportUnknownVariableType = true
+reportMissingTypeArgument = true
+reportIncompatibleMethodOverride = true
+reportIncompatibleVariableOverride = true
+reportUnnecessaryTypeIgnoreComment = true
 
+# `notebooks` 属于 `compatible-dynamic` 边界: 动态探索脚本允许定向放宽.
 [[tool.basedpyright.executionEnvironments]]
 root = "notebooks"
 reportImplicitRelativeImport = false       # marimo 脚本通过 sys.path 动态导入 _shared 模块
@@ -305,6 +315,7 @@ reportPossiblyUnboundVariable = false      # 不报告可能未绑定的变量
 reportMissingSuperCall = false             # 不报告缺少父类方法调用
 reportInvalidTypeForm = false              # 不报告无效的类型格式
 
+# `src/scalim/cli` 属于 `tooling-boundary`: 命令装配/参数分派保持受控放宽.
 [[tool.basedpyright.executionEnvironments]]
 root = "src/scalim/cli"
 reportArgumentType = false               # 不报告参数类型错误
