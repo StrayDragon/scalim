@@ -13,7 +13,7 @@
   - `utils/`, `vendor/`, `typedefs.py`
 - `packages/scalim-benchlib/` provides benchmark helpers.
 - `tests/` contains the pytest suite; `tests/bench/` is benchmark-only.
-- `scripts/` holds developer utilities (schema generation, agent skill export).
+- `scripts/` holds developer utilities (schema generation, agent skill export). Script filenames under `scripts/` use kebab-case with `-` separators.
 - `notebooks/` contains marimo demo scripts.
 - `openspec/` and `ARCH.md` capture architecture and change proposals.
 
@@ -28,6 +28,7 @@
 - Use ruff as the source of truth for formatting and linting.
 - Keep code compatible with Python 3.6 runtime even though dev uses 3.10+ (avoid 3.7+ only syntax).
 - Import rule: inside `scalim/` prefer relative imports; avoid `import scalim` or `from scalim...`. Tests/scripts can import `scalim` directly.
+- Scripts in `scripts/` should use `-`-separated filenames (for example, `gen-agent-skill.py`).
 - Tests: file names `tests/test_*.py`, functions `test_*`.
 
 ## Python Version & Packaging (Intentional Mismatch)

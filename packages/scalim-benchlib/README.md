@@ -1,3 +1,7 @@
 # scalim-benchlib
 
-Minimal benchmarking utilities for Scalim tests.
+用于Scalim测试的最小化基准测试实用工具
+
+- 供`tests/bench`及基准测试工具使用的仓库本地辅助包
+- 版本与主`scalim`包保持一致，以减少工作区差异
+- 目前不打算作为一个单独记录文档面向终端用户的软件包

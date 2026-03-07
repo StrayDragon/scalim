@@ -1,7 +1,7 @@
 [project]
 name = "scalim"
 version = "0.2.1"
-description = "NOT USE, WIP"
+description = "A data-orchestration framework simplifying perf opt & dev with unified way"
 readme = "README.md"
 authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
 requires-python = ">=3.6"
@@ -257,6 +257,12 @@ reportUnnecessaryIsInstance = false
 reportAny = false
 reportPrivateLocalImportUsage = false
 reportDeprecated = false
+
+[[tool.basedpyright.executionEnvironments]]
+root = "src/scalim"
+reportArgumentType = true
+reportReturnType = true
+reportUnknownMemberType = true
 
 [[tool.basedpyright.executionEnvironments]]
 root = "notebooks"

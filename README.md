@@ -120,12 +120,14 @@ just notebook
 - **方便集成AI开发环境**: 支持 [agent skill](./artifacts/skills/) 集成
 - **可视化在线工具**: 有可视化在线工具做回放和排查,执行计划、事件流和 trace 都能接起来看
 
-更多见 [参考文档](docs/doc/index.md)
+更多见 [参考文档](./docs/doc/index.md)
 
 ## 质量保证
 
 - 100% 核心测试覆盖率 (低于 100% 强制 CI 失败)
 - 基于 pyright 的类型检查
+- `src/scalim/` 主框架路径使用更严格的类型检查;脚本/前端/notebooks 等辅助区域按场景定向豁免
+- `Python 3.6` 兼容除语法检查外,还额外验证隔离环境中的 `typing-extensions==4.1.1`
 - Ruff 全量规则通过
 
 ## 设计哲学

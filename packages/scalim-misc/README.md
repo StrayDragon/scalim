@@ -1,5 +1,8 @@
 # scalim-misc
 
-`scalim-misc` contains misc utilities and example modules used by the `scalim` repository.
+包含“scalim”代码库使用的各类实用工具和示例模块
 
-This package is not required for running `scalim` in production.
+在生产环境中运行“scalim”并不需要这个软件包
+- 提供代码库支持代码，例如示例模块和辅助实用工具
+- 版本与主“scalim”包保持一致，以减少工作区差异
+- 首先尽力保证此代码库中的稳定性，并非对独立公共API的承诺

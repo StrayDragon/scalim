@@ -174,6 +174,37 @@ gen-viz-schedule-plan RUN_DIR="":
 validate-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
 
+# 检查: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认 dry-run; 需要 YES 才执行)
+openspec-sanitize CONFIRM="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    confirm="{{ CONFIRM }}"
+    if [ "$confirm" = "YES" ] || [ "$confirm" = "CONFIRM=YES" ]; then
+        uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
+        exit 0
+    fi
+    if [ -n "$confirm" ]; then
+        echo "[warn] confirm token ignored (expected 'YES'):" "$confirm" >&2
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --check --root openspec
+    echo ""
+    echo "[info] dry-run only. Apply with: just openspec-sanitize CONFIRM=YES"
+
+# 工具: 统一主包/子包/前端版本 (默认 dry-run; 需要 YES 才执行)
+bump-versions VERSION="" CONFIRM="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    args=()
+    if [ -n "{{ VERSION }}" ]; then
+        args+=( --version "{{ VERSION }}" )
+    fi
+    if [ "{{ CONFIRM }}" = "YES" ] || [ "{{ CONFIRM }}" = "CONFIRM=YES" ]; then
+        args+=( --apply )
+    elif [ -n "{{ CONFIRM }}" ]; then
+        echo "[warn] confirm token ignored (expected 'YES'):" "{{ CONFIRM }}" >&2
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/bump-versions.py "${args[@]}"
+
 # 生成: Agent Skill 数据
 gen-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py
@@ -365,16 +396,32 @@ quick-check: quick-check-only-py
 alias quick-qa := quick-check
 
 # QA: 仅py完整的检查
-check-only-py: quick-check-only-py examples bench bench-memray
+check-only-py: quick-check-only-py py36-compat-check py36-typingext-check examples bench bench-memray
 
 # QA: 所有完整的检查
-check: quick-check-only-py frontend-check
+check: quick-check-only-py py36-compat-check py36-typingext-check frontend-check
 
 alias qa := check
 
 # 检查: Python 3.6 语法兼容性 (仅 `src/scalim/`)
 py36-compat-check:
     docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 python -m compileall -q src/scalim
+
+# 检查: `Python 3.6` + `typing-extensions==4.1.1` 隔离环境兼容性
+py36-typingext-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash -lc '
+        set -euo pipefail
+        tmp_root=$(mktemp -d /tmp/scalim-py36-typingext.XXXXXX)
+        trap '\''rm -rf "$tmp_root"'\'' EXIT
+        python -m venv "$tmp_root/venv"
+        . "$tmp_root/venv/bin/activate"
+        python -m pip install --upgrade "pip<22" "setuptools<60" "wheel<0.38"
+        python -m pip install dataclasses "typing-extensions==4.1.1" "pyyaml>=5.4.1,<6.0.2"
+        PYTHONPATH=/repo/src python -m compileall -q /repo/src/scalim
+        PYTHONPATH=/repo/src python -c "from scalim.dsl.by_yaml import Compilation, RunOverrides; from scalim.execution import ScalimEngine; from scalim.ob import Observability; from scalim.planning import PlanBuilder; from scalim.spec.ir import DemandIr; from scalim.vendor.compact.typing_extensionsx import Self, override; _ = (Compilation, DemandIr, Observability, PlanBuilder, RunOverrides, ScalimEngine, Self, override); print(\"OK: py36 + typing-extensions 4.1.1\")"
+    '
 
 # 清理缓存/产物 (默认 dry-run; 需要 YES 才执行)
 clean-cache CONFIRM="":

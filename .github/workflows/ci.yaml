@@ -42,8 +42,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev --locked
 
-      - name: Check
-        run: just check
+      - name: QA
+        run: just qa
 
       - name: Upload artifacts
         if: always()
@@ -52,15 +52,3 @@ jobs:
           name: artifacts
           path: .tmp/artifacts/
           if-no-files-found: warn
-
-  py36-compat:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up just
-        uses: extractions/setup-just@v3
-
-      - name: Python 3.6 语法兼容性检查 (仅 `src/scalim/`)
-        run: just py36-compat-check

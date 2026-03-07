@@ -3199,12 +3199,12 @@ dev = [
 
 [[package]]
 name = "scalim-benchlib"
-version = "0.1.0"
+version = "0.2.1"
 source = { editable = "packages/scalim-benchlib" }
 
 [[package]]
 name = "scalim-misc"
-version = "0.1.0"
+version = "0.2.1"
 source = { editable = "packages/scalim-misc" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "http://mirrors.aliyun.com/pypi/simple/" }, marker = "python_full_version < '3.11'" },
