@@ -2,7 +2,7 @@
 set -euo pipefail
 
 install_with_retry() {
-    python -m pip install "$@" || python -m pip install -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@"
+    python -m pip install  "$@" || python -m pip install -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@"
 }
 
 tmp_root=$(mktemp -d /tmp/scalim-py36-typingext.XXXXXX)
