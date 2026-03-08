@@ -1,5 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false
-
 import logging
 
 from ...schema_dsl.constants import DEMAND_FIELDS_KEY

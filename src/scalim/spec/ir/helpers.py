@@ -1,5 +1,7 @@
-from typing import Any, Dict, Hashable, List, Optional, Tuple
+from collections.abc import Mapping
+from typing import List, Optional, Tuple, cast
 
+from ...typedefs import LoaderResultMapping, RuntimeValue
 from .aliases import LoaderResultMapCallable
 from .binding import BindingIr, LoaderCallContextIr
 from .relations import JoinConditionIr, LookupStepIr, RelationIr
@@ -7,7 +9,7 @@ from .sources import SourceIr, SourceRefIr
 
 
 def infer_lookup_steps(
-    relation: Any,
+    relation: object,
     from_source: SourceRefIr,
     to_source: SourceIr,
 ) -> Optional[Tuple[LookupStepIr, ...]]:
@@ -84,9 +86,15 @@ def call_loader_with_binding(
     binding: Optional[BindingIr],
     context: LoaderCallContextIr,
     loader_fn: LoaderResultMapCallable,
-) -> Dict[Hashable, Any]:
+) -> RuntimeValue:
     if binding is None:
         return loader_fn()
 
     args, kwargs = binding.build_params(context)
     return loader_fn(*args, **kwargs)
+
+
+def coerce_loader_result_mapping(result: object) -> LoaderResultMapping:
+    if isinstance(result, Mapping):
+        return cast("LoaderResultMapping", result)
+    return cast("LoaderResultMapping", result)

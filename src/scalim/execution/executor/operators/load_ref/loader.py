@@ -1,17 +1,17 @@
 import logging
 import time
 from collections.abc import Mapping
-from typing import Any, Dict, FrozenSet, Hashable, List, Optional, Set, Tuple, Union, cast
+from typing import List, Optional, Tuple, cast
 
 from .....events.catalog import EVENT_LOADER_CALL
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
-from .....spec.ir.helpers import call_loader_with_binding
+from .....spec.ir.helpers import call_loader_with_binding, coerce_loader_result_mapping
 from .....spec.ir.relations import LookupStepIr
 from .....spec.ir.sources import SourceIr
-from .....typedefs import RowData
+from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData
 from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
-from ...helpers.relation_signature import build_step_signature, normalize_key_field
+from ...helpers.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
 from ...runtime.runtime import ExecutionRuntime, LoadRefCacheEntry
 from .context import LoadRefExecutionContext
 
@@ -24,8 +24,8 @@ def build_ref_loader_context(
     source_id: str,
     event_field_keys: Tuple[str, ...],
     batch_rows: Optional[List[RowData]],
-    lookup_keys_set: Set[Hashable],
-    lookup_keys_list: List[Hashable],
+    lookup_keys_set: LookupKeySet,
+    lookup_keys_list: LookupKeyList,
 ) -> LoaderCallContextIr:
     return LoaderCallContextIr(
         batch_row_nth=exec_ctx.batch_row_nth,
@@ -43,7 +43,7 @@ def _trigger_ref_loader_call(
     source_id: str,
     binding: Optional[BindingIr],
     loader_context: LoaderCallContextIr,
-    result: Dict[Hashable, Any],
+    result: LoaderResultMapping,
     duration: float,
     *,
     cache_enabled: bool,
@@ -53,7 +53,7 @@ def _trigger_ref_loader_call(
 ) -> None:
     if not runtime.instrumentation.wants(EVENT_LOADER_CALL):
         return
-    call_kwargs: Dict[str, Any] = {}
+    call_kwargs: LoaderCallKwargs = {}
     if binding:
         _, call_kwargs = binding.build_params(loader_context)
     runtime.instrumentation.emit_loader_call(
@@ -79,10 +79,10 @@ def _call_ref_loader(
     lookup_key_count: int,
     event_field_keys: Tuple[str, ...],
     cache_status: str,
-) -> Dict[Hashable, Any]:
+) -> LoaderResultMapping:
     loader_start = time.perf_counter()
     policy = runtime.loader_retry.resolve(source.source_id)
-    result = call_with_loader_retry(
+    result: object = call_with_loader_retry(
         call=lambda: call_loader_with_binding(binding, loader_context, source.loader_spec.callable),
         instrumentation=runtime.instrumentation,
         policy=policy,
@@ -97,7 +97,7 @@ def _call_ref_loader(
         source_id=source.source_id,
         binding=binding,
         loader_context=loader_context,
-        result=result,
+        result=coerce_loader_result_mapping(result),
         duration=loader_duration,
         cache_enabled=cache_enabled,
         lookup_key_count=lookup_key_count,
@@ -113,18 +113,19 @@ def _call_ref_loader(
             context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result, is_ref_loader=True),
             action_mode="fast_fail",
         )
-    return result
+    result_obj = cast("object", result)
+    return coerce_loader_result_mapping(result_obj)
 
 
 def _get_cached_ref_result(
     runtime: ExecutionRuntime,
-    cache_key: Tuple[Tuple[Any, ...], FrozenSet[Hashable]],
+    cache_key: LoadRefCacheKey,
     binding: Optional[BindingIr],
     loader_context: LoaderCallContextIr,
     lookup_key_count: int,
     event_field_keys: Tuple[str, ...],
     source_id: str,
-) -> Optional[Dict[Hashable, Any]]:
+) -> Optional[LoaderResultMapping]:
     cached_entry = runtime.load_ref_cache.get(cache_key)
     if cached_entry is None:
         return None
@@ -180,8 +181,8 @@ def _load_ref_once(
     cache_enabled: bool,
     lookup_key_count: int,
     event_field_keys: Tuple[str, ...],
-    cache_key: Optional[Tuple[Tuple[Any, ...], FrozenSet[Hashable]]],
-) -> Dict[Hashable, Any]:
+    cache_key: Optional[LoadRefCacheKey],
+) -> LoaderResultMapping:
     result = _call_ref_loader(
         runtime=runtime,
         source=source,
@@ -207,12 +208,12 @@ def _load_ref_chunked(
     binding: Optional[BindingIr],
     runtime: ExecutionRuntime,
     event_field_keys: Tuple[str, ...],
-    lookup_keys_list: List[Hashable],
+    lookup_keys_list: LookupKeyList,
     batch_rows: Optional[List[RowData]],
     chunk_size: int,
-    cache_key: Optional[Tuple[Tuple[Any, ...], FrozenSet[Hashable]]],
-) -> Dict[Hashable, Any]:
-    merged: Dict[Hashable, Any] = {}
+    cache_key: Optional[LoadRefCacheKey],
+) -> LoaderResultMap:
+    merged: LoaderResultMap = {}
     for offset in range(0, len(lookup_keys_list), chunk_size):
         chunk_list = lookup_keys_list[offset : offset + chunk_size]
         chunk_set = set(chunk_list)
@@ -252,10 +253,10 @@ def load_step_data(
     *,
     exec_ctx: LoadRefExecutionContext,
     step: LookupStepIr,
-    lookup_keys: Set[Union[Hashable, Tuple[Any, ...]]],
+    lookup_keys: LookupKeySet,
     is_final_step: bool,
     group_field_keys: Tuple[str, ...],
-) -> Dict[Hashable, Any]:
+) -> LoaderResultMapping:
     source = step.to_source
     runtime = exec_ctx.runtime
 
@@ -265,8 +266,8 @@ def load_step_data(
     to_key = step.get_to_key_or_source_key()
     binding_key = normalize_key_field(to_key)
 
-    lookup_keys_list = build_stable_lookup_key_list(cast("Set[Hashable]", lookup_keys))
-    lookup_keys_set = cast("Set[Hashable]", lookup_keys)
+    lookup_keys_list = build_stable_lookup_key_list(lookup_keys)
+    lookup_keys_set = lookup_keys
 
     binding = step.bind or source.get_binding(binding_key)
     cache_enabled = False

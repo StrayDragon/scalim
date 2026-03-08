@@ -1,4 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 import logging
 from collections.abc import Set as AbstractSet
 from typing import Any, Callable, Dict, Optional, Set, Tuple, cast
@@ -43,7 +42,9 @@ _HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = {
     EVENT_COLUMN_WRITE: "on_column_write",
 }
 
-_CATALOG_EVENT_TYPES: Tuple[str, ...] = (
+HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = _HOOK_TYPED_DISPATCH_MAP
+
+CATALOG_EVENT_TYPES: Tuple[str, ...] = (
     EVENT_PIPELINE_START,
     EVENT_PIPELINE_END,
     EVENT_BATCH_START,
@@ -64,7 +65,7 @@ _CATALOG_EVENT_TYPES: Tuple[str, ...] = (
 )
 
 
-def _resolve_mro_attr(cls: type, name: str) -> Any:
+def resolve_mro_attr(cls: type, name: str) -> Any:
     for mro_cls in cls.__mro__:
         cls_dict = mro_cls.__dict__
         if name in cls_dict:
@@ -72,21 +73,21 @@ def _resolve_mro_attr(cls: type, name: str) -> Any:
     return None
 
 
-def _read_optional_attr(obj: Any, name: str) -> Any:
+def read_optional_attr(obj: Any, name: str) -> Any:
     try:
         return obj.__getattribute__(name)
     except AttributeError:
         return None
 
 
-def _read_callable_attr(obj: Any, name: str) -> Optional[Callable[..., Any]]:
-    value = _read_optional_attr(obj, name)
+def read_callable_attr(obj: Any, name: str) -> Optional[Callable[..., Any]]:
+    value = read_optional_attr(obj, name)
     if value is None or not callable(value):
         return None
     return cast("Callable[..., Any]", value)
 
 
-def _validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
+def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
     if value is None:
         return None
     if not isinstance(value, AbstractSet):

@@ -1,16 +1,14 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUninitializedInstanceVariable=false
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
-
+from ..parsers.utils import list_or_none, mapping_or_none
 from .constants import F
 from .issues import ValidationIssue
+from .sources import ValidatorSourcesMixin
 
 _F = F
 
 
-class ValidatorRelationsMixin:
-    _step_allowed_fields_by_source: Dict[str, Set[str]]
-
+class ValidatorRelationsMixin(ValidatorSourcesMixin):
     def _validate_relations(
         self,
         config: Dict[str, Any],
@@ -18,9 +16,9 @@ class ValidatorRelationsMixin:
         sources_info: Dict[str, Dict[str, bool]],
         main_source_id: str,
     ) -> Dict[str, List[Tuple[str, str, bool]]]:
-        relations_raw: Any = config.get(_F.RELATIONS, {})
-        if not isinstance(relations_raw, dict):
-            if relations_raw is not None:
+        relations_raw = mapping_or_none(config.get(_F.RELATIONS, {}))
+        if relations_raw is None:
+            if config.get(_F.RELATIONS) is not None:
                 self._add_error(errors, "'{}' must be a dictionary".format(_F.RELATIONS), path=_F.RELATIONS)
             return {}
 
@@ -31,11 +29,11 @@ class ValidatorRelationsMixin:
         relation_paths: Dict[str, List[Tuple[str, str, bool]]] = {}
         for rel_id_raw, rel_data_raw in relations_raw.items():
             rel_id = str(rel_id_raw)
-            if not isinstance(rel_data_raw, dict):
+            rel_dict = mapping_or_none(rel_data_raw)
+            if rel_dict is None:
                 self._add_error(errors, "Relation '{}' must be a dictionary".format(rel_id), path="relations.{}".format(rel_id))
                 continue
 
-            rel_dict = cast("Dict[str, Any]", rel_data_raw)
             steps_raw = rel_dict.get(_F.STEPS)
             steps = self._validate_steps(steps_raw, sources_set, errors, "relations.{}".format(rel_id))
             relation_paths[rel_id] = steps
@@ -63,23 +61,24 @@ class ValidatorRelationsMixin:
         errors: List[ValidationIssue],
         context: str,
     ) -> List[Tuple[str, str, bool]]:
-        if not isinstance(steps_raw, list):
+        steps_list = list_or_none(steps_raw)
+        if steps_list is None:
             self._add_error(errors, "{} steps must be a list".format(context), path="{}.steps".format(context))
             return []
-        if not steps_raw:
+        if not steps_list:
             self._add_error(errors, "{} steps must not be empty".format(context), path="{}.steps".format(context))
             return []
 
         steps: List[Tuple[str, str, bool]] = []
         prev_to_source: Optional[str] = None
 
-        for idx, step_raw in enumerate(steps_raw):
+        for idx, step_raw in enumerate(steps_list):
             step_path = "{}.steps.{}".format(context, idx)
-            if not isinstance(step_raw, dict):
+            step_dict = mapping_or_none(step_raw)
+            if step_dict is None:
                 self._add_error(errors, "{} steps[{}] must be a dictionary".format(context, idx), path=step_path)
                 continue
 
-            step_dict: Dict[str, Any] = step_raw
             if _F.FROM not in step_dict or _F.TO not in step_dict:
                 self._add_error(errors, "{} steps[{}] missing 'from' or 'to'".format(context, idx), path=step_path)
                 continue
@@ -144,12 +143,14 @@ class ValidatorRelationsMixin:
             to_bind_raw = step_dict.get(_F.TO_BIND)
             if to_bind_raw is not None:
                 self._validate_bind(to_bind_raw, errors, "{} steps[{}]".format(context, idx), step_path)
-                if isinstance(to_bind_raw, dict):
-                    to_bind_dict = cast("Dict[str, Any]", to_bind_raw)
-                    if _F.USE_ROWS in to_bind_dict and isinstance(to_bind_dict.get(_F.USE_ROWS), dict):
-                        has_to_bind = bool(cast("Dict[str, Any]", to_bind_dict[_F.USE_ROWS]).get(_F.PARAM))
-                    if _F.USE_KEYS in to_bind_dict and isinstance(to_bind_dict.get(_F.USE_KEYS), dict):
-                        has_to_bind = bool(cast("Dict[str, Any]", to_bind_dict[_F.USE_KEYS]).get(_F.PARAM)) or has_to_bind
+                to_bind_dict = mapping_or_none(to_bind_raw)
+                if to_bind_dict is not None:
+                    rows_dict = mapping_or_none(to_bind_dict.get(_F.USE_ROWS))
+                    if rows_dict is not None:
+                        has_to_bind = bool(rows_dict.get(_F.PARAM))
+                    keys_dict = mapping_or_none(to_bind_dict.get(_F.USE_KEYS))
+                    if keys_dict is not None:
+                        has_to_bind = bool(keys_dict.get(_F.PARAM)) or has_to_bind
 
             steps.append((from_source, to_source, has_to_bind))
 
@@ -282,8 +283,9 @@ class ValidatorRelationsMixin:
 
         source_id: Optional[str] = None
         fields: List[str] = []
-        if isinstance(value, list) and value:
-            for item in value:
+        values = list_or_none(value)
+        if values:
+            for item in values:
                 parsed = self._parse_source_field_expr(item)
                 if parsed is None:
                     source_id = None

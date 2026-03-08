@@ -1,6 +1,4 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false
-
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple
 
 from ...schema_dsl.constants import DEFAULT_GUARDRAILS_MODE
 from ...schema_dsl.models import (
@@ -15,6 +13,7 @@ from ...schema_dsl.models import (
     GuardrailsRelationsConfig,
 )
 from ..models import FieldDefIndex
+from .utils import list_or_none, mapping_or_none
 
 
 class ParserGuardrailsMixin:
@@ -23,11 +22,10 @@ class ParserGuardrailsMixin:
         raw: Dict[str, Any],
         field_def_index: FieldDefIndex,
     ) -> Optional[GuardrailsConfig]:
-        raw_guardrails: Any = raw.get(DEMAND_KEYS["guardrails"])
-        if not isinstance(raw_guardrails, dict):
+        guardrails_dict = mapping_or_none(raw.get(DEMAND_KEYS["guardrails"]))
+        if guardrails_dict is None:
             return None
 
-        guardrails_dict: Dict[str, Any] = raw_guardrails
         enabled = bool(guardrails_dict.get(GUARDRAILS_KEYS["enabled"], False))
         mode = str(guardrails_dict.get(GUARDRAILS_KEYS["mode"], DEFAULT_GUARDRAILS_MODE))
 
@@ -45,12 +43,12 @@ class ParserGuardrailsMixin:
 
     def _parse_guardrails_loader(
         self,
-        loader_raw: Any,
+        loader_raw: object,
         field_def_index: FieldDefIndex,
     ) -> Optional[GuardrailsLoaderConfig]:
-        if not isinstance(loader_raw, dict):
+        loader_dict = mapping_or_none(loader_raw)
+        if loader_dict is None:
             return None
-        loader_dict: Dict[str, Any] = loader_raw
 
         validate_result = bool(loader_dict.get(GUARDRAILS_LOADER_KEYS["validate_result"], False))
         required_fields = self._parse_guardrails_required_fields(
@@ -67,38 +65,39 @@ class ParserGuardrailsMixin:
 
     def _parse_guardrails_required_fields(
         self,
-        required_fields_raw: Any,
+        required_fields_raw: object,
         field_def_index: FieldDefIndex,
     ) -> Tuple[str, ...]:
         if required_fields_raw is None:
             return ()
-        if not isinstance(required_fields_raw, list):
+        required_field_items = list_or_none(required_fields_raw)
+        if required_field_items is None:
             msg = "guardrails.loader.required_fields must be a list"
             raise TypeError(msg)
 
         required: List[str] = []
-        for idx, item in enumerate(required_fields_raw):
+        for idx, item in enumerate(required_field_items):
             required.append(self._resolve_guardrails_field_ref(item, idx, field_def_index))
         return tuple(required)
 
     def _resolve_guardrails_field_ref(
         self,
-        item: Any,
+        item: object,
         idx: int,
         field_def_index: FieldDefIndex,
     ) -> str:
         if isinstance(item, str):
             field_id = item
-        elif isinstance(item, dict):
-            typed = cast("Dict[str, Any]", item)
+        else:
+            typed = mapping_or_none(item)
+            if typed is None:
+                msg = "guardrails.loader.required_fields[{}] must be field_id string or YAML alias".format(idx)
+                raise TypeError(msg)
             direct = field_def_index.alias_index.get(typed)
             if direct is None:
                 msg = "guardrails.loader.required_fields[{}] must be field_id string or YAML alias".format(idx)
                 raise ValueError(msg)
             field_id = direct.field_id
-        else:
-            msg = "guardrails.loader.required_fields[{}] must be field_id string or YAML alias".format(idx)
-            raise TypeError(msg)
 
         if field_id not in field_def_index.defs_by_id:
             msg = "guardrails.loader.required_fields[{}] references unknown field_id '{}'".format(idx, field_id)
@@ -106,10 +105,10 @@ class ParserGuardrailsMixin:
 
         return field_id
 
-    def _parse_guardrails_relations(self, relations_raw: Any) -> Optional[GuardrailsRelationsConfig]:
-        if not isinstance(relations_raw, dict):
+    def _parse_guardrails_relations(self, relations_raw: object) -> Optional[GuardrailsRelationsConfig]:
+        relations_dict = mapping_or_none(relations_raw)
+        if relations_dict is None:
             return None
-        relations_dict: Dict[str, Any] = relations_raw
 
         null_key_max_rate = self._parse_guardrails_rate(relations_dict.get(GUARDRAILS_RELATIONS_KEYS["null_key_max_rate"]))
         type_error_max_rate = self._parse_guardrails_rate(relations_dict.get(GUARDRAILS_RELATIONS_KEYS["type_error_max_rate"]))
@@ -119,18 +118,18 @@ class ParserGuardrailsMixin:
             type_error_max_rate=type_error_max_rate,
         )
 
-    def _parse_guardrails_compute(self, compute_raw: Any) -> Optional[GuardrailsComputeConfig]:
-        if not isinstance(compute_raw, dict):
+    def _parse_guardrails_compute(self, compute_raw: object) -> Optional[GuardrailsComputeConfig]:
+        compute_dict = mapping_or_none(compute_raw)
+        if compute_dict is None:
             return None
-        compute_dict: Dict[str, Any] = compute_raw
 
         on_error_raw = compute_dict.get(GUARDRAILS_COMPUTE_KEYS["on_error"])
         on_error = str(on_error_raw) if on_error_raw is not None else None
 
         return GuardrailsComputeConfig(on_error=on_error)
 
-    def _parse_guardrails_rate(self, raw_value: Any) -> Optional[float]:
-        if raw_value is None:
+    def _parse_guardrails_rate(self, raw_value: object) -> Optional[float]:
+        if raw_value is None or isinstance(raw_value, bool) or not isinstance(raw_value, (int, float, str)):
             return None
         try:
             return float(raw_value)

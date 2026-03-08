@@ -1,6 +1,6 @@
 # region imports
 
-from typing import Dict, List, Mapping, Sequence, Tuple, Union
+from typing import Dict, Hashable, List, Mapping, Sequence, Set, Tuple, Union
 
 from .vendor.compact import StrEnum
 from .vendor.compact.typing_extensionsx import Literal
@@ -12,6 +12,12 @@ FieldValue = Union[int, float, str, bool, None]
 
 RowData = Mapping[str, FieldValue]
 """行数据类型 - 从字段键到字段值的映射"""
+
+RuntimeValue = object
+"""运行时动态值边界: 外部输入先按 `object` 处理,再做显式窄化."""
+
+StaticParams = Dict[str, RuntimeValue]
+"""静态参数映射: 用于主源/加载器的透传参数."""
 
 # region literal types
 ParallelMode = Literal["seq", "adaptive"]
@@ -68,6 +74,36 @@ RowIdList = List[RowId]
 
 LoaderResult = Dict[RowId, RowData]
 """`Loader` 函数返回的数据映射: `row_id` -> `row_data`."""
+
+LookupKey = Hashable
+"""关联查找键: 单键与复合键统一按可哈希值处理."""
+
+LookupKeySeq = Sequence[LookupKey]
+"""关联查找键序列 (只读)."""
+
+LookupKeyList = List[LookupKey]
+"""关联查找键列表."""
+
+LookupKeySet = Set[LookupKey]
+"""关联查找键集合."""
+
+LoaderResultValue = RuntimeValue
+"""`Loader` 返回映射中的单个结果值."""
+
+LoaderResultMapping = Mapping[LookupKey, LoaderResultValue]
+"""`Loader` 结果的只读映射视图."""
+
+LoaderResultMap = Dict[LookupKey, LoaderResultValue]
+"""`Loader` 结果的具体字典形态,用于缓存与合并."""
+
+LoaderCallArgs = Tuple[RuntimeValue, ...]
+"""调用 `Loader` 时的位置参数元组."""
+
+LoaderCallKwargs = Dict[str, RuntimeValue]
+"""调用 `Loader` 时的关键字参数映射."""
+
+LoaderCallParams = Tuple[LoaderCallArgs, LoaderCallKwargs]
+"""`params_builder` 构造出的 `(args, kwargs)` 结果."""
 
 # `Sink` 接口使用的类型 (等同于 `RecordKey`/`RecordKeySeq`)
 SinkRowKey = RecordKey

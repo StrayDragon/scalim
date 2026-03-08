@@ -247,6 +247,28 @@ defineConstant = { DEBUG = true }
 pythonVersion = "3.6"
 pythonPlatform = "Linux"
 
+# 逐步收紧 `Any`/unknown 边界: 先覆盖核心 IR + `LoadRef` 执行链路.
+strict = [
+    "src/scalim/dsl/by_yaml/config_parsing/loader.py",
+    "src/scalim/dsl/by_yaml/config_parsing/parsers",
+    "src/scalim/dsl/by_yaml/config_parsing/validator.py",
+    "src/scalim/dsl/by_yaml/config_parsing/validators",
+    "src/scalim/dsl/by_yaml/runtime/_internal/conversion_bindings.py",
+    "src/scalim/dsl/by_yaml/runtime/_internal/conversion_lookup.py",
+    "src/scalim/dsl/by_yaml/runtime/_internal/conversion_relations.py",
+    "src/scalim/dsl/by_yaml/runtime/_internal/conversion_sources.py",
+    "src/scalim/dsl/by_yaml/runtime/conversion.py",
+    "src/scalim/dsl/by_yaml/schema_dsl",
+    "src/scalim/execution/adaptive",
+    "src/scalim/execution/executor/batch/executor.py",
+    "src/scalim/execution/executor/operators/load.py",
+    "src/scalim/execution/executor/operators/load_ref",
+    "src/scalim/hooks",
+    "src/scalim/spec/ir",
+    "src/scalim/utils/converters.py",
+    "src/scalim/utils/relation_signature.py",
+]
+
 # executionEnvironments = [
 #   { root = "tests", reportPrivateUsage = false ]},
 #   { root = "src/scalim", extraPaths = [".."] }

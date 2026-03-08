@@ -1,5 +1,3 @@
-# pyright: reportPrivateUsage=false
-
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import ClassVar, Optional, Tuple, Union
@@ -22,8 +20,8 @@ from ..constants import (
     RELATION_STEP_FROM_SCHEMA,
     RELATION_STEP_TO_SCHEMA,
     RELATION_STEPS_SCHEMA,
-    _schema_meta,
-    _schema_omit,
+    schema_meta,
+    schema_omit,
 )
 
 
@@ -40,7 +38,7 @@ class LookupCastConfig:
 
     name: str = dataclass_field(
         default="auto",
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="转换名称(auto/int/str/sep_first)",
             md=DESC_LOOKUP_CAST_MD,
             choices=LOOKUP_CAST_NAME_ENUM,
@@ -50,7 +48,7 @@ class LookupCastConfig:
 
     sep: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(desc="sep_first 的分隔符(默认 ,)", md="sep_first 的分隔符, 默认 `,`."),
+        metadata=schema_meta(desc="sep_first 的分隔符(默认 ,)", md="sep_first 的分隔符, 默认 `,`."),
     )
     """当 `name=sep_first` 时使用的分隔符(可选)."""
 
@@ -68,13 +66,13 @@ class BindRowsConfig:
 
     param: str = dataclass_field(
         default="",
-        metadata=_schema_meta(desc=DESC_BIND_PARAM, md="下游 loader 参数名.\n\n- 仅 rows 模式生效"),
+        metadata=schema_meta(desc=DESC_BIND_PARAM, md="下游 loader 参数名.\n\n- 仅 rows 模式生效"),
     )
     """下游加载器参数名(仅 `rows` 模式生效)."""
 
     cache_mode: str = dataclass_field(
         default=DEFAULT_BIND_CACHE_MODE,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc=DESC_BIND_CACHE_MODE,
             md="rows 缓存策略.\n\n- `batch`: 批次内复用\n- `none`: 不复用",
             choices=BIND_CACHE_MODE_ENUM,
@@ -98,13 +96,13 @@ class BindKeysConfig:
 
     param: str = dataclass_field(
         default="",
-        metadata=_schema_meta(desc=DESC_BIND_PARAM, md="下游 loader 参数名.\n\n- 仅 keys 模式生效"),
+        metadata=schema_meta(desc=DESC_BIND_PARAM, md="下游 loader 参数名.\n\n- 仅 keys 模式生效"),
     )
     """下游加载器参数名(仅 `keys` 模式生效)."""
 
     as_: str = dataclass_field(
         default=DEFAULT_BIND_AS,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc=DESC_BIND_AS,
             md="keys 容器类型.\n\n- `set`: 去重\n- `list`: 保持顺序",
             choices=BIND_AS_ENUM,
@@ -129,13 +127,13 @@ class BindConfig:
 
     use_rows: Optional[BindRowsConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(schema=BIND_ROWS_SCHEMA, schema_name="use_rows"),
+        metadata=schema_meta(schema=BIND_ROWS_SCHEMA, schema_name="use_rows"),
     )
     """可选:使用 `rows` 模式的绑定配置."""
 
     use_keys: Optional[BindKeysConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(schema=BIND_KEYS_SCHEMA, schema_name="use_keys"),
+        metadata=schema_meta(schema=BIND_KEYS_SCHEMA, schema_name="use_keys"),
     )
     """可选:使用 `keys` 模式的绑定配置."""
 
@@ -153,19 +151,19 @@ class RelationStepConfig:
 
     from_: Union[str, Tuple[str, ...]] = dataclass_field(
         default="",
-        metadata=_schema_meta(schema=RELATION_STEP_FROM_SCHEMA, schema_name="from"),
+        metadata=schema_meta(schema=RELATION_STEP_FROM_SCHEMA, schema_name="from"),
     )
     """关联起点字段名(对应 `from`)."""
 
     to: Union[str, Tuple[str, ...]] = dataclass_field(
         default="",
-        metadata=_schema_meta(schema=RELATION_STEP_TO_SCHEMA),
+        metadata=schema_meta(schema=RELATION_STEP_TO_SCHEMA),
     )
     """关联终点字段名."""
 
     lookup_cast: Optional[LookupCastConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             schema=LOOKUP_CAST_SCHEMA,
             desc="对 from 值进行归一化的转换(仅影响本 step)",
             md="对 `from` 值进行归一化(仅影响当前 step).",
@@ -175,7 +173,7 @@ class RelationStepConfig:
 
     to_bind: Optional[BindConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             schema=BIND_SCHEMA,
             desc="下游 loader 参数绑定(显式参数名与模式),默认 as: set",
             md=(
@@ -199,12 +197,12 @@ class RelationConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    relation_id: str = dataclass_field(default="", metadata=_schema_omit())
+    relation_id: str = dataclass_field(default="", metadata=schema_omit())
     """关联关系标识(内部字段;由外层映射键提供)."""
 
     steps: Tuple[RelationStepConfig, ...] = dataclass_field(
         default_factory=tuple,
-        metadata=_schema_meta(schema=RELATION_STEPS_SCHEMA, desc=DESC_RELATION_STEPS),
+        metadata=schema_meta(schema=RELATION_STEPS_SCHEMA, desc=DESC_RELATION_STEPS),
     )
     """关系路径的步骤列表."""
 
@@ -222,6 +220,6 @@ class InlineRelationConfig:
 
     steps: Tuple[RelationStepConfig, ...] = dataclass_field(
         default_factory=tuple,
-        metadata=_schema_meta(schema=RELATION_STEPS_SCHEMA, desc=DESC_RELATION_STEPS),
+        metadata=schema_meta(schema=RELATION_STEPS_SCHEMA, desc=DESC_RELATION_STEPS),
     )
     """关系路径的步骤列表."""

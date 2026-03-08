@@ -144,7 +144,7 @@ class FieldComputeEvent:
     field_key: str
     """字段键."""
 
-    row_id: Hashable
+    row_id: Optional[Hashable]
     """行标识."""
 
     dependencies: Dict[str, Any]
@@ -178,17 +178,17 @@ class DiagnosticWarningEvent:
     message: str
     """可读的告警说明."""
 
-    source_id: str
+    source_id: Optional[str]
     """关联的目标数据源标识."""
 
-    field_id: str
+    field_id: Optional[str]
     """当前计算字段标识."""
 
     lookup_key: Any
     """外键值/关联键."""
 
-    row_id: Hashable
-    """行标识."""
+    row_id: Optional[Hashable]
+    """行标识(可选)."""
 
 
 @dataclass(frozen=True)
@@ -201,10 +201,10 @@ class FieldSlimEvent:
     reason: str
     """触发原因标识."""
 
-    batch_num: int
-    """批次编号."""
+    batch_num: Optional[int]
+    """批次编号(可选)."""
 
-    remaining_fields: int
+    remaining_fields: Optional[int]
     """瘦身后保留的字段数量."""
 
 
@@ -218,10 +218,10 @@ class RowWriteEvent:
     field_count: int
     """写入的字段数量."""
 
-    batch_num: int
-    """批次编号."""
+    batch_num: Optional[int]
+    """批次编号(可选)."""
 
-    row_index: int
+    row_index: Optional[int]
     """批次内行序号(从 0 开始)."""
 
 
@@ -238,8 +238,8 @@ class RowReleaseEvent:
     retained_fields: List[str]
     """仍保留的字段键列表."""
 
-    batch_num: int
-    """批次编号."""
+    batch_num: Optional[int]
+    """批次编号(可选)."""
 
 
 @dataclass(frozen=True)
@@ -255,8 +255,8 @@ class LoaderSlimEvent:
     extracted_fields: List[str]
     """被抽取/保留的字段键列表."""
 
-    batch_num: int
-    """批次编号."""
+    batch_num: Optional[int]
+    """批次编号(可选)."""
 
 
 @dataclass(frozen=True)

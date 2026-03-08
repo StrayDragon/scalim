@@ -10,13 +10,14 @@ from ....ob.manager import ObserverManager
 from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks.sink_base import ISink
+from ....spec.ir.aliases import LookupKeyCast
 from ....spec.ir.fields import SupportedFieldIr
 from ....spec.ir.relations import LookupStepIr
 from ....spec.ir.sources import MainSourceIr
-from ....typedefs import ParallelMode, RowData
+from ....typedefs import LoaderResultMapping, LookupKey, ParallelMode, RowData
 from ...guardrails import GuardrailsPolicy
 from ...loader_retry import LoaderRetryPolicies
-from ..helpers.relation_signature import build_relation_signature
+from ..helpers.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
 from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
 
 # endregion
@@ -27,19 +28,19 @@ _logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LoadRefCacheEntry:
-    result: Dict[Hashable, Any]
+    result: LoaderResultMapping
     batch_rows: Optional[List[RowData]] = None
 
 
 class ExecutionRuntime:
     """执行运行时 - 共享资源"""
 
-    preloaded_cache: Dict[str, Dict[Hashable, Any]]
-    load_ref_cache: Dict[Tuple[Any, ...], LoadRefCacheEntry]
-    key_normalize_cache: Dict[Tuple[Tuple[Any, ...], ...], Dict[Tuple[Hashable, Tuple[str, ...]], Optional[Hashable]]]
-    load_ref_group_fields: Dict[Tuple[Tuple[Any, ...], ...], Tuple[str, ...]]
-    load_ref_group_executed: Set[Tuple[Tuple[Any, ...], ...]]
-    rows_cache_logged: Set[Tuple[Tuple[Any, ...], ...]]
+    preloaded_cache: Dict[str, LoaderResultMapping]
+    load_ref_cache: Dict[LoadRefCacheKey, LoadRefCacheEntry]
+    key_normalize_cache: Dict[RelationSignature, Dict[Tuple[Hashable, Tuple[str, ...]], Optional[LookupKey]]]
+    load_ref_group_fields: Dict[RelationSignature, Tuple[str, ...]]
+    load_ref_group_executed: Set[RelationSignature]
+    rows_cache_logged: Set[RelationSignature]
     guardrail_logged: Set[Tuple[str, ...]]
     relation_guardrail_stats: Dict[int, Any]
     hook_manager: HookManager
@@ -122,8 +123,8 @@ class ExecutionRuntime:
     def _build_load_ref_group_fields(
         self,
         plan: ExecutionPlan,
-    ) -> Dict[Tuple[Tuple[Any, ...], ...], Tuple[str, ...]]:
-        groups: Dict[Tuple[Tuple[Any, ...], ...], Set[str]] = {}
+    ) -> Dict[RelationSignature, Tuple[str, ...]]:
+        groups: Dict[RelationSignature, Set[str]] = {}
         for operator in plan.operators:
             if not isinstance(operator, LoadRefOperatorIr):
                 continue
@@ -149,7 +150,7 @@ class ExecutionRuntime:
     def is_source_cached(self, source_name: str) -> bool:
         return source_name in self.preloaded_cache
 
-    def get_from_cache(self, source_name: str, lookup_key: Any) -> Optional[Any]:
+    def get_from_cache(self, source_name: str, lookup_key: LookupKey) -> Optional[object]:
         cache = self.preloaded_cache.get(source_name)
         if cache is None:
             return None
@@ -157,9 +158,9 @@ class ExecutionRuntime:
 
     def normalize_lookup_key_with_status(
         self,
-        raw_key: Any,
+        raw_key: object,
         step: LookupStepIr,
-    ) -> Tuple[Optional[Hashable], str, Optional[str]]:
+    ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
         """将外键值规范化为目标源键类型,并返回状态信息"""
         normalized, status, error_message = self._normalize_lookup_key_status(raw_key, step)
         maybe_enforce_relation_guardrails(self, step, status=status, error_message=error_message)
@@ -167,9 +168,9 @@ class ExecutionRuntime:
 
     def _normalize_lookup_key_status(
         self,
-        raw_key: Any,
+        raw_key: object,
         step: LookupStepIr,
-    ) -> Tuple[Optional[Hashable], str, Optional[str]]:
+    ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
         if raw_key is None:
             return None, "null_key", None
 
@@ -183,11 +184,11 @@ class ExecutionRuntime:
 
     def _apply_lookup_cast(
         self,
-        lookup_cast: Any,
-        raw_key: Any,
+        lookup_cast: LookupKeyCast,
+        raw_key: object,
         *,
         none_message: str,
-    ) -> Tuple[Optional[Hashable], str, Optional[str]]:
+    ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
         try:
             normalized = lookup_cast(raw_key)
         except (ValueError, TypeError) as exc:
@@ -200,9 +201,9 @@ class ExecutionRuntime:
 
     def normalize_lookup_key(
         self,
-        raw_key: Any,
+        raw_key: object,
         step: LookupStepIr,
-    ) -> Optional[Hashable]:
+    ) -> Optional[LookupKey]:
         """将外键值规范化为目标源键类型"""
         normalized, status, _ = self.normalize_lookup_key_with_status(raw_key, step)
         if status != "ok":

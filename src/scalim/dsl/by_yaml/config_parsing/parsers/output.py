@@ -1,5 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false
-
 from typing import Any, Dict, List, Optional
 
 from ...schema_dsl.constants import (
@@ -42,7 +40,7 @@ from ...schema_dsl.models import (
     TraceConfig,
     VizConfig,
 )
-from .utils import str_or_none
+from .utils import list_or_none, mapping_or_none, str_or_none
 
 _VIZ_EVENT_MODE_REMOVED_MESSAGE = "observability.viz.event_mode has been removed; use observability.viz.trace_enabled"
 
@@ -54,13 +52,12 @@ class VizEventModeRemovedError(ValueError):
 
 class ParserOutputMixin:
     def _parse_output(self, raw: Dict[str, Any], output_fields: Optional[List[str]] = None) -> Optional[OutputConfig]:
-        raw_output: Any = raw.get(DEMAND_KEYS["output"])
-        if not isinstance(raw_output, dict):
+        output_dict = mapping_or_none(raw.get(DEMAND_KEYS["output"]))
+        if output_dict is None:
             return None
 
-        output_dict: Dict[str, Any] = raw_output
         output_format = str(output_dict.get(OUTPUT_KEYS["format"], DEFAULT_OUTPUT_FORMAT))
-        resolved_fields = output_fields if output_fields is not None else output_dict.get(OUTPUT_KEYS["fields"])
+        resolved_fields = list(output_fields) if output_fields is not None else list_or_none(output_dict.get(OUTPUT_KEYS["fields"]))
         return OutputConfig(
             format=output_format,
             path=str_or_none(output_dict.get(OUTPUT_KEYS["path"])),
@@ -72,31 +69,30 @@ class ParserOutputMixin:
         )
 
     def _parse_observability(self, raw: Dict[str, Any]) -> Optional[ObservabilityConfig]:
-        raw_observability: Any = raw.get(DEMAND_KEYS["observability"])
-        if not isinstance(raw_observability, dict):
+        observability_dict = mapping_or_none(raw.get(DEMAND_KEYS["observability"]))
+        if observability_dict is None:
             return None
 
-        observability_dict: Dict[str, Any] = raw_observability
-        logging_raw: Any = observability_dict.get(OBSERVABILITY_KEYS["logging"])
-        logging_config = self._parse_logging_observability(logging_raw) if isinstance(logging_raw, dict) else None
+        logging_raw = mapping_or_none(observability_dict.get(OBSERVABILITY_KEYS["logging"]))
+        logging_config = self._parse_logging_observability(logging_raw) if logging_raw is not None else None
 
-        perf_raw: Any = observability_dict.get(OBSERVABILITY_KEYS["performance"])
-        performance = self._parse_performance(perf_raw) if isinstance(perf_raw, dict) else None
+        perf_raw = mapping_or_none(observability_dict.get(OBSERVABILITY_KEYS["performance"]))
+        performance = self._parse_performance(perf_raw) if perf_raw is not None else None
 
-        relations_raw: Any = observability_dict.get(OBSERVABILITY_KEYS["relations"])
-        relations = self._parse_relations_observability(relations_raw) if isinstance(relations_raw, dict) else None
+        relations_raw = mapping_or_none(observability_dict.get(OBSERVABILITY_KEYS["relations"]))
+        relations = self._parse_relations_observability(relations_raw) if relations_raw is not None else None
 
-        viz_raw: Any = observability_dict.get(OBSERVABILITY_KEYS["viz"])
-        viz = self._parse_viz(viz_raw) if isinstance(viz_raw, dict) else None
+        viz_raw = mapping_or_none(observability_dict.get(OBSERVABILITY_KEYS["viz"]))
+        viz = self._parse_viz(viz_raw) if viz_raw is not None else None
 
-        trace_raw: Any = observability_dict.get(OBSERVABILITY_KEYS["trace"])
-        trace = self._parse_trace_observability(trace_raw) if isinstance(trace_raw, dict) else None
+        trace_raw = mapping_or_none(observability_dict.get(OBSERVABILITY_KEYS["trace"]))
+        trace = self._parse_trace_observability(trace_raw) if trace_raw is not None else None
 
-        row_gap_raw: Any = observability_dict.get(OBSERVABILITY_KEYS["row_gap"])
-        row_gap = self._parse_row_gap_observability(row_gap_raw) if isinstance(row_gap_raw, dict) else None
+        row_gap_raw = mapping_or_none(observability_dict.get(OBSERVABILITY_KEYS["row_gap"]))
+        row_gap = self._parse_row_gap_observability(row_gap_raw) if row_gap_raw is not None else None
 
-        memory_opt_raw: Any = observability_dict.get(OBSERVABILITY_KEYS["memory_opt"])
-        memory_opt = self._parse_memory_opt_observability(memory_opt_raw) if isinstance(memory_opt_raw, dict) else None
+        memory_opt_raw = mapping_or_none(observability_dict.get(OBSERVABILITY_KEYS["memory_opt"]))
+        memory_opt = self._parse_memory_opt_observability(memory_opt_raw) if memory_opt_raw is not None else None
 
         return ObservabilityConfig(
             logging=logging_config,
@@ -126,9 +122,10 @@ class ParserOutputMixin:
         enabled = bool(row_gap_raw.get(ROW_GAP_KEYS["enabled"], False))
         primary_loader_name = str(row_gap_raw.get(ROW_GAP_KEYS["primary_loader_name"], "primary_keys"))
 
-        data_loader_raw: Any = row_gap_raw.get(ROW_GAP_KEYS["data_loader_names"])
-        if isinstance(data_loader_raw, list):
-            data_loader_names = tuple(str(item) for item in data_loader_raw)
+        data_loader_raw = row_gap_raw.get(ROW_GAP_KEYS["data_loader_names"])
+        data_loader_list = list_or_none(data_loader_raw)
+        if data_loader_list is not None:
+            data_loader_names = tuple(str(item) for item in data_loader_list)
         elif isinstance(data_loader_raw, str):
             data_loader_names = (data_loader_raw,)
         else:
@@ -232,10 +229,10 @@ class ParserOutputMixin:
             report=report,
         )
 
-    def _parse_relation_report(self, report_raw: Any) -> Optional[RelationReportConfig]:
-        if not isinstance(report_raw, dict):
+    def _parse_relation_report(self, report_raw: object) -> Optional[RelationReportConfig]:
+        report_dict = mapping_or_none(report_raw)
+        if report_dict is None:
             return None
-        report_dict: Dict[str, Any] = report_raw
         return RelationReportConfig(
             format=str(report_dict.get(RELATION_REPORT_KEYS["format"], DEFAULT_REL_REPORT_FORMAT)),
             output=str_or_none(report_dict.get(RELATION_REPORT_KEYS["output"])),
@@ -244,9 +241,10 @@ class ParserOutputMixin:
     def _parse_performance(self, perf_raw: Dict[str, Any]) -> PerformanceConfig:
         enabled = bool(perf_raw.get(PERFORMANCE_KEYS["enabled"], False))
 
-        metrics_raw: Any = perf_raw.get(PERFORMANCE_KEYS["metrics"])
-        if isinstance(metrics_raw, list):
-            metrics = tuple(str(item) for item in metrics_raw)
+        metrics_raw = perf_raw.get(PERFORMANCE_KEYS["metrics"])
+        metrics_list = list_or_none(metrics_raw)
+        if metrics_list is not None:
+            metrics = tuple(str(item) for item in metrics_list)
         elif isinstance(metrics_raw, str):
             metrics = (metrics_raw,)
         else:
@@ -269,20 +267,20 @@ class ParserOutputMixin:
             thresholds=thresholds,
         )
 
-    def _parse_performance_report(self, report_raw: Any) -> Optional[PerformanceReportConfig]:
-        if not isinstance(report_raw, dict):
+    def _parse_performance_report(self, report_raw: object) -> Optional[PerformanceReportConfig]:
+        report_dict = mapping_or_none(report_raw)
+        if report_dict is None:
             return None
-        report_dict: Dict[str, Any] = report_raw
         return PerformanceReportConfig(
             format=str(report_dict.get(PERFORMANCE_REPORT_KEYS["format"], DEFAULT_PERF_REPORT_FORMAT)),
             output=str_or_none(report_dict.get(PERFORMANCE_REPORT_KEYS["output"])),
             include_details=bool(report_dict.get(PERFORMANCE_REPORT_KEYS["include_details"], False)),
         )
 
-    def _parse_performance_thresholds(self, thresholds_raw: Any) -> Optional[PerformanceThresholdsConfig]:
-        if not isinstance(thresholds_raw, dict):
+    def _parse_performance_thresholds(self, thresholds_raw: object) -> Optional[PerformanceThresholdsConfig]:
+        thresholds_dict = mapping_or_none(thresholds_raw)
+        if thresholds_dict is None:
             return None
-        thresholds_dict: Dict[str, Any] = thresholds_raw
         batch_duration_warn = thresholds_dict.get(PERFORMANCE_THRESHOLDS_KEYS["batch_duration_warn"])
         memory_increase_warn = thresholds_dict.get(PERFORMANCE_THRESHOLDS_KEYS["memory_increase_warn"])
         return PerformanceThresholdsConfig(

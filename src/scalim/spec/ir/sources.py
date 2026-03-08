@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Hashable, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, FrozenSet, Optional, Tuple, Union
 
-from ...typedefs import SourceSpecIrCacheMode
+from ...typedefs import SourceSpecIrCacheMode, StaticParams
 from ...vendor.compact.typing_extensionsx import override
-from .aliases import MainSourceRowIterableCallable
+from .aliases import LookupKeyCast, MainSourceRowIterableCallable, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ class KeyIr:
     键定义.
     """
 
-    cast: Optional[Callable[[Any], Optional[Hashable]]] = None
+    cast: Optional[LookupKeyCast] = None
     """
     键归一化转换:用于对齐关联键类型.
 
@@ -80,7 +80,7 @@ class SourceIr:
     在 `keys` 模式下,引用加载的 `lookup_keys` 分片大小;`None`/`0` 表示不分片.
     """
 
-    bindings: Dict[Union[str, Tuple[str, ...]], BindingIr] = field(default_factory=dict, compare=False, hash=False)
+    bindings: Dict[NormalizedLookupKeySpec, BindingIr] = field(default_factory=dict, compare=False, hash=False)
     """
     参数绑定映射(`key_field` -> `BindingIr`).
     """
@@ -90,7 +90,7 @@ class SourceIr:
     默认绑定(当无 `key_field` 匹配时使用).
     """
 
-    def get_binding(self, key_field: Union[str, Tuple[str, ...]]) -> Optional[BindingIr]:
+    def get_binding(self, key_field: NormalizedLookupKeySpec) -> Optional[BindingIr]:
         """获取指定键字段的绑定.
 
         参数:
@@ -141,7 +141,7 @@ class MainSourceIr:
     主数据源加载器(返回 `Iterable[RowData]`).
     """
 
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: StaticParams = field(default_factory=dict)
     """
     加载器静态参数(直接透传给加载器函数).
     """

@@ -3,14 +3,17 @@
 import math
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Any, Callable, Hashable, List, Optional, Sequence, Tuple, Union, cast
+from typing import List, Optional, Sequence, Tuple, Union, cast
+
+from ..spec.ir.aliases import LookupKeyCast
+from ..typedefs import LookupKey
 
 # endregion
 
-ConvertibleToInt = Union[int, float, str, bytes]
+ConvertibleToInt = Union[int, float, str, bytes, bytearray, Decimal]
 """可转换为 `int` 的类型"""
 
-ConvertibleToStr = Union[int, float, str, bytes, bool]
+ConvertibleToStr = Union[int, float, str, bytes, bytearray, bool, Decimal]
 """可转换为 `str` 的类型"""
 
 ConvertibleToIntTuple = Union[Tuple[ConvertibleToInt, ...], List[ConvertibleToInt], Sequence[ConvertibleToInt]]
@@ -25,11 +28,11 @@ class NamedLookupCast:
 
     scalim_lookup_cast_name: str
 
-    def __init__(self, name: str, fn: Callable[[Any], Optional[Hashable]]) -> None:
+    def __init__(self, name: str, fn: LookupKeyCast) -> None:
         self.scalim_lookup_cast_name = name
-        self._fn: Callable[[Any], Optional[Hashable]] = fn
+        self._fn: LookupKeyCast = fn
 
-    def __call__(self, value: Any) -> Optional[Hashable]:
+    def __call__(self, value: object) -> Optional[LookupKey]:
         return self._fn(value)
 
 
@@ -45,10 +48,13 @@ def to_str(value: ConvertibleToStr) -> str:
 
 def to_int_tuple(value: ConvertibleToIntTuple) -> Tuple[int, ...]:
     """将序列的每个元素转换为 `int`: 会抛异常哦!"""
-    return tuple(int(v) for v in value)
+    converted_items: List[int] = []
+    for item in value:
+        converted_items.append(int(item))
+    return tuple(converted_items)
 
 
-def get_seps_values_first_int(value: SeparatedValues, sep: str = ",") -> int:
+def get_seps_values_first_int(value: object, sep: str = ",") -> int:
     """从分割字符串提取第一个值并转换为 `int`: 会抛异常哦!"""
     if isinstance(value, (int, float)):
         return int(value)
@@ -58,41 +64,44 @@ def get_seps_values_first_int(value: SeparatedValues, sep: str = ",") -> int:
             msg = f"Empty first value in CSV string: {value!r}"
             raise ValueError(msg)
         return int(first)
-    msg = f"Unsupported type for CSV conversion: {type(value).__name__}"  # pyright: ignore[reportUnreachable]
+    msg = f"Unsupported type for CSV conversion: {type(value).__name__}"
     raise TypeError(msg)
 
 
-def must_to_int(value: Any) -> Optional[int]:
+def must_to_int(value: object) -> Optional[int]:
     """强制转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
     try:
-        # `cast` 用于让静态检查通过,同时保持运行时行为不变.
-        return int(cast("ConvertibleToInt", value))
+        return int(value)  # pyright: ignore[reportArgumentType]
     except (ValueError, TypeError):
         return None
 
 
-def must_to_str(value: Any) -> Optional[str]:
+def must_to_str(value: object) -> Optional[str]:
     """强制转换为 `str`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
     return str(value)
 
 
-def must_to_int_tuple(value: Optional[ConvertibleToIntTuple]) -> Optional[Tuple[int, ...]]:
+def must_to_int_tuple(value: object) -> Optional[Tuple[int, ...]]:
     """强制将序列的每个元素转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
     if not isinstance(value, (tuple, list)):
         return None
-    try:
-        return tuple(int(v) for v in value)
-    except (ValueError, TypeError):
-        return None
+    converted_items: List[int] = []
+    items = cast("Sequence[object]", value)
+    for item in items:
+        converted = must_to_int(item)
+        if converted is None:
+            return None
+        converted_items.append(converted)
+    return tuple(converted_items)
 
 
-def must_get_seps_values_first_int(value: Optional[SeparatedValues], sep: str = ",") -> Optional[int]:
+def must_get_seps_values_first_int(value: object, sep: str = ",") -> Optional[int]:
     """强制从分割字符串提取第一个值并转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
@@ -106,16 +115,16 @@ def must_get_seps_values_first_int(value: Optional[SeparatedValues], sep: str = 
             return int(first)
         except ValueError:
             return None
-    return None  # pyright: ignore[reportUnreachable]
+    return None
 
 
 def _format_decimal_no_exponent(d: Decimal) -> str:
     """格式化 `Decimal` 为字符串,去除尾部零并避免科学计数法"""
     sign, digits, exponent = d.as_tuple()
-    if exponent in {"n", "N", "F"}:
+    if not isinstance(exponent, int):
         return str(d)
 
-    exponent_int = int(exponent)  # type: ignore[arg-type]
+    exponent_int = exponent
     digit_str = "".join(str(digit) for digit in digits)
 
     if exponent_int >= 0:
@@ -134,7 +143,7 @@ def _format_decimal_no_exponent(d: Decimal) -> str:
     return result or "0"
 
 
-def auto_str_normalize(value: Any) -> Optional[str]:  # noqa: C901, PLR0911, PLR0912
+def auto_str_normalize(value: object) -> Optional[str]:  # noqa: C901, PLR0911, PLR0912
     """将值规范化为稳定的字符串形式,用于关联键匹配
 
     规则:
@@ -191,7 +200,7 @@ def auto_str_normalize(value: Any) -> Optional[str]:  # noqa: C901, PLR0911, PLR
     return None
 
 
-def auto_normalize_key(value: Any) -> Optional[Hashable]:  # noqa: PLR0911
+def auto_normalize_key(value: object) -> Optional[LookupKey]:  # noqa: PLR0911
     """自动规范化关联键,尝试类型转换后回退到 `auto_str_normalize`
 
     策略:

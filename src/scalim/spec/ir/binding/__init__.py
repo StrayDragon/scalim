@@ -1,18 +1,22 @@
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Set, Tuple, Union, cast
+from typing import Dict, List, Mapping, Optional, Tuple, cast
 
-from ....typedefs import RowData
+from ....typedefs import LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData
+from ..aliases import LoaderExtractor, LoaderParamsBuilder, LoaderResultMapCallable, NormalizedLookupKeySpec
 
 
-def _stable_lookup_key_sort_key(value: Any) -> Any:
+def _stable_lookup_key_sort_key(value: object) -> Tuple[str, object]:
     if isinstance(value, tuple):
-        items = cast("Tuple[Any, ...]", value)
-        return ("tuple", tuple(_stable_lookup_key_sort_key(item) for item in items))
+        items = cast("Tuple[object, ...]", value)
+        item_keys: List[Tuple[str, object]] = []
+        for item in items:
+            item_keys.append(_stable_lookup_key_sort_key(item))
+        return ("tuple", tuple(item_keys))
     return (type(value).__name__, repr(value))
 
 
-def build_stable_lookup_key_list(lookup_keys: Set[Hashable]) -> List[Hashable]:
+def build_stable_lookup_key_list(lookup_keys: LookupKeySet) -> LookupKeyList:
     """将 `lookup_keys` 稳定序列化为 `list`.
 
     用途:
@@ -30,7 +34,7 @@ class LoaderCallContextIr:
     加载器调用上下文(`IR`):框架在调用 `loader` 前构建此对象,并传递给用户的 `params_builder` 回调函数.
     """
 
-    batch_row_nth: List[Hashable] = field(default_factory=list)
+    batch_row_nth: List[LookupKey] = field(default_factory=list)
     """
     当前批次的行号列表 (主源流的行索引)
     """
@@ -50,12 +54,12 @@ class LoaderCallContextIr:
     是否为引用加载器(外键关联加载)
     """
 
-    lookup_keys: Optional[Set[Hashable]] = None
+    lookup_keys: Optional[LookupKeySet] = None
     """
     引用加载器的查找键集合(已去重)
     """
 
-    lookup_keys_list: Optional[List[Hashable]] = None
+    lookup_keys_list: Optional[LookupKeyList] = None
     """
     引用加载器的查找键列表(由 `lookup_keys` 生成)
     """
@@ -93,12 +97,12 @@ class BindingIr:
     ```
     """
 
-    key_field: Union[str, Tuple[str, ...]]
+    key_field: NormalizedLookupKeySpec
     """
     绑定的键字段名 (主键或外键)
     """
 
-    params_builder: Callable[["LoaderCallContextIr"], Tuple[Tuple[Any, ...], Dict[str, Any]]]
+    params_builder: LoaderParamsBuilder
     """
     参数构建器类型:`(context) -> (args, kwargs)`
     """
@@ -123,13 +127,45 @@ class BindingIr:
     `params_builder` 绑定的参数名(可选,用于诊断与签名稳定性)
     """
 
-    def build_params(self, context: "LoaderCallContextIr") -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+    def build_params(self, context: "LoaderCallContextIr") -> LoaderCallParams:
         """构建调用参数"""
         return self.params_builder(context)
 
 
-def _empty_bindings() -> "Mapping[Union[str, Tuple[str, ...]], BindingIr]":
+def _empty_bindings() -> "Mapping[NormalizedLookupKeySpec, BindingIr]":
     return MappingProxyType({})
+
+
+def _clone_bindings(bindings: Mapping[NormalizedLookupKeySpec, BindingIr]) -> Dict[NormalizedLookupKeySpec, BindingIr]:
+    return dict(bindings)
+
+
+def _is_valid_binding_key(value: object) -> bool:
+    if isinstance(value, str):
+        return True
+    if not isinstance(value, tuple):
+        return False
+
+    items = cast("Tuple[object, ...]", value)
+    return all(isinstance(item, str) for item in items)
+
+
+def _restore_bindings(bindings: object) -> Optional[Mapping[NormalizedLookupKeySpec, BindingIr]]:
+    if not isinstance(bindings, dict):
+        return None
+
+    bindings_dict = cast("Dict[object, object]", bindings)
+    typed_bindings: Dict[NormalizedLookupKeySpec, BindingIr] = {}
+    for key, value in bindings_dict.items():
+        if not _is_valid_binding_key(key):
+            msg = "Invalid binding key in state: {!r}".format(key)
+            raise TypeError(msg)
+        if not isinstance(value, BindingIr):
+            msg = "Invalid binding value in state for key {!r}".format(key)
+            raise TypeError(msg)
+        typed_key = cast("NormalizedLookupKeySpec", key)
+        typed_bindings[typed_key] = value
+    return MappingProxyType(typed_bindings)
 
 
 @dataclass(frozen=True)
@@ -138,41 +174,40 @@ class LoaderIr:
     [数据源]加载器(IR): 定义如何调用数据加载函数以及如何提取返回的数据
     """
 
-    callable: Callable[..., Dict[Any, Any]]
+    callable: LoaderResultMapCallable
     """
     实际的用户注册的加载函数
     """
 
-    extractor: Optional[Callable[[Any, Any], Dict[Hashable, Any]]] = None
+    extractor: Optional[LoaderExtractor] = None
     """
     数据提取器类型:`(key, loader_result) -> extracted_data`
     """
 
-    bindings: Mapping[Union[str, Tuple[str, ...]], BindingIr] = field(default_factory=_empty_bindings)
+    bindings: Mapping[NormalizedLookupKeySpec, BindingIr] = field(default_factory=_empty_bindings)
     """
     参数绑定映射(`key_field` -> `Binding`).使用 `Mapping` 确保不可变性.
     """
 
     def __post_init__(self) -> None:
         if isinstance(self.bindings, dict):
-            object.__setattr__(self, "bindings", MappingProxyType(self.bindings))
+            object.__setattr__(self, "bindings", MappingProxyType(_clone_bindings(self.bindings)))
 
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> Dict[str, object]:
         state = dict(self.__dict__)
         bindings = state.get("bindings")
         if isinstance(bindings, MappingProxyType):
-            state["bindings"] = dict(bindings)
+            state["bindings"] = _clone_bindings(cast("Mapping[NormalizedLookupKeySpec, BindingIr]", bindings))
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: Dict[str, object]) -> None:
         for key, value in state.items():
             object.__setattr__(self, key, value)
-        bindings = getattr(self, "bindings", None)
-        if isinstance(bindings, dict):
-            typed_bindings = cast("Dict[Any, Any]", bindings)
-            object.__setattr__(self, "bindings", MappingProxyType(typed_bindings))
+        bindings = _restore_bindings(getattr(self, "bindings", None))
+        if bindings is not None:
+            object.__setattr__(self, "bindings", bindings)
 
-    def get_binding(self, key_field: Union[str, Tuple[str, ...]]) -> Optional[BindingIr]:
+    def get_binding(self, key_field: NormalizedLookupKeySpec) -> Optional[BindingIr]:
         return self.bindings.get(key_field)
 
 

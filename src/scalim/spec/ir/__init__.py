@@ -3,7 +3,15 @@
 此包提供稳定的 IR 类型导入路径,供用户侧直接构造/读取 IR 结构.
 """
 
-from .aliases import LoaderResultMapCallable, LookupKeySpec, MainSourceRowIterableCallable
+from .aliases import (
+    LoaderExtractor,
+    LoaderParamsBuilder,
+    LoaderResultMapCallable,
+    LookupKeyCast,
+    LookupKeySpec,
+    MainSourceRowIterableCallable,
+    NormalizedLookupKeySpec,
+)
 from .binding import BindingIr, LoaderCallContextIr, LoaderIr, build_stable_lookup_key_list
 from .demand import DemandIr
 from .fields import ComputeCallContextIr, DerivedFieldIr, FieldIr, SupportedFieldIr
@@ -30,12 +38,16 @@ __all__ = (
     "JoinConditionIr",
     "KeyIr",
     "LoaderCallContextIr",
+    "LoaderExtractor",
     "LoaderIr",
+    "LoaderParamsBuilder",
     "LoaderResultMapCallable",
+    "LookupKeyCast",
     "LookupKeySpec",
     "LookupStepIr",
     "MainSourceIr",
     "MainSourceRowIterableCallable",
+    "NormalizedLookupKeySpec",
     "OrderByKeyIr",
     "PandasFieldPresentationIr",
     "RelationIr",

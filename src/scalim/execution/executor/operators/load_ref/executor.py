@@ -3,7 +3,7 @@
 请从 `scalim.execution.executor.operators.load_ref.executor` 导入 `LoadRefOperatorExecutor`.
 """
 
-from typing import Any, Dict, Hashable, List, Tuple, Union, cast
+from typing import TYPE_CHECKING, Dict, Hashable, List
 
 from .....planning.operators import LoadRefOperatorIr, SupportedOperatorIr
 from .....vendor.compact.typing_extensionsx import override
@@ -14,6 +14,9 @@ from ..base import OperatorExecutor
 from .context import LoadRefExecutionContext
 from .flow import build_next_mapping, init_first_fk_mapping, write_final_step
 from .loader import load_step_data
+
+if TYPE_CHECKING:
+    from .....typedefs import LookupKey
 
 
 class LoadRefOperatorExecutor(OperatorExecutor):
@@ -27,7 +30,10 @@ class LoadRefOperatorExecutor(OperatorExecutor):
         batch_row_nth: List[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
-        op = cast("LoadRefOperatorIr", operator)
+        if not isinstance(operator, LoadRefOperatorIr):
+            return
+
+        op = operator
         field_key = op.field_key
         steps = op.lookup_steps
 
@@ -50,7 +56,7 @@ class LoadRefOperatorExecutor(OperatorExecutor):
         if not pk_to_first_fk:
             return
 
-        current_mapping: Dict[Hashable, Union[Hashable, Tuple[Any, ...]]] = pk_to_first_fk
+        current_mapping: Dict[Hashable, "LookupKey"] = pk_to_first_fk
 
         for step_idx, step in enumerate(steps):
             lookup_keys = set(current_mapping.values())

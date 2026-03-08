@@ -1,5 +1,3 @@
-# pyright: reportPrivateUsage=false
-
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import Any, ClassVar, Dict, Optional, Tuple, Union
@@ -32,9 +30,9 @@ from ..constants import (
     LOADER_RETRY_BACKOFF_ENUM,
     LOOKUP_CAST_SCHEMA,
     LOOKUP_CHUNK_SIZE_SCHEMA,
-    _schema_meta,
-    _schema_omit,
-    _schema_ref,
+    schema_meta,
+    schema_omit,
+    schema_ref,
 )
 from .field import SourceFieldConfig
 from .lookup_bind_relation import BindConfig, LookupCastConfig
@@ -50,7 +48,7 @@ class LoaderRetryConfig:
 
     enabled: Optional[bool] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc=DESC_LOADER_RETRY,
             md=(
                 DESC_LOADER_RETRY_MD
@@ -66,7 +64,7 @@ class LoaderRetryConfig:
 
     should_retry: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="重试判定回调引用(安全引用,由 allowlist 约束)",
             md=(
                 "重试判定回调引用.\n\n"
@@ -81,7 +79,7 @@ class LoaderRetryConfig:
 
     max_attempts: Optional[int] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="最大尝试次数(含首次)",
             md="最大尝试次数(含首次调用).\n\n- 受硬上限保护: <= 5",
             min=1,
@@ -94,7 +92,7 @@ class LoaderRetryConfig:
 
     max_elapsed_seconds: Optional[float] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="最大累计耗时(秒,包含 sleep)",
             md="最大累计耗时(秒,包含 sleep).\n\n- 受硬上限保护: <= 20",
             min=0.000_001,
@@ -107,7 +105,7 @@ class LoaderRetryConfig:
 
     backoff: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="退避策略(fixed/exponential)",
             md=("退避策略.\n\n- `fixed`: 固定等待\n- `exponential`: 指数退避"),
             choices=LOADER_RETRY_BACKOFF_ENUM,
@@ -119,7 +117,7 @@ class LoaderRetryConfig:
 
     base_delay_seconds: Optional[float] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="基础等待时间(秒)",
             md="基础等待时间(秒).\n\n- fixed: 每次等待 base_delay\n- exponential: base_delay * 2**(attempt-1)",
             min=0.0,
@@ -131,7 +129,7 @@ class LoaderRetryConfig:
 
     max_delay_seconds: Optional[float] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="最大单次等待时间(秒)",
             md="最大单次等待时间(秒).\n\n- 受硬上限保护: <= 5",
             min=0.0,
@@ -144,7 +142,7 @@ class LoaderRetryConfig:
 
     jitter: Optional[bool] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="启用 jitter(随机扰动)",
             md="启用 jitter(随机扰动),避免重试风暴.\n\n- true: 在 [0, delay] 区间内随机\n- false: 精确使用 delay",
             default=DEFAULT_LOADER_RETRY_JITTER,
@@ -165,18 +163,18 @@ class SourceConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    source_id: str = dataclass_field(default="", metadata=_schema_omit())
+    source_id: str = dataclass_field(default="", metadata=schema_omit())
     """数据源标识(内部字段;由外层映射键提供)."""
 
     loader: str = dataclass_field(
         default="",
-        metadata=_schema_meta(desc=DESC_LOADER, md=DESC_LOADER_MD, examples=["myapp.loaders:load_orders"]),
+        metadata=schema_meta(desc=DESC_LOADER, md=DESC_LOADER_MD, examples=["myapp.loaders:load_orders"]),
     )
     """加载器引用(模块路径 + 可调用对象)."""
 
     key: Union[str, Tuple[str, ...]] = dataclass_field(
         default="",
-        metadata=_schema_meta(
+        metadata=schema_meta(
             one_of=[
                 {"type": "string"},
                 {"type": "array", "items": {"type": "string"}, "minItems": 1},
@@ -190,19 +188,19 @@ class SourceConfig:
 
     lookup_cast: Optional[LookupCastConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(schema=LOOKUP_CAST_SCHEMA, desc=DESC_LOOKUP_CAST, md=DESC_LOOKUP_CAST_MD),
+        metadata=schema_meta(schema=LOOKUP_CAST_SCHEMA, desc=DESC_LOOKUP_CAST, md=DESC_LOOKUP_CAST_MD),
     )
     """可选:查找键归一化配置."""
 
     lookup_chunk_size: Optional[int] = dataclass_field(
         default=None,
-        metadata=_schema_meta(schema=LOOKUP_CHUNK_SIZE_SCHEMA),
+        metadata=schema_meta(schema=LOOKUP_CHUNK_SIZE_SCHEMA),
     )
     """可选:查找键分块大小."""
 
     cache_mode: str = dataclass_field(
         default=DEFAULT_CACHE_MODE,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="缓存模式:none=不缓存,preload_forever=预加载永久缓存",
             md=(
                 "缓存模式.\n\n"
@@ -218,19 +216,19 @@ class SourceConfig:
 
     retry: Optional[LoaderRetryConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
+        metadata=schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
     )
     """该数据源的重试配置(可选;用于覆盖默认重试策略)."""
 
     bind: Optional[BindConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(schema=BIND_SCHEMA, desc=DESC_BIND, md=DESC_BIND_MD),
+        metadata=schema_meta(schema=BIND_SCHEMA, desc=DESC_BIND, md=DESC_BIND_MD),
     )
     """该数据源默认参数绑定配置(可选)."""
 
     fields: Dict[str, SourceFieldConfig] = dataclass_field(
         default_factory=dict,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="数据源字段配置映射, key 为 field_id",
             md=(
                 "数据源字段配置映射.\n\n"
@@ -238,7 +236,7 @@ class SourceConfig:
                 "- `source` 可省略或必须等于当前 `source_id`\n"
                 "- 支持 YAML anchor 复用"
             ),
-            additional_props=_schema_ref("source_field_inline"),
+            additional_props=schema_ref("source_field_inline"),
             min_props=0,
         ),
     )
@@ -246,7 +244,7 @@ class SourceConfig:
 
     params: Dict[str, Any] = dataclass_field(
         default_factory=dict,
-        metadata=_schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props=True),
+        metadata=schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props=True),
     )
     """传递给加载器的静态参数映射."""
 
@@ -264,7 +262,7 @@ class MainSourceConfig:
 
     source_id: str = dataclass_field(
         default="",
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="主数据源的 source_id",
             md="主数据源的 `source_id`.\n\n- 必填\n- 不能与 `sources` 的 key 重复",
         ),
@@ -273,13 +271,13 @@ class MainSourceConfig:
 
     loader: str = dataclass_field(
         default="",
-        metadata=_schema_meta(desc=DESC_LOADER, md=DESC_LOADER_MD, examples=["myapp.loaders:load_orders"]),
+        metadata=schema_meta(desc=DESC_LOADER, md=DESC_LOADER_MD, examples=["myapp.loaders:load_orders"]),
     )
     """主数据源加载器引用."""
 
     fields: Dict[str, SourceFieldConfig] = dataclass_field(
         default_factory=dict,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="主数据源字段配置映射, key 为 field_id",
             md=(
                 "主数据源字段配置映射.\n\n"
@@ -287,7 +285,7 @@ class MainSourceConfig:
                 "- `source` 可省略或必须等于 `main_source.source_id`\n"
                 "- 支持 YAML anchor 复用"
             ),
-            additional_props=_schema_ref("source_field_inline"),
+            additional_props=schema_ref("source_field_inline"),
             min_props=0,
         ),
     )
@@ -295,19 +293,19 @@ class MainSourceConfig:
 
     params: Dict[str, Any] = dataclass_field(
         default_factory=dict,
-        metadata=_schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props=True),
+        metadata=schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props=True),
     )
     """传递给主数据源加载器的静态参数映射."""
 
     retry: Optional[LoaderRetryConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
+        metadata=schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
     )
     """主数据源的重试配置(可选)."""
 
     order_by: Tuple[str, ...] = dataclass_field(
         default_factory=tuple,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             schema={"type": "array", "items": {"type": "string"}},
             desc=DESC_MAIN_SOURCE_ORDER_BY,
             md=DESC_MAIN_SOURCE_ORDER_BY_MD,

@@ -1,9 +1,9 @@
-from typing import TYPE_CHECKING, Any, Dict, Hashable, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Set, Tuple
 
 from .....spec.ir.fields import FieldIr
 from .....spec.ir.relations import LookupStepIr
 from .....spec.ir.sources import SourceIr
-from .....typedefs import FieldValue
+from .....typedefs import FieldValue, LoaderResultMapping, LookupKey
 from ...helpers.field_access import extract_field
 from .._internal.loader_guardrails import (
     handle_loader_extractor_error,
@@ -34,8 +34,8 @@ def init_first_fk_mapping(
     first_step: LookupStepIr,
     *,
     null_fill_fields: Optional[Tuple[str, ...]] = None,
-) -> Dict[Hashable, Union[Hashable, Tuple[Any, ...]]]:
-    pk_to_first_fk: Dict[Hashable, Union[Hashable, Tuple[Any, ...]]] = {}
+) -> Dict[Hashable, LookupKey]:
+    pk_to_first_fk: Dict[Hashable, LookupKey] = {}
 
     for row_id in exec_ctx.batch_row_nth:
         if first_step.is_multi_field():
@@ -73,9 +73,9 @@ def _collect_multi_field_fk(
 def _resolve_next_step_fk(
     exec_ctx: LoadRefExecutionContext,
     row_id: Hashable,
-    data: Any,
+    data: object,
     step: LookupStepIr,
-) -> Optional[Hashable]:
+) -> Optional[LookupKey]:
     from_field = step.from_field
     if isinstance(from_field, str):
         next_fk: FieldValue = extract_field(data, from_field)
@@ -88,20 +88,20 @@ def _resolve_next_step_fk(
 
 def build_next_mapping(
     exec_ctx: LoadRefExecutionContext,
-    current_mapping: Dict[Hashable, Union[Hashable, Tuple[Any, ...]]],
-    intermediate_result: Dict[Hashable, Any],
+    current_mapping: Dict[Hashable, LookupKey],
+    intermediate_result: LoaderResultMapping,
     next_step: LookupStepIr,
     *,
     null_fill_fields: Optional[Tuple[str, ...]] = None,
-) -> Dict[Hashable, Union[Hashable, Tuple[Any, ...]]]:
-    new_mapping: Dict[Hashable, Union[Hashable, Tuple[Any, ...]]] = {}
+) -> Dict[Hashable, LookupKey]:
+    new_mapping: Dict[Hashable, LookupKey] = {}
 
     for row_id, fk_value in current_mapping.items():
         if fk_value not in intermediate_result:
             _null_fill_row(exec_ctx, row_id, null_fill_fields=null_fill_fields)
             continue
 
-        data: Any = intermediate_result[fk_value]
+        data = intermediate_result[fk_value]
 
         normalized_key = _resolve_next_step_fk(exec_ctx, row_id, data, next_step)
         if normalized_key is not None:
@@ -115,9 +115,9 @@ def build_next_mapping(
 def _collect_multi_field_fk_from_data(
     exec_ctx: LoadRefExecutionContext,
     row_id: Hashable,
-    data: Any,
+    data: object,
     step: LookupStepIr,
-) -> Optional[Hashable]:
+) -> Optional[LookupKey]:
     from_fields = step.get_from_fields()
     fk_values: List[FieldValue] = []
     for key in from_fields:
@@ -146,11 +146,11 @@ def _apply_ref_extractor(
     exec_ctx: LoadRefExecutionContext,
     source: SourceIr,
     row_id: Hashable,
-    lookup_key: Any,
-    intermediate_result: Dict[Hashable, Any],
-    data: Any,
+    lookup_key: LookupKey,
+    intermediate_result: LoaderResultMapping,
+    data: object,
     transform_mode: str,
-) -> Any:
+) -> object:
     extractor = source.loader_spec.extractor
     if extractor is None:
         return data
@@ -177,9 +177,9 @@ def _resolve_ref_field_value(
     exec_ctx: LoadRefExecutionContext,
     source: SourceIr,
     row_id: Hashable,
-    lookup_key: Any,
+    lookup_key: LookupKey,
     field_key: str,
-    data: Any,
+    data: object,
     transform_mode: str,
 ) -> FieldValue:
     field_spec = exec_ctx.runtime.field_specs.get(field_key)
@@ -213,8 +213,8 @@ def _write_ref_fields(
     exec_ctx: LoadRefExecutionContext,
     source: SourceIr,
     row_id: Hashable,
-    lookup_key: Any,
-    data: Any,
+    lookup_key: LookupKey,
+    data: object,
     group_field_keys: Tuple[str, ...],
     required_field_keys: Set[str],
     required_mode: str,
@@ -249,8 +249,8 @@ def _write_final_step_row(
     *,
     exec_ctx: LoadRefExecutionContext,
     row_id: Hashable,
-    lookup_key: Any,
-    intermediate_result: Dict[Hashable, Any],
+    lookup_key: LookupKey,
+    intermediate_result: LoaderResultMapping,
     source: SourceIr,
     group_field_keys: Tuple[str, ...],
     required_field_keys: Set[str],
@@ -298,8 +298,8 @@ def _write_final_step_row(
 
 def write_final_step(
     exec_ctx: LoadRefExecutionContext,
-    current_mapping: Dict[Hashable, Union[Hashable, Tuple[Any, ...]]],
-    intermediate_result: Dict[Hashable, Any],
+    current_mapping: Dict[Hashable, LookupKey],
+    intermediate_result: LoaderResultMapping,
     source: SourceIr,
     group_field_keys: Tuple[str, ...],
 ) -> None:

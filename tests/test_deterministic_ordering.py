@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig
+from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig, LookupCastConfig
 from scalim.planning import PlanBuilder
-from scalim.spec.ir.binding import LoaderCallContextIr, build_stable_lookup_key_list
+from scalim.spec.ir.binding import LoaderCallContextIr, BindingIr, _is_valid_binding_key, _restore_bindings, build_stable_lookup_key_list
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
 from scalim.spec.ir.sources import MainSourceIr
@@ -125,7 +126,8 @@ def test_keys_list_is_hashseed_stable() -> None:
     snippet = """
 import json
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig
+from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig, LookupCastConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
 
 converter = ConfigToIRConverter(allow_unsafe_resolver=True)
@@ -139,3 +141,42 @@ print(json.dumps(kwargs["ids"]))
     result_a = _run_hashseed_snippet("1", snippet)
     result_b = _run_hashseed_snippet("2", snippet)
     assert result_a == result_b
+
+
+def test_binding_key_validation_and_restore_guards() -> None:
+    assert _is_valid_binding_key("id") is True
+    assert _is_valid_binding_key(("region", "institution")) is True
+    assert _is_valid_binding_key(123) is False
+    assert _is_valid_binding_key(("region", 1)) is False
+
+    assert _restore_bindings([]) is None
+
+
+def test_restore_bindings_rejects_invalid_state_entries() -> None:
+    valid_binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}))
+
+    try:
+        _restore_bindings({1: valid_binding})
+    except TypeError as exc:
+        assert "Invalid binding key" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("expected invalid binding key to raise")
+
+    try:
+        _restore_bindings({"id": object()})
+    except TypeError as exc:
+        assert "Invalid binding value" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("expected invalid binding value to raise")
+
+
+def test_lookup_cast_requires_initialized_registry() -> None:
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter._lookup_casts = None
+
+    try:
+        converter._get_lookup_cast_fn(LookupCastConfig(name="auto", sep=None), is_multi=False)
+    except ConversionError as exc:
+        assert "Lookup cast registry is not initialized" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("expected missing lookup cast registry to raise")

@@ -2,6 +2,7 @@ import json
 import logging
 
 import pytest
+from scalim.events.event import Event
 from scalim.events.events import (
     ColumnWriteEvent,
     DiagnosticWarningEvent,
@@ -192,6 +193,34 @@ def test_hook_manager_debug_mode_raises() -> None:
 
     with pytest.raises(RuntimeError):
         hook_manager.trigger_pipeline_start(["order_id"], 2)
+
+
+def test_hook_manager_debug_mode_non_exploding_hook_returns() -> None:
+    class _NoopPipelineHook(BaseHook):
+        def __init__(self) -> None:
+            self.events = []
+
+        def on_pipeline_start(self, event) -> None:  # type: ignore[override]
+            self.events.append(event)
+
+    hook = _NoopPipelineHook()
+    hook_manager = HookManager(enable_debugging=True)
+    hook_manager.register(hook)
+
+    hook_manager.trigger_pipeline_start(["order_id"], 2)
+
+    assert hook.events and hook.events[0].targets == ["order_id"]
+
+
+def test_hook_manager_emit_on_event_clears_stale_has_hooks_flag() -> None:
+    hook_manager = HookManager()
+    hook_manager.has_hooks = True
+    hook_manager.hooks = []
+    hook_manager.on_event_handlers_by_event_type = {}
+
+    hook_manager.emit_on_event(Event(event_type="demo", timestamp=0.0, run_id="r", payload=None))
+
+    assert hook_manager.has_hooks is False
 
 
 def test_hook_manager_unregister_and_clear() -> None:

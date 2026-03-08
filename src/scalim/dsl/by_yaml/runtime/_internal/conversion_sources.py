@@ -1,23 +1,95 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 from collections import deque
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, Union, cast
+from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
 
 from .....spec.ir.binding import LoaderIr
 from .....spec.ir.fields import DerivedFieldIr, FieldIr
-from .....spec.ir.relations import LookupStepIr  # noqa: TC001
-from .....spec.ir.sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr
-from .....typedefs import SourceSpecIrCacheMode
+from .....spec.ir.sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceRefIr
+from .....typedefs import FieldValue, RuntimeValue, SourceSpecIrCacheMode, StaticParams
 from ...config_parsing.call_by import CallByParseError, CallByValue, parse_call_by
-from ...config_parsing.security import is_constant_compute_expression
+from ...config_parsing.security import SecureComputeEngine, is_constant_compute_expression
 from ...schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceConfig, SourceFieldConfig
 from ..errors import ConversionError
+from ..references import PythonReferenceResolver
+from .conversion_bindings import ConfigToIRConversionBindingMixin
 from .conversion_lookup import CALL_BY_CTX_KEY, validate_source_id
+from .conversion_relations import ConfigToIRConversionRelationMixin
 
 if TYPE_CHECKING:
     from .....spec.ir.aliases import LoaderResultMapCallable, MainSourceRowIterableCallable
+    from .....spec.ir.relations import LookupStepIr
 
 
-class ConfigToIRConversionSourceMixin:
+_SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, str)
+
+
+def _copy_static_params(params: Optional[Dict[str, RuntimeValue]]) -> StaticParams:
+    copied: StaticParams = {}
+    if not params:
+        return copied
+    for key, value in params.items():
+        copied[key] = value
+    return copied
+
+
+def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
+    if value is None or isinstance(value, _SUPPORTED_FIELD_VALUE_TYPES):
+        return value
+    msg = "Derived field '{}' {} returned unsupported type '{}'; expected int/float/str/bool/None".format(
+        field_id,
+        producer,
+        type(value).__name__,
+    )
+    raise TypeError(msg)
+
+
+def _require_call_by_context(field_values: Dict[str, RuntimeValue]) -> object:
+    ctx_value = field_values.get(CALL_BY_CTX_KEY)
+    if ctx_value is None:
+        msg = "call_by requires context, but '{}' is missing".format(CALL_BY_CTX_KEY)
+        raise ValueError(msg)
+    return ctx_value
+
+
+def _resolve_call_by_ctx_attr(ctx: object, attr_name: str) -> RuntimeValue:
+    if not hasattr(ctx, attr_name):
+        msg = "call_by context missing attribute '{}'".format(attr_name)
+        raise AttributeError(msg)
+    return getattr(ctx, attr_name)
+
+
+def _eval_call_by_value(*, field_id: str, value: CallByValue, field_values: Dict[str, RuntimeValue]) -> RuntimeValue:
+    kind = value.kind
+    if kind == "literal":
+        return _ensure_field_value(value.value, field_id=field_id, producer="call_by literal")
+    if kind == "field":
+        return field_values.get(str(value.value))
+    ctx = _require_call_by_context(field_values)
+    if kind == "ctx":
+        return ctx
+    if kind == "ctx_attr":
+        return _resolve_call_by_ctx_attr(ctx, str(value.value))
+    msg = "Unknown call_by value kind: {}".format(kind)  # pragma: no cover
+    raise ValueError(msg)  # pragma: no cover
+
+
+class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigToIRConversionRelationMixin):
+    _resolver: Optional[PythonReferenceResolver] = None
+    _compute_engine: Optional[SecureComputeEngine] = None
+
+    def _require_resolver(self) -> PythonReferenceResolver:
+        resolver = self._resolver
+        if resolver is None:
+            msg = "Reference resolver is not initialized"
+            raise ConversionError(msg)
+        return resolver
+
+    def _require_compute_engine(self) -> SecureComputeEngine:
+        compute_engine = self._compute_engine
+        if compute_engine is None:
+            msg = "Compute engine is not initialized"
+            raise ConversionError(msg)
+        return compute_engine
+
     def _resolve_required_field_ids(self, config: DemandConfig) -> Optional[Set[str]]:
         if config.output is None or not config.output.fields:
             return None
@@ -57,13 +129,13 @@ class ConfigToIRConversionSourceMixin:
             msg = "Main source 'loader' is required"
             raise ConversionError(msg)
 
-        loader_fn = cast("MainSourceRowIterableCallable", self._resolver.resolve(config.loader))
+        loader_fn = cast("MainSourceRowIterableCallable", self._require_resolver().resolve(config.loader))
         order_by = self._convert_main_source_order_by(config.order_by)
 
         return MainSourceIr(
             source_id=config.source_id,
             loader=loader_fn,
-            params=dict(config.params or {}),
+            params=_copy_static_params(config.params),
             order_by=order_by,
         )
 
@@ -83,7 +155,7 @@ class ConfigToIRConversionSourceMixin:
 
     def _convert_source(self, source_config: SourceConfig) -> SourceIr:
         validate_source_id(source_config.source_id, "Source")
-        loader_fn = cast("LoaderResultMapCallable", self._resolver.resolve(source_config.loader))
+        loader_fn = cast("LoaderResultMapCallable", self._require_resolver().resolve(source_config.loader))
 
         lookup_cast_fn = None
         if source_config.lookup_cast is not None:
@@ -115,8 +187,18 @@ class ConfigToIRConversionSourceMixin:
             bind=bind_ir,
         )
 
-    def _make_loader_ir(self, callable_ref: Callable[..., Any]) -> LoaderIr:
+    def _make_loader_ir(self, callable_ref: "LoaderResultMapCallable") -> LoaderIr:
         return LoaderIr(callable=callable_ref, bindings={})
+
+    def _resolve_field_source(self, *, from_source_id: str, field_id: str) -> SourceRefIr:
+        if self._main_source_ir is not None and from_source_id == self._main_source_ir.source_id:
+            return self._main_source_ir
+
+        source_ir = self._require_sources_ir().get(from_source_id)
+        if source_ir is None:
+            msg = "Field '{}' references unknown source '{}'".format(field_id, from_source_id)
+            raise ConversionError(msg)
+        return source_ir
 
     def _convert_source_field(self, field_config: SourceFieldConfig, config: DemandConfig) -> FieldIr:
         from_source_id = field_config.source
@@ -128,20 +210,13 @@ class ConfigToIRConversionSourceMixin:
             msg = "Field '{}' missing field".format(field_config.field_id)
             raise ConversionError(msg)
 
-        source_ir: Optional[Union[SourceIr, MainSourceIr]] = None
-        if self._main_source_ir and from_source_id == self._main_source_ir.source_id:
-            source_ir = self._main_source_ir
-        else:
-            source_ir = self._sources_ir.get(from_source_id)
-        if source_ir is None:
-            msg = "Field '{}' references unknown source '{}'".format(field_config.field_id, from_source_id)
-            raise ConversionError(msg)
+        source_ir = self._resolve_field_source(from_source_id=from_source_id, field_id=field_config.field_id)
 
-        transform: Optional[Callable[[Any], Any]] = None
+        transform: Optional[Callable[[FieldValue], FieldValue]] = None
         if field_config.value_cast:
             transform = self._get_value_cast_fn(field_config.value_cast)
 
-        lookup_steps: Optional[Tuple[LookupStepIr, ...]] = None
+        lookup_steps: Optional[Tuple["LookupStepIr", ...]] = None
         if isinstance(source_ir, SourceIr):
             lookup_steps = self._resolve_lookup_steps(field_config, config, source_ir)
 
@@ -156,11 +231,28 @@ class ConfigToIRConversionSourceMixin:
             lookup_steps=lookup_steps,
         )
 
+    def _wrap_compute_calculator(
+        self,
+        *,
+        field_id: str,
+        raw_calculator: Callable[..., object],
+    ) -> Callable[..., FieldValue]:
+        def calculator(*args: FieldValue, **field_values: FieldValue) -> FieldValue:
+            result = raw_calculator(*args, **field_values)
+            return _ensure_field_value(result, field_id=field_id, producer="compute")
+
+        return calculator
+
     def _convert_derived_field(self, derived_config: DerivedFieldConfig) -> DerivedFieldIr:
-        call_ctx_key = None
+        call_ctx_key: Optional[str] = None
         is_constant_compute = False
+        calculator: Callable[..., FieldValue]
         if derived_config.compute:
-            calculator = self._compute_engine.compile(derived_config.compute, derived_config.depends_on)
+            raw_calculator = cast(
+                "Callable[..., object]",
+                self._require_compute_engine().compile(derived_config.compute, derived_config.depends_on),
+            )
+            calculator = self._wrap_compute_calculator(field_id=derived_config.field_id, raw_calculator=raw_calculator)
             if not derived_config.depends_on and is_constant_compute_expression(derived_config.compute):
                 is_constant_compute = True
         elif derived_config.call_by:
@@ -179,7 +271,7 @@ class ConfigToIRConversionSourceMixin:
             is_constant_compute=is_constant_compute,
         )
 
-    def _compile_call_by(self, *, field_id: str, call_by: str) -> Callable[..., Any]:
+    def _compile_call_by(self, *, field_id: str, call_by: str) -> Callable[..., FieldValue]:
         try:
             parsed = parse_call_by(call_by)
         except CallByParseError as exc:
@@ -187,30 +279,21 @@ class ConfigToIRConversionSourceMixin:
             raise ConversionError(msg) from exc
 
         try:
-            fn = self._resolver.resolve(parsed.reference)
+            fn = cast("Callable[..., object]", self._require_resolver().resolve(parsed.reference))
         except Exception as exc:
             msg = "Derived field '{}' failed to resolve call_by reference '{}': {}".format(field_id, parsed.reference, exc)
             raise ConversionError(msg) from exc
 
-        def _eval_value(value: CallByValue, field_values: Dict[str, Any]) -> Any:
-            if value.kind == "literal":
-                return value.value
-            if value.kind == "field":
-                return field_values.get(value.value)
-            ctx = field_values.get(CALL_BY_CTX_KEY)
-            if ctx is None:
-                msg = "call_by requires context, but '{}' is missing".format(CALL_BY_CTX_KEY)
-                raise ValueError(msg)
-            if value.kind == "ctx":
-                return ctx
-            if value.kind == "ctx_attr":
-                return getattr(ctx, value.value)
-            msg = "Unknown call_by value kind: {}".format(value.kind)  # pragma: no cover
-            raise ValueError(msg)  # pragma: no cover
+        def calculator(**field_values: RuntimeValue) -> FieldValue:
+            args: List[RuntimeValue] = []
+            for arg_value in parsed.args:
+                args.append(_eval_call_by_value(field_id=field_id, value=arg_value, field_values=field_values))
 
-        def calculator(**field_values: Any) -> Any:
-            args = [_eval_value(v, field_values) for v in parsed.args]
-            kwargs = {k: _eval_value(v, field_values) for k, v in parsed.kwargs}
-            return fn(*args, **kwargs)
+            kwargs: Dict[str, RuntimeValue] = {}
+            for key, kw_value in parsed.kwargs:
+                kwargs[key] = _eval_call_by_value(field_id=field_id, value=kw_value, field_values=field_values)
+
+            result = fn(*args, **kwargs)
+            return _ensure_field_value(result, field_id=field_id, producer="call_by")
 
         return calculator

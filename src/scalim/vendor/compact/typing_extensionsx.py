@@ -51,3 +51,16 @@ except ImportError:
             def __init_subclass__(cls, **kwargs: Any) -> None:
                 super().__init_subclass__()
 # endregion
+
+
+# region Protocol compat
+try:
+    from typing_extensions import Protocol  # pyright: ignore[reportUnusedImport, reportAssignmentType]
+except ImportError:
+    try:
+        from typing import Protocol  # pyright: ignore[reportUnusedImport, reportAssignmentType]
+    except ImportError:
+
+        class Protocol(object):
+            pass
+# endregion

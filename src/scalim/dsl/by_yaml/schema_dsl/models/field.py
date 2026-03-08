@@ -1,11 +1,8 @@
-# pyright: reportPrivateUsage=false
-
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 from ..constants import (
-    _SOURCE_ID_STRING_SCHEMA,
     DEFAULT_OUTPUT_ENCODING,
     DEFAULT_OUTPUT_FORMAT,
     DEFAULT_OUTPUT_HEADER_BY,
@@ -15,9 +12,10 @@ from ..constants import (
     DESC_FIELD_NAME_MD,
     OUTPUT_FIELD_ID_KEY,
     RELATION_STEPS_SCHEMA,
+    SOURCE_ID_STRING_SCHEMA,
     VALUE_CAST_ENUM,
-    _schema_meta,
-    _schema_omit,
+    schema_meta,
+    schema_omit,
 )
 from .lookup_bind_relation import InlineRelationConfig
 
@@ -30,14 +28,14 @@ class SourceFieldConfig:
     SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [{"not": {"required": ["call_by"]}}]
     """用于约束:源字段配置中禁止声明 `call_by`."""
 
-    field_id: str = dataclass_field(default="", metadata=_schema_omit())
+    field_id: str = dataclass_field(default="", metadata=schema_omit())
     """字段标识(内部字段;由外层映射键提供)."""
 
     source: str = dataclass_field(
         default="",
-        metadata=_schema_meta(
+        metadata=schema_meta(
             schema={
-                **_SOURCE_ID_STRING_SCHEMA,
+                **SOURCE_ID_STRING_SCHEMA,
                 "description": "字段来源的 source_id (例: source: orders)",
                 "markdownDescription": (
                     "字段来源的 `source_id`.\n\n"
@@ -51,9 +49,9 @@ class SourceFieldConfig:
 
     field: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             schema={
-                **_SOURCE_ID_STRING_SCHEMA,
+                **SOURCE_ID_STRING_SCHEMA,
                 "description": "字段来源的列名,缺省时等于字段 key (例: field: customer_id)",
                 "markdownDescription": "字段来源的列名.\n\n- 缺省时等于字段 key",
             }
@@ -61,12 +59,12 @@ class SourceFieldConfig:
     )
     """加载器返回结果中的列名/键名(可选;缺省时等于字段键)."""
 
-    name: str = dataclass_field(default="", metadata=_schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
+    name: str = dataclass_field(default="", metadata=schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
     """字段展示名称(可选)."""
 
     relation: Optional[InlineRelationConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             schema={
                 "type": "object",
                 "required": ["steps"],
@@ -92,7 +90,7 @@ class SourceFieldConfig:
 
     value_cast: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="字段值转换(仅源字段),用于写入上下文/输出前的类型调整",
             md=("字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str"),
             choices=VALUE_CAST_ENUM,
@@ -107,15 +105,15 @@ class DerivedFieldConfig:
     SCHEMA_NAME: ClassVar[str] = "derived_field"
     """派生字段配置对象在 `YAML` 中的节点名称."""
 
-    field_id: str = dataclass_field(default="", metadata=_schema_omit())
+    field_id: str = dataclass_field(default="", metadata=schema_omit())
     """字段标识(内部字段;由外层映射键提供)."""
 
-    name: str = dataclass_field(default="", metadata=_schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
+    name: str = dataclass_field(default="", metadata=schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
     """字段展示名称(可选)."""
 
     compute: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="派生字段计算表达式(使用 field_id 作为变量名)",
             md=("派生字段计算表达式(与 `call_by` 互斥).\n\n- 使用 `field_id` 作为变量名\n- 必填, 不能为空"),
             examples=["revenue - cost"],
@@ -125,7 +123,7 @@ class DerivedFieldConfig:
 
     call_by: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="派生字段函数调用(函数引用 + 参数列表),与 compute 互斥",
             md=(
                 "派生字段函数调用(与 `compute` 互斥).\n\n"
@@ -143,7 +141,7 @@ class DerivedFieldConfig:
     )
     """派生字段函数调用(与 `compute` 互斥)."""
 
-    depends_on: Tuple[str, ...] = dataclass_field(default_factory=tuple, metadata=_schema_omit())
+    depends_on: Tuple[str, ...] = dataclass_field(default_factory=tuple, metadata=schema_omit())
     """依赖字段标识列表(内部字段;解析后填充)."""
 
 
@@ -157,7 +155,7 @@ class OutputConfig:
 
     format: str = dataclass_field(
         default=DEFAULT_OUTPUT_FORMAT,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="输出格式 (excel/csv)",
             md="输出格式.\n\n- `csv`: CSV 文件\n- `excel`: Excel 文件\n- 默认 `csv`",
             choices=["excel", "csv"],
@@ -169,7 +167,7 @@ class OutputConfig:
 
     path: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)",
             md=(
                 "输出文件路径.\n\n"
@@ -185,13 +183,13 @@ class OutputConfig:
 
     encoding: str = dataclass_field(
         default=DEFAULT_OUTPUT_ENCODING,
-        metadata=_schema_meta(desc="文件编码", md="文件编码(CSV 输出使用).", default=DEFAULT_OUTPUT_ENCODING),
+        metadata=schema_meta(desc="文件编码", md="文件编码(CSV 输出使用).", default=DEFAULT_OUTPUT_ENCODING),
     )
     """文件编码(用于 `CSV` 输出)."""
 
     streaming: bool = dataclass_field(
         default=DEFAULT_OUTPUT_STREAMING,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="启用流式输出",
             md=(
                 "启用流式输出(按行写入).\n\n"
@@ -205,13 +203,13 @@ class OutputConfig:
 
     include_header: bool = dataclass_field(
         default=DEFAULT_OUTPUT_INCLUDE_HEADER,
-        metadata=_schema_meta(desc="包含表头行", md="包含表头行.", default=DEFAULT_OUTPUT_INCLUDE_HEADER),
+        metadata=schema_meta(desc="包含表头行", md="包含表头行.", default=DEFAULT_OUTPUT_INCLUDE_HEADER),
     )
     """是否包含表头行."""
 
     header_fields_output_by: str = dataclass_field(
         default=DEFAULT_OUTPUT_HEADER_BY,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="表头字段名来源: field_id=使用字段ID, name=使用字段的name属性",
             md=("表头字段名来源.\n\n- `field_id`: 使用字段 ID\n- `name`: 使用字段的 `name` (为空或等于 field_id 时回退为 field_id)"),
             choices=["field_id", "name"],
@@ -223,7 +221,7 @@ class OutputConfig:
 
     fields: Optional[List[Any]] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="输出字段顺序(仅支持对象条目: 显式 {field_id: ...}/{field: ...} 或 YAML alias; 推荐显式对象)",
             md=(
                 "输出字段顺序.\n\n"

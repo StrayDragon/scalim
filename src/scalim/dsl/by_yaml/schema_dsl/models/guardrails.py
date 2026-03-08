@@ -1,10 +1,8 @@
-# pyright: reportPrivateUsage=false
-
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import Any, ClassVar, Optional, Tuple
 
-from ..constants import DEFAULT_GUARDRAILS_MODE, GUARDRAILS_MODE_ENUM, _schema_meta
+from ..constants import DEFAULT_GUARDRAILS_MODE, GUARDRAILS_MODE_ENUM, schema_meta
 
 
 @dataclass(frozen=True)
@@ -17,7 +15,7 @@ class GuardrailsLoaderConfig:
 
     validate_result: bool = dataclass_field(
         default=False,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="校验 loader 返回结构(契约校验)",
             md="校验 loader 返回结构(契约校验).\n\n- 启用时,契约违规始终 fast_fail(即使 mode=quiet)",
             default=False,
@@ -27,7 +25,7 @@ class GuardrailsLoaderConfig:
 
     required_fields: Tuple[Any, ...] = dataclass_field(
         default=(),
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="关键字段列表(缺失/None 触发护栏;支持 field_id 字符串或 YAML alias)",
             md=(
                 "关键字段列表.\n\n"
@@ -43,7 +41,7 @@ class GuardrailsLoaderConfig:
 
     on_transform_error: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="字段转换异常策略(可选;默认继承 mode)",
             md="字段转换异常策略.\n\n- 作用于 extractor/value_cast/value_formatter/transform 等异常\n- 为空则继承 guardrails.mode",
             choices=GUARDRAILS_MODE_ENUM,
@@ -63,7 +61,7 @@ class GuardrailsRelationsConfig:
 
     null_key_max_rate: Optional[float] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="关联 null_key 最大比例(0.0-1.0;未设置则不启用)",
             md="关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- v1 默认对全部关联 lookup step 生效",
             min=0.0,
@@ -74,7 +72,7 @@ class GuardrailsRelationsConfig:
 
     type_error_max_rate: Optional[float] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="关联 type_error 最大比例(0.0-1.0;未设置则不启用)",
             md="关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- v1 默认对全部关联 lookup step 生效",
             min=0.0,
@@ -94,7 +92,7 @@ class GuardrailsComputeConfig:
 
     on_error: Optional[str] = dataclass_field(
         default=None,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="派生字段 compute 异常策略(可选;默认继承 mode)",
             md="派生字段 compute 异常策略.\n\n- 为空则继承 guardrails.mode",
             choices=GUARDRAILS_MODE_ENUM,
@@ -114,7 +112,7 @@ class GuardrailsConfig:
 
     enabled: bool = dataclass_field(
         default=False,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="启用运行时护栏(默认关闭)",
             md="启用运行时护栏.\n\n- 默认关闭(不改变现有行为)\n- 显式 enabled=true 才生效",
             default=False,
@@ -124,7 +122,7 @@ class GuardrailsConfig:
 
     mode: str = dataclass_field(
         default=DEFAULT_GUARDRAILS_MODE,
-        metadata=_schema_meta(
+        metadata=schema_meta(
             desc="护栏模式(quiet/fast_fail)",
             md=("护栏模式.\n\n- `quiet`: 不抛异常,但 best-effort 记录错误事件\n- `fast_fail`: 首次触发即失败并终止 pipeline"),
             choices=GUARDRAILS_MODE_ENUM,
@@ -136,18 +134,18 @@ class GuardrailsConfig:
 
     loader: Optional[GuardrailsLoaderConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(ref="guardrails_loader"),
+        metadata=schema_meta(ref="guardrails_loader"),
     )
     """加载器护栏子配置(可选)."""
 
     relations: Optional[GuardrailsRelationsConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(ref="guardrails_relations"),
+        metadata=schema_meta(ref="guardrails_relations"),
     )
     """关联护栏子配置(可选)."""
 
     compute: Optional[GuardrailsComputeConfig] = dataclass_field(
         default=None,
-        metadata=_schema_meta(ref="guardrails_compute"),
+        metadata=schema_meta(ref="guardrails_compute"),
     )
     """派生字段计算护栏子配置(可选)."""

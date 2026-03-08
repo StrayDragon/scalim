@@ -1,4 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 import pickle
 from concurrent.futures import Executor, Future
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
@@ -6,6 +5,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequ
 from ...events.catalog import EVENT_ADAPTIVE_SCHEDULER_DECISION
 from ...planning.operators import LoadRefOperatorIr
 from ...planning.plan import ExecutionPlan
+from ...vendor.compact.typing_extensionsx import override
 from ..context import BatchContext
 from ..executor.helpers.relation_signature import build_relation_signature, has_rows_binding
 from ..executor.runtime.runtime import ExecutionRuntime
@@ -52,6 +52,23 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
         self._tuning = tuning
         self._policy = policy
 
+    @override
+    def _require_plan(self) -> ExecutionPlan:
+        return self._plan
+
+    @override
+    def _require_overrides(self) -> "PipelineOverrides":
+        return self._overrides
+
+    @override
+    def _require_tuning(self) -> AdaptiveTuning:
+        return self._tuning
+
+    @override
+    def _require_policy(self) -> AdaptivePolicy:
+        return self._policy
+
+    @override
     def __repr__(self) -> str:
         return "AdaptiveLoadRefScheduler(min_parallel_tasks={})".format(self._tuning.min_parallel_tasks_per_layer)
 

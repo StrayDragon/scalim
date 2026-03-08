@@ -1,5 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false
-
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import Any, List, Optional, Tuple

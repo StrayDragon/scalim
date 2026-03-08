@@ -1,6 +1,4 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUninitializedInstanceVariable=false
-
-from typing import Any, Dict, List, Optional, Set, cast
+from typing import Any, Dict, List, Optional, Set
 
 from ...schema_dsl.constants import (
     BIND_AS_ENUM,
@@ -10,6 +8,8 @@ from ...schema_dsl.constants import (
     DEFAULT_CACHE_MODE,
     LOOKUP_CAST_NAME_ENUM,
 )
+from ..parsers.utils import list_or_none, mapping_or_none
+from .base import ValidatorMixinBase
 from .constants import LEGACY_FIELDS, MIN_PARTS_COUNT, F
 from .issues import ValidationIssue
 
@@ -17,24 +17,23 @@ _F = F
 _MIN_PARTS_COUNT = MIN_PARTS_COUNT
 
 
-class ValidatorSourcesMixin:
-    _step_allowed_fields_by_source: Dict[str, Set[str]]
-
-    def _collect_declared_field_names(self, fields_raw: Any) -> Set[str]:
+class ValidatorSourcesMixin(ValidatorMixinBase):
+    def _collect_declared_field_names(self, fields_raw: object) -> Set[str]:
         names: Set[str] = set()
-        if not isinstance(fields_raw, dict):
+        fields_dict = mapping_or_none(fields_raw)
+        if fields_dict is None:
             return names
-        for field_id_raw in fields_raw:
+        for field_id_raw in fields_dict:
             field_id = str(field_id_raw or "").strip()
-            if not field_id:
-                continue
-            names.add(field_id)
+            if field_id:
+                names.add(field_id)
         return names
 
-    def _collect_source_key_names(self, key_raw: Any) -> Set[str]:
+    def _collect_source_key_names(self, key_raw: object) -> Set[str]:
         names: Set[str] = set()
-        if isinstance(key_raw, list):
-            for item in key_raw:
+        key_list = list_or_none(key_raw)
+        if key_list is not None:
+            for item in key_list:
                 key_field = str(item or "").strip()
                 if key_field:
                     names.add(key_field)
@@ -49,23 +48,22 @@ class ValidatorSourcesMixin:
         allowed: Dict[str, Set[str]] = {}
 
         if main_source_id:
-            main_raw: Any = config.get(_F.MAIN_SOURCE)
-            if isinstance(main_raw, dict):
-                main_dict = cast("Dict[str, Any]", main_raw)
+            main_dict = mapping_or_none(config.get(_F.MAIN_SOURCE))
+            if main_dict is not None:
                 allowed[main_source_id] = self._collect_declared_field_names(main_dict.get(_F.FIELDS))
             else:
                 allowed[main_source_id] = set()
 
-        sources_raw: Any = config.get(_F.SOURCES, {})
-        if not isinstance(sources_raw, dict):
+        sources_raw = mapping_or_none(config.get(_F.SOURCES, {}))
+        if sources_raw is None:
             return allowed
 
         for source_id_raw, source_data_raw in sources_raw.items():
             source_id = str(source_id_raw)
-            if not isinstance(source_data_raw, dict):
+            source_dict = mapping_or_none(source_data_raw)
+            if source_dict is None:
                 allowed[source_id] = set()
                 continue
-            source_dict = cast("Dict[str, Any]", source_data_raw)
             source_allowed = self._collect_declared_field_names(source_dict.get(_F.FIELDS))
             source_allowed.update(self._collect_source_key_names(source_dict.get(_F.KEY)))
             allowed[source_id] = source_allowed
@@ -74,9 +72,9 @@ class ValidatorSourcesMixin:
 
     def _validate_required_fields(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
         required_fields = [_F.NAME, _F.MAIN_SOURCE]
-        for field in required_fields:
-            if field not in config:
-                self._add_error(errors, "Missing required field: '{}'".format(field), path=field)
+        for field_name in required_fields:
+            if field_name not in config:
+                self._add_error(errors, "Missing required field: '{}'".format(field_name), path=field_name)
 
     def _validate_batch_size(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
         if _F.BATCH_SIZE not in config:
@@ -95,40 +93,42 @@ class ValidatorSourcesMixin:
             if key in LEGACY_FIELDS:
                 self._add_error(errors, "Legacy field '{}' is not allowed".format(key), path=str(key))
 
-        sources_raw: Any = config.get(_F.SOURCES, {})
-        if isinstance(sources_raw, dict):
-            for source_id, source_data in sources_raw.items():
-                if not isinstance(source_data, dict):
+        sources_raw = mapping_or_none(config.get(_F.SOURCES, {}))
+        if sources_raw is not None:
+            for source_id_raw, source_data_raw in sources_raw.items():
+                source_dict = mapping_or_none(source_data_raw)
+                if source_dict is None:
                     continue
-                for key in source_data:
+                source_id = str(source_id_raw)
+                for key in source_dict:
                     if key in LEGACY_FIELDS:
                         path = "sources.{}.{}".format(source_id, key)
                         self._add_error(errors, "Legacy field '{}' is not allowed".format(path), path=path)
 
-        fields_raw: Any = config.get(_F.FIELDS, {})
-        if isinstance(fields_raw, dict):
-            for field_id, field_data in fields_raw.items():
-                if not isinstance(field_data, dict):
+        fields_raw = mapping_or_none(config.get(_F.FIELDS, {}))
+        if fields_raw is not None:
+            for field_id_raw, field_data_raw in fields_raw.items():
+                field_dict = mapping_or_none(field_data_raw)
+                if field_dict is None:
                     continue
-                for key in field_data:
+                field_id = str(field_id_raw)
+                for key in field_dict:
                     if key in LEGACY_FIELDS:
                         path = "fields.{}.{}".format(field_id, key)
                         self._add_error(errors, "Legacy field '{}' is not allowed".format(path), path=path)
 
     def _validate_sources(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> Dict[str, Dict[str, bool]]:  # noqa: C901
         sources_info: Dict[str, Dict[str, bool]] = {}
-        sources_raw: Any = config.get(_F.SOURCES)
-        if not isinstance(sources_raw, dict):
+        sources_raw = mapping_or_none(config.get(_F.SOURCES))
+        if sources_raw is None:
             return sources_info
 
         for source_id_raw, source_data_raw in sources_raw.items():
-            source_id: str = str(source_id_raw)
-
-            if not isinstance(source_data_raw, dict):
+            source_id = str(source_id_raw)
+            source_dict = mapping_or_none(source_data_raw)
+            if source_dict is None:
                 self._add_error(errors, "Source '{}' must be a dictionary".format(source_id), path="sources.{}".format(source_id))
                 continue
-
-            source_dict = cast("Dict[str, Any]", source_data_raw)
 
             if _F.LOADER not in source_dict:
                 self._add_error(
@@ -144,7 +144,7 @@ class ValidatorSourcesMixin:
                     path="sources.{}.{}".format(source_id, _F.KEY),
                 )
 
-            loader: Any = source_dict.get(_F.LOADER, "")
+            loader = source_dict.get(_F.LOADER, "")
             if loader and not self._is_valid_loader_ref(str(loader)):
                 msg = (
                     "Source '{}' has invalid loader reference '{}'. Expected format: 'module.path:ClassName' or 'module.path.function'"
@@ -160,19 +160,23 @@ class ValidatorSourcesMixin:
                 self._validate_lookup_cast(lookup_raw, errors, "sources.{}".format(source_id))
 
             cache_mode = str(source_dict.get(_F.CACHE_MODE, DEFAULT_CACHE_MODE))
-            if cache_mode not in ("none", "preload_forever"):
+            if cache_mode not in {"none", "preload_forever"}:
                 self._add_error(
                     errors,
                     "Source '{}' has invalid cache_mode '{}' (expected: none/preload_forever)".format(source_id, cache_mode),
                     path="sources.{}.{}".format(source_id, _F.CACHE_MODE),
                 )
+
             bind_present = False
-            if isinstance(bind_raw, dict):
-                bind_dict = cast("Dict[str, Any]", bind_raw)
-                if _F.USE_ROWS in bind_dict and isinstance(bind_dict.get(_F.USE_ROWS), dict):
-                    bind_present = bool(cast("Dict[str, Any]", bind_dict[_F.USE_ROWS]).get(_F.PARAM))
-                if _F.USE_KEYS in bind_dict and isinstance(bind_dict.get(_F.USE_KEYS), dict):
-                    bind_present = bool(cast("Dict[str, Any]", bind_dict[_F.USE_KEYS]).get(_F.PARAM)) or bind_present
+            bind_dict = mapping_or_none(bind_raw)
+            if bind_dict is not None:
+                rows_dict = mapping_or_none(bind_dict.get(_F.USE_ROWS))
+                if rows_dict is not None:
+                    bind_present = bool(rows_dict.get(_F.PARAM))
+                keys_dict = mapping_or_none(bind_dict.get(_F.USE_KEYS))
+                if keys_dict is not None:
+                    bind_present = bool(keys_dict.get(_F.PARAM)) or bind_present
+
             sources_info[source_id] = {
                 "bind": bind_present,
                 "preload": cache_mode == "preload_forever",
@@ -181,15 +185,14 @@ class ValidatorSourcesMixin:
         return sources_info
 
     def _validate_main_source(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> str:
-        main_source_raw: Any = config.get(_F.MAIN_SOURCE)
-        if not isinstance(main_source_raw, dict):
+        main_source_data = mapping_or_none(config.get(_F.MAIN_SOURCE))
+        if main_source_data is None:
             self._add_error(errors, "'{}' must be a dictionary".format(_F.MAIN_SOURCE), path=_F.MAIN_SOURCE)
             return ""
 
-        main_source_data = cast("Dict[str, Any]", main_source_raw)
         source_id = str(main_source_data.get(_F.SOURCE_ID, ""))
         loader = main_source_data.get(_F.LOADER)
-        sources_raw: Any = config.get(_F.SOURCES, {})
+        sources_raw = mapping_or_none(config.get(_F.SOURCES, {}))
 
         if not source_id:
             self._add_error(
@@ -209,7 +212,7 @@ class ValidatorSourcesMixin:
             ).format(loader)
             self._add_error(errors, msg, path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER))
 
-        if source_id and isinstance(sources_raw, dict) and str(source_id) in sources_raw:
+        if source_id and sources_raw is not None and source_id in sources_raw:
             self._add_error(
                 errors,
                 "Main source '{}' must not appear in 'sources'".format(source_id),
@@ -225,19 +228,20 @@ class ValidatorSourcesMixin:
         main_source_data: Dict[str, Any],
         errors: List[ValidationIssue],
     ) -> None:
-        order_by_raw: Any = main_source_data.get(_F.ORDER_BY)
+        order_by_raw = main_source_data.get(_F.ORDER_BY)
         if order_by_raw is None:
             return
-        if not isinstance(order_by_raw, list):
+        order_by_list = list_or_none(order_by_raw)
+        if order_by_list is None:
             self._add_error(
                 errors,
                 "'{}.{}' must be a list".format(_F.MAIN_SOURCE, _F.ORDER_BY),
                 path="{}.{}".format(_F.MAIN_SOURCE, _F.ORDER_BY),
             )
             return
-        main_fields_raw = main_source_data.get(_F.FIELDS)
-        main_field_ids = set(main_fields_raw.keys()) if isinstance(main_fields_raw, dict) else set()
-        for idx, item in enumerate(order_by_raw):
+        main_fields_raw = mapping_or_none(main_source_data.get(_F.FIELDS))
+        main_field_ids: Set[str] = set(main_fields_raw.keys()) if main_fields_raw is not None else set()
+        for idx, item in enumerate(order_by_list):
             item_path = "{}.{}[{}]".format(_F.MAIN_SOURCE, _F.ORDER_BY, idx)
             if not isinstance(item, str):
                 self._add_error(errors, "{} must be a string".format(item_path), path=item_path)
@@ -259,11 +263,11 @@ class ValidatorSourcesMixin:
         path_prefix: Optional[str] = None,
     ) -> None:
         bind_path = "{}.bind".format(path_prefix or context)
-        if not isinstance(bind_raw, dict):
+        bind_dict = mapping_or_none(bind_raw)
+        if bind_dict is None:
             self._add_error(errors, "{} bind must be a dictionary".format(context), path=bind_path)
             return
 
-        bind_dict = cast("Dict[str, Any]", bind_raw)
         use_rows_present = _F.USE_ROWS in bind_dict
         use_keys_present = _F.USE_KEYS in bind_dict
         if use_rows_present and use_keys_present:
@@ -286,10 +290,10 @@ class ValidatorSourcesMixin:
         context: str,
         bind_path: str,
     ) -> None:
-        if not isinstance(raw_rows, dict):
+        rows_dict = mapping_or_none(raw_rows)
+        if rows_dict is None:
             self._add_error(errors, "{} bind.use_rows must be a dictionary".format(context), path="{}.use_rows".format(bind_path))
             return
-        rows_dict = cast("Dict[str, Any]", raw_rows)
         param = rows_dict.get(_F.PARAM)
         if not param:
             self._add_error(
@@ -321,10 +325,10 @@ class ValidatorSourcesMixin:
         context: str,
         bind_path: str,
     ) -> None:
-        if not isinstance(raw_keys, dict):
+        keys_dict = mapping_or_none(raw_keys)
+        if keys_dict is None:
             self._add_error(errors, "{} bind.use_keys must be a dictionary".format(context), path="{}.use_keys".format(bind_path))
             return
-        keys_dict = cast("Dict[str, Any]", raw_keys)
         param = keys_dict.get(_F.PARAM)
         if not param:
             self._add_error(
@@ -357,11 +361,11 @@ class ValidatorSourcesMixin:
         path_prefix: Optional[str] = None,
     ) -> None:
         lookup_path = "{}.lookup_cast".format(path_prefix or context)
-        if not isinstance(lookup_raw, dict):
+        lookup_dict = mapping_or_none(lookup_raw)
+        if lookup_dict is None:
             self._add_error(errors, "{} lookup_cast must be a dictionary".format(context), path=lookup_path)
             return
 
-        lookup_dict = cast("Dict[str, Any]", lookup_raw)
         name = str(lookup_dict.get(_F.NAME_KEY, ""))
         if name not in LOOKUP_CAST_NAME_ENUM:
             self._add_error(
@@ -381,11 +385,11 @@ class ValidatorSourcesMixin:
             module_path, attr_path = parts
             if not module_path or not attr_path:
                 return False
-            if not all(p.isidentifier() for p in module_path.split(".")):
+            if not all(part.isidentifier() for part in module_path.split(".")):
                 return False
-            return all(p.isidentifier() for p in attr_path.split("."))
+            return all(part.isidentifier() for part in attr_path.split("."))
 
         parts = loader_ref.split(".")
         if len(parts) < _MIN_PARTS_COUNT:
             return False
-        return all(p.isidentifier() for p in parts)
+        return all(part.isidentifier() for part in parts)

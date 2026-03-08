@@ -1,14 +1,14 @@
 import time
 from collections.abc import Mapping
-from typing import Any, Dict, Hashable, List, Optional, Set, cast
+from typing import Hashable, List, Optional, Set, cast
 
 from ....events.catalog import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
 from ....planning.operators import LoadOperatorIr, SupportedOperatorIr
 from ....spec.ir.binding import BindingIr, LoaderCallContextIr
 from ....spec.ir.fields import FieldIr
-from ....spec.ir.helpers import call_loader_with_binding
+from ....spec.ir.helpers import call_loader_with_binding, coerce_loader_result_mapping
 from ....spec.ir.sources import SourceIr
-from ....typedefs import FieldValue
+from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
 from ...loader_retry import CALLSITE_LOAD, call_with_loader_retry
@@ -33,7 +33,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         runtime: "ExecutionRuntime",
         binding: Optional[BindingIr],
         loader_context: LoaderCallContextIr,
-    ) -> Dict[str, Any]:
+    ) -> LoaderCallKwargs:
         if binding is None:
             return {}
         if not runtime.instrumentation.wants(EVENT_LOADER_CALL):
@@ -46,18 +46,17 @@ class LoadOperatorExecutor(OperatorExecutor):
         runtime: "ExecutionRuntime",
         *,
         loader_name: str,
-        result: Any,
+        result: object,
         field_keys: List[str],
     ) -> None:
         if not runtime.instrumentation.wants(EVENT_LOADER_SLIM):
             return
         original_keys = 0
-        if isinstance(result, dict) and result:
-            result_dict = cast("Dict[Any, Any]", result)
-            sample_value: Any = next(iter(result_dict.values()))
-            if isinstance(sample_value, dict):
-                sample_dict = cast("Dict[Any, Any]", sample_value)
-                original_keys = len(sample_dict)
+        if isinstance(result, Mapping) and result:
+            sample_value = next(iter(result.values()))
+            if isinstance(sample_value, Mapping):
+                sample_mapping = cast("Mapping[object, object]", sample_value)
+                original_keys = len(sample_mapping)
         if original_keys and original_keys > len(field_keys):
             runtime.instrumentation.emit_loader_slim(
                 loader_name=loader_name,
@@ -77,12 +76,12 @@ class LoadOperatorExecutor(OperatorExecutor):
         *,
         runtime: ExecutionRuntime,
         source: SourceIr,
-        result: Any,
+        result: LoaderResultMapping,
         row_id: Hashable,
         required_field_keys: Set[str],
         required_mode: str,
         transform_mode: str,
-    ) -> Any:
+    ) -> object:
         if row_id not in result:
             for required_field_key in required_field_keys:
                 record_or_fail_required_field_missing(
@@ -122,7 +121,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         source: SourceIr,
         row_id: Hashable,
         field_key: str,
-        data: Any,
+        data: object,
         transform_mode: str,
     ) -> FieldValue:
         field_spec = runtime.field_specs.get(field_key)
@@ -155,7 +154,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         runtime: ExecutionRuntime,
         source: SourceIr,
         row_id: Hashable,
-        data: Any,
+        data: object,
         field_keys: List[str],
         required_field_keys: Set[str],
         required_mode: str,
@@ -190,7 +189,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         source: SourceIr,
         field_keys: List[str],
         batch_row_nth: List[Hashable],
-        result: Any,
+        result: LoaderResultMapping,
     ) -> None:
         guardrails = runtime.guardrails
         required_field_keys = self._resolve_required_field_keys(runtime, field_keys)
@@ -231,7 +230,10 @@ class LoadOperatorExecutor(OperatorExecutor):
         batch_row_nth: List[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
-        op = cast("LoadOperatorIr", operator)
+        if not isinstance(operator, LoadOperatorIr):
+            return
+
+        op = operator
         source = op.source
         field_keys = list(op.field_keys)
 
@@ -248,7 +250,7 @@ class LoadOperatorExecutor(OperatorExecutor):
 
         loader_start = time.perf_counter()
         policy = runtime.loader_retry.resolve(source.source_id)
-        result = call_with_loader_retry(
+        result_raw: object = call_with_loader_retry(
             call=lambda: call_loader_with_binding(binding, loader_context, loader_fn),
             instrumentation=runtime.instrumentation,
             policy=policy,
@@ -259,18 +261,19 @@ class LoadOperatorExecutor(OperatorExecutor):
         loader_duration = time.perf_counter() - loader_start
 
         call_kwargs = self._build_loader_call_kwargs(runtime, binding, loader_context)
-        runtime.instrumentation.emit_loader_call(source.source_id, call_kwargs, result, loader_duration)
-        self._maybe_emit_loader_slim(runtime, loader_name=source.source_id, result=result, field_keys=field_keys)
+        runtime.instrumentation.emit_loader_call(source.source_id, call_kwargs, result_raw, loader_duration)
+        self._maybe_emit_loader_slim(runtime, loader_name=source.source_id, result=result_raw, field_keys=field_keys)
 
         guardrails = runtime.guardrails
-        if guardrails.enabled and guardrails.loader.validate_result and not isinstance(result, Mapping):
+        if guardrails.enabled and guardrails.loader.validate_result and not isinstance(result_raw, Mapping):
             fail_guardrail(
                 runtime,
                 code="loader_result_not_mapping",
                 message="Loader result must be a Mapping",
-                context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result),
+                context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result_raw),
                 action_mode="fast_fail",
             )
+        result = coerce_loader_result_mapping(cast("object", result_raw))
         self._process_loader_rows(
             context=context,
             runtime=runtime,

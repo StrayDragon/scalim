@@ -1,5 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false
-
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
@@ -16,16 +14,17 @@ from ..call_by import extract_call_by_dependencies
 from ..field_index import OutputFieldErrors, OutputFieldResolver, build_source_data_key_index
 from ..models import AliasIndex, FieldDef, FieldDefIndex, RawDemand, collect_field_defs, field_def_key
 from ..security import extract_compute_dependencies
+from .relations import ParserRelationsMixin
 from .results import ParsedFieldsResult
-from .utils import str_or_none
+from .utils import list_or_none, str_or_none
 
 
-class ParserFieldsMixin:
+class ParserFieldsMixin(ParserRelationsMixin):
     def _parse_fields_v3(
         self,
         raw: RawDemand,
         main_source_id: str,
-        raw_output_fields: Any,
+        raw_output_fields: object,
     ) -> ParsedFieldsResult:
         index = self._collect_field_defs_v3(raw, main_source_id)
         output_field_ids, selected_defs, overrides = self._resolve_output_fields_v3(
@@ -66,10 +65,12 @@ class ParserFieldsMixin:
         if raw_main is None:
             return []
         order_by_raw = raw_main.get(MAIN_SOURCE_KEYS["order_by"])
-        if not isinstance(order_by_raw, list):
+        order_items = list_or_none(order_by_raw)
+        if order_items is None:
             return []
+
         order_defs: List[FieldDef] = []
-        for item in order_by_raw:
+        for item in order_items:
             if not isinstance(item, str):
                 continue
             raw_item = item.strip()
@@ -157,7 +158,7 @@ class ParserFieldsMixin:
 
     def _resolve_output_fields_v3(
         self,
-        raw_output_fields: Any,
+        raw_output_fields: object,
         field_defs: List[FieldDef],
         defs_by_id: Dict[str, List[FieldDef]],
         alias_index: AliasIndex,
@@ -170,7 +171,8 @@ class ParserFieldsMixin:
             self._ensure_unique_field_ids(field_defs)
             return None, list(field_defs), overrides
 
-        if not isinstance(raw_output_fields, list):
+        output_field_items = list_or_none(raw_output_fields)
+        if output_field_items is None:
             msg = "output.fields must be a list"
             raise TypeError(msg)
 
@@ -182,7 +184,7 @@ class ParserFieldsMixin:
             errors=OutputFieldErrors(),
         )
         selected_defs: List[FieldDef] = []
-        for idx, item in enumerate(raw_output_fields):
+        for idx, item in enumerate(output_field_items):
             field_def, override, _entry_kind = resolver.resolve_entry(item, idx)
             if field_def is None:  # pragma: no cover
                 continue  # pragma: no cover
@@ -281,7 +283,7 @@ class ParserFieldsMixin:
         call_by_raw = field_data.get(DERIVED_FIELD_KEYS["call_by"])
         call_by_expr = str(call_by_raw) if call_by_raw is not None else None
 
-        inferred: List[str] = self._infer_derived_dependencies(field_id, field_data)
+        inferred = self._infer_derived_dependencies(field_id, field_data)
         depends_on: Tuple[str, ...] = tuple(inferred)
 
         return DerivedFieldConfig(

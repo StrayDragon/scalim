@@ -1,17 +1,18 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, Dict, List, Tuple
 
 from ....schema_dsl.constants import FIELD_KIND_DERIVED, FIELD_KIND_SOURCE
 from ...call_by import CallByParseError, extract_call_by_dependencies, parse_call_by
 from ...models import AliasIndex, FieldDef, RawDemand
+from ...parsers.utils import mapping_or_none
 from ...security import ComputeExpressionError, SecurityError, extract_compute_dependencies, is_constant_compute_expression
+from ..base import ValidatorFieldBaseMixin
 from ..constants import F
 from ..issues import ValidationIssue
 
 _F = F
 
 
-class ValidatorFieldDerivedMixin:
+class ValidatorFieldDerivedMixin(ValidatorFieldBaseMixin):
     def _collect_derived_fields_v3(
         self,
         raw: RawDemand,
@@ -21,46 +22,43 @@ class ValidatorFieldDerivedMixin:
         alias_index: AliasIndex,
         derived_fields_with_deps: List[Tuple[str, List[str], str]],
     ) -> None:
-        raw_fields_val = raw.data.get(_F.FIELDS)
-        if raw_fields_val is None:
+        raw_fields_value = raw.data.get(_F.FIELDS)
+        if raw_fields_value is None:
             return
-        if not isinstance(raw_fields_val, dict):
+        raw_fields = mapping_or_none(raw_fields_value)
+        if raw_fields is None:
             self._add_error(errors, "'{}' must be a dictionary".format(_F.FIELDS), path=_F.FIELDS)
             return
-        raw_fields = raw_fields_val
 
         for field_id_raw, field_data_raw in raw_fields.items():
-            if not isinstance(field_data_raw, dict):
-                self._add_error(errors, "Field '{}' must be a dictionary".format(field_id_raw), path="fields.{}".format(field_id_raw))
+            field_id = str(field_id_raw)
+            field_dict = mapping_or_none(field_data_raw)
+            if field_dict is None:
+                self._add_error(errors, "Field '{}' must be a dictionary".format(field_id), path="fields.{}".format(field_id))
                 continue
-            field_dict = cast("Dict[str, Any]", field_data_raw)
             has_compute = _F.COMPUTE in field_dict
             has_call_by = _F.CALL_BY in field_dict
             if not has_compute and not has_call_by:
                 self._add_error(
                     errors,
-                    "v3 fields '{}' only allow derived fields with compute/call_by".format(field_id_raw),
-                    path="fields.{}".format(field_id_raw),
+                    "v3 fields '{}' only allow derived fields with compute/call_by".format(field_id),
+                    path="fields.{}".format(field_id),
                 )
                 continue
-            self._validate_field_id_not_reserved(
-                str(field_id_raw),
-                errors,
-                path="fields.{}".format(field_id_raw),
-            )
+            self._validate_field_id_not_reserved(field_id, errors, path="fields.{}".format(field_id))
             _ = self._add_field_def_v3(
-                field_id_raw,
+                field_id,
                 FIELD_KIND_DERIVED,
                 None,
-                field_data_raw,
+                field_dict,
                 field_defs,
                 defs_by_id,
                 alias_index,
                 errors,
             )
-            self._validate_derived_field(field_id=str(field_id_raw), field_data=field_dict, errors=errors)
-            deps, dep_path = self._resolve_derived_dependencies(field_id=str(field_id_raw), field_dict=field_dict)
-            derived_fields_with_deps.append((str(field_id_raw), deps, dep_path))
+            self._validate_derived_field(field_id=field_id, field_data=field_dict, errors=errors)
+            deps, dep_path = self._resolve_derived_dependencies(field_id=field_id, field_dict=field_dict)
+            derived_fields_with_deps.append((field_id, deps, dep_path))
 
     def _validate_no_derived_source_overlap(
         self,
@@ -175,7 +173,7 @@ class ValidatorFieldDerivedMixin:
             return
         dependencies = tuple(extract_compute_dependencies(compute_expr))
         try:
-            _ = self._compute_engine.compile(compute_expr, dependencies)
+            _ = self._require_compute_engine().compile(compute_expr, dependencies)
         except (SecurityError, ComputeExpressionError) as exc:
             self._add_error(
                 errors,

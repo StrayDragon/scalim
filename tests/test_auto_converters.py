@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.utils.converters import _format_decimal_no_exponent, auto_normalize_key, auto_str_normalize
+from scalim.utils.converters import _format_decimal_no_exponent, auto_normalize_key, auto_str_normalize, must_to_int
 
 
 class TestAutoStrNormalize:
@@ -217,3 +217,7 @@ class TestIdempotency:
 class TestDecimalInternalFormatting:
     def test_format_decimal_nan_uses_str(self) -> None:
         assert _format_decimal_no_exponent(Decimal("NaN")) == "NaN"
+
+
+def test_must_to_int_returns_none_for_unsupported_type() -> None:
+    assert must_to_int(object()) is None

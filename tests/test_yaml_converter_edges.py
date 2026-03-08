@@ -3,6 +3,8 @@ import pytest
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ConversionError
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
+from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_int
+from scalim.dsl.by_yaml.runtime._internal.conversion_sources import _ensure_field_value, _resolve_call_by_ctx_attr
 from scalim.dsl.by_yaml.schema_dsl.models import (
     DemandConfig,
     DerivedFieldConfig,
@@ -338,3 +340,22 @@ def test_converter_value_and_lookup_cast_edges() -> None:
     multi_cast = converter._get_lookup_cast_fn(LookupCastConfig(name="sep_first", sep=","), is_multi=True)
     assert multi_cast("bad") is None
     assert multi_cast(["", "1"]) is None
+
+
+def test_converter_lookup_cast_registry_uninitialized_and_cast_int_type_error() -> None:
+    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
+    converter._lookup_casts = None
+
+    with pytest.raises(ConversionError, match="Lookup cast registry is not initialized"):
+        converter._get_lookup_cast_fn(LookupCastConfig(name="auto", sep=None), is_multi=False)
+
+    with pytest.raises(TypeError, match="Unsupported int cast value type"):
+        cast_int(object())
+
+
+def test_conversion_source_helpers_raise_on_invalid_runtime_values() -> None:
+    with pytest.raises(TypeError, match="returned unsupported type"):
+        _ensure_field_value(object(), field_id="status_name", producer="call_by")
+
+    with pytest.raises(AttributeError, match="call_by context missing attribute"):
+        _resolve_call_by_ctx_attr(object(), "row_id")

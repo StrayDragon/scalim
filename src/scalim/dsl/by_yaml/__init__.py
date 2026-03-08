@@ -7,6 +7,9 @@
 - `scalim.dsl.by_yaml.runtime.*`
 """
 
+from typing import TYPE_CHECKING, Any
+
+from ...vendor.compact.importlibx import import_module
 from .runtime.contracts import (
     UNSET,
     Compilation,
@@ -15,8 +18,20 @@ from .runtime.contracts import (
     RunOverrides,
     RunResult,
 )
-from .runtime.entrypoints import compile as compile  # noqa: A004
-from .runtime.entrypoints import run as run
+
+if TYPE_CHECKING:
+    from .runtime.entrypoints import compile as compile  # noqa: A004
+    from .runtime.entrypoints import run as run
+else:
+
+    def compile(*args: Any, **kwargs: Any) -> Compilation:  # noqa: A001
+        entrypoints = import_module("scalim.dsl.by_yaml.runtime.entrypoints")
+        return entrypoints.compile(*args, **kwargs)
+
+    def run(*args: Any, **kwargs: Any) -> RunResult:
+        entrypoints = import_module("scalim.dsl.by_yaml.runtime.entrypoints")
+        return entrypoints.run(*args, **kwargs)
+
 
 __all__ = (
     "UNSET",

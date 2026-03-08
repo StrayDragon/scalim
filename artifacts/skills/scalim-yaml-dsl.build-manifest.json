@@ -62,7 +62,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema_dsl/constants.py",
-      "sha256": "ab78ccb162721a73ab4fe593c4f5a3b0b1d51e4433ae0a05542b4505874f1edc"
+      "sha256": "af6dea5366b7a0d572aae706d187b8273f52cd300eb855c91c7cfe09517e09e4"
     }
   ],
   "outputs": [

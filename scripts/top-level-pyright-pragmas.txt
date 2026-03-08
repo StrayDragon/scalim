@@ -1,0 +1,14 @@
+# 当前允许保留顶层 `# pyright:` pragma 的文件清单
+# 由 `python scripts/check-top-level-pyright-pragmas.py --sync` 同步生成
+
+src/scalim/ob/_internal/common.py
+src/scalim/ob/_internal/manager_capture.py
+src/scalim/ob/_internal/manager_emit.py
+src/scalim/ob/_internal/manager_registry.py
+src/scalim/ob/_internal/manager_state.py
+src/scalim/ob/manager.py
+src/scalim/ob/presets/_internal/viz_handlers.py
+src/scalim/ob/presets/_internal/viz_nodes.py
+src/scalim/ob/presets/_internal/viz_output.py
+src/scalim/ob/presets/viz.py
+src/scalim/spec/ir/relations.py

@@ -8,7 +8,7 @@ from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
-from scalim.planning.operators import LoadRefOperatorIr, OperatorType
+from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir.fields import FieldIr
@@ -759,3 +759,35 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
     assert context.get_field_value("country_name", 2) == "JAPAN"
     assert mapping_loader.calls == 0
     assert country_loader.calls == 0
+
+
+def test_load_ref_execute_returns_early_for_non_load_ref_operator() -> None:
+    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    operator = LoadOperatorIr(
+        operator_id="load_orders",
+        operator_type=OperatorType.LOAD.value,
+        source=source,
+        field_keys=("amount",),
+        is_primary=True,
+    )
+    runtime = _make_runtime(ExecutionPlan(field_specs={}), _make_main_source())
+
+    LoadRefOperatorExecutor().execute(operator, BatchContext(), [1], runtime)
+
+
+def test_load_ref_executor_ignores_non_load_ref_operator() -> None:
+    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
+    context = BatchContext()
+
+    wrong_operator = LoadOperatorIr(
+        operator_id="load",
+        operator_type=OperatorType.LOAD.value,
+        source=source,
+        field_keys=("amount",),
+        is_primary=False,
+    )
+
+    LoadRefOperatorExecutor().execute(wrong_operator, context, [1], runtime)
+    assert context.get_field_value("amount", 1) is None

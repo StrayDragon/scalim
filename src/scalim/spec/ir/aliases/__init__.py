@@ -1,13 +1,27 @@
-from typing import Any, Callable, Dict, Hashable, Iterable, List, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Union
 
-from ....typedefs import RowData
+from ....typedefs import LoaderCallParams, LoaderResultMapping, LookupKey, RowData
 
-LoaderResultMapCallable = Callable[..., Dict[Hashable, Any]]
+LoaderResultMapCallable = Callable[..., object]
 """
-`Loader` 函数类型: 返回 `Dict[Hashable, Any]` 的可调用对象
+`Loader` 函数类型: 返回 `Mapping[LookupKey, object]` 的可调用对象
 
 用户注入的数据源加载函数应符合此签名.
 """
+
+
+LoaderParamsBuilder = Callable[..., LoaderCallParams]
+"""
+`Binding.params_builder` 函数类型: `(context) -> (args, kwargs)`
+"""
+
+
+LookupKeyCast = Callable[[object], Optional[LookupKey]]
+"""关联键归一化函数类型."""
+
+
+LoaderExtractor = Callable[[LookupKey, LoaderResultMapping], object]
+"""`Loader` 结果提取器类型: `(lookup_key, loader_result) -> extracted_data`."""
 
 
 MainSourceRowIterableCallable = Callable[..., Iterable[RowData]]
@@ -24,8 +38,16 @@ LookupKeySpec = Union[str, Tuple[str, ...], List[str]]
 """
 
 
+NormalizedLookupKeySpec = Union[str, Tuple[str, ...]]
+"""归一化后的字段键类型: 单字段 `str` 或复合字段元组."""
+
+
 __all__ = [
+    "LoaderExtractor",
+    "LoaderParamsBuilder",
     "LoaderResultMapCallable",
+    "LookupKeyCast",
     "LookupKeySpec",
     "MainSourceRowIterableCallable",
+    "NormalizedLookupKeySpec",
 ]

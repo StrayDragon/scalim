@@ -1,6 +1,4 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false
-
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ...schema_dsl.models import (
     DEMAND_KEYS,
@@ -11,19 +9,23 @@ from ...schema_dsl.models import (
     RelationStepConfig,
 )
 from ..models import RawDemand
+from .sources import ParserSourcesMixin
+from .utils import list_or_none, mapping_or_none
 
 
-class ParserRelationsMixin:
-    def _parse_relation_ref(self, relation_raw: Any) -> Optional[InlineRelationConfig]:
+class ParserRelationsMixin(ParserSourcesMixin):
+    def _parse_relation_ref(self, relation_raw: object) -> Optional[InlineRelationConfig]:
         if isinstance(relation_raw, str):
             msg = "relation must be an object with steps; relation_id string is not supported"
             raise TypeError(msg)
-        if isinstance(relation_raw, dict):
-            relation_dict = cast("Dict[str, Any]", relation_raw)
-            steps_raw = relation_dict.get(RELATION_CONFIG_KEYS["steps"])
-            steps = self._parse_steps(steps_raw)
-            return InlineRelationConfig(steps=steps)
-        return None
+
+        relation_dict = mapping_or_none(relation_raw)
+        if relation_dict is None:
+            return None
+
+        steps_raw = relation_dict.get(RELATION_CONFIG_KEYS["steps"])
+        steps = self._parse_steps(steps_raw)
+        return InlineRelationConfig(steps=steps)
 
     def _parse_relations(self, raw: RawDemand) -> Dict[str, RelationConfig]:
         relations: Dict[str, RelationConfig] = {}
@@ -32,12 +34,11 @@ class ParserRelationsMixin:
             return relations
 
         for rel_id_raw, rel_data_raw in raw_relations.items():
-            if not isinstance(rel_data_raw, dict):
+            rel_data = mapping_or_none(rel_data_raw)
+            if rel_data is None:
                 continue
 
-            rel_id: str = str(rel_id_raw)
-            rel_data: Dict[str, Any] = rel_data_raw
-
+            rel_id = str(rel_id_raw)
             relations[rel_id] = self._parse_relation(rel_id, rel_data)
 
         return relations
@@ -49,15 +50,17 @@ class ParserRelationsMixin:
             steps=steps,
         )
 
-    def _parse_steps(self, steps_raw: Any) -> Tuple[RelationStepConfig, ...]:
-        if not isinstance(steps_raw, list):
+    def _parse_steps(self, steps_raw: object) -> Tuple[RelationStepConfig, ...]:
+        step_items = list_or_none(steps_raw)
+        if step_items is None:
             return ()
 
         steps: List[RelationStepConfig] = []
-        for step_raw in steps_raw:
-            if not isinstance(step_raw, dict):
+        for step_raw in step_items:
+            step_data = mapping_or_none(step_raw)
+            if step_data is None:
                 continue
-            step_data: Dict[str, Any] = step_raw
+
             from_value = self._parse_step_field(step_data.get(RELATION_STEP_KEYS["from_"]))
             to_value = self._parse_step_field(step_data.get(RELATION_STEP_KEYS["to"]))
             lookup_cast = self._parse_lookup_cast(step_data.get(RELATION_STEP_KEYS["lookup_cast"]))
@@ -74,7 +77,8 @@ class ParserRelationsMixin:
 
         return tuple(steps)
 
-    def _parse_step_field(self, raw_field: Any) -> Union[str, Tuple[str, ...]]:
-        if isinstance(raw_field, list):
-            return tuple(str(item) for item in raw_field)
+    def _parse_step_field(self, raw_field: object) -> Union[str, Tuple[str, ...]]:
+        field_items = list_or_none(raw_field)
+        if field_items is not None:
+            return tuple(str(item) for item in field_items)
         return str(raw_field) if raw_field is not None else ""

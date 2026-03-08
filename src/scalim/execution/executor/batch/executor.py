@@ -7,7 +7,7 @@
 
 import time
 from concurrent.futures import Executor
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
+from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
 
 from ....planning.operators import LoadRefOperatorIr as LoadRefOp
 from ....planning.operators import OperatorType, SupportedOperatorIr
@@ -15,7 +15,9 @@ from ....planning.plan import ExecutionPlan
 from ....sinks.sink_base import ISink
 from ....typedefs import FieldValue, RowData
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
+from ...adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from ...context import BatchContext
+from ...pipeline.overrides import PipelineOverrides
 from ..operators.base import OperatorExecutor
 from ..operators.compute.executor import ComputeOperatorExecutor
 from ..operators.load import LoadOperatorExecutor
@@ -28,10 +30,6 @@ from ._internal.stage_spans import init_stage_span_tracking
 from ._main_prefill import prefill_main_source_fields
 
 # endregion
-
-if TYPE_CHECKING:
-    from ...adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
-    from ...pipeline.overrides import PipelineOverrides
 
 
 class BatchExecutor:
@@ -61,12 +59,8 @@ class BatchExecutor:
             OperatorType.RELEASE.value: ReleaseOperatorExecutor(),
         }
         if overrides is None:
-            from ...pipeline.overrides import PipelineOverrides  # noqa: PLC0415
-
             overrides = PipelineOverrides()
         self._overrides = overrides
-        from ...adaptive.loadref_scheduler import AdaptiveLoadRefScheduler  # noqa: PLC0415
-
         self._adaptive_scheduler = AdaptiveLoadRefScheduler(plan, overrides=self._overrides)
 
     def prefill_main_source_fields(

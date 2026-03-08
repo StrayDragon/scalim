@@ -1,6 +1,4 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false
-
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ...schema_dsl.constants import (
     DEFAULT_BIND_AS,
@@ -26,27 +24,27 @@ from ...schema_dsl.models import (
     SourceFieldConfig,
 )
 from ..models import RawDemand
-from .utils import str_or_none
+from .utils import list_or_none, mapping_or_none, str_or_none
 
 
 class ParserSourcesMixin:
-    def _parse_loader_retry(self, raw_retry: Any) -> Optional[LoaderRetryConfig]:
-        if not isinstance(raw_retry, dict):
+    def _parse_loader_retry(self, raw_retry: object) -> Optional[LoaderRetryConfig]:
+        retry_dict = mapping_or_none(raw_retry)
+        if retry_dict is None:
             return None
-        retry_dict: Dict[str, Any] = cast("Dict[str, Any]", raw_retry)
 
-        def _as_int(value: Any) -> Optional[int]:
+        def _as_int(value: object) -> Optional[int]:
+            if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+                return None
             try:
-                if isinstance(value, bool):
-                    return None
                 return int(value)
             except (TypeError, ValueError):
                 return None
 
-        def _as_float(value: Any) -> Optional[float]:
+        def _as_float(value: object) -> Optional[float]:
+            if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+                return None
             try:
-                if isinstance(value, bool):
-                    return None
                 return float(value)
             except (TypeError, ValueError):
                 return None
@@ -83,12 +81,11 @@ class ParserSourcesMixin:
         if raw_main_source is None:
             return MainSourceConfig()
 
-        main_source_data = raw_main_source
-        source_id = str(main_source_data.get(MAIN_SOURCE_KEYS["source_id"], ""))
-        loader = str(main_source_data.get(MAIN_SOURCE_KEYS["loader"], ""))
-        params = self._parse_params(main_source_data)
-        order_by = self._parse_order_by(main_source_data)
-        retry = self._parse_loader_retry(main_source_data.get(MAIN_SOURCE_KEYS["retry"]))
+        source_id = str(raw_main_source.get(MAIN_SOURCE_KEYS["source_id"], ""))
+        loader = str(raw_main_source.get(MAIN_SOURCE_KEYS["loader"], ""))
+        params = self._parse_params(raw_main_source)
+        order_by = self._parse_order_by(raw_main_source)
+        retry = self._parse_loader_retry(raw_main_source.get(MAIN_SOURCE_KEYS["retry"]))
 
         return MainSourceConfig(
             source_id=source_id,
@@ -105,12 +102,11 @@ class ParserSourcesMixin:
             return sources
 
         for source_id_raw, source_data_raw in raw_sources.items():
-            if not isinstance(source_data_raw, dict):
+            source_data = mapping_or_none(source_data_raw)
+            if source_data is None:
                 continue
 
-            source_id: str = str(source_id_raw)
-            source_data: Dict[str, Any] = source_data_raw
-
+            source_id = str(source_id_raw)
             key = self._parse_key(source_data)
             lookup_cast = self._parse_lookup_cast(source_data.get(SOURCE_KEYS["lookup_cast"]))
             lookup_chunk_size = self._parse_lookup_chunk_size(source_data.get(SOURCE_KEYS["lookup_chunk_size"]))
@@ -167,32 +163,30 @@ class ParserSourcesMixin:
             )
         return updated
 
-    def _parse_bind(self, raw_bind: Any) -> Optional[BindConfig]:
-        if not isinstance(raw_bind, dict):
+    def _parse_bind(self, raw_bind: object) -> Optional[BindConfig]:
+        bind_dict = mapping_or_none(raw_bind)
+        if bind_dict is None:
             return None
 
-        bind_dict: Dict[str, Any] = raw_bind
         use_rows = None
         use_keys = None
         if BIND_KEYS["use_rows"] in bind_dict:
-            raw_rows = bind_dict.get(BIND_KEYS["use_rows"])
-            if isinstance(raw_rows, dict):
-                rows_dict = cast("Dict[str, Any]", raw_rows)
+            rows_dict = mapping_or_none(bind_dict.get(BIND_KEYS["use_rows"]))
+            if rows_dict is not None:
                 use_rows = BindRowsConfig(
                     param=str(rows_dict.get(BIND_ROWS_KEYS["param"], "")),
                     cache_mode=str(rows_dict.get(BIND_ROWS_KEYS["cache_mode"], DEFAULT_BIND_CACHE_MODE)),
                 )
         if BIND_KEYS["use_keys"] in bind_dict:
-            raw_keys = bind_dict.get(BIND_KEYS["use_keys"])
-            if isinstance(raw_keys, dict):
-                keys_dict = cast("Dict[str, Any]", raw_keys)
+            keys_dict = mapping_or_none(bind_dict.get(BIND_KEYS["use_keys"]))
+            if keys_dict is not None:
                 use_keys = BindKeysConfig(
                     param=str(keys_dict.get(BIND_KEY_CONFIG_KEYS["param"], "")),
                     as_=str(keys_dict.get(BIND_KEY_CONFIG_KEYS["as_"], DEFAULT_BIND_AS)),
                 )
         return BindConfig(use_rows=use_rows, use_keys=use_keys)
 
-    def _parse_lookup_chunk_size(self, raw_value: Any) -> Optional[int]:
+    def _parse_lookup_chunk_size(self, raw_value: object) -> Optional[int]:
         if raw_value is None:
             return None
         if isinstance(raw_value, bool):
@@ -204,36 +198,39 @@ class ParserSourcesMixin:
         except (TypeError, ValueError):
             return None
 
-    def _parse_lookup_cast(self, raw_lookup: Any) -> Optional[LookupCastConfig]:
-        if not isinstance(raw_lookup, dict):
+    def _parse_lookup_cast(self, raw_lookup: object) -> Optional[LookupCastConfig]:
+        lookup_dict = mapping_or_none(raw_lookup)
+        if lookup_dict is None:
             return None
-        lookup_dict: Dict[str, Any] = raw_lookup
         return LookupCastConfig(
             name=str(lookup_dict.get(LOOKUP_CAST_KEYS["name"], "")),
             sep=str_or_none(lookup_dict.get(LOOKUP_CAST_KEYS["sep"])),
         )
 
     def _parse_key(self, source_data: Dict[str, Any]) -> Union[str, Tuple[str, ...]]:
-        key_raw: Any = source_data.get(SOURCE_KEYS["key"], "")
-        if isinstance(key_raw, list):
-            return tuple(str(k) for k in key_raw)
+        key_raw = source_data.get(SOURCE_KEYS["key"], "")
+        key_items = list_or_none(key_raw)
+        if key_items is not None:
+            return tuple(str(item) for item in key_items)
         return str(key_raw)
 
     def _parse_params(self, source_data: Dict[str, Any]) -> Dict[str, Any]:
-        params_raw: Any = source_data.get(SOURCE_KEYS["params"])
-        if isinstance(params_raw, dict):
-            return dict(params_raw)
-        return {}
+        params_raw = mapping_or_none(source_data.get(SOURCE_KEYS["params"]))
+        if params_raw is None:
+            return {}
+        return dict(params_raw)
 
     def _parse_order_by(self, source_data: Dict[str, Any]) -> Tuple[str, ...]:
-        order_raw: Any = source_data.get(MAIN_SOURCE_KEYS["order_by"])
+        order_raw = source_data.get(MAIN_SOURCE_KEYS["order_by"])
         if order_raw is None:
             return ()
-        if not isinstance(order_raw, list):
+        order_items = list_or_none(order_raw)
+        if order_items is None:
             msg = "main_source.order_by must be a list"
             raise TypeError(msg)
+
         order_by: List[str] = []
-        for item in order_raw:
+        for item in order_items:
             if not isinstance(item, str):
                 msg = "main_source.order_by items must be strings"
                 raise TypeError(msg)

@@ -1,5 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false
-
 import json
 import logging
 from dataclasses import asdict, dataclass
@@ -27,8 +25,8 @@ else:
     SequenceNode = _yaml_nodes.SequenceNode
 
 from .errors import ConfigValidationError
-from .models import RawDemand
-from .security import build_compute_engine
+from .models import RawDemand, ensure_mapping
+from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
 from .validators.fields import OutputFieldIssueCollector, ValidatorFieldsMixin
 from .validators.issues import (
@@ -38,8 +36,6 @@ from .validators.issues import (
     ValidationIssue,
     ValidationReport,
 )
-from .validators.relations import ValidatorRelationsMixin
-from .validators.sources import ValidatorSourcesMixin
 
 _OutputFieldIssueCollector = OutputFieldIssueCollector
 
@@ -75,14 +71,10 @@ __all__ = [
 ]
 
 
-class ConfigValidator(
-    ValidatorSourcesMixin,
-    ValidatorRelationsMixin,
-    ValidatorFieldsMixin,
-):
+class ConfigValidator(ValidatorFieldsMixin):
     _schema_path: str
     _schema: Optional[Dict[str, Any]]
-    _compute_engine: Any
+    _compute_engine: Optional[SecureComputeEngine]
     _step_allowed_fields_by_source: Dict[str, Set[str]]
     _max_validation_error_lines: int
     _jsonschema_validate_fn: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]]
@@ -93,6 +85,7 @@ class ConfigValidator(
         max_validation_error_lines: Optional[int] = None,
         jsonschema_validate_fn: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]] = None,
     ) -> None:
+        super().__init__()
         if schema_path is None:
             schema_path = str(Path(__file__).parent.parent / "schema" / "demand.gen.json")
         self._schema_path = schema_path
@@ -106,9 +99,6 @@ class ConfigValidator(
         if self._max_validation_error_lines < 1:
             msg = "max_validation_error_lines must be >= 1"
             raise ValueError(msg)
-
-    def _add_error(self, errors: List["ValidationIssue"], message: str, path: str = "") -> None:
-        errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_ERROR, message=message, path=path))
 
     def _validate_deprecated_observability_fields(self, config: Dict[str, Any], errors: List["ValidationIssue"]) -> None:
         obs_raw: Any = config.get("observability")
@@ -304,9 +294,13 @@ def _index_yaml_node(
             _index_yaml_node(item_node, idx_path, locations, record_current=False)
 
 
+def _compose_yaml_node(yaml_text: str) -> Optional[object]:
+    return cast("Optional[object]", yaml.compose(yaml_text, Loader=yaml.SafeLoader))  # pyright: ignore[reportUnknownMemberType]
+
+
 def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:
     try:
-        root = yaml.compose(yaml_text, Loader=yaml.SafeLoader)  # pyright: ignore[reportUnknownMemberType]
+        root = _compose_yaml_node(yaml_text)
     except Exception:  # noqa: BLE001
         return {}
     if root is None:
@@ -411,8 +405,9 @@ def validate_yaml_text(
         )
 
     validator = ConfigValidator(schema_path=schema_path)
+    config_data = ensure_mapping(yaml_data) if isinstance(yaml_data, dict) else {}
     report = validator.validate_report(
-        yaml_data if isinstance(yaml_data, dict) else {},
+        config_data,
         strict_unknown_fields=bool(strict_unknown_fields),
         enable_jsonschema_validation=bool(enable_jsonschema_validation),
     )

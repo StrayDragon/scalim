@@ -1,9 +1,10 @@
+import pytest
 import pickle
 from types import MappingProxyType
 
 from scalim.hooks.base import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
-from scalim.spec.ir.binding import BindingIr, LoaderIr
+from scalim.spec.ir.binding import BindingIr, LoaderIr, _restore_bindings
 
 
 def _noop_loader():  # type: ignore[no-untyped-def]
@@ -45,3 +46,18 @@ def test_loader_ir_pickle_roundtrip_restores_mappingproxy_bindings() -> None:
     restored = pickle.loads(pickle.dumps(loader))
     assert isinstance(restored.bindings, MappingProxyType)
     assert "id" in restored.bindings
+
+
+def test_restore_bindings_returns_none_for_non_dict() -> None:
+    assert _restore_bindings([("id", object())]) is None
+
+
+def test_restore_bindings_rejects_non_string_tuple_key_items() -> None:
+    binding = BindingIr(key_field="id", params_builder=_noop_params)
+    with pytest.raises(TypeError, match="Invalid binding key"):
+        _restore_bindings({("id", 1): binding})
+
+
+def test_restore_bindings_rejects_invalid_value() -> None:
+    with pytest.raises(TypeError, match="Invalid binding value"):
+        _restore_bindings({"id": object()})

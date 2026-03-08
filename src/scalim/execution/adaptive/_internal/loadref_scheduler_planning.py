@@ -1,13 +1,9 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
-# ruff: noqa: TC001
-
 from concurrent.futures import Executor
 from typing import Any, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple, cast
 
 from ....events.catalog import EVENT_ADAPTIVE_SCHEDULER_DECISION
 from ....events.events import AdaptiveSchedulerDecisionEvent
 from ....planning.operators import LoadRefOperatorIr
-from ....typedefs import FieldValue
 from ...context import BatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
 from ..aggregation_unit import commit_layer_results as _commit_layer_results_unit
@@ -17,9 +13,10 @@ from ..strategy_unit import build_task_specs as _build_task_specs_unit
 from ..strategy_unit import collect_layer_executable_ops as _collect_layer_executable_ops_unit
 from ..submission_unit import LayerScheduleStats as _LayerScheduleStats
 from ..tuning import DEFAULT_ADAPTIVE_POOL
+from .loadref_scheduler_base import AdaptiveLoadRefSchedulerBase
 
 
-class AdaptiveLoadRefSchedulerPlanningMixin:
+class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
     def _collect_layer_executable_ops(
         self,
         layer_ops: Sequence[LoadRefOperatorIr],
@@ -43,9 +40,11 @@ class AdaptiveLoadRefSchedulerPlanningMixin:
         layer_lookup_keys: Optional[Dict[str, int]],
     ) -> AdaptiveLayerDecision:
         resolved_workers = max(1, int(max_workers))
-        return self._policy.decide_layer_parallelism(
+        policy = self._require_policy()
+        tuning = self._require_tuning()
+        return policy.decide_layer_parallelism(
             layer_task_ops,
-            tuning=self._tuning,
+            tuning=tuning,
             runtime=runtime,
             pool_is_available=pool is not None,
             resolved_max_workers=resolved_workers,
@@ -53,8 +52,9 @@ class AdaptiveLoadRefSchedulerPlanningMixin:
         )
 
     def _resolve_task_pool(self, op: LoadRefOperatorIr) -> str:
-        pool_name = self._policy.choose_task_pool(op=op, tuning=self._tuning) or DEFAULT_ADAPTIVE_POOL
-        if pool_name != DEFAULT_ADAPTIVE_POOL and pool_name not in self._tuning.pools:
+        tuning = self._require_tuning()
+        pool_name = self._require_policy().choose_task_pool(op=op, tuning=tuning) or DEFAULT_ADAPTIVE_POOL
+        if pool_name != DEFAULT_ADAPTIVE_POOL and pool_name not in tuning.pools:
             msg = "AdaptivePolicy returned unknown pool '{}' for field '{}'".format(pool_name, op.field_key)
             raise ValueError(msg)
         return pool_name
@@ -75,7 +75,7 @@ class AdaptiveLoadRefSchedulerPlanningMixin:
         if step.is_multi_field():
             from_fields = step.get_from_fields()
             for row_id in batch_row_nth:
-                raw_parts: List[FieldValue] = [context.get_field_value(key, row_id) for key in from_fields]
+                raw_parts = [context.get_field_value(key, row_id) for key in from_fields]
                 if any(val is None for val in raw_parts):
                     continue
                 raw_key = cast("Hashable", tuple(raw_parts))
@@ -87,7 +87,7 @@ class AdaptiveLoadRefSchedulerPlanningMixin:
 
         from_field = step.get_from_fields()[0]
         for row_id in batch_row_nth:
-            raw_value: FieldValue = context.get_field_value(from_field, row_id)
+            raw_value = context.get_field_value(from_field, row_id)
             if raw_value is None:
                 continue
             try:

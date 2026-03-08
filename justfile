@@ -216,8 +216,21 @@ gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-ag
 type-check:
     uv {{ UV_OPTIONS }} run basedpyright src/scalim/ # --level error
 
+# 检查: Docker 可用性
+is-docker-available:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker version >/dev/null 2>&1; then
+        echo "[error] docker unavailable; please start Docker and retry" >&2
+        exit 1
+    fi
+
+# 检查: 核心链路更严格的类型边界(以 `pyproject.toml` 的 `tool.basedpyright.strict` 为准)
+type-check-core-tight:
+    uv {{ UV_OPTIONS }} run basedpyright $(uv {{ UV_OPTIONS }} run scripts/toml-get.py --file pyproject.toml --key tool.basedpyright.strict --format shell-words)
+
 # 检查: 格式化&Lint (只检查;不改文件)
-lint: type-check
+lint: type-check type-check-core-tight
     uv {{ UV_OPTIONS }} run ruff format --check .
     uv {{ UV_OPTIONS }} run ruff check .
 
@@ -229,6 +242,10 @@ lintfix: type-check
 # 检查: 文档字符串/注释语言(中文为主;允许反引号包裹技术词)
 py-doc-language-check:
     uv {{ UV_OPTIONS }} run python scripts/check-py-doc-language.py
+
+# 检查: `src/scalim/` 顶层 `# pyright:` pragma 未新增(源码扫描 + 清单 ratchet)
+top-level-pyright-pragmas-check:
+    uv {{ UV_OPTIONS }} run python scripts/check-top-level-pyright-pragmas.py
 
 # 检查: `src/scalim/` 注释/文档字符串英文需用反引号包裹(更严格)
 comments-cn-check:
@@ -386,7 +403,7 @@ examples:
     echo "All examples completed!"
 
 # QA: 仅py轻量的检查
-quick-check-only-py: lint py-doc-language-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check stdlib-collisions-check test
+quick-check-only-py: lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check stdlib-collisions-check test
 
 alias quick-qa-only-py := quick-check-only-py
 
@@ -404,24 +421,12 @@ check: quick-check-only-py py36-compat-check py36-typingext-check frontend-check
 alias qa := check
 
 # 检查: Python 3.6 语法兼容性 (仅 `src/scalim/`)
-py36-compat-check:
+py36-compat-check: is-docker-available
     docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 python -m compileall -q src/scalim
 
 # 检查: `Python 3.6` + `typing-extensions==4.1.1` 隔离环境兼容性
-py36-typingext-check:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash -lc '
-        set -euo pipefail
-        tmp_root=$(mktemp -d /tmp/scalim-py36-typingext.XXXXXX)
-        trap '\''rm -rf "$tmp_root"'\'' EXIT
-        python -m venv "$tmp_root/venv"
-        . "$tmp_root/venv/bin/activate"
-        python -m pip install --upgrade "pip<22" "setuptools<60" "wheel<0.38"
-        python -m pip install dataclasses "typing-extensions==4.1.1" "pyyaml>=5.4.1,<6.0.2"
-        PYTHONPATH=/repo/src python -m compileall -q /repo/src/scalim
-        PYTHONPATH=/repo/src python -c "from scalim.dsl.by_yaml import Compilation, RunOverrides; from scalim.execution import ScalimEngine; from scalim.ob import Observability; from scalim.planning import PlanBuilder; from scalim.spec.ir import DemandIr; from scalim.vendor.compact.typing_extensionsx import Self, override; _ = (Compilation, DemandIr, Observability, PlanBuilder, RunOverrides, ScalimEngine, Self, override); print(\"OK: py36 + typing-extensions 4.1.1\")"
-    '
+py36-typingext-check: is-docker-available
+    docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash /repo/scripts/check-py36-typingext-docker.sh
 
 # 清理缓存/产物 (默认 dry-run; 需要 YES 才执行)
 clean-cache CONFIRM="":

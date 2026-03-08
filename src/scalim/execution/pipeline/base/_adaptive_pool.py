@@ -1,4 +1,4 @@
-from concurrent.futures import Executor, ThreadPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import ExitStack
 from typing import Optional
 from warnings import warn
@@ -6,6 +6,7 @@ from warnings import warn
 from ....planning.plan import ExecutionPlan
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
 from ...adaptive.policy import ADAPTIVE_BACKEND_ASYNC, ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_THREAD
+from ...adaptive.thread_loop_executor import ThreadLoopExecutor
 from ...executor.runtime.runtime import ExecutionRuntime
 from ..overrides import PipelineOverrides
 
@@ -60,12 +61,8 @@ def maybe_create_adaptive_pool(
     if backend == ADAPTIVE_BACKEND_THREAD:
         executor_cls = overrides.adaptive_executor_cls or ThreadPoolExecutor
     elif backend == ADAPTIVE_BACKEND_PROCESS:
-        from concurrent.futures import ProcessPoolExecutor  # noqa: PLC0415
-
         executor_cls = overrides.adaptive_process_executor_cls or ProcessPoolExecutor
     elif backend == ADAPTIVE_BACKEND_ASYNC:
-        from ...adaptive.thread_loop_executor import ThreadLoopExecutor  # noqa: PLC0415
-
         executor_cls = overrides.adaptive_async_executor_cls or ThreadLoopExecutor
     else:
         msg = "Invalid adaptive backend '{}'".format(backend)

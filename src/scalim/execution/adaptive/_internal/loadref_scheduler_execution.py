@@ -1,4 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 import pickle
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple, cast
 
@@ -19,13 +18,14 @@ from ..policy import (
 from ..strategy_unit import TaskSpec as _TaskSpec
 from ..submission_unit import LayerScheduleStats as _LayerScheduleStats
 from ..submission_unit import run_tasks_in_pool as _run_tasks_in_pool_unit
+from .loadref_scheduler_base import AdaptiveLoadRefSchedulerBase
 from .loadref_scheduler_support import AdaptiveTaskResult as _AdaptiveTaskResult
 from .loadref_scheduler_support import run_task_in_process as _run_task_in_process
 
 
-class AdaptiveLoadRefSchedulerExecutionMixin:
+class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
     def _build_loadref_executor(self) -> LoadRefOperatorExecutor:
-        factory = self._overrides.adaptive_loadref_executor_factory
+        factory = self._require_overrides().adaptive_loadref_executor_factory
         if factory is not None:
             return cast("LoadRefOperatorExecutor", factory())
         return LoadRefOperatorExecutor()
@@ -57,7 +57,7 @@ class AdaptiveLoadRefSchedulerExecutionMixin:
         observer_manager = runtime.observer_manager.create_capture_manager()
 
         task_runtime = ExecutionRuntime(
-            plan=self._plan,
+            plan=self._require_plan(),
             hook_manager=hook_manager,
             observer_manager=observer_manager,
             main_source=runtime.main_source,
@@ -98,7 +98,7 @@ class AdaptiveLoadRefSchedulerExecutionMixin:
             max_workers=max_workers,
             submit_task=submit_task,
             collect_stats=collect_stats,
-            resolve_pool_limit=lambda pool_name, resolved: self._tuning.resolve_pool_limit(
+            resolve_pool_limit=lambda pool_name, resolved: self._require_tuning().resolve_pool_limit(
                 pool_name,
                 resolved_max_workers=resolved,
             ),
@@ -118,7 +118,7 @@ class AdaptiveLoadRefSchedulerExecutionMixin:
         serialized_context = pickle.loads(pickle.dumps(context))  # noqa: S301
         return pool.submit(
             _run_task_in_process,
-            self._plan,
+            self._require_plan(),
             spec.op,
             spec.relation_key,
             serialized_context,
@@ -133,10 +133,10 @@ class AdaptiveLoadRefSchedulerExecutionMixin:
         )
 
     def _process_failure_mode(self, runtime: ExecutionRuntime) -> str:
-        failure_mode = runtime.adaptive_process_failure_mode or self._policy.choose_process_failure_mode(
-            plan=self._plan,
+        failure_mode = runtime.adaptive_process_failure_mode or self._require_policy().choose_process_failure_mode(
+            plan=self._require_plan(),
             runtime=runtime,
-            tuning=self._tuning,
+            tuning=self._require_tuning(),
         )
         if failure_mode not in (PROCESS_FAILURE_FAIL_FAST, PROCESS_FAILURE_FALLBACK_SERIAL):
             return PROCESS_FAILURE_FAIL_FAST

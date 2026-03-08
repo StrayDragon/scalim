@@ -21,6 +21,7 @@ from ....planning.plan import ExecutionPlan
 from ....sinks.sink_base import IColumnSink, IRowSink, ISink
 from ....spec.ir.demand import DemandIr
 from ....spec.ir.fields import FieldIr
+from ....spec.ir.helpers import coerce_loader_result_mapping
 from ....typedefs import FieldValue, RowData, SinkRowKeySeq
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
@@ -169,12 +170,14 @@ class Pipeline(ABC):
                 )
                 loader_duration = time.perf_counter() - loader_start
 
-                self.runtime.preloaded_cache[source.source_id] = result
+                result_mapping = coerce_loader_result_mapping(result)
+
+                self.runtime.preloaded_cache[source.source_id] = result_mapping
 
                 self.runtime.instrumentation.emit_loader_call(
                     loader_name=source.source_id,
                     params={},
-                    result=result,
+                    result=result_mapping,
                     duration=loader_duration,
                     cache_scope="preload_forever",
                 )

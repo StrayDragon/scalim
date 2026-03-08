@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Callable, Mapping, Optional, Set, Tuple, Union
+from typing import Callable, Hashable, Mapping, Optional, Set, Tuple, Union
 
+from ...typedefs import FieldValue
 from .helpers import extract_from_fields
 from .presentation import FieldPresentationIr
 from .relations import JoinConditionIr, LookupStepIr, RelationIr
@@ -12,11 +13,11 @@ from .sources import SourceRefIr
 class ComputeCallContextIr:
     """派生字段 `call_by` 上下文(IR): 运行时构建,用于提供受控上下文给用户函数."""
 
-    row_id: Any
+    row_id: Hashable
     batch_num: int
     field_id: str
     deps: Tuple[str, ...]
-    values: Mapping[str, Any]
+    values: Mapping[str, FieldValue]
 
     def __post_init__(self) -> None:
         if not isinstance(self.values, MappingProxyType):
@@ -61,12 +62,12 @@ class FieldIr:
     导出/展示元信息
     """
 
-    value_formatter: Optional[Callable[[Any], Any]] = None
+    value_formatter: Optional[Callable[[FieldValue], FieldValue]] = None
     """
     输出格式化函数
     """
 
-    transform: Optional[Callable[[Any], Any]] = None
+    transform: Optional[Callable[[FieldValue], FieldValue]] = None
     """
     值转换函数 (可选)
     """
@@ -109,14 +110,14 @@ class FieldIr:
             if isinstance(self.relation, JoinConditionIr):
                 # 单个条件,提取左侧字段
                 deps.add(self.relation.left.field_name)
-            elif isinstance(self.relation, RelationIr):
+            else:
                 # 多个条件,提取所有左侧字段
                 for condition in self.relation.conditions:
                     deps.add(condition.left.field_name)
             return tuple(deps)
         return ()
 
-    def apply_transform(self, value: Any) -> Any:
+    def apply_transform(self, value: FieldValue) -> FieldValue:
         """应用转换函数(结果侧)
 
         参数:
@@ -124,13 +125,13 @@ class FieldIr:
 
         注意: 类型安全说明:
         - 如果有 `transform` 函数,返回类型由 `transform` 决定
-        - 如果没有 `transform`,返回原始值 (类型为 `Any`,需要调用方处理)
+        - 如果没有 `transform`,返回原始值 (类型保持为 `FieldValue`)
         """
         if self.transform is not None:
             value = self.transform(value)
         if self.value_formatter is not None:
             return self.value_formatter(value)
-        return value  # type: ignore[return-value]   - 没有 transform 时返回原始值
+        return value
 
 
 @dataclass(frozen=True)
@@ -163,7 +164,7 @@ class DerivedFieldIr:
     依赖字段的 `field_key` 元组.
     """
 
-    calculator: Callable[..., Any]
+    calculator: Callable[..., FieldValue]
     """
     计算函数
     """
@@ -173,7 +174,7 @@ class DerivedFieldIr:
     导出/展示元信息
     """
 
-    value_formatter: Optional[Callable[[Any], Any]] = None
+    value_formatter: Optional[Callable[[FieldValue], FieldValue]] = None
     """
     输出格式化函数
     """
@@ -208,7 +209,7 @@ class DerivedFieldIr:
     def get_dependencies(self) -> Tuple[str, ...]:
         return self.dependencies
 
-    def compute(self, **field_values: Any) -> Optional[Any]:
+    def compute(self, **field_values: FieldValue) -> FieldValue:
         """
         执行计算: 通过依赖字段的值计算得出新的值
 

@@ -1,23 +1,27 @@
-# pyright: reportUnusedFunction=false
 from typing import Any, Dict
 
 SCHEMA_META_KEY = "schema"
 SCHEMA_OMIT_KEY = "schema_omit"
 
 
-def _schema_meta(**kwargs: Any) -> Dict[str, Any]:
+def schema_meta(**kwargs: Any) -> Dict[str, Any]:
     return {SCHEMA_META_KEY: kwargs}
 
 
-def _schema_omit(**kwargs: Any) -> Dict[str, Any]:
+def schema_omit(**kwargs: Any) -> Dict[str, Any]:
     meta: Dict[str, Any] = {SCHEMA_OMIT_KEY: True}
     if kwargs:
         meta[SCHEMA_META_KEY] = kwargs
     return meta
 
 
-def _schema_ref(name: str) -> Dict[str, Any]:
+def schema_ref(name: str) -> Dict[str, Any]:
     return {"$ref": "#/definitions/{}".format(name)}
+
+
+_schema_meta = schema_meta
+_schema_omit = schema_omit
+_schema_ref = schema_ref
 
 
 FIELD_KIND_SOURCE = "source"
@@ -138,12 +142,14 @@ DESC_LOADER_RETRY_MD = (
 
 _SOURCE_ID_PATTERN = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
 _SOURCE_FIELD_PATTERN = r"^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$"
-_SOURCE_ID_STRING_SCHEMA = {
+SOURCE_ID_STRING_SCHEMA = {
     "type": "string",
     "pattern": _SOURCE_ID_PATTERN,
     "description": "格式: source_id (字母/数字/下划线, 首字符为字母或下划线)",
     "markdownDescription": "格式: `source_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线",
 }
+
+_SOURCE_ID_STRING_SCHEMA = SOURCE_ID_STRING_SCHEMA
 _SOURCE_FIELD_STRING_SCHEMA = {
     "type": "string",
     "pattern": _SOURCE_FIELD_PATTERN,

@@ -1,12 +1,20 @@
-from typing import Any, Optional, Tuple, Union
+from typing import FrozenSet, Optional, Tuple, Union
 
-from ..spec.ir.aliases import LookupKeySpec
+from ..spec.ir.aliases import LookupKeySpec, NormalizedLookupKeySpec
 from ..spec.ir.binding import BindingIr
 from ..spec.ir.relations import LookupStepIr
+from ..typedefs import LookupKey
 from .converters import NamedLookupCast, auto_normalize_key
 
+LookupCastSignature = Tuple[str, Union[str, int]]
+BindingParamMarker = Union[str, int]
+BindingSignature = Tuple[str, str, str, str, NormalizedLookupKeySpec, BindingParamMarker]
+StepSignature = Tuple[str, Tuple[str, ...], NormalizedLookupKeySpec, Optional[LookupCastSignature], Optional[BindingSignature]]
+RelationSignature = Tuple[StepSignature, ...]
+LoadRefCacheKey = Tuple[StepSignature, FrozenSet[LookupKey]]
 
-def is_auto_lookup_cast(lookup_cast: Any) -> bool:
+
+def is_auto_lookup_cast(lookup_cast: object) -> bool:
     if lookup_cast is auto_normalize_key:
         return True
     if isinstance(lookup_cast, NamedLookupCast) and lookup_cast.scalim_lookup_cast_name == "auto":
@@ -15,7 +23,7 @@ def is_auto_lookup_cast(lookup_cast: Any) -> bool:
     return getattr(lookup_cast, "_scalim_lookup_cast_name", None) == "auto"
 
 
-def normalize_key_field(key_field: LookupKeySpec) -> Union[str, Tuple[str, ...]]:
+def normalize_key_field(key_field: LookupKeySpec) -> NormalizedLookupKeySpec:
     if isinstance(key_field, list):
         return tuple(key_field)
     if isinstance(key_field, tuple):
@@ -23,7 +31,7 @@ def normalize_key_field(key_field: LookupKeySpec) -> Union[str, Tuple[str, ...]]
     return key_field
 
 
-def lookup_cast_signature(lookup_cast: Optional[Any]) -> Optional[Tuple[str, Any]]:
+def lookup_cast_signature(lookup_cast: Optional[object]) -> Optional[LookupCastSignature]:
     if lookup_cast is None:
         return None
     if lookup_cast is auto_normalize_key:
@@ -33,10 +41,10 @@ def lookup_cast_signature(lookup_cast: Optional[Any]) -> Optional[Tuple[str, Any
     return ("callable", id(lookup_cast))
 
 
-def build_binding_signature(binding: Optional[BindingIr]) -> Optional[Tuple[Any, ...]]:
+def build_binding_signature(binding: Optional[BindingIr]) -> Optional[BindingSignature]:
     if binding is None:
         return None
-    param_marker: Any = binding.param_name if binding.param_name is not None else id(binding.params_builder)
+    param_marker = binding.param_name if binding.param_name is not None else id(binding.params_builder)
     return ("binding", binding.mode, binding.as_, binding.cache_mode, binding.key_field, param_marker)
 
 
@@ -66,7 +74,7 @@ def can_group_by_relation(steps: Tuple[LookupStepIr, ...]) -> bool:
     return True
 
 
-def build_step_signature(step: LookupStepIr) -> Tuple[Any, ...]:
+def build_step_signature(step: LookupStepIr) -> StepSignature:
     to_key = normalize_key_field(step.get_to_key_or_source_key())
     lookup_cast_sig = lookup_cast_signature(step.lookup_cast)
     binding_signature = build_binding_signature(resolve_step_binding(step))
@@ -79,11 +87,15 @@ def build_step_signature(step: LookupStepIr) -> Tuple[Any, ...]:
     )
 
 
-def build_relation_signature(steps: Tuple[LookupStepIr, ...]) -> Tuple[Tuple[Any, ...], ...]:
+def build_relation_signature(steps: Tuple[LookupStepIr, ...]) -> RelationSignature:
     return tuple(build_step_signature(step) for step in steps)
 
 
 __all__ = [
+    "LoadRefCacheKey",
+    "LookupCastSignature",
+    "RelationSignature",
+    "StepSignature",
     "build_binding_signature",
     "build_relation_signature",
     "build_step_signature",

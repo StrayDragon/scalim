@@ -1,17 +1,80 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 from collections import deque
-from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Tuple, Union, cast
+from typing import Deque, Dict, List, Optional, Set, Tuple, Union
 
+from .....spec.ir.aliases import LookupKeyCast, NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr
 from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.sources import SourceIr
-from ...schema_dsl.models import DemandConfig, InlineRelationConfig, RelationStepConfig, SourceFieldConfig
+from .....spec.ir.sources import MainSourceIr, SourceIr
+from .....typedefs import StaticParams
+from ...schema_dsl.models import (
+    BindConfig,
+    DemandConfig,
+    InlineRelationConfig,
+    LookupCastConfig,
+    RelationStepConfig,
+    SourceFieldConfig,
+)
 from ..errors import ConversionError
 
 StepInfo = Tuple[str, str, LookupStepIr]
 
 
 class ConfigToIRConversionRelationMixin:
+    _sources_ir: Optional[Dict[str, SourceIr]] = None
+    _main_source_ir: Optional[MainSourceIr] = None
+    _relation_steps: Optional[Dict[str, List[StepInfo]]] = None
+    _relation_adjacency: Optional[Dict[str, List[StepInfo]]] = None
+    _source_field_id_map: Optional[Dict[str, Dict[str, str]]] = None
+    _source_data_key_map: Optional[Dict[str, Dict[str, List[str]]]] = None
+
+    def _get_lookup_cast_fn(self, lookup_cast: LookupCastConfig, *, is_multi: bool) -> LookupKeyCast:
+        _ = (lookup_cast, is_multi)
+        raise NotImplementedError
+
+    def _create_binding(
+        self,
+        bind_config: BindConfig,
+        static_params: Optional[StaticParams],
+        key_field: NormalizedLookupKeySpec,
+    ) -> BindingIr:
+        _ = (bind_config, static_params, key_field)
+        raise NotImplementedError
+
+    def _require_sources_ir(self) -> Dict[str, SourceIr]:
+        sources_ir = self._sources_ir
+        if sources_ir is None:
+            msg = "Source IR map is not initialized"
+            raise ConversionError(msg)
+        return sources_ir
+
+    def _require_relation_steps(self) -> Dict[str, List[StepInfo]]:
+        relation_steps = self._relation_steps
+        if relation_steps is None:
+            msg = "Relation steps are not initialized"
+            raise ConversionError(msg)
+        return relation_steps
+
+    def _require_relation_adjacency(self) -> Dict[str, List[StepInfo]]:
+        relation_adjacency = self._relation_adjacency
+        if relation_adjacency is None:
+            msg = "Relation adjacency is not initialized"
+            raise ConversionError(msg)
+        return relation_adjacency
+
+    def _require_source_field_id_map(self) -> Dict[str, Dict[str, str]]:
+        source_field_id_map = self._source_field_id_map
+        if source_field_id_map is None:
+            msg = "Source field id map is not initialized"
+            raise ConversionError(msg)
+        return source_field_id_map
+
+    def _require_source_data_key_map(self) -> Dict[str, Dict[str, List[str]]]:
+        source_data_key_map = self._source_data_key_map
+        if source_data_key_map is None:
+            msg = "Source data key map is not initialized"
+            raise ConversionError(msg)
+        return source_data_key_map
+
     def _convert_relations(self, config: DemandConfig) -> Dict[str, List[StepInfo]]:
         relation_steps: Dict[str, List[StepInfo]] = {}
         for rel_id, rel_config in config.relations.items():
@@ -52,15 +115,15 @@ class ConfigToIRConversionRelationMixin:
         return from_source_id, to_source_id, step_ir
 
     def _require_source_ir(self, source_id: str) -> SourceIr:
-        source = self._sources_ir.get(source_id)
+        source = self._require_sources_ir().get(source_id)
         if source is None:
             msg = "Step references unknown source '{}'".format(source_id)
             raise ConversionError(msg)
         return source
 
-    def _resolve_to_field(self, to_fields: List[str], to_source: SourceIr) -> Optional[Union[str, Tuple[str, ...]]]:
+    def _resolve_to_field(self, to_fields: List[str], to_source: SourceIr) -> Optional["NormalizedLookupKeySpec"]:
         if len(to_fields) > 1:
-            to_field: Optional[Union[str, Tuple[str, ...]]] = tuple(to_fields)
+            to_field: Optional["NormalizedLookupKeySpec"] = tuple(to_fields)
         else:
             to_field = to_fields[0]
 
@@ -68,7 +131,7 @@ class ConfigToIRConversionRelationMixin:
             return None
         return to_field
 
-    def _resolve_step_lookup_cast(self, step: RelationStepConfig, from_fields: List[str]) -> Optional[Callable[[Any], Optional[Hashable]]]:
+    def _resolve_step_lookup_cast(self, step: RelationStepConfig, from_fields: List[str]) -> Optional["LookupKeyCast"]:
         if step.lookup_cast is None:
             return None
         is_multi = len(from_fields) > 1
@@ -79,7 +142,7 @@ class ConfigToIRConversionRelationMixin:
         step: RelationStepConfig,
         config: DemandConfig,
         to_source_id: str,
-        key_field: Union[str, Tuple[str, ...]],
+        key_field: "NormalizedLookupKeySpec",
     ) -> Optional[BindingIr]:
         if step.to_bind is None:
             return None
@@ -100,28 +163,27 @@ class ConfigToIRConversionRelationMixin:
             path = self._infer_unique_path(self._main_source_ir.source_id, target_source.source_id)
             return tuple(step for _from_id, _to_id, step in path) if path else None
 
-        if isinstance(field_config.relation, InlineRelationConfig):
-            steps = self._convert_steps(field_config.relation.steps, config)
-            return tuple(step for _from_id, _to_id, step in steps)
-
-        if field_config.relation is not None:
+        relation = getattr(field_config, "relation", None)
+        if not isinstance(relation, InlineRelationConfig):
             msg = "Unsupported relation reference; use inline steps object"
             raise ConversionError(msg)
 
-        return None  # pragma: no cover
+        steps = self._convert_steps(relation.steps, config)
+        return tuple(step for _from_id, _to_id, step in steps)
 
     def _infer_unique_path(self, start_id: str, target_id: str) -> Optional[List[StepInfo]]:
         if start_id == target_id:
             return []
 
-        adjacency = self._relation_adjacency
-        if not adjacency and self._relation_steps:
-            adjacency = self._build_relation_adjacency(self._relation_steps)
+        adjacency = self._require_relation_adjacency()
+        relation_steps = self._require_relation_steps()
+        if not adjacency and relation_steps:
+            adjacency = self._build_relation_adjacency(relation_steps)
             self._relation_adjacency = adjacency
 
         max_paths = 2
         found_paths: List[List[StepInfo]] = []
-        queue = deque([(start_id, [], {start_id})])
+        queue: Deque[Tuple[str, List[StepInfo], Set[str]]] = deque([(start_id, [], {start_id})])
 
         while queue and len(found_paths) < max_paths:
             current, path, visited = queue.popleft()
@@ -159,10 +221,9 @@ class ConfigToIRConversionRelationMixin:
 
     def _parse_step_field(self, value: Union[str, Tuple[str, ...]]) -> Tuple[str, List[str]]:
         if isinstance(value, tuple):
-            source_id = None
+            source_id: Optional[str] = None
             fields: List[str] = []
-            items = cast("Iterable[str]", value)
-            for item in items:
+            for item in value:
                 src, field_name = self._parse_source_field_expr(item)
                 if source_id is None:
                     source_id = src
@@ -187,13 +248,13 @@ class ConfigToIRConversionRelationMixin:
         return data_key_map
 
     def _resolve_source_field_name(self, source_id: str, field_name: str) -> str:
-        field_map = self._source_field_id_map.get(source_id)
+        field_map = self._require_source_field_id_map().get(source_id)
         if not field_map:
             return field_name
         if field_name not in field_map:
             return field_name
         mapped = field_map[field_name]
-        data_key_map = self._source_data_key_map.get(source_id, {})
+        data_key_map = self._require_source_data_key_map().get(source_id, {})
         conflicts = data_key_map.get(field_name, [])
         if conflicts:
             unique = set(conflicts)

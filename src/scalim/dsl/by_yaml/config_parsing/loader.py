@@ -1,5 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false
-
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Optional, Union
 
@@ -22,9 +20,7 @@ from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
 from .parsers.guardrails import ParserGuardrailsMixin
 from .parsers.output import ParserOutputMixin
-from .parsers.relations import ParserRelationsMixin
 from .parsers.results import ParsedFieldsResult
-from .parsers.sources import ParserSourcesMixin
 
 __all__ = [
     "ParsedFieldsResult",
@@ -32,9 +28,17 @@ __all__ = [
 ]
 
 
+def _safe_load_yaml(source: Union[str, IO[str]]) -> object:
+    return yaml.safe_load(source)
+
+
+def _create_validator() -> "ConfigValidator":
+    from .validator import ConfigValidator  # noqa: PLC0415
+
+    return ConfigValidator()
+
+
 class YamlDemandLoader(
-    ParserSourcesMixin,
-    ParserRelationsMixin,
     ParserFieldsMixin,
     ParserOutputMixin,
     ParserGuardrailsMixin,
@@ -47,9 +51,9 @@ class YamlDemandLoader(
     def load(self, source: Union[str, Path, IO[str]]) -> DemandConfig:
         if isinstance(source, (str, Path)):
             with Path(source).open("r", encoding=UTF8_ENCODING) as f:
-                raw = yaml.safe_load(f)
+                raw = _safe_load_yaml(f)
         else:
-            raw = yaml.safe_load(source)
+            raw = _safe_load_yaml(source)
         raw_demand = RawDemand.from_raw(raw)
 
         self._ensure_validator()
@@ -59,7 +63,7 @@ class YamlDemandLoader(
         return self._parse_config(raw_demand)
 
     def load_string(self, yaml_string: str) -> DemandConfig:
-        raw = yaml.safe_load(yaml_string)
+        raw = _safe_load_yaml(yaml_string)
         raw_demand = RawDemand.from_raw(raw)
 
         self._ensure_validator()
@@ -70,9 +74,7 @@ class YamlDemandLoader(
 
     def _ensure_validator(self) -> None:
         if self._validator is None:
-            from .validator import ConfigValidator  # noqa: PLC0415
-
-            self._validator = ConfigValidator()
+            self._validator = _create_validator()
 
     def _parse_config(self, raw: RawDemand) -> DemandConfig:
         name = str(raw.data.get(DEMAND_KEYS["name"], ""))

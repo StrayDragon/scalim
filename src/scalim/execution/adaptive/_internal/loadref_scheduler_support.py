@@ -1,13 +1,14 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 import os
 from dataclasses import dataclass
 from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 
 from ....events.event import Event
+from ....hooks.base import HookManager
+from ....ob.manager import ObserverManager
 from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....spec.ir.sources import MainSourceIr
-from ....typedefs import FieldValue
+from ....typedefs import FieldValue, LoaderResultMapping
 from ...context import BatchContext
 from ...executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from ...executor.runtime.runtime import ExecutionRuntime
@@ -43,15 +44,12 @@ def run_task_in_process(
     main_source: Optional[MainSourceIr],
     guardrails: GuardrailsPolicy,
     loader_retry: LoaderRetryPolicies,
-    preloaded_cache: Dict[str, Dict[Hashable, FieldValue]],
+    preloaded_cache: Dict[str, LoaderResultMapping],
     batch_num: int,
     required_fields: Optional[Set[str]],
     *,
     group_enabled: bool,
 ) -> AdaptiveTaskResult:
-    from ....hooks.base import HookManager  # noqa: PLC0415
-    from ....ob.manager import ObserverManager  # noqa: PLC0415
-
     task_runtime = ExecutionRuntime(
         plan=plan,
         hook_manager=HookManager(),

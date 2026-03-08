@@ -409,3 +409,30 @@ def test_compute_operator_injects_ctx_when_configured() -> None:
 
     assert context.get_field_value("score", 1) == "1:7"
     assert context.get_field_value("score", 2) == "2:7"
+
+
+def test_converter_call_by_ctx_attr_missing_attribute_raises() -> None:
+    converter = ConfigToIRConverter(
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.call_by_fns"])),
+    )
+    config = _make_call_by_config("tests.call_by_fns:needs_ctx_attr($ctx.row_id)", depends_on=("status",))
+    demand_ir = converter.convert(config)
+    derived = demand_ir.fields["text"]
+    assert isinstance(derived, DerivedFieldIr)
+
+    with pytest.raises(AttributeError, match="call_by context missing attribute 'row_id'"):
+        derived.compute(status=True, **{"$ctx": type("Ctx", (), {"batch_num": 1})()})
+
+
+def test_converter_call_by_rejects_non_field_value_result() -> None:
+    converter = ConfigToIRConverter(
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.call_by_fns"])),
+    )
+    config = _make_call_by_config("tests.call_by_fns:echo($ctx.values)", depends_on=("status",))
+    demand_ir = converter.convert(config)
+    derived = demand_ir.fields["text"]
+    assert isinstance(derived, DerivedFieldIr)
+
+    ctx = type("Ctx", (), {"values": {"status": True}})()
+    with pytest.raises(TypeError, match="returned unsupported type 'dict'"):
+        derived.compute(status=True, **{"$ctx": ctx})

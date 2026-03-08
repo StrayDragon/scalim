@@ -1,10 +1,11 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Set, cast
 
+from ......vendor.compact.typing_extensionsx import override
 from ....schema_dsl.constants import FIELD_KIND_SOURCE
 from ....schema_dsl.models import DEMAND_KEYS, OUTPUT_KEYS
 from ...field_index import OutputFieldErrors, OutputFieldResolver, build_source_data_key_index
 from ...models import AliasIndex, FieldDef, RawDemand
+from ..base import ValidatorMixinBase
 from ..issues import ValidationIssue
 
 
@@ -21,17 +22,20 @@ class OutputFieldIssueCollector(OutputFieldErrors):
     def set_index(self, idx: int) -> None:
         self._current_path = "{}.{}".format(self._base_path, idx)
 
+    @override
     def type_error(self, msg: str) -> None:
         self._errors.append(ValidationIssue(severity="error", message=msg, path=self._current_path))
 
+    @override
     def value_error(self, msg: str) -> None:
         self._errors.append(ValidationIssue(severity="error", message=msg, path=self._current_path))
 
+    @override
     def error(self, msg: str) -> None:
         self._errors.append(ValidationIssue(severity="error", message=msg, path=self._current_path))
 
 
-class ValidatorFieldOutputMixin:
+class ValidatorFieldOutputMixin(ValidatorMixinBase):
     def _validate_output_fields_v3(
         self,
         raw: RawDemand,
@@ -51,6 +55,7 @@ class ValidatorFieldOutputMixin:
         if not isinstance(fields_raw, list):
             self._add_error(errors, "output.fields must be a list", path="output.fields")
             return
+        fields_list = cast("List[Any]", fields_raw)
 
         field_defs: List[FieldDef] = []
         for defs in defs_by_id.values():
@@ -65,7 +70,7 @@ class ValidatorFieldOutputMixin:
             errors=collector,
         )
         seen: Dict[str, FieldDef] = {}
-        for idx, item in enumerate(fields_raw):
+        for idx, item in enumerate(fields_list):
             collector.set_index(idx)
             field_def, _override, entry_kind = resolver.resolve_entry(item, idx)
             if field_def is None:

@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, U
 
 from ..planning.operators import PlanOperatorIr
 from ..spec.ir.fields import SupportedFieldIr
+from .viz import build_viz_graph_snapshot
+from .viz_schedule import build_viz_schedule_plan
 
 # endregion
 
@@ -158,8 +160,6 @@ class ExecutionPlan:
         返回:
             包含 `nodes`/`edges`/`meta` 的字典结构
         """
-        from .viz import build_viz_graph_snapshot  # noqa: PLC0415
-
         return build_viz_graph_snapshot(
             self,
             schema_version=schema_version,
@@ -172,8 +172,6 @@ class ExecutionPlan:
         self,
     ) -> Dict[str, Any]:
         """生成 `viz_schedule_plan.json` (用于 `adaptive` 计划视角可视化)."""
-        from .viz_schedule import build_viz_schedule_plan  # noqa: PLC0415
-
         return build_viz_schedule_plan(self)
 
 

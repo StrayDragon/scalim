@@ -3,7 +3,7 @@
 from scalim.execution.context import BatchContext
 from scalim.events.catalog import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
 from scalim.execution.executor.operators.load import LoadOperatorExecutor
-from scalim.planning.operators import LoadOperatorIr, OperatorType
+from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from scalim.spec.ir.fields import FieldIr
@@ -184,3 +184,38 @@ def test_load_operator_object_missing_attribute_returns_none() -> None:
     LoadOperatorExecutor().execute(operator, context, [1], runtime)
 
     assert context.get_field_value("missing", 1) is None
+
+
+def test_load_operator_execute_returns_early_for_non_load_operator() -> None:
+    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref_amount",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=source,
+        field_key="amount",
+        field_spec=field_spec,
+        lookup_steps=(),
+    )
+
+    LoadOperatorExecutor().execute(operator, BatchContext(), [1], runtime)
+
+
+def test_load_operator_executor_ignores_non_load_operator() -> None:
+    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
+    context = BatchContext()
+
+    wrong_operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=source,
+        field_key="amount",
+        field_spec=field_spec,
+        lookup_steps=(),
+    )
+
+    LoadOperatorExecutor().execute(wrong_operator, context, [1], runtime)
+    assert context.get_field_value("amount", 1) is None

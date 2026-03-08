@@ -1,5 +1,3 @@
-# pyright: reportPrivateUsage=false
-
 from .demand import DemandConfig
 from .field import DerivedFieldConfig, OutputConfig, SourceFieldConfig
 from .guardrails import GuardrailsComputeConfig, GuardrailsConfig, GuardrailsLoaderConfig, GuardrailsRelationsConfig

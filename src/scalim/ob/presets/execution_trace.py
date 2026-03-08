@@ -57,7 +57,7 @@ class FieldSlimStep:
     step_type: str = "field_slim"
     field_key: str = ""
     reason: str = ""
-    remaining_fields: int = 0
+    remaining_fields: Optional[int] = None
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,7 +70,7 @@ class RowWriteStep:
 
     step_type: str = "row_write"
     row_id: Optional[Hashable] = None
-    batch_num: int = 0
+    batch_num: Optional[int] = None
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -84,7 +84,7 @@ class RowWriteStep:
 class BatchTrace:
     """单个批次的执行追踪"""
 
-    batch_num: int = 0
+    batch_num: Optional[int] = None
     row_ids: List[Hashable] = field(default_factory=list)
     steps: "List[Union[LoaderCallStep, FieldSlimStep, RowWriteStep]]" = field(default_factory=list)
     start_time: float = field(default_factory=time.time)

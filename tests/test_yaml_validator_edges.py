@@ -166,6 +166,14 @@ def test_validator_collect_main_source_fields_edges() -> None:
     assert any("Field 'ok' must be a dictionary" in msg for msg in _messages(errors))
 
 
+def test_validator_require_compute_engine_guard() -> None:
+    validator = validator_module.ConfigValidator()
+    validator._compute_engine = None
+
+    with pytest.raises(RuntimeError, match="not initialized"):
+        validator._require_compute_engine()
+
+
 def test_validator_add_field_def_requires_dict() -> None:
     validator = validator_module.ConfigValidator()
     errors = []

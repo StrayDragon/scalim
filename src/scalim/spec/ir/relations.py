@@ -1,10 +1,10 @@
 # pyright: reportImportCycles=false
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, FrozenSet, Hashable, List, Optional, Set, Tuple, overload
+from typing import Dict, FrozenSet, List, Optional, Set, Tuple, overload
 
 from ...vendor.compact.typing_extensionsx import override
-from .aliases import LookupKeySpec
+from .aliases import LookupKeyCast, LookupKeySpec
 from .binding import BindingIr
 from .sources import MainSourceIr, SourceIr, SourceRefIr
 
@@ -30,7 +30,7 @@ class FieldRefIr:
     字段名
     """
 
-    def join(self, other: "FieldRefIr") -> "JoinConditionIr":
+    def join(self, other: object) -> "JoinConditionIr":
         """构建关联条件 - 推荐方式
 
         示例:
@@ -39,11 +39,11 @@ class FieldRefIr:
               `relation = source_a["f1"].join(source_b["f1"]).and_(source_a["f2"].join(source_b["f2"]))`
         """
         if not isinstance(other, FieldRefIr):
-            msg = f"join() requires a FieldRefIr, got {type(other).__name__}"  # pyright: ignore[reportUnreachable]
+            msg = f"join() requires a FieldRefIr, got {type(other).__name__}"
             raise TypeError(msg)
         return JoinConditionIr(left=self, right=other)
 
-    def eq(self, other: "FieldRefIr") -> "JoinConditionIr":
+    def eq(self, other: object) -> "JoinConditionIr":
         """构建关联条件 - `join()` 的别名,语义更清晰
 
         示例:
@@ -81,7 +81,7 @@ class JoinConditionIr:
     @overload
     def and_(self, other: "RelationIr") -> "RelationIr": ...
 
-    def and_(self, other: Any) -> "RelationIr":
+    def and_(self, other: object) -> "RelationIr":
         """组合多个条件, 表达 "且" 的语义"""
         if isinstance(other, JoinConditionIr):
             return RelationIr(conditions=(self, other))
@@ -115,7 +115,7 @@ class RelationIr:
     @overload
     def and_(self, other: "RelationIr") -> "RelationIr": ...
 
-    def and_(self, other: Any) -> "RelationIr":
+    def and_(self, other: object) -> "RelationIr":
         """支持继续组合条件, 表达 "且" 的语义"""
         if isinstance(other, JoinConditionIr):
             return RelationIr(conditions=(*self.conditions, other))
@@ -245,7 +245,7 @@ class LookupStepIr:
     目标字段名或字段名列表(可选,默认使用 `to_source` 的键)
     """
 
-    lookup_cast: Optional[Callable[[Any], Optional[Hashable]]] = None
+    lookup_cast: Optional[LookupKeyCast] = None
     """
     关联键归一化转换(仅当前步骤)
     """

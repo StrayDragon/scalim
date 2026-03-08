@@ -1,12 +1,12 @@
-from typing import Any, Hashable, List, Optional, Tuple
+from typing import Hashable, List, Optional
 
 from .....spec.ir.relations import LookupStepIr
 from .....spec.ir.sources import SourceIr
-from .....typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY, RelationLookupResult, RowData
+from .....typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY, LookupKey, RelationLookupResult, RowData
 from ....context import BatchContext
 from ...helpers.batch_data import build_row
 from ...helpers.field_access import contains_float
-from ...helpers.relation_signature import is_auto_lookup_cast
+from ...helpers.relation_signature import RelationSignature, is_auto_lookup_cast
 from ...runtime.runtime import ExecutionRuntime
 from .._internal.sentinels import MISSING
 
@@ -18,7 +18,7 @@ class LoadRefExecutionContext:
     context: BatchContext
     batch_row_nth: List[Hashable]
     field_key: str
-    relation_signature: Tuple[Tuple[Any, ...], ...]
+    relation_signature: RelationSignature
 
     def __init__(
         self,
@@ -26,7 +26,7 @@ class LoadRefExecutionContext:
         context: BatchContext,
         batch_row_nth: List[Hashable],
         field_key: str,
-        relation_signature: Tuple[Tuple[Any, ...], ...],
+        relation_signature: RelationSignature,
     ) -> None:
         self.runtime = runtime
         self.context = context
@@ -37,8 +37,8 @@ class LoadRefExecutionContext:
     def record_lookup(
         self,
         row_id: Hashable,
-        fk_raw: Any,
-        fk_normalized: Any,
+        fk_raw: object,
+        fk_normalized: Optional[LookupKey],
         target_source: SourceIr,
         result: RelationLookupResult,
         error_message: Optional[str] = None,
@@ -55,7 +55,7 @@ class LoadRefExecutionContext:
             error_message=error_message,
         )
 
-    def maybe_warn_float_lookup_key(self, row_id: Hashable, raw_key: Any, step: LookupStepIr) -> None:
+    def maybe_warn_float_lookup_key(self, row_id: Hashable, raw_key: object, step: LookupStepIr) -> None:
         if not is_auto_lookup_cast(step.lookup_cast):
             return
         if not contains_float(raw_key):
@@ -69,7 +69,7 @@ class LoadRefExecutionContext:
             sample_once=True,
         )
 
-    def normalize_key(self, row_id: Hashable, raw_key: Any, step: LookupStepIr) -> Optional[Hashable]:
+    def normalize_key(self, row_id: Hashable, raw_key: object, step: LookupStepIr) -> Optional[LookupKey]:
         relation_cache = self.runtime.key_normalize_cache.get(self.relation_signature)
         if relation_cache is None:
             relation_cache = {}
