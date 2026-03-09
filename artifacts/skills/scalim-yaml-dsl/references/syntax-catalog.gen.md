@@ -1,0 +1,520 @@
+# Scalim YAML DSL Syntax Catalog
+
+此文档由 `scripts/gen-agent-skill.py` 自动生成.
+
+## Canonical Sources
+- Schema: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
+- Canonical example: `references/generated/example-full/ecommerce_report.gen.yaml`
+- Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`
+
+## Top-Level Fields
+- `name` (required)
+- `_templates`
+- `description`
+- `batch_size`
+- `retry`
+- `main_source` (required)
+- `sources`
+- `fields`
+- `relations`
+- `guardrails`
+- `output`
+- `observability`
+
+## Definitions
+- `field`
+- `guardrails`
+- `guardrails_compute`
+- `guardrails_loader`
+- `guardrails_relations`
+- `loader_retry`
+- `logging`
+- `main_source`
+- `memory_opt`
+- `observability`
+- `output`
+- `performance`
+- `performance_report`
+- `performance_thresholds`
+- `relation`
+- `relation_report`
+- `relations`
+- `row_gap`
+- `source`
+- `source_field_inline`
+- `trace`
+- `viz`
+
+## OpenSpec Requirement Map
+### `yaml-dsl-schema`
+- Source: `openspec/specs/yaml-dsl-schema/spec.md`
+- Purpose: 通过 dataclass 元数据生成 v3-only 的 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
+- Requirements:
+  - schema 元数据生成与 hover 指引
+  - output 字段 hover 指引明确可选与 overrides 推荐写法
+  - schema hover 提供常见错误与迁移提示
+  - 顶层 schema 字段(guardrails)
+  - observability.logging 支持 renderer/preset 字段
+  - 字段声明位置与 compute 约束
+  - relation steps-only 约束
+  - output.fields 解析与 schema 指引
+  - 字段 ID 唯一性与解析规则
+  - bind/to_bind oneOf Schema
+  - 派生字段支持 call_by Schema
+  - schema meta key 参考文档与推荐写法
+  - schema meta 中 schema dict 不得吞掉 desc/md
+  - schema 明确 batch_size 的 null-or-int 语义
+  - retry 字段纳入 JSON Schema 与 hover 指引
+  - `_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform
+### `demand-dsl`
+- Source: `openspec/specs/demand-dsl/spec.md`
+- Purpose: 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
+- Requirements:
+  - 顶层结构与 IR 转换规则
+  - unknown fields 诊断提供 suggestions(CLI/库一致)
+  - Loader 引用解析与 allowlist
+  - Source/Bind 结构与 keys 分片参数
+  - 字段/关系表达式默认行为
+  - main_source 批次排序配置
+  - 顶层 batch_size 语义统一且可显式禁用分批
+  - batch_size 校验在不同入口语义一致
+  - YAML DSL 增加 loader retry 配置入口
+  - `_templates.retry` 用于复用通用策略
+  - `should_retry` 引用解析与 allowlist
+### `source-relations`
+- Source: `openspec/specs/source-relations/spec.md`
+- Purpose: 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.
+- Requirements:
+  - steps 结构与 relation 解析/推断规则
+  - lookup_key 与 lookup_cast/诊断
+  - bind/to_bind 结构与校验
+  - 批次内 LoadRef 复用与分片语义
+  - ref loader 依赖信号驱动稳定排序
+  - 关联诊断基于样本值并支持复合键对比
+  - 关联路径与比较输出可读且稳定
+### `field-compute`
+- Source: `openspec/specs/field-compute/spec.md`
+- Purpose: 定义源字段 `value_cast` 转换与派生字段 `compute/call_by` 的解析、校验与执行行为,并规范派生字段依赖推导(拒绝显式 `depends_on`)与表达式安全策略.
+- Requirements:
+  - 字段值 value_cast
+  - compute 识别/校验/安全约束
+  - 依赖推导规则与无依赖拒绝
+  - 派生字段执行与错误处理
+  - compute 表达式预编译并复用执行
+  - compute 编译缓存有上限(有界 LRU)
+  - call_by 派生字段函数调用
+  - call_by 上下文引用
+### `source-cache`
+- Source: `openspec/specs/source-cache/spec.md`
+- Purpose: 支持 cache_mode=preload_forever 的数据源在 pipeline 启动前预加载,结果写入 ExecutionRuntime.preloaded_cache 并在关联加载时复用;计划元数据记录已缓存的数据源.
+- Requirements:
+  - 预加载缓存模式
+  - 关联加载优先命中缓存
+  - 计划元数据记录缓存源
+### `runtime-pruning`
+- Source: `openspec/specs/runtime-pruning/spec.md`
+- Purpose: PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用.
+- Requirements:
+  - 依赖剪枝与计划元数据
+  - YAML 转换阶段按 output.fields 剪枝字段定义
+  - 运行时字段保留与释放策略
+### `loader-retry-policy`
+- Source: `openspec/specs/loader-retry-policy/spec.md`
+- Purpose: TBD - created by archiving change add-loader-retry-policy. Update Purpose after archive.
+- Requirements:
+  - Loader retry policy 配置模型与默认值
+  - should_retry 回调契约
+  - Retry runner 语义(次数/耗时/退避)
+  - 全局策略与 per-loader 覆盖的解析
+  - iterable/generator 的重试边界
+### `runtime-guardrails`
+- Source: `openspec/specs/runtime-guardrails/spec.md`
+- Purpose: 定义运行期 guardrails 配置与执行契约,用于对 loader/relations/compute 等环节的契约违规、数据质量问题与异常处理提供可配置的 quiet/fast_fail 行为,并通过现有错误事件通道进行可观测记录.
+- Requirements:
+  - Guardrails 配置与默认行为
+  - quiet 模式违规记录
+  - Loader 结果结构护栏
+  - RowLike 字段提取语义(无歧义优先级)
+  - 关键字段缺失护栏
+  - 字段 extractor/value_cast/transform 异常护栏
+  - 关联 null_key/type_error 阈值护栏
+  - compute 异常护栏
+  - GuardrailViolation payload 包含稳定的 guardrail 元字段
+  - quiet 模式下的 guardrail once_key 去重约定
+### `performance-observability`
+- Source: `openspec/specs/performance-observability/spec.md`
+- Purpose: PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断.
+- Requirements:
+  - 性能指标采集与结构化输出
+  - duration 统计使用单调时钟
+  - 资源采样与报告输出
+  - Observability DSL 配置与独立开关
+  - RelationObserver 统计与报告
+  - adaptive 调度决策可观测性
+### `output-mode-api`
+- Source: `openspec/specs/output-mode-api/spec.md`
+- Purpose: 定义运行时输出语义为“显式 sink 驱动”: 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配. 同时要求稳定的执行元数据(例如 `ExecutionResult.total_rows`)以及异常路径的 best-effort 资源清理.
+- Requirements:
+  - 输出是否保留内存数据由 sink 表达
+  - 无输出时避免构造返回列表
+  - 允许 tee 同时写文件与显式 sink
+  - total_rows 为稳定元数据
+  - 异常路径 best-effort 关闭 sink
+
+## Top-Level Field Details
+### `name`
+- Required: `true`
+- Type: `string`
+- Description:
+  需求配置名称.
+  
+  - 必填, 用于标识当前配置
+- Examples: `order_report`
+
+### `_templates`
+- Type: `object`
+- Description:
+  YAML anchor 模板集合.
+  
+  - 仅用于 YAML 复用(anchors)
+  - 常用于 `fields` / `relations` / `retry`
+- `additionalProperties`: `true`
+- Properties:
+  - `retry`: `object`
+
+### `description`
+- Type: `string`
+- Description:
+  配置描述(可选).
+
+### `batch_size`
+- Type: `null` | `integer`
+- Description:
+  批处理大小.
+  
+  - 未声明时使用默认值
+  - `null` 表示禁用分批(单批执行)
+  - `>=1` 的整数表示固定分批大小
+- Default: `1000`
+- Examples: `null`, `1000`
+- `oneOf`:
+  - 1. `null`
+  - 2. `integer`
+
+### `retry`
+- Description:
+  Loader retry 策略.
+  
+  - 默认关闭: `enabled: false`
+  - 启用后会对 loader 调用的瞬态错误做有限重试
+  - 需要提供 `should_retry` 回调(安全引用),用于决定是否重试
+  - 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5
+- `allOf`:
+  - 1. ref `#/definitions/loader_retry`
+
+### `main_source`
+- Required: `true`
+- Description:
+  主数据源配置.
+  
+  - 必填: `source_id`, `loader`
+  - `source_id` 不能出现在 `sources` 中
+  - `fields` 仅允许源字段(禁止 `compute`)
+  - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)
+- `allOf`:
+  - 1. ref `#/definitions/main_source`
+
+### `sources`
+- Type: `object`
+- Description:
+  数据源配置映射, key 为 `source_id`.
+  
+  - 每个 source 必填: `loader`, `key`
+  - 不允许包含 `main_source.source_id`
+  - `fields` 仅允许源字段(禁止 `compute`)
+- `minProperties`: `0`
+- `additionalProperties`: ref `#/definitions/source`
+
+### `fields`
+- Type: `object`
+- Description:
+  字段配置映射(仅用于派生字段).
+  
+  - 必须包含 `compute` 或 `call_by`
+  - 不能与源字段同名(避免 source/derived 重名)
+  - 支持 YAML anchor 复用
+- `additionalProperties`: ref `#/definitions/field`
+
+### `relations`
+- Type: `object`
+- Description:
+  命名关联关系映射(steps 模板).
+  
+  - 供 `fields.*.relation` 通过 YAML alias 复用
+  - alias 需先定义 (YAML anchor)
+  - steps 必须是等值关联链, 参考 `relation.steps`
+- `additionalProperties`: ref `#/definitions/relation`
+
+### `guardrails`
+- Description:
+  运行时护栏配置.
+  
+  - 默认关闭
+  - 用于控制 loader/relations/compute 等运行期护栏策略
+- `allOf`:
+  - 1. ref `#/definitions/guardrails`
+
+### `output`
+- Description:
+  输出配置.
+  
+  - 可选: 不写 `output` 时使用默认输出策略
+  - 推荐: 把 `YAML` 当模板使用,在 Python 调用侧用 `overrides.output.*` 覆盖输出策略
+  - 默认 `format: csv`
+  - 字段重复时需要显式 `output.fields` 进行消歧
+- `allOf`:
+  - 1. ref `#/definitions/output`
+
+### `observability`
+- Description:
+  可观测性配置.
+  
+  包含 `logging`、`performance`、`relations`、`viz`、`trace`、`row_gap` 与 `memory_opt` 子配置.
+- `allOf`:
+  - 1. ref `#/definitions/observability`
+
+
+## Definition Details
+### `field`
+- Definition path: `definitions.field`
+- Type: `object`
+- `additionalProperties`: `true`
+- `allOf`:
+  - 1. oneOf(2)
+- Properties:
+  - `name`: `string`
+  - `call_by`: `string`
+  - `compute`: `string`
+  - `field`: `string`
+  - `relation`: `object`, properties `steps`
+  - `source`: `string`
+  - `value_cast`: `string`, enum `auto`, `int`, `str`
+
+### `guardrails`
+- Definition path: `definitions.guardrails`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `relations`: ref `#/definitions/guardrails_relations`
+  - `compute`: ref `#/definitions/guardrails_compute`
+  - `enabled`: `boolean`
+  - `loader`: ref `#/definitions/guardrails_loader`
+  - `mode`: `string`, enum `quiet`, `fast_fail`
+
+### `guardrails_compute`
+- Definition path: `definitions.guardrails_compute`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `on_error`: `string`, enum `quiet`, `fast_fail`
+
+### `guardrails_loader`
+- Definition path: `definitions.guardrails_loader`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `on_transform_error`: `string`, enum `quiet`, `fast_fail`
+  - `required_fields`: `array`, items `string` | `object`, anyOf(2)
+  - `validate_result`: `boolean`
+
+### `guardrails_relations`
+- Definition path: `definitions.guardrails_relations`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `null_key_max_rate`: 关联 null_key 最大比例(0.0-1.0;未设置则不启用)
+  - `type_error_max_rate`: 关联 type_error 最大比例(0.0-1.0;未设置则不启用)
+
+### `loader_retry`
+- Definition path: `definitions.loader_retry`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `backoff`: `string`, enum `fixed`, `exponential`
+  - `base_delay_seconds`: 基础等待时间(秒)
+  - `enabled`: `boolean`
+  - `jitter`: `boolean`
+  - `max_attempts`: `integer`
+  - `max_delay_seconds`: 最大单次等待时间(秒)
+  - `max_elapsed_seconds`: 最大累计耗时(秒,包含 sleep)
+  - `should_retry`: `string`
+
+### `logging`
+- Definition path: `definitions.logging`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `enabled`: `boolean`
+  - `renderer`: `string`, enum `pretty`, `logger`
+
+### `main_source`
+- Definition path: `definitions.main_source`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `retry`: allOf(1)
+  - `fields`: `object`
+  - `loader` (required): `string`
+  - `order_by`: `array`, items `string`
+  - `params`: `object`
+  - `source_id` (required): `string`
+
+### `memory_opt`
+- Definition path: `definitions.memory_opt`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `auto_report`: `boolean`
+  - `enabled`: `boolean`
+  - `max_fields`: `integer`
+
+### `observability`
+- Definition path: `definitions.observability`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `relations`: allOf(1)
+  - `logging`: allOf(1)
+  - `memory_opt`: allOf(1)
+  - `performance`: allOf(1)
+  - `row_gap`: allOf(1)
+  - `trace`: allOf(1)
+  - `viz`: allOf(1)
+
+### `output`
+- Definition path: `definitions.output`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `fields`: `array`, items `object`
+  - `encoding`: `string`
+  - `format`: `string`, enum `excel`, `csv`
+  - `header_fields_output_by`: `string`, enum `field_id`, `name`
+  - `include_header`: `boolean`
+  - `path`: `string`
+  - `streaming`: `boolean`
+
+### `performance`
+- Definition path: `definitions.performance`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `enabled`: `boolean`
+  - `metrics`: `array`, items enum `duration`, `memory`, `cpu`
+  - `report`: ref `#/definitions/performance_report`
+  - `sampling_interval`: `integer`
+  - `thresholds`: ref `#/definitions/performance_thresholds`
+
+### `performance_report`
+- Definition path: `definitions.performance_report`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `output`: `string`
+  - `format`: `string`, enum `console`, `json`, `csv`, `none`
+  - `include_details`: `boolean`
+
+### `performance_thresholds`
+- Definition path: `definitions.performance_thresholds`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `batch_duration_warn`: 批次耗时告警阈值(秒)
+  - `memory_increase_warn`: 内存增长告警阈值(MB)
+
+### `relation`
+- Definition path: `definitions.relation`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `steps` (required): `array`, items `object`, properties `from`, `lookup_cast`, `to`, `to_bind`
+
+### `relation_report`
+- Definition path: `definitions.relation_report`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `output`: `string`
+  - `format`: `string`, enum `console`, `json`, `none`
+
+### `relations`
+- Definition path: `definitions.relations`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `enabled`: `boolean`
+  - `log_type_mismatch`: `boolean`
+  - `max_samples`: `integer`
+  - `report`: ref `#/definitions/relation_report`
+  - `sampling_rate`: 采样率(0.0-1.0)
+
+### `row_gap`
+- Definition path: `definitions.row_gap`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `data_loader_names`: `array`, items `string`
+  - `enabled`: `boolean`
+  - `primary_loader_name`: `string`
+  - `sample_limit`: `integer`
+
+### `source`
+- Definition path: `definitions.source`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `retry`: allOf(1)
+  - `fields`: `object`
+  - `bind`: `object` | `object`, oneOf(2)
+  - `cache_mode`: `string`, enum `none`, `preload_forever`
+  - `key` (required): `string` | `array`, oneOf(2)
+  - `loader` (required): `string`
+  - `lookup_cast`: `object`, properties `name`, `sep`
+  - `lookup_chunk_size`: `integer` | `null`, oneOf(2)
+  - `params`: `object`
+
+### `source_field_inline`
+- Definition path: `definitions.source_field_inline`
+- Type: `object`
+- `allOf`:
+  - 1. `object`
+- Properties:
+  - `name`: `string`
+  - `field`: `string`
+  - `relation`: `object`, properties `steps`
+  - `source`: `string`
+  - `value_cast`: `string`, enum `auto`, `int`, `str`
+
+### `trace`
+- Definition path: `definitions.trace`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `enabled`: `boolean`
+
+### `viz`
+- Definition path: `definitions.viz`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `append`: `boolean`
+  - `enabled`: `boolean`
+  - `env`: `string`
+  - `output_dir`: `string`
+  - `output_path`: `string`
+  - `payload_policy`: `string`, enum `none`, `summary`, `sample`, `full`
+  - `run_name`: `string`
+  - `sample_size`: `integer`
+  - `snapshot_path`: `string`
+  - `trace_enabled`: `boolean`
+  - `use_default_output_dir`: `boolean`

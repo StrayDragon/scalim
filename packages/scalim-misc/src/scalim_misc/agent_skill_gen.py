@@ -1,43 +1,82 @@
 """
-技能生成器说明:
-- 使用 `YAML` 注释分区来固定示例类型:
-  `# region SCALIM-SKILL:<tag>[:<id>]` ... `# endregion`(标签 `tag` 取值:`minimal`、`advanced`、`relations`、`compute`、`relations-compute`、`example-full`).
-- 在 `notebooks/marimo/examples/` 下扫描分区;分区中的 `YAML` 片段必须是合法的 `YAML DSL`.
-- 元数据:在 `src/scalim/dsl/by_yaml/schema_dsl/constants.py` 中使用 `_schema_meta(md=..., examples=[...])`,以生成 `markdownDescription`/`examples`,用于 `YAML` `LSP` 悬停提示.
+`scalim-yaml-dsl` skill 生成器.
+
+本模块只负责生成 `artifacts/skills/scalim-yaml-dsl/references/*.gen.*`、
+`artifacts/skills/scalim-yaml-dsl/references/generated/` 与
+`scalim-yaml-dsl.build-manifest.json`.
+
+生成内容分层如下:
+- 语法目录: `src/scalim/dsl/by_yaml/schema/demand.gen.json` 为唯一语法真相
+- CLI/LSP 参考: `src/scalim/cli/yaml_dsl.py` 为唯一命令真相
+- 规范摘要: `openspec/specs/` 中相关 spec 作为维护来源,自动摘录 requirement 索引
+- canonical example: `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
+
+手工维护的 `SKILL.md` 与非 generated references 不由这里写入或重排.
 """
 
-import ast
+import argparse
 import hashlib
 import json
-import os
 import re
 import tempfile
 from pathlib import Path
-from textwrap import dedent, indent
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml.schema_dsl import constants as yaml_types
-from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
+import yaml
+
+from scalim import _project_constants
+from scalim.cli import yaml_dsl as yaml_dsl_cli
+from scalim.dsl.by_yaml.config_parsing.validator import validate_yaml_text
+from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
+
+try:
+    import jsonschema
+except ImportError:  # pragma: no cover
+    jsonschema = None
 
 SKILL_NAME = "scalim-yaml-dsl"
 SKILL_TITLE = "Scalim YAML DSL"
 SKILL_DESCRIPTION = (
-    "Scalim YAML DSL 使用与排错指南,涵盖 sources/fields/relations/output 等配置. "
-    "触发词: scalim dsl, scalim yaml dsl, scalim config, 使用 scalim 框架 yaml dsl 编写需求"
+    "Scalim YAML DSL 编写、升级、校验、订正与渐进迁移指南. "
+    "Use when Codex needs to author or refactor YAML DSL, upgrade legacy config to the current structure, "
+    "run schema/full validation, debug CLI/LSP behavior, or plan gradual migration for report scripts."
 )
 FORBIDDEN_NAME_WORDS = {"anthropic", "claude"}
 XML_TAG_RE = re.compile(r"<[^>]+>")
-ABS_PATH_RE = re.compile(r"(?P<prefix>^|[\s:])(?P<quote>['\"])?(?P<path>(?:/|[A-Za-z]:[\\/])[^'\"\s#]+)(?P=quote)?")
-REGION_START_RE = re.compile(
-    r"^\s*#\s*region\s+SCALIM-SKILL:(?P<tag>[a-z0-9_-]+)(?::(?P<id>[a-z0-9_.-]+))?\s*$",
-    re.IGNORECASE,
-)
-REGION_END_RE = re.compile(r"^\s*#\s*endregion\s*$", re.IGNORECASE)
-ADVANCED_TAGS = {"advanced", "relations", "compute", "relations-compute", "relations_compute"}
-YAML_REGION_TAGS = {"minimal", "advanced", "relations", "compute", "relations-compute"}
-NOTEBOOKS_EXAMPLES_REL = Path("notebooks") / "marimo" / "examples"
 
-REQUIRED_DSL_KEYS = tuple(yaml_types.DEMAND_SCHEMA_REQUIRED)
+FORBIDDEN_SKILL_ROOTS = (
+    Path.home() / ".codex" / "skills",
+    Path.home() / ".claude" / "skills",
+    Path("/etc") / "codex" / "skills",
+)
+
+GENERATED_ROOT_REL = Path("references") / "generated"
+REFERENCES_ROOT_REL = Path("references")
+SYNTAX_CATALOG_REL = REFERENCES_ROOT_REL / "syntax-catalog.gen.md"
+CLI_LSP_REFERENCE_REL = GENERATED_ROOT_REL / "cli-lsp-reference.gen.md"
+CANONICAL_EXAMPLE_OUTPUT_REL = GENERATED_ROOT_REL / "example-full" / "ecommerce_report.gen.yaml"
+
+SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
+CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
+CANONICAL_EXAMPLE_SOURCE_REL = Path("notebooks") / "marimo" / "examples" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_report.yaml"
+
+SYNTAX_SPEC_RELS = (
+    Path("openspec") / "specs" / "yaml-dsl-schema" / "spec.md",
+    Path("openspec") / "specs" / "demand-dsl" / "spec.md",
+    Path("openspec") / "specs" / "source-relations" / "spec.md",
+    Path("openspec") / "specs" / "field-compute" / "spec.md",
+    Path("openspec") / "specs" / "source-cache" / "spec.md",
+    Path("openspec") / "specs" / "runtime-pruning" / "spec.md",
+    Path("openspec") / "specs" / "loader-retry-policy" / "spec.md",
+    Path("openspec") / "specs" / "runtime-guardrails" / "spec.md",
+    Path("openspec") / "specs" / "performance-observability" / "spec.md",
+    Path("openspec") / "specs" / "output-mode-api" / "spec.md",
+)
+
+CLI_SPEC_RELS = (
+    Path("openspec") / "specs" / "yaml-dsl-cli-validation" / "spec.md",
+    Path("openspec") / "specs" / "yaml-dsl-editor-core" / "spec.md",
+)
 
 
 class GenerationError(RuntimeError):
@@ -45,15 +84,9 @@ class GenerationError(RuntimeError):
 
 
 def is_forbidden_output(path: Path) -> bool:
-    home = Path.home()
-    forbidden_roots = [
-        home / ".codex" / "skills",
-        home / ".claude" / "skills",
-        Path("/etc") / "codex" / "skills",
-    ]
-    for root in forbidden_roots:
+    for root in FORBIDDEN_SKILL_ROOTS:
         try:
-            path.relative_to(root)
+            path.resolve().relative_to(root.resolve())
         except ValueError:
             continue
         return True
@@ -62,129 +95,47 @@ def is_forbidden_output(path: Path) -> bool:
 
 def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     skill_dir = output_root / SKILL_NAME
-    references_dir = skill_dir / "references"
-    manifest_path = build_manifest_path(output_root)
-    legacy_manifest_path = skill_dir / "build-manifest.json"
     if is_forbidden_output(skill_dir):
         raise GenerationError("拒绝写入到用户技能目录下.")
 
-    schema = build_demand_schema()
+    schema_path = repo_root / SCHEMA_REL
+    cli_path = repo_root / CLI_SOURCE_REL
+    canonical_example_source = repo_root / CANONICAL_EXAMPLE_SOURCE_REL
 
-    notebook_root = repo_root / NOTEBOOKS_EXAMPLES_REL
-    notebook_examples, notebook_sources = extract_yaml_examples_from_marked_files(notebook_root)
-    example_full_sections, example_full_sources = extract_skill_sections_from_paths(
-        [
-            repo_root / NOTEBOOKS_EXAMPLES_REL / "demo_big_data_report" / "README.md",
-            repo_root / NOTEBOOKS_EXAMPLES_REL / "demo_big_data_report" / "_loaders.py",
-            repo_root / NOTEBOOKS_EXAMPLES_REL / "demo_big_data_report" / "demo_a0_tutor.py",
-            repo_root / NOTEBOOKS_EXAMPLES_REL / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_report.yaml",
-        ]
-    )
-    test_examples = extract_yaml_examples_from_tests(
-        [
-            repo_root / "tests" / "test_yaml_dsl.py",
-            repo_root / "tests" / "test_yaml_converter_transforms.py",
-        ]
-    )
-    minimal_example, advanced_example = select_examples(notebook_examples, test_examples)
-    minimal_example, advanced_example = require_examples(
-        minimal_example,
-        advanced_example,
-        notebook_examples,
-        test_examples,
-    )
-    example_full_yaml = require_section(example_full_sections, "example-full", "yaml")
+    schema = load_json_file(schema_path, "schema")
+    syntax_specs = load_spec_summaries(repo_root, SYNTAX_SPEC_RELS)
+    cli_specs = load_spec_summaries(repo_root, CLI_SPEC_RELS)
+    command_docs = build_cli_command_docs()
+    canonical_example_text = build_canonical_example(repo_root)
 
-    normalized_minimal, minimal_paths = normalize_paths_in_text(minimal_example, repo_root)
-    normalized_advanced, advanced_paths = normalize_paths_in_text(advanced_example, repo_root)
-    normalized_full_yaml, full_paths = normalize_paths_in_text(example_full_yaml, repo_root)
+    generated_files = {
+        SYNTAX_CATALOG_REL: render_syntax_catalog(schema, syntax_specs),
+        CLI_LSP_REFERENCE_REL: render_cli_lsp_reference(repo_root, command_docs, cli_specs),
+        CANONICAL_EXAMPLE_OUTPUT_REL: canonical_example_text,
+    }
+    sync_generated_files(skill_dir, generated_files)
 
-    example_full_readme = render_example_full_readme(
-        example_full_sections,
-        "references/example-full/ecommerce_report.yaml",
-        repo_root,
-    )
-    normalized_example_full_readme, example_full_paths = normalize_paths_in_text(example_full_readme, repo_root)
-
-    dsl_reference_md, coverage_index = render_dsl_reference(schema)
-
-    skill_md = render_skill_md(
-        top_level_fields=coverage_index["top_level_fields"],
-        minimal_example=normalized_minimal,
-        advanced_example=normalized_advanced,
-        example_full_readme_path="references/example-full/README.md",
-        example_full_yaml_path="references/example-full/ecommerce_report.yaml",
-    )
-
-    files: List[Tuple[Path, str]] = [
-        (skill_dir / "SKILL.md", skill_md),
-        (references_dir / "dsl-reference.md", dsl_reference_md),
-        (references_dir / "example-full" / "README.md", normalized_example_full_readme),
-        (references_dir / "example-full" / "ecommerce_report.yaml", normalized_full_yaml),
-    ]
-
-    for path, content in files:
-        write_text(path, content)
-
-    script_outputs: List[Path] = []
-    script_inputs: List[Path] = []
-
-    scripts_dir = skill_dir / "scripts"
-    if scripts_dir.exists():
-        for child in scripts_dir.iterdir():
-            if child.is_file():
-                child.unlink()
-        if not any(scripts_dir.iterdir()):
-            scripts_dir.rmdir()
-
-    legacy_examples_dir = references_dir / "examples"
-    if legacy_examples_dir.exists():
-        for child in sorted(legacy_examples_dir.rglob("*"), reverse=True):
-            if child.is_file():
-                child.unlink()
-            elif child.is_dir():
-                child.rmdir()
-        if legacy_examples_dir.exists() and not any(legacy_examples_dir.iterdir()):
-            legacy_examples_dir.rmdir()
-
-    legacy_usage_guide = references_dir / "usage-guide.md"
-    if legacy_usage_guide.is_file():
-        legacy_usage_guide.unlink()
-
-    schema_path = references_dir / "demand.schema.json"
-    if schema_path.is_file():
-        schema_path.unlink()
-
-    legacy_examples_path = references_dir / "examples.md"
-    if legacy_examples_path.is_file():
-        legacy_examples_path.unlink()
-
-    if legacy_manifest_path.is_file():
-        legacy_manifest_path.unlink()
+    outputs = [skill_dir / rel_path for rel_path in sorted(generated_files.keys(), key=lambda item: str(item))]
+    inputs = [schema_path, cli_path, canonical_example_source] + [repo_root / rel for rel in SYNTAX_SPEC_RELS + CLI_SPEC_RELS]
 
     manifest = build_manifest(
         repo_root=repo_root,
         skill_dir=skill_dir,
-        inputs=[
-            repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema_dsl" / "constants.py",
-        ]
-        + notebook_sources
-        + example_full_sources
-        + script_inputs,
-        outputs=[path for path, _ in files] + script_outputs,
-        coverage_index=coverage_index,
-        path_normalization=dedupe_mappings(minimal_paths + advanced_paths + full_paths + example_full_paths),
+        inputs=inputs,
+        outputs=outputs,
+        coverage_index=build_coverage_index(schema, syntax_specs, cli_specs, command_docs),
     )
-
-    write_text(manifest_path, dump_json(manifest) + "\n")
+    write_text(build_manifest_path(output_root), dump_json(manifest))
     return manifest
 
 
 def validate_skill(repo_root: Path, output_root: Path) -> bool:
     skill_dir = output_root / SKILL_NAME
     manifest_path = build_manifest_path(output_root)
-    if not skill_dir.exists():
-        print("未找到技能输出目录: {}".format(skill_dir))
+    generated_root = skill_dir / GENERATED_ROOT_REL
+
+    if not generated_root.exists():
+        print("未找到 `references/generated/` 目录: {}".format(generated_root))
         return False
     if not manifest_path.exists():
         print("未找到构建清单: {}".format(manifest_path))
@@ -195,12 +146,12 @@ def validate_skill(repo_root: Path, output_root: Path) -> bool:
         build_skill(repo_root, tmp_root)
         tmp_skill_dir = tmp_root / SKILL_NAME
         tmp_manifest_path = build_manifest_path(tmp_root)
+        tmp_generated_root = tmp_skill_dir / GENERATED_ROOT_REL
 
-        expected_files = list_files(tmp_skill_dir)
-        actual_files = list_files(skill_dir)
-
+        expected_files = list_managed_output_files(tmp_skill_dir)
+        actual_files = list_managed_output_files(skill_dir)
         if expected_files != actual_files:
-            print("输出文件集合不一致.")
+            print("受控参考文件集合不一致.")
             print("期望: {}".format(expected_files))
             print("实际: {}".format(actual_files))
             return False
@@ -209,8 +160,9 @@ def validate_skill(repo_root: Path, output_root: Path) -> bool:
             expected_path = tmp_skill_dir / rel_path
             actual_path = skill_dir / rel_path
             if read_bytes(expected_path) != read_bytes(actual_path):
-                print("检测到内容漂移: {}".format(rel_path))
+                print("检测到受控产物内容漂移: {}".format(rel_path))
                 return False
+
         if read_bytes(tmp_manifest_path) != read_bytes(manifest_path):
             print("检测到内容漂移: {}".format(manifest_path.name))
             return False
@@ -218,594 +170,581 @@ def validate_skill(repo_root: Path, output_root: Path) -> bool:
     return True
 
 
-def list_files(root: Path) -> List[str]:
-    files = []
-    for path in root.rglob("*"):
-        if path.is_file():
-            files.append(str(path.relative_to(root)))
-    return sorted(files)
+def build_canonical_example(repo_root: Path) -> str:
+    source_path = repo_root / CANONICAL_EXAMPLE_SOURCE_REL
+    if not source_path.exists():
+        raise GenerationError("未找到唯一完整示例来源: {}".format(source_path))
+
+    lines = []
+    for raw_line in read_text(source_path).splitlines():
+        stripped = raw_line.strip()
+        if stripped.startswith("# region SCALIM-SKILL:") or stripped == "# endregion":
+            continue
+        if stripped.startswith("# yaml-language-server: $schema="):
+            continue
+        lines.append(raw_line)
+
+    text = "\n".join(lines).strip() + "\n"
+    validate_canonical_example(repo_root, text)
+    return text
 
 
-def render_skill_md(
-    top_level_fields: Sequence[str],
-    minimal_example: str,
-    advanced_example: str,
-    example_full_readme_path: str,
-    example_full_yaml_path: str,
-) -> str:
-    frontmatter = "---\nname: {name}\ndescription: {desc}\n---\n\n".format(
-        name=SKILL_NAME,
-        desc=json.dumps(SKILL_DESCRIPTION, ensure_ascii=False),
+def validate_canonical_example(repo_root: Path, yaml_text: str) -> None:
+    schema_path = repo_root / SCHEMA_REL
+    result = validate_yaml_text(
+        yaml_text,
+        strict_unknown_fields=True,
+        schema_path=str(schema_path),
+        enable_jsonschema_validation=False,
     )
+    if not result.ok:
+        message = result.errors[0].message if result.errors else "未知校验错误"
+        raise GenerationError("唯一完整示例未通过内部校验: {}".format(message))
 
-    lines = [
-        "# {title}".format(title=SKILL_TITLE),
-        "",
-        "## 使用说明",
-        "- 使用 `references/dsl-reference.md` 获取字段/枚举完整说明.",
-        "- 使用 `references/example-full/README.md` 了解 loader、约束与完整示例.",
-        "- 示例仅存放在 `references/example-full/`",
-        "- 校验 YAML(完整): `uv run scalim-cli yaml-dsl validate <file.yaml>`.",
-        "- 校验 YAML(schema-only): `uv run scalim-cli yaml-dsl schema validate <file.yaml>`.",
-        "- Schema 查询: `scalim-cli yaml-dsl schema show` / `scalim-cli yaml-dsl schema path`.",
-        "- 安装(推荐): `uv tool install /path/to/scalim[cli]`.",
-        "- 安装(备选): `pip install --user /path/to/scalim[cli]`.",
-        "",
-        "## 适用场景",
-        "- 编写或修改 Scalim YAML DSL 配置.",
-        "- 基于 schema/validator 做配置校验.",
-        "- 排查 loader、relations 或字段映射错误.",
-        "",
-        "## 能力范围",
-        "- 提供完整 schema 与字段/枚举说明.",
-        "- 提供完整可运行示例与真实 loader.",
-        "- 提供校验命令指引(完整 + schema-only).",
-        "",
-        "## 限制",
-        "- 不直接执行 Scalim 任务,仅提供指引与参考.",
-        "- 示例集保持最小化(仅一个完整示例).",
-    ]
+    if jsonschema is None:  # pragma: no cover
+        raise GenerationError("缺少 `jsonschema` 依赖,无法执行唯一完整示例的 `schema validate` 校验.")
 
-    lines.extend(
-        [
-            "",
-            "## 参考文档",
-            "- `references/dsl-reference.md` - 字段/枚举完整说明.",
-            "- `{}` - 完整示例说明(含 loader 与约束).".format(example_full_readme_path),
-            "- `{}` - 完整 YAML 配置示例.".format(example_full_yaml_path),
-            "",
-            "顶层字段:",
-        ]
-    )
-
-    for field_name in top_level_fields:
-        lines.append("- `{}`".format(field_name))
-
-    validate_frontmatter(SKILL_NAME, SKILL_DESCRIPTION)
-    return frontmatter + "\n".join(lines)
+    schema = load_json_file(schema_path, "schema")
+    payload = yaml.safe_load(yaml_text)
+    validator = jsonschema.Draft7Validator(schema)
+    errors = sorted(validator.iter_errors(payload), key=lambda item: str(list(getattr(item, "absolute_path", []))))
+    if errors:
+        error = errors[0]
+        path = ".".join(str(part) for part in getattr(error, "absolute_path", [])) or "(root)"
+        raise GenerationError("唯一完整示例未通过 `schema` 校验: {}: {}".format(path, error.message))
 
 
-def render_dsl_reference(schema: Dict[str, Any]) -> Tuple[str, Dict[str, List[str]]]:
+def render_syntax_catalog(schema: Dict[str, Any], spec_summaries: Sequence[Dict[str, Any]]) -> str:
     properties = schema.get("properties", {})
     definitions = schema.get("definitions", {})
-
-    top_level_fields = list(yaml_types.DEMAND_SCHEMA_PROPERTIES_ORDER)
-    for key in properties.keys():
+    top_level_fields = list(yaml_schema_constants.DEMAND_SCHEMA_PROPERTIES_ORDER)
+    for key in sorted(properties.keys()):
         if key not in top_level_fields:
             top_level_fields.append(key)
 
     definition_names = sorted(definitions.keys())
-    coverage_index = {
-        "top_level_fields": top_level_fields,
-        "definitions": definition_names,
-    }
 
     lines = [
-        "# Scalim YAML DSL Reference",
+        "# Scalim YAML DSL Syntax Catalog",
         "",
-        "## Coverage Index",
-        "Top-level fields:",
+        "此文档由 `scripts/gen-agent-skill.py` 自动生成.",
+        "",
+        "## Canonical Sources",
+        "- Schema: `{}`".format(path_to_posix(SCHEMA_REL)),
+        "- Canonical example: `{}`".format(path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL)),
+        "- Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`",
+        "",
+        "## Top-Level Fields",
     ]
-    for name in top_level_fields:
-        lines.append("- {}".format(name))
-
-    lines.append("")
-    lines.append("Definitions:")
-    for name in definition_names:
-        lines.append("- {}".format(name))
-
-    lines.extend(["", "## Top-Level Fields"])
-    for name in top_level_fields:
-        field_schema = properties.get(name, {})
-        lines.append(format_schema_entry(name, field_schema))
+    for field_name in top_level_fields:
+        is_required = field_name in schema.get("required", [])
+        lines.append("- `{}`{}".format(field_name, " (required)" if is_required else ""))
 
     lines.extend(["", "## Definitions"])
-    for def_name in definition_names:
-        lines.append("### {}".format(def_name))
-        def_schema = definitions.get(def_name, {})
-        def_props = def_schema.get("properties", {})
-        if not def_props:
-            lines.append("- (no properties)")
-            lines.append("")
-            continue
-        lines.append("Properties:")
-        for prop_name in sorted(def_props.keys()):
-            lines.append(format_schema_entry(prop_name, def_props[prop_name]))
-        lines.append("")
+    for definition_name in definition_names:
+        lines.append("- `{}`".format(definition_name))
 
-    return "\n".join(lines), coverage_index
+    lines.extend(render_spec_requirement_map("## OpenSpec Requirement Map", spec_summaries))
 
-
-def render_example_full_readme(
-    sections: Sequence[Dict[str, Optional[str]]],
-    yaml_path: str,
-    repo_root: Path,
-) -> str:
-    required_ids = ("loader", "constraints")
-    section_map: Dict[str, List[Dict[str, Optional[str]]]] = {}
-    for item in sections:
-        if item.get("tag") != "example-full":
-            continue
-        section_id = item.get("id")
-        if not section_id:
-            continue
-        section_map.setdefault(section_id, []).append(
-            {
-                "text": dedent_block(item["text"] or ""),
-                "source": item.get("source"),
-            }
+    lines.extend(["", "## Top-Level Field Details"])
+    for field_name in top_level_fields:
+        field_schema = properties.get(field_name, {})
+        lines.extend(
+            render_schema_entry("`{}`".format(field_name), field_schema, required=field_name in schema.get("required", []), level=3)
         )
 
-    for section_id in required_ids:
-        if not section_map.get(section_id):
-            raise GenerationError("缺少 `example-full` 分区: '{}'".format(section_id))
+    lines.extend(["", "## Definition Details"])
+    for definition_name in definition_names:
+        definition_schema = definitions.get(definition_name, {})
+        entry_lines = render_schema_entry("`{}`".format(definition_name), definition_schema, required=False, level=3)
+        entry_lines.insert(1, "- Definition path: `definitions.{}`".format(definition_name))
+        lines.extend(entry_lines)
 
-    def format_source_comment(source: Optional[str], comment_prefix: str) -> Optional[str]:
-        if not source:
-            return None
-        source_path = Path(source)
-        source_text = str(source_path)
-        repo_root_str = str(repo_root)
-        if source_path.is_absolute() and is_within_repo(source_text, repo_root_str):
-            source_text = strip_repo_prefix(source_text, repo_root_str)
-        return "{} source: {}".format(comment_prefix, source_text.replace("\\", "/"))
+    return "\n".join(lines).rstrip() + "\n"
 
-    def join_sections(items: List[Dict[str, Optional[str]]], comment_prefix: str) -> str:
-        parts: List[str] = []
-        for item in items:
-            text = (item.get("text") or "").strip()
-            if not text:
-                continue
-            source_line = format_source_comment(item.get("source"), comment_prefix)
-            if source_line:
-                parts.append(source_line)
-            parts.append(text)
-        return "\n\n".join(parts).strip()
+
+def render_cli_lsp_reference(
+    repo_root: Path,
+    command_docs: Sequence[Dict[str, Any]],
+    spec_summaries: Sequence[Dict[str, Any]],
+) -> str:
+    repo_schema_path = path_to_posix(SCHEMA_REL)
+    default_schema_path = yaml_dsl_cli._default_schema_path().resolve()
+    try:
+        default_schema_repo_rel = path_to_posix(default_schema_path.relative_to(repo_root))
+    except ValueError as exc:
+        raise GenerationError("CLI 默认 `schema` 路径不在仓库内: {}".format(default_schema_path)) from exc
+
+    if default_schema_repo_rel != repo_schema_path:
+        raise GenerationError("CLI 默认 `schema` 路径与规范 `schema` 文件不一致: {}".format(default_schema_repo_rel))
 
     lines = [
-        "# 完整 YAML DSL 示例",
+        "# Scalim YAML DSL CLI and LSP Reference",
         "",
-        "当你需要完整 YAML 配置与真实 loader 时使用本示例.",
+        "此文档由 `scripts/gen-agent-skill.py` 自动生成.",
         "",
-        "## 文件",
-        "- YAML: `{}`".format(yaml_path),
+        "## Canonical Sources",
+        "- CLI implementation: `{}`".format(path_to_posix(CLI_SOURCE_REL)),
+        "- Project identity constants: `src/scalim/_project_constants.py`",
+        "- Schema file: `{}`".format(repo_schema_path),
+        "- Canonical example: `{}`".format(path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL)),
         "",
-        "## Loader 实现 (demo_big_data_report)",
-        "```python",
-        join_sections(section_map["loader"], "#"),
-        "```",
+        "## Command Variants",
+        "### Repo",
+        "- `uv run {cli} yaml-dsl validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+        "- `uv run {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+        "- `uv run {cli} yaml-dsl schema show`".format(cli=_project_constants.CLI_NAME),
+        "- `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
         "",
-        "## 框架约束 (校验 + allowlist)",
-        "```python",
-        join_sections(section_map["constraints"], "#"),
+        "### External",
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate <file.yaml>`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema validate <file.yaml>`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema show`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
+        "",
+        "## Validate Layering",
+        "- `yaml-dsl validate`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.",
+        "- `yaml-dsl schema validate`: 使用 JSON Schema,更适合 schema-only 校验、编辑器/LSP 对齐与 unknown-field strict 收敛.",
+        "",
+        "## LSP / Schema Header",
+        "- Repo schema path: `{}`".format(repo_schema_path),
+        "- Canonical example: 故意不写 `yaml-language-server` 头,避免把本机路径固化进共享 YAML.",
+        "- Repo query: `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
+        '- External query: `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
+        "- Python fallback: `python -c \"import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/by_yaml/schema/demand.gen.json'))\"`",
+        "- 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.",
+        "```yaml",
+        "# yaml-language-server: $schema=/absolute/path/to/demand.gen.json",
         "```",
     ]
 
-    optional_sections = [
-        ("run-yaml", "使用 `run()` 运行", "python"),
-    ]
-    for section_id, title, language in optional_sections:
-        content_items = section_map.get(section_id)
-        if not content_items:
-            continue
+    lines.extend(render_spec_requirement_map("## OpenSpec Requirement Map", spec_summaries))
+
+    lines.extend(["", "## Command Details"])
+    for command_doc in command_docs:
+        command_name = " ".join(command_doc["tokens"])
         lines.extend(
             [
-                "",
-                "## {}".format(title),
-                "```{}".format(language),
-                join_sections(content_items, "#"),
-                "```",
+                "### `{}`".format(command_name),
+                "- Help: {}".format(command_doc["help"]),
+                "- Usage: `{}`".format(command_doc["usage"]),
             ]
         )
+        positionals = command_doc["positionals"]
+        if positionals:
+            lines.append("- Positionals:")
+            for item in positionals:
+                lines.append("  - `{}`: {}".format(item["name"], item["help"]))
+        options = command_doc["options"]
+        if options:
+            lines.append("- Options:")
+            for item in options:
+                lines.append("  - `{}`: {}".format(item["name"], item["help"]))
+        lines.append("")
 
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines).rstrip() + "\n"
 
 
-def format_schema_entry(name: str, schema: Dict[str, Any]) -> str:
-    description = schema.get("markdownDescription") or schema.get("description", "")
-    entry = "- `{}`".format(name)
+def render_spec_requirement_map(title: str, spec_summaries: Sequence[Dict[str, Any]]) -> List[str]:
+    lines = ["", title]
+    for summary in spec_summaries:
+        lines.extend(
+            [
+                "### `{}`".format(summary["slug"]),
+                "- Source: `{}`".format(summary["path"]),
+                "- Purpose: {}".format(summary["purpose"]),
+                "- Requirements:",
+            ]
+        )
+        for requirement in summary["requirements"]:
+            lines.append("  - {}".format(requirement))
+    return lines
+
+
+def render_schema_entry(title: str, schema: Dict[str, Any], required: bool, level: int) -> List[str]:
+    lines = ["{} {}".format("#" * level, title)]
+    if required:
+        lines.append("- Required: `true`")
+
+    ref = schema.get("$ref")
+    if ref:
+        lines.append("- `$ref`: `{}`".format(ref))
+
+    type_summary = summarize_schema_type(schema)
+    if type_summary:
+        lines.append("- Type: {}".format(type_summary))
+
+    description = schema.get("markdownDescription") or schema.get("description")
     if description:
-        entry += ": {}".format(description)
+        lines.append("- Description:")
+        for item in str(description).strip().splitlines():
+            lines.append("  {}".format(item.rstrip()))
+
     enum_values = schema.get("enum")
-    default_value = schema.get("default")
-    examples = schema.get("examples")
     if enum_values:
-        entry += " (enum: {})".format(", ".join(str(item) for item in enum_values))
+        lines.append("- Enum: {}".format(", ".join("`{}`".format(item) for item in enum_values)))
+
+    default_value = schema.get("default")
     if default_value is not None:
-        entry += " (default: {})".format(default_value)
+        lines.append("- Default: `{}`".format(default_value))
+
+    const_value = schema.get("const")
+    if const_value is not None:
+        lines.append("- Const: `{}`".format(const_value))
+
+    examples = schema.get("examples")
     if examples:
-        entry += " (examples: {})".format(format_schema_examples(examples))
-    return entry
+        lines.append("- Examples: {}".format(format_examples(examples)))
+
+    for key in ("pattern", "minimum", "maximum", "minItems", "maxItems", "minProperties", "maxProperties"):
+        if key in schema:
+            lines.append("- `{}`: `{}`".format(key, schema[key]))
+
+    additional_props = schema.get("additionalProperties")
+    if additional_props is not None:
+        lines.append("- `additionalProperties`: {}".format(describe_inline_schema(additional_props)))
+
+    if "items" in schema:
+        lines.append("- `items`: {}".format(describe_inline_schema(schema["items"])))
+
+    for variant_key in ("oneOf", "anyOf", "allOf"):
+        variants = schema.get(variant_key)
+        if variants:
+            lines.append("- `{}`:".format(variant_key))
+            for idx, option in enumerate(variants, 1):
+                lines.append("  - {}. {}".format(idx, describe_inline_schema(option)))
+
+    properties = schema.get("properties")
+    if properties:
+        required_children = set(schema.get("required", []))
+        lines.append("- Properties:")
+        for child_name in sort_schema_properties(properties):
+            child_schema = properties[child_name]
+            child_summary = describe_inline_schema(child_schema)
+            suffix = " (required)" if child_name in required_children else ""
+            lines.append("  - `{}`{}: {}".format(child_name, suffix, child_summary))
+    lines.append("")
+    return lines
 
 
-def format_schema_examples(examples: Any) -> str:
+def summarize_schema_type(schema: Dict[str, Any]) -> str:
+    schema_type = schema.get("type")
+    if isinstance(schema_type, list):
+        return " | ".join("`{}`".format(item) for item in schema_type)
+    if isinstance(schema_type, str):
+        return "`{}`".format(schema_type)
+    for variant_key in ("oneOf", "anyOf"):
+        variants = schema.get(variant_key)
+        if not variants:
+            continue
+        variant_types = []
+        for option in variants:
+            option_type = option.get("type")
+            if isinstance(option_type, str):
+                variant_types.append("`{}`".format(option_type))
+            elif "$ref" in option:
+                variant_types.append("ref `{}`".format(option["$ref"]))
+        if variant_types:
+            return " | ".join(variant_types)
+    return ""
+
+
+def describe_inline_schema(schema: Any) -> str:
+    if isinstance(schema, bool):
+        return "`{}`".format(str(schema).lower())
+    if not isinstance(schema, dict):
+        return "`{}`".format(schema)
+
+    if "$ref" in schema:
+        return "ref `{}`".format(schema["$ref"])
+
+    parts = []
+    schema_type = summarize_schema_type(schema)
+    if schema_type:
+        parts.append(schema_type)
+    enum_values = schema.get("enum")
+    if enum_values:
+        parts.append("enum {}".format(", ".join("`{}`".format(item) for item in enum_values)))
+    const_value = schema.get("const")
+    if const_value is not None:
+        parts.append("const `{}`".format(const_value))
+    if "properties" in schema:
+        parts.append("properties {}".format(", ".join("`{}`".format(key) for key in sort_schema_properties(schema["properties"]))))
+    if "items" in schema:
+        parts.append("items {}".format(describe_inline_schema(schema["items"])))
+    if "oneOf" in schema:
+        parts.append("oneOf({})".format(len(schema["oneOf"])))
+    if "anyOf" in schema:
+        parts.append("anyOf({})".format(len(schema["anyOf"])))
+    if "allOf" in schema:
+        parts.append("allOf({})".format(len(schema["allOf"])))
+    description = schema.get("description")
+    if description and not parts:
+        parts.append(str(description))
+    return ", ".join(parts) if parts else "`object`"
+
+
+def sort_schema_properties(properties: Dict[str, Any]) -> List[str]:
+    ordered = []
+    for field_name in yaml_schema_constants.DEMAND_SCHEMA_PROPERTIES_ORDER:
+        if field_name in properties:
+            ordered.append(field_name)
+    for key in sorted(properties.keys()):
+        if key not in ordered:
+            ordered.append(key)
+    return ordered
+
+
+def format_examples(examples: Any) -> str:
     if not isinstance(examples, list):
         examples = [examples]
-    formatted = []
+    values = []
     for item in examples:
         if isinstance(item, str):
-            formatted.append("`{}`".format(item))
+            values.append("`{}`".format(item))
         else:
-            formatted.append(json.dumps(item, ensure_ascii=False, sort_keys=True))
-    return ", ".join(formatted)
+            values.append("`{}`".format(json.dumps(item, ensure_ascii=False, sort_keys=True)))
+    return ", ".join(values)
 
 
-def dedent_block(text: str) -> str:
-    return dedent(text).strip("\n")
+def build_cli_command_docs() -> List[Dict[str, Any]]:
+    root_parser = argparse.ArgumentParser(prog=_project_constants.CLI_NAME, description="Scalim CLI")
+    root_subparsers = root_parser.add_subparsers(dest="command")
+    yaml_dsl_cli.register(root_subparsers)
+
+    command_tokens = [
+        ("yaml-dsl", "validate"),
+        ("yaml-dsl", "schema", "validate"),
+        ("yaml-dsl", "schema", "show"),
+        ("yaml-dsl", "schema", "path"),
+    ]
+    docs = []
+    for tokens in command_tokens:
+        parser, help_text = resolve_command_parser(root_parser, tokens)
+        docs.append(
+            {
+                "tokens": tokens,
+                "help": help_text or parser.description or "",
+                "usage": parser.format_usage().strip().replace("usage: ", "", 1),
+                "positionals": collect_parser_positionals(parser),
+                "options": collect_parser_options(parser),
+            }
+        )
+    return docs
 
 
-def extract_yaml_examples_from_marked_files(
-    root: Path,
-    exclude_dirs: Optional[Sequence[Path]] = None,
-) -> Tuple[List[Dict[str, Optional[str]]], List[Path]]:
-    if not root.exists():
-        raise GenerationError("未找到示例根目录: {}".format(root))
-    examples: List[Dict[str, Optional[str]]] = []
-    sources: List[Path] = []
-    for path in iter_text_files(root, exclude_dirs=exclude_dirs):
-        extracted = extract_skill_regions_from_text(path, read_text(path))
-        if extracted:
-            yaml_only = [item for item in extracted if item.get("tag") in YAML_REGION_TAGS]
-            if not yaml_only:
-                continue
-            sources.append(path)
-            examples.extend(yaml_only)
-    return examples, sources
+def resolve_command_parser(root_parser: argparse.ArgumentParser, tokens: Sequence[str]) -> Tuple[argparse.ArgumentParser, str]:
+    current = root_parser
+    help_text = ""
+    for token in tokens:
+        current, help_text = get_subparser(current, token)
+    return current, help_text
 
 
-def extract_skill_sections_from_paths(paths: Sequence[Path]) -> Tuple[List[Dict[str, Optional[str]]], List[Path]]:
-    sections: List[Dict[str, Optional[str]]] = []
-    sources: List[Path] = []
-    for path in paths:
-        if not path.exists():
-            raise GenerationError("未找到技能源文件: {}".format(path))
-        extracted = extract_skill_regions_from_text(path, read_text(path))
-        if extracted:
-            sources.append(path)
-            sections.extend(extracted)
-    return sections, sources
-
-
-def require_section(sections: Sequence[Dict[str, Optional[str]]], tag: str, section_id: str) -> str:
-    matches = [item["text"] for item in sections if item.get("tag") == tag and item.get("id") == section_id and item.get("text")]
-    if not matches:
-        raise GenerationError("缺少 SCALIM-SKILL 区块: {}:{}".format(tag, section_id))
-    if len(matches) > 1:
-        raise GenerationError("发现多个 SCALIM-SKILL 区块: {}:{}".format(tag, section_id))
-    return matches[0] or ""
-
-
-def iter_text_files(root: Path, exclude_dirs: Optional[Sequence[Path]] = None) -> Iterable[Path]:
-    allowed = {".md", ".markdown", ".yaml", ".yml", ".py"}
-    excluded = [item.resolve() for item in (exclude_dirs or [])]
-    for path in root.rglob("*"):
-        if not path.is_file():
+def get_subparser(parser: argparse.ArgumentParser, name: str) -> Tuple[argparse.ArgumentParser, str]:
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
             continue
-        if excluded and is_within_any(path, excluded):
+        help_map = {item.dest: item.help for item in action._choices_actions}
+        if name in action.choices:
+            return action.choices[name], help_map.get(name, "") or ""
+    raise GenerationError("CLI 解析器中缺少子命令: {}".format(name))
+
+
+def collect_parser_positionals(parser: argparse.ArgumentParser) -> List[Dict[str, str]]:
+    positionals = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
             continue
-        if path.suffix.lower() not in allowed:
+        if action.option_strings:
             continue
-        yield path
-
-
-def is_within_any(path: Path, roots: Sequence[Path]) -> bool:
-    for root in roots:
-        try:
-            path.resolve().relative_to(root)
-        except ValueError:
+        if action.dest in ("help", argparse.SUPPRESS):
             continue
-        return True
-    return False
+        positionals.append({"name": action.dest, "help": action.help or ""})
+    return positionals
 
 
-def extract_skill_regions_from_text(path: Path, text: str) -> List[Dict[str, Optional[str]]]:
-    examples: List[Dict[str, Optional[str]]] = []
+def collect_parser_options(parser: argparse.ArgumentParser) -> List[Dict[str, str]]:
+    options = []
+    for action in parser._actions:
+        if isinstance(action, argparse._HelpAction):
+            continue
+        if isinstance(action, argparse._SubParsersAction):
+            continue
+        if not action.option_strings:
+            continue
+        options.append({"name": ", ".join(action.option_strings), "help": action.help or ""})
+    return options
+
+
+def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dict[str, Any]]:
+    summaries = []
+    for rel_path in spec_paths:
+        abs_path = repo_root / rel_path
+        if not abs_path.exists():
+            raise GenerationError("未找到 OpenSpec 文件: {}".format(abs_path))
+        text = read_text(abs_path)
+        purpose = extract_markdown_section(text, "## Purpose")
+        requirements = []
+        for line in text.splitlines():
+            if line.startswith("### Requirement:"):
+                requirements.append(line.split(":", 1)[1].strip())
+        if not requirements:
+            raise GenerationError("OpenSpec 文件未包含需求条目: {}".format(abs_path))
+        summaries.append(
+            {
+                "slug": rel_path.parent.name,
+                "path": path_to_posix(rel_path),
+                "purpose": purpose,
+                "requirements": requirements,
+            }
+        )
+    return summaries
+
+
+def extract_markdown_section(text: str, heading: str) -> str:
+    lines = text.splitlines()
     collecting = False
-    tag: Optional[str] = None
-    section_id: Optional[str] = None
-    buffer: List[str] = []
-    start_line = 0
-
-    for line_no, line in enumerate(text.splitlines(), 1):
-        start_match = REGION_START_RE.match(line)
-        end_match = REGION_END_RE.match(line)
-        if start_match:
-            if collecting:
-                raise GenerationError("{} 中第 {} 行出现嵌套的 SCALIM-SKILL 区块".format(path, line_no))
-            raw_tag = normalize_skill_tag(start_match.group("tag"))
-            if raw_tag not in allowed_skill_tags():
-                raise GenerationError("{} 中第 {} 行的 SCALIM-SKILL 标签 '{}' 未知".format(path, line_no, raw_tag))
+    buffer = []
+    for line in lines:
+        if line.startswith(heading):
             collecting = True
-            tag = raw_tag
-            section_id = normalize_skill_id(start_match.group("id"))
-            buffer = []
-            start_line = line_no
             continue
-        if end_match:
-            if not collecting:
-                raise GenerationError("{} 中第 {} 行出现未匹配的 SCALIM-SKILL `endregion`".format(path, line_no))
-            content = "\n".join(buffer).strip()
-            if not content:
-                raise GenerationError("{} 中的 SCALIM-SKILL 区块为空(开始于第 {} 行)".format(path, start_line))
-            if tag in YAML_REGION_TAGS and not is_dsl_yaml(content):
-                raise GenerationError("{} 中的 SCALIM-SKILL 区块不是 YAML DSL(开始于第 {} 行)".format(path, start_line))
-            examples.append(build_example(content, tag, section_id=section_id, source=path))
-            collecting = False
-            tag = None
-            section_id = None
-            buffer = []
-            start_line = 0
+        if collecting and line.startswith("## "):
+            break
+        if not collecting:
             continue
-        if collecting:
-            buffer.append(line)
-
-    if collecting:
-        raise GenerationError("{} 中的 SCALIM-SKILL 区块未闭合(开始于第 {} 行)".format(path, start_line))
-    return examples
-
-
-def normalize_skill_tag(tag: str) -> str:
-    tag = tag.strip().lower().replace("_", "-")
-    if tag == "relation":
-        return "relations"
-    return tag
-
-
-def normalize_skill_id(section_id: Optional[str]) -> Optional[str]:
-    if not section_id:
-        return None
-    return section_id.strip().lower().replace("_", "-")
-
-
-def allowed_skill_tags() -> Tuple[str, ...]:
-    return ("minimal", "advanced", "relations", "compute", "relations-compute", "example-full")
-
-
-def build_example(
-    text: str,
-    tag: Optional[str],
-    section_id: Optional[str] = None,
-    source: Optional[Path] = None,
-) -> Dict[str, Optional[str]]:
-    payload: Dict[str, Optional[str]] = {"text": text, "tag": tag, "id": section_id}
-    if source is not None:
-        payload["source"] = str(source)
-    return payload
-
-
-def is_dsl_yaml(text: str) -> bool:
-    lowered = text.lower()
-    return all(item in lowered for item in REQUIRED_DSL_KEYS)
-
-
-def select_examples(
-    notebook_examples: List[Dict[str, Optional[str]]],
-    test_examples: List[Dict[str, Optional[str]]],
-) -> Tuple[Optional[Dict[str, Optional[str]]], Optional[Dict[str, Optional[str]]]]:
-    notebook_examples = dedupe_examples(notebook_examples)
-    test_examples = dedupe_examples(test_examples)
-
-    minimal = None
-    advanced = None
-
-    if notebook_examples:
-        minimal = choose_tagged_example(notebook_examples, {"minimal"})
-        advanced = choose_tagged_example(notebook_examples, ADVANCED_TAGS)
-        return minimal, advanced
-
-    minimal = choose_minimal_example(test_examples)
-    advanced = choose_relations_compute_example(test_examples)
-
-    if minimal and advanced and normalize_yaml(minimal["text"]) == normalize_yaml(advanced["text"]):
-        exclude = {normalize_yaml(minimal["text"])}
-        advanced_alt = choose_relations_compute_example(test_examples, exclude)
-        if advanced_alt:
-            advanced = advanced_alt
-        else:
-            minimal_alt = choose_minimal_example(test_examples, exclude)
-            if minimal_alt:
-                minimal = minimal_alt
-
-    return minimal, advanced
-
-
-def choose_minimal_example(
-    examples: List[Dict[str, Optional[str]]],
-    exclude: Optional[Iterable[str]] = None,
-) -> Optional[Dict[str, Optional[str]]]:
-    if not examples:
-        return None
-    exclude_set = set(exclude or [])
-    candidates = [example for example in examples if normalize_yaml(example["text"]) not in exclude_set]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda item: count_non_empty_lines(item["text"]))
-
-
-def choose_relations_compute_example(
-    examples: List[Dict[str, Optional[str]]],
-    exclude: Optional[Iterable[str]] = None,
-) -> Optional[Dict[str, Optional[str]]]:
-    exclude_set = set(exclude or [])
-    matches = []
-    for example in examples:
-        text = example["text"]
-        if normalize_yaml(text) in exclude_set:
+        stripped = line.strip()
+        if not stripped:
             continue
-        lowered = text.lower()
-        if "relations:" in lowered or "compute:" in lowered:
-            matches.append(example)
-    if matches:
-        return min(matches, key=lambda item: count_non_empty_lines(item["text"]))
-    return None
+        buffer.append(stripped)
+    return " ".join(buffer)
 
 
-def choose_tagged_example(
-    examples: List[Dict[str, Optional[str]]],
-    tags: Iterable[str],
-) -> Optional[Dict[str, Optional[str]]]:
-    tag_set = set(tags)
-    matches = [example for example in examples if example.get("tag") in tag_set]
-    if matches:
-        return min(matches, key=lambda item: count_non_empty_lines(item["text"]))
-    return None
+def build_coverage_index(
+    schema: Dict[str, Any],
+    syntax_specs: Sequence[Dict[str, Any]],
+    cli_specs: Sequence[Dict[str, Any]],
+    command_docs: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+    properties = schema.get("properties", {})
+    top_level_fields = list(yaml_schema_constants.DEMAND_SCHEMA_PROPERTIES_ORDER)
+    for key in sorted(properties.keys()):
+        if key not in top_level_fields:
+            top_level_fields.append(key)
+
+    return {
+        "top_level_fields": top_level_fields,
+        "definitions": sorted(schema.get("definitions", {}).keys()),
+        "syntax_specs": [{"slug": item["slug"], "path": item["path"], "requirements": item["requirements"]} for item in syntax_specs],
+        "cli_specs": [{"slug": item["slug"], "path": item["path"], "requirements": item["requirements"]} for item in cli_specs],
+        "commands": [" ".join(item["tokens"]) for item in command_docs],
+    }
 
 
-def require_examples(
-    minimal_example: Optional[Dict[str, Optional[str]]],
-    advanced_example: Optional[Dict[str, Optional[str]]],
-    notebook_examples: List[Dict[str, Optional[str]]],
-    test_examples: List[Dict[str, Optional[str]]],
-) -> Tuple[str, str]:
-    missing = []
-    if not minimal_example:
-        missing.append("minimal 示例")
-    if not advanced_example:
-        missing.append("relations/compute 示例")
-    if missing:
-        if notebook_examples:
-            raise GenerationError(
-                "`notebooks/marimo/examples` 中缺少 {}(当前找到 {}). "
-                "请添加 `# region SCALIM-SKILL:minimal` 与 `# region SCALIM-SKILL:advanced` 区块.".format(
-                    ", ".join(missing),
-                    len(notebook_examples),
-                )
-            )
-        raise GenerationError(
-            "缺少 {}. 请在 `notebooks/marimo/examples/` 下添加 `# region SCALIM-SKILL:minimal` 与 `# region SCALIM-SKILL:advanced` 区块.".format(
-                ", ".join(missing)
-            )
-        )
+def sync_generated_files(skill_dir: Path, generated_files: Dict[Path, str]) -> None:
+    generated_root = skill_dir / GENERATED_ROOT_REL
+    references_root = skill_dir / REFERENCES_ROOT_REL
+    expected_paths = {skill_dir / rel_path for rel_path in generated_files}
 
-    minimal_text = minimal_example["text"]
-    advanced_text = advanced_example["text"]
-    if normalize_yaml(minimal_text) == normalize_yaml(advanced_text):
-        raise GenerationError(
-            "仅发现 1 个唯一的 YAML DSL 示例(`notebooks`: {}, `tests`: {}). "
-            "请再添加一个示例,确保 `minimal` 与 `relations/compute` 示例不同.".format(
-                len(notebook_examples),
-                len(test_examples),
-            )
-        )
+    if generated_root.exists():
+        for path in sorted(generated_root.rglob("*"), key=lambda item: str(item), reverse=True):
+            if path.is_file() and path not in expected_paths:
+                path.unlink()
+            elif path.is_dir() and not any(path.iterdir()):
+                path.rmdir()
 
-    return minimal_text, advanced_text
+    if references_root.exists():
+        for path in sorted(references_root.glob("*.gen.md"), key=lambda item: str(item), reverse=True):
+            if path.is_file() and path not in expected_paths:
+                path.unlink()
+
+    for rel_path, content in generated_files.items():
+        write_text(skill_dir / rel_path, content)
 
 
-def count_non_empty_lines(text: str) -> int:
-    return sum(1 for line in text.splitlines() if line.strip())
-
-
-def dedupe_examples(examples: List[Dict[str, Optional[str]]]) -> List[Dict[str, Optional[str]]]:
-    seen: Dict[str, Dict[str, Optional[str]]] = {}
-    for example in examples:
-        normalized = normalize_yaml(example["text"])
-        existing = seen.get(normalized)
-        if existing:
-            if example.get("tag") and not existing.get("tag"):
-                seen[normalized] = example
+def build_manifest(
+    repo_root: Path,
+    skill_dir: Path,
+    inputs: Iterable[Path],
+    outputs: Iterable[Path],
+    coverage_index: Dict[str, Any],
+) -> Dict[str, Any]:
+    input_entries = []
+    for path in sorted(set(inputs), key=lambda item: str(item)):
+        if not path.exists():
             continue
-        seen[normalized] = example
-    return list(seen.values())
+        input_entries.append({"path": path_to_posix(path.relative_to(repo_root)), "sha256": sha256_file(path)})
+
+    output_entries = []
+    for path in sorted(set(outputs), key=lambda item: str(item)):
+        if not path.exists():
+            continue
+        output_entries.append({"path": path_to_posix(path.relative_to(skill_dir)), "sha256": sha256_file(path)})
+
+    return {
+        "skill_name": SKILL_NAME,
+        "inputs": input_entries,
+        "outputs": output_entries,
+        "coverage_index": coverage_index,
+    }
 
 
-def normalize_paths_in_text(text: str, repo_root: Path) -> Tuple[str, List[Dict[str, Any]]]:
-    repo_root_str = str(repo_root)
-    mappings: List[Dict[str, Any]] = []
-    normalized_lines = []
-
-    for line in text.splitlines():
-        line_external = False
-        line_mappings: List[Dict[str, Any]] = []
-
-        def repl(match: re.Match) -> str:
-            nonlocal line_external
-            prefix = match.group("prefix") or ""
-            quote = match.group("quote") or ""
-            original = match.group("path")
-            if original and set(original) == {"/"}:
-                return match.group(0)
-            normalized, external = normalize_absolute_path(original, repo_root_str)
-            if normalized == original:
-                return match.group(0)
-            line_mappings.append({"original": original, "normalized": normalized, "external": external})
-            if external:
-                line_external = True
-            return "{prefix}{quote}{value}{quote}".format(prefix=prefix, quote=quote, value=normalized)
-
-        new_line = ABS_PATH_RE.sub(repl, line)
-        if line_external and "#" not in new_line:
-            new_line = new_line + "  # external"
-        normalized_lines.append(new_line)
-        mappings.extend(line_mappings)
-
-    return "\n".join(normalized_lines), dedupe_mappings(mappings)
+def build_manifest_path(output_root: Path) -> Path:
+    return output_root / "{}.build-manifest.json".format(SKILL_NAME)
 
 
-def normalize_absolute_path(path: str, repo_root_str: str) -> Tuple[str, bool]:
-    if not is_absolute_path(path):
-        return path, False
-    if is_within_repo(path, repo_root_str):
-        rel = strip_repo_prefix(path, repo_root_str)
-        normalized = "$REPO_ROOT/" + rel.replace("\\", "/")
-        return normalized, False
-    basename = path_basename(path)
-    normalized = "$LOCAL_PATH/" + basename
-    return normalized, True
+def list_files(root: Path, base: Optional[Path] = None) -> List[str]:
+    if base is None:
+        base = root
+    items = []
+    for path in root.rglob("*"):
+        if path.is_file():
+            items.append(path_to_posix(path.relative_to(base)))
+    return sorted(items)
 
 
-def is_absolute_path(path: str) -> bool:
-    if path.startswith("/"):
-        return True
-    return bool(re.match(r"^[A-Za-z]:[\\/]", path))
+def list_managed_output_files(skill_dir: Path) -> List[str]:
+    items = []
+    generated_root = skill_dir / GENERATED_ROOT_REL
+    references_root = skill_dir / REFERENCES_ROOT_REL
+
+    if generated_root.exists():
+        items.extend(list_files(generated_root, base=skill_dir))
+    if references_root.exists():
+        for path in references_root.glob("*.gen.md"):
+            if path.is_file():
+                items.append(path_to_posix(path.relative_to(skill_dir)))
+    return sorted(set(items))
 
 
-def is_within_repo(path: str, repo_root_str: str) -> bool:
-    if not path.startswith(repo_root_str):
-        return False
-    suffix = path[len(repo_root_str) :]
-    return suffix == "" or suffix.startswith("/") or suffix.startswith("\\")
+def load_json_file(path: Path, label: str) -> Dict[str, Any]:
+    if not path.exists():
+        raise GenerationError("未找到 {} 文件: {}".format(label, path))
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except json.JSONDecodeError as exc:
+        raise GenerationError("{} JSON 无法解析: {}".format(label, path)) from exc
 
 
-def strip_repo_prefix(path: str, repo_root_str: str) -> str:
-    rel = path[len(repo_root_str) :]
-    return rel.lstrip("/\\")
-
-
-def path_basename(path: str) -> str:
-    if "\\" in path or re.match(r"^[A-Za-z]:", path):
-        import ntpath
-
-        return ntpath.basename(path)
-    return os.path.basename(path)
-
-
-def dedupe_mappings(mappings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    seen = {}
-    for mapping in mappings:
-        key = mapping["original"]
-        if key not in seen:
-            seen[key] = mapping
-    return [seen[key] for key in sorted(seen.keys())]
+def dump_json(data: Dict[str, Any]) -> str:
+    return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
 def validate_frontmatter(name: str, description: str) -> None:
@@ -827,50 +766,6 @@ def validate_frontmatter(name: str, description: str) -> None:
         raise GenerationError("技能描述不能包含 XML 标签.")
 
 
-def build_manifest(
-    repo_root: Path,
-    skill_dir: Path,
-    inputs: Iterable[Path],
-    outputs: Iterable[Path],
-    coverage_index: Dict[str, List[str]],
-    path_normalization: List[Dict[str, Any]],
-) -> Dict[str, Any]:
-    input_entries = []
-    for path in sorted(set(inputs), key=lambda item: str(item)):
-        if not path.exists():
-            continue
-        rel = str(path.relative_to(repo_root))
-        input_entries.append({"path": rel, "sha256": sha256_file(path)})
-
-    output_entries = []
-    for path in sorted(set(outputs), key=lambda item: str(item)):
-        if not path.exists():
-            continue
-        rel = str(path.relative_to(skill_dir))
-        output_entries.append({"path": rel, "sha256": sha256_file(path)})
-
-    manifest = {
-        "skill_name": SKILL_NAME,
-        "inputs": input_entries,
-        "outputs": output_entries,
-        "coverage_index": coverage_index,
-        "path_normalization": path_normalization,
-    }
-    return manifest
-
-
-def build_manifest_path(output_root: Path) -> Path:
-    return output_root / "{}.build-manifest.json".format(SKILL_NAME)
-
-
-def dump_json(data: Dict[str, Any]) -> str:
-    return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
-
-
-def dump_schema_json(data: Dict[str, Any]) -> str:
-    return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=False)
-
-
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -882,7 +777,7 @@ def read_bytes(path: Path) -> bytes:
 def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if content and not content.endswith("\n"):
-        content = content + "\n"
+        content += "\n"
     path.write_text(content, encoding="utf-8")
 
 
@@ -894,89 +789,5 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def normalize_yaml(text: str) -> str:
-    return "\n".join(line.strip() for line in text.splitlines() if line.strip())
-
-
-def extract_yaml_examples_from_tests(paths: Sequence[Path]) -> List[Dict[str, Optional[str]]]:
-    examples: List[Dict[str, Optional[str]]] = []
-    for path in paths:
-        if not path.exists():
-            continue
-        try:
-            tree = ast.parse(read_text(path))
-        except SyntaxError:
-            continue
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if isinstance(func, ast.Name):
-                func_name = func.id
-            elif isinstance(func, ast.Attribute):
-                func_name = func.attr
-            else:
-                func_name = ""
-            if func_name != "make_yaml_config":
-                continue
-            payload = build_yaml_from_call(node)
-            if payload:
-                examples.append(build_example(payload, None))
-    return examples
-
-
-def build_yaml_from_call(node: ast.Call) -> Optional[str]:
-    kwargs: Dict[str, Optional[str]] = {}
-    for kw in node.keywords:
-        if not kw.arg:
-            continue
-        value = constant_string(kw.value)
-        if value is None:
-            continue
-        kwargs[kw.arg] = value
-    name = kwargs.get("name")
-    sources = kwargs.get("sources")
-    fields = kwargs.get("fields")
-    if not name or not sources:
-        return None
-    return build_yaml_config(
-        name=name,
-        sources=sources,
-        fields=fields,
-        description=kwargs.get("description"),
-        main_source=kwargs.get("main_source"),
-        relations=kwargs.get("relations"),
-    )
-
-
-def constant_string(node: ast.AST) -> Optional[str]:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    if isinstance(node, ast.Str):
-        return node.s
-    return None
-
-
-def build_yaml_config(
-    *,
-    name: str,
-    sources: str,
-    fields: Optional[str] = None,
-    description: Optional[str] = None,
-    main_source: Optional[str] = None,
-    relations: Optional[str] = None,
-) -> str:
-    header_lines = ["name: {}".format(name)]
-    if description:
-        header_lines.append("description: {}".format(description))
-
-    parts = ["\n".join(header_lines)]
-    if main_source:
-        parts.append("main_source:\n" + indent(dedent(main_source).strip(), "  "))
-    parts.append("sources:\n" + indent(dedent(sources).strip(), "  "))
-    if fields:
-        parts.append("fields:\n" + indent(dedent(fields).strip(), "  "))
-    if relations:
-        parts.append("relations:\n" + indent(dedent(relations).strip(), "  "))
-
-    return "\n\n".join(parts) + "\n"
+def path_to_posix(path: Any) -> str:
+    return str(path).replace("\\", "/")

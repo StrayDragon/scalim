@@ -1635,7 +1635,7 @@ print(f"输出路径: {result.output_path}")
 ### A. 完整配置示例位置
 
 - **简单订单报表**: `tests/fixtures/order_report.yaml`
-- **电商报表(完整)**: `artifacts/skills/scalim-yaml-dsl/references/example-full/ecommerce_report.yaml`
+- **电商报表(完整)**: `artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`
 
 ### B. 相关文档
 

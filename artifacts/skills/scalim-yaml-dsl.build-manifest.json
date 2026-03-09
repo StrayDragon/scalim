@@ -1,5 +1,52 @@
 {
   "coverage_index": {
+    "cli_specs": [
+      {
+        "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
+        "requirements": [
+          "CLI validate 与 schema validate 职责边界(避免重复诊断)",
+          "CLI Schema-Only Validation",
+          "CLI Schema Discovery",
+          "严格未知字段校验",
+          "运行时 validator 错误列表包含 issue path",
+          "校验命令输出与 schema 一致性",
+          "CLI 校验输出包含源码位置",
+          "Linter/编译器风格输出"
+        ],
+        "slug": "yaml-dsl-cli-validation"
+      },
+      {
+        "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
+        "requirements": [
+          "作为纯前端应用运行",
+          "文本编辑为主路径(Text-first)",
+          "可视化与 YAML 双向编辑(Split)",
+          "使用 canonical JSON Schema 提供补全与 hover",
+          "导入/导出与模板新建",
+          "Outline 与快速导航",
+          "可视化辅助视图(关系与依赖)",
+          "统一 issue 数据模型与定位能力",
+          "默认提供 schema-only 校验并支持 strict",
+          "支持 local semantic 与 exact semantic 并合并展示",
+          "exact semantic 基于 Worker + Pyodide 且默认关闭",
+          "exact 初始化失败自动降级",
+          "exact 依赖最小化",
+          "roundtrip 优先补丁并尽量保留格式",
+          "重写前必须 diff 预览并显式确认",
+          "alias 编辑提供共享与拆分策略",
+          "可视化编辑块必须提供稳定可发现的新增入口",
+          "同一编辑器中的可操作项必须采用一致的交互视觉体系",
+          "关键操作的可见性不得依赖 hover-only"
+        ],
+        "slug": "yaml-dsl-editor-core"
+      }
+    ],
+    "commands": [
+      "yaml-dsl validate",
+      "yaml-dsl schema validate",
+      "yaml-dsl schema show",
+      "yaml-dsl schema path"
+    ],
     "definitions": [
       "field",
       "guardrails",
@@ -24,6 +71,142 @@
       "trace",
       "viz"
     ],
+    "syntax_specs": [
+      {
+        "path": "openspec/specs/yaml-dsl-schema/spec.md",
+        "requirements": [
+          "schema 元数据生成与 hover 指引",
+          "output 字段 hover 指引明确可选与 overrides 推荐写法",
+          "schema hover 提供常见错误与迁移提示",
+          "顶层 schema 字段(guardrails)",
+          "observability.logging 支持 renderer/preset 字段",
+          "字段声明位置与 compute 约束",
+          "relation steps-only 约束",
+          "output.fields 解析与 schema 指引",
+          "字段 ID 唯一性与解析规则",
+          "bind/to_bind oneOf Schema",
+          "派生字段支持 call_by Schema",
+          "schema meta key 参考文档与推荐写法",
+          "schema meta 中 schema dict 不得吞掉 desc/md",
+          "schema 明确 batch_size 的 null-or-int 语义",
+          "retry 字段纳入 JSON Schema 与 hover 指引",
+          "`_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform"
+        ],
+        "slug": "yaml-dsl-schema"
+      },
+      {
+        "path": "openspec/specs/demand-dsl/spec.md",
+        "requirements": [
+          "顶层结构与 IR 转换规则",
+          "unknown fields 诊断提供 suggestions(CLI/库一致)",
+          "Loader 引用解析与 allowlist",
+          "Source/Bind 结构与 keys 分片参数",
+          "字段/关系表达式默认行为",
+          "main_source 批次排序配置",
+          "顶层 batch_size 语义统一且可显式禁用分批",
+          "batch_size 校验在不同入口语义一致",
+          "YAML DSL 增加 loader retry 配置入口",
+          "`_templates.retry` 用于复用通用策略",
+          "`should_retry` 引用解析与 allowlist"
+        ],
+        "slug": "demand-dsl"
+      },
+      {
+        "path": "openspec/specs/source-relations/spec.md",
+        "requirements": [
+          "steps 结构与 relation 解析/推断规则",
+          "lookup_key 与 lookup_cast/诊断",
+          "bind/to_bind 结构与校验",
+          "批次内 LoadRef 复用与分片语义",
+          "ref loader 依赖信号驱动稳定排序",
+          "关联诊断基于样本值并支持复合键对比",
+          "关联路径与比较输出可读且稳定"
+        ],
+        "slug": "source-relations"
+      },
+      {
+        "path": "openspec/specs/field-compute/spec.md",
+        "requirements": [
+          "字段值 value_cast",
+          "compute 识别/校验/安全约束",
+          "依赖推导规则与无依赖拒绝",
+          "派生字段执行与错误处理",
+          "compute 表达式预编译并复用执行",
+          "compute 编译缓存有上限(有界 LRU)",
+          "call_by 派生字段函数调用",
+          "call_by 上下文引用"
+        ],
+        "slug": "field-compute"
+      },
+      {
+        "path": "openspec/specs/source-cache/spec.md",
+        "requirements": [
+          "预加载缓存模式",
+          "关联加载优先命中缓存",
+          "计划元数据记录缓存源"
+        ],
+        "slug": "source-cache"
+      },
+      {
+        "path": "openspec/specs/runtime-pruning/spec.md",
+        "requirements": [
+          "依赖剪枝与计划元数据",
+          "YAML 转换阶段按 output.fields 剪枝字段定义",
+          "运行时字段保留与释放策略"
+        ],
+        "slug": "runtime-pruning"
+      },
+      {
+        "path": "openspec/specs/loader-retry-policy/spec.md",
+        "requirements": [
+          "Loader retry policy 配置模型与默认值",
+          "should_retry 回调契约",
+          "Retry runner 语义(次数/耗时/退避)",
+          "全局策略与 per-loader 覆盖的解析",
+          "iterable/generator 的重试边界"
+        ],
+        "slug": "loader-retry-policy"
+      },
+      {
+        "path": "openspec/specs/runtime-guardrails/spec.md",
+        "requirements": [
+          "Guardrails 配置与默认行为",
+          "quiet 模式违规记录",
+          "Loader 结果结构护栏",
+          "RowLike 字段提取语义(无歧义优先级)",
+          "关键字段缺失护栏",
+          "字段 extractor/value_cast/transform 异常护栏",
+          "关联 null_key/type_error 阈值护栏",
+          "compute 异常护栏",
+          "GuardrailViolation payload 包含稳定的 guardrail 元字段",
+          "quiet 模式下的 guardrail once_key 去重约定"
+        ],
+        "slug": "runtime-guardrails"
+      },
+      {
+        "path": "openspec/specs/performance-observability/spec.md",
+        "requirements": [
+          "性能指标采集与结构化输出",
+          "duration 统计使用单调时钟",
+          "资源采样与报告输出",
+          "Observability DSL 配置与独立开关",
+          "RelationObserver 统计与报告",
+          "adaptive 调度决策可观测性"
+        ],
+        "slug": "performance-observability"
+      },
+      {
+        "path": "openspec/specs/output-mode-api/spec.md",
+        "requirements": [
+          "输出是否保留内存数据由 sink 表达",
+          "无输出时避免构造返回列表",
+          "允许 tee 同时写文件与显式 sink",
+          "total_rows 为稳定元数据",
+          "异常路径 best-effort 关闭 sink"
+        ],
+        "slug": "output-mode-api"
+      }
+    ],
     "top_level_fields": [
       "name",
       "_templates",
@@ -41,48 +224,79 @@
   },
   "inputs": [
     {
-      "path": "notebooks/marimo/examples/demo_big_data_report/README.md",
-      "sha256": "ffaeafb8aa9daf64fdbe1cfb05830f537fc22a0ed51a0c3d8a39de84bb06118a"
-    },
-    {
-      "path": "notebooks/marimo/examples/demo_big_data_report/_loaders.py",
-      "sha256": "a2a195f948a008912fd1fb5295606016c779ee9c0fa259ce70963002e85a8428"
-    },
-    {
       "path": "notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "33a179ac289eedf1dbcdfd7fbf781ca272b5b4e5976f9fa4cb9375f1e4a9f617"
+      "sha256": "d332f7b084204794881348cadbe1ac641ff937151bb6ece3523196dc7aeed338"
     },
     {
-      "path": "notebooks/marimo/examples/demo_big_data_report/demo_a0_tutor.py",
-      "sha256": "0f4752ebdb014ac011053984abbdcf85160e7a9c422620ec525d7e06c3d74d67"
+      "path": "openspec/specs/demand-dsl/spec.md",
+      "sha256": "1470c30ec4c0a133024da0b96867da67dbf9dea6cf47de24d4003b64a64c9b46"
     },
     {
-      "path": "notebooks/marimo/examples/skill_examples.md",
-      "sha256": "0c3dfa2e02617db7b7d74fe7b98be18fe3e8e71ad4a69c0b5ec2574ff33d19a1"
+      "path": "openspec/specs/field-compute/spec.md",
+      "sha256": "56c17e23213caa186cbcf075e8233c13d7f6fdd14412f1fb62fd1a6c60e602c8"
     },
     {
-      "path": "src/scalim/dsl/by_yaml/schema_dsl/constants.py",
-      "sha256": "af6dea5366b7a0d572aae706d187b8273f52cd300eb855c91c7cfe09517e09e4"
+      "path": "openspec/specs/loader-retry-policy/spec.md",
+      "sha256": "9d606260b79157c9a1ff7939dc3431204137c28327a33cf0bfd0c4215c5a43d7"
+    },
+    {
+      "path": "openspec/specs/output-mode-api/spec.md",
+      "sha256": "33fb867d104692643dd652373ca8b9ca00a8e45befb3b2d58c3e0fba09ea7efb"
+    },
+    {
+      "path": "openspec/specs/performance-observability/spec.md",
+      "sha256": "b5c7353c5fd79835f4f8a9227468c6d0bb0cf961deebd4bba3c1609152b493c3"
+    },
+    {
+      "path": "openspec/specs/runtime-guardrails/spec.md",
+      "sha256": "6c6974270d4393efcf65155f36b39c9570ff7ecca0b0f4b98f6d78633a23c1ad"
+    },
+    {
+      "path": "openspec/specs/runtime-pruning/spec.md",
+      "sha256": "a8318071f66b53693f3c9e09a88a43ec4cf0171934c357abffc2e2ba4f215ca4"
+    },
+    {
+      "path": "openspec/specs/source-cache/spec.md",
+      "sha256": "0d55bf4260ae1e68be5991287f180c5af966a917b59d0d90e432c432cf6dfc3c"
+    },
+    {
+      "path": "openspec/specs/source-relations/spec.md",
+      "sha256": "dc64fbf1af4a00f3116dd92e285bb573c691385452247a4fc954f7eb6ad60c8f"
+    },
+    {
+      "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
+      "sha256": "135918fe01a030898dcbefd0e170e6e10d8e2f4b7d687643989d56e28eaa7954"
+    },
+    {
+      "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
+      "sha256": "5c9fde446c89ef79339e8723b57002da0c5670b8a585382a0145e1b336d9b908"
+    },
+    {
+      "path": "openspec/specs/yaml-dsl-schema/spec.md",
+      "sha256": "a207333e0d784c73793ffb4986f96aa3a9055de525563143d61086dd35bde6b2"
+    },
+    {
+      "path": "src/scalim/cli/yaml_dsl.py",
+      "sha256": "14d6c5662b51a33ea1e5d5e40991c4b756ad91c7693ea3235a4c8b52c61ba4d1"
+    },
+    {
+      "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
+      "sha256": "ed4d1c42bcf7cc5b59c026a71dfe44c32f5f88bb1f6d814f2ef2d9d53883918b"
     }
   ],
   "outputs": [
     {
-      "path": "SKILL.md",
-      "sha256": "5c594b7dd60f1f851b7399e25faf3500975816d0542ced6e6c4922c231765fb3"
+      "path": "references/generated/cli-lsp-reference.gen.md",
+      "sha256": "b739bc8fa163ecfcc2c3705ec11ef5c6998d02ecfa0b42f2df9b2ee5c295a6f7"
     },
     {
-      "path": "references/dsl-reference.md",
-      "sha256": "55716529e95d2c8e93c3115834712167ec2f669b305d253ebf9344cd9e32aa9c"
+      "path": "references/generated/example-full/ecommerce_report.gen.yaml",
+      "sha256": "c5981b808f81c3de466abc27433003499f3398a335b4b00b5bc244e0b3fe9fbd"
     },
     {
-      "path": "references/example-full/README.md",
-      "sha256": "9d392202390a227edba86868ebbf91f8b487e6c539823d00d43f474b9820cc93"
-    },
-    {
-      "path": "references/example-full/ecommerce_report.yaml",
-      "sha256": "f2fb26dac14a8882a98168495161dcc56e5d83b4acf6a93fe646315bc4f584eb"
+      "path": "references/syntax-catalog.gen.md",
+      "sha256": "2ce5acd40d432237c1d46907f92261a28773f0be5d497a4c00d090ea7fd12228"
     }
   ],
-  "path_normalization": [],
   "skill_name": "scalim-yaml-dsl"
 }

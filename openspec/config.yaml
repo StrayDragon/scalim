@@ -22,6 +22,10 @@ context: |
   架构模式: Hook/Event 扩展机制 + Sink 抽象输出层.
   测试基线: pytest + xdist;慢测使用 `@pytest.mark.slow`.
   行为变更需同步 `openspec/specs/*/spec.md`.
+  OpenSpec 工件在共享或发布前必须先运行 `just openspec-check`.
+  `just openspec-check` 会先运行 `scripts/sanitize.py --check --root openspec`,再运行 `openspec validate --all --strict --no-interactive`.
+  `scripts/sanitize.py` 必须同时应用 `openspec/sanitize_rules.yaml` 与 `openspec/sanitize_rules.local.yaml`(若存在).
+  若缺少 `openspec/sanitize_rules.local.yaml`,sanitize 步骤会给出 warning;在继续前必须确认当前 `openspec/` 内容不存在额外的组织/私有字面量需要本地规则脱敏.
   规范校验命令: `openspec validate --all --strict --no-interactive`.
   提交前缀建议: `fix:`、`tests:`、`doc:`、`PROJECT_DIST_NAME:`、`sync`、`tmp`.
   示例策略: 优先扩展现有 demo/YAML:,再新增文件.

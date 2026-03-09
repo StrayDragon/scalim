@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scalim YAML DSL"
+  short_description: "编写、升级、校验和迁移 Scalim YAML DSL"
+  default_prompt: "Use $scalim-yaml-dsl to author, upgrade, validate, debug, or plan migration for a Scalim YAML DSL task."

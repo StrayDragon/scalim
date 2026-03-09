@@ -3,14 +3,15 @@
 # requires-python = ">=3.10"
 # ///
 """
-生成 `Agent Skill` 数据的说明:
+生成 `scalim-yaml-dsl` 技能的受控参考产物:
 
-- 用 YAML 注释区域标记示例类型:
-  `# region SCALIM-SKILL:<tag>[:<id>]` ... `# endregion`
-  (标签: `minimal`、`advanced`、`relations`、`compute`、`relations-compute`、`example-full`).
-- 扫描目录: `notebooks/marimo/examples/`; 区域内内容必须是合法的 YAML DSL.
-- `schema` 元信息: 在 `src/scalim/dsl/by_yaml/schema_dsl/constants.py` 使用 `_schema_meta(md=..., examples=[...])`,
-  会把 `markdownDescription`/`examples` 写入 `schema`(用于 `YAML LSP hover`).
+- 只生成 `artifacts/skills/scalim-yaml-dsl/references/*.gen.*`、
+  `artifacts/skills/scalim-yaml-dsl/references/generated/` 与构建清单.
+- 语法目录来自 `src/scalim/dsl/by_yaml/schema/demand.gen.json`.
+- CLI/LSP 参考来自 `src/scalim/cli/yaml_dsl.py`.
+- 部分需求索引摘要来自 `openspec/specs/`.
+- 唯一完整示例仅来自
+  `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`.
 """
 
 from __future__ import annotations
@@ -24,9 +25,9 @@ from scalim_misc import agent_skill_gen
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate Scalim YAML DSL Agent Skill outputs.")
-    parser.add_argument("--output-root", help="Output root directory for skills (default: artifacts/skills).")
-    parser.add_argument("--validate", action="store_true", help="Validate existing outputs against generated content.")
+    parser = argparse.ArgumentParser(description="生成 Scalim YAML DSL skill 的受控参考产物。")
+    parser.add_argument("--output-root", help="技能输出根目录(默认: artifacts/skills)。")
+    parser.add_argument("--validate", action="store_true", help="校验现有受控产物是否与重新生成结果一致。")
     return parser.parse_args(argv)
 
 
