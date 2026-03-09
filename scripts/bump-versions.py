@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import argparse
 import re
+import runpy
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import List, Optional, Sequence, Tuple
 
-import project_meta
+project_meta = SimpleNamespace(**runpy.run_path(str(Path(__file__).with_name("project-meta.py"))))
 
 
 _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$")

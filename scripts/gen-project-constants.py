@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import runpy
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Tuple
 
-import project_meta
+project_meta = SimpleNamespace(**runpy.run_path(str(Path(__file__).with_name("project-meta.py"))))
 
 
 def _require_str(value: Any, key: str) -> str:

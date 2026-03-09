@@ -21,12 +21,14 @@
 from __future__ import annotations
 
 import argparse
+import runpy
 import tarfile
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Iterable, List, Optional, Sequence, Tuple
 
-import project_meta
+project_meta = SimpleNamespace(**runpy.run_path(str(Path(__file__).with_name("project-meta.py"))))
 
 
 BANNED_TOPLEVEL_PREFIXES: Tuple[str, ...] = (

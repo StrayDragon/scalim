@@ -76,9 +76,9 @@ def _print_value(value: Any) -> None:
 
 def _usage() -> None:
     cmds: List[str] = [
-        "python scripts/project_meta.py json",
-        "python scripts/project_meta.py get project.name",
-        "python scripts/project_meta.py get tool.scalim.viz.dir_name",
+        "python scripts/project-meta.py json",
+        "python scripts/project-meta.py get project.name",
+        "python scripts/project-meta.py get tool.scalim.viz.dir_name",
     ]
     sys.stderr.write("用法:\n  {}\n".format("\n  ".join(cmds)))
 
