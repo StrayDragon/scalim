@@ -23,6 +23,12 @@
 - **THEN** 编译或校验 MUST 失败
 - **AND** 错误 MUST 指向该指令节点的配置路径
 
+#### Scenario: composite lookup keys are preserved as tuples
+- **WHEN** 目标 source 使用复合 key(例如 `key: [region_id, store_id]`)
+- **AND** 模板中使用 `$keys`
+- **THEN** 注入到 loader 的 set/list 元素 MUST 保持为归一化后的 tuple lookup keys
+- **AND** 系统 MUST NOT 在本变更中隐式拆开 tuple 的各个分量
+
 ### Requirement: `$keys.as=list` produces stable ordering
 系统 SHALL 在 `$keys.as=list` 路径输出稳定顺序的 keys 列表,不得受集合迭代顺序或 `PYTHONHASHSEED` 影响.
 
@@ -93,4 +99,3 @@
 #### Scenario: 同时出现 `$keys` 与 `$rows` fail-fast
 - **WHEN** 同一模板中同时出现 `$keys` 与 `$rows`
 - **THEN** 编译或校验 MUST 失败并报告冲突位置
-

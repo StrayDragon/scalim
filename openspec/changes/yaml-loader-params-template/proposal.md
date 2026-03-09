@@ -7,6 +7,9 @@
 
 - 新增 by_yaml runtime 入口 `runtime_vars`(dict) 语义,用于在单次运行中注入运行期变量.
 - 支持在 `main_source.params` 与 `sources.<id>.params` 中使用 `$runtime.<name>` 占位符,并在编译期将其解析为 `runtime_vars[name]` 的值.
+- 与 `yaml-inline-dynamic-params` 共用同一份编译后的 params template representation:
+  - `$runtime.*` 在模板编译期落成 literal 节点
+  - preload 与 ref loader 共用同一份编译结果,避免维护两套 params 语义
 - **BREAKING**: `cache_mode: preload_forever` 的预加载调用从“零参 loader()”收敛为“与常规 loader 调用一致”: 预加载时也透传 `sources.<id>.params` 作为 kwargs(在完成 `$runtime.*` 解析之后).
 - 诊断策略: 当 `$runtime.<name>` 引用缺失时,编译/校验阶段 fail-fast 并给出明确路径(例如 `main_source.params.params.pay_end_datetime`).
 
@@ -27,4 +30,3 @@
 - 行为变更: `preload_forever` 将对既有 loader 产生额外 kwargs 调用(**破坏性变更**);需要升级依赖零参 preload 的 loader 或配置.
 - 代码影响面: YAML runtime contracts/compiler、preload 逻辑(`Pipeline._preload_cached_sources`)以及相关可观测事件中的 params 记录.
 - 测试/文档: 需要新增回归测试覆盖 `$runtime.*` 解析与 preload params 透传,并更新 DSL 参考文档与 schema 生成产物.
-

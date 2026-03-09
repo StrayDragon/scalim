@@ -7,6 +7,7 @@
 预加载调用 MUST 与常规 loader 调用保持一致的参数语义:
 - 若 `sources.<id>.params` 非空,预加载时 MUST 以 `loader(**sources.<id>.params)` 形式调用,且 `sources.<id>.params` 中的 `$runtime.*` 必须先完成解析.
 - 若 `sources.<id>.params` 为空,预加载时 MAY 使用零参调用以减少影响面.
+- preload 与 ref loader MUST 共用同一份编译后的 params template representation,避免双轨 params 逻辑
 
 #### Scenario: 预加载缓存数据源(透传 params)
 - **WHEN** source 配置 `cache_mode=preload_forever`
@@ -17,4 +18,3 @@
 #### Scenario: cache_mode 拼写错误被拒绝
 - **WHEN** source 配置 `cache_mode=prelaod_forever`(拼写错误)
 - **THEN** 语义校验必须失败并报告 `sources.<id>.cache_mode` 的错误
-

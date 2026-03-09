@@ -1,41 +1,46 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
-### Requirement: source loader params are rendered from a declarative kwargs template
-系统 SHALL 将 `main_source.params` 与 `sources.<id>.params` 视为 loader kwargs 模板,并在调用 loader 前渲染为最终的 kwargs.
+### Requirement: Source/Bind 结构与 keys 分片参数
+系统 SHALL 支持为数据源定义 `key`、`lookup_cast`、`cache_mode`、`params` 与 `lookup_chunk_size`.
 
-渲染规则:
+其中:
+- `main_source.params` 与 `sources.<id>.params` MUST 被视为 loader kwargs 模板
 - `main_source.params` 仅允许静态值(禁止 `$keys/$rows`)
-- `sources.<id>.params` 允许包含 `yaml-inline-dynamic-params` 定义的 `$keys/$rows` 指令节点
+- `sources.<id>.params` 允许包含 `$keys/$rows` 指令节点
+- `sources.*.bind` 不再属于该能力的稳定 YAML authoring surface
 
-#### Scenario: sources.<id>.params 渲染为嵌套 kwargs
-- **WHEN** `sources.order_evaluations.params` 为:
+当 `sources.<id>.params` 中使用 `$keys: {as: list}` 时,从 YAML 转换到运行时参数构建器的行为 MUST 产生稳定顺序列表。
+系统 MUST 使用语义清晰且无歧义的 key 常量公开命名,并在解析器/校验器中统一使用该命名.
+
+以下命名 MUST 生效:
+- `BIND_KEY_CONFIG_KEYS`
+- `MEMORY_OPTIMIZATION_KEYS`
+- `RELATION_CONFIG_KEYS`
+- `RELATIONS_CONFIG_KEYS`
+
+旧命名(`BIND_KEYS_KEYS`、`MEMORY_OPT_KEYS`、`RELATION_KEYS`、`RELATIONS_KEYS`)MUST NOT 继续作为公开常量提供.
+
+#### Scenario: source params 模板构造动态参数
+- **WHEN** source 配置:
   ```yaml
   params:
     params:
-      order_id_set: {$keys: {as: set}}
-      include_deleted: false
+      ids: {$keys: {as: set}}
   ```
-- **THEN** ref loader 调用 MUST 接收到 `kwargs["params"]["order_id_set"] == set(lookup_keys)`
-- **AND** ref loader 调用 MUST 接收到 `kwargs["params"]["include_deleted"] == false`
+- **THEN** loader 调用应包含 `params={"ids": set(lookup_keys)}`
 
-### Requirement: static `sources.<id>.params` MUST be passed even without legacy bind/to_bind
-系统 MUST 在 ref loader 调用时透传渲染后的 `sources.<id>.params` kwargs,即使未声明 legacy `bind/to_bind`.
+#### Scenario: `sources.*.bind` 旧写法被拒绝
+- **WHEN** source 配置 `bind: {use_keys: {param: ids}}`
+- **THEN** 校验 MUST 失败并提示迁移到 `params` 模板
 
-#### Scenario: 仅声明静态 params 仍被透传
-- **WHEN** `sources.customers` 未声明 `bind/to_bind`
-- **AND** `sources.customers.params` 为:
-  ```yaml
-  params:
-    region: "CN"
-  ```
-- **THEN** ref loader 调用 MUST 以 `loader(region="CN")` 的形式透传该参数(而非零参调用)
+#### Scenario: `$keys.as=list` 顺序稳定
+- **WHEN** source 配置 `params` 模板中使用 `$keys: {as: list}` 且 lookup_keys 集合相同
+- **THEN** 运行时传给 loader 的 keys 列表顺序必须稳定
 
-### Requirement: params directives and legacy bind/to_bind are mutually exclusive
-系统 MUST 禁止在同一 source/step 上同时使用 `$keys/$rows` 指令节点与 legacy `bind/to_bind`,以避免冲突与语义分裂.
+#### Scenario: 解析器使用新常量
+- **WHEN** 执行 YAML `bind/observability/relations` 解析
+- **THEN** 解析路径应使用新常量命名
 
-#### Scenario: 同时声明模板指令与 bind 被拒绝
-- **WHEN** `sources.customers` 同时声明:
-  - `bind: {use_keys: {param: ids}}`
-  - `params` 模板中包含 `$keys` 或 `$rows`
-- **THEN** 校验 MUST 失败并提示迁移为模板写法
-
+#### Scenario: 旧常量不可导入
+- **WHEN** 调用方尝试导入旧常量名
+- **THEN** 导入 MUST 失败

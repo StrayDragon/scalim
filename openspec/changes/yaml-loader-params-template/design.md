@@ -18,6 +18,7 @@
 - 支持在 `main_source.params` 与 `sources.<id>.params` 中用 `$runtime.<name>` 占位符引用运行期变量.
 - 让 `preload_forever` 预加载调用与常规 loader 调用保持一致: 预加载时也透传 `sources.<id>.params`.
 - 缺失 runtime var 时 fail-fast,并给出明确配置路径.
+- 与 `yaml-inline-dynamic-params` 共用同一份 compiled params template representation,避免 preload/ref-load 各自维护一套 params 逻辑.
 
 **Non-Goals:**
 - 不在本 change 中讨论/落地 nested params 的 keys/rows 绑定语法与更通用的 declarative params builder.
@@ -41,7 +42,7 @@
 拒绝原因:
 - overrides 语义是“mask 覆盖 YAML 输出与 viz 等运行策略”,而 runtime vars 是配置模板注入,不应混入 overrides.
 
-### Decision: Placeholder substitution is exact-match and restricted to loader params templates
+### Decision: Placeholder substitution is exact-match and happens during params template compilation
 
 占位符语法:
 - 仅当某个 YAML scalar string 的值 **完全等于** `$runtime.<name>` 时才触发替换.
@@ -58,16 +59,23 @@
 缺失行为:
 - 若配置引用 `$runtime.<name>` 但 `runtime_vars` 缺失或不包含该 key,编译 MUST fail-fast 并报告路径(例如 `main_source.params.params.pay_end_datetime`).
 
-### Decision: Apply runtime substitution after YAML parsing/validation and before IR conversion
+替换后的值处理:
+- `$runtime.*` 解析后的值在 template compiler 中落为 `LiteralNode(value)`
+- `LiteralNode` MUST 视为 opaque leaf,后续不得再按结构扫描其中是否包含 `"$keys"`/`"$rows"` 等保留键
+- 因此即使 `runtime_vars[name]` 是 `{"$keys": {...}}` 这样的字典,也必须按普通字面值透传,不得被误判为动态指令节点
+
+### Decision: Apply runtime substitution inside the shared params template compiler
 
 链路位置:
 1. `load_config(yaml_path)` 得到 `DemandConfig`
-2. 对 `DemandConfig.main_source.params` 与 `DemandConfig.sources[*].params` 执行占位符替换
-3. `compile_ir(config)` 将替换后的配置转换为 IR
+2. 共享 params template compiler 处理 `DemandConfig.main_source.params` 与 `DemandConfig.sources[*].params`
+3. compiler 在识别 `$keys/$rows` 指令节点的同时,将 `$runtime.*` 解析为 `LiteralNode`
+4. `compile_ir(config)` 将编译后的 template representation 转换为 IR
 
 理由:
 - YAML loader/validator 维持原有职责,不需要理解 runtime vars.
-- IR 中的静态 params 可直接持有运行期对象(例如 `datetime`)并透传到 loader.
+- 编译后的 template representation 可直接持有运行期对象(例如 `datetime`)并透传到 loader.
+- 通过 typed node/编译期标记避免 runtime 注入对象被二次识别为 `$keys/$rows` 指令
 
 ### Decision: Preload loader calls pass `sources.<id>.params` (semantic convergence)
 
@@ -75,12 +83,14 @@
 - 若 `sources.<id>.params` 非空: `loader(**sources.<id>.params)`
 - 若为空: 保持零参调用
 
-实现上需要让 execution 侧的 preload 阶段拿到静态 params 模板.为此:
-- 扩展 `SourceIr` 增加 `params: StaticParams`(与 `MainSourceIr.params` 对齐),由 YAML adapter 在 IR 转换时填充.
-- `Pipeline._preload_cached_sources()` 使用 `source.params` 构造调用.
+实现上需要让 execution 侧的 preload 阶段拿到与 ref loader 相同的编译结果.为此:
+- 将 `sources.<id>.params` 编译为共享 params template representation(例如 `params_template`)
+- preload callsite 通过 `source.params_template.render(preload_ctx)` 构造 kwargs
+- ref loader 侧的 `BindingIr.params_builder` 也委托同一份 `params_template.render(ref_ctx)`
 
 理由:
 - 不引入额外的 `preload_params` 字段,直接收敛 `params` 为 loader kwargs 模板的心智模型.
+- 不再引入单独的 `SourceIr.params` raw static params 副本,避免与 ref loader 路径形成双轨实现.
 - 保留“params 为空时仍零参调用”以减少对无参 loader 的影响面.
 
 ## Risks / Trade-offs
@@ -92,7 +102,6 @@
 ## Migration Plan
 
 1. 扩展 by_yaml runtime API: `RunOptions/runtime.entrypoints` 支持 `runtime_vars`.
-2. 实现 `$runtime.*` 占位符替换逻辑并补回归测试.
-3. 扩展 `SourceIr` 携带 `params`,并让 preload 调用透传 params;补回归测试.
+2. 在共享 params template compiler 中实现 `$runtime.*` 解析与 `LiteralNode` 标记,并补回归测试.
+3. 让 preload 与 ref loader 共用同一份 compiled params template,并补回归测试.
 4. 更新 schema hover 与 DSL reference 文档中关于 `params` 与 preload 的说明,并更新生成产物.
-

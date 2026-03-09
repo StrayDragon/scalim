@@ -6,7 +6,8 @@
 skill 文档 MUST 至少包含:
 - `$keys` 与 `$rows` 的最小示例
 - `$rows` 会触发 rows barrier 的提示
-- legacy `bind/to_bind` 到模板指令的迁移规则与常见错误诊断
+- composite key 在 `$keys` 下保持 tuple 结构的说明
+- `bind/to_bind` 到模板指令的迁移规则与常见错误诊断
 
 #### Scenario: authoring 示例包含 `$keys`
 - **WHEN** 用户请求编写一个 ref loader,需要把 lookup keys 注入到 `kwargs["params"]["..."]` 的嵌套位置
@@ -16,3 +17,7 @@ skill 文档 MUST 至少包含:
 - **WHEN** 用户请求将旧写法 `bind.use_keys.param` 升级为更直觉的 nested params 写法
 - **THEN** skill guidance MUST 给出迁移后的 `$keys/$rows` 模板写法与校验命令
 
+#### Scenario: old bind/to_bind 不再被建议
+- **WHEN** 用户请求为 ref loader 生成 YAML
+- **THEN** skill guidance MUST 不再输出 `bind/to_bind` 写法
+- **AND** 必须以 `params` 模板作为默认方案

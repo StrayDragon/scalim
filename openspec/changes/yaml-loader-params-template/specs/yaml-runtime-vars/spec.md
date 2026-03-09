@@ -37,3 +37,12 @@
 - **THEN** 编译 MUST 失败
 - **AND** 错误 MUST 指向包含该占位符的配置路径(例如 `main_source.params.params.pay_end_datetime`)
 
+### Requirement: substituted runtime values are opaque literals
+系统 MUST 将 `$runtime.<name>` 替换后的值视为编译期 literal 节点,后续模板处理不得再次按 `"$keys"`/`"$rows"` 的结构长相识别其中内容.
+
+#### Scenario: runtime var value contains `"$keys"`-shaped mapping
+- **WHEN** 调用方提供 `runtime_vars={"payload": {"$keys": {"as": "set"}}}`
+- **AND** `sources.demo.params` 中引用 `$runtime.payload`
+- **THEN** 编译后的模板 MUST 将该值视为普通 literal dict
+- **AND** loader 调用时 MUST 原样透传该 dict
+- **AND** 系统 MUST NOT 将其误判为动态指令节点
