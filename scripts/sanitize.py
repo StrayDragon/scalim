@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import os
 import re
 import sys
 from collections import Counter, defaultdict
@@ -40,6 +41,8 @@ _SKIPPED_RULE_FILES = {
     "sanitize_rules.local.yaml",
     "sanitize_rules.local.example.yaml",
 }
+
+_FALSEY_ENV_VALUES = {"", "0", "false", "no", "off"}
 
 
 def _iter_target_files(root: Path) -> Iterable[Path]:
@@ -169,6 +172,13 @@ def _dedupe_paths(paths: Iterable[Path]) -> List[Path]:
     return unique_paths
 
 
+def _env_var_is_truthy(name: str) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return False
+    return value.strip().lower() not in _FALSEY_ENV_VALUES
+
+
 def _resolve_rule_paths(args: argparse.Namespace, root: Path, repo_root: Path) -> List[Path]:
     rule_paths: List[Path] = []
 
@@ -176,7 +186,7 @@ def _resolve_rule_paths(args: argparse.Namespace, root: Path, repo_root: Path) -
         local_rules_path = _resolve_rule_path(args.local_rules, "sanitize_rules.local.yaml", root, repo_root)
         if local_rules_path is not None:
             rule_paths.append(local_rules_path)
-        elif not args.local_rules:
+        elif not args.local_rules and not _env_var_is_truthy("CI"):
             print(
                 "[warn] 未找到可选本地规则文件 `sanitize_rules.local.yaml`; 当前仅应用公共规则. "
                 "若存在组织/私有字面量,请在 `openspec/sanitize_rules.local.yaml` 中补充规则后重试.",

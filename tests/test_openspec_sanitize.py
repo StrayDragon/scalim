@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -7,6 +8,16 @@ from pathlib import Path
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def _subprocess_env(**overrides: str) -> dict:
+    env = os.environ.copy()
+    for key, value in overrides.items():
+        if value is None:
+            env.pop(key, None)
+            continue
+        env[key] = value
+    return env
 
 
 def _prepare_repo_fixture(tmp_path: Path) -> Path:
@@ -165,6 +176,49 @@ def test_sanitize_warns_when_local_rules_missing(tmp_path: Path) -> None:
     proc = subprocess.run(
         [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(openspec_root)],
         cwd=str(repo_root),
+        env=_subprocess_env(CI=None),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "sanitize_rules.local.yaml" in proc.stderr
+    assert "仅应用公共规则" in proc.stderr
+
+
+def test_sanitize_skips_missing_local_rules_warning_when_ci_enabled(tmp_path: Path) -> None:
+    repo_root = _prepare_repo_fixture(tmp_path)
+    openspec_root = repo_root / "openspec"
+    sample = openspec_root / "notes.md"
+    _write(sample, "CLI: scalim-cli\n")
+
+    proc = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(openspec_root)],
+        cwd=str(repo_root),
+        env=_subprocess_env(CI="true"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "sanitize_rules.local.yaml" not in proc.stderr
+    assert "仅应用公共规则" not in proc.stderr
+
+
+def test_sanitize_still_warns_when_ci_value_is_falsey(tmp_path: Path) -> None:
+    repo_root = _prepare_repo_fixture(tmp_path)
+    openspec_root = repo_root / "openspec"
+    sample = openspec_root / "notes.md"
+    _write(sample, "CLI: scalim-cli\n")
+
+    proc = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(openspec_root)],
+        cwd=str(repo_root),
+        env=_subprocess_env(CI="false"),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
