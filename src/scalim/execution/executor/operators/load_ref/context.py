@@ -1,7 +1,7 @@
 from typing import Hashable, List, Optional
 
 from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.sources import SourceIr
+from .....spec.ir.source_contracts import LookupSourceRefIrBase
 from .....typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY, LookupKey, RelationLookupResult, RowData
 from ....context import BatchContext
 from ...helpers.batch_data import build_row
@@ -39,7 +39,7 @@ class LoadRefExecutionContext:
         row_id: Hashable,
         fk_raw: object,
         fk_normalized: Optional[LookupKey],
-        target_source: SourceIr,
+        target_source: LookupSourceRefIrBase,
         result: RelationLookupResult,
         error_message: Optional[str] = None,
     ) -> None:

@@ -1,4 +1,3 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 # region imports
 
 import logging
@@ -8,8 +7,8 @@ from typing import Deque, Dict, List, Optional, Set, Tuple
 
 from ..events.event import Event, generate_run_id
 from ._internal.common import (
-    _DEFAULT_MAX_RECORDED_EVENTS,
-    ObserverCaptureOverflowError,  # noqa: F401
+    DEFAULT_MAX_RECORDED_EVENTS,
+    ObserverCaptureOverflowError,
 )
 from ._internal.common import (
     OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING as _OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING,
@@ -32,8 +31,8 @@ OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = _OBSERVER_CLOSE_RAISED_EXCEPTION_WARNI
 
 
 class ObserverManager(
-    ObserverManagerStateMixin,
     ObserverManagerRegistryMixin,
+    ObserverManagerStateMixin,
     ObserverManagerCaptureMixin,
     ObserverManagerEmitMixin,
 ):
@@ -42,11 +41,11 @@ class ObserverManager(
     注意:请通过 `register`/`unregister`/`clear` 管理观察者;直接修改 `observers` 列表可能导致订阅缓存不同步.
     """
 
-    observers: List[Observer]
+    observers: Optional[List[Observer]]
     _has_observers: bool
     _supports_all: bool
-    _supported_event_types: Set[str]
-    _observers_by_event_type: Dict[str, Tuple[Observer, ...]]
+    _supported_event_types: Optional[Set[str]]
+    _observers_by_event_type: Optional[Dict[str, Tuple[Observer, ...]]]
     _observers_for_unknown_event_type: Tuple[Observer, ...]
     _capture_event_types: Optional[Set[str]]
     _capture_unknown_event_types: bool
@@ -61,7 +60,7 @@ class ObserverManager(
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool
     _seq: int
-    _recorded_events: Deque[Event]
+    _recorded_events: Optional[Deque[Event]]
 
     def __init__(
         self,
@@ -73,7 +72,7 @@ class ObserverManager(
         loader_result_sample_size: int = 5,
         run_id: Optional[str] = None,
         mode: str = "process",
-        max_recorded_events: Optional[int] = _DEFAULT_MAX_RECORDED_EVENTS,
+        max_recorded_events: Optional[int] = DEFAULT_MAX_RECORDED_EVENTS,
         capture_overflow_policy: str = "raise",
     ) -> None:
         self.observers = list(observers or [])
@@ -100,5 +99,6 @@ class ObserverManager(
 
 
 __all__ = [
+    "ObserverCaptureOverflowError",
     "ObserverManager",
 ]

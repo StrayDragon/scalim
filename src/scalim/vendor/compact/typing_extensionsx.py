@@ -64,3 +64,18 @@ except ImportError:
         class Protocol(object):
             pass
 # endregion
+
+
+# region runtime_checkable compat
+try:
+    from typing_extensions import runtime_checkable  # pyright: ignore[reportUnusedImport]
+except ImportError:
+    try:
+        from typing import runtime_checkable  # pyright: ignore[reportUnusedImport]
+    except ImportError:
+        C = TypeVar("C")
+
+        def runtime_checkable(cls: C) -> C:
+            return cls
+
+# endregion

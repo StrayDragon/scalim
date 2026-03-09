@@ -190,6 +190,10 @@ openspec-sanitize CONFIRM="":
     echo ""
     echo "[info] dry-run only. Apply with: just openspec-sanitize CONFIRM=YES"
 
+# 检查: OpenSpec 提案/规范的脱敏与结构校验 (自动叠加本地 `sanitize_rules.local.yaml`; 缺失时脚本会告警)
+openspec-check: openspec-sanitize
+    uv {{ UV_OPTIONS }} run openspec validate --all --strict --no-interactive
+
 # 工具: 统一主包/子包/前端版本 (默认 dry-run; 需要 YES 才执行)
 bump-versions VERSION="" CONFIRM="":
     #!/usr/bin/env bash
@@ -243,9 +247,9 @@ lintfix: type-check
 py-doc-language-check:
     uv {{ UV_OPTIONS }} run python scripts/check-py-doc-language.py
 
-# 检查: `src/scalim/` 顶层 `# pyright:` pragma 未新增(源码扫描 + 清单 ratchet)
+# 检查: `src/scalim/` 运行时契约规则(`pyright` 顶层指令 + 严格顶层规则 + 类内 `if TYPE_CHECKING:` 条件方法)
 top-level-pyright-pragmas-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-top-level-pyright-pragmas.py
+    uv {{ UV_OPTIONS }} run python scripts/check-top-level-pyright-pragmas.py --strict-top-level
 
 # 检查: `src/scalim/` 注释/文档字符串英文需用反引号包裹(更严格)
 comments-cn-check:
@@ -403,7 +407,7 @@ examples:
     echo "All examples completed!"
 
 # QA: 仅py轻量的检查
-quick-check-only-py: lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check stdlib-collisions-check test
+quick-check-only-py: lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

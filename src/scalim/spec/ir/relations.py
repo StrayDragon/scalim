@@ -1,12 +1,11 @@
-# pyright: reportImportCycles=false
 from collections import deque
 from dataclasses import dataclass
-from typing import Dict, FrozenSet, List, Optional, Set, Tuple, overload
+from typing import Dict, FrozenSet, List, Optional, Set, Tuple, cast, overload
 
 from ...vendor.compact.typing_extensionsx import override
 from .aliases import LookupKeyCast, LookupKeySpec
 from .binding import BindingIr
-from .sources import MainSourceIr, SourceIr, SourceRefIr
+from .source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase
 
 
 @dataclass(frozen=True)
@@ -20,7 +19,7 @@ class FieldRefIr:
         - 或: `orders_source["customer_id"].eq(customers_source["customer_id"])`
     """
 
-    source: SourceRefIr
+    source: SourceRefIrBase
     """
     数据源(IR)实例
     """
@@ -124,15 +123,15 @@ class RelationIr:
         msg = "and_() requires JoinConditionIr or RelationIr, got {}".format(type(other).__name__)
         raise TypeError(msg)
 
-    def get_involved_sources(self) -> FrozenSet[SourceRefIr]:
-        sources: Set[SourceRefIr] = set()
+    def get_involved_sources(self) -> FrozenSet[SourceRefIrBase]:
+        sources: Set[SourceRefIrBase] = set()
         for condition in self.conditions:
             sources.add(condition.left.source)
             sources.add(condition.right.source)
         return frozenset(sources)
 
-    def _build_adjacency(self) -> Dict[str, List[Tuple[str, SourceRefIr, str]]]:
-        adjacency: Dict[str, List[Tuple[str, SourceRefIr, str]]] = {}
+    def _build_adjacency(self) -> Dict[str, List[Tuple[str, SourceRefIrBase, str]]]:
+        adjacency: Dict[str, List[Tuple[str, SourceRefIrBase, str]]] = {}
 
         for condition in self.conditions:
             left_src = condition.left.source
@@ -145,19 +144,20 @@ class RelationIr:
 
         return adjacency
 
-    def _build_lookup_steps(self, path: List[Tuple[str, SourceRefIr, str]]) -> "Tuple[LookupStepIr, ...]":
+    def _build_lookup_steps(self, path: List[Tuple[str, SourceRefIrBase, str]]) -> "Tuple[LookupStepIr, ...]":
         steps: List[LookupStepIr] = []
         for from_field, next_source, to_field in path:
-            if isinstance(next_source, MainSourceIr):
+            if isinstance(next_source, MainSourceRefIrBase):
                 msg = "主数据源不支持作为关联查找目标"
                 raise TypeError(msg)
-            if to_field == next_source.key.key:
-                steps.append(LookupStepIr(from_field=from_field, to_source=next_source))
+            lookup_source = cast("LookupSourceRefIrBase", next_source)
+            if to_field == lookup_source.key.key:
+                steps.append(LookupStepIr(from_field=from_field, to_source=lookup_source))
             else:
-                steps.append(LookupStepIr(from_field=from_field, to_source=next_source, to_field=to_field))
+                steps.append(LookupStepIr(from_field=from_field, to_source=lookup_source, to_field=to_field))
         return tuple(steps)
 
-    def infer_lookup_path(self, from_source: SourceRefIr, to_source: SourceIr) -> "Tuple[LookupStepIr, ...]":
+    def infer_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "Tuple[LookupStepIr, ...]":
         """
         推断从 `from_source` 到 `to_source` 的查找路径, 返回 `LookupStepIr` 序列
         """
@@ -169,7 +169,7 @@ class RelationIr:
             msg = f"起始数据源 {from_source.source_id!r} 不在关联关系中"
             raise ValueError(msg)
 
-        queue: "deque[Tuple[SourceRefIr, List[Tuple[str, SourceRefIr, str]]]]" = deque([(from_source, [])])
+        queue: "deque[Tuple[SourceRefIrBase, List[Tuple[str, SourceRefIrBase, str]]]]" = deque([(from_source, [])])
         visited: Set[str] = {from_source.source_id}
 
         while queue:
@@ -190,7 +190,7 @@ class RelationIr:
         msg = f"无法从 {from_source.source_id!r} 到达 {to_source.source_id!r}"
         raise ValueError(msg)
 
-    def infer_multi_field_lookup_path(self, from_source: SourceRefIr, to_source: SourceIr) -> "Tuple[LookupStepIr, ...]":
+    def infer_multi_field_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "Tuple[LookupStepIr, ...]":
         """
         推断多字段关联路径: 处理复合主键场景,将多个单字段条件合并为一个多字段 `LookupStepIr`
         """
@@ -235,7 +235,7 @@ class LookupStepIr:
     源字段名或字段名列表,从当前数据中取值
     """
 
-    to_source: SourceIr
+    to_source: LookupSourceRefIrBase
     """
     目标数据源对象,明确指定要关联到哪个源
     """

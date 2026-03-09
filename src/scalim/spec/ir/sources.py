@@ -1,13 +1,11 @@
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, FrozenSet, Optional, Tuple, Union
+from typing import Dict, FrozenSet, Optional, Tuple, Union
 
 from ...typedefs import SourceSpecIrCacheMode, StaticParams
 from ...vendor.compact.typing_extensionsx import override
 from .aliases import LookupKeyCast, MainSourceRowIterableCallable, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
-
-if TYPE_CHECKING:
-    from .relations import FieldRefIr
+from .relations import FieldRefIr
 
 
 @dataclass(frozen=True)
@@ -104,7 +102,7 @@ class SourceIr:
     def is_preload_forever(self) -> bool:
         return self.cache_mode == SourceSpecIrCacheMode.PRELOAD_FOREVER
 
-    def __getitem__(self, field_name: str) -> "FieldRefIr":
+    def __getitem__(self, field_name: str) -> FieldRefIr:
         """支持 `Source[\"field\"]` 语法创建字段引用.
 
         参数:
@@ -113,11 +111,7 @@ class SourceIr:
         示例:
             - `orders_source[\"customer_id\"].join(customers_source[\"customer_id\"])`
 
-        注意:
-            使用字符串类型注解避免前向引用问题
         """
-        from .relations import FieldRefIr  # noqa: PLC0415
-
         return FieldRefIr(source=self, field_name=field_name)
 
     @override
@@ -156,10 +150,8 @@ class MainSourceIr:
     内部行标识字段名 (框架维护)
     """
 
-    def __getitem__(self, field_name: str) -> "FieldRefIr":
+    def __getitem__(self, field_name: str) -> FieldRefIr:
         """支持 `MainSource[\"field\"]` 语法创建字段引用."""
-        from .relations import FieldRefIr  # noqa: PLC0415
-
         return FieldRefIr(source=self, field_name=field_name)
 
     @override

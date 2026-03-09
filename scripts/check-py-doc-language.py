@@ -87,6 +87,7 @@ _GOOGLE_STYLE_SECTION_HEADER_RE = re.compile(
 _GOOGLE_STYLE_PARAM_LINE_RE = re.compile(r"^(\s*)(\*{0,2}[A-Za-z_][A-Za-z0-9_]*)(?:\s*\([^)]*\))?(\s*:\s*)(.*?)(\r?\n)?$")
 _GOOGLE_STYLE_TUPLE_IDENTIFIER_LIST_RE = re.compile(r"\(\s*(?:\*{0,2}[A-Za-z_][A-Za-z0-9_]*\s*,\s*)+(?:\*{0,2}[A-Za-z_][A-Za-z0-9_]*)\s*\)")
 _GOOGLE_STYLE_BARE_IDENTIFIER_LIST_RE = re.compile(r"^(?:\*{0,2}[A-Za-z_][A-Za-z0-9_]*\s*,\s*)+(?:\*{0,2}[A-Za-z_][A-Za-z0-9_]*)$")
+_FORCE_EN_MARK = "force-en"
 
 
 @dataclass(frozen=True)
@@ -228,11 +229,17 @@ def _find_english_words(text: str) -> list[str]:
     return [w for w in words if not _is_probably_identifier(w)]
 
 
+def _has_ignore_mark(stripped_comment: str) -> bool:
+    return _FORCE_EN_MARK in stripped_comment.lower()
+
+
 def _is_directive_comment(comment: str) -> bool:
     if comment.startswith("#!"):
         return True
     stripped = comment.lstrip("#").strip()
     if not stripped:
+        return True
+    if _has_ignore_mark(stripped):
         return True
     if stripped.startswith(("region", "endregion")):
         return True
@@ -301,6 +308,28 @@ def _iter_comments(src: str) -> list[tuple[int, int, str]]:
     return comments
 
 
+def _iter_ignore_comment_lines(src: str) -> set[int]:
+    ignore_lines: set[int] = set()
+    for line, _col, comment in _iter_comments(src):
+        stripped = comment.lstrip("#").strip()
+        if _has_ignore_mark(stripped):
+            ignore_lines.add(line)
+    return ignore_lines
+
+
+def _is_ignored_by_comment(ignore_lines: set[int], *, line: int, end_line: Optional[int] = None) -> bool:
+    if line <= 0:
+        return False
+    if line in ignore_lines or line - 1 in ignore_lines:
+        return True
+    if end_line is None or end_line <= line:
+        return False
+    for current in range(line + 1, end_line + 1):
+        if current in ignore_lines:
+            return True
+    return False
+
+
 def _summarize_sample(text: str) -> str:
     one_line = " ".join(text.strip().splitlines()).strip()
     if len(one_line) > 120:  # noqa: PLR2004
@@ -323,13 +352,23 @@ def main() -> int:
         except SyntaxError:
             continue
 
+        ignore_lines = _iter_ignore_comment_lines(src)
+
         for line, col, kind, doc in _iter_docstrings(tree):
+            if _is_ignored_by_comment(
+                ignore_lines,
+                line=line,
+                end_line=None,
+            ):
+                continue
             words = _find_english_words(doc)
             if not words:
                 continue
             hits.append(_Hit(path=path, line=line, col=col, kind=kind, sample=_summarize_sample(doc)))
 
         for line, col, comment in _iter_comments(src):
+            if _is_ignored_by_comment(ignore_lines, line=line):
+                continue
             if _is_directive_comment(comment):
                 continue
             words = _find_english_words(comment)
@@ -340,7 +379,10 @@ def main() -> int:
     if not hits:
         return 0
 
-    print("检测到英文注释/文档字符串(请改为中文,或将代码/术语放入反引号 `...` 中):", file=sys.stderr)
+    print(
+        "检测到英文注释/文档字符串(请改为中文,或将代码/术语放入反引号 `...` 中;必要时可用 `# force-en` 显式跳过):",
+        file=sys.stderr,
+    )
     for hit in hits:
         rel = hit.path.relative_to(repo_root)
         print(f"{rel}:{hit.line}:{hit.col}  [{hit.kind}]  {hit.sample}", file=sys.stderr)

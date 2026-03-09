@@ -217,10 +217,11 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
                     raise ValueError(msg)
                 process_failure_mode = failure_mode
 
-                if runtime.hook_manager.hooks or runtime.observer_manager.observers:
+                observer_list = runtime.observer_manager.observers or []
+                if runtime.hook_manager.hooks or observer_list:
                     msg = "adaptive process backend is not compatible with hooks/observers (hooks={}, observers={})".format(
                         len(runtime.hook_manager.hooks),
-                        len(runtime.observer_manager.observers),
+                        len(observer_list),
                     )
                     if wants_scheduler_decisions:
                         self._emit_scheduler_decision(

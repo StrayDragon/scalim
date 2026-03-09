@@ -7,7 +7,7 @@ from .....events.catalog import EVENT_LOADER_CALL
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
 from .....spec.ir.helpers import call_loader_with_binding, coerce_loader_result_mapping
 from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.sources import SourceIr
+from .....spec.ir.source_contracts import LookupSourceRefIrBase
 from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData
 from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
@@ -72,7 +72,7 @@ def _trigger_ref_loader_call(
 def _call_ref_loader(
     *,
     runtime: ExecutionRuntime,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     binding: Optional[BindingIr],
     loader_context: LoaderCallContextIr,
     cache_enabled: bool,
@@ -156,7 +156,7 @@ def _get_cached_ref_result(
 
 
 def _resolve_lookup_chunk_size(
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     *,
     cache_enabled: bool,
     lookup_key_count: int,
@@ -174,7 +174,7 @@ def _resolve_lookup_chunk_size(
 
 def _load_ref_once(
     runtime: ExecutionRuntime,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     binding: Optional[BindingIr],
     loader_context: LoaderCallContextIr,
     *,
@@ -204,7 +204,7 @@ def _load_ref_once(
 def _load_ref_chunked(
     *,
     exec_ctx: LoadRefExecutionContext,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     binding: Optional[BindingIr],
     runtime: ExecutionRuntime,
     event_field_keys: Tuple[str, ...],

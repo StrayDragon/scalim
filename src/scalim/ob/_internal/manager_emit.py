@@ -1,5 +1,6 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 import logging
+import threading
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
 from ...events.catalog import (
@@ -42,7 +43,7 @@ from ...events.events import (
 from ...typedefs import RelationLookupResult
 from ..observer import Observer
 from .common import (
-    _CATALOG_EVENT_TYPES_SET,
+    CATALOG_EVENT_TYPES_SET,
     OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING,
     OBSERVER_RAISED_EXCEPTION_WARNING,
 )
@@ -50,7 +51,35 @@ from .common import (
 _logger = logging.getLogger(__name__)
 
 
-class ObserverManagerEmitMixin:
+class ObserverManagerEmitMixin(ABC):
+    observers: Optional[List[Observer]] = None
+    debug_mode: bool = False
+    fallback_logger_enabled: bool = False
+    loader_result_policy: str = "full"
+    run_id: str = ""
+    mode: str = "process"
+    _lock: "threading.RLock" = threading.RLock()
+    _has_observers: bool = False
+    _observers_by_event_type: Optional[Dict[str, Tuple[Observer, ...]]] = None
+    _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
+    _diagnostic_warning_emitted: bool = False
+    _seq: int = 0
+
+    @abstractmethod
+    def _record_event(self, event: Event) -> None: ...
+
+    @abstractmethod
+    def _supports_safely(self, observer: Observer, event_type: str) -> bool: ...
+
+    @abstractmethod
+    def _should_emit_event_type(self, event_type: str) -> bool: ...
+
+    @abstractmethod
+    def _summarize_result(self, result: Any) -> Dict[str, Any]: ...
+
+    @abstractmethod
+    def _sample_result(self, result: Any) -> Any: ...
+
     def _safe_call(
         self,
         observer: Observer,
@@ -66,6 +95,18 @@ class ObserverManagerEmitMixin:
                 OBSERVER_RAISED_EXCEPTION_WARNING,
                 type(observer).__name__,
                 method.__name__,
+                exc_info=True,
+            )
+
+    def _close_observer_safely(self, observer: Observer) -> None:
+        try:
+            observer.close()
+        except Exception:
+            if self.debug_mode:
+                raise
+            _logger.warning(
+                OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING,
+                type(observer).__name__,
                 exc_info=True,
             )
 
@@ -85,8 +126,12 @@ class ObserverManagerEmitMixin:
         with self._lock:
             if not self._has_observers:
                 return
-            if event_type in _CATALOG_EVENT_TYPES_SET:
-                observers = self._observers_by_event_type.get(event_type, ())
+            if event_type in CATALOG_EVENT_TYPES_SET:
+                observers_by_event_type = self._observers_by_event_type
+                if observers_by_event_type is None:
+                    observers_by_event_type = {}
+                    self._observers_by_event_type = observers_by_event_type
+                observers = observers_by_event_type.get(event_type, ())
             else:
                 unknown_observers = self._observers_for_unknown_event_type
 
@@ -116,19 +161,12 @@ class ObserverManagerEmitMixin:
 
     def close(self) -> None:
         with self._lock:
-            for observer in self.observers:
-                if not hasattr(observer, "close"):
-                    continue
-                try:
-                    observer.close()
-                except Exception:
-                    if self.debug_mode:
-                        raise
-                    _logger.warning(
-                        OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING,
-                        type(observer).__name__,
-                        exc_info=True,
-                    )
+            observers = self.observers
+            if observers is None:
+                observers = []
+                self.observers = observers
+            for observer in observers:
+                self._close_observer_safely(observer)
 
     def emit_pipeline_start(self, targets: List[str], batch_size: Optional[int]) -> None:
         if not self._should_emit_event_type(EVENT_PIPELINE_START):

@@ -31,6 +31,12 @@
 - Scripts in `scripts/` should use `-`-separated filenames (for example, `gen-agent-skill.py`).
 - Tests: file names `tests/test_*.py`, functions `test_*`.
 
+## Runtime Contract Rules
+- Do not define conditional methods or ellipsis stubs inside real runtime classes under `if TYPE_CHECKING:` to satisfy the type checker. This includes mixins, managers, handlers, and other production classes.
+- `if TYPE_CHECKING:` is only for type-only imports, aliases, and other non-runtime declarations; it must not be used to fake class interfaces.
+- When one mixin/class depends on methods provided by another mixin/class, express that dependency as an explicit runtime contract. Prefer `ABC` + `@abstractmethod` because it is Python 3.6 compatible and keeps MRO requirements visible.
+- Do not use lazy local imports or other ad-hoc tricks as a substitute for proper runtime contracts unless the user explicitly asks for a compatibility workaround.
+
 ## Python Version & Packaging (Intentional Mismatch)
 - Runtime compatibility target: `scalim/` must remain compatible with **Python 3.6** (and 3.10+ for dev/tests).
 - Packaging metadata in `pyproject.toml` sets `requires-python = ">=3.10"` intentionally:
@@ -52,7 +58,10 @@ When adding new typing_extensions features, add a compat shim in `typing_extensi
 - Add regression tests near the affected module and update fixtures under `tests/fixtures` when needed.
 
 ## Spec Hygiene
-- After spec edits, run `openspec validate --all --strict --no-interactive`.
+- After spec edits, run `just openspec-check`.
+- `just openspec-check` runs both `scripts/sanitize.py --check --root openspec` and `openspec validate --all --strict --no-interactive`.
+- `scripts/sanitize.py` must apply both `openspec/sanitize_rules.yaml` and `openspec/sanitize_rules.local.yaml` when the local file exists.
+- If `openspec/sanitize_rules.local.yaml` is missing, the sanitize step will warn. Treat that warning as a prompt to confirm whether extra organization/private literals need additional local masking rules before publishing or sharing OpenSpec artifacts.
 
 ## Commit & Pull Request Guidelines
 - Commit messages typically use a short type prefix: `fix:`, `tests:`, `doc:`, `scalim:`, or simple `sync`/`tmp`. Follow this style and keep summaries concise.

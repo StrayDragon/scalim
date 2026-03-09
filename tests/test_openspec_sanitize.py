@@ -154,3 +154,23 @@ def test_sanitize_auto_loads_local_rules_and_skips_rewriting_them(tmp_path: Path
     assert "private_vendor_name" in proc.stdout
     assert "private_home_path" in proc.stdout
     assert "SecretVendor" in local_rules.read_text(encoding="utf-8")
+
+
+def test_sanitize_warns_when_local_rules_missing(tmp_path: Path) -> None:
+    repo_root = _prepare_repo_fixture(tmp_path)
+    openspec_root = repo_root / "openspec"
+    sample = openspec_root / "notes.md"
+    _write(sample, "CLI: scalim-cli\n")
+
+    proc = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(openspec_root)],
+        cwd=str(repo_root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "sanitize_rules.local.yaml" in proc.stderr
+    assert "仅应用公共规则" in proc.stderr

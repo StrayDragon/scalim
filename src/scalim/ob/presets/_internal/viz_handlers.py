@@ -1,6 +1,6 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
+from abc import ABC, abstractmethod
 from dataclasses import asdict
-from typing import Any, Dict, cast
+from typing import Any, Dict, Optional, Sequence, Set, cast
 
 from ....events.events import (
     AdaptiveSchedulerDecisionEvent,
@@ -20,6 +20,8 @@ from ....events.events import (
     RowWriteEvent,
     StageSpanEvent,
 )
+from .viz_config import VizObserverConfig
+from .viz_output import VizEventEmitter
 
 
 def _safe_len(value: Any) -> int:
@@ -34,7 +36,7 @@ def _normalize_dict_keys(value: Dict[Any, Any]) -> Dict[str, Any]:
     for key, item in value.items():
         item_value = item
         if isinstance(item_value, dict):
-            item_value = _normalize_dict_keys(item_value)
+            item_value = _normalize_dict_keys(cast("Dict[Any, Any]", item_value))
         normalized[str(key)] = item_value
     return normalized
 
@@ -45,17 +47,44 @@ def _sample_value(value: Any, size: int) -> Any:
     if value is None:
         return None
     if isinstance(value, dict):
-        value = _normalize_dict_keys(value)
+        value = _normalize_dict_keys(cast("Dict[Any, Any]", value))
     if isinstance(value, dict):
-        return dict(list(value.items())[:size])
+        value_dict = cast("Dict[Any, Any]", value)
+        return dict(list(value_dict.items())[:size])
     if isinstance(value, (list, tuple)):
-        return list(value[:size])
+        value_seq = cast("Sequence[Any]", value)
+        return list(value_seq[:size])
     if isinstance(value, set):
-        return list(list(value)[:size])
+        value_set = cast("Set[Any]", value)
+        return list(list(value_set)[:size])
     return value
 
 
-class VizObserverHandlerMixin:
+class VizObserverHandlerMixin(ABC):
+    config: VizObserverConfig = cast("VizObserverConfig", object())
+    run_id: Optional[str] = None
+    _events_emitter: Optional[VizEventEmitter] = None
+    _trace_emitter: Optional[VizEventEmitter] = None
+
+    @abstractmethod
+    def _ensure_run_id(self) -> None: ...
+
+    @abstractmethod
+    def _ensure_emitters(self) -> None: ...
+
+    @abstractmethod
+    def _select_payload(self, summary: Dict[str, Any], sample: Dict[str, Any], full: Dict[str, Any]) -> Dict[str, Any]: ...
+
+    @abstractmethod
+    def _emit_event(self, event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None: ...
+
+    @abstractmethod
+    def _emit_trace(self, event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None: ...
+
+    @staticmethod
+    @abstractmethod
+    def _canonical_loader_name(value: Any) -> str: ...
+
     def supports(self, event_type: str) -> bool:
         if event_type in ("field_compute", "row_write", "row_release", "relation_lookup"):
             return self.config.trace_enabled_effective()
@@ -137,8 +166,9 @@ class VizObserverHandlerMixin:
         if display_loader_name and canonical_loader_name and display_loader_name != canonical_loader_name:
             summary["loader_display_name"] = display_loader_name
         full_event = asdict(event)
-        if isinstance(full_event.get("result"), dict):
-            full_event["result"] = _normalize_dict_keys(cast("Dict[Any, Any]", full_event["result"]))
+        result_value = full_event.get("result")
+        if isinstance(result_value, dict):
+            full_event["result"] = _normalize_dict_keys(cast("Dict[Any, Any]", result_value))
         sample = {
             "sample_size": self.config.sample_size,
             "sample": _sample_value(event.result, self.config.sample_size),

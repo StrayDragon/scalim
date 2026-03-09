@@ -1,61 +1,31 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 import json
 import logging
-import os
-import platform
 import time
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import IO, Any, Dict, Optional, cast
 
-from ...._project_constants import VIZ_DIR_NAME
+from .viz_config import VizObserverConfig
+from .viz_config import default_viz_dir as _default_viz_dir
+from .viz_config import normalize_output_dir as _normalize_output_dir
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _default_viz_dir() -> str:
-    system = platform.system().lower()
-    if system.startswith("win") or os.name == "nt":
-        base = Path(os.environ.get("APPDATA") or r"~\AppData\Roaming").expanduser()
-    elif system == "darwin":
-        base = Path("~/Library/Application Support").expanduser()
-    else:
-        base = Path(os.environ.get("XDG_CONFIG_HOME") or "~/.config").expanduser()
-    return str(base / VIZ_DIR_NAME)
-
-
-def _normalize_output_dir(base_dir: str) -> str:
-    normalized = Path(base_dir).expanduser()
-    base_name = normalized.name
-    parent_name = normalized.parent.name
-    if VIZ_DIR_NAME not in (base_name, parent_name):
-        normalized = normalized / VIZ_DIR_NAME
-    return str(normalized)
 
 
 class VizEventEmitter:
     _output_handle: Optional[IO[str]]
     _logger: logging.Logger
 
-    def __init__(self, path: Any, *, logger: Optional[logging.Logger] = None, append: bool = True) -> None:
-        resolved_logger = logger or _LOGGER
-        resolved_path = str(path)
-        resolved_append = append
-        if hasattr(path, "resolve_output_paths") and hasattr(path, "logger"):
-            config = cast("Any", path)
-            resolved_logger = config.logger
-            events_path, _, _ = config.resolve_output_paths()
-            resolved_path = events_path or ""
-            resolved_append = True
-
-        self._logger = resolved_logger
+    def __init__(self, path: Optional[str], *, logger: Optional[logging.Logger] = None, append: bool = True) -> None:
+        self._logger = logger or _LOGGER
         self._output_handle = None
-        if not resolved_path:
+        if not path:
             return
         try:
-            resolved = Path(resolved_path)
+            resolved = Path(path)
             if resolved.parent and not resolved.parent.exists():
                 resolved.parent.mkdir(parents=True, exist_ok=True)
-            mode = "a" if resolved_append else "w"
+            mode = "a" if append else "w"
             self._output_handle = resolved.open(mode, encoding="utf-8")
         except OSError as exc:
             self._logger.warning("[VizObserver] 打开输出路径失败: %s", exc)
@@ -77,7 +47,18 @@ class VizEventEmitter:
             self._output_handle = None
 
 
-class VizObserverOutputMixin:
+class VizObserverOutputMixin(ABC):
+    config: VizObserverConfig = cast("VizObserverConfig", object())
+    snapshot: Optional[Dict[str, Any]] = None
+    run_id: Optional[str] = None
+    _events_emitter: Optional[VizEventEmitter] = None
+    _trace_emitter: Optional[VizEventEmitter] = None
+    _snapshot_written: bool = False
+    _run_dir_applied: bool = False
+
+    @abstractmethod
+    def _normalize_node_ref(self, node_ref: Dict[str, str]) -> Dict[str, str]: ...
+
     def _ensure_run_id(self) -> None:
         if self.run_id is not None:
             return
@@ -121,12 +102,13 @@ class VizObserverOutputMixin:
             self._trace_emitter = VizEventEmitter(trace_path, logger=self.config.logger, append=append)
 
     def _attach_viz_metadata(self) -> None:
-        if not self.snapshot or not isinstance(self.snapshot, dict):
+        snapshot = self.snapshot
+        if not snapshot or not isinstance(snapshot, dict):
             return
-        meta = self.snapshot.get("meta")
+        meta = snapshot.get("meta")
         if not isinstance(meta, dict):
             meta = {}
-            self.snapshot["meta"] = meta
+            snapshot["meta"] = meta
         meta = cast("Dict[str, Any]", meta)
         viz_meta = meta.get("viz")
         if not isinstance(viz_meta, dict):
@@ -150,14 +132,15 @@ class VizObserverOutputMixin:
         if self._snapshot_written:
             return
         _, snapshot_path, _ = self.config.resolve_output_paths()
-        if not snapshot_path or not self.snapshot:
+        snapshot = self.snapshot
+        if not snapshot_path or not snapshot:
             return
         try:
             path = Path(snapshot_path)
             if path.parent and not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as handle:
-                json.dump(self.snapshot, handle, ensure_ascii=False, indent=2, default=str)
+                json.dump(snapshot, handle, ensure_ascii=False, indent=2, default=str)
             self._snapshot_written = True
         except OSError as exc:
             self.config.logger.warning("[VizObserver] 写入快照失败: %s", exc)

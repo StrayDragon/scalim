@@ -25,7 +25,8 @@ from scalim.events.events import (
     RowWriteEvent,
     StageSpanEvent,
 )
-from scalim.ob.presets import viz as viz_module
+from scalim.ob.presets._internal import viz_config as viz_config_module
+from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets.viz import VizEventEmitter, VizObserver, VizObserverConfig
 
 # endregion
@@ -53,45 +54,45 @@ class BrokenHandle:
 
 
 def test_viz_helpers_and_config_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(viz_module.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(viz_config_module.platform, "system", lambda: "Windows")
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
-    win_dir = viz_module._default_viz_dir()
+    win_dir = viz_config_module.default_viz_dir()
     assert win_dir.endswith(os.path.join("appdata", "scalim-viz"))
 
-    monkeypatch.setattr(viz_module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(viz_config_module.platform, "system", lambda: "Darwin")
     monkeypatch.setenv("HOME", str(tmp_path))
-    darwin_dir = viz_module._default_viz_dir()
+    darwin_dir = viz_config_module.default_viz_dir()
     assert "Application Support" in darwin_dir
     assert darwin_dir.endswith(os.path.join("Application Support", "scalim-viz"))
 
-    monkeypatch.setattr(viz_module.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(viz_config_module.platform, "system", lambda: "Linux")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
-    linux_dir = viz_module._default_viz_dir()
+    linux_dir = viz_config_module.default_viz_dir()
     assert linux_dir.endswith(os.path.join("xdg", "scalim-viz"))
 
-    assert viz_module._normalize_output_dir(str(tmp_path / "run-root")).endswith("scalim-viz")
-    assert viz_module._normalize_output_dir(str(tmp_path / "scalim-viz")) == os.path.normpath(str(tmp_path / "scalim-viz"))
-    assert viz_module._normalize_output_dir(str(tmp_path / "scalim-viz" / "run1")) == os.path.normpath(
+    assert viz_config_module.normalize_output_dir(str(tmp_path / "run-root")).endswith("scalim-viz")
+    assert viz_config_module.normalize_output_dir(str(tmp_path / "scalim-viz")) == os.path.normpath(str(tmp_path / "scalim-viz"))
+    assert viz_config_module.normalize_output_dir(str(tmp_path / "scalim-viz" / "run1")) == os.path.normpath(
         str(tmp_path / "scalim-viz" / "run1")
     )
 
-    assert viz_module._safe_len([1, 2]) == 2
-    assert viz_module._safe_len(5) == 0
-    assert viz_module._safe_len(BrokenLen()) == 0
+    assert viz_handlers_module._safe_len([1, 2]) == 2
+    assert viz_handlers_module._safe_len(5) == 0
+    assert viz_handlers_module._safe_len(BrokenLen()) == 0
 
-    assert viz_module._sample_value(None, 1) is None
-    assert viz_module._sample_value([1, 2, 3], 2) == [1, 2]
-    assert viz_module._sample_value((1, 2, 3), 2) == [1, 2]
-    assert viz_module._sample_value({"a": 1, "b": 2}, 1) == {"a": 1}
-    assert viz_module._sample_value({"a": {"b": 1}}, 1) == {"a": {"b": 1}}
-    assert viz_module._sample_value(set([1, 2, 3]), 1)
-    assert viz_module._sample_value("abc", 2) == "abc"
-    assert viz_module._sample_value([1, 2, 3], 0) is None
+    assert viz_handlers_module._sample_value(None, 1) is None
+    assert viz_handlers_module._sample_value([1, 2, 3], 2) == [1, 2]
+    assert viz_handlers_module._sample_value((1, 2, 3), 2) == [1, 2]
+    assert viz_handlers_module._sample_value({"a": 1, "b": 2}, 1) == {"a": 1}
+    assert viz_handlers_module._sample_value({"a": {"b": 1}}, 1) == {"a": {"b": 1}}
+    assert viz_handlers_module._sample_value(set([1, 2, 3]), 1)
+    assert viz_handlers_module._sample_value("abc", 2) == "abc"
+    assert viz_handlers_module._sample_value([1, 2, 3], 0) is None
 
     local = VizObserverConfig.default_local()
     assert local.output_dir
 
-    monkeypatch.setattr(viz_module.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(viz_config_module.platform, "system", lambda: "Linux")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "default"))
     config = VizObserverConfig(use_default_output_dir=True)
     events_path, snapshot_path, trace_path = config.resolve_output_paths()
@@ -118,17 +119,17 @@ def test_viz_event_emitter_success_and_error(monkeypatch: pytest.MonkeyPatch, tm
     out_path = tmp_path / "events" / "viz_events.jsonl"
     config = VizObserverConfig(output_path=str(out_path), logger=logger)
 
-    emitter = VizEventEmitter(VizObserverConfig())
+    emitter = VizEventEmitter(None)
     assert emitter._output_handle is None
 
-    emitter = VizEventEmitter(config)
+    emitter = VizEventEmitter(config.output_path, logger=config.logger)
     emitter.emit({"ok": True})
     emitter.close()
     text = out_path.read_text(encoding="utf-8").strip()
     assert '"ok": true' in text
     assert emitter._output_handle is None
 
-    emitter = VizEventEmitter(config)
+    emitter = VizEventEmitter(config.output_path, logger=config.logger)
     emitter._output_handle = BrokenHandle()
     emitter.emit({"ok": True})
     assert logger.messages
@@ -139,7 +140,7 @@ def test_viz_event_emitter_success_and_error(monkeypatch: pytest.MonkeyPatch, tm
         raise OSError("fail open")
 
     monkeypatch.setattr(Path, "open", boom)
-    emitter = VizEventEmitter(config)
+    emitter = VizEventEmitter(config.output_path, logger=config.logger)
     assert emitter._output_handle is None
 
 
@@ -247,7 +248,7 @@ def test_viz_observer_hook_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     hook._apply_run_output_dir()
     assert hook.config.output_dir is None
 
-    monkeypatch.setattr(viz_module.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(viz_config_module.platform, "system", lambda: "Linux")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "default"))
     hook = VizObserver(config=VizObserverConfig(output_dir=None, use_default_output_dir=True))
     hook.run_id = "run_3"

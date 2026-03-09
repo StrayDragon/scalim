@@ -1,0 +1,48 @@
+from typing import Optional
+
+from ...vendor.compact.typing_extensionsx import Protocol, runtime_checkable
+from .aliases import LookupKeyCast, LookupKeySpec, NormalizedLookupKeySpec
+from .binding import BindingIr, LoaderIr
+
+
+@runtime_checkable
+class SourceKeyIrBase(Protocol):
+    """供关联模块使用的最小键契约."""
+
+    @property
+    def key(self) -> LookupKeySpec: ...
+
+    @property
+    def cast(self) -> Optional[LookupKeyCast]: ...
+
+
+@runtime_checkable
+class SourceRefIrBase(Protocol):
+    """供跨模块共享的最小数据源引用契约."""
+
+    @property
+    def source_id(self) -> str: ...
+
+
+@runtime_checkable
+class LookupSourceRefIrBase(SourceRefIrBase, Protocol):
+    """具备键定义、可作为关联查找目标的数据源契约."""
+
+    @property
+    def key(self) -> SourceKeyIrBase: ...
+
+    @property
+    def loader_spec(self) -> LoaderIr: ...
+
+    @property
+    def lookup_chunk_size(self) -> Optional[int]: ...
+
+    def get_binding(self, key_field: NormalizedLookupKeySpec) -> Optional[BindingIr]: ...
+
+
+@runtime_checkable
+class MainSourceRefIrBase(SourceRefIrBase, Protocol):
+    """主数据源契约: 可作为关联端点,不可作为关联查找目标."""
+
+    @property
+    def loader(self) -> object: ...

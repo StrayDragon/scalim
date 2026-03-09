@@ -176,6 +176,12 @@ def _resolve_rule_paths(args: argparse.Namespace, root: Path, repo_root: Path) -
         local_rules_path = _resolve_rule_path(args.local_rules, "sanitize_rules.local.yaml", root, repo_root)
         if local_rules_path is not None:
             rule_paths.append(local_rules_path)
+        elif not args.local_rules:
+            print(
+                "[warn] 未找到可选本地规则文件 `sanitize_rules.local.yaml`; 当前仅应用公共规则. "
+                "若存在组织/私有字面量,请在 `openspec/sanitize_rules.local.yaml` 中补充规则后重试.",
+                file=sys.stderr,
+            )  # force-en
 
     for extra_rule in args.extra_rules:
         rule_paths.append(Path(extra_rule).resolve())

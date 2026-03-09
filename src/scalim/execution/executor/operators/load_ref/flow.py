@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Set, Tuple
 
 from .....spec.ir.fields import FieldIr
 from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.sources import SourceIr
+from .....spec.ir.source_contracts import LookupSourceRefIrBase
 from .....typedefs import FieldValue, LoaderResultMapping, LookupKey
 from ...helpers.field_access import extract_field
 from .._internal.loader_guardrails import (
@@ -144,7 +144,7 @@ def _resolve_ref_required_field_keys(
 def _apply_ref_extractor(
     *,
     exec_ctx: LoadRefExecutionContext,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     row_id: Hashable,
     lookup_key: LookupKey,
     intermediate_result: LoaderResultMapping,
@@ -175,7 +175,7 @@ def _apply_ref_extractor(
 def _resolve_ref_field_value(
     *,
     exec_ctx: LoadRefExecutionContext,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     row_id: Hashable,
     lookup_key: LookupKey,
     field_key: str,
@@ -211,7 +211,7 @@ def _resolve_ref_field_value(
 def _write_ref_fields(
     *,
     exec_ctx: LoadRefExecutionContext,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     row_id: Hashable,
     lookup_key: LookupKey,
     data: object,
@@ -251,7 +251,7 @@ def _write_final_step_row(
     row_id: Hashable,
     lookup_key: LookupKey,
     intermediate_result: LoaderResultMapping,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     group_field_keys: Tuple[str, ...],
     required_field_keys: Set[str],
     required_mode: str,
@@ -300,7 +300,7 @@ def write_final_step(
     exec_ctx: LoadRefExecutionContext,
     current_mapping: Dict[Hashable, LookupKey],
     intermediate_result: LoaderResultMapping,
-    source: SourceIr,
+    source: LookupSourceRefIrBase,
     group_field_keys: Tuple[str, ...],
 ) -> None:
     required_field_keys = _resolve_ref_required_field_keys(runtime=exec_ctx.runtime, group_field_keys=group_field_keys)

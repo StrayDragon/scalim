@@ -1,8 +1,18 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
-from typing import Any, Dict, Sequence, Set, cast
+from typing import Any, Dict, Optional, Set, cast
 
 
 class VizObserverNodeMixin:
+    snapshot: Optional[Dict[str, Any]] = None
+    _known_node_ids: Optional[Set[str]] = None
+    _node_id_cache: Optional[Dict[str, str]] = None
+
+    def _get_node_id_cache(self) -> Dict[str, str]:
+        cache = self._node_id_cache
+        if cache is None:
+            cache = {}
+            self._node_id_cache = cache
+        return cache
+
     @staticmethod
     def _canonical_loader_name(value: Any) -> str:
         raw = str(value or "").strip()
@@ -16,11 +26,13 @@ class VizObserverNodeMixin:
         if self._known_node_ids is not None:
             return self._known_node_ids
         known: Set[str] = set()
-        if self.snapshot and isinstance(self.snapshot, dict):
-            nodes = self.snapshot.get("nodes")
+        snapshot = self.snapshot
+        if snapshot and isinstance(snapshot, dict):
+            nodes = snapshot.get("nodes")
             if isinstance(nodes, list):
-                for item_dict in cast("Sequence[Dict[str, Any]]", nodes):
-                    node_id = item_dict.get("id")
+                typed_nodes = cast("list[Dict[str, Any]]", nodes)
+                for typed_item_dict in typed_nodes:
+                    node_id = typed_item_dict.get("id")
                     if node_id:
                         known.add(str(node_id))
         self._known_node_ids = known
@@ -30,19 +42,20 @@ class VizObserverNodeMixin:
         raw = str(node_id or "").strip()
         if not raw:
             return ""
-        cached = self._node_id_cache.get(raw)
+        cache = self._get_node_id_cache()
+        cached = cache.get(raw)
         if cached is not None:
             return cached
 
         known = self._get_known_node_ids()
         if not known or raw in known:
-            self._node_id_cache[raw] = raw
+            cache[raw] = raw
             return raw
 
         if " " in raw:
             trimmed = raw.split(" ", 1)[0].strip()
             if trimmed in known:
-                self._node_id_cache[raw] = trimmed
+                cache[raw] = trimmed
                 return trimmed
 
         if raw.startswith("field:"):
@@ -55,10 +68,10 @@ class VizObserverNodeMixin:
                         value = item
                         break
                 chosen = value or sorted(candidates)[0]
-                self._node_id_cache[raw] = chosen
+                cache[raw] = chosen
                 return chosen
 
-        self._node_id_cache[raw] = raw
+        cache[raw] = raw
         return raw
 
     def _normalize_node_ref(self, node_ref: Dict[str, str]) -> Dict[str, str]:

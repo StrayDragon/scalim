@@ -1,6 +1,5 @@
-# pyright: reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnannotatedClassAttribute=false, reportUninitializedInstanceVariable=false, reportPrivateUsage=false, reportCallIssue=false, reportArgumentType=false, reportUnusedFunction=false, reportImplicitOverride=false, reportUnusedImport=false, reportMissingTypeArgument=false, reportUnnecessaryComparison=false, reportUnnecessaryCast=false
 from collections.abc import Set as AbstractSet
-from typing import Any, Optional, Set, Tuple, cast
+from typing import Any, Optional, Set, Tuple
 
 from ...events.catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
@@ -25,7 +24,7 @@ from ...events.catalog import (
 OBSERVER_RAISED_EXCEPTION_WARNING = "观察者 %s.%s 抛出异常"
 OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = "观察者 %s 关闭时抛出异常"
 
-_CATALOG_EVENT_TYPES: Tuple[str, ...] = (
+CATALOG_EVENT_TYPES: Tuple[str, ...] = (
     EVENT_PIPELINE_START,
     EVENT_PIPELINE_END,
     EVENT_BATCH_START,
@@ -45,21 +44,22 @@ _CATALOG_EVENT_TYPES: Tuple[str, ...] = (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
 )
 
-_CATALOG_EVENT_TYPES_SET: Set[str] = set(_CATALOG_EVENT_TYPES)
-_DEFAULT_MAX_RECORDED_EVENTS = 10_000
-_CAPTURE_OVERFLOW_POLICIES = ("raise", "drop-oldest", "drop-newest")
+CATALOG_EVENT_TYPES_SET: Set[str] = set(CATALOG_EVENT_TYPES)
+DEFAULT_MAX_RECORDED_EVENTS = 10_000
+CAPTURE_OVERFLOW_POLICIES = ("raise", "drop-oldest", "drop-newest")
 
 
 class ObserverCaptureOverflowError(RuntimeError):
     pass
 
 
-def _validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:
+def validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:
     if value is None:
         return None
     if not isinstance(value, AbstractSet):
         msg = "observer.event_types must be None or Set[str]; got {} for {}".format(type(value).__name__, type(observer).__name__)
         raise TypeError(msg)
+    normalized: Set[str] = set()
     for item in value:
         if not isinstance(item, str):
             msg = "observer.event_types must contain only str; got {} element {!r} for {}".format(
@@ -68,4 +68,5 @@ def _validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:
                 type(observer).__name__,
             )
             raise TypeError(msg)
-    return cast("Set[str]", value)
+        normalized.add(item)
+    return normalized
