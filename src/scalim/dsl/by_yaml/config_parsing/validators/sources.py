@@ -1,10 +1,7 @@
 from typing import Any, Dict, List, Optional, Set
 
+from ...params_template import ParamsTemplateCompileError, compile_params_template
 from ...schema_dsl.constants import (
-    BIND_AS_ENUM,
-    BIND_CACHE_MODE_ENUM,
-    DEFAULT_BIND_AS,
-    DEFAULT_BIND_CACHE_MODE,
     DEFAULT_CACHE_MODE,
     LOOKUP_CAST_NAME_ENUM,
 )
@@ -18,6 +15,29 @@ _MIN_PARTS_COUNT = MIN_PARTS_COUNT
 
 
 class ValidatorSourcesMixin(ValidatorMixinBase):
+    def _validate_params_template_semantics(
+        self,
+        params_raw: object,
+        errors: List[ValidationIssue],
+        *,
+        path: str,
+        allow_directives: bool,
+    ) -> None:
+        params_dict = mapping_or_none(params_raw)
+        if params_raw is not None and params_dict is None:
+            self._add_error(errors, "'{}' must be a dictionary".format(path), path=path)
+            return
+        try:
+            _ = compile_params_template(
+                params_dict or {},
+                path=path,
+                resolve_runtime=False,  # `runtime_vars` 在 `run/compile` 时提供,`YAML` 校验阶段不解析.
+                allow_keys=allow_directives,
+                allow_rows=allow_directives,
+            )
+        except ParamsTemplateCompileError as exc:
+            self._add_error(errors, exc.message, path=exc.path)
+
     def _collect_declared_field_names(self, fields_raw: object) -> Set[str]:
         names: Set[str] = set()
         fields_dict = mapping_or_none(fields_raw)
@@ -153,7 +173,18 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
             bind_raw = source_dict.get(_F.BIND)
             if bind_raw is not None:
-                self._validate_bind(bind_raw, errors, "sources.{}".format(source_id))
+                self._add_error(
+                    errors,
+                    (
+                        "Legacy YAML syntax is not supported: 'sources.{}.bind'. "
+                        "Move binding into 'sources.{}.params' using `$keys` / `$rows` directives."
+                        "\nExample:\n"
+                        "  params:\n"
+                        "    ids:\n"
+                        "      $keys: {{as: set}}"
+                    ).format(source_id, source_id),
+                    path="sources.{}.{}".format(source_id, _F.BIND),
+                )
 
             lookup_raw = source_dict.get(_F.LOOKUP_CAST)
             if lookup_raw is not None:
@@ -167,18 +198,25 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                     path="sources.{}.{}".format(source_id, _F.CACHE_MODE),
                 )
 
-            bind_present = False
-            bind_dict = mapping_or_none(bind_raw)
-            if bind_dict is not None:
-                rows_dict = mapping_or_none(bind_dict.get(_F.USE_ROWS))
-                if rows_dict is not None:
-                    bind_present = bool(rows_dict.get(_F.PARAM))
-                keys_dict = mapping_or_none(bind_dict.get(_F.USE_KEYS))
-                if keys_dict is not None:
-                    bind_present = bool(keys_dict.get(_F.PARAM)) or bind_present
+            normalize_raw = source_dict.get(_F.NORMALIZE)
+            if normalize_raw is not None:
+                self._validate_normalize(
+                    normalize_raw,
+                    errors,
+                    path_prefix="sources.{}".format(source_id),
+                    source_id=source_id,
+                    key_raw=source_dict.get(_F.KEY),
+                )
+
+            allow_directives = cache_mode != "preload_forever"
+            self._validate_params_template_semantics(
+                source_dict.get(_F.PARAMS),
+                errors,
+                path="sources.{}.{}".format(source_id, _F.PARAMS),
+                allow_directives=allow_directives,
+            )
 
             sources_info[source_id] = {
-                "bind": bind_present,
                 "preload": cache_mode == "preload_forever",
             }
 
@@ -189,6 +227,13 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         if main_source_data is None:
             self._add_error(errors, "'{}' must be a dictionary".format(_F.MAIN_SOURCE), path=_F.MAIN_SOURCE)
             return ""
+
+        if _F.NORMALIZE in main_source_data:
+            self._add_error(
+                errors,
+                "`main_source.normalize` is not supported. Define `normalize` under `sources.<id>` instead.",
+                path="{}.{}".format(_F.MAIN_SOURCE, _F.NORMALIZE),
+            )
 
         source_id = str(main_source_data.get(_F.SOURCE_ID, ""))
         loader = main_source_data.get(_F.LOADER)
@@ -220,6 +265,12 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             )
 
         self._validate_main_source_order_by(main_source_data, errors)
+        self._validate_params_template_semantics(
+            main_source_data.get(_F.PARAMS),
+            errors,
+            path="{}.{}".format(_F.MAIN_SOURCE, _F.PARAMS),
+            allow_directives=False,
+        )
 
         return source_id
 
@@ -255,104 +306,6 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 msg = "main_source.order_by field '{}' not found in main_source.fields".format(field_id)
                 self._add_error(errors, msg, path=item_path)
 
-    def _validate_bind(
-        self,
-        bind_raw: Any,
-        errors: List[ValidationIssue],
-        context: str,
-        path_prefix: Optional[str] = None,
-    ) -> None:
-        bind_path = "{}.bind".format(path_prefix or context)
-        bind_dict = mapping_or_none(bind_raw)
-        if bind_dict is None:
-            self._add_error(errors, "{} bind must be a dictionary".format(context), path=bind_path)
-            return
-
-        use_rows_present = _F.USE_ROWS in bind_dict
-        use_keys_present = _F.USE_KEYS in bind_dict
-        if use_rows_present and use_keys_present:
-            self._add_error(errors, "{} bind must not set both 'use_rows' and 'use_keys'".format(context), path=bind_path)
-            return
-        if not use_rows_present and not use_keys_present:
-            self._add_error(errors, "{} bind must set one of 'use_rows' or 'use_keys'".format(context), path=bind_path)
-            return
-
-        if use_rows_present:
-            self._validate_bind_use_rows(bind_dict.get(_F.USE_ROWS), errors, context, bind_path)
-            return
-
-        self._validate_bind_use_keys(bind_dict.get(_F.USE_KEYS), errors, context, bind_path)
-
-    def _validate_bind_use_rows(
-        self,
-        raw_rows: Any,
-        errors: List[ValidationIssue],
-        context: str,
-        bind_path: str,
-    ) -> None:
-        rows_dict = mapping_or_none(raw_rows)
-        if rows_dict is None:
-            self._add_error(errors, "{} bind.use_rows must be a dictionary".format(context), path="{}.use_rows".format(bind_path))
-            return
-        param = rows_dict.get(_F.PARAM)
-        if not param:
-            self._add_error(
-                errors,
-                "{} bind.use_rows missing required 'param'".format(context),
-                path="{}.use_rows.{}".format(bind_path, _F.PARAM),
-            )
-        cache_mode = rows_dict.get(_F.ROWS_CACHE_MODE, DEFAULT_BIND_CACHE_MODE)
-        if cache_mode is not None:
-            cache_mode_value = str(cache_mode)
-            if cache_mode_value not in BIND_CACHE_MODE_ENUM:
-                self._add_error(
-                    errors,
-                    "{} bind.use_rows has invalid cache_mode '{}'".format(context, cache_mode_value),
-                    path="{}.use_rows.{}".format(bind_path, _F.ROWS_CACHE_MODE),
-                )
-        extra_keys = set(rows_dict.keys()) - {_F.PARAM, _F.ROWS_CACHE_MODE}
-        if extra_keys:
-            self._add_error(
-                errors,
-                "{} bind.use_rows has unknown keys {}".format(context, sorted(extra_keys)),
-                path="{}.use_rows".format(bind_path),
-            )
-
-    def _validate_bind_use_keys(
-        self,
-        raw_keys: Any,
-        errors: List[ValidationIssue],
-        context: str,
-        bind_path: str,
-    ) -> None:
-        keys_dict = mapping_or_none(raw_keys)
-        if keys_dict is None:
-            self._add_error(errors, "{} bind.use_keys must be a dictionary".format(context), path="{}.use_keys".format(bind_path))
-            return
-        param = keys_dict.get(_F.PARAM)
-        if not param:
-            self._add_error(
-                errors,
-                "{} bind.use_keys missing required 'param'".format(context),
-                path="{}.use_keys.{}".format(bind_path, _F.PARAM),
-            )
-        as_value = keys_dict.get(_F.AS, DEFAULT_BIND_AS)
-        if as_value is not None:
-            as_value_str = str(as_value)
-            if as_value_str not in BIND_AS_ENUM:
-                self._add_error(
-                    errors,
-                    "{} bind.use_keys has invalid as '{}'".format(context, as_value_str),
-                    path="{}.use_keys.{}".format(bind_path, _F.AS),
-                )
-        extra_keys = set(keys_dict.keys()) - {_F.PARAM, _F.AS}
-        if extra_keys:
-            self._add_error(
-                errors,
-                "{} bind.use_keys has unknown keys {}".format(context, sorted(extra_keys)),
-                path="{}.use_keys".format(bind_path),
-            )
-
     def _validate_lookup_cast(
         self,
         lookup_raw: Any,
@@ -372,6 +325,65 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 errors,
                 "{} lookup_cast has invalid name '{}'".format(context, name),
                 path="{}.{}".format(lookup_path, _F.NAME_KEY),
+            )
+
+    def _validate_normalize(
+        self,
+        normalize_raw: Any,
+        errors: List[ValidationIssue],
+        *,
+        path_prefix: str,
+        source_id: str,
+        key_raw: Any,
+    ) -> None:
+        norm_path = "{}.{}".format(path_prefix, _F.NORMALIZE)
+        norm_dict = mapping_or_none(normalize_raw)
+        if norm_dict is None:
+            self._add_error(errors, "'{}' must be a dictionary".format(norm_path), path=norm_path)
+            return
+
+        kind = str(norm_dict.get(_F.NORMALIZE_KIND, "")).strip()
+        if kind != "index_by_key":
+            self._add_error(
+                errors,
+                "sources.{} normalize.kind must be 'index_by_key'".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_KIND),
+            )
+
+        key_field = str(norm_dict.get(_F.NORMALIZE_KEY_FIELD, "")).strip()
+        if not key_field:
+            self._add_error(
+                errors,
+                "sources.{} normalize.key_field is required".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
+            )
+
+        if kind == "index_by_key":
+            key_items = list_or_none(key_raw)
+            if key_items is not None:
+                self._add_error(
+                    errors,
+                    "sources.{} normalize.kind=index_by_key does not support composite key yet".format(source_id),
+                    path="sources.{}.{}".format(source_id, _F.KEY),
+                )
+            if isinstance(key_raw, str):
+                declared_key = key_raw.strip()
+                if declared_key and key_field and declared_key != key_field:
+                    self._add_error(
+                        errors,
+                        "sources.{} normalize.key_field must equal sources.{}.key".format(source_id, source_id),
+                        path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
+                    )
+
+        on_conflict_raw = norm_dict.get(_F.NORMALIZE_ON_CONFLICT)
+        if on_conflict_raw is None:
+            return
+        on_conflict = str(on_conflict_raw).strip()
+        if on_conflict not in {"error", "first", "last"}:
+            self._add_error(
+                errors,
+                "sources.{} normalize.on_conflict must be one of: error/first/last".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
             )
 
     def _is_valid_loader_ref(self, loader_ref: str) -> bool:  # noqa: PLR0911

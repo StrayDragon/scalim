@@ -16,6 +16,7 @@ from .keys import (
     LOOKUP_CAST_KEYS,
     MAIN_SOURCE_KEYS,
     MEMORY_OPTIMIZATION_KEYS,
+    NORMALIZE_KEYS,
     OBSERVABILITY_KEYS,
     OUTPUT_KEYS,
     PERFORMANCE_KEYS,
@@ -71,7 +72,7 @@ from .raw import (
     TraceRaw,
     VizRaw,
 )
-from .source import LoaderRetryConfig, MainSourceConfig, SourceConfig
+from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, SourceConfig
 
 __all__ = [
     "BIND_KEYS",
@@ -88,6 +89,7 @@ __all__ = [
     "LOOKUP_CAST_KEYS",
     "MAIN_SOURCE_KEYS",
     "MEMORY_OPTIMIZATION_KEYS",
+    "NORMALIZE_KEYS",
     "OBSERVABILITY_KEYS",
     "OUTPUT_KEYS",
     "PERFORMANCE_KEYS",
@@ -124,6 +126,7 @@ __all__ = [
     "MainSourceConfig",
     "MemoryOptimizationConfig",
     "MemoryOptimizationRaw",
+    "NormalizeConfig",
     "ObservabilityConfig",
     "ObservabilityRaw",
     "OutputConfig",

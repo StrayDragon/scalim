@@ -69,6 +69,7 @@ output:
 - 顶层 `sources` 可省略,缺省视为 `{}`; 但一旦有跨源字段,就必须正确定义 `sources` 与 `relations`
 - 顶层 `fields` 只放派生字段
 - `main_source.fields` / `sources.<id>.fields` 只放源字段
+- whole-result reshape 用 `sources.<id>.normalize`;字段嵌套取值用字段级 `extract`(写在 `main_source.fields.*` / `sources.<id>.fields.*`)
 - `relation` 只能写 YAML alias 或内联 `steps`,不要写字符串 relation_id
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
 - `bind` / `to_bind` 只能二选一使用 `use_keys` 或 `use_rows`
@@ -114,6 +115,29 @@ relations:
     steps:
       - from: [orders.region_id, orders.product_category_id]
         to: [price.region_id, price.product_category_id]
+```
+
+### list-returning lookup source: `normalize.kind=index_by_key`
+
+当 lookup loader 返回 `list[row]`(而不是 `key -> row` mapping)时,优先在 source 上用 `normalize` 归一化:
+
+```yaml
+sources:
+  payment_methods:
+    loader: "myapp.loaders:load_payment_methods"
+    key: payment_method_id
+    normalize:
+      kind: index_by_key
+      key_field: payment_method_id
+      on_conflict: error
+```
+
+字段级 `extract` 仍然只负责从“单条 row value”里取字段:
+
+```yaml
+fields:
+  payment_method_name:
+    extract: payment_method_name
 ```
 
 ### `use_rows` 绑定

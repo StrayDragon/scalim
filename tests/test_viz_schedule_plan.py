@@ -28,7 +28,8 @@ sources:
   pays:
     loader: tests.conftest.mock_loader
     key: pay_id
-    bind: {use_keys: {param: pay_ids}}
+    params:
+      pay_ids: {$keys: {as: set}}
     fields:
       country_id:
         extract: country_id
@@ -45,7 +46,8 @@ sources:
   countries:
     loader: tests.conftest.mock_loader
     key: country_id
-    bind: {use_rows: {param: rows}}
+    params:
+      rows: {$rows: {cache_mode: batch}}
     fields:
       country_name:
         extract: name

@@ -1,13 +1,15 @@
 from collections import deque
-from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
-from .....spec.ir.binding import LoaderIr
+from .....spec.ir.aliases import NormalizedLookupKeySpec
+from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....spec.ir.fields import DerivedFieldIr, FieldIr
-from .....spec.ir.sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceRefIr
-from .....typedefs import FieldValue, RuntimeValue, SourceSpecIrCacheMode, StaticParams
+from .....spec.ir.sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceNormalizeIr, SourceRefIr
+from .....typedefs import FieldValue, LoaderCallKwargs, RuntimeValue, SourceSpecIrCacheMode
 from ...config_parsing.call_by import CallByParseError, CallByValue, parse_call_by
 from ...config_parsing.field_extract import FieldExtractCompileError, compile_field_extract
 from ...config_parsing.security import SecureComputeEngine, is_constant_compute_expression
+from ...params_template import CompiledParamsTemplate, ParamsTemplateCompileError, compile_params_template
 from ...schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceConfig, SourceFieldConfig
 from ..errors import ConversionError
 from ..references import PythonReferenceResolver
@@ -21,15 +23,6 @@ if TYPE_CHECKING:
 
 
 _SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, str)
-
-
-def _copy_static_params(params: Optional[Dict[str, RuntimeValue]]) -> StaticParams:
-    copied: StaticParams = {}
-    if not params:
-        return copied
-    for key, value in params.items():
-        copied[key] = value
-    return copied
 
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
@@ -76,6 +69,7 @@ def _eval_call_by_value(*, field_id: str, value: CallByValue, field_values: Dict
 class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigToIRConversionRelationMixin):
     _resolver: Optional[PythonReferenceResolver] = None
     _compute_engine: Optional[SecureComputeEngine] = None
+    _runtime_vars: Optional[Mapping[str, object]] = None
 
     def _require_resolver(self) -> PythonReferenceResolver:
         resolver = self._resolver
@@ -133,10 +127,26 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         loader_fn = cast("MainSourceRowIterableCallable", self._require_resolver().resolve(config.loader))
         order_by = self._convert_main_source_order_by(config.order_by)
 
+        runtime_vars = self._runtime_vars
+        try:
+            template = compile_params_template(
+                config.params,
+                path="main_source.params",
+                runtime_vars=runtime_vars,
+                allow_keys=False,
+                allow_rows=False,
+            )
+        except ParamsTemplateCompileError as exc:
+            raise ConversionError(str(exc)) from exc
+
+        params: LoaderCallKwargs = {}
+        if not template.is_empty_mapping():
+            params = template.render_kwargs(_build_main_source_context(config.source_id), path="main_source.params")
+
         return MainSourceIr(
             source_id=config.source_id,
             loader=loader_fn,
-            params=_copy_static_params(config.params),
+            params=params,
             order_by=order_by,
         )
 
@@ -165,15 +175,25 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         key_ir = KeyIr(key=source_config.key, cast=lookup_cast_fn)
 
-        bind_ir = None
+        normalize_ir = self._convert_source_normalize(source_config)
+
         if source_config.bind is not None:
-            bind_ir = self._create_binding(source_config.bind, source_config.params, source_config.key)
+            msg = (
+                "Legacy YAML syntax is not supported: 'sources.{}.bind'. "
+                "Move binding into 'sources.{}.params' using `$keys` / `$rows` directives."
+            ).format(source_config.source_id, source_config.source_id)
+            raise ConversionError(msg)
 
         loader_ir = self._make_loader_ir(callable_ref=loader_fn)
 
         cache_mode = SourceSpecIrCacheMode.NONE
         if source_config.cache_mode == "preload_forever":
             cache_mode = SourceSpecIrCacheMode.PRELOAD_FOREVER
+
+        bind_ir = self._binding_from_params_template(
+            source_config,
+            cache_mode=cache_mode,
+        )
 
         fk_fields: FrozenSet[str] = frozenset()
 
@@ -186,6 +206,66 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             lookup_chunk_size=source_config.lookup_chunk_size,
             bindings={},
             bind=bind_ir,
+            normalize=normalize_ir,
+        )
+
+    def _convert_source_normalize(self, source_config: SourceConfig) -> Optional[SourceNormalizeIr]:
+        norm = source_config.normalize
+        if norm is None:
+            return None
+
+        kind = str(norm.kind or "").strip()
+        if kind != "index_by_key":
+            msg = "sources.{}.normalize.kind must be 'index_by_key'".format(source_config.source_id)
+            raise ConversionError(msg)
+
+        key_field = str(norm.key_field or "").strip()
+        if not key_field:
+            msg = "sources.{}.normalize.key_field is required".format(source_config.source_id)
+            raise ConversionError(msg)
+
+        on_conflict = str(norm.on_conflict or "error").strip() or "error"
+        if on_conflict not in {"error", "first", "last"}:
+            msg = "sources.{}.normalize.on_conflict must be one of: error/first/last".format(source_config.source_id)
+            raise ConversionError(msg)
+
+        if isinstance(source_config.key, tuple):
+            msg = "sources.{}.normalize.kind=index_by_key does not support composite key yet".format(source_config.source_id)
+            raise ConversionError(msg)
+
+        declared_key = str(source_config.key or "").strip()
+        if declared_key and declared_key != key_field:
+            msg = "sources.{}.normalize.key_field must equal sources.{}.key".format(source_config.source_id, source_config.source_id)
+            raise ConversionError(msg)
+
+        return SourceNormalizeIr(kind=kind, key_field=key_field, on_conflict=on_conflict)
+
+    def _binding_from_params_template(
+        self,
+        source_config: SourceConfig,
+        *,
+        cache_mode: SourceSpecIrCacheMode,
+    ) -> Optional["BindingIr"]:
+        runtime_vars = self._runtime_vars
+        allow_directives = cache_mode != SourceSpecIrCacheMode.PRELOAD_FOREVER
+        try:
+            template = compile_params_template(
+                source_config.params,
+                path="sources.{}.params".format(source_config.source_id),
+                runtime_vars=runtime_vars,
+                allow_keys=allow_directives,
+                allow_rows=allow_directives,
+            )
+        except ParamsTemplateCompileError as exc:
+            raise ConversionError(str(exc)) from exc
+
+        if template.is_empty_mapping():
+            return None
+
+        return _binding_from_compiled_params_template(
+            template,
+            key_field=source_config.key,
+            path="sources.{}.params".format(source_config.source_id),
         )
 
     def _make_loader_ir(self, callable_ref: "LoaderResultMapCallable") -> LoaderIr:
@@ -310,3 +390,38 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             return _ensure_field_value(result, field_id=field_id, producer="call_by")
 
         return calculator
+
+
+def _build_main_source_context(source_id: str) -> LoaderCallContextIr:
+    return LoaderCallContextIr(source_id=source_id, is_ref_loader=False)
+
+
+def _binding_from_compiled_params_template(
+    template: CompiledParamsTemplate,
+    *,
+    key_field: NormalizedLookupKeySpec,
+    path: str,
+) -> BindingIr:
+    mode = "keys"
+    as_mode = "set"
+    cache_mode = "none"
+
+    if template.directive_mode == "rows":
+        mode = "rows"
+        cache_mode = template.rows_cache_mode
+    elif template.directive_mode == "keys":
+        as_mode = template.keys_as
+
+    def _builder(
+        ctx: LoaderCallContextIr, tmpl: CompiledParamsTemplate = template, p: str = path
+    ) -> Tuple[Tuple[RuntimeValue, ...], LoaderCallKwargs]:
+        return (), tmpl.render_kwargs(ctx, path=p)
+
+    return BindingIr(
+        key_field=key_field,
+        params_builder=_builder,
+        mode=mode,
+        as_=as_mode,
+        cache_mode=cache_mode,
+        param_name=None,
+    )

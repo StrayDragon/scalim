@@ -30,6 +30,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from scalim.spec.ir.sources import SourceNormalizeIr
+
 try:
     from ._loaders import (
         calc_final_price,
@@ -175,7 +177,11 @@ class _PythonJoinEngine:
 
     def _load(self, key: str, loader: Callable[[], Any]) -> Any:
         if key not in self._cache:
-            self._cache[key] = loader()
+            value = loader()
+            # 示例说明: `payment_methods` `loader` 返回 `list[row]`,Scalim 执行期会按 `key_field` 做 `normalize`.
+            if key == "payment_methods":
+                value = SourceNormalizeIr(kind="index_by_key", key_field="payment_method_id").apply(value, source_id=key)
+            self._cache[key] = value
             self._load_stats[key] = len(self._cache[key]) if hasattr(self._cache[key], "__len__") else 0
         return self._cache[key]
 

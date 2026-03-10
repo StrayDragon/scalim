@@ -23,6 +23,7 @@ from scalim.spec.ir import (
     MainSourceIr,
     OrderByKeyIr,
     SourceIr,
+    SourceNormalizeIr,
 )
 from scalim.typedefs import SourceSpecIrCacheMode
 
@@ -309,6 +310,7 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
             bindings={"payment_method_id": BindingIr(key_field="payment_method_id", params_builder=_default_binding_params)},
         ),
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
+        normalize=SourceNormalizeIr(kind="index_by_key", key_field="payment_method_id", on_conflict="error"),
     )
 
     logistics_source = SourceIr(

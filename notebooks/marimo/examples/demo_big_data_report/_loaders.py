@@ -528,7 +528,7 @@ def load_payment_methods(
     ids: Optional[List[int]] = None,
     field_keys: Optional[List[str]] = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> List[Dict[str, Any]]:
     """加载支付方式数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -538,16 +538,18 @@ def load_payment_methods(
 
     fee_rates = [0.002, 0.002, 0.003, 0.005, 0.0]
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: List[Dict[str, Any]] = []
     for mid in method_ids:
         name = _safe_index(_PAYMENT_METHODS, mid)
         fee_rate = fee_rates[mid % len(fee_rates)]
 
-        result[mid] = {
-            "payment_method_id": mid,
-            "payment_method_name": name,
-            "payment_fee_rate": fee_rate,
-        }
+        result.append(
+            {
+                "payment_method_id": mid,
+                "payment_method_name": name,
+                "payment_fee_rate": fee_rate,
+            }
+        )
 
     return result
 

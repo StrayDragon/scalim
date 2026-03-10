@@ -260,20 +260,24 @@ class LoadOperatorExecutor(OperatorExecutor):
         )
         loader_duration = time.perf_counter() - loader_start
 
+        result_obj: object = result_raw
+        if source.normalize is not None:
+            result_obj = source.normalize.apply(result_raw, source_id=source.source_id)
+
         call_kwargs = self._build_loader_call_kwargs(runtime, binding, loader_context)
-        runtime.instrumentation.emit_loader_call(source.source_id, call_kwargs, result_raw, loader_duration)
-        self._maybe_emit_loader_slim(runtime, loader_name=source.source_id, result=result_raw, field_keys=field_keys)
+        runtime.instrumentation.emit_loader_call(source.source_id, call_kwargs, result_obj, loader_duration)
+        self._maybe_emit_loader_slim(runtime, loader_name=source.source_id, result=result_obj, field_keys=field_keys)
 
         guardrails = runtime.guardrails
-        if guardrails.enabled and guardrails.loader.validate_result and not isinstance(result_raw, Mapping):
+        if guardrails.enabled and guardrails.loader.validate_result and not isinstance(result_obj, Mapping):
             fail_guardrail(
                 runtime,
                 code="loader_result_not_mapping",
                 message="Loader result must be a Mapping",
-                context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result_raw),
+                context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result_obj),
                 action_mode="fast_fail",
             )
-        result = coerce_loader_result_mapping(cast("object", result_raw))
+        result = coerce_loader_result_mapping(cast("object", result_obj))
         self._process_loader_rows(
             context=context,
             runtime=runtime,

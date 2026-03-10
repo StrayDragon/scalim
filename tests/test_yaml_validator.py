@@ -22,7 +22,7 @@ def _base_config() -> dict:
             "customers": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "customer_id",
-                "bind": {"use_keys": {"param": "ids"}},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {
                     "customer_name": {
                         "extract": "customer_name",
@@ -100,7 +100,7 @@ def _config_field_requires_via_when_no_path() -> dict:
             "customers": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "customer_id",
-                "bind": {"use_keys": {"param": "ids"}},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {"customer_name": {"extract": "customer_name"}},
             }
         },
@@ -117,23 +117,10 @@ def _config_field_ambiguous_paths_requires_via() -> dict:
     return config
 
 
-def _config_relation_steps_require_bind() -> dict:
-    return {
-        "name": "demo",
-        "main_source": {"source_id": "orders", "loader": "tests.conftest.mock_loader"},
-        "sources": {
-            "customers": {
-                "loader": "tests.conftest.mock_loader",
-                "key": "customer_id",
-                "fields": {
-                    "customer_name": {
-                        "extract": "customer_name",
-                        "relation": {"steps": [{"from": "orders.customer_id", "to": "customers.customer_id"}]},
-                    }
-                },
-            }
-        },
-    }
+def _config_relation_step_to_bind_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["to_bind"] = {"use_keys": {"param": "ids"}}
+    return config
 
 
 def _config_lookup_cast_invalid_name() -> dict:
@@ -188,7 +175,7 @@ def _config_derived_field_compute_unknown_name() -> dict:
         (_config_main_source_invalid_loader_reference, ["Main source has invalid loader reference"]),
         (_config_field_requires_via_when_no_path, ["has no relation path"]),
         (_config_field_ambiguous_paths_requires_via, ["ambiguous relation paths"]),
-        (_config_relation_steps_require_bind, ["requires to_bind or sources.customers.bind"]),
+        (_config_relation_step_to_bind_is_rejected, ["to_bind"]),
         (_config_lookup_cast_invalid_name, ["lookup_cast has invalid name"]),
         (_config_derived_field_depends_on_invalid_type, ["does not allow 'depends_on'"]),
         (_config_derived_field_compute_invalid_syntax, ["invalid compute expression"]),
@@ -202,7 +189,7 @@ def _config_derived_field_compute_unknown_name() -> dict:
         "main-source-invalid-loader",
         "field-requires-via",
         "field-ambiguous-paths",
-        "relation-steps-require-bind",
+        "relation-step-to-bind",
         "lookup-cast-invalid-name",
         "derived-depends-on-invalid-type",
         "derived-compute-invalid-syntax",

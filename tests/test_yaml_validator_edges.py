@@ -768,7 +768,7 @@ def test_validator_relations_edges() -> None:
     assert any("Relation 'r1' must be a dictionary" in msg for msg in _messages(errors))
 
     errors = []
-    sources_info = {"customers": {"bind": False, "preload": False}}
+    sources_info = {"customers": {"preload": False}}
     validator._validate_relations(
         {
             "relations": {
@@ -779,7 +779,7 @@ def test_validator_relations_edges() -> None:
         sources_info,
         "orders",
     )
-    assert any("requires to_bind" in msg for msg in _messages(errors))
+    assert not errors
 
 
 def test_validator_steps_edges() -> None:
@@ -843,9 +843,20 @@ def test_validator_step_field_name_check_skips_missing_allowed_index() -> None:
 
 def test_validator_bind_and_parse_helpers() -> None:
     validator = validator_module.ConfigValidator()
-    errors = []
-    validator._validate_bind("bad", errors, "ctx")
-    assert any("bind must be a dictionary" in msg for msg in _messages(errors))
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.conftest.mock_loader"},
+        "sources": {
+            "s1": {
+                "loader": "tests.conftest.mock_loader",
+                "key": "id",
+                "bind": "bad",
+            }
+        },
+    }
+    with pytest.raises(validator_module.ConfigValidationError) as exc:
+        validator.validate(config)
+    assert any("Legacy YAML syntax is not supported: 'sources.s1.bind'" in msg for msg in exc.value.errors)
 
     assert validator._parse_source_field_expr(123) is None
     assert validator._parse_source_field_expr("bad") is None

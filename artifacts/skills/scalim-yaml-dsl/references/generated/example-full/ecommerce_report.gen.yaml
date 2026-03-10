@@ -32,13 +32,6 @@ _templates:
     from: orders.customer_id
     to: customers.customer_id
 
-  step_orders_to_customers_with_bind: &step_orders_to_customers_with_bind
-    <<: *step_orders_to_customers
-    to_bind:
-      use_keys:
-        param: ids
-        as: list
-
   step_orders_to_products: &step_orders_to_products
     from: orders.product_id
     to: products.product_id
@@ -58,6 +51,9 @@ main_source:
   source_id: orders
   loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_orders"
   params:
+    # runtime_vars 注入示例: 由调用方传入 `runtime_vars={"order_ids": [...]}`.
+    # 为空列表时 loader 仍会读取全量订单(见 `load_orders` 实现),用于保证 canonical demo 可直接运行.
+    ids: "$runtime.order_ids"
     field_keys:
       - order_id
       - order_date
@@ -126,26 +122,18 @@ relations:
   # 单级关联
   orders_to_customers: &orders_to_customers
     steps:
-      - *step_orders_to_customers_with_bind
+      - *step_orders_to_customers
 
   # rows 模式关联(默认复用/显式禁用对拍)
   orders_to_customers_rows_cache: &orders_to_customers_rows_cache
     steps:
       - from: orders.customer_id
-        to: customers_rows.customer_id
-        to_bind:
-          use_rows:
-            param: rows
-            # cache_mode 省略 => 默认 batch
+        to: customers_rows_cached.customer_id
 
   orders_to_customers_rows_nocache: &orders_to_customers_rows_nocache
     steps:
       - from: orders.customer_id
-        to: customers_rows.customer_id
-        to_bind:
-          use_rows:
-            param: rows
-            cache_mode: none
+        to: customers_rows_nocache.customer_id
 
   orders_to_products: &orders_to_products
     steps:
@@ -202,7 +190,8 @@ sources:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers"
     key: customer_id
     lookup_chunk_size: 5
-    bind: { use_keys: { param: ids } }
+    params:
+      ids: {$keys: {as: list}}
     fields:
       # 单级关联 - 客户
       customer_name: &customer_name
@@ -221,9 +210,11 @@ sources:
         name: 注册日期
         relation: *orders_to_customers
 
-  customers_rows:
+  customers_rows_cached:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers_by_rows"
     key: customer_id
+    params:
+      rows: {$rows: {cache_mode: batch}}
     fields:
       # rows 模式对拍字段
       customer_name_rows_cached: &customer_name_rows_cached
@@ -234,6 +225,12 @@ sources:
         name: 会员等级(rows缓存)
         relation: *orders_to_customers_rows_cache
 
+  customers_rows_nocache:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers_by_rows"
+    key: customer_id
+    params:
+      rows: {$rows: {cache_mode: none}}
+    fields:
       customer_name_rows_nocache: &customer_name_rows_nocache
         name: 客户姓名(rows不缓存)
         relation: *orders_to_customers_rows_nocache
@@ -247,11 +244,8 @@ sources:
     key: product_id
     lookup_cast:
       name: int
-    bind:
-      use_keys:
-        param: ids
-        as: list
     params:
+      ids: {$keys: {as: list}}
       field_keys:
         - product_id
         - product_name
@@ -279,7 +273,8 @@ sources:
   categories:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_categories"
     key: category_id
-    bind: { use_keys: { param: ids } }
+    params:
+      ids: {$keys: {as: set}}
     fields:
       # 多级关联 - 分类
       category_name: &category_name
@@ -289,7 +284,8 @@ sources:
   warehouses:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_warehouses"
     key: warehouse_id
-    bind: { use_keys: { param: ids } }
+    params:
+      ids: {$keys: {as: set}}
     fields:
       region_id:
         name: 区域ID
@@ -304,7 +300,8 @@ sources:
   regions:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_regions"
     key: region_id
-    bind: { use_keys: { param: ids } }
+    params:
+      ids: {$keys: {as: set}}
     fields:
       # 多级关联 - 区域
       region_name_value: &region_name_value
@@ -326,7 +323,6 @@ sources:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_region_pricing"
     key: [region_id, product_category_id]
     cache_mode: preload_forever
-    bind: { use_keys: { param: ids } }
     fields:
       # 复合键关联 - 区域定价
       price_adjustment: &price_adjustment
@@ -345,7 +341,11 @@ sources:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_promotions"
     key: promotion_id
     cache_mode: preload_forever
-    bind: { use_keys: { param: ids } }
+    params:
+      field_keys:
+        - promotion_id
+        - promotion_name
+        - promotion_discount
     fields:
       # 单级关联 - 促销 (可能为空)
       promotion_name: &promotion_name
@@ -363,7 +363,10 @@ sources:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_payment_methods"
     key: payment_method_id
     cache_mode: preload_forever
-    bind: { use_keys: { param: ids } }
+    normalize:
+      kind: index_by_key
+      key_field: payment_method_id
+      on_conflict: error
     fields:
       # 单级关联 - 支付方式
       payment_method_name: &payment_method_name
@@ -374,7 +377,6 @@ sources:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_logistics"
     key: logistics_id
     cache_mode: preload_forever
-    bind: { use_keys: { param: ids } }
     fields:
       # 单级关联 - 物流
       logistics_name: &logistics_name

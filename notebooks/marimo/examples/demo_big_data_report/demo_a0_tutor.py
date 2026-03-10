@@ -209,8 +209,9 @@ def _(demand_config):
     from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 
     allowed_modules = frozenset(["notebooks.marimo.examples.demo_big_data_report._loaders"])
+    runtime_vars = {"order_ids": []}
     resolver = PythonReferenceResolver(allowed_modules=allowed_modules)
-    converter = ConfigToIRConverter(resolver=resolver)
+    converter = ConfigToIRConverter(resolver=resolver, runtime_vars=runtime_vars)
 
     demand_ir = converter.convert(demand_config)
 
@@ -856,10 +857,12 @@ def _(Path, yaml_path):
 
     try:
         sink = InMemoryRowSink()
+        runtime_vars = {"order_ids": []}
         result = run(
             str(yaml_path),
             allowed_modules=frozenset([_loaders_module]),
             sink=sink,
+            runtime_vars=runtime_vars,
         )
         print("✅ `run()` 执行成功!")
         print(f"   总行数: {result.total_rows}")

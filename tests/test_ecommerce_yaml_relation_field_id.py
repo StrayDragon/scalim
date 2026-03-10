@@ -17,6 +17,7 @@ def test_ecommerce_yaml_relation_steps_support_field_id_alias(ecommerce_config_s
         allowed_modules=frozenset(["notebooks.marimo.examples.demo_big_data_report._loaders"]),
         overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
         sink=sink,
+        runtime_vars={"order_ids": []},
     )
 
     relation = result.config.relations.get("orders_to_categories")

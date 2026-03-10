@@ -37,7 +37,8 @@
           "alias 编辑提供共享与拆分策略",
           "可视化编辑块必须提供稳定可发现的新增入口",
           "同一编辑器中的可操作项必须采用一致的交互视觉体系",
-          "关键操作的可见性不得依赖 hover-only"
+          "关键操作的可见性不得依赖 hover-only",
+          "editor exposes source-level `normalize` with canonical schema guidance"
         ],
         "slug": "yaml-dsl-editor-core"
       }
@@ -93,7 +94,9 @@
           "schema meta 中 schema dict 不得吞掉 desc/md",
           "schema 明确 batch_size 的 null-or-int 语义",
           "retry 字段纳入 JSON Schema 与 hover 指引",
-          "`_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform"
+          "`_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform",
+          "schema documents source-level `normalize` and its execution order",
+          "schema keeps `normalize` out of `main_source`"
         ],
         "slug": "yaml-dsl-schema"
       },
@@ -110,7 +113,8 @@
           "batch_size 校验在不同入口语义一致",
           "YAML DSL 增加 loader retry 配置入口",
           "`_templates.retry` 用于复用通用策略",
-          "`should_retry` 引用解析与 allowlist"
+          "`should_retry` 引用解析与 allowlist",
+          "`normalize` is allowed on `sources.*` and rejected on `main_source`"
         ],
         "slug": "demand-dsl"
       },
@@ -146,7 +150,8 @@
         "requirements": [
           "预加载缓存模式",
           "关联加载优先命中缓存",
-          "计划元数据记录缓存源"
+          "计划元数据记录缓存源",
+          "preload cache stores normalized source results"
         ],
         "slug": "source-cache"
       },
@@ -228,11 +233,11 @@
   "inputs": [
     {
       "path": "notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "f31ceb8589e5dcd88525c3ca42dfca586f8f9b7384b16937dc8754cd5a5b6dae"
+      "sha256": "cd3327b5a6b4e42ff14d47a41e676972cfc37b6e6262884c8fb65eabc21e7f87"
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
-      "sha256": "c2fffdb1e1a9ba7eb9b5b3b1bb9e3f90bcc97e1da54155c9b6adb07a46e5e2d1"
+      "sha256": "33bb04223336dc27ff97cecda554dcf1575ad2be159974d50950d065489de2e7"
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
@@ -260,7 +265,7 @@
     },
     {
       "path": "openspec/specs/source-cache/spec.md",
-      "sha256": "0d55bf4260ae1e68be5991287f180c5af966a917b59d0d90e432c432cf6dfc3c"
+      "sha256": "ee745296996da77e8e7771f54418a0249cf33e4cb7f19d0897109685eaab7f9a"
     },
     {
       "path": "openspec/specs/source-relations/spec.md",
@@ -272,11 +277,11 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
-      "sha256": "bc63a82ab206e7e84d1c40bf74d5087d4a7576f21c870f8a7d7819cdb51c2d0a"
+      "sha256": "b1513c918edd34735c979cc02eab21a49aee01738ca7edf4e74b0a837142c28f"
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "041612179c2b6125173e1aa61db5a80a3f92f33101d4ecefc69fb13d8eef909d"
+      "sha256": "440d1caede31b94d22583d6ef1400cd5afb77d2c44b26a0f42d688514615bc32"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
@@ -284,21 +289,21 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "004647d52f56e973b5f99967751b7b98e4473ff3a505f8d31986084ace439b1a"
+      "sha256": "9e8bcb749f92175751fcc10f684b0ecc3c52c4b1000982f41b9d40cbe4327302"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "f583e0ca93166c1c2fe6669d3efbf025a2fa20cc78359c8f32e826152cdf0d50"
+      "sha256": "a750d43ab458b8d45f514c1e37329688e60156646105f52935200f001d4ed146"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "ec0714137b15f61e96f5efab8e46021fa1d6236aebb4af4a77fb8b13cad54c4c"
+      "sha256": "6a821cb7e50188444ecc82062e9b1f1b085931c24df6c9aee51e0bc0755a9f34"
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "22d7e96784df47f5e4f1a7d609b67466bfcd9323d7e4433c0b1ee186ceb6aefa"
+      "sha256": "1702baeb844612d901819d2c61aef5b64df4b1378ae88389228e50cb0759aa8f"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

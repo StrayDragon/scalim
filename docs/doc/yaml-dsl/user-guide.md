@@ -177,6 +177,7 @@ result = run(
 
 - **loader**: 数据加载函数
 - **key**: 主键字段(支持复合键)
+- **normalize**: whole-result 归一化(可选;在字段级 `extract` 之前执行)
 - **bind**: 参数绑定配置(如何传递查询参数)
 
 ### 2.3 字段类型
@@ -318,6 +319,7 @@ main_source:
 |------|------|------|--------|------|
 | `loader` | string | ✅ | - | Python 可调用对象引用 |
 | `key` | string/list | ✅ | - | 主键字段(支持复合键) |
+| `normalize` | object | ❌ | - | whole-result 归一化(在字段级 `extract` 之前执行;仅 `sources.*` 支持) |
 | `bind` | object | ❌ | - | 参数绑定配置 |
 | `cache_mode` | string | ❌ | `"none"` | 缓存模式:`none`/`preload_forever` |
 | `lookup_cast` | object | ❌ | - | 键值归一化转换 |
@@ -395,6 +397,32 @@ lookup_cast:
   name: sep_first
   sep: ","          # 默认 ","
 ```
+
+#### 3.3.4 whole-result 归一化 (normalize)
+
+`normalize` 是 **source-level** 的 whole-result normalization: 作用于整个 `loader` 返回值,并且发生在字段级 `extract` 之前.
+
+v1 只提供 declarative preset:
+- `kind: index_by_key`: 将 `list[row]` 归一化为 `lookup_key -> row` 映射
+- `key_field`: 从每个 row 中读取 lookup key 的字段名
+- `on_conflict`: duplicate key 策略,可选 `error|first|last`(默认 `error`)
+
+示例: loader 返回 `list[row]`,用 `normalize.kind=index_by_key` 归一化为映射
+
+```yaml
+sources:
+  payment_methods:
+    loader: "myapp.loaders:load_payment_methods"
+    key: payment_method_id
+    normalize:
+      kind: index_by_key
+      key_field: payment_method_id
+      on_conflict: error
+```
+
+边界说明:
+- `normalize` 只负责“把整个返回值 reshape 成可 lookup 的形状”;它不负责从单条 row 里取字段
+- 从单条 row 里取字段请用字段级 `extract`(定义在 `sources.<id>.fields.*` / `main_source.fields.*`)
 
 ### 3.4 字段配置
 

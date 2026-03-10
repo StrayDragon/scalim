@@ -144,9 +144,14 @@ class ConfigToIRConversionRelationMixin:
         to_source_id: str,
         key_field: "NormalizedLookupKeySpec",
     ) -> Optional[BindingIr]:
-        if step.to_bind is None:
-            return None
-        return self._create_binding(step.to_bind, config.sources[to_source_id].params, key_field)
+        _ = (config, key_field)
+        if step.to_bind is not None:
+            msg = (
+                "Legacy YAML syntax is not supported: 'relations.*.steps[].to_bind'. "
+                "Move binding into 'sources.{}.params' using `$keys` / `$rows` directives."
+            ).format(to_source_id)
+            raise ConversionError(msg)
+        return None
 
     def _resolve_lookup_steps(
         self,

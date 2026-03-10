@@ -15,7 +15,7 @@ def _load_config(yaml_content: str):
     return loader.load_string(yaml_content)
 
 
-def test_to_bind_as_list_builds_list_params() -> None:
+def test_keys_directive_as_list_builds_list_params() -> None:
     yaml_content = make_yaml_config(
         name="binding_as_list",
         main_source="""
@@ -31,6 +31,8 @@ fields:
 customers:
   loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
   key: customer_id
+  params:
+    ids: {$keys: {as: list}}
   fields:
     customer_name:
       extract: customer_name
@@ -41,10 +43,6 @@ orders_to_customers: &orders_to_customers
   steps:
     - from: orders.customer_id
       to: customers.customer_id
-      to_bind:
-        use_keys:
-          param: ids
-          as: list
     """,
     )
     config = _load_config(yaml_content)
@@ -53,16 +51,16 @@ orders_to_customers: &orders_to_customers
     )
     demand_ir = converter.convert(config)
 
-    field = demand_ir.fields["customer_name"]
-    bind = field.lookup_steps[0].bind
+    bind = demand_ir.sources["customers"].bind
     assert bind is not None
 
-    ctx = LoaderCallContextIr(lookup_keys={1, 2, 3})
+    ctx = LoaderCallContextIr(is_ref_loader=True, lookup_keys={1, 2, 3})
     _, kwargs = bind.params_builder(ctx)
-    assert set(kwargs["ids"]) == {1, 2, 3}
+    assert isinstance(kwargs["ids"], list)
+    assert kwargs["ids"] == [1, 2, 3]
 
 
-def test_to_bind_rows_mode_passes_batch_rows() -> None:
+def test_rows_directive_passes_batch_rows() -> None:
     yaml_content = make_yaml_config(
         name="binding_rows",
         main_source="""
@@ -78,6 +76,8 @@ fields:
 regions:
   loader: "scalim_misc.example_report_ir:DAL.get_country_info_of_concrete_params"
   key: region_id
+  params:
+    rows: {$rows: {cache_mode: batch}}
   fields:
     region_name:
       extract: name
@@ -88,9 +88,6 @@ orders_to_regions: &orders_to_regions
   steps:
     - from: orders.region_id
       to: regions.region_id
-      to_bind:
-        use_rows:
-          param: rows
     """,
     )
     config = _load_config(yaml_content)
@@ -99,11 +96,10 @@ orders_to_regions: &orders_to_regions
     )
     demand_ir = converter.convert(config)
 
-    field = demand_ir.fields["region_name"]
-    bind = field.lookup_steps[0].bind
+    bind = demand_ir.sources["regions"].bind
     assert bind is not None
 
-    ctx = LoaderCallContextIr(batch_rows=[{"region_id": 1}, {"region_id": 2}])
+    ctx = LoaderCallContextIr(is_ref_loader=True, batch_rows=[{"region_id": 1}, {"region_id": 2}])
     _, kwargs = bind.params_builder(ctx)
     assert kwargs["rows"] == [{"region_id": 1}, {"region_id": 2}]
 

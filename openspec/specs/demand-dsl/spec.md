@@ -263,6 +263,18 @@
 - **AND** 调用 `compile/run` 未提供 allowlist(allowed_modules/allowed_functions 均为空)
 - **THEN** 系统 MUST 拒绝执行并提示必须提供 allowlist
 
+### Requirement: `normalize` is allowed on `sources.*` and rejected on `main_source`
+系统 SHALL 在 `sources.<id>` 上支持可选对象 `normalize`,并将其用于 lookup source 的 whole-result normalization.
+系统 MUST 拒绝 `main_source.normalize`.
+
+#### Scenario: `sources.*.normalize` 通过校验
+- **WHEN** `sources.order_recommends.normalize.kind: index_by_key`
+- **THEN** YAML 校验与 IR 转换 MUST 通过
+
+#### Scenario: `main_source.normalize` 被拒绝
+- **WHEN** YAML 声明 `main_source.normalize`
+- **THEN** 校验 MUST 失败并指出 `main_source.normalize`
+
 ## Notes
 - 当前仅支持 YAML DSL 与 IR 类构造(`DemandIr.from_irs`);类式 Python DSL 尚未实现.
 - rows 模式默认批次内复用;若 loader 依赖可变的 batch_rows 或有副作用,应显式配置 `bind.use_rows.cache_mode=none`.

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from typing import TYPE_CHECKING, Any, FrozenSet, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union, cast
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
@@ -87,6 +87,9 @@ class RunOptions:
 
     overrides: Optional[RunOverrides] = None
     """可选:运行期覆盖项(例如输出与 `viz` 配置覆盖)."""
+
+    runtime_vars: Optional[Dict[str, object]] = None
+    """可选:运行期变量注入(编译期使用,用于解析 `$runtime.*` 占位符)."""
 
 
 @dataclass(frozen=True)

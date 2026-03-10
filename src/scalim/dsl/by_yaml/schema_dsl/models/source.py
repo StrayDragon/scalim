@@ -12,6 +12,7 @@ from ..constants import (
     DEFAULT_LOADER_RETRY_MAX_ATTEMPTS,
     DEFAULT_LOADER_RETRY_MAX_DELAY_SECONDS,
     DEFAULT_LOADER_RETRY_MAX_ELAPSED_SECONDS,
+    DEFAULT_NORMALIZE_ON_CONFLICT,
     DESC_BIND,
     DESC_BIND_MD,
     DESC_LOADER,
@@ -24,12 +25,15 @@ from ..constants import (
     DESC_MAIN_SOURCE_ORDER_BY_MD,
     DESC_PARAMS,
     DESC_PARAMS_MD,
+    DESC_SOURCE_NORMALIZE,
+    DESC_SOURCE_NORMALIZE_MD,
     HARD_CAP_LOADER_RETRY_MAX_ATTEMPTS,
     HARD_CAP_LOADER_RETRY_MAX_DELAY_SECONDS,
     HARD_CAP_LOADER_RETRY_MAX_ELAPSED_SECONDS,
     LOADER_RETRY_BACKOFF_ENUM,
     LOOKUP_CAST_SCHEMA,
     LOOKUP_CHUNK_SIZE_SCHEMA,
+    NORMALIZE_SCHEMA,
     schema_meta,
     schema_omit,
     schema_ref,
@@ -153,6 +157,27 @@ class LoaderRetryConfig:
 
 
 @dataclass(frozen=True)
+class NormalizeConfig:
+    SCHEMA_NAME: ClassVar[str] = "normalize"
+    """`whole-result` `normalize` 配置对象在 `YAML` 中的节点名称."""
+
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind", "key_field")
+    """该配置对象在 `YAML` 中的必填字段列表."""
+
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    """是否允许出现未声明的额外键."""
+
+    kind: str = dataclass_field(default="")
+    """`normalize` 预置类型."""
+
+    key_field: str = dataclass_field(default="")
+    """用于建立索引的 `row` 字段名."""
+
+    on_conflict: str = dataclass_field(default=DEFAULT_NORMALIZE_ON_CONFLICT)
+    """`duplicate key` 冲突策略."""
+
+
+@dataclass(frozen=True)
 class SourceConfig:
     SCHEMA_NAME: ClassVar[str] = "source"
     """数据源配置对象在 `YAML` 中的节点名称."""
@@ -197,6 +222,12 @@ class SourceConfig:
         metadata=schema_meta(schema=LOOKUP_CHUNK_SIZE_SCHEMA),
     )
     """可选:查找键分块大小."""
+
+    normalize: Optional[NormalizeConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(schema=NORMALIZE_SCHEMA, desc=DESC_SOURCE_NORMALIZE, md=DESC_SOURCE_NORMALIZE_MD),
+    )
+    """可选: `whole-result` `normalize` 配置."""
 
     cache_mode: str = dataclass_field(
         default=DEFAULT_CACHE_MODE,

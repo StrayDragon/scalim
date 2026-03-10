@@ -1,6 +1,6 @@
 {
   "meta": {
-    "created_at": 1773138168.3377843,
+    "created_at": 1773161111.7588751,
     "target_fields": [
       "order_id",
       "order_date",
@@ -117,7 +117,7 @@
           {
             "task_id": "t2",
             "chain": [
-              "customers_rows"
+              "customers_rows_cached"
             ],
             "fields": [
               "customer_level_rows_cached",
@@ -128,7 +128,7 @@
           {
             "task_id": "t3",
             "chain": [
-              "customers_rows"
+              "customers_rows_nocache"
             ],
             "fields": [
               "customer_level_rows_nocache",

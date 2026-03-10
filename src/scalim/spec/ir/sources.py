@@ -1,7 +1,8 @@
+from collections.abc import Hashable, Mapping
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, Optional, Tuple, Union
+from typing import Dict, FrozenSet, Optional, Sequence, Tuple, Union, cast
 
-from ...typedefs import SourceSpecIrCacheMode, StaticParams
+from ...typedefs import LoaderResultMap, LoaderResultMapping, SourceSpecIrCacheMode, StaticParams
 from ...vendor.compact.typing_extensionsx import override
 from .aliases import LookupKeyCast, MainSourceRowIterableCallable, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
@@ -40,6 +41,114 @@ class KeyIr:
     @override
     def __hash__(self) -> int:
         return hash(self.key)
+
+
+@dataclass(frozen=True)
+class SourceNormalizeIr:
+    """数据源 `whole-result` `normalize` 配置(`IR`)."""
+
+    kind: str
+    """`normalize` 预置类型."""
+
+    key_field: str
+    """用于建立索引的 `row` 字段名."""
+
+    on_conflict: str = "error"
+    """`duplicate key` 冲突策略(`error`/`first`/`last`)."""
+
+    def apply(self, result: object, *, source_id: str) -> LoaderResultMapping:
+        if self.kind == "index_by_key":
+            return _normalize_index_by_key(
+                result,
+                source_id=source_id,
+                key_field=self.key_field,
+                on_conflict=self.on_conflict,
+            )
+        msg = "Unknown normalize.kind '{}' for source '{}'".format(self.kind, source_id)
+        raise ValueError(msg)
+
+
+def _normalize_index_by_key(
+    result: object,
+    *,
+    source_id: str,
+    key_field: str,
+    on_conflict: str,
+) -> LoaderResultMapping:
+    # 若 `loader` 已返回 `mapping`,则直接透传.
+    if isinstance(result, Mapping):
+        return cast("LoaderResultMapping", result)
+
+    if not isinstance(result, (list, tuple)):
+        msg = "Source '{}' normalize.index_by_key expected loader result list[row], got '{}'".format(source_id, type(result).__name__)
+        raise TypeError(msg)
+
+    indexed: LoaderResultMap = {}
+    for idx, item in enumerate(cast("Sequence[object]", result)):
+        row = _normalize_index_by_key_require_row(item, source_id=source_id, idx=idx)
+        key = _normalize_index_by_key_extract_key(row, source_id=source_id, key_field=key_field, idx=idx)
+        _normalize_index_by_key_insert(indexed, key=key, row=row, source_id=source_id, on_conflict=on_conflict)
+
+    return indexed
+
+
+def _normalize_index_by_key_require_row(item: object, *, source_id: str, idx: int) -> "Mapping[str, object]":
+    if not isinstance(item, Mapping):
+        msg = "Source '{}' normalize.index_by_key expected list[row] where row is a Mapping, got '{}' at index {}".format(
+            source_id,
+            type(item).__name__,
+            idx,
+        )
+        raise TypeError(msg)
+    return cast("Mapping[str, object]", item)
+
+
+def _normalize_index_by_key_extract_key(
+    row: "Mapping[str, object]",
+    *,
+    source_id: str,
+    key_field: str,
+    idx: int,
+) -> Hashable:
+    if key_field not in row:
+        msg = "Source '{}' normalize.index_by_key missing key_field '{}' at index {}".format(source_id, key_field, idx)
+        raise KeyError(msg)
+    key = row.get(key_field)
+    if key is None:
+        msg = "Source '{}' normalize.index_by_key key_field '{}' is None at index {}".format(source_id, key_field, idx)
+        raise ValueError(msg)
+    if not isinstance(key, Hashable):
+        msg = "Source '{}' normalize.index_by_key key_field '{}' must be hashable, got '{}' at index {}".format(
+            source_id,
+            key_field,
+            type(key).__name__,
+            idx,
+        )
+        raise TypeError(msg)
+    return key
+
+
+def _normalize_index_by_key_insert(
+    indexed: LoaderResultMap,
+    *,
+    key: Hashable,
+    row: "Mapping[str, object]",
+    source_id: str,
+    on_conflict: str,
+) -> None:
+    if key not in indexed:
+        indexed[key] = row
+        return
+    if on_conflict == "first":
+        return
+    if on_conflict == "last":
+        indexed[key] = row
+        return
+    if on_conflict != "error":
+        msg = "Source '{}' normalize.index_by_key has invalid on_conflict '{}'".format(source_id, on_conflict)
+        raise ValueError(msg)
+    msg = "Source '{}' normalize.index_by_key duplicate key '{}'".format(source_id, key)
+    raise ValueError(msg)
 
 
 @dataclass(frozen=True)
@@ -86,6 +195,11 @@ class SourceIr:
     bind: Optional[BindingIr] = None
     """
     默认绑定(当无 `key_field` 匹配时使用).
+    """
+
+    normalize: Optional[SourceNormalizeIr] = None
+    """
+    数据源 `whole-result` `normalize` 配置(可选).
     """
 
     def get_binding(self, key_field: NormalizedLookupKeySpec) -> Optional[BindingIr]:

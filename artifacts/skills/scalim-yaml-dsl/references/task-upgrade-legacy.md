@@ -19,7 +19,19 @@
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-field-extract.md`
   - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-field-extract/`
   - Spec: `openspec/specs/yaml-field-extract/spec.md`
+- 2026-03-10: yaml-source-normalize
+  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-source-normalize.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-source-normalize/`
+  - Spec: `openspec/specs/demand-dsl/spec.md`
 <!-- END SCALIM-GEN:yaml-dsl-upgrades -->
+
+## whole-result reshape: 用 `normalize`,不用字段级 `extract`
+
+如果你的 lookup loader 返回 `list[row]`,而你过去通过 Python wrapper 把它改成 `key -> row` mapping,现在可以优先用 `sources.<id>.normalize.kind=index_by_key` 完成归一化.
+
+边界:
+- `normalize`: 对整个 source 返回值做一次 reshape(发生在字段读取前)
+- `extract`: 从单条 row value 里取字段(包含 nested 取值与 rename)
 
 ## 必查项目
 

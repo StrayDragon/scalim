@@ -241,7 +241,8 @@ fields:
 customers:
   loader: "tests.conftest.mock_loader"
   key: customer_id
-  bind: {use_keys: {param: ids}}
+  params:
+    ids: {$keys: {as: set}}
   fields:
     customer_name:
       extract: customer_name
@@ -279,7 +280,8 @@ fields:
 customers:
   loader: "tests.conftest.mock_loader"
   key: customer_id
-  bind: {use_keys: {param: ids}}
+  params:
+    ids: {$keys: {as: set}}
   fields:
     customer_name:
       extract: customer_name

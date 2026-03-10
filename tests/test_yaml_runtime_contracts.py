@@ -8,7 +8,7 @@ from scalim.dsl.by_yaml import run
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError, ConversionError
 from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
-from scalim.dsl.by_yaml.schema_dsl.models import BindConfig
+from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig, SourceConfig
 from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink
 
 
@@ -48,12 +48,10 @@ relations:
       - from: orders.customer_id
         to: customers.customer_id
         lookup_cast: {name: sep_first, sep: ","}
-        to_bind: {use_keys: {param: ids}}
 sources:
   customers:
     loader: tests.conftest.mock_loader
     key: customer_id
-    bind: {use_keys: {param: ids}}
     fields:
       customer_name:
         extract: customer_name
@@ -67,7 +65,7 @@ sources:
         assert step.lookup_cast.name == "sep_first"
         assert step.lookup_cast.sep == ","
 
-    def test_bind_defaults_to_keys_set(self) -> None:
+    def test_keys_directive_defaults_to_set(self) -> None:
         yaml_content = """
 name: test_bind_defaults
 main_source:
@@ -83,12 +81,13 @@ relations:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
-        to_bind: {use_keys: {param: ids}}
 sources:
   customers:
     loader: tests.conftest.mock_loader
     key: customer_id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids:
+        $keys: null
     fields:
       customer_name:
         extract: customer_name
@@ -96,18 +95,14 @@ sources:
 """
         loader = YamlDemandLoader()
         config = loader.load_string(yaml_content)
+        converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
+        demand_ir = converter.convert(config)
+        binding = demand_ir.sources["customers"].bind
+        assert binding is not None
+        assert binding.mode == "keys"
+        assert binding.as_ == "set"
 
-        source_bind = config.sources["customers"].bind
-        assert source_bind is not None
-        assert source_bind.use_keys is not None
-        assert source_bind.use_keys.as_ == "set"
-
-        step_bind = config.relations["r1"].steps[0].to_bind
-        assert step_bind is not None
-        assert step_bind.use_keys is not None
-        assert step_bind.use_keys.as_ == "set"
-
-    def test_bind_rows_defaults_to_batch_cache(self) -> None:
+    def test_rows_directive_defaults_to_batch_cache(self) -> None:
         yaml_content = """
 name: test_bind_rows_defaults
 main_source:
@@ -123,12 +118,13 @@ relations:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
-        to_bind: {use_rows: {param: rows}}
 sources:
   customers:
     loader: tests.conftest.mock_loader
     key: customer_id
-    bind: {use_rows: {param: rows}}
+    params:
+      rows:
+        $rows: null
     fields:
       customer_name:
         extract: customer_name
@@ -136,16 +132,12 @@ sources:
 """
         loader = YamlDemandLoader()
         config = loader.load_string(yaml_content)
-
-        source_bind = config.sources["customers"].bind
-        assert source_bind is not None
-        assert source_bind.use_rows is not None
-        assert source_bind.use_rows.cache_mode == "batch"
-
-        step_bind = config.relations["r1"].steps[0].to_bind
-        assert step_bind is not None
-        assert step_bind.use_rows is not None
-        assert step_bind.use_rows.cache_mode == "batch"
+        converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
+        demand_ir = converter.convert(config)
+        binding = demand_ir.sources["customers"].bind
+        assert binding is not None
+        assert binding.mode == "rows"
+        assert binding.cache_mode == "batch"
 
 
 class TestAllowlistRequired:
@@ -296,19 +288,17 @@ class TestExcelIncludeHeader:
 
 
 class TestBindConfigErrors:
-    def test_create_params_builder_requires_use_branch(self) -> None:
+    def test_converter_rejects_sources_bind_legacy_syntax(self) -> None:
         converter = ConfigToIRConverter(allow_unsafe_resolver=True)
-        bind_config = BindConfig()
+        source_config = SourceConfig(
+            source_id="s1",
+            loader="tests.conftest.mock_loader",
+            key="id",
+            bind=BindConfig(use_keys=BindKeysConfig(param="ids")),
+        )
 
-        with pytest.raises(ConversionError, match="BindConfig requires use_rows or use_keys"):
-            converter._create_params_builder(bind_config)
-
-    def test_create_binding_requires_use_branch(self) -> None:
-        converter = ConfigToIRConverter(allow_unsafe_resolver=True)
-        bind_config = BindConfig()
-
-        with pytest.raises(ConversionError, match="BindConfig requires use_rows or use_keys"):
-            converter._create_binding(bind_config, None, "id")
+        with pytest.raises(ConversionError, match=r"Legacy YAML syntax is not supported: 'sources\.s1\.bind'"):
+            _ = converter._convert_source(source_config)
 
 
 class TestSchemaItemsChoicesEnum:

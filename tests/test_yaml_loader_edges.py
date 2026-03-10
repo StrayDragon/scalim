@@ -55,9 +55,8 @@ sources:
   good:
     loader: tests.conftest.mock_loader
     key: id
-    bind:
-      use_keys:
-        param: ids
+    params:
+      ids: {$keys: {as: set}}
   bad: []
 fields:
   bad_field: 1
@@ -86,7 +85,8 @@ sources:
   mapping:
     loader: tests.conftest.mock_loader
     key: map_id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       region_id:
         extract: region_id
@@ -97,7 +97,8 @@ sources:
   customers:
     loader: tests.conftest.mock_loader
     key: customer_id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
 relations:
   r1:
     steps:

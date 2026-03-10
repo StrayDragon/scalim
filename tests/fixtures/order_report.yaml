@@ -97,7 +97,8 @@ sources:
   customers:
     loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
     key: customer_id
-    bind: {use_keys: {param: customer_ids_set}}
+    params:
+      customer_ids_set: {$keys: {as: set}}
     fields:
       customer_name: &customer_name
         extract: customer_name
@@ -107,7 +108,8 @@ sources:
   pays:
     loader: "scalim_misc.example_report_ir:BLL.get_pay_info_from_api_of_concrete_params"
     key: pay_id
-    bind: {use_keys: {param: pay_ids_set}}
+    params:
+      pay_ids_set: {$keys: {as: set}}
     fields:
       country_id:
         extract: country_id
@@ -122,7 +124,8 @@ sources:
   countries:
     loader: "scalim_misc.example_report_ir:DAL.get_country_info_of_concrete_params"
     key: country_id
-    bind: {use_keys: {param: country_ids_set}}
+    params:
+      country_ids_set: {$keys: {as: set}}
     fields:
       country_name: &country_name
         extract: country_name
@@ -133,7 +136,6 @@ sources:
     loader: "scalim_misc.example_report_ir:data_loader.get_order_types"
     key: type_id
     cache_mode: preload_forever
-    bind: {use_keys: {param: type_ids_set}}
     fields:
       order_type_name:
         extract: type_name
@@ -144,7 +146,6 @@ sources:
     loader: "scalim_misc.example_report_ir:data_loader.get_small_groups"
     key: small_group_id
     cache_mode: preload_forever
-    bind: {use_keys: {param: group_ids_set}}
     fields:
       big_group_id:
         extract: big_group_id
@@ -160,7 +161,6 @@ sources:
     loader: "scalim_misc.example_report_ir:data_loader.get_big_groups"
     key: big_group_id
     cache_mode: preload_forever
-    bind: {use_keys: {param: group_ids_set}}
     lookup_cast: {name: int}
     fields:
       big_group_name:

@@ -9,6 +9,7 @@ from ...schema_dsl.models import (
     DERIVED_FIELD_KEYS,
     LOOKUP_CAST_KEYS,
     MAIN_SOURCE_KEYS,
+    NORMALIZE_KEYS,
     RELATION_CONFIG_KEYS,
     RELATION_STEP_KEYS,
     SOURCE_FIELD_KEYS,
@@ -38,6 +39,11 @@ class _FieldNames:
     ROWS_CACHE_MODE: str = BIND_ROWS_KEYS["cache_mode"]
     LOOKUP_CAST: str = SOURCE_KEYS["lookup_cast"]
     LOOKUP_CHUNK_SIZE: str = SOURCE_KEYS["lookup_chunk_size"]
+    NORMALIZE: str = SOURCE_KEYS["normalize"]
+    PARAMS: str = SOURCE_KEYS["params"]
+    NORMALIZE_KIND: str = NORMALIZE_KEYS["kind"]
+    NORMALIZE_KEY_FIELD: str = NORMALIZE_KEYS["key_field"]
+    NORMALIZE_ON_CONFLICT: str = NORMALIZE_KEYS["on_conflict"]
     NAME_KEY: str = LOOKUP_CAST_KEYS["name"]
     SEP: str = LOOKUP_CAST_KEYS["sep"]
     SOURCE: str = SOURCE_FIELD_KEYS["source"]

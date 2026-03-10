@@ -81,7 +81,8 @@ sources:
   customers:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       name:
         extract: name
@@ -194,7 +195,8 @@ sources:
   other:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       dup:
         extract: id2
@@ -229,7 +231,8 @@ sources:
   other:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       dup:
         extract: id
@@ -305,7 +308,8 @@ sources:
   other:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       dup:
         extract: id2
@@ -361,7 +365,8 @@ sources:
   customers:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       customer_id:
         extract: id
@@ -395,7 +400,8 @@ sources:
   customers:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       customer_id:
         extract: id
@@ -507,7 +513,8 @@ sources:
   other:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       dup:
         extract: id2
@@ -571,7 +578,8 @@ sources:
   other:
     loader: tests.conftest.mock_loader
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       dup:
         extract: id2
@@ -679,7 +687,8 @@ sources:
   customers:
     loader: tests.conftest.mock_loader
     key: customer_id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
 relations:
   empty_steps:
     steps: bad

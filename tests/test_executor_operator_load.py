@@ -8,7 +8,7 @@ from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from scalim.spec.ir.fields import FieldIr
 from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, SourceIr
+from scalim.spec.ir.sources import KeyIr, SourceIr, SourceNormalizeIr
 
 from .fixtures.executor_operator_fixtures import (
     _Order,
@@ -157,6 +157,35 @@ def test_load_operator_handles_object_data_and_missing_pk() -> None:
 
     assert context.get_field_value("amount", 1) == 7
     assert context.get_field_value("amount", 2) is None
+
+
+def test_load_operator_applies_source_normalize_index_by_key() -> None:
+    def _loader():  # type: ignore[no-untyped-def]
+        return [{"order_id": 1, "amount": 7}, {"order_id": 2, "amount": 9}]
+
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable=_loader),
+        normalize=SourceNormalizeIr(kind="index_by_key", key_field="order_id"),
+    )
+    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
+    runtime = _make_runtime(plan, _make_main_source())
+    context = BatchContext()
+
+    operator = LoadOperatorIr(
+        operator_id="load_orders",
+        operator_type=OperatorType.LOAD.value,
+        source=source,
+        field_keys=("amount",),
+        is_primary=True,
+    )
+
+    LoadOperatorExecutor().execute(operator, context, [1, 2], runtime)
+
+    assert context.get_field_value("amount", 1) == 7
+    assert context.get_field_value("amount", 2) == 9
 
 
 def test_load_operator_object_missing_attribute_returns_none() -> None:

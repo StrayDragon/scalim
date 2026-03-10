@@ -148,7 +148,8 @@ sources:
   clearn_reasons:
     loader: "tests.field_extract_loaders:load_clearn_reasons"
     key: order_id
-    bind: {use_keys: {param: order_id_set}}
+    params:
+      order_id_set: {$keys: {as: set}}
     fields:
       customer_level:
         extract: "[1].clearn_reason_level"

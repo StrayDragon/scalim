@@ -6,9 +6,12 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
+import pytest
+
+from scalim.dsl.by_yaml.params_template import ParamsTemplateRenderError, compile_params_template
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ConversionError
-from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig, LookupCastConfig
+from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import LoaderCallContextIr, BindingIr, _is_valid_binding_key, _restore_bindings, build_stable_lookup_key_list
 from scalim.spec.ir.demand import DemandIr
@@ -36,39 +39,34 @@ def test_stable_lookup_keys_list_sorts_tuple_keys() -> None:
 
 
 def test_yaml_params_builder_use_keys_as_list_prefers_lookup_keys_list_when_present() -> None:
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
-    bind_config = BindConfig(use_keys=BindKeysConfig(param="ids", as_="list"))
-    builder = converter._create_params_builder(bind_config)
+    template = compile_params_template({"ids": {"$keys": {"as": "list"}}}, path="sources.s1.params", resolve_runtime=False)
 
     ctx = LoaderCallContextIr(
+        is_ref_loader=True,
         lookup_keys={1, 2},
         lookup_keys_list=[2, 1],
     )
-    _args, kwargs = builder(ctx)
+    kwargs = template.render_kwargs(ctx, path="sources.s1.params")
     assert kwargs["ids"] == [2, 1]
 
 
 def test_yaml_params_builder_use_keys_as_list_stable_sorts_lookup_keys_when_list_missing() -> None:
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
-    bind_config = BindConfig(use_keys=BindKeysConfig(param="ids", as_="list"))
-    builder = converter._create_params_builder(bind_config)
+    template = compile_params_template({"ids": {"$keys": {"as": "list"}}}, path="sources.s1.params", resolve_runtime=False)
 
     ctx = LoaderCallContextIr(
+        is_ref_loader=True,
         lookup_keys={3, 1, 2},
         lookup_keys_list=None,
     )
-    _args, kwargs = builder(ctx)
+    kwargs = template.render_kwargs(ctx, path="sources.s1.params")
     assert kwargs["ids"] == [1, 2, 3]
 
 
 def test_yaml_params_builder_use_keys_as_list_uses_batch_row_nth_for_non_ref_loader() -> None:
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
-    bind_config = BindConfig(use_keys=BindKeysConfig(param="row_ids", as_="list"))
-    builder = converter._create_params_builder(bind_config)
-
+    template = compile_params_template({"row_ids": {"$keys": {"as": "list"}}}, path="sources.s1.params", resolve_runtime=False)
     ctx = LoaderCallContextIr(batch_row_nth=[2, 1])
-    _args, kwargs = builder(ctx)
-    assert kwargs["row_ids"] == [2, 1]
+    with pytest.raises(ParamsTemplateRenderError, match="only valid in ref loader call contexts"):
+        _ = template.render_kwargs(ctx, path="sources.s1.params")
 
 
 def test_plan_builder_field_specs_and_dependencies_follow_field_order() -> None:
@@ -125,17 +123,13 @@ print(json.dumps({"field_order": plan.field_order, "compute_fields": compute_fie
 def test_keys_list_is_hashseed_stable() -> None:
     snippet = """
 import json
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ConversionError
-from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig, LookupCastConfig
+from scalim.dsl.by_yaml.params_template import compile_params_template
 from scalim.spec.ir.binding import LoaderCallContextIr
 
-converter = ConfigToIRConverter(allow_unsafe_resolver=True)
-bind_config = BindConfig(use_keys=BindKeysConfig(param="ids", as_="list"))
-builder = converter._create_params_builder(bind_config)
+template = compile_params_template({"ids": {"$keys": {"as": "list"}}}, path="sources.s1.params", resolve_runtime=False)
 
-ctx = LoaderCallContextIr(lookup_keys=set([(2, "b"), (1, "a")]))
-_args, kwargs = builder(ctx)
+ctx = LoaderCallContextIr(is_ref_loader=True, lookup_keys=set([(2, "b"), (1, "a")]))
+kwargs = template.render_kwargs(ctx, path="sources.s1.params")
 print(json.dumps(kwargs["ids"]))
 """
     result_a = _run_hashseed_snippet("1", snippet)

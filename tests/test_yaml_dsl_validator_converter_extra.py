@@ -43,7 +43,7 @@ def _base_validator_config() -> dict:
             "customers": {
                 "loader": _CUSTOMER_LOADER,
                 "key": "customer_id",
-                "bind": {"use_keys": {"param": "ids"}},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {
                     "customer_name": {
                         "extract": "customer_name",

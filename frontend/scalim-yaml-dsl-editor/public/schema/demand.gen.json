@@ -260,6 +260,51 @@
           "description": "keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)",
           "markdownDescription": "keys 模式 lookup_keys 分片大小.\n\n- `0` / `null` 表示不分片"
         },
+        "normalize": {
+          "type": "object",
+          "required": [
+            "kind",
+            "key_field"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "index_by_key"
+              ],
+              "description": "normalize 预置类型(index_by_key)",
+              "markdownDescription": "normalize 预置类型.\n\n- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射",
+              "examples": [
+                "index_by_key"
+              ]
+            },
+            "key_field": {
+              "type": "string",
+              "description": "用于建立索引的 row 字段名(必填)",
+              "markdownDescription": "用于建立索引的 row 字段名(必填).\n\n- 对应 `sources.<id>.key`",
+              "examples": [
+                "order_id"
+              ]
+            },
+            "on_conflict": {
+              "type": "string",
+              "enum": [
+                "error",
+                "first",
+                "last"
+              ],
+              "default": "error",
+              "description": "duplicate key 冲突策略(error/first/last)",
+              "markdownDescription": "duplicate key 冲突策略.\n\n- `error`: 报错(默认)\n- `first`: 保留第一条\n- `last`: 保留最后一条",
+              "examples": [
+                "error"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "source-level whole-result `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)",
+          "markdownDescription": "source-level whole-result `normalize`.\n\n- 作用于 `loader` 的整个返回值,用于把整体结果 reshape 成更适合字段读取的形状\n- 执行时机: 在字段级 `extract` 之前\n- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n示例:\n```yaml\nnormalize:\n  kind: index_by_key\n  key_field: order_id\n  on_conflict: error\n```\n\n输入/输出形状:\n- 输入: `[{order_id: 101, ...}, ...]`\n- 输出: `{101: {order_id: 101, ...}, ...}`\n\n注意:\n- 若只是 row 内字段嵌套取值,请使用字段级 `extract`"
+        },
         "cache_mode": {
           "type": "string",
           "description": "缓存模式:none=不缓存,preload_forever=预加载永久缓存",

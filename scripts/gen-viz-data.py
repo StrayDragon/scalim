@@ -255,6 +255,7 @@ def main(argv: List[str]) -> int:
             ),
             parallel_mode=parallel_mode,
             max_workers=int(args.max_workers or 0),
+            runtime_vars={"order_ids": []},
         )
 
         try:

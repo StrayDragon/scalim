@@ -18,9 +18,7 @@
 - `artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`
 - `tests/test_agent_skill_generator.py`
 - `docs/doc/yaml-dsl/agent-skill.md`
-
 ## Requirements
-
 ### Requirement: Task-Driven Manual Skill Entry
 系统 MUST 提供手工维护的 YAML DSL skill 本体,用于把 agent 引导到正确的任务路径,而不是把 skill 退化为单个 schema 摘要页.
 
@@ -179,3 +177,19 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 - **WHEN** 当前环境无法跑通真实数据库或下游系统
 - **THEN** skill 必须要求 agent 明确说明缺少什么依赖
 - **THEN** 并说明已完成哪些静态校验与 YAML 校验
+
+### Requirement: `scalim-yaml-dsl` skill explains when to use `normalize`
+系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**`,使其能区分:
+- 需要先把整个 source 返回值 reshape 成 `key -> row` 的场景: 优先使用 `normalize`
+- 只是当前 row value 内部字段嵌套: 优先使用字段级 `extract`
+
+#### Scenario: list-returning loader 优先推荐 `normalize`
+- **WHEN** 用户给出的 lookup source loader 返回 `list[row]`,而不是 `key -> row` 映射
+- **THEN** skill MUST 优先给出 `normalize.kind=index_by_key` 的方案
+- **AND** MUST NOT 默认建议为此仅写一个 Python wrapper
+
+#### Scenario: 仅字段嵌套时不误导到 `normalize`
+- **WHEN** 用户的 source loader 已经返回 `key -> row`,只是 row 内部字段有嵌套
+- **THEN** skill MUST 优先推荐字段级 `extract`
+- **AND** MUST 明确说明此时不需要 source-level `normalize`
+

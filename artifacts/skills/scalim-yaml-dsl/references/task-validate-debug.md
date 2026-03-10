@@ -80,6 +80,19 @@ uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
 - 确认 relation 链路连续
 - 确认 `sources.<id>.key` 与 step 右侧匹配
 
+### `normalize` 相关错误
+
+- `main_source.normalize`:
+  - `normalize` 只允许出现在 lookup `sources.*`,不允许写在 `main_source`
+- `normalize.key_field is required` / `normalize.key_field must be a non-empty string`:
+  - 补齐 `sources.<id>.normalize.key_field`
+- duplicate key 报错:
+  - 默认 `on_conflict: error` 会 fail-fast
+  - 如业务允许覆盖,显式设为 `on_conflict: first|last`
+- `normalize` 与 `extract` 的边界:
+  - whole-result reshape(例如 `list[row] -> key -> row`)用 `sources.<id>.normalize`
+  - 从单条 row 里取嵌套字段用字段级 `extract`
+
 ### `call_by` / `loader` 相关错误
 
 - YAML 中只写引用

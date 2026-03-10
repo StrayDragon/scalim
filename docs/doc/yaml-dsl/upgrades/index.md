@@ -9,4 +9,4 @@
 升级清单:
 
 - [2026-03-10: yaml-field-extract](2026-03-10-yaml-field-extract.md)
-
+- [2026-03-10: yaml-source-normalize](2026-03-10-yaml-source-normalize.md)

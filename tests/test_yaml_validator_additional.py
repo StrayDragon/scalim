@@ -23,7 +23,7 @@ def _ambiguous_sources_config() -> dict:
             "s1": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
-                "bind": {"use_keys": {"param": "ids"}},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {
                     "name": {
                         "extract": "name",
@@ -34,7 +34,7 @@ def _ambiguous_sources_config() -> dict:
             "s2": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
-                "bind": {"use_keys": {"param": "ids"}},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {
                     "name": {
                         "extract": "name",
@@ -99,7 +99,7 @@ def test_validator_output_fields_data_key_ambiguous_requires_source() -> None:
             "customers": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
-                "bind": {"use_keys": {"param": "ids"}},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {
                     "customer_id": {
                         "extract": "id",
@@ -127,7 +127,7 @@ def test_validator_output_fields_data_key_with_source() -> None:
             "customers": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
-                "bind": {"use_keys": {"param": "ids"}},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {
                     "customer_id": {
                         "extract": "id",
@@ -176,46 +176,9 @@ def test_validator_bind_and_lookup_cast_validation() -> None:
     }
     _assert_validation_errors(
         config,
-        "bind.use_keys missing required 'param'",
-        "bind.use_keys has invalid as",
+        "Legacy YAML syntax is not supported",
         "lookup_cast must be a dictionary",
     )
-
-
-def test_validator_bind_requires_use_branch() -> None:
-    config = _base_config()
-    config["sources"] = {
-        "s1": {
-            "loader": "tests.conftest.mock_loader",
-            "key": "id",
-            "bind": {"param": "ids"},
-            "fields": {
-                "name": {
-                    "extract": "name",
-                    "relation": {"steps": [{"from": "orders.order_id", "to": "s1.id"}]},
-                }
-            },
-        }
-    }
-    _assert_validation_errors(config, "bind must set one of 'use_rows' or 'use_keys'")
-
-
-def test_validator_bind_rejects_both_use_branches() -> None:
-    config = _base_config()
-    config["sources"] = {
-        "s1": {
-            "loader": "tests.conftest.mock_loader",
-            "key": "id",
-            "bind": {"use_rows": {"param": "rows"}, "use_keys": {"param": "ids"}},
-            "fields": {
-                "name": {
-                    "extract": "name",
-                    "relation": {"steps": [{"from": "orders.order_id", "to": "s1.id"}]},
-                }
-            },
-        }
-    }
-    _assert_validation_errors(config, "bind must not set both 'use_rows' and 'use_keys'")
 
 
 def test_validator_main_source_order_by_valid() -> None:
@@ -243,7 +206,7 @@ def test_validator_main_source_order_by_invalid_entries() -> None:
     _assert_validation_errors(config, "not found in main_source.fields")
 
 
-def test_validator_to_bind_rejects_both_use_branches() -> None:
+def test_validator_relation_step_to_bind_is_rejected() -> None:
     config = _base_config()
     config["sources"] = {"s1": {"loader": "tests.conftest.mock_loader", "key": "id"}}
     config["relations"] = {
@@ -252,106 +215,94 @@ def test_validator_to_bind_rejects_both_use_branches() -> None:
                 {
                     "from": "orders.order_id",
                     "to": "s1.id",
-                    "to_bind": {"use_rows": {"param": "rows"}, "use_keys": {"param": "ids"}},
+                    "to_bind": {"use_keys": {"param": "ids"}},
                 }
             ]
         }
     }
-    _assert_validation_errors(config, "bind must not set both 'use_rows' and 'use_keys'")
+    _assert_validation_errors(config, "to_bind")
 
 
-def test_validator_bind_use_rows_requires_dict() -> None:
+def test_validator_main_source_params_rejects_keys_directive() -> None:
+    config = _base_config()
+    config["main_source"]["params"] = {"ids": {"$keys": {"as": "set"}}}
+    _assert_validation_errors(config, "`$keys` is not allowed")
+
+
+def test_validator_preload_source_params_rejects_directives() -> None:
     config = _base_config()
     config["sources"] = {
         "s1": {
             "loader": "tests.conftest.mock_loader",
             "key": "id",
-            "bind": {"use_rows": "rows"},
+            "cache_mode": "preload_forever",
+            "params": {"ids": {"$keys": {"as": "set"}}},
             "fields": {},
         }
     }
-    _assert_validation_errors(config, "bind.use_rows must be a dictionary")
+    _assert_validation_errors(config, "`$keys` is not allowed")
 
 
-def test_validator_bind_use_rows_requires_param() -> None:
+def test_validator_params_template_rejects_directive_extra_keys() -> None:
     config = _base_config()
     config["sources"] = {
         "s1": {
             "loader": "tests.conftest.mock_loader",
             "key": "id",
-            "bind": {"use_rows": {}},
+            "params": {"ids": {"$keys": {"as": "set"}, "other": 1}},
             "fields": {},
         }
     }
-    _assert_validation_errors(config, "bind.use_rows missing required 'param'")
+    _assert_validation_errors(config, "Directive node must be a single-key mapping")
 
 
-def test_validator_bind_use_rows_invalid_cache_mode() -> None:
+def test_validator_params_template_rejects_keys_unknown_option() -> None:
     config = _base_config()
     config["sources"] = {
         "s1": {
             "loader": "tests.conftest.mock_loader",
             "key": "id",
-            "bind": {"use_rows": {"param": "rows", "cache_mode": "forever"}},
+            "params": {"ids": {"$keys": {"as": "set", "foo": "x"}}},
             "fields": {},
         }
     }
-    _assert_validation_errors(config, "bind.use_rows has invalid cache_mode")
+    _assert_validation_errors(config, "Unknown `$keys` option")
 
 
-def test_validator_bind_use_keys_requires_dict() -> None:
+def test_validator_params_template_rejects_keys_invalid_as() -> None:
     config = _base_config()
     config["sources"] = {
         "s1": {
             "loader": "tests.conftest.mock_loader",
             "key": "id",
-            "bind": {"use_keys": "ids"},
+            "params": {"ids": {"$keys": {"as": "bad"}}},
             "fields": {},
         }
     }
-    _assert_validation_errors(config, "bind.use_keys must be a dictionary")
+    _assert_validation_errors(config, "`$keys.as` must be one of: set, list")
 
 
-def test_validator_bind_use_keys_unknown_keys() -> None:
+def test_validator_params_template_rejects_rows_invalid_cache_mode() -> None:
     config = _base_config()
     config["sources"] = {
         "s1": {
             "loader": "tests.conftest.mock_loader",
             "key": "id",
-            "bind": {"use_keys": {"param": "ids", "extra": "x"}},
+            "params": {"rows": {"$rows": {"cache_mode": "forever"}}},
             "fields": {},
         }
     }
-    _assert_validation_errors(config, "bind.use_keys has unknown keys")
+    _assert_validation_errors(config, "`$rows.cache_mode` must be one of: batch, none")
 
 
-def test_validator_bind_rejects_rows_as() -> None:
-    config = {
-        "name": "demo",
-        "main_source": {"source_id": "orders", "loader": "tests.conftest.mock_loader"},
-        "sources": {
-            "s1": {
-                "loader": "tests.conftest.mock_loader",
-                "key": "id",
-                "bind": {"use_rows": {"param": "ids", "as": "set"}},
-            }
-        },
-    }
-    _assert_validation_errors(config, "bind.use_rows has unknown keys")
-
-
-def test_validator_to_bind_rejects_rows_as() -> None:
+def test_validator_params_template_rejects_keys_and_rows_mutually_exclusive() -> None:
     config = _base_config()
-    config["sources"] = {"customers": {"loader": "tests.conftest.mock_loader", "key": "customer_id"}}
-    config["relations"] = {
-        "orders_to_customers": {
-            "steps": [
-                {
-                    "from": "orders.customer_id",
-                    "to": "customers.customer_id",
-                    "to_bind": {"use_rows": {"param": "ids", "as": "set"}},
-                }
-            ]
+    config["sources"] = {
+        "s1": {
+            "loader": "tests.conftest.mock_loader",
+            "key": "id",
+            "params": {"ids": {"$keys": {"as": "set"}}, "rows": {"$rows": {"cache_mode": "batch"}}},
+            "fields": {},
         }
     }
-    _assert_validation_errors(config, "bind.use_rows has unknown keys")
+    _assert_validation_errors(config, "mutually exclusive")

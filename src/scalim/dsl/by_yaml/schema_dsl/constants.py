@@ -39,6 +39,7 @@ DEFAULT_OUTPUT_STREAMING = True
 DEFAULT_CACHE_MODE = "none"
 DEFAULT_BIND_AS = "set"
 DEFAULT_BIND_CACHE_MODE = "batch"
+DEFAULT_NORMALIZE_ON_CONFLICT = "error"
 DEFAULT_REL_REPORT_FORMAT = "console"
 DEFAULT_PERF_REPORT_FORMAT = "console"
 DEFAULT_REL_LOG_TYPE_MISMATCH = True
@@ -106,6 +107,25 @@ DESC_PARAMS_MD = (
     "- sources.<id>.params: 仅在 bind/use_keys 或 bind/use_rows 时合并到 loader kwargs\n"
     "- 当 source 使用 cache_mode: preload_forever 时,预加载调用为无参,不会传 sources.<id>.params"
 )
+DESC_SOURCE_NORMALIZE = "source-level whole-result `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)"
+DESC_SOURCE_NORMALIZE_MD = (
+    "source-level whole-result `normalize`.\n\n"
+    "- 作用于 `loader` 的整个返回值,用于把整体结果 reshape 成更适合字段读取的形状\n"
+    "- 执行时机: 在字段级 `extract` 之前\n"
+    "- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n"
+    "示例:\n"
+    "```yaml\n"
+    "normalize:\n"
+    "  kind: index_by_key\n"
+    "  key_field: order_id\n"
+    "  on_conflict: error\n"
+    "```\n\n"
+    "输入/输出形状:\n"
+    "- 输入: `[{order_id: 101, ...}, ...]`\n"
+    "- 输出: `{101: {order_id: 101, ...}, ...}`\n\n"
+    "注意:\n"
+    "- 若只是 row 内字段嵌套取值,请使用字段级 `extract`"
+)
 DESC_FIELD_NAME = "字段显示名称"
 DESC_FIELD_NAME_MD = "字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头"
 DESC_RELATION_STEPS = (
@@ -130,6 +150,8 @@ LOOKUP_CAST_NAME_ENUM = ["auto", "int", "str", "sep_first"]
 BIND_AS_ENUM = ["set", "list"]
 BIND_CACHE_MODE_ENUM = ["none", "batch"]
 VALUE_CAST_ENUM = ["auto", "int", "str"]
+NORMALIZE_KIND_ENUM = ["index_by_key"]
+NORMALIZE_ON_CONFLICT_ENUM = ["error", "first", "last"]
 
 DESC_LOADER_RETRY = "Loader retry 策略(可选;默认关闭)"
 DESC_LOADER_RETRY_MD = (
@@ -220,6 +242,37 @@ LOOKUP_CAST_SCHEMA = {
     "additionalProperties": False,
     "description": DESC_LOOKUP_CAST,
     "markdownDescription": DESC_LOOKUP_CAST_MD,
+}
+
+NORMALIZE_SCHEMA = {
+    "type": "object",
+    "required": ["kind", "key_field"],
+    "properties": {
+        "kind": {
+            "type": "string",
+            "enum": NORMALIZE_KIND_ENUM,
+            "description": "normalize 预置类型(index_by_key)",
+            "markdownDescription": "normalize 预置类型.\n\n- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射",
+            "examples": ["index_by_key"],
+        },
+        "key_field": {
+            "type": "string",
+            "description": "用于建立索引的 row 字段名(必填)",
+            "markdownDescription": "用于建立索引的 row 字段名(必填).\n\n- 对应 `sources.<id>.key`",
+            "examples": ["order_id"],
+        },
+        "on_conflict": {
+            "type": "string",
+            "enum": NORMALIZE_ON_CONFLICT_ENUM,
+            "default": DEFAULT_NORMALIZE_ON_CONFLICT,
+            "description": "duplicate key 冲突策略(error/first/last)",
+            "markdownDescription": "duplicate key 冲突策略.\n\n- `error`: 报错(默认)\n- `first`: 保留第一条\n- `last`: 保留最后一条",
+            "examples": ["error"],
+        },
+    },
+    "additionalProperties": False,
+    "description": DESC_SOURCE_NORMALIZE,
+    "markdownDescription": DESC_SOURCE_NORMALIZE_MD,
 }
 
 LOOKUP_CHUNK_SIZE_SCHEMA = {

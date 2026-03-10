@@ -73,11 +73,14 @@
   - 可视化编辑块必须提供稳定可发现的新增入口
   - 同一编辑器中的可操作项必须采用一致的交互视觉体系
   - 关键操作的可见性不得依赖 hover-only
+  - editor exposes source-level `normalize` with canonical schema guidance
 
 ## Command Details
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
-- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
+- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
+                                    [--verbose]
+                                    yaml_file`
 - Positionals:
   - `yaml_file`: YAML 文件路径
 - Options:
@@ -88,7 +91,9 @@
 
 ### `yaml-dsl schema validate`
 - Help: Validate YAML DSL via JSON Schema
-- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
+- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
+                                           [--json] [--verbose]
+                                           yaml_file`
 - Positionals:
   - `yaml_file`: YAML 文件路径
 - Options:

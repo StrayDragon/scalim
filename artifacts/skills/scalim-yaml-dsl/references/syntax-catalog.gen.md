@@ -68,6 +68,8 @@
   - schema 明确 batch_size 的 null-or-int 语义
   - retry 字段纳入 JSON Schema 与 hover 指引
   - `_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform
+  - schema documents source-level `normalize` and its execution order
+  - schema keeps `normalize` out of `main_source`
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`
 - Purpose: 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
@@ -83,6 +85,7 @@
   - YAML DSL 增加 loader retry 配置入口
   - `_templates.retry` 用于复用通用策略
   - `should_retry` 引用解析与 allowlist
+  - `normalize` is allowed on `sources.*` and rejected on `main_source`
 ### `source-relations`
 - Source: `openspec/specs/source-relations/spec.md`
 - Purpose: 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.
@@ -113,6 +116,7 @@
   - 预加载缓存模式
   - 关联加载优先命中缓存
   - 计划元数据记录缓存源
+  - preload cache stores normalized source results
 ### `runtime-pruning`
 - Source: `openspec/specs/runtime-pruning/spec.md`
 - Purpose: PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用.
@@ -483,6 +487,7 @@
   - `loader` (required): `string`
   - `lookup_cast`: `object`, properties `name`, `sep`
   - `lookup_chunk_size`: `integer` | `null`, oneOf(2)
+  - `normalize`: `object`, properties `key_field`, `kind`, `on_conflict`
   - `params`: `object`
 
 ### `source_field_inline`

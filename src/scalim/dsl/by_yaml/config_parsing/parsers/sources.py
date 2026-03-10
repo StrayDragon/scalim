@@ -13,6 +13,7 @@ from ...schema_dsl.models import (
     LOADER_RETRY_KEYS,
     LOOKUP_CAST_KEYS,
     MAIN_SOURCE_KEYS,
+    NORMALIZE_KEYS,
     SOURCE_KEYS,
     BindConfig,
     BindKeysConfig,
@@ -20,6 +21,7 @@ from ...schema_dsl.models import (
     LoaderRetryConfig,
     LookupCastConfig,
     MainSourceConfig,
+    NormalizeConfig,
     SourceConfig,
     SourceFieldConfig,
 )
@@ -110,6 +112,7 @@ class ParserSourcesMixin:
             key = self._parse_key(source_data)
             lookup_cast = self._parse_lookup_cast(source_data.get(SOURCE_KEYS["lookup_cast"]))
             lookup_chunk_size = self._parse_lookup_chunk_size(source_data.get(SOURCE_KEYS["lookup_chunk_size"]))
+            normalize = self._parse_normalize(source_data.get(SOURCE_KEYS["normalize"]))
             bind = self._parse_bind(source_data.get(SOURCE_KEYS["bind"]))
             params = self._parse_params(source_data)
             retry = self._parse_loader_retry(source_data.get(SOURCE_KEYS["retry"]))
@@ -120,6 +123,7 @@ class ParserSourcesMixin:
                 key=key,
                 lookup_cast=lookup_cast,
                 lookup_chunk_size=lookup_chunk_size,
+                normalize=normalize,
                 cache_mode=str(source_data.get(SOURCE_KEYS["cache_mode"], DEFAULT_CACHE_MODE)),
                 retry=retry,
                 bind=bind,
@@ -155,6 +159,7 @@ class ParserSourcesMixin:
                 key=source_config.key,
                 lookup_cast=source_config.lookup_cast,
                 lookup_chunk_size=source_config.lookup_chunk_size,
+                normalize=source_config.normalize,
                 cache_mode=source_config.cache_mode,
                 retry=source_config.retry,
                 bind=source_config.bind,
@@ -205,6 +210,21 @@ class ParserSourcesMixin:
         return LookupCastConfig(
             name=str(lookup_dict.get(LOOKUP_CAST_KEYS["name"], "")),
             sep=str_or_none(lookup_dict.get(LOOKUP_CAST_KEYS["sep"])),
+        )
+
+    def _parse_normalize(self, raw_value: object) -> Optional[NormalizeConfig]:
+        norm_dict = mapping_or_none(raw_value)
+        if norm_dict is None:
+            return None
+
+        kind = str(norm_dict.get(NORMALIZE_KEYS["kind"], "")).strip()
+        key_field = str(norm_dict.get(NORMALIZE_KEYS["key_field"], "")).strip()
+        on_conflict = str(norm_dict.get(NORMALIZE_KEYS["on_conflict"], "error")).strip() or "error"
+
+        return NormalizeConfig(
+            kind=kind,
+            key_field=key_field,
+            on_conflict=on_conflict,
         )
 
     def _parse_key(self, source_data: Dict[str, Any]) -> Union[str, Tuple[str, ...]]:

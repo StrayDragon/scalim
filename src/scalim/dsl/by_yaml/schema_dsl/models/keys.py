@@ -27,7 +27,7 @@ from .observability import (
     TraceConfig,
     VizConfig,
 )
-from .source import LoaderRetryConfig, MainSourceConfig, SourceConfig
+from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, SourceConfig
 
 
 class _KeyMap:
@@ -66,6 +66,7 @@ def _build_key_map(cls: type, *, include_omitted: bool = False) -> _KeyMap:
 
 LOOKUP_CAST_KEYS = _build_key_map(LookupCastConfig)
 LOADER_RETRY_KEYS = _build_key_map(LoaderRetryConfig)
+NORMALIZE_KEYS = _build_key_map(NormalizeConfig)
 BIND_KEYS = _build_key_map(BindConfig)
 BIND_ROWS_KEYS = _build_key_map(BindRowsConfig)
 BIND_KEY_CONFIG_KEYS = _build_key_map(BindKeysConfig)

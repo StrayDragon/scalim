@@ -38,20 +38,6 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
             steps = self._validate_steps(steps_raw, sources_set, errors, "relations.{}".format(rel_id))
             relation_paths[rel_id] = steps
 
-            for _from_source, to_source, has_to_bind in steps:
-                source_info = sources_info.get(to_source)
-                if source_info is None:
-                    continue
-                if source_info.get("preload"):
-                    continue
-                has_bind = source_info.get("bind", False)
-                if not (has_to_bind or has_bind):
-                    self._add_error(
-                        errors,
-                        "Relation '{}' step to '{}' requires to_bind or sources.{}.bind".format(rel_id, to_source, to_source),
-                        path="relations.{}.steps".format(rel_id),
-                    )
-
         return relation_paths
 
     def _validate_steps(  # noqa: C901, PLR0912
@@ -142,15 +128,20 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
 
             to_bind_raw = step_dict.get(_F.TO_BIND)
             if to_bind_raw is not None:
-                self._validate_bind(to_bind_raw, errors, "{} steps[{}]".format(context, idx), step_path)
-                to_bind_dict = mapping_or_none(to_bind_raw)
-                if to_bind_dict is not None:
-                    rows_dict = mapping_or_none(to_bind_dict.get(_F.USE_ROWS))
-                    if rows_dict is not None:
-                        has_to_bind = bool(rows_dict.get(_F.PARAM))
-                    keys_dict = mapping_or_none(to_bind_dict.get(_F.USE_KEYS))
-                    if keys_dict is not None:
-                        has_to_bind = bool(keys_dict.get(_F.PARAM)) or has_to_bind
+                self._add_error(
+                    errors,
+                    (
+                        "Legacy YAML syntax is not supported: '{}'. "
+                        "Move binding into the target source's `params` template using `$keys` / `$rows` directives."
+                        "\nExample:\n"
+                        "  sources:\n"
+                        "    <to_source_id>:\n"
+                        "      params:\n"
+                        "        ids:\n"
+                        "          $keys: {{as: set}}"
+                    ).format("{}.{}".format(step_path, _F.TO_BIND)),
+                    path="{}.{}".format(step_path, _F.TO_BIND),
+                )
 
             steps.append((from_source, to_source, has_to_bind))
 
@@ -216,19 +207,8 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         errors: List[ValidationIssue],
         context: str,
     ) -> None:
-        for _from_source, to_source, has_to_bind in steps:
-            source_info = sources_info.get(to_source)
-            if source_info is None:
-                continue
-            if source_info.get("preload"):
-                continue
-            has_bind = source_info.get("bind", False)
-            if not (has_to_bind or has_bind):
-                self._add_error(
-                    errors,
-                    "{} step to '{}' requires to_bind or sources.{}.bind".format(context, to_source, to_source),
-                    path="{}.steps".format(context),
-                )
+        _ = (steps, sources_info, errors, context)
+        # 绑定通过目标 `source` 的 `params` 模板(`$keys`/`$rows`)表达,不再使用 `legacy` `to_bind`/`bind`.
 
     def _validate_relation_path(
         self,

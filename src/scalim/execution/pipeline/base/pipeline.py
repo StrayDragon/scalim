@@ -11,18 +11,21 @@ import sys
 import time
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from concurrent.futures import Executor
-from typing import Any, Dict, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, Callable, Dict, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
 
 from ....hooks.base import HookManager
 from ....ob.manager import ObserverManager
 from ....planning.operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks.sink_base import IColumnSink, IRowSink, ISink
+from ....spec.ir.aliases import LoaderResultMapCallable
+from ....spec.ir.binding import LoaderCallContextIr
 from ....spec.ir.demand import DemandIr
 from ....spec.ir.fields import FieldIr
 from ....spec.ir.helpers import coerce_loader_result_mapping
-from ....typedefs import FieldValue, RowData, SinkRowKeySeq
+from ....typedefs import FieldValue, LoaderCallKwargs, RowData, SinkRowKeySeq
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
 from ...executor.batch.executor import BatchExecutor
@@ -44,6 +47,20 @@ class _ReverseSortValue:
 
     def __lt__(self, other: "_ReverseSortValue") -> bool:
         return other.value < self.value
+
+
+def _make_noarg_loader_call(callable_ref: LoaderResultMapCallable, call_kwargs: LoaderCallKwargs) -> Callable[[], object]:
+    if call_kwargs:
+
+        def call() -> object:
+            return callable_ref(**call_kwargs)
+
+        return call
+
+    def call() -> object:
+        return callable_ref()
+
+    return call
 
 
 class Pipeline(ABC):
@@ -158,10 +175,18 @@ class Pipeline(ABC):
         """预加载缓存数据源"""
         for source in self.plan.preload_sources:
             if source.is_preload_forever():
+                binding = source.bind
+                call_kwargs: LoaderCallKwargs = {}
+                callable_ref = source.loader_spec.callable
+                if binding is not None:
+                    preload_ctx = LoaderCallContextIr(source_id=source.source_id, is_ref_loader=False)
+                    _args, call_kwargs = binding.build_params(preload_ctx)
+                call = _make_noarg_loader_call(callable_ref, call_kwargs)
+
                 loader_start = time.perf_counter()
                 policy = self.runtime.loader_retry.resolve(source.source_id)
                 result = call_with_loader_retry(
-                    call=source.loader_spec.callable,
+                    call=call,
                     instrumentation=self.runtime.instrumentation,
                     policy=policy,
                     loader_name=source.source_id,
@@ -170,13 +195,19 @@ class Pipeline(ABC):
                 )
                 loader_duration = time.perf_counter() - loader_start
 
-                result_mapping = coerce_loader_result_mapping(result)
+                result_obj: object = result
+                if source.normalize is not None:
+                    result_obj = source.normalize.apply(result, source_id=source.source_id)
+                if not isinstance(result_obj, Mapping):
+                    msg = "Loader '{}' result must be a Mapping".format(source.source_id)
+                    raise TypeError(msg)
+                result_mapping = coerce_loader_result_mapping(cast("object", result_obj))
 
                 self.runtime.preloaded_cache[source.source_id] = result_mapping
 
                 self.runtime.instrumentation.emit_loader_call(
                     loader_name=source.source_id,
-                    params={},
+                    params=call_kwargs,
                     result=result_mapping,
                     duration=loader_duration,
                     cache_scope="preload_forever",

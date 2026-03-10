@@ -23,7 +23,7 @@ from .presentation import (
     SpreadsheetFieldPresentationIr,
 )
 from .relations import FieldRefIr, JoinConditionIr, LookupStepIr, RelationIr
-from .sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceRefIr
+from .sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceNormalizeIr, SourceRefIr
 
 __all__ = (
     "BindingIr",
@@ -52,6 +52,7 @@ __all__ = (
     "PandasFieldPresentationIr",
     "RelationIr",
     "SourceIr",
+    "SourceNormalizeIr",
     "SourceRefIr",
     "SpreadsheetFieldPresentationIr",
     "SupportedFieldIr",

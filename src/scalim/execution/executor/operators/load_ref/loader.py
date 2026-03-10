@@ -1,7 +1,7 @@
 import logging
 import time
 from collections.abc import Mapping
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, Tuple
 
 from .....events.catalog import EVENT_LOADER_CALL
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
@@ -82,7 +82,7 @@ def _call_ref_loader(
 ) -> LoaderResultMapping:
     loader_start = time.perf_counter()
     policy = runtime.loader_retry.resolve(source.source_id)
-    result: object = call_with_loader_retry(
+    result_raw: object = call_with_loader_retry(
         call=lambda: call_loader_with_binding(binding, loader_context, source.loader_spec.callable),
         instrumentation=runtime.instrumentation,
         policy=policy,
@@ -92,12 +92,18 @@ def _call_ref_loader(
     )
     loader_duration = time.perf_counter() - loader_start
 
+    result_obj: object = result_raw
+    normalize_spec = getattr(source, "normalize", None)
+    if normalize_spec is not None:
+        result_obj = normalize_spec.apply(result_raw, source_id=source.source_id)
+
+    result_mapping = coerce_loader_result_mapping(result_obj)
     _trigger_ref_loader_call(
         runtime=runtime,
         source_id=source.source_id,
         binding=binding,
         loader_context=loader_context,
-        result=coerce_loader_result_mapping(result),
+        result=result_mapping,
         duration=loader_duration,
         cache_enabled=cache_enabled,
         lookup_key_count=lookup_key_count,
@@ -105,16 +111,15 @@ def _call_ref_loader(
         cache_status=cache_status,
     )
     guardrails = runtime.guardrails
-    if guardrails.enabled and guardrails.loader.validate_result and not isinstance(result, Mapping):
+    if guardrails.enabled and guardrails.loader.validate_result and not isinstance(result_obj, Mapping):
         fail_guardrail(
             runtime,
             code="loader_result_not_mapping",
             message="Loader result must be a Mapping",
-            context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result, is_ref_loader=True),
+            context=build_loader_result_guardrail_payload(runtime, source_id=source.source_id, result=result_obj, is_ref_loader=True),
             action_mode="fast_fail",
         )
-    result_obj = cast("object", result)
-    return coerce_loader_result_mapping(result_obj)
+    return result_mapping
 
 
 def _get_cached_ref_result(
@@ -315,7 +320,7 @@ def load_step_data(
             _logger.info(
                 (
                     "已启用 `LoadRef` 的 `rows` 批次缓存: 来源 '%s'(字段=%s). "
-                    "若加载器有副作用或依赖可变的 `batch_rows`, 请将 `to_bind.use_rows.cache_mode` 设置为 `none`."
+                    "若加载器有副作用或依赖可变的 `batch_rows`, 请将该 `source` 的 `params` 模板设置为 `$rows: {cache_mode: none}`."
                 ),
                 source.source_id,
                 ",".join(event_field_keys),
