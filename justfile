@@ -441,13 +441,31 @@ check: quick-check-only-py py36-compat-check py36-typingext-check frontend-check
 
 alias qa := check
 
-# 检查: Python 3.6 语法兼容性 (仅 `src/scalim/`)
-py36-compat-check: is-docker-available
-    docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 python -m compileall -q src/scalim
+# 检查: `Python 3.6` 语法兼容性 (仅 `src/scalim/`)
+py36-compat-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if docker version >/dev/null 2>&1; then
+        docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 python -m compileall -q src/scalim
+        exit 0
+    fi
+
+    echo "[warn] docker unavailable; fallback to static py36 syntax check" >&2
+    uv {{ UV_OPTIONS }} run python scripts/check-py36-syntax.py
 
 # 检查: `Python 3.6` + `typing-extensions==4.1.1` 隔离环境兼容性
-py36-typingext-check: is-docker-available
-    docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash /repo/scripts/check-py36-typingext-docker.sh
+py36-typingext-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if docker version >/dev/null 2>&1; then
+        docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash /repo/scripts/check-py36-typingext-docker.sh
+        exit 0
+    fi
+
+    echo "[warn] docker unavailable; fallback to typing-extensions==4.1.1 check under current python" >&2
+    bash scripts/check-py36-typingext-docker.sh
 
 # 清理缓存/产物 (默认 dry-run; 需要 YES 才执行)
 clean-cache CONFIRM="":
