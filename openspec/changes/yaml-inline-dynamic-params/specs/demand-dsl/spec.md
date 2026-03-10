@@ -32,6 +32,12 @@
 #### Scenario: `sources.*.bind` 旧写法被拒绝
 - **WHEN** source 配置 `bind: {use_keys: {param: ids}}`
 - **THEN** 校验 MUST 失败并提示迁移到 `params` 模板
+- **AND** 错误信息 MUST 包含可直接照抄的替换建议片段(至少覆盖该常见形态),例如:
+  ```yaml
+  params:
+    ids:
+      $keys: {as: set}
+  ```
 
 #### Scenario: `$keys.as=list` 顺序稳定
 - **WHEN** source 配置 `params` 模板中使用 `$keys: {as: list}` 且 lookup_keys 集合相同

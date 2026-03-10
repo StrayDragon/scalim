@@ -81,6 +81,22 @@ keys 模式支持 `lookup_chunk_size` 分片加载并合并结果;分片语义�
 - **AND** `sources.customers.params` 中出现 `$keys` 或 `$rows`
 - **THEN** 编译或校验 MUST 失败并报告配置路径
 
+### Requirement: legacy `to_bind` is rejected with a copy-pastable migration hint
+系统 MUST 将 step 级 `to_bind` 视为 legacy 写法并在校验阶段 fail-fast.
+错误信息 MUST 明确指出应将绑定迁移到“目标 source 的 `params` 模板”,并给出可直接照抄的替换建议片段(至少覆盖常见 `use_keys.param` 形态)。
+
+#### Scenario: relation step `to_bind.use_keys.param` 被拒绝并给迁移建议
+- **WHEN** 某个 relation step 中出现 `to_bind: {use_keys: {param: ids}}`
+- **THEN** 校验 MUST 失败并指向该 step 的配置路径
+- **AND** 错误信息 MUST 包含可直接照抄的替换建议片段(示例):
+  ```yaml
+  sources:
+    <to_source_id>:
+      params:
+        ids:
+          $keys: {as: set}
+  ```
+
 ## REMOVED Requirements
 
 ### Requirement: bind/to_bind 结构与校验

@@ -1,23 +1,48 @@
-## 1. Execution Composition Layer
+> Status (2026-03-10): 暂缓/搁置。本 change 先不推进实现;待需求侧对齐后再补齐 v1 默认策略与最小聚合接口并继续。
 
-- [ ] 1.1 引入多输出目标的运行时模型与组合器,确保单输出路径保持兼容
-- [ ] 1.2 定义同容器多逻辑输出的命名与冲突校验,支持 workbook 多 sheet 一类容器场景
-- [ ] 1.3 实现运行级失败策略,明确主输出与派生输出的提交顺序和降级行为
+## 0. Scope & Defaults (Re-open Checklist)
 
-## 2. Derived Output Aggregation
+- [ ] 0.1 明确 failure policy 默认值（主输出优先 vs 全失败），并写入 spec/design
+- [ ] 0.2 明确 `adaptive` 下的派生聚合一致性边界（允许/禁止/需 seq），并给出 fail-fast 规则
+- [ ] 0.3 明确命名冲突策略：sheet 名冲突默认 error（不得静默覆盖/隐式改名）
 
-- [ ] 2.1 实现派生输出的增量聚合接口与生命周期(初始化、批次累计、收尾输出)
-- [ ] 2.2 实现二阶段/后置聚合作为兜底模式,用于列式输出或不可增量指标
-- [ ] 2.3 增加聚合状态资源控制,覆盖高基数键、近似算法和必要的落盘/溢出策略
+## 1. Workbook Container & Multi-Sheet Sinks (Memory & Robustness First)
 
-## 3. Containers, Events, And Compatibility
+- [ ] 1.1 引入 workbook 容器型输出模型：单次运行可向同一 workbook 写入多个 sheet
+- [ ] 1.2 实现多 sheet 的流式写入（write_only/stream），避免“全量 rows 攒内存”
+- [ ] 1.3 sheet 名冲突 fail-fast；输出顺序稳定可控（便于 compare）
+- [ ] 1.4 header 与 rows 分离建模，避免 header list 被复用污染/extend
+- [ ] 1.5 增加针对多 sheet workbook 的单元/集成测试（含冲突/顺序/内存模型）
 
-- [ ] 3.1 盘点并接通现有 sink/container 能力,确保多输出与同容器输出能复用现有实现而不破坏单输出行为
-- [ ] 3.2 补齐多输出/派生输出对应的 instrumentation 与事件顺序约束,确保 `adaptive` 模式下结果可解释
-- [ ] 3.3 明确并实现 `seq|adaptive` 下的聚合一致性边界,必要时对不安全路径做限制或 fail-fast
+## 2. Output Composition Layer (Tee/Router)
 
-## 4. Docs, Examples, And Verification
+- [ ] 2.1 引入多输出目标的运行时组合器（保持单输出路径兼容）
+- [ ] 2.2 TeeRowSink / RouterRowSink：同一明细流多路分发到多张 sheet（Detail/FilteredDetail/Audit/Summary）
+- [ ] 2.3 Filter/Select 等轻量行变换（用于 FilteredDetail/Audit），并保证流式写入
+- [ ] 2.4 instrumentation：每张 sheet 的行数/耗时/错误计数可观测（为 meta/audit 提供数据）
 
-- [ ] 4.1 更新用户文档与示例,明确 v1 仅支持 IR/Python 配置,并给出“详情 + 汇总”以及同 workbook 多 sheet 的示例
-- [ ] 4.2 新增单元与集成测试,覆盖多输出组合、派生汇总、容器命名冲突、失败策略与资源控制
-- [ ] 4.3 运行 `openspec validate add-derived-outputs --strict --no-interactive` 并补充必要的实现期校验命令说明
+## 3. Derived Output Aggregation (Summary/RankedSummary)
+
+- [ ] 3.1 定义最小增量聚合接口与生命周期（init/accumulate/finalize）
+- [ ] 3.2 内置 streaming-friendly 聚合（count/sum/min/max/count_true）+ `group_by`
+- [ ] 3.3 RankedSummary：支持 finalize 后排序/排名（或二阶段兜底），并明确默认策略
+- [ ] 3.4 资源控制：高基数键的状态上限/近似/必要的落盘或溢出策略（可先仅做 guardrails）
+- [ ] 3.5 增加聚合相关测试：正确性、并发边界（`seq|adaptive`）、失败策略
+
+## 4. Meta/Audit Standardization (Compare Friendly)
+
+- [ ] 4.1 MetaSheet：运行参数、配置 hash、版本信息、各 sheet 行数/耗时（标准化结构）
+- [ ] 4.2 AuditSheet：常见排除/缺失映射/异常清单的框架化输出（至少提供最小钩子）
+- [ ] 4.3 增加对拍友好的固定输出顺序与字段规范（避免 compare 误报）
+
+## 5. MultiRootSheets (Workbook as Container of Demands)
+
+- [ ] 5.1 workbook 允许每张 sheet 绑定独立 demand（多根数据源）
+- [ ] 5.2 明确与缓存/复用/并发的交互规则（避免重复执行与不可解释结果）
+- [ ] 5.3 增加 multi-root 的集成测试（多 sheet + 多 demand）
+
+## 6. Docs, Examples, And Verification
+
+- [ ] 6.1 更新用户文档与示例：解释 v1 仅 IR/Python 配置，展示 workbook 多 sheet + 派生汇总概念
+- [ ] 6.2 新增验证用例：命名冲突、失败策略、顺序稳定、meta/audit、资源 guardrails
+- [ ] 6.3 运行 `openspec validate add-derived-outputs --strict --no-interactive` 并补充必要的实现期校验命令说明

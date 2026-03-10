@@ -16,3 +16,8 @@
 - [ ] 3.1 更新 `params` 的 schema hover 文案: 移除“preload_forever 不透传 params”的旧描述,补充 `$runtime.*` 说明;运行 `just gen-yaml-dsl-schema` 并通过 drift 测试.
 - [ ] 3.2 更新 DSL reference 文档(例如 `artifacts/skills/scalim-yaml-dsl/references/dsl-reference.md`)补充 `runtime_vars` 与 `$runtime.*` 示例,并同步 preload params 行为说明.
 - [ ] 3.3 运行 `openspec validate --all --strict --no-interactive` 与 `just openspec-check` 确认规范与脱敏规则通过.
+
+## 4. Repo + Downstream Upgrade (canonical demo)
+
+- [ ] 4.1 升级 canonical example `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 至少覆盖一个 `preload_forever` + `sources.<id>.params` 非空的示例,以验证 “params 非空才透传 kwargs;为空仍零参” 的收敛语义
+- [ ] 4.2 下游适配盘点: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并对其中关联代码做同步升级(不得在输出中引用其内容)

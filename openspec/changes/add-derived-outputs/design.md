@@ -1,5 +1,43 @@
+> Status (2026-03-10): 暂缓/搁置。本文档保留作为探索材料;在需求侧对齐并确认 v1 默认策略前不进入实现阶段。
+
 ## Context
 需要在一次运行内产出“详情 + 分析/汇总”多份结果,并支持写入同一报表容器(多 sheet)或拆分为独立输出.同时要求保留现有单输出行为与性能特性,且 v1 仅通过 IR/Python 进行配置.
+
+## Downstream Patterns (Survey → Framework Concepts)
+
+需求侧（以 ET 迁移为主）多 sheet 的现实形态可以抽象为 7 类 sheet（覆盖绝大多数报表）：
+
+1) **DetailSheet（明细流）**
+- 每行一条业务事实（订单/用户/交易）；列多、行可能非常大；通常必须支持流式写入。
+
+2) **FilteredDetailSheet（过滤子明细）**
+- 与 Detail 同源，但按规则过滤（产品类型/状态/快付与否等），输出子集明细；仍倾向流式写入。
+
+3) **SummarySheet（维度汇总）**
+- 从明细流聚合 `group_by` 产出每组一行（行数不大）；常见指标可增量计算（count/sum/min/max/count_true）。
+
+4) **RankedSummarySheet（带排名的汇总）**
+- SummarySheet + 全局排序/排名/积分；通常需要“先聚合再排名”两阶段（或 finalize 后处理）。
+
+5) **AuditSheet（审计/异常清单）**
+- 用于对拍与解释口径：缺失映射、排除用户、异常订单等；常是 ID 清单或带 reason 的明细；倾向流式写入。
+
+6) **MetaSheet（运行参数/运行信息）**
+- 记录统计区间、过滤条件摘要、版本/配置 hash、各 sheet 行数/耗时等，保证可解释可复现；对双跑对拍非常关键。
+
+7) **MultiRootSheets（多根数据源的 sheet 集合）**
+- 每张 sheet 来自独立数据源/独立 demand；workbook 作为容器，不强行把所有根源塞进一个 main_source。
+
+这 7 类并不要求在 v1 作为 DSL 的强类型出现，但有助于约束“最小能力边界”与测试矩阵。
+
+### Legacy Anti-Patterns To Avoid (Explicit Guardrails)
+
+需求侧现有实现里反复出现的一些问题，建议在框架层用默认行为“钉死”：
+
+- **内存模型**：先攒全量 rows 再写 Excel（多 sheet 叠加后更容易 OOM）。
+- **命名冲突**：重复 sheet 名不 fail-fast，导致静默覆盖、难以对拍。
+- **header/rows 污染**：header list 与 rows 混在同一结构里，或被 `extend` 复用污染，导致后续 sheet header/数据错位。
+- **顺序不稳定**：输出顺序依赖 dict/迭代顺序，导致 compare 误报与不确定性。
 
 ## Goals / Non-Goals
 - Goals:
@@ -32,6 +70,28 @@
 - Decision: v1 仅提供 IR/Python 配置入口,不改动 YAML DSL;文档说明潜在映射.
 - Decision: 同一容器内输出名称冲突时直接拒绝,避免隐式改名掩盖问题.
 
+## Implementation Priorities (When Resumed)
+
+本 change 重新开启时，建议按“先容器与健壮性，再派生能力”的顺序推进，避免把 DSL 设计绑死在早期实现细节上：
+
+1) **Workbook 容器 + 多 sheet 流式写入**
+- 支持单 workbook 多 sheet 的输出组合；每个 sheet 可独立 header/rows；默认 sheet 名冲突 fail-fast。
+- 输出顺序稳定可控（便于 compare）。
+
+2) **同源明细流多路分发（router/tee）**
+- 明细只跑一次；多张 Detail/FilteredDetail/Audit 同时消费同一 row stream。
+- 为 summary/audit/meta 采集必要的计数与诊断信息。
+
+3) **派生汇总：增量聚合 + finalize 后处理**
+- 先落“可增量”指标集合（count/sum/min/max/count_true），保证常见 SummarySheet 可 streaming。
+- RankedSummary 允许 finalize 后排序/排名（或二阶段兜底），明确哪些指标必须 finalize/保留 state。
+
+4) **Meta/Audit 标准化**
+- 统一的 meta sheet（运行参数、行数、耗时、版本/配置 hash 等）与基础 audit（例如重复 sheet 名/写入失败/聚合冲突）的事件对齐。
+
+5) **MultiRootSheets**
+- workbook 允许多个 root demand，并把输出路由到不同 sheet；避免“一个 main_source 绑所有 SQL”。
+
 ## Risks / Trade-offs
 - 内存压力: 聚合器状态可能增长 → 需要批次级累计、稀疏化/分桶、或可选落盘策略.
 - 并行一致性: 并行模式可能导致聚合顺序与统计非确定 → 需要清晰限制或隔离.
@@ -49,6 +109,77 @@
 - 不可增量指标的精确与近似策略如何形成默认推荐?
 
 ## Reference Examples
+
+> 注意：以下 YAML 片段仅用于表达“概念形态”，不代表本 change 会立即扩展 YAML DSL。
+
+### MVP-A: 单明细流，分发多 sheet（Detail/FilteredDetail/Summary/Audit/Meta）
+```yaml
+container:
+  type: workbook
+  path: report.xlsx
+
+datasets:
+  detail:
+    demand: detail_wide_table.demand.yaml  # 一次跑出 canonical rows
+
+sheets:
+  - name: 明细
+    from: detail
+    kind: detail
+    select: [order_id, user_id, pay_datetime, product_type]
+    write_mode: stream
+
+  - name: 快付-应走
+    from: detail
+    kind: filtered_detail
+    where: should_quick == true
+    select: [order_id, custom_service_name]
+    write_mode: stream
+
+  - name: 客服汇总
+    from: detail
+    kind: summary
+    aggregate:
+      group_by: [custom_service_id, custom_service_name, group_name]
+      metrics:
+        paid_order_cnt: {op: count, field: order_id}
+        should_quick_cnt: {op: count_true, field: should_quick}
+        quick_cnt: {op: count_true, field: quick}
+    post:
+      rank_by: [paid_order_cnt desc]
+    write_mode: finalize
+
+  - name: 标签排除用户
+    from: detail
+    kind: audit
+    where: excluded_by_tag == true
+    select: [user_key, exclude_reason]
+    write_mode: stream
+
+  - name: 运行参数
+    kind: meta
+    rows:
+      - [start_datetime, "..."]
+      - [end_datetime, "..."]
+      - [detail_total_rows, 123456]
+```
+
+### MVP-B: 多根数据源 sheet（MultiRootSheets）
+```yaml
+container:
+  type: workbook
+  path: report.xlsx
+
+sheets:
+  - name: 总体
+    demand: total_view.demand.yaml
+
+  - name: 渠道
+    demand: channel_view.demand.yaml
+
+  - name: 客服
+    demand: service_view.demand.yaml
+```
 
 ### Example: “详情 + 汇总”派生输出(概念 API, v1 IR/Python-only)
 ```python

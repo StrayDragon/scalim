@@ -123,7 +123,6 @@ PyYAML 的 anchor/alias 会产生共享对象引用。模板渲染必须视为�
 
 - 最终规范中,`sources.<id>.bind` 与 `relations.*.steps[].to_bind` 不再作为 loader 入参构造的稳定 YAML 入口
 - validator/schema/docs/examples MUST 以 `params` 模板为唯一 authoring surface
-- 若实现阶段出于迁移需要保留短期兼容分支,该兼容仅作为实现细节存在,不进入稳定 spec
 - 遇到旧写法时,校验错误应明确给出迁移提示,指向新的 `params` 模板写法
 
 ## Risks / Trade-offs

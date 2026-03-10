@@ -9,6 +9,7 @@
 
 ## What Changes
 
+- 与 `yaml-loader-params-template` 合并一并落地: 共享同一份 params template IR/渲染器与校验边界,避免 preload/ref-load 两套语义漂移。
 - 在 `main_source.params` 与 `sources.<id>.params` 中引入“入参模板 + 内联动态节点”的 declarative 语义,允许在任意嵌套位置注入运行时值:
   - `{$keys: {as: set|list}}`: 注入当前 `LoadRef(keys)` 的 lookup keys(支持稳定顺序 list)
   - `{$rows: {cache_mode: batch|none}}`: 注入当前 `LoadRef(rows)` 的 batch rows 上下文(并保留 rows barrier/缓存语义)
@@ -17,7 +18,7 @@
   - preload loader 与 ref loader 共享同一份编译后的 params template,避免出现两套 params 语义与 instrumentation 漂移.
   - 模板渲染对非法场景 fail-fast(例如 preload callsite 或非 ref loader 使用 `$keys/$rows`).
 - `bind/to_bind` 从 YAML authoring surface 中移除:
-  - 新写法以 `params` 模板为唯一稳定入口;旧写法只允许作为受控迁移期的内部兼容分支,不再作为稳定规范的一部分.
+  - 新写法以 `params` 模板为唯一稳定入口;旧写法直接按迁移错误处理(校验阶段 fail-fast),不保留兼容分支.
   - 仓库内示例、文档与 skill 文档应统一升级为新写法,并在 validator/schema 中给出迁移提示.
 
 ## Capabilities

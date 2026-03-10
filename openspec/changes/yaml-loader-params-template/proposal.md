@@ -5,12 +5,15 @@
 
 ## What Changes
 
+- 与 `yaml-inline-dynamic-params` 合并一并落地: 共用同一份 compiled params template representation,确保 preload/ref-load 调用语义一致且不漂移。
 - 新增 by_yaml runtime 入口 `runtime_vars`(dict) 语义,用于在单次运行中注入运行期变量.
 - 支持在 `main_source.params` 与 `sources.<id>.params` 中使用 `$runtime.<name>` 占位符,并在编译期将其解析为 `runtime_vars[name]` 的值.
 - 与 `yaml-inline-dynamic-params` 共用同一份编译后的 params template representation:
   - `$runtime.*` 在模板编译期落成 literal 节点
   - preload 与 ref loader 共用同一份编译结果,避免维护两套 params 语义
-- **BREAKING**: `cache_mode: preload_forever` 的预加载调用从“零参 loader()”收敛为“与常规 loader 调用一致”: 预加载时也透传 `sources.<id>.params` 作为 kwargs(在完成 `$runtime.*` 解析之后).
+- **BREAKING**: `cache_mode: preload_forever` 的预加载调用语义收敛:
+  - 若 `sources.<id>.params` 非空: 预加载时透传 `sources.<id>.params` 作为 kwargs(在完成 `$runtime.*` 解析之后)
+  - 若为空: 预加载时保持零参调用,以减少对无参 loader 的影响面
 - 诊断策略: 当 `$runtime.<name>` 引用缺失时,编译/校验阶段 fail-fast 并给出明确路径(例如 `main_source.params.params.pay_end_datetime`).
 
 ## Capabilities

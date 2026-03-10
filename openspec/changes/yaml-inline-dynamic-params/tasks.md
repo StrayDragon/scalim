@@ -23,7 +23,7 @@
 ## 4. CLI 校验与 Schema Hover
 
 - [ ] 4.1 为严格校验(validator)增加对 `$keys/$rows` 指令节点的语义校验与错误定位
-- [ ] 4.2 更新 schema/validator,使 `bind/to_bind` 退出稳定 YAML authoring surface,旧写法报迁移错误
+- [ ] 4.2 更新 schema/validator,使 `bind/to_bind` 退出稳定 YAML authoring surface,旧写法报迁移错误(错误文案包含可直接照抄的替换建议片段)
 - [ ] 4.3 更新 schema hover 文档: `main_source.params`/`sources.*.params` 的 markdownDescription 增加 `$keys/$rows` 用法、选项、composite key 说明与 `$rows` barrier 提示
 - [ ] 4.4 重新生成 YAML DSL schema 并通过 drift guard 测试
 
@@ -42,3 +42,8 @@
 
 - [ ] 7.1 运行 `openspec validate --all --strict --no-interactive` 确认工件合法
 - [ ] 7.2 运行 `just qa`(或至少 pytest + schema 生成)确认实现与文档/skill 更新一致
+
+## 8. Repo + Downstream Upgrade (canonical demo)
+
+- [ ] 8.1 升级 canonical example `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 移除 `bind/to_bind`,迁移为 `sources.*.params` 的 `$keys/$rows` 模板指令(并保持语义/示例价值)
+- [ ] 8.2 下游适配盘点: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并对其中关联代码做同步升级(不得在输出中引用其内容)
