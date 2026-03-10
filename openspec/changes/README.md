@@ -42,4 +42,4 @@
 - `openspec/changes/add-derived-outputs/`
 
 状态:
-- 需求侧场景与默认策略未对齐前不推进实现；避免过早增加 YAML DSL 复杂度。
+- 需求侧场景与默认策略未对齐前不推进实现；已在 `openspec/changes/add-derived-outputs/proposal.md` 补充 YAML DSL 候选方案/示例/权衡,等待 review 后再决定是否重启实现。

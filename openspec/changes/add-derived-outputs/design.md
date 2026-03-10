@@ -132,7 +132,8 @@ sheets:
   - name: 快付-应走
     from: detail
     kind: filtered_detail
-    where: should_quick == true
+    where:
+      call_by: "myapp.filters:should_quick"  # 概念: 复用 allowlist/安全引用机制,避免引入任意表达式语言
     select: [order_id, custom_service_name]
     write_mode: stream
 
@@ -152,7 +153,8 @@ sheets:
   - name: 标签排除用户
     from: detail
     kind: audit
-    where: excluded_by_tag == true
+    where:
+      call_by: "myapp.filters:excluded_by_tag"  # 概念
     select: [user_key, exclude_reason]
     write_mode: stream
 
