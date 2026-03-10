@@ -86,26 +86,34 @@ DESC_LOOKUP_CAST_MD = (
 DESC_LOOKUP_CAST_NAME_MD = (
     "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化"
 )
-DESC_BIND = "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch"
-DESC_BIND_MD = (
-    "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n"
-    "- 必须且只能设置一种: `use_rows` 或 `use_keys`\n"
-    "- `param` 为 loader 参数名\n"
-    "- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n"
-    "- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
-)
+DESC_BIND = "Legacy: bind/to_bind (已移除;请使用 params 模板 + `$keys/$rows`)"
+DESC_BIND_MD = "Legacy 绑定配置.已从稳定 YAML authoring surface 移除,请使用 `sources.<id>.params` 模板中的 `$keys/$rows` 指令节点."
 DESC_BIND_PARAM = "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
 DESC_BIND_AS = "绑定容器: set/list (仅 keys 模式生效)"
 DESC_BIND_CACHE_MODE = "rows 模式缓存: batch=批次内复用, none=不复用(仅 rows 模式生效;未配置时默认 batch)"
 DESC_BIND_USE_ROWS = "rows 绑定: rows=批次行上下文(主源+已 join)"
 DESC_BIND_USE_KEYS = "keys 绑定: keys=lookup keys"
 DESC_LOOKUP_CHUNK_SIZE = "keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)"
-DESC_PARAMS = "调用 loader 时透传的静态参数字典(主源直传,非主源随 bind)"
+DESC_PARAMS = "调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)"
 DESC_PARAMS_MD = (
-    "调用 loader 时透传的静态参数字典.\n\n"
-    "- main_source.params: 直接以 kwargs 传给 main source loader\n"
-    "- sources.<id>.params: 仅在 bind/use_keys 或 bind/use_rows 时合并到 loader kwargs\n"
-    "- 当 source 使用 cache_mode: preload_forever 时,预加载调用为无参,不会传 sources.<id>.params"
+    "调用 loader 时透传的 kwargs 模板.\n\n"
+    "- `main_source.params`: 直接以 kwargs 传给 main source loader\n"
+    "  - 仅允许静态值与 `$runtime.<name>` 占位符(编译期解析)\n"
+    "  - 禁止 `$keys/$rows`\n"
+    "- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n"
+    "  - 支持 `$runtime.<name>` 占位符(仅当值完全等于该字符串时才替换;不做子串插值)\n"
+    "  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n"
+    "    - 形式: `{$keys: {as: set|list}}`(默认 set)\n"
+    "    - composite key 注入为 tuple 元素\n"
+    "  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n"
+    "    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n"
+    "    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n"
+    "- `cache_mode: preload_forever` 的 source:\n"
+    "  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n"
+    "  - 若为空,预加载时保持零参调用\n"
+    "  - 禁止 `$keys/$rows`\n\n"
+    "迁移:\n"
+    "- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点"
 )
 DESC_SOURCE_NORMALIZE = "source-level whole-result `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)"
 DESC_SOURCE_NORMALIZE_MD = (
@@ -350,7 +358,6 @@ RELATION_STEPS_SCHEMA = {
             "from": RELATION_STEP_FROM_SCHEMA,
             "to": RELATION_STEP_TO_SCHEMA,
             "lookup_cast": LOOKUP_CAST_SCHEMA,
-            "to_bind": BIND_SCHEMA,
         },
         "additionalProperties": False,
     },

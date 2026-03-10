@@ -44,7 +44,7 @@
 - schema 顶层仅保留 `relations`(排除 `relations_sql_like`/`relations_graph`)
 - `relations.steps.from/to` 支持 `source.field` 字符串或同源字符串列表
 - 数组字段 `items_choices` 映射为 `items.enum`
-- schema 提供 steps/fields/sources/bind 的中文 hover 描述与示例
+- schema 提供 steps/fields/sources/params 的中文 hover 描述与示例
 - 对枚举/choices 字段提供简洁 hover 说明(逐项解释语义)并附带示例
 
 #### Scenario: 生成器不产出 dsl_version
@@ -57,7 +57,7 @@
 
 #### Scenario: enum hover 说明与示例
 - **WHEN** 执行 schema 生成脚本
-- **THEN** `output.format`/`output.header_fields_output_by`/`value_cast`/`lookup_cast.name`/`bind.use_rows.cache_mode`/`bind.use_keys.as`/`performance.report.format`/`relations.report.format`/`observability.viz.payload_policy` 的 `markdownDescription` 均包含选项语义说明且具备示例值
+- **THEN** `output.format`/`output.header_fields_output_by`/`value_cast`/`lookup_cast.name`/`performance.report.format`/`relations.report.format`/`observability.viz.payload_policy` 的 `markdownDescription` 均包含选项语义说明且具备示例值
 - **AND** `output.path` 的 `markdownDescription` MUST 说明相对路径以进程 CWD 为基准、会自动创建父目录且可能覆盖同名文件(并提示不要对不可信 YAML 开启文件输出)
 
 ### Requirement: output 字段 hover 指引明确可选与 overrides 推荐写法
@@ -75,7 +75,7 @@
 
 - `relations.*.steps.from/to` 的 hover MUST 提示 steps 仅接受 **field_id**(YAML key)而非 loader 的 data_key,并给出简短示例.
 - `lookup_cast` 的 hover MUST 提示 float lookup key 会被拒绝(避免歧义)并建议通过 `lookup_cast`/`value_cast` 显式归一化.
-- `to_bind`/`bind` 的 hover MUST 提示 oneOf 结构(`use_keys`/`use_rows`)并给出旧语法迁移提示.
+- `main_source.params`/`sources.*.params` 的 hover MUST 解释 `$runtime.*`/`$keys/$rows` 的用法与限制,并说明 legacy `bind/to_bind` 已移除并迁移到 `params` 模板.
 
 #### Scenario: hover 包含 field_id/data_key 提示
 - **WHEN** 生成 `demand.gen.json`
@@ -84,6 +84,27 @@
 #### Scenario: hover 包含 float key 策略提示
 - **WHEN** 生成 `demand.gen.json`
 - **THEN** `lookup_cast` 的 `markdownDescription` MUST 提示 float 被拒绝并给出修复建议
+
+### Requirement: schema hover documents `$keys/$rows` directive nodes under `params`
+系统 MUST 在生成的 YAML DSL JSON Schema 中,为 `main_source.params` 与 `sources.*.params` 提供明确的 hover 文档,解释:
+- `$keys` 指令节点的用途、`as=set|list` 选项与最小示例
+- `$rows` 指令节点的用途、`cache_mode=batch|none` 选项与最小示例
+- `$rows` 会触发 rows barrier(并行退化)的提示
+- `$keys/$rows` 仅在 ref loader 上下文可用,main_source/preload 禁止
+
+#### Scenario: params hover 包含 `$keys/$rows` 示例
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **THEN** `main_source.params` 与 `sources.*.params` 的 `markdownDescription` MUST 包含 `$keys/$rows` 指令节点说明与示例片段
+
+### Requirement: `params` hover documents `$runtime.*` and preload params behavior
+Schema 生成器 MUST 在 `main_source.params` 与 `sources.*.params` 的 hover/markdownDescription 中清晰说明:
+- `main_source.params` 作为 kwargs 直接透传给 main source loader
+- `sources.<id>.params` 作为 loader kwargs 模板,在对应 loader 被调用时透传(包含 preload_forever 的预加载调用)
+- `$runtime.<name>` 可用于引用运行期变量,并在编译期被解析为调用方提供的 `runtime_vars[<name>]`
+
+#### Scenario: schema hover 不再声称 preload_forever 零参调用
+- **WHEN** 生成 `demand.gen.json`
+- **THEN** `sources.*.params` 的 markdownDescription MUST 不再包含“preload_forever 预加载调用为无参”的旧描述
 
 ### Requirement: 顶层 schema 字段(guardrails)
 系统 SHALL 在 YAML DSL schema 顶层新增可选对象 `guardrails` 用于运行时护栏配置.
@@ -211,17 +232,6 @@ schema 的 `description`/`markdownDescription`/示例 MUST 展示:
 
 字段剪枝与 required-fields 闭包语义详见 `runtime-pruning`.
 
-### Requirement: bind/to_bind oneOf Schema
-系统 SHALL 在生成的 schema 中将 bind/to_bind 设为 `use_rows`/`use_keys` oneOf 结构:
-- `use_rows` 允许 `param` 与 `cache_mode`(none|batch, 默认 batch)
-- `use_keys` 允许 `param` 与 `as`(set|list, 默认 set)
-
-#### Scenario: oneOf 互斥
-- **WHEN** bind/to_bind 同时包含 `use_rows` 与 `use_keys`
-- **THEN** schema 校验应失败
-
-CLI 校验分层、严格模式、JSON/linter 输出与源码定位见 `yaml-dsl-cli-validation`(本 spec 仅聚焦 schema 生成与 hover 指引).
-
 ### Requirement: 派生字段支持 call_by Schema
 Schema 生成器 SHALL 在派生字段定义中加入 `call_by` 字段,类型为字符串,并在 schema hover 中说明 `reference(args...)` 语法、kwargs 示例、Python 字面量示例与 `$ctx.*` 可用属性( `row_id`/`batch_num`/`field_id`/`deps`/`values` ).
 Schema SHALL 对派生字段声明 `compute` 与 `call_by` 做互斥约束(oneOf),并确保源字段/主源字段不允许出现 `call_by`.
@@ -318,4 +328,3 @@ Schema MUST 为 retry policy 字段提供:
 #### Scenario: `main_source` schema 无 `normalize`
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
 - **THEN** `definitions.main_source.properties` MUST NOT 包含 `normalize`
-

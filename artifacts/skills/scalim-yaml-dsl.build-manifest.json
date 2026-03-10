@@ -80,6 +80,8 @@
           "schema 元数据生成与 hover 指引",
           "output 字段 hover 指引明确可选与 overrides 推荐写法",
           "schema hover 提供常见错误与迁移提示",
+          "schema hover documents `$keys/$rows` directive nodes under `params`",
+          "`params` hover documents `$runtime.*` and preload params behavior",
           "顶层 schema 字段(guardrails)",
           "observability.logging 支持 renderer/preset 字段",
           "字段声明位置与 compute 约束",
@@ -88,7 +90,6 @@
           "relation steps-only 约束",
           "output.fields 解析与 schema 指引",
           "字段 ID 唯一性与解析规则",
-          "bind/to_bind oneOf Schema",
           "派生字段支持 call_by Schema",
           "schema meta key 参考文档与推荐写法",
           "schema meta 中 schema dict 不得吞掉 desc/md",
@@ -107,6 +108,7 @@
           "unknown fields 诊断提供 suggestions(CLI/库一致)",
           "Loader 引用解析与 allowlist",
           "Source/Bind 结构与 keys 分片参数",
+          "loader params templates support `$runtime.*` placeholders",
           "字段/关系表达式默认行为",
           "main_source 批次排序配置",
           "顶层 batch_size 语义统一且可显式禁用分批",
@@ -123,7 +125,10 @@
         "requirements": [
           "steps 结构与 relation 解析/推断规则",
           "lookup_key 与 lookup_cast/诊断",
-          "bind/to_bind 结构与校验",
+          "ref loader params are expressed by target-source params templates",
+          "`$rows` preserves rows barrier semantics for relations",
+          "preload_forever sources reject `$keys/$rows` directives",
+          "legacy `to_bind` is rejected with a copy-pastable migration hint",
           "批次内 LoadRef 复用与分片语义",
           "ref loader 依赖信号驱动稳定排序",
           "关联诊断基于样本值并支持复合键对比",
@@ -237,7 +242,7 @@
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
-      "sha256": "33bb04223336dc27ff97cecda554dcf1575ad2be159974d50950d065489de2e7"
+      "sha256": "2cf99dd0a1fb4f152db182fe7a4e89287d24e78bde31d9176d9df35f52773ee0"
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
@@ -265,11 +270,11 @@
     },
     {
       "path": "openspec/specs/source-cache/spec.md",
-      "sha256": "ee745296996da77e8e7771f54418a0249cf33e4cb7f19d0897109685eaab7f9a"
+      "sha256": "b3e185265d7674d6e16857efbaecfc49a3cb32ab8d0966f34b6fb793c4ea5426"
     },
     {
       "path": "openspec/specs/source-relations/spec.md",
-      "sha256": "dc64fbf1af4a00f3116dd92e285bb573c691385452247a4fc954f7eb6ad60c8f"
+      "sha256": "4bc681a4b8c4088f6fb8a5beac3ae002f415f07e5535e41c5880cf96dd3cdad7"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -277,11 +282,11 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
-      "sha256": "b1513c918edd34735c979cc02eab21a49aee01738ca7edf4e74b0a837142c28f"
+      "sha256": "1dcc01886be7c1830ccb5fa1fdcc4023c37cef646d87a3b2ff88b6bd4583e220"
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "440d1caede31b94d22583d6ef1400cd5afb77d2c44b26a0f42d688514615bc32"
+      "sha256": "696783e8391ea9799451e5ed9de4a2f736ce8ba2f5c74e6f76f7ac9ede8898c3"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
@@ -289,7 +294,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "9e8bcb749f92175751fcc10f684b0ecc3c52c4b1000982f41b9d40cbe4327302"
+      "sha256": "7f8b962f1e4feded34c4d8e8de58bad400d102bf965015bbdda1ffd22a3de80a"
     }
   ],
   "outputs": [
@@ -303,7 +308,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "1702baeb844612d901819d2c61aef5b64df4b1378ae88389228e50cb0759aa8f"
+      "sha256": "ab5b30ecb1c38712ce704f2bee15830cc94a7667f4767e63f26eee2e0d3482eb"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

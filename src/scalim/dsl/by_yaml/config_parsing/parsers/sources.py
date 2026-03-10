@@ -1,23 +1,15 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ...schema_dsl.constants import (
-    DEFAULT_BIND_AS,
-    DEFAULT_BIND_CACHE_MODE,
     DEFAULT_CACHE_MODE,
 )
 from ...schema_dsl.models import (
-    BIND_KEY_CONFIG_KEYS,
-    BIND_KEYS,
-    BIND_ROWS_KEYS,
     DEMAND_KEYS,
     LOADER_RETRY_KEYS,
     LOOKUP_CAST_KEYS,
     MAIN_SOURCE_KEYS,
     NORMALIZE_KEYS,
     SOURCE_KEYS,
-    BindConfig,
-    BindKeysConfig,
-    BindRowsConfig,
     LoaderRetryConfig,
     LookupCastConfig,
     MainSourceConfig,
@@ -113,7 +105,6 @@ class ParserSourcesMixin:
             lookup_cast = self._parse_lookup_cast(source_data.get(SOURCE_KEYS["lookup_cast"]))
             lookup_chunk_size = self._parse_lookup_chunk_size(source_data.get(SOURCE_KEYS["lookup_chunk_size"]))
             normalize = self._parse_normalize(source_data.get(SOURCE_KEYS["normalize"]))
-            bind = self._parse_bind(source_data.get(SOURCE_KEYS["bind"]))
             params = self._parse_params(source_data)
             retry = self._parse_loader_retry(source_data.get(SOURCE_KEYS["retry"]))
 
@@ -126,7 +117,6 @@ class ParserSourcesMixin:
                 normalize=normalize,
                 cache_mode=str(source_data.get(SOURCE_KEYS["cache_mode"], DEFAULT_CACHE_MODE)),
                 retry=retry,
-                bind=bind,
                 params=params,
             )
 
@@ -162,34 +152,10 @@ class ParserSourcesMixin:
                 normalize=source_config.normalize,
                 cache_mode=source_config.cache_mode,
                 retry=source_config.retry,
-                bind=source_config.bind,
                 fields=fields_by_source.get(source_id, {}),
                 params=source_config.params,
             )
         return updated
-
-    def _parse_bind(self, raw_bind: object) -> Optional[BindConfig]:
-        bind_dict = mapping_or_none(raw_bind)
-        if bind_dict is None:
-            return None
-
-        use_rows = None
-        use_keys = None
-        if BIND_KEYS["use_rows"] in bind_dict:
-            rows_dict = mapping_or_none(bind_dict.get(BIND_KEYS["use_rows"]))
-            if rows_dict is not None:
-                use_rows = BindRowsConfig(
-                    param=str(rows_dict.get(BIND_ROWS_KEYS["param"], "")),
-                    cache_mode=str(rows_dict.get(BIND_ROWS_KEYS["cache_mode"], DEFAULT_BIND_CACHE_MODE)),
-                )
-        if BIND_KEYS["use_keys"] in bind_dict:
-            keys_dict = mapping_or_none(bind_dict.get(BIND_KEYS["use_keys"]))
-            if keys_dict is not None:
-                use_keys = BindKeysConfig(
-                    param=str(keys_dict.get(BIND_KEY_CONFIG_KEYS["param"], "")),
-                    as_=str(keys_dict.get(BIND_KEY_CONFIG_KEYS["as_"], DEFAULT_BIND_AS)),
-                )
-        return BindConfig(use_rows=use_rows, use_keys=use_keys)
 
     def _parse_lookup_chunk_size(self, raw_value: object) -> Optional[int]:
         if raw_value is None:

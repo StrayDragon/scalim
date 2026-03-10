@@ -11,7 +11,7 @@
 
     - JSON Schema 结构/默认值/枚举调整
     - 语义校验规则变更(unknown fields、约束收紧/放宽)
-    - `relations` / `bind` / `output.fields` 等关键语义调整
+    - `relations` / `params` / `output.fields` 等关键语义调整
     - Python 引用解析与 allowlist 规则调整(影响 `loader` / `call_by`)
 
 ## 1. 语法的事实来源在哪里
@@ -117,16 +117,25 @@ YAML 里引用 Python 的地方主要有两类:
 - 不支持用字符串 relation_id 来引用
 - 使用 alias 时,alias 必须先在 `relations` 里定义(这是 YAML 的约束)
 
-## 6. bind: `use_keys` vs `use_rows`
+## 6. params 模板: `$keys` / `$rows` / `$runtime.*`
 
-bind 的 schema 是一个二选一结构:
+Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 
-- `use_keys`: 传入 lookup keys
-- `use_rows`: 传入批次行上下文
+- `main_source.params`: 直接以 kwargs 传给 main source loader
+  - 支持 `$runtime.<name>` 作为占位符(编译期解析)
+  - 禁止 `$keys/$rows`
+- `sources.<id>.params`: loader kwargs 模板
+  - 支持 `$runtime.<name>` 占位符(编译期解析;仅 exact-match string 生效,不做子串插值)
+  - 支持 `$keys` 注入 lookup keys(可出现在任意嵌套位置):
+    - `{$keys: {as: set|list}}`(默认 set)
+    - `$keys.as=list` 会输出稳定顺序列表; composite key 注入为 tuple 元素
+  - 支持 `$rows` 注入批次行上下文(可出现在任意嵌套位置):
+    - `{$rows: {cache_mode: batch|none}}`(默认 batch)
+    - `$rows.cache_mode=none` 会禁用批次内 relation 复用(每个字段各自调用 loader)
 
-执行语义上,`use_rows` 会影响调度边界:
+执行语义上,`$rows` 会影响调度边界:
 
-- `parallel_mode="adaptive"` 时,调度器会把 `use_rows` 视为 barrier,该层直接串行执行(见 [并行模式](../architecture/parallel-modes.md)).
+- `parallel_mode="adaptive"` 时,调度器会把 `$rows` 视为 barrier,该层直接串行执行(见 [并行模式](../architecture/parallel-modes.md)).
 
 ## 7. output.fields: 为什么必须是对象/alias
 

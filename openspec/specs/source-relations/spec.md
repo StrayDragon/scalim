@@ -23,11 +23,13 @@
 - `src/IMPL_ROOT/utils/relation_diagnostics.py`
 ## Requirements
 ### Requirement: steps 结构与 relation 解析/推断规则
-系统 SHALL 将关系定义为有序 `steps` 列表并按声明顺序执行;每个 step 包含 `from`/`to`(source.field 或同源列表)以及可选 `lookup_cast`/`to_bind`,相邻 steps 必须链式相连.
+系统 SHALL 将关系定义为有序 `steps` 列表并按声明顺序执行;每个 step 包含 `from`/`to`(source.field 或同源列表)以及可选 `lookup_cast`,相邻 steps 必须链式相连.
 字段通过 `relation` 提供 steps 对象(允许 YAML alias 复用),不支持 relation_id 字符串引用.
 若 `relation` 缺省且字段 source 不是 main_source,系统仅在唯一路径存在时自动推断;无路径或多路径时校验失败.
 `relation` steps 必须以 main_source 为起点、以字段 source 为终点,并保持 left join 语义(未命中保持 None).
 系统 MUST 将 steps 中的依赖字段用于 ref loader 排序信号构建,以驱动 `ref_loader_sequence` 的依赖排序.
+
+ref loader 的入参与绑定模式 MUST 通过目标 source 的 `params` 模板表达,而不是通过 step 级 `to_bind`.
 
 #### Scenario: 多字段 step
 - **WHEN** `from` 与 `to` 为等长同源列表
@@ -67,29 +69,56 @@
 - **WHEN** 多字段关联中任一 from_field 为 None
 - **THEN** 该键不参与关联查找
 
-### Requirement: bind/to_bind 结构与校验
-系统 SHALL 支持在 step 中声明 `to_bind` 构造下游 loader 参数,缺省时使用 `sources.*.bind`;`use_keys` 传入 lookup keys,`use_rows` 传入 batch_rows.
-`use_keys.as` 仅允许 `set`(默认)/`list`,`use_rows.cache_mode` 仅允许 `batch`(默认)/`none`;`to_bind` 必须且仅允许包含 `use_rows` 或 `use_keys` 之一.
-若目标 source 为 `preload_forever`,可省略绑定.
-当 `use_keys.as=list` 时,系统 MUST 输出稳定顺序的 keys 列表,不得受集合迭代顺序影响.
+### Requirement: ref loader params are expressed by target-source params templates
+系统 SHALL 通过目标 source 的 `params` 模板内联指令(`$keys/$rows`)表达 ref loader 的入参与绑定模式,并用于 relation steps 的 `LoadRef` 调用.
 
-#### Scenario: keys 模式绑定
-- **WHEN** step 声明 `to_bind: {use_keys: {param: ids}}`
-- **THEN** loader 调用应传入 `ids=<lookup_keys>`
+#### Scenario: relation ref loader 通过 `$keys` 注入 lookup keys
+- **GIVEN** relation steps 从 main_source 关联到 `sources.order_evaluations`
+- **WHEN** `sources.order_evaluations.params` 使用 `$keys` 指令节点注入 lookup keys
+- **THEN** 执行 `LoadRef` 时 MUST 将该步骤的 lookup keys 注入到模板对应位置并透传给 loader
 
-#### Scenario: to_bind 缺少 use 分支
-- **WHEN** step 配置 `to_bind: {param: ids}` (旧语法)
-- **THEN** 校验失败并提示需使用 `use_rows` 或 `use_keys`
+#### Scenario: relation step without bind/to_bind remains valid
+- **GIVEN** relation steps 指向一个非 preload source
+- **AND** 目标 source 仅声明 `params` 模板(无 `bind/to_bind`)
+- **THEN** relation 校验 MUST 通过
+- **AND** `LoadRef` 时 MUST 按模板透传 loader kwargs
 
-#### Scenario: use_keys.as=list 顺序稳定
-- **WHEN** step 声明 `to_bind: {use_keys: {param: ids, as: list}}` 且 lookup_keys 相同
-- **THEN** 不同运行中的 `ids` 列表顺序必须一致
+### Requirement: `$rows` preserves rows barrier semantics for relations
+系统 MUST 将 `$rows` 指令视为 rows 模式绑定,并保留 rows barrier 语义(例如 adaptive 下该层串行)以及 `cache_mode` 语义.
+
+#### Scenario: `$rows` 触发 rows barrier
+- **WHEN** 某个 relation 目标 source 的 params 模板中出现 `$rows`
+- **THEN** 该 relation 对应的 `LoadRef` 执行 MUST 按 rows barrier 语义串行运行(不得作为可并行 keys 任务执行)
+
+### Requirement: preload_forever sources reject `$keys/$rows` directives
+系统 MUST 禁止在 `cache_mode: preload_forever` 的 source 的 preload 调用路径中使用 `$keys/$rows` 指令节点(因为 preload 不具备 ref 上下文).
+
+#### Scenario: preload_forever params 模板包含 `$keys` 被拒绝
+- **WHEN** `sources.customers.cache_mode=preload_forever`
+- **AND** `sources.customers.params` 中出现 `$keys` 或 `$rows`
+- **THEN** 编译或校验 MUST 失败并报告配置路径
+
+### Requirement: legacy `to_bind` is rejected with a copy-pastable migration hint
+系统 MUST 将 step 级 `to_bind` 视为 legacy 写法并在校验阶段 fail-fast.
+错误信息 MUST 明确指出应将绑定迁移到“目标 source 的 `params` 模板”,并给出可直接照抄的替换建议片段(至少覆盖常见 `use_keys.param` 形态)。
+
+#### Scenario: relation step `to_bind.use_keys.param` 被拒绝并给迁移建议
+- **WHEN** 某个 relation step 中出现 `to_bind: {use_keys: {param: ids}}`
+- **THEN** 校验 MUST 失败并指向该 step 的配置路径
+- **AND** 错误信息 MUST 包含可直接照抄的替换建议片段(示例):
+  ```yaml
+  sources:
+    <to_source_id>:
+      params:
+        ids:
+          $keys: {as: set}
+  ```
 
 ### Requirement: 批次内 LoadRef 复用与分片语义
 系统 MUST 在同一批次内对 relation signature 完全一致的 LoadRef 字段进行 group 合并并一次执行;signature 由 steps 中的 to_source/from_fields/to_key/lookup_cast/binding 组成.
 系统 MUST 基于 group 内字段构建 lookup_keys 并集并写回所有字段;若 relation 不一致则不得合并.
 系统 MUST 复用同 relation/row_id/from_field 的 lookup key 归一化结果;不同 relation 不复用,且诊断事件仅在首次归一化时触发.
-rows 模式默认复用,`to_bind.use_rows.cache_mode=none` 显式禁用;复用使用首次调用的 batch_rows 快照.
+rows 模式默认复用,若目标 source 的 `params` 模板中使用 `$rows: {cache_mode: none}`,系统 MUST 显式禁用该 relation 的批次内复用;复用使用首次调用的 batch_rows 快照.
 keys 模式支持 `lookup_chunk_size` 分片加载并合并结果;分片语义与一次性加载一致.
 
 #### Scenario: 同 relation 多字段只执行一次
@@ -98,8 +127,8 @@ keys 模式支持 `lookup_chunk_size` 分片加载并合并结果;分片语义�
 - **THEN** 该 group 在该批次仅触发一次逻辑加载
 - **AND** loader_context.field_keys 应为 `[f1, f2, f3]`
 
-#### Scenario: rows 模式禁用复用
-- **WHEN** relation 使用 rows 模式绑定且 `to_bind.use_rows.cache_mode=none`
+#### Scenario: `$rows.cache_mode=none` 禁用复用
+- **WHEN** relation 目标 source 的 `params` 模板使用 `$rows: {cache_mode: none}`
 - **THEN** 系统不得对该 relation 做 group 合并
 
 #### Scenario: lookup_chunk_size 分片加载
@@ -134,8 +163,8 @@ keys 模式支持 `lookup_chunk_size` 分片加载并合并结果;分片语义�
 
 ## Notes
 - rows 模式传入的批次行上下文来自 BatchContext,仅包含 required_fields 内的字段.
-- rows 模式默认批次内复用;若 loader 依赖可变的 batch_rows 或有副作用,应显式配置 `to_bind.use_rows.cache_mode=none`.
-- `use_keys.as=list` 仅保证 keys-list 的顺序稳定可重复(与 `PYTHONHASHSEED` 无关);由于 keys 通常先以 set 去重,因此不承诺保持输入行出现顺序.如需自定义顺序,请在 loader 内自行排序/归并.
+- rows 模式默认批次内复用;若 loader 依赖可变的 batch_rows 或有副作用,应在目标 source 的 `params` 模板中使用 `$rows: {cache_mode: none}` 禁用复用.
+- `$keys.as=list` 仅保证 keys-list 的顺序稳定可重复(与 `PYTHONHASHSEED` 无关);由于 keys 通常先以 set 去重,因此不承诺保持输入行出现顺序.如需自定义顺序,请在 loader 内自行排序/归并.
 - path 推断仅基于已声明 relations 的有向 steps 构图.
 - `lookup_cast` 仅影响关联键,不影响字段值输出.
 - `value_cast: auto` 使用 `auto_str_normalize` 并在字段值写入上下文前执行(详见 `field-compute`).

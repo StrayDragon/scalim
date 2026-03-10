@@ -177,13 +177,6 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         normalize_ir = self._convert_source_normalize(source_config)
 
-        if source_config.bind is not None:
-            msg = (
-                "Legacy YAML syntax is not supported: 'sources.{}.bind'. "
-                "Move binding into 'sources.{}.params' using `$keys` / `$rows` directives."
-            ).format(source_config.source_id, source_config.source_id)
-            raise ConversionError(msg)
-
         loader_ir = self._make_loader_ir(callable_ref=loader_fn)
 
         cache_mode = SourceSpecIrCacheMode.NONE

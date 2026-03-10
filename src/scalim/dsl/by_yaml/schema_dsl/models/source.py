@@ -3,7 +3,6 @@ from dataclasses import field as dataclass_field
 from typing import Any, ClassVar, Dict, Optional, Tuple, Union
 
 from ..constants import (
-    BIND_SCHEMA,
     DEFAULT_CACHE_MODE,
     DEFAULT_LOADER_RETRY_BACKOFF,
     DEFAULT_LOADER_RETRY_BASE_DELAY_SECONDS,
@@ -13,8 +12,6 @@ from ..constants import (
     DEFAULT_LOADER_RETRY_MAX_DELAY_SECONDS,
     DEFAULT_LOADER_RETRY_MAX_ELAPSED_SECONDS,
     DEFAULT_NORMALIZE_ON_CONFLICT,
-    DESC_BIND,
-    DESC_BIND_MD,
     DESC_LOADER,
     DESC_LOADER_MD,
     DESC_LOADER_RETRY,
@@ -39,7 +36,7 @@ from ..constants import (
     schema_ref,
 )
 from .field import SourceFieldConfig
-from .lookup_bind_relation import BindConfig, LookupCastConfig
+from .lookup_bind_relation import LookupCastConfig
 
 
 @dataclass(frozen=True)
@@ -237,7 +234,9 @@ class SourceConfig:
                 "缓存模式.\n\n"
                 "- `none`: 不缓存\n"
                 "- `preload_forever`: 预加载并长期缓存\n"
-                "- 设为 `preload_forever` 时, 关联到该 source 的 step 可不配置 `to_bind`"
+                "- 设为 `preload_forever` 时,预加载阶段会执行一次 loader 并将结果缓存\n"
+                "- 若 `sources.<id>.params` 非空,预加载调用会透传 kwargs;为空则保持零参调用\n"
+                "- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`"
             ),
             choices=["none", "preload_forever"],
             default=DEFAULT_CACHE_MODE,
@@ -250,12 +249,6 @@ class SourceConfig:
         metadata=schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
     )
     """该数据源的重试配置(可选;用于覆盖默认重试策略)."""
-
-    bind: Optional[BindConfig] = dataclass_field(
-        default=None,
-        metadata=schema_meta(schema=BIND_SCHEMA, desc=DESC_BIND, md=DESC_BIND_MD),
-    )
-    """该数据源默认参数绑定配置(可选)."""
 
     fields: Dict[str, SourceFieldConfig] = dataclass_field(
         default_factory=dict,
@@ -277,7 +270,7 @@ class SourceConfig:
         default_factory=dict,
         metadata=schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props=True),
     )
-    """传递给加载器的静态参数映射."""
+    """传递给加载器的 `kwargs` 模板(编译期解析 `$runtime.*`,运行期渲染 `$keys/$rows`)."""
 
 
 @dataclass(frozen=True)

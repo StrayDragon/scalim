@@ -2,9 +2,6 @@ import logging
 
 from ...schema_dsl.constants import DEMAND_FIELDS_KEY
 from ...schema_dsl.models import (
-    BIND_KEY_CONFIG_KEYS,
-    BIND_KEYS,
-    BIND_ROWS_KEYS,
     DEMAND_KEYS,
     DERIVED_FIELD_KEYS,
     LOOKUP_CAST_KEYS,
@@ -31,12 +28,7 @@ class _FieldNames:
     LOADER: str = SOURCE_KEYS["loader"]
     KEY: str = SOURCE_KEYS["key"]
     CACHE_MODE: str = SOURCE_KEYS["cache_mode"]
-    BIND: str = SOURCE_KEYS["bind"]
-    USE_ROWS: str = BIND_KEYS["use_rows"]
-    USE_KEYS: str = BIND_KEYS["use_keys"]
-    PARAM: str = BIND_ROWS_KEYS["param"]
-    AS: str = BIND_KEY_CONFIG_KEYS["as_"]
-    ROWS_CACHE_MODE: str = BIND_ROWS_KEYS["cache_mode"]
+    BIND: str = "bind"
     LOOKUP_CAST: str = SOURCE_KEYS["lookup_cast"]
     LOOKUP_CHUNK_SIZE: str = SOURCE_KEYS["lookup_chunk_size"]
     NORMALIZE: str = SOURCE_KEYS["normalize"]
@@ -52,7 +44,7 @@ class _FieldNames:
     FROM: str = RELATION_STEP_KEYS["from_"]
     STEPS: str = RELATION_CONFIG_KEYS["steps"]
     TO: str = RELATION_STEP_KEYS["to"]
-    TO_BIND: str = RELATION_STEP_KEYS["to_bind"]
+    TO_BIND: str = "to_bind"
     VALUE_CAST: str = SOURCE_FIELD_KEYS["value_cast"]
     COMPUTE: str = DERIVED_FIELD_KEYS["compute"]
     CALL_BY: str = DERIVED_FIELD_KEYS["call_by"]

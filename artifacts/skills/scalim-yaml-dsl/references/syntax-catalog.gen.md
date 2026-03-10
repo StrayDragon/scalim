@@ -53,6 +53,8 @@
   - schema 元数据生成与 hover 指引
   - output 字段 hover 指引明确可选与 overrides 推荐写法
   - schema hover 提供常见错误与迁移提示
+  - schema hover documents `$keys/$rows` directive nodes under `params`
+  - `params` hover documents `$runtime.*` and preload params behavior
   - 顶层 schema 字段(guardrails)
   - observability.logging 支持 renderer/preset 字段
   - 字段声明位置与 compute 约束
@@ -61,7 +63,6 @@
   - relation steps-only 约束
   - output.fields 解析与 schema 指引
   - 字段 ID 唯一性与解析规则
-  - bind/to_bind oneOf Schema
   - 派生字段支持 call_by Schema
   - schema meta key 参考文档与推荐写法
   - schema meta 中 schema dict 不得吞掉 desc/md
@@ -78,6 +79,7 @@
   - unknown fields 诊断提供 suggestions(CLI/库一致)
   - Loader 引用解析与 allowlist
   - Source/Bind 结构与 keys 分片参数
+  - loader params templates support `$runtime.*` placeholders
   - 字段/关系表达式默认行为
   - main_source 批次排序配置
   - 顶层 batch_size 语义统一且可显式禁用分批
@@ -92,7 +94,10 @@
 - Requirements:
   - steps 结构与 relation 解析/推断规则
   - lookup_key 与 lookup_cast/诊断
-  - bind/to_bind 结构与校验
+  - ref loader params are expressed by target-source params templates
+  - `$rows` preserves rows barrier semantics for relations
+  - preload_forever sources reject `$keys/$rows` directives
+  - legacy `to_bind` is rejected with a copy-pastable migration hint
   - 批次内 LoadRef 复用与分片语义
   - ref loader 依赖信号驱动稳定排序
   - 关联诊断基于样本值并支持复合键对比
@@ -443,7 +448,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
-  - `steps` (required): `array`, items `object`, properties `from`, `lookup_cast`, `to`, `to_bind`
+  - `steps` (required): `array`, items `object`, properties `from`, `lookup_cast`, `to`
 
 ### `relation_report`
 - Definition path: `definitions.relation_report`
@@ -481,7 +486,6 @@
 - Properties:
   - `retry`: allOf(1)
   - `fields`: `object`
-  - `bind`: `object` | `object`, oneOf(2)
   - `cache_mode`: `string`, enum `none`, `preload_forever`
   - `key` (required): `string` | `array`, oneOf(2)
   - `loader` (required): `string`

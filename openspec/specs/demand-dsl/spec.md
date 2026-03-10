@@ -101,22 +101,38 @@
 - **THEN** 解析 MUST 失败并报告 allowlist 拒绝
 
 ### Requirement: Source/Bind 结构与 keys 分片参数
-系统 SHALL 支持为数据源定义 `key`、`lookup_cast`、`cache_mode`、`params` 与 `bind`,并在运行时构造绑定参数.
-`bind` 必须且仅允许包含 `use_rows` 或 `use_keys` 之一;`use_rows.cache_mode` 仅允许 `none|batch`(默认 batch),`use_keys.as` 仅允许 `set|list`(默认 set).
-系统 MUST 支持在 source 配置中声明 `lookup_chunk_size`,用于 keys 模式 LoadRef 的 lookup_keys 分片.
-当 `use_keys.as=list` 时,从 YAML 转换到运行时参数构建器的行为 MUST 产生稳定顺序列表.
+系统 SHALL 支持为数据源定义 `key`、`lookup_cast`、`cache_mode`、`params` 与 `lookup_chunk_size`.
 
-#### Scenario: binding 构造参数
+其中:
+- `main_source.params` 与 `sources.<id>.params` MUST 被视为 loader kwargs 模板
+- `main_source.params` 仅允许静态值与 `$runtime.<name>` 占位符(禁止 `$keys/$rows`)
+- `sources.<id>.params` 允许包含 `$runtime.<name>` 占位符与 `$keys/$rows` 指令节点
+- `sources.*.bind` 不再属于该能力的稳定 YAML authoring surface
+
+当 `sources.<id>.params` 中使用 `$keys: {as: list}` 时,从 YAML 转换到运行时参数构建器的行为 MUST 产生稳定顺序列表。
+
+#### Scenario: source params 模板构造动态参数
+- **WHEN** source 配置:
+  ```yaml
+  params:
+    params:
+      ids: {$keys: {as: set}}
+  ```
+- **THEN** loader 调用应包含 `params={"ids": set(lookup_keys)}`
+
+#### Scenario: `sources.*.bind` 旧写法被拒绝
 - **WHEN** source 配置 `bind: {use_keys: {param: ids}}`
-- **THEN** loader 调用参数应包含 `ids=set(lookup_keys)`
+- **THEN** 校验 MUST 失败并提示迁移到 `params` 模板
+- **AND** 错误信息 MUST 包含可直接照抄的替换建议片段(至少覆盖该常见形态),例如:
+  ```yaml
+  params:
+    ids:
+      $keys: {as: set}
+  ```
 
-#### Scenario: bind 缺少 use 分支
-- **WHEN** 配置 `bind: {param: ids}` (旧语法)
-- **THEN** 校验失败并提示需使用 `use_rows` 或 `use_keys`
-
-#### Scenario: YAML list 绑定顺序可重复
-- **WHEN** source 配置 `bind: {use_keys: {param: ids, as: list}}` 且 lookup_keys 集合相同
-- **THEN** 运行时传给 loader 的 `ids` 列表顺序必须稳定
+#### Scenario: `$keys.as=list` 顺序稳定
+- **WHEN** source 配置 `params` 模板中使用 `$keys: {as: list}` 且 lookup_keys 集合相同
+- **THEN** 运行时传给 loader 的 keys 列表顺序必须稳定
 
 系统 MUST 使用语义清晰且无歧义的 key 常量公开命名,并在解析器/校验器中统一使用该命名.
 
@@ -129,12 +145,24 @@
 旧命名(`BIND_KEYS_KEYS`、`MEMORY_OPT_KEYS`、`RELATION_KEYS`、`RELATIONS_KEYS`)MUST NOT 继续作为公开常量提供.
 
 #### Scenario: 解析器使用新常量
-- **WHEN** 执行 YAML `bind/observability/relations` 解析
+- **WHEN** 执行 YAML `observability/relations` 解析
 - **THEN** 解析路径应使用新常量命名
 
 #### Scenario: 旧常量不可导入
 - **WHEN** 调用方尝试导入旧常量名
 - **THEN** 导入 MUST 失败
+
+### Requirement: loader params templates support `$runtime.*` placeholders
+系统 SHALL 允许在 loader kwargs 模板中声明 `$runtime.<name>` 占位符,并在编译期将其解析为调用方提供的运行期变量.
+
+占位符解析的适用位置为:
+- `main_source.params`
+- `sources.<id>.params`
+
+#### Scenario: main_source.params 引用 runtime var
+- **WHEN** `main_source.params` 中某个值等于 `$runtime.end_datetime_user`
+- **AND** 调用方提供 `runtime_vars={"end_datetime_user": <value>}`
+- **THEN** main source loader MUST 接收到解析后的值而不是占位符字符串
 
 ### Requirement: 字段/关系表达式默认行为
 系统 SHALL 支持 relations.steps 中 `source.field_id` 点号表达式(含同源列表),并在源字段定义中当 `extract` 未声明时默认使用 field_id(等价于 `extract: <field_id>`).
@@ -277,5 +305,5 @@
 
 ## Notes
 - 当前仅支持 YAML DSL 与 IR 类构造(`DemandIr.from_irs`);类式 Python DSL 尚未实现.
-- rows 模式默认批次内复用;若 loader 依赖可变的 batch_rows 或有副作用,应显式配置 `bind.use_rows.cache_mode=none`.
+- rows 模式默认批次内复用;若 loader 依赖可变的 `batch_rows` 或有副作用,应在目标 source 的 `params` 模板中使用 `$rows: {cache_mode: none}` 禁用复用.
 - 字段 transform、派生字段、关系与输出行为详见 `field-compute`、`source-relations`、`streaming-output`.

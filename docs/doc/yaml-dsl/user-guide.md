@@ -92,7 +92,8 @@ sources:
   customers:
     loader: "myapp.loaders:load_customers"
     key: customer_id
-    bind: {use_keys: {param: customer_ids}}
+    params:
+      customer_ids: {$keys: {as: set}}
     fields:
       customer_name:
         name: 客户名称
@@ -159,6 +160,24 @@ result = run(
 )
 ```
 
+`runtime_vars` 注入(用于解析 `params` 中的 `$runtime.<name>` 占位符):
+
+```yaml
+main_source:
+  params:
+    end_dt: "$runtime.end_dt"
+```
+
+```python
+from datetime import datetime
+
+result = run(
+    "path/to/config.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    runtime_vars={"end_dt": datetime(2024, 1, 31)},
+)
+```
+
 ---
 
 ## 2. 核心概念 (Core Concepts)
@@ -178,7 +197,7 @@ result = run(
 - **loader**: 数据加载函数
 - **key**: 主键字段(支持复合键)
 - **normalize**: whole-result 归一化(可选;在字段级 `extract` 之前执行)
-- **bind**: 参数绑定配置(如何传递查询参数)
+- **params**: loader kwargs 模板(可用 `$runtime.*` / `$keys/$rows` 表达动态上下文)
 
 ### 2.3 字段类型
 
@@ -270,10 +289,8 @@ batch_size: 500
 
 _templates:
   # 定义可复用的 YAML 锚点
-  common_bind: &common_bind
-    use_keys:
-      param: ids
-      as: set
+  common_params_keys: &common_params_keys
+    ids: {$keys: {as: set}}
 ```
 
 ### 3.2 主数据源配置 (main_source)
@@ -282,7 +299,7 @@ _templates:
 |------|------|------|--------|------|
 | `source_id` | string | ✅ | - | 主数据源唯一标识 |
 | `loader` | string | ✅ | - | Python 可调用对象引用 |
-| `params` | object | ❌ | `{}` | 调用 loader 时透传的静态参数 |
+| `params` | object | ❌ | `{}` | 调用 loader 时透传的 kwargs 模板(支持 `$runtime.*` 占位符) |
 | `fields` | object | ❌ | `{}` | 主数据源字段映射 |
 
 **loader 引用格式**:
@@ -320,41 +337,48 @@ main_source:
 | `loader` | string | ✅ | - | Python 可调用对象引用 |
 | `key` | string/list | ✅ | - | 主键字段(支持复合键) |
 | `normalize` | object | ❌ | - | whole-result 归一化(在字段级 `extract` 之前执行;仅 `sources.*` 支持) |
-| `bind` | object | ❌ | - | 参数绑定配置 |
 | `cache_mode` | string | ❌ | `"none"` | 缓存模式:`none`/`preload_forever` |
 | `lookup_cast` | object | ❌ | - | 键值归一化转换 |
 | `lookup_chunk_size` | integer | ❌ | - | keys 模式分片大小 |
-| `params` | object | ❌ | `{}` | 静态参数 |
+| `params` | object | ❌ | `{}` | loader kwargs 模板(支持 `$runtime.*`、`$keys/$rows` 指令节点) |
 | `fields` | object | ❌ | `{}` | 字段配置 |
 
-#### 3.3.1 参数绑定配置 (bind)
+#### 3.3.1 loader kwargs 模板 (params)
 
-参数绑定定义了如何向 loader 传递参数.支持两种模式:
+Scalim 将 loader 的调用参数收敛到 `params` kwargs 模板:
 
-**keys 模式** (use_keys): 传递 lookup keys
+- `main_source.params`: 直接以 kwargs 传给 main source loader
+  - 支持 `$runtime.<name>` 占位符(编译期解析)
+  - 禁止 `$keys/$rows`
+- `sources.<id>.params`: loader kwargs 模板
+  - 支持 `$runtime.<name>` 占位符(编译期解析;仅 exact-match string 生效,不做子串插值)
+  - 支持 `$keys` 注入 lookup keys(可出现在任意嵌套位置):
+    - `{$keys: {as: set|list}}`(默认 set)
+    - `$keys.as=list` 会输出稳定顺序列表
+    - composite key 注入为 tuple 元素
+  - 支持 `$rows` 注入批次行上下文(可出现在任意嵌套位置):
+    - `{$rows: {cache_mode: batch|none}}`(默认 batch)
+    - `$rows` 会触发 rows barrier: `parallel_mode="adaptive"` 时该层 LoadRef 串行执行
+    - `$rows.cache_mode=none` 会禁用批次内 relation 复用(每个字段各自调用 loader)
 
 ```yaml
 sources:
   customers:
     loader: "myapp.loaders:load_customers"
     key: customer_id
-    bind:
-      use_keys:
-        param: customer_ids    # loader 参数名
-        as: set                # 容器类型:set/list(默认 set)
+    params:
+      customer_ids_set: {$keys: {as: set}}
 ```
 
-**rows 模式** (use_rows): 传递批次行上下文
+`$rows` 示例(注意 barrier 语义):
 
 ```yaml
 sources:
   customers:
     loader: "myapp.loaders:load_customers_by_rows"
     key: customer_id
-    bind:
-      use_rows:
-        param: rows            # loader 参数名
-        cache_mode: batch      # 缓存模式:batch/none(默认 batch)
+    params:
+      rows: {$rows: {cache_mode: batch}}
 ```
 
 #### 3.3.2 缓存模式 (cache_mode)
@@ -362,7 +386,7 @@ sources:
 | 模式 | 说明 |
 |------|------|
 | `none` | 不缓存,每次关联都重新查询 |
-| `preload_forever` | 预加载并永久缓存,关联时可省略 `to_bind` |
+| `preload_forever` | 预加载并永久缓存(若 `params` 非空会透传 kwargs;为空则保持零参 preload) |
 
 #### 3.3.3 键值归一化 (lookup_cast)
 
@@ -617,7 +641,6 @@ sources:
 | `from` | string/list | ✅ | 上游字段(支持列表用于复合键) |
 | `to` | string/list | ✅ | 下游字段(支持列表) |
 | `lookup_cast` | object | ❌ | 键值归一化转换 |
-| `to_bind` | object | ❌ | 参数绑定配置 |
 
 **重要: steps 中的 `source.field` 使用 field_id**
 
@@ -636,8 +659,9 @@ main_source:
 sources:
   customers:
     loader: "myapp.loaders:load_customers"
-    key: id
-    bind: {use_keys: {param: ids}}
+    key: customer_id
+    params:
+      ids: {$keys: {as: set}}
     fields:
       customer_id:
         extract: id  # data_key
@@ -652,15 +676,18 @@ relations:
 **示例**:
 
 ```yaml
+sources:
+  customers:
+    loader: "myapp.loaders:load_customers"
+    key: customer_id
+    params:
+      ids: {$keys: {as: list}}
+
 steps:
   - from: orders.customer_id
     to: customers.customer_id
     lookup_cast:
       name: int
-    to_bind:
-      use_keys:
-        param: ids
-        as: list
 ```
 
 #### 3.5.4 关联类型
@@ -865,10 +892,8 @@ _templates:
     from: orders.customer_id
     to: customers.customer_id
 
-  bind_keys: &bind_keys
-    use_keys:
-      param: ids
-      as: set
+  params_keys: &params_keys
+    ids: {$keys: {as: set}}
 
 relations:
   orders_to_customers:
@@ -877,10 +902,10 @@ relations:
 
 sources:
   customers:
-    bind: *bind_keys
+    params: *params_keys
 
   products:
-    bind: *bind_keys
+    params: *params_keys
 ```
 
 **合并配置**:
@@ -898,65 +923,57 @@ relations:
 
   orders_to_customers_custom:
     steps:
-      <<: *base_step              # 继承 base_step
-      lookup_cast:                # 添加自定义属性
-        name: int
-      to_bind:
-        use_keys:
-          param: ids
-          as: list
+      - <<: *base_step            # 继承 base_step
+        lookup_cast:              # 添加自定义属性
+          name: int
 ```
 
-### 4.2 参数绑定模式详解
+### 4.2 params 模板指令详解
 
-#### 4.2.1 keys 模式 (use_keys)
+#### 4.2.1 `$keys`: 注入 lookup keys
 
-传递去重的键值集合给 loader:
+`$keys` 会把当前 ref lookup 的 keys 注入到模板指定位置(支持 nested/list 位置):
 
 ```yaml
 sources:
   customers:
     loader: "myapp.loaders:load_customers"
     key: customer_id
-    bind:
-      use_keys:
-        param: customer_ids    # loader 接收的参数名
-        as: set                # 容器类型: set(去重,无序) 或 list(去重后的稳定顺序; 不承诺与输入行出现顺序一致)
+    params:
+      customer_ids_set: {$keys: {as: set}}
 ```
 
 **对应的 Loader 函数签名**:
 
 ```python
-def load_customers(customer_ids: set[int]) -> list[dict]:
-    # customer_ids 是去重后的集合
+def load_customers(customer_ids_set: set[int]) -> dict:
     pass
 ```
 
-> NOTE: `as: list` 的顺序仅保证“同一输入下稳定可重复”.由于 keys 在框架内部通常先去重为集合,因此 list 顺序是框架的 canonical 顺序,
+> NOTE: `$keys.as=list` 的顺序仅保证“同一输入下稳定可重复”.由于 keys 在框架内部通常先去重为集合,因此 list 顺序是框架的 canonical 顺序,
 > 并不承诺与输入行的出现顺序一致.如果 loader 需要特定排序,请在 loader 内自行排序/归并.
 
-#### 4.2.2 rows 模式 (use_rows)
+#### 4.2.2 `$rows`: 注入 batch rows
 
-传递批次行上下文(主数据源 + 已关联的数据):
+`$rows` 会把当前批次的行上下文(batch rows)注入到模板指定位置:
 
 ```yaml
 sources:
   customers:
     loader: "myapp.loaders:load_customers_by_rows"
     key: customer_id
-    bind:
-      use_rows:
-        param: rows            # loader 接收的参数名
-        cache_mode: batch      # 缓存模式:batch(批次内复用)或 none(不复用)
+    params:
+      rows: {$rows: {cache_mode: batch}}
 ```
 
 **对应的 Loader 函数签名**:
 
 ```python
 def load_customers_by_rows(rows: list[dict]) -> dict:
-    # rows 包含主数据源和已关联的数据
     pass
 ```
+
+> 注意: `$rows` 会触发 rows barrier.在 `parallel_mode="adaptive"` 下,该层 LoadRef 会按串行执行.
 
 ### 4.3 键值归一化 (lookup_cast)
 
@@ -1001,12 +1018,13 @@ relations:
 sources:
   customers:
     cache_mode: none        # 每次关联都重新查询
-    bind:
-      use_keys:
-        param: ids
+    params:
+      ids: {$keys: {as: set}}
 ```
 
-**注意**:使用 `none` 时,必须配置 `to_bind` 或 `sources.<id>.bind`.
+提示:
+
+- ref loader 通常需要在 `params` 模板中显式使用 `$keys` 或 `$rows`,否则 loader 不会收到 lookup 上下文,可能只能全量加载.
 
 #### 4.4.2 preload_forever: 预加载永久缓存
 
@@ -1014,21 +1032,14 @@ sources:
 sources:
   order_types:
     cache_mode: preload_forever    # 启动时加载一次,永久缓存
-    bind:
-      use_keys:
-        param: ids
+    params:
+      group_by: type_id
 ```
 
-**注意**:使用 `preload_forever` 时,关联步骤可不配置 `to_bind`:
+提示:
 
-```yaml
-relations:
-  orders_to_order_types:
-    steps:
-      - from: orders.order_type_id
-        to: order_types.type_id
-        # 不需要 to_bind
-```
+- `preload_forever` 场景允许声明 `params`.当 `params` 非空时,预加载调用会透传 kwargs;为空则保持零参 preload.
+- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`.
 
 ---
 
@@ -1083,7 +1094,8 @@ sources:
   customers:
     loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
     key: customer_id
-    bind: {use_keys: {param: customer_ids_set}}
+    params:
+      customer_ids_set: {$keys: {as: set}}
     fields:
       customer_name:
         name: 客户名称
@@ -1092,7 +1104,8 @@ sources:
   pays:
     loader: "scalim_misc.example_report_ir:BLL.get_pay_info_from_api_of_concrete_params"
     key: pay_id
-    bind: {use_keys: {param: pay_ids_set}}
+    params:
+      pay_ids_set: {$keys: {as: set}}
     fields:
       pay_method:
         name: 支付方式
@@ -1188,7 +1201,8 @@ sources:
   customers:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers"
     key: customer_id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       customer_name:
         name: 客户姓名
@@ -1203,14 +1217,12 @@ sources:
     key: product_id
     lookup_cast:
       name: int
-    bind:
-      use_keys:
-        param: ids
-        as: list
+    params:
+      ids: {$keys: {as: list}}
     fields:
       product_name:
         name: 产品名称
-        relation: *orders_to_customers
+        relation: *orders_to_products
 
       product_category_id:
         name: 产品分类ID
@@ -1220,7 +1232,8 @@ sources:
   categories:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_categories"
     key: category_id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       category_name:
         name: 产品分类
@@ -1230,7 +1243,6 @@ sources:
     loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_region_pricing"
     key: [region_id, product_category_id]
     cache_mode: preload_forever
-    bind: {use_keys: {param: ids}}
     fields:
       price_adjustment:
         name: 价格调整系数
@@ -1343,17 +1355,13 @@ _templates:
       from: orders.product_id
       to: products.product_id
 
-  # 绑定配置模板
-  binds:
-    keys_set: &bind_keys_set
-      use_keys:
-        param: ids
-        as: set
+  # params 模板片段
+  params:
+    keys_set: &params_keys_set
+      ids: {$keys: {as: set}}
 
-    keys_list: &bind_keys_list
-      use_keys:
-        param: ids
-        as: list
+    keys_list: &params_keys_list
+      ids: {$keys: {as: list}}
 
   # 字段配置模板
   fields:
@@ -1369,12 +1377,12 @@ relations:
 
 sources:
   customers:
-    bind: *bind_keys_set
+    params: *params_keys_set
     fields:
       customer_name: *field_customer_name
 
   products:
-    bind: *bind_keys_list
+    params: *params_keys_list
 ```
 
 ### 6.3 性能优化建议
@@ -1409,22 +1417,20 @@ output:
   streaming: true    # 减少内存占用
 ```
 
-**4. 使用 keys 模式而非 rows 模式**:
+**4. 使用 `$keys` 而非 `$rows`(尽量避免 rows barrier)**:
 
 ```yaml
-# 推荐:keys 模式
+# 推荐:`$keys`
 sources:
   customers:
-    bind:
-      use_keys:
-        param: ids
+    params:
+      ids: {$keys: {as: set}}
 
-# 谨慎使用:rows 模式(可能传递大量数据)
+# 谨慎使用:`$rows`(可能传递大量数据,并触发 rows barrier)
 sources:
   customers:
-    bind:
-      use_rows:
-        param: rows
+    params:
+      rows: {$rows: {cache_mode: batch}}
 ```
 
 ### 6.4 安全注意事项
@@ -1640,14 +1646,13 @@ output:
   streaming: true
 ```
 
-3. **使用 keys 模式**:
+3. **优先使用 `$keys`(而不是 `$rows`)**:
 
 ```yaml
 sources:
   customers:
-    bind:
-      use_keys:    # 而非 use_rows
-        param: ids
+    params:
+      ids: {$keys: {as: set}}
 ```
 
 4. **启用内存优化统计**:

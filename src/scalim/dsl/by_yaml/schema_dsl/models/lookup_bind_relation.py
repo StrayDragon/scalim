@@ -7,7 +7,6 @@ from ..constants import (
     BIND_CACHE_MODE_ENUM,
     BIND_KEYS_SCHEMA,
     BIND_ROWS_SCHEMA,
-    BIND_SCHEMA,
     DEFAULT_BIND_AS,
     DEFAULT_BIND_CACHE_MODE,
     DESC_BIND_AS,
@@ -170,20 +169,6 @@ class RelationStepConfig:
         ),
     )
     """可选:对 `from` 值进行归一化的转换(仅影响当前步骤)."""
-
-    to_bind: Optional[BindConfig] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema=BIND_SCHEMA,
-            desc="下游 loader 参数绑定(显式参数名与模式),默认 as: set",
-            md=(
-                "下游 loader 参数绑定.\n\n"
-                "- 显式指定 `param` 与模式\n"
-                "- 若目标 source 未设置 `cache_mode: preload_forever`, 则需要 `to_bind` 或 `sources.<id>.bind`"
-            ),
-        ),
-    )
-    """可选:下游加载器参数绑定配置."""
 
 
 @dataclass(frozen=True)

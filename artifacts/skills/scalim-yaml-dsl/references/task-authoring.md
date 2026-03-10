@@ -24,6 +24,9 @@ batch_size: 1000
 main_source:
   source_id: orders
   loader: "myapp.loaders:load_orders"
+  params:
+    # 运行期变量注入示例: 由 Python 调用方传入 `runtime_vars={"end_dt": ...}`.
+    end_dt: "$runtime.end_dt"
   fields:
     order_id: &order_id
       name: 订单ID
@@ -36,9 +39,8 @@ sources:
   customers:
     loader: "myapp.loaders:load_customers"
     key: customer_id
-    bind:
-      use_keys:
-        param: ids
+    params:
+      ids: {$keys: {as: set}}
     fields:
       customer_name: &customer_name
         name: 客户名称
@@ -72,7 +74,8 @@ output:
 - whole-result reshape 用 `sources.<id>.normalize`;字段嵌套取值用字段级 `extract`(写在 `main_source.fields.*` / `sources.<id>.fields.*`)
 - `relation` 只能写 YAML alias 或内联 `steps`,不要写字符串 relation_id
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
-- `bind` / `to_bind` 只能二选一使用 `use_keys` 或 `use_rows`
+- 动态入参用 `sources.<id>.params` 模板内联指令节点表达(`$keys` / `$rows`)
+- 运行期变量用 `runtime_vars` 注入并在 `params` 中用 `$runtime.<name>` 引用(仅 exact-match string 生效)
 - `output.fields` 每项必须是对象或 alias,不能写纯字符串
 - 跨 source 同名 `field_id` 时,`output.fields` 里必须显式加 `source`
 
@@ -140,13 +143,15 @@ fields:
     extract: payment_method_name
 ```
 
-### `use_rows` 绑定
+### `$rows` 注入 batch rows
 
 ```yaml
 sources:
   customers_rows:
     loader: "myapp.loaders:load_customers_by_rows"
     key: customer_id
+    params:
+      rows: {$rows: {cache_mode: batch}}
     fields:
       customer_name:
         name: 客户名称
@@ -154,10 +159,6 @@ sources:
           steps:
             - from: orders.customer_id
               to: customers_rows.customer_id
-              to_bind:
-                use_rows:
-                  param: rows
-                  cache_mode: batch
 ```
 
 ### 派生字段

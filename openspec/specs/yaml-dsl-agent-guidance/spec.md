@@ -123,6 +123,28 @@ skill MUST 为这类报表迁移任务提供清晰的职责切分准则,让 agen
 - **THEN** skill 必须引导 agent 优先选择单 YAML + 单入口的精简结构
 - **THEN** 不得默认拆出大量 `_loaders.py`、`_helpers.py`、`_adapters.py`
 
+### Requirement: `scalim-yaml-dsl` skill documents `$keys/$rows` inline params directives
+系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**` 使其覆盖新的 params 模板指令写法,并将其作为首选方案用于解决 nested params 绑定问题.
+
+skill 文档 MUST 至少包含:
+- `$keys` 与 `$rows` 的最小示例
+- `$rows` 会触发 rows barrier 的提示
+- composite key 在 `$keys` 下保持 tuple 结构的说明
+- `bind/to_bind` 到模板指令的迁移规则与常见错误诊断
+
+#### Scenario: authoring 示例包含 `$keys`
+- **WHEN** 用户请求编写一个 ref loader,需要把 lookup keys 注入到 `kwargs["params"]["..."]` 的嵌套位置
+- **THEN** skill guidance MUST 给出 `$keys` 内联模板示例(而非建议编写 Python wrapper)
+
+#### Scenario: upgrade guidance 指导从 bind 迁移到模板指令
+- **WHEN** 用户请求将旧写法 `bind.use_keys.param` 升级为更直觉的 nested params 写法
+- **THEN** skill guidance MUST 给出迁移后的 `$keys/$rows` 模板写法与校验命令
+
+#### Scenario: old bind/to_bind 不再被建议
+- **WHEN** 用户请求为 ref loader 生成 YAML
+- **THEN** skill guidance MUST 不再输出 `bind/to_bind` 写法
+- **AND** 必须以 `params` 模板作为默认方案
+
 ### Requirement: `scalim-yaml-dsl` skill guides field-level `extract` usage
 系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**`,使其在“loader 返回嵌套 row value”场景下优先推荐字段级 `extract`,而不是先建议编写 Python wrapper。
 
@@ -192,4 +214,3 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 - **WHEN** 用户的 source loader 已经返回 `key -> row`,只是 row 内部字段有嵌套
 - **THEN** skill MUST 优先推荐字段级 `extract`
 - **AND** MUST 明确说明此时不需要 source-level `normalize`
-

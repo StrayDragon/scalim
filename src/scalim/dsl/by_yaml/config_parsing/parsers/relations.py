@@ -64,14 +64,12 @@ class ParserRelationsMixin(ParserSourcesMixin):
             from_value = self._parse_step_field(step_data.get(RELATION_STEP_KEYS["from_"]))
             to_value = self._parse_step_field(step_data.get(RELATION_STEP_KEYS["to"]))
             lookup_cast = self._parse_lookup_cast(step_data.get(RELATION_STEP_KEYS["lookup_cast"]))
-            to_bind = self._parse_bind(step_data.get(RELATION_STEP_KEYS["to_bind"]))
 
             steps.append(
                 RelationStepConfig(
                     from_=from_value,
                     to=to_value,
                     lookup_cast=lookup_cast,
-                    to_bind=to_bind,
                 )
             )
 

@@ -7,33 +7,8 @@ from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ConversionError
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.schema_dsl.models import (
-    BindConfig,
-    BindKeysConfig,
-    DemandConfig,
-    MainSourceConfig,
-    RelationConfig,
-    RelationStepConfig,
-    SourceConfig,
-)
+from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, MainSourceConfig, SourceConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
-
-
-def test_parser_parse_bind_covers_use_rows_and_use_keys() -> None:
-    loader = YamlDemandLoader()
-    bind = loader._parse_bind(  # type: ignore[attr-defined]
-        {
-            "use_rows": {"param": "rows", "cache_mode": "batch"},
-            "use_keys": {"param": "ids", "as": "list"},
-        }
-    )
-    assert bind is not None
-    assert bind.use_rows is not None
-    assert bind.use_rows.param == "rows"
-    assert bind.use_rows.cache_mode == "batch"
-    assert bind.use_keys is not None
-    assert bind.use_keys.param == "ids"
-    assert bind.use_keys.as_ == "list"
 
 
 def test_validator_rejects_params_non_mapping() -> None:
@@ -96,6 +71,52 @@ def test_params_template_invalid_runtime_placeholder_is_literal_string() -> None
     )
     out = template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
     assert out["sql"] == "$runtime.bad-name"
+
+
+def test_params_template_reserved_keys_inside_runtime_vars_are_treated_as_literal_values() -> None:
+    payload = {"$keys": {"as": "set"}, "$rows": {"cache_mode": "batch"}}
+    template = params_tmpl.compile_params_template(
+        {"payload": "$runtime.payload"},
+        path="p",
+        runtime_vars={"payload": payload},
+    )
+    out = template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
+    assert out["payload"] == payload
+
+
+def test_params_template_missing_runtime_var_reports_nested_path() -> None:
+    with pytest.raises(params_tmpl.ParamsTemplateCompileError) as exc:
+        params_tmpl.compile_params_template(
+            {"params": {"end_dt": "$runtime.end_dt"}},
+            path="sources.foo.params",
+            runtime_vars={},
+        )
+    assert exc.value.path == "sources.foo.params.params.end_dt"
+
+
+def test_params_template_renders_directives_in_nested_dict_and_list_positions() -> None:
+    template_nested = params_tmpl.compile_params_template(
+        {"params": {"ids": {"$keys": {"as": "list"}}}},
+        path="p",
+    )
+    out_nested = template_nested.render_kwargs(LoaderCallContextIr(is_ref_loader=True, lookup_keys={2, 1}), path="p")
+    assert out_nested == {"params": {"ids": [1, 2]}}
+
+    template_list = params_tmpl.compile_params_template(
+        {"ids": [{"$keys": None}]},
+        path="p",
+    )
+    out_list = template_list.render_kwargs(LoaderCallContextIr(is_ref_loader=True, lookup_keys={1, 2}), path="p")
+    assert out_list == {"ids": [{1, 2}]}
+
+
+def test_params_template_keys_composite_key_injects_tuple_elements() -> None:
+    template = params_tmpl.compile_params_template({"ids": {"$keys": {"as": "list"}}}, path="p")
+    out = template.render_kwargs(
+        LoaderCallContextIr(is_ref_loader=True, lookup_keys={("r1", 2), ("r1", 1)}),
+        path="p",
+    )
+    assert out["ids"] == [("r1", 1), ("r1", 2)]
 
 
 def test_params_template_compile_validates_options_and_conflicts() -> None:
@@ -195,7 +216,7 @@ def test_params_template_render_kwargs_requires_mapping_and_allows_none() -> Non
         _ = template_scalar.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
 
 
-def test_converter_rejects_legacy_to_bind_and_bind_and_reports_template_errors() -> None:
+def test_converter_rejects_disallowed_directives_and_reports_template_errors() -> None:
     resolver = PythonReferenceResolver(allowed_modules=frozenset(["tests.conftest"]))
 
     config = DemandConfig(
@@ -216,21 +237,6 @@ def test_converter_rejects_legacy_to_bind_and_bind_and_reports_template_errors()
     with pytest.raises(ConversionError, match="`\\$keys` is not allowed"):
         ConfigToIRConverter(resolver=resolver).convert(config)
 
-    config2 = DemandConfig(
-        name="demo",
-        main_source=MainSourceConfig(source_id="orders", loader="tests.conftest.mock_loader"),
-        sources={
-            "customers": SourceConfig(
-                source_id="customers",
-                loader="tests.conftest.mock_loader",
-                key="customer_id",
-                bind=BindConfig(use_keys=BindKeysConfig(param="ids", as_="set")),
-            )
-        },
-    )
-    with pytest.raises(ConversionError, match="sources\\.customers\\.bind"):
-        ConfigToIRConverter(resolver=resolver).convert(config2)
-
     config3 = DemandConfig(
         name="demo",
         main_source=MainSourceConfig(source_id="orders", loader="tests.conftest.mock_loader"),
@@ -245,23 +251,3 @@ def test_converter_rejects_legacy_to_bind_and_bind_and_reports_template_errors()
     )
     with pytest.raises(ConversionError, match="Missing runtime var"):
         ConfigToIRConverter(resolver=resolver).convert(config3)
-
-    config4 = DemandConfig(
-        name="demo",
-        main_source=MainSourceConfig(source_id="orders", loader="tests.conftest.mock_loader"),
-        sources={"customers": SourceConfig(source_id="customers", loader="tests.conftest.mock_loader", key="customer_id")},
-        relations={
-            "r1": RelationConfig(
-                relation_id="r1",
-                steps=(
-                    RelationStepConfig(
-                        from_="orders.customer_id",
-                        to="customers.customer_id",
-                        to_bind=BindConfig(use_keys=BindKeysConfig(param="ids", as_="set")),
-                    ),
-                ),
-            )
-        },
-    )
-    with pytest.raises(ConversionError, match="to_bind"):
-        ConfigToIRConverter(resolver=resolver).convert(config4)

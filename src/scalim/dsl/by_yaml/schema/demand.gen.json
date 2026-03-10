@@ -156,8 +156,8 @@
         },
         "params": {
           "type": "object",
-          "description": "调用 loader 时透传的静态参数字典(主源直传,非主源随 bind)",
-          "markdownDescription": "调用 loader 时透传的静态参数字典.\n\n- main_source.params: 直接以 kwargs 传给 main source loader\n- sources.<id>.params: 仅在 bind/use_keys 或 bind/use_rows 时合并到 loader kwargs\n- 当 source 使用 cache_mode: preload_forever 时,预加载调用为无参,不会传 sources.<id>.params",
+          "description": "调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)",
+          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `$runtime.<name>` 占位符(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `$runtime.<name>` 占位符(仅当值完全等于该字符串时才替换;不做子串插值)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点",
           "additionalProperties": true
         },
         "retry": {
@@ -308,7 +308,7 @@
         "cache_mode": {
           "type": "string",
           "description": "缓存模式:none=不缓存,preload_forever=预加载永久缓存",
-          "markdownDescription": "缓存模式.\n\n- `none`: 不缓存\n- `preload_forever`: 预加载并长期缓存\n- 设为 `preload_forever` 时, 关联到该 source 的 step 可不配置 `to_bind`",
+          "markdownDescription": "缓存模式.\n\n- `none`: 不缓存\n- `preload_forever`: 预加载并长期缓存\n- 设为 `preload_forever` 时,预加载阶段会执行一次 loader 并将结果缓存\n- 若 `sources.<id>.params` 非空,预加载调用会透传 kwargs;为空则保持零参调用\n- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`",
           "enum": [
             "none",
             "preload_forever"
@@ -324,86 +324,6 @@
             }
           ]
         },
-        "bind": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "use_rows"
-              ],
-              "properties": {
-                "use_rows": {
-                  "type": "object",
-                  "required": [
-                    "param"
-                  ],
-                  "properties": {
-                    "param": {
-                      "type": "string",
-                      "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                    },
-                    "cache_mode": {
-                      "type": "string",
-                      "enum": [
-                        "none",
-                        "batch"
-                      ],
-                      "default": "batch",
-                      "description": "rows 模式缓存: batch=批次内复用, none=不复用(仅 rows 模式生效;未配置时默认 batch)",
-                      "markdownDescription": "rows 缓存策略.\n\n- `batch`: 批次内复用\n- `none`: 不复用",
-                      "examples": [
-                        "batch"
-                      ]
-                    }
-                  },
-                  "additionalProperties": false,
-                  "description": "rows 绑定: rows=批次行上下文(主源+已 join)",
-                  "markdownDescription": "rows 绑定: 传入批次行上下文(主源 + 已 join).\n\n- `param` 必填\n- `cache_mode`: batch/none"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "use_keys"
-              ],
-              "properties": {
-                "use_keys": {
-                  "type": "object",
-                  "required": [
-                    "param"
-                  ],
-                  "properties": {
-                    "param": {
-                      "type": "string",
-                      "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                    },
-                    "as": {
-                      "type": "string",
-                      "enum": [
-                        "set",
-                        "list"
-                      ],
-                      "default": "set",
-                      "description": "绑定容器: set/list (仅 keys 模式生效)",
-                      "markdownDescription": "keys 容器类型.\n\n- `set`: 去重\n- `list`: 保持顺序",
-                      "examples": [
-                        "set"
-                      ]
-                    }
-                  },
-                  "additionalProperties": false,
-                  "description": "keys 绑定: keys=lookup keys",
-                  "markdownDescription": "keys 绑定: 传入 lookup keys.\n\n- `param` 必填\n- `as`: set/list"
-                }
-              },
-              "additionalProperties": false
-            }
-          ],
-          "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-          "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
-        },
         "fields": {
           "type": "object",
           "description": "数据源字段配置映射, key 为 field_id",
@@ -415,8 +335,8 @@
         },
         "params": {
           "type": "object",
-          "description": "调用 loader 时透传的静态参数字典(主源直传,非主源随 bind)",
-          "markdownDescription": "调用 loader 时透传的静态参数字典.\n\n- main_source.params: 直接以 kwargs 传给 main source loader\n- sources.<id>.params: 仅在 bind/use_keys 或 bind/use_rows 时合并到 loader kwargs\n- 当 source 使用 cache_mode: preload_forever 时,预加载调用为无参,不会传 sources.<id>.params",
+          "description": "调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)",
+          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `$runtime.<name>` 占位符(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `$runtime.<name>` 占位符(仅当值完全等于该字符串时才替换;不做子串插值)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点",
           "additionalProperties": true
         }
       },
@@ -553,86 +473,6 @@
                     "additionalProperties": false,
                     "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
                     "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
-                  },
-                  "to_bind": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "required": [
-                          "use_rows"
-                        ],
-                        "properties": {
-                          "use_rows": {
-                            "type": "object",
-                            "required": [
-                              "param"
-                            ],
-                            "properties": {
-                              "param": {
-                                "type": "string",
-                                "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                              },
-                              "cache_mode": {
-                                "type": "string",
-                                "enum": [
-                                  "none",
-                                  "batch"
-                                ],
-                                "default": "batch",
-                                "description": "rows 模式缓存: batch=批次内复用, none=不复用(仅 rows 模式生效;未配置时默认 batch)",
-                                "markdownDescription": "rows 缓存策略.\n\n- `batch`: 批次内复用\n- `none`: 不复用",
-                                "examples": [
-                                  "batch"
-                                ]
-                              }
-                            },
-                            "additionalProperties": false,
-                            "description": "rows 绑定: rows=批次行上下文(主源+已 join)",
-                            "markdownDescription": "rows 绑定: 传入批次行上下文(主源 + 已 join).\n\n- `param` 必填\n- `cache_mode`: batch/none"
-                          }
-                        },
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "required": [
-                          "use_keys"
-                        ],
-                        "properties": {
-                          "use_keys": {
-                            "type": "object",
-                            "required": [
-                              "param"
-                            ],
-                            "properties": {
-                              "param": {
-                                "type": "string",
-                                "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                              },
-                              "as": {
-                                "type": "string",
-                                "enum": [
-                                  "set",
-                                  "list"
-                                ],
-                                "default": "set",
-                                "description": "绑定容器: set/list (仅 keys 模式生效)",
-                                "markdownDescription": "keys 容器类型.\n\n- `set`: 去重\n- `list`: 保持顺序",
-                                "examples": [
-                                  "set"
-                                ]
-                              }
-                            },
-                            "additionalProperties": false,
-                            "description": "keys 绑定: keys=lookup keys",
-                            "markdownDescription": "keys 绑定: 传入 lookup keys.\n\n- `param` 必填\n- `as`: set/list"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
-                    ],
-                    "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-                    "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
                   }
                 },
                 "additionalProperties": false
@@ -805,86 +645,6 @@
                     "additionalProperties": false,
                     "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
                     "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
-                  },
-                  "to_bind": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "required": [
-                          "use_rows"
-                        ],
-                        "properties": {
-                          "use_rows": {
-                            "type": "object",
-                            "required": [
-                              "param"
-                            ],
-                            "properties": {
-                              "param": {
-                                "type": "string",
-                                "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                              },
-                              "cache_mode": {
-                                "type": "string",
-                                "enum": [
-                                  "none",
-                                  "batch"
-                                ],
-                                "default": "batch",
-                                "description": "rows 模式缓存: batch=批次内复用, none=不复用(仅 rows 模式生效;未配置时默认 batch)",
-                                "markdownDescription": "rows 缓存策略.\n\n- `batch`: 批次内复用\n- `none`: 不复用",
-                                "examples": [
-                                  "batch"
-                                ]
-                              }
-                            },
-                            "additionalProperties": false,
-                            "description": "rows 绑定: rows=批次行上下文(主源+已 join)",
-                            "markdownDescription": "rows 绑定: 传入批次行上下文(主源 + 已 join).\n\n- `param` 必填\n- `cache_mode`: batch/none"
-                          }
-                        },
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "required": [
-                          "use_keys"
-                        ],
-                        "properties": {
-                          "use_keys": {
-                            "type": "object",
-                            "required": [
-                              "param"
-                            ],
-                            "properties": {
-                              "param": {
-                                "type": "string",
-                                "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                              },
-                              "as": {
-                                "type": "string",
-                                "enum": [
-                                  "set",
-                                  "list"
-                                ],
-                                "default": "set",
-                                "description": "绑定容器: set/list (仅 keys 模式生效)",
-                                "markdownDescription": "keys 容器类型.\n\n- `set`: 去重\n- `list`: 保持顺序",
-                                "examples": [
-                                  "set"
-                                ]
-                              }
-                            },
-                            "additionalProperties": false,
-                            "description": "keys 绑定: keys=lookup keys",
-                            "markdownDescription": "keys 绑定: 传入 lookup keys.\n\n- `param` 必填\n- `as`: set/list"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
-                    ],
-                    "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-                    "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
                   }
                 },
                 "additionalProperties": false
@@ -1054,86 +814,6 @@
                 "additionalProperties": false,
                 "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
                 "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
-              },
-              "to_bind": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "required": [
-                      "use_rows"
-                    ],
-                    "properties": {
-                      "use_rows": {
-                        "type": "object",
-                        "required": [
-                          "param"
-                        ],
-                        "properties": {
-                          "param": {
-                            "type": "string",
-                            "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                          },
-                          "cache_mode": {
-                            "type": "string",
-                            "enum": [
-                              "none",
-                              "batch"
-                            ],
-                            "default": "batch",
-                            "description": "rows 模式缓存: batch=批次内复用, none=不复用(仅 rows 模式生效;未配置时默认 batch)",
-                            "markdownDescription": "rows 缓存策略.\n\n- `batch`: 批次内复用\n- `none`: 不复用",
-                            "examples": [
-                              "batch"
-                            ]
-                          }
-                        },
-                        "additionalProperties": false,
-                        "description": "rows 绑定: rows=批次行上下文(主源+已 join)",
-                        "markdownDescription": "rows 绑定: 传入批次行上下文(主源 + 已 join).\n\n- `param` 必填\n- `cache_mode`: batch/none"
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "use_keys"
-                    ],
-                    "properties": {
-                      "use_keys": {
-                        "type": "object",
-                        "required": [
-                          "param"
-                        ],
-                        "properties": {
-                          "param": {
-                            "type": "string",
-                            "description": "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
-                          },
-                          "as": {
-                            "type": "string",
-                            "enum": [
-                              "set",
-                              "list"
-                            ],
-                            "default": "set",
-                            "description": "绑定容器: set/list (仅 keys 模式生效)",
-                            "markdownDescription": "keys 容器类型.\n\n- `set`: 去重\n- `list`: 保持顺序",
-                            "examples": [
-                              "set"
-                            ]
-                          }
-                        },
-                        "additionalProperties": false,
-                        "description": "keys 绑定: keys=lookup keys",
-                        "markdownDescription": "keys 绑定: 传入 lookup keys.\n\n- `param` 必填\n- `as`: set/list"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                ],
-                "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-                "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
               }
             },
             "additionalProperties": false

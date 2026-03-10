@@ -28,13 +28,13 @@
 - **AND** 在不同 `PYTHONHASHSEED` 环境下输出顺序仍必须一致
 
 ### Requirement: keys-list 绑定参数顺序可重复
-系统 SHALL 在 `use_keys.as=list` 路径输出稳定顺序的 keys 列表.
+系统 SHALL 在 `$keys.as=list` 路径输出稳定顺序的 keys 列表.
 系统 SHALL 通过 `build_stable_lookup_key_list` 作为公开 helper 名称提供稳定排序实现.
 
 `build_stable_lookup_key_list` MUST 作为唯一公开函数名;旧名 `stable_lookup_keys_list` MUST NOT 继续公开.
 
 #### Scenario: 不同 hash seed 下 ids 列表一致
-- **WHEN** loader 绑定配置为 `use_keys.as=list` 且输入 lookup_keys 集合相同
+- **WHEN** loader params 模板使用 `$keys: {as: list}` 且输入 lookup_keys 集合相同
 - **THEN** 传递给 loader 的 keys 列表顺序必须一致
 
 #### Scenario: helper 名称统一

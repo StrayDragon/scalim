@@ -6,9 +6,8 @@ import pytest
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml import run
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError, ConversionError
+from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
 from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
-from scalim.dsl.by_yaml.schema_dsl.models import BindConfig, BindKeysConfig, SourceConfig
 from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink
 
 
@@ -285,20 +284,6 @@ class TestExcelIncludeHeader:
         rows = list(ws.iter_rows(values_only=True))
         wb.close()
         assert rows == expected_rows
-
-
-class TestBindConfigErrors:
-    def test_converter_rejects_sources_bind_legacy_syntax(self) -> None:
-        converter = ConfigToIRConverter(allow_unsafe_resolver=True)
-        source_config = SourceConfig(
-            source_id="s1",
-            loader="tests.conftest.mock_loader",
-            key="id",
-            bind=BindConfig(use_keys=BindKeysConfig(param="ids")),
-        )
-
-        with pytest.raises(ConversionError, match=r"Legacy YAML syntax is not supported: 'sources\.s1\.bind'"):
-            _ = converter._convert_source(source_config)
 
 
 class TestSchemaItemsChoicesEnum:

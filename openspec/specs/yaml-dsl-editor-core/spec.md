@@ -52,7 +52,7 @@
 系统 MUST 以 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` 作为唯一 canonical schema 输入,为 YAML 提供 schema 级别的补全、hover(markdownDescription)与基础校验.
 
 #### Scenario: schema 驱动的 hover
-- **WHEN** 用户将光标移动到 `relations.*.steps.from` 或 `bind.use_keys.as` 等字段
+- **WHEN** 用户将光标移动到 `relations.*.steps.from` 或 `sources.*.params` 等字段
 - **THEN** 系统展示来自 schema 的字段说明(含 markdownDescription 与示例)
 
 ### Requirement: editor exposes `extract` with the same semantics as the canonical schema
@@ -111,7 +111,7 @@ Issue 模型 MUST 可直接用于面板展示与跳转定位.
 系统 MUST 支持可选语义校验链路(local semantic / exact semantic),并与 schema issues 合并展示且保留来源.
 
 #### Scenario: 语义错误可见
-- **WHEN** relation steps 断链或 bind/to_bind 配置错误
+- **WHEN** relation steps 断链或 legacy bind/to_bind 使用/params 模板指令语义错误
 - **THEN** 系统 MUST 展示 semantic issue 并可定位
 
 ### Requirement: exact semantic 基于 Worker + Pyodide 且默认关闭

@@ -4,7 +4,7 @@
 
 - 用户明确说“升级旧 YAML DSL”
 - `validate` / `schema validate` 提示 legacy field
-- 你看到旧版 `bind`、旧顶层结构、旧输出字段写法
+- 你看到旧版 `bind` / `to_bind`、旧顶层结构、旧输出字段写法
 
 ## 原则
 
@@ -22,6 +22,10 @@
 - 2026-03-10: yaml-source-normalize
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-source-normalize.md`
   - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-source-normalize/`
+  - Spec: `openspec/specs/demand-dsl/spec.md`
+- 2026-03-11: yaml-params-template
+  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-11-yaml-params-template.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
   - Spec: `openspec/specs/demand-dsl/spec.md`
 <!-- END SCALIM-GEN:yaml-dsl-upgrades -->
 
@@ -82,16 +86,9 @@ main_source:
 - `fields.*.field` 已从稳定 YAML authoring surface 移除,出现即 fail-fast
 - `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)
 
-### 4. `bind` / `to_bind`
+### 4. `bind` / `to_bind` -> `params` 模板指令(`$keys` / `$rows`)
 
-旧写法:
-
-```yaml
-bind:
-  param: ids
-```
-
-新写法:
+旧写法(不再允许,会 fail-fast):
 
 ```yaml
 bind:
@@ -99,14 +96,24 @@ bind:
     param: ids
 ```
 
-`rows` 模式则改成:
+新写法(推荐):
 
 ```yaml
-to_bind:
-  use_rows:
-    param: rows
-    cache_mode: batch
+params:
+  ids: {$keys: {as: set}}
 ```
+
+`rows` 模式:
+
+```yaml
+params:
+  rows: {$rows: {cache_mode: batch}}
+```
+
+提示:
+
+- `$rows` 会触发 rows barrier.在 `parallel_mode="adaptive"` 下,该层 LoadRef 会按串行执行.
+- `cache_mode: preload_forever` 的 source 禁止在 `params` 中使用 `$keys/$rows`.
 
 ### 5. `output.fields`
 
@@ -152,7 +159,7 @@ output:
 1. 清掉 legacy 字段
 2. 规范化 `main_source` / `sources` / 顶层 `fields`
 3. 把 `fields.*.field` 全部升级为 `fields.*.extract`
-4. 把所有 `bind` / `to_bind` 改成 `use_keys` / `use_rows`
+4. 把所有 `bind` / `to_bind` 改成 `params` 模板中的 `$keys` / `$rows` 指令节点
 5. 重写 `output.fields`
 6. 检查 relation steps 是否还在写 `data_key`
 7. 跑校验并修掉剩余错误

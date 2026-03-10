@@ -5,9 +5,7 @@ from .....spec.ir.aliases import LookupKeyCast, NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr
 from .....spec.ir.relations import LookupStepIr
 from .....spec.ir.sources import MainSourceIr, SourceIr
-from .....typedefs import StaticParams
 from ...schema_dsl.models import (
-    BindConfig,
     DemandConfig,
     InlineRelationConfig,
     LookupCastConfig,
@@ -33,10 +31,10 @@ class ConfigToIRConversionRelationMixin:
 
     def _create_binding(
         self,
-        bind_config: BindConfig,
-        static_params: Optional[StaticParams],
-        key_field: NormalizedLookupKeySpec,
-    ) -> BindingIr:
+        bind_config: object,
+        static_params: object,
+        key_field: "NormalizedLookupKeySpec",
+    ) -> Optional[BindingIr]:
         _ = (bind_config, static_params, key_field)
         raise NotImplementedError
 
@@ -144,13 +142,7 @@ class ConfigToIRConversionRelationMixin:
         to_source_id: str,
         key_field: "NormalizedLookupKeySpec",
     ) -> Optional[BindingIr]:
-        _ = (config, key_field)
-        if step.to_bind is not None:
-            msg = (
-                "Legacy YAML syntax is not supported: 'relations.*.steps[].to_bind'. "
-                "Move binding into 'sources.{}.params' using `$keys` / `$rows` directives."
-            ).format(to_source_id)
-            raise ConversionError(msg)
+        _ = (step, config, to_source_id, key_field)
         return None
 
     def _resolve_lookup_steps(
