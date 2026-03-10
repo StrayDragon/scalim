@@ -13,7 +13,7 @@ from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
 from ...loader_retry import CALLSITE_LOAD, call_with_loader_retry
 from ..guardrails import build_loader_result_guardrail_payload, fail_guardrail
-from ..helpers.field_access import extract_field
+from ..helpers.field_access import extract_field, extract_field_segments
 from ..runtime.runtime import ExecutionRuntime
 from ._internal.loader_guardrails import (
     handle_loader_extractor_error,
@@ -128,8 +128,8 @@ class LoadOperatorExecutor(OperatorExecutor):
         if not isinstance(field_spec, FieldIr):
             return extract_field(data, field_key)
 
-        data_key = field_spec.data_key or field_key
-        value: FieldValue = extract_field(data, data_key)
+        data_key = field_spec.extract_expr or field_spec.data_key or field_key
+        value: FieldValue = extract_field_segments(data, field_spec.extract_segments)
         try:
             return field_spec.apply_transform(value)
         except Exception as exc:

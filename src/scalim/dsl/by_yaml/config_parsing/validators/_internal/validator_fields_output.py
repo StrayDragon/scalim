@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Set, cast
 from ......vendor.compact.typing_extensionsx import override
 from ....schema_dsl.constants import FIELD_KIND_SOURCE
 from ....schema_dsl.models import DEMAND_KEYS, OUTPUT_KEYS
+from ...field_extract import derive_source_field_data_key
 from ...field_index import OutputFieldErrors, OutputFieldResolver, build_source_data_key_index
 from ...models import AliasIndex, FieldDef, RawDemand
 from ..base import ValidatorMixinBase
@@ -36,7 +37,7 @@ class OutputFieldIssueCollector(OutputFieldErrors):
 
 
 class ValidatorFieldOutputMixin(ValidatorMixinBase):
-    def _validate_output_fields_v3(
+    def _validate_output_fields(
         self,
         raw: RawDemand,
         errors: List[ValidationIssue],
@@ -110,8 +111,9 @@ class ValidatorFieldOutputMixin(ValidatorMixinBase):
             return
         source_id = field_def.source_id or ""
         dup_fields = duplicate_fields_by_source.get(source_id, set())
-        field_value_raw = field_def.data.get("field")
-        field_value = str(field_value_raw) if field_value_raw is not None else field_def.field_id
+        extract_raw = field_def.data.get("extract")
+        extract_expr = None if extract_raw is None else str(extract_raw)
+        field_value = derive_source_field_data_key(field_id=field_def.field_id, extract=extract_expr)
         if field_value in dup_fields:
             self._add_error(
                 errors,

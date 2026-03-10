@@ -125,9 +125,9 @@ def _base_validator_config() -> dict:
             "source_id": "orders",
             "loader": "tests.call_by_fns:dummy_main_loader",
             "fields": {
-                "a": {"field": "a"},
-                "b": {"field": "b"},
-                "status": {"field": "status"},
+                "a": {"extract": "a"},
+                "b": {"extract": "b"},
+                "status": {"extract": "status"},
             },
         },
         "sources": {},
@@ -138,7 +138,7 @@ def _base_validator_config() -> dict:
 def test_validator_rejects_call_by_in_source_fields() -> None:
     validator = ConfigValidator()
     config = _base_validator_config()
-    config["main_source"]["fields"]["bad"] = {"field": "x", "call_by": "tests.call_by_fns:echo(a)"}
+    config["main_source"]["fields"]["bad"] = {"extract": "x", "call_by": "tests.call_by_fns:echo(a)"}
 
     with pytest.raises(ConfigValidationError) as exc:
         validator.validate(config)
@@ -153,7 +153,7 @@ def test_validator_rejects_call_by_in_sources_fields() -> None:
         "s1": {
             "loader": "tests.call_by_fns:dummy_main_loader",
             "key": "id",
-            "fields": {"bad": {"field": "x", "call_by": "tests.call_by_fns:echo(a)"}},
+            "fields": {"bad": {"extract": "x", "call_by": "tests.call_by_fns:echo(a)"}},
         }
     }
 
@@ -247,7 +247,7 @@ def _make_call_by_config(call_by: str, *, depends_on: tuple) -> DemandConfig:
         name="demo",
         main_source=MainSourceConfig(source_id="orders", loader="tests.call_by_fns:dummy_main_loader"),
         sources={},
-        source_fields={"status": SourceFieldConfig(field_id="status", source="orders", field="status")},
+        source_fields={"status": SourceFieldConfig(field_id="status", source="orders", extract="status")},
         derived_fields={
             "text": DerivedFieldConfig(
                 field_id="text",
@@ -301,7 +301,7 @@ def test_converter_rejects_missing_compute_and_call_by() -> None:
         name="demo",
         main_source=MainSourceConfig(source_id="orders", loader="tests.call_by_fns:dummy_main_loader"),
         sources={},
-        source_fields={"status": SourceFieldConfig(field_id="status", source="orders", field="status")},
+        source_fields={"status": SourceFieldConfig(field_id="status", source="orders", extract="status")},
         derived_fields={
             "bad": DerivedFieldConfig(
                 field_id="bad",
@@ -326,7 +326,7 @@ def test_converter_call_by_parse_error_and_literal_and_ctx_attr_and_missing_ctx(
         name="demo",
         main_source=MainSourceConfig(source_id="orders", loader="tests.call_by_fns:dummy_main_loader"),
         sources={},
-        source_fields={"status": SourceFieldConfig(field_id="status", source="orders", field="status")},
+        source_fields={"status": SourceFieldConfig(field_id="status", source="orders", extract="status")},
         derived_fields={},
     )
 

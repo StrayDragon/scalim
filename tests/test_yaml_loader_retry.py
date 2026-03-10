@@ -28,7 +28,7 @@ main_source:
   loader: "tests.loader_retry_allowlist_mod:load_orders"
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 """.lstrip()
 
     yaml_path = tmp_path / "demand.yaml"
@@ -59,7 +59,7 @@ main_source:
   loader: "tests.loader_retry_allowlist_mod:load_orders"
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 """.lstrip()
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
@@ -84,7 +84,7 @@ main_source:
   loader: "tests.loader_retry_allowlist_mod:load_orders"
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 """.lstrip()
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
@@ -112,7 +112,7 @@ main_source:
   loader: "tests.loader_retry_allowlist_mod:load_orders"
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 """.lstrip()
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
@@ -129,7 +129,7 @@ main_source:
   loader: "tests.loader_retry_allowlist_mod:load_orders"
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 """.lstrip()
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
@@ -158,7 +158,7 @@ main_source:
   retry: *enabled_retry
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 
 sources:
   customers:
@@ -196,7 +196,7 @@ main_source:
   loader: "tests.loader_retry_allowlist_mod:load_orders"
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 """.lstrip()
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")

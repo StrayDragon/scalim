@@ -52,6 +52,22 @@ class FieldIr:
     - 当未显式提供 `data_key`(或提供空字符串)时, 默认等于 `field_id`.
     """
 
+    extract_expr: str = ""
+    """
+    字段提取表达式(诊断友好).
+
+    - 对 YAML DSL: 通常等于用户声明的 `extract` 原始字符串(或其规范化文本)
+    - 对纯 IR 使用: 默认回退为 `data_key`
+    """
+
+    extract_segments: Tuple[Union[str, int], ...] = ()
+    """
+    字段提取的 `canonical segments(typed)`.
+
+    - 仅支持 `str`/`int` 段
+    - 当未显式提供时, 默认回退为单段 `(data_key,)`(保持旧 `flat getter` 行为)
+    """
+
     is_primary: bool = False
     """
     是否为主键字段
@@ -85,6 +101,10 @@ class FieldIr:
     def __post_init__(self) -> None:
         if not self.data_key:
             object.__setattr__(self, "data_key", self.field_id)
+        if not self.extract_expr:
+            object.__setattr__(self, "extract_expr", self.data_key)
+        if not self.extract_segments:
+            object.__setattr__(self, "extract_segments", (self.data_key,))
 
     def is_ref_field(self) -> bool:
         """是否是关联字段: 关联字段通过 `relation` 定义."""

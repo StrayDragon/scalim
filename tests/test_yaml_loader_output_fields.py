@@ -16,7 +16,7 @@ main_source:
   fields:
     bad: 1
     good:
-      field: order_id
+      extract: order_id
 sources: {}
 """,
             "Field 'bad' must be a dictionary",
@@ -29,7 +29,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields: order_id
@@ -44,7 +44,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -60,7 +60,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -76,7 +76,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     name:
-      field: name
+      extract: name
 sources:
   customers:
     loader: tests.conftest.mock_loader
@@ -84,7 +84,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       name:
-        field: name
+        extract: name
 relations:
   orders_to_customers:
     steps:
@@ -104,7 +104,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -141,7 +141,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -165,7 +165,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -189,7 +189,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     dup:
-      field: id
+      extract: id
 sources:
   other:
     loader: tests.conftest.mock_loader
@@ -197,7 +197,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       dup:
-        field: id2
+        extract: id2
 relations:
   orders_to_other:
     steps:
@@ -224,7 +224,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     dup:
-      field: id
+      extract: id
 sources:
   other:
     loader: tests.conftest.mock_loader
@@ -232,7 +232,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       dup:
-        field: id
+        extract: id
 relations:
   orders_to_other:
     steps:
@@ -260,7 +260,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -278,7 +278,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -300,7 +300,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     dup:
-      field: id
+      extract: id
 sources:
   other:
     loader: tests.conftest.mock_loader
@@ -308,7 +308,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       dup:
-        field: id2
+        extract: id2
 relations:
   orders_to_other:
     steps:
@@ -330,7 +330,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_name:
-      field: order_real_name
+      extract: order_real_name
       name: 源字段名
 sources: {}
 output:
@@ -356,7 +356,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: id
+      extract: id
 sources:
   customers:
     loader: tests.conftest.mock_loader
@@ -364,7 +364,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_id:
-        field: id
+        extract: id
         relation:
           steps:
             - from: orders.order_id
@@ -390,7 +390,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: id
+      extract: id
 sources:
   customers:
     loader: tests.conftest.mock_loader
@@ -398,7 +398,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_id:
-        field: id
+        extract: id
         relation:
           steps:
             - from: orders.order_id
@@ -425,9 +425,9 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     id_alias_a:
-      field: id
+      extract: id
     id_alias_b:
-      field: id
+      extract: id
 sources: {}
 output:
   fields:
@@ -451,12 +451,13 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_name: &order_name
-      field: order_real_name
+      extract: order_real_name
       name: 源字段名
 sources: {}
 output:
   fields:
     - <<: *order_name
+      field: order_real_name
       name: 输出覆写名
 """
 
@@ -501,7 +502,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     dup:
-      field: id
+      extract: id
 sources:
   other:
     loader: tests.conftest.mock_loader
@@ -509,7 +510,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       dup:
-        field: id2
+        extract: id2
 relations:
   orders_to_other:
     steps:
@@ -539,7 +540,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 fields:
   calc:
@@ -565,7 +566,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     dup:
-      field: id
+      extract: id
 sources:
   other:
     loader: tests.conftest.mock_loader
@@ -573,7 +574,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       dup:
-        field: id2
+        extract: id2
 relations:
   orders_to_other:
     steps:
@@ -603,7 +604,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     amount:
-      field: amount
+      extract: amount
 sources: {}
 fields:
   net:
@@ -630,7 +631,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     amount:
-      field: amount
+      extract: amount
 sources: {}
 fields:
   calc:
@@ -655,7 +656,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     customer_name:
-      field: name
+      extract: name
       relation: r1
 sources: {}
 """

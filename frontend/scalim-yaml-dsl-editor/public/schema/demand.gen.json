@@ -357,7 +357,7 @@
             }
           ],
           "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-          "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- v3-only: 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
+          "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
         },
         "fields": {
           "type": "object",
@@ -390,11 +390,17 @@
           "description": "字段来源的 source_id (例: source: orders)",
           "markdownDescription": "字段来源的 `source_id`.\n\n- 在 `main_source.fields` / `sources.<id>.fields` 中可省略\n- 若显式提供, 必须与容器 `source_id` 一致"
         },
-        "field": {
+        "extract": {
           "type": "string",
-          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "字段来源的列名,缺省时等于字段 key (例: field: customer_id)",
-          "markdownDescription": "字段来源的列名.\n\n- 缺省时等于字段 key"
+          "minLength": 1,
+          "description": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).",
+          "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).\n\n语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):\n- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)\n- dot: `a.b.c`\n- int-key: `\"[1].clearn_reason_level\"` (表示 key=1,不是 list index)\n- 字面量 string key: `'[\"a.b\"].x'` (用于 key 本身包含点号等特殊字符)\n\n注意:\n- 不做 `\"1\"` ↔ `1` 的隐式转换(避免歧义)\n- 不支持数组/列表下标语义: `[1]` 永远表示 “key=1”\n- 缺失/路径不匹配时返回 `None`\n\n示例(含嵌套取值):\n\n```yaml\nmain_source:\n  fields:\n    # 顶层同名 key: extract 可省略\n    review_status:\n      name: 审核状态\n\n    # int-key nested dict: role_id 是 int(例如 1/2)\n    customer_clearn_reason_level:\n      name: 客户净利原因等级\n      extract: \"[1].clearn_reason_level\"\n\n    # dotted literal key: row 的 key 就叫 \"a.b\"\n    dotted_literal_key_value:\n      extract: '[\"a.b\"].x'\n```\n\n示例(给定 loader 返回值,extract 提取后的输出长什么样):\n\n```python\nresult = {\n  1: {1: {\"clearn_reason_level\": 2}, 2: {\"clearn_reason_level\": 1}, \"review_status\": 0},\n}\n```\n\n字段:\n\n```yaml\nsources:\n  clearn_reasons:\n    fields:\n      customer_level:\n        extract: \"[1].clearn_reason_level\"\n      operation_level:\n        extract: \"[2].clearn_reason_level\"\n      review_status:\n        extract: review_status\n```\n\n对 `lookup_key=1` 的 row value:\n- `customer_level` → `2`\n- `operation_level` → `1`\n- `review_status` → `0`\n\n最终输出行片段:\n\n```python\n{\"customer_level\": 2, \"operation_level\": 1, \"review_status\": 0}\n```\n\n补充边界:\n- 如果中间段是 list/tuple, `\"[1]\"` 也不会当作下标(会返回 `None`)\n- 如果同时存在 key `\"1\"` 与 `1`,需要用 `extract: '[\"1\"].x'` 与 `extract: \"[1].x\"` 明确区分\n",
+          "examples": [
+            "review_status",
+            "CustomerMark.clearn_reason_level",
+            "[1].clearn_reason_level",
+            "[\"a.b\"].x"
+          ]
         },
         "name": {
           "type": "string",
@@ -581,7 +587,7 @@
                       }
                     ],
                     "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-                    "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- v3-only: 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
+                    "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
                   }
                 },
                 "additionalProperties": false
@@ -616,6 +622,13 @@
               "call_by"
             ]
           }
+        },
+        {
+          "not": {
+            "required": [
+              "field"
+            ]
+          }
         }
       ]
     },
@@ -629,11 +642,17 @@
           "description": "字段来源的 source_id (例: source: orders)",
           "markdownDescription": "字段来源的 `source_id`.\n\n- 在 `main_source.fields` / `sources.<id>.fields` 中可省略\n- 若显式提供, 必须与容器 `source_id` 一致"
         },
-        "field": {
+        "extract": {
           "type": "string",
-          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "字段来源的列名,缺省时等于字段 key (例: field: customer_id)",
-          "markdownDescription": "字段来源的列名.\n\n- 缺省时等于字段 key"
+          "minLength": 1,
+          "description": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).",
+          "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).\n\n语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):\n- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)\n- dot: `a.b.c`\n- int-key: `\"[1].clearn_reason_level\"` (表示 key=1,不是 list index)\n- 字面量 string key: `'[\"a.b\"].x'` (用于 key 本身包含点号等特殊字符)\n\n注意:\n- 不做 `\"1\"` ↔ `1` 的隐式转换(避免歧义)\n- 不支持数组/列表下标语义: `[1]` 永远表示 “key=1”\n- 缺失/路径不匹配时返回 `None`\n\n示例(含嵌套取值):\n\n```yaml\nmain_source:\n  fields:\n    # 顶层同名 key: extract 可省略\n    review_status:\n      name: 审核状态\n\n    # int-key nested dict: role_id 是 int(例如 1/2)\n    customer_clearn_reason_level:\n      name: 客户净利原因等级\n      extract: \"[1].clearn_reason_level\"\n\n    # dotted literal key: row 的 key 就叫 \"a.b\"\n    dotted_literal_key_value:\n      extract: '[\"a.b\"].x'\n```\n\n示例(给定 loader 返回值,extract 提取后的输出长什么样):\n\n```python\nresult = {\n  1: {1: {\"clearn_reason_level\": 2}, 2: {\"clearn_reason_level\": 1}, \"review_status\": 0},\n}\n```\n\n字段:\n\n```yaml\nsources:\n  clearn_reasons:\n    fields:\n      customer_level:\n        extract: \"[1].clearn_reason_level\"\n      operation_level:\n        extract: \"[2].clearn_reason_level\"\n      review_status:\n        extract: review_status\n```\n\n对 `lookup_key=1` 的 row value:\n- `customer_level` → `2`\n- `operation_level` → `1`\n- `review_status` → `0`\n\n最终输出行片段:\n\n```python\n{\"customer_level\": 2, \"operation_level\": 1, \"review_status\": 0}\n```\n\n补充边界:\n- 如果中间段是 list/tuple, `\"[1]\"` 也不会当作下标(会返回 `None`)\n- 如果同时存在 key `\"1\"` 与 `1`,需要用 `extract: '[\"1\"].x'` 与 `extract: \"[1].x\"` 明确区分\n",
+          "examples": [
+            "review_status",
+            "CustomerMark.clearn_reason_level",
+            "[1].clearn_reason_level",
+            "[\"a.b\"].x"
+          ]
         },
         "name": {
           "type": "string",
@@ -820,7 +839,7 @@
                       }
                     ],
                     "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-                    "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- v3-only: 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
+                    "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
                   }
                 },
                 "additionalProperties": false
@@ -1069,7 +1088,7 @@
                   }
                 ],
                 "description": "默认绑定(供 steps[].to_bind 缺省时使用); use_keys 默认 as: set, use_rows 默认 cache_mode: batch",
-                "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- v3-only: 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
+                "markdownDescription": "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n- 必须且只能设置一种: `use_rows` 或 `use_keys`\n- `param` 为 loader 参数名\n- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
               }
             },
             "additionalProperties": false
@@ -1581,13 +1600,13 @@
       "properties": {
         "null_key_max_rate": {
           "description": "关联 null_key 最大比例(0.0-1.0;未设置则不启用)",
-          "markdownDescription": "关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- v1 默认对全部关联 lookup step 生效",
+          "markdownDescription": "关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
           "minimum": 0.0,
           "maximum": 1.0
         },
         "type_error_max_rate": {
           "description": "关联 type_error 最大比例(0.0-1.0;未设置则不启用)",
-          "markdownDescription": "关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- v1 默认对全部关联 lookup step 生效",
+          "markdownDescription": "关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
           "minimum": 0.0,
           "maximum": 1.0
         }
@@ -1729,6 +1748,6 @@
       "additionalProperties": false
     }
   },
-  "markdownDescription": "Scalim 框架 YAML 需求配置定义 Schema.\n\n入口字段: `main_source` / `sources` / `fields` (v3-only).\n不再支持 legacy 字段: relations_sql_like / relations_graph / foreign_key / target / from / via / column / pk / pk_transform / derived.",
+  "markdownDescription": "Scalim 框架 YAML 需求配置定义 Schema.\n\n入口字段: `main_source` / `sources` / `fields`.\n不再支持 legacy 字段: relations_sql_like / relations_graph / foreign_key / target / from / via / column / pk / pk_transform / derived.",
   "additionalProperties": false
 }

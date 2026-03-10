@@ -21,9 +21,9 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: id
+      extract: id
     pay_id:
-      field: pay_id
+      extract: pay_id
 sources:
   pays:
     loader: tests.conftest.mock_loader
@@ -31,13 +31,13 @@ sources:
     bind: {use_keys: {param: pay_ids}}
     fields:
       country_id:
-        field: country_id
+        extract: country_id
         relation:
           steps:
             - from: orders.pay_id
               to: pays.pay_id
       pay_method:
-        field: method
+        extract: method
         relation:
           steps:
             - from: orders.pay_id
@@ -48,7 +48,7 @@ sources:
     bind: {use_rows: {param: rows}}
     fields:
       country_name:
-        field: name
+        extract: name
         relation:
           steps:
             - from: orders.pay_id

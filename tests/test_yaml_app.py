@@ -70,10 +70,10 @@ main_source:
     region: eu
   fields:
     order_id:
-      field: order_id
+      extract: order_id
       name: Order ID
     amount:
-      field: amount
+      extract: amount
       name: Amount
 sources: {}
 output:
@@ -100,7 +100,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
     bad_field: 1
 sources: {}
 """,
@@ -149,9 +149,9 @@ main_source:
   order_by: [created_at]
   fields:
     order_id:
-      field: order_id
+      extract: order_id
     created_at:
-      field: created_at
+      extract: created_at
 sources: {}
 output:
   fields:

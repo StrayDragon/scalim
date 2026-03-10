@@ -9,7 +9,7 @@ def _base_config() -> dict:
         "main_source": {
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
-            "fields": {"order_id": {"field": "order_id"}},
+            "fields": {"order_id": {"extract": "order_id"}},
         },
         "sources": {},
     }
@@ -26,7 +26,7 @@ def _ambiguous_sources_config() -> dict:
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
                     "name": {
-                        "field": "name",
+                        "extract": "name",
                         "relation": {"steps": [{"from": "orders.id", "to": "s1.id"}]},
                     }
                 },
@@ -37,7 +37,7 @@ def _ambiguous_sources_config() -> dict:
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
                     "name": {
-                        "field": "name",
+                        "extract": "name",
                         "relation": {"steps": [{"from": "orders.id", "to": "s2.id"}]},
                     }
                 },
@@ -93,7 +93,7 @@ def test_validator_output_fields_data_key_ambiguous_requires_source() -> None:
         "main_source": {
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
-            "fields": {"order_id": {"field": "id"}},
+            "fields": {"order_id": {"extract": "id"}},
         },
         "sources": {
             "customers": {
@@ -102,7 +102,7 @@ def test_validator_output_fields_data_key_ambiguous_requires_source() -> None:
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
                     "customer_id": {
-                        "field": "id",
+                        "extract": "id",
                         "relation": {"steps": [{"from": "orders.order_id", "to": "customers.id"}]},
                     }
                 },
@@ -121,7 +121,7 @@ def test_validator_output_fields_data_key_with_source() -> None:
         "main_source": {
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
-            "fields": {"order_id": {"field": "id"}},
+            "fields": {"order_id": {"extract": "id"}},
         },
         "sources": {
             "customers": {
@@ -130,7 +130,7 @@ def test_validator_output_fields_data_key_with_source() -> None:
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
                     "customer_id": {
-                        "field": "id",
+                        "extract": "id",
                         "relation": {"steps": [{"from": "orders.order_id", "to": "customers.id"}]},
                     }
                 },
@@ -151,8 +151,8 @@ def test_validator_rejects_derived_source_field_id_overlap() -> None:
 def test_validator_source_field_value_cast_and_relation_type() -> None:
     config = _base_config()
     config["main_source"]["fields"] = {
-        "bad_cast": {"field": "order_id", "value_cast": "bad"},
-        "bad_relation": {"field": "order_id", "relation": []},
+        "bad_cast": {"extract": "order_id", "value_cast": "bad"},
+        "bad_relation": {"extract": "order_id", "relation": []},
     }
     _assert_validation_errors(
         config,
@@ -191,7 +191,7 @@ def test_validator_bind_requires_use_branch() -> None:
             "bind": {"param": "ids"},
             "fields": {
                 "name": {
-                    "field": "name",
+                    "extract": "name",
                     "relation": {"steps": [{"from": "orders.order_id", "to": "s1.id"}]},
                 }
             },
@@ -209,7 +209,7 @@ def test_validator_bind_rejects_both_use_branches() -> None:
             "bind": {"use_rows": {"param": "rows"}, "use_keys": {"param": "ids"}},
             "fields": {
                 "name": {
-                    "field": "name",
+                    "extract": "name",
                     "relation": {"steps": [{"from": "orders.order_id", "to": "s1.id"}]},
                 }
             },

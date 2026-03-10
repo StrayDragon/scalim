@@ -22,7 +22,7 @@ main_source:
   loader: {loader_path}
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {{}}
 """.format(loader_path=loader_path),
         encoding="utf-8",
@@ -39,9 +39,9 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
     customer_id:
-      field: customer_id
+      extract: customer_id
 relations:
   r1: &r1
     steps:
@@ -56,7 +56,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_name:
-        field: customer_name
+        extract: customer_name
         relation: *r1
 """
         loader = YamlDemandLoader()
@@ -75,9 +75,9 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
     customer_id:
-      field: customer_id
+      extract: customer_id
 relations:
   r1: &r1
     steps:
@@ -91,7 +91,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_name:
-        field: customer_name
+        extract: customer_name
         relation: *r1
 """
         loader = YamlDemandLoader()
@@ -115,9 +115,9 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
     customer_id:
-      field: customer_id
+      extract: customer_id
 relations:
   r1: &r1
     steps:
@@ -131,7 +131,7 @@ sources:
     bind: {use_rows: {param: rows}}
     fields:
       customer_name:
-        field: customer_name
+        extract: customer_name
         relation: *r1
 """
         loader = YamlDemandLoader()
@@ -178,7 +178,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 """
         loader = YamlDemandLoader()

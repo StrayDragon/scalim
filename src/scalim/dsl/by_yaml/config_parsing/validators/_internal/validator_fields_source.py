@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ....schema_dsl.constants import FIELD_KIND_SOURCE, VALUE_CAST_ENUM
+from ...field_extract import FieldExtractCompileError, compile_field_extract, derive_source_field_data_key
 from ...models import AliasIndex, FieldDef, RawDemand
 from ...parsers.utils import mapping_or_none
 from ..base import ValidatorFieldBaseMixin
@@ -28,8 +29,9 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if not source_id:
                 continue
             field_id = field_def.field_id
-            data_key_raw = field_def.data.get(_F.FIELD)
-            data_key = field_id if data_key_raw is None else str(data_key_raw)
+            extract_raw = field_def.data.get(_F.EXTRACT)
+            extract_expr = None if extract_raw is None else str(extract_raw)
+            data_key = derive_source_field_data_key(field_id=field_id, extract=extract_expr)
 
             field_ids_by_source.setdefault(source_id, set()).add(field_id)
             data_key_map_by_source.setdefault(source_id, {}).setdefault(data_key, set()).add(field_id)
@@ -57,7 +59,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                     base_path = "sources.{}.fields".format(source_id)
                 self._add_error(errors, msg, path=base_path)
 
-    def _collect_main_source_fields_v3(
+    def _collect_main_source_fields(
         self,
         raw: RawDemand,
         errors: List[ValidationIssue],
@@ -98,7 +100,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 )
                 continue
             self._validate_field_id_not_reserved(field_id, errors, path="main_source.fields.{}".format(field_id))
-            field_def = self._add_field_def_v3(
+            field_def = self._add_field_def(
                 field_id,
                 FIELD_KIND_SOURCE,
                 main_source_id or None,
@@ -129,7 +131,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 seen_field_values_by_source,
             )
 
-    def _collect_source_fields_v3(
+    def _collect_source_fields(
         self,
         raw: RawDemand,
         errors: List[ValidationIssue],
@@ -179,7 +181,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                     )
                     continue
                 self._validate_field_id_not_reserved(field_id, errors, path="sources.{}.fields.{}".format(source_id, field_id))
-                field_def = self._add_field_def_v3(
+                field_def = self._add_field_def(
                     field_id,
                     FIELD_KIND_SOURCE,
                     source_id,
@@ -307,14 +309,33 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         errors: List[ValidationIssue],
         field_path: str,
     ) -> bool:
-        field_val = field_data.get(_F.FIELD)
-        if field_val is not None and (not isinstance(field_val, str) or not field_val):
+        if "field" in field_data:
+            legacy_val = field_data.get("field")
+            msg = "Legacy source field 'field: {}' is not allowed; 请改用 'extract: ...'".format(legacy_val)
+            self._add_error(errors, msg, path="{}.field".format(field_path))
+            return False
+
+        extract_val = field_data.get(_F.EXTRACT)
+        if extract_val is not None and (not isinstance(extract_val, str) or not extract_val):
             self._add_error(
                 errors,
-                "Field '{}' has invalid field '{}', expected field name".format(field_id, field_val),
-                path="{}.{}".format(field_path, _F.FIELD),
+                "Field '{}' has invalid extract '{}', expected non-empty string".format(field_id, extract_val),
+                path="{}.{}".format(field_path, _F.EXTRACT),
             )
             return False
+
+        extract_expr = field_id if extract_val is None else str(extract_val)
+        try:
+            _ = compile_field_extract(extract_expr)
+        except FieldExtractCompileError as exc:
+            msg = "Field '{}' has invalid extract '{}': {}".format(field_id, extract_expr, str(exc))
+            self._add_error(
+                errors,
+                msg,
+                path="{}.{}".format(field_path, _F.EXTRACT) if extract_val is not None else field_path,
+            )
+            return False
+
         return True
 
     def _validate_source_field_value_cast(
@@ -379,8 +400,9 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         duplicates: Dict[str, Set[str]],
         seen_values: Dict[str, Dict[str, str]],
     ) -> None:
-        field_value_raw = field_dict.get(_F.FIELD)
-        field_value = str(field_value_raw) if field_value_raw is not None else field_id
+        extract_raw = field_dict.get(_F.EXTRACT)
+        extract_expr = None if extract_raw is None else str(extract_raw)
+        field_value = derive_source_field_data_key(field_id=field_id, extract=extract_expr)
         source_dups = duplicates.setdefault(source_id, set())
         source_seen = seen_values.setdefault(source_id, {})
         if field_value in source_seen and source_seen[field_value] != field_id:

@@ -15,6 +15,7 @@ from scalim.dsl.by_yaml.schema_dsl.builder import (
     write_demand_schema,
 )
 from scalim.dsl.by_yaml.schema_dsl.models import LOOKUP_CAST_KEYS
+from scalim.dsl.by_yaml.schema_dsl import doc_texts as yaml_doc_texts
 
 
 def _schema_path(name: str) -> Path:
@@ -133,3 +134,12 @@ def test_generated_schema_batch_size_supports_null_or_positive_integer() -> None
     one_of = batch_size["oneOf"]
     assert {"type": "null"} in one_of
     assert {"type": "integer", "minimum": 1} in one_of
+
+
+def test_doc_texts_first_non_empty_line_blank_returns_empty() -> None:
+    assert yaml_doc_texts._first_non_empty_line("\n\n") == ""
+
+
+def test_doc_texts_build_generated_doc_block_handles_empty_and_non_empty() -> None:
+    assert yaml_doc_texts.build_generated_doc_block([]) == ""
+    assert yaml_doc_texts.build_generated_doc_block(["a", "b"]) == "a\nb\n"

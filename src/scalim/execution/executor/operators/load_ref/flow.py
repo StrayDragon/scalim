@@ -4,7 +4,7 @@ from .....spec.ir.fields import FieldIr
 from .....spec.ir.relations import LookupStepIr
 from .....spec.ir.source_contracts import LookupSourceRefIrBase
 from .....typedefs import FieldValue, LoaderResultMapping, LookupKey
-from ...helpers.field_access import extract_field
+from ...helpers.field_access import extract_field, extract_field_segments
 from .._internal.loader_guardrails import (
     handle_loader_extractor_error,
     handle_loader_transform_error,
@@ -186,8 +186,8 @@ def _resolve_ref_field_value(
     if not isinstance(field_spec, FieldIr):
         return extract_field(data, field_key)
 
-    data_key = field_spec.data_key or field_key
-    value: FieldValue = extract_field(data, data_key)
+    data_key = field_spec.extract_expr or field_spec.data_key or field_key
+    value: FieldValue = extract_field_segments(data, field_spec.extract_segments)
     try:
         return field_spec.apply_transform(value)
     except Exception as exc:

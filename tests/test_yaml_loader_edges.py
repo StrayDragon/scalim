@@ -50,7 +50,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources:
   good:
     loader: tests.conftest.mock_loader
@@ -79,9 +79,9 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     region_id:
-      field: region_id
+      extract: region_id
     institution_id:
-      field: institution_id
+      extract: institution_id
 sources:
   mapping:
     loader: tests.conftest.mock_loader
@@ -89,11 +89,11 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       region_id:
-        field: region_id
+        extract: region_id
       institution_id:
-        field: institution_id
+        extract: institution_id
       customer_id:
-        field: customer_id
+        extract: customer_id
   customers:
     loader: tests.conftest.mock_loader
     key: customer_id

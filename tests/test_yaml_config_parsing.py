@@ -196,7 +196,7 @@ def test_resolve_output_fields_requires_list() -> None:
     loader = YamlDemandLoader()
 
     with pytest.raises(TypeError, match="output.fields must be a list"):
-        loader._resolve_output_fields_v3({}, [], {}, AliasIndex())
+        loader._resolve_output_fields({}, [], {}, AliasIndex())
 
 
 def test_ensure_unique_output_defs_rejects_duplicates() -> None:

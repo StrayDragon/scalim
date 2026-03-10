@@ -13,7 +13,7 @@ _F = F
 
 
 class ValidatorFieldDerivedMixin(ValidatorFieldBaseMixin):
-    def _collect_derived_fields_v3(
+    def _collect_derived_fields(
         self,
         raw: RawDemand,
         errors: List[ValidationIssue],
@@ -41,12 +41,12 @@ class ValidatorFieldDerivedMixin(ValidatorFieldBaseMixin):
             if not has_compute and not has_call_by:
                 self._add_error(
                     errors,
-                    "v3 fields '{}' only allow derived fields with compute/call_by".format(field_id),
+                    "Derived field '{}' must declare compute/call_by".format(field_id),
                     path="fields.{}".format(field_id),
                 )
                 continue
             self._validate_field_id_not_reserved(field_id, errors, path="fields.{}".format(field_id))
-            _ = self._add_field_def_v3(
+            _ = self._add_field_def(
                 field_id,
                 FIELD_KIND_DERIVED,
                 None,

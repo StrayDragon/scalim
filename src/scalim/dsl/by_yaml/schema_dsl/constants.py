@@ -90,7 +90,7 @@ DESC_BIND_MD = (
     "绑定配置(将 rows 或 lookup keys 传给 loader).\n\n"
     "- 必须且只能设置一种: `use_rows` 或 `use_keys`\n"
     "- `param` 为 loader 参数名\n"
-    "- v3-only: 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n"
+    "- 旧写法 `bind: {param: ids}` / `to_bind: {param: ids}` 会被拒绝,请迁移为 `use_keys`/`use_rows`\n"
     "- 若目标 source 未设置 `cache_mode: preload_forever`, 需要 `to_bind` 或 `sources.<id>.bind`"
 )
 DESC_BIND_PARAM = "下游 loader 参数名(用于传入 lookup keys 或批次行上下文)"
@@ -122,6 +122,7 @@ DESC_RELATION_STEPS_MD = (
 )
 OUTPUT_FIELD_ID_KEY = "field_id"
 OUTPUT_FIELD_SOURCE_KEY = "source"
+OUTPUT_FIELD_DATA_KEY_KEY = "field"
 
 DESC_OBSERVABILITY = "可观测性配置"
 DESC_OBSERVABILITY_MD = "可观测性配置.\n\n包含 `logging`、`performance`、`relations`、`viz`、`trace`、`row_gap` 与 `memory_opt` 子配置."
@@ -312,7 +313,7 @@ DEMAND_SCHEMA_META = {
     "description": "Scalim 框架 YAML 需求配置定义 Schema",
     "markdownDescription": (
         "Scalim 框架 YAML 需求配置定义 Schema.\n\n"
-        "入口字段: `main_source` / `sources` / `fields` (v3-only).\n"
+        "入口字段: `main_source` / `sources` / `fields`.\n"
         "不再支持 legacy 字段: relations_sql_like / relations_graph / foreign_key / target / from / via / "
         "column / pk / pk_transform / derived."
     ),

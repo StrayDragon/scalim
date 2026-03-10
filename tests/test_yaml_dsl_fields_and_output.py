@@ -7,7 +7,7 @@ from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 
 
-def test_loader_v3_parses_output_fields_and_dependencies() -> None:
+def test_loader_parses_output_fields_and_dependencies() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -15,14 +15,14 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id: &order_id
-      field: order_id
+      extract: order_id
       name: Order ID
     quantity: &quantity
-      field: quantity
+      extract: quantity
     unit_price: &unit_price
-      field: unit_price
+      extract: unit_price
     extra: &extra
-      field: extra
+      extract: extra
 sources: {}
 fields:
   total: &total
@@ -46,7 +46,7 @@ output:
     assert config.derived_fields["total"].name == "Total Override"
 
 
-def test_validator_v3_allows_missing_top_level_fields() -> None:
+def test_validator_allows_missing_top_level_fields() -> None:
     validator = ConfigValidator()
     config = {
         "name": "demo",
@@ -57,22 +57,22 @@ def test_validator_v3_allows_missing_top_level_fields() -> None:
     validator.validate(config)
 
 
-def test_validator_v3_rejects_top_level_source_fields() -> None:
+def test_validator_rejects_top_level_source_fields() -> None:
     validator = ConfigValidator()
     config = {
         "name": "demo",
         "main_source": {"source_id": "orders", "loader": "tests.conftest.mock_loader"},
         "sources": {},
-        "fields": {"order_id": {"field": "order_id"}},
+        "fields": {"order_id": {"extract": "order_id"}},
     }
 
     with pytest.raises(ConfigValidationError) as exc:
         validator.validate(config)
 
-    assert any("v3 fields 'order_id' only allow derived fields" in msg for msg in exc.value.errors)
+    assert any("Derived field 'order_id' must declare compute/call_by" in msg for msg in exc.value.errors)
 
 
-def test_validator_v3_output_fields_accepts_alias_and_explicit() -> None:
+def test_validator_output_fields_accepts_alias_and_explicit() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -80,10 +80,10 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id: &order_id
-      field: order_id
+      extract: order_id
       name: Order ID
     order_date: &order_date
-      field: order_date
+      extract: order_date
       name: Order Date
 sources: {}
 fields:
@@ -102,7 +102,7 @@ output:
     validator.validate(config)
 
 
-def test_validator_v3_output_fields_ambiguous_across_sources() -> None:
+def test_validator_output_fields_ambiguous_across_sources() -> None:
     validator = ConfigValidator()
     config = {
         "name": "demo",
@@ -112,13 +112,13 @@ def test_validator_v3_output_fields_ambiguous_across_sources() -> None:
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
                 "bind": {"param": "ids"},
-                "fields": {"name": {"field": "name", "relation": {"steps": [{"from": "orders.id", "to": "s1.id"}]}}},
+                "fields": {"name": {"extract": "name", "relation": {"steps": [{"from": "orders.id", "to": "s1.id"}]}}},
             },
             "s2": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
                 "bind": {"param": "ids"},
-                "fields": {"name": {"field": "name", "relation": {"steps": [{"from": "orders.id", "to": "s2.id"}]}}},
+                "fields": {"name": {"extract": "name", "relation": {"steps": [{"from": "orders.id", "to": "s2.id"}]}}},
             },
         },
         "output": {"fields": [{"field_id": "name"}]},
@@ -138,8 +138,8 @@ def test_validator_v3_allows_duplicate_field_values_in_source() -> None:
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
             "fields": {
-                "id_a": {"field": "id"},
-                "id_b": {"field": "id"},
+                "id_a": {"extract": "id"},
+                "id_b": {"extract": "id"},
             },
         },
         "sources": {},

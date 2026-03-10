@@ -99,7 +99,7 @@ guardrails 配置 SHALL 按职责分层,包含 `loader`/`relations`/`compute` �
 ### Requirement: 关联 null_key/type_error 阈值护栏
 系统 SHALL 支持对关联 lookup 的 `null_key` 与 `type_error` 计数进行阈值检查:
 - 阈值按 batch + step 评估;rate 分母为该 step 在该 batch 内的归一化尝试次数(对该 step 调用 normalize 的次数).
-v1 中,当 `guardrails.relations.null_key_max_rate` 或 `guardrails.relations.type_error_max_rate` 被设置时,关联阈值护栏对全部关联 lookup step 生效(无范围选择器).
+当 `guardrails.relations.null_key_max_rate` 或 `guardrails.relations.type_error_max_rate` 被设置时,关联阈值护栏对全部关联 lookup step 生效(无范围选择器).
 当阈值超过时,系统 MUST 按 guardrails.mode 处理.
 
 #### Scenario: null_key 超阈值

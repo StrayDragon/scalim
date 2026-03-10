@@ -151,7 +151,7 @@ fields:
 
 ## 不要这样写
 
-- 不要在 `top-level fields` 放 `field: xxx`
+- 不要在 `top-level fields` 放源字段(源字段请写在 `main_source.fields` / `sources.<id>.fields`)
 - 不要在 `output.fields` 里写 `- order_id`
 - 不要把 `data_key` 写进 relation steps
 - 不要把 allowlist 当成 YAML 字段写进配置

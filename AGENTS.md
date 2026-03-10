@@ -72,3 +72,7 @@ When adding new typing_extensions features, add a compat shim in `typing_extensi
 - CLI install (recommended): `uv tool install scalim[cli]` (fallback: `pip install --user scalim[cli]`).
 - Some sinks require optional dependencies (for example, Excel output needs `openpyxl`); call out new optional deps in docs/tests.
 - Do not remove `# region SCALIM-SKILL:<tag>` / `# endregion` markers; they are used for automated skill example extraction.
+
+## Privacy & Desensitization
+- When assessing whether external repos/paths need coordinated updates, you may read `.tmp/known-outer-paths-using-this-package.txt`.
+- For desensitization, do not quote, enumerate, or summarize the contents of `.tmp/known-outer-paths-using-this-package.txt` in chat output, docs, or spec artifacts; only reference the file path.

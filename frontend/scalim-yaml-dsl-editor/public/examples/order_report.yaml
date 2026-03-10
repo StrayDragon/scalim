@@ -15,15 +15,15 @@ main_source:
     # region 主键和基础字段
 
     order_id: &order_id
-      field: order_id
+      extract: order_id
       name: 订单ID
 
     amount: &amount
-      field: amount
+      extract: amount
       name: 金额
 
     cost: &cost
-      field: cost
+      extract: cost
       name: 成本
 
     # endregion
@@ -31,19 +31,19 @@ main_source:
     # region 外键字段
 
     customer_id:
-      field: customer_id
+      extract: customer_id
       name: 客户ID
 
     pay_id:
-      field: pay_id
+      extract: pay_id
       name: 支付ID
 
     order_type_id:
-      field: order_type_id
+      extract: order_type_id
       name: 订单类型ID
 
     small_group_ids:
-      field: small_group_ids
+      extract: small_group_ids
       name: 小组ID列表
 
     # endregion
@@ -100,7 +100,7 @@ sources:
     bind: {use_keys: {param: customer_ids_set}}
     fields:
       customer_name: &customer_name
-        field: customer_name
+        extract: customer_name
         name: 客户名称
         relation: *orders_to_customers
 
@@ -110,12 +110,12 @@ sources:
     bind: {use_keys: {param: pay_ids_set}}
     fields:
       country_id:
-        field: country_id
+        extract: country_id
         name: 国家ID
         relation: *orders_to_pays
 
       pay_method:
-        field: pay_name
+        extract: pay_name
         name: 支付方式
         relation: *orders_to_pays
 
@@ -125,7 +125,7 @@ sources:
     bind: {use_keys: {param: country_ids_set}}
     fields:
       country_name: &country_name
-        field: country_name
+        extract: country_name
         name: 国家名称
         relation: *orders_to_countries
 
@@ -136,7 +136,7 @@ sources:
     bind: {use_keys: {param: type_ids_set}}
     fields:
       order_type_name:
-        field: type_name
+        extract: type_name
         name: 订单类型
         relation: *orders_to_order_types
 
@@ -147,12 +147,12 @@ sources:
     bind: {use_keys: {param: group_ids_set}}
     fields:
       big_group_id:
-        field: big_group_id
+        extract: big_group_id
         name: 大组ID
         relation: *orders_to_small_groups
 
       small_group_name:
-        field: small_group_name
+        extract: small_group_name
         name: 小组名称
         relation: *orders_to_small_groups
 
@@ -164,7 +164,7 @@ sources:
     lookup_cast: {name: int}
     fields:
       big_group_name:
-        field: big_group_name
+        extract: big_group_name
         name: 大组名称
         relation: *orders_to_big_groups
 

@@ -33,7 +33,7 @@ def _make_config() -> DemandConfig:
         "customer_name": SourceFieldConfig(
             field_id="customer_name",
             source="customers",
-            field="name",
+            extract="name",
             name="Customer",
             relation=None,
             value_cast=None,

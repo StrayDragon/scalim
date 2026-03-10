@@ -17,6 +17,7 @@ from ..constants import (
     schema_meta,
     schema_omit,
 )
+from ..doc_texts import SOURCE_FIELD_EXTRACT_DESC, SOURCE_FIELD_EXTRACT_MD
 from .lookup_bind_relation import InlineRelationConfig
 
 
@@ -25,8 +26,11 @@ class SourceFieldConfig:
     SCHEMA_NAME: ClassVar[str] = "source_field"
     """源字段配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [{"not": {"required": ["call_by"]}}]
-    """用于约束:源字段配置中禁止声明 `call_by`."""
+    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
+        {"not": {"required": ["call_by"]}},
+        {"not": {"required": ["field"]}},
+    ]
+    """用于约束:源字段配置中禁止声明 `call_by` 与历史 `field`."""
 
     field_id: str = dataclass_field(default="", metadata=schema_omit())
     """字段标识(内部字段;由外层映射键提供)."""
@@ -47,17 +51,24 @@ class SourceFieldConfig:
     )
     """字段来源的 `source_id`(可选;在容器内通常可省略)."""
 
-    field: Optional[str] = dataclass_field(
+    extract: Optional[str] = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
-                **SOURCE_ID_STRING_SCHEMA,
-                "description": "字段来源的列名,缺省时等于字段 key (例: field: customer_id)",
-                "markdownDescription": "字段来源的列名.\n\n- 缺省时等于字段 key",
+                "type": "string",
+                "minLength": 1,
+                "description": SOURCE_FIELD_EXTRACT_DESC,
+                "markdownDescription": SOURCE_FIELD_EXTRACT_MD,
+                "examples": [
+                    "review_status",
+                    "CustomerMark.clearn_reason_level",
+                    "[1].clearn_reason_level",
+                    '["a.b"].x',
+                ],
             }
         ),
     )
-    """加载器返回结果中的列名/键名(可选;缺省时等于字段键)."""
+    """可选:字段提取表达式(缺省时等于字段键/`field_id`)."""
 
     name: str = dataclass_field(default="", metadata=schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
     """字段展示名称(可选)."""

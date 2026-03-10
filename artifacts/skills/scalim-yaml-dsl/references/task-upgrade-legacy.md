@@ -12,6 +12,15 @@
 - 不保留兼容层
 - 升级后立刻跑 `schema validate` 与 `validate`
 
+## YAML DSL 升级批次索引 (自动生成)
+
+<!-- BEGIN SCALIM-GEN:yaml-dsl-upgrades -->
+- 2026-03-10: yaml-field-extract
+  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-field-extract.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-field-extract/`
+  - Spec: `openspec/specs/yaml-field-extract/spec.md`
+<!-- END SCALIM-GEN:yaml-dsl-upgrades -->
+
 ## 必查项目
 
 ### 1. legacy 字段
@@ -34,9 +43,34 @@
 ### 2. 顶层 `fields`
 
 - 顶层 `fields` 只允许派生字段
-- 如果顶层字段里出现 `field: xxx`,说明还是旧思路,需要移到 `main_source.fields` 或 `sources.<id>.fields`
+- 如果顶层字段里出现源字段写法(例如 `extract:`/`relation:`/`value_cast:`),说明位置错,需要移到 `main_source.fields` 或 `sources.<id>.fields`
 
-### 3. `bind` / `to_bind`
+### 3. 源字段取值: `field` → `extract` (breaking)
+
+旧写法(不再允许):
+
+```yaml
+main_source:
+  fields:
+    customer_id:
+      field: customer_id_col
+```
+
+新写法:
+
+```yaml
+main_source:
+  fields:
+    customer_id:
+      extract: customer_id_col
+```
+
+提示:
+
+- `fields.*.field` 已从稳定 YAML authoring surface 移除,出现即 fail-fast
+- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)
+
+### 4. `bind` / `to_bind`
 
 旧写法:
 
@@ -62,7 +96,7 @@ to_bind:
     cache_mode: batch
 ```
 
-### 4. `output.fields`
+### 5. `output.fields`
 
 旧写法:
 
@@ -91,12 +125,12 @@ output:
     - *customer_name
 ```
 
-### 5. relation 引用
+### 6. relation 引用
 
 - `relation` 不要写字符串 relation_id
 - 用 YAML alias 或内联 `steps`
 
-### 6. step 字段选择
+### 7. step 字段选择
 
 - `steps.from` / `steps.to` 使用 `field_id`
 - 即使 loader 真实列名不同,这里仍然写 YAML key
@@ -105,10 +139,11 @@ output:
 
 1. 清掉 legacy 字段
 2. 规范化 `main_source` / `sources` / 顶层 `fields`
-3. 把所有 `bind` / `to_bind` 改成 `use_keys` / `use_rows`
-4. 重写 `output.fields`
-5. 检查 relation steps 是否还在写 `data_key`
-6. 跑校验并修掉剩余错误
+3. 把 `fields.*.field` 全部升级为 `fields.*.extract`
+4. 把所有 `bind` / `to_bind` 改成 `use_keys` / `use_rows`
+5. 重写 `output.fields`
+6. 检查 relation steps 是否还在写 `data_key`
+7. 跑校验并修掉剩余错误
 
 ## 最小自检
 
@@ -119,10 +154,10 @@ uv run scalim-cli yaml-dsl validate <file.yaml> --strict
 
 ## 常见报错到修复动作
 
-- `Legacy field 'xxx' is not allowed in v3`
+- `Legacy field 'xxx' is not allowed`
   - 删除旧字段,改写到当前入口结构
-- `v3 fields 'xxx' only allow derived fields`
-  - 把该字段移回源字段容器
+- `Derived field 'xxx' must declare compute/call_by`
+  - 如果它是源字段,请移回 `main_source.fields`/`sources.*.fields`;如果它是派生字段,请补 `compute` 或 `call_by`
 - `output.fields[0] must be explicit field object`
   - 把字符串改成 alias 或显式对象
 - `Unknown field`

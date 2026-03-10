@@ -23,9 +23,9 @@ source_id: orders
 loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
   customer_id:
-    field: customer_id
+    extract: customer_id
 """,
         sources="""
 customers:
@@ -33,7 +33,7 @@ customers:
   key: customer_id
   fields:
     customer_name:
-      field: customer_name
+      extract: customer_name
       relation: *orders_to_customers
 """,
         relations="""
@@ -70,9 +70,9 @@ source_id: orders
 loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
   region_id:
-    field: region_id
+    extract: region_id
 """,
         sources="""
 regions:
@@ -80,7 +80,7 @@ regions:
   key: region_id
   fields:
     region_name:
-      field: name
+      extract: name
       relation: *orders_to_regions
 """,
         relations="""
@@ -116,7 +116,7 @@ source_id: orders
 loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
     value_cast: not_supported
 """,
         sources="{}",
@@ -144,7 +144,7 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
     value_cast: {value_cast}
 """.format(value_cast=value_cast),
         sources="{}",
@@ -174,7 +174,7 @@ source_id: orders
 loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
 """,
         sources="""
 customers:
@@ -182,7 +182,7 @@ customers:
   key: customer_id
   fields:
     customer_name:
-      field: customer_name
+      extract: customer_name
       relation: *orders_to_customers
 """,
         relations="""

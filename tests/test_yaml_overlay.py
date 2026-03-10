@@ -26,10 +26,10 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
       name: Order ID
     amount:
-      field: amount
+      extract: amount
       name: Amount
 sources: {}
 output:
@@ -79,9 +79,9 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
     amount:
-      field: amount
+      extract: amount
 sources: {}
 output:
   fields:
@@ -105,7 +105,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 """,
     )
@@ -126,7 +126,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 """,
     )
@@ -152,7 +152,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 observability:
   viz:
@@ -178,7 +178,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 observability:
   performance:
@@ -212,7 +212,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 """,
     )
@@ -236,7 +236,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 """,
     )

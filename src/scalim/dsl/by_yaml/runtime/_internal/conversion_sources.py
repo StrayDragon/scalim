@@ -6,6 +6,7 @@ from .....spec.ir.fields import DerivedFieldIr, FieldIr
 from .....spec.ir.sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceRefIr
 from .....typedefs import FieldValue, RuntimeValue, SourceSpecIrCacheMode, StaticParams
 from ...config_parsing.call_by import CallByParseError, CallByValue, parse_call_by
+from ...config_parsing.field_extract import FieldExtractCompileError, compile_field_extract
 from ...config_parsing.security import SecureComputeEngine, is_constant_compute_expression
 from ...schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceConfig, SourceFieldConfig
 from ..errors import ConversionError
@@ -202,13 +203,23 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
     def _convert_source_field(self, field_config: SourceFieldConfig, config: DemandConfig) -> FieldIr:
         from_source_id = field_config.source
-        data_key = field_config.field or field_config.field_id
+        extract_expr = field_config.field_id if field_config.extract is None else str(field_config.extract)
         if not from_source_id:
             msg = "Field '{}' missing source".format(field_config.field_id)
             raise ConversionError(msg)
-        if not data_key:
-            msg = "Field '{}' missing field".format(field_config.field_id)
+        if not extract_expr:
+            msg = "Field '{}' missing extract".format(field_config.field_id)
             raise ConversionError(msg)
+
+        try:
+            extract_segments = compile_field_extract(extract_expr)
+        except FieldExtractCompileError as exc:
+            msg = "Field '{}' has invalid extract '{}': {}".format(field_config.field_id, extract_expr, str(exc))
+            raise ConversionError(msg) from exc
+
+        data_key = field_config.field_id
+        if len(extract_segments) == 1 and isinstance(extract_segments[0], str):
+            data_key = extract_segments[0]
 
         source_ir = self._resolve_field_source(from_source_id=from_source_id, field_id=field_config.field_id)
 
@@ -225,6 +236,8 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             name=field_config.name or field_config.field_id,
             source=source_ir,
             data_key=data_key,
+            extract_expr=extract_expr,
+            extract_segments=extract_segments,
             is_primary=False,
             transform=transform,
             relation=None,

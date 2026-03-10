@@ -1,8 +1,9 @@
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 from ....vendor.compact.typing_extensionsx import override
-from ..schema_dsl.constants import FIELD_KIND_SOURCE, OUTPUT_FIELD_ID_KEY, OUTPUT_FIELD_SOURCE_KEY
+from ..schema_dsl.constants import FIELD_KIND_SOURCE, OUTPUT_FIELD_DATA_KEY_KEY, OUTPUT_FIELD_ID_KEY, OUTPUT_FIELD_SOURCE_KEY
 from ..schema_dsl.models import SOURCE_FIELD_KEYS
+from .field_extract import derive_source_field_data_key
 from .models import AliasIndex, FieldDef
 
 ERR_OUTPUT_FIELDS_ENTRY = "output.fields[{}] must be explicit field object (field_id or field) or alias"
@@ -14,8 +15,9 @@ def build_source_data_key_index(field_defs: List[FieldDef]) -> Dict[str, Dict[st
         if field_def.kind != FIELD_KIND_SOURCE:
             continue
         source_id = field_def.source_id or ""
-        data_key_raw = field_def.data.get(SOURCE_FIELD_KEYS["field"])
-        data_key = field_def.field_id if data_key_raw is None else str(data_key_raw)
+        extract_raw = field_def.data.get(SOURCE_FIELD_KEYS["extract"])
+        extract_expr = None if extract_raw is None else str(extract_raw)
+        data_key = derive_source_field_data_key(field_id=field_def.field_id, extract=extract_expr)
         index.setdefault(source_id, {}).setdefault(data_key, []).append(field_def)
     return index
 
@@ -92,7 +94,7 @@ class OutputFieldResolver:
             direct_def = self._resolve_alias(typed)
             if direct_def is not None:
                 return direct_def, None, "alias"
-            if SOURCE_FIELD_KEYS["field"] in typed:
+            if OUTPUT_FIELD_DATA_KEY_KEY in typed:
                 field_def, override = self._resolve_data_key(typed, idx)
                 return field_def, override, "data_key"
             self._errors.error(ERR_OUTPUT_FIELDS_ENTRY.format(idx))
@@ -147,7 +149,7 @@ class OutputFieldResolver:
         item: Dict[str, Any],
         idx: int,
     ) -> Tuple[Optional[FieldDef], Optional[Dict[str, Any]]]:
-        field_raw = item.get(SOURCE_FIELD_KEYS["field"])
+        field_raw = item.get(OUTPUT_FIELD_DATA_KEY_KEY)
         if field_raw is None:
             self._errors.value_error("output.fields[{}] missing field; use explicit field object".format(idx))
             return None, None
@@ -201,7 +203,7 @@ class OutputFieldResolver:
     @staticmethod
     def _build_data_key_override(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         override = dict(item)
-        override.pop(SOURCE_FIELD_KEYS["field"], None)
+        override.pop(OUTPUT_FIELD_DATA_KEY_KEY, None)
         override.pop(OUTPUT_FIELD_SOURCE_KEY, None)
         if not override:
             return None

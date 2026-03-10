@@ -11,7 +11,7 @@ class _WeirdStr(str):
 
 
 def _field_def(field_id, kind="source", source_id=None, field="id", data=None):
-    payload = data if data is not None else {"field": field}
+    payload = data if data is not None else {"extract": field}
     return FieldDef(field_id=str(field_id), kind=kind, source_id=source_id, data=payload)
 
 
@@ -106,7 +106,7 @@ def test_validator_collect_main_source_fields_edges() -> None:
     duplicate_fields_by_source = {}
     seen_field_values_by_source = {}
 
-    validator._collect_main_source_fields_v3(
+    validator._collect_main_source_fields(
         RawDemand.from_raw({"main_source": []}),
         errors,
         sources_set,
@@ -120,7 +120,7 @@ def test_validator_collect_main_source_fields_edges() -> None:
         seen_field_values_by_source,
     )
 
-    validator._collect_main_source_fields_v3(
+    validator._collect_main_source_fields(
         RawDemand.from_raw({"main_source": {"fields": []}}),
         errors,
         sources_set,
@@ -135,7 +135,7 @@ def test_validator_collect_main_source_fields_edges() -> None:
     )
     assert any("main_source.fields" in msg for msg in _messages(errors))
 
-    validator._collect_main_source_fields_v3(
+    validator._collect_main_source_fields(
         RawDemand.from_raw({"main_source": {"fields": {"bad": {"compute": "x"}}}}),
         errors,
         sources_set,
@@ -150,7 +150,7 @@ def test_validator_collect_main_source_fields_edges() -> None:
     )
     assert any("must not declare compute" in msg for msg in _messages(errors))
 
-    validator._collect_main_source_fields_v3(
+    validator._collect_main_source_fields(
         RawDemand.from_raw({"main_source": {"fields": {"ok": 1}}}),
         errors,
         sources_set,
@@ -181,7 +181,7 @@ def test_validator_add_field_def_requires_dict() -> None:
     defs_by_id = {}
     alias_index = AliasIndex()
 
-    assert validator._add_field_def_v3("f", "source", "orders", 1, field_defs, defs_by_id, alias_index, errors) is None
+    assert validator._add_field_def("f", "source", "orders", 1, field_defs, defs_by_id, alias_index, errors) is None
     assert any("Field 'f' must be a dictionary" in msg for msg in _messages(errors))
 
 
@@ -198,7 +198,7 @@ def test_validator_collect_source_fields_edges() -> None:
     duplicate_fields_by_source = {}
     seen_field_values_by_source = {}
 
-    validator._collect_source_fields_v3(
+    validator._collect_source_fields(
         RawDemand.from_raw({"sources": []}),
         errors,
         sources_set,
@@ -212,7 +212,7 @@ def test_validator_collect_source_fields_edges() -> None:
         seen_field_values_by_source,
     )
 
-    validator._collect_source_fields_v3(
+    validator._collect_source_fields(
         RawDemand.from_raw({"sources": {"s1": []}}),
         errors,
         sources_set,
@@ -226,7 +226,7 @@ def test_validator_collect_source_fields_edges() -> None:
         seen_field_values_by_source,
     )
 
-    validator._collect_source_fields_v3(
+    validator._collect_source_fields(
         RawDemand.from_raw({"sources": {"s1": {"fields": []}}}),
         errors,
         sources_set,
@@ -241,7 +241,7 @@ def test_validator_collect_source_fields_edges() -> None:
     )
     assert any("sources.s1.fields" in msg for msg in _messages(errors))
 
-    validator._collect_source_fields_v3(
+    validator._collect_source_fields(
         RawDemand.from_raw({"sources": {"s1": {"fields": {"bad": {"compute": "x"}}}}}),
         errors,
         sources_set,
@@ -256,7 +256,7 @@ def test_validator_collect_source_fields_edges() -> None:
     )
     assert any("must not declare compute" in msg for msg in _messages(errors))
 
-    validator._collect_source_fields_v3(
+    validator._collect_source_fields(
         RawDemand.from_raw({"sources": {"s1": {"fields": {"ok": 1}}}}),
         errors,
         sources_set,
@@ -280,7 +280,7 @@ def test_validator_collect_derived_fields_edges() -> None:
     alias_index = AliasIndex()
     derived_fields_with_deps = []
 
-    validator._collect_derived_fields_v3(
+    validator._collect_derived_fields(
         RawDemand.from_raw({"fields": []}),
         errors,
         field_defs,
@@ -290,7 +290,7 @@ def test_validator_collect_derived_fields_edges() -> None:
     )
     assert any("'fields' must be a dictionary" in msg for msg in _messages(errors))
 
-    validator._collect_derived_fields_v3(
+    validator._collect_derived_fields(
         RawDemand.from_raw({"fields": {"bad": []}}),
         errors,
         field_defs,
@@ -300,7 +300,7 @@ def test_validator_collect_derived_fields_edges() -> None:
     )
     assert any("Field 'bad' must be a dictionary" in msg for msg in _messages(errors))
 
-    validator._collect_derived_fields_v3(
+    validator._collect_derived_fields(
         RawDemand.from_raw({"fields": {"calc": {"field": "id"}}}),
         errors,
         field_defs,
@@ -308,9 +308,9 @@ def test_validator_collect_derived_fields_edges() -> None:
         alias_index,
         derived_fields_with_deps,
     )
-    assert any("only allow derived fields with compute/call_by" in msg for msg in _messages(errors))
+    assert any("must declare compute/call_by" in msg for msg in _messages(errors))
 
-    validator._collect_derived_fields_v3(
+    validator._collect_derived_fields(
         RawDemand.from_raw({"fields": {"ok": {"compute": "1"}}}),
         errors,
         field_defs,
@@ -348,7 +348,7 @@ def test_validator_output_field_duplicate_defs() -> None:
     alias_index.add(field_a.data, field_a)
     alias_index.add(field_b.data, field_b)
 
-    validator._validate_output_fields_v3(RawDemand.from_raw(config), errors, defs_by_id, alias_index, {})
+    validator._validate_output_fields(RawDemand.from_raw(config), errors, defs_by_id, alias_index, {})
 
     assert any("maps to multiple definitions" in msg for msg in _messages(errors))
 
@@ -517,14 +517,14 @@ def test_validator_output_field_source_ambiguity_duplicates() -> None:
     validator._track_duplicate_source_field(
         "orders",
         "id_alias",
-        {"field": "id"},
+        {"extract": "id"},
         duplicate_fields_by_source,
         seen_field_values_by_source,
     )
     validator._track_duplicate_source_field(
         "orders",
         "id",
-        {"field": "id"},
+        {"extract": "id"},
         duplicate_fields_by_source,
         seen_field_values_by_source,
     )
@@ -543,8 +543,8 @@ def test_validator_rejects_field_id_data_key_naming_conflict() -> None:
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
             "fields": {
-                "category_id": {"field": "category_id_v2"},
-                "product_category_id": {"field": "category_id"},
+                "category_id": {"extract": "category_id_v2"},
+                "product_category_id": {"extract": "category_id"},
             },
         },
         "sources": {},
@@ -560,7 +560,7 @@ def test_validator_rejects_field_id_data_key_naming_conflict_in_source() -> None
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
             "fields": {
-                "order_id": {"field": "order_id"},
+                "order_id": {"extract": "order_id"},
             },
         },
         "sources": {
@@ -568,8 +568,8 @@ def test_validator_rejects_field_id_data_key_naming_conflict_in_source() -> None
                 "loader": "tests.conftest.mock_loader",
                 "key": "product_id",
                 "fields": {
-                    "category_id": {"field": "category_id_v2"},
-                    "product_category_id": {"field": "category_id"},
+                    "category_id": {"extract": "category_id_v2"},
+                    "product_category_id": {"extract": "category_id"},
                 },
             },
         },
@@ -585,7 +585,7 @@ def test_validator_relation_steps_rejects_source_data_key_when_field_id_is_alias
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
             "fields": {
-                "category_id": {"field": "category_id"},
+                "category_id": {"extract": "category_id"},
             },
         },
         "sources": {
@@ -595,7 +595,7 @@ def test_validator_relation_steps_rejects_source_data_key_when_field_id_is_alias
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
                     # field_id != data_key
-                    "product_category_id": {"field": "category_id"},
+                    "product_category_id": {"extract": "category_id"},
                 },
             },
         },
@@ -619,7 +619,7 @@ def test_validator_relation_steps_reject_unknown_source_field_name() -> None:
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
             "fields": {
-                "category_id": {"field": "category_id"},
+                "category_id": {"extract": "category_id"},
             },
         },
         "sources": {
@@ -628,7 +628,7 @@ def test_validator_relation_steps_reject_unknown_source_field_name() -> None:
                 "key": "product_id",
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
-                    "product_category_id": {"field": "category_id"},
+                    "product_category_id": {"extract": "category_id"},
                 },
             },
         },
@@ -696,11 +696,11 @@ def test_validator_source_field_edges() -> None:
     assert any("missing required 'source'" in msg for msg in _messages(errors))
 
     errors = []
-    validator._validate_source_field("f", {"field": 1, "source": "orders"}, {"orders"}, {}, "orders", {}, errors)
-    assert any("invalid field" in msg for msg in _messages(errors))
+    validator._validate_source_field("f", {"extract": 1, "source": "orders"}, {"orders"}, {}, "orders", {}, errors)
+    assert any("invalid extract" in msg for msg in _messages(errors))
 
     errors = []
-    validator._validate_source_field("f", {"field": "id", "source": "missing"}, {"orders"}, {}, "orders", {}, errors)
+    validator._validate_source_field("f", {"extract": "id", "source": "missing"}, {"orders"}, {}, "orders", {}, errors)
     assert any("references unknown source" in msg for msg in _messages(errors))
 
 
@@ -728,7 +728,7 @@ def test_validator_source_field_name_errors() -> None:
     validator = validator_module.ConfigValidator()
     errors = []
     assert validator._validate_source_field_name("f", {"field": 1}, errors, "fields.f") is False
-    assert any("invalid field" in msg for msg in _messages(errors))
+    assert any("Legacy source field" in msg for msg in _messages(errors))
 
 
 def test_validator_steps_binding_and_relation_path_edges() -> None:

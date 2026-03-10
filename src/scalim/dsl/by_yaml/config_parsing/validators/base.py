@@ -42,7 +42,7 @@ class ValidatorFieldBaseMixin(ValidatorMixinBase):
         ).format(field_id, field_id)
         self._add_error(errors, msg, path=path)
 
-    def _add_field_def_v3(
+    def _add_field_def(
         self,
         field_id_raw: Any,
         kind: str,

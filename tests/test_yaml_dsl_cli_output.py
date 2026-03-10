@@ -70,7 +70,7 @@ main_source:
     - missing_field
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 """.lstrip(),
         encoding="utf-8",
@@ -93,7 +93,7 @@ main_source:
   loader: tests.call_by_fns:dummy_main_loader
   fields:
     a:
-      field: a
+      extract: a
 sources: {}
 fields:
   text:
@@ -146,7 +146,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -203,7 +203,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     customer_id:
-      field: customer_id
+      extract: customer_id
 relations:
   orders_to_customers:
     steps:

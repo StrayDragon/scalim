@@ -92,7 +92,7 @@ class YamlDemandLoader(
         if raw_output is not None:
             raw_output_fields = raw_output.get(OUTPUT_KEYS["fields"])
 
-        parsed_fields = self._parse_fields_v3(raw, main_source.source_id, raw_output_fields)
+        parsed_fields = self._parse_fields(raw, main_source.source_id, raw_output_fields)
         main_source = self._with_main_source_fields(main_source, parsed_fields.main_source_fields)
         sources = self._with_source_fields(sources, parsed_fields.source_fields_by_source)
 

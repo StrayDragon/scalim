@@ -11,6 +11,7 @@ from ...schema_dsl.models import (
     SourceFieldConfig,
 )
 from ..call_by import extract_call_by_dependencies
+from ..field_extract import derive_source_field_data_key
 from ..field_index import OutputFieldErrors, OutputFieldResolver, build_source_data_key_index
 from ..models import AliasIndex, FieldDef, FieldDefIndex, RawDemand, collect_field_defs, field_def_key
 from ..security import extract_compute_dependencies
@@ -20,14 +21,14 @@ from .utils import list_or_none, str_or_none
 
 
 class ParserFieldsMixin(ParserRelationsMixin):
-    def _parse_fields_v3(
+    def _parse_fields(
         self,
         raw: RawDemand,
         main_source_id: str,
         raw_output_fields: object,
     ) -> ParsedFieldsResult:
-        index = self._collect_field_defs_v3(raw, main_source_id)
-        output_field_ids, selected_defs, overrides = self._resolve_output_fields_v3(
+        index = self._collect_field_defs(raw, main_source_id)
+        output_field_ids, selected_defs, overrides = self._resolve_output_fields(
             raw_output_fields,
             index.field_defs,
             index.defs_by_id,
@@ -39,7 +40,7 @@ class ParserFieldsMixin(ParserRelationsMixin):
         if order_by_defs:
             required_defs = self._merge_required_defs(required_defs, order_by_defs)
 
-        source_fields, derived_fields, main_source_fields, source_fields_by_source = self._build_field_configs_v3(
+        source_fields, derived_fields, main_source_fields, source_fields_by_source = self._build_field_configs(
             required_defs,
             overrides,
             main_source_id,
@@ -96,10 +97,10 @@ class ParserFieldsMixin(ParserRelationsMixin):
                 merged[field_key] = field_def
         return list(merged.values())
 
-    def _collect_field_defs_v3(self, raw: RawDemand, main_source_id: str) -> FieldDefIndex:
+    def _collect_field_defs(self, raw: RawDemand, main_source_id: str) -> FieldDefIndex:
         return collect_field_defs(raw, main_source_id)
 
-    def _build_field_configs_v3(
+    def _build_field_configs(
         self,
         required_defs: List[FieldDef],
         overrides: Dict[Tuple[str, Optional[str], str, int], Dict[str, Any]],
@@ -151,12 +152,13 @@ class ParserFieldsMixin(ParserRelationsMixin):
             override = overrides.get(field_def_key(field_def))
             if override:
                 field_data.update(override)
-            field_name_raw = field_data.get(SOURCE_FIELD_KEYS["field"])
-            field_name = field_def.field_id if field_name_raw is None else str(field_name_raw)
-            source_field_id_map.setdefault(source_id, {})[field_def.field_id] = field_name
+            extract_raw = field_data.get(SOURCE_FIELD_KEYS["extract"])
+            extract_expr = None if extract_raw is None else str(extract_raw)
+            data_key = derive_source_field_data_key(field_id=field_def.field_id, extract=extract_expr)
+            source_field_id_map.setdefault(source_id, {})[field_def.field_id] = data_key
         return source_field_id_map
 
-    def _resolve_output_fields_v3(
+    def _resolve_output_fields(
         self,
         raw_output_fields: object,
         field_defs: List[FieldDef],
@@ -296,14 +298,14 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
     def _parse_source_field(self, field_id: str, field_data: Dict[str, Any], source_id: Optional[str] = None) -> SourceFieldConfig:
         resolved_source_id = source_id or str(field_data.get(SOURCE_FIELD_KEYS["source"], ""))
-        field_name_raw = field_data.get(SOURCE_FIELD_KEYS["field"])
-        field_name = field_id if field_name_raw is None else str(field_name_raw)
+        extract_raw = field_data.get(SOURCE_FIELD_KEYS["extract"])
+        extract_expr = str(extract_raw) if extract_raw is not None else None
         relation = self._parse_relation_ref(field_data.get(SOURCE_FIELD_KEYS["relation"]))
 
         return SourceFieldConfig(
             field_id=field_id,
             source=resolved_source_id,
-            field=field_name,
+            extract=extract_expr,
             name=str(field_data.get(SOURCE_FIELD_KEYS["name"], field_id)),
             relation=relation,
             value_cast=str_or_none(field_data.get(SOURCE_FIELD_KEYS["value_cast"])),

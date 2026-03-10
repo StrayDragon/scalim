@@ -2,7 +2,7 @@
 
 **状态: ✅ 已实现**
 ## Purpose
-通过 dataclass 元数据生成 v3-only 的 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
+通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/models/__init__.py` (schema meta dataclasses)
 - `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/constants.py` (enum/hover fragments)
@@ -75,7 +75,7 @@
 
 - `relations.*.steps.from/to` 的 hover MUST 提示 steps 仅接受 **field_id**(YAML key)而非 loader 的 data_key,并给出简短示例.
 - `lookup_cast` 的 hover MUST 提示 float lookup key 会被拒绝(避免歧义)并建议通过 `lookup_cast`/`value_cast` 显式归一化.
-- `to_bind`/`bind` 的 hover MUST 提示 v3-only 的 oneOf 结构(`use_keys`/`use_rows`)并给出旧语法迁移提示.
+- `to_bind`/`bind` 的 hover MUST 提示 oneOf 结构(`use_keys`/`use_rows`)并给出旧语法迁移提示.
 
 #### Scenario: hover 包含 field_id/data_key 提示
 - **WHEN** 生成 `demand.gen.json`
@@ -90,7 +90,7 @@
 `guardrails.mode` 仅允许 `quiet|fast_fail`;`loader.on_transform_error` 与 `compute.on_error` 仅允许 `quiet|fast_fail`;
 `loader.validate_result` 为布尔值(可选);`loader.required_fields` 为数组(可选),条目允许为 `field_id` 字符串或对象(alias);
 `relations.null_key_max_rate` 与 `relations.type_error_max_rate` 为 0-1 的浮点数(可选);
-v1 中不提供 `relations.fields` 范围选择器(关联阈值护栏默认对全部关联 lookup step 生效).
+不提供 `relations.fields` 范围选择器(关联阈值护栏默认对全部关联 lookup step 生效).
 
 #### Scenario: guardrails schema 可选
 - **WHEN** YAML 未提供 `guardrails`
@@ -119,6 +119,33 @@ schema MUST 对该字段提供 hover 说明与示例值.
 #### Scenario: 顶层 fields 出现源字段
 - **WHEN** 顶层 `fields` 中声明无 `compute` 的字段
 - **THEN** 校验必须失败并提示仅允许派生字段
+
+### Requirement: schema documents `extract` as current-row-relative field extraction
+系统 MUST 在 YAML DSL JSON Schema 的源字段定义中新增 `extract` 字段,并在 `description` / `markdownDescription` 中明确说明:
+- `extract` 相对当前 key 对应的 row value 解析
+- 系统只隐式省略最外层 `lookup_key -> value` 包装
+- row value 内部的包裹层不会被自动跳过
+
+schema 示例 MUST 至少包含:
+- `extract: CustomerMark.clearn_reason_level`
+- `extract: "[1].clearn_reason_level"`
+- `extract: '["a.b"]'`
+- `extract: review_status`
+
+#### Scenario: schema hover 包含 current-row-relative 说明
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **THEN** 源字段定义中的 `extract` MUST 具备 `description` 或 `markdownDescription`
+- **AND** 其文案 MUST 明确说明 `extract` 不是相对整个 loader-result mapping 解析
+
+### Requirement: schema removes legacy `field` and provides migration guidance
+系统 MUST 从源字段 schema 中移除 `field`,并在 hover/文档中明确说明:
+- 源字段取值唯一入口是 `extract`
+- rename 也用 `extract: <key_name>`
+- 若出现历史 `field: ...`,应按迁移错误处理并提示改为 `extract: ...`
+
+#### Scenario: schema 不再暴露 `field`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **THEN** 源字段定义 MUST NOT 包含可用的 `field` 属性(应通过 schema/validator 拒绝)
 
 ### Requirement: relation steps-only 约束
 系统 SHALL 将 `fields.*.relation` 限制为 steps 对象(允许 YAML alias 复用),禁止 relation_id 字符串引用.
@@ -155,7 +182,7 @@ schema 的 `description`/`markdownDescription`/示例 MUST 展示:
 - **THEN** 解析器解析 `order_id` 并应用 name 覆盖
 
 #### Scenario: output 使用显式 field(data_key) 选择器对象
-- **GIVEN** source `orders` 定义字段 `order_name: {field: order_real_name}`
+- **GIVEN** source `orders` 定义字段 `order_name: {extract: order_real_name}`
 - **WHEN** `output.fields` 包含 `{field: order_real_name, source: orders, name: "Order Name"}`
 - **THEN** 解析器解析到 `orders.order_name` 并应用 name 覆盖
 
@@ -175,7 +202,7 @@ schema 的 `description`/`markdownDescription`/示例 MUST 展示:
 
 ### Requirement: 字段 ID 唯一性与解析规则
 系统 SHALL 要求源字段 `field_id` 在单个 source 内唯一;派生字段 `field_id` 全局唯一且不得与任何源字段同名.
-系统 SHALL 允许源字段 `field_id` 采用 `<source_id>.<field_id>` 命名约定并视为普通字符串;同一 source 内多个字段可引用相同 `field` 值但 `field_id` 不同.
+系统 SHALL 允许源字段 `field_id` 采用 `<source_id>.<field_id>` 命名约定并视为普通字符串;同一 source 内多个字段可引用相同 `data_key`(例如多个字段的 `extract` 为同一个顶层 key),但 `field_id` 不同.
 当 `output.fields` 缺省且存在跨 source 同名 `field_id` 时,校验必须失败并提示必须显式指定 `output.fields`.
 
 #### Scenario: 派生/源同名 field_id

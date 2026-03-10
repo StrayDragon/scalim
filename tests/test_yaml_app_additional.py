@@ -23,13 +23,13 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id: &order_id
-      field: order_id
+      extract: order_id
       name: Order ID
     region: &region
-      field: region
+      extract: region
       name: Region
     customer_id:
-      field: customer_id
+      extract: customer_id
       name: Customer ID
 sources:
   customers:
@@ -38,7 +38,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_name: &customer_name
-        field: customer_name
+        extract: customer_name
         name: Customer Name
 fields:
   profit: &profit
@@ -103,7 +103,7 @@ sources:
     key: customer_id
     fields:
       customer_id:
-        field: customer_id
+        extract: customer_id
         name: Customer
 output:
   fields:

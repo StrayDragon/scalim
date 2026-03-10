@@ -41,7 +41,7 @@ class _FieldNames:
     NAME_KEY: str = LOOKUP_CAST_KEYS["name"]
     SEP: str = LOOKUP_CAST_KEYS["sep"]
     SOURCE: str = SOURCE_FIELD_KEYS["source"]
-    FIELD: str = SOURCE_FIELD_KEYS["field"]
+    EXTRACT: str = SOURCE_FIELD_KEYS["extract"]
     RELATION: str = SOURCE_FIELD_KEYS["relation"]
     FROM: str = RELATION_STEP_KEYS["from_"]
     STEPS: str = RELATION_CONFIG_KEYS["steps"]

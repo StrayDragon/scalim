@@ -5,7 +5,8 @@
 
 skill 文档 MUST 至少说明:
 - `extract` 相对当前 key 对应的 row value 解析
-- `field` 仍是 raw flat selector
+- `extract` 是唯一字段取值写法(包含 rename 与 nested path)
+- bracket 语法示例: `"[1].x"`、`'["a.b"]'`
 - 只有 whole-result reshape 才应考虑 source-level `normalize` 或 wrapper
 
 #### Scenario: 嵌套 row value 场景优先推荐 `extract`

@@ -33,7 +33,7 @@ main_source:
   loader: tests.conftest:mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 """
         + extra

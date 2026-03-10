@@ -14,8 +14,8 @@ def _base_config() -> dict:
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
             "fields": {
-                "order_id": {"field": "order_id"},
-                "customer_id": {"field": "customer_id"},
+                "order_id": {"extract": "order_id"},
+                "customer_id": {"extract": "customer_id"},
             },
         },
         "sources": {
@@ -25,7 +25,7 @@ def _base_config() -> dict:
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
                     "customer_name": {
-                        "field": "customer_name",
+                        "extract": "customer_name",
                         "relation": {"steps": [{"from": "orders.customer_id", "to": "customers.customer_id"}]},
                     }
                 },
@@ -55,7 +55,7 @@ def _config_source_errors() -> dict:
         "main_source": {
             "source_id": "orders",
             "loader": "tests.conftest.mock_loader",
-            "fields": {"order_id": {"field": "order_id"}},
+            "fields": {"order_id": {"extract": "order_id"}},
         },
         "sources": {"s1": {}},
     }
@@ -101,7 +101,7 @@ def _config_field_requires_via_when_no_path() -> dict:
                 "loader": "tests.conftest.mock_loader",
                 "key": "customer_id",
                 "bind": {"use_keys": {"param": "ids"}},
-                "fields": {"customer_name": {"field": "customer_name"}},
+                "fields": {"customer_name": {"extract": "customer_name"}},
             }
         },
     }
@@ -127,7 +127,7 @@ def _config_relation_steps_require_bind() -> dict:
                 "key": "customer_id",
                 "fields": {
                     "customer_name": {
-                        "field": "customer_name",
+                        "extract": "customer_name",
                         "relation": {"steps": [{"from": "orders.customer_id", "to": "customers.customer_id"}]},
                     }
                 },
@@ -235,7 +235,7 @@ def test_validator_errors_are_truncated_but_issues_are_preserved() -> None:
 def test_validator_derived_field_compute_allows_not() -> None:
     validator = ConfigValidator()
     config = _base_config()
-    config["main_source"]["fields"]["is_active"] = {"field": "is_active"}
+    config["main_source"]["fields"]["is_active"] = {"extract": "is_active"}
     config["fields"]["inactive"] = {"compute": "not is_active"}
 
     validator.validate(config)

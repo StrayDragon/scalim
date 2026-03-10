@@ -61,7 +61,7 @@ uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
 - 再检查是不是旧字段名
 - 需要时加 `--strict` 让问题尽早变成 error
 
-### `Legacy field 'xxx' is not allowed in v3`
+### `Legacy field 'xxx' is not allowed`
 
 - 按 [task-upgrade-legacy.md](task-upgrade-legacy.md) 直接改到新结构
 

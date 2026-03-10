@@ -16,7 +16,7 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
     name: Order ID
 """,
             sources="{}",
@@ -39,11 +39,11 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   quantity:
-    field: quantity
+    extract: quantity
     name: Quantity
 
   unit_price:
-    field: unit_price
+    extract: unit_price
     name: Unit Price
 """,
             sources="{}",
@@ -69,7 +69,7 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
 """,
             sources="{}",
             fields="""
@@ -93,19 +93,19 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   a:
-    field: a
+    extract: a
     name: A
 
   b:
-    field: b
+    extract: b
     name: B
 
   flag:
-    field: flag
+    extract: flag
     name: Flag
 
   c:
-    field: c
+    extract: c
     name: C
 """,
             sources="{}",
@@ -130,11 +130,11 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   a:
-    field: a
+    extract: a
     name: A
 
   b:
-    field: b
+    extract: b
     name: B
 """,
             sources="{}",
@@ -158,9 +158,9 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   a:
-    field: a
+    extract: a
   b:
-    field: b
+    extract: b
 """,
             sources="{}",
             fields="""
@@ -184,11 +184,11 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   a:
-    field: a
+    extract: a
   b:
-    field: b
+    extract: b
   extra:
-    field: extra
+    extract: extra
 """,
             sources="{}",
             fields="""
@@ -211,7 +211,7 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
 """,
             sources="{}",
             fields="""
@@ -233,9 +233,9 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   order_id:
-    field: order_id
+    extract: order_id
   customer_id:
-    field: customer_id
+    extract: customer_id
 """,
             sources="""
 customers:
@@ -244,7 +244,7 @@ customers:
   bind: {use_keys: {param: ids}}
   fields:
     customer_name:
-      field: customer_name
+      extract: customer_name
       relation:
         steps:
           - from: orders.customer_id
@@ -273,7 +273,7 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   customer_id:
-    field: customer_id
+    extract: customer_id
 """,
             sources="""
 customers:
@@ -282,7 +282,7 @@ customers:
   bind: {use_keys: {param: ids}}
   fields:
     customer_name:
-      field: customer_name
+      extract: customer_name
       relation:
         steps:
           - from: orders.customer_id
@@ -304,7 +304,7 @@ source_id: orders
 loader: "tests.conftest.mock_loader"
 fields:
   amount:
-    field: amount
+    extract: amount
     value_cast: int
 """,
             sources="{}",

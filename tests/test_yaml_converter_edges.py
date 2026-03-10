@@ -33,11 +33,11 @@ def _make_main_source() -> MainSourceConfig:
     return MainSourceConfig(source_id="orders", loader="tests.conftest.mock_loader")
 
 
-def _make_source_field(field_id, source="orders", field=None, name="", relation=None):
+def _make_source_field(field_id, source="orders", extract=None, name="", relation=None):
     return SourceFieldConfig(
         field_id=field_id,
         source=source,
-        field=field,
+        extract=extract,
         name=name or field_id,
         relation=relation,
         value_cast=None,
@@ -72,7 +72,7 @@ def _dummy_source_ir(source_id):
 
 def test_converter_rejects_unknown_output_fields() -> None:
     config = _make_config(
-        source_fields={"order_id": _make_source_field("order_id", field="order_id")},
+        source_fields={"order_id": _make_source_field("order_id", extract="order_id")},
         output_fields=["missing"],
     )
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
@@ -83,8 +83,8 @@ def test_converter_rejects_unknown_output_fields() -> None:
 
 def test_converter_skips_unrequired_source_and_derived_fields() -> None:
     source_fields = {
-        "order_id": _make_source_field("order_id", field="order_id"),
-        "amount": _make_source_field("amount", field="amount"),
+        "order_id": _make_source_field("order_id", extract="order_id"),
+        "amount": _make_source_field("amount", extract="amount"),
     }
     derived_fields = {
         "total": DerivedFieldConfig(field_id="total", name="total", compute="amount", depends_on=("amount",)),
@@ -102,7 +102,7 @@ def test_converter_skips_unrequired_source_and_derived_fields() -> None:
 
 def test_converter_collects_nested_derived_dependencies() -> None:
     source_fields = {
-        "amount": _make_source_field("amount", field="amount"),
+        "amount": _make_source_field("amount", extract="amount"),
     }
     derived_fields = {
         "net": DerivedFieldConfig(field_id="net", name="net", compute="amount", depends_on=("amount",)),
@@ -165,24 +165,35 @@ def test_converter_step_to_field_tuple() -> None:
     assert step.to_field == ("region_id", "institution_id")
 
 
-def test_converter_source_field_missing_source_or_field() -> None:
+def test_converter_source_field_missing_source_or_extract() -> None:
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
     converter._main_source_ir = MainSourceIr(source_id="orders", loader=lambda: [])
 
     cases = [
-        (_make_source_field("bad", source="", field="id"), "missing source"),
-        (_make_source_field("", source="orders", field=None), "missing field"),
+        (_make_source_field("bad", source="", extract="id"), "missing source"),
+        (_make_source_field("", source="orders", extract=None), "missing extract"),
     ]
     for source_field, match in cases:
         with pytest.raises(ConversionError, match=match):
             converter._convert_source_field(source_field, _make_config())
 
 
+def test_converter_rejects_invalid_source_field_extract_expression() -> None:
+    config = _make_config(
+        source_fields={"bad": _make_source_field("bad", extract="a..b")},
+        output_fields=["bad"],
+    )
+    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
+
+    with pytest.raises(ConversionError, match="invalid extract"):
+        converter.convert(config)
+
+
 def test_converter_lookup_steps_return_none_when_no_main_source() -> None:
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
     target_source = _dummy_source_ir("customers")
 
-    result = converter._resolve_lookup_steps(_make_source_field("name", source="customers", field="name"), _make_config(), target_source)
+    result = converter._resolve_lookup_steps(_make_source_field("name", source="customers", extract="name"), _make_config(), target_source)
 
     assert result is None
 
@@ -193,7 +204,7 @@ def test_converter_lookup_steps_return_none_for_main_source_target() -> None:
     target_source = _dummy_source_ir("orders")
 
     result = converter._resolve_lookup_steps(
-        _make_source_field("order_id", source="orders", field="order_id"), _make_config(), target_source
+        _make_source_field("order_id", source="orders", extract="order_id"), _make_config(), target_source
     )
 
     assert result is None

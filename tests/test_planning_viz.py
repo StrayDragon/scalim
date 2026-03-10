@@ -249,7 +249,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 observability:
   viz:
@@ -320,7 +320,7 @@ main_source:
   loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
   fields:
     order_id:
-      field: order_id
+      extract: order_id
       name: Order ID
 sources: {}
 """

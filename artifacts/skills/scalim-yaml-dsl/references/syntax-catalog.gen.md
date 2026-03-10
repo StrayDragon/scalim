@@ -48,7 +48,7 @@
 ## OpenSpec Requirement Map
 ### `yaml-dsl-schema`
 - Source: `openspec/specs/yaml-dsl-schema/spec.md`
-- Purpose: 通过 dataclass 元数据生成 v3-only 的 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
+- Purpose: 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 - Requirements:
   - schema 元数据生成与 hover 指引
   - output 字段 hover 指引明确可选与 overrides 推荐写法
@@ -56,6 +56,8 @@
   - 顶层 schema 字段(guardrails)
   - observability.logging 支持 renderer/preset 字段
   - 字段声明位置与 compute 约束
+  - schema documents `extract` as current-row-relative field extraction
+  - schema removes legacy `field` and provides migration guidance
   - relation steps-only 约束
   - output.fields 解析与 schema 指引
   - 字段 ID 唯一性与解析规则
@@ -295,7 +297,7 @@
   - `name`: `string`
   - `call_by`: `string`
   - `compute`: `string`
-  - `field`: `string`
+  - `extract`: `string`
   - `relation`: `object`, properties `steps`
   - `source`: `string`
   - `value_cast`: `string`, enum `auto`, `int`, `str`
@@ -488,9 +490,10 @@
 - Type: `object`
 - `allOf`:
   - 1. `object`
+  - 2. `object`
 - Properties:
   - `name`: `string`
-  - `field`: `string`
+  - `extract`: `string`
   - `relation`: `object`, properties `steps`
   - `source`: `string`
   - `value_cast`: `string`, enum `auto`, `int`, `str`

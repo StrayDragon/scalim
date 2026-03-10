@@ -137,8 +137,12 @@
 - **THEN** 导入 MUST 失败
 
 ### Requirement: 字段/关系表达式默认行为
-系统 SHALL 支持 relations.steps 中 `source.field` 点号表达式(含同源列表),并在字段定义中当 `field` 未声明时默认使用 field_id.
-系统 MUST 将 `relations.steps` 的 `source.<name>` 视为字段的 `field_id`(YAML key),并映射为其 `field`(data_key) 供运行时使用.
+系统 SHALL 支持 relations.steps 中 `source.field_id` 点号表达式(含同源列表),并在源字段定义中当 `extract` 未声明时默认使用 field_id(等价于 `extract: <field_id>`).
+系统 MUST 将 `relations.steps` 的 `source.<name>` 视为字段的 `field_id`(YAML key),并将其映射为运行时使用的 `data_key`.
+系统 MUST 基于 `extract` 推导 `data_key`:
+- 若 `extract` 编译后恰为单段 string,则 `data_key` 等于该段(支持 rename: `extract: <key_name>`)
+- 否则 `data_key` MUST 回退为 `field_id`
+系统 MUST 将源字段中的 legacy `field: ...` 视为不允许,并在校验/编译阶段 fail-fast,错误消息应包含可直接照抄的迁移提示: “请改用 extract: ...”.
 系统 SHALL 允许在 steps 中引用非主源 `sources.<id>.key` 中声明的 key 字段,即使该 key 未显式声明在 `sources.<id>.fields`.
 系统 MUST 在 `<name>` 不存在于该 source 的声明字段(field_id)且也不在 `sources.<id>.key` 时,视为配置错误并在校验阶段失败.
 系统 MUST 在同一 source 内禁止 field_id 与其他 field_id 的 data_key 重名;一旦出现即视为配置错误并在校验阶段失败.
@@ -148,32 +152,38 @@
 - **WHEN** step 定义为 `from: orders.customer_id` 与 `to: customers.customer_id`
 - **THEN** 系统应正确解析为 from=(orders, customer_id) 与 to=(customers, customer_id)
 
-#### Scenario: field 未声明时使用默认值
-- **WHEN** 源字段定义为 `user_id: { name: 用户ID }` 且未声明 `field`
-- **THEN** 系统应将 `field` 默认设置为 `user_id`
+#### Scenario: extract 未声明时使用默认值
+- **WHEN** 源字段定义为 `user_id: { name: 用户ID }` 且未声明 `extract`
+- **THEN** 系统应将该字段的 `extract` 默认等价为 `user_id`
+- **AND** 该字段的 `data_key` MUST 为 `user_id`
+
+#### Scenario: legacy field 写法被拒绝
+- **WHEN** 某个源字段声明 `field: review_status`
+- **THEN** 校验 MUST 失败并指向该字段路径
+- **AND** 错误 MUST 给出迁移提示: “请改用 extract: review_status”
 
 #### Scenario: step 优先使用 field_id 映射
-- **GIVEN** source `products` 定义字段 `product_category_id: {field: category_id}`
+- **GIVEN** source `products` 定义字段 `product_category_id: {extract: category_id}`
 - **WHEN** step 使用 `to: products.product_category_id`
 - **THEN** 系统应解析为 data_key `category_id`
 
 #### Scenario: step 使用 data_key 时校验失败
-- **GIVEN** source `products` 定义字段 `product_category_id: {field: category_id}`
+- **GIVEN** source `products` 定义字段 `product_category_id: {extract: category_id}`
 - **WHEN** step 使用 `to: products.category_id`
 - **THEN** 校验必须失败并提示 steps 只能使用 field_id
 
 #### Scenario: field_id 与其他 data_key 重名时校验失败
-- **GIVEN** source `products` 定义 `category_id: {field: category_id_v2}` 且 `product_category_id: {field: category_id}`
+- **GIVEN** source `products` 定义 `category_id: {extract: category_id_v2}` 且 `product_category_id: {extract: category_id}`
 - **WHEN** 配置被校验
 - **THEN** 校验必须失败并提示 field_id/data_key 命名冲突
 
 #### Scenario: step 引用未知字段校验失败
-- **GIVEN** source `products` 定义字段 `product_category_id: {field: category_id}`
+- **GIVEN** source `products` 定义字段 `product_category_id: {extract: category_id}`
 - **WHEN** step 使用 `to: products.unknown_field`
 - **THEN** 校验必须失败并提示引用未知字段
 
 #### Scenario: 多个 field_id 映射同一 data_key 不视为歧义
-- **GIVEN** source `products` 定义 `a: {field: id}` 与 `b: {field: id}` 与 `c: {field: id}`
+- **GIVEN** source `products` 定义 `a: {extract: id}` 与 `b: {extract: id}` 与 `c: {extract: id}`
 - **WHEN** step 使用 `to: products.a`
 - **THEN** 系统应解析为 data_key `id` 且不报歧义错误
 

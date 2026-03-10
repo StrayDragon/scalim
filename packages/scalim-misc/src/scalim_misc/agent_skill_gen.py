@@ -11,7 +11,9 @@
 - 规范摘要: `openspec/specs/` 中相关 spec 作为维护来源,自动摘录 requirement 索引
 - canonical example: `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
 
-手工维护的 `SKILL.md` 与非 generated references 不由这里写入或重排.
+手工维护的 `SKILL.md` 与非 generated references 一般不由这里写入或重排.
+例外: 若存在手工 reference `references/task-upgrade-legacy.md`,生成器会在约定的 marker 区块内
+注入“升级批次索引”,用于把 `docs/doc/yaml-dsl/upgrades/` 的升级文档同步到 skill 参考中.
 """
 
 import argparse
@@ -59,6 +61,11 @@ CANONICAL_EXAMPLE_OUTPUT_REL = GENERATED_ROOT_REL / "example-full" / "ecommerce_
 SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
 CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
 CANONICAL_EXAMPLE_SOURCE_REL = Path("notebooks") / "marimo" / "examples" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_report.yaml"
+
+UPGRADES_DOCS_ROOT_REL = Path("docs") / "doc" / "yaml-dsl" / "upgrades"
+UPGRADE_LEGACY_REFERENCE_REL = REFERENCES_ROOT_REL / "task-upgrade-legacy.md"
+UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN SCALIM-GEN:yaml-dsl-upgrades -->"
+UPGRADES_INDEX_END_MARKER = "<!-- END SCALIM-GEN:yaml-dsl-upgrades -->"
 
 SYNTAX_SPEC_RELS = (
     Path("openspec") / "specs" / "yaml-dsl-schema" / "spec.md",
@@ -114,6 +121,7 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
         CANONICAL_EXAMPLE_OUTPUT_REL: canonical_example_text,
     }
     sync_generated_files(skill_dir, generated_files)
+    sync_upgrade_legacy_reference(repo_root, skill_dir)
 
     outputs = [skill_dir / rel_path for rel_path in sorted(generated_files.keys(), key=lambda item: str(item))]
     inputs = [schema_path, cli_path, canonical_example_source] + [repo_root / rel for rel in SYNTAX_SPEC_RELS + CLI_SPEC_RELS]
@@ -358,6 +366,104 @@ def render_cli_lsp_reference(
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def sync_upgrade_legacy_reference(repo_root: Path, skill_dir: Path) -> None:
+    """将升级批次索引注入到手工 reference 中(若存在)."""
+    upgrades_root = repo_root / UPGRADES_DOCS_ROOT_REL
+    if not upgrades_root.exists():
+        return
+
+    upgrade_reference_path = skill_dir / UPGRADE_LEGACY_REFERENCE_REL
+    if not upgrade_reference_path.exists():
+        return
+
+    original = read_text(upgrade_reference_path)
+    injected = inject_markdown_block(
+        original,
+        begin_marker=UPGRADES_INDEX_BEGIN_MARKER,
+        end_marker=UPGRADES_INDEX_END_MARKER,
+        content=render_yaml_dsl_upgrades_index(repo_root, upgrades_root),
+    )
+    if injected != original:
+        write_text(upgrade_reference_path, injected)
+
+
+def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
+    docs = []
+    for path in sorted(upgrades_root.glob("*.md"), key=lambda item: item.name):
+        if path.name == "index.md":
+            continue
+        title = extract_markdown_h1(read_text(path)) or path.name
+        doc_rel = path_to_posix(path.relative_to(repo_root))
+        content = read_text(path)
+        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/")
+        spec_path = extract_backtick_path(content, prefix="openspec/specs/")
+        docs.append(
+            {
+                "title": title,
+                "doc_rel": doc_rel,
+                "openspec_archive": openspec_archive,
+                "spec_path": spec_path,
+            }
+        )
+
+    if not docs:
+        return "- (未发现升级文档)\n"
+
+    lines = []
+    for item in docs:
+        lines.append("- {}".format(item["title"]))
+        lines.append("  - Docs: `{}`".format(item["doc_rel"]))
+        if item["openspec_archive"]:
+            lines.append("  - OpenSpec: `{}`".format(item["openspec_archive"]))
+        if item["spec_path"]:
+            lines.append("  - Spec: `{}`".format(item["spec_path"]))
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def extract_markdown_h1(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            return stripped[2:].strip()
+    return ""
+
+
+def extract_backtick_path(text: str, *, prefix: str) -> Optional[str]:
+    for match in re.finditer(r"`([^`]+)`", text):
+        value = match.group(1)
+        if value.startswith(prefix):
+            return value
+    return None
+
+
+def inject_markdown_block(text: str, *, begin_marker: str, end_marker: str, content: str) -> str:
+    lines = text.splitlines(True)
+    begin_index = None
+    end_index = None
+    for idx, line in enumerate(lines):
+        if line.strip() == begin_marker:
+            begin_index = idx
+            continue
+        if begin_index is not None and line.strip() == end_marker:
+            end_index = idx
+            break
+
+    content_lines = content.splitlines(True)
+    if content and not content.endswith("\n"):
+        content_lines.append("\n")
+
+    if begin_index is None or end_index is None or end_index <= begin_index:
+        # 没有 marker 时,直接追加一个可再次注入的区块(不尝试猜测插入位置).
+        appended = text.rstrip() + "\n\n{}\n{}\n{}\n".format(begin_marker, content.rstrip(), end_marker)
+        return appended
+
+    injected_lines = []
+    injected_lines.extend(lines[: begin_index + 1])
+    injected_lines.extend(content_lines)
+    injected_lines.extend(lines[end_index:])
+    return "".join(injected_lines)
 
 
 def render_spec_requirement_map(title: str, spec_summaries: Sequence[Dict[str, Any]]) -> List[str]:

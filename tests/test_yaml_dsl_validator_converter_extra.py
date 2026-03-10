@@ -35,8 +35,8 @@ def _base_validator_config() -> dict:
             "source_id": "orders",
             "loader": _ORDER_LOADER,
             "fields": {
-                "order_id": {"field": "order_id"},
-                "customer_id": {"field": "customer_id"},
+                "order_id": {"extract": "order_id"},
+                "customer_id": {"extract": "customer_id"},
             },
         },
         "sources": {
@@ -46,7 +46,7 @@ def _base_validator_config() -> dict:
                 "bind": {"use_keys": {"param": "ids"}},
                 "fields": {
                     "customer_name": {
-                        "field": "customer_name",
+                        "extract": "customer_name",
                         "relation": {"steps": [{"from": "orders.customer_id", "to": "customers.customer_id"}]},
                     }
                 },
@@ -66,11 +66,11 @@ def _base_converter_config() -> DemandConfig:
             "customers": SourceConfig(source_id="customers", loader=_CUSTOMER_LOADER, key="customer_id"),
         },
         source_fields={
-            "order_id": SourceFieldConfig(field_id="order_id", source="orders", field="order_id"),
+            "order_id": SourceFieldConfig(field_id="order_id", source="orders", extract="order_id"),
             "customer_name": SourceFieldConfig(
                 field_id="customer_name",
                 source="customers",
-                field="customer_name",
+                extract="customer_name",
                 relation=InlineRelationConfig(steps=(RelationStepConfig(from_="orders.customer_id", to="customers.customer_id"),)),
             ),
         },
@@ -187,7 +187,7 @@ def _config_main_source_conflicts_with_sources() -> DemandConfig:
 
 def _config_field_unknown_source() -> DemandConfig:
     config = copy.deepcopy(_base_converter_config())
-    config.source_fields["order_id"] = SourceFieldConfig(field_id="order_id", source="missing", field="order_id")
+    config.source_fields["order_id"] = SourceFieldConfig(field_id="order_id", source="missing", extract="order_id")
     return config
 
 
@@ -196,7 +196,7 @@ def _config_unknown_relation_ref() -> DemandConfig:
     config.source_fields["customer_name"] = SourceFieldConfig(
         field_id="customer_name",
         source="customers",
-        field="customer_name",
+        extract="customer_name",
         relation="missing",
     )
     return config
@@ -211,7 +211,7 @@ def _config_ambiguous_path() -> DemandConfig:
     config.source_fields["customer_name"] = SourceFieldConfig(
         field_id="customer_name",
         source="customers",
-        field="customer_name",
+        extract="customer_name",
     )
     return config
 
@@ -221,7 +221,7 @@ def _config_inline_steps_unknown_source() -> DemandConfig:
     config.source_fields["customer_name"] = SourceFieldConfig(
         field_id="customer_name",
         source="customers",
-        field="customer_name",
+        extract="customer_name",
         relation=InlineRelationConfig(
             steps=(RelationStepConfig(from_="orders.customer_id", to="missing.customer_id"),),
         ),
@@ -262,7 +262,7 @@ def test_converter_infers_unique_path() -> None:
     config.source_fields["customer_name"] = SourceFieldConfig(
         field_id="customer_name",
         source="customers",
-        field="customer_name",
+        extract="customer_name",
     )
 
     demand = converter.convert(config)

@@ -174,7 +174,7 @@ def _collect_legacy_fields(errors: List[Issue], data: Dict[str, Any], prefix: Op
         if key not in LEGACY_FIELDS:
             continue
         path = "{}.{}".format(prefix, key) if prefix else str(key)
-        errors.append(Issue(path=path, message="Legacy field '{}' is not allowed in v3".format(key)))
+        errors.append(Issue(path=path, message="Legacy field '{}' is not allowed".format(key)))
 
 
 def _issues_to_rows(issues: Iterable[Any]) -> List[Issue]:

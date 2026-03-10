@@ -22,6 +22,7 @@
           "文本编辑为主路径(Text-first)",
           "可视化与 YAML 双向编辑(Split)",
           "使用 canonical JSON Schema 提供补全与 hover",
+          "editor exposes `extract` with the same semantics as the canonical schema",
           "导入/导出与模板新建",
           "Outline 与快速导航",
           "可视化辅助视图(关系与依赖)",
@@ -81,6 +82,8 @@
           "顶层 schema 字段(guardrails)",
           "observability.logging 支持 renderer/preset 字段",
           "字段声明位置与 compute 约束",
+          "schema documents `extract` as current-row-relative field extraction",
+          "schema removes legacy `field` and provides migration guidance",
           "relation steps-only 约束",
           "output.fields 解析与 schema 指引",
           "字段 ID 唯一性与解析规则",
@@ -225,11 +228,11 @@
   "inputs": [
     {
       "path": "notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "d332f7b084204794881348cadbe1ac641ff937151bb6ece3523196dc7aeed338"
+      "sha256": "f31ceb8589e5dcd88525c3ca42dfca586f8f9b7384b16937dc8754cd5a5b6dae"
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
-      "sha256": "1470c30ec4c0a133024da0b96867da67dbf9dea6cf47de24d4003b64a64c9b46"
+      "sha256": "c2fffdb1e1a9ba7eb9b5b3b1bb9e3f90bcc97e1da54155c9b6adb07a46e5e2d1"
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
@@ -249,7 +252,7 @@
     },
     {
       "path": "openspec/specs/runtime-guardrails/spec.md",
-      "sha256": "6c6974270d4393efcf65155f36b39c9570ff7ecca0b0f4b98f6d78633a23c1ad"
+      "sha256": "04510332f44c0c16a35d39f4cd546aa4a9e2c903d7f92ba20849487b8a3731a1"
     },
     {
       "path": "openspec/specs/runtime-pruning/spec.md",
@@ -269,33 +272,33 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
-      "sha256": "5c9fde446c89ef79339e8723b57002da0c5670b8a585382a0145e1b336d9b908"
+      "sha256": "bc63a82ab206e7e84d1c40bf74d5087d4a7576f21c870f8a7d7819cdb51c2d0a"
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "a207333e0d784c73793ffb4986f96aa3a9055de525563143d61086dd35bde6b2"
+      "sha256": "041612179c2b6125173e1aa61db5a80a3f92f33101d4ecefc69fb13d8eef909d"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "14d6c5662b51a33ea1e5d5e40991c4b756ad91c7693ea3235a4c8b52c61ba4d1"
+      "sha256": "8fee11e3a4ddda9c46a7d03f937d87d2efaecbf66bb3a2b06d63b3f406ae87ae"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "ed4d1c42bcf7cc5b59c026a71dfe44c32f5f88bb1f6d814f2ef2d9d53883918b"
+      "sha256": "004647d52f56e973b5f99967751b7b98e4473ff3a505f8d31986084ace439b1a"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "b739bc8fa163ecfcc2c3705ec11ef5c6998d02ecfa0b42f2df9b2ee5c295a6f7"
+      "sha256": "f583e0ca93166c1c2fe6669d3efbf025a2fa20cc78359c8f32e826152cdf0d50"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "c5981b808f81c3de466abc27433003499f3398a335b4b00b5bc244e0b3fe9fbd"
+      "sha256": "ec0714137b15f61e96f5efab8e46021fa1d6236aebb4af4a77fb8b13cad54c4c"
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "2ce5acd40d432237c1d46907f92261a28773f0be5d497a4c00d090ea7fd12228"
+      "sha256": "22d7e96784df47f5e4f1a7d609b67466bfcd9323d7e4433c0b1ee186ceb6aefa"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

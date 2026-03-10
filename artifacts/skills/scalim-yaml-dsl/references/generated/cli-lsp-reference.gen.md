@@ -57,6 +57,7 @@
   - 文本编辑为主路径(Text-first)
   - 可视化与 YAML 双向编辑(Split)
   - 使用 canonical JSON Schema 提供补全与 hover
+  - editor exposes `extract` with the same semantics as the canonical schema
   - 导入/导出与模板新建
   - Outline 与快速导航
   - 可视化辅助视图(关系与依赖)
@@ -76,9 +77,7 @@
 ## Command Details
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
-- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
-                                    [--verbose]
-                                    yaml_file`
+- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
 - Positionals:
   - `yaml_file`: YAML 文件路径
 - Options:
@@ -89,9 +88,7 @@
 
 ### `yaml-dsl schema validate`
 - Help: Validate YAML DSL via JSON Schema
-- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
-                                           [--json] [--verbose]
-                                           yaml_file`
+- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
 - Positionals:
   - `yaml_file`: YAML 文件路径
 - Options:

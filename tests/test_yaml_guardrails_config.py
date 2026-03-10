@@ -18,8 +18,8 @@ def _base_config() -> dict:
             "source_id": "orders",
             "loader": "tests.conftest:mock_loader",
             "fields": {
-                "order_id": {"field": "order_id"},
-                "customer_id": {"field": "customer_id"},
+                "order_id": {"extract": "order_id"},
+                "customer_id": {"extract": "customer_id"},
             },
         },
         "sources": {},
@@ -74,7 +74,7 @@ main_source:
   loader: tests.conftest:mock_loader
   fields:
     order_id: &order_id
-      field: order_id
+      extract: order_id
 sources: {}
 guardrails:
   enabled: true

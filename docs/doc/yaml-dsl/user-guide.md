@@ -190,7 +190,7 @@ Scalim YAML DSL 支持两种字段类型:
 main_source:
   fields:
     order_id:
-      field: order_id      # 列名(默认等于 field_id)
+      extract: order_id    # 可省略: 缺省等价于 extract: <field_id>
       name: 订单ID          # 显示名称
       value_cast: int      # 值转换(可选)
 ```
@@ -404,10 +404,83 @@ lookup_cast:
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| `field` | string | ❌ | field_id | 列名 |
+| `extract` | string | ❌ | field_id | 从当前 source row 中取值的路径表达式(支持 dot + bracket) |
 | `name` | string | ❌ | - | 显示名称 |
 | `value_cast` | string | ❌ | - | 值转换:`auto`/`int`/`str` |
 | `relation` | object | ❌ | - | 关联路径或 YAML 别名引用 |
+
+**extract 的默认与语法**:
+
+<!-- BEGIN SCALIM-GEN:yaml-dsl-source-field-extract -->
+从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).
+
+语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):
+- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)
+- dot: `a.b.c`
+- int-key: `"[1].clearn_reason_level"` (表示 key=1,不是 list index)
+- 字面量 string key: `'["a.b"].x'` (用于 key 本身包含点号等特殊字符)
+
+注意:
+- 不做 `"1"` ↔ `1` 的隐式转换(避免歧义)
+- 不支持数组/列表下标语义: `[1]` 永远表示 “key=1”
+- 缺失/路径不匹配时返回 `None`
+
+示例(含嵌套取值):
+
+```yaml
+main_source:
+  fields:
+    # 顶层同名 key: extract 可省略
+    review_status:
+      name: 审核状态
+
+    # int-key nested dict: role_id 是 int(例如 1/2)
+    customer_clearn_reason_level:
+      name: 客户净利原因等级
+      extract: "[1].clearn_reason_level"
+
+    # dotted literal key: row 的 key 就叫 "a.b"
+    dotted_literal_key_value:
+      extract: '["a.b"].x'
+```
+
+示例(给定 loader 返回值,extract 提取后的输出长什么样):
+
+```python
+result = {
+  1: {1: {"clearn_reason_level": 2}, 2: {"clearn_reason_level": 1}, "review_status": 0},
+}
+```
+
+字段:
+
+```yaml
+sources:
+  clearn_reasons:
+    fields:
+      customer_level:
+        extract: "[1].clearn_reason_level"
+      operation_level:
+        extract: "[2].clearn_reason_level"
+      review_status:
+        extract: review_status
+```
+
+对 `lookup_key=1` 的 row value:
+- `customer_level` → `2`
+- `operation_level` → `1`
+- `review_status` → `0`
+
+最终输出行片段:
+
+```python
+{"customer_level": 2, "operation_level": 1, "review_status": 0}
+```
+
+补充边界:
+- 如果中间段是 list/tuple, `"[1]"` 也不会当作下标(会返回 `None`)
+- 如果同时存在 key `"1"` 与 `1`,需要用 `extract: '["1"].x'` 与 `extract: "[1].x"` 明确区分
+<!-- END SCALIM-GEN:yaml-dsl-source-field-extract -->
 
 **示例**:
 
@@ -423,7 +496,6 @@ sources:
   customers:
     fields:
       customer_name:
-        field: customer_name    # 列名(默认等于 field_id)
         name: 客户名称
         relation: *orders_to_customers  # YAML 别名引用
       customer_level:
@@ -521,9 +593,9 @@ sources:
 
 **重要: steps 中的 `source.field` 使用 field_id**
 
-`from/to` 里写的 `orders.customer_id` / `customers.customer_id` 中 `customer_id` 指的是字段的 **field_id(YAML key)**,不是字段配置里的 `field:`(data_key/列名).
+`from/to` 里写的 `orders.customer_id` / `customers.customer_id` 中 `customer_id` 指的是字段的 **field_id(YAML key)**,不是字段配置里的 `extract:`(data_key/路径表达式).
 
-当你做了重命名(`field_id != field`)时,steps 仍然引用 `field_id`:
+当你做了重命名(`field_id != extract`)时,steps 仍然引用 `field_id`:
 
 ```yaml
 main_source:
@@ -531,7 +603,7 @@ main_source:
   loader: "myapp.loaders:load_orders"
   fields:
     customer_id:
-      field: customer_id_col  # data_key
+      extract: customer_id_col  # data_key
 
 sources:
   customers:
@@ -540,7 +612,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_id:
-        field: id  # data_key
+        extract: id  # data_key
 
 relations:
   orders_to_customers:
@@ -1114,7 +1186,7 @@ sources:
 
       product_category_id:
         name: 产品分类ID
-        field: category_id
+        extract: category_id
         relation: *orders_to_products
 
   categories:

@@ -63,7 +63,7 @@ class GuardrailsRelationsConfig:
         default=None,
         metadata=schema_meta(
             desc="关联 null_key 最大比例(0.0-1.0;未设置则不启用)",
-            md="关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- v1 默认对全部关联 lookup step 生效",
+            md="关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
             min=0.0,
             max=1.0,
         ),
@@ -74,7 +74,7 @@ class GuardrailsRelationsConfig:
         default=None,
         metadata=schema_meta(
             desc="关联 type_error 最大比例(0.0-1.0;未设置则不启用)",
-            md="关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- v1 默认对全部关联 lookup step 生效",
+            md="关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
             min=0.0,
             max=1.0,
         ),

@@ -22,11 +22,11 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id: &order_id
-      field: order_id
+      extract: order_id
     customer_id:
-      field: customer_id
+      extract: customer_id
     amount:
-      field: amount
+      extract: amount
 sources:
   customers:
     loader: tests.conftest.mock_loader
@@ -34,7 +34,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_name: &customer_name
-        field: customer_name
+        extract: customer_name
 relations:
   r1:
     steps:
@@ -66,7 +66,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 output:
   fields:
@@ -88,7 +88,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources:
   mapping:
     loader: tests.conftest.mock_loader
@@ -113,9 +113,9 @@ main_source:
     - order_id
   fields:
     order_id: &order_id
-      field: order_id
+      extract: order_id
     customer_id:
-      field: customer_id
+      extract: customer_id
 sources:
   customers:
     loader: tests.conftest.mock_loader
@@ -123,7 +123,7 @@ sources:
     bind: {use_keys: {param: ids}}
     fields:
       customer_name: &customer_name
-        field: customer_name
+        extract: customer_name
 relations:
   r1:
     steps:
@@ -149,7 +149,7 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id:
-      field: order_id
+      extract: order_id
 sources: {}
 fields:
   const:

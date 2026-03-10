@@ -273,7 +273,7 @@ sources:
         relation: *orders_to_products
       product_category_id: &product_category_id
         name: 产品分类ID
-        field: category_id
+        extract: category_id
         relation: *orders_to_products
 
   categories:
@@ -293,7 +293,7 @@ sources:
     fields:
       region_id:
         name: 区域ID
-        field: region_id
+        extract: region_id
         relation: *orders_to_warehouses
 
       # 多级关联 - 仓库
@@ -309,13 +309,13 @@ sources:
       # 多级关联 - 区域
       region_name_value: &region_name_value
         name: 区域名称
-        field: region_name
+        extract: region_name
         relation: *orders_to_regions
 
       # 复用同一 field 值: 通过不同字段名/展示名表达不同语义
       region_name_display: &region_name_display
         name: 区域名称(展示)
-        field: region_name
+        extract: region_name
         relation: *orders_to_regions
 
       region_manager: &region_manager

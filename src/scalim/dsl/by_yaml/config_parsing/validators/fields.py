@@ -16,16 +16,6 @@ class ValidatorFieldsMixin(ValidatorFieldSourceMixin, ValidatorFieldDerivedMixin
         main_source_id: str,
         relation_paths: Dict[str, List[Tuple[str, str, bool]]],
     ) -> None:
-        self._validate_fields_v3(raw, errors, sources_info, main_source_id, relation_paths)
-
-    def _validate_fields_v3(
-        self,
-        raw: RawDemand,
-        errors: List[ValidationIssue],
-        sources_info: Dict[str, Dict[str, bool]],
-        main_source_id: str,
-        relation_paths: Dict[str, List[Tuple[str, str, bool]]],
-    ) -> None:
         sources_set: Set[str] = set(sources_info.keys())
         if main_source_id:
             sources_set.add(main_source_id)
@@ -37,7 +27,7 @@ class ValidatorFieldsMixin(ValidatorFieldSourceMixin, ValidatorFieldDerivedMixin
         duplicate_fields_by_source: Dict[str, Set[str]] = {}
         seen_field_values_by_source: Dict[str, Dict[str, str]] = {}
 
-        self._collect_main_source_fields_v3(
+        self._collect_main_source_fields(
             raw,
             errors,
             sources_set,
@@ -50,7 +40,7 @@ class ValidatorFieldsMixin(ValidatorFieldSourceMixin, ValidatorFieldDerivedMixin
             duplicate_fields_by_source,
             seen_field_values_by_source,
         )
-        self._collect_source_fields_v3(
+        self._collect_source_fields(
             raw,
             errors,
             sources_set,
@@ -63,7 +53,7 @@ class ValidatorFieldsMixin(ValidatorFieldSourceMixin, ValidatorFieldDerivedMixin
             duplicate_fields_by_source,
             seen_field_values_by_source,
         )
-        self._collect_derived_fields_v3(
+        self._collect_derived_fields(
             raw,
             errors,
             field_defs,
@@ -75,7 +65,7 @@ class ValidatorFieldsMixin(ValidatorFieldSourceMixin, ValidatorFieldDerivedMixin
         self._validate_source_field_id_data_key_conflicts(field_defs, errors, main_source_id)
         self._validate_no_derived_source_overlap(defs_by_id, errors)
         self._validate_derived_dependencies(derived_fields_with_deps, defs_by_id, errors)
-        self._validate_output_fields_v3(raw, errors, defs_by_id, alias_index, duplicate_fields_by_source)
+        self._validate_output_fields(raw, errors, defs_by_id, alias_index, duplicate_fields_by_source)
 
 
 __all__ = ["OutputFieldIssueCollector", "ValidatorFieldsMixin"]
