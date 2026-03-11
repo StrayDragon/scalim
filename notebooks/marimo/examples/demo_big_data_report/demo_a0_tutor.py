@@ -52,6 +52,11 @@ def _():
     from dataclasses import asdict
     from pprint import pformat
 
+    _repo_root = Path(__file__).resolve().parents[4]
+    _repo_root_str = str(_repo_root)
+    if _repo_root_str not in sys.path:
+        sys.path.insert(0, _repo_root_str)
+
     return (Path,)
 
 
@@ -167,8 +172,8 @@ def _(demand_config, mo):
     _config_summary.append("\n**Source Fields (来源字段)**:")
     for _field_id, _field_cfg in list(demand_config.source_fields.items())[:5]:
         _relation_str = f", relation={_field_cfg.relation}" if _field_cfg.relation else ""
-        _field_name = _field_cfg.field or _field_id
-        _config_summary.append(f"  - `{_field_id}`: source={_field_cfg.source}, field={_field_name}{_relation_str}")
+        _extract_expr = _field_cfg.extract or _field_id
+        _config_summary.append(f"  - `{_field_id}`: source={_field_cfg.source}, extract={_extract_expr}{_relation_str}")
     if len(demand_config.source_fields) > 5:
         _config_summary.append(f"  - ... 共 {len(demand_config.source_fields)} 个来源字段")
 
@@ -857,12 +862,12 @@ def _(Path, yaml_path):
 
     try:
         sink = InMemoryRowSink()
-        runtime_vars = {"order_ids": []}
+        _runtime_vars = {"order_ids": []}
         result = run(
             str(yaml_path),
             allowed_modules=frozenset([_loaders_module]),
             sink=sink,
-            runtime_vars=runtime_vars,
+            runtime_vars=_runtime_vars,
         )
         print("✅ `run()` 执行成功!")
         print(f"   总行数: {result.total_rows}")

@@ -2,6 +2,13 @@ set dotenv-load := true
 
 UV_OPTIONS := "--preview-features extra-build-dependencies"
 
+# 统一在 just 子进程里固定到默认 PyPI,避免继承本地镜像环境后把 `uv.lock` 再次写脏。
+export UV_DEFAULT_INDEX := "https://pypi.org/simple"
+export UV_INDEX_URL := ""
+export UV_EXTRA_INDEX_URL := ""
+export PIP_INDEX_URL := ""
+export PIP_EXTRA_INDEX_URL := ""
+
 _default:
     just --list
 
@@ -121,6 +128,19 @@ schema-drift-check: gen-yaml-dsl-editor-schema
 # 检查: stdlib 同名模块冲突
 stdlib-collisions-check:
     uv {{ UV_OPTIONS }} run python scripts/check-stdlib-module-collisions.py
+
+# 检查: `uv.lock` 是否与当前项目元数据一致(强制按默认 PyPI 校验,避免本地镜像环境掩盖 CI 漂移)
+uv-lock-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    env \
+        -u UV_INDEX \
+        -u UV_INDEX_URL \
+        -u UV_EXTRA_INDEX_URL \
+        -u PIP_INDEX_URL \
+        -u PIP_EXTRA_INDEX_URL \
+        UV_DEFAULT_INDEX="https://pypi.org/simple" \
+        uv {{ UV_OPTIONS }} lock --check
 
 # 构建: wheel/sdist (发行物)
 build-dist:
@@ -279,7 +299,7 @@ py-output-language-check:
 # 检查: 运行单元测试
 test:
     # Fast/local functional checks (bench excluded). Use for daily dev loops.
-    uv {{ UV_OPTIONS }} run pytest tests/ -v -m "not bench"
+    uv {{ UV_OPTIONS }} run pytest tests/ -q -m "not bench"
 
 # 压力测试: 运行
 bench *ARGS:
@@ -424,7 +444,7 @@ examples:
     echo "All examples completed!"
 
 # QA: 仅py轻量的检查
-quick-check-only-py: lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 
@@ -437,7 +457,7 @@ alias quick-qa := quick-check
 check-only-py: quick-check-only-py py36-compat-check py36-typingext-check examples bench bench-memray
 
 # QA: 所有完整的检查
-check: quick-check-only-py py36-compat-check py36-typingext-check frontend-check
+check: quick-check-only-py py36-compat-check py36-typingext-check frontend-check examples
 
 alias qa := check
 

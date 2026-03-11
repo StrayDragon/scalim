@@ -33,7 +33,7 @@ def _prepare_repo_fixture(tmp_path: Path) -> Path:
     return repo_root
 
 
-def test_sanitize_apply_rewrites_only_narrow_public_patterns(tmp_path: Path) -> None:
+def test_sanitize_apply_rewrites_only_example_secret_tokens(tmp_path: Path) -> None:
     repo_root = _prepare_repo_fixture(tmp_path)
     openspec_root = repo_root / "openspec"
     sample = openspec_root / "sample.md"
@@ -73,12 +73,12 @@ def test_sanitize_apply_rewrites_only_narrow_public_patterns(tmp_path: Path) -> 
     assert 'api_key: "API_KEY_PLACEHOLDER"' in text
     assert "--token TOKEN_PLACEHOLDER" in text
     assert "`TOKEN_PLACEHOLDER`" in text
-    assert "PROJECT_CLI_NAME" in text
-    assert "src/IMPL_ROOT/runtime.py" in text
-    assert "from IMPL_ROOT.runtime import run" in text
-    assert "IMPL_ROOT.runtime.entrypoints" in text
-    assert "PROJECT_NAME overview" in text
-    assert "Package: PROJECT_DIST_NAME" in text
+    assert "CLI: scalim-cli" in text
+    assert "Source: src/scalim/runtime.py" in text
+    assert "Import: from scalim.runtime import run" in text
+    assert "Module: scalim.runtime.entrypoints" in text
+    assert "Title: Scalim overview" in text
+    assert "Package: scalim" in text
 
     assert "/home/alice/Projects/acme/private/report.md" in text
     assert "with_alpha_reimpl" in text
