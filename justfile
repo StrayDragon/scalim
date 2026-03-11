@@ -129,6 +129,20 @@ schema-drift-check: gen-yaml-dsl-editor-schema
 stdlib-collisions-check:
     uv {{ UV_OPTIONS }} run python scripts/check-stdlib-module-collisions.py
 
+# 依赖: 同步开发依赖
+uv-sync-dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    env \
+        -u UV_INDEX \
+        -u UV_INDEX_URL \
+        -u UV_EXTRA_INDEX_URL \
+        -u PIP_INDEX_URL \
+        -u PIP_EXTRA_INDEX_URL \
+        UV_DEFAULT_INDEX="https://pypi.org/simple" \
+        uv {{ UV_OPTIONS }} sync --locked
+
+
 # 检查: `uv.lock` 是否与当前项目元数据一致(强制按默认 PyPI 校验,避免本地镜像环境掩盖 CI 漂移)
 uv-lock-check:
     #!/usr/bin/env bash
