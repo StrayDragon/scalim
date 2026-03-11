@@ -163,7 +163,7 @@ skill 文档 MUST 至少说明:
 - `extract` 相对当前 key 对应的 row value 解析
 - `extract` 是唯一字段取值写法(包含 rename 与 nested path)
 - bracket 语法示例: `\"[1].x\"`、`'[\"a.b\"]'`
-- 只有需要整理整体结果形状时才应考虑源级 `normalize` 或包装函数
+- 只有需要整理整体结果形状时才应考虑源代码级 `normalize` 或包装函数
 
 #### Scenario: 嵌套 row value 场景优先推荐 `extract`
 - **WHEN** 用户给出的 source loader 已经能返回按 key 索引的 row value,只是字段值藏在嵌套 dict / 对象内
@@ -224,4 +224,4 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 #### Scenario: 仅字段嵌套时不误导到 `normalize`
 - **WHEN** 用户的 source loader 已经返回 `key -> row`,只是 row 内部字段有嵌套
 - **THEN** skill MUST 优先推荐字段级 `extract`
-- **AND** MUST 明确说明此时不需要源级 `normalize`
+- **AND** MUST 明确说明此时不需要源代码级 `normalize`

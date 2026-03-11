@@ -126,9 +126,9 @@ DESC_PARAMS_MD = (
     "迁移:\n"
     "- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点"
 )
-DESC_SOURCE_NORMALIZE = "源级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)"
+DESC_SOURCE_NORMALIZE = "源代码级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)"
 DESC_SOURCE_NORMALIZE_MD = (
-    "`normalize` 是源级的整体结果整形.\n\n"
+    "`normalize` 是源代码级的整体结果整形.\n\n"
     "- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n"
     "- 执行时机: 在字段级 `extract` 之前\n"
     "- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n"

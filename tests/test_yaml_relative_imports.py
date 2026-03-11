@@ -101,7 +101,7 @@ def test_derive_base_module_path_reads_sys_path_when_not_provided(monkeypatch: p
 
 
 def test_derive_base_module_path_errors_on_missing_yaml_path() -> None:
-    with pytest.raises(ResolverError, match="yaml_path is required"):
+    with pytest.raises(ResolverError, match="必须提供 `yaml_path`"):
         derive_base_module_path("")
 
 
@@ -109,7 +109,7 @@ def test_derive_base_module_path_errors_when_no_candidate_sys_path_prefix(tmp_pa
     yaml_path = tmp_path / "relpkg/sub/config.yaml"
     _write_text(yaml_path, "name: demo\nmain_source: {source_id: a, loader: x.y:z}\n")
 
-    with pytest.raises(ResolverError, match="not under any sys\\.path entry"):
+    with pytest.raises(ResolverError, match="不在任何 `sys\\.path` 条目下"):
         derive_base_module_path(str(yaml_path), sys_path=[], cwd=str(tmp_path))
 
 
@@ -117,7 +117,7 @@ def test_derive_base_module_path_errors_on_non_identifier_segment(tmp_path: Path
     yaml_path = tmp_path / "bad-name/sub/config.yaml"
     _write_text(yaml_path, "name: demo\nmain_source: {source_id: a, loader: x.y:z}\n")
 
-    with pytest.raises(ResolverError, match="not a valid Python identifier"):
+    with pytest.raises(ResolverError, match="不是合法的 Python 标识符"):
         derive_base_module_path(str(yaml_path), sys_path=[str(tmp_path)], cwd=str(tmp_path))
 
 
@@ -135,7 +135,7 @@ def test_secure_resolver_normalizes_relative_reference_and_enforces_allowlist(mo
     assert resolver.resolve(".loaders.ping")() == "sub"
     assert resolver.resolve("..common:ping")() == "common"
 
-    with pytest.raises(ResolverError, match="not in the allowed modules list"):
+    with pytest.raises(ResolverError, match="不在 `allowed_modules` 允许列表中"):
         SecurePythonReferenceResolver(allowed_modules=frozenset(["relpkg.sub"]), base_module_path=base).resolve("..common:ping")
 
 
@@ -145,7 +145,7 @@ def test_secure_resolver_errors_when_base_module_is_missing(monkeypatch: pytest.
     _purge_modules("relpkg")
 
     resolver = SecurePythonReferenceResolver(allowed_modules=frozenset(["relpkg"]))
-    with pytest.raises(ResolverError, match="requires a base module path"):
+    with pytest.raises(ResolverError, match="需要先根据 `yaml_path` \\+ `sys\\.path` 推导 `base_module_path`"):
         resolver.resolve(".loaders:ping")
 
 
@@ -157,15 +157,15 @@ def test_secure_resolver_errors_for_relative_syntax_edges(monkeypatch: pytest.Mo
     base = derive_base_module_path(str(yaml_path))
     resolver = SecurePythonReferenceResolver(allowed_modules=frozenset(["relpkg"]), base_module_path=base)
 
-    with pytest.raises(ResolverError, match="missing module path after leading dots"):
+    with pytest.raises(ResolverError, match="前导点后缺少模块路径"):
         resolver.resolve(".:ping")
-    with pytest.raises(ResolverError, match="Invalid class-style reference"):
+    with pytest.raises(ResolverError, match="类式引用 .* 非法"):
         resolver.resolve(".loaders:ping:extra")
-    with pytest.raises(ResolverError, match="Invalid relative dotted reference"):
+    with pytest.raises(ResolverError, match="相对点号引用 .* 非法"):
         SecurePythonReferenceResolver().resolve(".ping")
-    with pytest.raises(ResolverError, match="goes beyond root"):
+    with pytest.raises(ResolverError, match="超出了根包范围"):
         resolver.resolve("....loaders:ping")
-    with pytest.raises(ResolverError, match="illegal identifier segment"):
+    with pytest.raises(ResolverError, match="模块路径 .* 非法"):
         resolver.resolve(".bad-name:ping")
 
 
@@ -173,7 +173,7 @@ def test_compile_raises_clear_error_when_relative_reference_cannot_derive_base_m
     yaml_path = _prepare_pkg(tmp_path)
     _purge_modules("relpkg")
 
-    with pytest.raises(ResolverError, match="Cannot derive base module path"):
+    with pytest.raises(ResolverError, match="无法根据 `yaml_path="):
         compile_yaml(
             str(yaml_path),
             allowed_modules=frozenset(["relpkg"]),
@@ -266,7 +266,7 @@ def test_config_validator_and_call_by_parser_reject_invalid_relative_references(
     with pytest.raises(ConfigValidationError):
         validator.validate(bad_retry)
 
-    with pytest.raises(CallByParseError, match="Invalid call_by reference"):
+    with pytest.raises(CallByParseError, match="`call_by` 引用 .* 非法"):
         parse_call_by(".:echo(status)")
 
 

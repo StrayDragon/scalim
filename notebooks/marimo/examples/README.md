@@ -152,11 +152,11 @@ orders_to_dim_d = (
 
 | 机制 | 作用范围 | 优先级 | 使用场景 |
 |------|----------|--------|----------|
-| `KeyIr.cast` | 数据源级别 | 2 | str→int 类型统一 |
+| `KeyIr.cast` | 数据源层 | 2 | str→int 类型统一 |
 | `LookupStepIr.lookup_cast` | step级别 | 1 (最高) | CSV多值提取 |
 
 ```python
-# KeyIr.cast: 数据源级别
+# KeyIr.cast: 数据源层
 customers_source = SourceIr(
     key=KeyIr(key="customer_id", cast=must_to_int),
     ...

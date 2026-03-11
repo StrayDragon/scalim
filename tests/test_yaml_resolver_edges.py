@@ -14,8 +14,15 @@ from scalim.dsl.by_yaml.runtime.references import (
 def test_resolver_rejects_invalid_dotted_reference() -> None:
     resolver = PythonReferenceResolver()
 
-    with pytest.raises(ResolverError, match="Invalid dotted reference"):
+    with pytest.raises(ResolverError, match="点号形式引用 .* 非法"):
         resolver.resolve("invalid")
+
+
+def test_resolver_rejects_invalid_dotted_callable_name() -> None:
+    resolver = PythonReferenceResolver()
+
+    with pytest.raises(ResolverError, match="可调用名 '1bad' 非法"):
+        resolver.resolve("math.1bad")
 
 
 def test_resolver_max_cache_size_must_be_positive() -> None:
@@ -25,8 +32,8 @@ def test_resolver_max_cache_size_must_be_positive() -> None:
 
 def test_resolver_rejects_disallowed_module_and_function() -> None:
     cases = [
-        (PythonReferenceResolver(allowed_modules=frozenset(["allowed"])), "math.sqrt", "allowed modules list"),
-        (PythonReferenceResolver(allowed_functions=frozenset(["math:sqrt"])), "math.pow", "allowed functions list"),
+        (PythonReferenceResolver(allowed_modules=frozenset(["allowed"])), "math.sqrt", "allowed_modules"),
+        (PythonReferenceResolver(allowed_functions=frozenset(["math:sqrt"])), "math.pow", "allowed_functions"),
     ]
     for resolver, ref, match in cases:
         with pytest.raises(ResolverError, match=match):
@@ -65,8 +72,8 @@ def test_resolver_allows_wildcard_functions_and_warns(caplog) -> None:
 @pytest.mark.parametrize(
     "ref,match",
     [
-        ("missing.module.fn", "Failed to import module 'missing.module'"),
-        ("math.missing", "Module 'math' has no attribute 'missing'"),
+        ("missing.module.fn", "导入模块 'missing.module' 失败"),
+        ("math.missing", "模块 'math' 不存在属性 'missing'"),
     ],
     ids=["missing-module", "missing-attr"],
 )
@@ -80,8 +87,8 @@ def test_resolver_import_and_attribute_errors(ref: str, match: str) -> None:
 @pytest.mark.parametrize(
     "ref,match",
     [
-        ("os.path:join", "dangerous modules list"),
-        ("math.__class__", "dangerous pattern '__'"),
+        ("os.path:join", "危险模块列表"),
+        ("math.__class__", "危险模式 '__'"),
     ],
     ids=["dangerous-module", "dangerous-pattern"],
 )

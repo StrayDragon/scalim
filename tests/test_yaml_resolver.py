@@ -7,12 +7,12 @@ from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 @pytest.mark.parametrize(
     "ref,match",
     [
-        ("no.such.module:func", "Failed to import module"),
-        ("json:__name__", "dunder attribute.*forbidden"),
-        ("os.path:join.__class__", "dunder attribute.*forbidden"),
-        ("json.__name__", "dunder attribute.*forbidden"),
-        ("os.path:sep", "is not callable"),
-        ("os.path.sep", "is not callable"),
+        ("no.such.module:func", "导入模块"),
+        ("json:__name__", "禁止访问双下划线属性"),
+        ("os.path:join.__class__", "禁止访问双下划线属性"),
+        ("json.__name__", "禁止访问双下划线属性"),
+        ("os.path:sep", "不是可调用对象"),
+        ("os.path.sep", "不是可调用对象"),
     ],
     ids=[
         "missing-module",

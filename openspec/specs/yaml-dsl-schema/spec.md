@@ -325,9 +325,9 @@ Schema MUST 为 retry policy 字段提供:
 - **WHEN** `_templates.retry.db_default.backoff: \"random\"`
 - **THEN** schema 校验 MUST 失败并指出字段路径
 
-### Requirement: schema 说明源级 `normalize` 及其执行顺序
+### Requirement: schema 说明源代码级 `normalize` 及其执行顺序
 系统 MUST 在 YAML DSL JSON Schema 的 `sources.*` 定义中新增 `normalize` 字段,并在 `description` / `markdownDescription` 中明确说明:
-- `normalize` 是源级整体结果归一化
+- `normalize` 是源代码级整体结果归一化
 - `normalize` 先于字段级 `extract` 执行
 - `normalize.kind=index_by_key` 的输入输出形状示例
 

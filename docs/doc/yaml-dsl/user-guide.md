@@ -424,7 +424,7 @@ lookup_cast:
 
 #### 3.3.4 整体结果归一化 (normalize)
 
-`normalize` 是 **源级** 的整体结果归一化: 作用于整个 `loader` 返回值,并且发生在字段级 `extract` 之前.
+`normalize` 是 **源代码级** 的整体结果归一化: 作用于整个 `loader` 返回值,并且发生在字段级 `extract` 之前.
 
 当前只提供声明式预置:
 - `kind: index_by_key`: 将 `list[row]` 归一化为 `lookup_key -> row` 映射

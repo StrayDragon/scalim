@@ -51,7 +51,7 @@ def test_parse_call_by_rejects_invalid_reference_and_split_errors() -> None:
         parse_call_by("(1)")
     with pytest.raises(CallByParseError, match="unexpected trailing"):
         parse_call_by("tests.call_by_fns:echo(1) trailing")
-    with pytest.raises(CallByParseError, match="Invalid call_by reference"):
+    with pytest.raises(CallByParseError, match="`call_by` 引用 .* 非法"):
         parse_call_by("module:attr:extra(1)")
 
 

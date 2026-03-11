@@ -39,7 +39,7 @@
           "可视化编辑块必须提供稳定可发现的新增入口",
           "同一编辑器中的可操作项必须采用一致的交互视觉体系",
           "关键操作的可见性不得依赖 hover-only",
-          "编辑器暴露源级 `normalize` 并提供与 canonical schema 一致的指引"
+          "编辑器暴露源代码级 `normalize` 并提供与 canonical schema 一致的指引"
         ],
         "slug": "yaml-dsl-editor-core"
       }
@@ -98,7 +98,7 @@
           "schema 明确 batch_size 的 null-or-int 语义",
           "retry 字段纳入 JSON Schema 与 hover 指引",
           "`_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform",
-          "schema 说明源级 `normalize` 及其执行顺序",
+          "schema 说明源代码级 `normalize` 及其执行顺序",
           "schema keeps `normalize` out of `main_source`"
         ],
         "slug": "yaml-dsl-schema"
@@ -284,11 +284,11 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
-      "sha256": "dbf9ef1a9afc061a22a42d630fced831eaaf25dfbeda2b3947c0b3e2557b3aef"
+      "sha256": "42518df6e32afb7d07b7c14071ed71265a73424ff5fcf1674f4d573b77363051"
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "e43697d4da02a0fcbef973da973f4aff9bcf524a5e50530cd6002d863ef307d7"
+      "sha256": "f7107e9cd0bae184a2ba662a590943ad143d2d4ef28247d1f0077a2d097182ed"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
@@ -296,13 +296,13 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "e465b324f9de26e244d68804196c4982ae0f1d33001f86c47a20f808ae33e774"
+      "sha256": "dfb86593d2491b683a12cd0e6c93f18e3a30da7a33a9cc7aa68aae9ff443a68e"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "97679598b4bce0052c271e69c3385faf2104d0a8656a56564f2f459d80454afd"
+      "sha256": "216eb92685d5d8b5e514657651d6a2ab356e48a5f6ee4dc0d176b9045cea3a2c"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -310,7 +310,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "cc692ab3ff71279deb21784bf7f0b1e3b03100747a3399008c625b20967dede0"
+      "sha256": "b52e9435535a92145ae0f44da5a36f658c8543d171dbf045e73746c252c3343d"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

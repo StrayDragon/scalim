@@ -1,7 +1,7 @@
-import re
 from typing import Any, Dict, List, Optional, Set
 
 from ...params_template import ParamsTemplateCompileError, compile_params_template
+from ...reference_syntax import REFERENCE_FORMAT_EXAMPLES, is_valid_python_reference
 from ...schema_dsl.constants import (
     DEFAULT_CACHE_MODE,
     LOOKUP_CAST_NAME_ENUM,
@@ -9,12 +9,10 @@ from ...schema_dsl.constants import (
 from ...schema_dsl.models import LOADER_RETRY_KEYS
 from ..parsers.utils import list_or_none, mapping_or_none
 from .base import ValidatorMixinBase
-from .constants import LEGACY_FIELDS, MIN_PARTS_COUNT, F
+from .constants import LEGACY_FIELDS, F
 from .issues import ValidationIssue
 
 _F = F
-_MIN_PARTS_COUNT = MIN_PARTS_COUNT
-_MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
 
 
 class ValidatorSourcesMixin(ValidatorMixinBase):
@@ -47,10 +45,9 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             return
         should_retry_ref = should_retry_raw.strip()
         if should_retry_ref and not self._is_valid_loader_ref(should_retry_ref):
-            msg = (
-                "'{}.{}' has invalid reference '{}'. Expected format: "
-                "'module.path:function' / 'module.path:obj.method' / 'module.path.function'"
-            ).format(path_prefix, should_retry_key, should_retry_raw)
+            msg = "'{}.{}' 的引用 '{}' 非法. 期望格式: {}".format(
+                path_prefix, should_retry_key, should_retry_raw, REFERENCE_FORMAT_EXAMPLES
+            )
             self._add_error(errors, msg, path="{}.{}".format(path_prefix, should_retry_key))
 
     def _validate_params_template_semantics(
@@ -204,9 +201,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
             loader = source_dict.get(_F.LOADER, "")
             if loader and not self._is_valid_loader_ref(str(loader)):
-                msg = (
-                    "Source '{}' has invalid loader reference '{}'. Expected format: 'module.path:ClassName' or 'module.path.function'"
-                ).format(source_id, loader)
+                msg = "数据源 '{}' 的 loader 引用 '{}' 非法. 期望格式: {}".format(source_id, loader, REFERENCE_FORMAT_EXAMPLES)
                 self._add_error(errors, msg, path="sources.{}.{}".format(source_id, _F.LOADER))
 
             self._validate_loader_retry_should_retry(
@@ -296,9 +291,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER),
             )
         if loader and not self._is_valid_loader_ref(str(loader)):
-            msg = (
-                "Main source has invalid loader reference '{}'. Expected format: 'module.path:ClassName' or 'module.path.function'"
-            ).format(loader)
+            msg = "主数据源的 loader 引用 '{}' 非法. 期望格式: {}".format(loader, REFERENCE_FORMAT_EXAMPLES)
             self._add_error(errors, msg, path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER))
 
         self._validate_loader_retry_should_retry(
@@ -437,18 +430,4 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             )
 
     def _is_valid_loader_ref(self, loader_ref: str) -> bool:
-        if not loader_ref:
-            return False
-
-        is_valid = False
-        if ":" in loader_ref:
-            module_path, sep, attr_path = loader_ref.partition(":")
-            if sep == ":" and module_path and attr_path and _MODULE_PATH_RE.fullmatch(module_path) is not None:
-                attr_parts = attr_path.split(".")
-                is_valid = all(part and part.isidentifier() for part in attr_parts)
-        else:
-            module_path, sep, func_name = loader_ref.rpartition(".")
-            if sep == "." and module_path and func_name and _MODULE_PATH_RE.fullmatch(module_path) is not None:
-                is_valid = func_name.isidentifier()
-
-        return is_valid
+        return is_valid_python_reference(loader_ref)

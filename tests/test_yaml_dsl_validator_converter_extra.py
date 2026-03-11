@@ -158,7 +158,7 @@ def test_secure_resolver_rejects_invalid_and_patterns() -> None:
 def test_secure_resolver_rejects_dangerous_module_parts() -> None:
     resolver = SecurePythonReferenceResolver()
 
-    for ref, match in (("safe.__evil:func", "dangerous pattern '__'"), ("lambda.safe:func", "dangerous pattern 'lambda'")):
+    for ref, match in (("safe.__evil:func", "危险模式 '__'"), ("lambda.safe:func", "危险模式 'lambda'")):
         with pytest.raises(ResolverError, match=match):
             resolver.resolve(ref)
 

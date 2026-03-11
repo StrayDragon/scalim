@@ -2,7 +2,7 @@
 
 ## 变更摘要
 
-这次升级为 lookup `sources.*` 引入源级 `normalize`,用于在字段级 `extract` 之前对 `loader` 的整体返回值做一次整体结果归一化。
+这次升级为 lookup `sources.*` 引入源代码级 `normalize`,用于在字段级 `extract` 之前对 `loader` 的整体返回值做一次整体结果归一化。
 
 - 新增 `sources.<id>.normalize`(显式拒绝 `main_source.normalize`)
 - 支持 `normalize.kind: index_by_key`:把 `list[row]` 归一化为 `key -> row`

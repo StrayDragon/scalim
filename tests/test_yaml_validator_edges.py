@@ -73,7 +73,7 @@ def test_validator_validate_sources_edges() -> None:
 
     errors = []
     validator._validate_sources({"sources": {"s1": {"loader": "bad ref", "key": "id"}}}, errors)
-    assert any("invalid loader reference" in msg for msg in _messages(errors))
+    assert any("loader 引用" in msg for msg in _messages(errors))
 
 
 def test_validator_validate_main_source_edges() -> None:

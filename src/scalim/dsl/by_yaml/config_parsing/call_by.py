@@ -1,13 +1,11 @@
 import ast
-import re
 import sys
 from dataclasses import dataclass
 from typing import Any, FrozenSet, List, Optional, Set, Tuple
 
-_PY38_PLUS = sys.version_info >= (3, 8)
+from ..reference_syntax import is_valid_python_reference
 
-_MIN_PARTS_COUNT = 2
-_MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
+_PY38_PLUS = sys.version_info >= (3, 8)
 
 _CTX_TOKEN = "$ctx"  # noqa: S105
 _CTX_PLACEHOLDER = "__scalim_ctx__"
@@ -63,7 +61,9 @@ def _normalize_call_by(call_by: Any) -> str:
 def _parse_call_by_call(raw: str) -> Tuple[str, ast.Call]:
     reference, args_src = _split_reference_and_args(raw)
     if not _is_valid_loader_ref(reference):
-        msg = "Invalid call_by reference '{}'. Expected format: 'module.path:attr' or 'module.path.function'".format(reference)
+        msg = ("`call_by` 引用 '{}' 非法. 期望格式: `module.path:function` / `module.path:obj.method` / `module.path.function`").format(
+            reference
+        )
         raise CallByParseError(msg)
 
     rewritten_args = _rewrite_ctx_tokens(args_src)
@@ -335,21 +335,7 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
 
 
 def _is_valid_loader_ref(loader_ref: str) -> bool:
-    if not loader_ref:
-        return False
-
-    is_valid = False
-    if ":" in loader_ref:
-        module_path, sep, attr_path = loader_ref.partition(":")
-        if sep == ":" and module_path and attr_path and _MODULE_PATH_RE.fullmatch(module_path) is not None:
-            attr_parts = attr_path.split(".")
-            is_valid = all(part and part.isidentifier() for part in attr_parts)
-    else:
-        module_path, sep, func_name = loader_ref.rpartition(".")
-        if sep == "." and module_path and func_name and _MODULE_PATH_RE.fullmatch(module_path) is not None:
-            is_valid = func_name.isidentifier()
-
-    return is_valid
+    return is_valid_python_reference(loader_ref)
 
 
 __all__ = [

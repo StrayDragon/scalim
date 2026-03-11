@@ -1,4 +1,4 @@
-> Status (2026-03-11): 已实现(IR/Python-only).当前实现覆盖 workbook 多 sheet、输出组合(router)、派生汇总(group_by + 内置聚合 + finalize 排名)、meta/audit 与 multi-root workbook;待 `just qa`/`just gen` 验收后归档。
+> Status (2026-03-11): 已实现(IR/Python-only).当前实现覆盖 workbook 多 sheet、输出组合(router)、派生汇总(group_by + 内置聚合 + finalize 排名)、meta/audit 与 multi-root workbook,并补充了 `notebooks/` 示例与独立对拍集成测试;待 `just qa`/`just gen` 验收后归档。
 
 ## Why
 

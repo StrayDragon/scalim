@@ -64,7 +64,7 @@ main_source:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
-    with pytest.raises(ResolverError, match="allowed modules"):
+    with pytest.raises(ResolverError, match="allowed_modules"):
         _ = compile(
             str(yaml_path),
             allowed_modules=frozenset(["tests.resolver_allowlist_mod"]),

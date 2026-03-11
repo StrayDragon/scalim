@@ -70,7 +70,7 @@
   - schema 明确 batch_size 的 null-or-int 语义
   - retry 字段纳入 JSON Schema 与 hover 指引
   - `_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform
-  - schema 说明源级 `normalize` 及其执行顺序
+  - schema 说明源代码级 `normalize` 及其执行顺序
   - schema keeps `normalize` out of `main_source`
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`

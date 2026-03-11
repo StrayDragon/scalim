@@ -172,7 +172,7 @@ def _config_derived_field_compute_unknown_name() -> dict:
                 "Main source missing required field 'loader'",
             ],
         ),
-        (_config_main_source_invalid_loader_reference, ["Main source has invalid loader reference"]),
+        (_config_main_source_invalid_loader_reference, ["主数据源的 loader 引用"]),
         (_config_field_requires_via_when_no_path, ["has no relation path"]),
         (_config_field_ambiguous_paths_requires_via, ["ambiguous relation paths"]),
         (_config_relation_step_to_bind_is_rejected, ["to_bind"]),

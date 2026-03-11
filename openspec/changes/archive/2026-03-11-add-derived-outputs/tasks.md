@@ -46,3 +46,4 @@
 - [x] 6.1 更新用户文档与示例：解释该能力仅 IR/Python 配置，展示 workbook 多 sheet + 派生汇总概念
 - [x] 6.2 新增验证用例：命名冲突、失败策略、顺序稳定、meta/audit、资源 guardrails
 - [x] 6.3 运行 `openspec validate add-derived-outputs --strict --no-interactive` 并补充必要的实现期校验命令说明
+- [x] 6.4 补充 `notebooks/` 中的多输出组合示例与独立对拍集成测试
