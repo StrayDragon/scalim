@@ -15,6 +15,7 @@ from .events import (
     LoaderCallEvent,
     LoaderRetryEvent,
     LoaderSlimEvent,
+    OutputTargetEndEvent,
     PipelineEndEvent,
     PipelineStartEvent,
     RelationLookupEvent,
@@ -42,6 +43,7 @@ EVENT_COLUMN_WRITE = "column_write"
 EVENT_RELATION_LOOKUP = "relation_lookup"
 EVENT_STAGE_SPAN = "stage_span"
 EVENT_ADAPTIVE_SCHEDULER_DECISION = "adaptive_scheduler_decision"
+EVENT_OUTPUT_TARGET_END = "output_target_end"
 
 
 @dataclass(frozen=True)
@@ -202,6 +204,14 @@ _EVENT_CATALOG: List[EventDescriptor] = [
         payload_policy="full",
         payload_type=AdaptiveSchedulerDecisionEvent.__name__,
     ),
+    EventDescriptor(
+        name=EVENT_OUTPUT_TARGET_END,
+        summary="输出目标结束统计",
+        key_fields=("target_id", "output_path", "sheet_name", "row_count", "error_count"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=OutputTargetEndEvent.__name__,
+    ),
 ]
 
 
@@ -225,6 +235,7 @@ __all__ = [
     "EVENT_LOADER_CALL",
     "EVENT_LOADER_RETRY",
     "EVENT_LOADER_SLIM",
+    "EVENT_OUTPUT_TARGET_END",
     "EVENT_PIPELINE_END",
     "EVENT_PIPELINE_START",
     "EVENT_RELATION_LOOKUP",

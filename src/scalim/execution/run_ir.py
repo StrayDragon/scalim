@@ -3,10 +3,11 @@ import time
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..hooks.base import HookManager, IExecutionHook
 from ..ob.components import split_components
+from ..ob.hub import InstrumentationHub
 from ..ob.observability import Observability
 from ..ob.observer import Observer
 from ..ob.presets.viz import VizObserver, VizObserverConfig
@@ -15,48 +16,17 @@ from ..planning.plan import ExecutionPlan
 from ..sinks.sink_base import BaseRowSink, BaseSink, ColumnBatch, ColumnValues, IColumnSink, IRowSink, ISink
 from ..sinks.sink_csv import ColumnCSVSink, CSVSink
 from ..spec.ir.demand import DemandIr
-from ..spec.ir.fields import SupportedFieldIr
+from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import ParallelMode, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
 from .engine import ScalimEngine
 from .guardrails import GuardrailsPolicy
 from .loader_retry import LoaderRetryPolicies
+from .output_contracts import ExportLayout, OutputSpec
 
-
-@dataclass(frozen=True)
-class ExportLayout:
-    """与 `DSL` 无关的导出布局.
-
-    此对象定义:
-    - 需要导出的字段(及其顺序)
-    - 与字段顺序对齐的可选表头名称
-    """
-
-    field_ids: Tuple[str, ...]
-    header_names: Optional[Tuple[str, ...]] = None
-
-    def __post_init__(self) -> None:
-        if self.header_names is not None and len(self.header_names) != len(self.field_ids):
-            msg = "ExportLayout.header_names must align with field_ids"
-            raise ValueError(msg)
-
-
-@dataclass(frozen=True)
-class OutputSpec:
-    """与 `DSL` 无关的输出策略.
-
-    当 `path` 为假值(`None`/`\"\"`)时,不会创建文件输出端.
-
-    安全提示:
-    - `path` 控制文件系统写入(会创建父目录并以原子方式替换目标文件).
-    - 仅在 `YAML`/配置输入可信时启用基于文件的输出;否则应在外部校验/覆盖 `path`.
-    """
-
-    format: str = "csv"
-    path: Optional[str] = None
-    encoding: str = "utf-8"
-    streaming: bool = True
-    include_header: bool = True
+if TYPE_CHECKING:
+    from ..ob.manager import ObserverManager
+    from .output_composition import OutputCompositionSpec, OutputTargetStats, RouterRowSink
 
 
 @dataclass(frozen=True)
@@ -102,6 +72,14 @@ class ExecutionRequest:
     loader_retry: Optional[LoaderRetryPolicies] = None
     """可选:加载重试策略."""
 
+    output_composition: Optional["OutputCompositionSpec"] = None
+    """可选:多输出组合请求(`v1` `IR/Python-only`).
+
+    当提供该字段时:
+    - `output`/`sink` 的单输出装配将被忽略
+    - 运行计划的目标字段将由组合请求的 `required_demand_fields` 计算得出
+    """
+
 
 @dataclass(frozen=True)
 class ExecutionResult:
@@ -118,6 +96,11 @@ class ExecutionResult:
     duration: float
     demand_ir: DemandIr
     plan: ExecutionPlan
+    outputs: Optional[Dict[str, str]] = None
+    """可选:输出目标到 `output_path` 的映射(多输出组合时提供)."""
+
+    output_target_stats: Optional[List["OutputTargetStats"]] = None
+    """可选:每个输出目标的统计(行数/耗时/错误/禁用)(多输出组合时提供)."""
 
 
 class _TeeRowSink(BaseRowSink):
@@ -356,12 +339,14 @@ def _create_file_sink(output: OutputSpec, layout: ExportLayout) -> Optional[ISin
                 output_path=str(output.path),
                 field_names=field_names,
                 header_names=header_names,
+                sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
                 include_header=output.include_header,
             )
         return ColumnExcelSink(
             output_path=str(output.path),
             field_names=field_names,
             header_names=header_names,
+            sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
             include_header=output.include_header,
         )
 
@@ -420,15 +405,28 @@ def _create_output_plan(output: OutputSpec, layout: ExportLayout, sink: Optional
     return _OutputPlan(sink=tee_sink, output_path=output_path)
 
 
-def run_ir(
-    demand_ir: DemandIr,
+@dataclass(frozen=True)
+class _OutputAssembly:
+    counting_sink: ISink
+    output_path: Optional[str]
+    outputs: Optional[Dict[str, str]]
+    composition_router: Optional["RouterRowSink"]
+
+
+def _build_execution_plan(demand_ir: DemandIr, request: ExecutionRequest) -> ExecutionPlan:
+    plan_targets: List[str] = list(request.export_layout.field_ids)
+    if request.output_composition is not None:
+        from .output_composition import required_demand_fields  # noqa: PLC0415
+
+        plan_targets = list(required_demand_fields(request.output_composition))
+    return PlanBuilder(demand_ir).build(targets=plan_targets)
+
+
+def _build_observer_and_hook_managers(
+    *,
+    plan: ExecutionPlan,
     request: ExecutionRequest,
-    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
-) -> ExecutionResult:
-    start_time = time.perf_counter()
-
-    plan = PlanBuilder(demand_ir).build(targets=list(request.export_layout.field_ids))
-
+) -> Tuple["ObserverManager", HookManager]:
     fallback_logger_enabled = False
     viz_config: Optional[VizObserverConfig] = None
     if request.observability is not None:
@@ -448,14 +446,108 @@ def run_ir(
     for hook in component_hooks:
         hook_manager.register(hook)
 
-    output_plan = _create_output_plan(request.output, request.export_layout, request.sink)
-    stats = InternalStatsCollector()
-    counting_sink = _wrap_sink_for_row_count(output_plan.sink, stats)
-    batch_size = request.batch_size if request.batch_size is not None else demand_ir.batch_size_hint
+    return observer_manager, hook_manager
 
+
+def _build_field_fingerprints_for_meta(demand_ir: DemandIr) -> List[Tuple[str, str, str, str]]:
+    """生成稳定指纹(不包含可调用对象`callable`),用于元信息工作表."""
+    field_fingerprints: List[Tuple[str, str, str, str]] = []
+    for field_id in sorted(demand_ir.fields.keys()):
+        spec = demand_ir.fields[field_id]
+        if isinstance(spec, FieldIr):
+            field_fingerprints.append((spec.field_id, "field", str(spec.source.source_id), str(spec.data_key)))
+        elif isinstance(spec, DerivedFieldIr):
+            field_fingerprints.append((spec.field_id, "derived", "", ",".join(spec.dependencies)))
+        else:
+            field_fingerprints.append((str(field_id), type(spec).__name__, "", ""))
+    return field_fingerprints
+
+
+def _select_primary_output_path(outputs: Dict[str, str], spec: "OutputCompositionSpec") -> Optional[str]:
+    primary_id: Optional[str] = None
+    for t in spec.targets:
+        if t.is_primary:
+            primary_id = str(t.target_id)
+            break
+    if primary_id is None:
+        for t in spec.derived_targets:
+            if t.is_primary:
+                primary_id = str(t.target_id)
+                break
+
+    if primary_id is not None:
+        resolved = outputs.get(primary_id)
+        if resolved is not None:
+            return resolved
+
+    if outputs:
+        return next(iter(outputs.values()))
+    return None
+
+
+def _assemble_outputs(
+    *,
+    demand_ir: DemandIr,
+    plan: ExecutionPlan,
+    request: ExecutionRequest,
+    hook_manager: HookManager,
+    observer_manager: "ObserverManager",
+    wall_start_time: float,
+    batch_size: Optional[int],
+    stats: InternalStatsCollector,
+) -> _OutputAssembly:
+    composition_spec = request.output_composition
+    if composition_spec is None:
+        output_plan = _create_output_plan(request.output, request.export_layout, request.sink)
+        counting_sink = _wrap_sink_for_row_count(output_plan.sink, stats)
+        return _OutputAssembly(
+            counting_sink=counting_sink,
+            output_path=output_plan.output_path,
+            outputs=None,
+            composition_router=None,
+        )
+
+    from .output_composition import build_output_composition  # noqa: PLC0415
+
+    # 构建一个与 `engine` 共享订阅者的 `InstrumentationHub`,用于输出级事件(每个输出目标结束统计).
+    instrumentation = InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)
+
+    composition_plan = build_output_composition(
+        spec=composition_spec,
+        demand_name=str(demand_ir.name),
+        demand_main_source_id=str(demand_ir.main_source.source_id),
+        demand_target_fields=list(plan.target_fields),
+        demand_field_fingerprints=_build_field_fingerprints_for_meta(demand_ir),
+        run_started_at_epoch=wall_start_time,
+        run_parallel_mode=str(request.parallel_mode),
+        run_batch_size=batch_size,
+        instrumentation=instrumentation,
+    )
+    counting_sink = _wrap_sink_for_row_count(composition_plan.sink, stats)
+    outputs = composition_plan.output_paths
+    output_path = _select_primary_output_path(outputs, composition_spec) if outputs else None
+    return _OutputAssembly(
+        counting_sink=counting_sink,
+        output_path=output_path,
+        outputs=outputs,
+        composition_router=composition_plan.sink,
+    )
+
+
+def _create_engine_with_cleanup(
+    *,
+    demand_ir: DemandIr,
+    plan: ExecutionPlan,
+    request: ExecutionRequest,
+    hook_manager: HookManager,
+    observer_manager: "ObserverManager",
+    batch_size: Optional[int],
+    sink: ISink,
+    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+) -> ScalimEngine:
+    engine_cls = engine_factory or ScalimEngine
     try:
-        engine_cls = engine_factory or ScalimEngine
-        engine = engine_cls(
+        return engine_cls(
             demand=demand_ir,
             plan=plan,
             hook_manager=hook_manager,
@@ -468,26 +560,70 @@ def run_ir(
         )
     except Exception:
         with contextlib.suppress(Exception):
-            counting_sink.close()
+            sink.close()
         with contextlib.suppress(Exception):
             observer_manager.close()
         raise
 
+
+def run_ir(
+    demand_ir: DemandIr,
+    request: ExecutionRequest,
+    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+) -> ExecutionResult:
+    start_time = time.perf_counter()
+    wall_start_time = time.time()
+
+    plan = _build_execution_plan(demand_ir, request)
+    observer_manager, hook_manager = _build_observer_and_hook_managers(plan=plan, request=request)
+
+    stats = InternalStatsCollector()
+    batch_size = request.batch_size if request.batch_size is not None else demand_ir.batch_size_hint
+
+    output_assembly = _assemble_outputs(
+        demand_ir=demand_ir,
+        plan=plan,
+        request=request,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        wall_start_time=wall_start_time,
+        batch_size=batch_size,
+        stats=stats,
+    )
+
+    engine = _create_engine_with_cleanup(
+        demand_ir=demand_ir,
+        plan=plan,
+        request=request,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        batch_size=batch_size,
+        sink=output_assembly.counting_sink,
+        engine_factory=engine_factory,
+    )
+
     try:
-        _ = engine.run(sink=counting_sink)
+        _ = engine.run(sink=output_assembly.counting_sink)
     finally:
         # 尽力清理: 即使 `engine`/`pipeline` 在关闭前失败也要执行.
         with contextlib.suppress(Exception):
-            counting_sink.close()
+            output_assembly.counting_sink.close()
         with contextlib.suppress(Exception):
             observer_manager.close()
 
+    output_target_stats: Optional[List["OutputTargetStats"]] = None
+    if output_assembly.composition_router is not None:
+        # 注意: `counting_sink.close()` 在 `finally` 中执行;此处读取的是关闭后的最终统计快照.
+        output_target_stats = output_assembly.composition_router.get_target_stats()
+
     return ExecutionResult(
-        output_path=output_plan.output_path,
+        output_path=output_assembly.output_path,
         total_rows=stats.total_rows,
         duration=time.perf_counter() - start_time,
         demand_ir=demand_ir,
         plan=plan,
+        outputs=output_assembly.outputs,
+        output_target_stats=output_target_stats,
     )
 
 

@@ -33,13 +33,7 @@
 - `yaml-source-normalize` 已归档：`openspec/changes/archive/2026-03-10-yaml-source-normalize/`
 - `yaml-inline-dynamic-params` 已归档：`openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
 - `yaml-loader-params-template` 已归档：`openspec/changes/archive/2026-03-11-yaml-loader-params-template/`
+- `add-derived-outputs` 已归档：`openspec/changes/archive/2026-03-11-add-derived-outputs/`
 
 ## 待实现分组（按推荐顺序）
-
-### Backlog: add-derived-outputs（暂缓/搁置）
-
-涉及 changes:
-- `openspec/changes/add-derived-outputs/`
-
-状态:
-- 需求侧场景与默认策略未对齐前不推进实现；已在 `openspec/changes/add-derived-outputs/proposal.md` 补充 YAML DSL 候选方案/示例/权衡,等待 review 后再决定是否重启实现。
+暂无

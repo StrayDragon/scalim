@@ -80,6 +80,35 @@ def test_excel_sink_close_twice(tmp_path: Path) -> None:
     assert output_path.exists()
 
 
+def test_excel_workbook_sheet_row_sink_raises_when_closed() -> None:
+    sheet_sink = excel_mod.ExcelWorkbookSheetRowSink(
+        worksheet=_FakeWorksheet(),
+        sheet_name="Sheet1",
+        field_names=["id"],
+        include_header=False,
+    )
+    sheet_sink.close()
+
+    with pytest.raises(RuntimeError, match="ExcelWorkbookSheetRowSink is closed"):
+        sheet_sink.write_row({"id": 1})
+    with pytest.raises(RuntimeError, match="ExcelWorkbookSheetRowSink is closed"):
+        sheet_sink.write_batch([{"id": 1}])
+
+
+def test_excel_workbook_sink_close_twice_and_rejects_new_sheet(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(excel_mod, "Workbook", _FakeWorkbook)
+
+    output_path = tmp_path / "wb.xlsx"
+    wb = excel_mod.ExcelWorkbookSink(str(output_path))
+    _ = wb.create_sheet_row_sink("Sheet1", field_names=["id"])
+
+    wb.close()
+    wb.close()
+
+    with pytest.raises(RuntimeError, match="ExcelWorkbookSink is closed"):
+        _ = wb.create_sheet_row_sink("Sheet2", field_names=["id"])
+
+
 def test_column_excel_sink_write_columns_and_batch(tmp_path: Path) -> None:
     output_path = tmp_path / "cols.xlsx"
     sink = excel_mod.ColumnExcelSink(str(output_path), ["id", "name"])
@@ -201,6 +230,32 @@ def test_excel_sink_close_exception_closes_open_worksheet(tmp_path: Path, monkey
         sink.close()
 
     assert worksheet.closed_called is True
+
+
+def test_excel_workbook_sink_close_exception_logs_unlink_failure(tmp_path: Path, monkeypatch, caplog) -> None:
+    caplog.set_level(logging.WARNING, logger=excel_mod.__name__)
+    monkeypatch.setattr(excel_mod, "Workbook", _FailingSaveWorkbook)
+
+    output_path = tmp_path / "exc_wb.xlsx"
+    wb = excel_mod.ExcelWorkbookSink(str(output_path))
+    _ = wb.create_sheet_row_sink("Sheet1", field_names=["id"])
+
+    original_unlink = excel_mod.Path.unlink
+
+    def _failing_unlink(path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if str(path).endswith(".xlsx.tmp"):
+            raise OSError("simulated unlink failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(excel_mod.Path, "unlink", _failing_unlink)
+
+    with pytest.raises(OSError, match="simulated save failure"):
+        wb.close()
+
+    assert any(excel_mod.EXCEL_WORKBOOK_SINK_SAVE_FAILED in record.getMessage() for record in caplog.records)
+    assert any(excel_mod.EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED in record.getMessage() for record in caplog.records)
+    for temp_file in tmp_path.glob("*.xlsx.tmp"):
+        os.unlink(temp_file)
 
 
 @pytest.mark.parametrize(

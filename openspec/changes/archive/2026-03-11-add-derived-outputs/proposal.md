@@ -1,4 +1,4 @@
-> Status (2026-03-10): 暂缓/搁置。本 change 需要先与需求方对齐场景规模与 v1 默认策略,避免过早把 YAML DSL 复杂化;在重新开启前不进入实现阶段。
+> Status (2026-03-11): 已实现(v1 IR/Python-only).当前实现覆盖 workbook 多 sheet、输出组合(router)、派生汇总(group_by + 内置聚合 + finalize 排名)、meta/audit 与 multi-root workbook;待 `just qa`/`just gen` 验收后归档。
 
 ## Why
 

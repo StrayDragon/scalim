@@ -57,3 +57,16 @@
 #### Scenario: 仅使用编程方式配置
 - **WHEN** 用户通过编程方式定义派生输出
 - **THEN** 系统应无需修改 YAML DSL 即可运行
+
+### Requirement: `adaptive` 一致性边界
+系统 SHALL 明确 `adaptive` 并发下派生聚合的一致性边界,并在不满足条件时 fail-fast.
+
+#### Scenario: 内置可交换聚合在 adaptive 下可用
+- **WHEN** 派生输出仅使用内置可交换/可结合的增量指标(count/sum/min/max/count_true)并在 finalize 阶段单线程输出
+- **AND** 运行模式为 `parallel_mode="adaptive"`
+- **THEN** 系统应允许派生聚合并确保结果确定性
+
+#### Scenario: 自定义聚合器在 adaptive 下默认拒绝
+- **WHEN** 派生输出使用自定义聚合器且未声明支持 `adaptive`
+- **AND** 运行模式为 `parallel_mode="adaptive"`
+- **THEN** 系统应 fail-fast 并提示切换到 `parallel_mode="seq"`

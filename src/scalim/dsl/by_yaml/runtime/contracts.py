@@ -16,6 +16,7 @@ from ..schema_dsl.models import DemandConfig
 if TYPE_CHECKING:
     import pandas as pd
 
+    from ....execution.output_composition import OutputCompositionSpec
     from ....execution.run_ir import ExecutionRequest
     from ....ob.presets.viz import VizObserverConfig
     from ....planning.plan import ExecutionPlan
@@ -69,6 +70,9 @@ class RunOptions:
 
     sink: Optional[ISink] = None
     """可选:显式指定输出端;若为 `None` 则按配置创建."""
+
+    output_composition: Optional["OutputCompositionSpec"] = None
+    """可选:多输出组合请求(`IR/Python-only`).当提供该字段时,运行期会忽略 YAML 的单输出装配."""
 
     guardrails: Optional[GuardrailsPolicy] = None
     """可选:运行时护栏策略."""

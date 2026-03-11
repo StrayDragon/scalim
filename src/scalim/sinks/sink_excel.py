@@ -41,6 +41,12 @@ EXCEL_SINK_SAVE_FAILED_LOG = EXCEL_SINK_SAVE_FAILED + ": %s"
 EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = "ExcelSink 删除临时文件失败"
 EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG = EXCEL_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
+EXCEL_WORKBOOK_SINK_SAVE_FAILED = "ExcelWorkbookSink 保存失败"
+EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG = EXCEL_WORKBOOK_SINK_SAVE_FAILED + ": %s"
+
+EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED = "ExcelWorkbookSink 删除临时文件失败"
+EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG = EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
+
 COLUMN_EXCEL_SINK_SAVE_FAILED = "ColumnExcelSink 保存失败"
 COLUMN_EXCEL_SINK_SAVE_FAILED_LOG = COLUMN_EXCEL_SINK_SAVE_FAILED + ": %s"
 
@@ -142,6 +148,139 @@ class ExcelSink(BaseRowSink):
             if not is_closed:
                 with suppress(Exception):
                     self._worksheet.close()
+            raise
+        finally:
+            with suppress(Exception):
+                self._workbook.close()
+
+        self._closed = True
+
+
+class ExcelWorkbookSheetRowSink(BaseRowSink):
+    """`Excel` `workbook` 中单个 `sheet` 的行写入器(共享同一 `workbook`).
+
+    - 该 `sink` 仅负责向 `worksheet` 追加行.
+    - `workbook` 的保存/原子替换由 `ExcelWorkbookSink.close()` 统一完成.
+    """
+
+    sheet_name: str
+    include_header: bool
+    field_names: List[str]
+    header_names: List[str]
+    _worksheet: Any
+    _closed: bool
+
+    def __init__(
+        self,
+        *,
+        worksheet: Any,
+        sheet_name: str,
+        field_names: List[str],
+        header_names: Optional[List[str]] = None,
+        include_header: bool = True,
+    ) -> None:
+        self._worksheet = worksheet
+        self.sheet_name = str(sheet_name)
+        self.include_header = bool(include_header)
+        self.field_names = list(field_names)
+        self.header_names = list(header_names) if header_names is not None else list(self.field_names)
+        self._closed = False
+        if self.include_header:
+            # 关键护栏: `header` 与 `rows` 分离,避免 `header` `list` 被复用污染.
+            _ = self._worksheet.append(list(self.header_names))
+
+    def _format_row(self, row: RowData) -> List[Any]:
+        return [row.get(field_name) for field_name in self.field_names]
+
+    @override
+    def write_row(self, row: RowData) -> None:
+        if self._closed:
+            msg = "ExcelWorkbookSheetRowSink is closed: {}".format(self.sheet_name)
+            raise RuntimeError(msg)
+        _ = self._worksheet.append(self._format_row(row))
+
+    @override
+    def write_batch(self, rows: Sequence[RowData]) -> None:
+        if self._closed:
+            msg = "ExcelWorkbookSheetRowSink is closed: {}".format(self.sheet_name)
+            raise RuntimeError(msg)
+        for row in rows:
+            _ = self._worksheet.append(self._format_row(row))
+
+    @override
+    def close(self) -> None:
+        # `sheet` `sink` 仅标记关闭,不保存文件.
+        self._closed = True
+
+
+class ExcelWorkbookSink:
+    """`Excel` `workbook` 容器: 单次保存,支持多 `sheet`.
+
+    设计目标:
+    - 多 `sheet` 共享同一 `workbook`,避免重复打开/保存文件
+    - 支持 `write_only` 流式写入,避免“全量 `rows` 攒内存”
+    - `sheet` 名冲突 `fail-fast`
+    - `sheet` 顺序稳定: 由 `create_sheet()` 调用顺序决定
+    """
+
+    output_path: str
+    _workbook: Workbook
+    _sheet_names: List[str]
+    _closed: bool
+
+    def __init__(
+        self,
+        output_path: str,
+    ) -> None:
+        self.output_path = str(output_path)
+        self._workbook = Workbook(write_only=True)
+        self._sheet_names = []
+        self._closed = False
+
+    def create_sheet_row_sink(
+        self,
+        sheet_name: str,
+        *,
+        field_names: List[str],
+        header_names: Optional[List[str]] = None,
+        include_header: bool = True,
+    ) -> ExcelWorkbookSheetRowSink:
+        if self._closed:
+            msg = "ExcelWorkbookSink is closed: {}".format(self.output_path)
+            raise RuntimeError(msg)
+
+        name = str(sheet_name)
+        if name in self._sheet_names:
+            msg = "Duplicate excel sheet name in workbook: {!r}".format(name)
+            raise ValueError(msg)
+
+        ws = self._workbook.create_sheet(name)
+        self._sheet_names.append(name)
+        return ExcelWorkbookSheetRowSink(
+            worksheet=ws,
+            sheet_name=name,
+            field_names=field_names,
+            header_names=header_names,
+            include_header=include_header,
+        )
+
+    def close(self) -> None:
+        if self._closed:
+            return
+
+        temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
+        temp_path_obj = Path(temp_path)
+
+        try:
+            self._workbook.save(temp_path_obj)
+            _ = temp_path_obj.replace(self.output_path)
+        except Exception:
+            _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
+            if temp_path_obj.exists():
+                try:
+                    temp_path_obj.unlink()
+                except OSError:
+                    _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
             raise
         finally:
             with suppress(Exception):

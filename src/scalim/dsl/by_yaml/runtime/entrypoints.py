@@ -2,6 +2,7 @@ from typing import Dict, FrozenSet, List, Optional, Union
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
+from ....execution.output_composition import OutputCompositionSpec
 from ....execution.run_ir import run_ir
 from ....hooks.base import IExecutionHook
 from ....ob.observer import Observer
@@ -18,6 +19,7 @@ def run(
     allowed_functions: Optional[FrozenSet[str]] = None,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
+    output_composition: Optional[OutputCompositionSpec] = None,
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
@@ -43,6 +45,7 @@ def run(
         allowed_functions=allowed_functions,
         components=components,
         sink=sink,
+        output_composition=output_composition,
         overrides=overrides,
         guardrails=guardrails,
         loader_retry=loader_retry,
@@ -63,6 +66,7 @@ def compile(  # noqa: A001
     allowed_functions: Optional[FrozenSet[str]] = None,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
+    output_composition: Optional[OutputCompositionSpec] = None,
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
@@ -76,6 +80,7 @@ def compile(  # noqa: A001
         allowed_functions=allowed_functions,
         components=components,
         sink=sink,
+        output_composition=output_composition,
         overrides=overrides,
         guardrails=guardrails,
         loader_retry=loader_retry,

@@ -320,6 +320,41 @@ class StageSpanEvent:
 
 
 @dataclass(frozen=True)
+class OutputTargetEndEvent:
+    """输出目标结束统计事件.
+
+    由输出组合层在 `close()` 时发出,用于记录每个输出目标的写出统计.
+    """
+
+    target_id: str
+    """输出目标标识."""
+
+    output_path: Optional[str]
+    """输出路径(可选;例如工作簿路径或文件路径)."""
+
+    sheet_name: Optional[str]
+    """`Excel` 工作表名称(可选)."""
+
+    row_count: int
+    """写入的行数."""
+
+    error_count: int
+    """写入/关闭过程的错误次数."""
+
+    duration: float
+    """该输出目标累计耗时(秒)."""
+
+    disabled: bool
+    """是否被禁用(例如 `failure_policy=primary_only` 下发生错误后被禁用)."""
+
+    error_type: Optional[str] = None
+    """首个错误的异常类型(可选)."""
+
+    error_message: Optional[str] = None
+    """首个错误的异常消息(可选)."""
+
+
+@dataclass(frozen=True)
 class AdaptiveSchedulerDecisionEvent:
     """自适应调度器决策事件.
 
@@ -372,6 +407,7 @@ __all__ = [
     "LoaderCallEvent",
     "LoaderRetryEvent",
     "LoaderSlimEvent",
+    "OutputTargetEndEvent",
     "PipelineEndEvent",
     "PipelineStartEvent",
     "RelationLookupEvent",

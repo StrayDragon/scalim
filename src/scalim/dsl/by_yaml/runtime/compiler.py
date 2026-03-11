@@ -314,6 +314,7 @@ def build_request(
         export_layout=export_layout,
         output=output_spec,
         sink=options.sink,
+        output_composition=options.output_composition,
         observability=observability,
         guardrails=guardrails,
         loader_retry=loader_retry,

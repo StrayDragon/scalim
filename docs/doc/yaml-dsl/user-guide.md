@@ -1041,6 +1041,121 @@ sources:
 - `preload_forever` 场景允许声明 `params`.当 `params` 非空时,预加载调用会透传 kwargs;为空则保持零参 preload.
 - `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`.
 
+### 4.5 多输出组合与派生汇总 (IR/Python-only)
+
+`YAML DSL` 的 v1 仍然是**单输出**模型(顶层 `output` 仅描述一个输出目标).
+当你需要在**同一次运行**内交付“明细 + 汇总 + meta/audit”并写入同一 workbook 的多 sheet 时,应在 Python 调用侧使用执行层的 `output_composition` 能力.
+
+关键点:
+
+- v1 不新增/不要求 YAML 写法变更;你可以继续把 YAML 当作“宽表需求模板”.
+- 当多个输出共享同一 Excel `path` 时,每个输出必须显式设置 `sheet_name`(否则会覆盖同一个文件).
+- 派生汇总目前支持 streaming-friendly 的内置聚合(count/sum/min/max/count_true)与可选 finalize 排序/排名.
+
+#### 4.5.1 示例: 单次运行写入同一 workbook 的多 sheet(明细 + 汇总 + meta + audit)
+
+```python
+from dataclasses import replace
+
+from scalim.dsl.by_yaml import RunOptions, compile
+from scalim.execution.output_composition import (
+    AggMetricSpec,
+    AuditSheetSpec,
+    DerivedGroupBySpec,
+    DerivedOutputTargetSpec,
+    MetaSheetSpec,
+    OutputCompositionSpec,
+    OutputTargetSpec,
+)
+from scalim.execution.run_ir import ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
+
+# 1) 编译 YAML 得到 demand_ir/request (安全:需要 allowlist)
+options = RunOptions(allowed_modules=frozenset(["myapp.loaders"]))
+comp = compile("path/to/config.yaml", options=options)
+
+# 2) 为每个 sheet 定义自己的字段顺序/表头
+detail_layout = export_layout_from_demand_ir(
+    comp.demand_ir,
+    ["order_id", "order_source", "amount", "cost", "profit"],
+    header_fields_output_by="name",
+)
+
+summary_layout = ExportLayout(
+    field_ids=("order_source", "order_cnt", "sum_amount", "sum_profit", "rank"),
+    header_names=None,
+)
+
+workbook_path = "./output/report.xlsx"
+
+# 3) 组合输出: 同一次 run 写 4 张 sheet
+spec = OutputCompositionSpec(
+    targets=(
+        OutputTargetSpec(
+            target_id="detail",
+            layout=detail_layout,
+            output=OutputSpec(format="excel", path=workbook_path, streaming=True, include_header=True, sheet_name="Detail"),
+            is_primary=True,
+        ),
+    ),
+    derived_targets=(
+        DerivedOutputTargetSpec(
+            target_id="summary_by_source",
+            derived=DerivedGroupBySpec(
+                group_by=("order_source",),
+                metrics=(
+                    AggMetricSpec(out_field_id="order_cnt", op="count", field_id="order_id"),
+                    AggMetricSpec(out_field_id="sum_amount", op="sum", field_id="amount"),
+                    AggMetricSpec(out_field_id="sum_profit", op="sum", field_id="profit"),
+                ),
+                rank_by="sum_profit",
+                rank_order="desc",
+                max_groups=10000,
+            ),
+            output_layout=summary_layout,
+            output=OutputSpec(format="excel", path=workbook_path, streaming=True, include_header=True, sheet_name="Summary"),
+        ),
+    ),
+    meta_sheet=MetaSheetSpec(
+        target_id="meta",
+        output=OutputSpec(format="excel", path=workbook_path),
+        sheet_name="Meta",
+    ),
+    audit_sheet=AuditSheetSpec(
+        target_id="audit",
+        output=OutputSpec(format="excel", path=workbook_path),
+        sheet_name="Audit",
+    ),
+    failure_policy="all_fail",
+)
+
+request = replace(
+    comp.request,
+    output=OutputSpec(path=None),  # 禁用 YAML 的单输出文件装配(由 output_composition 接管)
+    sink=None,
+    output_composition=spec,
+)
+
+result = run_ir(comp.demand_ir, request)
+print(result.outputs)  # 例如: {"detail": "./output/report.xlsx", "summary_by_source": "./output/report.xlsx", ...}
+```
+
+#### 4.5.2 示例: multi-root workbook(每张 sheet 绑定独立 demand)
+
+当 workbook 的每张 sheet 来自独立数据源/独立 demand 时,可以把 workbook 当作容器顺序执行多个 demand 并写入不同 sheet:
+
+```python
+from scalim.execution.workbook_multi_root import run_multi_root_workbook
+
+results = run_multi_root_workbook(
+    output_path="./output/report.xlsx",
+    runs=(
+        ("Total", demand_ir_total, request_total),
+        ("Channel", demand_ir_channel, request_channel),
+        ("Service", demand_ir_service, request_service),
+    ),
+)
+```
+
 ---
 
 ## 5. 完整示例 (Complete Examples)

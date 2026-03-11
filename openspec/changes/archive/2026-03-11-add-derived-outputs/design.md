@@ -1,4 +1,4 @@
-> Status (2026-03-10): 暂缓/搁置。本文档保留作为探索材料;在需求侧对齐并确认 v1 默认策略前不进入实现阶段。
+> Status (2026-03-11): 已实现(v1 IR/Python-only).本文档保留为设计与约束说明;实现完成后用于回溯默认策略与边界。
 
 ## Context
 需要在一次运行内产出“详情 + 分析/汇总”多份结果,并支持写入同一报表容器(多 sheet)或拆分为独立输出.同时要求保留现有单输出行为与性能特性,且 v1 仅通过 IR/Python 进行配置.
@@ -69,6 +69,8 @@
 - Decision: 采用“输出组合器 + 增量聚合器”为主方案,并保留“二阶段执行”作为兜底模式(适用于列式/超大数据场景).
 - Decision: v1 仅提供 IR/Python 配置入口,不改动 YAML DSL;文档说明潜在映射.
 - Decision: 同一容器内输出名称冲突时直接拒绝,避免隐式改名掩盖问题.
+- Decision: failure policy 默认 `all_fail`(任一输出失败即 run 失败);同时支持 `primary_only`(仅主输出失败才失败,派生输出失败会被标记并写入 meta/audit).
+- Decision: `adaptive` 下允许内置派生聚合(交换律/结合律指标,且 finalize 在单线程执行);自定义聚合器默认要求 `parallel_mode=\"seq\"`(否则 fail-fast),避免非确定统计.
 
 ## Implementation Priorities (When Resumed)
 
