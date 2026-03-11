@@ -30,7 +30,7 @@
 - 不支持任意 Python 表达式、任意函数调用、属性访问或字符串子串插值。
 - 不尝试在本变更中落地多输出/多 sheet 或其它 DSL 扩展。
 - 不引入新的外部依赖(保持 PyYAML 解析与现有安全边界)。
-- v1 不提供 composite key 的按分量投影语法(例如 `$keys.foo`/`$keys[0]`);复合 key 先整体以 tuple 形式注入.
+- 不提供 composite key 的按分量投影语法(例如 `$keys.foo`/`$keys[0]`);复合 key 先整体以 tuple 形式注入.
 
 ## Decisions
 
@@ -97,7 +97,7 @@ typed template IR 的最小节点形态:
 - `$keys` 注入的是“完整 lookup key 集合/列表”:
   - 单 key source: 元素为普通标量 key
   - composite key source: 元素为 tuple key,保持归一化后的 tuple 结构
-- v1 不提供 `$keys` 的按分量投影语法;若业务需要拆解 composite key,应在 loader 内处理或后续单独扩展语法
+- 不提供 `$keys` 的按分量投影语法;若业务需要拆解 composite key,应在 loader 内处理或后续单独扩展语法
 
 指令的运行时来源来自 `LoaderCallContextIr`:
 

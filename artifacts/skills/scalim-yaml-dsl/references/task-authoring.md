@@ -1,4 +1,4 @@
-# YAML Authoring
+# YAML 编写
 
 ## 何时读取
 
@@ -78,6 +78,27 @@ output:
 - 运行期变量用 `runtime_vars` 注入并在 `params` 中用 `$runtime.<name>` 引用(仅 exact-match string 生效)
 - `output.fields` 每项必须是对象或 alias,不能写纯字符串
 - 跨 source 同名 `field_id` 时,`output.fields` 里必须显式加 `source`
+
+## 相对模块引用(可选)
+
+如果 YAML 文件与 loaders / `call_by` / retry 回调放在同一个 Python 包内,可以用以 `.` / `..` 开头的相对 module 引用来减少 `myapp.xxx` 这种前缀重复:
+
+```yaml
+main_source:
+  loader: ".loaders:load_orders"
+
+fields:
+  status_text:
+    call_by: ".helpers:to_text(status)"
+
+retry:
+  should_retry: ".retry:should_retry"
+```
+
+注意:
+
+- 相对引用以 **YAML 文件所在目录** 为基准,运行期会先归一化为绝对引用,再做 allowlist 校验
+- allowlist 仍需要覆盖归一化后的模块前缀(例如 YAML 在 `myapp/reports/` 下, `.loaders:load_orders` 会归一化为 `myapp.reports.loaders:load_orders`)
 
 ## 设计偏好
 

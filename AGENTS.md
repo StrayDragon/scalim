@@ -63,6 +63,10 @@ When adding new typing_extensions features, add a compat shim in `typing_extensi
 - `scripts/sanitize.py` must apply both `openspec/sanitize_rules.yaml` and `openspec/sanitize_rules.local.yaml` when the local file exists.
 - If `openspec/sanitize_rules.local.yaml` is missing, the sanitize step will warn. Treat that warning as a prompt to confirm whether extra organization/private literals need additional local masking rules before publishing or sharing OpenSpec artifacts.
 
+## YAML DSL Versioning
+- 不要在注释/文档/规范中引入 YAML DSL 的 `v1/v2/v3` 版本预设;只描述当前最新语义.
+- 旧写法由升级链路强制一步到位迁移;仓库内示例/fixtures/skills/前端 examples 等保持最新写法.
+
 ## Commit & Pull Request Guidelines
 - Commit messages typically use a short type prefix: `fix:`, `tests:`, `doc:`, `scalim:`, or simple `sync`/`tmp`. Follow this style and keep summaries concise.
 - PRs should include purpose, key changes, test commands run, and any schema changes (for example, mention `just gen-yaml-dsl-schema`). Add tests for behavior changes and update docs (`README.md`, `ARCH.md`) when relevant.

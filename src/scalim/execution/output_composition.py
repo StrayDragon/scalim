@@ -21,7 +21,7 @@ OutputRowPredicate = Callable[[RowData], bool]
 
 @dataclass(frozen=True)
 class OutputTargetSpec:
-    """输出目标(`v1` `IR/Python-only`).
+    """输出目标(`IR/Python-only`).
 
     - `layout.field_ids` 表示该目标写出的字段顺序(来自输入行 `dict` 取值).
     - `output.sheet_name` 仅在 `excel` 且写入同一工作簿容器时使用.
@@ -769,7 +769,7 @@ def build_output_composition(
 ) -> OutputCompositionPlan:
     """物化多输出组合为一个 `IRowSink`(`RouterRowSink`).
 
-    该函数只处理行流式写出路径(`v1`).
+    该函数只处理行流式写出路径.
     """
 
     failure_policy = _normalize_failure_policy(spec.failure_policy)

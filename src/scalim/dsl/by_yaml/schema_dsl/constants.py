@@ -73,8 +73,19 @@ DESC_MAIN_SOURCE_ORDER_BY = "主数据源批次内排序字段列表(仅主数�
 DESC_MAIN_SOURCE_ORDER_BY_MD = (
     "主数据源批次内排序字段列表.\n\n- 每项为字段 id, 前缀 `-` 表示 desc\n- 未配置时保持 loader 原始顺序\n- 仅允许主数据源字段"
 )
-DESC_LOADER = "Python 可调用对象引用(支持格式: module.path:ClassName / module.path:obj.method / module.path:function)"
-DESC_LOADER_MD = "Python 可调用对象引用.\n\n- `module.path:ClassName`\n- `module.path:function`\n- `module.path:obj.method`"
+DESC_LOADER = "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)"
+DESC_LOADER_MD = (
+    "Python 可调用对象引用.\n\n"
+    "绝对引用:\n"
+    "- 点式引用: `module.path.function`\n"
+    "- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n"
+    "相对引用:\n"
+    "- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n"
+    "- 运行期会先归一化为绝对引用,再做白名单校验\n\n"
+    "示例:\n"
+    "- `.loaders:load_orders`\n"
+    "- `.loaders.load_orders`"
+)
 DESC_LOOKUP_CAST = "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}"
 DESC_LOOKUP_CAST_MD = (
     "归一化 lookup key 的转换.\n\n"
@@ -115,10 +126,10 @@ DESC_PARAMS_MD = (
     "迁移:\n"
     "- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点"
 )
-DESC_SOURCE_NORMALIZE = "source-level whole-result `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)"
+DESC_SOURCE_NORMALIZE = "源级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)"
 DESC_SOURCE_NORMALIZE_MD = (
-    "source-level whole-result `normalize`.\n\n"
-    "- 作用于 `loader` 的整个返回值,用于把整体结果 reshape 成更适合字段读取的形状\n"
+    "`normalize` 是源级的整体结果整形.\n\n"
+    "- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n"
     "- 执行时机: 在字段级 `extract` 之前\n"
     "- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n"
     "示例:\n"
@@ -132,7 +143,7 @@ DESC_SOURCE_NORMALIZE_MD = (
     "- 输入: `[{order_id: 101, ...}, ...]`\n"
     "- 输出: `{101: {order_id: 101, ...}, ...}`\n\n"
     "注意:\n"
-    "- 若只是 row 内字段嵌套取值,请使用字段级 `extract`"
+    "- 若只是 `row` 内字段嵌套取值,请使用字段级 `extract`"
 )
 DESC_FIELD_NAME = "字段显示名称"
 DESC_FIELD_NAME_MD = "字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头"

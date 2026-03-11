@@ -25,7 +25,7 @@ from .contracts import UNSET, Compilation, OutputOverrides, RunOptions
 from .conversion import ConfigToIRConverter
 from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError
 from .observability import compile_observability_spec
-from .references import SecurePythonReferenceResolver
+from .references import SecurePythonReferenceResolver, derive_base_module_path
 
 if TYPE_CHECKING:
     from ....ob.presets.viz import VizObserverConfig
@@ -250,10 +250,12 @@ def create_reference_resolver(
     *,
     allowed_modules: FrozenSet[str],
     allowed_functions: Optional[FrozenSet[str]],
+    base_module_path: Optional[str] = None,
 ) -> SecurePythonReferenceResolver:
     return SecurePythonReferenceResolver(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
+        base_module_path=base_module_path,
     )
 
 
@@ -332,9 +334,13 @@ def compile(  # noqa: A001
 ) -> Compilation:
     validate_allowlist(allowed_modules=options.allowed_modules, allowed_functions=options.allowed_functions)
     config = load_config(yaml_path)
+    base_module_path = None
+    if _config_uses_relative_references(config):
+        base_module_path = derive_base_module_path(yaml_path)
     resolver = create_reference_resolver(
         allowed_modules=options.allowed_modules,
         allowed_functions=options.allowed_functions,
+        base_module_path=base_module_path,
     )
     demand_ir = compile_ir(config, resolver=resolver, runtime_vars=options.runtime_vars)
     request = build_request(config, demand_ir, options=options, resolver=resolver)
@@ -353,3 +359,26 @@ __all__ = [
     "load_config",
     "validate_allowlist",
 ]
+
+
+def _is_relative_reference(value: Optional[str]) -> bool:
+    raw = str(value or "").strip()
+    return bool(raw) and raw.startswith(".")
+
+
+def _config_uses_relative_references(config: DemandConfig) -> bool:
+    if _is_relative_reference(config.main_source.loader):
+        return True
+
+    if any(
+        _is_relative_reference(source.loader) or (source.retry is not None and _is_relative_reference(source.retry.should_retry))
+        for source in config.sources.values()
+    ):
+        return True
+
+    if config.retry is not None and _is_relative_reference(config.retry.should_retry):
+        return True
+    if config.main_source.retry is not None and _is_relative_reference(config.main_source.retry.should_retry):
+        return True
+
+    return any(derived.call_by is not None and _is_relative_reference(derived.call_by) for derived in config.derived_fields.values())

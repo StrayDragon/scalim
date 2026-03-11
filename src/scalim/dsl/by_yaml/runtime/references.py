@@ -1,8 +1,10 @@
 import importlib
 import logging
+import sys
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, FrozenSet, Optional, Tuple
+from pathlib import Path
+from typing import Any, Callable, ClassVar, FrozenSet, List, Optional, Sequence, Tuple
 
 from ....vendor.compact.typing_extensionsx import override
 from .errors import ResolverError
@@ -14,6 +16,11 @@ _ALLOWLIST_WILDCARD = "*"
 
 ALLOWLIST_WILDCARD_MODULES_WARNING = "在 `allowed_modules` 中使用允许列表通配符 `*`: 将允许所有模块. 生产环境请使用严格允许列表."
 ALLOWLIST_WILDCARD_FUNCTIONS_WARNING = "在 `allowed_functions` 中使用允许列表通配符 `*`: 将允许所有函数. 生产环境请使用严格允许列表."
+
+RELATIVE_REFERENCE_BASE_REQUIRED = (
+    "Relative module reference '{}' requires a base module path derived from `yaml_path` + `sys.path`. "
+    "Fix: use `scalim.dsl.by_yaml.run/compile(yaml_path=...)`, or provide `base_module_path` when creating the resolver."
+)
 
 
 @dataclass(frozen=True)
@@ -274,22 +281,86 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         ]
     )
 
+    _base_module_path: Optional[str]
+
     def __init__(
         self,
         allowed_modules: Optional[FrozenSet[str]] = None,
         allowed_functions: Optional[FrozenSet[str]] = None,
         max_cache_size: int = PythonReferenceResolver.DEFAULT_CACHE_MAX_SIZE,
+        base_module_path: Optional[str] = None,
     ) -> None:
         super(SecurePythonReferenceResolver, self).__init__(
             allowed_modules=allowed_modules,
             allowed_functions=allowed_functions,
             max_cache_size=max_cache_size,
         )
+        self._base_module_path = base_module_path
 
     @override
     def resolve(self, reference: str) -> Callable[..., Any]:
+        if reference.startswith("."):
+            normalized = self._normalize_reference(reference)
+            self._security_check(normalized)
+            return super(SecurePythonReferenceResolver, self).resolve(normalized)
+
         self._security_check(reference)
         return super(SecurePythonReferenceResolver, self).resolve(reference)
+
+    def _normalize_reference(self, reference: str) -> str:
+        if ":" in reference:
+            parts = reference.split(":")
+            if len(parts) != _MIN_PARTS_COUNT:
+                msg = "Invalid class-style reference '{}'. Expected 'module.path:attr' or 'module.path:obj.method'".format(reference)
+                raise ResolverError(msg)
+            module_path, attr_path = parts
+            absolute_module_path = self._normalize_relative_module_path(module_path, reference=reference)
+            return "{}:{}".format(absolute_module_path, attr_path)
+
+        module_path, func_name = reference.rsplit(".", 1)
+        if not module_path:
+            msg = "Invalid relative dotted reference '{}'. Expected '.module.path.function'".format(reference)
+            raise ResolverError(msg)
+        absolute_module_path = self._normalize_relative_module_path(module_path, reference=reference)
+        return "{}.{}".format(absolute_module_path, func_name)
+
+    def _normalize_relative_module_path(self, module_path: str, *, reference: str) -> str:
+        base = self._base_module_path
+        if base is None:
+            msg = RELATIVE_REFERENCE_BASE_REQUIRED.format(reference)
+            raise ResolverError(msg)
+
+        dot_count = 0
+        for ch in module_path:
+            if ch != ".":
+                break
+            dot_count += 1
+
+        rest = module_path[dot_count:]
+        if not rest:
+            msg = "Invalid relative module path '{}' in reference '{}' (missing module path after leading dots)".format(
+                module_path, reference
+            )
+            raise ResolverError(msg)
+
+        base_parts = [p for p in str(base).split(".") if p] if base else []
+        up_levels = dot_count - 1
+        if up_levels > len(base_parts):
+            msg = "Relative module reference '{}' goes beyond root (base_module_path='{}')".format(reference, base)
+            raise ResolverError(msg)
+
+        prefix_parts = base_parts[: len(base_parts) - up_levels] if up_levels else base_parts
+
+        rest_parts = rest.split(".")
+        invalid = [p for p in rest_parts if not p.isidentifier()]
+        if invalid:
+            msg = "Invalid relative module path '{}' in reference '{}' (illegal identifier segment: '{}')".format(
+                module_path, reference, invalid[0]
+            )
+            raise ResolverError(msg)
+
+        absolute_parts = prefix_parts + rest_parts
+        return ".".join(absolute_parts)
 
     def _security_check(self, reference: str) -> None:
         if ":" in reference:
@@ -324,10 +395,90 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
                 raise ResolverError(msg)
 
 
+def derive_base_module_path(
+    yaml_path: str,
+    *,
+    sys_path: Optional[Sequence[Optional[str]]] = None,
+    cwd: Optional[str] = None,
+) -> str:
+    """从 `yaml_path` + `sys.path` 推导相对引用的基准模块路径(`base module path`).
+
+    规则:
+    - 以 YAML 文件所在目录为基准(`Path(yaml_path).parent`)
+    - 遍历 `sys.path` 找到 YAML 目录的前缀路径候选
+    - 选择最长匹配
+    - 将 `yaml_dir` 相对前缀的目录段用 `.` 拼接为模块路径
+    """
+    raw_yaml_path = str(yaml_path or "").strip()
+    if not raw_yaml_path:
+        msg = "yaml_path is required to derive base module path"
+        raise ResolverError(msg)
+
+    yaml_dir = Path(raw_yaml_path).expanduser().resolve(strict=False).parent
+    cwd_path = Path(cwd).expanduser().resolve(strict=False) if cwd else Path.cwd().resolve(strict=False)
+
+    candidates = _collect_sys_path_prefixes(yaml_dir=yaml_dir, sys_path=sys_path, cwd_path=cwd_path)
+
+    if not candidates:
+        msg = (
+            "Cannot derive base module path from yaml_path '{}': directory '{}' is not under any sys.path entry. "
+            "Fix: add the package root to PYTHONPATH (or sys.path), or use absolute module references."
+        ).format(raw_yaml_path, str(yaml_dir))
+        raise ResolverError(msg)
+
+    prefix = max(candidates, key=lambda p: len(p.parts))
+    rel_path = yaml_dir.relative_to(prefix)
+    if rel_path == Path():
+        return ""
+
+    parts = [p for p in rel_path.parts if p and p != "."]
+    _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=prefix)
+
+    return ".".join(parts)
+
+
+def _normalize_sys_path_entry(entry: Optional[str], *, cwd_path: Path) -> Optional[Path]:
+    if entry is None:
+        return None
+    item = str(entry)
+    if item == "":
+        return cwd_path
+    p = Path(item)
+    if not p.is_absolute():
+        return (cwd_path / p).resolve(strict=False)
+    return p.resolve(strict=False)
+
+
+def _collect_sys_path_prefixes(*, yaml_dir: Path, sys_path: Optional[Sequence[Optional[str]]], cwd_path: Path) -> List[Path]:
+    candidates: List[Path] = []
+    for entry in list(sys_path) if sys_path is not None else list(sys.path):
+        p = _normalize_sys_path_entry(entry, cwd_path=cwd_path)
+        if p is None:
+            continue
+        try:
+            _ = yaml_dir.relative_to(p)
+        except ValueError:
+            continue
+        candidates.append(p)
+    return candidates
+
+
+def _validate_module_parts(*, parts: Sequence[str], raw_yaml_path: str, yaml_dir: Path, prefix: Path) -> None:
+    for part in parts:
+        if part.isidentifier():
+            continue
+        msg = (
+            "Cannot derive base module path from yaml_path '{}': directory segment '{}' (from '{}', sys.path prefix='{}') "
+            "is not a valid Python identifier. Fix: rename the directory segment or use absolute references."
+        ).format(raw_yaml_path, part, str(yaml_dir), str(prefix))
+        raise ResolverError(msg)
+
+
 __all__ = [
     "ParsedReference",
     "PythonReferenceResolver",
     "ReferenceParser",
     "ResolverPolicy",
     "SecurePythonReferenceResolver",
+    "derive_base_module_path",
 ]

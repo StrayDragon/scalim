@@ -1,7 +1,7 @@
-> Status (2026-03-11): 已实现(v1 IR/Python-only).本文档保留为设计与约束说明;实现完成后用于回溯默认策略与边界。
+> Status (2026-03-11): 已实现(IR/Python-only).本文档保留为设计与约束说明;实现完成后用于回溯默认策略与边界。
 
 ## Context
-需要在一次运行内产出“详情 + 分析/汇总”多份结果,并支持写入同一报表容器(多 sheet)或拆分为独立输出.同时要求保留现有单输出行为与性能特性,且 v1 仅通过 IR/Python 进行配置.
+需要在一次运行内产出“详情 + 分析/汇总”多份结果,并支持写入同一报表容器(多 sheet)或拆分为独立输出.同时要求保留现有单输出行为与性能特性,且目前仅通过 IR/Python 进行配置.
 
 ## Downstream Patterns (Survey → Framework Concepts)
 
@@ -28,7 +28,7 @@
 7) **MultiRootSheets（多根数据源的 sheet 集合）**
 - 每张 sheet 来自独立数据源/独立 demand；workbook 作为容器，不强行把所有根源塞进一个 main_source。
 
-这 7 类并不要求在 v1 作为 DSL 的强类型出现，但有助于约束“最小能力边界”与测试矩阵。
+这 7 类并不要求作为 DSL 的强类型出现，但有助于约束“最小能力边界”与测试矩阵。
 
 ### Legacy Anti-Patterns To Avoid (Explicit Guardrails)
 
@@ -46,8 +46,8 @@
   - 支持同一容器多逻辑输出与独立输出
   - 不中断既有单输出行为与事件顺序
 - Non-Goals:
-  - v1 不新增 YAML DSL 配置(仅评估影响)
-  - v1 不强制引入外部依赖或分布式组件
+  - 本次不新增 YAML DSL 配置(仅评估影响)
+  - 本次不强制引入外部依赖或分布式组件
 
 ## Options Considered
 1) **输出组合器 + 增量聚合器(推荐方向)**
@@ -67,7 +67,7 @@
 
 ## Decisions
 - Decision: 采用“输出组合器 + 增量聚合器”为主方案,并保留“二阶段执行”作为兜底模式(适用于列式/超大数据场景).
-- Decision: v1 仅提供 IR/Python 配置入口,不改动 YAML DSL;文档说明潜在映射.
+- Decision: 仅提供 IR/Python 配置入口,不改动 YAML DSL;文档说明潜在映射.
 - Decision: 同一容器内输出名称冲突时直接拒绝,避免隐式改名掩盖问题.
 - Decision: failure policy 默认 `all_fail`(任一输出失败即 run 失败);同时支持 `primary_only`(仅主输出失败才失败,派生输出失败会被标记并写入 meta/audit).
 - Decision: `adaptive` 下允许内置派生聚合(交换律/结合律指标,且 finalize 在单线程执行);自定义聚合器默认要求 `parallel_mode=\"seq\"`(否则 fail-fast),避免非确定统计.
@@ -185,7 +185,7 @@ sheets:
     demand: service_view.demand.yaml
 ```
 
-### Example: “详情 + 汇总”派生输出(概念 API, v1 IR/Python-only)
+### Example: “详情 + 汇总”派生输出(概念 API, IR/Python-only)
 ```python
 # 目标:
 # - 详情: 每行订单明细写入 detail.csv

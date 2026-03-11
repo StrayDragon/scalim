@@ -26,9 +26,9 @@
 
 **Non-Goals:**
 
-- v1 不支持 `main_source.normalize`;主数据源 contract 仍保持“按行 iterable”.
-- v1 不开放任意 Python normalize 函数。
-- v1 不处理 nested envelope 中的列表提取、project_fields、multi-step transforms;这些留给后续 preset 或 wrapper。
+- 不支持 `main_source.normalize`;主数据源 contract 仍保持“按行 iterable”.
+- 不开放任意 Python normalize 函数。
+- 不处理 nested envelope 中的列表提取、project_fields、multi-step transforms;这些留给后续 preset 或 wrapper。
 
 ## Decisions
 
@@ -50,7 +50,7 @@
 
 - 现有 main source 执行路径与 source loader 路径完全不同,会显著扩大实现和认知范围。
 
-### 2) v1 only ships a declarative `index_by_key` preset
+### 2) only ships a declarative `index_by_key` preset
 
 公开 YAML 形态:
 
@@ -74,23 +74,23 @@ sources:
 
 选择 `index_by_key` 而不是旧的 `list_by_key`,是因为它更准确表达“建立索引”,不会被误解为 `key -> list[rows]` 分组。
 
-### 3) Whole-result normalize needs a dedicated IR slot; do not overload `LoaderIr.extractor`
+### 3) 整体结果 `normalize` 需要独立 IR 槽位;不要复用 `LoaderIr.extractor`
 
 YAML `normalize` 不应直接复用 `LoaderIr.extractor`.
 
 原因:
 
 - `LoaderIr.extractor` 是 per-key,签名和调用时机都不对;
-- whole-result normalize 必须在 `coerce_loader_result_mapping(...)` 之前执行;
+- 整体结果 `normalize` 必须在 `coerce_loader_result_mapping(...)` 之前执行;
 - preload/cache 路径也需要消费同一能力。
 
-因此实现上应新增独立的 source-level normalizer 表示(例如 `result_normalizer` / `normalize_spec`),并让所有 lookup source loader callsite 在同一位置应用:
+因此实现上应新增独立的源级归一化器表示(例如 `result_normalizer` / `normalize_spec`),并让所有 lookup source loader callsite 在同一位置应用:
 
 1. 调 loader 得到 raw result
 2. 若声明 `normalize`,先把 raw result 归一化为 `LoaderResultMapping`
 3. 再进入 `coerce_loader_result_mapping(...)` / cache write / field extraction
 
-### 4) Cache stores normalized mappings, not raw loader outputs
+### 4) Cache 存的是归一化后的映射,而不是原始 loader 输出
 
 `preload_forever` 必须缓存 normalize 后的结果,并确保 cache hit path 与非 cache path 对字段读取看到同样的形状。
 
@@ -100,7 +100,7 @@ YAML `normalize` 不应直接复用 `LoaderIr.extractor`.
 - instrumentation 对外暴露的结果形状应与实际缓存/读取形状一致
 - source-cache 语义围绕 normalized mapping 建立,避免一边缓存 raw list、一边运行时再重复 normalize
 
-### 5) Schema/docs/editor/skill must explain the `normalize` vs `extract` boundary
+### 5) schema/docs/editor/skill 必须说明 `normalize` 与 `extract` 的边界
 
 这次改动最容易失败的地方不是代码,而是认知混淆:
 
@@ -115,7 +115,7 @@ YAML `normalize` 不应直接复用 `LoaderIr.extractor`.
 
 ## Risks / Trade-offs
 
-- [preset 过少仍需 wrapper] → v1 只做 `index_by_key`,其余 whole-result reshape 继续允许保留最薄 wrapper,后续再扩 preset。
+- [preset 过少仍需 wrapper] → 当前只做 `index_by_key`,其余整体结果 reshape 继续允许保留最薄 wrapper,后续再扩 preset。
 - [duplicate key 语义不清] → 用 `on_conflict` 显式收口,默认 `error` 避免静默覆盖。
 - [cache/raw instrumentation 认知变化] → 明确对外统一展示 normalized shape,并在文档中说明这是“执行期实际看到的结果”。
 - [与 field-level extract 混淆] → 在 schema/docs/skill 中反复强调边界,并把两个 change 分开建模。
@@ -123,11 +123,11 @@ YAML `normalize` 不应直接复用 `LoaderIr.extractor`.
 ## Migration Plan
 
 1. 在 source schema/model/parser/validator 中新增 `normalize` 配置,并限制其只出现在 `sources.*`.
-2. 新增 source-level result normalizer 表示,不要直接塞进现有 `LoaderIr.extractor`.
+2. 新增源级结果归一化器表示,不要直接塞进现有 `LoaderIr.extractor`.
 3. 在 lookup source 的普通加载与 preload 缓存路径统一应用 normalize,确保缓存与非缓存行为一致。
 4. 更新 schema / editor / docs / skill,加入 `index_by_key` 示例与 `normalize vs extract` 边界说明。
 
 ## Open Questions
 
 - `normalize_fn` 未来是否直接采用受 allowlist 约束的 Python 引用,还是继续优先 declarative preset?
-- v2 是否需要支持 `from_path` 这类“先从 envelope 里取出 list 再 index”的扩展,还是继续鼓励最薄 wrapper?
+- 后续是否需要支持 `from_path` 这类“先从 envelope 里取出 list 再 index”的扩展,还是继续鼓励最薄 wrapper?

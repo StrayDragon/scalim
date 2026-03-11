@@ -1,4 +1,4 @@
-> Status (2026-03-11): 已实现(v1 IR/Python-only).当前实现覆盖 workbook 多 sheet、输出组合(router)、派生汇总(group_by + 内置聚合 + finalize 排名)、meta/audit 与 multi-root workbook;待 `just qa`/`just gen` 验收后归档。
+> Status (2026-03-11): 已实现(IR/Python-only).当前实现覆盖 workbook 多 sheet、输出组合(router)、派生汇总(group_by + 内置聚合 + finalize 排名)、meta/audit 与 multi-root workbook;待 `just qa`/`just gen` 验收后归档。
 
 ## Why
 
@@ -24,8 +24,8 @@
 
 - 引入“多输出组合”能力: 单次运行可定义多个输出目标(详情+汇总),可写入同一容器(如同一 workbook 的多 sheet)或独立输出。
 - 引入“派生输出”能力: 允许在同一次运行中对详情流做增量聚合并产出汇总表,支持批次累计、收尾输出与二阶段兜底模式。
-- v1 明确限定为 IR/Python 配置入口,不在本 change 的 v1 实现中扩展 YAML DSL authoring surface。
-- 为了后续 review 能落到“可写的 YAML”形态,本文档补充了若干 YAML DSL 候选方案(仅提案/对齐材料,不代表会在本 change 的 v1 一并实现)。
+- 本次变更明确限定为 IR/Python 配置入口,不扩展 YAML DSL authoring surface。
+- 为了后续 review 能落到“可写的 YAML”形态,本文档补充了若干 YAML DSL 候选方案(仅提案/对齐材料,不代表会在本次变更一并实现)。
 - 明确同容器命名冲突、输出失败策略、资源控制与并发一致性约束。
 
 ## Capabilities
@@ -41,7 +41,7 @@
 
 - 影响执行流程、输出组合层、容器型 sink、派生聚合状态管理与可观测事件对齐。
 - 主要风险是内存增长、输出顺序稳定性、以及 `adaptive` 并发下的聚合一致性约束。
-- v1 不改 YAML DSL / schema / editor;如需 YAML authoring surface,应作为后续独立 change 处理。
+- 本次变更不改 YAML DSL / schema / editor;如需 YAML authoring surface,应作为后续独立 change 处理。
 
 ## Compatibility Notes
 
@@ -64,7 +64,7 @@
 > - 多输出组合器(router/tee/collector)
 > - 派生聚合接口 + 失败策略 + `adaptive` 一致性边界
 
-### Option 0: 保持 YAML 不变,仅 IR/Python 入口组合输出 (v1 baseline)
+### Option 0: 保持 YAML 不变,仅 IR/Python 入口组合输出
 
 **YAML(保持现状)**:
 ```yaml
@@ -93,7 +93,7 @@ output:
 - workbook 多 sheet 仍需要额外容器实现与 driver 组装,对非 Python 用户不友好。
 
 未来规划:
-- 以本 change 的执行层实现为前置,再从 Option 1/2/3 中选择一个 YAML authoring surface 做独立 change(或作为本 change 的 v2)。
+- 以本 change 的执行层实现为前置,再从 Option 1/2/3 中选择一个 YAML authoring surface 做独立 change。
 
 ### Option 1: 在 demand YAML 内引入 `outputs:` 列表(通用;csv/excel 都可)
 
@@ -165,8 +165,8 @@ outputs:
 - 受当前写出点限制,派生汇总如果挂在行式输出链路上,只能看到导出字段;因此 `derive` 必须声明所需字段并驱动 retained/target 选择,否则会出现“汇总缺字段”的隐性错误。
 
 未来规划:
-- v2 先落地 `outputs` 但只支持“不改变行形状”的分发(多 sheet detail / filtered_detail / audit),不引入聚合。
-- v3 再引入 `derive.aggregate` 的最小可增量指标集合(count/sum/min/max/count_true)与 finalize 约束;Rank/排序走 finalize 或二阶段兜底。
+- 后续阶段先落地 `outputs`,但只支持“不改变行形状”的分发(多 sheet detail / filtered_detail / audit),不引入聚合。
+- 更后续阶段再引入 `derive.aggregate` 的最小可增量指标集合(count/sum/min/max/count_true)与 finalize 约束;Rank/排序走 finalize 或二阶段兜底。
 
 ### Option 2: Excel-first: `output.format=excel` 时支持 `output.workbook.sheets`(更贴近报表心智)
 
@@ -220,8 +220,8 @@ output:
 - 仍然会遇到派生汇总所需字段的声明与 retained/targets 协调问题;如果 `select` 过早裁剪字段,会影响后续 `aggregate`。
 
 未来规划:
-- v2 仅支持 `workbook.sheets.<name>.select`(同源拆分)与基础 meta sheet,不引入 `aggregate`。
-- v3 把 `aggregate` 作为显式开关能力逐步加入,并要求 sheet 声明 `requires_fields`(或系统自动从 `aggregate` 推导)以避免隐性缺字段。
+- 后续阶段仅支持 `workbook.sheets.<name>.select`(同源拆分)与基础 meta sheet,不引入 `aggregate`。
+- 更后续阶段把 `aggregate` 作为显式开关能力逐步加入,并要求 sheet 声明 `requires_fields`(或系统自动从 `aggregate` 推导)以避免隐性缺字段。
 
 ### Option 3: 引入“报表包 YAML”(bundle)作为新 DSL 文件类型,引用多个 demand YAML (支持 MultiRootSheets)
 
@@ -290,10 +290,10 @@ sheets:
 
 为了避免 YAML 过早绑定实现细节,建议按阶段推进:
 
-1) v1(本 change 的实现阶段): IR/Python-only 输出组合 + workbook 容器 sink + 基础派生聚合接口(最小可用)。
-2) v2(YAML authoring surface): 在 Option 1 与 Option 2 之间选择一个作为“单 demand 多输出”入口,先覆盖同源分发与 workbook 多 sheet。
-3) v3(派生聚合 YAML 化): 增量聚合指标集合 + finalize 约束 + failure policy 默认值 + `adaptive` 并发一致性边界。
-4) v4(MultiRootSheets): 采用 Option 3 的 bundle DSL,或在 demand DSL 内引入 multi-root(成本更高),并补全迁移文档与 editor 支持。
+1) 阶段 1(本 change 的实现阶段): IR/Python-only 输出组合 + workbook 容器 sink + 基础派生聚合接口(最小可用)。
+2) 阶段 2(YAML authoring surface): 在 Option 1 与 Option 2 之间选择一个作为“单 demand 多输出”入口,先覆盖同源分发与 workbook 多 sheet。
+3) 阶段 3(派生聚合 YAML 化): 增量聚合指标集合 + finalize 约束 + failure policy 默认值 + `adaptive` 并发一致性边界。
+4) 阶段 4(MultiRootSheets): 采用 Option 3 的 bundle DSL,或在 demand DSL 内引入 multi-root(成本更高),并补全迁移文档与 editor 支持。
 
 ## Documentation & Migration (When YAML Is Enabled)
 

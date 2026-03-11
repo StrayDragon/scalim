@@ -1,4 +1,4 @@
-> Status (2026-03-11): 已实现(v1 IR/Python-only),任务清单全部完成;待 `just qa`/`just gen` 全量验收后归档。
+> Status (2026-03-11): 已实现(IR/Python-only),任务清单全部完成;待 `just qa`/`just gen` 全量验收后归档。
 
 ## 0. Scope & Defaults (Re-open Checklist)
 
@@ -43,6 +43,6 @@
 
 ## 6. Docs, Examples, And Verification
 
-- [x] 6.1 更新用户文档与示例：解释 v1 仅 IR/Python 配置，展示 workbook 多 sheet + 派生汇总概念
+- [x] 6.1 更新用户文档与示例：解释该能力仅 IR/Python 配置，展示 workbook 多 sheet + 派生汇总概念
 - [x] 6.2 新增验证用例：命名冲突、失败策略、顺序稳定、meta/audit、资源 guardrails
 - [x] 6.3 运行 `openspec validate add-derived-outputs --strict --no-interactive` 并补充必要的实现期校验命令说明

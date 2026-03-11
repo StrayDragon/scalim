@@ -24,7 +24,7 @@ def run_multi_root_workbook(
 ) -> List[ExecutionResult]:
     """将多个独立 `demand` 依次写入同一 `workbook`(多根数据源 `sheet` 集合).
 
-    规则(`v1`):
+    规则:
     - 目前不做跨 `demand` 的缓存/复用;每个 `demand` 独立执行.
     - `workbook` 仅作为容器复用,保证 `sheet` 顺序与命名冲突策略.
     - `failure_policy`:

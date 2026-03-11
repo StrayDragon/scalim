@@ -55,7 +55,14 @@
 - **WHEN** 用户将光标移动到 `relations.*.steps.from` 或 `sources.*.params` 等字段
 - **THEN** 系统展示来自 schema 的字段说明(含 markdownDescription 与示例)
 
-### Requirement: editor exposes `extract` with the same semantics as the canonical schema
+### Requirement: 编辑器对相对模块引用提供一致提示
+系统 MUST 在编辑器中对 `main_source.loader` / `sources.*.loader` / `fields.*.call_by` / `*.retry.should_retry` 等引用字段提供与 canonical schema 一致的 hover/补全提示,并确保相对模块引用语法 `.` / `..` 不会被前端链路误判为非法格式。
+
+#### Scenario: 编辑器 hover 可见相对引用示例
+- **WHEN** 用户在编辑器 hover 查看 `main_source.loader`
+- **THEN** hover 文案 MUST 展示相对引用示例(例如 `.loaders:load_orders`)
+
+### Requirement: 编辑器暴露与 canonical schema 语义一致的 `extract`
 系统 MUST 基于 canonical schema 在编辑器中暴露 `extract` 的补全、hover 与 schema-only 校验,并保持前端文案与主仓库 schema 一致。
 
 #### Scenario: hover 展示 `extract` 的 current-row-relative 解释
@@ -199,12 +206,12 @@ hover 效果 MAY 作为增强,但 MUST NOT 是关键操作的唯一可见方式.
 - **THEN** 系统可以增强关键按钮视觉反馈
 - **THEN** 即使不悬停,关键按钮也 MUST 保持可发现
 
-### Requirement: editor exposes source-level `normalize` with canonical schema guidance
+### Requirement: 编辑器暴露源级 `normalize` 并提供与 canonical schema 一致的指引
 系统 MUST 基于 canonical schema 在编辑器中暴露 `sources.*.normalize` 的补全、hover 与 schema-only 校验,并清楚区分它与字段级 `extract` 的边界。
 
 #### Scenario: hover 说明 `normalize` 与 `extract` 的边界
 - **WHEN** 用户在 `sources.*.normalize` 上查看 hover
-- **THEN** 编辑器 MUST 展示其 source-level whole-result 语义
+- **THEN** 编辑器 MUST 展示其源级整体结果语义
 - **AND** MUST 提示字段内部取值应使用字段级 `extract`
 
 ## Notes

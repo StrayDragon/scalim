@@ -3,7 +3,7 @@
 ### Requirement: lookup sources support declarative whole-result `normalize`
 系统 SHALL 支持在 lookup source 上声明 `normalize`,用于在字段读取前对 loader 的整个返回值做一次 whole-result normalization。
 
-v1 MUST 至少支持:
+系统 MUST 至少支持:
 - `kind: index_by_key`
 - `key_field: <field_name>`
 - `on_conflict: error|first|last`(默认 `error`)

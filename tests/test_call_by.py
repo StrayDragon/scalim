@@ -112,8 +112,15 @@ def test_parse_call_by_rejects_attribute_access_and_unsupported_exprs_and_litera
 def test_is_valid_loader_ref_coverage() -> None:
     assert call_by_module._is_valid_loader_ref("") is False
     assert call_by_module._is_valid_loader_ref("module:attr") is True
+    assert call_by_module._is_valid_loader_ref(".module:attr") is True
+    assert call_by_module._is_valid_loader_ref("..module:attr") is True
+    assert call_by_module._is_valid_loader_ref(".module.attr") is True
+    assert call_by_module._is_valid_loader_ref(".attr") is False
+    assert call_by_module._is_valid_loader_ref("bad-mod.attr") is False
     assert call_by_module._is_valid_loader_ref("module:attr:extra") is False
     assert call_by_module._is_valid_loader_ref(":attr") is False
+    assert call_by_module._is_valid_loader_ref(".:attr") is False
+    assert call_by_module._is_valid_loader_ref("..:attr") is False
     assert call_by_module._is_valid_loader_ref("module.:attr") is False
     assert call_by_module._is_valid_loader_ref("module") is False
 

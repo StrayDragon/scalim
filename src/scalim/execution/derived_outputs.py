@@ -23,7 +23,7 @@ class AggregationKeyLimitExceededError(RuntimeError):
 
 
 class IRowAggregator(ABC):
-    """派生聚合器最小接口(`v1`): 初始化/累计/收尾(对应 `required_fields`/`accumulate`/`finalize_rows`)."""
+    """派生聚合器最小接口: 初始化/累计/收尾(对应 `required_fields`/`accumulate`/`finalize_rows`)."""
 
     @abstractmethod
     def required_fields(self) -> Tuple[str, ...]:
@@ -317,7 +317,7 @@ class GroupByAggregator(IRowAggregator):
 
 
 class RankedGroupByAggregator(IRowAggregator):
-    """`GroupBy` + `finalize` 阶段排序/排名(`v1`).
+    """`GroupBy` + `finalize` 阶段排序/排名.
 
     说明:
     - 排名仅在 `finalize` 阶段执行(单线程),用于保持结果确定性.

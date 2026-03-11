@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List, Optional, Set
 
 from ...params_template import ParamsTemplateCompileError, compile_params_template
@@ -5,6 +6,7 @@ from ...schema_dsl.constants import (
     DEFAULT_CACHE_MODE,
     LOOKUP_CAST_NAME_ENUM,
 )
+from ...schema_dsl.models import LOADER_RETRY_KEYS
 from ..parsers.utils import list_or_none, mapping_or_none
 from .base import ValidatorMixinBase
 from .constants import LEGACY_FIELDS, MIN_PARTS_COUNT, F
@@ -12,9 +14,45 @@ from .issues import ValidationIssue
 
 _F = F
 _MIN_PARTS_COUNT = MIN_PARTS_COUNT
+_MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
 
 
 class ValidatorSourcesMixin(ValidatorMixinBase):
+    def _validate_loader_retry_should_retry(
+        self,
+        retry_raw: object,
+        errors: List[ValidationIssue],
+        *,
+        path_prefix: str,
+    ) -> None:
+        retry_dict = mapping_or_none(retry_raw)
+        if retry_raw is not None and retry_dict is None:
+            self._add_error(errors, "'{}' must be a dictionary".format(path_prefix), path=path_prefix)
+            return
+        if retry_dict is None:
+            return
+
+        should_retry_key = LOADER_RETRY_KEYS["should_retry"]
+        if should_retry_key not in retry_dict:
+            return
+        should_retry_raw = retry_dict.get(should_retry_key)
+        if should_retry_raw is None:
+            return
+        if not isinstance(should_retry_raw, str):
+            self._add_error(
+                errors,
+                "'{}.{}' must be a string".format(path_prefix, should_retry_key),
+                path="{}.{}".format(path_prefix, should_retry_key),
+            )
+            return
+        should_retry_ref = should_retry_raw.strip()
+        if should_retry_ref and not self._is_valid_loader_ref(should_retry_ref):
+            msg = (
+                "'{}.{}' has invalid reference '{}'. Expected format: "
+                "'module.path:function' / 'module.path:obj.method' / 'module.path.function'"
+            ).format(path_prefix, should_retry_key, should_retry_raw)
+            self._add_error(errors, msg, path="{}.{}".format(path_prefix, should_retry_key))
+
     def _validate_params_template_semantics(
         self,
         params_raw: object,
@@ -171,6 +209,12 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 ).format(source_id, loader)
                 self._add_error(errors, msg, path="sources.{}.{}".format(source_id, _F.LOADER))
 
+            self._validate_loader_retry_should_retry(
+                source_dict.get("retry"),
+                errors,
+                path_prefix="sources.{}.retry".format(source_id),
+            )
+
             bind_raw = source_dict.get(_F.BIND)
             if bind_raw is not None:
                 self._add_error(
@@ -256,6 +300,12 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 "Main source has invalid loader reference '{}'. Expected format: 'module.path:ClassName' or 'module.path.function'"
             ).format(loader)
             self._add_error(errors, msg, path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER))
+
+        self._validate_loader_retry_should_retry(
+            main_source_data.get("retry"),
+            errors,
+            path_prefix="{}.retry".format(_F.MAIN_SOURCE),
+        )
 
         if source_id and sources_raw is not None and source_id in sources_raw:
             self._add_error(
@@ -386,22 +436,19 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
             )
 
-    def _is_valid_loader_ref(self, loader_ref: str) -> bool:  # noqa: PLR0911
+    def _is_valid_loader_ref(self, loader_ref: str) -> bool:
         if not loader_ref:
             return False
 
+        is_valid = False
         if ":" in loader_ref:
-            parts = loader_ref.split(":")
-            if len(parts) != _MIN_PARTS_COUNT:
-                return False
-            module_path, attr_path = parts
-            if not module_path or not attr_path:
-                return False
-            if not all(part.isidentifier() for part in module_path.split(".")):
-                return False
-            return all(part.isidentifier() for part in attr_path.split("."))
+            module_path, sep, attr_path = loader_ref.partition(":")
+            if sep == ":" and module_path and attr_path and _MODULE_PATH_RE.fullmatch(module_path) is not None:
+                attr_parts = attr_path.split(".")
+                is_valid = all(part and part.isidentifier() for part in attr_parts)
+        else:
+            module_path, sep, func_name = loader_ref.rpartition(".")
+            if sep == "." and module_path and func_name and _MODULE_PATH_RE.fullmatch(module_path) is not None:
+                is_valid = func_name.isidentifier()
 
-        parts = loader_ref.split(".")
-        if len(parts) < _MIN_PARTS_COUNT:
-            return False
-        return all(part.isidentifier() for part in parts)
+        return is_valid

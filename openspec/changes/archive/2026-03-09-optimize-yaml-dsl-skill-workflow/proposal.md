@@ -7,7 +7,7 @@
 ## What Changes
 
 - 将 `scripts/gen-agent-skill.py` 与 skill 生成逻辑改为仅生成和校验受控的 generated references,不再直接生成或覆盖手工维护的 `SKILL.md`.
-- 将 `artifacts/skills/scalim-yaml-dsl/` 调整为手工维护的 task-driven skill,核心目标是帮助 agent 一次完成 YAML DSL 编写、v3 升级、校验订正和渐进迁移方案设计.
+- 将 `artifacts/skills/scalim-yaml-dsl/` 调整为手工维护的 task-driven skill,核心目标是帮助 agent 一次完成 YAML DSL 编写、升级到最新写法、校验订正和渐进迁移方案设计.
 - 为 skill 增加明确的 CLI/LSP 指引,包括:
   - 仓库内使用 `uv run PROJECT_CLI_NAME ...`
   - 脱离仓库使用 `uvx --from "PROJECT_DIST_NAME[cli]" PROJECT_CLI_NAME ...`

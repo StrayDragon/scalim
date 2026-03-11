@@ -1,12 +1,12 @@
 ## Why
 
-当前 YAML DSL 的源字段只能表达“从当前 row 顶层按一个键取值”,当 loader 的单条结果 value 内部是嵌套 dict 或类对象时,用户必须额外写薄 wrapper 先拍平结果,才能继续在 YAML 中声明字段。这把本应属于字段读取层的简单投影抬升成了 Python 代码,也让第 3 点讨论中的 source-level normalize 与 field-level extraction 混在了一起。
+当前 YAML DSL 的源字段只能表达“从当前 row 顶层按一个键取值”,当 loader 的单条结果 value 内部是嵌套 dict 或类对象时,用户必须额外写薄包装先拍平结果,才能继续在 YAML 中声明字段。这把本应属于字段读取层的简单投影抬升成了 Python 代码,也让第 3 点讨论中的源级 `normalize` 与字段级提取混在了一起。
 
-现在需要把“单字段如何从当前 row 中取值”单独下沉到 YAML,并明确它与 whole-result normalize 的边界,同时给未来的 `extract_fn` 留出稳定命名空间。
+现在需要把“单字段如何从当前 row 中取值”单独下沉到 YAML,并明确它与整体结果 `normalize` 的边界,同时给未来的 `extract_fn` 留出稳定命名空间。
 
 ## What Changes
 
-- 在 `main_source.fields.<field_id>` 与 `sources.<id>.fields.<field_id>` 下新增 declarative 字段级配置 `extract`,并将其作为**唯一稳定的字段取值入口**。
+- 在 `main_source.fields.<field_id>` 与 `sources.<id>.fields.<field_id>` 下新增声明式字段级配置 `extract`,并将其作为**唯一稳定的字段取值入口**。
 - `fields.<field_id>.field` 从稳定 YAML authoring surface 中移除:
   - 需要“顶层 key rename”时,直接使用 `extract: <key_name>`;
   - 历史 `field: ...` 写法在校验阶段 fail-fast,并给出迁移提示。
@@ -20,12 +20,12 @@
   - `["a.b"]` / `['a.b']`: string key 段(用于字面量含点号/空格/特殊字符的 key)
   - YAML 书写建议: 为避免与 YAML flow sequence 产生歧义,文档/示例/hover 中应将 `extract` 明确写成字符串,例如 `extract: "[1].x"`、`extract: '["a.b"]'`
   - 系统 MUST NOT 做 `"1" -> 1` 或 `1 -> "1"` 的自动转换,避免歧义
-  - v1 仍 MUST NOT 支持数组下标语义: `[1]` 永远表示“key=1”,不是 list index
+  - 系统 MUST NOT 支持数组下标语义: `[1]` 永远表示“key=1”,不是 list index
 - JSON Schema 与编辑器提示必须把上述语义写入 `description` / `markdownDescription`,并至少覆盖:
   - `extract` 的 current-row-relative 解释与常见包裹层反例
   - `extract` 的 bracket 语法(`"[1].x"`、`'["a.b"]'`)与“不做隐式 cast”的说明
   - `field` 已移除,rename 必须用 `extract`
-- 初版保持 declarative,不在 YAML 中暴露任意 Python extractor;命名与结构应为后续可选的 `extract_fn` 扩展留出空间,但本变更不引入该能力。
+- 初版保持声明式,不在 YAML 中暴露任意 Python extractor;命名与结构应为后续可选的 `extract_fn` 扩展留出空间,但本变更不引入该能力。
 
 ## Capabilities
 

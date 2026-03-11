@@ -2,7 +2,7 @@
 
 **状态: ⚠️ 实验性**
 ## Purpose
-支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 v1(IR/Python-only) 配置入口、资源护栏与 `adaptive` 并发边界.
+支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 IR/Python-only 配置入口、资源护栏与 `adaptive` 并发边界.
 
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/execution/derived_outputs.py` (内置增量聚合接口与实现)
@@ -63,7 +63,7 @@
 - **THEN** 系统应触发既定的资源控制策略并继续主流程
 
 ### Requirement: IR/Python 配置入口
-系统 SHALL 在 v1 仅提供 IR/Python 方式配置派生输出,并保持 YAML DSL 不变.
+系统 SHALL 仅提供 IR/Python 方式配置派生输出,并保持 YAML DSL 不变.
 
 #### Scenario: 仅使用编程方式配置
 - **WHEN** 用户通过编程方式定义派生输出

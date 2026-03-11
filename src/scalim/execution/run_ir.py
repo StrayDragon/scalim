@@ -73,7 +73,7 @@ class ExecutionRequest:
     """可选:加载重试策略."""
 
     output_composition: Optional["OutputCompositionSpec"] = None
-    """可选:多输出组合请求(`v1` `IR/Python-only`).
+    """可选:多输出组合请求(`IR/Python-only`).
 
     当提供该字段时:
     - `output`/`sink` 的单输出装配将被忽略

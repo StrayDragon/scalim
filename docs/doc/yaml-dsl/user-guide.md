@@ -422,11 +422,11 @@ lookup_cast:
   sep: ","          # 默认 ","
 ```
 
-#### 3.3.4 whole-result 归一化 (normalize)
+#### 3.3.4 整体结果归一化 (normalize)
 
-`normalize` 是 **source-level** 的 whole-result normalization: 作用于整个 `loader` 返回值,并且发生在字段级 `extract` 之前.
+`normalize` 是 **源级** 的整体结果归一化: 作用于整个 `loader` 返回值,并且发生在字段级 `extract` 之前.
 
-v1 只提供 declarative preset:
+当前只提供声明式预置:
 - `kind: index_by_key`: 将 `list[row]` 归一化为 `lookup_key -> row` 映射
 - `key_field`: 从每个 row 中读取 lookup key 的字段名
 - `on_conflict`: duplicate key 策略,可选 `error|first|last`(默认 `error`)
@@ -445,8 +445,8 @@ sources:
 ```
 
 边界说明:
-- `normalize` 只负责“把整个返回值 reshape 成可 lookup 的形状”;它不负责从单条 row 里取字段
-- 从单条 row 里取字段请用字段级 `extract`(定义在 `sources.<id>.fields.*` / `main_source.fields.*`)
+- `normalize` 只负责“把整个返回值整理成可用于 `lookup` 的形状”;它不负责从单条 `row` 里取字段
+- 从单条 `row` 里取字段请用字段级 `extract`(定义在 `sources.<id>.fields.*` / `main_source.fields.*`)
 
 ### 3.4 字段配置
 
@@ -1043,12 +1043,12 @@ sources:
 
 ### 4.5 多输出组合与派生汇总 (IR/Python-only)
 
-`YAML DSL` 的 v1 仍然是**单输出**模型(顶层 `output` 仅描述一个输出目标).
+`YAML DSL` 仍然是**单输出**模型(顶层 `output` 仅描述一个输出目标).
 当你需要在**同一次运行**内交付“明细 + 汇总 + meta/audit”并写入同一 workbook 的多 sheet 时,应在 Python 调用侧使用执行层的 `output_composition` 能力.
 
 关键点:
 
-- v1 不新增/不要求 YAML 写法变更;你可以继续把 YAML 当作“宽表需求模板”.
+- 该能力不要求 YAML 写法变更;你可以继续把 YAML 当作“宽表需求模板”.
 - 当多个输出共享同一 Excel `path` 时,每个输出必须显式设置 `sheet_name`(否则会覆盖同一个文件).
 - 派生汇总目前支持 streaming-friendly 的内置聚合(count/sum/min/max/count_true)与可选 finalize 排序/排名.
 
@@ -1607,8 +1607,18 @@ run(
 
 - dotted-style: `module.path.function`
 - class-style: `module.path:function` / `module.path:obj.method`
+- 相对 module 引用: 以 `.` / `..` 开头(相对 YAML 文件所在目录对应模块路径),例如 `.loaders:load_orders` / `..common.transforms:fixup`
+- 相对引用会先归一化为绝对引用再做 allowlist 校验;因此 allowlist 需要覆盖归一化后的模块前缀
 - `allowed_functions` 对 class-style 支持**完整链匹配**(例如允许 `pkg.mod:Obj.safe` 时,`pkg.mod:Obj.unsafe` 会被拒绝;同时也支持等价 dotted 形式 `pkg.mod.Obj.safe`)
 - `allowed_modules` 仍是模块级放行(允许模块及其子模块内的所有可调用引用);如需更严格限制,优先使用 `allowed_functions`
+
+相对引用示例(假设 `config.yaml` 位于 `myapp/reports/config.yaml`,且 `myapp` 在 `PYTHONPATH` / `sys.path` 可导入范围内):
+
+```yaml
+main_source:
+  source_id: orders
+  loader: ".loaders:load_orders"  # => myapp.reports.loaders:load_orders
+```
 
 **高级用法(迁移提示)**:
 

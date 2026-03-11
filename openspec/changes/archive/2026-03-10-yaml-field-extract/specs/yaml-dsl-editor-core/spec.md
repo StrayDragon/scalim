@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-### Requirement: editor exposes `extract` with the same semantics as the canonical schema
+### Requirement: 编辑器暴露与 canonical schema 语义一致的 `extract`
 系统 MUST 基于 canonical schema 在编辑器中暴露 `extract` 的补全、hover 与 schema-only 校验,并保持前端文案与主仓库 schema 一致。
 
 #### Scenario: hover 展示 `extract` 的 current-row-relative 解释

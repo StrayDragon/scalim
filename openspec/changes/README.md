@@ -34,6 +34,7 @@
 - `yaml-inline-dynamic-params` 已归档：`openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
 - `yaml-loader-params-template` 已归档：`openspec/changes/archive/2026-03-11-yaml-loader-params-template/`
 - `add-derived-outputs` 已归档：`openspec/changes/archive/2026-03-11-add-derived-outputs/`
+- `yaml-relative-import-paths` 已归档：`openspec/changes/archive/2026-03-11-yaml-relative-import-paths/`
 
 ## 待实现分组（按推荐顺序）
-暂无
+- （暂无）

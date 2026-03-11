@@ -139,6 +139,10 @@ class DerivedFieldConfig:
             md=(
                 "派生字段函数调用(与 `compute` 互斥).\n\n"
                 "- 语法: `reference(args...)`\n"
+                "- `reference` 形式与 `loader` 引用一致,支持:\n"
+                "  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n"
+                "  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n"
+                "- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n"
                 "- 支持位置参数与 kwargs\n"
                 "- Python 字面量: `1`/`1.5`/`'ok'`/`True`/`False`/`None`\n"
                 "- 上下文引用: `$ctx` 或 `$ctx.<attr>`\n"
@@ -147,6 +151,7 @@ class DerivedFieldConfig:
             examples=[
                 "myapp.enums:get_status_text(status)",
                 "myapp.enums:get_status_text(status=status, ctx=$ctx)",
+                ".helpers:to_text(status)",
             ],
         ),
     )

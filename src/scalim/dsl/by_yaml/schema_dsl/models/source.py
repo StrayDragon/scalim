@@ -69,11 +69,13 @@ class LoaderRetryConfig:
             desc="重试判定回调引用(安全引用,由 allowlist 约束)",
             md=(
                 "重试判定回调引用.\n\n"
-                "- 形式与 loader 引用一致: `module.path:function` 或 `module.path:obj.method`\n"
-                "- 由 allowlist(allowed_modules/allowed_functions) 约束\n"
+                "- 形式与 `loader` 引用一致:\n"
+                "  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n"
+                "  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n"
+                "- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n"
                 "- 签名: `should_retry(exc, ctx) -> bool`"
             ),
-            examples=["myapp.retry:should_retry_db"],
+            examples=["myapp.retry:should_retry_db", ".retry:should_retry_db"],
         ),
     )
     """重试判定回调引用(受允许列表约束)."""

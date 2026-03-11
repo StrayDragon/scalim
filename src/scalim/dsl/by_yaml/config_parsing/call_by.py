@@ -1,4 +1,5 @@
 import ast
+import re
 import sys
 from dataclasses import dataclass
 from typing import Any, FrozenSet, List, Optional, Set, Tuple
@@ -6,6 +7,7 @@ from typing import Any, FrozenSet, List, Optional, Set, Tuple
 _PY38_PLUS = sys.version_info >= (3, 8)
 
 _MIN_PARTS_COUNT = 2
+_MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
 
 _CTX_TOKEN = "$ctx"  # noqa: S105
 _CTX_PLACEHOLDER = "__scalim_ctx__"
@@ -336,19 +338,18 @@ def _is_valid_loader_ref(loader_ref: str) -> bool:
     if not loader_ref:
         return False
 
+    is_valid = False
     if ":" in loader_ref:
-        parts = loader_ref.split(":")
-        if len(parts) != _MIN_PARTS_COUNT:
-            return False
-        module_path, attr_path = parts
-        if not module_path or not attr_path:
-            return False
-        if not all(p.isidentifier() for p in module_path.split(".")):
-            return False
-        return all(p.isidentifier() for p in attr_path.split("."))
+        module_path, sep, attr_path = loader_ref.partition(":")
+        if sep == ":" and module_path and attr_path and _MODULE_PATH_RE.fullmatch(module_path) is not None:
+            attr_parts = attr_path.split(".")
+            is_valid = all(part and part.isidentifier() for part in attr_parts)
+    else:
+        module_path, sep, func_name = loader_ref.rpartition(".")
+        if sep == "." and module_path and func_name and _MODULE_PATH_RE.fullmatch(module_path) is not None:
+            is_valid = func_name.isidentifier()
 
-    parts = loader_ref.split(".")
-    return len(parts) >= _MIN_PARTS_COUNT and all(p.isidentifier() for p in parts)
+    return is_valid
 
 
 __all__ = [

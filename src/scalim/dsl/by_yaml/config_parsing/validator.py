@@ -145,6 +145,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._validate_batch_size(raw.data, errors)
         self._validate_legacy_fields(raw.data, errors)
         self._validate_deprecated_observability_fields(raw.data, errors)
+        self._validate_loader_retry_should_retry(raw.data.get("retry"), errors, path_prefix="retry")
 
         sources_info = self._validate_sources(raw.data, errors)
         main_source_id = self._validate_main_source(raw.data, errors)

@@ -37,14 +37,14 @@
 约束:
 - dot identifier segment MUST 匹配标识符语法(例如 `CustomerMark`),不支持 `a-b`/`a b` 之类;这类 key 必须用 bracket string segment 表达
 - 系统 MUST NOT 做 `"1" -> 1` 或 `1 -> "1"` 的自动转换,避免歧义
-- v1 MUST NOT 支持数组下标语义: `[1]` 永远表示 “key=1”,不是 list index(即使中间值是 list/tuple,也不得把 `[1]` 当索引)
+- 系统 MUST NOT 支持数组下标语义: `[1]` 永远表示 “key=1”,不是 list index(即使中间值是 list/tuple,也不得把 `[1]` 当索引)
 - bracket int segment 的语法 MUST 为非负十进制整数(`[0-9]+`),不得包含符号位或空白(例如 `[-1]`、`[ 1 ]` 均非法)
 - bracket string segment 支持最小转义,以允许表达包含引号或反斜杠的 key:
   - `\\` 表示字面量 `\`
   - `\"` 仅在 `["..."]` 中表示字面量 `"`
   - `\'` 仅在 `['...']` 中表示字面量 `'`
   - 其它 `\x` 形式 MUST fail-fast(避免引入不清晰的逃逸语义)
-- v1 MUST 在编译/校验阶段拒绝非法表达式(空 segment/连续点/首尾点/未闭合括号或引号等,以及非法转义)
+- 系统 MUST 在编译/校验阶段拒绝非法表达式(空 segment/连续点/首尾点/未闭合括号或引号等,以及非法转义)
 
 #### Scenario: bracket int key 读取 int-key nested dict
 - **GIVEN** 当前 key 对应的 row value 为:
@@ -71,7 +71,7 @@
 - **THEN** 字段值 MUST 解析为 `2`
 - **AND** 当字段配置为 `extract: '["1"].x'` 时,字段值 MUST 解析为 `1`
 
-#### Scenario: v1 不支持 list/tuple 索引
+#### Scenario: 不支持 list/tuple 索引
 - **GIVEN** 当前 key 对应的 row value 为:
   ```python
   [{"x": 0}, {"x": 1}]

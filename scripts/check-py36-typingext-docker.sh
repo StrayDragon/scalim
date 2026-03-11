@@ -50,4 +50,4 @@ else
 fi
 
 PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python -m compileall -q "$repo_root/src/scalim"
-PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python -c "from scalim.dsl.by_yaml import Compilation, RunOverrides; from scalim.execution import ScalimEngine; from scalim.ob import Observability; from scalim.planning import PlanBuilder; from scalim.spec.ir import DemandIr; from scalim.vendor.compact.typing_extensionsx import Self, override; _ = (Compilation, DemandIr, Observability, PlanBuilder, RunOverrides, ScalimEngine, Self, override); print('OK: typing-extensions 4.1.1')"
+PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python -c "from scalim.dsl.by_yaml import Compilation, RunOverrides; from scalim.execution import ScalimEngine; from scalim.ob import Observability; from scalim.planning import PlanBuilder; from scalim.spec.ir import DemandIr; from scalim.vendor.compact.typing_extensionsx import Self, override; _ = (Compilation, DemandIr, Observability, PlanBuilder, RunOverrides, ScalimEngine, Self, override); print('检查通过: typing-extensions 4.1.1')"

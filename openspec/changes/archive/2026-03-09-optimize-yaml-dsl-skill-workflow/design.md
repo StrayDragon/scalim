@@ -31,7 +31,7 @@ skill 包将拆成两部分:
 - manual:
   - `SKILL.md`
   - `references/task-authoring.md`
-  - `references/task-upgrade-v3.md`
+  - `references/task-upgrade-legacy.md`
   - `references/task-validate-debug.md`
   - `references/task-report-migration-playbook.md`
 - generated:

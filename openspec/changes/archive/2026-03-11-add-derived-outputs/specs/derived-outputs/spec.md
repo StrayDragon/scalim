@@ -52,7 +52,7 @@
 - **THEN** 系统应触发既定的资源控制策略并继续主流程
 
 ### Requirement: IR/Python 配置入口
-系统 SHALL 在 v1 仅提供 IR/Python 方式配置派生输出,并保持 YAML DSL 不变.
+系统 SHALL 仅提供 IR/Python 方式配置派生输出,并保持 YAML DSL 不变.
 
 #### Scenario: 仅使用编程方式配置
 - **WHEN** 用户通过编程方式定义派生输出

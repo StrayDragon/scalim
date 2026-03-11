@@ -5,7 +5,7 @@
 
 手工维护的 `SKILL.md` MUST 明确覆盖至少以下任务类型:
 - 新建或修改 YAML DSL 配置
-- 将旧写法直接升级到 v3 写法
+- 将旧写法直接升级到最新写法
 - 对现有 YAML 做 schema/full validate 与订正
 - 为某类 legacy 批量报表脚本设计渐进迁移方案
 
@@ -17,9 +17,9 @@
 - **THEN** skill 必须引导 agent 先读取 authoring 相关 references
 - **THEN** 不得要求 agent 先通读全部 generated references
 
-#### Scenario: v3 升级任务直接按新写法处理
+#### Scenario: 升级任务直接按新写法处理
 - **WHEN** 用户请求把旧 YAML DSL 写法升级为当前写法
-- **THEN** skill 必须引导 agent 直接迁移到 v3 结构
+- **THEN** skill 必须引导 agent 直接迁移到最新结构
 - **THEN** 不得默认保留 legacy 写法作为兼容层
 
 #### Scenario: 详细预设通过一层直达 references 提供
@@ -108,7 +108,7 @@ skill MUST 提供对完整 YAML DSL 语法与相关 CLI API 的可发现入口,�
 至少 MUST 可发现:
 - 顶层字段与 definitions
 - enum/default/examples 或等价约束信息
-- 互斥关系、必填关系与 legacy/v3 升级约束
+- 互斥关系、必填关系与 legacy/升级约束
 - `yaml-dsl` 相关 CLI 命令与关键参数
 
 #### Scenario: 用户请求完整语法目录

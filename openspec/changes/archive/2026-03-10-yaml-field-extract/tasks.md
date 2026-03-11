@@ -11,7 +11,7 @@
   - `a.b.c`(string segments)
   - `[1]`(int key segment)
   - `["a.b"]` / `['a.b']`(string key segment,用于字面量含点号/特殊字符的 key)
-- [x] 2.3 约束: 不做 `"1" ↔ 1` 隐式 cast;v1 不支持数组下标语义(`[1]` 永远表示 key=1,不是 list index)
+- [x] 2.3 约束: 不做 `"1" ↔ 1` 隐式 cast;不支持数组下标语义(`[1]` 永远表示 key=1,不是 list index)
 - [x] 2.4 bracket string segment 支持最小转义(`\\`/`\"`/`\'`)并在编译期 fail-fast 拒绝非法转义
 - [x] 2.5 非法表达式在编译/校验阶段 fail-fast(空 segment/连续点/首尾点/非法括号/未闭合引号等),错误包含配置 path 与修复建议
 

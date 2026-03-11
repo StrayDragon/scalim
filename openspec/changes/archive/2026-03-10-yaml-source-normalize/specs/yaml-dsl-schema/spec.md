@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
-### Requirement: schema documents source-level `normalize` and its execution order
+### Requirement: schema 说明源级 `normalize` 及其执行顺序
 系统 MUST 在 YAML DSL JSON Schema 的 `sources.*` 定义中新增 `normalize` 字段,并在 `description` / `markdownDescription` 中明确说明:
-- `normalize` 是 source-level whole-result normalization
+- `normalize` 是源级整体结果归一化
 - `normalize` 先于字段级 `extract` 执行
 - `normalize.kind=index_by_key` 的输入输出形状示例
 

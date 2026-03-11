@@ -7,7 +7,7 @@
 ## 2. Manual Skill Rewrite
 
 - [x] 2.1 手工重写 `artifacts/skills/scalim-yaml-dsl/SKILL.md`,改为 task-driven 入口并补充 `uv run` / `uvx --from "PROJECT_DIST_NAME[cli]"` / `schema validate` / schema path / `$schema` header 指引
-- [x] 2.2 新增或重写 manual references,覆盖 authoring、v3 升级、validate/debug 与脱敏的 legacy 批量报表渐进迁移 playbook,并让 `SKILL.md` 以一层直达链接方式路由到这些 references
+- [x] 2.2 新增或重写 manual references,覆盖 authoring、升级到最新写法、validate/debug 与脱敏的 legacy 批量报表渐进迁移 playbook,并让 `SKILL.md` 以一层直达链接方式路由到这些 references
 - [x] 2.3 让 manual skill 明确 YAML/Python 职责切分规则,包括大宽表、多 sheet、compare 路由、runtime state 与最薄 Python 适配层判断
 
 ## 3. Validation, Tests, and Docs

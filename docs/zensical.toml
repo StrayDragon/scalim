@@ -15,6 +15,7 @@ nav = [
     { "写 YAML" = "yaml-dsl/index.md" },
     { "YAML 语法速查" = "yaml-dsl/syntax.md" },
     { "YAML 用户指南" = "yaml-dsl/user-guide.md" },
+    { "YAML DSL 升级指南" = "yaml-dsl/upgrades/index.md" },
     { "配置补全与在线编辑器" = "yaml-dsl/editor.md" },
     { "集成AI环境 (Agent Skill)" = "yaml-dsl/agent-skill.md" },
   ] },

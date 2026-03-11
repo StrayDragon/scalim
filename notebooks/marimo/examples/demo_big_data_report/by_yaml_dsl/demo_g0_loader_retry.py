@@ -32,6 +32,7 @@ def _(mo):
 
 @app.cell
 def _():
+    import sys
     import tempfile
     import textwrap
     from pathlib import Path
@@ -39,6 +40,15 @@ def _():
     from scalim.dsl.by_yaml import run
     from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
     from scalim.sinks.sink_memory import InMemoryRowSink
+
+    # `marimo` 导出 `HTML` 时,不会自动把本文件目录加入 `sys.path`;
+    # 这里显式补上,确保同目录下的示例模块可被导入.
+    for cand in [Path.cwd()] + list(Path.cwd().parents):
+        if (cand / "pyproject.toml").is_file():
+            demo_dir = cand / "notebooks" / "marimo" / "examples" / "demo_big_data_report" / "by_yaml_dsl"
+            if demo_dir.is_dir():
+                sys.path.insert(0, str(demo_dir))
+            break
 
     import _loader_retry_demo_mod as demo_mod
 
@@ -53,7 +63,7 @@ def _():
           loader: "_loader_retry_demo_mod:load_orders"
           fields:
             order_id:
-              field: order_id
+              {}
         """
     ).lstrip()
 
@@ -82,7 +92,7 @@ def _():
           loader: "_loader_retry_demo_mod:load_orders"
           fields:
             order_id:
-              field: order_id
+              {}
         """
     ).lstrip()
 

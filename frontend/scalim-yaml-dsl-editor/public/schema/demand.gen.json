@@ -139,8 +139,8 @@
         },
         "loader": {
           "type": "string",
-          "description": "Python 可调用对象引用(支持格式: module.path:ClassName / module.path:obj.method / module.path:function)",
-          "markdownDescription": "Python 可调用对象引用.\n\n- `module.path:ClassName`\n- `module.path:function`\n- `module.path:obj.method`",
+          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)",
+          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做白名单校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`",
           "examples": [
             "myapp.loaders:load_orders"
           ]
@@ -189,8 +189,8 @@
       "properties": {
         "loader": {
           "type": "string",
-          "description": "Python 可调用对象引用(支持格式: module.path:ClassName / module.path:obj.method / module.path:function)",
-          "markdownDescription": "Python 可调用对象引用.\n\n- `module.path:ClassName`\n- `module.path:function`\n- `module.path:obj.method`",
+          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)",
+          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做白名单校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`",
           "examples": [
             "myapp.loaders:load_orders"
           ]
@@ -302,8 +302,8 @@
             }
           },
           "additionalProperties": false,
-          "description": "source-level whole-result `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)",
-          "markdownDescription": "source-level whole-result `normalize`.\n\n- 作用于 `loader` 的整个返回值,用于把整体结果 reshape 成更适合字段读取的形状\n- 执行时机: 在字段级 `extract` 之前\n- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n示例:\n```yaml\nnormalize:\n  kind: index_by_key\n  key_field: order_id\n  on_conflict: error\n```\n\n输入/输出形状:\n- 输入: `[{order_id: 101, ...}, ...]`\n- 输出: `{101: {order_id: 101, ...}, ...}`\n\n注意:\n- 若只是 row 内字段嵌套取值,请使用字段级 `extract`"
+          "description": "源级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)",
+          "markdownDescription": "`normalize` 是源级的整体结果整形.\n\n- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n- 执行时机: 在字段级 `extract` 之前\n- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n示例:\n```yaml\nnormalize:\n  kind: index_by_key\n  key_field: order_id\n  on_conflict: error\n```\n\n输入/输出形状:\n- 输入: `[{order_id: 101, ...}, ...]`\n- 输出: `{101: {order_id: 101, ...}, ...}`\n\n注意:\n- 若只是 `row` 内字段嵌套取值,请使用字段级 `extract`"
         },
         "cache_mode": {
           "type": "string",
@@ -682,10 +682,11 @@
         "call_by": {
           "type": "string",
           "description": "派生字段函数调用(函数引用 + 参数列表),与 compute 互斥",
-          "markdownDescription": "派生字段函数调用(与 `compute` 互斥).\n\n- 语法: `reference(args...)`\n- 支持位置参数与 kwargs\n- Python 字面量: `1`/`1.5`/`'ok'`/`True`/`False`/`None`\n- 上下文引用: `$ctx` 或 `$ctx.<attr>`\n- 可用 ctx 属性: `row_id`/`batch_num`/`field_id`/`deps`/`values`",
+          "markdownDescription": "派生字段函数调用(与 `compute` 互斥).\n\n- 语法: `reference(args...)`\n- `reference` 形式与 `loader` 引用一致,支持:\n  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- 支持位置参数与 kwargs\n- Python 字面量: `1`/`1.5`/`'ok'`/`True`/`False`/`None`\n- 上下文引用: `$ctx` 或 `$ctx.<attr>`\n- 可用 ctx 属性: `row_id`/`batch_num`/`field_id`/`deps`/`values`",
           "examples": [
             "myapp.enums:get_status_text(status)",
-            "myapp.enums:get_status_text(status=status, ctx=$ctx)"
+            "myapp.enums:get_status_text(status=status, ctx=$ctx)",
+            ".helpers:to_text(status)"
           ]
         }
       },
@@ -1402,9 +1403,10 @@
         "should_retry": {
           "type": "string",
           "description": "重试判定回调引用(安全引用,由 allowlist 约束)",
-          "markdownDescription": "重试判定回调引用.\n\n- 形式与 loader 引用一致: `module.path:function` 或 `module.path:obj.method`\n- 由 allowlist(allowed_modules/allowed_functions) 约束\n- 签名: `should_retry(exc, ctx) -> bool`",
+          "markdownDescription": "重试判定回调引用.\n\n- 形式与 `loader` 引用一致:\n  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- 签名: `should_retry(exc, ctx) -> bool`",
           "examples": [
-            "myapp.retry:should_retry_db"
+            "myapp.retry:should_retry_db",
+            ".retry:should_retry_db"
           ]
         },
         "max_attempts": {

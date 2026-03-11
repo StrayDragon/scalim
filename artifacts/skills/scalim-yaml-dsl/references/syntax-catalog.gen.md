@@ -57,6 +57,7 @@
   - `params` hover documents `$runtime.*` and preload params behavior
   - 顶层 schema 字段(guardrails)
   - observability.logging 支持 renderer/preset 字段
+  - schema hover 说明 loader 引用支持相对模块语法
   - 字段声明位置与 compute 约束
   - schema documents `extract` as current-row-relative field extraction
   - schema removes legacy `field` and provides migration guidance
@@ -69,7 +70,7 @@
   - schema 明确 batch_size 的 null-or-int 语义
   - retry 字段纳入 JSON Schema 与 hover 指引
   - `_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform
-  - schema documents source-level `normalize` and its execution order
+  - schema 说明源级 `normalize` 及其执行顺序
   - schema keeps `normalize` out of `main_source`
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`

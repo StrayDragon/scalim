@@ -57,7 +57,8 @@
   - 文本编辑为主路径(Text-first)
   - 可视化与 YAML 双向编辑(Split)
   - 使用 canonical JSON Schema 提供补全与 hover
-  - editor exposes `extract` with the same semantics as the canonical schema
+  - 编辑器对相对模块引用提供一致提示
+  - 编辑器暴露与 canonical schema 语义一致的 `extract`
   - 导入/导出与模板新建
   - Outline 与快速导航
   - 可视化辅助视图(关系与依赖)
@@ -73,7 +74,7 @@
   - 可视化编辑块必须提供稳定可发现的新增入口
   - 同一编辑器中的可操作项必须采用一致的交互视觉体系
   - 关键操作的可见性不得依赖 hover-only
-  - editor exposes source-level `normalize` with canonical schema guidance
+  - 编辑器暴露源级 `normalize` 并提供与 canonical schema 一致的指引
 
 ## Command Details
 ### `yaml-dsl validate`
