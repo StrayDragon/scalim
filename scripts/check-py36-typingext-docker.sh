@@ -1,8 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+is_ci_enabled() {
+    local v="${CI:-}"
+    if [ -z "$v" ]; then
+        return 1
+    fi
+    v=$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')
+    case "$v" in
+        0 | false | no)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
 install_with_retry() {
-    python -m pip install  "$@" || python -m pip install -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@"
+    if is_ci_enabled; then
+        python -m pip install -i https://pypi.org/simple "$@"
+        return 0
+    fi
+
+    python -m pip install -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@" || python -m pip install "$@"
 }
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

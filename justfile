@@ -447,7 +447,7 @@ py36-compat-check:
     set -euo pipefail
 
     if docker version >/dev/null 2>&1; then
-        docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 python -m compileall -q src/scalim
+        docker run --rm -e CI -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 python -m compileall -q src/scalim
         exit 0
     fi
 
@@ -460,7 +460,7 @@ py36-typingext-check:
     set -euo pipefail
 
     if docker version >/dev/null 2>&1; then
-        docker run --rm -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash /repo/scripts/check-py36-typingext-docker.sh
+        docker run --rm -e CI -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash /repo/scripts/check-py36-typingext-docker.sh
         exit 0
     fi
 
