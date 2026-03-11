@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.9"
+__generated_with = "0.20.4"
 app = marimo.App(width="medium")
 
 
@@ -13,17 +13,15 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # 多输出组合与派生汇总
+    mo.md(r"""
+    # 多输出组合与派生汇总
 
-        这个示例演示 `output_composition` 的 `IR/Python-only` 链路:
+    这个示例演示 `output_composition` 的 `IR/Python-only` 链路:
 
-        - 同一次运行写入同一个 workbook 的 `Detail` / `Summary` / `Meta` / `Audit`
-        - 明细 sheet 用纯 Python 对照组做字段级对拍
-        - 汇总 sheet 用“从明细手工聚合”的方式再做一次对拍
-        """
-    )
+    - 同一次运行写入同一个 workbook 的 `Detail` / `Summary` / `Meta` / `Audit`
+    - 明细 sheet 用纯 Python 对照组做字段级对拍
+    - 汇总 sheet 用“从明细手工聚合”的方式再做一次对拍
+    """)
     return
 
 
@@ -51,7 +49,6 @@ def _():
         detail_preview = demo_result.detail_rows[:10]
         summary_preview = demo_result.summary_rows
         outputs = demo_result.outputs
-
     return detail_preview, outputs, summary_preview
 
 

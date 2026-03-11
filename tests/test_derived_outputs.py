@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 
 from scalim.execution import derived_outputs as mod
@@ -31,14 +33,25 @@ def test_metric_state_contract_and_stable_sort_key_variants() -> None:
     with pytest.raises(NotImplementedError):
         _ = dummy.finalize()
 
-    # `_stable_sort_key` 的分支覆盖: `None`/`bool`/任意对象
+    # `_stable_sort_key` 的分支覆盖: `None`/`bool`/`Decimal`/任意对象
     assert mod._stable_sort_key(None) == "none"  # noqa: SLF001
     assert mod._stable_sort_key(True) == "bool:1"  # noqa: SLF001
+    assert mod._stable_sort_key(Decimal("12.30")) == "num:12.30"  # noqa: SLF001
     obj = object()
     assert mod._stable_sort_key(obj).startswith(type(obj).__name__ + ":")  # noqa: SLF001
 
 
 def test_metric_state_from_spec_error_branches_and_min_max_sum_metrics() -> None:
+    assert mod._to_decimal(None) is None  # noqa: SLF001
+    assert mod._to_decimal("") is None  # noqa: SLF001
+    assert mod._to_decimal(True) == Decimal("1")  # noqa: SLF001
+    assert mod._to_decimal(2) == Decimal("2")  # noqa: SLF001
+    assert mod._to_decimal(0.1) == Decimal("0.1")  # noqa: SLF001
+    assert mod._to_decimal("1.50") == Decimal("1.50")  # noqa: SLF001
+    assert mod._to_decimal(Decimal("2.5")) == Decimal("2.5")  # noqa: SLF001
+    assert mod._to_decimal("oops") is None  # noqa: SLF001
+    assert mod._to_decimal(Decimal("NaN")) is None  # noqa: SLF001
+
     with pytest.raises(ValueError, match="count_true requires field_id"):
         _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_true"))  # noqa: SLF001
     count_true = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_true", field_id="flag"))  # noqa: SLF001
@@ -52,7 +65,10 @@ def test_metric_state_from_spec_error_branches_and_min_max_sum_metrics() -> None
     sum_metric.accumulate({"v": None})
     sum_metric.accumulate({"v": "oops"})
     sum_metric.accumulate({"v": "1.5"})
-    assert sum_metric.finalize() == 1.5
+    sum_metric.accumulate({"v": 0.1})
+    sum_metric.accumulate({"v": 0.2})
+    sum_metric.accumulate({"v": Decimal("2.2")})
+    assert sum_metric.finalize() == Decimal("4.0")
 
     with pytest.raises(ValueError, match="min requires field_id"):
         _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="min"))  # noqa: SLF001
@@ -80,6 +96,16 @@ def test_min_max_metrics_finalize_branches() -> None:
     max_metric.accumulate({"v": "a"})
     max_metric.accumulate({"v": "b"})
     assert max_metric.finalize() == "b"
+
+    min_metric_num = mod._MinMetric("v")  # noqa: SLF001
+    min_metric_num.accumulate({"v": Decimal("0.5")})
+    min_metric_num.accumulate({"v": 1.25})
+    assert min_metric_num.finalize() == Decimal("0.5")
+
+    max_metric_num = mod._MaxMetric("v")  # noqa: SLF001
+    max_metric_num.accumulate({"v": Decimal("0.5")})
+    max_metric_num.accumulate({"v": Decimal("9.5")})
+    assert max_metric_num.finalize() == Decimal("9.5")
 
 
 def test_group_by_aggregator_validation_and_ranked_finalize_branches() -> None:

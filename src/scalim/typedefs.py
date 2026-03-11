@@ -1,5 +1,6 @@
 # region imports
 
+from decimal import Decimal
 from typing import Dict, Hashable, List, Mapping, Sequence, Set, Tuple, Union
 
 from .vendor.compact import StrEnum
@@ -7,7 +8,7 @@ from .vendor.compact.typing_extensionsx import Literal
 
 # endregion
 
-FieldValue = Union[int, float, str, bool, None]
+FieldValue = Union[int, float, Decimal, str, bool, None]
 """字段值的常见具体类型"""
 
 RowData = Mapping[str, FieldValue]

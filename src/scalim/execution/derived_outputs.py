@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 
 from ..sinks.sink_base import BaseRowSink, IRowSink
@@ -47,6 +48,40 @@ class AggMetricSpec:
     field_id: Optional[str] = None
 
 
+_DECIMAL_ZERO = Decimal(0)
+_DECIMAL_ONE = Decimal(1)
+
+
+def _decimal_from_text(text: str) -> Optional[Decimal]:
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except InvalidOperation:
+        return None
+
+
+def _to_decimal(value: object) -> Optional[Decimal]:
+    if value is None:
+        return None
+    dec: Optional[Decimal] = None
+    if isinstance(value, Decimal):
+        dec = value
+    elif isinstance(value, bool):
+        dec = _DECIMAL_ONE if value else _DECIMAL_ZERO
+    elif isinstance(value, int):
+        dec = Decimal(value)
+    elif isinstance(value, float):
+        dec = _decimal_from_text(str(value))
+    elif isinstance(value, str):
+        dec = _decimal_from_text(value.strip())
+    if dec is None:
+        return None
+    if not dec.is_finite():
+        return None
+    return dec
+
+
 def _stable_sort_key(value: object) -> str:
     if value is None:
         return "none"
@@ -54,8 +89,9 @@ def _stable_sort_key(value: object) -> str:
         return "str:" + value
     if isinstance(value, bool):
         return "bool:" + ("1" if value else "0")
-    if isinstance(value, (int, float)):
-        return "num:" + repr(value)
+    numeric = _to_decimal(value)
+    if numeric is not None:
+        return "num:" + format(numeric, "f")
     return "{}:{}".format(type(value).__name__, repr(value))
 
 
@@ -113,11 +149,11 @@ class _CountTrueMetric(_MetricState):
 
 
 class _SumMetric(_MetricState):
-    _sum: float
+    _sum: Decimal
     _field_id: str
 
     def __init__(self, field_id: str) -> None:
-        self._sum = 0.0
+        self._sum = _DECIMAL_ZERO
         self._field_id = str(field_id)
 
     @override
@@ -125,21 +161,21 @@ class _SumMetric(_MetricState):
         raw = row.get(self._field_id)
         if raw is None:
             return
-        try:
-            self._sum += float(raw)
-        except (TypeError, ValueError):
+        dec = _to_decimal(raw)
+        if dec is None:
             return
+        self._sum += dec
 
     @override
     def finalize(self) -> FieldValue:
-        return float(self._sum)
+        return self._sum
 
 
 class _MinMetric(_MetricState):
     _value: FieldValue
     _field_id: str
     _has_value: bool
-    _best_key: Optional[Tuple[int, float, str]]
+    _best_key: Optional[Tuple[int, Decimal, str]]
 
     def __init__(self, field_id: str) -> None:
         self._field_id = str(field_id)
@@ -154,11 +190,11 @@ class _MinMetric(_MetricState):
             return
         raw_nn: NonNullFieldValue = raw
 
-        def _cmp_key(v: NonNullFieldValue) -> Tuple[int, float, str]:
-            try:
-                return (0, float(v), "")
-            except (TypeError, ValueError):
-                return (1, 0.0, _stable_sort_key(v))
+        def _cmp_key(v: NonNullFieldValue) -> Tuple[int, Decimal, str]:
+            dec = _to_decimal(v)
+            if dec is not None:
+                return (0, dec, "")
+            return (1, _DECIMAL_ZERO, _stable_sort_key(v))
 
         key = _cmp_key(raw_nn)
         if not self._has_value or self._best_key is None:
@@ -182,7 +218,7 @@ class _MaxMetric(_MetricState):
     _value: FieldValue
     _field_id: str
     _has_value: bool
-    _best_key: Optional[Tuple[int, float, str]]
+    _best_key: Optional[Tuple[int, Decimal, str]]
 
     def __init__(self, field_id: str) -> None:
         self._field_id = str(field_id)
@@ -197,11 +233,11 @@ class _MaxMetric(_MetricState):
             return
         raw_nn: NonNullFieldValue = raw
 
-        def _cmp_key(v: NonNullFieldValue) -> Tuple[int, float, str]:
-            try:
-                return (0, float(v), "")
-            except (TypeError, ValueError):
-                return (1, 0.0, _stable_sort_key(v))
+        def _cmp_key(v: NonNullFieldValue) -> Tuple[int, Decimal, str]:
+            dec = _to_decimal(v)
+            if dec is not None:
+                return (0, dec, "")
+            return (1, _DECIMAL_ZERO, _stable_sort_key(v))
 
         key = _cmp_key(raw_nn)
         if not self._has_value or self._best_key is None:
@@ -362,21 +398,21 @@ class RankedGroupByAggregator(IRowAggregator):
         # 将 `base` 输出显式转为可变 `dict`,以便追加 `rank` 字段.
         rows: List[Dict[str, FieldValue]] = [dict(r) for r in self._base.finalize_rows()]
 
-        def _rank_value_key(v: object) -> Tuple[int, float, str]:
+        def _rank_value_key(v: object) -> Tuple[int, Decimal, str]:
             # `None` 永远排在最后;其余尽量按数值排序(失败时回退为稳定字符串键).
             if v is None:
-                return (1, 0.0, "")
-            try:
-                return (0, float(cast("NonNullFieldValue", v)), "")
-            except (TypeError, ValueError):
-                return (0, 0.0, _stable_sort_key(v))
+                return (1, _DECIMAL_ZERO, "")
+            dec = _to_decimal(cast("NonNullFieldValue", v))
+            if dec is not None:
+                return (0, dec, "")
+            return (0, _DECIMAL_ZERO, _stable_sort_key(v))
 
-        def _row_sort_key(r: RowData) -> Tuple[int, float, str, str]:
+        def _row_sort_key(r: RowData) -> Tuple[int, Decimal, str, str]:
             group_key = tuple(r.get(fid) for fid in self._group_by)
-            is_none, num, s = _rank_value_key(r.get(self._rank_by))
+            is_none, num_dec, s = _rank_value_key(r.get(self._rank_by))
             if self._order != "asc":
-                num = -num
-            return (is_none, num, s, _stable_group_key_tuple(group_key))
+                num_dec = -num_dec
+            return (is_none, num_dec, s, _stable_group_key_tuple(group_key))
 
         rows.sort(key=_row_sort_key)
 
@@ -457,4 +493,4 @@ def fingerprint_for_meta(
     return h.hexdigest()
 
 
-NonNullFieldValue = Union[int, float, str, bool]
+NonNullFieldValue = Union[int, float, Decimal, str, bool]

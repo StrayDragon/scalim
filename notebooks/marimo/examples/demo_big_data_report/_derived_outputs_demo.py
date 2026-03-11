@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -50,6 +51,7 @@ _SHEET_DETAIL = "Detail"
 _SHEET_SUMMARY = "Summary"
 _SHEET_META = "Meta"
 _SHEET_AUDIT = "Audit"
+_DECIMAL_ZERO = Decimal("0")
 
 
 @dataclass
@@ -213,16 +215,16 @@ def _build_expected_summary_rows(detail_rows: List[Dict[str, Any]]) -> List[Dict
             {
                 "payment_method_name": group_key,
                 "order_cnt": 0,
-                "sum_amount": 0.0,
-                "sum_profit": 0.0,
+                "sum_amount": _DECIMAL_ZERO,
+                "sum_profit": _DECIMAL_ZERO,
             },
         )
         bucket["order_cnt"] += 1
-        bucket["sum_amount"] += _to_float(row.get("order_amount"))
-        bucket["sum_profit"] += _to_float(row.get("profit"))
+        bucket["sum_amount"] += _to_decimal(row.get("order_amount"))
+        bucket["sum_profit"] += _to_decimal(row.get("profit"))
 
     ordered = list(grouped.values())
-    ordered.sort(key=lambda item: (-float(item["sum_profit"]), str(item["payment_method_name"])))
+    ordered.sort(key=lambda item: (-_to_decimal(item["sum_profit"]), str(item["payment_method_name"])))
     for idx, row in enumerate(ordered, start=1):
         row["rank"] = idx
     return ordered
@@ -238,7 +240,7 @@ def _compare_summary_rows(actual_rows: List[Dict[str, Any]], expected_rows: List
             actual_value = actual.get(field_name)
             expected_value = expected.get(field_name)
             if field_name in ("sum_amount", "sum_profit"):
-                if abs(_to_float(actual_value) - _to_float(expected_value)) > 1e-9:
+                if _to_decimal(actual_value) != _to_decimal(expected_value):
                     msg = "汇总第 {} 行字段 '{}' 不一致: actual={} expected={}".format(idx, field_name, actual_value, expected_value)
                     return False, msg
                 continue
@@ -254,13 +256,18 @@ def _compare_summary_rows(actual_rows: List[Dict[str, Any]], expected_rows: List
     return True, "汇总 sheet 与明细手工聚合结果一致"
 
 
-def _to_float(value: Any) -> float:
+def _to_decimal(value: Any) -> Decimal:
     if value is None:
-        return 0.0
+        return _DECIMAL_ZERO
+    if isinstance(value, Decimal):
+        return value
     try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
+        dec = Decimal(str(value).strip())
+    except (InvalidOperation, AttributeError, TypeError, ValueError):
+        return _DECIMAL_ZERO
+    if not dec.is_finite():
+        return _DECIMAL_ZERO
+    return dec
 
 
 __all__ = [
