@@ -5,7 +5,7 @@
 - `sources.<id>.params`: 静态 kwargs
 - `bind/use_keys` 与 `bind/use_rows`: 从运行时上下文注入 keys/rows 的“动态参数构造器”
 
-这种拆分在概念上不直觉,并且 `bind.use_keys.param` 只能做顶层 kwarg 注入(`kwargs[param]=...`),无法表达 ET 等大量 loader 的常见签名形态 `kwargs.get("params", {})` 的 nested params 写法(例如 `kwargs["params"]["order_id_set"]=...`). 结果是需要为“整形入参”专门写一层薄 wrapper,导致 loader 复用困难、YAML 下沉受阻。
+这种拆分在概念上不直觉,并且 `bind.use_keys.param` 只能做顶层 kwarg 注入(`kwargs[param]=...`),无法表达下游业务等大量 loader 的常见签名形态 `kwargs.get("params", {})` 的 nested params 写法(例如 `kwargs["params"]["order_id_set"]=...`). 结果是需要为“整形入参”专门写一层薄 wrapper,导致 loader 复用困难、YAML 下沉受阻。
 
 ## What Changes
 

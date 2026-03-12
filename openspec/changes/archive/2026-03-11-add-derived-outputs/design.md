@@ -5,7 +5,7 @@
 
 ## Downstream Patterns (Survey → Framework Concepts)
 
-需求侧（以 ET 迁移为主）多 sheet 的现实形态可以抽象为 7 类 sheet（覆盖绝大多数报表）：
+需求侧下游业务 多 sheet 的现实形态可以抽象为 7 类 sheet（覆盖绝大多数报表）：
 
 1) **DetailSheet（明细流）**
 - 每行一条业务事实（订单/用户/交易）；列多、行可能非常大；通常必须支持流式写入。

@@ -19,7 +19,7 @@
 **Goals:**
 
 - 在 `sources.<id>` 上提供 declarative `normalize`,用于 whole-result normalization。
-- 初版先覆盖最常见的 `list[row] -> key -> row` 归一化,减少为 ET / report loader 编写薄 wrapper 的需求。
+- 初版先覆盖最常见的 `list[row] -> key -> row` 归一化,减少为 下游业务 / report loader 编写薄 wrapper 的需求。
 - 明确 `normalize` 与字段级 `extract` 的边界: `normalize` 处理整个 source 返回值,`extract` 处理单个字段如何从 row 中读取。
 - 让 preload/cache 与非缓存路径都观察到同样的 normalized result 形状。
 - 为未来 `normalize_fn` 预留稳定命名空间。

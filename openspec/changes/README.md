@@ -47,8 +47,14 @@
 - `yaml-dsl-imports`（建议先落地 `path_aliases`/import 展开）
 - `yaml-dsl-workflow`（复用 `path_aliases`，实现 runs 编排 + shared preload cache）
 
-3) **Group: 派生聚合 set 口径原语（为 ET 去状态壳打底）**
+3) **Group: source normalize 形状补齐（减少 wrapper）**
+- `yaml-source-normalize-shapes`
+
+4) **Group: 派生聚合 set 口径原语（去状态壳打底）**
 - `derived-outputs-set-aggregations`
 
-4) **Group: 工具链侧改良（不阻塞主线）**
+5) **Group: outputs/workbook 编排面（YAML authoring surface）**
+- `yaml-dsl-outputs`
+
+6) **Group: 工具链侧改良（不阻塞主线）**
 - `prompt-eval-workflow`

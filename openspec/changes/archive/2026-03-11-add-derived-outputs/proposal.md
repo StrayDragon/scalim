@@ -8,7 +8,7 @@
 
 ## Downstream Survey Highlights (Why Now)
 
-需求侧（以 ET 迁移为主）的现实形态高度集中在以下几类：
+需求侧下游业务的现实形态高度集中在以下几类：
 
 - 同一份**明细宽表**拆成多张 sheet（同源分发）。
 - “**明细 + 汇总**”两/三张 sheet 的组合交付（先产出事实流，再按维度聚合）。
@@ -89,7 +89,7 @@ output:
 - 不改现有 schema,不影响 LSP/editor,迁移成本最低。
 
 缺点:
-- ET 迁移场景仍需要 Python 外围编排,无法用单 YAML 表达“报表包(明细+汇总+meta)”。
+-下游业务 迁移场景仍需要 Python 外围编排,无法用单 YAML 表达“报表包(明细+汇总+meta)”。
 - workbook 多 sheet 仍需要额外容器实现与 driver 组装,对非 Python 用户不友好。
 
 未来规划:
