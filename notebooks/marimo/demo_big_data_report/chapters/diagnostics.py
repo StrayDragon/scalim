@@ -4,8 +4,8 @@ from typing import Any, Dict, List
 
 from scalim.spec.ir import DerivedFieldIr, FieldIr, JoinConditionIr, RelationIr
 
-from notebooks.marimo.examples.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.examples.demo_big_data_report._shared import build_ecommerce_model
+from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
+from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
 
 from ._types import ChapterResult
 

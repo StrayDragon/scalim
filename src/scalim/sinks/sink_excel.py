@@ -88,7 +88,8 @@ def _best_effort_close_write_only_worksheet(worksheet: Any) -> None:
     """尽力关闭 `openpyxl` `write_only` 的 `worksheet`,避免生成器在 `GC` 时抛出 `PytestUnraisableExceptionWarning`.
 
     背景: `openpyxl` 的 `WriteOnlyWorksheet.append()` 会创建并持有 `_write_rows()` 生成器,该生成器依赖底层 `xmlfile` 仍处于打开状态.
-    若在保存/关闭前抛错(例如写锁冲突 `fail-fast`),对象在 `GC` 时可能先关闭底层文件再关闭生成器,从而产生 `ValueError: I/O operation on closed file`.
+    若在保存/关闭前抛错(例如写锁冲突 `fail-fast`),对象在 `GC` 时可能先关闭底层文件再关闭生成器,
+    从而产生 `ValueError: I/O operation on closed file`.
     """
 
     try:
@@ -104,9 +105,12 @@ def _best_effort_close_write_only_worksheet(worksheet: Any) -> None:
 def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
     """尽力关闭 `write_only workbook` 下所有 `worksheet`(仅在异常路径使用)."""
 
+    worksheets = getattr(workbook, "worksheets", None)
+    if worksheets is None:
+        return
     try:
-        worksheets = list(workbook.worksheets)
-    except Exception:
+        worksheets = list(worksheets)
+    except TypeError:
         return
     for ws in worksheets:
         _best_effort_close_write_only_worksheet(ws)

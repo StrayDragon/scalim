@@ -9,7 +9,7 @@ from scalim.dsl.by_yaml import run
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim.sinks.sink_memory import InMemoryRowSink
 
-from notebooks.marimo.examples.demo_big_data_report.by_yaml_dsl import _loader_retry_demo_mod as demo_mod
+from notebooks.marimo.demo_big_data_report.by_yaml_dsl import _loader_retry_demo_mod as demo_mod
 
 from ._types import ChapterResult
 
@@ -22,7 +22,7 @@ def run_loader_retry() -> ChapterResult:
 
         main_source:
           source_id: orders
-          loader: "notebooks.marimo.examples.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod:load_orders"
+          loader: "notebooks.marimo.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod:load_orders"
           fields:
             order_id:
               {}
@@ -50,14 +50,14 @@ def run_loader_retry() -> ChapterResult:
 
         main_source:
           source_id: orders
-          loader: "notebooks.marimo.examples.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod:load_orders"
+          loader: "notebooks.marimo.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod:load_orders"
           fields:
             order_id:
               {}
         """
     ).lstrip()
 
-    allowed_modules = frozenset(["notebooks.marimo.examples.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod"])
+    allowed_modules = frozenset(["notebooks.marimo.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod"])
 
     with tempfile.TemporaryDirectory() as tmpdir:
         yaml_no_retry_path = Path(tmpdir) / "no_retry.yaml"

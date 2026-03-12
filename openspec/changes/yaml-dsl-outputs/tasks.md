@@ -3,6 +3,7 @@
 - [ ] 1.1 在 `src/scalim/dsl/by_yaml/schema_dsl/models/` 中新增 `outputs` 相关配置模型(输出目标、容器、where、aggregate、meta/audit、failure_policy 等)并更新 `DemandConfig`
 - [ ] 1.2 更新 `schema_dsl` builder/常量键映射,生成 `outputs` 对应的 JSONSchema(并移除旧 `output` 顶层字段,不保留兼容层)
 - [ ] 1.3 通过既有生成入口刷新 `src/scalim/dsl/by_yaml/schema/demand.gen.json` 与相关文档生成物(禁止手改生成文件)
+- [ ] 1.4 重新生成并提交 editor schema: `just gen-yaml-dsl-editor-schema`(同步 `frontend/scalim-yaml-dsl-editor/**/schema/demand.gen.json`)
 
 ## 2. 解析与语义校验(config_parsing)
 
@@ -16,6 +17,7 @@
   - composed outputs 仅允许 `streaming=true`
   - `aggregate` 结构完整性(必填 group_by/metrics 等)与与 `fields` 的互斥/约束
   - `where` 依赖字段无法解析时给出可操作的错误提示
+- [ ] 2.5 当检测到旧写法 `output:` 顶层字段时 fail-fast,提示升级到 `outputs:` 并给出最小迁移片段
 
 ## 3. Runtime 装配(outputs → OutputCompositionSpec)
 
@@ -43,7 +45,7 @@
 ## 5. Demo / 文档迁移
 
 - [ ] 5.1 升级 `acceptance/mvp_demo` 以使用 YAML `outputs`(去掉“最薄 Python sink” glue),保持可运行
-- [ ] 5.2 升级 canonical demo YAML(例如 notebooks 下的 ecommerce_report)覆盖新语义
+- [ ] 5.2 升级 canonical demo: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 覆盖新语义
 - [ ] 5.3 如涉及 docs 生成物/注入区块,运行 `just gen-docs` 刷新,并在提交前跑 `just qa`/`just openspec-check`
 
 ## 6. 全仓迁移(一步到位;不做兼容层)
@@ -56,3 +58,12 @@
   - `where` 依赖注入(required fields)与依赖缺失时的诊断
   - `failure_policy: primary_only` 下 primary/非 primary 失败行为
 - [ ] 6.5 运行 `just qa` 验证迁移后的 repo 质量门禁通过
+
+## 7. Breaking 升级指南 / 下游适配 / 门禁 / 归档
+
+- [ ] 7.1 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
+- [ ] 7.2 新增升级指南: `docs/doc/yaml-dsl/upgrades/YYYY-MM-DD-yaml-dsl-outputs.md`,并运行 `just gen` 注入升级索引
+- [ ] 7.3 通过: `just gen`
+- [ ] 7.4 通过: `just qa`
+- [ ] 7.5 通过: `just openspec-check`
+- [ ] 7.6 归档到: `openspec/changes/archive/YYYY-MM-DD-yaml-dsl-outputs/`

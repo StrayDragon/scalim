@@ -3,6 +3,7 @@
 - [ ] 1.1 扩展 `normalize.kind` 枚举与 schema(新增 `take_first`/`map_values`/`project_fields`),并补齐 markdownDescription/examples
 - [ ] 1.2 为 `take_first`/`project_fields`/`map_values` 增加结构化配置 schema(含 `on_empty`/`on_missing`/`steps`/`fields.path` 等约束)
 - [ ] 1.3 运行生成入口刷新 YAML schema 生成物,并通过 drift gate(避免手改 `.gen.*` 或 injected blocks)
+- [ ] 1.4 重新生成并提交 editor schema: `just gen-yaml-dsl-editor-schema`(同步 `frontend/scalim-yaml-dsl-editor/**/schema/demand.gen.json`)
 
 ## 2. Runtime / IR 实现
 
@@ -25,9 +26,14 @@
 - [ ] 5.1 增加单测覆盖: `take_first`(on_empty=miss|null|error)、`map_values` pipeline、`project_fields`(含 int key path 与 from_key)
 - [ ] 5.2 增加单测覆盖: `normalize.call_by` allowlist/contract(返回非 Mapping 被拒绝)
 - [ ] 5.3 扩展/新增 acceptance demo YAML,覆盖 “nested dict flatten(含 int key)” 与 “mapping[key -> list] take_first” 的可运行样例
+- [ ] 5.4 更新 canonical demo: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 覆盖至少一种新 normalize 写法
 
 ## 6. Docs / QA
 
 - [ ] 6.1 更新与 `yaml-source-normalize` 相关的文档/说明(作者视角: 何时用 `take_first`/`project_fields`/`map_values`/`call_by`)
-- [ ] 6.2 跑 `just openspec-check` 与 `just qa` 确认工件校验、schema 漂移与核心测试通过
-
+- [ ] 6.2 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
+- [ ] 6.3 新增升级指南: `docs/doc/yaml-dsl/upgrades/YYYY-MM-DD-yaml-source-normalize-shapes.md`,并运行 `just gen` 注入升级索引
+- [ ] 6.4 通过: `just gen`
+- [ ] 6.5 通过: `just qa`
+- [ ] 6.6 通过: `just openspec-check`
+- [ ] 6.7 归档到: `openspec/changes/archive/YYYY-MM-DD-yaml-source-normalize-shapes/`

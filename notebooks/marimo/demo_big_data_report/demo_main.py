@@ -36,7 +36,7 @@ def _():
     from pathlib import Path
 
     # `marimo` 运行/导出时,显式把仓库根目录加入 `sys.path`,确保 `notebooks.*` 可被导入.
-    repo_root = Path(__file__).resolve().parents[4]
+    repo_root = Path(__file__).resolve().parents[3]
     repo_root_str = str(repo_root)
     if repo_root_str not in sys.path:
         sys.path.insert(0, repo_root_str)
@@ -110,7 +110,7 @@ def _(mo):
 
 @app.cell
 def _():
-    from notebooks.marimo.examples.demo_big_data_report.chapters.registry import run_all_chapters
+    from notebooks.marimo.demo_big_data_report.chapters.registry import run_all_chapters
 
     chapter_results = run_all_chapters()
     return chapter_results
@@ -151,7 +151,7 @@ def _(Path, yaml_path):
     from scalim.sinks.sink_memory import InMemoryRowSink
 
     # 注意: `run()` 需要 `allowlist` 配置
-    _loaders_module = "notebooks.marimo.examples.demo_big_data_report._loaders"
+    _loaders_module = "notebooks.marimo.demo_big_data_report._loaders"
 
     try:
         sink = InMemoryRowSink()

@@ -13,12 +13,12 @@ import logging
 import sys
 from pathlib import Path
 
-repo_root = Path(__file__).resolve().parents[4]
+repo_root = Path(__file__).resolve().parents[3]
 repo_root_str = str(repo_root)
 if repo_root_str not in sys.path:
     sys.path.insert(0, repo_root_str)
 
-from notebooks.marimo.examples.demo_big_data_report.chapters.registry import run_all_chapters
+from notebooks.marimo.demo_big_data_report.chapters.registry import run_all_chapters
 
 
 def _configure_logging() -> None:

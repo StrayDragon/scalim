@@ -4,6 +4,7 @@
 - [ ] 1.2 生成并提交 workflow JSON Schema(用于 editor/schema validate)与漂移测试门禁
   - 输出建议: `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
   - 更新生成脚本(与 demand schema 同步): `scripts/gen-yaml-dsl-schema.py` / `scripts/gen-yaml-dsl-editor-schema.py`
+- [ ] 1.3 若需要前端 editor 校验 workflow YAML,将 workflow schema 同步到前端并支持 schema 选择/校验(如变动过大,拆分到独立 frontend change)
 
 ## 2. Python Entrypoint & Runner
 
@@ -29,3 +30,12 @@
 ## 5. Docs
 
 - [ ] 5.1 按 SSOT 规则补充 workflow 语法与示例文档,并运行 `just gen-docs`(不手改 `.gen.`)
+- [ ] 5.2 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
+- [ ] 5.3 新增升级指南: `docs/doc/yaml-dsl/upgrades/YYYY-MM-DD-yaml-dsl-workflow.md`,并运行 `just gen` 注入升级索引
+
+## 6. Gates / Archive
+
+- [ ] 6.1 通过: `just gen`
+- [ ] 6.2 通过: `just qa`
+- [ ] 6.3 通过: `just openspec-check`
+- [ ] 6.4 归档到: `openspec/changes/archive/YYYY-MM-DD-yaml-dsl-workflow/`

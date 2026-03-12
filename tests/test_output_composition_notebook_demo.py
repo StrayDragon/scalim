@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from notebooks.marimo.examples.demo_big_data_report._derived_outputs_demo import run_derived_outputs_demo
+from notebooks.marimo.demo_big_data_report._derived_outputs_demo import run_derived_outputs_demo
 
 
 def test_derived_outputs_demo_matches_python_verification(tmp_path: Path) -> None:

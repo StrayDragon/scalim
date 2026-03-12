@@ -12,7 +12,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate viz_schedule_plan.json from YAML + run_started.targets in viz_events.jsonl.")
     parser.add_argument(
         "--yaml-path",
-        default="notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
+        default="notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
         help="YAML DSL path.",
     )
     parser.add_argument(
@@ -22,7 +22,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--allowed-modules",
-        default="notebooks.marimo.examples.demo_big_data_report._loaders",
+        default="notebooks.marimo.demo_big_data_report._loaders",
         help="Comma-separated allowed modules for YAML compilation.",
     )
     parser.add_argument(

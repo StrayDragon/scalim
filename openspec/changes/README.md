@@ -8,7 +8,7 @@
 - 除非需求明确要求兼容，否则不保留旧写法兼容分支；仓内所有旧写法一次性升级（YAML 示例/fixtures/notebooks/skills/frontend examples 等）。
 
 2) **每组必须更新 canonical demo**
-- 必须改造 `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`，确保新语义在可运行的真实配置里被覆盖。
+- 必须改造 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`，确保新语义在可运行的真实配置里被覆盖。
 
 3) **每组必须做下游适配盘点（脱敏规则）**
 - 允许读取 `.tmp/known-outer-paths-using-this-package.txt` 用于盘点下游适配与同步修改。

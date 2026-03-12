@@ -32,7 +32,7 @@
 
 - [x] 5.1 一次性升级仓库内所有 YAML 示例/fixtures/notebooks/skill/前端 examples: 将 `fields.*.field` 全部改为 `fields.*.extract`
 - [x] 5.2 增加回归/守卫: 校验器对 `fields.*.field` 给出明确迁移错误,防止旧写法回流
-- [x] 5.3 升级 canonical example `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 将所有 `fields.*.field` 改为 `extract` 并确保相关测试/导出产物可验证
+- [x] 5.3 升级 canonical example `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 将所有 `fields.*.field` 改为 `extract` 并确保相关测试/导出产物可验证
 
 ## 6. Tests And Verification
 

@@ -1272,7 +1272,7 @@ _templates:
 
 main_source:
   source_id: orders
-  loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_orders"
+  loader: "notebooks.marimo.demo_big_data_report._loaders:load_orders"
   params:
     field_keys:
       - order_id
@@ -1314,7 +1314,7 @@ relations:
 
 sources:
   customers:
-    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers"
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers"
     key: customer_id
     params:
       ids: {$keys: {as: set}}
@@ -1328,7 +1328,7 @@ sources:
         relation: *orders_to_customers
 
   products:
-    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_products"
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_products"
     key: product_id
     lookup_cast:
       name: int
@@ -1345,7 +1345,7 @@ sources:
         relation: *orders_to_products
 
   categories:
-    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_categories"
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_categories"
     key: category_id
     params:
       ids: {$keys: {as: set}}
@@ -1355,7 +1355,7 @@ sources:
         relation: *orders_to_categories
 
   region_pricing:
-    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_region_pricing"
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_region_pricing"
     key: [region_id, product_category_id]
     cache_mode: preload_forever
     fields:

@@ -54,7 +54,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate Scalim Viz artifacts from YAML DSL demo.")
     parser.add_argument(
         "--yaml-path",
-        default="notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
+        default="notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
         help="YAML DSL path for the demo run.",
     )
     parser.add_argument(
@@ -213,7 +213,7 @@ def main(argv: List[str]) -> int:
     _ensure_repo_root_on_syspath()
     args = _parse_args(argv)
     yaml_path = args.yaml_path
-    allowed_modules = frozenset(["notebooks.marimo.examples.demo_big_data_report._loaders"])
+    allowed_modules = frozenset(["notebooks.marimo.demo_big_data_report._loaders"])
 
     scenarios = _normalize_scenarios(args.scenarios)
     trace_enabled = args.mode == "events+trace"

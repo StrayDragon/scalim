@@ -239,8 +239,8 @@
   },
   "inputs": [
     {
-      "path": "notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "cd3327b5a6b4e42ff14d47a41e676972cfc37b6e6262884c8fb65eabc21e7f87"
+      "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
+      "sha256": "be11139f4ebafd46300fa80418041bfe1e00cefd1fc80fd06db5e5ceaf1705ef"
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
@@ -302,11 +302,11 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "23182558611ebfb8e3ff8606790a3c351bb706966f0e9677b463ffa0de213805"
+      "sha256": "abb24649dbc1874585df47c597a8b96595609b8d0d86b27cead3fe45e593b9f8"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "6a821cb7e50188444ecc82062e9b1f1b085931c24df6c9aee51e0bc0755a9f34"
+      "sha256": "b437a16622bba5f872ceff7db23a39a4568ea77813c2f06cc3b971557e1f6c13"
     },
     {
       "path": "references/syntax-catalog.gen.md",

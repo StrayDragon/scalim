@@ -52,7 +52,7 @@ def _():
     from dataclasses import asdict
     from pprint import pformat
 
-    _repo_root = Path(__file__).resolve().parents[4]
+    _repo_root = Path(__file__).resolve().parents[3]
     _repo_root_str = str(_repo_root)
     if _repo_root_str not in sys.path:
         sys.path.insert(0, _repo_root_str)
@@ -213,7 +213,7 @@ def _(demand_config):
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
     from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 
-    allowed_modules = frozenset(["notebooks.marimo.examples.demo_big_data_report._loaders"])
+    allowed_modules = frozenset(["notebooks.marimo.demo_big_data_report._loaders"])
     runtime_vars = {"order_ids": []}
     resolver = PythonReferenceResolver(allowed_modules=allowed_modules)
     converter = ConfigToIRConverter(resolver=resolver, runtime_vars=runtime_vars)
@@ -858,7 +858,7 @@ def _(Path, yaml_path):
     # 注意: `run()` 需要 `allowlist` 配置
     # 这里我们使用当前目录的 _loaders 模块
     _this_dir = Path(__file__).parent
-    _loaders_module = "notebooks.marimo.examples.demo_big_data_report._loaders"
+    _loaders_module = "notebooks.marimo.demo_big_data_report._loaders"
 
     try:
         sink = InMemoryRowSink()

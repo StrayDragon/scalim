@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
 
-from notebooks.marimo.examples.demo_big_data_report._derived_outputs_demo import DerivedOutputsDemoResult, run_derived_outputs_demo
+from notebooks.marimo.demo_big_data_report._derived_outputs_demo import DerivedOutputsDemoResult, run_derived_outputs_demo
 
 from ._types import ChapterResult
 

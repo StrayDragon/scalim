@@ -5,7 +5,7 @@ description: |
 pipeline:
   - id: orders
     kind: source
-    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_orders"
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_orders"
     params:
       ids: {$runtime: order_ids}
       field_keys: [order_id, order_date, quantity, unit_price, discount_rate, customer_id, product_id]
@@ -21,7 +21,7 @@ pipeline:
 
   - id: customers
     kind: lookup
-    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers"
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers"
     key: customer_id
     params:
       ids: {$keys: {as: list}}
@@ -31,7 +31,7 @@ pipeline:
 
   - id: products
     kind: lookup
-    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_products"
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_products"
     key: product_id
     lookup_cast: {name: int}
     params:
@@ -75,7 +75,7 @@ pipeline:
       profit:
         name: 利润
         call:
-          ref: "notebooks.marimo.examples.demo_big_data_report._loaders:calc_profit"
+          ref: "notebooks.marimo.demo_big_data_report._loaders:calc_profit"
           kwargs:
             order_amount: order_amount
             product_cost: products.product_cost
@@ -101,4 +101,3 @@ observability:
     enabled: true
     metrics: [duration]
     sampling_interval: 2
-

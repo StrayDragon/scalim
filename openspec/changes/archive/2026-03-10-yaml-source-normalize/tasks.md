@@ -16,7 +16,7 @@
 - [x] 3.2 重新生成 `src/scalim/dsl/by_yaml/schema/demand.gen.json`,并同步更新 `frontend/scalim-yaml-dsl-editor/src/schema/demand.gen.json`
 - [x] 3.3 更新 `docs/doc/` 下 YAML DSL 文档与示例,明确 `normalize` 与字段级 `extract` 的边界,并补充 `index_by_key` 示例
 - [x] 3.4 更新 `artifacts/skills/scalim-yaml-dsl/**`,确保 agent 能区分“whole-result reshape 用 `normalize`”与“字段嵌套取值用 `extract`”
-- [x] 3.5 升级 canonical example `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 至少引入一个 `normalize.kind=index_by_key` 的真实使用场景(例如把某个 lookup source 的 loader 改为返回 list 并用 normalize 归一化)
+- [x] 3.5 升级 canonical example `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 至少引入一个 `normalize.kind=index_by_key` 的真实使用场景(例如把某个 lookup source 的 loader 改为返回 list 并用 normalize 归一化)
 
 ## 4. Tests And Verification
 

@@ -4,8 +4,8 @@ import tempfile
 from pathlib import Path
 from typing import List, Sequence
 
-from notebooks.marimo.examples.demo_big_data_report._cases import build_test_config_small
-from notebooks.marimo.examples.demo_big_data_report._shared import TARGET_FIELDS_FULL
+from notebooks.marimo.demo_big_data_report._cases import build_test_config_small
+from notebooks.marimo.demo_big_data_report._shared import TARGET_FIELDS_FULL
 
 from ._types import ChapterResult
 from .basics import run_basics

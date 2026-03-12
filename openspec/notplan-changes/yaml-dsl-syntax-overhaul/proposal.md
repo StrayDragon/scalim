@@ -52,4 +52,4 @@
   - 语义 validator: `src/scalim/dsl/by_yaml/config_parsing/**`
   - YAML → IR 转换与运行入口: `src/scalim/dsl/by_yaml/runtime/**`
   - CLI/LSP 与 editor schema: `src/scalim/cli/yaml_dsl.py` + `frontend/scalim-yaml-dsl-editor/**`
-  - 文档/技能与 canonical demo: `docs/doc/yaml-dsl/**` + `artifacts/skills/scalim-yaml-dsl/**` + `notebooks/marimo/examples/**`
+  - 文档/技能与 canonical demo: `docs/doc/yaml-dsl/**` + `artifacts/skills/scalim-yaml-dsl/**` + `notebooks/marimo/**`

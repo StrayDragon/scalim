@@ -27,7 +27,7 @@ from scalim.spec.ir import (
 )
 from scalim.typedefs import SourceSpecIrCacheMode
 
-from notebooks.marimo.examples.demo_big_data_report._loaders import (
+from notebooks.marimo.demo_big_data_report._loaders import (
     ECommerceConfig,
     calc_final_price,
     calc_order_amount,

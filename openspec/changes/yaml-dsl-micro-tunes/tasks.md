@@ -15,8 +15,9 @@
 ## 3. 迁移与下游盘点
 
 - [ ] 3.1 一步到位迁移仓内 YAML 示例/fixtures/notebooks/skills/frontend examples 到新写法(不保留旧写法分支)
-- [ ] 3.2 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
-- [ ] 3.3 新增升级指南(无自动升级器入口,按日期顺序升级): `docs/doc/yaml-dsl/upgrades/2026-03-12-yaml-dsl-micro-tunes.md`,并运行 `just gen-docs` 注入索引
+- [ ] 3.2 更新 canonical demo: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 使用新写法并保持可运行
+- [ ] 3.3 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
+- [ ] 3.4 新增升级指南(无自动升级器入口,按日期顺序升级): `docs/doc/yaml-dsl/upgrades/2026-03-12-yaml-dsl-micro-tunes.md`,并运行 `just gen-docs` 注入索引
 
 ## 4. 测试与验收门禁
 
@@ -25,3 +26,4 @@
 - [ ] 4.3 通过: `just gen`
 - [ ] 4.4 通过: `just qa`
 - [ ] 4.5 通过: `just openspec-check`
+- [ ] 4.6 归档到: `openspec/changes/archive/YYYY-MM-DD-yaml-dsl-micro-tunes/`

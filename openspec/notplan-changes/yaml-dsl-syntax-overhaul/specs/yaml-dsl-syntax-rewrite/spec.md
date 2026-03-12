@@ -6,7 +6,7 @@
 
 #### Scenario: 仓库示例保持最新语义
 - **WHEN** 维护者合入新的 YAML DSL 语法实现
-- **THEN** 仓库内 `tests/fixtures`、`notebooks/marimo/examples/**/by_yaml_dsl/*.yaml`、`artifacts/skills/**/example*.yaml` MUST 仅包含最新写法
+- **THEN** 仓库内 `tests/fixtures`、`notebooks/marimo/**/by_yaml_dsl/*.yaml`、`artifacts/skills/**/example*.yaml` MUST 仅包含最新写法
 
 ### Requirement: Candidate plans are reviewable with MVP examples
 系统 MUST 提供不少于 5 套候选语法方案,每套方案 MUST 包含可 review 的完整 MVP 示例 YAML,用于对比“同一业务配置在不同语法下的可读性与一致性”。
@@ -60,4 +60,3 @@
 #### Scenario: 升级文档可被 skill 索引
 - **WHEN** 维护者完成一次 breaking 语法变更并归档 change
 - **THEN** `docs/doc/yaml-dsl/upgrades/` MUST 增加升级指南并可被 skill references 自动索引
-

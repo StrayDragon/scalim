@@ -32,7 +32,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from scalim.spec.ir.sources import SourceNormalizeIr
 
-from notebooks.marimo.examples.demo_big_data_report._loaders import (
+from notebooks.marimo.demo_big_data_report._loaders import (
     calc_final_price,
     calc_order_amount,
     calc_profit,

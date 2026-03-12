@@ -1,6 +1,6 @@
 from pathlib import Path
 
-_DEMO_DIR = Path("notebooks/marimo/examples/demo_big_data_report")
+_DEMO_DIR = Path("notebooks/marimo/demo_big_data_report")
 
 
 def test_demo_directory_contains_unified_examples() -> None:

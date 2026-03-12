@@ -11,9 +11,9 @@ from scalim.planning import PlanBuilder
 from scalim.sinks.sink_csv import BlockColumnCSVSink, ColumnCSVSink
 from scalim.sinks.sink_memory import InMemoryColumnSink
 
-from notebooks.marimo.examples.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.examples.demo_big_data_report._shared import TARGET_FIELDS_FULL, build_ecommerce_model
-from notebooks.marimo.examples.demo_big_data_report._verification import VerificationResult, verify_scalim_output
+from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
+from notebooks.marimo.demo_big_data_report._shared import TARGET_FIELDS_FULL, build_ecommerce_model
+from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
 
 from ._types import ChapterResult
 

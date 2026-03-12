@@ -134,7 +134,7 @@
 1) 选定一个 plan,把它变成唯一 canonical YAML DSL 语法
 2) 编写升级器(脚本/CLI 子命令),把仓内所有 YAML 一次性迁移
 3) 更新:
-   - canonical demo: `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
+   - canonical demo: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
    - schema 生成物与 editor schema
    - skill references 与 docs guide
 4) `just gen` + `just qa` + `just openspec-check` 作为门禁

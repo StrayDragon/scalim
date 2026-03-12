@@ -27,7 +27,7 @@
 ## 4. 迁移与文档(选定方案后)
 
 - [ ] 4.1 一步到位迁移仓内所有 YAML 示例/fixtures/skills/frontend examples
-- [ ] 4.2 更新 canonical demo: `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
+- [ ] 4.2 更新 canonical demo: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
 - [ ] 4.3 增加升级指南: `docs/doc/yaml-dsl/upgrades/YYYY-MM-DD-<group>.md` 并接入自动索引
 - [ ] 4.4 更新 skill references 与 docs-site(只保留最新写法;移除旧写法提示)
 
@@ -36,4 +36,3 @@
 - [ ] 5.1 通过: `just gen`
 - [ ] 5.2 通过: `just qa`
 - [ ] 5.3 通过: `just openspec-check`
-

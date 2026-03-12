@@ -8,7 +8,7 @@
 - `justfile` (`test`/`bench`/`schema-drift-check`/`lintfix` quality gates)
 - `tests/test_yaml_schema_generation.py` (YAML schema generation drift guard)
 - `tests/test_et_yaml_parse_regression.py` (INTEGRATION_APP YAML parse regression; parser-only, no business loaders)
-- `notebooks/marimo/examples/demo_big_data_report/_verification.py` (demo verification logic reused by pytest)
+- `notebooks/marimo/demo_big_data_report/_verification.py` (demo verification logic reused by pytest)
 - `tests/bench/` (bench-only suite; marker `bench`)
 
 ## Implementation Notes (Current Behavior)
@@ -46,7 +46,7 @@
 - **THEN** 使用可配置的小规模数据与共享 fixture
 
 ### Requirement: Notebook 对拍验证纳入默认测试
-- 对于 `notebooks/marimo/examples` 下包含 `_verification.py` 的 demo,pytest MUST 至少提供一个非 bench 测试用例复用该对拍验证逻辑(小规模数据).
+- 对于 `notebooks/marimo/` 下包含 `_verification.py` 的 demo,pytest MUST 至少提供一个非 bench 测试用例复用该对拍验证逻辑(小规模数据).
 
 #### Scenario: demo 对拍验证被 pytest 覆盖
 - **WHEN** 运行默认测试命令(非 bench)
@@ -217,4 +217,3 @@
 - **GIVEN** 开发机未安装或不可用 docker
 - **WHEN** 开发者运行 `just qa`(或相关 py36 检查任务)
 - **THEN** 命令 MUST 失败并提示需要安装/启动 docker
-

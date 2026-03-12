@@ -18,7 +18,7 @@
 
 notebooks 属于交互式 demo,不纳入 docs-site 的受控生成物与 drift gate. 推荐本地启动 marimo server:
 
-- `uv run python -m marimo edit notebooks/marimo/examples/<notebook>.py`
+- `uv run marimo edit notebooks/marimo/`
 
 ## doc_texts 模式(推荐)
 

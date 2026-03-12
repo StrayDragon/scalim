@@ -9,7 +9,7 @@
 - 语法目录: `src/scalim/dsl/by_yaml/schema/demand.gen.json` 为唯一语法真相
 - CLI/LSP 参考: `src/scalim/cli/yaml_dsl.py` 为唯一命令真相
 - 规范摘要: `openspec/specs/` 中相关 spec 作为维护来源,自动摘录 requirement 索引
-- canonical example: `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
+- canonical example: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
 
 手工维护的 `SKILL.md` 与非 generated references 一般不由这里写入或重排.
 例外: 若存在手工 reference `references/task-upgrade-legacy.md`,生成器会在约定的 marker 区块内
@@ -62,7 +62,7 @@ CANONICAL_EXAMPLE_OUTPUT_REL = GENERATED_ROOT_REL / "example-full" / "ecommerce_
 
 SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
 CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
-CANONICAL_EXAMPLE_SOURCE_REL = Path("notebooks") / "marimo" / "examples" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_report.yaml"
+CANONICAL_EXAMPLE_SOURCE_REL = Path("notebooks") / "marimo" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_report.yaml"
 
 UPGRADES_DOCS_ROOT_REL = Path("docs") / "doc" / "yaml-dsl" / "upgrades"
 UPGRADE_LEGACY_REFERENCE_REL = REFERENCES_ROOT_REL / "task-upgrade-legacy.md"

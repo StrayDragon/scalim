@@ -168,7 +168,7 @@ build-dist:
 dist-check: build-dist
     uv {{ UV_OPTIONS }} run python scripts/check-build-artifacts.py
 
-# 生成: Viz 数据 (默认为 notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml)
+# 生成: Viz 数据 (默认为 notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml)
 gen-viz-data PARAM="":
     uv {{ UV_OPTIONS }} run python scripts/gen-viz-data.py --mode events-only {{ PARAM }}
     # uv {{ UV_OPTIONS }} run python scripts/gen-viz-data.py --mode events+trace {{ PARAM }}
@@ -367,11 +367,13 @@ notebook:
 
 # 运行示例: 大数据的示例
 examples-big-data:
-    uv {{ UV_OPTIONS }} run python notebooks/marimo/examples/demo_big_data_report/demo_main.py
+    uv {{ UV_OPTIONS }} run python notebooks/marimo/demo_big_data_report/demo_main.py
 
 # 运行示例: 运行所有示例
 examples:
-    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python notebooks/marimo/examples/demo_big_data_report/run_examples.py
+    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python notebooks/marimo/demo_big_data_report/run_examples.py
+
+alias example := examples
 
 # QA: 仅py轻量的检查
 quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check doc-governance-check stdlib-collisions-check openspec-check test

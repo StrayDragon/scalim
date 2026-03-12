@@ -10,7 +10,7 @@ from scalim.ob.observer import EventDispatchObserver
 from scalim.planning import PlanBuilder
 from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, KeyIr, LoaderIr, MainSourceIr, SourceIr
 
-from notebooks.marimo.examples.demo_big_data_report._guardrails_demo_loaders import (
+from notebooks.marimo.demo_big_data_report._guardrails_demo_loaders import (
     load_guardrails_demo_main_rows,
     load_guardrails_demo_ref_table,
 )

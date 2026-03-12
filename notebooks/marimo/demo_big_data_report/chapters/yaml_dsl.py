@@ -13,9 +13,9 @@ from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.sinks.sink_memory import InMemoryRowSink
 
-from notebooks.marimo.examples.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.examples.demo_big_data_report._shared import TARGET_FIELDS_FULL
-from notebooks.marimo.examples.demo_big_data_report._verification import VerificationResult, verify_scalim_output
+from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
+from notebooks.marimo.demo_big_data_report._shared import TARGET_FIELDS_FULL
+from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
 
 from ._types import ChapterResult
 
@@ -31,7 +31,7 @@ def run_yaml_dsl(cfg: ECommerceConfig, *, yaml_path: Path, runtime_vars: Optiona
     """YAML DSL 主线: `compile`/`run` + 内存 `sink` + 对拍 + `rows-binding` 对拍字段校验."""
     set_config(cfg)
 
-    loader_module = "notebooks.marimo.examples.demo_big_data_report._loaders"
+    loader_module = "notebooks.marimo.demo_big_data_report._loaders"
     allowed_modules = frozenset([loader_module])
     runtime_vars = runtime_vars or {"order_ids": []}
 

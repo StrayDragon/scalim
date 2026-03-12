@@ -8,9 +8,9 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from notebooks.marimo.examples.demo_big_data_report._loaders import ECommerceConfig, get_config, load_orders, set_config
-from notebooks.marimo.examples.demo_big_data_report._shared import build_ecommerce_model
-from notebooks.marimo.examples.demo_big_data_report._verification import VerificationResult, verify_scalim_output
+from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, get_config, load_orders, set_config
+from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
+from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
 
 
 @dataclass(frozen=True)

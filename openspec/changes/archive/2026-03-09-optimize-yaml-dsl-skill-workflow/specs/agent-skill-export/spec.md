@@ -51,21 +51,21 @@
 
 #### Scenario: canonical example 来源固定
 - **WHEN** 生成器运行
-- **THEN** 它必须从 `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 导出唯一 canonical example
+- **THEN** 它必须从 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 导出唯一 canonical example
 - **THEN** 不得额外生成 minimal / advanced / examples index 形式的示例产物
 
 ### Requirement: Example Selection and Validation
 系统 MUST 仅导出一个 canonical full example,目标路径固定为 `artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.yaml`.
 
 该 canonical example MUST:
-- 仅通过静态读取 `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 获得,不得执行 notebook
+- 仅通过静态读取 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 获得,不得执行 notebook
 - 在导出后通过 `PROJECT_CLI_NAME yaml-dsl schema validate` 与 `PROJECT_CLI_NAME yaml-dsl validate` 校验
 - 在内容包含位置敏感引用时(例如 `$schema` header),保留或重写为从导出目标位置可正确解析的形式
 
 系统 MUST NOT 再要求 `# region SCALIM-SKILL:<tag>` 标注、notebooks > tests 的示例优先级竞争,或 minimal / relations / compute 示例齐备.
 
 #### Scenario: canonical source 缺失
-- **WHEN** `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 不存在
+- **WHEN** `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 不存在
 - **THEN** 生成器退出非零并提示 canonical example 来源缺失
 
 #### Scenario: 不执行 notebooks

@@ -23,10 +23,11 @@
 
 - [ ] 4.1 更新 `schema_dsl` 元数据与生成器,让 JSON Schema 接受顶层 `imports` 与 mapping 内 `$import`
 - [ ] 4.2 运行 `just gen-yaml-dsl-schema` 并确保 schema 漂移测试通过
-- [ ] 4.3 按 SSOT 规则补充 YAML 语法文档与示例,并运行 `just gen-docs`(不手改 `.gen.`)
-- [ ] 4.4 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
-- [ ] 4.5 更新 canonical demo: `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 覆盖 `imports/$import` 的最小可运行用例
-- [ ] 4.6 新增升级指南: `docs/doc/yaml-dsl/upgrades/2026-03-12-yaml-dsl-imports.md`,并运行 `just gen` 注入升级索引
+- [ ] 4.3 运行 `just gen-yaml-dsl-editor-schema` 同步 `frontend/scalim-yaml-dsl-editor/**/schema/demand.gen.json` 与 `dist/` 产物(避免前后端 schema 漂移)
+- [ ] 4.4 按 SSOT 规则补充 YAML 语法文档与示例,并运行 `just gen-docs`(不手改 `.gen.`)
+- [ ] 4.5 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
+- [ ] 4.6 更新 canonical demo: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 覆盖 `imports/$import` 的最小可运行用例
+- [ ] 4.7 新增升级指南: `docs/doc/yaml-dsl/upgrades/2026-03-12-yaml-dsl-imports.md`,并运行 `just gen` 注入升级索引
 
 ## 5. Tests
 

@@ -46,4 +46,4 @@
   - `docs/doc/yaml-dsl/**`
   - `artifacts/skills/scalim-yaml-dsl/**`
   - `tests/fixtures/**`
-  - `notebooks/marimo/examples/**`
+  - `notebooks/marimo/**`

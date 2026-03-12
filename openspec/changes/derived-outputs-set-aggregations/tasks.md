@@ -27,5 +27,10 @@
 
 ## 6. 质量门禁
 
-- [ ] 6.1 运行相关测试集并修复(建议从 `pytest -k derived_outputs or output_composition` 开始)
-- [ ] 6.2 运行 `just qa` 与 `just openspec-check`(归档前必做)
+- [ ] 6.1 更新 delta spec: `openspec/changes/derived-outputs-set-aggregations/specs/derived-outputs/spec.md`(明确 determinism/guardrails/meta-audit 边界)
+- [ ] 6.2 将 delta spec 同步到主规范: `openspec/specs/derived-outputs/spec.md`(按 OpenSpec 流程,避免直接手改生成物)
+- [ ] 6.3 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
+- [ ] 6.4 运行 acceptance demo: `openspec/changes/derived-outputs-set-aggregations/acceptance/mvp_demo/run_demo.py`(脱敏,对齐口径与产物)
+- [ ] 6.5 运行相关测试集并修复(建议从 `pytest -k derived_outputs or output_composition` 开始)
+- [ ] 6.6 运行 `just qa` 与 `just openspec-check`(归档前必做)
+- [ ] 6.7 归档到: `openspec/changes/archive/YYYY-MM-DD-derived-outputs-set-aggregations/`

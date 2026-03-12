@@ -45,5 +45,5 @@
 
 ## 8. Repo + Downstream Upgrade (canonical demo)
 
-- [x] 8.1 升级 canonical example `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 移除 `bind/to_bind`,迁移为 `sources.*.params` 的 `$keys/$rows` 模板指令(并保持语义/示例价值)
+- [x] 8.1 升级 canonical example `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 移除 `bind/to_bind`,迁移为 `sources.*.params` 的 `$keys/$rows` 模板指令(并保持语义/示例价值)
 - [x] 8.2 下游适配盘点: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并对其中关联代码做同步升级(不得在输出中引用其内容)

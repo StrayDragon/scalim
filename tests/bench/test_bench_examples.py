@@ -5,8 +5,8 @@ from typing import Callable, Dict, List, Optional
 import pytest
 
 from scalim_benchlib import BenchmarkRunner
-from notebooks.marimo.examples.demo_big_data_report._loaders import ECommerceConfig, load_orders
-from notebooks.marimo.examples.demo_big_data_report._shared import (
+from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, load_orders
+from notebooks.marimo.demo_big_data_report._shared import (
     TARGET_FIELDS_BASIC,
     TARGET_FIELDS_DERIVED,
     TARGET_FIELDS_FULL,
@@ -261,9 +261,9 @@ def test_bench_pipeline_trace(benchmark) -> None:
 @pytest.mark.benchmark(group="dsl")
 def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
     cfg = _build_model()
-    yaml_path = Path("notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml")
+    yaml_path = Path("notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml")
     output_path = tmp_path / "ecommerce_report.csv"
-    allowed_modules = frozenset(["notebooks.marimo.examples.demo_big_data_report._loaders"])
+    allowed_modules = frozenset(["notebooks.marimo.demo_big_data_report._loaders"])
 
     def _run_yaml() -> None:
         run(

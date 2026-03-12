@@ -76,7 +76,7 @@ manual 部分由人维护,负责“何时读什么、怎么决策、怎么交付
 
 - syntax catalog: 来自 schema 顶层字段、definitions、metadata
 - CLI/LSP reference: 直接来自 `src/IMPL_ROOT/cli/yaml_dsl.py` 与 canonical schema path,作为命令与 schema 查询方式的唯一详尽来源
-- canonical example: 仅来自 `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`,导出到 `references/generated/example-full/ecommerce_report.yaml`
+- canonical example: 仅来自 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`,导出到 `references/generated/example-full/ecommerce_report.yaml`
 
 manual skill 只保留最关键的入口指引,例如:
 - 仓库内: `uv run PROJECT_CLI_NAME ...`

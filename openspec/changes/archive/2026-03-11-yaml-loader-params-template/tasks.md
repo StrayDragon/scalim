@@ -19,5 +19,5 @@
 
 ## 4. Repo + Downstream Upgrade (canonical demo)
 
-- [x] 4.1 升级 canonical example `notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 至少覆盖一个 `preload_forever` + `sources.<id>.params` 非空的示例,以验证 “params 非空才透传 kwargs;为空仍零参” 的收敛语义
+- [x] 4.1 升级 canonical example `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`: 至少覆盖一个 `preload_forever` + `sources.<id>.params` 非空的示例,以验证 “params 非空才透传 kwargs;为空仍零参” 的收敛语义
 - [x] 4.2 下游适配盘点: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并对其中关联代码做同步升级(不得在输出中引用其内容)
