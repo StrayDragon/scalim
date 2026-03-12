@@ -4,13 +4,17 @@ from typing import Dict, List
 
 import pytest
 
+from scalim.events.catalog import EVENT_LOADER_CALL
 from scalim.execution.context import BatchContext
+from scalim.execution.executor.operators.load_ref import loader as load_ref_loader
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
+from scalim.execution.executor.runtime.runtime import LoadRefCacheEntry
 from scalim.ob.manager import ObserverManager
+from scalim.ob.observer import Observer
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir.binding import BindingIr, LoaderIr
+from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from scalim.spec.ir.fields import FieldIr
 from scalim.spec.ir.relations import LookupStepIr
 from scalim.spec.ir.sources import KeyIr, SourceIr
@@ -103,6 +107,88 @@ def test_load_ref_builds_batch_rows_with_row_binding() -> None:
     assert captured["batch_rows"] == [{"fk_id": 1, "note": "n1"}]
     assert captured["rows_param"] == [{"fk_id": 1, "note": "n1"}]
     assert context.get_field_value("target_name", 1) == "Alpha"
+
+
+def test_load_ref_rows_cache_does_not_retain_batch_rows_in_cache() -> None:
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"rows": ctx.batch_rows}
+
+    def _loader(rows):  # type: ignore[no-untyped-def]
+        assert rows is not None
+        return {1: {"name": "Alpha"}}
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    binding = BindingIr(key_field="target_id", params_builder=_params_builder, mode="rows", cache_mode="batch")
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    context = BatchContext()
+    context.set_field_value("fk_id", 1, 1)
+    context.set_field_value("note", 1, "n1")
+
+    LoadRefOperatorExecutor().execute(operator, context, [1], runtime)
+
+    assert runtime.load_ref_cache
+    assert all(entry.batch_rows is None for entry in runtime.load_ref_cache.values())
+
+
+def test_load_ref_cache_hit_uses_cached_batch_rows_in_context() -> None:
+    class _CaptureLoaderCallObserver(Observer):
+        event_types = {EVENT_LOADER_CALL}
+
+        def __init__(self) -> None:
+            self.events: List[object] = []
+
+        def on_event(self, event) -> None:  # type: ignore[override]
+            self.events.append(event)
+
+    runtime = _make_runtime(ExecutionPlan(), _make_main_source())
+    observer = _CaptureLoaderCallObserver()
+    runtime.observer_manager.register(observer)
+
+    cache_key = (("targets", ("fk_id",), "target_id", None, None), frozenset([1]))
+    cached_batch_rows = [{"fk_id": 1, "note": "n1"}]
+    cached_result = {1: {"name": "Alpha"}}
+    runtime.load_ref_cache[cache_key] = LoadRefCacheEntry(result=cached_result, batch_rows=cached_batch_rows)
+    binding = BindingIr(key_field="target_id", params_builder=lambda ctx: ((), {"rows": ctx.batch_rows}), mode="rows")
+
+    loader_context = LoaderCallContextIr(
+        batch_row_nth=[0],
+        source_id="targets",
+        field_keys=["target_name"],
+        is_ref_loader=True,
+        lookup_keys={1},
+        lookup_keys_list=[1],
+        batch_rows=None,
+    )
+
+    result = load_ref_loader._get_cached_ref_result(
+        runtime=runtime,
+        cache_key=cache_key,
+        binding=binding,
+        loader_context=loader_context,
+        lookup_key_count=1,
+        event_field_keys=("target_name",),
+        source_id="targets",
+    )
+
+    assert result == cached_result
+    assert observer.events
+    captured_event = observer.events[-1]
+    assert captured_event.payload.params["rows"] == cached_batch_rows
 
 
 def test_load_ref_lookup_chunking_splits_calls() -> None:

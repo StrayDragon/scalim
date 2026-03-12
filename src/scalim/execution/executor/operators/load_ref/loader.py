@@ -199,9 +199,13 @@ def _load_ref_once(
         cache_status="miss",
     )
     if cache_enabled and cache_key is not None:
+        cached_batch_rows = loader_context.batch_rows
+        if binding is not None and binding.mode == "rows":
+            # 避免将可能很大的 `batch_rows` 列表保存在长生命周期 `cache` 中.
+            cached_batch_rows = None
         runtime.load_ref_cache[cache_key] = LoadRefCacheEntry(
             result=result,
-            batch_rows=loader_context.batch_rows,
+            batch_rows=cached_batch_rows,
         )
     return result
 
@@ -319,8 +323,11 @@ def load_step_data(
         if cache_enabled and exec_ctx.relation_signature not in runtime.rows_cache_logged:
             _logger.info(
                 (
-                    "已启用 `LoadRef` 的 `rows` 批次缓存: 来源 '%s'(字段=%s). "
-                    "若加载器有副作用或依赖可变的 `batch_rows`, 请将该 `source` 的 `params` 模板设置为 `$rows: {cache_mode: none}`."
+                    "已启用 `LoadRef` 的 `rows` 批次复用: 来源 '%s'(字段=%s). "
+                    "注意: 大批次下构造 `batch_rows` 可能较重;"
+                    "系统默认不会将完整 `batch_rows` 存入长生命周期缓存(避免驻留放大). "
+                    "若加载器有副作用或依赖可变的 `batch_rows`, "
+                    "请将该 `source` 的 `params` 模板设置为 `$rows: {cache_mode: none}` 禁用复用."
                 ),
                 source.source_id,
                 ",".join(event_field_keys),
