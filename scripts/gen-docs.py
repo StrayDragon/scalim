@@ -11,7 +11,6 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
 from scalim.dsl.by_yaml.schema_dsl.doc_texts import SOURCE_FIELD_EXTRACT_MD
-from scalim_misc.cli_docs import build_yaml_dsl_command_docs
 from scalim_misc.markdown_inject import InjectBlockSpec, replace_markdown_injected_block
 
 
@@ -256,35 +255,6 @@ def _render_yaml_schema_reference(repo_root: Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _render_yaml_cli_reference(repo_root: Path) -> str:
-    cli_rel = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
-    command_docs = build_yaml_dsl_command_docs()
-
-    lines = [
-        _autogen_md_header(sources=["`{}`".format(str(cli_rel).replace("\\", "/"))]).rstrip("\n"),
-        "# YAML CLI 参考(生成)",
-        "",
-        "此页从 CLI 实现自动生成,用于对齐命令用法与参数说明.",
-        "",
-        "## Commands",
-    ]
-    for command_doc in command_docs:
-        command_name = " ".join(command_doc["tokens"])
-        lines.extend(
-            [
-                "",
-                "### `{}`".format(command_name),
-                "- Help: {}".format(_collapse_text(command_doc["help"])),
-                "- Usage: `{}`".format(_collapse_text(command_doc["usage"])),
-            ]
-        )
-        help_full = str(command_doc.get("help_full") or "").rstrip()
-        if help_full:
-            lines.extend(["- Full help:", "```text", help_full.rstrip(), "```"])
-    lines.append("")
-    return "\n".join(lines).rstrip() + "\n"
-
-
 def _extract_markdown_h1(text: str) -> str:
     for line in text.splitlines():
         stripped = line.strip()
@@ -363,7 +333,6 @@ def _render_openspec_index(repo_root: Path) -> str:
 def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, str]:
     return {
         docs_dir / "yaml-dsl" / "schema-reference.gen.md": _render_yaml_schema_reference(repo_root),
-        docs_dir / "yaml-dsl" / "cli-reference.gen.md": _render_yaml_cli_reference(repo_root),
         docs_dir / "specs" / "openspec-index.gen.md": _render_openspec_index(repo_root),
     }
 

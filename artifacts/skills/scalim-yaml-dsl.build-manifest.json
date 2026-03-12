@@ -276,7 +276,7 @@
     },
     {
       "path": "openspec/specs/source-relations/spec.md",
-      "sha256": "4bc681a4b8c4088f6fb8a5beac3ae002f415f07e5535e41c5880cf96dd3cdad7"
+      "sha256": "d5204d27c56ba975c420234ee3149c172d0e867b8ec26398ce3ae70008e5f04f"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -296,13 +296,13 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "dfb86593d2491b683a12cd0e6c93f18e3a30da7a33a9cc7aa68aae9ff443a68e"
+      "sha256": "a158a8282472ff88d46f58df6bc031c894e790fba771f540e721778d416c5ba5"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "934f6071d79e1a4fccee8665af6b80f50f40225f1af83ae045a1d8aefb2bd49a"
+      "sha256": "23182558611ebfb8e3ff8606790a3c351bb706966f0e9677b463ffa0de213805"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",

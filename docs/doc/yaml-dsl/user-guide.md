@@ -135,7 +135,7 @@ uv tool install --editable <PATH_TO_SCALIM>/scalim[cli]
 scalim-cli yaml-dsl validate config.yaml
 ```
 
-更多 CLI 子命令与参数说明见: [YAML CLI 参考(生成)](cli-reference.gen.md).
+更多 CLI 子命令与参数说明以 `scalim-cli yaml-dsl --help` / `scalim-cli yaml-dsl validate --help` 为准.
 
 **Python 代码调用**:
 
@@ -265,7 +265,7 @@ output:
 顶层字段集合、`required` 边界与默认值以 JSON Schema 为准(避免文档漂移):
 
 - [YAML Schema 参考(生成)](schema-reference.gen.md) (Top-Level Fields / Definitions)
-- [YAML CLI 参考(生成)](cli-reference.gen.md) (`scalim-cli yaml-dsl schema show` / `... path`)
+- CLI 导出 schema: `scalim-cli yaml-dsl schema show` / `scalim-cli yaml-dsl schema path`
 
 最小必填字段只有:
 
@@ -1793,14 +1793,14 @@ observability:
 
 **A**:
 
-- 查看/导出 schema: 见 [YAML CLI 参考(生成)](cli-reference.gen.md)
+- 查看/导出 schema: `scalim-cli yaml-dsl schema show` / `scalim-cli yaml-dsl schema path`
 - 更新仓库内 schema 生成物: `just gen-yaml-dsl-schema` (并提交 `src/scalim/dsl/by_yaml/schema/demand.gen.json`)
 
 ### Q8: 如何验证配置文件？
 
 **A**:
 
-- CLI 校验参数与更多命令见: [YAML CLI 参考(生成)](cli-reference.gen.md)
+- CLI 校验参数与更多命令见: `scalim-cli yaml-dsl validate --help`
 
 ```bash
 # 使用 CLI 验证

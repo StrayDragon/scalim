@@ -263,6 +263,7 @@ bump-versions VERSION="" CONFIRM="":
         echo "[warn] confirm token ignored (expected 'YES'):" "{{ CONFIRM }}" >&2
     fi
     uv {{ UV_OPTIONS }} run python scripts/bump-versions.py "${args[@]}"
+    uv {{ UV_OPTIONS }} version "${args[@]}"
 
 # 生成: Agent Skill 数据
 gen-agent-skill:

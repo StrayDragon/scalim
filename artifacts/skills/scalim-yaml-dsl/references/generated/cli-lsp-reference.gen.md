@@ -80,29 +80,59 @@
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
 - Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
-- Positionals:
-  - `yaml_file`: YAML 文件路径
-- Options:
-  - `--schema, -s`: JSON Schema 文件路径
-  - `--strict`: 严格模式: 将未知字段视为错误
-  - `--json`: 输出 JSON 结果
-  - `--verbose, -v`: 显示详细错误信息
+- Full help:
+```text
+usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file
+
+positional arguments:
+  yaml_file             YAML 文件路径
+
+options:
+  -h, --help            show this help message and exit
+  --schema SCHEMA, -s SCHEMA
+                        JSON Schema 文件路径
+  --strict              严格模式: 将未知字段视为错误
+  --json                输出 JSON 结果
+  --verbose, -v         显示详细错误信息
+```
 
 ### `yaml-dsl schema validate`
 - Help: Validate YAML DSL via JSON Schema
 - Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
-- Positionals:
-  - `yaml_file`: YAML 文件路径
-- Options:
-  - `--schema, -s`: JSON Schema 文件路径
-  - `--strict`: 严格模式: 将未知字段视为错误
-  - `--json`: 输出 JSON 结果
-  - `--verbose, -v`: 显示详细错误信息
+- Full help:
+```text
+usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file
+
+positional arguments:
+  yaml_file             YAML 文件路径
+
+options:
+  -h, --help            show this help message and exit
+  --schema SCHEMA, -s SCHEMA
+                        JSON Schema 文件路径
+  --strict              严格模式: 将未知字段视为错误
+  --json                输出 JSON 结果
+  --verbose, -v         显示详细错误信息
+```
 
 ### `yaml-dsl schema show`
 - Help: Print JSON Schema
 - Usage: `scalim-cli yaml-dsl schema show [-h]`
+- Full help:
+```text
+usage: scalim-cli yaml-dsl schema show [-h]
+
+options:
+  -h, --help  show this help message and exit
+```
 
 ### `yaml-dsl schema path`
 - Help: Print JSON Schema path
 - Usage: `scalim-cli yaml-dsl schema path [-h]`
+- Full help:
+```text
+usage: scalim-cli yaml-dsl schema path [-h]
+
+options:
+  -h, --help  show this help message and exit
+```

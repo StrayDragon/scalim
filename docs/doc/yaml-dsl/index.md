@@ -10,7 +10,7 @@
 - 升级旧写法/破坏性变更: [升级指南](upgrades/index.md)
 - 想让智能助手协助写/改 YAML: [集成AI环境 (Agent Skill)](agent-skill.md)
 - 维护 schema/编辑器补全: [Schema Meta 参考](schema-meta.md)
-- 需要稳定 reference(字段集合/命令参数): [YAML Schema 参考(生成)](schema-reference.gen.md), [YAML CLI 参考(生成)](cli-reference.gen.md)
+- 需要稳定 reference(字段集合): [YAML Schema 参考(生成)](schema-reference.gen.md)
 
 下一步:
 

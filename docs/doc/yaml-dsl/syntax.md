@@ -20,7 +20,7 @@ YAML DSL 的语法有两层来源:
 
 1. JSON Schema(结构与类型)
    - CLI: `scalim-cli yaml-dsl schema show` / `scalim-cli yaml-dsl schema path`
-   - 参考页: [YAML CLI 参考(生成)](cli-reference.gen.md), [YAML Schema 参考(生成)](schema-reference.gen.md)
+   - 参考页: [YAML Schema 参考(生成)](schema-reference.gen.md)
 2. 内置 validator(语义规则,超出 schema 的部分)
    - 入口: `scalim-cli yaml-dsl validate ...`
 
