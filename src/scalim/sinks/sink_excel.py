@@ -1,6 +1,8 @@
 # region imports
 
 import logging
+import os
+import time
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Type
@@ -53,6 +55,48 @@ COLUMN_EXCEL_SINK_SAVE_FAILED_LOG = COLUMN_EXCEL_SINK_SAVE_FAILED + ": %s"
 COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = "ColumnExcelSink 删除临时文件失败"
 COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
+_FORMULA_PREFIXES = ("=", "+", "-", "@")
+_WRITE_LOCK_SUFFIX = ".scalim.lock"
+
+
+def _acquire_write_lock(output_path: str) -> Path:
+    lock_path = Path(str(output_path) + _WRITE_LOCK_SUFFIX)
+    try:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        msg = "Output path is locked (possible concurrent writers): output_path={!r}, lock_path={!r}".format(
+            str(output_path),
+            str(lock_path),
+        )
+        raise RuntimeError(msg) from None
+    with os.fdopen(fd, "w") as f:
+        _ = f.write("pid={}\n".format(os.getpid()))
+        _ = f.write("created_at_epoch={}\n".format(time.time()))
+    return lock_path
+
+
+def _release_write_lock(lock_path: Path) -> None:
+    try:
+        lock_path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        _LOGGER.warning("删除输出锁文件失败: %s", lock_path, exc_info=True)
+
+
+def _escape_excel_formula(value: Any, *, allow_formulas: bool) -> Any:
+    if allow_formulas:
+        return value
+    if not isinstance(value, str) or not value:
+        return value
+    if value.startswith("'"):
+        return value
+    stripped = value.lstrip()
+    if stripped and stripped[0] in _FORMULA_PREFIXES:
+        # 前缀转义,避免 `Excel` 将其解析为公式.
+        return "'" + value
+    return value
+
 
 class ExcelSink(BaseRowSink):
     """`Excel` 行写入器:支持流式行写入.
@@ -87,6 +131,8 @@ class ExcelSink(BaseRowSink):
     header_names: List[str]
     _workbook: Workbook
     _worksheet: Any
+    _allow_formulas: bool
+    _write_lock: bool
 
     def __init__(
         self,
@@ -95,6 +141,8 @@ class ExcelSink(BaseRowSink):
         header_names: Optional[List[str]] = None,
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
+        allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        write_lock: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.sheet_name = sheet_name
@@ -102,13 +150,18 @@ class ExcelSink(BaseRowSink):
         self._closed = False
         self.field_names = field_names
         self.header_names = header_names if header_names is not None else field_names
+        self._allow_formulas = bool(allow_formulas)
+        self._write_lock = bool(write_lock)
         self._workbook = Workbook(write_only=True)
         self._worksheet = self._workbook.create_sheet(self.sheet_name)
         if self.include_header:
-            _ = self._worksheet.append(self.header_names)
+            _ = self._worksheet.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
     def _format_row(self, row: RowData) -> List[Any]:
-        return [row.get(field_name) for field_name in self.field_names]
+        values: List[Any] = []
+        for field_name in self.field_names:
+            values.append(_escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
+        return values
 
     @override
     def write_row(self, row: RowData) -> None:
@@ -125,31 +178,41 @@ class ExcelSink(BaseRowSink):
             return
 
         # 使用临时文件,确保在同一目录以支持原子重命名
-        temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
-        temp_path_obj = Path(temp_path)
+        output_dir = Path(self.output_path).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
 
+        lock_path: Optional[Path] = None
         try:
-            self._workbook.save(temp_path_obj)
-            # 原子重命名临时文件到目标路径
-            _ = temp_path_obj.replace(self.output_path)
-        except Exception:
-            _LOGGER.exception(EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
-            # 清理临时文件
-            if temp_path_obj.exists():
-                try:
-                    temp_path_obj.unlink()
-                except OSError:
-                    _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
-            # 尽力清理:在保存失败时避免出现只写生成器告警.
+            if self._write_lock:
+                lock_path = _acquire_write_lock(self.output_path)
+
+            temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
+            temp_path_obj = Path(temp_path)
+
             try:
-                is_closed = self._worksheet.closed
-            except AttributeError:
-                is_closed = True
-            if not is_closed:
-                with suppress(Exception):
-                    self._worksheet.close()
-            raise
+                self._workbook.save(temp_path_obj)
+                # 原子重命名临时文件到目标路径
+                _ = temp_path_obj.replace(self.output_path)
+            except Exception:
+                _LOGGER.exception(EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
+                # 清理临时文件
+                if temp_path_obj.exists():
+                    try:
+                        temp_path_obj.unlink()
+                    except OSError:
+                        _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                # 尽力清理:在保存失败时避免出现只写生成器告警.
+                try:
+                    is_closed = self._worksheet.closed
+                except AttributeError:
+                    is_closed = True
+                if not is_closed:
+                    with suppress(Exception):
+                        self._worksheet.close()
+                raise
         finally:
+            if lock_path is not None:
+                _release_write_lock(lock_path)
             with suppress(Exception):
                 self._workbook.close()
 
@@ -169,6 +232,7 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
     header_names: List[str]
     _worksheet: Any
     _closed: bool
+    _allow_formulas: bool
 
     def __init__(
         self,
@@ -178,19 +242,24 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
         field_names: List[str],
         header_names: Optional[List[str]] = None,
         include_header: bool = True,
+        allow_formulas: bool = False,
     ) -> None:
         self._worksheet = worksheet
         self.sheet_name = str(sheet_name)
         self.include_header = bool(include_header)
         self.field_names = list(field_names)
         self.header_names = list(header_names) if header_names is not None else list(self.field_names)
+        self._allow_formulas = bool(allow_formulas)
         self._closed = False
         if self.include_header:
             # 关键护栏: `header` 与 `rows` 分离,避免 `header` `list` 被复用污染.
-            _ = self._worksheet.append(list(self.header_names))
+            _ = self._worksheet.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(self.header_names)])
 
     def _format_row(self, row: RowData) -> List[Any]:
-        return [row.get(field_name) for field_name in self.field_names]
+        values: List[Any] = []
+        for field_name in self.field_names:
+            values.append(_escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
+        return values
 
     @override
     def write_row(self, row: RowData) -> None:
@@ -227,15 +296,19 @@ class ExcelWorkbookSink:
     _workbook: Workbook
     _sheet_names: List[str]
     _closed: bool
+    write_lock: bool
 
     def __init__(
         self,
         output_path: str,
+        *,
+        write_lock: bool = False,
     ) -> None:
         self.output_path = str(output_path)
         self._workbook = Workbook(write_only=True)
         self._sheet_names = []
         self._closed = False
+        self.write_lock = bool(write_lock)
 
     def create_sheet_row_sink(
         self,
@@ -244,6 +317,7 @@ class ExcelWorkbookSink:
         field_names: List[str],
         header_names: Optional[List[str]] = None,
         include_header: bool = True,
+        allow_formulas: bool = False,
     ) -> ExcelWorkbookSheetRowSink:
         if self._closed:
             msg = "ExcelWorkbookSink is closed: {}".format(self.output_path)
@@ -262,27 +336,38 @@ class ExcelWorkbookSink:
             field_names=field_names,
             header_names=header_names,
             include_header=include_header,
+            allow_formulas=allow_formulas,
         )
 
     def close(self) -> None:
         if self._closed:
             return
 
-        temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
-        temp_path_obj = Path(temp_path)
+        output_dir = Path(self.output_path).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
 
+        lock_path: Optional[Path] = None
         try:
-            self._workbook.save(temp_path_obj)
-            _ = temp_path_obj.replace(self.output_path)
-        except Exception:
-            _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
-            if temp_path_obj.exists():
-                try:
-                    temp_path_obj.unlink()
-                except OSError:
-                    _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
-            raise
+            if self.write_lock:
+                lock_path = _acquire_write_lock(self.output_path)
+
+            temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
+            temp_path_obj = Path(temp_path)
+
+            try:
+                self._workbook.save(temp_path_obj)
+                _ = temp_path_obj.replace(self.output_path)
+            except Exception:
+                _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
+                if temp_path_obj.exists():
+                    try:
+                        temp_path_obj.unlink()
+                    except OSError:
+                        _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                raise
         finally:
+            if lock_path is not None:
+                _release_write_lock(lock_path)
             with suppress(Exception):
                 self._workbook.close()
 
@@ -329,6 +414,8 @@ class ColumnExcelSink(IColumnSink):
     _row_ids: List[Any]
     _columns: ColumnData
     _closed: bool
+    _allow_formulas: bool
+    _write_lock: bool
 
     def __init__(
         self,
@@ -337,6 +424,8 @@ class ColumnExcelSink(IColumnSink):
         header_names: Optional[List[str]] = None,
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
+        allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        write_lock: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.field_names = field_names
@@ -346,6 +435,8 @@ class ColumnExcelSink(IColumnSink):
         self._row_ids = []
         self._columns = {}
         self._closed = False
+        self._allow_formulas = bool(allow_formulas)
+        self._write_lock = bool(write_lock)
 
     @override
     def set_row_ids(self, row_ids: "SinkRowKeySeq") -> None:
@@ -369,45 +460,56 @@ class ColumnExcelSink(IColumnSink):
         store_rows_as_columns(rows, self._row_ids, self._columns, _pk_factory)
 
     @override
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: C901, PLR0912
         if self._closed:
             return
 
-        # 使用临时文件,确保在同一目录以支持原子重命名
-        temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
-        temp_path_obj = Path(temp_path)
-        wb = None
+        output_dir = Path(self.output_path).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        lock_path: Optional[Path] = None
+        if self._write_lock:
+            lock_path = _acquire_write_lock(self.output_path)
 
         try:
-            wb = Workbook()
-            ws = wb.active
-            if ws is None:
-                ws = wb.create_sheet(self.sheet_name)
-            else:
-                ws.title = self.sheet_name
+            # 使用临时文件,确保在同一目录以支持原子重命名
+            temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
+            temp_path_obj = Path(temp_path)
+            wb = None
 
-            if self.include_header:
-                _ = ws.append(self.header_names)
+            try:
+                wb = Workbook()
+                ws = wb.active
+                if ws is None:
+                    ws = wb.create_sheet(self.sheet_name)
+                else:
+                    ws.title = self.sheet_name
 
-            for row_values in iter_row_values(self._row_ids, self.field_names, self._columns):
-                _ = ws.append(list(row_values))
+                if self.include_header:
+                    _ = ws.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
-            wb.save(temp_path_obj)
-            # 原子重命名临时文件到目标路径
-            _ = temp_path_obj.replace(self.output_path)
-        except Exception:
-            _LOGGER.exception(COLUMN_EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
-            # 清理临时文件
-            if temp_path_obj.exists():
-                try:
-                    temp_path_obj.unlink()
-                except OSError:
-                    _LOGGER.warning(COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
-            raise
+                for row_values in iter_row_values(self._row_ids, self.field_names, self._columns):
+                    _ = ws.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(row_values)])
+
+                wb.save(temp_path_obj)
+                # 原子重命名临时文件到目标路径
+                _ = temp_path_obj.replace(self.output_path)
+            except Exception:
+                _LOGGER.exception(COLUMN_EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
+                # 清理临时文件
+                if temp_path_obj.exists():
+                    try:
+                        temp_path_obj.unlink()
+                    except OSError:
+                        _LOGGER.warning(COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                raise
+            finally:
+                if wb is not None:
+                    with suppress(Exception):
+                        wb.close()
         finally:
-            if wb is not None:
-                with suppress(Exception):
-                    wb.close()
+            if lock_path is not None:
+                _release_write_lock(lock_path)
 
         self._closed = True
 

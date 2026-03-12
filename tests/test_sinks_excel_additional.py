@@ -17,6 +17,18 @@ def _read_excel_rows(path: Path):
     return rows
 
 
+def _read_cell_value_and_type(path: Path, cell_ref: str):
+    from openpyxl import load_workbook
+
+    wb = load_workbook(str(path), data_only=False)
+    try:
+        ws = wb.active
+        cell = ws[cell_ref]
+        return cell.value, cell.data_type
+    finally:
+        wb.close()
+
+
 def _write_excel_rows(path: Path, sink_cls, rows, header_names=None) -> None:
     if sink_cls is excel_mod.ExcelSink:
         with sink_cls(str(path), field_names=["id", "name"], header_names=header_names) as sink:
@@ -232,6 +244,97 @@ def test_excel_sink_close_exception_closes_open_worksheet(tmp_path: Path, monkey
     assert worksheet.closed_called is True
 
 
+@pytest.mark.parametrize(
+    "sink_cls",
+    [excel_mod.ExcelSink, excel_mod.ColumnExcelSink],
+    ids=["row-sink", "column-sink"],
+)
+def test_excel_formula_injection_escape_and_allow(tmp_path: Path, sink_cls) -> None:
+    escape_path = tmp_path / "escape.xlsx"
+    allow_path = tmp_path / "allow.xlsx"
+
+    if sink_cls is excel_mod.ExcelSink:
+        sink = sink_cls(str(escape_path), field_names=["id", "name"], allow_formulas=False)
+        sink.write_row({"id": 1, "name": "=1+1"})
+        sink.close()
+
+        sink2 = sink_cls(str(allow_path), field_names=["id", "name"], allow_formulas=True)
+        sink2.write_row({"id": 1, "name": "=1+1"})
+        sink2.close()
+    else:
+        sink = sink_cls(str(escape_path), field_names=["id", "name"], allow_formulas=False)
+        sink.set_row_ids([1])
+        sink.write_column("id", {1: 1})
+        sink.write_column("name", {1: "=1+1"})
+        sink.close()
+
+        sink2 = sink_cls(str(allow_path), field_names=["id", "name"], allow_formulas=True)
+        sink2.set_row_ids([1])
+        sink2.write_column("id", {1: 1})
+        sink2.write_column("name", {1: "=1+1"})
+        sink2.close()
+
+    escaped_value, escaped_type = _read_cell_value_and_type(escape_path, "B2")
+    assert escaped_type != "f"
+    assert escaped_value == "'=1+1"
+
+    allowed_value, allowed_type = _read_cell_value_and_type(allow_path, "B2")
+    assert allowed_type == "f"
+    assert allowed_value == "=1+1"
+
+
+def test_excel_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:
+    output_path = tmp_path / "locked.xlsx"
+    lock_path = Path(str(output_path) + ".scalim.lock")
+
+    sink = excel_mod.ExcelSink(str(output_path), ["id"], write_lock=True)
+    sink.write_row({"id": 1})
+    sink.close()
+
+    assert output_path.exists()
+    assert lock_path.exists() is False
+
+
+def test_excel_sink_write_lock_conflict_fails_fast(tmp_path: Path) -> None:
+    output_path = tmp_path / "locked_conflict.xlsx"
+    lock_path = Path(str(output_path) + ".scalim.lock")
+    lock_path.write_text("held", encoding="utf-8")
+
+    sink = excel_mod.ExcelSink(str(output_path), ["id"], write_lock=True)
+    sink.write_row({"id": 1})
+    with pytest.raises(RuntimeError, match="Output path is locked"):
+        sink.close()
+
+    assert output_path.exists() is False
+    assert lock_path.exists() is True
+
+
+def test_excel_workbook_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:
+    output_path = tmp_path / "wb_lock.xlsx"
+    lock_path = Path(str(output_path) + ".scalim.lock")
+
+    wb = excel_mod.ExcelWorkbookSink(str(output_path), write_lock=True)
+    sheet = wb.create_sheet_row_sink("Sheet1", field_names=["id"], include_header=True)
+    sheet.write_row({"id": 1})
+    wb.close()
+
+    assert output_path.exists()
+    assert lock_path.exists() is False
+
+
+def test_column_excel_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:
+    output_path = tmp_path / "col_lock.xlsx"
+    lock_path = Path(str(output_path) + ".scalim.lock")
+
+    sink = excel_mod.ColumnExcelSink(str(output_path), ["id"], write_lock=True)
+    sink.set_row_ids([1])
+    sink.write_column("id", {1: 1})
+    sink.close()
+
+    assert output_path.exists()
+    assert lock_path.exists() is False
+
+
 def test_excel_workbook_sink_close_exception_logs_unlink_failure(tmp_path: Path, monkeypatch, caplog) -> None:
     caplog.set_level(logging.WARNING, logger=excel_mod.__name__)
     monkeypatch.setattr(excel_mod, "Workbook", _FailingSaveWorkbook)
@@ -298,3 +401,31 @@ def test_excel_sink_close_exception_logs_unlink_failure(
     assert any(expected in record.getMessage() for record in caplog.records)
     for temp_file in tmp_path.glob("*.xlsx.tmp"):
         os.unlink(temp_file)
+
+
+def test_excel_write_lock_release_ignores_missing_lock_file(tmp_path: Path) -> None:
+    lock_path = tmp_path / "missing.scalim.lock"
+    excel_mod._release_write_lock(lock_path)
+
+
+def test_excel_write_lock_release_logs_warning_on_oserror(tmp_path: Path, monkeypatch, caplog) -> None:
+    lock_path = tmp_path / "held.scalim.lock"
+    lock_path.write_text("held", encoding="utf-8")
+
+    caplog.set_level(logging.WARNING, logger=excel_mod.__name__)
+
+    original_unlink = excel_mod.Path.unlink
+
+    def _failing_unlink(path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if str(path) == str(lock_path):
+            raise OSError("simulated unlink failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(excel_mod.Path, "unlink", _failing_unlink)
+
+    excel_mod._release_write_lock(lock_path)
+    assert any("删除输出锁文件失败" in record.getMessage() for record in caplog.records)
+
+
+def test_excel_formula_escape_skips_already_escaped_value() -> None:
+    assert excel_mod._escape_excel_formula("'=1+1", allow_formulas=False) == "'=1+1"

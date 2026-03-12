@@ -341,6 +341,8 @@ def _create_file_sink(output: OutputSpec, layout: ExportLayout) -> Optional[ISin
                 header_names=header_names,
                 sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
                 include_header=output.include_header,
+                allow_formulas=bool(output.excel_allow_formulas),
+                write_lock=bool(output.write_lock),
             )
         return ColumnExcelSink(
             output_path=str(output.path),
@@ -348,6 +350,8 @@ def _create_file_sink(output: OutputSpec, layout: ExportLayout) -> Optional[ISin
             header_names=header_names,
             sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
             include_header=output.include_header,
+            allow_formulas=bool(output.excel_allow_formulas),
+            write_lock=bool(output.write_lock),
         )
 
     msg = "Unsupported output format: '{}'. Supported formats: excel, csv.".format(output.format)

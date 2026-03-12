@@ -193,6 +193,8 @@ def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> ExcelSin
         header_names=header_names,
         sheet_name=sheet_name,
         include_header=bool(output.include_header),
+        allow_formulas=bool(output.excel_allow_formulas),
+        write_lock=bool(output.write_lock),
     )
 
 
@@ -608,8 +610,10 @@ def _create_row_sink_for_composed_output(
             path = str(output.path)
             wb = workbook_by_path.get(path)
             if wb is None:
-                wb = ExcelWorkbookSink(path)
+                wb = ExcelWorkbookSink(path, write_lock=bool(output.write_lock))
                 workbook_by_path[path] = wb
+            else:
+                wb.write_lock = bool(wb.write_lock or output.write_lock)
             field_names = list(layout.field_ids)
             header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
             sheet_sink = wb.create_sheet_row_sink(
@@ -617,6 +621,7 @@ def _create_row_sink_for_composed_output(
                 field_names=field_names,
                 header_names=header_names,
                 include_header=bool(output.include_header),
+                allow_formulas=bool(output.excel_allow_formulas),
             )
             sink = _CountingOutputRowSink(sheet_sink, counter)
             return sink, counter
