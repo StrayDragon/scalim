@@ -485,8 +485,8 @@ py36-compat-check:
         exit 0
     fi
 
-    echo "[warn] docker unavailable; fallback to static py36 syntax check" >&2
-    uv {{ UV_OPTIONS }} run python scripts/check-py36-syntax.py
+    echo "[error] docker unavailable; py36-compat-check requires docker. Please install/start docker and retry." >&2
+    exit 1
 
 # 检查: `Python 3.6` + `typing-extensions==4.1.1` 隔离环境兼容性
 py36-typingext-check:
@@ -498,8 +498,8 @@ py36-typingext-check:
         exit 0
     fi
 
-    echo "[warn] docker unavailable; fallback to typing-extensions==4.1.1 check under current python" >&2
-    bash scripts/check-py36-typingext-docker.sh
+    echo "[error] docker unavailable; py36-typingext-check requires docker. Please install/start docker and retry." >&2
+    exit 1
 
 # 清理缓存/产物 (默认 dry-run; 需要 YES 才执行)
 clean-cache CONFIRM="":
