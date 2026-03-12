@@ -9,6 +9,7 @@ from ...vendor.compact.typing_extensionsx import override
 _RUNTIME_PREFIX = "$runtime."
 _RUNTIME_VAR_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
+_DIRECTIVE_RUNTIME = "$runtime"
 _DIRECTIVE_KEYS = "$keys"
 _DIRECTIVE_ROWS = "$rows"
 
@@ -150,7 +151,18 @@ class RowsDirectiveNode(_NodeBase):
         return ctx.batch_rows
 
 
-Node = Union[LiteralNode, MappingNode, ListNode, KeysDirectiveNode, RowsDirectiveNode]
+@dataclass(frozen=True)
+class RuntimeDirectiveNode(_NodeBase):
+    name: str
+
+    @override
+    def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
+        _ = (ctx, path)
+        msg = "`$runtime` directive must be resolved at compile time; provide runtime_vars when compiling the params template"
+        raise ParamsTemplateRenderError(msg, path=path)
+
+
+Node = Union[LiteralNode, MappingNode, ListNode, RuntimeDirectiveNode, KeysDirectiveNode, RowsDirectiveNode]
 
 
 @dataclass(frozen=True)
@@ -220,24 +232,82 @@ def _maybe_compile_runtime_literal(
     node_value: object,
     *,
     node_path: str,
-    opts: _CompileOptions,
-    resolve_runtime: bool,
-) -> Optional[LiteralNode]:
-    if not resolve_runtime:
-        return None
+) -> None:
     if not isinstance(node_value, str):
-        return None
+        return
     if not node_value.startswith(_RUNTIME_PREFIX):
-        return None
+        return
 
     var_name = node_value[len(_RUNTIME_PREFIX) :]
-    if not var_name or not _RUNTIME_VAR_RE.match(var_name):
-        return None
-
-    if opts.runtime_vars is None or var_name not in opts.runtime_vars:
-        msg = "Missing runtime var: {}".format(var_name)
+    if not var_name:
+        msg = "Legacy `$runtime.<name>` placeholder is not supported; use `{$runtime: <name>}`"
         raise ParamsTemplateCompileError(msg, path=node_path)
-    return LiteralNode(opts.runtime_vars[var_name])
+    if not _RUNTIME_VAR_RE.match(var_name):
+        msg = (
+            "Legacy `$runtime.<name>` placeholder is not supported; invalid runtime var name '{}' (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(
+                var_name
+            )
+        )
+        raise ParamsTemplateCompileError(msg, path=node_path)
+
+    msg = "Legacy `$runtime.{}` placeholder is not supported; use `{{$runtime: {}}}`".format(var_name, var_name)
+    raise ParamsTemplateCompileError(msg, path=node_path)
+
+
+def _compile_runtime_directive_node(
+    mapping_dict: Dict[object, object],
+    *,
+    node_path: str,
+    opts: _CompileOptions,
+    resolve_runtime: bool,
+) -> Node:
+    var_name_raw = mapping_dict.get(_DIRECTIVE_RUNTIME)
+    if not isinstance(var_name_raw, str) or not var_name_raw:
+        msg = "`$runtime` value must be a non-empty string"
+        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_RUNTIME))
+    if not _RUNTIME_VAR_RE.match(var_name_raw):
+        msg = "`$runtime` value '{}' is invalid (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(var_name_raw)
+        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_RUNTIME))
+
+    if resolve_runtime:
+        if opts.runtime_vars is None or var_name_raw not in opts.runtime_vars:
+            msg = "Missing runtime var: {}".format(var_name_raw)
+            raise ParamsTemplateCompileError(msg, path=node_path)
+        return LiteralNode(opts.runtime_vars[var_name_raw])
+
+    return RuntimeDirectiveNode(name=var_name_raw)
+
+
+def _compile_keys_directive_node(
+    mapping_dict: Dict[object, object],
+    *,
+    node_path: str,
+    opts: _CompileOptions,
+    state: _CompileState,
+) -> Node:
+    if not opts.allow_keys:
+        msg = "`$keys` is not allowed in this context"
+        raise ParamsTemplateCompileError(msg, path=node_path)
+    options_raw = mapping_dict.get(_DIRECTIVE_KEYS)
+    as_mode = _parse_keys_options(options_raw, path=_path_child(node_path, _DIRECTIVE_KEYS))
+    state.seen_keys(as_mode, path=node_path)
+    return KeysDirectiveNode(as_=as_mode)
+
+
+def _compile_rows_directive_node(
+    mapping_dict: Dict[object, object],
+    *,
+    node_path: str,
+    opts: _CompileOptions,
+    state: _CompileState,
+) -> Node:
+    if not opts.allow_rows:
+        msg = "`$rows` is not allowed in this context"
+        raise ParamsTemplateCompileError(msg, path=node_path)
+    options_raw = mapping_dict.get(_DIRECTIVE_ROWS)
+    cache_mode = _parse_rows_options(options_raw, path=_path_child(node_path, _DIRECTIVE_ROWS))
+    state.seen_rows(cache_mode, path=node_path)
+    return RowsDirectiveNode(cache_mode=cache_mode)
 
 
 def _maybe_compile_directive_node(
@@ -246,32 +316,27 @@ def _maybe_compile_directive_node(
     node_path: str,
     opts: _CompileOptions,
     state: _CompileState,
+    resolve_runtime: bool,
 ) -> Optional[Node]:
-    has_keys = _DIRECTIVE_KEYS in mapping_dict
-    has_rows = _DIRECTIVE_ROWS in mapping_dict
-    if not has_keys and not has_rows:
+    directive_key: Optional[str] = None
+    if _DIRECTIVE_RUNTIME in mapping_dict:
+        directive_key = _DIRECTIVE_RUNTIME
+    elif _DIRECTIVE_KEYS in mapping_dict:
+        directive_key = _DIRECTIVE_KEYS
+    elif _DIRECTIVE_ROWS in mapping_dict:
+        directive_key = _DIRECTIVE_ROWS
+    else:
         return None
 
     if len(mapping_dict) != 1:
-        msg = "Directive node must be a single-key mapping: `{}` or `{}`".format(_DIRECTIVE_KEYS, _DIRECTIVE_ROWS)
+        msg = "Directive node must be a single-key mapping: `{}`, `{}` or `{}`".format(_DIRECTIVE_RUNTIME, _DIRECTIVE_KEYS, _DIRECTIVE_ROWS)
         raise ParamsTemplateCompileError(msg, path=node_path)
 
-    if has_keys:
-        if not opts.allow_keys:
-            msg = "`$keys` is not allowed in this context"
-            raise ParamsTemplateCompileError(msg, path=node_path)
-        options_raw = mapping_dict.get(_DIRECTIVE_KEYS)
-        as_mode = _parse_keys_options(options_raw, path=_path_child(node_path, _DIRECTIVE_KEYS))
-        state.seen_keys(as_mode, path=node_path)
-        return KeysDirectiveNode(as_=as_mode)
-
-    if not opts.allow_rows:
-        msg = "`$rows` is not allowed in this context"
-        raise ParamsTemplateCompileError(msg, path=node_path)
-    options_raw = mapping_dict.get(_DIRECTIVE_ROWS)
-    cache_mode = _parse_rows_options(options_raw, path=_path_child(node_path, _DIRECTIVE_ROWS))
-    state.seen_rows(cache_mode, path=node_path)
-    return RowsDirectiveNode(cache_mode=cache_mode)
+    if directive_key == _DIRECTIVE_RUNTIME:
+        return _compile_runtime_directive_node(mapping_dict, node_path=node_path, opts=opts, resolve_runtime=resolve_runtime)
+    if directive_key == _DIRECTIVE_KEYS:
+        return _compile_keys_directive_node(mapping_dict, node_path=node_path, opts=opts, state=state)
+    return _compile_rows_directive_node(mapping_dict, node_path=node_path, opts=opts, state=state)
 
 
 def _compile_mapping_node(
@@ -329,13 +394,17 @@ def _compile_params_template_node(
     state: _CompileState,
     resolve_runtime: bool,
 ) -> Node:
-    runtime_node = _maybe_compile_runtime_literal(node_value, node_path=node_path, opts=opts, resolve_runtime=resolve_runtime)
-    if runtime_node is not None:
-        return runtime_node
+    _maybe_compile_runtime_literal(node_value, node_path=node_path)
 
     if isinstance(node_value, dict):
         mapping_dict = cast("Dict[object, object]", node_value)
-        directive_node = _maybe_compile_directive_node(mapping_dict, node_path=node_path, opts=opts, state=state)
+        directive_node = _maybe_compile_directive_node(
+            mapping_dict,
+            node_path=node_path,
+            opts=opts,
+            state=state,
+            resolve_runtime=resolve_runtime,
+        )
         if directive_node is not None:
             return directive_node
         return _compile_mapping_node(
@@ -370,7 +439,7 @@ def compile_params_template(
     """将加载器 `params` 模板编译为类型化的 `IR`.
 
     说明:
-    - `$runtime.*` 占位符在编译期解析并落成不透明的 `LiteralNode`(后续不会再按结构扫描其内部内容).
+    - `{$runtime: <name>}` 在编译期解析并落成不透明的 `LiteralNode`(后续不会再按结构扫描其内部内容).
     - `$keys`/`$rows` 为保留指令节点,仅允许以“单键字典”形式出现.
     - 编译后的模板渲染是纯函数: 不会原地修改 `YAML` 解析对象(避免锚点/别名共享对象被污染).
     """

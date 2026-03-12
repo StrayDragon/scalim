@@ -99,11 +99,12 @@ class DemandConfig:
     relations: Dict[str, RelationConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
-            desc="命名关联关系映射(steps 模板),供 fields.*.relation 通过 alias 复用; alias 需先定义",
+            desc="命名关联关系映射(steps 模板),供字段通过 string ref/alias 复用",
             md=(
                 "命名关联关系映射(steps 模板).\n\n"
-                "- 供 `fields.*.relation` 通过 YAML alias 复用\n"
-                "- alias 需先定义 (YAML anchor)\n"
+                "- 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用\n"
+                "- string ref: `relation: <relation_id>` 引用 `relations.<relation_id>`\n"
+                "- alias 复用: `relation: *<anchor>` (YAML anchor)\n"
                 "- steps 必须是等值关联链, 参考 `relation.steps`"
             ),
             additional_props=schema_ref("relation"),

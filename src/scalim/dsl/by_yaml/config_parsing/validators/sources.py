@@ -7,6 +7,7 @@ from ...schema_dsl.constants import (
     LOOKUP_CAST_NAME_ENUM,
 )
 from ...schema_dsl.models import LOADER_RETRY_KEYS
+from ..field_extract import derive_source_field_data_key
 from ..parsers.utils import list_or_none, mapping_or_none
 from .base import ValidatorMixinBase
 from .constants import LEGACY_FIELDS, F
@@ -16,6 +17,26 @@ _F = F
 
 
 class ValidatorSourcesMixin(ValidatorMixinBase):
+    _step_field_ids_by_source_data_key: Dict[str, Dict[str, Set[str]]]
+
+    def _collect_field_data_key_map(self, fields_raw: object) -> Dict[str, Set[str]]:
+        data_key_map: Dict[str, Set[str]] = {}
+        fields_dict = mapping_or_none(fields_raw)
+        if fields_dict is None:
+            return data_key_map
+        for field_id_raw, field_data_raw in fields_dict.items():
+            field_id = str(field_id_raw or "").strip()
+            if not field_id:
+                continue
+            field_dict = mapping_or_none(field_data_raw)
+            extract_val = None
+            if field_dict is not None:
+                extract_val = field_dict.get(_F.EXTRACT)
+            extract_expr = None if extract_val is None else str(extract_val)
+            data_key = derive_source_field_data_key(field_id=field_id, extract=extract_expr)
+            data_key_map.setdefault(data_key, set()).add(field_id)
+        return data_key_map
+
     def _validate_loader_retry_should_retry(
         self,
         retry_raw: object,
@@ -101,16 +122,20 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
     def _collect_step_allowed_fields(self, config: Dict[str, Any], main_source_id: str) -> Dict[str, Set[str]]:
         allowed: Dict[str, Set[str]] = {}
+        suggestions: Dict[str, Dict[str, Set[str]]] = {}
 
         if main_source_id:
             main_dict = mapping_or_none(config.get(_F.MAIN_SOURCE))
             if main_dict is not None:
                 allowed[main_source_id] = self._collect_declared_field_names(main_dict.get(_F.FIELDS))
+                suggestions[main_source_id] = self._collect_field_data_key_map(main_dict.get(_F.FIELDS))
             else:
                 allowed[main_source_id] = set()
+                suggestions[main_source_id] = {}
 
         sources_raw = mapping_or_none(config.get(_F.SOURCES, {}))
         if sources_raw is None:
+            self._step_field_ids_by_source_data_key = suggestions
             return allowed
 
         for source_id_raw, source_data_raw in sources_raw.items():
@@ -118,11 +143,14 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             source_dict = mapping_or_none(source_data_raw)
             if source_dict is None:
                 allowed[source_id] = set()
+                suggestions[source_id] = {}
                 continue
             source_allowed = self._collect_declared_field_names(source_dict.get(_F.FIELDS))
             source_allowed.update(self._collect_source_key_names(source_dict.get(_F.KEY)))
             allowed[source_id] = source_allowed
+            suggestions[source_id] = self._collect_field_data_key_map(source_dict.get(_F.FIELDS))
 
+        self._step_field_ids_by_source_data_key = suggestions
         return allowed
 
     def _validate_required_fields(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:

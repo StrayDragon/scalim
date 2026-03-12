@@ -106,18 +106,22 @@ def test_validator_output_fields_ambiguous_across_sources() -> None:
     validator = ConfigValidator()
     config = {
         "name": "demo",
-        "main_source": {"source_id": "orders", "loader": "tests.conftest.mock_loader"},
+        "main_source": {
+            "source_id": "orders",
+            "loader": "tests.conftest.mock_loader",
+            "fields": {"id": {"extract": "id"}},
+        },
         "sources": {
             "s1": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
-                "bind": {"param": "ids"},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {"name": {"extract": "name", "relation": {"steps": [{"from": "orders.id", "to": "s1.id"}]}}},
             },
             "s2": {
                 "loader": "tests.conftest.mock_loader",
                 "key": "id",
-                "bind": {"param": "ids"},
+                "params": {"ids": {"$keys": {"as": "set"}}},
                 "fields": {"name": {"extract": "name", "relation": {"steps": [{"from": "orders.id", "to": "s2.id"}]}}},
             },
         },
@@ -127,7 +131,10 @@ def test_validator_output_fields_ambiguous_across_sources() -> None:
     with pytest.raises(ConfigValidationError) as exc:
         validator.validate(config)
 
-    assert any("Output field 'name' is ambiguous; add source to explicit field_id object" in msg for msg in exc.value.errors)
+    assert any(
+        "Output field 'name' is ambiguous; use 'source.field_id' sugar or add source to explicit field_id object" in msg
+        for msg in exc.value.errors
+    )
 
 
 def test_validator_v3_allows_duplicate_field_values_in_source() -> None:

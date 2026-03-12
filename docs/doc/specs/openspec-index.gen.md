@@ -186,6 +186,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-core/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 YAML DSL 编辑器的核心能力:文本优先编辑、Visual 双向同步、统一校验模型、roundtrip 稳定性与可选 exact(Pyodide)语义校验.
 
+### `yaml-dsl-micro-tunes`
+- Title: yaml-dsl-micro-tunes Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-micro-tunes/spec.md)
+- Summary: TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after archive.
+
 ### `yaml-dsl-schema`
 - Title: yaml-dsl-schema Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-schema/spec.md)
@@ -204,7 +209,7 @@ Sources:
 ### `yaml-runtime-vars`
 - Title: yaml-runtime-vars Specification
 - Source: [spec.md](#code=openspec/specs/yaml-runtime-vars/spec.md)
-- Summary: **状态: ✅ 已实现** 为 by_yaml runtime 提供编译期的运行期变量注入入口: 调用方通过 `runtime_vars` 注入任意 Python 对象,并在 `main_source.params` / `sources.<id>.params` 的 kwargs 模板中用 `$runtime.<name>` 占位符引用,由 adapter 在编译期解析并透传给 loader.
+- Summary: **状态: ✅ 已实现** 为 by_yaml runtime 提供编译期的运行期变量注入入口: 调用方通过 `runtime_vars` 注入任意 Python 对象,并在 `main_source.params` / `sources.<id>.params` 的 kwargs 模板中用 `{$runtime: <name>}` 指令节点引用,由 adapter 在编译期解析并透传给 loader.
 
 ### `yaml-source-normalize`
 - Title: yaml-source-normalize Specification

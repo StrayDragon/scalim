@@ -54,7 +54,7 @@
   - output 字段 hover 指引明确可选与 overrides 推荐写法
   - schema hover 提供常见错误与迁移提示
   - schema hover documents `$keys/$rows` directive nodes under `params`
-  - `params` hover documents `$runtime.*` and preload params behavior
+  - `params` hover documents `{$runtime: <name>}` and preload params behavior
   - 顶层 schema 字段(guardrails)
   - observability.logging 支持 renderer/preset 字段
   - schema hover 说明 loader 引用支持相对模块语法
@@ -80,7 +80,7 @@
   - unknown fields 诊断提供 suggestions(CLI/库一致)
   - Loader 引用解析与 allowlist
   - Source/Bind 结构与 keys 分片参数
-  - loader params templates support `$runtime.*` placeholders
+  - loader params templates support `{$runtime: <name>}` directives
   - 字段/关系表达式默认行为
   - main_source 批次排序配置
   - 顶层 batch_size 语义统一且可显式禁用分批
@@ -262,8 +262,9 @@
 - Description:
   命名关联关系映射(steps 模板).
   
-  - 供 `fields.*.relation` 通过 YAML alias 复用
-  - alias 需先定义 (YAML anchor)
+  - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用
+  - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>`
+  - alias 复用: `relation: *<anchor>` (YAML anchor)
   - steps 必须是等值关联链, 参考 `relation.steps`
 - `additionalProperties`: ref `#/definitions/relation`
 
@@ -308,7 +309,7 @@
   - `call_by`: `string`
   - `compute`: `string`
   - `extract`: `string`
-  - `relation`: `object`, properties `steps`
+  - `relation`: `string` | `object`, oneOf(2)
   - `source`: `string`
   - `value_cast`: `string`, enum `auto`, `int`, `str`
 
@@ -408,7 +409,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
-  - `fields`: `array`, items `object`
+  - `fields`: `array`, items `object`, oneOf(2)
   - `encoding`: `string`
   - `format`: `string`, enum `excel`, `csv`
   - `header_fields_output_by`: `string`, enum `field_id`, `name`
@@ -504,7 +505,7 @@
 - Properties:
   - `name`: `string`
   - `extract`: `string`
-  - `relation`: `object`, properties `steps`
+  - `relation`: `string` | `object`, oneOf(2)
   - `source`: `string`
   - `value_cast`: `string`, enum `auto`, `int`, `str`
 

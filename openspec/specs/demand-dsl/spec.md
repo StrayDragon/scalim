@@ -121,8 +121,8 @@
 
 其中:
 - `main_source.params` 与 `sources.<id>.params` MUST 被视为 loader kwargs 模板
-- `main_source.params` 仅允许静态值与 `$runtime.<name>` 占位符(禁止 `$keys/$rows`)
-- `sources.<id>.params` 允许包含 `$runtime.<name>` 占位符与 `$keys/$rows` 指令节点
+- `main_source.params` 仅允许静态值与 `{$runtime: <name>}` 指令节点(禁止 `$keys/$rows`)
+- `sources.<id>.params` 允许包含 `{$runtime: <name>}` 指令节点与 `$keys/$rows` 指令节点
 - `sources.*.bind` 不再属于该能力的稳定 YAML authoring surface
 
 当 `sources.<id>.params` 中使用 `$keys: {as: list}` 时,从 YAML 转换到运行时参数构建器的行为 MUST 产生稳定顺序列表。
@@ -168,15 +168,15 @@
 - **WHEN** 调用方尝试导入旧常量名
 - **THEN** 导入 MUST 失败
 
-### Requirement: loader params templates support `$runtime.*` placeholders
-系统 SHALL 允许在 loader kwargs 模板中声明 `$runtime.<name>` 占位符,并在编译期将其解析为调用方提供的运行期变量.
+### Requirement: loader params templates support `{$runtime: <name>}` directives
+系统 SHALL 允许在 loader kwargs 模板中声明 `{$runtime: <name>}` 指令节点,并在编译期将其解析为调用方提供的运行期变量.
 
 占位符解析的适用位置为:
 - `main_source.params`
 - `sources.<id>.params`
 
 #### Scenario: main_source.params 引用 runtime var
-- **WHEN** `main_source.params` 中某个值等于 `$runtime.end_datetime_user`
+- **WHEN** `main_source.params` 中某个值等于 `{$runtime: end_datetime_user}`
 - **AND** 调用方提供 `runtime_vars={"end_datetime_user": <value>}`
 - **THEN** main source loader MUST 接收到解析后的值而不是占位符字符串
 

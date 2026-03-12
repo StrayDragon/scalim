@@ -21,7 +21,7 @@
 系统 MUST 将 `source.cache_mode` 约束为显式枚举(当前仅允许 `none|preload_forever`),并在语义校验阶段拒绝未知值(避免拼写错误导致静默降级).
 
 预加载调用 MUST 与常规 loader 调用保持一致的参数语义:
-- 若 `sources.<id>.params` 非空,预加载时 MUST 以 `loader(**sources.<id>.params)` 形式调用,且 `sources.<id>.params` 中的 `$runtime.*` 必须先完成解析.
+- 若 `sources.<id>.params` 非空,预加载时 MUST 以 `loader(**sources.<id>.params)` 形式调用,且 `sources.<id>.params` 中的 `{$runtime: <name>}` 必须先完成解析.
 - 若 `sources.<id>.params` 为空,预加载时 MAY 使用零参调用以减少影响面.
 - preload 与 ref loader MUST 共用同一份编译后的 params template representation,避免双轨 params 逻辑
 

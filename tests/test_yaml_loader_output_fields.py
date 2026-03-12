@@ -50,23 +50,7 @@ output:
   fields:
     - 1
 """,
-            "output.fields[0] must be explicit field object (field_id or field) or alias",
-        ),
-        (
-            """
-name: demo
-main_source:
-  source_id: orders
-  loader: tests.conftest.mock_loader
-  fields:
-    order_id:
-      extract: order_id
-sources: {}
-output:
-  fields:
-    - order_id
-""",
-            "output.fields[0] must be explicit field object (field_id or field) or alias",
+            "output.fields[0] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias",
         ),
         (
             """
@@ -95,7 +79,7 @@ output:
   fields:
     - field_id: name
 """,
-            "Output field 'name' is ambiguous; add source to explicit field_id object",
+            "Output field 'name' is ambiguous; use 'source.field_id' sugar or add source to explicit field_id object",
         ),
         (
             """
@@ -118,7 +102,6 @@ output:
         "bad-main-field",
         "output-fields-not-list",
         "output-item-type",
-        "output-string-entry",
         "output-ambiguous-id",
         "output-missing-field",
     ],
@@ -178,6 +161,65 @@ output:
 
     assert config.output is not None
     assert config.output.fields == ["order_id"]
+
+
+def test_loader_parses_output_field_string_sugar() -> None:
+    loader = YamlDemandLoader()
+
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+output:
+  fields:
+    - order_id
+"""
+
+    config = loader.load_string(yaml_content)
+
+    assert config.output is not None
+    assert config.output.fields == ["order_id"]
+
+
+def test_loader_parses_output_field_source_field_id_sugar() -> None:
+    loader = YamlDemandLoader()
+
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    dup:
+      extract: id
+sources:
+  other:
+    loader: tests.conftest.mock_loader
+    key: id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      dup:
+        extract: id2
+relations:
+  orders_to_other:
+    steps:
+      - from: orders.dup
+        to: other.id
+output:
+  fields:
+    - other.dup
+"""
+
+    config = loader.load_string(yaml_content)
+
+    assert config.output is not None
+    assert config.output.fields == ["dup"]
 
 
 def test_loader_output_field_explicit_source_resolves() -> None:
@@ -272,7 +314,10 @@ output:
     with pytest.raises(ConfigValidationError) as exc:
         loader.load_string(missing_field_id)
 
-    assert any("output.fields[0] must be explicit field object (field_id or field) or alias" in msg for msg in exc.value.errors)
+    assert any(
+        "output.fields[0] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias" in msg
+        for msg in exc.value.errors
+    )
 
     null_field_id = """
 name: demo
@@ -495,7 +540,10 @@ output:
     with pytest.raises(ConfigValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("output.fields[0] must be explicit field object (field_id or field) or alias" in msg for msg in exc.value.errors)
+    assert any(
+        "output.fields[0] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias" in msg
+        for msg in exc.value.errors
+    )
 
 
 def test_loader_rejects_duplicate_output_definitions() -> None:
@@ -672,7 +720,8 @@ sources: {}
     with pytest.raises(ConfigValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("relation must be steps object or alias" in msg for msg in exc.value.errors)
+    assert any("unknown relation id" in msg for msg in exc.value.errors)
+    assert any("missing 'relations.r1'" in msg for msg in exc.value.errors)
 
 
 def test_loader_parse_steps_non_list_and_skip_bad_items() -> None:

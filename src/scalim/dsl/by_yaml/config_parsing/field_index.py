@@ -6,7 +6,9 @@ from ..schema_dsl.models import SOURCE_FIELD_KEYS
 from .field_extract import derive_source_field_data_key
 from .models import AliasIndex, FieldDef
 
-ERR_OUTPUT_FIELDS_ENTRY = "output.fields[{}] must be explicit field object (field_id or field) or alias"
+ERR_OUTPUT_FIELDS_ENTRY = (
+    "output.fields[{}] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias"
+)
 
 
 def build_source_data_key_index(field_defs: List[FieldDef]) -> Dict[str, Dict[str, List[FieldDef]]]:
@@ -86,19 +88,61 @@ class OutputFieldResolver:
         item: Any,
         idx: int,
     ) -> Tuple[Optional[FieldDef], Optional[Dict[str, Any]], str]:
+        if isinstance(item, str):
+            return self._resolve_entry_string(item, idx)
+
         if isinstance(item, dict):
-            typed = cast("Dict[str, Any]", item)
-            if OUTPUT_FIELD_ID_KEY in typed:
-                field_def, override = self._resolve_explicit(typed, idx)
-                return field_def, override, "field_id"
-            direct_def = self._resolve_alias(typed)
-            if direct_def is not None:
-                return direct_def, None, "alias"
-            if OUTPUT_FIELD_DATA_KEY_KEY in typed:
-                field_def, override = self._resolve_data_key(typed, idx)
-                return field_def, override, "data_key"
-            self._errors.error(ERR_OUTPUT_FIELDS_ENTRY.format(idx))
+            return self._resolve_entry_mapping(cast("Dict[str, Any]", item), idx)
+
+        self._errors.error(ERR_OUTPUT_FIELDS_ENTRY.format(idx))
+        return None, None, "invalid"
+
+    def _resolve_entry_string(self, item: str, idx: int) -> Tuple[Optional[FieldDef], Optional[Dict[str, Any]], str]:
+        raw = item.strip()
+        if not raw:
+            self._errors.value_error("output.fields[{}] must be a non-empty string".format(idx))
             return None, None, "invalid"
+
+        if "." not in raw:
+            field_def, _override = self._resolve_explicit({OUTPUT_FIELD_ID_KEY: raw}, idx)
+            return field_def, None, "string"
+
+        if raw.count(".") != 1:
+            self._errors.value_error(
+                "output.fields[{}] invalid string '{}': source.field_id sugar must be two-segment (single '.')".format(idx, raw)
+            )
+            return None, None, "invalid"
+
+        source, field_id = raw.split(".", 1)
+        source = source.strip()
+        field_id = field_id.strip()
+        if not source or not field_id:
+            self._errors.value_error(
+                "output.fields[{}] invalid string '{}': source.field_id sugar must be '<source>.<field_id>'".format(idx, raw)
+            )
+            return None, None, "invalid"
+
+        field_def, _override = self._resolve_explicit(
+            {
+                OUTPUT_FIELD_ID_KEY: field_id,
+                OUTPUT_FIELD_SOURCE_KEY: source,
+            },
+            idx,
+        )
+        return field_def, None, "signature"
+
+    def _resolve_entry_mapping(self, item: Dict[str, Any], idx: int) -> Tuple[Optional[FieldDef], Optional[Dict[str, Any]], str]:
+        if OUTPUT_FIELD_ID_KEY in item:
+            field_def, override = self._resolve_explicit(item, idx)
+            return field_def, override, "field_id"
+
+        direct_def = self._resolve_alias(item)
+        if direct_def is not None:
+            return direct_def, None, "alias"
+
+        if OUTPUT_FIELD_DATA_KEY_KEY in item:
+            field_def, override = self._resolve_data_key(item, idx)
+            return field_def, override, "data_key"
 
         self._errors.error(ERR_OUTPUT_FIELDS_ENTRY.format(idx))
         return None, None, "invalid"
@@ -132,7 +176,9 @@ class OutputFieldResolver:
 
         if len(matched) > 1:
             if source_raw is None:
-                self._errors.value_error("Output field '{}' is ambiguous; add source to explicit field_id object".format(field_id))
+                self._errors.value_error(
+                    "Output field '{}' is ambiguous; use 'source.field_id' sugar or add source to explicit field_id object".format(field_id)
+                )
             else:
                 self._errors.value_error("Output field '{}' is ambiguous; use unique field_id".format(field_id))
             return None, None

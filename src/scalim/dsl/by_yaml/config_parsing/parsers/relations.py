@@ -14,10 +14,21 @@ from .utils import list_or_none, mapping_or_none
 
 
 class ParserRelationsMixin(ParserSourcesMixin):
-    def _parse_relation_ref(self, relation_raw: object) -> Optional[InlineRelationConfig]:
+    def _parse_relation_ref(
+        self,
+        relation_raw: object,
+        *,
+        relations: Dict[str, RelationConfig],
+    ) -> Optional[InlineRelationConfig]:
         if isinstance(relation_raw, str):
-            msg = "relation must be an object with steps; relation_id string is not supported"
-            raise TypeError(msg)
+            rel_id = relation_raw.strip()
+            if not rel_id:
+                return None
+            ref = relations.get(rel_id)
+            if ref is None:
+                msg = "Unknown relation id '{}'".format(rel_id)
+                raise ValueError(msg)
+            return InlineRelationConfig(steps=ref.steps)
 
         relation_dict = mapping_or_none(relation_raw)
         if relation_dict is None:

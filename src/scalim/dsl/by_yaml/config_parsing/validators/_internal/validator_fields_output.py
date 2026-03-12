@@ -105,7 +105,7 @@ class ValidatorFieldOutputMixin(ValidatorMixinBase):
         duplicate_fields_by_source: Dict[str, Set[str]],
         errors: List[ValidationIssue],
     ) -> None:
-        if entry_kind not in {"string", "signature"}:
+        if entry_kind != "data_key":
             return
         if field_def.kind != FIELD_KIND_SOURCE:
             return

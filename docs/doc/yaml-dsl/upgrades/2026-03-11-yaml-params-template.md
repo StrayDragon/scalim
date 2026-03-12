@@ -8,7 +8,7 @@
 - 新增模板指令节点:
   - `{$keys: {as: set|list}}`: 注入 lookup keys
   - `{$rows: {cache_mode: batch|none}}`: 注入 batch rows(并影响调度与复用语义)
-- 新增 `runtime_vars` 注入与 `$runtime.<name>` 占位符(仅 exact-match string 生效,不做子串插值)
+- 新增 `runtime_vars` 注入与 `{$runtime: <name>}` 指令节点(编译期解析;不做子串插值)
 - **BREAKING**: `bind` / `to_bind` 已从稳定 YAML authoring surface 移除(出现即 fail-fast)
 - **BREAKING**: `cache_mode: preload_forever` 的预加载语义收敛:
   - 若 `sources.<id>.params` 非空: 预加载透传渲染后的 kwargs
@@ -111,7 +111,7 @@ YAML:
 ```yaml
 main_source:
   params:
-    end_dt: "$runtime.end_dt"
+    end_dt: {$runtime: end_dt}
 ```
 
 Python:
@@ -129,7 +129,7 @@ result = run(
 
 提示:
 
-- 仅当某个 scalar string 的值**完全等于** `$runtime.<name>` 时才会替换
+- 仅解析 `{$runtime: <name>}` 指令节点(单键映射);不做子串插值
 - 缺失 runtime var 会在编译期 fail-fast,错误信息包含配置路径(例如 `sources.foo.params.params.end_dt`)
 
 ## 常见报错与修复
@@ -138,4 +138,3 @@ result = run(
   - 修复: 按错误中的示例把绑定迁移到 `sources.<id>.params` 的 `$keys/$rows` 指令节点
 - `Missing runtime var: <name> (path=...)`
   - 修复: `run(..., runtime_vars={...})` 补齐该 key,或把 YAML 中的占位符改为普通字面值
-

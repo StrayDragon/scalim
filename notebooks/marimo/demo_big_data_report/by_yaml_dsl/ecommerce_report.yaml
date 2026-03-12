@@ -56,7 +56,7 @@ main_source:
   params:
     # runtime_vars 注入示例: 由调用方传入 `runtime_vars={"order_ids": [...]}`.
     # 为空列表时 loader 仍会读取全量订单(见 `load_orders` 实现),用于保证 canonical demo 可直接运行.
-    ids: "$runtime.order_ids"
+    ids: {$runtime: order_ids}
     field_keys:
       - order_id
       - order_date
@@ -199,19 +199,19 @@ sources:
       # 单级关联 - 客户
       customer_name: &customer_name
         name: 客户姓名
-        relation: *orders_to_customers
+        relation: orders_to_customers
 
       customer_level: &customer_level
         name: 会员等级
-        relation: *orders_to_customers
+        relation: orders_to_customers
 
       customer_phone: &customer_phone
         name: 客户电话
-        relation: *orders_to_customers
+        relation: orders_to_customers
 
       registration_date: &registration_date
         name: 注册日期
-        relation: *orders_to_customers
+        relation: orders_to_customers
 
   customers_rows_cached:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers_by_rows"
@@ -222,11 +222,11 @@ sources:
       # rows 模式对拍字段
       customer_name_rows_cached: &customer_name_rows_cached
         name: 客户姓名(rows缓存)
-        relation: *orders_to_customers_rows_cache
+        relation: orders_to_customers_rows_cache
 
       customer_level_rows_cached: &customer_level_rows_cached
         name: 会员等级(rows缓存)
-        relation: *orders_to_customers_rows_cache
+        relation: orders_to_customers_rows_cache
 
   customers_rows_nocache:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers_by_rows"
@@ -236,11 +236,11 @@ sources:
     fields:
       customer_name_rows_nocache: &customer_name_rows_nocache
         name: 客户姓名(rows不缓存)
-        relation: *orders_to_customers_rows_nocache
+        relation: orders_to_customers_rows_nocache
 
       customer_level_rows_nocache: &customer_level_rows_nocache
         name: 会员等级(rows不缓存)
-        relation: *orders_to_customers_rows_nocache
+        relation: orders_to_customers_rows_nocache
 
   products:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_products"
@@ -259,19 +259,19 @@ sources:
       # 单级关联 - 产品
       product_name: &product_name
         name: 产品名称
-        relation: *orders_to_products
+        relation: orders_to_products
 
       product_brand: &product_brand
         name: 产品品牌
-        relation: *orders_to_products
+        relation: orders_to_products
 
       product_cost: &product_cost
         name: 产品成本
-        relation: *orders_to_products
+        relation: orders_to_products
       product_category_id: &product_category_id
         name: 产品分类ID
         extract: category_id
-        relation: *orders_to_products
+        relation: orders_to_products
 
   categories:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_categories"
@@ -282,7 +282,7 @@ sources:
       # 多级关联 - 分类
       category_name: &category_name
         name: 产品分类
-        relation: *orders_to_categories
+        relation: orders_to_categories
 
   warehouses:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_warehouses"
@@ -293,12 +293,12 @@ sources:
       region_id:
         name: 区域ID
         extract: region_id
-        relation: *orders_to_warehouses
+        relation: orders_to_warehouses
 
       # 多级关联 - 仓库
       warehouse_name: &warehouse_name
         name: 仓库名称
-        relation: *orders_to_warehouses
+        relation: orders_to_warehouses
 
   regions:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_regions"
@@ -310,17 +310,17 @@ sources:
       region_name_value: &region_name_value
         name: 区域名称
         extract: region_name
-        relation: *orders_to_regions
+        relation: orders_to_regions
 
       # 复用同一 field 值: 通过不同字段名/展示名表达不同语义
       region_name_display: &region_name_display
         name: 区域名称(展示)
         extract: region_name
-        relation: *orders_to_regions
+        relation: orders_to_regions
 
       region_manager: &region_manager
         name: 区域经理
-        relation: *orders_to_regions
+        relation: orders_to_regions
 
   region_pricing:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_region_pricing"
@@ -330,15 +330,15 @@ sources:
       # 复合键关联 - 区域定价
       price_adjustment: &price_adjustment
         name: 价格调整系数
-        relation: *orders_to_region_pricing
+        relation: orders_to_region_pricing
 
       shipping_fee: &shipping_fee
         name: 运费
-        relation: *orders_to_region_pricing
+        relation: orders_to_region_pricing
 
       tax_rate: &tax_rate
         name: 税率
-        relation: *orders_to_region_pricing
+        relation: orders_to_region_pricing
 
   promotions:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_promotions"
@@ -360,7 +360,7 @@ sources:
 
       promotion_discount: &promotion_discount
         name: 促销折扣
-        relation: *orders_to_promotions
+        relation: orders_to_promotions
 
   payment_methods:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_payment_methods"
@@ -374,7 +374,7 @@ sources:
       # 单级关联 - 支付方式
       payment_method_name: &payment_method_name
         name: 支付方式
-        relation: *orders_to_payment_methods
+        relation: orders_to_payment_methods
 
   logistics:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_logistics"
@@ -384,11 +384,11 @@ sources:
       # 单级关联 - 物流
       logistics_name: &logistics_name
         name: 物流公司
-        relation: *orders_to_logistics
+        relation: orders_to_logistics
 
       logistics_speed: &logistics_speed
         name: 配送时效
-        relation: *orders_to_logistics
+        relation: orders_to_logistics
 
 # ==============================================================================
 # 派生字段定义
@@ -435,16 +435,15 @@ output:
   include_header: true
   header_fields_output_by: name
   fields:
-    - *order_id
-    - { field_id: order_date }
+    - order_id
+    - order_date
     - field_id: quantity
       name: 数量(输出覆写)
-    - *unit_price
-    - *discount_rate
-    - field_id: customer_name
-      source: customers
-    - *customer_phone
-    - *registration_date
+    - unit_price
+    - discount_rate
+    - customers.customer_name
+    - customer_phone
+    - registration_date
     - *output_field_customer_level
     - *customer_name_rows_cached
     - *customer_level_rows_cached

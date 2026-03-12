@@ -26,13 +26,13 @@ main_source:
   loader: "myapp.loaders:load_orders"
   params:
     # 运行期变量注入示例: 由 Python 调用方传入 `runtime_vars={"end_dt": ...}`.
-    end_dt: "$runtime.end_dt"
+    end_dt: {$runtime: end_dt}
   fields:
-    order_id: &order_id
+    order_id:
       name: 订单ID
     customer_id:
       name: 客户ID
-    amount: &amount
+    amount:
       name: 金额
 
 sources:
@@ -42,27 +42,27 @@ sources:
     params:
       ids: {$keys: {as: set}}
     fields:
-      customer_name: &customer_name
+      customer_name:
         name: 客户名称
-        relation: *orders_to_customers
+        relation: orders_to_customers
 
 relations:
-  orders_to_customers: &orders_to_customers
+  orders_to_customers:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
 
 fields:
-  profit: &profit
+  profit:
     name: 利润
     compute: "amount - cost"
 
 output:
   fields:
-    - *order_id
-    - *customer_name
-    - *amount
-    - *profit
+    - order_id
+    - customers.customer_name
+    - amount
+    - profit
 ```
 
 ## 关键规则
@@ -72,12 +72,17 @@ output:
 - 顶层 `fields` 只放派生字段
 - `main_source.fields` / `sources.<id>.fields` 只放源字段
 - whole-result reshape 用 `sources.<id>.normalize`;字段嵌套取值用字段级 `extract`(写在 `main_source.fields.*` / `sources.<id>.fields.*`)
-- `relation` 只能写 YAML alias 或内联 `steps`,不要写字符串 relation_id
+- `relation` 支持 string ref/alias/内联 `steps`:
+  - `relation: <relation_id>` 引用 `relations.<relation_id>`
+  - `relation: *anchor` (YAML alias)
+  - `relation: {steps: [...]}` (内联)
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
 - 动态入参用 `sources.<id>.params` 模板内联指令节点表达(`$keys` / `$rows`)
-- 运行期变量用 `runtime_vars` 注入并在 `params` 中用 `$runtime.<name>` 引用(仅 exact-match string 生效)
-- `output.fields` 每项必须是对象或 alias,不能写纯字符串
-- 跨 source 同名 `field_id` 时,`output.fields` 里必须显式加 `source`
+- 运行期变量用 `runtime_vars` 注入并在 `params` 中用 `{$runtime: <name>}` 指令节点引用
+- `output.fields` 支持 string sugar/对象/alias(可混用):
+  - `field_id` (例: `order_id`)
+  - `source.field_id` (例: `orders.order_id`,用于消歧;仅支持二段式)
+- 跨 source 同名 `field_id` 时,`output.fields` 里必须显式指定 `source`(`source.field_id` 或 `{field_id: ..., source: ...}`)
 
 ## 相对模块引用(可选)
 
@@ -103,8 +108,8 @@ retry:
 ## 设计偏好
 
 - 优先把 YAML 当模板使用,输出路径尽量交给 Python `overrides.output.*`
-- 优先给需要复用的字段对象和 relation 对象打 anchor
-- 输出字段优先写 alias 或显式对象,不要依赖隐式全量导出
+- 优先使用 string ref / string sugar;仅在需要大段复用/覆写时再用 anchor
+- 输出字段优先显式声明(避免隐式全量导出);简单场景可用 string sugar
 - 只有在 DSL 无法表达时才退回 Python
 
 ## 常见模式
@@ -113,7 +118,7 @@ retry:
 
 ```yaml
 relations:
-  orders_to_customers: &orders_to_customers
+  orders_to_customers:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
@@ -123,7 +128,7 @@ relations:
 
 ```yaml
 relations:
-  orders_to_regions: &orders_to_regions
+  orders_to_regions:
     steps:
       - from: orders.warehouse_id
         to: warehouses.warehouse_id
@@ -135,7 +140,7 @@ relations:
 
 ```yaml
 relations:
-  orders_to_price: &orders_to_price
+  orders_to_price:
     steps:
       - from: [orders.region_id, orders.product_category_id]
         to: [price.region_id, price.product_category_id]
@@ -198,7 +203,7 @@ fields:
 ## 不要这样写
 
 - 不要在 `top-level fields` 放源字段(源字段请写在 `main_source.fields` / `sources.<id>.fields`)
-- 不要在 `output.fields` 里写 `- order_id`
+- 不要使用 legacy `$runtime.<name>` 字符串占位符
 - 不要把 `data_key` 写进 relation steps
 - 不要把 allowlist 当成 YAML 字段写进配置
 - 不要为了复用就默认拆出 `_loaders.py` / `_helpers.py` / `_adapters.py`

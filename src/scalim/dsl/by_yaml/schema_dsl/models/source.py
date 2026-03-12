@@ -272,7 +272,7 @@ class SourceConfig:
         default_factory=dict,
         metadata=schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props=True),
     )
-    """传递给加载器的 `kwargs` 模板(编译期解析 `$runtime.*`,运行期渲染 `$keys/$rows`)."""
+    """传递给加载器的 `kwargs` 模板(编译期解析 `{$runtime: <name>}`,运行期渲染 `$keys/$rows`)."""
 
 
 @dataclass(frozen=True)

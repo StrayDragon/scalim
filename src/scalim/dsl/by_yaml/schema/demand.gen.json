@@ -94,8 +94,8 @@
     },
     "relations": {
       "type": "object",
-      "description": "命名关联关系映射(steps 模板),供 fields.*.relation 通过 alias 复用; alias 需先定义",
-      "markdownDescription": "命名关联关系映射(steps 模板).\n\n- 供 `fields.*.relation` 通过 YAML alias 复用\n- alias 需先定义 (YAML anchor)\n- steps 必须是等值关联链, 参考 `relation.steps`",
+      "description": "命名关联关系映射(steps 模板),供字段通过 string ref/alias 复用",
+      "markdownDescription": "命名关联关系映射(steps 模板).\n\n- 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用\n- string ref: `relation: <relation_id>` 引用 `relations.<relation_id>`\n- alias 复用: `relation: *<anchor>` (YAML anchor)\n- steps 必须是等值关联链, 参考 `relation.steps`",
       "additionalProperties": {
         "$ref": "#/definitions/relation"
       }
@@ -156,8 +156,8 @@
         },
         "params": {
           "type": "object",
-          "description": "调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)",
-          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `$runtime.<name>` 占位符(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `$runtime.<name>` 占位符(仅当值完全等于该字符串时才替换;不做子串插值)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点",
+          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)",
+          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$runtime: <name>}` 指令节点(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$runtime: <name>}` 指令节点(单键映射;inline/block 等价)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$runtime: <name>}`",
           "additionalProperties": true
         },
         "retry": {
@@ -335,8 +335,8 @@
         },
         "params": {
           "type": "object",
-          "description": "调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)",
-          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `$runtime.<name>` 占位符(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `$runtime.<name>` 占位符(仅当值完全等于该字符串时才替换;不做子串插值)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点",
+          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)",
+          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$runtime: <name>}` 指令节点(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$runtime: <name>}` 指令节点(单键映射;inline/block 等价)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$runtime: <name>}`",
           "additionalProperties": true
         }
       },
@@ -373,118 +373,130 @@
           "markdownDescription": "字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头"
         },
         "relation": {
-          "type": "object",
-          "required": [
-            "steps"
-          ],
-          "properties": {
-            "steps": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": [
-                  "from",
-                  "to"
-                ],
-                "properties": {
-                  "from": {
-                    "oneOf": [
-                      {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                        "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                        "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                          "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                        },
-                        "minItems": 1
-                      }
-                    ],
-                    "description": "上游字段(等值条件左侧),格式 source.field; 多字段用列表",
-                    "markdownDescription": "上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
-                    "examples": [
-                      "orders.customer_id",
-                      [
-                        "orders.region_id",
-                        "orders.institution_id"
-                      ]
-                    ]
-                  },
-                  "to": {
-                    "oneOf": [
-                      {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                        "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                        "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                          "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                        },
-                        "minItems": 1
-                      }
-                    ],
-                    "description": "下游字段(等值条件右侧/lookup key),格式 source.field; 多字段用列表",
-                    "markdownDescription": "下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
-                    "examples": [
-                      "customers.customer_id",
-                      [
-                        "regions.region_id",
-                        "mappings.institution_id"
-                      ]
-                    ]
-                  },
-                  "lookup_cast": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+              "description": "relation 引用(字符串 ref),示例: relation: orders_to_customers",
+              "markdownDescription": "relation 引用(字符串 ref).\n\n- 形式: `relation: <relation_id>`\n- 表示引用 `relations.<relation_id>`\n- full validate 会校验 `relations.<relation_id>` 存在"
+            },
+            {
+              "type": "object",
+              "required": [
+                "steps"
+              ],
+              "properties": {
+                "steps": {
+                  "type": "array",
+                  "items": {
                     "type": "object",
                     "required": [
-                      "name"
+                      "from",
+                      "to"
                     ],
                     "properties": {
-                      "name": {
-                        "type": "string",
-                        "enum": [
-                          "auto",
-                          "int",
-                          "str",
-                          "sep_first"
+                      "from": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                            "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                              "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                            },
+                            "minItems": 1
+                          }
                         ],
-                        "description": "转换名称(auto/int/str/sep_first)",
-                        "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+                        "description": "上游字段(等值条件左侧),格式 source.field; 多字段用列表",
+                        "markdownDescription": "上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
                         "examples": [
-                          "auto"
+                          "orders.customer_id",
+                          [
+                            "orders.region_id",
+                            "orders.institution_id"
+                          ]
                         ]
                       },
-                      "sep": {
-                        "type": "string",
-                        "description": "sep_first 的分隔符(默认 ,)"
+                      "to": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                            "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                              "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                            },
+                            "minItems": 1
+                          }
+                        ],
+                        "description": "下游字段(等值条件右侧/lookup key),格式 source.field; 多字段用列表",
+                        "markdownDescription": "下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                        "examples": [
+                          "customers.customer_id",
+                          [
+                            "regions.region_id",
+                            "mappings.institution_id"
+                          ]
+                        ]
+                      },
+                      "lookup_cast": {
+                        "type": "object",
+                        "required": [
+                          "name"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "enum": [
+                              "auto",
+                              "int",
+                              "str",
+                              "sep_first"
+                            ],
+                            "description": "转换名称(auto/int/str/sep_first)",
+                            "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+                            "examples": [
+                              "auto"
+                            ]
+                          },
+                          "sep": {
+                            "type": "string",
+                            "description": "sep_first 的分隔符(默认 ,)"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
+                        "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
                       }
                     },
-                    "additionalProperties": false,
-                    "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
-                    "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
-                  }
-                },
-                "additionalProperties": false
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
+                  "markdownDescription": "按顺序定义等值关联链(from == to).\n\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)\n- 列表用于复合键, 长度需一致\n- 链路必须连续: steps[n].from 的 source = steps[n-1].to 的 source"
+                }
               },
-              "minItems": 1,
-              "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
-              "markdownDescription": "按顺序定义等值关联链(from == to).\n\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)\n- 列表用于复合键, 长度需一致\n- 链路必须连续: steps[n].from 的 source = steps[n-1].to 的 source"
+              "additionalProperties": false,
+              "description": "内联 steps 或 alias 引用(需先定义),示例: relation: {steps: [...]}",
+              "markdownDescription": "关系路径引用(内联 steps 或 YAML alias; alias 需先在 relations 定义).\n\n- `relation: *orders_to_customers`\n- `relation: {steps: [...]}`\n- steps 必须从 `main_source` 开始, 以当前 `source` 结束\n- 若 `source` 非 `main_source`, 且未显式 relation, 需确保 `relations` 中存在唯一链路"
             }
-          },
-          "additionalProperties": false,
-          "description": "关系路径(仅 steps 对象或 YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: *orders_to_customers)",
-          "markdownDescription": "关系路径(仅 steps 对象或 YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: *orders_to_customers)"
+          ],
+          "description": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)",
+          "markdownDescription": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)"
         },
         "value_cast": {
           "type": "string",
@@ -545,118 +557,130 @@
           "markdownDescription": "字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头"
         },
         "relation": {
-          "type": "object",
-          "required": [
-            "steps"
-          ],
-          "properties": {
-            "steps": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": [
-                  "from",
-                  "to"
-                ],
-                "properties": {
-                  "from": {
-                    "oneOf": [
-                      {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                        "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                        "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                          "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                        },
-                        "minItems": 1
-                      }
-                    ],
-                    "description": "上游字段(等值条件左侧),格式 source.field; 多字段用列表",
-                    "markdownDescription": "上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
-                    "examples": [
-                      "orders.customer_id",
-                      [
-                        "orders.region_id",
-                        "orders.institution_id"
-                      ]
-                    ]
-                  },
-                  "to": {
-                    "oneOf": [
-                      {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                        "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                        "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: source.field (source 与 field 使用同样命名规则)",
-                          "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
-                        },
-                        "minItems": 1
-                      }
-                    ],
-                    "description": "下游字段(等值条件右侧/lookup key),格式 source.field; 多字段用列表",
-                    "markdownDescription": "下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
-                    "examples": [
-                      "customers.customer_id",
-                      [
-                        "regions.region_id",
-                        "mappings.institution_id"
-                      ]
-                    ]
-                  },
-                  "lookup_cast": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+              "description": "relation 引用(字符串 ref),示例: relation: orders_to_customers",
+              "markdownDescription": "relation 引用(字符串 ref).\n\n- 形式: `relation: <relation_id>`\n- 表示引用 `relations.<relation_id>`\n- full validate 会校验 `relations.<relation_id>` 存在"
+            },
+            {
+              "type": "object",
+              "required": [
+                "steps"
+              ],
+              "properties": {
+                "steps": {
+                  "type": "array",
+                  "items": {
                     "type": "object",
                     "required": [
-                      "name"
+                      "from",
+                      "to"
                     ],
                     "properties": {
-                      "name": {
-                        "type": "string",
-                        "enum": [
-                          "auto",
-                          "int",
-                          "str",
-                          "sep_first"
+                      "from": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                            "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                              "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                            },
+                            "minItems": 1
+                          }
                         ],
-                        "description": "转换名称(auto/int/str/sep_first)",
-                        "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+                        "description": "上游字段(等值条件左侧),格式 source.field; 多字段用列表",
+                        "markdownDescription": "上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
                         "examples": [
-                          "auto"
+                          "orders.customer_id",
+                          [
+                            "orders.region_id",
+                            "orders.institution_id"
+                          ]
                         ]
                       },
-                      "sep": {
-                        "type": "string",
-                        "description": "sep_first 的分隔符(默认 ,)"
+                      "to": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                            "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: source.field (source 与 field 使用同样命名规则)",
+                              "markdownDescription": "格式: `source.field`.\n\n- 仅允许字母/数字/下划线\n- `field` 必须是字段的 `field_id`(YAML key)\n- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n- 系统会将 `field_id` 映射为其 `field`(data_key)"
+                            },
+                            "minItems": 1
+                          }
+                        ],
+                        "description": "下游字段(等值条件右侧/lookup key),格式 source.field; 多字段用列表",
+                        "markdownDescription": "下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                        "examples": [
+                          "customers.customer_id",
+                          [
+                            "regions.region_id",
+                            "mappings.institution_id"
+                          ]
+                        ]
+                      },
+                      "lookup_cast": {
+                        "type": "object",
+                        "required": [
+                          "name"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "enum": [
+                              "auto",
+                              "int",
+                              "str",
+                              "sep_first"
+                            ],
+                            "description": "转换名称(auto/int/str/sep_first)",
+                            "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+                            "examples": [
+                              "auto"
+                            ]
+                          },
+                          "sep": {
+                            "type": "string",
+                            "description": "sep_first 的分隔符(默认 ,)"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
+                        "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
                       }
                     },
-                    "additionalProperties": false,
-                    "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
-                    "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
-                  }
-                },
-                "additionalProperties": false
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
+                  "markdownDescription": "按顺序定义等值关联链(from == to).\n\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)\n- 列表用于复合键, 长度需一致\n- 链路必须连续: steps[n].from 的 source = steps[n-1].to 的 source"
+                }
               },
-              "minItems": 1,
-              "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
-              "markdownDescription": "按顺序定义等值关联链(from == to).\n\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)\n- 列表用于复合键, 长度需一致\n- 链路必须连续: steps[n].from 的 source = steps[n-1].to 的 source"
+              "additionalProperties": false,
+              "description": "内联 steps 或 alias 引用(需先定义),示例: relation: {steps: [...]}",
+              "markdownDescription": "关系路径引用(内联 steps 或 YAML alias; alias 需先在 relations 定义).\n\n- `relation: *orders_to_customers`\n- `relation: {steps: [...]}`\n- steps 必须从 `main_source` 开始, 以当前 `source` 结束\n- 若 `source` 非 `main_source`, 且未显式 relation, 需确保 `relations` 中存在唯一链路"
             }
-          },
-          "additionalProperties": false,
-          "description": "关系路径(仅 steps 对象或 YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: *orders_to_customers)",
-          "markdownDescription": "关系路径(仅 steps 对象或 YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: *orders_to_customers)"
+          ],
+          "description": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)",
+          "markdownDescription": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)"
         },
         "value_cast": {
           "type": "string",
@@ -884,10 +908,36 @@
         "fields": {
           "type": "array",
           "items": {
-            "type": "object"
+            "oneOf": [
+              {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+                    "description": "格式: source.field_id (两段式,单个 '.' 分隔)",
+                    "markdownDescription": "格式: `source.field_id`.\n\n- 仅允许两段式(单个 `.` 分隔)\n- `field_id` 必须是字段的 `field_id`(YAML key)\n- 用于 `output.fields` 显式消歧: 当 field_id 在多个 source 中同名时,用 `source.field_id` 选择"
+                  }
+                ],
+                "description": "输出字段 string sugar: field_id 或 source.field_id(用于消歧)",
+                "markdownDescription": "输出字段 string sugar.\n\n- `field_id` (例: `order_id`)\n- `source.field_id` (例: `orders.order_id`,用于消歧;仅支持二段式)",
+                "examples": [
+                  "order_id",
+                  "orders.order_id"
+                ]
+              },
+              {
+                "type": "object"
+              }
+            ]
           },
-          "description": "输出字段顺序(仅支持对象条目: 显式 {field_id: ...}/{field: ...} 或 YAML alias; 推荐显式对象)",
-          "markdownDescription": "输出字段顺序.\n\n推荐显式对象:\n- `{field_id: order_id, name: 订单ID}`\n\n按 data_key 选择:\n- `{field: order_real_name, source: orders, name: 订单名}`\n\nAlias 复用(指向已定义字段对象):\n- `*order_id`\n\n注意:\n- 每项必须是对象或 alias, 不支持纯字符串\n- 可用选择器: `field_id`(字段 ID) 或 `field`(loader data_key); 歧义时必须加 `source`\n- YAML merge(`<<`) 会生成新对象并丢失 alias 身份; merge 产物需包含 `field_id` 或 `field` 选择器\n- 显式对象除选择器键(`field_id`/`field`/`source`)外的键会覆盖字段配置"
+          "description": "输出字段顺序(支持 string sugar / 对象条目 / YAML alias; 推荐显式对象)",
+          "markdownDescription": "输出字段顺序.\n\nString sugar:\n- `order_id` -> `field_id` sugar\n- `orders.order_id` -> 显式 `source.field_id` sugar(用于消歧;仅支持二段式)\n\n推荐显式对象:\n- `{field_id: order_id, name: 订单ID}`\n\n按 data_key 选择:\n- `{field: order_real_name, source: orders, name: 订单名}`\n\nAlias 复用(指向已定义字段对象):\n- `*order_id`\n\n注意:\n- 允许在同一列表中混用 string 与对象条目\n- `source.field_id` 仅支持二段式(单个 `.`);多段式会被拒绝,请改用对象条目\n- 可用选择器: `field_id`(字段 ID) 或 `field`(loader data_key); 歧义时必须加 `source`\n- YAML merge(`<<`) 会生成新对象并丢失 alias 身份; merge 产物需包含 `field_id` 或 `field` 选择器\n- 显式对象除选择器键(`field_id`/`field`/`source`)外的键会覆盖字段配置"
         }
       },
       "additionalProperties": false

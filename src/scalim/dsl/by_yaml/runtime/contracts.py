@@ -93,7 +93,7 @@ class RunOptions:
     """可选:运行期覆盖项(例如输出与 `viz` 配置覆盖)."""
 
     runtime_vars: Optional[Dict[str, object]] = None
-    """可选:运行期变量注入(编译期使用,用于解析 `$runtime.*` 占位符)."""
+    """可选:运行期变量注入(编译期使用,用于解析 `params` 中的 `{$runtime: <name>}` 指令节点)."""
 
 
 @dataclass(frozen=True)

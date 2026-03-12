@@ -197,7 +197,7 @@ main_source:
   source_id: orders
   loader: tests.params_template_loaders:load_orders_main
   params:
-    end_dt: "$runtime.end_dt"
+    end_dt: {$runtime: end_dt}
   fields:
     order_id:
       extract: order_id

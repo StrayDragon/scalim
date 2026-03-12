@@ -108,25 +108,26 @@ YAML 里引用 Python 的地方主要有两类:
 
 ### 5.2 relation 在字段里怎么引用
 
-源字段里用 `relation` 指定“从 main_source 到当前字段 source”的链路,只支持两种写法:
+源字段里用 `relation` 指定“从 main_source 到当前字段 source”的链路,支持三种写法:
 
-1. YAML alias 引用(指向一个已定义的 relation 对象)
-2. 内联 `steps: [...]`
+1. string ref 引用: `relation: <relation_id>` (引用 `relations.<relation_id>`)
+2. YAML alias 引用(指向一个已定义的 relation 对象)
+3. 内联 `steps: [...]`
 
 要点:
 
-- 不支持用字符串 relation_id 来引用
+- 推荐优先使用 string ref,减少对 YAML anchors/alias 的依赖
 - 使用 alias 时,alias 必须先在 `relations` 里定义(这是 YAML 的约束)
 
-## 6. params 模板: `$keys` / `$rows` / `$runtime.*`
+## 6. params 模板: `$keys` / `$rows` / `{$runtime: ...}`
 
 Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 
 - `main_source.params`: 直接以 kwargs 传给 main source loader
-  - 支持 `$runtime.<name>` 作为占位符(编译期解析)
+  - 支持 `{$runtime: <name>}` 指令节点(编译期解析)
   - 禁止 `$keys/$rows`
 - `sources.<id>.params`: loader kwargs 模板
-  - 支持 `$runtime.<name>` 占位符(编译期解析;仅 exact-match string 生效,不做子串插值)
+  - 支持 `{$runtime: <name>}` 指令节点(编译期解析;单键映射;不做子串插值)
   - 支持 `$keys` 注入 lookup keys(可出现在任意嵌套位置):
     - `{$keys: {as: set|list}}`(默认 set)
     - `$keys.as=list` 会输出稳定顺序列表; composite key 注入为 tuple 元素
@@ -138,14 +139,19 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 
 - `parallel_mode="adaptive"` 时,调度器会把 `$rows` 视为 barrier,该层直接串行执行(见 [并行模式](../architecture/parallel-modes.md)).
 
-## 7. output.fields: 为什么必须是对象/alias
+## 7. output.fields: string sugar / 对象 / alias
 
 `output.fields` 用来明确导出字段顺序,并在字段存在歧义时做选择与覆盖.
 
-当前实现不支持在 `output.fields` 里直接写纯字符串列表,每一项必须是:
+`output.fields` 支持三类条目(可混用):
 
+- string sugar:
+  - `field_id` (例: `order_id`)
+  - `source.field_id` (例: `orders.order_id`,用于消歧;仅支持二段式)
 - 显式对象(包含 `field_id` 或 `field` 选择器,必要时加 `source`)
-- 或 YAML alias(指向一个字段对象)
+- YAML alias(指向一个字段对象)
+
+当跨 source 存在同名 `field_id` 时,必须用 `source.field_id` 或显式对象的 `source` 来消歧.
 
 ## 8. 校验与排错: 先用什么命令
 

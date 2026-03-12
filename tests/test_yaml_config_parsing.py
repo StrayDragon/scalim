@@ -255,11 +255,40 @@ def test_constant_compute_expression_syntax_error_returns_false() -> None:
     assert is_constant_compute_expression("1 +") is False
 
 
-def test_parse_relation_ref_rejects_string() -> None:
+def test_parse_relation_ref_resolves_string_id() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(TypeError, match="relation must be an object"):
-        loader._parse_relation_ref("rel1")
+    raw = RawDemand.from_raw(
+        {
+            "relations": {
+                "rel1": {
+                    "steps": [
+                        {
+                            "from": "orders.order_id",
+                            "to": "customers.customer_id",
+                        }
+                    ]
+                }
+            }
+        }
+    )
+    relations = loader._parse_relations(raw)
+    inline = loader._parse_relation_ref("rel1", relations=relations)
+    assert inline is not None
+    assert inline.steps == relations["rel1"].steps
+
+
+def test_parse_relation_ref_empty_string_returns_none() -> None:
+    loader = YamlDemandLoader()
+
+    assert loader._parse_relation_ref("   ", relations={}) is None
+
+
+def test_parse_relation_ref_unknown_id_is_rejected() -> None:
+    loader = YamlDemandLoader()
+
+    with pytest.raises(ValueError, match="Unknown relation id"):
+        loader._parse_relation_ref("missing", relations={})
 
 
 def test_parse_relations_skips_non_dict_entries() -> None:

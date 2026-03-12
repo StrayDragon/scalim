@@ -10,7 +10,7 @@ template:
       main: true
       loader: "notebooks.marimo.demo_big_data_report._loaders:load_orders"
       params:
-        # template 部分只声明“需要哪些变量”,不内联 $runtime.*
+        # template 部分只声明“需要哪些变量”,不内联 {$runtime: ...}
         ids: {$var: order_ids}
         field_keys: [order_id, order_date, quantity, unit_price, discount_rate, customer_id, product_id]
       order_by: [orders.order_id]

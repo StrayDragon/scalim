@@ -156,12 +156,12 @@ result = run(
 )
 ```
 
-`runtime_vars` 注入(用于解析 `params` 中的 `$runtime.<name>` 占位符):
+`runtime_vars` 注入(用于解析 `params` 中的 `{$runtime: <name>}` 指令节点):
 
 ```yaml
 main_source:
   params:
-    end_dt: "$runtime.end_dt"
+    end_dt: {$runtime: end_dt}
 ```
 
 ```python
@@ -193,7 +193,7 @@ result = run(
 - **loader**: 数据加载函数
 - **key**: 主键字段(支持复合键)
 - **normalize**: whole-result 归一化(可选;在字段级 `extract` 之前执行)
-- **params**: loader kwargs 模板(可用 `$runtime.*` / `$keys/$rows` 表达动态上下文)
+- **params**: loader kwargs 模板(可用 `{$runtime: <name>}` / `$keys/$rows` 表达动态上下文)
 
 ### 2.3 字段类型
 
@@ -336,10 +336,10 @@ main_source:
 Scalim 将 loader 的调用参数收敛到 `params` kwargs 模板:
 
 - `main_source.params`: 直接以 kwargs 传给 main source loader
-  - 支持 `$runtime.<name>` 占位符(编译期解析)
+  - 支持 `{$runtime: <name>}` 指令节点(编译期解析)
   - 禁止 `$keys/$rows`
 - `sources.<id>.params`: loader kwargs 模板
-  - 支持 `$runtime.<name>` 占位符(编译期解析;仅 exact-match string 生效,不做子串插值)
+  - 支持 `{$runtime: <name>}` 指令节点(编译期解析;单键映射;不做子串插值)
   - 支持 `$keys` 注入 lookup keys(可出现在任意嵌套位置):
     - `{$keys: {as: set|list}}`(默认 set)
     - `$keys.as=list` 会输出稳定顺序列表

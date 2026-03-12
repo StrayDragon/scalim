@@ -17,7 +17,7 @@ Sources:
 - `main_source` (required): ref=main_source; 主数据源配置. - 必填: `source_id`, `loader` - `source_id` 不能出现在 `sources` 中 - `fields` 仅允许源字段(禁止 `compute`) - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)
 - `sources`: type=object; 数据源配置映射, key 为 `source_id`. - 每个 source 必填: `loader`, `key` - 不允许包含 `main_source.source_id` - `fields` 仅允许源字段(禁止 `compute`)
 - `fields`: type=object; 字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用
-- `relations`: type=object; 命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 YAML alias 复用 - alias 需先定义 (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`
+- `relations`: type=object; 命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`
 - `guardrails`: ref=guardrails; 运行时护栏配置. - 默认关闭 - 用于控制 loader/relations/compute 等运行期护栏策略
 - `output`: ref=output; 输出配置. - 可选: 不写 `output` 时使用默认输出策略 - 推荐: 把 `YAML` 当模板使用,在 Python 调用侧用 `overrides.output.*` 覆盖输出策略 - 默认 `format: csv` - 字段重复时需要显式 `output.fields` 进行消歧
 - `observability`: ref=observability; 可观测性配置. 包含 `logging`、`performance`、`relations`、`viz`、`trace`、`row_gap` 与 `memory_opt` 子配置.
@@ -29,7 +29,7 @@ Sources:
 - `compute`: type=string; 派生字段计算表达式(使用 field_id 作为变量名)
 - `extract`: type=string; 从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).
 - `name`: type=string; 字段显示名称
-- `relation`: type=object; 关系路径(仅 steps 对象或 YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: *orders_to_customers)
+- `relation`: 关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)
 - `source`: type=string; 字段来源的 source_id (例: source: orders)
 - `value_cast`: type=string; enum=auto|int|str; 字段值转换(仅源字段),用于写入上下文/输出前的类型调整
 
@@ -72,7 +72,7 @@ Sources:
 - `fields`: type=object; 主数据源字段配置映射, key 为 field_id
 - `loader` (required): type=string; Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)
 - `order_by`: type=array[string]; 主数据源批次内排序字段列表(仅主数据源字段)
-- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)
+- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)
 - `retry`: ref=loader_retry; Loader retry 策略(可选;默认关闭)
 - `source_id` (required): type=string; 主数据源的 source_id
 
@@ -92,7 +92,7 @@ Sources:
 
 ### `output`
 - `encoding`: type=string; default=utf-8; 文件编码
-- `fields`: type=array[object]; 输出字段顺序(仅支持对象条目: 显式 {field_id: ...}/{field: ...} 或 YAML alias; 推荐显式对象)
+- `fields`: type=array; 输出字段顺序(支持 string sugar / 对象条目 / YAML alias; 推荐显式对象)
 - `format`: type=string; default=csv; enum=excel|csv; 输出格式 (excel/csv)
 - `header_fields_output_by`: type=string; default=field_id; enum=field_id|name; 表头字段名来源: field_id=使用字段ID, name=使用字段的name属性
 - `include_header`: type=boolean; default=true; 包含表头行
@@ -147,13 +147,13 @@ Sources:
 - `lookup_cast`: type=object; 归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}
 - `lookup_chunk_size`: keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)
 - `normalize`: type=object; 源代码级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)
-- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)
+- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)
 - `retry`: ref=loader_retry; Loader retry 策略(可选;默认关闭)
 
 ### `source_field_inline`
 - `extract`: type=string; 从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).
 - `name`: type=string; 字段显示名称
-- `relation`: type=object; 关系路径(仅 steps 对象或 YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: *orders_to_customers)
+- `relation`: 关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)
 - `source`: type=string; 字段来源的 source_id (例: source: orders)
 - `value_cast`: type=string; enum=auto|int|str; 字段值转换(仅源字段),用于写入上下文/输出前的类型调整
 

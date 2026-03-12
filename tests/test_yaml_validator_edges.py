@@ -400,6 +400,36 @@ def test_validator_output_field_helpers() -> None:
     assert result is dup_a
 
 
+def test_validator_output_field_string_sugar_rejects_empty_string() -> None:
+    errors = []
+    resolver = OutputFieldResolver({}, AliasIndex(), CollectingOutputFieldErrors(errors))
+    field_def, override, entry_kind = resolver.resolve_entry("   ", 0)
+    assert field_def is None
+    assert override is None
+    assert entry_kind == "invalid"
+    assert any("must be a non-empty string" in msg for msg in _messages(errors))
+
+
+def test_validator_output_field_string_sugar_rejects_multi_dot_signature() -> None:
+    errors = []
+    resolver = OutputFieldResolver({}, AliasIndex(), CollectingOutputFieldErrors(errors))
+    field_def, override, entry_kind = resolver.resolve_entry("orders.customer.id", 0)
+    assert field_def is None
+    assert override is None
+    assert entry_kind == "invalid"
+    assert any("two-segment" in msg for msg in _messages(errors))
+
+
+def test_validator_output_field_string_sugar_rejects_missing_segments() -> None:
+    errors = []
+    resolver = OutputFieldResolver({}, AliasIndex(), CollectingOutputFieldErrors(errors))
+    field_def, override, entry_kind = resolver.resolve_entry("orders.", 0)
+    assert field_def is None
+    assert override is None
+    assert entry_kind == "invalid"
+    assert any("must be '<source>.<field_id>'" in msg for msg in _messages(errors))
+
+
 def test_validator_output_field_data_key_helpers() -> None:
     dup_a = _field_def("dup_a", source_id="a", field="id")
     dup_b = _field_def("dup_b", source_id="b", field="id")
@@ -531,9 +561,23 @@ def test_validator_output_field_source_ambiguity_duplicates() -> None:
 
     errors = []
     field_def = _field_def("id_alias", source_id="orders", field="id")
-    validator._validate_output_field_source_ambiguity(field_def, "string", duplicate_fields_by_source, errors)
+    validator._validate_output_field_source_ambiguity(field_def, "data_key", duplicate_fields_by_source, errors)
 
     assert any("ambiguous in source 'orders'" in msg for msg in _messages(errors))
+
+
+def test_validator_output_field_source_ambiguity_skips_non_source_kind() -> None:
+    validator = validator_module.ConfigValidator()
+    errors = []
+    field_def = _field_def("calc", kind="derived", source_id="orders", field="id")
+    validator._validate_output_field_source_ambiguity(field_def, "data_key", {"orders": {"id"}}, errors)
+    assert errors == []
+
+
+def test_validator_collect_field_data_key_map_skips_blank_field_ids() -> None:
+    validator = validator_module.ConfigValidator()
+    out = validator._collect_field_data_key_map({None: {"extract": "id"}, "": {"extract": "id"}, " ok ": {"extract": "id"}})
+    assert out == {"id": {"ok"}}
 
 
 def test_validator_rejects_field_id_data_key_naming_conflict() -> None:

@@ -18,6 +18,7 @@ _RESERVED_FIELD_IDS = frozenset(
 class ValidatorMixinBase:
     def __init__(self) -> None:
         self._step_allowed_fields_by_source: Dict[str, Set[str]] = {}
+        self._step_field_ids_by_source_data_key: Dict[str, Dict[str, Set[str]]] = {}
 
     def _add_error(self, errors: List[ValidationIssue], message: str, path: str = "") -> None:
         errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_ERROR, message=message, path=path))

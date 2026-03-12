@@ -13,8 +13,8 @@ main_source:
   loader: ".loaders:load_paid_orders_rows"
   params:
     params:
-      start_datetime: "$runtime.start_datetime"
-      end_datetime: "$runtime.end_datetime"
+      start_datetime: {$runtime: start_datetime}
+      end_datetime: {$runtime: end_datetime}
   order_by:
     - order_id
   fields:
@@ -54,7 +54,7 @@ sources:
     fields:
       institution_name: &institution_name
         name: 机构名
-        relation: *orders_to_institutions
+        relation: orders_to_institutions
   custom_services:
     loader: ".loaders:load_custom_services_dict"
     key: cs_id
@@ -62,13 +62,13 @@ sources:
     fields:
       cs_name: &cs_name
         name: 客服
-        relation: *orders_to_custom_services
+        relation: orders_to_custom_services
       group_name: &group_name
         name: 组别
-        relation: *orders_to_custom_services
+        relation: orders_to_custom_services
       wechat_name: &wechat_name
         name: 微信
-        relation: *orders_to_custom_services
+        relation: orders_to_custom_services
 
 fields:
   amount_yuan: &amount_yuan

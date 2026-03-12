@@ -30,7 +30,7 @@ def test_params_template_node_base_render_raises_not_implemented() -> None:
 def test_params_template_runtime_deepcopy_is_alias_safe_and_path_can_be_empty() -> None:
     payload = {"a": [1], "b": ({"c": {1}},)}
     template = params_tmpl.compile_params_template(
-        {"payload": "$runtime.payload"},
+        {"payload": {"$runtime": "payload"}},
         path="",
         runtime_vars={"payload": payload},
     )
@@ -47,7 +47,7 @@ def test_params_template_runtime_deepcopy_is_alias_safe_and_path_can_be_empty() 
 
 def test_params_template_missing_runtime_var_has_path_and_str() -> None:
     with pytest.raises(params_tmpl.ParamsTemplateCompileError) as exc:
-        params_tmpl.compile_params_template({"x": "$runtime.missing"}, path="root", runtime_vars={})
+        params_tmpl.compile_params_template({"x": {"$runtime": "missing"}}, path="root", runtime_vars={})
     assert exc.value.path == "root.x"
     assert "Missing runtime var" in str(exc.value)
     assert "(path=root.x)" in str(exc.value)
@@ -63,20 +63,69 @@ def test_params_template_runtime_placeholder_does_not_do_substring_interpolation
     assert out["sql"] == "and t > $runtime.end_dt"
 
 
-def test_params_template_invalid_runtime_placeholder_is_literal_string() -> None:
+def test_params_template_runtime_directive_render_raises_error_when_not_resolved_at_compile_time() -> None:
     template = params_tmpl.compile_params_template(
-        {"sql": "$runtime.bad-name"},
+        {"end_dt": {"$runtime": "end_dt"}},
         path="p",
-        runtime_vars={},
+        resolve_runtime=False,
     )
-    out = template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
-    assert out["sql"] == "$runtime.bad-name"
+
+    with pytest.raises(params_tmpl.ParamsTemplateRenderError, match="must be resolved at compile time"):
+        template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
+
+
+def test_params_template_invalid_runtime_placeholder_is_literal_string() -> None:
+    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Legacy `\\$runtime\\.<name>` placeholder is not supported"):
+        _ = params_tmpl.compile_params_template(
+            {"sql": "$runtime.bad-name"},
+            path="p",
+            runtime_vars={},
+        )
+
+
+def test_params_template_legacy_runtime_placeholder_missing_name_is_rejected() -> None:
+    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Legacy `\\$runtime\\.<name>` placeholder is not supported"):
+        _ = params_tmpl.compile_params_template(
+            {"sql": "$runtime."},
+            path="p",
+            runtime_vars={},
+        )
+
+
+def test_params_template_legacy_runtime_placeholder_valid_name_is_rejected() -> None:
+    with pytest.raises(
+        params_tmpl.ParamsTemplateCompileError,
+        match="Legacy `\\$runtime\\.end_dt` placeholder is not supported",
+    ):
+        _ = params_tmpl.compile_params_template(
+            {"sql": "$runtime.end_dt"},
+            path="p",
+            runtime_vars={},
+        )
+
+
+def test_params_template_runtime_directive_value_must_be_non_empty_string() -> None:
+    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$runtime` value must be a non-empty string"):
+        _ = params_tmpl.compile_params_template(
+            {"end_dt": {"$runtime": None}},
+            path="p",
+            runtime_vars={},
+        )
+
+
+def test_params_template_runtime_directive_value_rejects_invalid_name() -> None:
+    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$runtime` value 'bad-name' is invalid"):
+        _ = params_tmpl.compile_params_template(
+            {"end_dt": {"$runtime": "bad-name"}},
+            path="p",
+            runtime_vars={},
+        )
 
 
 def test_params_template_reserved_keys_inside_runtime_vars_are_treated_as_literal_values() -> None:
     payload = {"$keys": {"as": "set"}, "$rows": {"cache_mode": "batch"}}
     template = params_tmpl.compile_params_template(
-        {"payload": "$runtime.payload"},
+        {"payload": {"$runtime": "payload"}},
         path="p",
         runtime_vars={"payload": payload},
     )
@@ -87,7 +136,7 @@ def test_params_template_reserved_keys_inside_runtime_vars_are_treated_as_litera
 def test_params_template_missing_runtime_var_reports_nested_path() -> None:
     with pytest.raises(params_tmpl.ParamsTemplateCompileError) as exc:
         params_tmpl.compile_params_template(
-            {"params": {"end_dt": "$runtime.end_dt"}},
+            {"params": {"end_dt": {"$runtime": "end_dt"}}},
             path="sources.foo.params",
             runtime_vars={},
         )
@@ -245,7 +294,7 @@ def test_converter_rejects_disallowed_directives_and_reports_template_errors() -
                 source_id="customers",
                 loader="tests.conftest.mock_loader",
                 key="customer_id",
-                params={"payload": "$runtime.missing"},
+                params={"payload": {"$runtime": "missing"}},
             )
         },
     )

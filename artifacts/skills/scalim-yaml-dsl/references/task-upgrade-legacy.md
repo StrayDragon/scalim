@@ -27,6 +27,10 @@
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-11-yaml-params-template.md`
   - OpenSpec: `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
   - Spec: `openspec/specs/demand-dsl/spec.md`
+- 2026-03-13: demand-dsl-breaking
+  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-demand-dsl-breaking.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
+  - Spec: `openspec/specs/demand-dsl/spec.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

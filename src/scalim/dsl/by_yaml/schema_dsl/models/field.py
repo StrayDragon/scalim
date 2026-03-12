@@ -10,8 +10,10 @@ from ..constants import (
     DEFAULT_OUTPUT_STREAMING,
     DESC_FIELD_NAME,
     DESC_FIELD_NAME_MD,
+    FIELD_ID_STRING_SCHEMA,
     OUTPUT_FIELD_ID_KEY,
     RELATION_STEPS_SCHEMA,
+    SOURCE_FIELD_ID_STRING_SCHEMA,
     SOURCE_ID_STRING_SCHEMA,
     VALUE_CAST_ENUM,
     schema_meta,
@@ -77,23 +79,36 @@ class SourceFieldConfig:
         default=None,
         metadata=schema_meta(
             schema={
-                "type": "object",
-                "required": ["steps"],
-                "properties": {"steps": RELATION_STEPS_SCHEMA},
-                "additionalProperties": False,
-                "description": "内联 steps 或 alias 引用(需先定义),示例: relation: {steps: [...]}",
-                "markdownDescription": (
-                    "关系路径引用(内联 steps 或 YAML alias; alias 需先在 relations 定义).\n\n"
-                    "- `relation: *orders_to_customers`\n"
-                    "- `relation: {steps: [...]}`\n"
-                    "- steps 必须从 `main_source` 开始, 以当前 `source` 结束\n"
-                    "- 不支持 relation_id 字符串\n"
-                    "- 若 `source` 非 `main_source`, 且未显式 relation, 需确保 `relations` 中存在唯一链路"
-                ),
+                "oneOf": [
+                    {
+                        **FIELD_ID_STRING_SCHEMA,
+                        "description": "relation 引用(字符串 ref),示例: relation: orders_to_customers",
+                        "markdownDescription": (
+                            "relation 引用(字符串 ref).\n\n"
+                            "- 形式: `relation: <relation_id>`\n"
+                            "- 表示引用 `relations.<relation_id>`\n"
+                            "- full validate 会校验 `relations.<relation_id>` 存在"
+                        ),
+                    },
+                    {
+                        "type": "object",
+                        "required": ["steps"],
+                        "properties": {"steps": RELATION_STEPS_SCHEMA},
+                        "additionalProperties": False,
+                        "description": "内联 steps 或 alias 引用(需先定义),示例: relation: {steps: [...]}",
+                        "markdownDescription": (
+                            "关系路径引用(内联 steps 或 YAML alias; alias 需先在 relations 定义).\n\n"
+                            "- `relation: *orders_to_customers`\n"
+                            "- `relation: {steps: [...]}`\n"
+                            "- steps 必须从 `main_source` 开始, 以当前 `source` 结束\n"
+                            "- 若 `source` 非 `main_source`, 且未显式 relation, 需确保 `relations` 中存在唯一链路"
+                        ),
+                    },
+                ]
             },
             desc=(
-                "关系路径(仅 steps 对象或 YAML alias; alias 需先定义),"
-                "表示从 main_source 到当前字段 source 的等值关联链 (例: relation: *orders_to_customers)"
+                "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),"
+                "表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)"
             ),
         ),
     )
@@ -238,19 +253,37 @@ class OutputConfig:
     fields: Optional[List[Any]] = dataclass_field(
         default=None,
         metadata=schema_meta(
-            desc="输出字段顺序(仅支持对象条目: 显式 {field_id: ...}/{field: ...} 或 YAML alias; 推荐显式对象)",
+            desc="输出字段顺序(支持 string sugar / 对象条目 / YAML alias; 推荐显式对象)",
             md=(
                 "输出字段顺序.\n\n"
+                "String sugar:\n"
+                "- `order_id` -> `field_id` sugar\n"
+                "- `orders.order_id` -> 显式 `source.field_id` sugar(用于消歧;仅支持二段式)\n\n"
                 "推荐显式对象:\n- `{{{field_id_key}: order_id, name: 订单ID}}`\n\n"
                 "按 data_key 选择:\n- `{{field: order_real_name, source: orders, name: 订单名}}`\n\n"
                 "Alias 复用(指向已定义字段对象):\n- `*order_id`\n\n"
                 "注意:\n"
-                "- 每项必须是对象或 alias, 不支持纯字符串\n"
+                "- 允许在同一列表中混用 string 与对象条目\n"
+                "- `source.field_id` 仅支持二段式(单个 `.`);多段式会被拒绝,请改用对象条目\n"
                 "- 可用选择器: `field_id`(字段 ID) 或 `field`(loader data_key); 歧义时必须加 `source`\n"
                 "- YAML merge(`<<`) 会生成新对象并丢失 alias 身份; merge 产物需包含 `field_id` 或 `field` 选择器\n"
                 "- 显式对象除选择器键(`field_id`/`field`/`source`)外的键会覆盖字段配置"
             ).format(field_id_key=OUTPUT_FIELD_ID_KEY),
-            items={"type": "object"},
+            items={
+                "oneOf": [
+                    {
+                        "oneOf": [FIELD_ID_STRING_SCHEMA, SOURCE_FIELD_ID_STRING_SCHEMA],
+                        "description": "输出字段 string sugar: field_id 或 source.field_id(用于消歧)",
+                        "markdownDescription": (
+                            "输出字段 string sugar.\n\n"
+                            "- `field_id` (例: `order_id`)\n"
+                            "- `source.field_id` (例: `orders.order_id`,用于消歧;仅支持二段式)"
+                        ),
+                        "examples": ["order_id", "orders.order_id"],
+                    },
+                    {"type": "object"},
+                ]
+            },
         ),
     )
     """可选:输出字段顺序与字段覆盖配置列表."""

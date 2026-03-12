@@ -72,7 +72,13 @@ def _config_legacy_fields() -> dict:
 
 def _config_relation_id_string() -> dict:
     config = _base_config()
-    config["sources"]["customers"]["fields"]["customer_name"]["relation"] = "orders_to_customers"
+    config["sources"]["customers"]["fields"]["customer_name"]["relation"] = "missing_relation"
+    return config
+
+
+def _config_relation_id_string_empty() -> dict:
+    config = _base_config()
+    config["sources"]["customers"]["fields"]["customer_name"]["relation"] = "   "
     return config
 
 
@@ -164,7 +170,8 @@ def _config_derived_field_compute_unknown_name() -> dict:
                 "Legacy field 'fields.customer_name.from'",
             ],
         ),
-        (_config_relation_id_string, ["relation must be steps object"]),
+        (_config_relation_id_string, ["unknown relation id", "missing 'relations.missing_relation'"]),
+        (_config_relation_id_string_empty, ["non-empty relation id"]),
         (
             _config_main_source_missing_fields,
             [
@@ -185,6 +192,7 @@ def _config_derived_field_compute_unknown_name() -> dict:
         "source-errors",
         "legacy-fields",
         "relation-id-string",
+        "relation-id-string-empty",
         "main-source-missing-fields",
         "main-source-invalid-loader",
         "field-requires-via",

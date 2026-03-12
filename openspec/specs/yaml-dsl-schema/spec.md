@@ -75,7 +75,7 @@
 
 - `relations.*.steps.from/to` 的 hover MUST 提示 steps 仅接受 **field_id**(YAML key)而非 loader 的 data_key,并给出简短示例.
 - `lookup_cast` 的 hover MUST 提示 float lookup key 会被拒绝(避免歧义)并建议通过 `lookup_cast`/`value_cast` 显式归一化.
-- `main_source.params`/`sources.*.params` 的 hover MUST 解释 `$runtime.*`/`$keys/$rows` 的用法与限制,并说明 legacy `bind/to_bind` 已移除并迁移到 `params` 模板.
+- `main_source.params`/`sources.*.params` 的 hover MUST 解释 `{$runtime: <name>}`/`$keys/$rows` 的用法与限制,并说明 legacy `bind/to_bind` 已移除并迁移到 `params` 模板.
 
 #### Scenario: hover 包含 field_id/data_key 提示
 - **WHEN** 生成 `demand.gen.json`
@@ -96,11 +96,11 @@
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
 - **THEN** `main_source.params` 与 `sources.*.params` 的 `markdownDescription` MUST 包含 `$keys/$rows` 指令节点说明与示例片段
 
-### Requirement: `params` hover documents `$runtime.*` and preload params behavior
+### Requirement: `params` hover documents `{$runtime: <name>}` and preload params behavior
 Schema 生成器 MUST 在 `main_source.params` 与 `sources.*.params` 的 hover/markdownDescription 中清晰说明:
 - `main_source.params` 作为 kwargs 直接透传给 main source loader
 - `sources.<id>.params` 作为 loader kwargs 模板,在对应 loader 被调用时透传(包含 preload_forever 的预加载调用)
-- `$runtime.<name>` 可用于引用运行期变量,并在编译期被解析为调用方提供的 `runtime_vars[<name>]`
+- `{$runtime: <name>}` 可用于引用运行期变量,并在编译期被解析为调用方提供的 `runtime_vars[<name>]`
 
 #### Scenario: schema hover 不再声称 preload_forever 零参调用
 - **WHEN** 生成 `demand.gen.json`

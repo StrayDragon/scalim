@@ -8,6 +8,7 @@ from ...schema_dsl.models import (
     MAIN_SOURCE_KEYS,
     SOURCE_FIELD_KEYS,
     DerivedFieldConfig,
+    RelationConfig,
     SourceFieldConfig,
 )
 from ..call_by import extract_call_by_dependencies
@@ -26,6 +27,7 @@ class ParserFieldsMixin(ParserRelationsMixin):
         raw: RawDemand,
         main_source_id: str,
         raw_output_fields: object,
+        relations: Dict[str, RelationConfig],
     ) -> ParsedFieldsResult:
         index = self._collect_field_defs(raw, main_source_id)
         output_field_ids, selected_defs, overrides = self._resolve_output_fields(
@@ -44,6 +46,7 @@ class ParserFieldsMixin(ParserRelationsMixin):
             required_defs,
             overrides,
             main_source_id,
+            relations,
         )
 
         return ParsedFieldsResult(
@@ -105,6 +108,7 @@ class ParserFieldsMixin(ParserRelationsMixin):
         required_defs: List[FieldDef],
         overrides: Dict[Tuple[str, Optional[str], str, int], Dict[str, Any]],
         main_source_id: str,
+        relations: Dict[str, RelationConfig],
     ) -> Tuple[
         Dict[str, SourceFieldConfig],
         Dict[str, DerivedFieldConfig],
@@ -127,7 +131,7 @@ class ParserFieldsMixin(ParserRelationsMixin):
                 continue
 
             source_id = field_def.source_id or ""
-            parsed = self._parse_source_field(field_def.field_id, field_data, source_id=source_id)
+            parsed = self._parse_source_field(field_def.field_id, field_data, source_id=source_id, relations=relations)
             source_fields[field_def.field_id] = parsed
             if source_id and source_id == main_source_id:
                 main_source_fields[field_def.field_id] = parsed
@@ -296,11 +300,18 @@ class ParserFieldsMixin(ParserRelationsMixin):
             depends_on=depends_on,
         )
 
-    def _parse_source_field(self, field_id: str, field_data: Dict[str, Any], source_id: Optional[str] = None) -> SourceFieldConfig:
+    def _parse_source_field(
+        self,
+        field_id: str,
+        field_data: Dict[str, Any],
+        *,
+        source_id: Optional[str] = None,
+        relations: Dict[str, RelationConfig],
+    ) -> SourceFieldConfig:
         resolved_source_id = source_id or str(field_data.get(SOURCE_FIELD_KEYS["source"], ""))
         extract_raw = field_data.get(SOURCE_FIELD_KEYS["extract"])
         extract_expr = str(extract_raw) if extract_raw is not None else None
-        relation = self._parse_relation_ref(field_data.get(SOURCE_FIELD_KEYS["relation"]))
+        relation = self._parse_relation_ref(field_data.get(SOURCE_FIELD_KEYS["relation"]), relations=relations)
 
         return SourceFieldConfig(
             field_id=field_id,

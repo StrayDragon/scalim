@@ -72,13 +72,19 @@ def test_validator_output_fields_must_be_list() -> None:
 def test_validator_output_fields_entry_invalid_type() -> None:
     config = _base_config()
     config["output"] = {"fields": [1]}
-    _assert_validation_errors(config, "output.fields[0] must be explicit field object (field_id or field) or alias")
+    _assert_validation_errors(
+        config,
+        "output.fields[0] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias",
+    )
 
 
 def test_validator_output_fields_requires_explicit_object_or_alias() -> None:
     config = _ambiguous_sources_config()
     config["output"] = {"fields": [{"name": {"name": "Name Override"}}]}
-    _assert_validation_errors(config, "output.fields[0] must be explicit field object (field_id or field) or alias")
+    _assert_validation_errors(
+        config,
+        "output.fields[0] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias",
+    )
 
 
 def test_validator_output_fields_signature_no_match() -> None:

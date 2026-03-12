@@ -164,7 +164,7 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         for field_name in fields:
             if field_name in allowed:
                 continue
-            msg = (
+            base_msg = (
                 "{} references unknown field '{}.{}'; "
                 "relation steps must use field_id (YAML key), not loader data_key. "
                 "Define it under main_source.fields or sources.{}.fields (or use sources.{}.key for key fields)"
@@ -175,6 +175,16 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                 source_id,
                 source_id,
             )
+
+            suggestions = sorted(self._step_field_ids_by_source_data_key.get(source_id, {}).get(field_name, set()))
+            if not suggestions:
+                self._add_error(errors, base_msg, path=path)
+                continue
+
+            step_key = path.rsplit(".", 1)[-1] if path else "from"
+            suggested = suggestions[0]
+            fix_snippet = "  {}: {}.{}".format(step_key, source_id, suggested)
+            msg = "{}\nLikely field_id: {}\nFix snippet:\n{}".format(base_msg, ", ".join(suggestions), fix_snippet)
             self._add_error(errors, msg, path=path)
 
     def _validate_relation_paths_for_field(

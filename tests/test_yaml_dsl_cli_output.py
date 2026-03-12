@@ -151,16 +151,16 @@ sources: {}
 output:
   fields:
     - order_id
-""".lstrip(),
+    """.lstrip(),
         encoding="utf-8",
     )
 
     code = yaml_dsl._run_validate(_args(yaml_path, json_output=False))
-    assert code == 1
+    assert code == 0
 
     out = capsys.readouterr().out
     assert "Schema validation error" not in out
-    assert "output.fields" in out
+    assert "OK" in out
 
 
 def test_yaml_dsl_validate_does_not_log_jsonschema_skip_noise(tmp_path, caplog) -> None:

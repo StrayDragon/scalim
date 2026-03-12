@@ -250,6 +250,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 main_source_id,
                 sources_set,
                 sources_info,
+                relation_paths,
                 errors,
                 field_path,
             )
@@ -367,6 +368,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         main_source_id: str,
         sources_set: Set[str],
         sources_info: Dict[str, Dict[str, bool]],
+        relation_paths: Dict[str, List[Tuple[str, str, bool]]],
         errors: List[ValidationIssue],
         field_path: str,
     ) -> None:
@@ -379,11 +381,26 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 self._validate_steps_binding_requirements(steps, sources_info, errors, field_path)
             return
         if isinstance(relation_val, str):
-            self._add_error(
-                errors,
-                "Field '{}' relation must be steps object or alias (relation_id is not supported)".format(field_id),
-                path="{}.{}".format(field_path, _F.RELATION),
-            )
+            rel_id = relation_val.strip()
+            if not rel_id:
+                self._add_error(
+                    errors,
+                    "Field '{}' relation must be a non-empty relation id or steps object".format(field_id),
+                    path="{}.{}".format(field_path, _F.RELATION),
+                )
+                return
+
+            steps = relation_paths.get(rel_id)
+            if steps is None:
+                self._add_error(
+                    errors,
+                    "Field '{}' references unknown relation id '{}'; missing 'relations.{}'".format(field_id, rel_id, rel_id),
+                    path="{}.{}".format(field_path, _F.RELATION),
+                )
+                return
+
+            self._validate_relation_path(field_id, source_id, main_source_id, steps, errors, field_path)
+            self._validate_steps_binding_requirements(steps, sources_info, errors, field_path)
             return
 
         self._add_error(

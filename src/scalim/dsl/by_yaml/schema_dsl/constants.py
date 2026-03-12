@@ -105,14 +105,14 @@ DESC_BIND_CACHE_MODE = "rows 模式缓存: batch=批次内复用, none=不复用
 DESC_BIND_USE_ROWS = "rows 绑定: rows=批次行上下文(主源+已 join)"
 DESC_BIND_USE_KEYS = "keys 绑定: keys=lookup keys"
 DESC_LOOKUP_CHUNK_SIZE = "keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)"
-DESC_PARAMS = "调用 loader 时透传的 kwargs 模板(支持 `$runtime.*`; sources 支持 `$keys/$rows`)"
+DESC_PARAMS = "调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)"
 DESC_PARAMS_MD = (
     "调用 loader 时透传的 kwargs 模板.\n\n"
     "- `main_source.params`: 直接以 kwargs 传给 main source loader\n"
-    "  - 仅允许静态值与 `$runtime.<name>` 占位符(编译期解析)\n"
+    "  - 仅允许静态值与 `{$runtime: <name>}` 指令节点(编译期解析)\n"
     "  - 禁止 `$keys/$rows`\n"
     "- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n"
-    "  - 支持 `$runtime.<name>` 占位符(仅当值完全等于该字符串时才替换;不做子串插值)\n"
+    "  - 支持 `{$runtime: <name>}` 指令节点(单键映射;inline/block 等价)\n"
     "  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n"
     "    - 形式: `{$keys: {as: set|list}}`(默认 set)\n"
     "    - composite key 注入为 tuple 元素\n"
@@ -127,7 +127,8 @@ DESC_PARAMS_MD = (
     "  - 若为空,预加载时保持零参调用\n"
     "  - 禁止 `$keys/$rows`\n\n"
     "迁移:\n"
-    "- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点"
+    "- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n"
+    "- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$runtime: <name>}`"
 )
 DESC_SOURCE_NORMALIZE = "源代码级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)"
 DESC_SOURCE_NORMALIZE_MD = (
@@ -195,6 +196,12 @@ SOURCE_ID_STRING_SCHEMA = {
 }
 
 _SOURCE_ID_STRING_SCHEMA = SOURCE_ID_STRING_SCHEMA
+FIELD_ID_STRING_SCHEMA = {
+    "type": "string",
+    "pattern": _SOURCE_ID_PATTERN,
+    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线",
+}
 _SOURCE_FIELD_STRING_SCHEMA = {
     "type": "string",
     "pattern": _SOURCE_FIELD_PATTERN,
@@ -206,6 +213,17 @@ _SOURCE_FIELD_STRING_SCHEMA = {
         "- 不允许写 loader 的 data_key; 若 field_id != data_key,仍必须在 steps 中写 field_id\n"
         "- 对于非主源的 key 字段,也可直接引用 `sources.<id>.key` 中声明的字段名\n"
         "- 系统会将 `field_id` 映射为其 `field`(data_key)"
+    ),
+}
+SOURCE_FIELD_ID_STRING_SCHEMA = {
+    "type": "string",
+    "pattern": _SOURCE_FIELD_PATTERN,
+    "description": "格式: source.field_id (两段式,单个 '.' 分隔)",
+    "markdownDescription": (
+        "格式: `source.field_id`.\n\n"
+        "- 仅允许两段式(单个 `.` 分隔)\n"
+        "- `field_id` 必须是字段的 `field_id`(YAML key)\n"
+        "- 用于 `output.fields` 显式消歧: 当 field_id 在多个 source 中同名时,用 `source.field_id` 选择"
     ),
 }
 _SOURCE_FIELD_LIST_SCHEMA = {
