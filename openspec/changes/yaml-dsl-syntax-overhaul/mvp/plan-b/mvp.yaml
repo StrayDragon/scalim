@@ -1,0 +1,94 @@
+name: ecommerce_order_report
+description: |
+  Plan B MVP: SQL-ish query(from/join/select)
+
+datasets:
+  orders:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_orders"
+    params:
+      ids: {$runtime: order_ids}
+      field_keys: [order_id, order_date, quantity, unit_price, discount_rate, customer_id, product_id]
+    fields:
+      order_id: {name: 订单ID}
+      order_date: {name: 订单日期}
+      quantity: {name: 数量, value_cast: int}
+      unit_price: {name: 单价}
+      discount_rate: {name: 折扣率}
+      customer_id: {name: 客户ID}
+      product_id: {name: 产品ID}
+
+  customers:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_customers"
+    key: customer_id
+    params:
+      ids: {$keys: {as: list}}
+    fields:
+      customer_name: {name: 客户姓名}
+      customer_level: {name: 会员等级}
+
+  products:
+    loader: "notebooks.marimo.examples.demo_big_data_report._loaders:load_products"
+    key: product_id
+    lookup_cast: {name: int}
+    params:
+      ids: {$keys: {as: list}}
+      field_keys: [product_id, product_name, product_cost]
+    fields:
+      product_name: {name: 产品名称}
+      product_cost: {name: 产品成本}
+
+query:
+  from: orders
+  joins:
+    - to: customers
+      type: left
+      on:
+        - from: orders.customer_id
+          to: customers.customer_id
+    - to: products
+      type: left
+      on:
+        - from: orders.product_id
+          to: products.product_id
+          lookup_cast: {name: int}
+
+  select:
+    - orders.order_id
+    - orders.order_date
+    - ref: orders.quantity
+      name: 数量(输出覆写)
+    - orders.unit_price
+    - orders.discount_rate
+    - ref: customers.customer_name
+      as: customer_name
+      name: 客户姓名
+    - ref: customers.customer_level
+      as: customer_level
+      name: 会员等级
+    - products.product_name
+    - products.product_cost
+
+    - expr: "round(orders.quantity * orders.unit_price * orders.discount_rate, 2)"
+      as: order_amount
+      name: 订单金额
+
+    - call:
+        ref: "notebooks.marimo.examples.demo_big_data_report._loaders:calc_profit"
+        kwargs:
+          order_amount: order_amount
+          product_cost: products.product_cost
+          quantity: orders.quantity
+      as: profit
+      name: 利润
+
+output:
+  format: csv
+  path: ./.tmp/output/plan_b_ecommerce_report.csv
+  streaming: true
+
+observability:
+  performance:
+    enabled: true
+    metrics: [duration]
+    sampling_interval: 2
+
