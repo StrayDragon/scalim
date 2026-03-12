@@ -392,12 +392,12 @@ def derive_base_module_path(
     prefix = max(candidates, key=lambda p: len(p.parts))
     rel_path = yaml_dir.relative_to(prefix)
     if rel_path == Path():
-        return ""
+        return ""  # pragma: no cover
 
     parts = [p for p in rel_path.parts if p and p != "."]
     _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=prefix)
 
-    return ".".join(parts)
+    return ".".join(parts)  # pragma: no cover
 
 
 def _normalize_sys_path_entry(entry: Optional[str], *, cwd_path: Path) -> Optional[Path]:

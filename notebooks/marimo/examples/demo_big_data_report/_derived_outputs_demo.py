@@ -18,16 +18,10 @@ from scalim.execution.output_composition import (
 )
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 
-try:
-    from ._cases import build_test_config_small
-    from ._loaders import get_config, set_config
-    from ._shared import build_ecommerce_model
-    from ._verification import VerificationResult, verify_scalim_output
-except ImportError:
-    from _cases import build_test_config_small
-    from _loaders import get_config, set_config
-    from _shared import build_ecommerce_model
-    from _verification import VerificationResult, verify_scalim_output
+from notebooks.marimo.examples.demo_big_data_report._cases import build_test_config_small
+from notebooks.marimo.examples.demo_big_data_report._loaders import get_config, set_config
+from notebooks.marimo.examples.demo_big_data_report._shared import build_ecommerce_model
+from notebooks.marimo.examples.demo_big_data_report._verification import VerificationResult, verify_scalim_output
 
 
 DETAIL_FIELDS: Tuple[str, ...] = (

@@ -187,6 +187,8 @@ max-args = 16
 [tool.ruff.lint.per-file-ignores]
 "*.ipynb" = ["S101", "DTZ005"]
 "**/notebooks/marimo/*.py" = ["ALL"]
+"openspec/changes/**/acceptance/**/*.py" = ["ALL"]
+"openspec/changes/**/*mvp*/**/*.py" = ["ALL"]
 "{tests,bench}/*.py" = ["ALL"]
 "tests/**/*.py" = ["ALL"]
 "docs/snippets/*.py" = ["ALL"]

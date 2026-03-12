@@ -27,46 +27,25 @@ from scalim.spec.ir import (
 )
 from scalim.typedefs import SourceSpecIrCacheMode
 
-try:
-    from ._loaders import (
-        ECommerceConfig,
-        calc_final_price,
-        calc_order_amount,
-        calc_profit,
-        calc_tax_amount,
-        get_config,
-        load_categories,
-        load_customers,
-        load_logistics,
-        load_orders,
-        load_payment_methods,
-        load_products,
-        load_promotions,
-        load_region_pricing,
-        load_regions,
-        load_warehouses,
-        set_config,
-    )
-except ImportError:
-    from _loaders import (
-        ECommerceConfig,
-        calc_final_price,
-        calc_order_amount,
-        calc_profit,
-        calc_tax_amount,
-        get_config,
-        load_categories,
-        load_customers,
-        load_logistics,
-        load_orders,
-        load_payment_methods,
-        load_products,
-        load_promotions,
-        load_region_pricing,
-        load_regions,
-        load_warehouses,
-        set_config,
-    )
+from notebooks.marimo.examples.demo_big_data_report._loaders import (
+    ECommerceConfig,
+    calc_final_price,
+    calc_order_amount,
+    calc_profit,
+    calc_tax_amount,
+    get_config,
+    load_categories,
+    load_customers,
+    load_logistics,
+    load_orders,
+    load_payment_methods,
+    load_products,
+    load_promotions,
+    load_region_pricing,
+    load_regions,
+    load_warehouses,
+    set_config,
+)
 
 # 重新导出
 __all__ = [
@@ -79,65 +58,7 @@ __all__ = [
     "TARGET_FIELDS_BASIC",
     "TARGET_FIELDS_RELATIONS",
     "TARGET_FIELDS_DERIVED",
-    # 兼容旧接口
-    "BigDataDemoConfig",
-    "build_big_data_demo_model",
 ]
-
-
-# ============================================================================
-# 兼容旧接口 (BigDataDemoConfig -> ECommerceConfig)
-# ============================================================================
-
-
-class BigDataDemoConfig:
-    """兼容旧接口的配置类,内部转换为 ECommerceConfig"""
-
-    def __init__(
-        self,
-        num_rows: int = 500,
-        wide_cols: int = 10,
-        small_table_count: int = 5,
-        small_table_size: int = 50,
-        preload_small_tables: int = 2,
-        region_count: int = 5,
-        institution_count: int = 3,
-        preload_mapping: bool = True,
-    ) -> None:
-        self.num_rows = num_rows
-        self.wide_cols = wide_cols
-        self.small_table_count = small_table_count
-        self.small_table_size = small_table_size
-        self.preload_small_tables = preload_small_tables
-        self.region_count = region_count
-        self.institution_count = institution_count
-        self.preload_mapping = preload_mapping
-
-    def clamp(self) -> "BigDataDemoConfig":
-        """兼容旧接口的 `clamp` 方法"""
-        return self
-
-    def to_ecommerce_config(self) -> ECommerceConfig:
-        """转换为新的 ECommerceConfig"""
-        return ECommerceConfig(
-            order_count=self.num_rows,
-            customer_count=max(50, self.num_rows // 10),
-            product_count=max(100, self.num_rows // 5),
-        )
-
-
-def build_big_data_demo_model(
-    config: BigDataDemoConfig,
-) -> Tuple[DemandIr, Any]:
-    """兼容旧接口的模型构建函数
-
-    Returns:
-        (DemandIr, loader_func) 元组,其中 loader_func 为 load_orders
-    """
-    ecommerce_config = config.to_ecommerce_config()
-    set_config(ecommerce_config)
-    demand = build_ecommerce_model()
-    return demand, load_orders
 
 
 # ============================================================================

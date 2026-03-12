@@ -32,40 +32,22 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from scalim.spec.ir.sources import SourceNormalizeIr
 
-try:
-    from ._loaders import (
-        calc_final_price,
-        calc_order_amount,
-        calc_profit,
-        calc_tax_amount,
-        load_categories,
-        load_customers,
-        load_logistics,
-        load_orders,
-        load_payment_methods,
-        load_products,
-        load_promotions,
-        load_region_pricing,
-        load_regions,
-        load_warehouses,
-    )
-except ImportError:
-    from _loaders import (
-        calc_final_price,
-        calc_order_amount,
-        calc_profit,
-        calc_tax_amount,
-        load_categories,
-        load_customers,
-        load_logistics,
-        load_orders,
-        load_payment_methods,
-        load_products,
-        load_promotions,
-        load_region_pricing,
-        load_regions,
-        load_warehouses,
-    )
+from notebooks.marimo.examples.demo_big_data_report._loaders import (
+    calc_final_price,
+    calc_order_amount,
+    calc_profit,
+    calc_tax_amount,
+    load_categories,
+    load_customers,
+    load_logistics,
+    load_orders,
+    load_payment_methods,
+    load_products,
+    load_promotions,
+    load_region_pricing,
+    load_regions,
+    load_warehouses,
+)
 
 
 @dataclass

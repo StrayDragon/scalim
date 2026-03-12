@@ -366,108 +366,11 @@ notebook:
 
 # 运行示例: 大数据的示例
 examples-big-data:
-    uv {{ UV_OPTIONS }} run python notebooks/marimo/examples/demo_big_data_report/demo_a0_main.py
+    uv {{ UV_OPTIONS }} run python notebooks/marimo/examples/demo_big_data_report/demo_main.py
 
 # 运行示例: 运行所有示例
 examples:
-    #!/usr/bin/env bash
-    set -e
-    shopt -s nullglob
-
-    tmpdir="$(mktemp -d)"
-    cleanup() {
-        rm -rf "$tmpdir"
-    }
-    trap cleanup EXIT
-
-    group_titles=(
-        "demo_big_data_report"
-        "demo_big_data_report (yaml dsl)"
-    )
-    group_globs=(
-        "notebooks/marimo/examples/demo_big_data_report/demo_*.py"
-        "notebooks/marimo/examples/demo_big_data_report/by_yaml_dsl/demo_*.py"
-    )
-
-    pids=()
-    outs=()
-    group_start=()
-    group_count=()
-
-    for idx in "${!group_titles[@]}"; do
-        files=( ${group_globs[$idx]} )
-        group_start+=( "${#pids[@]}" )
-        group_count+=( "${#files[@]}" )
-        for f in "${files[@]}"; do
-            out="$tmpdir/out_${#pids[@]}.log"
-            (
-                echo "Running: $f"
-                PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python "$f"
-            ) >"$out" 2>&1 &
-            pids+=( "$!" )
-            outs+=( "$out" )
-        done
-    done
-
-    status=0
-    done_count=0
-    done=()
-    total="${#pids[@]}"
-    # Poll for completion so we can fail fast without relying on wait -n.
-    while [ "$done_count" -lt "$total" ]; do
-        progress=0
-        for i in "${!pids[@]}"; do
-            if [ "${done[$i]:-0}" -eq 1 ]; then
-                continue
-            fi
-            pid="${pids[$i]}"
-            if kill -0 "$pid" 2>/dev/null; then
-                continue
-            fi
-            if ! wait "$pid"; then
-                status=1
-            fi
-            done[$i]=1
-            done_count=$((done_count + 1))
-            progress=1
-            if [ "$status" -ne 0 ]; then
-                # Stop remaining jobs early on first failure.
-                for j in "${!pids[@]}"; do
-                    if [ "${done[$j]:-0}" -eq 0 ]; then
-                        kill "${pids[$j]}" 2>/dev/null || true
-                    fi
-                done
-                for j in "${!pids[@]}"; do
-                    if [ "${done[$j]:-0}" -eq 0 ]; then
-                        wait "${pids[$j]}" 2>/dev/null || true
-                        done[$j]=1
-                        done_count=$((done_count + 1))
-                    fi
-                done
-                break 2
-            fi
-        done
-        if [ "$progress" -eq 0 ]; then
-            sleep 0.1
-        fi
-    done
-
-    for idx in "${!group_titles[@]}"; do
-        echo "=== ${group_titles[$idx]} ==="
-        start=${group_start[$idx]}
-        count=${group_count[$idx]}
-        for ((i=0; i<count; i++)); do
-            pos=$((start + i))
-            cat "${outs[$pos]}"
-        done
-        echo ""
-    done
-
-    if [ "$status" -ne 0 ]; then
-        exit "$status"
-    fi
-
-    echo "All examples completed!"
+    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python notebooks/marimo/examples/demo_big_data_report/run_examples.py
 
 # QA: 仅py轻量的检查
 quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check doc-governance-check stdlib-collisions-check openspec-check test

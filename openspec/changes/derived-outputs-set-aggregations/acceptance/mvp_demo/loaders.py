@@ -94,11 +94,15 @@ def load_custom_services_dict(*, params: Optional[Dict[str, object]] = None) -> 
 def example_loader_order_recommends_list(*, params: Dict[str, object]) -> List[Dict[str, object]]:
     """形状:list[dict],需要 normalize/list_to_map 才能变成 keyed mapping."""
     order_id_set = set(params.get("order_id_set") or [])
-    return [
-        {"order_id": 10001, "recommend_cs_id": 9002},
-        {"order_id": 10001, "recommend_cs_id": 9002},  # duplicate row
-        {"order_id": 10003, "recommend_cs_id": 9001},
-    ] if order_id_set else []
+    return (
+        [
+            {"order_id": 10001, "recommend_cs_id": 9002},
+            {"order_id": 10001, "recommend_cs_id": 9002},  # duplicate row
+            {"order_id": 10003, "recommend_cs_id": 9001},
+        ]
+        if order_id_set
+        else []
+    )
 
 
 def example_loader_clearn_reason_nested_dict(*, params: Dict[str, object]) -> Dict[int, Dict[object, object]]:

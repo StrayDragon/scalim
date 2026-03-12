@@ -3,23 +3,14 @@
 这个模块集中管理示例场景的配置与执行方式,确保:
 - `tests/` 可以复用同一套场景定义,避免重复拼装配置/目标字段/对拍验证逻辑
 - 示例始终有一个“用例真相来源”,避免不同入口各写一套
-
-本模块刻意同时支持两种导入方式:
-- 包导入: `notebooks.marimo.examples.demo_big_data_report._cases`
-- 目录内脚本式导入: 通过 `sys.path` 注入后直接 `import _cases`
 """
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-try:
-    from ._loaders import ECommerceConfig, get_config, load_orders, set_config
-    from ._shared import build_ecommerce_model
-    from ._verification import VerificationResult, verify_scalim_output
-except ImportError:
-    from _loaders import ECommerceConfig, get_config, load_orders, set_config
-    from _shared import build_ecommerce_model
-    from _verification import VerificationResult, verify_scalim_output
+from notebooks.marimo.examples.demo_big_data_report._loaders import ECommerceConfig, get_config, load_orders, set_config
+from notebooks.marimo.examples.demo_big_data_report._shared import build_ecommerce_model
+from notebooks.marimo.examples.demo_big_data_report._verification import VerificationResult, verify_scalim_output
 
 
 @dataclass(frozen=True)
