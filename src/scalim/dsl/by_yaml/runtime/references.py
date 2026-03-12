@@ -3,7 +3,7 @@ import logging
 import sys
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Callable, ClassVar, FrozenSet, List, Optional, Sequence
+from typing import Any, Callable, ClassVar, FrozenSet, List, Optional, Sequence, Tuple
 
 from ....vendor.compact.typing_extensionsx import override
 from ..reference_syntax import ParsedReference, ReferenceSyntaxError, parse_python_reference
@@ -369,6 +369,26 @@ def derive_base_module_path(
         ).format(raw_yaml_path, str(yaml_dir))
         raise ResolverError(msg)
 
+    valid: List[Tuple[Tuple[str, ...], Path]] = []
+    for prefix in candidates:
+        rel_path = yaml_dir.relative_to(prefix)
+        if rel_path == Path():
+            valid.append(((), prefix))
+            continue
+        parts = tuple(p for p in rel_path.parts if p and p != ".")
+        try:
+            _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=prefix)
+        except ResolverError:
+            continue
+        valid.append((parts, prefix))
+
+    if valid:
+        # 选择“最长的模块路径”(更符合“YAML 文件所在目录对应模块路径”的直觉),
+        # 同时避免在脚本执行场景下被 `sys.path[0]==yaml_dir` 误导为根包(`base_module_path=''`).
+        parts, _prefix = max(valid, key=lambda item: (len(item[0]), -len(item[1].parts), str(item[1])))
+        return ".".join(parts)
+
+    # 若所有候选均非法(例如包含非标识符的目录段),沿用旧策略选择最长前缀并报错.
     prefix = max(candidates, key=lambda p: len(p.parts))
     rel_path = yaml_dir.relative_to(prefix)
     if rel_path == Path():

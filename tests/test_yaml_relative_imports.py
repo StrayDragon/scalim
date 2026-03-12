@@ -91,6 +91,19 @@ def test_derive_base_module_path_returns_empty_when_yaml_dir_is_sys_path_root(tm
     assert base == ""
 
 
+def test_derive_base_module_path_prefers_non_empty_module_path_when_yaml_dir_is_in_sys_path(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "relpkg/sub/config.yaml"
+    _write_text(yaml_path, "name: demo\nmain_source: {source_id: a, loader: x.y:z}\n")
+
+    yaml_dir = yaml_path.parent
+    base = derive_base_module_path(
+        str(yaml_path),
+        sys_path=[str(yaml_dir), str(tmp_path)],
+        cwd=str(tmp_path),
+    )
+    assert base == "relpkg.sub"
+
+
 def test_derive_base_module_path_reads_sys_path_when_not_provided(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     yaml_path = tmp_path / "pkg/config.yaml"
     _write_text(yaml_path, "name: demo\nmain_source: {source_id: a, loader: x.y:z}\n")
