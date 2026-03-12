@@ -1,7 +1,10 @@
+import logging
+import hashlib
 from pathlib import Path
 
 import pytest
 
+from scalim.execution import output_composition as output_comp_mod
 from scalim.execution.output_composition import (
     AggMetricSpec,
     AuditSheetSpec,
@@ -10,6 +13,7 @@ from scalim.execution.output_composition import (
     MetaSheetSpec,
     OutputCompositionSpec,
     OutputTargetSpec,
+    build_output_composition,
 )
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, run_ir
 from scalim.sinks.sink_excel import ExcelWorkbookSink
@@ -214,3 +218,151 @@ def test_ranked_summary_orders_and_adds_rank(tmp_path: Path) -> None:
     assert rows[0] == ["order_source", "sum_amount", "rank"]
     assert rows[1][0] == "app"
     assert rows[1][2] == 1
+
+
+def test_meta_and_audit_redact_error_message_by_default_and_allow_full(tmp_path: Path) -> None:
+    out = tmp_path / "report.xlsx"
+
+    ok = OutputTargetSpec(
+        target_id="ok",
+        layout=ExportLayout(field_ids=("id",), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="OK"),
+        is_primary=True,
+    )
+    fail = OutputTargetSpec(
+        target_id="fail",
+        layout=ExportLayout(field_ids=("id",), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="FAIL"),
+        is_primary=False,
+    )
+
+    meta = MetaSheetSpec(target_id="meta", output=OutputSpec(format="excel", path=str(out)), sheet_name="Meta")
+    audit = AuditSheetSpec(target_id="audit", output=OutputSpec(format="excel", path=str(out)), sheet_name="Audit")
+
+    secret = "SECRET=token-123"
+    secret_hash = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+    class FailSink:
+        def write_row(self, row):  # type: ignore[no-untyped-def]
+            raise RuntimeError(secret)
+
+        def write_batch(self, rows):  # type: ignore[no-untyped-def]
+            for row in rows:
+                self.write_row(row)
+
+        def close(self) -> None:
+            return
+
+    spec = OutputCompositionSpec(targets=(ok, fail), meta_sheet=meta, audit_sheet=audit, failure_policy="primary_only")
+    plan = build_output_composition(
+        spec=spec,
+        demand_name="d",
+        demand_main_source_id="s",
+        demand_target_fields=["id"],
+        demand_field_fingerprints=[],
+    )
+    router = plan.sink
+    for route in router._routes:
+        if route.target_id == "fail":
+            route.sink = FailSink()  # type: ignore[assignment]
+
+    router.write_row({"id": 1})
+    router.close()
+
+    meta_rows = _read_sheet_rows(out, "Meta")
+    meta_kv = {r[0]: r[1] for r in meta_rows[1:]}
+    assert meta_kv["output.fail.error_type"] == "RuntimeError"
+    assert meta_kv["output.fail.error_message_hash"] == secret_hash
+    assert secret not in str(meta_kv["output.fail.error_message"])
+    assert secret_hash in str(meta_kv["output.fail.error_message"])
+
+    audit_rows = _read_sheet_rows(out, "Audit")
+    header = audit_rows[0]
+    idx_target = header.index("target_id")
+    idx_msg = header.index("error_message")
+    fail_row = [r for r in audit_rows[1:] if r[idx_target] == "fail"][0]
+    assert secret not in str(fail_row[idx_msg])
+    assert secret_hash in str(fail_row[idx_msg])
+
+    # allow full message
+    out2 = tmp_path / "report_full.xlsx"
+    spec2 = OutputCompositionSpec(
+        targets=(
+            OutputTargetSpec(
+                target_id="ok",
+                layout=ExportLayout(field_ids=("id",), header_names=None),
+                output=OutputSpec(format="excel", path=str(out2), streaming=True, include_header=True, sheet_name="OK"),
+                is_primary=True,
+            ),
+            OutputTargetSpec(
+                target_id="fail",
+                layout=ExportLayout(field_ids=("id",), header_names=None),
+                output=OutputSpec(format="excel", path=str(out2), streaming=True, include_header=True, sheet_name="FAIL"),
+                is_primary=False,
+            ),
+        ),
+        meta_sheet=MetaSheetSpec(target_id="meta", output=OutputSpec(format="excel", path=str(out2)), sheet_name="Meta"),
+        audit_sheet=AuditSheetSpec(target_id="audit", output=OutputSpec(format="excel", path=str(out2)), sheet_name="Audit"),
+        failure_policy="primary_only",
+        include_full_error_message=True,
+    )
+    plan2 = build_output_composition(
+        spec=spec2,
+        demand_name="d",
+        demand_main_source_id="s",
+        demand_target_fields=["id"],
+        demand_field_fingerprints=[],
+    )
+    router2 = plan2.sink
+    for route in router2._routes:
+        if route.target_id == "fail":
+            route.sink = FailSink()  # type: ignore[assignment]
+
+    router2.write_row({"id": 1})
+    router2.close()
+
+    meta_rows2 = _read_sheet_rows(out2, "Meta")
+    meta_kv2 = {r[0]: r[1] for r in meta_rows2[1:]}
+    assert secret in str(meta_kv2["output.fail.error_message"])
+
+
+def test_derived_output_max_groups_zero_emits_warning(tmp_path: Path, caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="scalim.execution.output_composition")
+    out = tmp_path / "report.xlsx"
+
+    detail = OutputTargetSpec(
+        target_id="detail",
+        layout=ExportLayout(field_ids=("order_id", "order_source"), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Detail"),
+        is_primary=True,
+    )
+    derived = DerivedOutputTargetSpec(
+        target_id="summary",
+        derived=DerivedGroupBySpec(
+            group_by=("order_source",),
+            metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="order_id"),),
+            max_groups=0,
+        ),
+        output_layout=ExportLayout(field_ids=("order_source", "cnt"), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
+    )
+
+    spec = OutputCompositionSpec(targets=(detail,), derived_targets=(derived,))
+    _ = build_output_composition(
+        spec=spec,
+        demand_name="d",
+        demand_main_source_id="s",
+        demand_target_fields=["order_id"],
+        demand_field_fingerprints=[],
+    )
+
+    assert any("max_groups=0" in record.getMessage() for record in caplog.records)
+
+
+def test_truncate_text_returns_empty_when_max_chars_nonpositive() -> None:
+    assert output_comp_mod._truncate_text("abc", max_chars=0) == ""
+    assert output_comp_mod._truncate_text("abc", max_chars=-1) == ""
+
+
+def test_truncate_text_truncates_long_text() -> None:
+    assert output_comp_mod._truncate_text("abcd", max_chars=3) == "abc…(truncated)"

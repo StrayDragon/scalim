@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import hashlib
+import logging
 import time
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
@@ -17,6 +19,8 @@ from .derived_outputs import AggMetricSpec, AggregatingRowSink, GroupByAggregato
 from .output_contracts import ExportLayout, OutputSpec
 
 OutputRowPredicate = Callable[[RowData], bool]
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,7 @@ class OutputCompositionSpec:
     meta_sheet: Optional[MetaSheetSpec] = None
     audit_sheet: Optional[AuditSheetSpec] = None
     failure_policy: str = "all_fail"
+    include_full_error_message: bool = False
 
 
 @dataclass(frozen=True)
@@ -110,6 +115,7 @@ class OutputTargetStats:
     sheet_name: Optional[str]
     error_type: Optional[str] = None
     error_message: Optional[str] = None
+    error_message_hash: Optional[str] = None
 
 
 class OutputTargetWriteError(RuntimeError):
@@ -129,6 +135,25 @@ def _ordered_unique(items: Sequence[str]) -> Tuple[str, ...]:
         seen.add(item)
         out.append(item)
     return tuple(out)
+
+
+def _sha256_text(value: str) -> str:
+    digest = hashlib.sha256()
+    digest.update(value.encode("utf-8", errors="replace"))
+    return digest.hexdigest()
+
+
+def _as_single_line(value: str) -> str:
+    # 避免 `meta/audit` 出现多行单元格,并保持输出可预测.
+    return " ".join(str(value).splitlines())
+
+
+def _truncate_text(value: str, *, max_chars: int) -> str:
+    if max_chars <= 0:
+        return ""
+    if len(value) <= max_chars:
+        return value
+    return value[:max_chars] + "…(truncated)"
 
 
 def required_demand_fields(spec: OutputCompositionSpec) -> Tuple[str, ...]:
@@ -253,6 +278,7 @@ class RouterRowSink(BaseRowSink):
     _run_parallel_mode: str
     _run_batch_size: Optional[int]
     _run_failure_policy: str
+    _include_full_error_message: bool
 
     def __init__(
         self,
@@ -272,6 +298,7 @@ class RouterRowSink(BaseRowSink):
         run_parallel_mode: str = "",
         run_batch_size: Optional[int] = None,
         run_failure_policy: str = "",
+        include_full_error_message: bool = False,
     ) -> None:
         self._routes = list(routes)
         self._failure_policy = str(failure_policy or "all_fail")
@@ -292,13 +319,24 @@ class RouterRowSink(BaseRowSink):
         self._run_parallel_mode = str(run_parallel_mode or "")
         self._run_batch_size = int(run_batch_size) if run_batch_size is not None else None
         self._run_failure_policy = str(run_failure_policy or "")
+        self._include_full_error_message = bool(include_full_error_message)
 
     def get_target_stats(self) -> List[OutputTargetStats]:
         stats: List[OutputTargetStats] = []
         for r in self._routes:
             output_rows = int(r.output_counter.rows) if r.output_counter is not None else int(r.input_row_count)
             error_type = type(r.first_error).__name__ if r.first_error is not None else None
-            error_message = str(r.first_error) if r.first_error is not None else None
+            error_message = None
+            error_message_hash = None
+            if r.first_error is not None:
+                raw = str(r.first_error)
+                error_message_hash = _sha256_text(raw)
+                if self._include_full_error_message:
+                    normalized = _as_single_line(raw)
+                    error_message = _truncate_text(normalized, max_chars=2000)
+                else:
+                    # 默认使用脱敏摘要,避免把敏感信息落到输出文件中.
+                    error_message = "sha256={}".format(error_message_hash)
             stats.append(
                 OutputTargetStats(
                     target_id=r.target_id,
@@ -311,6 +349,7 @@ class RouterRowSink(BaseRowSink):
                     sheet_name=r.sheet_name,
                     error_type=error_type,
                     error_message=error_message,
+                    error_message_hash=error_message_hash,
                 )
             )
         stats.extend(list(self._final_stats))
@@ -429,9 +468,11 @@ class RouterRowSink(BaseRowSink):
                 rows.append({"key": prefix + ".sheet_name", "value": str(stat.sheet_name)})
             if stat.output_path:
                 rows.append({"key": prefix + ".output_path", "value": str(stat.output_path)})
-            if stat.error_type or stat.error_message:
+            if stat.error_type or stat.error_message or stat.error_message_hash:
                 rows.append({"key": prefix + ".error_type", "value": stat.error_type or ""})
                 rows.append({"key": prefix + ".error_message", "value": stat.error_message or ""})
+                if stat.error_message_hash:
+                    rows.append({"key": prefix + ".error_message_hash", "value": str(stat.error_message_hash)})
         return rows
 
     def _write_meta(self) -> None:
@@ -647,6 +688,12 @@ def _append_derived_target_routes(
     workbook_by_path: Dict[str, ExcelWorkbookSink],
 ) -> None:
     for t in targets:
+        if not int(t.derived.max_groups):
+            _logger.warning(
+                "派生输出 max_groups=0(不设上限);高基数分组可能耗尽内存: 目标=%s, 分组键=%s",
+                str(t.target_id),
+                ",".join(str(x) for x in t.derived.group_by),
+            )
         out_sink, out_counter = _create_row_sink_for_composed_output(
             target_id=str(t.target_id),
             output=t.output,
@@ -823,6 +870,7 @@ def build_output_composition(
         run_parallel_mode=run_parallel_mode,
         run_batch_size=run_batch_size,
         run_failure_policy=failure_policy,
+        include_full_error_message=bool(spec.include_full_error_message),
     )
 
     return OutputCompositionPlan(
