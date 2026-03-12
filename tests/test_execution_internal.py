@@ -472,6 +472,114 @@ def test_pipeline_collect_streaming_rows_binding_barriers_skips_steps_without_bi
     assert rows_binding_ops == set()
 
 
+@pytest.mark.parametrize(
+    "cache_mode",
+    ["none", "batch"],
+    ids=["op-barrier-cache-none", "relation-barrier-cache-batch"],
+)
+def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_operator(cache_mode: str) -> None:
+    events: List[tuple] = []
+
+    class _OrderHook(BaseHook):
+        def on_row_write(self, event) -> None:  # type: ignore[override]
+            events.append(("write", event.row_id))
+
+        def on_row_release(self, event) -> None:  # type: ignore[override]
+            events.append(("release", event.row_id))
+
+    sink = InMemoryRowSink()
+    hook = _OrderHook()
+
+    def _build_rows_params(field_name: str, param_name: str):  # type: ignore[no-untyped-def]
+        def _builder(ctx):  # type: ignore[no-untyped-def]
+            return (), {param_name: list(ctx.batch_rows or [])}
+
+        return BindingIr(key_field=field_name, params_builder=_builder, mode="rows", cache_mode=cache_mode)
+
+    def _load_customers(rows=None):  # type: ignore[no-untyped-def]
+        _ = rows
+        return {
+            100: {"customer_id": 100, "customer_name": "Alice", "level": "VIP"},
+        }
+
+    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    customers = SourceIr(
+        source_id="customers",
+        key=KeyIr(key="customer_id"),
+        loader_spec=LoaderIr(callable=_load_customers, bindings={"customer_id": _build_rows_params("customer_id", "rows")}),
+    )
+
+    fields = [
+        FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True),
+        FieldIr(
+            field_id="customer_name",
+            name="Customer",
+            source=customers,
+            data_key="customer_name",
+            relation=main_source["customer_id"].join(customers["customer_id"]),
+        ),
+        FieldIr(
+            field_id="customer_level",
+            name="Level",
+            source=customers,
+            data_key="level",
+            relation=main_source["customer_id"].join(customers["customer_id"]),
+        ),
+    ]
+
+    demand = DemandIr.from_irs(sources=[customers], fields=fields, main_source=main_source)
+    plan = PlanBuilder(demand).build(targets=["order_id", "customer_name", "customer_level"])
+    pipeline = _make_pipeline(plan, demand, main_source)
+    pipeline.hook_manager.register(hook)
+
+    rows_binding_relations, rows_binding_ops = pipeline._collect_streaming_rows_binding_barriers()
+    assert bool(rows_binding_relations) is (cache_mode == "batch")
+    assert bool(rows_binding_ops) is (cache_mode == "none")
+
+    orig_execute_operators = pipeline.executor.execute_operators
+
+    def _wrapped_execute_operators(*args, **kwargs):  # type: ignore[no-untyped-def]
+        after_operator = kwargs.get("after_operator")
+
+        def _wrapped_after(op):  # type: ignore[no-untyped-def]
+            events.append(("after_operator", op.operator_id, "start"))
+            if after_operator is not None:
+                after_operator(op)
+            events.append(("after_operator", op.operator_id, "end"))
+
+        kwargs["after_operator"] = _wrapped_after
+        return orig_execute_operators(*args, **kwargs)
+
+    pipeline.executor.execute_operators = _wrapped_execute_operators  # type: ignore[method-assign]
+
+    row_ids = [0]
+    batch_rows = {0: {"order_id": 0, "customer_id": 100}}
+
+    pipeline._execute_batch_streaming_mode(row_ids, batch_rows, sink, batch_num=1)
+
+    write_idx = next(i for i, e in enumerate(events) if e[0] == "write")
+    release_idx = next(i for i, e in enumerate(events) if e[0] == "release")
+
+    after_spans: List[tuple] = []
+    current_start = None
+    current_op = None
+    for idx, e in enumerate(events):
+        if e[0] != "after_operator":
+            continue
+        _, op_id, phase = e
+        if phase == "start":
+            current_start = idx
+            current_op = op_id
+        elif phase == "end":
+            if current_start is not None and current_op == op_id:
+                after_spans.append((current_start, idx, op_id))
+            current_start = None
+            current_op = None
+
+    assert write_idx < release_idx
+    assert any(start < release_idx < end for start, end, _op_id in after_spans)
+
+
 def test_row_emission_coordinator_flush_noops_when_write_order_missing() -> None:
     plan = _make_plan({}, ["a"])
     runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
