@@ -8,7 +8,6 @@
 - `src/IMPL_ROOT/execution/derived_outputs.py` (内置增量聚合接口与实现)
 - `src/IMPL_ROOT/execution/output_composition.py` (派生输出在 Router/close 阶段输出)
 - `src/IMPL_ROOT/execution/run_ir.py` (ExecutionRequest.output_composition 装配入口)
-
 ## Requirements
 ### Requirement: 派生输出定义(同步聚合)
 系统 SHALL 支持在同一次运行中定义派生输出,派生输出可基于详情数据进行聚合/计算,并在运行结束时输出结果.
@@ -81,6 +80,16 @@
 - **WHEN** 派生输出使用自定义聚合器且未声明支持 `adaptive`
 - **AND** 运行模式为 `parallel_mode="adaptive"`
 - **THEN** 系统应 fail-fast 并提示切换到 `parallel_mode="seq"`
+
+### Requirement: `max_groups=0`(不设上限)时必须输出明确 warn
+当派生聚合输出的 `max_groups=0` 表示“不设上限”时,系统 MUST 输出明确的 warn,提示高基数 group-by 可能导致聚合状态无限增长并拖垮内存.
+
+该 warn MUST 仅作为告警,不得改变结果语义(仍信任用户配置).
+
+#### Scenario: 无上限聚合触发 warn
+- **GIVEN** 某个派生输出配置 `max_groups=0`
+- **WHEN** 运行开始执行派生聚合
+- **THEN** 系统 MUST 输出一次 warn 提示资源耗尽风险并建议设置 `max_groups`
 
 ## Notes
 - 当前实现侧重 “详情流增量聚合 + finalize 输出 + 资源护栏”. 其它数据来源选择/后置聚合/近似算法属于后续扩展点,本规范先将意图固定以便演进对齐.
