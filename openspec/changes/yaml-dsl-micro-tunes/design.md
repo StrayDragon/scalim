@@ -27,7 +27,6 @@
 
 **Goals:**
 - 让用户在不学习 YAML anchors/alias 细节的情况下完成常见写法: relation 引用、output 字段选择与 params runtime vars。
-- 降低“概念命名误导”: 顶层派生字段入口清晰表达其语义边界。
 - 统一 params 语言形态,提升 schema hover 与错误诊断的可解释性。
 - 提升迁移/排错体验: field_id vs data_key 误用能给出可操作修复建议。
 - 一步到位升级仓内所有示例/fixtures/docs/skills/frontend examples,不保留旧写法分支。
@@ -35,23 +34,58 @@
 **Non-Goals:**
 - 不做完整语法重写/不引入版本标签(v1/v2/v3)。
 - 不改变 IR 语义边界(仅改变表达方式与校验/诊断)。
-- 不实现 `fields` 的“跨多数据源/多需求字段入口”新能力(仅预留命名空间)。
+- 不调整顶层 `fields` 的命名/语义边界(本 change 不做 `derived_fields` 重命名)。
 
 ## Decisions
 
-### Decision 1: `fields` → `derived_fields` 一步到位迁移,不保留旧写法
+### Decision 1: runtime vars 统一为指令节点 `{$runtime: name}`,移除 `$runtime.name` 字符串占位符
 
-`fields` 在当前 DSL 中只允许派生字段,与读者直觉强冲突。将其改名为 `derived_fields`,并将 `fields` 预留给未来扩展:
+目标是把 runtime vars 与 `$keys/$rows` 统一成同一种 AST 形态(单键映射),便于 schema 表达与 hover 解释,也避免字符串模板解析的隐式规则:
 
-- 方案 A: 同时支持 `fields` 与 `derived_fields`(兼容) → 维护成本高,且阻碍 `fields` 被重用为“更通用入口”。
-- **方案 B(选择)**: 直接改名并一次性升级仓内写法,对外通过升级指南/升级器承接迁移。
+- 旧写法(将被移除): `"$runtime.order_ids"`
+- 新写法(选择): `{$runtime: order_ids}`
 
-### Decision 2: runtime vars 统一为指令节点 `{$runtime: name}`,移除 `$runtime.name` 字符串占位符
+示例:
 
-目标是把 runtime vars 与 `$keys/$rows` 统一成同一种 AST 形态,便于 schema 表达与 hover 解释,也避免字符串模板解析的隐式规则:
+```yaml
+sources:
+  orders:
+    params:
+      ids: "$runtime.order_ids"
+      country: "$runtime.country"
+```
 
-- 方案 A: 继续同时支持 `$runtime.name`(兼容) → 增加维护面与诊断复杂度。
-- **方案 B(选择)**: 统一到 `{$runtime: name}` 并在 validator 中对旧写法 fail-fast,提示升级路径。
+升级为:
+
+```yaml
+sources:
+  orders:
+    params:
+      ids: {$runtime: order_ids}
+      country: {$runtime: country}
+```
+
+说明:
+- 这是“单键映射指令节点”(类似 `{$keys: ...}` / `{$rows: ...}`),可出现在 params 的任意嵌套位置。
+- 指令节点必须是**单键映射**,value 必须是变量名字符串;`inline mapping` 与 `block mapping` 等价:
+
+```yaml
+sources:
+  orders:
+    params:
+      ids:
+        $runtime: order_ids
+```
+
+- `{$runtime: ...}` 可与 `{$keys: ...}` / `{$rows: ...}` 共存;`$keys` 与 `$rows` 仍互斥,`$runtime` 不参与互斥。
+- validator 对旧写法 fail-fast,报错中给出最小替换片段。
+
+### Decision 2: `output.fields` 的 `source.field_id` string sugar 仅支持二段式
+
+`source.field_id` string sugar 的语法边界与 `relation.steps[*].{from,to}` 一致: 仅支持二段式 `<source_id>.<field_id>`(单个 `.` 分隔)。
+
+- 支持: `orders.order_id`
+- 不支持: `orders.customer.id`(多个 `.`);本 change 不引入多段路径语法,需要更复杂表达时应使用对象条目显式拆分/覆写。
 
 ### Decision 3: 引用优先提供稳定 string ref,anchors/alias 仅作为可选复用
 
@@ -59,10 +93,17 @@
 
 - relation 引用新增 `relation: <relation_id>` string ref,并在语义 validator 中做存在性与 chain 校验。
 - `output.fields` 新增 string sugar,让“最简单场景”不必写对象也不必使用 alias。
-- 盘点当前 DSL 中其它依赖 alias 身份/解析细节的场景,优先为其补齐 string ref 兜底(若存在),避免未来升级解析器时出现不可控的兼容性问题。
+- 本 change 仅通过 relation/output.fields 的 string ref/sugar 降低对 anchors/alias 的**必要性**;不额外盘点其它依赖点。若后续发现新的 alias/解析细节依赖点,另起 change 处理。
 - 仍允许用户在需要时使用 steps 对象/对象条目覆写,但仓内 canonical 示例应优先使用 string 形式。
 
-### Decision 4: 文档/生成边界与 drift gate 收敛在实现前确定
+### Decision 4: 不提供强制“自动升级器”,仅提供升级指南 + 明确报错
+
+本 change 不提供强制入口形式的“自动升级器”(例如 `PROJECT_CLI_NAME yaml-dsl upgrade`)。
+
+- 迁移承接以“按日期顺序”的升级指南为准。
+- validator 报错必须足够可操作: 给出“怎么改”的最小片段,让用户不依赖升级器也能快速完成迁移。
+
+### Decision 5: 文档/生成边界与 drift gate 收敛在实现前确定
 
 本 change 涉及 schema/文档/skill/editor 的联动,必须在实现前明确哪些文件是 SSOT、哪些是生成物,并用 gate 防漂移:
 
@@ -79,7 +120,7 @@
 
 ## Risks / Trade-offs
 
-- [Breaking 变更影响下游配置] → 提供升级指南 + (可选)升级器脚本/CLI 子命令,并在错误信息中提示“怎么改”。
+- [Breaking 变更影响下游配置] → 提供升级指南(按日期顺序) + 明确报错(含可复制修复片段);不提供强制升级器入口。
 - [schema-only 与 full validate 行为不一致] → 对新增 union/sugar 做 schema/validator 双侧对齐,并补充 fixtures 覆盖。
 - [output.fields string sugar 引入歧义] → 规定 `source.field_id` 仅用于消歧;遇到同名 field_id 必须显式 source。
 - [runtime vars 指令化影响面广] → 在 params 校验处 fail-fast,给出最小迁移片段,并在升级文档中集中说明。
@@ -90,8 +131,3 @@
 2) 一步到位升级仓内所有 YAML 示例/fixtures/skills/frontend examples
 3) 新增升级指南: `docs/doc/yaml-dsl/upgrades/2026-03-12-yaml-dsl-micro-tunes.md`,并运行 `just gen-docs` 注入索引
 4) 跑通门禁: `just gen` + `just qa` + `just openspec-check`
-
-## Open Questions
-
-- `output.fields` 的 `source.field_id` 是否允许更复杂的路径(例如包含更多 `.`)？本 change 默认仅支持单个 `.` 分隔的二段式。
-- 是否需要提供“自动升级器”作为强制入口(例如 `PROJECT_CLI_NAME yaml-dsl upgrade`)？或先以升级指南 + 明确报错承接。

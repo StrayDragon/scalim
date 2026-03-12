@@ -3,7 +3,6 @@
 当前 YAML DSL 能力边界已经很强,但仍存在几类“即使不做完整重写,也能用较低成本显著减痛”的问题:
 
 - 若干关键路径仍依赖 YAML anchors/alias 的解析细节与“对象身份”(尤其是 `output.fields`),对普通 YAML 用户不直觉,且对未来解析器升级/替换不友好。
-- 概念命名存在误导(顶层 `fields` 实际只允许派生字段),容易写错且文档解释成本高。
 - params 语言形态不一致(字符串占位符 `$runtime.*` vs 映射指令节点 `$keys/$rows`),让“模板 vs 运行期渲染”的心智负担偏高。
 - relation steps 的 `field_id vs data_key` 误用诊断仍不够“可操作”,迁移/排错成本高。
 
@@ -16,20 +15,20 @@
   - 仍允许 `relation: {steps: [...]}`(steps 对象写法)。
 - `output.fields` 引入更直觉的 string sugar:
   - 允许 `output.fields: [order_id, order_date, customer_name]` 作为 `field_id` 列表 sugar。
-  - 允许 `output.fields: [orders.order_id, customers.customer_name]` 作为显式 `source.field_id` sugar(用于消歧)。
-  - 仍保留对象条目用于覆写 `name/relation/value_cast/...`。
-- **BREAKING**: 顶层派生字段入口从 `fields` 改名为 `derived_fields`:
-  - 仓内示例/fixtures/docs/skills/frontend examples 一次性升级为 `derived_fields`。
-  - `fields` 名称预留给未来“跨多数据源/多需求的字段处理入口”(本 change 不实现该能力)。
+  - 允许 `output.fields: [orders.order_id, customers.customer_name]` 作为显式 `source.field_id` sugar(用于消歧;仅支持二段式,单个 `.` 分隔)。
+  - 允许在同一 `output.fields` 列表中混用 string 与对象条目;对象条目仍用于覆写 `name/relation/value_cast/...`。
 - **BREAKING**: runtime vars 统一为指令节点形态:
-  - 以 `{$runtime: order_ids}` 取代字符串占位符 `$runtime.order_ids`,与 `$keys/$rows` 的映射指令形态统一。
+  - 以 `{$runtime: order_ids}`(单键映射;inline/block 皆可)取代字符串占位符 `$runtime.order_ids`,与 `$keys/$rows` 的映射指令形态统一。
+  - validator 对旧写法 fail-fast,并给出最小迁移片段。
+- 迁移策略:
+  - 不提供强制“自动升级器”入口;仅提供按日期顺序的升级指南 + 明确报错承接迁移。
 - 强化静态提示与自动修复建议:
   - 当 relation steps 误写 data_key 时,错误消息附带最可能的 `field_id` 建议与可直接复制的修复片段。
 
 ## Capabilities
 
 ### New Capabilities
-- `yaml-dsl-micro-tunes`: 当前 YAML DSL 的低风险语法/校验改良(减少 alias 依赖、统一命名与 params 指令形态、提升诊断可操作性)。
+- `yaml-dsl-micro-tunes`: 当前 YAML DSL 的低风险语法/校验改良(减少 alias 依赖、统一 params 指令形态、提升诊断可操作性)。
 
 ### Modified Capabilities
 - (none)

@@ -25,16 +25,61 @@
 
 ## What Changes
 
-- 扩展 `derived-outputs` 内置聚合指标能力(仍保持“增量累计 + finalize 输出”的模型),新增:
-  - `count_distinct(field_id=...)`: 统计 distinct key 数量(支持复合 key)
-  - `dedup_by(key_fields=...)`: distinct-on 语义,作为后续计数/求和等指标的前置去重阶段
-  - `two_stage_group_by`: 两阶段聚合(例如 stage1 `group_by=id_number`, stage2 `group_by=cs_id`),并固定确定性 tie-break 规则
-- 为高基数/高 distinct 风险补齐资源护栏与诊断:
-  - 明确 max keys/内存风险告警或 fail-fast 策略(与 `max_groups` 风险告警保持一致的治理口径)
-  - meta/audit 侧提供可对拍的聚合配置指纹与关键统计(如 distinct key 数量/截断信息)
-- 不改变 YAML DSL(本 change 聚焦执行层聚合原语);YAML authoring surface 作为后续独立 change 推进,并复用本 change 的能力.
+本 change 仅扩展执行层的派生聚合原语(IR/Python-only),不引入 YAML authoring surface 变更.
 
-## Notes / Suggestions (for future spec)
+### MVP 新增能力(可实现且可对拍)
+
+1) **新指标**: `count_distinct`
+- 作为内置 metric op 扩展到 `GroupByAggregator`(仍保持“增量累计 + finalize 输出”模型).
+- 支持:
+  - 单字段 distinct:`count_distinct(field_id="user_id")`
+  - 复合 key distinct:`count_distinct(field_ids=("cs_id","user_id"))`
+- `max_distinct` 护栏(默认 per-group): 对每个 group key 的 distinct key 数限制上限(与 `max_groups` 分工明确).
+
+2) **新阶段**: `dedup_by`(distinct-on)
+- 作为派生聚合 pipeline 的“前置去重阶段”:
+  - `dedup_by(key_fields=("cs_id","user_id"), on_conflict=...)` 先将流压缩为唯一 key 的代表行
+  - 然后再执行后续 `group_by + metrics`(count/sum/count_distinct 等)
+- 冲突策略(MVP):
+  - `error`(默认,强口径可对拍)
+  - `first|last`(显式依赖输入顺序;仅 `parallel_mode="seq"` 允许,`adaptive` 下 fail-fast)
+
+3) **新聚合器**: `two_stage_group_by`(两阶段聚合)
+- stage1: 先按实体维度聚合(例如 `user_id`/`id_number`)
+- stage2: 再按业务维度聚合(例如 `cs_id`)
+- stage1→stage2 的数据流为 “stage1 finalize 输出行(稳定排序) → stage2 accumulate”(保证确定性).
+- 条件计数采用**结构化 predicate**(不引入表达式字符串),MVP 支持 6 种比较: `>= > == != <= <`(可对拍且可指纹化).
+
+4) **资源护栏 + 诊断(meta/audit)**
+- 新增 `max_distinct`:
+  - `max_distinct=0` 表示不设上限,但 MUST 输出一次明确 warn(不改变语义).
+  - 默认溢出策略为 `error`(fail-fast),并写入审计信息.
+- meta/audit 增强:
+  - 写入派生聚合配置的稳定指纹(`fingerprint`)与关键统计(如 distinct key 数/冲突次数/触发护栏信息).
+
+### 不做的事(范围边界)
+- 不改变 YAML DSL(本 change 聚焦执行层聚合原语);YAML authoring surface 作为后续独立 change 推进,并复用本 change 的能力.
+- MVP 不提供 `on_overflow="truncate"`(避免静默错数);未来若引入,仅允许 deterministic 的 `truncate_stable` 并必须记录审计信息.
+- MVP 不引入近似 distinct(HLL/Theta)与落盘 spill;这些作为后续扩展点.
+
+## Decisions (resolved defaults)
+
+为保证“可实现 + 可对拍 + 可扩展”,本 change 的默认行为固定如下:
+
+- `max_distinct`:
+  - `count_distinct`: **per-group** 上限(每个 group key 一套 distinct 状态)
+  - `dedup_by`: **global** 上限(该 stage 的 dedup key 总量上限)
+- `on_overflow`:
+  - MVP 仅支持 `error`(fail-fast)并输出结构化审计;不支持截断.
+- `count_distinct` 缺失值:
+  - distinct key 为 `None` 时默认 **忽略**(对齐 SQL `COUNT(DISTINCT)` 的 `NULL` 语义)
+  - 空字符串 `""` 默认作为普通值参与 distinct
+  - 未来扩展点: `exclude_values`/`null_policy` 等更泛化的过滤规则(见下文 Extensibility)
+- `two_stage_group_by` 条件计数:
+  - MVP 采用结构化 predicate,支持 6 比较符: `>= > == != <= <`
+  - 可选组合: `all`/`any`(AND/OR)作为未来扩展点,但仍要求完全可指纹化.
+
+## Concrete Semantics (MVP)
 
 ### Determinism & explainability
 
@@ -52,11 +97,43 @@
   - 规范应要求可配置的护栏(例如 `max_distinct` 或统一的资源上限),并规定当上限为 0(不设限)时必须输出明确 warn.
 - 当触发护栏时的行为必须可解释且可对拍:
   - fail-fast(推荐用于强口径一致性)
-  - 或者允许“截断但记录审计信息”(必须写入 meta/audit 并包含稳定指纹,避免静默偏差)
+  - 或者允许“截断但记录审计信息”(未来扩展;必须写入 meta/audit 并包含稳定指纹,避免静默偏差)
 
 ### Parallel mode boundary
 
 - `count_distinct`/`dedup_by`/两阶段聚合在语义上仍是可交换/可结合的增量累计,但实现需明确其在 `parallel_mode="adaptive"` 下的确定性边界(与现有 derived-outputs spec 的并发边界保持一致口径).
+- MVP 规则:
+  - `dedup_by.on_conflict=first|last` 属于顺序依赖语义,在 `adaptive` 下 MUST fail-fast,提示切换 `seq` 或改用 `error`.
+  - `dedup_by.on_conflict=error` 与 `count_distinct`/`sum` 等可交换聚合可以在 `adaptive` 下工作(前提:实现不依赖输入顺序,且输出排序仅在 finalize 阶段执行).
+
+## IR/Python Configuration (draft, non-YAML)
+
+该 change 不引入 YAML authoring surface,但需要一个清晰可实现的 IR/Python 配置形态.建议实现侧以“stage pipeline”收敛:
+
+- `dedup_by?`(可选) → `group_by(stage1)` → `group_by(stage2)?`(可选) → `rank?`(既有能力)
+
+最小 IR/Python 入口建议包含:
+
+- `DedupBySpec(key_fields, on_conflict, max_distinct)`
+- `GroupBySpec(group_by, metrics, max_groups, max_distinct?)`
+- `TwoStageGroupBySpec(stage1, stage2)`
+- `PredicateSpec(field_id, op, value)`(用于 `count_true(predicate=...)`)
+
+并要求每个派生聚合目标可生成:
+- `required_fields()`(用于 demand 字段裁剪)
+- `fingerprint_parts()`(用于 meta/audit 指纹)
+- `supports_parallel_mode(parallel_mode)`(用于 `adaptive` fail-fast)
+
+## Extensibility (non-MVP, keep deterministic)
+
+在不破坏 MVP 语义的前提下,后续可按同一规律扩展:
+
+- 溢出策略:
+  - `truncate_stable`: 仅允许 deterministic 的截断规则(例如按稳定 key/hash 排序取前 N),并必须输出 `dropped_keys_count`/`truncated=true`/fingerprint.
+- 去重 tie-break:
+  - `min_by/max_by`/`first_by/last_by(order_fields=...)` 以稳定排序字段替代纯输入顺序,从而使其在 `adaptive` 下也可用.
+- predicate 扩展:
+  - `in/not_in`、`between`、`is_null`、`all/any` 组合,但仍要求完全可指纹化(不引入任意表达式 eval).
 
 ## Capabilities
 

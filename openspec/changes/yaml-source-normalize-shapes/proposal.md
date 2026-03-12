@@ -16,13 +16,19 @@
 ## What Changes
 
 - 扩展 YAML DSL 的 source-level `normalize` 能力,覆盖常见“非理想形状”:
-  - `take_first`: `list[...]`/`mapping[key -> list]` 取第一条(并定义 on_empty 策略)
+  - `take_first`: `mapping[key -> list[row]]` 取第一条并归一化为 `mapping[key -> row]`(并定义 `on_empty` 策略)
   - `map_values`: 对 `mapping` 的 values 批量应用 normalization pipeline(例如 take_first + project_fields + rename)
-  - `project_fields`: 对 row/nested mapping 做投影与重命名,并允许 key 为任意标量(含 int)的定位方式
+  - `project_fields`: 对 row/nested mapping 做投影与重命名,并复用既有 `extract` 路径语法来定位(支持 int/enum key,例如 `"[1].clearn_reason_level"`)
 - 提供受控扩展点 `normalize.call_by`(可选):
   - 复用现有 allowlist 安全边界与引用解析能力
   - 固定 contract: 输入与输出必须为 `Mapping`(否则 fail-fast),避免不可解释形状漂移
   - 用于覆盖 “无法用 declarative normalize 表达但又不想写 wrapper module” 的场景
+
+## Decisions (确定化)
+
+- `take_first` **不**处理顶层 `list[row]` 场景: list→keyed mapping 仍统一使用 `index_by_key` + `on_conflict`(现有写法),避免职责重叠与二义性.
+- `normalize.call_by` 仅允许 **top-level(whole-result)** 使用,不作为 `map_values.steps` 的一步;需要 value-level 自定义时,在 `call_by` 内部自行遍历 `result.items()` 处理.
+- `project_fields` 保持 **纯投影/重命名**(可注入 `from_key`),不引入常量/表达式赋值;常量/派生逻辑使用既有字段 `compute/call_by` 或 `normalize.call_by` 实现.
 
 ## Capabilities
 

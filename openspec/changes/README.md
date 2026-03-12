@@ -57,4 +57,4 @@
 - `yaml-dsl-outputs`
 
 6) **Group: 工具链侧改良（不阻塞主线）**
-- `prompt-eval-workflow`
+- `prompt-eval-workflow` **DELAYED**（移除 DELAYED 标记后才允许实现；在此之前不得实现）

@@ -18,9 +18,10 @@
   - list 只允许 replace(不做 concat)
   - 支持 `$import` 为 string 或 list,并按顺序合并
   - 检测循环引用与最大展开深度,错误信息包含导入链路
-- 不扩展 CLI。仅在 Python 运行入口 `scalim.dsl.by_yaml.run()` / `compile()` 增加可选参数 `path_aliases`:
-  - 支持 `"@/..."` 与 `"COMMON:/..."` 风格路径前缀映射到绝对目录,用于解析 import 文件路径与其它 YAML 引用路径
-  - 说明: `@/` 形式在 PyYAML 下必须写成字符串(例如 `"@/fragments/x.yaml"`),否则 YAML 语法层无法解析
+- **V1 路径限制(同级目录导入)**:
+  - `imports.*` 的路径仅允许同级文件名(例如 `common.yaml` 或 `./common.yaml`),不允许子目录/父目录/绝对路径/alias 前缀。
+  - 片段文件递归 import 时也遵循同样限制(相对其所在目录,且只能同级文件)。
+  - `load_string` / 纯文本校验因缺少 base_dir,遇到 `imports/$import` MUST fail-fast,提示改用文件路径入口。
 - 更新 YAML DSL JSON Schema 与语义 validator:
   - schema-only 校验应接受 `imports`/`$import`
   - full validate 在 import 展开后的“最终配置”上执行,保持 fail-fast 与诊断可读
@@ -31,9 +32,10 @@
 ## Notes / Recommendations
 
 - 推荐的片段组织方式(非强制,用于减少重复与口径漂移):
-  - `fragments/sources.yaml`: 小表 sources(尤其 `preload_forever`)与通用 params/normalize
-  - `fragments/relations.yaml`: 通用 relation chains
-  - `fragments/fields.yaml`: 通用字段定义(含命名与 extract/selector)
+  - V1 仅支持同级目录导入,因此建议用“同目录文件名约定”而非子目录:
+    - `fragments.sources.yaml`: 小表 sources(尤其 `preload_forever`)与通用 params/normalize
+    - `fragments.relations.yaml`: 通用 relation chains
+    - `fragments.fields.yaml`: 通用字段定义(含命名与 extract/selector)
   - 每个 demand 仅声明 `main_source` + 少量差异项,其它通过 `$import` 引入并做最小覆写
 - `$import` 的目标值必须是 mapping,片段文件建议也以“顶层 mapping”作为 SSOT,避免导入 list/scalar 引发歧义。
 - 本机制刻意不把 YAML merge(`<<`)作为官方复用路径:
@@ -43,7 +45,7 @@
   - import 展开应对“同一路径 + 同一引用”做缓存(同一 demand 编译期避免重复 IO)
   - 递归展开必须有最大深度上限,并在错误中输出链路以定位循环
 - 与 workflow 的协同:
-  - `path_aliases` 建议作为“跨文件路径解析”的统一能力,供 imports 与 workflow 共同使用,避免两套 alias 规则漂移
+  - 后续若引入 workflow/更强路径解析(如 `path_aliases`),应复用同一套路径解析能力,避免两套规则漂移(本 change 不实现)
 
 ## Capabilities
 
@@ -56,8 +58,8 @@
 ## Impact
 
 - DSL 编译链路: `YamlDemandLoader` 增加 import 展开步骤(在 schema/validator 之前)。
-- Public Python API: `scalim.dsl.by_yaml.run/compile` 与 `RunOptions` 增加可选 `path_aliases` 参数。
+- Public Python API: 不新增参数;import 路径以 `yaml_path` 所在目录为 base_dir 解析(并受 V1 同级目录限制)。
 - Schema/Docs/Tests:
   - schema 生成与漂移门禁需要更新
-  - 增加 import 合并、循环检测、路径别名解析的单元/集成测试
+  - 增加 import 合并、循环检测、同级目录路径限制的单元/集成测试
   - 文档补充(按 SSOT 规则生成,不手改 `.gen.`)

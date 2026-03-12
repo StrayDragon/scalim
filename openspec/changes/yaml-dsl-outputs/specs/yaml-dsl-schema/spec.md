@@ -7,7 +7,7 @@
 - **GIVEN** 用户在同一个 YAML 中声明多个 outputs
 - **WHEN** 两个明细 outputs 通过 `where` 进行分发过滤并写入同一 workbook 的不同 sheet
 - **AND** 一个汇总 output 通过 `aggregate` 在同一份明细流上声明派生汇总并写入汇总 sheet
-- **THEN** schema 校验 MUST 通过且运行时装配 MUST 生成等价的 `OutputCompositionSpec` + `DerivedOutputs` 配置
+- **THEN** schema 校验 MUST 通过且运行时装配 MUST 生成等价的 `OutputCompositionSpec`(包含明细 targets 与派生汇总 derived targets)
 
 ### Requirement: `outputs.*.from` 复用与覆盖
 系统 MUST 支持 `outputs.*.from` 复用另一个 output 的字段集合与容器配置,并允许在当前 output 上覆盖 `where`/sheet 名称/汇总配置等.
@@ -22,5 +22,5 @@
 
 #### Scenario: `where` 依赖字段未声明时 fail-fast
 - **GIVEN** `where` 表达式依赖字段 `channel`
-- **WHEN** `channel` 未被 layout/字段集合包含且无法从引用推导获得
-- **THEN** 编译期校验 MUST 失败并提示补齐字段依赖
+- **WHEN** `channel` 无法解析为 demand 的已定义字段(field_id)因而无法注入到 required fields
+- **THEN** 编译期校验 MUST 失败并提示补齐字段定义/引用

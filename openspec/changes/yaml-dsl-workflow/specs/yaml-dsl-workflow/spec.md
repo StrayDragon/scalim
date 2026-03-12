@@ -27,14 +27,16 @@ workflow MUST 包含:
 #### Scenario: all_fail stops on first error
 - **WHEN** `failure_policy=all_fail` 且某个 run 执行抛出异常
 - **THEN** workflow MUST 失败并抛出包含该 run id 的错误
+- **AND** workflow MUST 不再调度任何尚未开始的 runs
 
 #### Scenario: primary_only continues and returns errors
 - **WHEN** `failure_policy=primary_only` 且某个 run 失败
 - **THEN** workflow MUST 继续执行后续 runs
-- **AND** workflow 返回值 MUST 包含失败 run 的可检查错误信息
+- **AND** workflow 返回值 MUST 包含失败 run 的可检查错误信息(至少包含 run id 与 demand 路径)
 
 ### Requirement: max_concurrency limits parallel runs deterministically
 系统 MUST 支持 `max_concurrency` 控制 runs 粒度并发上限,并确保返回结果顺序与 `workflow.runs` 声明顺序一致。
+workflow 返回值 MUST 提供“按 runs 对齐”的结果集合:返回集合长度 MUST 等于 `workflow.runs` 长度,并包含每个 run 的 `id` 与 `demand` 路径,以便调用方可稳定对齐检查。
 
 #### Scenario: results preserve declared order
 - **WHEN** `max_concurrency>1` 导致 runs 并发执行
@@ -51,10 +53,11 @@ workflow MUST 包含:
 
 ### Requirement: preload cache conflicts fail fast
 当 `share_preload_cache=true` 时,系统 MUST 对同一 `source_id` 的 preload 规格执行一致性校验(至少包含 loader 引用与渲染后的 params 与 normalize 等关键字段)。
+系统 MUST 在执行任一 run 之前完成上述一致性预检查(避免运行长时间后才因冲突失败)。
 若不同 runs 中同一 `source_id` 的规格不一致,系统 MUST fail-fast 报错并指出冲突 runs 与差异字段。
 
-#### Scenario: conflicting preload spec is rejected
+#### Scenario: conflicting preload spec is rejected before execution
 - **GIVEN** run A 的 `sources.dim.loader` 与 run B 的 `sources.dim.loader` 不同(或 params/normalize 不同)
-- **WHEN** workflow 执行且 `share_preload_cache=true`
+- **WHEN** workflow 启动且 `share_preload_cache=true`
 - **THEN** workflow MUST 报错并包含 run A/run B 的冲突信息
-
+- **AND** workflow MUST 不执行任何 run

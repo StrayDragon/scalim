@@ -19,8 +19,9 @@
 ### Requirement: output.fields supports string list sugar
 系统 MUST 支持 `output.fields` 的 string sugar:
 - string 作为 `field_id`(例如 `order_id`)
-- `source.field_id` 作为显式消歧形式(例如 `orders.order_id`)
+- `source.field_id` 作为显式消歧形式(例如 `orders.order_id`),且仅支持单个 `.` 分隔的二段式
 
+系统 MUST 允许在同一 `output.fields` 列表中混用 string 与对象条目。
 系统 MUST 保留对象条目用于覆写字段输出行为(例如覆写 `name` 或指定 selector)。
 
 #### Scenario: output.fields accepts field_id strings
@@ -29,19 +30,11 @@
 
 #### Scenario: output.fields accepts source.field_id strings
 - **WHEN** 用户写 `output.fields: [orders.order_id, customers.customer_name]`
-- **THEN** full validate MUST 将其解析为显式选择器,避免同名字段歧义
+- **THEN** schema-only 校验与 full validate MUST 通过;full validate MUST 将其解析为显式选择器,避免同名字段歧义
 
-### Requirement: Derived fields are declared under derived_fields (breaking)
-系统 MUST 使用顶层 `derived_fields` 作为派生字段入口,并在该入口下允许 `compute/call_by` 等派生字段能力。
-系统 MUST NOT 接受顶层 `fields` 作为派生字段入口。
-
-#### Scenario: derived fields live under derived_fields
-- **WHEN** 用户写 `derived_fields: {order_amount: {compute: \"...\"}}`
-- **THEN** full validate MUST 识别其为派生字段,并按既有派生字段规则进行校验
-
-#### Scenario: legacy fields key is rejected
-- **WHEN** 用户仍使用顶层 `fields`
-- **THEN** full validate MUST 失败,并提示改用 `derived_fields`
+#### Scenario: output.fields rejects multi-dot source.field_id strings
+- **WHEN** 用户写 `output.fields: [orders.customer.id]`
+- **THEN** schema-only 校验与 full validate MUST 失败,并提示 `source.field_id` 仅支持二段式(单个 `.`);需要更复杂表达时应使用对象条目
 
 ### Requirement: Runtime vars use directive node form (breaking)
 系统 MUST 支持并统一 runtime vars 的指令节点形态:

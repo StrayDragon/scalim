@@ -32,8 +32,8 @@
     - loader 引用(归一化后的 reference)
     - 渲染后的静态 params(含 runtime_vars 注入结果;`preload_forever` 禁止 `$keys/$rows` 后应为静态)
     - normalize 配置
-    - key/lookup_cast/lookup_chunk_size 等会影响 mapping 形状与 lookup 语义的关键字段
-  - 若签名不一致,系统 fail-fast 报错,错误信息包含冲突 runs 与差异字段,避免静默复用错误缓存
+    - key/lookup_cast 等会影响 mapping 形状与 lookup 语义的关键字段
+  - 系统会在执行任一 run 之前完成冲突预检查;若签名不一致,fail-fast 报错,错误信息包含冲突 runs 与差异字段,避免静默复用错误缓存
   - 并发下对单个 `source_id` 细粒度加锁,保证最多一次真实 loader 调用;其余等待复用结果(避免重复 IO)
 
 ## Capabilities
