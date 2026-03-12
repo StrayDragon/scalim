@@ -43,9 +43,11 @@ try:
     jsonschema = import_module("jsonschema")
 
     _has_jsonschema: bool = True
-except ImportError:
+    _jsonschema_import_error: Optional[Exception] = None
+except Exception as exc:  # noqa: BLE001
     jsonschema = None  # type: ignore[assignment]
     _has_jsonschema = False
+    _jsonschema_import_error = exc
 
 HAS_JSONSCHEMA: bool = _has_jsonschema
 
@@ -170,7 +172,11 @@ class ConfigValidator(ValidatorFieldsMixin):
 
     def _validate_with_jsonschema(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
         if not HAS_JSONSCHEMA or jsonschema is None:  # pragma: no cover
-            msg = "JSONSchema is not available, skipping schema validation"
+            # `JSONSchema` 校验是可选项. 某些旧运行时可能存在但因依赖版本不匹配(例如旧 `attrs`)而不可用,因此这里不能直接失败.
+            hint = ""
+            if _jsonschema_import_error is not None:
+                hint = " ({}: {})".format(type(_jsonschema_import_error).__name__, _jsonschema_import_error)
+            msg = "JSONSchema is not available{}, skipping schema validation".format(hint)
             _VALIDATOR_LOGGER.warning(msg)
             errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
             return
