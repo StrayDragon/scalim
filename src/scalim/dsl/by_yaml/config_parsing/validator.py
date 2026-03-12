@@ -25,6 +25,7 @@ else:
     SequenceNode = _yaml_nodes.SequenceNode
 
 from .errors import ConfigValidationError
+from .imports import contains_import_syntax
 from .models import RawDemand, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
@@ -408,6 +409,14 @@ def validate_yaml_text(
         return YamlValidationResult(
             ok=False,
             errors=[YamlValidationIssue(path="(root)", message="YAML document is empty", line=1, column=1)],
+            warnings=[],
+        )
+
+    if contains_import_syntax(yaml_data):
+        msg = "imports/$import is only supported for file path entrypoints; use scalim-cli yaml-dsl validate <file.yaml>"
+        return YamlValidationResult(
+            ok=False,
+            errors=[YamlValidationIssue(path="(root)", message=msg, line=1, column=1)],
             warnings=[],
         )
 

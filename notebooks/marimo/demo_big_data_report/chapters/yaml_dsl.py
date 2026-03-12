@@ -4,11 +4,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
-
 from scalim.dsl.by_yaml import compile as compile_yaml
 from scalim.dsl.by_yaml import run as run_yaml
 from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.imports import load_and_expand_imports
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.sinks.sink_memory import InMemoryRowSink
@@ -37,8 +36,7 @@ def run_yaml_dsl(cfg: ECommerceConfig, *, yaml_path: Path, runtime_vars: Optiona
 
     # 1) 语义校验: ConfigValidator + YamlDemandLoader
     validator = ConfigValidator()
-    yaml_text = yaml_path.read_text(encoding="utf-8")
-    yaml_config = yaml.safe_load(yaml_text)
+    yaml_config = load_and_expand_imports(yaml_path)
     try:
         validator.validate(yaml_config)
     except ConfigValidationError as exc:

@@ -8,7 +8,7 @@
   import { parse as parseYaml } from "yaml";
   import { state } from "$domain/state.svelte";
   import type { Issue } from "$domain/issues";
-  import { loadDemandSchema } from "$services/schema";
+  import { loadDemandSchema, loadWorkflowSchema } from "$services/schema";
   import { pyodideValidate } from "$services/pyodide_client";
   import { validateSemantic } from "$services/semantic_validate";
   import { findUnknownFields } from "$services/unknown_fields";
@@ -21,9 +21,19 @@
   let debounceTimerDerived: number | null = null;
   let debounceTimerMarkers: number | null = null;
   let demandSchema: any | null = null;
+  let workflowSchema: any | null = null;
   let yamlLsp: MonacoYaml | null = null;
   let applyingExternalText = false;
   let semanticRunId = 0;
+
+  const schemaKind = (): "demand" | "workflow" => {
+    const raw = String(state.schemaHeaderPath || "").toLowerCase();
+    return raw.includes("workflow.gen.json") ? "workflow" : "demand";
+  };
+
+  const activeSchema = () => {
+    return schemaKind() === "workflow" ? workflowSchema : demandSchema;
+  };
 
   const ensureDebounceDerived = (fn: () => void, ms: number) => {
     if (debounceTimerDerived) window.clearTimeout(debounceTimerDerived);
@@ -55,7 +65,8 @@
   };
 
   const syncUnknownFields = async () => {
-    if (!state.schemaLoaded || !demandSchema) return;
+    const schema = activeSchema();
+    if (!state.schemaLoaded || !schema) return;
     let raw: unknown;
     try {
       raw = parseYaml(state.yamlText);
@@ -68,7 +79,7 @@
       return;
     }
     try {
-      const unknowns = findUnknownFields(raw, demandSchema);
+      const unknowns = findUnknownFields(raw, schema);
       const issues: Issue[] = unknowns.map((u) => ({
         severity: state.strict ? "error" : "warning",
         source: "unknown_fields",
@@ -89,7 +100,11 @@
 
     if (state.semanticMode === "pyodide") {
       state.pyodideStatus = "loading";
-      const out = await pyodideValidate(state.yamlText, { strict: state.strict, timeoutMs: 30000 });
+      const out = await pyodideValidate(state.yamlText, {
+        strict: state.strict,
+        timeoutMs: 30000,
+        schemaPath: state.schemaHeaderPath
+      });
       if (runId !== semanticRunId) return;
       if (out.ok) {
         state.pyodideStatus = "ok";
@@ -103,6 +118,11 @@
     } else {
       state.pyodideStatus = "disabled";
       state.pyodideLastError = "";
+    }
+
+    if (schemaKind() === "workflow") {
+      state.semanticIssues = [];
+      return;
     }
 
     let raw: unknown;
@@ -183,6 +203,7 @@
 
     try {
       demandSchema = await loadDemandSchema();
+      workflowSchema = await loadWorkflowSchema();
       yamlLsp = configureMonacoYaml(monaco as any, {
         validate: true,
         // Enable schema requests so the yaml-language-server `$schema` header works.
@@ -191,20 +212,13 @@
         format: true,
         hover: true,
         completion: true,
-        schemas: [
-          {
-            // Use the same URI as the recommended `# yaml-language-server: $schema=...` header (resolved).
-            // This avoids spurious "Unable to load schema ... Failed to fetch" warnings when users keep the header.
-            uri: "/schema/demand.gen.json",
-            fileMatch: [docUri, "*.yaml", "*.yml", "**/*.yaml", "**/*.yml"],
-            schema: demandSchema
-          }
-        ]
+        schemas: []
       });
       state.schemaLoaded = true;
       state.schemaLoadError = "";
     } catch (err: any) {
       demandSchema = null;
+      workflowSchema = null;
       yamlLsp?.dispose?.();
       yamlLsp = null;
       state.schemaLoaded = false;

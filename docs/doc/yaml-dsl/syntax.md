@@ -88,6 +88,35 @@ observability: {}       # 可选
 - YAML merge 会生成新对象,丢失 alias 身份
 - merge 产物必须仍然包含 `field_id` 或 `field` 作为选择器
 
+### 3.4 跨文件复用: `imports` / `$import` (V1: 同级文件)
+
+当一个 demand 配置变大后,常见做法是把 `sources/relations/fields` 等片段拆分成多个文件复用.为此 Scalim 提供编译期 `imports/$import` 展开能力:
+
+- 顶层新增 `imports: {<alias>: <fragment.yaml>}` 映射
+- 在任意 mapping 节点内允许 `$import`(string 或 string list):
+  - `$import: common.sources`
+  - `$import: [common.sources, other.sources]`
+- `$import` 引用格式: `<alias>(.<segment>)*`(点路径下钻)
+- 合并规则(确定性):
+  - mapping: deep-merge
+  - list: replace(本地覆盖导入)
+  - 类型不匹配: fail-fast
+- **V1 路径限制**: `imports.*` 仅允许同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`(禁止绝对路径/父目录/子目录/alias 前缀)
+- **仅文件路径入口支持**: `scalim.dsl.by_yaml.run/compile(yaml_path)` / `scalim-cli yaml-dsl validate <file.yaml>` 等会先展开再校验;纯文本入口会 fail-fast 并提示改用文件路径入口
+
+一个最小示例:
+
+```yaml
+imports:
+  common: common.yaml
+
+sources:
+  $import: common.sources
+  my_source:
+    loader: "myapp.loaders:load_x"
+    key: id
+```
+
 ## 4. 引用 Python: loader / call_by
 
 YAML 里引用 Python 的地方主要有两类:

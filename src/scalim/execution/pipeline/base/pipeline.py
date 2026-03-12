@@ -25,7 +25,7 @@ from ....spec.ir.binding import LoaderCallContextIr
 from ....spec.ir.demand import DemandIr
 from ....spec.ir.fields import FieldIr
 from ....spec.ir.helpers import coerce_loader_result_mapping
-from ....typedefs import FieldValue, LoaderCallKwargs, RowData, SinkRowKeySeq
+from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, RowData, SinkRowKeySeq
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
 from ...executor.batch.executor import BatchExecutor
@@ -175,6 +175,9 @@ class Pipeline(ABC):
         """预加载缓存数据源"""
         for source in self.plan.preload_sources:
             if source.is_preload_forever():
+                if self.runtime.is_source_cached(source.source_id):
+                    continue
+
                 binding = source.bind
                 call_kwargs: LoaderCallKwargs = {}
                 callable_ref = source.loader_spec.callable
@@ -183,35 +186,54 @@ class Pipeline(ABC):
                     _args, call_kwargs = binding.build_params(preload_ctx)
                 call = _make_noarg_loader_call(callable_ref, call_kwargs)
 
-                loader_start = time.perf_counter()
-                policy = self.runtime.loader_retry.resolve(source.source_id)
-                result = call_with_loader_retry(
-                    call=call,
-                    instrumentation=self.runtime.instrumentation,
-                    policy=policy,
-                    loader_name=source.source_id,
-                    callsite=CALLSITE_PRELOAD_FOREVER,
-                    batch_num=self.runtime.batch_num,
-                )
-                loader_duration = time.perf_counter() - loader_start
+                source_id = source.source_id
+                normalize = source.normalize
 
-                result_obj: object = result
-                if source.normalize is not None:
-                    result_obj = source.normalize.apply(result, source_id=source.source_id)
-                if not isinstance(result_obj, Mapping):
-                    msg = "Loader '{}' result must be a Mapping".format(source.source_id)
-                    raise TypeError(msg)
-                result_mapping = coerce_loader_result_mapping(cast("object", result_obj))
+                def _load_preload_forever_source(
+                    *,
+                    source_id: str = source_id,
+                    normalize: object = normalize,
+                    call: Callable[[], object] = call,
+                    call_kwargs: LoaderCallKwargs = call_kwargs,
+                ) -> LoaderResultMapping:
+                    loader_start = time.perf_counter()
+                    policy = self.runtime.loader_retry.resolve(source_id)
+                    result = call_with_loader_retry(
+                        call=call,
+                        instrumentation=self.runtime.instrumentation,
+                        policy=policy,
+                        loader_name=source_id,
+                        callsite=CALLSITE_PRELOAD_FOREVER,
+                        batch_num=self.runtime.batch_num,
+                    )
+                    loader_duration = time.perf_counter() - loader_start
 
-                self.runtime.preloaded_cache[source.source_id] = result_mapping
+                    result_obj: object = result
+                    if normalize is not None:
+                        result_obj = cast("Any", normalize).apply(result, source_id=source_id)
+                    if not isinstance(result_obj, Mapping):
+                        msg = "Loader '{}' result must be a Mapping".format(source_id)
+                        raise TypeError(msg)
+                    result_mapping = coerce_loader_result_mapping(cast("object", result_obj))
 
-                self.runtime.instrumentation.emit_loader_call(
-                    loader_name=source.source_id,
-                    params=call_kwargs,
-                    result=result_mapping,
-                    duration=loader_duration,
-                    cache_scope="preload_forever",
-                )
+                    self.runtime.instrumentation.emit_loader_call(
+                        loader_name=source_id,
+                        params=call_kwargs,
+                        result=result_mapping,
+                        duration=loader_duration,
+                        cache_scope="preload_forever",
+                    )
+                    return result_mapping
+
+                cache = self.runtime.preloaded_cache
+                get_or_load = getattr(cache, "get_or_load", None)
+                if callable(get_or_load):
+                    result_mapping = cast("LoaderResultMapping", get_or_load(source_id, _load_preload_forever_source))
+                    cache[source_id] = result_mapping
+                    continue
+
+                result_mapping = _load_preload_forever_source()
+                cache[source_id] = result_mapping
 
     def _load_main_rows(self) -> Iterable[RowData]:
         """加载主数据源行(按行流)."""

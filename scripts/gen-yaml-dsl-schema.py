@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scalim.dsl.by_yaml.schema_dsl.builder import write_demand_schema
+from scalim.dsl.by_yaml.schema_dsl.builder import write_demand_schema, write_workflow_schema
 from scalim.dsl.by_yaml.schema_dsl.doc_texts import SOURCE_FIELD_EXTRACT_MD
 from scalim_misc.markdown_inject import InjectBlockSpec, replace_markdown_injected_block
 
@@ -31,9 +31,11 @@ def sync_yaml_dsl_user_guide(repo_root: Path) -> None:
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     schema_dir = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema"
-    output_path = schema_dir / "demand.gen.json"
+    demand_path = schema_dir / "demand.gen.json"
+    workflow_path = schema_dir / "workflow.gen.json"
 
-    write_demand_schema(output_path)
+    write_demand_schema(demand_path)
+    write_workflow_schema(workflow_path)
     sync_yaml_dsl_user_guide(repo_root)
 
     return 0

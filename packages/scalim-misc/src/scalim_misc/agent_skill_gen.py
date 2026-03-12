@@ -30,7 +30,8 @@ from scalim_misc.markdown_inject import InjectBlockError, InjectBlockSpec, repla
 
 from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml.config_parsing.validator import validate_yaml_text
+from scalim.dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
+from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
 
 try:
@@ -116,17 +117,25 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     cli_specs = load_spec_summaries(repo_root, CLI_SPEC_RELS)
     command_docs = build_yaml_dsl_command_docs()
     canonical_example_text = build_canonical_example(repo_root)
+    canonical_example_fragments = build_canonical_example_fragments(repo_root)
+    validate_canonical_example(repo_root, canonical_example_text, fragments=canonical_example_fragments)
 
     generated_files = {
         SYNTAX_CATALOG_REL: render_syntax_catalog(schema, syntax_specs),
         CLI_LSP_REFERENCE_REL: render_cli_lsp_reference(repo_root, command_docs, cli_specs),
         CANONICAL_EXAMPLE_OUTPUT_REL: canonical_example_text,
     }
+    for fragment_name, fragment_text in canonical_example_fragments.items():
+        fragment_rel = GENERATED_ROOT_REL / "example-full" / fragment_name
+        generated_files[fragment_rel] = fragment_text
     sync_generated_files(skill_dir, generated_files)
     sync_upgrade_legacy_reference(repo_root, skill_dir)
 
     outputs = [skill_dir / rel_path for rel_path in sorted(generated_files.keys(), key=lambda item: str(item))]
-    inputs = [schema_path, cli_path, canonical_example_source] + [repo_root / rel for rel in SYNTAX_SPEC_RELS + CLI_SPEC_RELS]
+    fragment_inputs = [canonical_example_source.parent / name for name in sorted(canonical_example_fragments)]
+    inputs = (
+        [schema_path, cli_path, canonical_example_source] + fragment_inputs + [repo_root / rel for rel in SYNTAX_SPEC_RELS + CLI_SPEC_RELS]
+    )
 
     manifest = build_manifest(
         repo_root=repo_root,
@@ -194,34 +203,99 @@ def build_canonical_example(repo_root: Path) -> str:
             continue
         lines.append(raw_line)
 
-    text = "\n".join(lines).strip() + "\n"
-    validate_canonical_example(repo_root, text)
-    return text
+    return "\n".join(lines).strip() + "\n"
 
 
-def validate_canonical_example(repo_root: Path, yaml_text: str) -> None:
+def build_canonical_example_fragments(repo_root: Path) -> Dict[str, str]:
+    source_path = repo_root / CANONICAL_EXAMPLE_SOURCE_REL
+    if not source_path.exists():
+        raise GenerationError("未找到唯一完整示例来源: {}".format(source_path))
+
+    try:
+        payload = yaml.safe_load(read_text(source_path))
+    except Exception as exc:  # noqa: BLE001
+        msg = "唯一完整示例 YAML 解析失败: {}: {}".format(type(exc).__name__, exc)
+        raise GenerationError(msg)
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+
+    imports_raw = payload.get("imports")
+    if imports_raw is None:
+        return {}
+    if not isinstance(imports_raw, dict):
+        raise GenerationError("唯一完整示例 `imports` 必须为映射: {}".format(source_path))
+
+    fragments: Dict[str, str] = {}
+    base_dir = source_path.parent
+    for alias, path_raw in sorted(imports_raw.items(), key=lambda item: str(item[0])):
+        if not isinstance(alias, str) or not alias.strip():
+            raise GenerationError("唯一完整示例 `imports` 的 `alias` 必须为非空字符串: {}".format(source_path))
+        if not isinstance(path_raw, str) or not path_raw.strip():
+            raise GenerationError("唯一完整示例 `imports.{}` 的路径必须为非空字符串".format(alias))
+        fragment_name = str(path_raw).strip()
+        if fragment_name.startswith("./"):
+            fragment_name = fragment_name[2:]
+        if not fragment_name:
+            raise GenerationError("唯一完整示例 `imports.{}` 的路径不能为空".format(alias))
+
+        fragment_path = (base_dir / fragment_name).resolve()
+        if not fragment_path.exists():
+            raise GenerationError("未找到唯一完整示例 `imports` 片段文件: {}".format(fragment_path))
+
+        text = read_text(fragment_path).strip() + "\n"
+        fragments[fragment_name] = text
+    return fragments
+
+
+def validate_canonical_example(repo_root: Path, yaml_text: str, *, fragments: Dict[str, str]) -> None:
     schema_path = repo_root / SCHEMA_REL
-    result = validate_yaml_text(
-        yaml_text,
-        strict_unknown_fields=True,
-        schema_path=str(schema_path),
-        enable_jsonschema_validation=False,
-    )
-    if not result.ok:
-        message = result.errors[0].message if result.errors else "未知校验错误"
-        raise GenerationError("唯一完整示例未通过内部校验: {}".format(message))
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_root = Path(tmpdir)
+        yaml_path = tmp_root / "ecommerce_report.yaml"
+        write_text(yaml_path, yaml_text)
+        for fragment_name, fragment_text in fragments.items():
+            write_text(tmp_root / fragment_name, fragment_text)
 
-    if jsonschema is None:  # pragma: no cover
-        raise GenerationError("缺少 `jsonschema` 依赖,无法执行唯一完整示例的 `schema validate` 校验.")
+        try:
+            payload = yaml.safe_load(yaml_text)
+        except Exception as exc:  # noqa: BLE001
+            msg = "唯一完整示例 YAML 解析失败: {}: {}".format(type(exc).__name__, exc)
+            raise GenerationError(msg)
+        if payload is None:
+            raise GenerationError("唯一完整示例 YAML 为空")
+        if not isinstance(payload, dict):
+            raise GenerationError("唯一完整示例 `YAML` 根节点必须为映射")
 
-    schema = load_json_file(schema_path, "schema")
-    payload = yaml.safe_load(yaml_text)
-    validator = jsonschema.Draft7Validator(schema)
-    errors = sorted(validator.iter_errors(payload), key=lambda item: str(list(getattr(item, "absolute_path", []))))
-    if errors:
-        error = errors[0]
-        path = ".".join(str(part) for part in getattr(error, "absolute_path", [])) or "(root)"
-        raise GenerationError("唯一完整示例未通过 `schema` 校验: {}: {}".format(path, error.message))
+        payload_dict = dict(payload)
+        try:
+            if contains_import_syntax(payload_dict):
+                _ = expand_imports_inplace(payload_dict, yaml_path=yaml_path)
+        except YamlImportExpansionError as exc:
+            raise GenerationError("唯一完整示例 `imports` 展开失败: {}".format(exc))
+
+        validator = ConfigValidator(schema_path=str(schema_path))
+        report = validator.validate_report(
+            payload_dict,
+            strict_unknown_fields=True,
+            enable_jsonschema_validation=False,
+        )
+        issues = report.errors() + report.warnings()
+        if issues:
+            message = issues[0].message if issues else "未知校验错误"
+            raise GenerationError("唯一完整示例未通过内部校验: {}".format(message))
+
+        if jsonschema is None:  # pragma: no cover
+            raise GenerationError("缺少 `jsonschema` 依赖,无法执行唯一完整示例的 `schema validate` 校验.")
+
+        schema = load_json_file(schema_path, "schema")
+        schema_validator = jsonschema.Draft7Validator(schema)
+        errors = sorted(schema_validator.iter_errors(payload_dict), key=lambda item: str(list(getattr(item, "absolute_path", []))))
+        if errors:
+            error = errors[0]
+            path = ".".join(str(part) for part in getattr(error, "absolute_path", [])) or "(root)"
+            raise GenerationError("唯一完整示例未通过 `schema` 校验: {}: {}".format(path, error.message))
 
 
 def render_syntax_catalog(schema: Dict[str, Any], spec_summaries: Sequence[Dict[str, Any]]) -> str:

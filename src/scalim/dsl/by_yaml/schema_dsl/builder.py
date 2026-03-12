@@ -10,6 +10,9 @@ from . import constants as schema_constants
 from . import models as schema_models
 from .constants import SCHEMA_META_KEY
 
+_IMPORT_KEY = "$import"
+_IMPORTS_KEY = "imports"
+
 
 def _build_default_types_module() -> Any:
     merged: Dict[str, Any] = {}
@@ -128,8 +131,126 @@ class SchemaBuilder:
             schema["additionalProperties"] = bool(additional_props)
         return schema
 
+    def build_workflow_schema(self) -> Dict[str, Any]:
+        types_mod = self._types
+        options: Dict[str, Any] = {
+            "type": "object",
+            "properties": {
+                "max_concurrency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1,
+                    "description": "runs 粒度并发上限(>=1)",
+                    "markdownDescription": "runs 粒度并发上限(>=1).",
+                },
+                "failure_policy": {
+                    "type": "string",
+                    "enum": ["all_fail", "primary_only"],
+                    "default": "all_fail",
+                    "description": "失败策略(all_fail/primary_only)",
+                    "markdownDescription": (
+                        "失败策略.\n\n- `all_fail`: 任一 run 失败即失败\n- `primary_only`: 失败 run 被跳过但 workflow 继续"
+                    ),
+                },
+                "share_preload_cache": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "跨 runs 共享 preload_forever cache",
+                    "markdownDescription": "跨 runs 共享 `cache_mode: preload_forever` 的预加载缓存(仅同一次 workflow 内).",
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        run_item: Dict[str, Any] = {
+            "type": "object",
+            "required": ["id", "demand"],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "run 标识(非空且唯一)",
+                    "markdownDescription": "run 标识(非空且唯一).",
+                },
+                "demand": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "demand YAML 路径(字符串)",
+                    "markdownDescription": (
+                        "demand YAML 路径(字符串).\n\n"
+                        "- 相对路径以 workflow 文件所在目录为基准\n"
+                        "- 可通过 Python 入口注入 path_aliases 解析 `@/...` 或 `ALIAS:/...`"
+                    ),
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        workflow: Dict[str, Any] = {
+            "type": "object",
+            "required": ["runs"],
+            "properties": {
+                "runs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": run_item,
+                },
+                "options": options,
+            },
+            "additionalProperties": False,
+        }
+
+        schema: Dict[str, Any] = {
+            "$schema": types_mod.DEMAND_SCHEMA_META["$schema"],
+            "$id": "https://scalim.example.com/schemas/workflow.json",
+            "title": "Scalim Workflow 配置",
+            "description": "Scalim 框架 workflow YAML 配置定义 Schema",
+            "$comment": self.GENERATED_SCHEMA_COMMENT,
+            "type": "object",
+            "required": ["workflow"],
+            "properties": {"workflow": workflow},
+            "additionalProperties": False,
+        }
+        return schema
+
+    def _import_ref_schema(self) -> Dict[str, Any]:
+        return {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            ],
+            "description": "$import 引用(支持 string 或 string list)",
+            "markdownDescription": (
+                "$import 引用.\n\n"
+                "- string: `<alias>(.<segment>)*`\n"
+                "- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n"
+                "- 仅支持 mapping 片段\n"
+                "- V1 仅支持同级文件导入(见顶层 `imports`)"
+            ),
+            "examples": ["common.sources", ["common.sources", "other.sources"]],
+        }
+
+    def _imports_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "description": "片段文件导入别名映射(编译期展开)",
+            "markdownDescription": (
+                "片段文件导入别名映射.\n\n"
+                "- key: alias\n"
+                "- value: 片段文件路径(字符串)\n"
+                "- V1 仅支持同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`\n"
+                "- 禁止: 绝对路径/父目录/子目录/alias 前缀"
+            ),
+            "propertyNames": {"type": "string", "pattern": r"^[a-zA-Z_][a-zA-Z0-9_]*$"},
+            "additionalProperties": {
+                "type": "string",
+                "pattern": r"^(\./)?[^/\\\\:]+\\.ya?ml$",
+            },
+        }
+
     def _build_definition(self, cls: type) -> Dict[str, Any]:
         properties = self._build_class_properties(cls)
+        properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
         schema: Dict[str, Any] = {
             "type": "object",
             "properties": properties,
@@ -152,6 +273,8 @@ class SchemaBuilder:
     def _build_demand_properties(self) -> Dict[str, Any]:
         types_mod = self._types
         base_properties = self._build_class_properties(types_mod.DemandConfig)
+        base_properties.setdefault(_IMPORTS_KEY, self._imports_schema())
+        base_properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
         ordered: Dict[str, Any] = {}
         for name in types_mod.DEMAND_SCHEMA_PROPERTIES_ORDER:
             if name == "_templates":
@@ -201,6 +324,8 @@ class SchemaBuilder:
                     raise ValueError(msg)
                 continue
             properties[name] = schema
+
+        properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
 
         return {
             "type": "object",
@@ -327,7 +452,7 @@ class SchemaBuilder:
             return {"type": "array", "items": self._schema_for_type(item_type)}
 
         if origin is dict or tp is dict:
-            return {"type": "object"}
+            return {"type": "object", "properties": {_IMPORT_KEY: self._import_ref_schema()}}
 
         if origin is tuple or tp is tuple:
             return self._tuple_schema(tp)
@@ -366,6 +491,10 @@ def build_demand_schema() -> Dict[str, Any]:
     return _DEFAULT_BUILDER.build_demand_schema()
 
 
+def build_workflow_schema() -> Dict[str, Any]:
+    return _DEFAULT_BUILDER.build_workflow_schema()
+
+
 def load_schema(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -373,6 +502,14 @@ def load_schema(path: Path) -> Dict[str, Any]:
 
 def write_demand_schema(output_path: Path) -> None:
     schema = build_demand_schema()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(schema, handle, ensure_ascii=False, indent=2, sort_keys=False)
+        _ = handle.write("\n")
+
+
+def write_workflow_schema(output_path: Path) -> None:
+    schema = build_workflow_schema()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as handle:
         json.dump(schema, handle, ensure_ascii=False, indent=2, sort_keys=False)

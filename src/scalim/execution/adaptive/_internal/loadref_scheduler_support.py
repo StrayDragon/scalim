@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
+from typing import Callable, Dict, Hashable, List, MutableMapping, Optional, Sequence, Set, Tuple
 
 from ....events.event import Event
 from ....hooks.base import HookManager
@@ -44,7 +44,7 @@ def run_task_in_process(
     main_source: Optional[MainSourceIr],
     guardrails: GuardrailsPolicy,
     loader_retry: LoaderRetryPolicies,
-    preloaded_cache: Dict[str, LoaderResultMapping],
+    preloaded_cache: MutableMapping[str, LoaderResultMapping],
     batch_num: int,
     required_fields: Optional[Set[str]],
     *,

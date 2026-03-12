@@ -18,6 +18,42 @@
         "order_report"
       ]
     },
+    "imports": {
+      "type": "object",
+      "description": "片段文件导入别名映射(编译期展开)",
+      "markdownDescription": "片段文件导入别名映射.\n\n- key: alias\n- value: 片段文件路径(字符串)\n- V1 仅支持同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`\n- 禁止: 绝对路径/父目录/子目录/alias 前缀",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(\\./)?[^/\\\\\\\\:]+\\\\.ya?ml$"
+      }
+    },
+    "$import": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      ],
+      "description": "$import 引用(支持 string 或 string list)",
+      "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+      "examples": [
+        "common.sources",
+        [
+          "common.sources",
+          "other.sources"
+        ]
+      ]
+    },
     "_templates": {
       "type": "object",
       "description": "YAML anchor 模板集合(_templates), 供 fields/relations 复用",
@@ -77,6 +113,31 @@
     },
     "sources": {
       "type": "object",
+      "properties": {
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
       "description": "数据源配置映射, key 为 source_id",
       "markdownDescription": "数据源配置映射, key 为 `source_id`.\n\n- 每个 source 必填: `loader`, `key`\n- 不允许包含 `main_source.source_id`\n- `fields` 仅允许源字段(禁止 `compute`)",
       "additionalProperties": {
@@ -94,6 +155,31 @@
     },
     "relations": {
       "type": "object",
+      "properties": {
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
       "description": "命名关联关系映射(steps 模板),供字段通过 string ref/alias 复用",
       "markdownDescription": "命名关联关系映射(steps 模板).\n\n- 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用\n- string ref: `relation: <relation_id>` 引用 `relations.<relation_id>`\n- alias 复用: `relation: *<anchor>` (YAML anchor)\n- steps 必须是等值关联链, 参考 `relation.steps`",
       "additionalProperties": {
@@ -147,6 +233,31 @@
         },
         "fields": {
           "type": "object",
+          "properties": {
+            "$import": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              ],
+              "description": "$import 引用(支持 string 或 string list)",
+              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+              "examples": [
+                "common.sources",
+                [
+                  "common.sources",
+                  "other.sources"
+                ]
+              ]
+            }
+          },
           "description": "主数据源字段配置映射, key 为 field_id",
           "markdownDescription": "主数据源字段配置映射.\n\n- 仅允许源字段(禁止 `compute`)\n- `source` 可省略或必须等于 `main_source.source_id`\n- 支持 YAML anchor 复用",
           "additionalProperties": {
@@ -156,9 +267,34 @@
         },
         "params": {
           "type": "object",
+          "properties": {
+            "$import": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              ],
+              "description": "$import 引用(支持 string 或 string list)",
+              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+              "examples": [
+                "common.sources",
+                [
+                  "common.sources",
+                  "other.sources"
+                ]
+              ]
+            }
+          },
           "description": "调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)",
           "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$runtime: <name>}` 指令节点(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$runtime: <name>}` 指令节点(单键映射;inline/block 等价)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$runtime: <name>}`",
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "retry": {
           "description": "Loader retry 策略(可选;默认关闭)",
@@ -176,6 +312,29 @@
           },
           "description": "主数据源批次内排序字段列表(仅主数据源字段)",
           "markdownDescription": "主数据源批次内排序字段列表.\n\n- 每项为字段 id, 前缀 `-` 表示 desc\n- 未配置时保持 loader 原始顺序\n- 仅允许主数据源字段"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "required": [
@@ -326,6 +485,31 @@
         },
         "fields": {
           "type": "object",
+          "properties": {
+            "$import": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              ],
+              "description": "$import 引用(支持 string 或 string list)",
+              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+              "examples": [
+                "common.sources",
+                [
+                  "common.sources",
+                  "other.sources"
+                ]
+              ]
+            }
+          },
           "description": "数据源字段配置映射, key 为 field_id",
           "markdownDescription": "数据源字段配置映射.\n\n- 仅允许源字段(禁止 `compute`)\n- `source` 可省略或必须等于当前 `source_id`\n- 支持 YAML anchor 复用",
           "additionalProperties": {
@@ -335,9 +519,57 @@
         },
         "params": {
           "type": "object",
+          "properties": {
+            "$import": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              ],
+              "description": "$import 引用(支持 string 或 string list)",
+              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+              "examples": [
+                "common.sources",
+                [
+                  "common.sources",
+                  "other.sources"
+                ]
+              ]
+            }
+          },
           "description": "调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)",
           "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$runtime: <name>}` 指令节点(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$runtime: <name>}` 指令节点(单键映射;inline/block 等价)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$runtime: <name>}`",
-          "additionalProperties": true
+          "additionalProperties": {}
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "required": [
@@ -509,6 +741,29 @@
           ],
           "examples": [
             "auto"
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
           ]
         }
       },
@@ -712,6 +967,29 @@
             "myapp.enums:get_status_text(status=status, ctx=$ctx)",
             ".helpers:to_text(status)"
           ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "allOf": [
@@ -846,6 +1124,29 @@
           "minItems": 1,
           "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
           "markdownDescription": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "required": [
@@ -938,6 +1239,29 @@
           },
           "description": "输出字段顺序(支持 string sugar / 对象条目 / YAML alias; 推荐显式对象)",
           "markdownDescription": "输出字段顺序.\n\nString sugar:\n- `order_id` -> `field_id` sugar\n- `orders.order_id` -> 显式 `source.field_id` sugar(用于消歧;仅支持二段式)\n\n推荐显式对象:\n- `{field_id: order_id, name: 订单ID}`\n\n按 data_key 选择:\n- `{field: order_real_name, source: orders, name: 订单名}`\n\nAlias 复用(指向已定义字段对象):\n- `*order_id`\n\n注意:\n- 允许在同一列表中混用 string 与对象条目\n- `source.field_id` 仅支持二段式(单个 `.`);多段式会被拒绝,请改用对象条目\n- 可用选择器: `field_id`(字段 ID) 或 `field`(loader data_key); 歧义时必须加 `source`\n- YAML merge(`<<`) 会生成新对象并丢失 alias 身份; merge 产物需包含 `field_id` 或 `field` 选择器\n- 显式对象除选择器键(`field_id`/`field`/`source`)外的键会覆盖字段配置"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -963,6 +1287,29 @@
           "examples": [
             "pretty"
           ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -977,6 +1324,29 @@
         "memory_increase_warn": {
           "description": "内存增长告警阈值(MB)",
           "markdownDescription": "内存增长告警阈值(MB)"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1009,6 +1379,29 @@
           "description": "包含详细统计",
           "markdownDescription": "包含详细统计.",
           "default": false
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1046,6 +1439,29 @@
         },
         "thresholds": {
           "$ref": "#/definitions/performance_thresholds"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1071,6 +1487,29 @@
           "type": "string",
           "description": "报告输出路径",
           "markdownDescription": "报告输出路径"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1106,6 +1545,29 @@
         },
         "report": {
           "$ref": "#/definitions/relation_report"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1189,6 +1651,29 @@
           "description": "使用默认输出目录",
           "markdownDescription": "使用默认输出目录(~/.config/scalim-viz 等).",
           "default": false
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1201,6 +1686,29 @@
           "description": "启用执行追踪",
           "markdownDescription": "启用执行追踪.",
           "default": false
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1234,6 +1742,29 @@
           "markdownDescription": "缺口采样数量.",
           "minimum": 0,
           "default": 5
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1259,6 +1790,29 @@
           "markdownDescription": "摘要字段上限(0 表示不限制).",
           "minimum": 0,
           "default": 0
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1328,6 +1882,29 @@
               "$ref": "#/definitions/memory_opt"
             }
           ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1367,6 +1944,29 @@
           "examples": [
             "fast_fail"
           ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1385,6 +1985,29 @@
           "markdownDescription": "关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
           "minimum": 0.0,
           "maximum": 1.0
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1402,6 +2025,29 @@
           ],
           "examples": [
             "fast_fail"
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
           ]
         }
       },
@@ -1437,6 +2083,29 @@
         },
         "compute": {
           "$ref": "#/definitions/guardrails_compute"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -1519,6 +2188,29 @@
           "default": true,
           "examples": [
             true
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
           ]
         }
       },

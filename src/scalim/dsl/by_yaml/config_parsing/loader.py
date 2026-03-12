@@ -16,6 +16,7 @@ else:
 
 from ..schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_KEYS, DemandConfig
+from .imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
 from .parsers.guardrails import ParserGuardrailsMixin
@@ -49,12 +50,24 @@ class YamlDemandLoader(
         self._validator = None
 
     def load(self, source: Union[str, Path, IO[str]]) -> DemandConfig:
+        yaml_path: Optional[Path] = None
         if isinstance(source, (str, Path)):
-            with Path(source).open("r", encoding=UTF8_ENCODING) as f:
+            yaml_path = Path(source)
+            with yaml_path.open("r", encoding=UTF8_ENCODING) as f:
                 raw = _safe_load_yaml(f)
         else:
             raw = _safe_load_yaml(source)
         raw_demand = RawDemand.from_raw(raw)
+
+        if contains_import_syntax(raw_demand.data):
+            if yaml_path is not None:
+                try:
+                    _ = expand_imports_inplace(raw_demand.data, yaml_path=yaml_path)
+                except YamlImportExpansionError as exc:
+                    raise ValueError(str(exc)) from exc
+            else:
+                msg = "imports/$import is only supported for file path entrypoints; use YamlDemandLoader.load(<yaml_path>)"
+                raise ValueError(msg)
 
         self._ensure_validator()
         if self._validator:
@@ -65,6 +78,10 @@ class YamlDemandLoader(
     def load_string(self, yaml_string: str) -> DemandConfig:
         raw = _safe_load_yaml(yaml_string)
         raw_demand = RawDemand.from_raw(raw)
+
+        if contains_import_syntax(raw_demand.data):
+            msg = "imports/$import is only supported for file path entrypoints; use YamlDemandLoader.load(<yaml_path>)"
+            raise ValueError(msg)
 
         self._ensure_validator()
         if self._validator:

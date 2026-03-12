@@ -9,6 +9,7 @@ type WorkerValidateRequest = {
   id: number;
   yamlText: string;
   strict: boolean;
+  schemaPath?: string;
 };
 
 type WorkerValidateResponse =
@@ -67,16 +68,17 @@ const ensureWorker = (): Worker => {
 
 export const pyodideValidate = async (
   yamlText: string,
-  opts?: { strict?: boolean; timeoutMs?: number }
+  opts?: { strict?: boolean; timeoutMs?: number; schemaPath?: string }
 ): Promise<PyodideValidateResult> => {
   const w = ensureWorker();
   const id = (seq += 1);
   const strict = Boolean(opts?.strict);
   const timeoutMs = Math.max(200, Number(opts?.timeoutMs) || 0);
+  const schemaPath = String(opts?.schemaPath || "");
 
   const result = await new Promise<PyodideValidateResult>((resolve) => {
     pending.set(id, { resolve });
-    const req: WorkerValidateRequest = { type: "validate", id, yamlText: String(yamlText || ""), strict };
+    const req: WorkerValidateRequest = { type: "validate", id, yamlText: String(yamlText || ""), strict, schemaPath };
     w.postMessage(req);
 
     if (!timeoutMs) return;
@@ -91,4 +93,3 @@ export const pyodideValidate = async (
 
   return result;
 };
-

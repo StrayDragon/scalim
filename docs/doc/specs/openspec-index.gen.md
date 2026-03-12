@@ -186,6 +186,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-core/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 YAML DSL 编辑器的核心能力:文本优先编辑、Visual 双向同步、统一校验模型、roundtrip 稳定性与可选 exact(Pyodide)语义校验.
 
+### `yaml-dsl-imports`
+- Title: yaml-dsl-imports Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-imports/spec.md)
+- Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + 任意 mapping 内 `$import`(编译期展开),并在 schema/语义校验前完成展开.
+
 ### `yaml-dsl-micro-tunes`
 - Title: yaml-dsl-micro-tunes Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-micro-tunes/spec.md)
@@ -195,6 +200,11 @@ Sources:
 - Title: yaml-dsl-schema Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-schema/spec.md)
 - Summary: **状态: ✅ 已实现** 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
+
+### `yaml-dsl-workflow`
+- Title: yaml-dsl-workflow Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow/spec.md)
+- Summary: **状态: ✅ 已实现** 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的跨 runs 共享 `preload_forever` 预加载缓存.
 
 ### `yaml-field-extract`
 - Title: yaml-field-extract Specification

@@ -7,6 +7,7 @@
 推荐阅读顺序(按使用目的):
 
 - 写配置/跑起来: [语法速查](syntax.md) → [用户指南](user-guide.md) → [编辑器](editor.md)
+- 编排多条 demand: [Workflow](workflow.md)
 - 升级旧写法/破坏性变更: [升级指南](upgrades/index.md)
 - 想让智能助手协助写/改 YAML: [集成AI环境 (Agent Skill)](agent-skill.md)
 - 维护 schema/编辑器补全: [Schema Meta 参考](schema-meta.md)

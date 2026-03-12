@@ -1,0 +1,290 @@
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, cast
+
+from ...vendor.compact.importlibx import require_optional_dependency
+
+if TYPE_CHECKING:
+    import yaml
+else:
+    yaml = require_optional_dependency(
+        "yaml",
+        context="scalim.dsl.by_yaml.workflow",
+        install_name="pyyaml",
+    )
+
+
+_FAILURE_POLICIES = ("all_fail", "primary_only")
+
+_ALIAS_DEMAND_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):/(.+)$")
+
+
+class WorkflowConfigError(ValueError):
+    path: str
+
+    def __init__(self, message: str, *, path: str = "") -> None:
+        self.path = str(path or "")
+        super(WorkflowConfigError, self).__init__(self._format(message))
+
+    def _format(self, message: str) -> str:
+        if not self.path:
+            return str(message)
+        return "{} (path={})".format(message, self.path)
+
+
+@dataclass(frozen=True)
+class WorkflowRun:
+    id: str
+    demand: str
+
+
+@dataclass(frozen=True)
+class WorkflowOptions:
+    max_concurrency: int = 1
+    failure_policy: str = "all_fail"
+    share_preload_cache: bool = False
+
+
+@dataclass(frozen=True)
+class WorkflowConfig:
+    runs: Tuple[WorkflowRun, ...]
+    options: WorkflowOptions
+
+
+def load_workflow_config(workflow_yaml_path: str) -> WorkflowConfig:
+    yaml_path = Path(str(workflow_yaml_path or "")).expanduser()
+    try:
+        text = yaml_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        msg = "Failed to read workflow YAML: {}: {}".format(type(exc).__name__, exc)
+        raise WorkflowConfigError(msg, path="(file)") from exc
+
+    try:
+        loaded = yaml.safe_load(text)
+    except Exception as exc:
+        msg = "YAML parse error: {}: {}".format(type(exc).__name__, exc)
+        raise WorkflowConfigError(msg, path="(root)") from exc
+
+    if not isinstance(loaded, dict):
+        msg = "workflow YAML root must be a mapping"
+        raise WorkflowConfigError(msg, path="(root)")
+
+    return load_workflow_config_from_mapping(cast("Dict[str, Any]", loaded))
+
+
+def resolve_workflow_demand_path(
+    demand: str,
+    *,
+    workflow_yaml_path: str,
+    path_aliases: Optional[Mapping[str, str]] = None,
+    run_id: Optional[str] = None,
+) -> Path:
+    raw = str(demand or "").strip()
+    if not raw:
+        msg = "run.demand must be a non-empty string"
+        raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+
+    wf_path = Path(str(workflow_yaml_path or "")).expanduser().resolve(strict=False)
+    base_dir = wf_path.parent
+
+    if raw.startswith("@/"):
+        alias = "@"
+        rel = raw[2:]
+        return _resolve_alias_path(
+            alias=alias,
+            rel=rel,
+            raw=raw,
+            path_aliases=path_aliases,
+            run_id=run_id,
+        )
+
+    m = _ALIAS_DEMAND_RE.match(raw)
+    if m is not None:
+        alias = m.group(1)
+        rel = m.group(2)
+        return _resolve_alias_path(
+            alias=alias,
+            rel=rel,
+            raw=raw,
+            path_aliases=path_aliases,
+            run_id=run_id,
+        )
+
+    p = Path(raw).expanduser()
+    if p.is_absolute():
+        return p.resolve(strict=False)
+
+    return (base_dir / p).resolve(strict=False)
+
+
+def _resolve_alias_path(
+    *,
+    alias: str,
+    rel: str,
+    raw: str,
+    path_aliases: Optional[Mapping[str, str]],
+    run_id: Optional[str],
+) -> Path:
+    aliases = path_aliases or {}
+    base_raw = aliases.get(alias)
+    if base_raw is None:
+        msg = "Unknown path alias '{}' for demand path '{}'".format(alias, raw)
+        if run_id:
+            msg = "{} (run_id={})".format(msg, run_id)
+        raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+    base = Path(str(base_raw)).expanduser()
+    rel_str = str(rel or "").lstrip("/")
+    if not rel_str:
+        msg = "Invalid demand alias path '{}'".format(raw)
+        if run_id:
+            msg = "{} (run_id={})".format(msg, run_id)
+        raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+    rel_path = Path(rel_str)
+    return (base / rel_path).resolve(strict=False)
+
+
+def validate_workflow_yaml_text_json(
+    yaml_text: str,
+    strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
+    schema_path: Optional[str] = None,
+) -> str:
+    """返回与 YAML DSL 编辑器的“精确校验器”兼容的 JSON 载荷(`Workflow` 版).
+
+    注意:
+    - `workflow` YAML 与 `demand` YAML 是两套语义;此校验器只做 `workflow` 语义校验.
+    - 目前不基于 `schema_path` 做 `JSONSchema` 校验(结构校验建议交给 `YAML LSP`).
+    """
+    _ = (strict_unknown_fields, schema_path)
+    payload = _validate_workflow_yaml_text(yaml_text)
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
+    try:
+        yaml_data = yaml.safe_load(yaml_text)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "errors": [{"path": "(root)", "message": "YAML parse error: {}".format(exc)}],
+            "warnings": [],
+        }
+
+    if yaml_data is None:
+        return {
+            "ok": False,
+            "errors": [{"path": "(root)", "message": "YAML document is empty"}],
+            "warnings": [],
+        }
+
+    if not isinstance(yaml_data, dict):
+        return {
+            "ok": False,
+            "errors": [{"path": "(root)", "message": "workflow YAML root must be a mapping"}],
+            "warnings": [],
+        }
+
+    try:
+        _ = load_workflow_config_from_mapping(cast("Dict[str, Any]", yaml_data))
+    except WorkflowConfigError as exc:
+        return {
+            "ok": False,
+            "errors": [{"path": str(exc.path or "(root)"), "message": str(exc)}],
+            "warnings": [],
+        }
+
+    return {"ok": True, "errors": [], "warnings": []}
+
+
+def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  # noqa: C901, PLR0912, PLR0915
+    """从已解析的 `mapping` 加载 `workflow` 配置(用于文本校验/编辑器等无文件系统场景)."""
+    wf_raw = root.get("workflow")
+    if not isinstance(wf_raw, dict):
+        msg = "Missing required mapping 'workflow'"
+        raise WorkflowConfigError(msg, path="workflow")
+    wf = cast("Dict[str, Any]", wf_raw)
+
+    runs_raw = wf.get("runs")
+    if not isinstance(runs_raw, list) or not runs_raw:
+        msg = "workflow.runs must be a non-empty list"
+        raise WorkflowConfigError(msg, path="workflow.runs")
+
+    seen_ids: Dict[str, int] = {}
+    runs: List[WorkflowRun] = []
+    for idx, item in enumerate(cast("List[Any]", runs_raw)):
+        item_path = "workflow.runs.{}".format(idx)
+        if not isinstance(item, dict):
+            msg = "run entry must be a mapping"
+            raise WorkflowConfigError(msg, path=item_path)
+        run_dict = cast("Dict[str, Any]", item)
+        run_id_raw = run_dict.get("id")
+        demand_raw = run_dict.get("demand")
+        run_id = str(run_id_raw or "").strip()
+        if not run_id:
+            msg = "run.id must be a non-empty string"
+            raise WorkflowConfigError(msg, path="{}.id".format(item_path))
+        if run_id in seen_ids:
+            msg = "Duplicate run.id '{}'".format(run_id)
+            raise WorkflowConfigError(msg, path="{}.id".format(item_path))
+        seen_ids[run_id] = idx
+        demand = str(demand_raw or "").strip()
+        if not demand:
+            msg = "run.demand must be a non-empty string"
+            raise WorkflowConfigError(msg, path="{}.demand".format(item_path))
+        runs.append(WorkflowRun(id=run_id, demand=demand))
+
+    options_raw = wf.get("options", {})
+    if options_raw is None:
+        options_raw = {}
+    if not isinstance(options_raw, dict):
+        msg = "workflow.options must be a mapping"
+        raise WorkflowConfigError(msg, path="workflow.options")
+    options_dict = cast("Dict[str, Any]", options_raw)
+
+    max_concurrency_raw = options_dict.get("max_concurrency", 1)
+    if isinstance(max_concurrency_raw, bool) or not isinstance(max_concurrency_raw, (int, float, str)):
+        msg = "workflow.options.max_concurrency must be an integer >= 1"
+        raise WorkflowConfigError(
+            msg,
+            path="workflow.options.max_concurrency",
+        )
+    try:
+        max_concurrency = int(max_concurrency_raw)
+    except (TypeError, ValueError) as exc:
+        msg = "workflow.options.max_concurrency must be an integer >= 1"
+        raise WorkflowConfigError(
+            msg,
+            path="workflow.options.max_concurrency",
+        ) from exc
+    if max_concurrency < 1:
+        msg = "workflow.options.max_concurrency must be >= 1"
+        raise WorkflowConfigError(msg, path="workflow.options.max_concurrency")
+
+    failure_policy = str(options_dict.get("failure_policy", "all_fail") or "all_fail").strip()
+    if failure_policy not in _FAILURE_POLICIES:
+        msg = "workflow.options.failure_policy must be one of: {}".format("/".join(_FAILURE_POLICIES))
+        raise WorkflowConfigError(msg, path="workflow.options.failure_policy")
+
+    share_preload_cache = bool(options_dict.get("share_preload_cache", False))
+
+    return WorkflowConfig(
+        runs=tuple(runs),
+        options=WorkflowOptions(
+            max_concurrency=max_concurrency,
+            failure_policy=failure_policy,
+            share_preload_cache=share_preload_cache,
+        ),
+    )
+
+
+__all__ = [
+    "WorkflowConfig",
+    "WorkflowConfigError",
+    "WorkflowOptions",
+    "WorkflowRun",
+    "load_workflow_config",
+    "load_workflow_config_from_mapping",
+    "resolve_workflow_demand_path",
+    "validate_workflow_yaml_text_json",
+]

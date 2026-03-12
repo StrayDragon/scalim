@@ -1,0 +1,645 @@
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml.runtime import workflow_entrypoints as entrypoints_mod
+from scalim.dsl.by_yaml.workflow import (
+    WorkflowConfigError,
+    load_workflow_config,
+    load_workflow_config_from_mapping,
+    resolve_workflow_demand_path,
+    validate_workflow_yaml_text_json,
+)
+from tests.fixtures import workflow_loaders
+
+
+_ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])
+
+
+def _write_text(path: Path, text: str) -> Path:
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _write_demand_yaml(
+    tmp_path: Path,
+    *,
+    file_name: str,
+    name: str,
+    main_loader_ref: str,
+    preload_loader_ref: str,
+    cache_mode: str = "preload_forever",
+) -> Path:
+    return _write_text(
+        tmp_path / file_name,
+        (
+            """
+name: {name}
+
+main_source:
+  source_id: main
+  loader: "{main_loader_ref}"
+  fields:
+    ref_id:
+      name: ref_id
+
+sources:
+  preload:
+    loader: "{preload_loader_ref}"
+    key: id
+    cache_mode: {cache_mode}
+    fields:
+      value:
+        name: value
+        relation: main_to_preload
+
+relations:
+  main_to_preload:
+    steps:
+      - from: main.ref_id
+        to: preload.id
+
+output:
+  path: ""
+  fields:
+    - ref_id
+    - preload.value
+"""
+        )
+        .format(
+            name=name,
+            main_loader_ref=main_loader_ref,
+            preload_loader_ref=preload_loader_ref,
+            cache_mode=cache_mode,
+        )
+        .lstrip(),
+    )
+
+
+def _write_workflow_yaml(
+    tmp_path: Path,
+    *,
+    runs: list,
+    max_concurrency: int = 1,
+    failure_policy: str = "all_fail",
+    share_preload_cache: bool = False,
+) -> Path:
+    run_lines = []
+    for item in runs:
+        run_lines.append("    - id: {}\n      demand: {}".format(item["id"], item["demand"]))
+    return _write_text(
+        tmp_path / "workflow.yaml",
+        (
+            """
+workflow:
+  runs:
+{runs}
+  options:
+    max_concurrency: {max_concurrency}
+    failure_policy: {failure_policy}
+    share_preload_cache: {share_preload_cache}
+"""
+        )
+        .format(
+            runs="\n".join(run_lines),
+            max_concurrency=max_concurrency,
+            failure_policy=failure_policy,
+            share_preload_cache="true" if share_preload_cache else "false",
+        )
+        .lstrip(),
+    )
+
+
+def test_load_workflow_config_semantic_validation(tmp_path: Path) -> None:
+    workflow_path = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: a
+      demand: b.yaml
+"""
+        ).lstrip(),
+    )
+
+    with pytest.raises(WorkflowConfigError):
+        _ = load_workflow_config(str(workflow_path))
+
+
+def test_run_workflow_primary_only_collects_errors(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="bad.yaml",
+        name="bad",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_raises",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+
+    workflow_loaders.reset_counters()
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}, {"id": "bad", "demand": "bad.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+        share_preload_cache=False,
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert [o.run_id for o in result.outcomes] == ["ok", "bad"]
+    assert result.outcomes[0].result is not None
+    assert result.outcomes[0].error is None
+    assert result.outcomes[1].result is None
+    assert result.outcomes[1].error is not None
+    assert result.outcomes[1].error.exc_type in {"ValueError", "WorkflowRunFailedError", "RuntimeError"}
+    assert result.errors()
+
+
+def test_run_workflow_all_fail_raises(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="bad.yaml",
+        name="bad",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_raises",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "bad", "demand": "bad.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+        share_preload_cache=False,
+    )
+
+    with pytest.raises(Exception) as excinfo:
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+
+    assert "run_id=bad" in str(excinfo.value)
+
+
+def test_workflow_outcomes_are_in_declared_order(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="slow.yaml",
+        name="slow",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_slow",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="fast.yaml",
+        name="fast",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "slow", "demand": "slow.yaml"}, {"id": "fast", "demand": "fast.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+        share_preload_cache=False,
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert [o.run_id for o in result.outcomes] == ["slow", "fast"]
+
+
+def test_share_preload_cache_loads_once(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+
+    workflow_loaders.reset_counters()
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+        share_preload_cache=True,
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert not result.errors()
+    assert workflow_loaders.preload_calls() == 1
+
+
+def test_share_preload_cache_conflict_fails_fast(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
+    )
+
+    workflow_loaders.reset_counters()
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+        share_preload_cache=True,
+    )
+
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+
+    msg = str(excinfo.value)
+    assert "run 'a'" in msg and "run 'b'" in msg and "diff=" in msg
+    assert workflow_loaders.preload_calls() == 0
+
+
+def test_workflow_schema_validation(tmp_path: Path) -> None:
+    jsonschema = pytest.importorskip("jsonschema")
+    yaml = pytest.importorskip("yaml")
+
+    from scalim.dsl.by_yaml.schema_dsl.builder import build_workflow_schema
+
+    schema = build_workflow_schema()
+    ok = yaml.safe_load(
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+"""
+        ).lstrip()
+    )
+    jsonschema.validate(ok, schema)
+
+    bad = yaml.safe_load(
+        (
+            """
+workflow:
+  runs: []
+"""
+        ).lstrip()
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(bad, schema)
+
+
+def test_workflow_config_error_formats_without_path() -> None:
+    assert str(WorkflowConfigError("msg")) == "msg"
+
+
+def test_load_workflow_config_wraps_read_errors(tmp_path: Path) -> None:
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(tmp_path))
+    assert "Failed to read workflow YAML" in str(excinfo.value)
+
+
+def test_load_workflow_config_wraps_yaml_parse_errors(tmp_path: Path) -> None:
+    workflow_path = _write_text(tmp_path / "wf.yaml", "workflow: [\n")
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "YAML parse error" in str(excinfo.value)
+
+
+def test_load_workflow_config_root_must_be_mapping(tmp_path: Path) -> None:
+    workflow_path = _write_text(tmp_path / "wf.yaml", "- 1\n")
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "root must be a mapping" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_requires_non_empty_string(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path("", workflow_yaml_path=str(wf))
+    assert "run.demand must be a non-empty string" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_supports_at_alias(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    demand = resolve_workflow_demand_path(
+        "@/a.yaml",
+        workflow_yaml_path=str(wf),
+        path_aliases={"@": str(tmp_path)},
+        run_id="r1",
+    )
+    assert demand == (tmp_path / "a.yaml").resolve(strict=False)
+
+
+def test_resolve_workflow_demand_path_supports_named_alias(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    demand = resolve_workflow_demand_path(
+        "DATA:/b.yaml",
+        workflow_yaml_path=str(wf),
+        path_aliases={"DATA": str(tmp_path)},
+        run_id="r1",
+    )
+    assert demand == (tmp_path / "b.yaml").resolve(strict=False)
+
+
+def test_resolve_workflow_demand_path_rejects_unknown_alias(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "DATA:/b.yaml",
+            workflow_yaml_path=str(wf),
+            path_aliases={},
+            run_id="r1",
+        )
+    assert "Unknown path alias" in str(excinfo.value)
+    assert "run_id=r1" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_rejects_empty_at_alias_path(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "@/",
+            workflow_yaml_path=str(wf),
+            path_aliases={"@": str(tmp_path)},
+            run_id="r1",
+        )
+    assert "Invalid demand alias path" in str(excinfo.value)
+    assert "run_id=r1" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_supports_absolute_paths(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    abs_path = (tmp_path / "abs.yaml").resolve(strict=False)
+    demand = resolve_workflow_demand_path(str(abs_path), workflow_yaml_path=str(wf))
+    assert demand == abs_path
+
+
+def test_resolve_workflow_demand_path_supports_paths_relative_to_workflow(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    demand = resolve_workflow_demand_path("rel.yaml", workflow_yaml_path=str(wf))
+    assert demand == (tmp_path / "rel.yaml").resolve(strict=False)
+
+
+def test_validate_workflow_yaml_text_json_variants() -> None:
+    bad_parse = json.loads(validate_workflow_yaml_text_json("workflow: [\n"))
+    assert bad_parse["ok"] is False
+
+    empty = json.loads(validate_workflow_yaml_text_json(""))
+    assert empty["ok"] is False
+    assert "empty" in empty["errors"][0]["message"].lower()
+
+    root_not_mapping = json.loads(validate_workflow_yaml_text_json("- 1\n"))
+    assert root_not_mapping["ok"] is False
+
+    semantic_error = json.loads(validate_workflow_yaml_text_json("workflow: {}\n"))
+    assert semantic_error["ok"] is False
+    assert semantic_error["errors"]
+
+    ok = json.loads(
+        validate_workflow_yaml_text_json(
+            (
+                """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+"""
+            ).lstrip()
+        )
+    )
+    assert ok["ok"] is True
+
+
+@pytest.mark.parametrize(
+    "bad_mapping",
+    [
+        {},
+        {"workflow": {}},
+        {"workflow": {"runs": []}},
+        {"workflow": {"runs": [1]}},
+        {"workflow": {"runs": [{"id": "", "demand": "a.yaml"}]}},
+        {"workflow": {"runs": [{"id": "a", "demand": ""}]}},
+        {"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": []}},
+        {"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": {"max_concurrency": True}}},
+        {"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": {"max_concurrency": "x"}}},
+        {"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": {"max_concurrency": 0}}},
+        {"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": {"failure_policy": "nope"}}},
+    ],
+)
+def test_load_workflow_config_from_mapping_rejects_invalid_structures(bad_mapping: dict) -> None:
+    with pytest.raises(WorkflowConfigError):
+        _ = load_workflow_config_from_mapping(bad_mapping)
+
+
+def test_load_workflow_config_from_mapping_accepts_null_options() -> None:
+    cfg = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": None}})
+    assert cfg.options.max_concurrency == 1
+
+
+def test_run_workflow_requires_workflow_path(tmp_path: Path) -> None:
+    _ = tmp_path
+    with pytest.raises(WorkflowConfigError):
+        _ = run_workflow("", allowed_modules=_ALLOWED_MODULES)
+
+
+def test_run_workflow_primary_only_submits_pending_after_failure(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="bad.yaml",
+        name="bad",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_raises",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok1.yaml",
+        name="ok1",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok2.yaml",
+        name="ok2",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "bad", "demand": "bad.yaml"}, {"id": "ok1", "demand": "ok1.yaml"}, {"id": "ok2", "demand": "ok2.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+        share_preload_cache=False,
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert [o.run_id for o in result.outcomes] == ["bad", "ok1", "ok2"]
+    assert result.outcomes[0].error is not None
+    assert result.outcomes[1].result is not None
+    assert result.outcomes[2].result is not None
+
+
+def test_run_workflow_all_fail_cancels_pending_queue(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="bad.yaml",
+        name="bad",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_raises",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "bad", "demand": "bad.yaml"}, {"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+        share_preload_cache=False,
+    )
+
+    with pytest.raises(Exception) as excinfo:
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert "run_id=bad" in str(excinfo.value)
+
+
+def test_workflow_entrypoints_internal_helpers_are_covered() -> None:
+    with pytest.raises(entrypoints_mod.ResolverError):
+        _ = entrypoints_mod._normalize_python_reference(".demo.mod.func", base_module_path=None)  # noqa: SLF001
+
+    assert (
+        entrypoints_mod._normalize_python_reference(".a.b:Obj.m", base_module_path="pkg")  # noqa: SLF001
+        == "pkg.a.b:Obj.m"
+    )
+    assert (
+        entrypoints_mod._normalize_python_reference(".a.b.func", base_module_path="pkg")  # noqa: SLF001
+        == "pkg.a.b.func"
+    )
+
+    with pytest.raises(entrypoints_mod.ResolverError):
+        _ = entrypoints_mod._normalize_relative_module_path("...x", base_module_path="a", reference="...x.f")  # noqa: SLF001
+
+    assert (
+        entrypoints_mod._render_preload_forever_params(  # noqa: SLF001
+            "src",
+            params={},
+            runtime_vars=None,
+            path="sources.src.params",
+        )
+        == {}
+    )
+
+    with pytest.raises(WorkflowConfigError):
+        _ = entrypoints_mod._render_preload_forever_params(  # noqa: SLF001
+            "src",
+            params={"$keys": None},
+            runtime_vars=None,
+            path="sources.src.params",
+        )
+
+    with pytest.raises(WorkflowConfigError):
+        _ = entrypoints_mod._render_preload_forever_params(  # noqa: SLF001
+            "src",
+            params=1,
+            runtime_vars=None,
+            path="sources.src.params",
+        )
+
+    assert entrypoints_mod._ensure_json_like([1], path="p") == [1]  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError):
+        _ = entrypoints_mod._ensure_json_like({1: "x"}, path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError):
+        _ = entrypoints_mod._ensure_json_like(set([1]), path="p")  # noqa: SLF001
+
+
+def test_share_preload_cache_precheck_skips_when_single_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "path", [str(tmp_path)] + list(sys.path))
+
+    demand_path = _write_text(
+        tmp_path / "demand.yaml",
+        (
+            """
+name: demo
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_main_fast"
+  fields:
+    ref_id:
+      name: ref_id
+
+sources:
+  other:
+    loader: "tests.fixtures.workflow_loaders:load_preload_table"
+    key: id
+    cache_mode: none
+  preload:
+    loader: ".tests.fixtures.workflow_loaders:load_preload_table"
+    key: id
+    cache_mode: preload_forever
+    lookup_cast:
+      name: sep_first
+      sep: ","
+    normalize:
+      kind: index_by_key
+      key_field: id
+      on_conflict: last
+    fields:
+      value:
+        name: value
+        relation: main_to_preload
+
+relations:
+  main_to_preload:
+    steps:
+      - from: main.ref_id
+        to: preload.id
+
+output:
+  path: ""
+  fields:
+    - ref_id
+    - preload.value
+"""
+        ).lstrip(),
+    )
+
+    workflow_loaders.reset_counters()
+    wf = _write_workflow_yaml(tmp_path, runs=[{"id": "a", "demand": str(demand_path)}], share_preload_cache=True)
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert not result.errors()

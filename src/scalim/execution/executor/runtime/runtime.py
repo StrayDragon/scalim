@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, FrozenSet, Hashable, List, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, Hashable, List, MutableMapping, Optional, Set, Tuple
 
 from ....hooks.base import HookManager
 from ....ob.hub import InstrumentationHub
@@ -35,7 +35,8 @@ class LoadRefCacheEntry:
 class ExecutionRuntime:
     """执行运行时 - 共享资源"""
 
-    preloaded_cache: Dict[str, LoaderResultMapping]
+    preloaded_cache: MutableMapping[str, LoaderResultMapping]
+    _preload_source_ids: FrozenSet[str]
     load_ref_cache: Dict[LoadRefCacheKey, LoadRefCacheEntry]
     key_normalize_cache: Dict[RelationSignature, Dict[Tuple[Hashable, Tuple[str, ...]], Optional[LookupKey]]]
     load_ref_group_fields: Dict[RelationSignature, Tuple[str, ...]]
@@ -73,8 +74,9 @@ class ExecutionRuntime:
         *,
         parallel_mode: ParallelMode = "seq",
         max_workers: int = 0,
+        preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
     ) -> None:
-        self.preloaded_cache = {}
+        self.preloaded_cache = preloaded_cache if preloaded_cache is not None else {}
         self.load_ref_cache = {}
         self.key_normalize_cache = {}
         self.hook_manager = hook_manager
@@ -93,6 +95,7 @@ class ExecutionRuntime:
         self.max_workers = max_workers
         self.adaptive_backend = None
         self.adaptive_process_failure_mode = None
+        self._preload_source_ids = frozenset(str(source.source_id) for source in plan.preload_sources if source.is_preload_forever())
 
         self.reverse_deps = self._compute_reverse_deps(plan)
         self.field_consumers = self._compute_field_consumers()

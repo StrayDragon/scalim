@@ -224,6 +224,8 @@
     ],
     "top_level_fields": [
       "name",
+      "imports",
+      "$import",
       "_templates",
       "description",
       "batch_size",
@@ -240,7 +242,11 @@
   "inputs": [
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "25d7407047120ef3fb2c2862194166ae5213ca6f015e042718b5271681635210"
+      "sha256": "fef8c280051694c857ca4f2448ad97921f09a0182836b64bb6af07dadea89450"
+    },
+    {
+      "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
+      "sha256": "b0935683155878fb84025f4a0c91e8178a447f971b3aa3e410c54df6be89efcf"
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
@@ -292,11 +298,11 @@
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "8fee11e3a4ddda9c46a7d03f937d87d2efaecbf66bb3a2b06d63b3f406ae87ae"
+      "sha256": "c5cbee6581b03888c0236473e6076468d426eb71cab32c7799ac73c6d0056d36"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "c721651b8fba0e2bcbaf34589ac243d5807f35862d46acb04a7908fef26cd96a"
+      "sha256": "70293f70603b21bd52b5d0497a8e871cc53169ac4c507a150581658540ed2f62"
     }
   ],
   "outputs": [
@@ -306,11 +312,15 @@
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "ccbd0a9985fcbcb9e12bf7142d6d5377cf904a651af3f02c0d8ca0cac52a0c2b"
+      "sha256": "4da30637173f1f8c7b0d7762fd294dd97d4ff4a7a809324f9cc2f151a6f4eef7"
+    },
+    {
+      "path": "references/generated/example-full/ecommerce_report_fragments.yaml",
+      "sha256": "aef6fecbc986e199c9cbdf796e6e47cd71f8dc3f0897d65c0c7c95271eb1f670"
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "74337a24d672844c6ca23f46705740b6d06aa19721619a987d4e1c6e129b13a4"
+      "sha256": "f65bd4146c8a5e700078d5aa5a310ca309f5eaae23c02efda14face9d8e5c442"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

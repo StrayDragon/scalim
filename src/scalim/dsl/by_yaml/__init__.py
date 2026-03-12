@@ -22,6 +22,7 @@ from .runtime.contracts import (
 if TYPE_CHECKING:
     from .runtime.entrypoints import compile as compile  # noqa: A004
     from .runtime.entrypoints import run as run
+    from .runtime.workflow_entrypoints import run_workflow as run_workflow
 else:
 
     def compile(*args: Any, **kwargs: Any) -> Compilation:  # noqa: A001
@@ -31,6 +32,10 @@ else:
     def run(*args: Any, **kwargs: Any) -> RunResult:
         entrypoints = import_module("scalim.dsl.by_yaml.runtime.entrypoints")
         return entrypoints.run(*args, **kwargs)
+
+    def run_workflow(*args: Any, **kwargs: Any) -> Any:
+        entrypoints = import_module("scalim.dsl.by_yaml.runtime.workflow_entrypoints")
+        return entrypoints.run_workflow(*args, **kwargs)
 
 
 __all__ = (
@@ -42,4 +47,5 @@ __all__ = (
     "RunResult",
     "compile",
     "run",
+    "run_workflow",
 )

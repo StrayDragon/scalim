@@ -12,6 +12,13 @@ description: |
 batch_size: 100
 
 # ==============================================================================
+# 跨文件复用示例 (imports/$import)
+# ==============================================================================
+
+imports:
+  fragments: ecommerce_report_fragments.yaml
+
+# ==============================================================================
 # 模板/别名示例 (YAML anchors)
 # ==============================================================================
 
@@ -53,21 +60,7 @@ main_source:
   params:
     # runtime_vars 注入示例: 由调用方传入 `runtime_vars={"order_ids": [...]}`.
     # 为空列表时 loader 仍会读取全量订单(见 `load_orders` 实现),用于保证 canonical demo 可直接运行.
-    ids: {$runtime: order_ids}
-    field_keys:
-      - order_id
-      - order_date
-      - quantity
-      - unit_price
-      - discount_rate
-      - customer_id
-      - product_id
-      - warehouse_id
-      - promotion_id
-      - payment_method_id
-      - logistics_id
-      - region_id
-      - product_category_id
+    $import: fragments.main_source_params
   order_by:
     - order_id
   fields:

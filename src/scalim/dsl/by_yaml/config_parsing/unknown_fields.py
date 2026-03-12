@@ -85,6 +85,12 @@ def _select_child_schema(schema: Dict[str, Any], root_schema: Dict[str, Any], ke
 
 def _collect_property_keys(schema: Dict[str, Any], root_schema: Dict[str, Any]) -> Optional[FrozenSet[str]]:
     variants = _iter_effective_schemas(schema, root_schema, seen=set())
+    # 对于 `additionalProperties` 为 `schema` 的“动态映射”, `key` 空间由调用方自定义,
+    # 不应在此处做 `unknown-fields` 提示(否则会把合法的 `source_id`/`field_id` 等映射键误报为 `unknown`).
+    for variant in variants:
+        additional = variant.get("additionalProperties")
+        if isinstance(additional, dict):
+            return None
     saw_props = False
     keys: Set[str] = set()
 

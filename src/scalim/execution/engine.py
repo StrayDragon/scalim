@@ -1,14 +1,14 @@
 # region imports
 
 import threading
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, MutableMapping, Optional, Sequence
 
 from ..hooks.base import HookManager
 from ..ob.manager import ObserverManager
 from ..planning.plan import ExecutionPlan
 from ..sinks.sink_base import ISink
 from ..spec.ir.demand import DemandIr
-from ..typedefs import RowData
+from ..typedefs import LoaderResultMapping, RowData
 from .executor.batch.executor import BatchExecutor
 from .executor.runtime.runtime import ExecutionRuntime
 from .guardrails import GuardrailsPolicy
@@ -47,6 +47,7 @@ class ScalimEngine:
         pipeline_overrides: Optional[PipelineOverrides] = None,
         guardrails: Optional[GuardrailsPolicy] = None,
         loader_retry: Optional[LoaderRetryPolicies] = None,
+        preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
     ) -> None:
         """初始化 `ScalimEngine` 计算引擎.
 
@@ -100,6 +101,7 @@ class ScalimEngine:
             loader_retry=loader_retry,
             parallel_mode=parallel_mode,
             max_workers=max_workers,
+            preloaded_cache=preloaded_cache,
         )
         executor = BatchExecutor(plan, runtime, overrides=pipeline_overrides)
 

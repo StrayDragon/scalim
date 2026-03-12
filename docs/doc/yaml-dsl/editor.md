@@ -18,13 +18,22 @@ pnpm dev
 
 ## Schema 同步
 
-编辑器内置使用 `src/scalim/dsl/by_yaml/schema/demand.gen.json` 的前端拷贝版本:
+编辑器内置使用 `src/scalim/dsl/by_yaml/schema/*.gen.json` 的前端拷贝版本:
 
 ```bash
 just gen-yaml-dsl-editor-schema
 ```
 
-会生成/同步:`frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json`.
+会生成/同步:
+
+- `frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json`
+- `frontend/scalim-yaml-dsl-editor/public/schema/workflow.gen.json`
+
+提示: 若要在编辑器中校验 workflow YAML,可在文件头使用:
+
+```yaml
+# yaml-language-server: $schema=../schema/workflow.gen.json
+```
 
 ## 使用要点
 

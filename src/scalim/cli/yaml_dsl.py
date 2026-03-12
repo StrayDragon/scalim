@@ -16,9 +16,10 @@ else:
         install_name="pyyaml",
     )
 
+from ..dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from ..dsl.by_yaml.config_parsing.unknown_fields import find_unknown_fields
+from ..dsl.by_yaml.config_parsing.validator import ConfigValidator, attach_locations, build_yaml_location_index
 from ..dsl.by_yaml.config_parsing.validator import YamlValidationIssue as Issue
-from ..dsl.by_yaml.config_parsing.validator import attach_locations, build_yaml_location_index, validate_yaml_text
 
 try:
     jsonschema = import_module("jsonschema")
@@ -341,6 +342,17 @@ def _read_yaml_or_error(
     return yaml_data, 0
 
 
+def _extract_yaml_error_location(exc: Exception) -> Optional[Tuple[int, int]]:
+    mark = getattr(exc, "problem_mark", None) or getattr(exc, "context_mark", None)
+    if mark is None:
+        return None
+    line = getattr(mark, "line", None)
+    column = getattr(mark, "column", None)
+    if not isinstance(line, int) or not isinstance(column, int):
+        return None
+    return line + 1, column + 1
+
+
 def _emit_error(
     message: str,
     *,
@@ -362,7 +374,7 @@ def _emit_error(
     _write_line_stderr("错误: {}".format(message))
 
 
-def _run_validate(args: argparse.Namespace) -> int:
+def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     yaml_path = args.yaml_file.resolve()
     schema_path = _resolve_schema_path(args.schema)
 
@@ -388,11 +400,128 @@ def _run_validate(args: argparse.Namespace) -> int:
         )
         return 1
 
-    result = validate_yaml_text(yaml_text, strict_unknown_fields=bool(args.strict), schema_path=str(schema_path))
-    errors = result.errors
-    warnings = result.warnings
-    ok = bool(result.ok)
-    source_lines: Optional[List[str]] = yaml_text.splitlines()
+    source_lines: List[str] = yaml_text.splitlines()
+
+    try:
+        yaml_data = yaml.safe_load(yaml_text)
+    except yaml.YAMLError as exc:
+        loc = _extract_yaml_error_location(exc)
+        line = loc[0] if loc is not None else None
+        column = loc[1] if loc is not None else None
+        errors = [Issue(path="(root)", message="YAML parse error: {}".format(exc), line=line, column=column)]
+        warnings: List[Issue] = []
+        ok = False
+        if args.json:
+            payload = ValidationPayload(
+                mode="validate",
+                ok=ok,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=warnings,
+            )
+            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
+        else:
+            _render_result(
+                yaml_path,
+                errors=errors,
+                warnings=warnings,
+                verbose=args.verbose,
+                source_lines=source_lines,
+            )
+        return 1
+
+    if yaml_data is None:
+        errors = [Issue(path="(root)", message="YAML document is empty", line=1, column=1)]
+        warnings = []
+        ok = False
+        if args.json:
+            payload = ValidationPayload(
+                mode="validate",
+                ok=ok,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=warnings,
+            )
+            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
+        else:
+            _render_result(
+                yaml_path,
+                errors=errors,
+                warnings=warnings,
+                verbose=args.verbose,
+                source_lines=source_lines,
+            )
+        return 1
+
+    if not isinstance(yaml_data, dict):
+        errors = [Issue(path="(root)", message="YAML root must be a mapping", line=1, column=1)]
+        warnings = []
+        ok = False
+        if args.json:
+            payload = ValidationPayload(
+                mode="validate",
+                ok=ok,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=warnings,
+            )
+            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
+        else:
+            _render_result(
+                yaml_path,
+                errors=errors,
+                warnings=warnings,
+                verbose=args.verbose,
+                source_lines=source_lines,
+            )
+        return 1
+
+    yaml_data_dict = cast("Dict[str, Any]", yaml_data)
+    locations = build_yaml_location_index(yaml_text)
+    try:
+        if contains_import_syntax(yaml_data_dict):
+            _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
+    except YamlImportExpansionError as exc:
+        errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
+        warnings = []
+        errors = attach_locations(errors, locations)
+        ok = False
+        if args.json:
+            payload = ValidationPayload(
+                mode="validate",
+                ok=ok,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=warnings,
+            )
+            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
+        else:
+            _render_result(
+                yaml_path,
+                errors=errors,
+                warnings=warnings,
+                verbose=args.verbose,
+                source_lines=source_lines,
+            )
+        return 1
+
+    validator = ConfigValidator(schema_path=str(schema_path))
+    report = validator.validate_report(
+        yaml_data_dict,
+        strict_unknown_fields=bool(args.strict),
+        enable_jsonschema_validation=False,
+    )
+    errors = _issues_to_rows(report.errors())
+    warnings = _issues_to_rows(report.warnings())
+
+    errors = attach_locations(errors, locations)
+    warnings = attach_locations(warnings, locations)
+
+    ok = (not errors) and (not (bool(args.strict) and warnings))
 
     if args.json:
         payload = ValidationPayload(
@@ -441,6 +570,12 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
         return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=None)
 
     yaml_data_dict = cast("Dict[str, Any]", yaml_data)
+    try:
+        if contains_import_syntax(yaml_data_dict):
+            _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
+    except YamlImportExpansionError as exc:
+        errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
+        return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=None)
     errors, warnings = _collect_schema_issues(yaml_data_dict, schema, args, jsonschema_module)
     ok = not errors and not (args.strict and warnings)
     source_lines: Optional[List[str]] = None

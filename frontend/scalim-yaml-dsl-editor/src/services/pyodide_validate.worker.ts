@@ -1,4 +1,5 @@
 import bundledDemandSchema from "../schema/demand.gen.json";
+import bundledWorkflowSchema from "../schema/workflow.gen.json";
 import { DIST_NAME, IMPORT_ROOT } from "../generated/project_constants";
 import type { Issue } from "$domain/issues";
 
@@ -7,6 +8,7 @@ type ValidateRequest = {
   id: number;
   yamlText: string;
   strict: boolean;
+  schemaPath?: string;
 };
 
 type ValidateResponse =
@@ -74,11 +76,12 @@ const envPyodideIndexUrl = envPyodideIndexUrlRaw ? resolveIndexUrl(envPyodideInd
 const pyodideCandidates = envPyodideIndexUrl ? [envPyodideIndexUrl] : [localPyodideIndexUrl, cdnPyodideIndexUrl];
 
 let pyodide: any | null = null;
-let validateFn: any | null = null;
+let validateDemandFn: any | null = null;
+let validateWorkflowFn: any | null = null;
 let initPromise: Promise<void> | null = null;
 
 const ensurePyodide = async (): Promise<void> => {
-  if (pyodide && validateFn) return;
+  if (pyodide && validateDemandFn && validateWorkflowFn) return;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
@@ -96,6 +99,7 @@ const ensurePyodide = async (): Promise<void> => {
 
         instance.FS.mkdirTree("/schema");
         instance.FS.writeFile("/schema/demand.gen.json", JSON.stringify(bundledDemandSchema));
+        instance.FS.writeFile("/schema/workflow.gen.json", JSON.stringify(bundledWorkflowSchema));
 
         const wheelUrl = await loadScalimWheelUrl();
         instance.globals.set("_SCALIM_WHEEL_URL", wheelUrl);
@@ -106,13 +110,17 @@ await micropip.install(str(_SCALIM_WHEEL_URL), deps=False)
 
         await instance.runPythonAsync(`
 from ${IMPORT_ROOT}.dsl.by_yaml.config_parsing.validator import validate_yaml_text_json
+from ${IMPORT_ROOT}.dsl.by_yaml.workflow import validate_workflow_yaml_text_json
 `);
 
-        const fn = instance.globals.get("validate_yaml_text_json");
-        if (!fn) throw new Error("validate_yaml_text_json not found");
+        const demandFn = instance.globals.get("validate_yaml_text_json");
+        if (!demandFn) throw new Error("validate_yaml_text_json not found");
+        const workflowFn = instance.globals.get("validate_workflow_yaml_text_json");
+        if (!workflowFn) throw new Error("validate_workflow_yaml_text_json not found");
 
         pyodide = instance;
-        validateFn = fn;
+        validateDemandFn = demandFn;
+        validateWorkflowFn = workflowFn;
         return;
       } catch (err: any) {
         lastErr = err;
@@ -136,11 +144,13 @@ from ${IMPORT_ROOT}.dsl.by_yaml.config_parsing.validator import validate_yaml_te
     initPromise = null;
     pyodide = null;
     try {
-      validateFn?.destroy?.();
+      validateDemandFn?.destroy?.();
+      validateWorkflowFn?.destroy?.();
     } catch {
       // ignore
     }
-    validateFn = null;
+    validateDemandFn = null;
+    validateWorkflowFn = null;
     throw err;
   }
 };
@@ -176,8 +186,14 @@ self.addEventListener("message", async (event: MessageEvent) => {
 
     const yamlText = String(msg.yamlText || "");
     const strict = Boolean(msg.strict);
+    const schemaPath = String(msg.schemaPath || "");
 
-    const raw = String(validateFn(yamlText, strict, "/schema/demand.gen.json") || "");
+    const isWorkflow = schemaPath.includes("workflow.gen.json");
+    const schemaFile = isWorkflow ? "/schema/workflow.gen.json" : "/schema/demand.gen.json";
+    const fn = isWorkflow ? validateWorkflowFn : validateDemandFn;
+    if (!fn) throw new Error("validator function not initialized");
+
+    const raw = String(fn(yamlText, strict, schemaFile) || "");
     const parsed = (raw ? (JSON.parse(raw) as PyodidePayload) : { ok: false }) as PyodidePayload;
 
     const issues: Issue[] = [];

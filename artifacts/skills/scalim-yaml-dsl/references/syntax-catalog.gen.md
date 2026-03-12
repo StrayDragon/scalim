@@ -9,6 +9,8 @@
 
 ## Top-Level Fields
 - `name` (required)
+- `imports`
+- `$import`
 - `_templates`
 - `description`
 - `batch_size`
@@ -183,6 +185,31 @@
   - 必填, 用于标识当前配置
 - Examples: `order_report`
 
+### `imports`
+- Type: `object`
+- Description:
+  片段文件导入别名映射.
+  
+  - key: alias
+  - value: 片段文件路径(字符串)
+  - V1 仅支持同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`
+  - 禁止: 绝对路径/父目录/子目录/alias 前缀
+- `additionalProperties`: `string`
+
+### `$import`
+- Type: `string` | `array`
+- Description:
+  $import 引用.
+  
+  - string: `<alias>(.<segment>)*`
+  - list: 按顺序合并,后者覆盖前者,最终再被本地覆盖
+  - 仅支持 mapping 片段
+  - V1 仅支持同级文件导入(见顶层 `imports`)
+- Examples: `common.sources`, `["common.sources", "other.sources"]`
+- `oneOf`:
+  - 1. `string`
+  - 2. `array`, items `string`
+
 ### `_templates`
 - Type: `object`
 - Description:
@@ -246,6 +273,8 @@
   - `fields` 仅允许源字段(禁止 `compute`)
 - `minProperties`: `0`
 - `additionalProperties`: ref `#/definitions/source`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
 
 ### `fields`
 - Type: `object`
@@ -267,6 +296,8 @@
   - alias 复用: `relation: *<anchor>` (YAML anchor)
   - steps 必须是等值关联链, 参考 `relation.steps`
 - `additionalProperties`: ref `#/definitions/relation`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
 
 ### `guardrails`
 - Description:
@@ -306,6 +337,7 @@
   - 1. oneOf(2)
 - Properties:
   - `name`: `string`
+  - `$import`: `string` | `array`, oneOf(2)
   - `call_by`: `string`
   - `compute`: `string`
   - `extract`: `string`
@@ -318,6 +350,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `relations`: ref `#/definitions/guardrails_relations`
   - `compute`: ref `#/definitions/guardrails_compute`
   - `enabled`: `boolean`
@@ -329,6 +362,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `on_error`: `string`, enum `quiet`, `fast_fail`
 
 ### `guardrails_loader`
@@ -336,6 +370,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `on_transform_error`: `string`, enum `quiet`, `fast_fail`
   - `required_fields`: `array`, items `string` | `object`, anyOf(2)
   - `validate_result`: `boolean`
@@ -345,6 +380,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `null_key_max_rate`: 关联 null_key 最大比例(0.0-1.0;未设置则不启用)
   - `type_error_max_rate`: 关联 type_error 最大比例(0.0-1.0;未设置则不启用)
 
@@ -353,6 +389,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `backoff`: `string`, enum `fixed`, `exponential`
   - `base_delay_seconds`: 基础等待时间(秒)
   - `enabled`: `boolean`
@@ -367,6 +404,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `enabled`: `boolean`
   - `renderer`: `string`, enum `pretty`, `logger`
 
@@ -375,11 +413,12 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `retry`: allOf(1)
-  - `fields`: `object`
+  - `fields`: `object`, properties `$import`
   - `loader` (required): `string`
   - `order_by`: `array`, items `string`
-  - `params`: `object`
+  - `params`: `object`, properties `$import`
   - `source_id` (required): `string`
 
 ### `memory_opt`
@@ -387,6 +426,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `auto_report`: `boolean`
   - `enabled`: `boolean`
   - `max_fields`: `integer`
@@ -396,6 +436,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `relations`: allOf(1)
   - `logging`: allOf(1)
   - `memory_opt`: allOf(1)
@@ -409,6 +450,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `fields`: `array`, items `object`, oneOf(2)
   - `encoding`: `string`
   - `format`: `string`, enum `excel`, `csv`
@@ -422,6 +464,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `enabled`: `boolean`
   - `metrics`: `array`, items enum `duration`, `memory`, `cpu`
   - `report`: ref `#/definitions/performance_report`
@@ -433,6 +476,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `output`: `string`
   - `format`: `string`, enum `console`, `json`, `csv`, `none`
   - `include_details`: `boolean`
@@ -442,6 +486,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `batch_duration_warn`: 批次耗时告警阈值(秒)
   - `memory_increase_warn`: 内存增长告警阈值(MB)
 
@@ -450,6 +495,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `steps` (required): `array`, items `object`, properties `from`, `lookup_cast`, `to`
 
 ### `relation_report`
@@ -457,6 +503,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `output`: `string`
   - `format`: `string`, enum `console`, `json`, `none`
 
@@ -465,6 +512,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `enabled`: `boolean`
   - `log_type_mismatch`: `boolean`
   - `max_samples`: `integer`
@@ -476,6 +524,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `data_loader_names`: `array`, items `string`
   - `enabled`: `boolean`
   - `primary_loader_name`: `string`
@@ -486,15 +535,16 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `retry`: allOf(1)
-  - `fields`: `object`
+  - `fields`: `object`, properties `$import`
   - `cache_mode`: `string`, enum `none`, `preload_forever`
   - `key` (required): `string` | `array`, oneOf(2)
   - `loader` (required): `string`
   - `lookup_cast`: `object`, properties `name`, `sep`
   - `lookup_chunk_size`: `integer` | `null`, oneOf(2)
   - `normalize`: `object`, properties `key_field`, `kind`, `on_conflict`
-  - `params`: `object`
+  - `params`: `object`, properties `$import`
 
 ### `source_field_inline`
 - Definition path: `definitions.source_field_inline`
@@ -504,6 +554,7 @@
   - 2. `object`
 - Properties:
   - `name`: `string`
+  - `$import`: `string` | `array`, oneOf(2)
   - `extract`: `string`
   - `relation`: `string` | `object`, oneOf(2)
   - `source`: `string`
@@ -514,6 +565,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `enabled`: `boolean`
 
 ### `viz`
@@ -521,6 +573,7 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `$import`: `string` | `array`, oneOf(2)
   - `append`: `boolean`
   - `enabled`: `boolean`
   - `env`: `string`

@@ -38,6 +38,7 @@ def test_build_generates_generated_references_only(tmp_path: Path) -> None:
     assert agent_skill_gen.list_files(skill_dir) == [
         "references/generated/cli-lsp-reference.gen.md",
         "references/generated/example-full/ecommerce_report.gen.yaml",
+        "references/generated/example-full/ecommerce_report_fragments.yaml",
         "references/syntax-catalog.gen.md",
     ]
 
@@ -47,6 +48,7 @@ def test_build_generates_generated_references_only(tmp_path: Path) -> None:
     assert [item["path"] for item in payload["outputs"]] == [
         "references/generated/cli-lsp-reference.gen.md",
         "references/generated/example-full/ecommerce_report.gen.yaml",
+        "references/generated/example-full/ecommerce_report_fragments.yaml",
         "references/syntax-catalog.gen.md",
     ]
     assert "path_normalization" not in payload
