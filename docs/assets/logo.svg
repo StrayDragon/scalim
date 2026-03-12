@@ -121,84 +121,105 @@
     <circle cx="2300" cy="880" r="7" fill="#7C5CFF"/>
   </g>
 
-  <!-- central compression chamber -->
+  <!-- central symbol: scale-pattern slim diamond -->
   <g>
-    <!-- outer pinch field -->
-    <path d="M1110 270C1170 340 1195 410 1198 540C1195 670 1170 740 1110 810"
-          stroke="#8DCFFF" stroke-opacity="0.14" stroke-width="3" fill="none"/>
-    <path d="M1410 270C1350 340 1325 410 1322 540C1325 670 1350 740 1410 810"
-          stroke="#9A8BFF" stroke-opacity="0.14" stroke-width="3" fill="none"/>
+    <!-- slim diamond outline -->
+    <path d="M1260 300L1380 540L1260 780L1140 540Z"
+          fill="#0B1528" fill-opacity="0.80" stroke="url(#accent)" stroke-opacity="0.12" stroke-width="2" stroke-linejoin="round"/>
 
-    <!-- narrowing lines -->
-    <path d="M1010 380C1100 430 1160 475 1210 540C1160 605 1100 650 1010 700"
-          stroke="#73F0D0" stroke-opacity="0.13" stroke-width="5" fill="none"/>
-    <path d="M1510 380C1420 430 1360 475 1310 540C1360 605 1420 650 1510 700"
-          stroke="#7C5CFF" stroke-opacity="0.13" stroke-width="5" fill="none"/>
+    <!-- layered scale tiles (fish-scale / roof-tile pattern inside diamond) -->
+    <!-- row 1 (top) -->
+    <ellipse cx="1260" cy="380" rx="32" ry="18" fill="none" stroke="#7EF3DB" stroke-opacity="0.18" stroke-width="1.5"/>
 
-    <!-- compression gate -->
-    <rect x="1186" y="322" width="148" height="436" rx="74" fill="#0E1830" stroke="#CFE1FF" stroke-opacity="0.12" stroke-width="2"/>
-    <rect x="1218" y="360" width="84" height="360" rx="42" fill="#0A1326" stroke="#D8EEFF" stroke-opacity="0.08" stroke-width="1.5"/>
+    <!-- row 2 -->
+    <ellipse cx="1235" cy="420" rx="32" ry="18" fill="none" stroke="#6AEACC" stroke-opacity="0.16" stroke-width="1.5"/>
+    <ellipse cx="1285" cy="420" rx="32" ry="18" fill="none" stroke="#6AEACC" stroke-opacity="0.16" stroke-width="1.5"/>
 
-    <!-- glow spine -->
-    <rect x="1248" y="300" width="24" height="480" rx="12" fill="url(#accentSoft)" filter="url(#blurSoft)"/>
+    <!-- row 3 -->
+    <ellipse cx="1210" cy="460" rx="32" ry="18" fill="none" stroke="#55D8F0" stroke-opacity="0.15" stroke-width="1.5"/>
+    <ellipse cx="1260" cy="460" rx="32" ry="18" fill="none" stroke="#55D8F0" stroke-opacity="0.15" stroke-width="1.5"/>
+    <ellipse cx="1310" cy="460" rx="32" ry="18" fill="none" stroke="#55D8F0" stroke-opacity="0.15" stroke-width="1.5"/>
+
+    <!-- row 4 (widest) -->
+    <ellipse cx="1190" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
+    <ellipse cx="1240" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
+    <ellipse cx="1290" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
+    <ellipse cx="1340" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
+
+    <!-- row 5 -->
+    <ellipse cx="1195" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
+    <ellipse cx="1245" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
+    <ellipse cx="1295" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
+    <ellipse cx="1345" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
+
+    <!-- row 6 -->
+    <ellipse cx="1210" cy="580" rx="32" ry="18" fill="none" stroke="#5B8FFF" stroke-opacity="0.15" stroke-width="1.5"/>
+    <ellipse cx="1260" cy="580" rx="32" ry="18" fill="none" stroke="#5B8FFF" stroke-opacity="0.15" stroke-width="1.5"/>
+    <ellipse cx="1310" cy="580" rx="32" ry="18" fill="none" stroke="#5B8FFF" stroke-opacity="0.15" stroke-width="1.5"/>
+
+    <!-- row 7 -->
+    <ellipse cx="1230" cy="620" rx="32" ry="18" fill="none" stroke="#6A78FF" stroke-opacity="0.16" stroke-width="1.5"/>
+    <ellipse cx="1280" cy="620" rx="32" ry="18" fill="none" stroke="#6A78FF" stroke-opacity="0.16" stroke-width="1.5"/>
+
+    <!-- row 8 (bottom) -->
+    <ellipse cx="1260" cy="660" rx="32" ry="18" fill="none" stroke="#7C5CFF" stroke-opacity="0.18" stroke-width="1.5"/>
+
+    <!-- inner glow core -->
+    <ellipse cx="1260" cy="540" rx="35" ry="55" fill="url(#accentSoft)" filter="url(#blurSoft)" opacity="0.4"/>
+
+    <!-- slim vertical accent line -->
+    <line x1="1260" y1="310" x2="1260" y2="770" stroke="url(#accent)" stroke-opacity="0.06" stroke-width="1.5"/>
   </g>
 
   <!-- central mascot/icon -->
   <g filter="url(#glow)">
     <!-- soft badge halo -->
-    <circle cx="1260" cy="540" r="185" fill="url(#accentSoft)" opacity="0.55"/>
-    <circle cx="1260" cy="540" r="210" stroke="#8FD8FF" stroke-opacity="0.08" stroke-width="2"/>
-    <circle cx="1260" cy="540" r="250" stroke="#8B7BFF" stroke-opacity="0.06" stroke-width="2"/>
+    <circle cx="1260" cy="540" r="190" fill="url(#accentSoft)" opacity="0.45"/>
+    <circle cx="1260" cy="540" r="220" stroke="#8FD8FF" stroke-opacity="0.07" stroke-width="1.5"/>
+    <circle cx="1260" cy="540" r="255" stroke="#8B7BFF" stroke-opacity="0.05" stroke-width="1.5"/>
 
-    <!-- stylized S scale spirit -->
-    <path d="M1336 327
-             C1270 297 1189 305 1156 359
-             C1128 405 1158 453 1234 468
-             C1340 488 1380 525 1376 587
-             C1370 668 1276 723 1179 707
-             C1132 699 1092 678 1065 649"
-          stroke="url(#accentSoft)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+    <!-- stylized S scale spirit - shadow -->
+    <path d="M1320 340
+             C1265 315 1200 320 1175 365
+             C1152 405 1175 445 1240 458
+             C1335 476 1395 510 1390 575
+             C1383 650 1295 710 1195 698
+             C1148 690 1105 668 1078 642"
+          stroke="url(#accentSoft)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
 
-    <path d="M1312 334
-             C1261 313 1207 319 1184 360
-             C1164 395 1187 425 1246 437
-             C1335 455 1404 482 1417 554
-             C1431 630 1367 699 1267 718
-             C1193 732 1117 709 1066 667"
-          stroke="url(#accent)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- stylized S scale spirit - main stroke -->
+    <path d="M1310 340
+             C1260 318 1205 322 1182 362
+             C1162 398 1182 430 1242 442
+             C1330 458 1398 490 1408 558
+             C1418 628 1358 698 1260 716
+             C1190 728 1120 708 1072 665"
+          stroke="url(#accent)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
 
     <!-- layered scales -->
-    <path d="M1230 366C1207 365 1188 375 1180 392C1174 408 1183 423 1202 430C1224 438 1248 443 1277 447"
-          stroke="#8CF8E2" stroke-width="16" stroke-linecap="round"/>
-    <path d="M1205 421C1230 436 1267 444 1303 451C1350 460 1387 478 1404 504"
-          stroke="#64D9FF" stroke-width="16" stroke-linecap="round"/>
-    <path d="M1236 515C1268 524 1297 530 1326 536C1368 545 1392 566 1394 595"
-          stroke="#48C5FF" stroke-width="16" stroke-linecap="round"/>
-    <path d="M1226 603C1257 612 1283 620 1306 631C1328 641 1338 658 1332 678"
-          stroke="#6B9FFF" stroke-width="16" stroke-linecap="round"/>
-    <path d="M1176 662C1211 683 1256 689 1291 680C1312 675 1326 664 1333 649"
-          stroke="#8D78FF" stroke-width="16" stroke-linecap="round"/>
-
-    <!-- sprite eye -->
-    <circle cx="1296" cy="368" r="7" fill="#F7FFFF"/>
-    <circle cx="1298" cy="367" r="3" fill="#091120"/>
+    <path d="M1225 375C1205 374 1190 382 1183 396C1178 410 1186 422 1204 428C1224 435 1248 440 1275 444"
+          stroke="#8CF8E2" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1210 425C1235 438 1268 446 1302 452C1345 460 1380 476 1396 500"
+          stroke="#64D9FF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1240 510C1268 518 1296 524 1322 530C1360 538 1386 558 1390 585"
+          stroke="#48C5FF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1232 598C1260 606 1285 614 1306 624C1326 634 1336 650 1330 670"
+          stroke="#6B9FFF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1182 658C1215 676 1255 682 1288 674C1308 669 1322 658 1328 644"
+          stroke="#8D78FF" stroke-width="14" stroke-linecap="round"/>
 
     <!-- spark particles -->
-    <circle cx="1110" cy="668" r="8" fill="#73F0D0"/>
-    <circle cx="1083" cy="649" r="5" fill="#47C6FF"/>
-    <circle cx="1368" cy="643" r="6" fill="#8B7BFF"/>
-    <circle cx="1408" cy="509" r="5" fill="#6AD7FF"/>
+    <circle cx="1115" cy="662" r="7" fill="#73F0D0" opacity="0.85"/>
+    <circle cx="1090" cy="645" r="4.5" fill="#47C6FF" opacity="0.80"/>
+    <circle cx="1362" cy="640" r="5.5" fill="#8B7BFF" opacity="0.80"/>
+    <circle cx="1400" cy="510" r="4.5" fill="#6AD7FF" opacity="0.80"/>
   </g>
 
-  <!-- subtle flow arrows / compression marks -->
-  <g opacity="0.20" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M1080 540H1160" stroke="#D9F6FF" stroke-width="3"/>
-    <path d="M1142 522L1160 540L1142 558" stroke="#D9F6FF" stroke-width="3"/>
-
-    <path d="M1440 540H1360" stroke="#E7E0FF" stroke-width="3"/>
-    <path d="M1378 522L1360 540L1378 558" stroke="#E7E0FF" stroke-width="3"/>
-
-    <path d="M1195 298L1220 322" stroke="#8CF8E2" stroke-width="3"/>
-    <path d="M1325 758L1300 734" stroke="#8D78FF" stroke-width="3"/>
+  <!-- subtle top/bottom flow marks -->
+  <g opacity="0.18" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M1260 290L1260 320" stroke="#7EF3DB" stroke-width="2.5"/>
+    <path d="M1248 308L1260 320L1272 308" stroke="#7EF3DB" stroke-width="2.5"/>
+    <path d="M1260 760L1260 790" stroke="#7C5CFF" stroke-width="2.5"/>
+    <path d="M1248 778L1260 790L1272 778" stroke="#7C5CFF" stroke-width="2.5"/>
   </g>
 </svg>
