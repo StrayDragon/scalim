@@ -35,6 +35,20 @@
 - `yaml-loader-params-template` 已归档：`openspec/changes/archive/2026-03-11-yaml-loader-params-template/`
 - `add-derived-outputs` 已归档：`openspec/changes/archive/2026-03-11-add-derived-outputs/`
 - `yaml-relative-import-paths` 已归档：`openspec/changes/archive/2026-03-11-yaml-relative-import-paths/`
+- `doc-system-workflow` 已归档：`openspec/changes/archive/2026-03-12-doc-system-workflow/`
+- `qa-hardening` 已归档：`openspec/changes/archive/2026-03-12-qa-hardening/`
 
 ## 待实现分组（按推荐顺序）
-- （暂无）
+
+1) **Group: demand DSL 语法收敛（breaking）**
+- `yaml-dsl-micro-tunes`
+
+2) **Group: YAML 复用与编排（共享路径解析能力）**
+- `yaml-dsl-imports`（建议先落地 `path_aliases`/import 展开）
+- `yaml-dsl-workflow`（复用 `path_aliases`，实现 runs 编排 + shared preload cache）
+
+3) **Group: 派生聚合 set 口径原语（为 ET 去状态壳打底）**
+- `derived-outputs-set-aggregations`
+
+4) **Group: 工具链侧改良（不阻塞主线）**
+- `prompt-eval-workflow`

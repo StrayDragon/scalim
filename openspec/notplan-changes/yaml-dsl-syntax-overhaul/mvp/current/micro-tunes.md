@@ -16,6 +16,9 @@
 收益:
 - 大幅降低 YAML anchors 学习/使用门槛
 
+
+> 同意, 可以支持, 另外还有哪些其他类似场景也可以罗列出来支持, 因为我们大量的alias 场景其实挺依赖 pyyaml的解析逻辑行为的 所以最好也支持 string ref 来兜底之后如果升级解析器导致兼容性问题
+
 ## 2) output.fields 引入更直觉的 string sugar
 
 当前 `output.fields` 不支持纯字符串(必须对象或 alias),导致“最简单场景也得写一堆对象”。
@@ -29,16 +32,20 @@
 收益:
 - 让 80% 场景写法更短,同时保留高级覆写能力
 
+> 同意, 可以支持
+
 ## 3) derived 字段入口改名以减少误解
 
 当前顶层 `fields` 实际只允许派生字段(源字段写在 sources/main_source),这对读者非常反直觉。
 
 微调提案:
-- 把顶层 `fields` 重命名为 `derive`(或 `derived_fields`)
+- 把顶层 `fields` 重命名为 `derived_fields`
 - schema 与 validator 直接体现“这里只有派生字段”
 
 收益:
 - 不改变能力,但显著降低误写与文档解释成本
+
+> 这一步修改后需要统一适配相关使用的点 请一步到位升级 之后 我们可以将 fields 作为跨多数据源多需求的字段处理的专有入口
 
 ## 4) `$runtime` 占位符与 `$keys/$rows` 指令统一形态
 
@@ -48,9 +55,12 @@
 - 允许 runtime var 也用指令节点表达:
   - `ids: {$runtime: order_ids}`
 - 同时保留 `$runtime.order_ids` 作为 shorthand(可选)
+> 这个保留需要评估下 是不是需要一步到位迁移(以不支持 避免维护复杂)
 
 收益:
 - params 语言更一致,更易在 schema hover 中解释
+
+> 支持
 
 ## 5) 强化“field_id vs data_key”的静态提示与自动修复建议
 
@@ -62,3 +72,4 @@
 收益:
 - 降低迁移/排错成本,对现有语法也增益
 
+> 支持

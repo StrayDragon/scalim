@@ -86,7 +86,7 @@
 
 ### Decision 2: 方案输出结构固定在 `mvp/plan-*`
 
-每套方案在 `openspec/changes/yaml-dsl-syntax-overhaul/mvp/plan-*/` 中包含:
+每套方案在 `openspec/notplan-changes/yaml-dsl-syntax-overhaul/mvp/plan-*/` 中包含:
 
 - `plan.md`: 语法结构、关键规则、与当前 DSL 的映射、优缺点与实施成本
 - `mvp.yaml`: 完整可读的 MVP 示例(覆盖 main + 至少一个 join + 至少一个 derived + output + params)
@@ -144,4 +144,3 @@
 - 最终“可读性 vs 形式化”的取舍: 我们更偏向 plan-a(映射直观)还是 plan-d(结构化可生成)?
 - 是否接受“SQL-ish”语法作为默认写法(plan-b),以及它对 call_by/allowlist 的表达方式?
 - params 指令(`$keys/$rows/$runtime.*`)是否应统一为同一种模板语法(例如 `{{runtime.xxx}}`/`{{keys(...)}}`)?
-

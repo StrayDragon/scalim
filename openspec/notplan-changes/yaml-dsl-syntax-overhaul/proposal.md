@@ -1,3 +1,13 @@
+## Status
+
+**Decision (2026-03-12)**: 本 change 的“全量语法重写”方向在 review 后暂不推进,转为 **Not Planned** 存档备忘。
+
+从本 change 的 `mvp/current/micro-tunes.md` 中提取出的“无争议减痛改良”将以独立 change 推进:
+- `openspec/changes/yaml-dsl-micro-tunes/`
+
+本 change 已移动到:
+- `openspec/notplan-changes/yaml-dsl-syntax-overhaul/`
+
 ## Why
 
 当前 YAML DSL 能表达的能力很强(多 source 关联、多级 relation、派生字段、params 模板、cache/normalize、输出与可观测性),但随着迭代积累,语法与约束已经变得“对新用户不直觉、对老用户也容易踩坑”:
@@ -20,12 +30,12 @@
 - 本 change 只做提案与对比,不写任何实际代码逻辑;实现会在 review 选定方案后以独立 change 推进。
 
 候选方案与预写材料落在:
-- `openspec/changes/yaml-dsl-syntax-overhaul/mvp/plan-a/`
-- `openspec/changes/yaml-dsl-syntax-overhaul/mvp/plan-b/`
-- `openspec/changes/yaml-dsl-syntax-overhaul/mvp/plan-c/`
-- `openspec/changes/yaml-dsl-syntax-overhaul/mvp/plan-d/`
-- `openspec/changes/yaml-dsl-syntax-overhaul/mvp/plan-e/`
-- `openspec/changes/yaml-dsl-syntax-overhaul/mvp/plan-f/`
+- `openspec/notplan-changes/yaml-dsl-syntax-overhaul/mvp/plan-a/`
+- `openspec/notplan-changes/yaml-dsl-syntax-overhaul/mvp/plan-b/`
+- `openspec/notplan-changes/yaml-dsl-syntax-overhaul/mvp/plan-c/`
+- `openspec/notplan-changes/yaml-dsl-syntax-overhaul/mvp/plan-d/`
+- `openspec/notplan-changes/yaml-dsl-syntax-overhaul/mvp/plan-e/`
+- `openspec/notplan-changes/yaml-dsl-syntax-overhaul/mvp/plan-f/`
 
 ## Capabilities
 
@@ -43,4 +53,3 @@
   - YAML → IR 转换与运行入口: `src/scalim/dsl/by_yaml/runtime/**`
   - CLI/LSP 与 editor schema: `src/scalim/cli/yaml_dsl.py` + `frontend/scalim-yaml-dsl-editor/**`
   - 文档/技能与 canonical demo: `docs/doc/yaml-dsl/**` + `artifacts/skills/scalim-yaml-dsl/**` + `notebooks/marimo/examples/**`
-
