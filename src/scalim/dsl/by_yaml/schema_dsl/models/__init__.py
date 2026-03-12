@@ -72,7 +72,14 @@ from .raw import (
     TraceRaw,
     VizRaw,
 )
-from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, SourceConfig
+from .source import (
+    LoaderRetryConfig,
+    MainSourceConfig,
+    NormalizeConfig,
+    NormalizeProjectFieldRuleConfig,
+    NormalizeStepConfig,
+    SourceConfig,
+)
 
 __all__ = [
     "BIND_KEYS",
@@ -127,6 +134,8 @@ __all__ = [
     "MemoryOptimizationConfig",
     "MemoryOptimizationRaw",
     "NormalizeConfig",
+    "NormalizeProjectFieldRuleConfig",
+    "NormalizeStepConfig",
     "ObservabilityConfig",
     "ObservabilityRaw",
     "OutputConfig",

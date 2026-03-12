@@ -14,6 +14,8 @@ from ...schema_dsl.models import (
     LookupCastConfig,
     MainSourceConfig,
     NormalizeConfig,
+    NormalizeProjectFieldRuleConfig,
+    NormalizeStepConfig,
     SourceConfig,
     SourceFieldConfig,
 )
@@ -22,6 +24,60 @@ from .utils import list_or_none, mapping_or_none, str_or_none
 
 
 class ParserSourcesMixin:
+    @staticmethod
+    def _normalize_opt_str(value: object) -> Optional[str]:
+        if value is None:
+            return None
+        raw = str(value).strip()
+        return raw or None
+
+    def _parse_normalize_project_fields(self, raw_value: object) -> Dict[str, NormalizeProjectFieldRuleConfig]:
+        fields_raw = mapping_or_none(raw_value)
+        if fields_raw is None:
+            return {}
+
+        fields_by_name: Dict[str, NormalizeProjectFieldRuleConfig] = {}
+        for field_name_raw, field_rule_raw in fields_raw.items():
+            field_name = str(field_name_raw or "").strip()
+            if not field_name:
+                continue
+            field_rule = mapping_or_none(field_rule_raw)
+            if field_rule is None:
+                continue
+            from_key = field_rule.get("from_key")
+            extract = self._normalize_opt_str(field_rule.get("extract"))
+            fields_by_name[field_name] = NormalizeProjectFieldRuleConfig(
+                from_key=bool(from_key) if from_key is not None else None,
+                extract=extract,
+            )
+        return fields_by_name
+
+    def _parse_normalize_steps(self, raw_value: object) -> Tuple[NormalizeStepConfig, ...]:
+        steps_raw = list_or_none(raw_value)
+        if steps_raw is None:
+            return ()
+
+        steps_converted: List[NormalizeStepConfig] = []
+        for item in steps_raw:
+            step_dict = mapping_or_none(item)
+            if step_dict is None:
+                continue
+
+            step_kind = str(step_dict.get("kind", "")).strip()
+            step_on_empty = self._normalize_opt_str(step_dict.get("on_empty"))
+            step_on_missing = self._normalize_opt_str(step_dict.get("on_missing"))
+            step_fields = self._parse_normalize_project_fields(step_dict.get("fields"))
+
+            steps_converted.append(
+                NormalizeStepConfig(
+                    kind=step_kind,
+                    on_empty=step_on_empty,
+                    on_missing=step_on_missing,
+                    fields=step_fields,
+                )
+            )
+        return tuple(steps_converted)
+
     def _parse_loader_retry(self, raw_retry: object) -> Optional[LoaderRetryConfig]:
         retry_dict = mapping_or_none(raw_retry)
         if retry_dict is None:
@@ -187,10 +243,30 @@ class ParserSourcesMixin:
         key_field = str(norm_dict.get(NORMALIZE_KEYS["key_field"], "")).strip()
         on_conflict = str(norm_dict.get(NORMALIZE_KEYS["on_conflict"], "error")).strip() or "error"
 
+        on_empty = None
+        if NORMALIZE_KEYS["on_empty"] in norm_dict:
+            on_empty = self._normalize_opt_str(norm_dict.get(NORMALIZE_KEYS["on_empty"]))
+
+        on_missing = None
+        if NORMALIZE_KEYS["on_missing"] in norm_dict:
+            on_missing = self._normalize_opt_str(norm_dict.get(NORMALIZE_KEYS["on_missing"]))
+
+        call_by = None
+        if NORMALIZE_KEYS["call_by"] in norm_dict:
+            call_by = self._normalize_opt_str(norm_dict.get(NORMALIZE_KEYS["call_by"]))
+
+        fields_by_name = self._parse_normalize_project_fields(norm_dict.get(NORMALIZE_KEYS["fields"]))
+        steps_converted = self._parse_normalize_steps(norm_dict.get(NORMALIZE_KEYS["steps"]))
+
         return NormalizeConfig(
             kind=kind,
             key_field=key_field,
             on_conflict=on_conflict,
+            on_empty=on_empty,
+            on_missing=on_missing,
+            fields=fields_by_name,
+            steps=steps_converted,
+            call_by=call_by,
         )
 
     def _parse_key(self, source_data: Dict[str, Any]) -> Union[str, Tuple[str, ...]]:

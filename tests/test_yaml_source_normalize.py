@@ -4,6 +4,8 @@ import pytest
 
 import scalim.dsl.by_yaml.config_parsing.validator as validator_module
 from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml.config_parsing.parsers.sources import ParserSourcesMixin
+from scalim.dsl.by_yaml.config_parsing.validators.sources import ValidatorSourcesMixin
 from scalim.sinks.sink_memory import InMemoryRowSink
 
 import tests.source_normalize_loaders as loaders
@@ -22,6 +24,19 @@ def _assert_validation_errors(config: dict, *expected_messages: str) -> None:
     errors = exc.value.errors
     for message in expected_messages:
         assert any(message in msg for msg in errors)
+
+
+def _validate_normalize_raw(normalize_raw: object, *, key_raw: object = "id") -> list:
+    validator = ValidatorSourcesMixin()
+    errors: list = []
+    validator._validate_normalize(  # type: ignore[attr-defined]
+        normalize_raw,
+        errors,
+        path_prefix="sources.s1",
+        source_id="s1",
+        key_raw=key_raw,
+    )
+    return errors
 
 
 def test_validator_rejects_main_source_normalize() -> None:
@@ -83,7 +98,7 @@ def test_validator_rejects_unknown_normalize_kind() -> None:
             }
         },
     }
-    _assert_validation_errors(config, "normalize.kind must be 'index_by_key'")
+    _assert_validation_errors(config, "normalize.kind must be one of: index_by_key/take_first/project_fields/map_values")
 
 
 def test_validator_rejects_normalize_for_composite_key() -> None:
@@ -222,6 +237,92 @@ output:
     assert loaders.CALL_COUNTS["recommends"] == 1
 
 
+def test_run_rejects_normalize_call_by_not_in_allowlist(tmp_path: Path) -> None:
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: normalize_call_by_not_allowed
+main_source:
+  source_id: orders
+  loader: tests.source_normalize_loaders:load_orders_main
+  fields:
+    order_id:
+      extract: order_id
+
+sources:
+  recommends:
+    loader: tests.source_normalize_loaders:load_recommends_list
+    key: order_id
+    normalize:
+      kind: index_by_key
+      key_field: order_id
+      call_by: tests.source_normalize_call_by:normalize_identity
+    fields:
+      recommend_score:
+        extract: payload.score
+        relation:
+          steps:
+            - from: orders.order_id
+              to: recommends.order_id
+
+output:
+  fields:
+    - field_id: order_id
+    - field_id: recommend_score
+""",
+    )
+
+    sink = InMemoryRowSink()
+    with pytest.raises(ConversionError, match=r"normalize\.call_by.*allowed_modules"):
+        _ = run(str(yaml_path), allowed_modules=frozenset(["tests.source_normalize_loaders"]), sink=sink)
+
+
+def test_run_rejects_normalize_call_by_return_non_mapping(tmp_path: Path) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: normalize_call_by_bad_return
+main_source:
+  source_id: orders
+  loader: tests.source_normalize_loaders:load_orders_main
+  fields:
+    order_id:
+      extract: order_id
+
+sources:
+  recommends:
+    loader: tests.source_normalize_loaders:load_recommends_list
+    key: order_id
+    normalize:
+      kind: index_by_key
+      key_field: order_id
+      call_by: tests.source_normalize_call_by:normalize_bad_return
+    fields:
+      recommend_score:
+        extract: payload.score
+        relation:
+          steps:
+            - from: orders.order_id
+              to: recommends.order_id
+
+output:
+  fields:
+    - field_id: order_id
+    - field_id: recommend_score
+""",
+    )
+
+    sink = InMemoryRowSink()
+    with pytest.raises(TypeError, match=r"must return Mapping.*sources\.recommends\.normalize\.call_by"):
+        _ = run(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests.source_normalize_loaders", "tests.source_normalize_call_by"]),
+            sink=sink,
+        )
+
+
 def test_converter_rejects_unknown_normalize_kind() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
@@ -234,7 +335,7 @@ def test_converter_rejects_unknown_normalize_kind() -> None:
         key="id",
         normalize=NormalizeConfig(kind="bad", key_field="id"),
     )
-    with pytest.raises(ConversionError, match="normalize\\.kind must be 'index_by_key'"):
+    with pytest.raises(ConversionError, match="normalize\\.kind must be one of: index_by_key/take_first/project_fields/map_values"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
@@ -299,4 +400,317 @@ def test_converter_rejects_normalize_key_field_mismatch() -> None:
         normalize=NormalizeConfig(kind="index_by_key", key_field="other"),
     )
     with pytest.raises(ConversionError, match="normalize\\.key_field must equal sources\\.s1\\.key"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
+def test_parser_sources_normalize_helpers_cover_skip_branches() -> None:
+    class _Parser(ParserSourcesMixin):
+        pass
+
+    parser = _Parser()
+    _ = parser._parse_normalize_project_fields({"": {"from_key": True}, "x": {"from_key": True}, "y": "not-a-dict"})  # type: ignore[attr-defined]
+    _ = parser._parse_normalize_steps(["not-a-dict", {"kind": "take_first"}])  # type: ignore[attr-defined]
+    norm = parser._parse_normalize({"kind": "take_first", "on_empty": "miss", "on_missing": "null"})  # type: ignore[attr-defined]
+    assert norm is not None
+
+
+def test_validator_sources_normalize_call_by_validation_branches() -> None:
+    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": "id", "call_by": 123})
+    assert any("normalize.call_by must be a string" in issue.message for issue in errors)
+
+    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": "id", "call_by": "  "})
+    assert any("normalize.call_by must not be empty" in issue.message for issue in errors)
+
+    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": "id", "call_by": "bad ref"})
+    assert any("normalize.call_by 引用" in issue.message for issue in errors)
+
+
+def test_validator_sources_normalize_take_first_and_project_fields_branch_coverage() -> None:
+    errors = _validate_normalize_raw(
+        {
+            "kind": "take_first",
+            "key_field": "id",
+            "on_conflict": "error",
+            "on_missing": "error",
+            "fields": {},
+            "steps": [],
+            "on_empty": "bad",
+        }
+    )
+    assert errors
+
+    errors = _validate_normalize_raw({"kind": "take_first"})
+    assert errors == []
+
+    errors = _validate_normalize_raw(
+        {
+            "kind": "project_fields",
+            "key_field": "id",
+            "on_conflict": "error",
+            "on_empty": "miss",
+            "steps": [],
+            "on_missing": "bad",
+        }
+    )
+    assert errors
+
+    errors = _validate_normalize_raw({"kind": "project_fields", "on_missing": "bad", "fields": "not-a-dict"})
+    assert errors
+
+
+def test_validator_sources_normalize_map_values_branch_coverage() -> None:
+    errors = _validate_normalize_raw({"kind": "map_values", "steps": "not-a-list"})
+    assert errors
+
+    errors = _validate_normalize_raw({"kind": "map_values", "steps": []})
+    assert errors
+
+    errors = _validate_normalize_raw(
+        {
+            "kind": "map_values",
+            "key_field": "id",
+            "on_conflict": "error",
+            "on_empty": "miss",
+            "on_missing": "error",
+            "fields": {},
+            "steps": [
+                "not-a-dict",
+                {"call_by": "x"},
+                {},
+                {"kind": 123},
+                {"kind": "bad"},
+                {"kind": "take_first", "fields": {}, "on_missing": "error", "key_field": "id", "on_conflict": "error"},
+                {"kind": "take_first", "on_empty": "bad"},
+                {"kind": "project_fields", "on_empty": "miss", "key_field": "id", "on_conflict": "error", "on_missing": "bad"},
+            ],
+        }
+    )
+    assert errors
+
+    validator = ValidatorSourcesMixin()
+    rules_errors: list = []
+    validator._validate_normalize_project_fields_rules(  # type: ignore[attr-defined]
+        "not-a-dict",
+        rules_errors,
+        fields_path="sources.s1.normalize.fields",
+    )
+    validator._validate_normalize_project_fields_rules(  # type: ignore[attr-defined]
+        {},
+        rules_errors,
+        fields_path="sources.s1.normalize.fields",
+    )
+    validator._validate_normalize_project_fields_rules(  # type: ignore[attr-defined]
+        {
+            "rule_raw_not_mapping": "bad",
+            "both": {"from_key": True, "extract": "id"},
+            "neither": {},
+            "from_key_not_bool": {"from_key": "bad"},
+            "extract_not_str": {"extract": 1},
+            "extract_empty": {"extract": " "},
+            "extract_invalid": {"extract": "[x"},
+        },
+        rules_errors,
+        fields_path="sources.s1.normalize.fields",
+    )
+    assert rules_errors
+
+
+def test_converter_converts_take_first_normalize() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="take_first", on_empty="null"),
+    )
+    ir = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+    assert ir is not None
+    assert ir.kind == "take_first"
+    assert ir.on_empty == "null"
+
+
+def test_converter_rejects_take_first_invalid_on_empty() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="take_first", on_empty="bad"),
+    )
+    with pytest.raises(ConversionError, match="normalize\\.on_empty must be one of: miss/null/error"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
+def test_converter_rejects_normalize_call_by_empty() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="index_by_key", key_field="id", call_by=" "),
+    )
+    with pytest.raises(ConversionError, match="normalize\\.call_by must not be empty"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
+def test_converter_converts_project_fields_normalize() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeProjectFieldRuleConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(
+            kind="project_fields",
+            on_missing="null",
+            fields={
+                "id": NormalizeProjectFieldRuleConfig(from_key=True),
+                "review_status": NormalizeProjectFieldRuleConfig(extract="review_status"),
+            },
+        ),
+    )
+    ir = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+    assert ir is not None
+    assert ir.kind == "project_fields"
+    assert ir.on_missing == "null"
+    assert {rule.name for rule in ir.fields} == {"id", "review_status"}
+
+
+def test_converter_rejects_project_fields_invalid_on_missing() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="project_fields", on_missing="bad", fields={"id": {"from_key": True}}),
+    )
+    with pytest.raises(ConversionError, match="normalize\\.on_missing must be one of: error/null"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
+def test_converter_rejects_project_fields_empty_rules() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="project_fields", fields={}),
+    )
+    with pytest.raises(ConversionError, match="normalize\\.fields.*must not be empty"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
+def test_converter_rejects_project_fields_invalid_rule_shapes() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeProjectFieldRuleConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="project_fields", fields={"x": object()}),
+    )
+    with pytest.raises(ConversionError, match="must be a normalize project_fields rule"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="project_fields", fields={"x": NormalizeProjectFieldRuleConfig(from_key=True, extract="id")}),
+    )
+    with pytest.raises(ConversionError, match="must not declare both"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="project_fields", fields={"x": NormalizeProjectFieldRuleConfig()}),
+    )
+    with pytest.raises(ConversionError, match="must declare from_key or extract"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="project_fields", fields={"x": NormalizeProjectFieldRuleConfig(extract="[x")}),
+    )
+    with pytest.raises(ConversionError, match="has invalid extract"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
+def test_converter_rejects_map_values_empty_steps() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="map_values"),
+    )
+    with pytest.raises(ConversionError, match="normalize\\.steps must not be empty"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
+def test_converter_rejects_map_values_step_invalid_configs() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeStepConfig, SourceConfig
+
+    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="map_values", steps=(NormalizeStepConfig(kind="take_first", on_empty="bad"),)),
+    )
+    with pytest.raises(ConversionError, match="on_empty must be one of: miss/null/error"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="map_values", steps=(NormalizeStepConfig(kind="project_fields", on_missing="bad"),)),
+    )
+    with pytest.raises(ConversionError, match="on_missing must be one of: error/null"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.conftest.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="map_values", steps=(NormalizeStepConfig(kind="bad"),)),
+    )
+    with pytest.raises(ConversionError, match="kind must be one of: take_first/project_fields"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]

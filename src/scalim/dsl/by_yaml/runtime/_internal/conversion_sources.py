@@ -4,13 +4,30 @@ from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Opti
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....spec.ir.fields import DerivedFieldIr, FieldIr
-from .....spec.ir.sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceNormalizeIr, SourceRefIr
+from .....spec.ir.sources import (
+    KeyIr,
+    MainSourceIr,
+    OrderByKeyIr,
+    SourceIr,
+    SourceNormalizeIr,
+    SourceNormalizeProjectFieldRuleIr,
+    SourceNormalizeStepIr,
+    SourceRefIr,
+)
 from .....typedefs import FieldValue, LoaderCallKwargs, RuntimeValue, SourceSpecIrCacheMode
 from ...config_parsing.call_by import CallByParseError, CallByValue, parse_call_by
 from ...config_parsing.field_extract import FieldExtractCompileError, compile_field_extract
 from ...config_parsing.security import SecureComputeEngine, is_constant_compute_expression
 from ...params_template import CompiledParamsTemplate, ParamsTemplateCompileError, compile_params_template
-from ...schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceConfig, SourceFieldConfig
+from ...schema_dsl.models import (
+    DemandConfig,
+    DerivedFieldConfig,
+    MainSourceConfig,
+    NormalizeConfig,
+    NormalizeStepConfig,
+    SourceConfig,
+    SourceFieldConfig,
+)
 from ..errors import ConversionError
 from ..references import PythonReferenceResolver
 from .conversion_bindings import ConfigToIRConversionBindingMixin
@@ -207,31 +224,206 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         if norm is None:
             return None
 
+        source_id = source_config.source_id
         kind = str(norm.kind or "").strip()
-        if kind != "index_by_key":
-            msg = "sources.{}.normalize.kind must be 'index_by_key'".format(source_config.source_id)
+        if kind not in {"index_by_key", "take_first", "project_fields", "map_values"}:
+            msg = "sources.{}.normalize.kind must be one of: index_by_key/take_first/project_fields/map_values".format(source_id)
             raise ConversionError(msg)
+
+        call_by_fn = self._convert_source_normalize_call_by_fn(norm, source_id=source_id)
+
+        if kind == "index_by_key":
+            return self._convert_source_normalize_index_by_key(source_config, norm=norm, call_by_fn=call_by_fn)
+        if kind == "take_first":
+            return self._convert_source_normalize_take_first(source_id=source_id, norm=norm, call_by_fn=call_by_fn)
+        if kind == "project_fields":
+            return self._convert_source_normalize_project_fields(source_id=source_id, norm=norm, call_by_fn=call_by_fn)
+        if kind == "map_values":
+            return self._convert_source_normalize_map_values(source_id=source_id, norm=norm, call_by_fn=call_by_fn)
+
+        msg = "sources.{}.normalize.kind must be one of: index_by_key/take_first/project_fields/map_values".format(
+            source_id
+        )  # pragma: no cover
+        raise ConversionError(msg)  # pragma: no cover
+
+    def _convert_source_normalize_call_by_fn(
+        self,
+        norm: NormalizeConfig,
+        *,
+        source_id: str,
+    ) -> Optional[Callable[..., object]]:
+        if norm.call_by is None:
+            return None
+
+        call_by_ref = str(norm.call_by or "").strip()
+        if not call_by_ref:
+            msg = "sources.{}.normalize.call_by must not be empty".format(source_id)
+            raise ConversionError(msg)
+        try:
+            return cast("Callable[..., object]", self._require_resolver().resolve(call_by_ref))
+        except Exception as exc:
+            msg = "sources.{}.normalize.call_by failed to resolve reference '{}': {}".format(source_id, call_by_ref, str(exc))
+            raise ConversionError(msg) from exc
+
+    def _convert_source_normalize_index_by_key(
+        self,
+        source_config: SourceConfig,
+        *,
+        norm: NormalizeConfig,
+        call_by_fn: Optional[Callable[..., object]],
+    ) -> SourceNormalizeIr:
+        source_id = source_config.source_id
 
         key_field = str(norm.key_field or "").strip()
         if not key_field:
-            msg = "sources.{}.normalize.key_field is required".format(source_config.source_id)
+            msg = "sources.{}.normalize.key_field is required".format(source_id)
             raise ConversionError(msg)
 
         on_conflict = str(norm.on_conflict or "error").strip() or "error"
         if on_conflict not in {"error", "first", "last"}:
-            msg = "sources.{}.normalize.on_conflict must be one of: error/first/last".format(source_config.source_id)
+            msg = "sources.{}.normalize.on_conflict must be one of: error/first/last".format(source_id)
             raise ConversionError(msg)
 
         if isinstance(source_config.key, tuple):
-            msg = "sources.{}.normalize.kind=index_by_key does not support composite key yet".format(source_config.source_id)
+            msg = "sources.{}.normalize.kind=index_by_key does not support composite key yet".format(source_id)
             raise ConversionError(msg)
 
         declared_key = str(source_config.key or "").strip()
         if declared_key and declared_key != key_field:
-            msg = "sources.{}.normalize.key_field must equal sources.{}.key".format(source_config.source_id, source_config.source_id)
+            msg = "sources.{}.normalize.key_field must equal sources.{}.key".format(source_id, source_id)
             raise ConversionError(msg)
 
-        return SourceNormalizeIr(kind=kind, key_field=key_field, on_conflict=on_conflict)
+        return SourceNormalizeIr(kind="index_by_key", key_field=key_field, on_conflict=on_conflict, call_by=call_by_fn)
+
+    def _convert_source_normalize_take_first(
+        self,
+        *,
+        source_id: str,
+        norm: NormalizeConfig,
+        call_by_fn: Optional[Callable[..., object]],
+    ) -> SourceNormalizeIr:
+        on_empty = str(norm.on_empty or "miss").strip() or "miss"
+        if on_empty not in {"miss", "null", "error"}:
+            msg = "sources.{}.normalize.on_empty must be one of: miss/null/error".format(source_id)
+            raise ConversionError(msg)
+        return SourceNormalizeIr(kind="take_first", on_empty=on_empty, call_by=call_by_fn)
+
+    def _convert_source_normalize_project_fields(
+        self,
+        *,
+        source_id: str,
+        norm: NormalizeConfig,
+        call_by_fn: Optional[Callable[..., object]],
+    ) -> SourceNormalizeIr:
+        on_missing = str(norm.on_missing or "error").strip() or "error"
+        if on_missing not in {"error", "null"}:
+            msg = "sources.{}.normalize.on_missing must be one of: error/null".format(source_id)
+            raise ConversionError(msg)
+
+        fields = self._convert_source_normalize_project_fields_rules(
+            cast("Mapping[str, object]", norm.fields),
+            config_path="sources.{}.normalize.fields".format(source_id),
+        )
+        return SourceNormalizeIr(kind="project_fields", fields=fields, on_missing=on_missing, call_by=call_by_fn)
+
+    def _convert_source_normalize_map_values(
+        self,
+        *,
+        source_id: str,
+        norm: NormalizeConfig,
+        call_by_fn: Optional[Callable[..., object]],
+    ) -> SourceNormalizeIr:
+        steps = norm.steps
+        if not steps:
+            msg = "sources.{}.normalize.steps must not be empty".format(source_id)
+            raise ConversionError(msg)
+
+        converted_steps: List[SourceNormalizeStepIr] = []
+        for idx, step in enumerate(steps):
+            converted_steps.append(self._convert_source_normalize_step(step, source_id=source_id, idx=idx))
+
+        return SourceNormalizeIr(kind="map_values", steps=tuple(converted_steps), call_by=call_by_fn)
+
+    def _convert_source_normalize_step(
+        self,
+        step: NormalizeStepConfig,
+        *,
+        source_id: str,
+        idx: int,
+    ) -> SourceNormalizeStepIr:
+        step_kind = str(step.kind or "").strip()
+        step_path = "sources.{}.normalize.steps[{}]".format(source_id, idx)
+
+        if step_kind == "take_first":
+            step_on_empty = str(step.on_empty or "miss").strip() or "miss"
+            if step_on_empty not in {"miss", "null", "error"}:
+                msg = "{}.on_empty must be one of: miss/null/error".format(step_path)
+                raise ConversionError(msg)
+            return SourceNormalizeStepIr(kind="take_first", on_empty=step_on_empty)
+
+        if step_kind == "project_fields":
+            step_on_missing = str(step.on_missing or "error").strip() or "error"
+            if step_on_missing not in {"error", "null"}:
+                msg = "{}.on_missing must be one of: error/null".format(step_path)
+                raise ConversionError(msg)
+            step_fields = self._convert_source_normalize_project_fields_rules(
+                cast("Mapping[str, object]", step.fields),
+                config_path="{}.fields".format(step_path),
+            )
+            return SourceNormalizeStepIr(kind="project_fields", on_missing=step_on_missing, fields=step_fields)
+
+        msg = "{}.kind must be one of: take_first/project_fields".format(step_path)
+        raise ConversionError(msg)
+
+    def _convert_source_normalize_project_fields_rules(
+        self,
+        rules: Mapping[str, object],
+        *,
+        config_path: str,
+    ) -> Tuple[SourceNormalizeProjectFieldRuleIr, ...]:
+        if not rules:
+            msg = "{} must not be empty".format(config_path)
+            raise ConversionError(msg)
+
+        converted: List[SourceNormalizeProjectFieldRuleIr] = []
+        for name, rule_obj in rules.items():
+            converted.append(self._convert_source_normalize_project_field_rule(name=name, rule_obj=rule_obj, config_path=config_path))
+        return tuple(converted)
+
+    def _convert_source_normalize_project_field_rule(
+        self,
+        *,
+        name: str,
+        rule_obj: object,
+        config_path: str,
+    ) -> SourceNormalizeProjectFieldRuleIr:
+        if not hasattr(rule_obj, "from_key") and not hasattr(rule_obj, "extract"):
+            msg = "{}.{} must be a normalize project_fields rule".format(config_path, name)
+            raise ConversionError(msg)
+
+        from_key = bool(getattr(rule_obj, "from_key", False))
+        extract_expr = str(getattr(rule_obj, "extract", "") or "").strip()
+        if from_key and extract_expr:
+            msg = "{}.{} must not declare both from_key and extract".format(config_path, name)
+            raise ConversionError(msg)
+        if not from_key and not extract_expr:
+            msg = "{}.{} must declare from_key or extract".format(config_path, name)
+            raise ConversionError(msg)
+
+        if from_key:
+            return SourceNormalizeProjectFieldRuleIr(name=name, from_key=True)
+
+        try:
+            segments = compile_field_extract(extract_expr)
+        except FieldExtractCompileError as exc:
+            msg = "{}.{} has invalid extract '{}': {}".format(config_path, name, extract_expr, str(exc))
+            raise ConversionError(msg) from exc
+        return SourceNormalizeProjectFieldRuleIr(
+            name=name,
+            from_key=False,
+            extract_expr=extract_expr,
+            extract_segments=segments,
+        )
 
     def _binding_from_params_template(
         self,

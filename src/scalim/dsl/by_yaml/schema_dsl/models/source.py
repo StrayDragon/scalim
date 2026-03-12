@@ -156,11 +156,53 @@ class LoaderRetryConfig:
 
 
 @dataclass(frozen=True)
+class NormalizeProjectFieldRuleConfig:
+    SCHEMA_NAME: ClassVar[str] = "normalize_project_field_rule"
+    """用于 `normalize.fields.<name>` 的规则对象(内部模型)."""
+
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ()
+    """该配置对象在 `YAML` 中的必填字段列表."""
+
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    """是否允许出现未声明的额外键."""
+
+    from_key: Optional[bool] = dataclass_field(default=None)
+    """将 `lookup key` 注入该字段(可选)."""
+
+    extract: Optional[str] = dataclass_field(default=None)
+    """从 `row value` 中提取字段值的路径表达式(可选)."""
+
+
+@dataclass(frozen=True)
+class NormalizeStepConfig:
+    SCHEMA_NAME: ClassVar[str] = "normalize_step"
+    """用于 `normalize.steps` 的步骤配置对象(内部模型)."""
+
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind",)
+    """该配置对象在 `YAML` 中的必填字段列表."""
+
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    """是否允许出现未声明的额外键."""
+
+    kind: str = dataclass_field(default="")
+    """`normalize` 步骤类型."""
+
+    on_empty: Optional[str] = dataclass_field(default=None)
+    """空列表策略(仅 `take_first`)."""
+
+    on_missing: Optional[str] = dataclass_field(default=None)
+    """缺失路径策略(仅 `project_fields`)."""
+
+    fields: Dict[str, NormalizeProjectFieldRuleConfig] = dataclass_field(default_factory=dict)
+    """`project_fields` 的投影规则."""
+
+
+@dataclass(frozen=True)
 class NormalizeConfig:
     SCHEMA_NAME: ClassVar[str] = "normalize"
     """`whole-result` `normalize` 配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind", "key_field")
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -174,6 +216,21 @@ class NormalizeConfig:
 
     on_conflict: str = dataclass_field(default=DEFAULT_NORMALIZE_ON_CONFLICT)
     """`duplicate key` 冲突策略."""
+
+    on_empty: Optional[str] = dataclass_field(default=None)
+    """空列表策略(仅 `take_first`)."""
+
+    on_missing: Optional[str] = dataclass_field(default=None)
+    """缺失路径策略(仅 `project_fields`)."""
+
+    fields: Dict[str, NormalizeProjectFieldRuleConfig] = dataclass_field(default_factory=dict)
+    """`project_fields` 的投影规则."""
+
+    steps: Tuple[NormalizeStepConfig, ...] = dataclass_field(default_factory=tuple)
+    """用于 `normalize.kind: map_values` 的步骤列表."""
+
+    call_by: Optional[str] = dataclass_field(default=None)
+    """可选: `normalize` 受控扩展点(安全引用)."""
 
 
 @dataclass(frozen=True)

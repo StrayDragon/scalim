@@ -422,25 +422,30 @@
         "normalize": {
           "type": "object",
           "required": [
-            "kind",
-            "key_field"
+            "kind"
           ],
           "properties": {
             "kind": {
               "type": "string",
               "enum": [
-                "index_by_key"
+                "index_by_key",
+                "take_first",
+                "project_fields",
+                "map_values"
               ],
-              "description": "normalize 预置类型(index_by_key)",
-              "markdownDescription": "normalize 预置类型.\n\n- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射",
+              "description": "normalize 预置类型",
+              "markdownDescription": "normalize 预置类型.\n\n- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射\n- `take_first`: 将 `mapping[key -> list[row]]` 归一化为 `mapping[key -> row]`(空列表由 `on_empty` 决定)\n- `project_fields`: 对 `mapping[key -> row]` 的 row value 做投影/重命名(支持 int-key path,可注入 `from_key`)\n- `map_values`: 对 `mapping` 的 values 批量应用 normalize steps(例如 take_first + project_fields)\n\n注意:\n- 顶层 `list[row]` 场景请用 `index_by_key`(通过 `on_conflict` 定义冲突策略)\n- `call_by` 为受控扩展点: whole-result `Mapping -> Mapping`(受 allowlist 约束)",
               "examples": [
-                "index_by_key"
+                "index_by_key",
+                "take_first",
+                "project_fields",
+                "map_values"
               ]
             },
             "key_field": {
               "type": "string",
-              "description": "用于建立索引的 row 字段名(必填)",
-              "markdownDescription": "用于建立索引的 row 字段名(必填).\n\n- 对应 `sources.<id>.key`",
+              "description": "用于建立索引的 row 字段名(index_by_key)",
+              "markdownDescription": "用于建立索引的 row 字段名.\n\n- 仅 `kind: index_by_key` 使用\n- 对应 `sources.<id>.key`",
               "examples": [
                 "order_id"
               ]
@@ -458,9 +463,435 @@
               "examples": [
                 "error"
               ]
+            },
+            "on_empty": {
+              "type": "string",
+              "enum": [
+                "miss",
+                "null",
+                "error"
+              ],
+              "default": "miss",
+              "description": "空列表策略(miss/null/error)",
+              "markdownDescription": "空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错",
+              "examples": [
+                "miss"
+              ]
+            },
+            "on_missing": {
+              "type": "string",
+              "enum": [
+                "error",
+                "null"
+              ],
+              "default": "error",
+              "description": "缺失路径策略(error/null)",
+              "markdownDescription": "缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`",
+              "examples": [
+                "error"
+              ]
+            },
+            "fields": {
+              "type": "object",
+              "minProperties": 1,
+              "description": "投影字段映射(key 为输出字段名)",
+              "markdownDescription": "投影字段映射.\n\n- key: 输出字段名(天然完成 rename)\n- value: 投影规则(`from_key` 或 `extract` 二选一)\n- `extract` 支持 int-key path(例如 `\"[1].x\"`)",
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "from_key": {
+                    "type": "boolean",
+                    "description": "将 lookup key 写入该字段",
+                    "markdownDescription": "将 lookup key(外层 mapping 的 key)写入该字段.\n\n- true: 注入\n- false: 不注入",
+                    "examples": [
+                      true
+                    ]
+                  },
+                  "extract": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "从当前 row value 提取字段值的路径表达式",
+                    "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式.\n\n- 语法与字段级 `extract` 一致: dot + bracket path\n- 支持 int-key: `\"[1].x\"`(表示 key=1,不是数组下标)\n- 缺失/路径不匹配时为 missing(由 `on_missing` 决定)",
+                    "examples": [
+                      "review_status",
+                      "[1].clearn_reason_level"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "required": [
+                          "from_key"
+                        ],
+                        "not": {
+                          "required": [
+                            "extract"
+                          ]
+                        }
+                      },
+                      {
+                        "required": [
+                          "extract"
+                        ],
+                        "not": {
+                          "required": [
+                            "from_key"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "take_first",
+                      "project_fields"
+                    ],
+                    "description": "normalize step 类型(take_first/project_fields)",
+                    "markdownDescription": "normalize step 类型.\n\n- `take_first`\n- `project_fields`",
+                    "examples": [
+                      "take_first"
+                    ]
+                  },
+                  "on_empty": {
+                    "type": "string",
+                    "enum": [
+                      "miss",
+                      "null",
+                      "error"
+                    ],
+                    "default": "miss",
+                    "description": "空列表策略(miss/null/error)",
+                    "markdownDescription": "空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错",
+                    "examples": [
+                      "miss"
+                    ]
+                  },
+                  "on_missing": {
+                    "type": "string",
+                    "enum": [
+                      "error",
+                      "null"
+                    ],
+                    "default": "error",
+                    "description": "缺失路径策略(error/null)",
+                    "markdownDescription": "缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`",
+                    "examples": [
+                      "error"
+                    ]
+                  },
+                  "fields": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "description": "投影字段映射(key 为输出字段名)",
+                    "markdownDescription": "投影字段映射.\n\n- key: 输出字段名(天然完成 rename)\n- value: 投影规则(`from_key` 或 `extract` 二选一)\n- `extract` 支持 int-key path(例如 `\"[1].x\"`)",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "from_key": {
+                          "type": "boolean",
+                          "description": "将 lookup key 写入该字段",
+                          "markdownDescription": "将 lookup key(外层 mapping 的 key)写入该字段.\n\n- true: 注入\n- false: 不注入",
+                          "examples": [
+                            true
+                          ]
+                        },
+                        "extract": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "从当前 row value 提取字段值的路径表达式",
+                          "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式.\n\n- 语法与字段级 `extract` 一致: dot + bracket path\n- 支持 int-key: `\"[1].x\"`(表示 key=1,不是数组下标)\n- 缺失/路径不匹配时为 missing(由 `on_missing` 决定)",
+                          "examples": [
+                            "review_status",
+                            "[1].clearn_reason_level"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "oneOf": [
+                            {
+                              "required": [
+                                "from_key"
+                              ],
+                              "not": {
+                                "required": [
+                                  "extract"
+                                ]
+                              }
+                            },
+                            {
+                              "required": [
+                                "extract"
+                              ],
+                              "not": {
+                                "required": [
+                                  "from_key"
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "take_first"
+                            ]
+                          }
+                        },
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "on_missing"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "fields"
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "required": [
+                          "kind",
+                          "fields"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "project_fields"
+                            ]
+                          }
+                        },
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "on_empty"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "minItems": 1,
+              "description": "按顺序执行的 normalize steps",
+              "markdownDescription": "按顺序执行的 normalize steps.\n\n- 对每个 `(key, value)` 依次执行"
+            },
+            "call_by": {
+              "type": "string",
+              "description": "Normalize 受控扩展点(安全引用,由 allowlist 约束)",
+              "markdownDescription": "Normalize 受控扩展点(可选).\n\n- 形式与 `loader` 引用一致(支持绝对/相对引用)\n- 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n- 固定 contract: 输入与输出均为 `Mapping`\n\n建议签名:\n- `fn(result, ctx) -> Mapping`\n  - `ctx.source_id`\n  - `ctx.kind`\n  - `ctx.config_path`",
+              "examples": [
+                "myapp.normalizes:normalize_source_x"
+              ]
             }
           },
           "additionalProperties": false,
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "required": [
+                    "kind",
+                    "key_field"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "index_by_key"
+                      ]
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "on_empty"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_missing"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "fields"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "steps"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "take_first"
+                      ]
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "key_field"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_conflict"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_missing"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "fields"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "steps"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "kind",
+                    "fields"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "project_fields"
+                      ]
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "key_field"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_conflict"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_empty"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "steps"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "kind",
+                    "steps"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "map_values"
+                      ]
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "key_field"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_conflict"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_empty"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_missing"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "fields"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ],
           "description": "源代码级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)",
           "markdownDescription": "`normalize` 是源代码级的整体结果整形.\n\n- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n- 执行时机: 在字段级 `extract` 之前\n- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n示例:\n```yaml\nnormalize:\n  kind: index_by_key\n  key_field: order_id\n  on_conflict: error\n```\n\n输入/输出形状:\n- 输入: `[{order_id: 101, ...}, ...]`\n- 输出: `{101: {order_id: 101, ...}, ...}`\n\n注意:\n- 若只是 `row` 内字段嵌套取值,请使用字段级 `extract`"
         },

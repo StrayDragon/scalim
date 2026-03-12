@@ -35,6 +35,10 @@
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-reuse-workflow.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-imports/`
   - Spec: `openspec/specs/yaml-dsl-imports/spec.md`
+- 2026-03-13: yaml-source-normalize-shapes
+  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-source-normalize-shapes/`
+  - Spec: `openspec/specs/yaml-source-normalize/spec.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

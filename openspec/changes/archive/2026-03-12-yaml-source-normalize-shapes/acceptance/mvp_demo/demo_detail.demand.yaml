@@ -1,0 +1,148 @@
+name: mvp_demo_detail
+description: |
+  最小脱敏可运行样例:一条“支付订单宽表”事实流 + preload_forever 小表 lookup + normalize 形状样例源.
+
+  目的:
+  - 作为 imports/workflow/derived-outputs 等 changes 的 acceptance baseline(先保证事实流能跑).
+  - 为“多 sheet 分发、派生汇总、normalize 形状”提供一个极小的数据载体.
+
+batch_size: 1000
+
+main_source:
+  source_id: orders
+  loader: ".loaders:load_paid_orders_rows"
+  params:
+    params:
+      start_datetime: {$runtime: start_datetime}
+      end_datetime: {$runtime: end_datetime}
+  order_by:
+    - order_id
+  fields:
+    order_id: &order_id
+      name: 订单ID
+    user_id: &user_id
+      name: 用户ID
+    cs_id: &cs_id
+      name: 客服ID
+      value_cast: int
+    institution_code: &institution_code
+      name: 机构编码
+    channel: &channel
+      name: 渠道
+    pay_datetime: &pay_datetime
+      name: 支付时间
+    amount_cent: &amount_cent
+      name: 金额(分)
+    is_quick_pay: &is_quick_pay
+      name: 快付
+
+relations:
+  orders_to_institutions: &orders_to_institutions
+    steps:
+      - from: orders.institution_code
+        to: institutions.institution_code
+  orders_to_custom_services: &orders_to_custom_services
+    steps:
+      - from: orders.cs_id
+        to: custom_services.cs_id
+  orders_to_clearn_reasons: &orders_to_clearn_reasons
+    steps:
+      - from: orders.order_id
+        to: clearn_reasons.order_id
+  orders_to_recommend_candidates: &orders_to_recommend_candidates
+    steps:
+      - from: orders.order_id
+        to: recommend_candidates.order_id
+
+sources:
+  institutions:
+    loader: ".loaders:load_institutions_dict"
+    key: institution_code
+    cache_mode: preload_forever
+    fields:
+      institution_name: &institution_name
+        name: 机构名
+        relation: orders_to_institutions
+  custom_services:
+    loader: ".loaders:load_custom_services_dict"
+    key: cs_id
+    cache_mode: preload_forever
+    fields:
+      cs_name: &cs_name
+        name: 客服
+        relation: orders_to_custom_services
+      group_name: &group_name
+        name: 组别
+        relation: orders_to_custom_services
+      wechat_name: &wechat_name
+        name: 微信
+        relation: orders_to_custom_services
+  clearn_reasons:
+    loader: ".loaders:example_loader_clearn_reason_nested_dict"
+    key: order_id
+    params:
+      params:
+        order_id_set:
+          $keys: {as: set}
+    normalize:
+      kind: project_fields
+      on_missing: error
+      fields:
+        order_id: {from_key: true}
+        customer_level: {extract: "[1].clearn_reason_level"}
+        operation_level: {extract: "[2].clearn_reason_level"}
+        review_status: {extract: review_status}
+    fields:
+      customer_level: &customer_level
+        name: 客户净利原因等级
+        relation: orders_to_clearn_reasons
+      operation_level: &operation_level
+        name: 运营净利原因等级
+        relation: orders_to_clearn_reasons
+      review_status: &review_status
+        name: 审核状态
+        relation: orders_to_clearn_reasons
+  recommend_candidates:
+    loader: ".loaders:example_loader_recommend_candidates_by_order_id"
+    key: order_id
+    params:
+      params:
+        order_id_set:
+          $keys: {as: set}
+    normalize:
+      kind: take_first
+      on_empty: miss
+    fields:
+      recommend_cs_id: &recommend_cs_id
+        name: 推荐客服ID
+        relation: orders_to_recommend_candidates
+        value_cast: int
+      recommend_score: &recommend_score
+        name: 推荐得分
+        relation: orders_to_recommend_candidates
+
+fields:
+  amount_yuan: &amount_yuan
+    name: 金额(元)
+    compute: "amount_cent / 100"
+
+output:
+  fields:
+    - field_id: order_id
+    - field_id: user_id
+    - field_id: cs_id
+    - field_id: group_name
+    - field_id: cs_name
+    - field_id: wechat_name
+    - field_id: institution_code
+    - field_id: institution_name
+    - field_id: channel
+    - field_id: pay_datetime
+    - field_id: amount_cent
+    - field_id: amount_yuan
+    - field_id: is_quick_pay
+    - field_id: recommend_cs_id
+    - field_id: recommend_score
+    - field_id: customer_level
+    - field_id: operation_level
+    - field_id: review_status

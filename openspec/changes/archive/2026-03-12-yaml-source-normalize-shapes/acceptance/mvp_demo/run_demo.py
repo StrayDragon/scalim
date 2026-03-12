@@ -83,6 +83,11 @@ def main() -> None:
             "amount_cent",
             "amount_yuan",
             "is_quick_pay",
+            "recommend_cs_id",
+            "recommend_score",
+            "customer_level",
+            "operation_level",
+            "review_status",
         ],
         header_names=[
             "订单ID",
@@ -98,6 +103,11 @@ def main() -> None:
             "金额(分)",
             "金额(元)",
             "快付",
+            "推荐客服ID",
+            "推荐得分",
+            "客户净利原因等级",
+            "运营净利原因等级",
+            "审核状态",
         ],
         sheet_key_field="channel",
     )

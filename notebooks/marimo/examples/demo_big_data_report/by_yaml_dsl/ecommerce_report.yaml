@@ -150,6 +150,11 @@ relations:
       - from: orders.payment_method_id
         to: payment_methods.payment_method_id
 
+  orders_to_payment_methods_candidates: &orders_to_payment_methods_candidates
+    steps:
+      - from: orders.payment_method_id
+        to: payment_methods_candidates.payment_method_id
+
   orders_to_logistics: &orders_to_logistics
     steps:
       - from: orders.logistics_id
@@ -369,6 +374,26 @@ sources:
         name: 支付方式
         relation: orders_to_payment_methods
 
+  payment_methods_candidates:
+    loader: "notebooks.marimo.demo_big_data_report._loaders:load_payment_methods_candidates"
+    key: payment_method_id
+    cache_mode: preload_forever
+    normalize:
+      kind: map_values
+      steps:
+        - kind: take_first
+          on_empty: miss
+        - kind: project_fields
+          on_missing: error
+          fields:
+            payment_method_id: {from_key: true}
+            payment_fee_rate: {extract: payment_fee_rate}
+    fields:
+      payment_fee_rate_candidates: &payment_fee_rate_candidates
+        name: 手续费率(候选取首条)
+        extract: payment_fee_rate
+        relation: orders_to_payment_methods_candidates
+
   logistics:
     loader: "notebooks.marimo.demo_big_data_report._loaders:load_logistics"
     key: logistics_id
@@ -459,6 +484,7 @@ output:
     - *promotion_discount
     - *no_promotion
     - *payment_method_name
+    - *payment_fee_rate_candidates
     - *logistics_name
     - *logistics_speed
     - *price_adjustment

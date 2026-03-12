@@ -13,3 +13,4 @@
 - [2026-03-11: yaml-params-template](2026-03-11-yaml-params-template.md)
 - [2026-03-13: demand-dsl-breaking](2026-03-13-demand-dsl-breaking.md)
 - [2026-03-13: yaml-reuse-workflow](2026-03-13-yaml-reuse-workflow.md)
+- [2026-03-13: yaml-source-normalize-shapes](2026-03-13-yaml-source-normalize-shapes.md)

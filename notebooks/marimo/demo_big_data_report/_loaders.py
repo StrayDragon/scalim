@@ -554,6 +554,36 @@ def load_payment_methods(
     return result
 
 
+def load_payment_methods_candidates(
+    ids: Optional[List[int]] = None,
+    field_keys: Optional[List[str]] = None,
+    is_ref_loader: bool = False,
+) -> Dict[int, List[Dict[str, Any]]]:
+    """加载支付方式候选数据(示例: `mapping[key -> list[row]]`)."""
+    _ = is_ref_loader
+    _ = field_keys
+
+    cfg = get_config()
+    method_ids: Iterable[int] = range(cfg.payment_method_count) if ids is None else ids
+
+    fee_rates = [0.002, 0.002, 0.003, 0.005, 0.0]
+
+    result: Dict[int, List[Dict[str, Any]]] = {}
+    for mid in method_ids:
+        name = _safe_index(_PAYMENT_METHODS, mid)
+        fee_rate = fee_rates[mid % len(fee_rates)]
+        # 保留一个空列表样例,用于展示 `take_first.on_empty=miss` 的行为.
+        if mid == 0:
+            result[mid] = []
+            continue
+        result[mid] = [
+            {"payment_fee_rate": fee_rate, "payment_method_name": name},
+            {"payment_fee_rate": fee_rate, "payment_method_name": name},
+        ]
+
+    return result
+
+
 # ============================================================================
 # 物流公司表 (小表)
 # ============================================================================

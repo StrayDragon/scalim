@@ -543,7 +543,7 @@
   - `loader` (required): `string`
   - `lookup_cast`: `object`, properties `name`, `sep`
   - `lookup_chunk_size`: `integer` | `null`, oneOf(2)
-  - `normalize`: `object`, properties `key_field`, `kind`, `on_conflict`
+  - `normalize`: `object`, properties `fields`, `call_by`, `key_field`, `kind`, `on_conflict`, `on_empty`, `on_missing`, `steps`, allOf(1)
   - `params`: `object`, properties `$import`
 
 ### `source_field_inline`

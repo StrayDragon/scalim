@@ -118,3 +118,17 @@ def example_loader_clearn_reason_nested_dict(*, params: Dict[str, object]) -> Di
             "review_status": 3,
         }
     }
+
+
+def example_loader_recommend_candidates_by_order_id(*, params: Dict[str, object]) -> Dict[int, List[Dict[str, object]]]:
+    """形状:dict[order_id] -> list[row],需要 take_first 才能落地为单条 row."""
+    order_id_set = set(params.get("order_id_set") or [])
+    if not order_id_set:
+        return {}
+    return {
+        10001: [
+            {"recommend_cs_id": 9002, "recommend_score": 0.95},
+            {"recommend_cs_id": 9002, "recommend_score": 0.94},
+        ],
+        10002: [],
+    }

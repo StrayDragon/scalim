@@ -173,8 +173,10 @@ LOOKUP_CAST_NAME_ENUM = ["auto", "int", "str", "sep_first"]
 BIND_AS_ENUM = ["set", "list"]
 BIND_CACHE_MODE_ENUM = ["none", "batch"]
 VALUE_CAST_ENUM = ["auto", "int", "str"]
-NORMALIZE_KIND_ENUM = ["index_by_key"]
+NORMALIZE_KIND_ENUM = ["index_by_key", "take_first", "project_fields", "map_values"]
 NORMALIZE_ON_CONFLICT_ENUM = ["error", "first", "last"]
+NORMALIZE_ON_EMPTY_ENUM = ["miss", "null", "error"]
+NORMALIZE_ON_MISSING_ENUM = ["error", "null"]
 
 DESC_LOADER_RETRY = "Loader retry 策略(可选;默认关闭)"
 DESC_LOADER_RETRY_MD = (
@@ -284,21 +286,151 @@ LOOKUP_CAST_SCHEMA = {
     "markdownDescription": DESC_LOOKUP_CAST_MD,
 }
 
+_DESC_SOURCE_NORMALIZE_KIND_MD = (
+    "normalize 预置类型.\n\n"
+    "- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射\n"
+    "- `take_first`: 将 `mapping[key -> list[row]]` 归一化为 `mapping[key -> row]`(空列表由 `on_empty` 决定)\n"
+    "- `project_fields`: 对 `mapping[key -> row]` 的 row value 做投影/重命名(支持 int-key path,可注入 `from_key`)\n"
+    "- `map_values`: 对 `mapping` 的 values 批量应用 normalize steps(例如 take_first + project_fields)\n\n"
+    "注意:\n"
+    "- 顶层 `list[row]` 场景请用 `index_by_key`(通过 `on_conflict` 定义冲突策略)\n"
+    "- `call_by` 为受控扩展点: whole-result `Mapping -> Mapping`(受 allowlist 约束)"
+)
+
+_DESC_SOURCE_NORMALIZE_CALL_BY_MD = (
+    "Normalize 受控扩展点(可选).\n\n"
+    "- 形式与 `loader` 引用一致(支持绝对/相对引用)\n"
+    "- 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n"
+    "- 固定 contract: 输入与输出均为 `Mapping`\n\n"
+    "建议签名:\n"
+    "- `fn(result, ctx) -> Mapping`\n"
+    "  - `ctx.source_id`\n"
+    "  - `ctx.kind`\n"
+    "  - `ctx.config_path`"
+)
+
+_NORMALIZE_PROJECT_FIELD_RULE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "from_key": {
+            "type": "boolean",
+            "description": "将 lookup key 写入该字段",
+            "markdownDescription": "将 lookup key(外层 mapping 的 key)写入该字段.\n\n- true: 注入\n- false: 不注入",
+            "examples": [True],
+        },
+        "extract": {
+            "type": "string",
+            "minLength": 1,
+            "description": "从当前 row value 提取字段值的路径表达式",
+            "markdownDescription": (
+                "从当前 key 对应的 row value 中提取字段值的路径表达式.\n\n"
+                "- 语法与字段级 `extract` 一致: dot + bracket path\n"
+                '- 支持 int-key: `"[1].x"`(表示 key=1,不是数组下标)\n'
+                "- 缺失/路径不匹配时为 missing(由 `on_missing` 决定)"
+            ),
+            "examples": ["review_status", "[1].clearn_reason_level"],
+        },
+    },
+    "additionalProperties": False,
+    "allOf": [
+        {
+            "oneOf": [
+                {"required": ["from_key"], "not": {"required": ["extract"]}},
+                {"required": ["extract"], "not": {"required": ["from_key"]}},
+            ]
+        }
+    ],
+}
+
+_NORMALIZE_PROJECT_FIELDS_SCHEMA = {
+    "type": "object",
+    "minProperties": 1,
+    "description": "投影字段映射(key 为输出字段名)",
+    "markdownDescription": (
+        "投影字段映射.\n\n"
+        "- key: 输出字段名(天然完成 rename)\n"
+        "- value: 投影规则(`from_key` 或 `extract` 二选一)\n"
+        '- `extract` 支持 int-key path(例如 `"[1].x"`)'
+    ),
+    "propertyNames": {"type": "string", "pattern": _SOURCE_ID_PATTERN},
+    "additionalProperties": _NORMALIZE_PROJECT_FIELD_RULE_SCHEMA,
+}
+
+_NORMALIZE_STEP_KIND_ENUM = ["take_first", "project_fields"]
+
+_NORMALIZE_STEP_SCHEMA = {
+    "type": "object",
+    "required": ["kind"],
+    "properties": {
+        "kind": {
+            "type": "string",
+            "enum": _NORMALIZE_STEP_KIND_ENUM,
+            "description": "normalize step 类型(take_first/project_fields)",
+            "markdownDescription": "normalize step 类型.\n\n- `take_first`\n- `project_fields`",
+            "examples": ["take_first"],
+        },
+        "on_empty": {
+            "type": "string",
+            "enum": NORMALIZE_ON_EMPTY_ENUM,
+            "default": "miss",
+            "description": "空列表策略(miss/null/error)",
+            "markdownDescription": (
+                "空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错"
+            ),
+            "examples": ["miss"],
+        },
+        "on_missing": {
+            "type": "string",
+            "enum": NORMALIZE_ON_MISSING_ENUM,
+            "default": "error",
+            "description": "缺失路径策略(error/null)",
+            "markdownDescription": "缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`",
+            "examples": ["error"],
+        },
+        "fields": _NORMALIZE_PROJECT_FIELDS_SCHEMA,
+    },
+    "additionalProperties": False,
+    "allOf": [
+        {
+            "oneOf": [
+                {
+                    "required": ["kind"],
+                    "properties": {"kind": {"enum": ["take_first"]}},
+                    "not": {"anyOf": [{"required": ["on_missing"]}, {"required": ["fields"]}]},
+                },
+                {
+                    "required": ["kind", "fields"],
+                    "properties": {"kind": {"enum": ["project_fields"]}},
+                    "not": {"anyOf": [{"required": ["on_empty"]}]},
+                },
+            ]
+        }
+    ],
+}
+
+_NORMALIZE_STEPS_SCHEMA = {
+    "type": "array",
+    "items": _NORMALIZE_STEP_SCHEMA,
+    "minItems": 1,
+    "description": "按顺序执行的 normalize steps",
+    "markdownDescription": "按顺序执行的 normalize steps.\n\n- 对每个 `(key, value)` 依次执行",
+}
+
 NORMALIZE_SCHEMA = {
     "type": "object",
-    "required": ["kind", "key_field"],
+    "required": ["kind"],
     "properties": {
         "kind": {
             "type": "string",
             "enum": NORMALIZE_KIND_ENUM,
-            "description": "normalize 预置类型(index_by_key)",
-            "markdownDescription": "normalize 预置类型.\n\n- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射",
-            "examples": ["index_by_key"],
+            "description": "normalize 预置类型",
+            "markdownDescription": _DESC_SOURCE_NORMALIZE_KIND_MD,
+            "examples": ["index_by_key", "take_first", "project_fields", "map_values"],
         },
         "key_field": {
             "type": "string",
-            "description": "用于建立索引的 row 字段名(必填)",
-            "markdownDescription": "用于建立索引的 row 字段名(必填).\n\n- 对应 `sources.<id>.key`",
+            "description": "用于建立索引的 row 字段名(index_by_key)",
+            "markdownDescription": "用于建立索引的 row 字段名.\n\n- 仅 `kind: index_by_key` 使用\n- 对应 `sources.<id>.key`",
             "examples": ["order_id"],
         },
         "on_conflict": {
@@ -309,8 +441,90 @@ NORMALIZE_SCHEMA = {
             "markdownDescription": "duplicate key 冲突策略.\n\n- `error`: 报错(默认)\n- `first`: 保留第一条\n- `last`: 保留最后一条",
             "examples": ["error"],
         },
+        "on_empty": {
+            "type": "string",
+            "enum": NORMALIZE_ON_EMPTY_ENUM,
+            "default": "miss",
+            "description": "空列表策略(miss/null/error)",
+            "markdownDescription": (
+                "空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错"
+            ),
+            "examples": ["miss"],
+        },
+        "on_missing": {
+            "type": "string",
+            "enum": NORMALIZE_ON_MISSING_ENUM,
+            "default": "error",
+            "description": "缺失路径策略(error/null)",
+            "markdownDescription": "缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`",
+            "examples": ["error"],
+        },
+        "fields": _NORMALIZE_PROJECT_FIELDS_SCHEMA,
+        "steps": _NORMALIZE_STEPS_SCHEMA,
+        "call_by": {
+            "type": "string",
+            "description": "Normalize 受控扩展点(安全引用,由 allowlist 约束)",
+            "markdownDescription": _DESC_SOURCE_NORMALIZE_CALL_BY_MD,
+            "examples": ["myapp.normalizes:normalize_source_x"],
+        },
     },
     "additionalProperties": False,
+    "allOf": [
+        {
+            "oneOf": [
+                {
+                    "required": ["kind", "key_field"],
+                    "properties": {"kind": {"enum": ["index_by_key"]}},
+                    "not": {
+                        "anyOf": [
+                            {"required": ["on_empty"]},
+                            {"required": ["on_missing"]},
+                            {"required": ["fields"]},
+                            {"required": ["steps"]},
+                        ]
+                    },
+                },
+                {
+                    "required": ["kind"],
+                    "properties": {"kind": {"enum": ["take_first"]}},
+                    "not": {
+                        "anyOf": [
+                            {"required": ["key_field"]},
+                            {"required": ["on_conflict"]},
+                            {"required": ["on_missing"]},
+                            {"required": ["fields"]},
+                            {"required": ["steps"]},
+                        ]
+                    },
+                },
+                {
+                    "required": ["kind", "fields"],
+                    "properties": {"kind": {"enum": ["project_fields"]}},
+                    "not": {
+                        "anyOf": [
+                            {"required": ["key_field"]},
+                            {"required": ["on_conflict"]},
+                            {"required": ["on_empty"]},
+                            {"required": ["steps"]},
+                        ]
+                    },
+                },
+                {
+                    "required": ["kind", "steps"],
+                    "properties": {"kind": {"enum": ["map_values"]}},
+                    "not": {
+                        "anyOf": [
+                            {"required": ["key_field"]},
+                            {"required": ["on_conflict"]},
+                            {"required": ["on_empty"]},
+                            {"required": ["on_missing"]},
+                            {"required": ["fields"]},
+                        ]
+                    },
+                },
+            ]
+        }
+    ],
     "description": DESC_SOURCE_NORMALIZE,
     "markdownDescription": DESC_SOURCE_NORMALIZE_MD,
 }

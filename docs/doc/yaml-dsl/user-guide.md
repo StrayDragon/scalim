@@ -416,10 +416,23 @@ lookup_cast:
 
 `normalize` 是 **源代码级** 的整体结果归一化: 作用于整个 `loader` 返回值,并且发生在字段级 `extract` 之前.
 
-当前只提供声明式预置:
+支持的写法(按复杂度由低到高):
+
 - `kind: index_by_key`: 将 `list[row]` 归一化为 `lookup_key -> row` 映射
-- `key_field`: 从每个 row 中读取 lookup key 的字段名
-- `on_conflict`: duplicate key 策略,可选 `error|first|last`(默认 `error`)
+  - `key_field`: 从每个 row 中读取 lookup key 的字段名(必填)
+  - `on_conflict`: duplicate key 策略,可选 `error|first|last`(默认 `error`)
+- `kind: take_first`: 将 `mapping[key -> list[row]]` 归一化为 `mapping[key -> row]`
+  - `on_empty`: 空列表策略,可选 `miss|null|error`(默认 `miss`)
+  - 注意: 顶层 `list[row]` 场景仍应使用 `index_by_key`
+- `kind: project_fields`: 对 `mapping[key -> row]` 的 row value 做投影/重命名
+  - `fields`: 投影规则映射,每个字段用 `from_key` 或 `extract` 二选一
+  - `on_missing`: 缺失路径策略,可选 `error|null`(默认 `error`)
+  - `extract` 的语法与字段级 `extract` 一致(支持 int-key path,例如 `"[1].x"`)
+- `kind: map_values`: 对 `mapping` 的 values 批量应用 normalize steps(当前支持 `take_first` / `project_fields`)
+  - `steps`: step 列表(按顺序执行)
+- 可选扩展点: `call_by`
+  - whole-result `Mapping -> Mapping`,引用解析与 `loader` 一致(支持相对引用,并受 allowlist 约束)
+  - 用于 declarative normalize 难以表达但不想写 wrapper module 的场景
 
 示例: loader 返回 `list[row]`,用 `normalize.kind=index_by_key` 归一化为映射
 
@@ -432,6 +445,42 @@ sources:
       kind: index_by_key
       key_field: payment_method_id
       on_conflict: error
+```
+
+示例: `mapping[key -> list[row]]` 用 `take_first` 取首条
+
+```yaml
+normalize:
+  kind: take_first
+  on_empty: miss  # miss|null|error
+```
+
+示例: nested dict 拍平/重命名(`project_fields`)
+
+```yaml
+normalize:
+  kind: project_fields
+  on_missing: error  # error|null
+  fields:
+    order_id: {from_key: true}
+    customer_level: {extract: "[1].clearn_reason_level"}
+    operation_level: {extract: "[2].clearn_reason_level"}
+    review_status: {extract: review_status}
+```
+
+示例: values pipeline(`map_values`: take_first + project_fields)
+
+```yaml
+normalize:
+  kind: map_values
+  steps:
+    - kind: take_first
+      on_empty: miss
+    - kind: project_fields
+      on_missing: error
+      fields:
+        order_id: {from_key: true}
+        review_status: {extract: review_status}
 ```
 
 边界说明:
