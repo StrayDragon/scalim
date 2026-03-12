@@ -11,6 +11,7 @@
 仓库约定与边界:
 
 - [仓库开发约定](repo-guide.md)
+- [文档治理与生成工作流](doc-governance.md)
 
 常用命令:
 

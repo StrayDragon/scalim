@@ -14,10 +14,9 @@
 OpenSpec 是本仓库对核心行为/边界的“约束性描述”,更接近规范而不是教程.
 
 - 规范目录: `openspec/specs/`
-- 入口文件: `openspec/specs/README.md`
+- 索引页(生成): [OpenSpec 索引(生成)](openspec-index.gen.md)
 
 常见用法:
 
 - 在改动执行语义、并行边界、安全策略前,先在 `openspec/specs/` 找到对应主题的 spec 对齐预期
 - 站内文档偏“怎么用/怎么跑/怎么排查”;遇到边界争议,以 spec 为准
-

@@ -133,13 +133,9 @@ uv tool install --editable <PATH_TO_SCALIM>/scalim[cli]
 ```bash
 # 验证配置语法
 scalim-cli yaml-dsl validate config.yaml
-
-# 打印 JSON Schema(用于编辑器补全)
-scalim-cli yaml-dsl schema show > demand.schema.json
-
-# 打印内置 schema 路径
-scalim-cli yaml-dsl schema path
 ```
+
+更多 CLI 子命令与参数说明见: [YAML CLI 参考(生成)](cli-reference.gen.md).
 
 **Python 代码调用**:
 
@@ -266,19 +262,15 @@ output:
 
 ### 3.1 顶层配置
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `name` | string | ✅ | - | 配置名称,用于标识当前配置 |
-| `_templates` | object | ❌ | - | YAML 模板/锚点定义(供 fields/relations 等复用) |
-| `description` | string | ❌ | - | 配置描述 |
-| `batch_size` | integer | ❌ | `1000` | 批处理大小(> 0) |
-| `main_source` | object | ✅ | - | 主数据源配置 |
-| `sources` | object | ❌ | `{}` | 辅助数据源映射(不包含 main_source) |
-| `fields` | object | ❌ | `{}` | 顶层派生字段映射 |
-| `relations` | object | ❌ | `{}` | 命名关系模板映射(供字段 relation 通过 alias 复用) |
-| `output` | object | ❌ | - | 输出配置(格式/路径/字段顺序等) |
-| `observability` | object | ❌ | - | 可观测性配置(logging/perf/viz/trace 等) |
-| `guardrails` | object | ❌ | - | 运行时护栏配置(loader/relations/compute 等) |
+顶层字段集合、`required` 边界与默认值以 JSON Schema 为准(避免文档漂移):
+
+- [YAML Schema 参考(生成)](schema-reference.gen.md) (Top-Level Fields / Definitions)
+- [YAML CLI 参考(生成)](cli-reference.gen.md) (`scalim-cli yaml-dsl schema show` / `... path`)
+
+最小必填字段只有:
+
+- `name`
+- `main_source`
 
 **示例**:
 
@@ -295,12 +287,12 @@ _templates:
 
 ### 3.2 主数据源配置 (main_source)
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `source_id` | string | ✅ | - | 主数据源唯一标识 |
-| `loader` | string | ✅ | - | Python 可调用对象引用 |
-| `params` | object | ❌ | `{}` | 调用 loader 时透传的 kwargs 模板(支持 `$runtime.*` 占位符) |
-| `fields` | object | ❌ | `{}` | 主数据源字段映射 |
+`main_source` 必须包含:
+
+- `source_id` (required)
+- `loader` (required)
+
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `main_source` definition.
 
 **loader 引用格式**:
 
@@ -332,16 +324,12 @@ main_source:
 
 顶层 `sources` 为可选字段;未提供时等价于空映射 `{}`.
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `loader` | string | ✅ | - | Python 可调用对象引用 |
-| `key` | string/list | ✅ | - | 主键字段(支持复合键) |
-| `normalize` | object | ❌ | - | whole-result 归一化(在字段级 `extract` 之前执行;仅 `sources.*` 支持) |
-| `cache_mode` | string | ❌ | `"none"` | 缓存模式:`none`/`preload_forever` |
-| `lookup_cast` | object | ❌ | - | 键值归一化转换 |
-| `lookup_chunk_size` | integer | ❌ | - | keys 模式分片大小 |
-| `params` | object | ❌ | `{}` | loader kwargs 模板(支持 `$runtime.*`、`$keys/$rows` 指令节点) |
-| `fields` | object | ❌ | `{}` | 字段配置 |
+每个 source 必填:
+
+- `loader`
+- `key` (支持复合键)
+
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `source` definition.
 
 #### 3.3.1 loader kwargs 模板 (params)
 
@@ -383,10 +371,12 @@ sources:
 
 #### 3.3.2 缓存模式 (cache_mode)
 
-| 模式 | 说明 |
-|------|------|
-| `none` | 不缓存,每次关联都重新查询 |
-| `preload_forever` | 预加载并永久缓存(若 `params` 非空会透传 kwargs;为空则保持零参 preload) |
+取值与默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `source.cache_mode`.
+
+语义:
+
+- `none`: 不缓存,每次关联都重新查询
+- `preload_forever`: 预加载并永久缓存(若 `params` 非空会透传 kwargs;为空则保持零参 preload)
 
 #### 3.3.3 键值归一化 (lookup_cast)
 
@@ -454,16 +444,18 @@ sources:
 
 在 `main_source.fields` 或 `sources.<id>.fields` 中定义:
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `extract` | string | ❌ | field_id | 从当前 source row 中取值的路径表达式(支持 dot + bracket) |
-| `name` | string | ❌ | - | 显示名称 |
-| `value_cast` | string | ❌ | - | 值转换:`auto`/`int`/`str` |
-| `relation` | object | ❌ | - | 关联路径或 YAML 别名引用 |
+常用 key:
+
+- `extract`: 从当前 source row 中取值的路径表达式(可省略;缺省等价于 `extract: <field_id>`)
+- `name`: 显示名称(可选)
+- `value_cast`: 值转换(可选)
+- `relation`: 关联路径或 YAML 别名引用(可选)
+
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `field` / `source_field_inline` definition.
 
 **extract 的默认与语法**:
 
-<!-- BEGIN SCALIM-GEN:yaml-dsl-source-field-extract -->
+<!-- BEGIN AUTOGEN:yaml-dsl-source-field-extract -->
 从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).
 
 语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):
@@ -532,7 +524,7 @@ sources:
 补充边界:
 - 如果中间段是 list/tuple, `"[1]"` 也不会当作下标(会返回 `None`)
 - 如果同时存在 key `"1"` 与 `1`,需要用 `extract: '["1"].x'` 与 `extract: "[1].x"` 明确区分
-<!-- END SCALIM-GEN:yaml-dsl-source-field-extract -->
+<!-- END AUTOGEN:yaml-dsl-source-field-extract -->
 
 **示例**:
 
@@ -563,11 +555,16 @@ sources:
 
 在顶层 `fields` 中定义:
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `compute` | string | ✅(与 `call_by` 二选一) | - | Python 表达式(使用 field_id 作为变量) |
-| `call_by` | string | ✅(与 `compute` 二选一) | - | 函数调用:`reference(args...)`(支持 kwargs / Python 字面量 / `$ctx`) |
-| `name` | string | ❌ | - | 显示名称 |
+必须二选一:
+
+- `compute`: Python 表达式(使用 field_id 作为变量)
+- `call_by`: 函数调用:`reference(args...)`(支持 kwargs / Python 字面量 / `$ctx`)
+
+可选:
+
+- `name`: 显示名称
+
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `field` definition.
 
 > 注: `depends_on` 不再作为用户侧配置字段.派生字段依赖由系统从 `compute` 表达式中自动推导;若配置中出现 `depends_on`,校验会失败.
 
@@ -636,11 +633,16 @@ sources:
 
 #### 3.5.3 关系步骤属性 (Step Properties)
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `from` | string/list | ✅ | 上游字段(支持列表用于复合键) |
-| `to` | string/list | ✅ | 下游字段(支持列表) |
-| `lookup_cast` | object | ❌ | 键值归一化转换 |
+每个 step 必填:
+
+- `from` (支持列表用于复合键)
+- `to` (支持列表用于复合键)
+
+可选:
+
+- `lookup_cast`: 键值归一化转换
+
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `relation` definition.
 
 **重要: steps 中的 `source.field` 使用 field_id**
 
@@ -739,15 +741,13 @@ relations:
 
 ### 3.6 输出配置 (output)
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `format` | string | ❌ | `"csv"` | 输出格式:`csv`/`excel` |
-| `path` | string | ❌ | - | 输出路径 |
-| `encoding` | string | ❌ | `"utf-8"` | 文件编码 |
-| `streaming` | boolean | ❌ | `true` | 流式输出(按行写入; 推荐保持 `true` 以降低内存占用) |
-| `include_header` | boolean | ❌ | `true` | 包含表头行 |
-| `header_fields_output_by` | string | ❌ | `"field_id"` | 表头来源:`field_id`/`name` |
-| `fields` | list | ❌ | - | 输出字段顺序 |
+`output` 可省略;常用字段:
+
+- `format` (default: `csv`)
+- `path`
+- `fields` (输出字段顺序/选择器)
+
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `output` definition.
 
 **示例**:
 
@@ -1793,20 +1793,14 @@ observability:
 
 **A**:
 
-```bash
-# 使用 CLI 打印 schema
-scalim-cli yaml-dsl schema show > demand.schema.json
-
-# 查看内置 schema 路径
-scalim-cli yaml-dsl schema path
-
-# 或使用 just 命令
-just gen-yaml-dsl-schema
-```
+- 查看/导出 schema: 见 [YAML CLI 参考(生成)](cli-reference.gen.md)
+- 更新仓库内 schema 生成物: `just gen-yaml-dsl-schema` (并提交 `src/scalim/dsl/by_yaml/schema/demand.gen.json`)
 
 ### Q8: 如何验证配置文件？
 
 **A**:
+
+- CLI 校验参数与更多命令见: [YAML CLI 参考(生成)](cli-reference.gen.md)
 
 ```bash
 # 使用 CLI 验证

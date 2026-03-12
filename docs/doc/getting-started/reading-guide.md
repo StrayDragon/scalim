@@ -6,9 +6,24 @@
 
 这页带你从“一个入口文件”一路跟到“执行结果”,把每一层该看的目录/符号标出来,减少靠猜的时间.
 
+## 0. 目录索引(快速定位)
+
+- 运行时代码: `src/scalim/`
+  - YAML DSL: `src/scalim/dsl/by_yaml/` (`config_parsing/`, `schema_dsl/`, `runtime/`)
+  - IR/types: `src/scalim/spec/`
+  - 规划层: `src/scalim/planning/`
+  - 执行层: `src/scalim/execution/`
+  - 输出 sinks: `src/scalim/sinks/`
+  - 可观测性: `src/scalim/ob/`, `src/scalim/events/`, `src/scalim/hooks/`
+- 开发脚本: `scripts/` (生成/校验/漂移门禁)
+- 测试: `tests/` (pytest) + `tests/bench/` (benchmark-only)
+- 示例与数据: `notebooks/` (marimo) + `packages/scalim-misc/src/scalim_misc/`
+- 文档站点: `docs/doc/` (manual + `*.gen.*`) + `docs/zensical.toml`
+- 规范与变更: `openspec/specs/` + `openspec/changes/`
+
 ## 1. 先读哪些文档(避免迷路)
 
-- [仓库开发约定](../dev/repo-guide.md): 开发约定、Python 3.6/3.10 兼容边界、常用命令、schema 生成物维护规则
+- [`AGENTS.md`](#code=AGENTS.md): 仓库协作约定与硬边界(唯一准则)
 - [架构详解](../architecture/arch.md): 架构分层与主要流程图;实现细节与行为约束会指向 `openspec/`
 - [OpenSpec 规范](../specs/index.md): 更接近“规范/约束”的描述,适合在改行为前先对齐预期
 
@@ -81,6 +96,7 @@
 
 - YAML 示例(带 anchors): [`tests/fixtures/order_report.yaml`](#code=tests/fixtures/order_report.yaml)
 - 运行示例与 demo: [`notebooks/`](#code=notebooks/)(marimo)与 [`packages/scalim-misc/src/scalim_misc/`](#code=packages/scalim-misc/src/scalim_misc/)
+  - 本地启动 marimo server(推荐): `uv run python -m marimo edit notebooks/marimo/examples/<notebook>.py`
 - 规划/执行相关 fixture: [`tests/fixtures/planning_fixtures.py`](#code=tests/fixtures/planning_fixtures.py), [`tests/fixtures/executor_operator_fixtures.py`](#code=tests/fixtures/executor_operator_fixtures.py)
 
 要改 DSL 行为或 schema,尽量先补一个能覆盖你场景的 fixture/测试,不然很难防止“文档写对了,实现悄悄漂”.

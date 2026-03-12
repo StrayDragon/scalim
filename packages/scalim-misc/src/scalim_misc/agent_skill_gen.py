@@ -16,7 +16,6 @@
 注入“升级批次索引”,用于把 `docs/doc/yaml-dsl/upgrades/` 的升级文档同步到 skill 参考中.
 """
 
-import argparse
 import hashlib
 import json
 import re
@@ -25,6 +24,9 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import yaml
+
+from scalim_misc.cli_docs import build_yaml_dsl_command_docs
+from scalim_misc.markdown_inject import InjectBlockError, InjectBlockSpec, replace_markdown_injected_block
 
 from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
@@ -64,8 +66,8 @@ CANONICAL_EXAMPLE_SOURCE_REL = Path("notebooks") / "marimo" / "examples" / "demo
 
 UPGRADES_DOCS_ROOT_REL = Path("docs") / "doc" / "yaml-dsl" / "upgrades"
 UPGRADE_LEGACY_REFERENCE_REL = REFERENCES_ROOT_REL / "task-upgrade-legacy.md"
-UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN SCALIM-GEN:yaml-dsl-upgrades -->"
-UPGRADES_INDEX_END_MARKER = "<!-- END SCALIM-GEN:yaml-dsl-upgrades -->"
+UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->"
+UPGRADES_INDEX_END_MARKER = "<!-- END AUTOGEN:yaml-dsl-upgrades -->"
 
 SYNTAX_SPEC_RELS = (
     Path("openspec") / "specs" / "yaml-dsl-schema" / "spec.md",
@@ -112,7 +114,7 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     schema = load_json_file(schema_path, "schema")
     syntax_specs = load_spec_summaries(repo_root, SYNTAX_SPEC_RELS)
     cli_specs = load_spec_summaries(repo_root, CLI_SPEC_RELS)
-    command_docs = build_cli_command_docs()
+    command_docs = build_yaml_dsl_command_docs()
     canonical_example_text = build_canonical_example(repo_root)
 
     generated_files = {
@@ -353,16 +355,9 @@ def render_cli_lsp_reference(
                 "- Usage: `{}`".format(command_doc["usage"]),
             ]
         )
-        positionals = command_doc["positionals"]
-        if positionals:
-            lines.append("- Positionals:")
-            for item in positionals:
-                lines.append("  - `{}`: {}".format(item["name"], item["help"]))
-        options = command_doc["options"]
-        if options:
-            lines.append("- Options:")
-            for item in options:
-                lines.append("  - `{}`: {}".format(item["name"], item["help"]))
+        help_full = str(command_doc.get("help_full") or "").rstrip()
+        if help_full:
+            lines.extend(["- Full help:", "```text", help_full.rstrip(), "```"])
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
@@ -379,12 +374,18 @@ def sync_upgrade_legacy_reference(repo_root: Path, skill_dir: Path) -> None:
         return
 
     original = read_text(upgrade_reference_path)
-    injected = inject_markdown_block(
-        original,
-        begin_marker=UPGRADES_INDEX_BEGIN_MARKER,
-        end_marker=UPGRADES_INDEX_END_MARKER,
-        content=render_yaml_dsl_upgrades_index(repo_root, upgrades_root),
-    )
+    try:
+        injected = replace_markdown_injected_block(
+            original,
+            spec=InjectBlockSpec(
+                begin_marker=UPGRADES_INDEX_BEGIN_MARKER,
+                end_marker=UPGRADES_INDEX_END_MARKER,
+                label=str(upgrade_reference_path),
+            ),
+            content=render_yaml_dsl_upgrades_index(repo_root, upgrades_root),
+        )
+    except InjectBlockError as exc:
+        raise GenerationError(str(exc)) from exc
     if injected != original:
         write_text(upgrade_reference_path, injected)
 
@@ -436,34 +437,6 @@ def extract_backtick_path(text: str, *, prefix: str) -> Optional[str]:
         if value.startswith(prefix):
             return value
     return None
-
-
-def inject_markdown_block(text: str, *, begin_marker: str, end_marker: str, content: str) -> str:
-    lines = text.splitlines(True)
-    begin_index = None
-    end_index = None
-    for idx, line in enumerate(lines):
-        if line.strip() == begin_marker:
-            begin_index = idx
-            continue
-        if begin_index is not None and line.strip() == end_marker:
-            end_index = idx
-            break
-
-    content_lines = content.splitlines(True)
-    if content and not content.endswith("\n"):
-        content_lines.append("\n")
-
-    if begin_index is None or end_index is None or end_index <= begin_index:
-        # 没有 marker 时,直接追加一个可再次注入的区块(不尝试猜测插入位置).
-        appended = text.rstrip() + "\n\n{}\n{}\n{}\n".format(begin_marker, content.rstrip(), end_marker)
-        return appended
-
-    injected_lines = []
-    injected_lines.extend(lines[: begin_index + 1])
-    injected_lines.extend(content_lines)
-    injected_lines.extend(lines[end_index:])
-    return "".join(injected_lines)
 
 
 def render_spec_requirement_map(title: str, spec_summaries: Sequence[Dict[str, Any]]) -> List[str]:
@@ -626,76 +599,6 @@ def format_examples(examples: Any) -> str:
         else:
             values.append("`{}`".format(json.dumps(item, ensure_ascii=False, sort_keys=True)))
     return ", ".join(values)
-
-
-def build_cli_command_docs() -> List[Dict[str, Any]]:
-    root_parser = argparse.ArgumentParser(prog=_project_constants.CLI_NAME, description="Scalim CLI")
-    root_subparsers = root_parser.add_subparsers(dest="command")
-    yaml_dsl_cli.register(root_subparsers)
-
-    command_tokens = [
-        ("yaml-dsl", "validate"),
-        ("yaml-dsl", "schema", "validate"),
-        ("yaml-dsl", "schema", "show"),
-        ("yaml-dsl", "schema", "path"),
-    ]
-    docs = []
-    for tokens in command_tokens:
-        parser, help_text = resolve_command_parser(root_parser, tokens)
-        docs.append(
-            {
-                "tokens": tokens,
-                "help": help_text or parser.description or "",
-                "usage": parser.format_usage().strip().replace("usage: ", "", 1),
-                "positionals": collect_parser_positionals(parser),
-                "options": collect_parser_options(parser),
-            }
-        )
-    return docs
-
-
-def resolve_command_parser(root_parser: argparse.ArgumentParser, tokens: Sequence[str]) -> Tuple[argparse.ArgumentParser, str]:
-    current = root_parser
-    help_text = ""
-    for token in tokens:
-        current, help_text = get_subparser(current, token)
-    return current, help_text
-
-
-def get_subparser(parser: argparse.ArgumentParser, name: str) -> Tuple[argparse.ArgumentParser, str]:
-    for action in parser._actions:
-        if not isinstance(action, argparse._SubParsersAction):
-            continue
-        help_map = {item.dest: item.help for item in action._choices_actions}
-        if name in action.choices:
-            return action.choices[name], help_map.get(name, "") or ""
-    raise GenerationError("CLI 解析器中缺少子命令: {}".format(name))
-
-
-def collect_parser_positionals(parser: argparse.ArgumentParser) -> List[Dict[str, str]]:
-    positionals = []
-    for action in parser._actions:
-        if isinstance(action, argparse._SubParsersAction):
-            continue
-        if action.option_strings:
-            continue
-        if action.dest in ("help", argparse.SUPPRESS):
-            continue
-        positionals.append({"name": action.dest, "help": action.help or ""})
-    return positionals
-
-
-def collect_parser_options(parser: argparse.ArgumentParser) -> List[Dict[str, str]]:
-    options = []
-    for action in parser._actions:
-        if isinstance(action, argparse._HelpAction):
-            continue
-        if isinstance(action, argparse._SubParsersAction):
-            continue
-        if not action.option_strings:
-            continue
-        options.append({"name": ", ".join(action.option_strings), "help": action.help or ""})
-    return options
 
 
 def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dict[str, Any]]:

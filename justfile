@@ -14,11 +14,11 @@ _default:
 
 # 构建文档站点: 预览
 docs-serve *ARGS:
+    just gen-docs
     uv {{ UV_OPTIONS }} run zensical serve -f docs/zensical.toml -a 0.0.0.0:8000 {{ ARGS }}
 
 # 构建文档站点
-docs-build:
-    uv {{ UV_OPTIONS }} run python scripts/export-marimo-to-docs.py --clean
+docs-build: gen-docs
     uv {{ UV_OPTIONS }} run zensical build -f docs/zensical.toml
 
 # 检查: frontend 公共流程 (install + lint + build)
@@ -124,6 +124,10 @@ schema-drift-check: gen-yaml-dsl-editor-schema
         echo "  - commit the updated frontend schema file"
         exit 1
     fi
+
+# 检查: 文档治理一致性(SSOT 入口/漂移源头)
+doc-governance-check:
+    uv {{ UV_OPTIONS }} run python scripts/check-doc-governance.py
 
 # 检查: stdlib 同名模块冲突
 stdlib-collisions-check:
@@ -264,8 +268,16 @@ bump-versions VERSION="" CONFIRM="":
 gen-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py
 
+# 生成: 文档站点受控生成物(含 injected blocks)
+gen-docs:
+    uv {{ UV_OPTIONS }} run python scripts/gen-docs.py
+
+# 检查: docs 生成物是否有 drift
+docs-drift-check:
+    uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
+
 # 生成: 所有需要生成的数据
-gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-agent-skill gen-viz-data gen-viz-schedule-plan
+gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-agent-skill gen-viz-data gen-viz-schedule-plan gen-docs
 
 # 检查: 类型检查
 type-check:
@@ -458,7 +470,7 @@ examples:
     echo "All examples completed!"
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

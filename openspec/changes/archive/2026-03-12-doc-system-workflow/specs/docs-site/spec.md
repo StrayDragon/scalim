@@ -9,7 +9,7 @@ The system MUST provide a Zensical configuration (MkDocs-compatible) and allow b
 
 ### Requirement: Generated/third-party artifacts are excluded
 The system MUST NOT include third-party or uncontrolled generated artifacts (for example `.venv/`, `node_modules/`, archived change artifacts) into the documentation site.
-The system MAY include repository-owned, deterministic, and drift-checked generated docs under `docs/doc/` (for example `*.gen.md`, exported notebooks) as part of the curated site.
+The system MAY include repository-owned, deterministic, and drift-checked generated docs under `docs/doc/` (for example `*.gen.md`) as part of the curated site.
 
 #### Scenario: Site content stays curated
 - **WHEN** the documentation site is built or served
@@ -21,4 +21,3 @@ The system MUST scope the documentation site to curated developer/user manual pa
 #### Scenario: Specs and reports are out of scope
 - **WHEN** the documentation site is built or served
 - **THEN** the navigation MUST NOT reference pages sourced from `openspec/specs/**` or `_REPORT/**`
-

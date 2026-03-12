@@ -14,7 +14,7 @@
 
 ## YAML DSL 升级批次索引 (自动生成)
 
-<!-- BEGIN SCALIM-GEN:yaml-dsl-upgrades -->
+<!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->
 - 2026-03-10: yaml-field-extract
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-field-extract.md`
   - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-field-extract/`
@@ -27,7 +27,7 @@
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-11-yaml-params-template.md`
   - OpenSpec: `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
   - Spec: `openspec/specs/demand-dsl/spec.md`
-<!-- END SCALIM-GEN:yaml-dsl-upgrades -->
+<!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`
 

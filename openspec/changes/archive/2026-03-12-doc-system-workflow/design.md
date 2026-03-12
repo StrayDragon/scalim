@@ -6,7 +6,7 @@
   - `src/scalim/dsl/by_yaml/schema/demand.gen.json` 由 `scripts/gen-yaml-dsl-schema.py` 生成并有 drift check。
   - `artifacts/skills/scalim-yaml-dsl/references/**/*.gen.*` 由 `scripts/gen-agent-skill.py` 生成并有 validate/drift 机制与 manifest。
 - **手工文档的受控注入区块**:
-  - `scripts/gen-yaml-dsl-schema.py` 会把 `src/.../schema_dsl/doc_texts.py` 中的片段同步注入 `docs/doc/yaml-dsl/user-guide.md` 的 `SCALIM-GEN` 区块。
+  - `scripts/gen-yaml-dsl-schema.py` 会把 `src/.../schema_dsl/doc_texts.py` 中的片段同步注入 `docs/doc/yaml-dsl/user-guide.md` 的 `AUTOGEN` 区块。
   - `scripts/gen-agent-skill.py` 会向 `artifacts/skills/.../references/task-upgrade-legacy.md` 注入升级索引区块。
 - **文档站点**:
   - 当前以 `docs/zensical.toml` 配置 Zensical 构建,内容根目录为 `docs/doc/`。
@@ -53,7 +53,7 @@
    - 允许引用 SSOT 与 generated,但不重复完整 reference(避免漂移)
 4) **Manual + Injected Blocks(手工 + 受控注入区块)**:
    - 手工文档内允许存在少量“必须保持与 SSOT 同步”的区块,由脚本按标记替换
-   - 统一使用 `<!-- BEGIN SCALIM-GEN:<id> -->` / `<!-- END SCALIM-GEN:<id> -->`
+   - 统一使用 `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->`
 
 备选方案: 继续允许“任意文档都手工维护 + 口头约定同步”。  
 拒绝原因: 已被历史证明会产生漂移,且 agent 很难稳定遵守。
@@ -63,7 +63,7 @@
 仓库级硬规则:
 
 - **文件级**: 路径或文件名包含 `.gen.` 的文件视为 generated,agent MUST NOT 直接修改(除非用户明确要求),应改 SSOT 并运行生成器。
-- **区块级**: 任何包含 `BEGIN/END SCALIM-GEN` 的区块视为 injected,agent MUST NOT 修改区块内部内容,应改 SSOT 并运行对应脚本刷新。
+- **区块级**: 任何包含 `BEGIN/END AUTOGEN` 的区块视为 injected,agent MUST NOT 修改区块内部内容,应改 SSOT 并运行对应脚本刷新。
 - **生成入口提示**必须可追溯(脚本路径或 `just` 目标),并尽量单一入口(避免多脚本互相覆盖)。
 
 ### Decision 3: docs-site 引入“受控 generated reference”
@@ -82,10 +82,10 @@
 推荐把文档相关生成/注入收敛为两层入口:
 
 - **生成入口**:
-  - 继续复用现有 `just gen`(或新增 `just gen-docs` 并由 `just gen` 调用)
+  - 新增 `just gen-docs` 并由 `just gen` 调用
   - 任何新增 generated/reference 都必须接入该入口
 - **漂移门禁**:
-  - 引入 `docs-drift-check`(或把 docs 检查纳入现有 drift 框架),在 CI/`just qa` 中确保 generated/reference 不漂移
+  - 引入 `docs-drift-check`,在 CI/`just qa` 中确保 generated/reference 不漂移
 
 备选方案:
 - 每个生成器各自独立,贡献者按经验记忆要跑哪些命令
@@ -98,7 +98,7 @@
 为保证“可长期维护且成本可控”,给出三档方案,允许按阶段推进:
 
 **方案 A: 规则化但不大规模生成(最低成本)**
-- 仅补齐治理规范(AGENTS/openspec config/spec),统一 `.gen.` 与 `SCALIM-GEN` 规则
+- 仅补齐治理规范(AGENTS/openspec config/spec),统一 `.gen.` 与 `AUTOGEN` 规则
 - 只做少量高漂移区块注入(例如 Python 版本边界/核心命令清单)
 
 适合: 先把漂移风险降下来,不动 docs 结构。  
@@ -119,23 +119,20 @@
 适合: 组织规模大、变更频繁且必须极低漂移。  
 代价: 工具链复杂,前期投入与后续维护都更高。
 
-本 change 默认按 **方案 B** 设计 tasks,并保留 A/C 作为可选分支。
+**本 change 选择方案 B 作为唯一落地方案**,并按 Migration Plan 的三阶段推进:
 
-### Decision 6: prompt 评测/调优的落点(可选)
+- 阶段 1 覆盖方案 A 的“治理基线”内容(规则/入口/门禁)。
+- 阶段 2/3 落方案 B 的“reference 自动生成 + guide 手工维护”的最小闭环。
+- 方案 C 作为长期备选,明确不在本次 change 的实现与验收范围内。
 
-将 prompt 评测作为“文档体系”的旁路能力,不与运行时耦合:
-
-- 评测对象优先覆盖:
-  - 关键 skill 的触发与路由正确性
-  - “generated vs manual 边界”相关的 agent 行为(不修改 `*.gen.*`,不篡改注入区块)
-- 以 `just` 目标挂载,在 CI 中可作为可选 job(允许先手工跑,逐步升级为门禁)。
+备注: prompt 评测/调优流水线不在本 change 的实现与验收范围内,已拆分为独立 change `openspec/changes/prompt-eval-workflow/` 跟踪(仅完成 proposal + 最小 delta spec 占位)。
 
 ## Risks / Trade-offs
 
-- [生成器增多导致维护复杂] → 收敛入口(`just gen[/gen-docs]`) + 约束输出边界(`.gen.`/marker) + drift check。
+- [生成器增多导致维护复杂] → 收敛入口(`just gen-docs` + 由 `just gen` 调用) + 约束输出边界(`.gen.`/marker) + drift check。
 - [generated reference 与 guide 重复/冲突] → guide 只保留叙事与排错路径,reference 全部指向 generated。
 - [docs-site 索引与 nav 维护负担] → 优先生成“少量关键 reference”,并把 spec/目录索引自动化(而不是自动生成全部页面)。
-- [AGENTS/CLAUDE 等指令文件仍会漂移] → 引入 injected blocks 或单源生成策略,并加 check(至少对关键事实做一致性校验)。
+- [AGENTS/CLAUDE 等指令文件仍会漂移] → 单源策略(`AGENTS.md` SSOT + `CLAUDE.md` symlink) + `doc-governance-check` gate。
 - [把 generated 引入站点会放大 diff 噪音] → 强制确定性输出(排序/末尾换行/格式),必要时输出 manifest。
 
 ## Migration Plan
@@ -143,16 +140,81 @@
 建议分 3 个阶段推进(每阶段都可独立合入并在 CI 中形成门禁):
 
 1) **治理基线**: 落 `doc-governance` spec + 更新 `docs-site` spec + 更新 `AGENTS.md`/`openspec/config.yaml` 规则。
-2) **生成入口与漂移门禁**: 新增 `gen-docs`/`docs-drift-check`(或并入现有流程),先覆盖最容易漂移的 reference(版本边界/核心命令/索引)。
+2) **生成入口与漂移门禁**: 新增 `gen-docs`/`docs-drift-check`,先覆盖最容易漂移的 reference(版本边界/核心命令/索引)。
 3) **逐步搬迁 reference**: 从 YAML DSL/skill/docs-site 的高漂移章节开始,把“字段/枚举/默认值/CLI 清单/规范索引”迁移到 generated reference 或注入区块。
 
 回滚策略:
 - 任何生成器引入的输出均以 `.gen.*` 或 marker 区块为边界,可按文件/区块回滚,不影响运行时。
 - 若 docs-site 引入 generated reference 产生阅读负担,可先从 nav 移除并保留文件用于内部 reference,不阻塞治理基线落地。
 
-## Open Questions
+## Resolved Questions (from discussion)
 
-- `AGENTS.md` 与 `CLAUDE.md` 的关系: 选“单源生成”还是“保留两份但注入关键事实区块 + check”?
-- docs-site 中 generated reference 的目录布局: `docs/doc/_generated/` vs `docs/doc/generated/` vs 就地生成(与手工页面同级)?
-- generated reference 的来源是否允许复用 `artifacts/skills/**/references/*.gen.md`(复制/二次生成),还是必须直接从 SSOT 生成两份输出?
+以下结论用于把本 change 变成“可直接实现且无歧义”的方案基线;后续实现与验收以此为准.
 
+### Q1: `AGENTS.md` 与 `CLAUDE.md` 的关系
+
+**结论**: `AGENTS.md` 为唯一 SSOT, `CLAUDE.md` MUST 为指向 `AGENTS.md` 的 symlink.
+
+- 原因: 彻底消灭“双份指令文本漂移”源头,同时兼容工具对 `CLAUDE.md` 的默认发现行为。
+- 落地要求:
+  - 新增 `just doc-governance-check` 并纳入 `quick-check-only-py`(因此也进入 `just qa`/CI) gate。
+  - check 行为:
+    - 校验 `CLAUDE.md` 是 symlink 且指向 `AGENTS.md`(不满足则 fail-fast)
+
+### Q2: docs-site 中 generated reference 的目录布局
+
+**结论**: 采用“就地生成 + `.gen.md` 后缀”。
+
+- generated reference 放在其语义上“应该存在”的文档目录内(例如 YAML DSL 的 reference 放在 `docs/doc/yaml-dsl/`),而不是集中到 `_generated/` 或 `generated/` 根目录。
+- 依赖仓库硬规则识别 generated:
+  - 文件名包含 `.gen.` 即视为 generated(不可手改)
+  - 文件头部包含生成提示与生成入口
+- `docs/zensical.toml` nav MUST 显式收录这些 reference 页面,避免“生成但不可见”。
+
+### Q3: generated reference 的来源是否复用 `artifacts/skills/**/references/*.gen.md`
+
+**结论**: 不把 skill 产物当 docs-site 的输入;采用“共享渲染逻辑,从同一 SSOT 生成两份输出”.
+
+- docs-site reference 与 skill reference 都从 SSOT(如 schema/CLI/spec)生成,但输出到不同目录。
+- 允许/鼓励复用 `packages/scalim-misc` 中的渲染函数(renderers),避免两套生成逻辑产生语义漂移。
+- 禁止采用“复制/二次生成 skill 产物到 docs-site”的路径,避免 docs-site 对 `artifacts/` 形成隐式依赖与链接/路径二次处理成本。
+
+### Q7: `AGENTS.md` 与 `docs/doc/dev/repo-guide.md` 的重复与漂移
+
+**结论**: `AGENTS.md` 为仓库约定 SSOT, docs-site 的 `docs/doc/dev/repo-guide.md` 收敛为“单链接页”,只提供一个指向 `AGENTS.md` 的链接.
+
+- 原因: `docs/doc/dev/repo-guide.md` 属于站内手工页,很容易与仓库真实约束漂移;将其变为入口链接可显著降低维护面。
+- 同时要求 `AGENTS.md` 尽可能精简:
+  - 不重复可从 SSOT 文件直接读取的事实(例如 `pyproject.toml`/`justfile`)
+  - 用“指向 SSOT 的链接 + 少量关键边界规则”的方式表达约束
+  - 允许把“介绍性/索引性”内容下沉到站内手工页或 generated reference,`AGENTS.md` 只保留入口链接:
+    - 项目结构/代码阅读地图 → `docs/doc/getting-started/reading-guide.md`
+    - 架构分层与流程图 → `ARCH.md`
+    - 常用开发命令入口 → `just --list` + `justfile` + `docs/doc/dev/index.md`
+    - OpenSpec 规范入口 → `openspec/specs/README.md` + `docs/doc/specs/index.md`
+
+### Q4: docs 生成入口如何收敛
+
+**结论**: 提供 `just gen-docs` 作为 docs 治理的稳定入口,并让 `just gen` 依赖/调用 `gen-docs`.
+
+- `gen-docs` 覆盖 docs 治理相关的全部受控输出:
+  - `docs/doc/**/*.gen.md`
+  - 手工 Markdown 中的 `AUTOGEN:*` 注入区块
+- `gen-docs` 的定位是“贡献者/agent 一次性刷新 docs 的唯一入口”;`gen` 则是“刷新仓库所有生成物”的超集入口。
+
+### Q5: docs drift check 的最小覆盖面
+
+**结论**: `docs-drift-check` MUST gate 两类受控输出的一致性:
+
+1) `docs/doc/**/*.gen.md`
+2) `AUTOGEN:*` 注入区块(例如 `docs/doc/yaml-dsl/user-guide.md` 中的区块)
+
+漂移失败时 MUST 给出明确修复提示(运行 `just gen-docs`).
+
+### Q6: notebooks 是否导出到 docs-site 并纳入 drift gate
+
+**结论**: 不纳入 docs-site 的受控生成物与 drift gate.
+
+- 原因: notebooks 输出包含运行时耗时/吞吐/临时路径等信息,天生不稳定;强行 gate 会持续制造无意义的漂移成本。
+- 推荐做法: notebooks 保留在仓库中作为交互式 demo(`notebooks/marimo/**`),由读者本地启动 marimo server 运行/理解.
+- docs-site 仅提供指向 `notebooks/` 的入口链接(不导出静态 HTML).
