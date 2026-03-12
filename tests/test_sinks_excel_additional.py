@@ -304,6 +304,11 @@ def test_excel_sink_write_lock_conflict_fails_fast(tmp_path: Path) -> None:
     sink.write_row({"id": 1})
     with pytest.raises(RuntimeError, match="Output path is locked"):
         sink.close()
+    # close 失败后也要尽力关闭 `write_only worksheet`,避免 openpyxl 生成器在 GC 时抛出 unraisable warning.
+    assert getattr(sink._worksheet, "closed", False) is True
+    # 再次 close: 仍然会因锁冲突失败,但应为幂等清理(避免二次 close 触发 `write_only worksheet` 的异常分支).
+    with pytest.raises(RuntimeError, match="Output path is locked"):
+        sink.close()
 
     assert output_path.exists() is False
     assert lock_path.exists() is True
@@ -320,6 +325,21 @@ def test_excel_workbook_sink_write_lock_removes_lock_file(tmp_path: Path) -> Non
 
     assert output_path.exists()
     assert lock_path.exists() is False
+
+
+def test_excel_workbook_sink_write_lock_conflict_closes_write_only_sheets(tmp_path: Path) -> None:
+    output_path = tmp_path / "wb_locked_conflict.xlsx"
+    lock_path = Path(str(output_path) + ".scalim.lock")
+    lock_path.write_text("held", encoding="utf-8")
+
+    wb = excel_mod.ExcelWorkbookSink(str(output_path), write_lock=True)
+    sheet = wb.create_sheet_row_sink("Sheet1", field_names=["id"], include_header=True)
+    sheet.write_row({"id": 1})
+    with pytest.raises(RuntimeError, match="Output path is locked"):
+        wb.close()
+
+    # close 失败后也要尽力关闭 `write_only worksheet`,避免 openpyxl 生成器在 GC 时抛出 unraisable warning.
+    assert all(getattr(ws, "closed", False) is True for ws in getattr(wb._workbook, "worksheets", []))
 
 
 def test_column_excel_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:

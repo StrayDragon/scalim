@@ -84,6 +84,34 @@ def _release_write_lock(lock_path: Path) -> None:
         _LOGGER.warning("删除输出锁文件失败: %s", lock_path, exc_info=True)
 
 
+def _best_effort_close_write_only_worksheet(worksheet: Any) -> None:
+    """尽力关闭 `openpyxl` `write_only` 的 `worksheet`,避免生成器在 `GC` 时抛出 `PytestUnraisableExceptionWarning`.
+
+    背景: `openpyxl` 的 `WriteOnlyWorksheet.append()` 会创建并持有 `_write_rows()` 生成器,该生成器依赖底层 `xmlfile` 仍处于打开状态.
+    若在保存/关闭前抛错(例如写锁冲突 `fail-fast`),对象在 `GC` 时可能先关闭底层文件再关闭生成器,从而产生 `ValueError: I/O operation on closed file`.
+    """
+
+    try:
+        is_closed = bool(worksheet.closed)
+    except AttributeError:
+        return
+    if is_closed:
+        return
+    with suppress(Exception):
+        worksheet.close()
+
+
+def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
+    """尽力关闭 `write_only workbook` 下所有 `worksheet`(仅在异常路径使用)."""
+
+    try:
+        worksheets = list(workbook.worksheets)
+    except Exception:
+        return
+    for ws in worksheets:
+        _best_effort_close_write_only_worksheet(ws)
+
+
 def _escape_excel_formula(value: Any, *, allow_formulas: bool) -> Any:
     if allow_formulas:
         return value
@@ -183,32 +211,29 @@ class ExcelSink(BaseRowSink):
 
         lock_path: Optional[Path] = None
         try:
-            if self._write_lock:
-                lock_path = _acquire_write_lock(self.output_path)
-
-            temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
-            temp_path_obj = Path(temp_path)
-
             try:
-                self._workbook.save(temp_path_obj)
-                # 原子重命名临时文件到目标路径
-                _ = temp_path_obj.replace(self.output_path)
-            except Exception:
-                _LOGGER.exception(EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
-                # 清理临时文件
-                if temp_path_obj.exists():
-                    try:
-                        temp_path_obj.unlink()
-                    except OSError:
-                        _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
-                # 尽力清理:在保存失败时避免出现只写生成器告警.
+                if self._write_lock:
+                    lock_path = _acquire_write_lock(self.output_path)
+
+                temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
+                temp_path_obj = Path(temp_path)
+
                 try:
-                    is_closed = self._worksheet.closed
-                except AttributeError:
-                    is_closed = True
-                if not is_closed:
-                    with suppress(Exception):
-                        self._worksheet.close()
+                    self._workbook.save(temp_path_obj)
+                    # 原子重命名临时文件到目标路径
+                    _ = temp_path_obj.replace(self.output_path)
+                except Exception:
+                    _LOGGER.exception(EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
+                    # 清理临时文件
+                    if temp_path_obj.exists():
+                        try:
+                            temp_path_obj.unlink()
+                        except OSError:
+                            _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                    raise
+            except Exception:
+                # 尽力清理: 在写锁冲突/保存失败等异常路径,避免出现只写生成器告警.
+                _best_effort_close_write_only_worksheet(self._worksheet)
                 raise
         finally:
             if lock_path is not None:
@@ -348,22 +373,27 @@ class ExcelWorkbookSink:
 
         lock_path: Optional[Path] = None
         try:
-            if self.write_lock:
-                lock_path = _acquire_write_lock(self.output_path)
-
-            temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
-            temp_path_obj = Path(temp_path)
-
             try:
-                self._workbook.save(temp_path_obj)
-                _ = temp_path_obj.replace(self.output_path)
+                if self.write_lock:
+                    lock_path = _acquire_write_lock(self.output_path)
+
+                temp_path = create_temp_path(self.output_path, ".xlsx.tmp")
+                temp_path_obj = Path(temp_path)
+
+                try:
+                    self._workbook.save(temp_path_obj)
+                    _ = temp_path_obj.replace(self.output_path)
+                except Exception:
+                    _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
+                    if temp_path_obj.exists():
+                        try:
+                            temp_path_obj.unlink()
+                        except OSError:
+                            _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                    raise
             except Exception:
-                _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
-                if temp_path_obj.exists():
-                    try:
-                        temp_path_obj.unlink()
-                    except OSError:
-                        _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                # 尽力清理: 在写锁冲突/保存失败等异常路径,避免出现只写生成器告警.
+                _best_effort_close_write_only_workbook_worksheets(self._workbook)
                 raise
         finally:
             if lock_path is not None:

@@ -348,13 +348,14 @@ def test_derived_output_max_groups_zero_emits_warning(tmp_path: Path, caplog) ->
     )
 
     spec = OutputCompositionSpec(targets=(detail,), derived_targets=(derived,))
-    _ = build_output_composition(
+    plan = build_output_composition(
         spec=spec,
         demand_name="d",
         demand_main_source_id="s",
         demand_target_fields=["order_id"],
         demand_field_fingerprints=[],
     )
+    plan.sink.close()
 
     assert any("max_groups=0" in record.getMessage() for record in caplog.records)
 
