@@ -53,6 +53,19 @@ _templates:
 
   perf_metrics_all: &perf_metrics_all [duration, memory, cpu]
 
+  # 派生聚合 set 口径原语示意(IR/Python-only; YAML outputs/workbook 将在后续变更提供)
+  # 可运行脱敏样例见: `openspec/changes/derived-outputs-set-aggregations/acceptance/mvp_demo/run_demo.py`
+  derived_outputs_set_aggregations_ir_only: &derived_outputs_set_aggregations_ir_only
+    group_by_metrics:
+      new_paid_users: {op: count_distinct, field_id: user_id, max_distinct: 10000, on_overflow: error}
+      new_paid_users_composite: {op: count_distinct, field_ids: [cs_id, user_id], max_distinct: 10000, on_overflow: error}
+    dedup_by:
+      key_fields: [cs_id, user_id]
+      on_conflict: first
+    two_stage_group_by:
+      stage2_metrics:
+        repeat_paid_users: {op: count_true_gte, field_id: pay_order_cnt, threshold: 2}
+
 # ==============================================================================
 # 主数据源
 # ==============================================================================

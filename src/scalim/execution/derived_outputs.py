@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import hashlib
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 
@@ -23,6 +23,60 @@ class AggregationKeyLimitExceededError(RuntimeError):
         self.max_groups = int(max_groups)
 
 
+class DistinctKeyLimitExceededError(RuntimeError):
+    distinct_count: int
+    max_distinct: int
+    on_overflow: str
+    key_fields: Tuple[str, ...]
+
+    def __init__(
+        self,
+        *,
+        distinct_count: int,
+        max_distinct: int,
+        on_overflow: str,
+        key_fields: Sequence[str],
+    ) -> None:
+        super(DistinctKeyLimitExceededError, self).__init__(
+            "Distinct key cardinality exceeded: distinct_count={} > max_distinct={} (on_overflow={}, key_fields={})".format(
+                int(distinct_count),
+                int(max_distinct),
+                str(on_overflow),
+                ",".join(str(x) for x in key_fields),
+            )
+        )
+        self.distinct_count = int(distinct_count)
+        self.max_distinct = int(max_distinct)
+        self.on_overflow = str(on_overflow)
+        self.key_fields = tuple(str(x) for x in key_fields)
+
+
+class DedupKeyConflictError(RuntimeError):
+    key_fields: Tuple[str, ...]
+    on_conflict: str
+
+    def __init__(self, *, key_fields: Sequence[str], on_conflict: str) -> None:
+        super(DedupKeyConflictError, self).__init__(
+            "dedup_by key conflict: on_conflict={!r} requires deterministic resolution; duplicate keys encountered (key_fields={})".format(
+                str(on_conflict), ",".join(str(x) for x in key_fields)
+            )
+        )
+        self.key_fields = tuple(str(x) for x in key_fields)
+        self.on_conflict = str(on_conflict)
+
+
+@dataclass
+class AggregatorDiagnostics:
+    """派生聚合诊断信息(用于 `meta`/`audit`).
+
+    约束:
+    - `meta`/`audit_events` 不得包含明细行内容与聚合 `key` 的具体值(避免泄露敏感数据).
+    """
+
+    meta: Dict[str, FieldValue] = field(default_factory=dict)
+    audit_events: List[Dict[str, FieldValue]] = field(default_factory=list)
+
+
 class IRowAggregator(ABC):
     """派生聚合器最小接口: 初始化/累计/收尾(对应 `required_fields`/`accumulate`/`finalize_rows`)."""
 
@@ -38,6 +92,10 @@ class IRowAggregator(ABC):
     def finalize_rows(self) -> List[RowData]:
         """在结束时输出聚合结果行列表."""
 
+    @abstractmethod
+    def diagnostics(self) -> AggregatorDiagnostics:
+        """返回聚合诊断信息,用于 `meta`/`audit`."""
+
 
 @dataclass(frozen=True)
 class AggMetricSpec:
@@ -46,6 +104,8 @@ class AggMetricSpec:
     out_field_id: str
     op: str
     field_id: Optional[str] = None
+    field_ids: Optional[Tuple[str, ...]] = None
+    threshold: Optional[object] = None
 
 
 _DECIMAL_ZERO = Decimal(0)
@@ -97,6 +157,83 @@ def _stable_sort_key(value: object) -> str:
 
 def _stable_group_key_tuple(key: Tuple[object, ...]) -> str:
     return "\x1f".join(_stable_sort_key(item) for item in key)
+
+
+class _BoundedDistinctKeySet:
+    _keys: Set[Tuple[FieldValue, ...]]
+    _max_distinct: int
+    _on_overflow: str
+    _key_fields: Tuple[str, ...]
+    _truncated: bool
+
+    def __init__(self, *, max_distinct: int, on_overflow: str, key_fields: Sequence[str]) -> None:
+        self._keys = set()
+        self._max_distinct = int(max_distinct) if max_distinct else 0
+        self._on_overflow = str(on_overflow or "error").lower()
+        self._key_fields = tuple(str(x) for x in key_fields)
+        self._truncated = False
+
+    @property
+    def max_distinct(self) -> int:
+        return int(self._max_distinct)
+
+    @property
+    def on_overflow(self) -> str:
+        return str(self._on_overflow)
+
+    @property
+    def truncated(self) -> bool:
+        return bool(self._truncated)
+
+    @property
+    def key_count(self) -> int:
+        return len(self._keys)
+
+    def add(self, key: Tuple[FieldValue, ...]) -> Tuple[bool, Optional[Tuple[FieldValue, ...]]]:
+        """添加去重 `key`.
+
+        返回:
+        - `retained`: 新 `key` 是否被纳入状态(截断时可能被丢弃)
+        - `removed_key`: 当 `truncate` 且新 `key` 纳入导致替换时,返回被移除的 `key`
+        """
+
+        if key in self._keys:
+            return False, None
+
+        if not self._max_distinct:
+            self._keys.add(key)
+            return True, None
+
+        if len(self._keys) < self._max_distinct:
+            self._keys.add(key)
+            return True, None
+
+        if self._on_overflow == "error":
+            raise DistinctKeyLimitExceededError(
+                distinct_count=len(self._keys) + 1,
+                max_distinct=self._max_distinct,
+                on_overflow=self._on_overflow,
+                key_fields=self._key_fields,
+            )
+
+        if self._on_overflow != "truncate":
+            msg = "Unsupported on_overflow: {!r}".format(self._on_overflow)
+            raise ValueError(msg)
+
+        # 在稳定序(按 `_stable_group_key_tuple`)下,仅保留最小的 `max_distinct` 个 `key`.
+        worst_key = max(self._keys, key=_stable_group_key_tuple)
+        worst_sig = _stable_group_key_tuple(worst_key)
+        new_sig = _stable_group_key_tuple(key)
+
+        # 若新 `key` 不优于当前最差 `key`,则直接丢弃.
+        if new_sig >= worst_sig:
+            self._truncated = True
+            return False, None
+
+        self._keys.add(key)
+        self._keys.remove(worst_key)
+        self._truncated = True
+        return True, worst_key
 
 
 class _MetricState(ABC):
@@ -257,32 +394,151 @@ class _MaxMetric(_MetricState):
         return self._value
 
 
-def _metric_state_from_spec(spec: AggMetricSpec) -> _MetricState:
-    op = str(spec.op).lower()
-    if op == "count":
-        return _CountMetric(spec.field_id)
-    if op == "count_true":
-        if not spec.field_id:
-            msg = "count_true requires field_id"
+class _CountDistinctMetric(_MetricState):
+    _field_ids: Tuple[str, ...]
+    _distinct: _BoundedDistinctKeySet
+
+    def __init__(self, *, field_ids: Sequence[str], max_distinct: int, on_overflow: str) -> None:
+        ids = [str(x) for x in field_ids if str(x)]
+        if not ids:
+            msg = "count_distinct requires field_id(s)"
             raise ValueError(msg)
-        return _CountTrueMetric(spec.field_id)
-    if op == "sum":
-        if not spec.field_id:
-            msg = "sum requires field_id"
+        self._field_ids = tuple(ids)
+        self._distinct = _BoundedDistinctKeySet(
+            max_distinct=int(max_distinct),
+            on_overflow=str(on_overflow),
+            key_fields=self._field_ids,
+        )
+
+    @property
+    def truncated(self) -> bool:
+        return bool(self._distinct.truncated)
+
+    @property
+    def key_count(self) -> int:
+        return int(self._distinct.key_count)
+
+    @override
+    def accumulate(self, row: RowData) -> None:
+        key = tuple(row.get(fid) for fid in self._field_ids)
+        # 对齐 `SQL` `COUNT(DISTINCT)` 的 `NULL` 语义: 任一组成字段为 `None` 则忽略该行.
+        if any(v is None for v in key):
+            return
+        _ = self._distinct.add(key)
+
+    @override
+    def finalize(self) -> FieldValue:
+        return int(self._distinct.key_count)
+
+
+class _CountTrueGteMetric(_MetricState):
+    _count: int
+    _field_id: str
+    _threshold: Decimal
+
+    def __init__(self, *, field_id: str, threshold: object) -> None:
+        self._count = 0
+        self._field_id = str(field_id)
+        dec = _to_decimal(threshold)
+        if dec is None:
+            msg = "count_true_gte requires numeric threshold"
             raise ValueError(msg)
-        return _SumMetric(spec.field_id)
-    if op == "min":
-        if not spec.field_id:
-            msg = "min requires field_id"
-            raise ValueError(msg)
-        return _MinMetric(spec.field_id)
-    if op == "max":
-        if not spec.field_id:
-            msg = "max requires field_id"
-            raise ValueError(msg)
-        return _MaxMetric(spec.field_id)
-    msg = "Unsupported aggregation op: {!r}".format(spec.op)
+        self._threshold = dec
+
+    @override
+    def accumulate(self, row: RowData) -> None:
+        raw = row.get(self._field_id)
+        if raw is None:
+            return
+        dec = _to_decimal(raw)
+        if dec is None:
+            return
+        if dec >= self._threshold:
+            self._count += 1
+
+    @override
+    def finalize(self) -> FieldValue:
+        return int(self._count)
+
+
+def _metric_state_count(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+    _ = max_distinct, on_overflow
+    return _CountMetric(spec.field_id)
+
+
+def _metric_state_count_true(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+    _ = max_distinct, on_overflow
+    if not spec.field_id:
+        msg = "count_true requires field_id"
+        raise ValueError(msg)
+    return _CountTrueMetric(spec.field_id)
+
+
+def _metric_state_sum(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+    _ = max_distinct, on_overflow
+    if not spec.field_id:
+        msg = "sum requires field_id"
+        raise ValueError(msg)
+    return _SumMetric(spec.field_id)
+
+
+def _metric_state_min(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+    _ = max_distinct, on_overflow
+    if not spec.field_id:
+        msg = "min requires field_id"
+        raise ValueError(msg)
+    return _MinMetric(spec.field_id)
+
+
+def _metric_state_max(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+    _ = max_distinct, on_overflow
+    if not spec.field_id:
+        msg = "max requires field_id"
+        raise ValueError(msg)
+    return _MaxMetric(spec.field_id)
+
+
+def _metric_state_count_distinct(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+    if spec.field_id and spec.field_ids:
+        msg = "count_distinct does not allow both field_id and field_ids"
+        raise ValueError(msg)
+    if spec.field_id:
+        return _CountDistinctMetric(field_ids=(str(spec.field_id),), max_distinct=max_distinct, on_overflow=on_overflow)
+    if spec.field_ids:
+        return _CountDistinctMetric(field_ids=tuple(str(x) for x in spec.field_ids), max_distinct=max_distinct, on_overflow=on_overflow)
+    msg = "count_distinct requires field_id or field_ids"
     raise ValueError(msg)
+
+
+def _metric_state_count_true_gte(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+    _ = max_distinct, on_overflow
+    if not spec.field_id:
+        msg = "count_true_gte requires field_id"
+        raise ValueError(msg)
+    if spec.threshold is None:
+        msg = "count_true_gte requires threshold"
+        raise ValueError(msg)
+    return _CountTrueGteMetric(field_id=str(spec.field_id), threshold=spec.threshold)
+
+
+_METRIC_STATE_FACTORY_BY_OP = {
+    "count": _metric_state_count,
+    "count_distinct": _metric_state_count_distinct,
+    "count_true": _metric_state_count_true,
+    "count_true_gte": _metric_state_count_true_gte,
+    "max": _metric_state_max,
+    "min": _metric_state_min,
+    "sum": _metric_state_sum,
+}
+
+
+def _metric_state_from_spec(spec: AggMetricSpec, *, max_distinct: int = 0, on_overflow: str = "error") -> _MetricState:
+    op = str(spec.op).lower()
+    factory = _METRIC_STATE_FACTORY_BY_OP.get(op)
+    if factory is None:
+        msg = "Unsupported aggregation op: {!r}".format(spec.op)
+        raise ValueError(msg)
+    return factory(spec, max_distinct=max_distinct, on_overflow=on_overflow)
 
 
 class GroupByAggregator(IRowAggregator):
@@ -290,6 +546,8 @@ class GroupByAggregator(IRowAggregator):
     _metrics: Tuple[AggMetricSpec, ...]
     _states: Dict[Tuple[FieldValue, ...], Tuple[_MetricState, ...]]
     _max_groups: int
+    _max_distinct: int
+    _distinct_on_overflow: str
 
     def __init__(
         self,
@@ -297,6 +555,8 @@ class GroupByAggregator(IRowAggregator):
         group_by: Sequence[str],
         metrics: Sequence[AggMetricSpec],
         max_groups: int = 0,
+        max_distinct: int = 0,
+        distinct_on_overflow: str = "error",
     ) -> None:
         if not group_by:
             msg = "group_by cannot be empty"
@@ -308,6 +568,8 @@ class GroupByAggregator(IRowAggregator):
         self._metrics = tuple(metrics)
         self._states = {}
         self._max_groups = int(max_groups) if max_groups else 0
+        self._max_distinct = int(max_distinct) if max_distinct else 0
+        self._distinct_on_overflow = str(distinct_on_overflow or "error").lower()
 
     @override
     def required_fields(self) -> Tuple[str, ...]:
@@ -315,6 +577,8 @@ class GroupByAggregator(IRowAggregator):
         for m in self._metrics:
             if m.field_id:
                 required.append(str(m.field_id))
+            if m.field_ids:
+                required.extend([str(x) for x in m.field_ids])
         # 去重但保留顺序.
         seen: Set[str] = set()
         ordered: List[str] = []
@@ -332,7 +596,9 @@ class GroupByAggregator(IRowAggregator):
         if state is None:
             if self._max_groups and len(self._states) >= self._max_groups:
                 raise AggregationKeyLimitExceededError(group_count=len(self._states) + 1, max_groups=self._max_groups)
-            state = tuple(_metric_state_from_spec(m) for m in self._metrics)
+            state = tuple(
+                _metric_state_from_spec(m, max_distinct=self._max_distinct, on_overflow=self._distinct_on_overflow) for m in self._metrics
+            )
             self._states[key] = state
         for metric in state:
             metric.accumulate(row)
@@ -350,6 +616,45 @@ class GroupByAggregator(IRowAggregator):
                 out[str(metric_spec.out_field_id)] = metric_state.finalize()
             rows.append(out)
         return rows
+
+    @override
+    def diagnostics(self) -> AggregatorDiagnostics:
+        meta: Dict[str, FieldValue] = {"group_count": len(self._states)}
+        audit_events: List[Dict[str, FieldValue]] = []
+
+        distinct_indices = [i for i, m in enumerate(self._metrics) if str(m.op).lower() == "count_distinct"]
+        for idx in distinct_indices:
+            out_field = str(self._metrics[idx].out_field_id)
+            total_keys = 0
+            max_keys_per_group = 0
+            truncated_groups = 0
+            for state in self._states.values():
+                metric_state = state[idx]
+                if not isinstance(metric_state, _CountDistinctMetric):
+                    continue
+                total_keys += int(metric_state.key_count)
+                max_keys_per_group = max(max_keys_per_group, int(metric_state.key_count))
+                if metric_state.truncated:
+                    truncated_groups += 1
+
+            meta["metric.{}.distinct_keys_total".format(out_field)] = int(total_keys)
+            meta["metric.{}.distinct_keys_max_per_group".format(out_field)] = int(max_keys_per_group)
+            meta["metric.{}.distinct_truncated_groups".format(out_field)] = int(truncated_groups)
+
+            if truncated_groups:
+                audit_events.append(
+                    {
+                        "event_type": "distinct_truncated",
+                        "message": "count_distinct truncated: metric={}, truncated_groups={}, max_distinct={}, on_overflow={}".format(
+                            out_field,
+                            int(truncated_groups),
+                            int(self._max_distinct),
+                            str(self._distinct_on_overflow),
+                        ),
+                    }
+                )
+
+        return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
 
 
 class RankedGroupByAggregator(IRowAggregator):
@@ -377,13 +682,21 @@ class RankedGroupByAggregator(IRowAggregator):
         order: str = "desc",
         top_k: int = 0,
         max_groups: int = 0,
+        max_distinct: int = 0,
+        distinct_on_overflow: str = "error",
     ) -> None:
         self._group_by = tuple(str(item) for item in group_by)
         self._rank_by = str(rank_by)
         self._rank_field_id = str(rank_field_id)
         self._order = str(order or "desc").lower()
         self._top_k = int(top_k) if top_k else 0
-        self._base = GroupByAggregator(group_by=self._group_by, metrics=metrics, max_groups=max_groups)
+        self._base = GroupByAggregator(
+            group_by=self._group_by,
+            metrics=metrics,
+            max_groups=max_groups,
+            max_distinct=max_distinct,
+            distinct_on_overflow=distinct_on_overflow,
+        )
 
     @override
     def required_fields(self) -> Tuple[str, ...]:
@@ -422,6 +735,153 @@ class RankedGroupByAggregator(IRowAggregator):
         for idx, row in enumerate(rows):
             row[self._rank_field_id] = int(idx) + 1
         return list(rows)
+
+    @override
+    def diagnostics(self) -> AggregatorDiagnostics:
+        return self._base.diagnostics()
+
+
+class DedupByThenAggregator(IRowAggregator):
+    _key_fields: Tuple[str, ...]
+    _on_conflict: str
+    _distinct: _BoundedDistinctKeySet
+    _downstream: IRowAggregator
+    _store_fields: Tuple[str, ...]
+    _rows: Dict[Tuple[FieldValue, ...], Dict[str, FieldValue]]
+    _conflict_count: int
+
+    def __init__(
+        self,
+        *,
+        key_fields: Sequence[str],
+        on_conflict: str,
+        max_distinct: int,
+        on_overflow: str,
+        downstream: IRowAggregator,
+    ) -> None:
+        ids = [str(x) for x in key_fields if str(x)]
+        if not ids:
+            msg = "dedup_by requires key_fields"
+            raise ValueError(msg)
+        self._key_fields = tuple(ids)
+        self._on_conflict = str(on_conflict or "error").lower()
+        if self._on_conflict not in ("error", "first", "last"):
+            msg = "Unsupported dedup_by.on_conflict: {!r}".format(on_conflict)
+            raise ValueError(msg)
+
+        self._distinct = _BoundedDistinctKeySet(
+            max_distinct=int(max_distinct),
+            on_overflow=str(on_overflow or "error"),
+            key_fields=self._key_fields,
+        )
+        self._downstream = downstream
+        store_fields: List[str] = list(self._key_fields) + list(downstream.required_fields())
+        # 去重但保留顺序.
+        seen: Set[str] = set()
+        ordered: List[str] = []
+        for fid in store_fields:
+            if fid in seen:
+                continue
+            seen.add(fid)
+            ordered.append(fid)
+        self._store_fields = tuple(ordered)
+
+        self._rows = {}
+        self._conflict_count = 0
+
+    @override
+    def required_fields(self) -> Tuple[str, ...]:
+        return self._store_fields
+
+    @override
+    def accumulate(self, row: RowData) -> None:
+        key = tuple(row.get(fid) for fid in self._key_fields)
+        existing = self._rows.get(key)
+        if existing is not None:
+            self._conflict_count += 1
+            if self._on_conflict == "error":
+                raise DedupKeyConflictError(key_fields=self._key_fields, on_conflict=self._on_conflict)
+            if self._on_conflict == "last":
+                self._rows[key] = {fid: row.get(fid) for fid in self._store_fields}
+            # `first`: 保留已有行
+            return
+
+        retained, removed = self._distinct.add(key)
+        if removed is not None:
+            _ = self._rows.pop(removed, None)
+        if not retained:
+            return
+
+        self._rows[key] = {fid: row.get(fid) for fid in self._store_fields}
+
+    @override
+    def finalize_rows(self) -> List[RowData]:
+        # 将 `dedup_by` 后的“实体行”按稳定顺序喂给下游聚合器,确保对拍友好.
+        for key in sorted(self._rows.keys(), key=_stable_group_key_tuple):
+            self._downstream.accumulate(self._rows[key])
+        return self._downstream.finalize_rows()
+
+    @override
+    def diagnostics(self) -> AggregatorDiagnostics:
+        diag = self._downstream.diagnostics()
+        meta = dict(diag.meta)
+        audit_events = list(diag.audit_events)
+
+        meta["dedup.key_count"] = int(self._distinct.key_count)
+        meta["dedup.truncated"] = bool(self._distinct.truncated)
+        meta["dedup.conflict_count"] = int(self._conflict_count)
+
+        if self._distinct.truncated:
+            audit_events.append(
+                {
+                    "event_type": "dedup_truncated",
+                    "message": "dedup_by truncated: key_count_kept={}, max_distinct={}, on_overflow={}".format(
+                        int(self._distinct.key_count),
+                        int(self._distinct.max_distinct),
+                        str(self._distinct.on_overflow),
+                    ),
+                }
+            )
+
+        return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
+
+
+class TwoStageGroupByAggregator(IRowAggregator):
+    _stage1: GroupByAggregator
+    _stage2: GroupByAggregator
+
+    def __init__(self, *, stage1: GroupByAggregator, stage2: GroupByAggregator) -> None:
+        self._stage1 = stage1
+        self._stage2 = stage2
+
+    @override
+    def required_fields(self) -> Tuple[str, ...]:
+        return self._stage1.required_fields()
+
+    @override
+    def accumulate(self, row: RowData) -> None:
+        self._stage1.accumulate(row)
+
+    @override
+    def finalize_rows(self) -> List[RowData]:
+        rows1 = self._stage1.finalize_rows()
+        for row in rows1:
+            self._stage2.accumulate(row)
+        return self._stage2.finalize_rows()
+
+    @override
+    def diagnostics(self) -> AggregatorDiagnostics:
+        diag1 = self._stage1.diagnostics()
+        diag2 = self._stage2.diagnostics()
+
+        meta: Dict[str, FieldValue] = {}
+        for k, v in diag1.meta.items():
+            meta["stage1." + str(k)] = v
+        for k, v in diag2.meta.items():
+            meta["stage2." + str(k)] = v
+
+        audit_events = list(diag1.audit_events) + list(diag2.audit_events)
+        return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
 
 
 class AggregatingRowSink(BaseRowSink):

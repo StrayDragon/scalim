@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import hashlib
 import logging
 import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
@@ -15,7 +16,16 @@ from ..sinks.sink_csv import CSVSink
 from ..sinks.sink_excel import ExcelSink, ExcelWorkbookSink
 from ..typedefs import RowData
 from ..vendor.compact.typing_extensionsx import override
-from .derived_outputs import AggMetricSpec, AggregatingRowSink, GroupByAggregator, RankedGroupByAggregator, fingerprint_for_meta
+from .derived_outputs import (
+    AggMetricSpec,
+    AggregatingRowSink,
+    DedupByThenAggregator,
+    GroupByAggregator,
+    IRowAggregator,
+    RankedGroupByAggregator,
+    TwoStageGroupByAggregator,
+    fingerprint_for_meta,
+)
 from .output_contracts import ExportLayout, OutputSpec
 
 OutputRowPredicate = Callable[[RowData], bool]
@@ -39,21 +49,225 @@ class OutputTargetSpec:
     requires: Optional[Tuple[str, ...]] = None
 
 
+class IDerivedAggregationSpec(ABC):
+    @abstractmethod
+    def required_fields(self) -> Tuple[str, ...]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def fingerprint_parts(self) -> Tuple[str, ...]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def validate_parallel_mode(self, parallel_mode: str) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_aggregator(self) -> IRowAggregator:
+        raise NotImplementedError
+
+
+def _metric_fingerprint_part(m: AggMetricSpec) -> str:
+    field_id = str(m.field_id) if m.field_id else ""
+    field_ids = ",".join(str(x) for x in (m.field_ids or ()))
+    threshold = "" if m.threshold is None else str(m.threshold)
+    return "{}|op={}|field_id={}|field_ids={}|threshold={}".format(str(m.out_field_id), str(m.op), field_id, field_ids, threshold)
+
+
 @dataclass(frozen=True)
-class DerivedGroupBySpec:
+class DerivedGroupBySpec(IDerivedAggregationSpec):
     """派生汇总输出(内置 `group_by`)."""
 
     group_by: Tuple[str, ...]
     metrics: Tuple[AggMetricSpec, ...]
     max_groups: int = 0
+    max_distinct: int = 0
+    distinct_on_overflow: str = "error"
     rank_by: Optional[str] = None
     rank_field_id: str = "rank"
     rank_order: str = "desc"
     top_k: int = 0
 
+    @override
     def required_fields(self) -> Tuple[str, ...]:
         agg = GroupByAggregator(group_by=self.group_by, metrics=self.metrics, max_groups=0)
         return agg.required_fields()
+
+    @override
+    def fingerprint_parts(self) -> Tuple[str, ...]:
+        parts: List[str] = []
+        parts.append("kind=group_by")
+        parts.append("group_by=" + ",".join(str(x) for x in self.group_by))
+        parts.append("max_groups=" + str(int(self.max_groups)))
+        parts.append("max_distinct=" + str(int(self.max_distinct)))
+        parts.append("distinct_on_overflow=" + str(self.distinct_on_overflow or "error").lower())
+        if self.rank_by:
+            parts.append("rank_by=" + str(self.rank_by))
+            parts.append("rank_field_id=" + str(self.rank_field_id))
+            parts.append("rank_order=" + str(self.rank_order))
+            parts.append("top_k=" + str(int(self.top_k)))
+        parts.append("metrics=")
+        for m in self.metrics:
+            parts.append("  " + _metric_fingerprint_part(m))
+        return tuple(parts)
+
+    @override
+    def validate_parallel_mode(self, parallel_mode: str) -> None:
+        _ = str(parallel_mode or "").lower()
+        overflow = str(self.distinct_on_overflow or "error").lower()
+        if overflow not in ("error", "truncate"):
+            msg = "Unsupported distinct_on_overflow: {!r}".format(self.distinct_on_overflow)
+            raise ValueError(msg)
+
+    @override
+    def build_aggregator(self) -> IRowAggregator:
+        if self.rank_by:
+            return RankedGroupByAggregator(
+                group_by=self.group_by,
+                metrics=self.metrics,
+                rank_by=str(self.rank_by),
+                rank_field_id=str(self.rank_field_id),
+                order=str(self.rank_order),
+                top_k=int(self.top_k),
+                max_groups=int(self.max_groups),
+                max_distinct=int(self.max_distinct),
+                distinct_on_overflow=str(self.distinct_on_overflow),
+            )
+        return GroupByAggregator(
+            group_by=self.group_by,
+            metrics=self.metrics,
+            max_groups=int(self.max_groups),
+            max_distinct=int(self.max_distinct),
+            distinct_on_overflow=str(self.distinct_on_overflow),
+        )
+
+
+@dataclass(frozen=True)
+class DedupBySpec:
+    key_fields: Tuple[str, ...]
+    on_conflict: str = "error"
+    max_distinct: int = 0
+    on_overflow: str = "error"
+
+    def fingerprint_parts(self) -> Tuple[str, ...]:
+        parts: List[str] = []
+        parts.append("kind=dedup_by")
+        parts.append("key_fields=" + ",".join(str(x) for x in self.key_fields))
+        parts.append("on_conflict=" + str(self.on_conflict or "error").lower())
+        parts.append("max_distinct=" + str(int(self.max_distinct)))
+        parts.append("on_overflow=" + str(self.on_overflow or "error").lower())
+        return tuple(parts)
+
+    def validate_parallel_mode(self, parallel_mode: str) -> None:
+        mode = str(parallel_mode or "").lower()
+        on_conflict = str(self.on_conflict or "error").lower()
+        if on_conflict not in ("error", "first", "last"):
+            msg = "Unsupported dedup_by.on_conflict: {!r}".format(self.on_conflict)
+            raise ValueError(msg)
+        on_overflow = str(self.on_overflow or "error").lower()
+        if on_overflow not in ("error", "truncate"):
+            msg = "Unsupported dedup_by.on_overflow: {!r}".format(self.on_overflow)
+            raise ValueError(msg)
+        if mode == "adaptive" and on_conflict in ("first", "last"):
+            msg = (
+                "dedup_by.on_conflict={!r} is order-dependent and is not supported in parallel_mode='adaptive'; "
+                "use parallel_mode='seq' or switch to on_conflict='error'"
+            ).format(on_conflict)
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True)
+class DerivedDedupByGroupBySpec(IDerivedAggregationSpec):
+    dedup_by: DedupBySpec
+    group_by: DerivedGroupBySpec
+
+    @override
+    def required_fields(self) -> Tuple[str, ...]:
+        required: List[str] = list(self.dedup_by.key_fields) + list(self.group_by.required_fields())
+        # 去重但保留顺序.
+        seen: Set[str] = set()
+        ordered: List[str] = []
+        for fid in required:
+            if fid in seen:
+                continue
+            seen.add(fid)
+            ordered.append(fid)
+        return tuple(ordered)
+
+    @override
+    def fingerprint_parts(self) -> Tuple[str, ...]:
+        parts: List[str] = ["kind=dedup_by+group_by", "dedup_by:"]
+        parts.extend(["  " + x for x in self.dedup_by.fingerprint_parts()])
+        parts.append("group_by:")
+        parts.extend(["  " + x for x in self.group_by.fingerprint_parts()])
+        return tuple(parts)
+
+    @override
+    def validate_parallel_mode(self, parallel_mode: str) -> None:
+        self.dedup_by.validate_parallel_mode(parallel_mode)
+        self.group_by.validate_parallel_mode(parallel_mode)
+
+    @override
+    def build_aggregator(self) -> IRowAggregator:
+        base = self.group_by.build_aggregator()
+        return DedupByThenAggregator(
+            key_fields=self.dedup_by.key_fields,
+            on_conflict=str(self.dedup_by.on_conflict),
+            max_distinct=int(self.dedup_by.max_distinct),
+            on_overflow=str(self.dedup_by.on_overflow),
+            downstream=base,
+        )
+
+
+@dataclass(frozen=True)
+class TwoStageGroupBySpec(IDerivedAggregationSpec):
+    stage1: DerivedGroupBySpec
+    stage2: DerivedGroupBySpec
+
+    @override
+    def required_fields(self) -> Tuple[str, ...]:
+        return self.stage1.required_fields()
+
+    @override
+    def fingerprint_parts(self) -> Tuple[str, ...]:
+        parts: List[str] = ["kind=two_stage_group_by", "stage1:"]
+        parts.extend(["  " + x for x in self.stage1.fingerprint_parts()])
+        parts.append("stage2:")
+        parts.extend(["  " + x for x in self.stage2.fingerprint_parts()])
+        return tuple(parts)
+
+    @override
+    def validate_parallel_mode(self, parallel_mode: str) -> None:
+        if self.stage1.rank_by or self.stage2.rank_by:
+            msg = "two_stage_group_by does not support rank_by in stage specs"
+            raise ValueError(msg)
+        self.stage1.validate_parallel_mode(parallel_mode)
+        self.stage2.validate_parallel_mode(parallel_mode)
+
+        stage1_fields: Set[str] = set(self.stage1.group_by)
+        stage1_fields.update([str(m.out_field_id) for m in self.stage1.metrics])
+        missing = [x for x in self.stage2.required_fields() if x not in stage1_fields]
+        if missing:
+            msg = "two_stage_group_by stage2 requires fields not produced by stage1: {}".format(", ".join(sorted(missing)))
+            raise ValueError(msg)
+
+    @override
+    def build_aggregator(self) -> IRowAggregator:
+        agg1 = GroupByAggregator(
+            group_by=self.stage1.group_by,
+            metrics=self.stage1.metrics,
+            max_groups=int(self.stage1.max_groups),
+            max_distinct=int(self.stage1.max_distinct),
+            distinct_on_overflow=str(self.stage1.distinct_on_overflow),
+        )
+        agg2 = GroupByAggregator(
+            group_by=self.stage2.group_by,
+            metrics=self.stage2.metrics,
+            max_groups=int(self.stage2.max_groups),
+            max_distinct=int(self.stage2.max_distinct),
+            distinct_on_overflow=str(self.stage2.distinct_on_overflow),
+        )
+        return TwoStageGroupByAggregator(stage1=agg1, stage2=agg2)
 
 
 @dataclass(frozen=True)
@@ -61,7 +275,7 @@ class DerivedOutputTargetSpec:
     """派生输出目标: 从明细流聚合并在 `close()` 时输出."""
 
     target_id: str
-    derived: DerivedGroupBySpec
+    derived: IDerivedAggregationSpec
     output_layout: ExportLayout
     output: OutputSpec
     is_primary: bool = False
@@ -143,6 +357,13 @@ def _sha256_text(value: str) -> str:
     return digest.hexdigest()
 
 
+def _fingerprint_for_derived_target(*, target_id: str, derived: IDerivedAggregationSpec) -> str:
+    h = hashlib.sha1()  # noqa: S324
+    payload = "\n".join(["target_id=" + str(target_id), *derived.fingerprint_parts()]).encode("utf-8", errors="replace")
+    h.update(payload)
+    return h.hexdigest()
+
+
 def _as_single_line(value: str) -> str:
     # 避免 `meta/audit` 出现多行单元格,并保持输出可预测.
     return " ".join(str(value).splitlines())
@@ -206,6 +427,7 @@ class _RouteState:
     is_primary: bool
     output_path: Optional[str]
     sheet_name: Optional[str]
+    derived_fingerprint: Optional[str] = None
     disabled: bool = False
     input_row_count: int = 0
     error_count: int = 0
@@ -436,6 +658,35 @@ class RouterRowSink(BaseRowSink):
         self._write_meta()
         self._write_audit()
 
+    def _append_output_stats_meta_rows(self, rows: List[RowData]) -> None:
+        for stat in self.get_target_stats():
+            prefix = "output.{}".format(stat.target_id)
+            rows.append({"key": prefix + ".input_rows", "value": int(stat.input_row_count)})
+            rows.append({"key": prefix + ".rows", "value": int(stat.row_count)})
+            rows.append({"key": prefix + ".errors", "value": int(stat.error_count)})
+            rows.append({"key": prefix + ".disabled", "value": bool(stat.disabled)})
+            rows.append({"key": prefix + ".duration_seconds", "value": float(stat.duration_seconds)})
+            if stat.sheet_name:
+                rows.append({"key": prefix + ".sheet_name", "value": str(stat.sheet_name)})
+            if stat.output_path:
+                rows.append({"key": prefix + ".output_path", "value": str(stat.output_path)})
+            if stat.error_type or stat.error_message or stat.error_message_hash:
+                rows.append({"key": prefix + ".error_type", "value": stat.error_type or ""})
+                rows.append({"key": prefix + ".error_message", "value": stat.error_message or ""})
+                if stat.error_message_hash:
+                    rows.append({"key": prefix + ".error_message_hash", "value": str(stat.error_message_hash)})
+
+    def _append_derived_meta_rows(self, rows: List[RowData]) -> None:
+        # 派生聚合指纹与诊断(仅包含对拍友好的脱敏信息)
+        for route in self._routes:
+            if route.derived_fingerprint:
+                rows.append({"key": "derived.{}.fingerprint".format(route.target_id), "value": str(route.derived_fingerprint)})
+            if not isinstance(route.sink, AggregatingRowSink):
+                continue
+            diag = route.sink.aggregator.diagnostics()
+            for k, v in diag.meta.items():
+                rows.append({"key": "derived.{}.{}".format(route.target_id, str(k)), "value": v})
+
     def _build_meta_rows(self) -> List[RowData]:
         rows: List[RowData] = []
         fingerprint = fingerprint_for_meta(
@@ -459,22 +710,8 @@ class RouterRowSink(BaseRowSink):
         if self._run_failure_policy:
             rows.append({"key": "run.failure_policy", "value": self._run_failure_policy})
 
-        for stat in self.get_target_stats():
-            prefix = "output.{}".format(stat.target_id)
-            rows.append({"key": prefix + ".input_rows", "value": int(stat.input_row_count)})
-            rows.append({"key": prefix + ".rows", "value": int(stat.row_count)})
-            rows.append({"key": prefix + ".errors", "value": int(stat.error_count)})
-            rows.append({"key": prefix + ".disabled", "value": bool(stat.disabled)})
-            rows.append({"key": prefix + ".duration_seconds", "value": float(stat.duration_seconds)})
-            if stat.sheet_name:
-                rows.append({"key": prefix + ".sheet_name", "value": str(stat.sheet_name)})
-            if stat.output_path:
-                rows.append({"key": prefix + ".output_path", "value": str(stat.output_path)})
-            if stat.error_type or stat.error_message or stat.error_message_hash:
-                rows.append({"key": prefix + ".error_type", "value": stat.error_type or ""})
-                rows.append({"key": prefix + ".error_message", "value": stat.error_message or ""})
-                if stat.error_message_hash:
-                    rows.append({"key": prefix + ".error_message_hash", "value": str(stat.error_message_hash)})
+        self._append_output_stats_meta_rows(rows)
+        self._append_derived_meta_rows(rows)
         return rows
 
     def _write_meta(self) -> None:
@@ -500,18 +737,53 @@ class RouterRowSink(BaseRowSink):
 
     def _build_audit_rows(self) -> List[RowData]:
         rows: List[RowData] = []
+        route_by_id = {r.target_id: r for r in self._routes}
+
         for stat in self.get_target_stats():
             if not stat.error_count:
                 continue
+            fingerprint = ""
+            route = route_by_id.get(stat.target_id)
+            if route is not None and route.derived_fingerprint:
+                fingerprint = str(route.derived_fingerprint)
             rows.append(
                 {
                     "target_id": stat.target_id,
+                    "event_type": "output_error",
+                    "fingerprint": fingerprint,
                     "error_type": stat.error_type,
                     "error_message": stat.error_message,
+                    "error_message_hash": stat.error_message_hash,
                     "error_count": int(stat.error_count),
                     "disabled": bool(stat.disabled),
                 }
             )
+
+        for route in self._routes:
+            if not isinstance(route.sink, AggregatingRowSink):
+                continue
+            diag = route.sink.aggregator.diagnostics()
+            for event in diag.audit_events:
+                raw = str(event.get("message") or "")
+                event_type = str(event.get("event_type") or "derived_event")
+                msg_hash = _sha256_text(raw)
+                if self._include_full_error_message:
+                    normalized = _as_single_line(raw)
+                    msg_out = _truncate_text(normalized, max_chars=2000)
+                else:
+                    msg_out = "sha256={}".format(msg_hash)
+                rows.append(
+                    {
+                        "target_id": route.target_id,
+                        "event_type": event_type,
+                        "fingerprint": str(route.derived_fingerprint or ""),
+                        "error_type": event_type,
+                        "error_message": msg_out,
+                        "error_message_hash": msg_hash,
+                        "error_count": 0,
+                        "disabled": bool(route.disabled),
+                    }
+                )
         return rows
 
     def _write_audit(self) -> None:
@@ -644,6 +916,7 @@ def _append_route_state(
     is_primary: bool,
     output: OutputSpec,
     output_counter: _RowCounter,
+    derived_fingerprint: Optional[str] = None,
 ) -> None:
     output_paths[str(target_id)] = str(output.path) if output.path else ""
     routes.append(
@@ -654,6 +927,7 @@ def _append_route_state(
             is_primary=bool(is_primary),
             output_path=str(output.path) if output.path else None,
             sheet_name=str(output.sheet_name) if output.sheet_name else None,
+            derived_fingerprint=str(derived_fingerprint) if derived_fingerprint else None,
             output_counter=output_counter,
         )
     )
@@ -685,38 +959,71 @@ def _append_direct_target_routes(
         )
 
 
+def _validate_derived_parallel_mode(target_id: str, derived: IDerivedAggregationSpec, run_parallel_mode: str) -> None:
+    try:
+        derived.validate_parallel_mode(run_parallel_mode)
+    except ValueError as exc:
+        msg = "派生输出不支持 parallel_mode={!r}: target_id={!r}: {}".format(str(run_parallel_mode), str(target_id), exc)
+        raise ValueError(msg) from exc
+
+
+def _collect_specs_for_derived_warnings(derived: IDerivedAggregationSpec) -> Tuple[List[DerivedGroupBySpec], List[DedupBySpec]]:
+    if isinstance(derived, DerivedGroupBySpec):
+        return [derived], []
+    if isinstance(derived, DerivedDedupByGroupBySpec):
+        return [derived.group_by], [derived.dedup_by]
+    if isinstance(derived, TwoStageGroupBySpec):
+        return [derived.stage1, derived.stage2], []
+    return [], []
+
+
+def _warn_derived_guardrails(*, target_id: str, group_specs: Sequence[DerivedGroupBySpec], dedup_specs: Sequence[DedupBySpec]) -> None:
+    for g in group_specs:
+        if not int(g.max_groups):
+            _logger.warning(
+                "派生输出 max_groups=0(不设上限);高基数分组可能耗尽内存: 目标=%s, 分组键=%s",
+                str(target_id),
+                ",".join(str(x) for x in g.group_by),
+            )
+        has_count_distinct = any(str(m.op).lower() == "count_distinct" for m in g.metrics)
+        if has_count_distinct and not int(g.max_distinct):
+            _logger.warning(
+                "派生输出 max_distinct=0(不设上限);count_distinct 高基数可能耗尽内存: 目标=%s, 分组键=%s",
+                str(target_id),
+                ",".join(str(x) for x in g.group_by),
+            )
+
+    for d in dedup_specs:
+        if not int(d.max_distinct):
+            _logger.warning(
+                "派生输出 dedup_by.max_distinct=0(不设上限);高基数去重可能耗尽内存: 目标=%s, key_fields=%s",
+                str(target_id),
+                ",".join(str(x) for x in d.key_fields),
+            )
+
+
 def _append_derived_target_routes(
     *,
     routes: List[_RouteState],
     output_paths: Dict[str, str],
     targets: Sequence[DerivedOutputTargetSpec],
     workbook_by_path: Dict[str, ExcelWorkbookSink],
+    run_parallel_mode: str,
 ) -> None:
     for t in targets:
-        if not int(t.derived.max_groups):
-            _logger.warning(
-                "派生输出 max_groups=0(不设上限);高基数分组可能耗尽内存: 目标=%s, 分组键=%s",
-                str(t.target_id),
-                ",".join(str(x) for x in t.derived.group_by),
-            )
+        # `adaptive` 下的确定性边界 `fail-fast` 校验
+        _validate_derived_parallel_mode(str(t.target_id), t.derived, run_parallel_mode)
+        derived_fingerprint = _fingerprint_for_derived_target(target_id=str(t.target_id), derived=t.derived)
+        group_specs, dedup_specs = _collect_specs_for_derived_warnings(t.derived)
+        _warn_derived_guardrails(target_id=str(t.target_id), group_specs=group_specs, dedup_specs=dedup_specs)
+
         out_sink, out_counter = _create_row_sink_for_composed_output(
             target_id=str(t.target_id),
             output=t.output,
             layout=t.output_layout,
             workbook_by_path=workbook_by_path,
         )
-        if t.derived.rank_by:
-            agg = RankedGroupByAggregator(
-                group_by=t.derived.group_by,
-                metrics=t.derived.metrics,
-                rank_by=str(t.derived.rank_by),
-                rank_field_id=str(t.derived.rank_field_id),
-                order=str(t.derived.rank_order),
-                top_k=int(t.derived.top_k),
-                max_groups=int(t.derived.max_groups),
-            )
-        else:
-            agg = GroupByAggregator(group_by=t.derived.group_by, metrics=t.derived.metrics, max_groups=int(t.derived.max_groups))
+        agg = t.derived.build_aggregator()
 
         sink = AggregatingRowSink(aggregator=agg, out_sink=out_sink)
         _append_route_state(
@@ -728,6 +1035,7 @@ def _append_derived_target_routes(
             is_primary=bool(t.is_primary),
             output=t.output,
             output_counter=out_counter,
+            derived_fingerprint=derived_fingerprint,
         )
 
 
@@ -780,8 +1088,26 @@ def _maybe_create_audit_target(
         return None
 
     layout = ExportLayout(
-        field_ids=("target_id", "error_type", "error_message", "error_count", "disabled"),
-        header_names=("target_id", "error_type", "error_message", "error_count", "disabled"),
+        field_ids=(
+            "target_id",
+            "error_type",
+            "error_message",
+            "error_count",
+            "disabled",
+            "event_type",
+            "fingerprint",
+            "error_message_hash",
+        ),
+        header_names=(
+            "target_id",
+            "error_type",
+            "error_message",
+            "error_count",
+            "disabled",
+            "event_type",
+            "fingerprint",
+            "error_message_hash",
+        ),
     )
     audit_output = OutputSpec(
         format=audit_sheet.output.format,
@@ -843,6 +1169,7 @@ def build_output_composition(
         output_paths=output_paths,
         targets=spec.derived_targets,
         workbook_by_path=workbook_by_path,
+        run_parallel_mode=str(run_parallel_mode or ""),
     )
     _ensure_primary_route(routes)
 
@@ -886,8 +1213,11 @@ def build_output_composition(
 
 __all__ = [
     "AuditSheetSpec",
+    "DedupBySpec",
+    "DerivedDedupByGroupBySpec",
     "DerivedGroupBySpec",
     "DerivedOutputTargetSpec",
+    "IDerivedAggregationSpec",
     "MetaSheetSpec",
     "OutputCompositionPlan",
     "OutputCompositionSpec",
@@ -895,6 +1225,7 @@ __all__ = [
     "OutputTargetStats",
     "OutputTargetWriteError",
     "RouterRowSink",
+    "TwoStageGroupBySpec",
     "build_output_composition",
     "required_demand_fields",
 ]

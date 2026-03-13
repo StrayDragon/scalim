@@ -31,13 +31,17 @@
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-demand-dsl-breaking.md`
   - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
   - Spec: `openspec/specs/demand-dsl/spec.md`
+- 2026-03-13: derived-outputs-set-aggregations
+  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-13-derived-outputs-set-aggregations/`
+  - Spec: `openspec/specs/derived-outputs/spec.md`
 - 2026-03-13: yaml-reuse-workflow
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-reuse-workflow.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-imports/`
   - Spec: `openspec/specs/yaml-dsl-imports/spec.md`
 - 2026-03-13: yaml-source-normalize-shapes
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
-  - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-source-normalize-shapes/`
+  - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-source-normalize-shapes/`
   - Spec: `openspec/specs/yaml-source-normalize/spec.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 

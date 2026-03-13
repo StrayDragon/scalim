@@ -81,6 +81,26 @@ def test_metric_state_from_spec_error_branches_and_min_max_sum_metrics() -> None
     with pytest.raises(ValueError, match="Unsupported aggregation op"):
         _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="avg", field_id="v"))  # noqa: SLF001
 
+    with pytest.raises(ValueError, match="count_distinct does not allow both field_id and field_ids"):
+        _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_distinct", field_id="a", field_ids=("b",)))  # noqa: SLF001
+    with pytest.raises(ValueError, match="count_distinct requires field_id or field_ids"):
+        _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_distinct"))  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"count_distinct requires field_id\(s\)"):
+        _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_distinct", field_ids=("",)))  # noqa: SLF001
+
+    with pytest.raises(ValueError, match="count_true_gte requires field_id"):
+        _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_true_gte", threshold=2))  # noqa: SLF001
+    with pytest.raises(ValueError, match="count_true_gte requires threshold"):
+        _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_true_gte", field_id="v"))  # noqa: SLF001
+    with pytest.raises(ValueError, match="count_true_gte requires numeric threshold"):
+        _ = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_true_gte", field_id="v", threshold="oops"))  # noqa: SLF001
+
+    gte = mod._metric_state_from_spec(mod.AggMetricSpec(out_field_id="x", op="count_true_gte", field_id="v", threshold=2))  # noqa: SLF001
+    gte.accumulate({"v": None})
+    gte.accumulate({"v": "oops"})
+    gte.accumulate({"v": 2})
+    assert gte.finalize() == 1
+
 
 def test_min_max_metrics_finalize_branches() -> None:
     min_metric = mod._MinMetric("v")  # noqa: SLF001
@@ -129,6 +149,7 @@ def test_group_by_aggregator_validation_and_ranked_finalize_branches() -> None:
     rows = agg.finalize_rows()
     assert len(rows) == 1
     assert rows[0]["rank"] == 1
+    assert agg.diagnostics().meta["group_count"] == 3
 
 
 def test_aggregating_row_sink_close_and_closed_guards() -> None:
@@ -151,3 +172,235 @@ def test_aggregating_row_sink_close_and_closed_guards() -> None:
 
     with pytest.raises(RuntimeError, match="AggregatingRowSink is closed"):
         sink.write_row({"g": "b"})
+
+
+def test_count_distinct_single_and_composite_and_missing_value_semantics() -> None:
+    agg = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(
+            mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),
+            mod.AggMetricSpec(out_field_id="c", op="count_distinct", field_ids=("cs_id", "user_id")),
+        ),
+    )
+    assert agg.required_fields() == ("g", "user_id", "cs_id")
+
+    # duplicates
+    agg.accumulate({"g": "x", "cs_id": 1, "user_id": "u1"})
+    agg.accumulate({"g": "x", "cs_id": 1, "user_id": "u1"})
+    agg.accumulate({"g": "x", "cs_id": 1, "user_id": "u2"})
+
+    # missing values: any None in the key is ignored (SQL COUNT(DISTINCT) NULL semantics)
+    agg.accumulate({"g": "x", "cs_id": 1, "user_id": None})
+    agg.accumulate({"g": "x", "cs_id": None, "user_id": "u3"})
+
+    rows = agg.finalize_rows()
+    assert rows == [{"g": "x", "u": 3, "c": 2}]
+
+
+def test_count_distinct_guardrails_error_and_truncate_is_deterministic() -> None:
+    # error
+    err = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
+        max_distinct=2,
+        distinct_on_overflow="error",
+    )
+    err.accumulate({"g": "x", "user_id": "u1"})
+    err.accumulate({"g": "x", "user_id": "u2"})
+    with pytest.raises(mod.DistinctKeyLimitExceededError, match="distinct_count=3"):
+        err.accumulate({"g": "x", "user_id": "u3"})
+
+    # truncate keeps stable-smallest keys, regardless of row order
+    def run(keys) -> "set[tuple[object, ...]]":
+        agg = mod.GroupByAggregator(
+            group_by=("g",),
+            metrics=(mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="k"),),
+            max_distinct=2,
+            distinct_on_overflow="truncate",
+        )
+        for k in keys:
+            agg.accumulate({"g": "x", "k": k})
+        _ = agg.finalize_rows()
+        state = agg._states[("x",)][0]  # noqa: SLF001
+        assert isinstance(state, mod._CountDistinctMetric)  # noqa: SLF001
+        assert state.truncated is True
+        # stable smallest 2 keys: a, b
+        return set(state._distinct._keys)  # noqa: SLF001
+
+    assert run(["c", "b", "a"]) == {("a",), ("b",)}
+    assert run(["a", "c", "b"]) == {("a",), ("b",)}
+
+
+def test_dedup_by_on_conflict_variants_and_truncate() -> None:
+    base = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
+    )
+
+    first = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="first",
+        max_distinct=0,
+        on_overflow="error",
+        downstream=base,
+    )
+    first.accumulate({"k": "a", "g": "x", "v": 1})
+    first.accumulate({"k": "a", "g": "x", "v": 9})
+    first.accumulate({"k": "b", "g": "x", "v": 2})
+    assert first.finalize_rows() == [{"g": "x", "sum_v": 3}]
+
+    last = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="last",
+        max_distinct=0,
+        on_overflow="error",
+        downstream=mod.GroupByAggregator(
+            group_by=("g",),
+            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
+        ),
+    )
+    last.accumulate({"k": "a", "g": "x", "v": 1})
+    last.accumulate({"k": "a", "g": "x", "v": 9})
+    last.accumulate({"k": "b", "g": "x", "v": 2})
+    assert last.finalize_rows() == [{"g": "x", "sum_v": 11}]
+
+    err = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="error",
+        max_distinct=0,
+        on_overflow="error",
+        downstream=mod.GroupByAggregator(
+            group_by=("g",),
+            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
+        ),
+    )
+    err.accumulate({"k": "a", "g": "x", "v": 1})
+    with pytest.raises(mod.DedupKeyConflictError):
+        err.accumulate({"k": "a", "g": "x", "v": 9})
+
+    # truncate: keeps stable-smallest keys (a,b) and drops c
+    trunc = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="first",
+        max_distinct=2,
+        on_overflow="truncate",
+        downstream=mod.GroupByAggregator(
+            group_by=("g",),
+            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
+        ),
+    )
+    trunc.accumulate({"k": "c", "g": "x", "v": 100})
+    trunc.accumulate({"k": "b", "g": "x", "v": 10})
+    trunc.accumulate({"k": "a", "g": "x", "v": 1})
+    assert trunc.finalize_rows() == [{"g": "x", "sum_v": 11}]
+    diag = trunc.diagnostics()
+    assert diag.meta["dedup.truncated"] is True
+    assert any(e.get("event_type") == "dedup_truncated" for e in diag.audit_events)
+
+
+def test_bounded_distinct_key_set_unsupported_on_overflow_raises() -> None:
+    s = mod._BoundedDistinctKeySet(  # noqa: SLF001
+        max_distinct=1,
+        on_overflow="oops",
+        key_fields=("k",),
+    )
+    _ = s.add(("a",))
+    with pytest.raises(ValueError, match="Unsupported on_overflow"):
+        _ = s.add(("b",))
+
+
+def test_group_by_diagnostics_skips_unexpected_distinct_metric_state() -> None:
+    agg = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
+    )
+    agg.accumulate({"g": "x", "user_id": "u1"})
+
+    # 防御性覆盖: 若内部状态不符合预期类型, diagnostics 应跳过并继续.
+    agg._states[("x",)] = (_DummyMetricState(),)  # noqa: SLF001
+    diag = agg.diagnostics()
+    assert diag.meta["group_count"] == 1
+    assert diag.meta["metric.u.distinct_keys_total"] == 0
+
+
+def test_dedup_by_validation_required_fields_and_truncate_drops_new_key() -> None:
+    downstream = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+    )
+
+    with pytest.raises(ValueError, match="dedup_by requires key_fields"):
+        _ = mod.DedupByThenAggregator(  # type: ignore[arg-type]
+            key_fields=(),
+            on_conflict="first",
+            max_distinct=0,
+            on_overflow="error",
+            downstream=downstream,
+        )
+    with pytest.raises(ValueError, match="Unsupported dedup_by.on_conflict"):
+        _ = mod.DedupByThenAggregator(
+            key_fields=("k",),
+            on_conflict="middle",
+            max_distinct=0,
+            on_overflow="error",
+            downstream=downstream,
+        )
+
+    # key_fields 与下游 required_fields 重叠时,仍应保序去重.
+    dedup_key_overlaps = mod.DedupByThenAggregator(
+        key_fields=("g",),
+        on_conflict="first",
+        max_distinct=0,
+        on_overflow="error",
+        downstream=downstream,
+    )
+    assert dedup_key_overlaps.required_fields() == ("g",)
+
+    # truncate: 当新 key 不优于当前最差 key 时应直接丢弃(覆盖 `retained=False` 分支).
+    trunc = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="first",
+        max_distinct=2,
+        on_overflow="truncate",
+        downstream=mod.GroupByAggregator(
+            group_by=("g",),
+            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
+        ),
+    )
+    trunc.accumulate({"k": "a", "g": "x", "v": 1})
+    trunc.accumulate({"k": "b", "g": "x", "v": 2})
+    trunc.accumulate({"k": "c", "g": "x", "v": 100})
+    assert trunc.finalize_rows() == [{"g": "x", "sum_v": 3}]
+
+
+def test_two_stage_group_by_and_count_true_gte() -> None:
+    stage1 = mod.GroupByAggregator(
+        group_by=("cs_id", "user_id"),
+        metrics=(mod.AggMetricSpec(out_field_id="pay_order_cnt", op="count", field_id="order_id"),),
+    )
+    stage2 = mod.GroupByAggregator(
+        group_by=("cs_id",),
+        metrics=(mod.AggMetricSpec(out_field_id="repeat_paid_users", op="count_true_gte", field_id="pay_order_cnt", threshold=2),),
+    )
+    agg = mod.TwoStageGroupByAggregator(stage1=stage1, stage2=stage2)
+    assert agg.required_fields() == ("cs_id", "user_id", "order_id")
+
+    rows = [
+        {"order_id": 1, "cs_id": 1, "user_id": "u1"},
+        {"order_id": 2, "cs_id": 1, "user_id": "u1"},
+        {"order_id": 3, "cs_id": 1, "user_id": "u2"},
+        {"order_id": 4, "cs_id": 2, "user_id": "u3"},
+        {"order_id": 5, "cs_id": 2, "user_id": "u3"},
+        {"order_id": 6, "cs_id": 2, "user_id": "u3"},
+    ]
+    for r in rows:
+        agg.accumulate(r)
+
+    out = agg.finalize_rows()
+    assert out == [
+        {"cs_id": 1, "repeat_paid_users": 1},
+        {"cs_id": 2, "repeat_paid_users": 1},
+    ]
+    diag = agg.diagnostics()
+    assert diag.meta["stage1.group_count"] == 3
+    assert diag.meta["stage2.group_count"] == 2
