@@ -11,7 +11,7 @@
 
     - JSON Schema 结构/默认值/枚举调整
     - 语义校验规则变更(unknown fields、约束收紧/放宽)
-    - `relations` / `params` / `output.fields` 等关键语义调整
+    - `relations` / `params` / `outputs` 等关键语义调整
     - Python 引用解析与 allowlist 规则调整(影响 `loader` / `call_by`)
 
 ## 1. 语法的事实来源在哪里
@@ -49,14 +49,19 @@ relations: {}           # 可选: 命名 relation 模板(供 YAML alias 复用)
 fields: {}              # 可选: 仅派生字段(必须 compute/call_by 二选一)
 
 guardrails: {}          # 可选
-output: {}              # 可选
+meta: false             # 可选: true 或对象(写入 meta sheet)
+audit: false            # 可选: true 或对象(写入 audit sheet)
+outputs: []             # 可选: 多输出编排(有序列表)
+failure_policy: all_fail             # 可选: all_fail/primary_only
+include_full_error_message: false    # 可选
 observability: {}       # 可选
 ```
 
 提示:
 
-- 顶层 `output` **可省略**.当把 `YAML` 当作模板使用时,推荐在 Python 调用侧使用 `overrides.output.*`(例如 `overrides.output.path`)决定输出策略.
-- 若存在跨 source 同名 `field_id`,则需要显式 `output.fields` 进行消歧(即使顶层未声明 `output`,也可能因为字段歧义而被要求补充 `output.fields`).
+- 顶层已不再支持旧写法 `output:`(会 fail-fast).请使用 `outputs:`(有序列表)描述输出编排.
+- `outputs` 可省略.省略时运行在“单输出模式”: 由 Python 调用侧提供 `sink=...` 或通过 `overrides.output.*` 控制输出策略.
+- `field_id` 必须全局唯一(不再支持 `source.field_id` 消歧).
 
 ## 3. YAML 复用: anchors、alias、`_templates`
 
@@ -83,10 +88,10 @@ observability: {}       # 可选
 
 ### 3.3 一个容易踩的点: YAML merge(`<<`)
 
-`output.fields` 的文案里明确提示了 merge 的副作用:
+`outputs.*.container` 等 mapping 节点非常适合用 YAML merge(`<<`)复用基础配置:
 
 - YAML merge 会生成新对象,丢失 alias 身份
-- merge 产物必须仍然包含 `field_id` 或 `field` 作为选择器
+- merge 产物必须仍然满足 schema 与语义校验(例如 `type/path` 必填; 多 sheet 共享 workbook 时每个 output 需显式 `sheet`)
 
 ### 3.4 跨文件复用: `imports` / `$import` (V1: 同级文件)
 
@@ -168,19 +173,46 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 
 - `parallel_mode="adaptive"` 时,调度器会把 `$rows` 视为 barrier,该层直接串行执行(见 [并行模式](../architecture/parallel-modes.md)).
 
-## 7. output.fields: string sugar / 对象 / alias
+## 7. outputs: 多输出编排(有序)
 
-`output.fields` 用来明确导出字段顺序,并在字段存在歧义时做选择与覆盖.
+`outputs` 是 demand YAML 的“多输出编排”入口(有序列表):
 
-`output.fields` 支持三类条目(可混用):
+- 每个 output 必填唯一 `name`(供 `from` 引用)
+- `container` 描述输出容器(workbook/csv)与路径/工作表等
+- 明细输出使用 `fields: [field_id, ...]` 指定导出列顺序
+- `where` 是安全表达式,用于分发过滤;其依赖字段会在编译期注入 required fields
+- 派生汇总输出使用 `aggregate`(与 `fields` 互斥)
+- `from` 可复用另一个 output 的字段集合与容器配置(未声明则继承; `where/aggregate` 不继承)
 
-- string sugar:
-  - `field_id` (例: `order_id`)
-  - `source.field_id` (例: `orders.order_id`,用于消歧;仅支持二段式)
-- 显式对象(包含 `field_id` 或 `field` 选择器,必要时加 `source`)
-- YAML alias(指向一个字段对象)
+辅助配置:
 
-当跨 source 存在同名 `field_id` 时,必须用 `source.field_id` 或显式对象的 `source` 来消歧.
+- 顶层 `failure_policy` / `include_full_error_message` 控制 composed outputs 的失败策略与错误信息脱敏
+- 顶层 `meta` / `audit` 可开启额外 sheet(默认写入 primary workbook)
+
+一个最小示例:
+
+```yaml
+meta: true
+audit: true
+
+outputs:
+  - name: detail
+    container: {type: workbook, path: ./out.xlsx, sheet: 明细, write_lock: true}
+    fields: [order_id, customer_name, amount_yuan]
+
+  - name: direct
+    from: detail
+    container: {type: workbook, path: ./out.xlsx, sheet: 直客明细, write_lock: true}
+    where: "channel == 'direct'"
+
+  - name: by_channel
+    container: {type: workbook, path: ./out.xlsx, sheet: 渠道汇总, write_lock: true}
+    aggregate:
+      group_by: [channel]
+      metrics:
+        order_cnt: {op: count}
+        sum_amount: {op: sum, field: amount_yuan}
+```
 
 ## 8. 校验与排错: 先用什么命令
 

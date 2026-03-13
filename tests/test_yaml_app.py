@@ -76,10 +76,10 @@ main_source:
       extract: amount
       name: Amount
 sources: {}
-output:
-  fields:
-    - field_id: order_id
-    - field_id: amount
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [order_id, amount]
 """,
         encoding="utf-8",
     )
@@ -153,9 +153,10 @@ main_source:
     created_at:
       extract: created_at
 sources: {}
-output:
-  fields:
-    - field_id: order_id
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [order_id]
 """,
         encoding="utf-8",
     )

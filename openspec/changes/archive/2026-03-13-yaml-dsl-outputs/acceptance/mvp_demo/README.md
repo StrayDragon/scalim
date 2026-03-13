@@ -9,19 +9,22 @@
 
 ## 1) baseline(当前就能跑)
 
-该 baseline 只验证“事实流 + lookup + 多 sheet 分发”的最小闭环;多 sheet 分发目前由最薄 Python sink 实现,目标是被 YAML outputs/workbook 取代.
+该 baseline 验证“事实流 + lookup + 多 outputs(workbook 多 sheet) + 派生汇总 + meta/audit”的最小闭环.
 
 ```bash
-uv run python openspec/changes/yaml-dsl-outputs/acceptance/mvp_demo/run_demo.py
+uv run python openspec/changes/archive/2026-03-13-yaml-dsl-outputs/acceptance/mvp_demo/run_demo.py
 # 或(不依赖安装环境):
-PYTHONPATH=src python openspec/changes/yaml-dsl-outputs/acceptance/mvp_demo/run_demo.py
+PYTHONPATH=src python openspec/changes/archive/2026-03-13-yaml-dsl-outputs/acceptance/mvp_demo/run_demo.py
 ```
 
 它会写出:`/tmp/scalim_mvp_demo.xlsx`
 
-- Sheet 名 = `channel`(`direct` / `partner`)
+- Sheet:
+  - `direct` / `partner`: 明细分发(where)
+  - `by_cs`: 派生汇总(aggregate)
+  - `__meta__` / `__audit__`: 对拍友好产物(meta/audit)
 - 行数据来自 `loaders.py` 的内存数据
-- `demo_detail.demand.yaml` 只负责主事实流 + `preload_forever` 小表 lookup
+- `demo_detail.demand.yaml` 负责主事实流 + `preload_forever` 小表 lookup + `outputs` 编排
 
 ## 2) 典型“多 sheet + 派生汇总”的脱敏需求表达
 

@@ -278,6 +278,7 @@ class DerivedOutputTargetSpec:
     derived: IDerivedAggregationSpec
     output_layout: ExportLayout
     output: OutputSpec
+    predicate: Optional[OutputRowPredicate] = None
     is_primary: bool = False
     requires: Optional[Tuple[str, ...]] = None
 
@@ -1031,7 +1032,7 @@ def _append_derived_target_routes(
             output_paths=output_paths,
             target_id=str(t.target_id),
             sink=sink,
-            predicate=None,
+            predicate=t.predicate,
             is_primary=bool(t.is_primary),
             output=t.output,
             output_counter=out_counter,
@@ -1061,6 +1062,8 @@ def _maybe_create_meta_target(
         streaming=True,
         include_header=True,
         sheet_name=str(meta_sheet.sheet_name),
+        excel_allow_formulas=bool(meta_sheet.output.excel_allow_formulas),
+        write_lock=bool(meta_sheet.output.write_lock),
     )
     sink, counter = _create_row_sink_for_composed_output(
         target_id=str(meta_sheet.target_id),
@@ -1116,6 +1119,8 @@ def _maybe_create_audit_target(
         streaming=True,
         include_header=True,
         sheet_name=str(audit_sheet.sheet_name),
+        excel_allow_formulas=bool(audit_sheet.output.excel_allow_formulas),
+        write_lock=bool(audit_sheet.output.write_lock),
     )
     sink, counter = _create_row_sink_for_composed_output(
         target_id=str(audit_sheet.target_id),

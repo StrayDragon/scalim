@@ -10,7 +10,6 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     DerivedFieldConfig,
     LookupCastConfig,
     MainSourceConfig,
-    OutputConfig,
     RelationConfig,
     RelationStepConfig,
     SourceConfig,
@@ -49,10 +48,8 @@ def _make_config(
     derived_fields=None,
     sources=None,
     relations=None,
-    output_fields=None,
     source_field_id_map=None,
 ):
-    output = OutputConfig(fields=output_fields) if output_fields is not None else None
     return DemandConfig(
         name="demo",
         main_source=_make_main_source(),
@@ -61,7 +58,6 @@ def _make_config(
         derived_fields=derived_fields or {},
         source_field_id_map=source_field_id_map or {},
         relations=relations or {},
-        output=output,
     )
 
 
@@ -70,18 +66,7 @@ def _dummy_source_ir(source_id):
     return SourceIr(source_id=source_id, key=KeyIr(key="id", cast=None), loader_spec=loader_spec)
 
 
-def test_converter_rejects_unknown_output_fields() -> None:
-    config = _make_config(
-        source_fields={"order_id": _make_source_field("order_id", extract="order_id")},
-        output_fields=["missing"],
-    )
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
-
-    with pytest.raises(ConversionError, match="Output fields reference unknown fields"):
-        converter.convert(config)
-
-
-def test_converter_skips_unrequired_source_and_derived_fields() -> None:
+def test_converter_does_not_filter_fields() -> None:
     source_fields = {
         "order_id": _make_source_field("order_id", extract="order_id"),
         "amount": _make_source_field("amount", extract="amount"),
@@ -90,14 +75,12 @@ def test_converter_skips_unrequired_source_and_derived_fields() -> None:
         "total": DerivedFieldConfig(field_id="total", name="total", compute="amount", depends_on=("amount",)),
         "unused": DerivedFieldConfig(field_id="unused", name="unused", compute="order_id", depends_on=("order_id",)),
     }
-    config = _make_config(source_fields=source_fields, derived_fields=derived_fields, output_fields=["total"])
+    config = _make_config(source_fields=source_fields, derived_fields=derived_fields)
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
 
     demand_ir = converter.convert(config)
 
-    assert "order_id" not in demand_ir.fields
-    assert "total" in demand_ir.fields
-    assert "unused" not in demand_ir.fields
+    assert set(demand_ir.fields.keys()) == {"order_id", "amount", "total", "unused"}
 
 
 def test_converter_collects_nested_derived_dependencies() -> None:
@@ -108,7 +91,7 @@ def test_converter_collects_nested_derived_dependencies() -> None:
         "net": DerivedFieldConfig(field_id="net", name="net", compute="amount", depends_on=("amount",)),
         "total": DerivedFieldConfig(field_id="total", name="total", compute="net", depends_on=("net",)),
     }
-    config = _make_config(source_fields=source_fields, derived_fields=derived_fields, output_fields=["total"])
+    config = _make_config(source_fields=source_fields, derived_fields=derived_fields)
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
 
     demand_ir = converter.convert(config)
@@ -116,24 +99,6 @@ def test_converter_collects_nested_derived_dependencies() -> None:
     assert "amount" in demand_ir.fields
     assert "net" in demand_ir.fields
     assert "total" in demand_ir.fields
-
-
-def test_resolve_required_field_ids_handles_missing_derived_entry() -> None:
-    config = _make_config(output_fields=["ghost"])
-    config = DemandConfig(
-        name=config.name,
-        main_source=config.main_source,
-        sources=config.sources,
-        source_fields=config.source_fields,
-        derived_fields=_DerivedFieldsDict(),
-        relations=config.relations,
-        output=config.output,
-    )
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
-
-    required = converter._resolve_required_field_ids(config)
-
-    assert required == {"ghost"}
 
 
 def test_converter_step_to_field_tuple() -> None:
@@ -181,7 +146,6 @@ def test_converter_source_field_missing_source_or_extract() -> None:
 def test_converter_rejects_invalid_source_field_extract_expression() -> None:
     config = _make_config(
         source_fields={"bad": _make_source_field("bad", extract="a..b")},
-        output_fields=["bad"],
     )
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
 

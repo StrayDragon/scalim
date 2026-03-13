@@ -22,10 +22,10 @@ main_source:
   source_id: orders
   loader: tests.conftest.mock_loader
   fields:
-    order_id: &order_id
+    order_id:
       extract: order_id
       name: Order ID
-    region: &region
+    region:
       extract: region
       name: Region
     customer_id:
@@ -38,26 +38,21 @@ sources:
     params:
       ids: {$keys: {as: set}}
     fields:
-      customer_name: &customer_name
+      customer_name:
         extract: customer_name
         name: Customer Name
+        relation:
+          steps:
+            - from: orders.customer_id
+              to: customers.customer_id
 fields:
-  profit: &profit
+  profit:
     name: Profit
     compute: "order_id"
-relations:
-  orders_to_customers: &orders_to_customers
-    steps:
-      - from: orders.customer_id
-        to: customers.customer_id
-output:
-  fields:
-    - *order_id
-    - field_id: customer_name
-      name: Customer Name Override
-    - field_id: region
-      name: Region Override
-    - *profit
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [order_id, customer_name, region, profit]
 """,
     )
 
@@ -66,8 +61,8 @@ output:
     assert result["params"] == {}
     assert result["output_fields"] == ["order_id", "customer_name", "region", "profit"]
     assert result["field_name_mapping"]["order_id"] == "Order ID"
-    assert result["field_name_mapping"]["customer_name"] == "Customer Name Override"
-    assert result["field_name_mapping"]["region"] == "Region Override"
+    assert result["field_name_mapping"]["customer_name"] == "Customer Name"
+    assert result["field_name_mapping"]["region"] == "Region"
     assert result["field_name_mapping"]["profit"] == "Profit"
 
 
@@ -82,13 +77,12 @@ main_source:
   source_id: orders
   loader: tests.conftest.mock_loader
 sources: {}
-output:
-  fields:
-    - field_id: missing
-      name: Missing
-    - 123
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [missing]
 """,
-            "Output field 'missing' not found",
+            "outputs.detail.fields reference unknown fields: missing",
         ),
         (
             "export_sources.yaml",
@@ -106,9 +100,10 @@ sources:
       customer_id:
         extract: customer_id
         name: Customer
-output:
-  fields:
-    - field_id: customer_id
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [customer_id]
 """,
             "Source 'bad' must be a dictionary",
         ),
@@ -123,7 +118,7 @@ sources: {}
 output:
   fields: customer_id
 """,
-            "output.fields must be a list",
+            "Legacy YAML syntax is not supported: top-level 'output'",
         ),
     ],
     ids=["missing-output", "bad-sources", "bad-output-list"],

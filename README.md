@@ -61,15 +61,16 @@ sources:
   payments:
     loader: load_payments
     key: id
-    bind: {use_keys: {param: ids}}
+    params:
+      ids: {$keys: {as: set}}
     fields:
       method:
         name: 支付方式
-        field: payment_method
-        relation: *orders_to_payments
+        extract: payment_method
+        relation: orders_to_payments
 
 relations:
-  orders_to_payments: &orders_to_payments
+  orders_to_payments:
     steps:
       - from: orders.pay_id
         to: payments.id
@@ -79,9 +80,10 @@ fields:
     name: 总金额
     compute: "sum(amount)"
 
-output:
-  format: csv
-  path: ./output/orders_report.csv```
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/orders_report.csv, header_fields_output_by: name}
+    fields: [order_id, method, total_amount]
 ```
 
 ## 快速上手

@@ -20,7 +20,11 @@
 - `fields`
 - `relations`
 - `guardrails`
-- `output`
+- `outputs`
+- `failure_policy`
+- `include_full_error_message`
+- `meta`
+- `audit`
 - `observability`
 
 ## Definitions
@@ -34,7 +38,11 @@
 - `main_source`
 - `memory_opt`
 - `observability`
-- `output`
+- `output_aggregate`
+- `output_aggregate_metric`
+- `output_container`
+- `output_extra_sheet`
+- `output_target`
 - `performance`
 - `performance_report`
 - `performance_thresholds`
@@ -308,16 +316,60 @@
 - `allOf`:
   - 1. ref `#/definitions/guardrails`
 
-### `output`
+### `outputs`
+- Type: `array`
 - Description:
-  输出配置.
+  输出目标列表(有序).
   
-  - 可选: 不写 `output` 时使用默认输出策略
-  - 推荐: 把 `YAML` 当模板使用,在 Python 调用侧用 `overrides.output.*` 覆盖输出策略
-  - 默认 `format: csv`
-  - 字段重复时需要显式 `output.fields` 进行消歧
-- `allOf`:
-  - 1. ref `#/definitions/output`
+  - 通过 `where` 分发到不同 sheet
+  - 通过 `aggregate` 声明派生汇总输出
+  - 通过 `from` 复用字段集合与容器配置
+  - 不再支持旧写法: 顶层 `output:`
+- Examples: `[{"container": {"path": "./output/report.xlsx", "sheet": "明细", "type": "workbook"}, "fields": ["order_id", "user_id"], "name": "detail"}]`
+- `minItems`: `0`
+- `items`: ref `#/definitions/output_target`
+
+### `failure_policy`
+- Type: `string`
+- Description:
+  多输出失败策略.
+  
+  - `all_fail`: 任一目标失败即失败
+  - `primary_only`: 非主输出失败将被禁用但不阻断主输出
+- Enum: `all_fail`, `primary_only`
+- Default: `all_fail`
+- Examples: `all_fail`
+
+### `include_full_error_message`
+- Type: `boolean`
+- Description:
+  包含完整错误信息(可能包含敏感信息;默认 false).
+- Default: `False`
+- Examples: `false`
+
+### `meta`
+- Type: `boolean` | ref `#/definitions/output_extra_sheet`
+- Description:
+  可选:启用 meta sheet.
+  
+  - `true` 表示启用并使用默认配置
+  - 对象形式可覆盖 sheet 名称与 workbook 路径
+- Examples: `true`, `{"sheet": "__meta__"}`
+- `oneOf`:
+  - 1. `boolean`
+  - 2. ref `#/definitions/output_extra_sheet`
+
+### `audit`
+- Type: `boolean` | ref `#/definitions/output_extra_sheet`
+- Description:
+  可选:启用 audit sheet.
+  
+  - `true` 表示启用并使用默认配置
+  - 对象形式可覆盖 sheet 名称与 workbook 路径
+- Examples: `true`, `{"sheet": "__audit__"}`
+- `oneOf`:
+  - 1. `boolean`
+  - 2. ref `#/definitions/output_extra_sheet`
 
 ### `observability`
 - Description:
@@ -445,19 +497,72 @@
   - `trace`: allOf(1)
   - `viz`: allOf(1)
 
-### `output`
-- Definition path: `definitions.output`
+### `output_aggregate`
+- Definition path: `definitions.output_aggregate`
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
-  - `fields`: `array`, items `object`, oneOf(2)
+  - `distinct_on_overflow`: `string`, enum `error`, `truncate`
+  - `group_by` (required): `array`, items `string`
+  - `max_distinct`: `integer`
+  - `max_groups`: `integer`
+  - `metrics` (required): `object`
+  - `rank_by`: `string`
+  - `rank_field_id`: `string`
+  - `rank_order`: `string`, enum `asc`, `desc`
+  - `top_k`: `integer`
+
+### `output_aggregate_metric`
+- Definition path: `definitions.output_aggregate_metric`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `fields`: `array`, items `string`
+  - `field`: `string`
+  - `op` (required): `string`, enum `count`, `sum`, `min`, `max`, `count_true`, `count_true_gte`, `count_distinct`
+  - `threshold`: 阈值(部分算子需要)
+
+### `output_container`
+- Definition path: `definitions.output_container`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `allow_formulas`: `boolean`
   - `encoding`: `string`
-  - `format`: `string`, enum `excel`, `csv`
   - `header_fields_output_by`: `string`, enum `field_id`, `name`
   - `include_header`: `boolean`
-  - `path`: `string`
+  - `path` (required): `string`
+  - `sheet`: `string`
   - `streaming`: `boolean`
+  - `type` (required): `string`, enum `workbook`, `csv`
+  - `write_lock`: `boolean`
+
+### `output_extra_sheet`
+- Definition path: `definitions.output_extra_sheet`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `allow_formulas`: `boolean`
+  - `path`: `string`
+  - `sheet`: `string`
+  - `write_lock`: `boolean`
+
+### `output_target`
+- Definition path: `definitions.output_target`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `name` (required): `string`
+  - `$import`: `string` | `array`, oneOf(2)
+  - `fields`: `array`, items `string`
+  - `aggregate`: allOf(1)
+  - `container`: allOf(1)
+  - `from`: `string`
+  - `where`: `string`
 
 ### `performance`
 - Definition path: `definitions.performance`
@@ -477,9 +582,9 @@
 - `additionalProperties`: `false`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
-  - `output`: `string`
   - `format`: `string`, enum `console`, `json`, `csv`, `none`
   - `include_details`: `boolean`
+  - `output`: `string`
 
 ### `performance_thresholds`
 - Definition path: `definitions.performance_thresholds`
@@ -504,8 +609,8 @@
 - `additionalProperties`: `false`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
-  - `output`: `string`
   - `format`: `string`, enum `console`, `json`, `none`
+  - `output`: `string`
 
 ### `relations`
 - Definition path: `definitions.relations`

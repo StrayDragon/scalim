@@ -1,11 +1,6 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ...schema_dsl.constants import (
-    DEFAULT_OUTPUT_ENCODING,
-    DEFAULT_OUTPUT_FORMAT,
-    DEFAULT_OUTPUT_HEADER_BY,
-    DEFAULT_OUTPUT_INCLUDE_HEADER,
-    DEFAULT_OUTPUT_STREAMING,
     DEFAULT_PERF_REPORT_FORMAT,
     DEFAULT_PERF_SAMPLING_INTERVAL,
     DEFAULT_REL_LOG_TYPE_MISMATCH,
@@ -18,7 +13,6 @@ from ...schema_dsl.models import (
     LOGGING_KEYS,
     MEMORY_OPTIMIZATION_KEYS,
     OBSERVABILITY_KEYS,
-    OUTPUT_KEYS,
     PERFORMANCE_KEYS,
     PERFORMANCE_REPORT_KEYS,
     PERFORMANCE_THRESHOLDS_KEYS,
@@ -30,7 +24,6 @@ from ...schema_dsl.models import (
     LoggingConfig,
     MemoryOptimizationConfig,
     ObservabilityConfig,
-    OutputConfig,
     PerformanceConfig,
     PerformanceReportConfig,
     PerformanceThresholdsConfig,
@@ -51,23 +44,6 @@ class VizEventModeRemovedError(ValueError):
 
 
 class ParserOutputMixin:
-    def _parse_output(self, raw: Dict[str, Any], output_fields: Optional[List[str]] = None) -> Optional[OutputConfig]:
-        output_dict = mapping_or_none(raw.get(DEMAND_KEYS["output"]))
-        if output_dict is None:
-            return None
-
-        output_format = str(output_dict.get(OUTPUT_KEYS["format"], DEFAULT_OUTPUT_FORMAT))
-        resolved_fields = list(output_fields) if output_fields is not None else list_or_none(output_dict.get(OUTPUT_KEYS["fields"]))
-        return OutputConfig(
-            format=output_format,
-            path=str_or_none(output_dict.get(OUTPUT_KEYS["path"])),
-            encoding=str(output_dict.get(OUTPUT_KEYS["encoding"], DEFAULT_OUTPUT_ENCODING)),
-            streaming=bool(output_dict.get(OUTPUT_KEYS["streaming"], DEFAULT_OUTPUT_STREAMING)),
-            include_header=bool(output_dict.get(OUTPUT_KEYS["include_header"], DEFAULT_OUTPUT_INCLUDE_HEADER)),
-            header_fields_output_by=str(output_dict.get(OUTPUT_KEYS["header_fields_output_by"], DEFAULT_OUTPUT_HEADER_BY)),
-            fields=resolved_fields,
-        )
-
     def _parse_observability(self, raw: Dict[str, Any]) -> Optional[ObservabilityConfig]:
         observability_dict = mapping_or_none(raw.get(DEMAND_KEYS["observability"]))
         if observability_dict is None:

@@ -9,7 +9,7 @@
 
     - YAML DSL 的 JSON Schema 与语义校验规则变更
     - `loader` / `call_by` 的解析与 allowlist 规则变更
-    - `output` / `observability` 等关键字段的结构与默认值变更
+    - `outputs` / `observability` 等关键字段的结构与默认值变更
 
 ## 目录
 
@@ -38,7 +38,7 @@ Scalim YAML DSL 是一个用于配置数据关联和报表生成的声明式配�
 
 下面给出两个层次的示例:
 
-**最小模板示例**(仅包含必填字段;顶层 `sources` 可缺省并视为 `{}`;推荐把 `YAML` 当作模板使用,不写顶层 `output`):
+**最小模板示例**(仅包含必填字段;顶层 `sources` 可缺省并视为 `{}`;推荐把 `YAML` 当作模板使用,不声明 `outputs`):
 
 ```yaml
 name: minimal_order_report
@@ -63,14 +63,16 @@ result = run(
 )
 ```
 
-当然,也可以在 YAML 内固定输出路径(可选):
+当然,也可以在 YAML 内固定输出路径(可选;使用 `outputs`):
 
 ```yaml
-output:
-  path: ./output/minimal_order_report.csv
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/minimal_order_report.csv}
+    fields: [order_id]
 ```
 
-**更完整示例**(包含 sources/relations/derived fields/output.fields):
+**更完整示例**(包含 sources/relations/derived fields/outputs):
 
 ```yaml
 name: simple_order_report
@@ -109,15 +111,10 @@ fields:
     name: 总金额
     compute: "sum(amount)"
 
-output:
-  format: csv
-  path: ./output/order_report.csv
-  fields:
-    - field_id: order_id
-      name: 订单ID
-    - field_id: customer_name
-    - field_id: amount
-    - field_id: total_amount
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/order_report.csv, header_fields_output_by: name}
+    fields: [order_id, customer_name, amount, total_amount]
 ```
 
 ### 1.3 运行配置的方法
@@ -148,7 +145,7 @@ result = run(
     allowed_modules=frozenset(["myapp.loaders"]),
 )
 
-# 常见用法: YAML 不写 output,由 Python overrides 决定输出策略
+# 常见用法: YAML 不声明 outputs,由 Python overrides/sink 决定单输出策略
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
@@ -239,21 +236,44 @@ relations:
 - **多级关联**: `A → B → C`
 - **复合键关联**: `[f1, f2] → [k1, k2]`
 
-### 2.5 输出配置 (output)
+### 2.5 输出配置 (outputs)
 
-定义报表的输出格式、路径和字段顺序:
+定义报表的多输出编排(有序列表),支持 workbook 多 sheet 分发(where)与派生汇总(aggregate):
 
 ```yaml
-output:
-  format: csv                      # 输出格式:csv/excel
-  path: ./output/report.csv        # 输出路径
-  encoding: utf-8                  # 文件编码
-  streaming: true                  # 流式输出
-  include_header: true             # 包含表头
-  header_fields_output_by: name    # 表头使用 name 或 field_id
-  fields:                          # 输出字段顺序
-    - field_id: order_id
-    - field_id: customer_name
+meta: true
+audit: true
+
+outputs:
+  - name: detail
+    container:
+      type: workbook
+      path: ./output/report.xlsx
+      sheet: 明细
+      header_fields_output_by: name
+      write_lock: true
+    fields: [order_id, customer_name, amount]
+
+  - name: direct
+    from: detail
+    container:
+      type: workbook
+      path: ./output/report.xlsx
+      sheet: 直客
+      write_lock: true
+    where: "channel == 'direct'"
+
+  - name: by_channel
+    container:
+      type: workbook
+      path: ./output/report.xlsx
+      sheet: 渠道汇总
+      write_lock: true
+    aggregate:
+      group_by: [channel]
+      metrics:
+        order_cnt: {op: count}
+        sum_amount: {op: sum, field: amount}
 ```
 
 ---
@@ -788,33 +808,25 @@ relations:
           sep: ","
 ```
 
-### 3.6 输出配置 (output)
+### 3.6 输出配置 (outputs)
 
-`output` 可省略;常用字段:
+`outputs` 可省略;声明后进入 composed outputs 模式.常用字段:
 
-- `format` (default: `csv`)
-- `path`
-- `fields` (输出字段顺序/选择器)
+- `outputs`: 有序列表(顺序决定 primary 输出)
+- `outputs.*.container`: 输出容器(workbook/csv)与路径/工作表等
+- `outputs.*.fields`: 明细输出的导出列顺序(field_id 列表)
+- `outputs.*.where`: 安全表达式过滤(用于分发多 sheet)
+- `outputs.*.aggregate`: 派生汇总输出(与 `fields` 互斥)
 
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `output` definition.
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `outputs` / `output_container` / `output_target` definitions.
 
 **示例**:
 
 ```yaml
-output:
-  format: csv
-  path: ./output/order_report.csv
-  encoding: utf-8
-  streaming: true
-  include_header: true
-  header_fields_output_by: name    # 使用字段的 name 作为表头
-  fields:
-    - field_id: order_id
-      name: 订单ID
-    - *customer_name                # YAML 别名引用
-    - {field_id: amount}            # 简写对象
-    - field_id: profit
-      name: 利润(输出覆写)          # 覆盖原 name
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/order_report.csv, header_fields_output_by: name}
+    fields: [order_id, customer_name, amount, profit]
 ```
 
 ### 3.7 可观测性配置 (observability)
@@ -1090,16 +1102,16 @@ sources:
 - `preload_forever` 场景允许声明 `params`.当 `params` 非空时,预加载调用会透传 kwargs;为空则保持零参 preload.
 - `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`.
 
-### 4.5 多输出组合与派生汇总 (IR/Python-only)
+### 4.5 多输出编排与派生汇总 (outputs / output_composition)
 
-`YAML DSL` 仍然是**单输出**模型(顶层 `output` 仅描述一个输出目标).
-当你需要在**同一次运行**内交付“明细 + 汇总 + meta/audit”并写入同一 workbook 的多 sheet 时,应在 Python 调用侧使用执行层的 `output_composition` 能力.
+`YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 workbook 多 sheet / where 分发 / aggregate 派生汇总 / meta/audit).
+运行时会自动将 `outputs` 装配为等价的执行层 `OutputCompositionSpec`.
 
 关键点:
 
-- 该能力不要求 YAML 写法变更;你可以继续把 YAML 当作“宽表需求模板”.
-- 当多个输出共享同一 Excel `path` 时,每个输出必须显式设置 `sheet_name`(否则会覆盖同一个文件).
-- 派生汇总目前支持 streaming-friendly 的内置聚合(count/sum/min/max/count_true)与可选 finalize 排序/排名.
+- `outputs` 是有序列表;顺序决定 primary 输出
+- 当多个 outputs 共享同一 Excel `path` 时,每个 output 必须显式设置 `sheet`(否则会覆盖同一个 sheet)
+- 如需在 Python 调用侧完全覆盖 YAML 的 outputs,可以传入 `output_composition=...`(driver override)
 
 #### 4.5.1 示例: 单次运行写入同一 workbook 的多 sheet(明细 + 汇总 + meta + audit)
 
@@ -1179,7 +1191,7 @@ spec = OutputCompositionSpec(
 
 request = replace(
     comp.request,
-    output=OutputSpec(path=None),  # 禁用 YAML 的单输出文件装配(由 output_composition 接管)
+    output=OutputSpec(path=None),  # 禁用默认单输出输出(由 output_composition 接管)
     sink=None,
     output_composition=spec,
 )
@@ -1284,18 +1296,10 @@ fields:
     name: 利润率
     compute: "(amount - cost) / amount * 100 if amount > 0 else 0"
 
-output:
-  format: csv
-  path: ./.tmp/output/order_report.csv
-  encoding: utf-8
-  streaming: true
-  include_header: true
-  fields:
-    - field_id: order_id
-    - field_id: customer_name
-    - field_id: amount
-    - field_id: cost
-    - field_id: profit
+outputs:
+  - name: detail
+    container: {type: csv, path: ./.tmp/output/order_report.csv}
+    fields: [order_id, customer_name, amount, cost, profit]
 ```
 
 ### 5.2 示例2: 电商报表(多级关联、复合键、派生字段)
@@ -1437,27 +1441,23 @@ fields:
     name: 最终价格
     compute: "order_amount * price_adjustment + shipping_fee"
 
-output:
-  format: csv
-  path: ./.tmp/output/ecommerce_report.csv
-  encoding: utf-8
-  streaming: true
-  include_header: true
-  header_fields_output_by: name
-  fields:
-    - field_id: order_id
-    - field_id: customer_name
-    - field_id: quantity
-    - field_id: unit_price
-    - field_id: product_name
-    - field_id: category_name
-    - field_id: price_adjustment
-    - field_id: shipping_fee
-    - field_id: tax_rate
-    - field_id: order_amount
-    - field_id: profit
-    - field_id: tax_amount
-    - field_id: final_price
+outputs:
+  - name: detail
+    container: {type: csv, path: ./.tmp/output/ecommerce_report.csv, header_fields_output_by: name}
+    fields:
+      - order_id
+      - customer_name
+      - quantity
+      - unit_price
+      - product_name
+      - category_name
+      - price_adjustment
+      - shipping_fee
+      - tax_rate
+      - order_amount
+      - profit
+      - tax_amount
+      - final_price
 
 observability:
   performance:
@@ -1577,8 +1577,10 @@ sources:
 **3. 启用流式输出**:
 
 ```yaml
-output:
-  streaming: true    # 减少内存占用
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/report.csv, streaming: true} # streaming=true(按行写出;减少内存占用)
+    fields: [order_id]
 ```
 
 **4. 使用 `$keys` 而非 `$rows`(尽量避免 rows barrier)**:
@@ -1748,18 +1750,26 @@ fields:
     compute: "order_amount * tax_rate"
 ```
 
-### Q3: 如何处理一个 source_id 在多个 field 中重复的情况？
+### Q3: 不同 source 下 field_id 重名怎么办？
 
-**A**: 在 `output.fields` 中显式指定 `source`:
+**A**: `field_id` 必须全局唯一.请在 YAML 中重命名这些字段(用 `extract` 指向真实 data_key),例如:
 
 ```yaml
-output:
-  fields:
-    - field_id: name
-      source: customers        # 指定来源
-    - field_id: name
-      source: products
+sources:
+  customers:
+    fields:
+      customer_name:
+        extract: name
+        name: 客户名称
+
+  products:
+    fields:
+      product_name:
+        extract: name
+        name: 产品名称
 ```
+
+然后在 `outputs.*.fields` 中直接使用 `customer_name` / `product_name`.
 
 ### Q4: lookup_cast 和 value_cast 有什么区别？
 
@@ -1816,8 +1826,10 @@ batch_size: 500    # 默认 1000
 2. **启用流式输出**:
 
 ```yaml
-output:
-  streaming: true
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/report.csv, streaming: true}
+    fields: [order_id]
 ```
 
 3. **优先使用 `$keys`(而不是 `$rows`)**:
@@ -1866,13 +1878,14 @@ _ = YamlDemandLoader().load("config.yaml")
 
 **A**:
 
-- **CSV**: `format: csv`(默认)
-- **Excel**: `format: excel`(需要 `openpyxl` 依赖)
+- **CSV**: `outputs.*.container.type: csv`
+- **Excel(workbook)**: `outputs.*.container.type: workbook`(需要 `openpyxl` 依赖)
 
 ```yaml
-output:
-  format: excel
-  path: ./output/report.xlsx
+outputs:
+  - name: detail
+    container: {type: workbook, path: ./output/report.xlsx, sheet: 明细}
+    fields: [order_id]
 ```
 
 ### Q10: 如何在 Python 中调用 YAML DSL？

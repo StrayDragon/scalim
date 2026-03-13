@@ -45,7 +45,6 @@ def _demo_yaml_path() -> Path:
 
 def _write_yaml_without_output(tmp_path: Path, source_path: Path) -> Path:
     content = source_path.read_text(encoding="utf-8")
-    content = content.replace("path: ./.tmp/output/order_report.csv", 'path: ""')
     output_path = tmp_path / "order_report_no_output.yaml"
     output_path.write_text(content, encoding="utf-8")
     return output_path
@@ -53,28 +52,32 @@ def _write_yaml_without_output(tmp_path: Path, source_path: Path) -> Path:
 
 def _write_yaml_with_column_output(tmp_path: Path, source_path: Path) -> Path:
     content = source_path.read_text(encoding="utf-8")
-    content = content.replace("streaming: true", "streaming: false")
     output_path = tmp_path / "order_report_column.yaml"
     output_path.write_text(content, encoding="utf-8")
     return output_path
 
 
 def _write_yaml_with_output_path(tmp_path: Path, source_path: Path, output_path: Path) -> Path:
-    content = source_path.read_text(encoding="utf-8")
-    content = content.replace("path: ./.tmp/output/order_report.csv", 'path: "{}"'.format(output_path))
+    import yaml
+
+    config = yaml.safe_load(source_path.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise TypeError("expected mapping")
+    config["outputs"] = [
+        {
+            "name": "detail",
+            "container": {"type": "csv", "path": str(output_path)},
+            "fields": ["order_id"],
+        }
+    ]
+
     yaml_path = tmp_path / "order_report_custom_output.yaml"
-    yaml_path.write_text(content, encoding="utf-8")
+    yaml_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
     return yaml_path
 
 
 def _write_yaml_with_named_headers(tmp_path: Path, source_path: Path, output_path: Path) -> Path:
     content = source_path.read_text(encoding="utf-8")
-    content = content.replace(
-        "include_header: true",
-        "include_header: true\n  header_fields_output_by: name",
-        1,
-    )
-    content = content.replace("path: ./.tmp/output/order_report.csv", 'path: "{}"'.format(output_path))
     yaml_path = tmp_path / "order_report_named_headers.yaml"
     yaml_path.write_text(content, encoding="utf-8")
     return yaml_path
@@ -129,7 +132,7 @@ def test_run_outputs_and_returns_data(
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
+        overrides=RunOverrides(output=OutputOverrides(path=str(output_path), streaming=output_name != "order_report_column.csv")),
         sink=sink,
     )
 
@@ -151,7 +154,7 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
+        overrides=RunOverrides(output=OutputOverrides(path=str(output_path), header_fields_output_by="name")),
     )
 
     with output_path.open("r", encoding="utf-8", newline="") as handle:
@@ -159,8 +162,8 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
         header = next(reader)
         first_row = next(reader)
 
-    output_fields = list(result.config.output.fields) if result.config.output and result.config.output.fields else []
-    export_layout = export_layout_from_demand_ir(result.demand_ir, output_fields, header_fields_output_by="name")
+    target_fields = list(result.demand_ir.fields.keys())
+    export_layout = export_layout_from_demand_ir(result.demand_ir, target_fields, header_fields_output_by="name")
     expected_headers = list(export_layout.header_names or export_layout.field_ids)
     assert header == expected_headers
     assert first_row[0] != ""

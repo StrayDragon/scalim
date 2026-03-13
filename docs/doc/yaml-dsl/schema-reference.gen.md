@@ -21,7 +21,11 @@ Sources:
 - `fields`: type=object; 字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用
 - `relations`: type=object; 命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`
 - `guardrails`: ref=guardrails; 运行时护栏配置. - 默认关闭 - 用于控制 loader/relations/compute 等运行期护栏策略
-- `output`: ref=output; 输出配置. - 可选: 不写 `output` 时使用默认输出策略 - 推荐: 把 `YAML` 当模板使用,在 Python 调用侧用 `overrides.output.*` 覆盖输出策略 - 默认 `format: csv` - 字段重复时需要显式 `output.fields` 进行消歧
+- `outputs`: type=array[ref=output_target]; 输出目标列表(有序). - 通过 `where` 分发到不同 sheet - 通过 `aggregate` 声明派生汇总输出 - 通过 `from` 复用字段集合与容器配置 - 不再支持旧写法: 顶层 `output:`
+- `failure_policy`: type=string; 多输出失败策略. - `all_fail`: 任一目标失败即失败 - `primary_only`: 非主输出失败将被禁用但不阻断主输出
+- `include_full_error_message`: type=boolean; 包含完整错误信息(可能包含敏感信息;默认 false).
+- `meta`: ref=output_extra_sheet; 可选:启用 meta sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径
+- `audit`: ref=output_extra_sheet; 可选:启用 audit sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径
 - `observability`: ref=observability; 可观测性配置. 包含 `logging`、`performance`、`relations`、`viz`、`trace`、`row_gap` 与 `memory_opt` 子配置.
 
 ## Definitions
@@ -102,15 +106,60 @@ Sources:
 - `trace`: ref=trace; 执行追踪配置
 - `viz`: ref=viz; Scalim Viz 可视化输出配置
 
-### `output`
+### `output_aggregate`
+
+- Required: `group_by`, `metrics`
 - `$import`: $import 引用(支持 string 或 string list)
-- `encoding`: type=string; default=utf-8; 文件编码
-- `fields`: type=array; 输出字段顺序(支持 string sugar / 对象条目 / YAML alias; 推荐显式对象)
-- `format`: type=string; default=csv; enum=excel|csv; 输出格式 (excel/csv)
-- `header_fields_output_by`: type=string; default=field_id; enum=field_id|name; 表头字段名来源: field_id=使用字段ID, name=使用字段的name属性
+- `distinct_on_overflow`: type=string; default=error; enum=error|truncate; distinct 护栏溢出策略(error/truncate)
+- `group_by` (required): type=array[string]; 分组字段列表
+- `max_distinct`: type=integer; default=0; max_distinct 护栏(0 表示不限制)
+- `max_groups`: type=integer; default=0; max_groups 护栏(0 表示不限制)
+- `metrics` (required): type=object; 聚合指标映射(key 为 out_field_id)
+- `rank_by`: type=string; 可选:按某个输出字段排序生成 rank/top_k
+- `rank_field_id`: type=string; default=rank; rank 输出字段名
+- `rank_order`: type=string; default=desc; enum=asc|desc; rank 排序方向(asc/desc)
+- `top_k`: type=integer; default=0; top_k 限制(0 表示不限制)
+
+### `output_aggregate_metric`
+
+- Required: `op`
+- `$import`: $import 引用(支持 string 或 string list)
+- `field`: type=string; 输入字段(field_id)
+- `fields`: type=array[string]; 输入字段列表(field_id 列表)
+- `op` (required): type=string; enum=count|sum|min|max|count_true|count_true_gte|count_distinct; 聚合算子
+- `threshold`: 阈值(部分算子需要)
+
+### `output_container`
+
+- Required: `path`, `type`
+- `$import`: $import 引用(支持 string 或 string list)
+- `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(仅 workbook)
+- `encoding`: type=string; default=utf-8; 文件编码(CSV 输出使用)
+- `header_fields_output_by`: type=string; default=field_id; enum=field_id|name; 表头字段名来源: field_id/name
 - `include_header`: type=boolean; default=true; 包含表头行
-- `path`: type=string; 输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)
-- `streaming`: type=boolean; default=true; 启用流式输出
+- `path` (required): type=string; 输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)
+- `sheet`: type=string; Excel sheet 名称(仅 workbook)
+- `streaming`: type=boolean; default=true; 启用流式输出(必须为 true)
+- `type` (required): type=string; enum=workbook|csv; 输出容器类型(workbook/csv)
+- `write_lock`: type=boolean; default=false; 写锁(仅 workbook)
+
+### `output_extra_sheet`
+- `$import`: $import 引用(支持 string 或 string list)
+- `allow_formulas`: type=boolean; 可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置)
+- `path`: type=string; 可选:工作簿路径(缺省使用 primary workbook)
+- `sheet`: type=string; sheet 名称
+- `write_lock`: type=boolean; 可选:写锁(缺省使用 primary workbook 的容器配置)
+
+### `output_target`
+
+- Required: `name`
+- `$import`: $import 引用(支持 string 或 string list)
+- `aggregate`: ref=output_aggregate; 可选:派生汇总配置(声明后视为 derived output)
+- `container`: ref=output_container; 输出容器配置(workbook/csv)
+- `fields`: type=array[string]; 明细输出字段顺序(field_id 列表)
+- `from`: type=string; 可选:继承来源输出(name)
+- `name` (required): type=string; 输出名称(name)
+- `where`: type=string; 可选:过滤表达式(安全表达式)
 
 ### `performance`
 - `$import`: $import 引用(支持 string 或 string list)

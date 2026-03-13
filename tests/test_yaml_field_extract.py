@@ -163,19 +163,6 @@ sources:
       review_status:
         extract: review_status
         relation: *orders_to_clearn_reasons
-
-output:
-  fields:
-    - field_id: order_id
-    - field_id: good_level
-    - field_id: bad_level
-    - field_id: list_index_x
-    - field_id: dotted_x
-    - field_id: int_key_x
-    - field_id: str_key_x
-    - field_id: customer_level
-    - field_id: operation_level
-    - field_id: review_status
 """.lstrip()
 
     yaml_path = tmp_path / "demand.yaml"

@@ -31,12 +31,13 @@ def run(
     """运行 `YAML DSL`,并支持显式覆盖项与输出 `sink`.
 
     优先级(高 -> 低):
-    - `overrides.*`(仅对未设为 `UNSET` 的字段生效)
-    - 配置文件中的 `output.*`
+    - `output_composition=...`(完全覆盖 `YAML` 的 `outputs`)
+    - `overrides.*`(仅对未设为 `UNSET` 的字段生效;主要用于单输出模式)
     - 执行默认值
 
     注意:
-    - `overrides.output.path=None` 会禁用文件输出,即使 `YAML` 设置了 `output.path`.
+    - 当 `YAML` 声明 `outputs` 时,会自动装配 `composed outputs`;此时 `overrides.output.*` 不影响 `outputs.*.container.*`.
+    - `overrides.output.path=None` 会禁用单输出模式的文件输出.
     - `overrides.viz_config` 可启用/禁用 `viz`,不受 `YAML` 的 `observability.viz.*` 影响.
     - 输出数据的保留完全由 `sink=...`(例如 `InMemoryRowSink`)决定,而不是由布尔开关控制.
     """

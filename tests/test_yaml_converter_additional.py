@@ -3,9 +3,7 @@ import pytest
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
 from scalim.dsl.by_yaml.runtime.errors import ConversionError
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, MainSourceConfig, OutputConfig
 from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
 
 
@@ -41,10 +39,10 @@ relations:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
-output:
-  fields:
-    - *order_id
-    - *customer_name
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [order_id, customer_name]
 """
     config = _load_config(yaml_content)
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
@@ -69,16 +67,13 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
-output:
-  fields:
-    - field_id: missing_field
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [missing_field]
 """
-    loader = YamlDemandLoader()
-
-    with pytest.raises(ConfigValidationError) as exc:
-        loader.load_string(yaml_content)
-
-    assert any("Output field 'missing_field' not found" in msg for msg in exc.value.errors)
+    with pytest.raises(ValueError, match=r"outputs\.detail\.fields reference unknown fields: missing_field"):
+        _ = _load_config(yaml_content)
 
 
 def test_converter_multi_field_lookup_cast() -> None:
@@ -131,9 +126,10 @@ relations:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
-output:
-  fields:
-    - *customer_name
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [customer_name]
 """
     config = _load_config(yaml_content)
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
@@ -165,21 +161,6 @@ fields:
     const_field = demand_ir.fields["const"]
     assert isinstance(const_field, DerivedFieldIr)
     assert const_field.is_constant_compute is True
-
-
-def test_converter_resolve_required_field_ids_ignores_empty_order_by() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
-    config = DemandConfig(
-        main_source=MainSourceConfig(
-            source_id="orders",
-            loader="tests.conftest.mock_loader",
-            order_by=(" ",),
-        ),
-        output=OutputConfig(fields=["order_id"]),
-    )
-
-    required = converter._resolve_required_field_ids(config)
-    assert required == {"order_id"}
 
 
 def test_converter_rejects_invalid_order_by_entry() -> None:

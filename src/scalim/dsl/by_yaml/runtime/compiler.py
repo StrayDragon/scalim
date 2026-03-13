@@ -25,6 +25,7 @@ from .contracts import UNSET, Compilation, OutputOverrides, RunOptions
 from .conversion import ConfigToIRConverter
 from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError
 from .observability import compile_observability_spec
+from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
 
 if TYPE_CHECKING:
@@ -49,7 +50,6 @@ def validate_allowlist(
 
 
 def _resolve_target_field_ids(
-    config: DemandConfig,
     demand_ir: DemandIr,
     overrides: Optional[OutputOverrides],
 ) -> List[str]:
@@ -61,21 +61,11 @@ def _resolve_target_field_ids(
             msg = "overrides.output.fields cannot be empty (use None to select all fields)"
             raise ValueError(msg)
         return [str(fid) for fid in raw_fields]
-    if config.output and config.output.fields:
-        return list(config.output.fields)
     return list(demand_ir.fields.keys())
 
 
-def _compile_output_spec(config: DemandConfig, options: RunOptions) -> OutputSpec:
+def _compile_output_spec(options: RunOptions) -> OutputSpec:
     spec = OutputSpec()
-    if config.output:
-        spec = OutputSpec(
-            format=config.output.format,
-            path=config.output.path,
-            encoding=config.output.encoding,
-            streaming=config.output.streaming,
-            include_header=config.output.include_header,
-        )
 
     overrides = options.overrides.output if options.overrides is not None else None
     if overrides is None:
@@ -277,18 +267,25 @@ def build_request(
     resolver: SecurePythonReferenceResolver,
 ) -> ExecutionRequest:
     output_overrides = options.overrides.output if options.overrides is not None else None
-    target_field_ids = _resolve_target_field_ids(config, demand_ir, output_overrides)
+    yaml_output_composition = None
+    if options.output_composition is None and config.outputs:
+        yaml_output_composition = compile_output_composition_from_yaml(config, demand_ir)
+    output_composition = options.output_composition or yaml_output_composition
 
-    header_by = config.output.header_fields_output_by if config.output else "field_id"
-    if output_overrides is not None and output_overrides.header_fields_output_by is not UNSET:
-        header_by = str(output_overrides.header_fields_output_by)
-
-    export_layout = export_layout_from_demand_ir(
-        demand_ir,
-        target_field_ids,
-        header_fields_output_by=header_by,
-    )
-    output_spec = _compile_output_spec(config, options)
+    # 单输出模式: 仍可通过 `overrides.output.*` 控制输出. 当启用 `outputs`/`output_composition` 时, `export_layout`/`output` 会被忽略.
+    export_layout = export_layout_from_demand_ir(demand_ir, (), header_fields_output_by="field_id")
+    output_spec = OutputSpec(path=None)
+    if output_composition is None:
+        target_field_ids = _resolve_target_field_ids(demand_ir, output_overrides)
+        header_by = "field_id"
+        if output_overrides is not None and output_overrides.header_fields_output_by is not UNSET:
+            header_by = str(output_overrides.header_fields_output_by)
+        export_layout = export_layout_from_demand_ir(
+            demand_ir,
+            target_field_ids,
+            header_fields_output_by=header_by,
+        )
+        output_spec = _compile_output_spec(options)
 
     observability: Optional[ObservabilitySpec] = None
     components = list(options.components or [])
@@ -316,7 +313,7 @@ def build_request(
         export_layout=export_layout,
         output=output_spec,
         sink=options.sink,
-        output_composition=options.output_composition,
+        output_composition=output_composition,
         observability=observability,
         guardrails=guardrails,
         loader_retry=loader_retry,

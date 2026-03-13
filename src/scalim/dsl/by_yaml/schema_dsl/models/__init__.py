@@ -1,5 +1,5 @@
 from .demand import DemandConfig
-from .field import DerivedFieldConfig, OutputConfig, SourceFieldConfig
+from .field import DerivedFieldConfig, SourceFieldConfig
 from .guardrails import GuardrailsComputeConfig, GuardrailsConfig, GuardrailsLoaderConfig, GuardrailsRelationsConfig
 from .keys import (
     BIND_KEY_CONFIG_KEYS,
@@ -18,7 +18,11 @@ from .keys import (
     MEMORY_OPTIMIZATION_KEYS,
     NORMALIZE_KEYS,
     OBSERVABILITY_KEYS,
-    OUTPUT_KEYS,
+    OUTPUT_AGGREGATE_KEYS,
+    OUTPUT_AGGREGATE_METRIC_KEYS,
+    OUTPUT_CONTAINER_KEYS,
+    OUTPUT_EXTRA_SHEET_KEYS,
+    OUTPUT_TARGET_KEYS,
     PERFORMANCE_KEYS,
     PERFORMANCE_REPORT_KEYS,
     PERFORMANCE_THRESHOLDS_KEYS,
@@ -53,6 +57,13 @@ from .observability import (
     RowGapConfig,
     TraceConfig,
     VizConfig,
+)
+from .outputs import (
+    OutputAggregateConfig,
+    OutputAggregateMetricConfig,
+    OutputContainerConfig,
+    OutputExtraSheetConfig,
+    OutputTargetConfig,
 )
 from .raw import (
     GuardrailsComputeRaw,
@@ -98,7 +109,11 @@ __all__ = [
     "MEMORY_OPTIMIZATION_KEYS",
     "NORMALIZE_KEYS",
     "OBSERVABILITY_KEYS",
-    "OUTPUT_KEYS",
+    "OUTPUT_AGGREGATE_KEYS",
+    "OUTPUT_AGGREGATE_METRIC_KEYS",
+    "OUTPUT_CONTAINER_KEYS",
+    "OUTPUT_EXTRA_SHEET_KEYS",
+    "OUTPUT_TARGET_KEYS",
     "PERFORMANCE_KEYS",
     "PERFORMANCE_REPORT_KEYS",
     "PERFORMANCE_THRESHOLDS_KEYS",
@@ -138,7 +153,11 @@ __all__ = [
     "NormalizeStepConfig",
     "ObservabilityConfig",
     "ObservabilityRaw",
-    "OutputConfig",
+    "OutputAggregateConfig",
+    "OutputAggregateMetricConfig",
+    "OutputContainerConfig",
+    "OutputExtraSheetConfig",
+    "OutputTargetConfig",
     "PerformanceConfig",
     "PerformanceRaw",
     "PerformanceReportConfig",

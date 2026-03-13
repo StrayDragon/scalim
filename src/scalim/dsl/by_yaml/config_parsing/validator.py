@@ -29,7 +29,7 @@ from .imports import contains_import_syntax
 from .models import RawDemand, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
-from .validators.fields import OutputFieldIssueCollector, ValidatorFieldsMixin
+from .validators.fields import ValidatorFieldsMixin
 from .validators.issues import (
     MAX_VALIDATION_ERROR_LINES,
     VALIDATION_SEVERITY_ERROR,
@@ -37,8 +37,6 @@ from .validators.issues import (
     ValidationIssue,
     ValidationReport,
 )
-
-_OutputFieldIssueCollector = OutputFieldIssueCollector
 
 try:
     jsonschema = import_module("jsonschema")
@@ -65,7 +63,6 @@ __all__ = [
     "YamlLocationIndex",
     "YamlValidationIssue",
     "YamlValidationResult",
-    "_OutputFieldIssueCollector",
     "attach_locations",
     "build_yaml_location_index",
     "lookup_yaml_location",

@@ -1,6 +1,5 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.field_index import CollectingOutputFieldErrors, OutputFieldErrors
 from scalim.dsl.by_yaml.config_parsing.models import (
     AliasIndex,
     FieldDef,
@@ -88,29 +87,7 @@ def test_build_source_field_id_map_skips_empty_source_id() -> None:
     loader = YamlDemandLoader()
     field_def = FieldDef(field_id="id", kind=FIELD_KIND_SOURCE, data={}, source_id=None)
 
-    assert loader._build_source_field_id_map([field_def], {}) == {}
-
-
-def test_output_field_errors_raise() -> None:
-    errors = OutputFieldErrors()
-
-    with pytest.raises(TypeError):
-        errors.type_error("bad")
-    with pytest.raises(ValueError):
-        errors.value_error("bad")
-    with pytest.raises(ValueError):
-        errors.error("bad")
-
-
-def test_collecting_output_field_errors_accumulates() -> None:
-    errors = []
-    collector = CollectingOutputFieldErrors(errors)
-
-    collector.type_error("one")
-    collector.value_error("two")
-    collector.error("three")
-
-    assert errors == ["one", "two", "three"]
+    assert loader._build_source_field_id_map([field_def]) == {}
 
 
 def test_parse_main_source_missing_returns_default() -> None:
@@ -190,22 +167,6 @@ def test_parse_sources_handles_missing_and_invalid_entries() -> None:
 
     parsed = loader._parse_sources(RawDemand.from_raw({"sources": {"bad": []}}))
     assert parsed == {}
-
-
-def test_resolve_output_fields_requires_list() -> None:
-    loader = YamlDemandLoader()
-
-    with pytest.raises(TypeError, match="output.fields must be a list"):
-        loader._resolve_output_fields({}, [], {}, AliasIndex())
-
-
-def test_ensure_unique_output_defs_rejects_duplicates() -> None:
-    loader = YamlDemandLoader()
-    field_a = FieldDef(field_id="dup", kind=FIELD_KIND_SOURCE, data={}, source_id="a")
-    field_b = FieldDef(field_id="dup", kind=FIELD_KIND_SOURCE, data={}, source_id="b")
-
-    with pytest.raises(ValueError, match="maps to multiple definitions"):
-        loader._ensure_unique_output_defs([field_a, field_b])
 
 
 def test_collect_required_field_defs_unknown_dependency() -> None:

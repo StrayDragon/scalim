@@ -18,7 +18,7 @@ sources: {}
 
     config = loader.load_string(yaml_content)
 
-    assert config.output is None
+    assert config.outputs == ()
 
 
 def test_compile_applies_output_overrides_when_output_missing(tmp_path) -> None:
@@ -44,6 +44,6 @@ sources: {}
         overrides=RunOverrides(output=OutputOverrides(path=str(out_path))),
     )
 
-    assert compilation.config.output is None
+    assert compilation.config.outputs == ()
     assert compilation.request.output.path == str(out_path)
     assert compilation.request.output.format == "csv"

@@ -88,11 +88,11 @@ sources:
     params:
       ids: {$keys: {as: set}}
     fields:
-      region_id:
+      mapping_region_id:
         extract: region_id
-      institution_id:
+      mapping_institution_id:
         extract: institution_id
-      customer_id:
+      mapping_customer_id:
         extract: customer_id
   customers:
     loader: tests.conftest.mock_loader
@@ -103,13 +103,9 @@ relations:
   r1:
     steps:
       - from: [orders.region_id, orders.institution_id]
-        to: [mapping.region_id, mapping.institution_id]
-      - from: mapping.customer_id
+        to: [mapping.mapping_region_id, mapping.mapping_institution_id]
+      - from: mapping.mapping_customer_id
         to: customers.customer_id
-output:
-  fields:
-    - field_id: region_id
-      source: orders
 """
     config = loader.load_string(yaml_content)
 
@@ -117,7 +113,7 @@ output:
     assert len(relation.steps) == 2
     first_step = relation.steps[0]
     assert first_step.from_ == ("orders.region_id", "orders.institution_id")
-    assert first_step.to == ("mapping.region_id", "mapping.institution_id")
+    assert first_step.to == ("mapping.mapping_region_id", "mapping.mapping_institution_id")
 
 
 def test_loader_parses_observability_with_defaults() -> None:

@@ -32,16 +32,6 @@ main_source:
       extract: amount
       name: Amount
 sources: {}
-output:
-  format: csv
-  path: original.csv
-  encoding: utf-8
-  streaming: true
-  include_header: true
-  header_fields_output_by: field_id
-  fields:
-    - field_id: order_id
-    - field_id: amount
 """,
     )
 
@@ -83,9 +73,6 @@ main_source:
     amount:
       extract: amount
 sources: {}
-output:
-  fields:
-    - field_id: order_id
 """,
     )
 

@@ -195,12 +195,86 @@
         }
       ]
     },
-    "output": {
-      "description": "输出配置",
-      "markdownDescription": "输出配置.\n\n- 可选: 不写 `output` 时使用默认输出策略\n- 推荐: 把 `YAML` 当模板使用,在 Python 调用侧用 `overrides.output.*` 覆盖输出策略\n- 默认 `format: csv`\n- 字段重复时需要显式 `output.fields` 进行消歧",
-      "allOf": [
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/output_target"
+      },
+      "description": "输出目标列表(多 sheet 分发 + 派生汇总)",
+      "markdownDescription": "输出目标列表(有序).\n\n- 通过 `where` 分发到不同 sheet\n- 通过 `aggregate` 声明派生汇总输出\n- 通过 `from` 复用字段集合与容器配置\n- 不再支持旧写法: 顶层 `output:`",
+      "minItems": 0,
+      "examples": [
+        [
+          {
+            "name": "detail",
+            "container": {
+              "type": "workbook",
+              "path": "./output/report.xlsx",
+              "sheet": "明细"
+            },
+            "fields": [
+              "order_id",
+              "user_id"
+            ]
+          }
+        ]
+      ]
+    },
+    "failure_policy": {
+      "type": "string",
+      "description": "多输出失败策略(all_fail/primary_only)",
+      "markdownDescription": "多输出失败策略.\n\n- `all_fail`: 任一目标失败即失败\n- `primary_only`: 非主输出失败将被禁用但不阻断主输出",
+      "enum": [
+        "all_fail",
+        "primary_only"
+      ],
+      "default": "all_fail",
+      "examples": [
+        "all_fail"
+      ]
+    },
+    "include_full_error_message": {
+      "type": "boolean",
+      "description": "包含完整错误信息(可能包含敏感信息;默认 false)",
+      "markdownDescription": "包含完整错误信息(可能包含敏感信息;默认 false).",
+      "default": false,
+      "examples": [
+        false
+      ]
+    },
+    "meta": {
+      "oneOf": [
         {
-          "$ref": "#/definitions/output"
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/definitions/output_extra_sheet"
+        }
+      ],
+      "description": "可选:启用 meta sheet(写入运行信息与统计)",
+      "markdownDescription": "可选:启用 meta sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径",
+      "examples": [
+        true,
+        {
+          "sheet": "__meta__"
+        }
+      ]
+    },
+    "audit": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/definitions/output_extra_sheet"
+        }
+      ],
+      "description": "可选:启用 audit sheet(写入目标失败等审计信息)",
+      "markdownDescription": "可选:启用 audit sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径",
+      "examples": [
+        true,
+        {
+          "sheet": "__audit__"
         }
       ]
     },
@@ -1585,49 +1659,72 @@
       ],
       "additionalProperties": false
     },
-    "output": {
+    "output_container": {
       "type": "object",
       "properties": {
-        "format": {
+        "type": {
           "type": "string",
-          "description": "输出格式 (excel/csv)",
-          "markdownDescription": "输出格式.\n\n- `csv`: CSV 文件\n- `excel`: Excel 文件\n- 默认 `csv`",
+          "description": "输出容器类型(workbook/csv)",
+          "markdownDescription": "输出容器类型.\n\n- `workbook`: Excel 工作簿容器(支持多 sheet)\n- `csv`: CSV 文件",
           "enum": [
-            "excel",
+            "workbook",
             "csv"
           ],
-          "default": "csv",
           "examples": [
-            "csv"
+            "workbook"
           ]
         },
         "path": {
           "type": "string",
+          "minLength": 1,
           "description": "输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)",
-          "markdownDescription": "输出文件路径.\n\n- 为空则不生成文件\n- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n- 可能覆盖同名文件\n- 注意: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出; 生产建议在受控工作目录/权限隔离环境运行"
+          "markdownDescription": "输出文件路径.\n\n- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n- 可能覆盖同名文件\n- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出",
+          "examples": [
+            "./output/report.xlsx",
+            "./output/report.csv"
+          ]
+        },
+        "sheet": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Excel sheet 名称(仅 workbook)",
+          "markdownDescription": "Excel sheet 名称(仅 `type: workbook`).",
+          "examples": [
+            "订单明细",
+            "Summary"
+          ]
         },
         "encoding": {
           "type": "string",
-          "description": "文件编码",
+          "description": "文件编码(CSV 输出使用)",
           "markdownDescription": "文件编码(CSV 输出使用).",
-          "default": "utf-8"
+          "default": "utf-8",
+          "examples": [
+            "utf-8"
+          ]
         },
         "streaming": {
           "type": "boolean",
-          "description": "启用流式输出",
-          "markdownDescription": "启用流式输出(按行写入).\n\n- 推荐保持为 `true` 以降低内存占用(尤其是大批量 CSV/Excel 输出)\n- 设为 `false` 时会使用列式 file sink, 可能在 close() 前缓存大量输出数据",
-          "default": true
+          "description": "启用流式输出(必须为 true)",
+          "markdownDescription": "启用流式输出(按行写入).\n\n- composed outputs 仅支持 `true`",
+          "default": true,
+          "examples": [
+            true
+          ]
         },
         "include_header": {
           "type": "boolean",
           "description": "包含表头行",
           "markdownDescription": "包含表头行.",
-          "default": true
+          "default": true,
+          "examples": [
+            true
+          ]
         },
         "header_fields_output_by": {
           "type": "string",
-          "description": "表头字段名来源: field_id=使用字段ID, name=使用字段的name属性",
-          "markdownDescription": "表头字段名来源.\n\n- `field_id`: 使用字段 ID\n- `name`: 使用字段的 `name` (为空或等于 field_id 时回退为 field_id)",
+          "description": "表头字段名来源: field_id/name",
+          "markdownDescription": "表头字段名来源.\n\n- `field_id`: 使用字段 ID\n- `name`: 使用字段的 `name`(为空或等于 field_id 时回退为 field_id)",
           "enum": [
             "field_id",
             "name"
@@ -1637,39 +1734,411 @@
             "field_id"
           ]
         },
+        "allow_formulas": {
+          "type": "boolean",
+          "description": "允许 Excel 公式(仅 workbook)",
+          "markdownDescription": "允许 Excel 公式(仅 `type: workbook`).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        },
+        "write_lock": {
+          "type": "boolean",
+          "description": "写锁(仅 workbook)",
+          "markdownDescription": "写锁(仅 `type: workbook`; 多目标共享同一 workbook 时建议开启).",
+          "default": false,
+          "examples": [
+            true
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "output_aggregate_metric": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "description": "聚合算子",
+          "markdownDescription": "聚合算子.\n\n- `count`/`sum`/`min`/`max`\n- `count_true`/`count_true_gte`\n- `count_distinct`",
+          "enum": [
+            "count",
+            "sum",
+            "min",
+            "max",
+            "count_true",
+            "count_true_gte",
+            "count_distinct"
+          ],
+          "examples": [
+            "count",
+            "sum"
+          ]
+        },
+        "field": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "输入字段(field_id)",
+          "markdownDescription": "输入字段(field_id).",
+          "examples": [
+            "order_id",
+            "amount_yuan"
+          ]
+        },
         "fields": {
           "type": "array",
           "items": {
-            "oneOf": [
-              {
-                "oneOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
-                    "description": "格式: source.field_id (两段式,单个 '.' 分隔)",
-                    "markdownDescription": "格式: `source.field_id`.\n\n- 仅允许两段式(单个 `.` 分隔)\n- `field_id` 必须是字段的 `field_id`(YAML key)\n- 用于 `output.fields` 显式消歧: 当 field_id 在多个 source 中同名时,用 `source.field_id` 选择"
-                  }
-                ],
-                "description": "输出字段 string sugar: field_id 或 source.field_id(用于消歧)",
-                "markdownDescription": "输出字段 string sugar.\n\n- `field_id` (例: `order_id`)\n- `source.field_id` (例: `orders.order_id`,用于消歧;仅支持二段式)",
-                "examples": [
-                  "order_id",
-                  "orders.order_id"
-                ]
-              },
-              {
-                "type": "object"
-              }
-            ]
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
           },
-          "description": "输出字段顺序(支持 string sugar / 对象条目 / YAML alias; 推荐显式对象)",
-          "markdownDescription": "输出字段顺序.\n\nString sugar:\n- `order_id` -> `field_id` sugar\n- `orders.order_id` -> 显式 `source.field_id` sugar(用于消歧;仅支持二段式)\n\n推荐显式对象:\n- `{field_id: order_id, name: 订单ID}`\n\n按 data_key 选择:\n- `{field: order_real_name, source: orders, name: 订单名}`\n\nAlias 复用(指向已定义字段对象):\n- `*order_id`\n\n注意:\n- 允许在同一列表中混用 string 与对象条目\n- `source.field_id` 仅支持二段式(单个 `.`);多段式会被拒绝,请改用对象条目\n- 可用选择器: `field_id`(字段 ID) 或 `field`(loader data_key); 歧义时必须加 `source`\n- YAML merge(`<<`) 会生成新对象并丢失 alias 身份; merge 产物需包含 `field_id` 或 `field` 选择器\n- 显式对象除选择器键(`field_id`/`field`/`source`)外的键会覆盖字段配置"
+          "minItems": 1,
+          "description": "输入字段列表(field_id 列表)",
+          "markdownDescription": "输入字段列表(field_id 列表).",
+          "examples": [
+            [
+              "user_id",
+              "device_id"
+            ]
+          ]
+        },
+        "threshold": {
+          "description": "阈值(部分算子需要)",
+          "markdownDescription": "阈值(部分算子需要;例如 `count_true_gte`)."
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "output_aggregate": {
+      "type": "object",
+      "properties": {
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+          },
+          "minItems": 1,
+          "description": "分组字段列表",
+          "markdownDescription": "分组字段列表(field_id 列表).",
+          "examples": [
+            [
+              "cs_id",
+              "cs_name"
+            ]
+          ]
+        },
+        "metrics": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/output_aggregate_metric"
+          },
+          "description": "聚合指标映射(key 为 out_field_id)",
+          "markdownDescription": "聚合指标映射(key 为 out_field_id)."
+        },
+        "max_groups": {
+          "type": "integer",
+          "description": "max_groups 护栏(0 表示不限制)",
+          "markdownDescription": "max_groups 护栏(0 表示不限制).",
+          "minimum": 0,
+          "default": 0,
+          "examples": [
+            0,
+            10000
+          ]
+        },
+        "max_distinct": {
+          "type": "integer",
+          "description": "max_distinct 护栏(0 表示不限制)",
+          "markdownDescription": "max_distinct 护栏(0 表示不限制).",
+          "minimum": 0,
+          "default": 0,
+          "examples": [
+            0,
+            200000
+          ]
+        },
+        "distinct_on_overflow": {
+          "type": "string",
+          "description": "distinct 护栏溢出策略(error/truncate)",
+          "markdownDescription": "distinct 护栏溢出策略.\n\n- `error`: 失败\n- `truncate`: 截断并继续",
+          "enum": [
+            "error",
+            "truncate"
+          ],
+          "default": "error",
+          "examples": [
+            "error"
+          ]
+        },
+        "rank_by": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "可选:按某个输出字段排序生成 rank/top_k",
+          "markdownDescription": "可选:按某个输出字段排序生成 rank/top_k (字段为 out_field_id).",
+          "examples": [
+            "sum_amount"
+          ]
+        },
+        "rank_field_id": {
+          "type": "string",
+          "description": "rank 输出字段名",
+          "markdownDescription": "rank 输出字段名.",
+          "default": "rank",
+          "examples": [
+            "rank"
+          ]
+        },
+        "rank_order": {
+          "type": "string",
+          "description": "rank 排序方向(asc/desc)",
+          "markdownDescription": "rank 排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "desc",
+          "examples": [
+            "desc"
+          ]
+        },
+        "top_k": {
+          "type": "integer",
+          "description": "top_k 限制(0 表示不限制)",
+          "markdownDescription": "top_k 限制(0 表示不限制).",
+          "minimum": 0,
+          "default": 0,
+          "examples": [
+            0,
+            100
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "required": [
+        "group_by",
+        "metrics"
+      ],
+      "additionalProperties": false
+    },
+    "output_target": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "输出名称(name)",
+          "markdownDescription": "输出名称(name)",
+          "examples": [
+            "detail",
+            "direct_detail",
+            "by_cs"
+          ]
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "可选:继承来源输出(name)",
+          "markdownDescription": "可选:继承来源输出(name).\n\n- 继承字段集合与容器配置\n- 不继承 where/aggregate",
+          "examples": [
+            "detail"
+          ]
+        },
+        "container": {
+          "description": "输出容器配置(workbook/csv)",
+          "markdownDescription": "输出容器配置(workbook/csv)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/output_container"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+          },
+          "minItems": 1,
+          "description": "明细输出字段顺序(field_id 列表)",
+          "markdownDescription": "明细输出字段顺序(field_id 列表).\n\n- 派生汇总输出(aggregate)不允许 fields\n- 可通过 `from` 继承",
+          "examples": [
+            [
+              "order_id",
+              "user_id"
+            ]
+          ]
+        },
+        "where": {
+          "type": "string",
+          "description": "可选:过滤表达式(安全表达式)",
+          "markdownDescription": "可选:过滤表达式(安全表达式).\n\n- 仅支持受限表达式(禁止任意 import)\n- 编译期静态提取依赖字段并注入 required fields",
+          "examples": [
+            "channel == 'direct'"
+          ]
+        },
+        "aggregate": {
+          "description": "可选:派生汇总配置(声明后视为 derived output)",
+          "markdownDescription": "可选:派生汇总配置(声明后视为 derived output)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/output_aggregate"
+            }
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "output_extra_sheet": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "可选:工作簿路径(缺省使用 primary workbook)",
+          "markdownDescription": "可选:工作簿路径(缺省使用 primary workbook).",
+          "examples": [
+            "./output/report.xlsx"
+          ]
+        },
+        "sheet": {
+          "type": "string",
+          "minLength": 1,
+          "description": "sheet 名称",
+          "markdownDescription": "sheet 名称.",
+          "examples": [
+            "__meta__",
+            "__audit__"
+          ]
+        },
+        "allow_formulas": {
+          "type": "boolean",
+          "description": "可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置)",
+          "markdownDescription": "可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置).",
+          "examples": [
+            false
+          ]
+        },
+        "write_lock": {
+          "type": "boolean",
+          "description": "可选:写锁(缺省使用 primary workbook 的容器配置)",
+          "markdownDescription": "可选:写锁(缺省使用 primary workbook 的容器配置).",
+          "examples": [
+            true
+          ]
         },
         "$import": {
           "oneOf": [

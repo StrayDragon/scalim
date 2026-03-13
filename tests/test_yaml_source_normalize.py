@@ -173,11 +173,6 @@ sources:
           steps:
             - from: orders.order_id
               to: recommends.order_id
-
-output:
-  fields:
-    - field_id: order_id
-    - field_id: recommend_score
 """,
     )
 
@@ -219,11 +214,6 @@ sources:
           steps:
             - from: orders.order_id
               to: recommends.order_id
-
-output:
-  fields:
-    - field_id: order_id
-    - field_id: recommend_score
 """,
     )
 
@@ -266,11 +256,6 @@ sources:
           steps:
             - from: orders.order_id
               to: recommends.order_id
-
-output:
-  fields:
-    - field_id: order_id
-    - field_id: recommend_score
 """,
     )
 
@@ -306,11 +291,6 @@ sources:
           steps:
             - from: orders.order_id
               to: recommends.order_id
-
-output:
-  fields:
-    - field_id: order_id
-    - field_id: recommend_score
 """,
     )
 

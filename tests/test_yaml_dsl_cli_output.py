@@ -136,7 +136,7 @@ fields:
     assert "help: compute" in out
 
 
-def test_yaml_dsl_validate_does_not_emit_schema_validation_error_for_output_fields_string_item(tmp_path, capsys) -> None:
+def test_yaml_dsl_validate_reports_legacy_output_as_error(tmp_path, capsys) -> None:
     yaml_path = tmp_path / "invalid_output_fields.yaml"
     yaml_path.write_text(
         """
@@ -156,11 +156,12 @@ output:
     )
 
     code = yaml_dsl._run_validate(_args(yaml_path, json_output=False))
-    assert code == 0
+    assert code == 1
 
     out = capsys.readouterr().out
     assert "Schema validation error" not in out
-    assert "OK" in out
+    assert "Legacy YAML syntax is not supported: top-level 'output'" in out
+    assert "ERROR" in out
 
 
 def test_yaml_dsl_validate_does_not_log_jsonschema_skip_noise(tmp_path, caplog) -> None:

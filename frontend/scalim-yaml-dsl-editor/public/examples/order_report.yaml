@@ -181,17 +181,13 @@ fields:
 
   # endregion
 
-output:
-  format: csv
-  path: ./.tmp/output/order_report.csv
-  encoding: utf-8
-  streaming: true
-  include_header: true
-  header_fields_output_by: name
-  fields:
-    - order_id
-    - customers.customer_name
-    - amount
-    - cost
-    - profit
-    - countries.country_name
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: ./.tmp/output/order_report.csv
+      encoding: utf-8
+      streaming: true
+      include_header: true
+      header_fields_output_by: name
+    fields: [order_id, customer_name, amount, cost, profit, country_name]

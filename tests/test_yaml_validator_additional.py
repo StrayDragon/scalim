@@ -57,95 +57,10 @@ def _assert_validation_errors(config: dict, *expected_messages: str) -> None:
         assert any(message in msg for msg in errors)
 
 
-def test_validator_requires_output_fields_for_ambiguous_defs() -> None:
-    config = _ambiguous_sources_config()
-    config["output"] = {}
-    _assert_validation_errors(config, "output.fields is required to disambiguate field 'name'")
-
-
-def test_validator_output_fields_must_be_list() -> None:
+def test_validator_rejects_legacy_output() -> None:
     config = _base_config()
-    config["output"] = {"fields": "order_id"}
-    _assert_validation_errors(config, "output.fields must be a list")
-
-
-def test_validator_output_fields_entry_invalid_type() -> None:
-    config = _base_config()
-    config["output"] = {"fields": [1]}
-    _assert_validation_errors(
-        config,
-        "output.fields[0] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias",
-    )
-
-
-def test_validator_output_fields_requires_explicit_object_or_alias() -> None:
-    config = _ambiguous_sources_config()
-    config["output"] = {"fields": [{"name": {"name": "Name Override"}}]}
-    _assert_validation_errors(
-        config,
-        "output.fields[0] must be string sugar (field_id or source.field_id), explicit field object (field_id or field), or alias",
-    )
-
-
-def test_validator_output_fields_signature_no_match() -> None:
-    config = _base_config()
-    config["output"] = {"fields": [{"field": "missing", "name": "Missing"}]}
-    _assert_validation_errors(config, "Output field data_key 'missing' not found")
-
-
-def test_validator_output_fields_data_key_ambiguous_requires_source() -> None:
-    config = {
-        "name": "demo",
-        "main_source": {
-            "source_id": "orders",
-            "loader": "tests.conftest.mock_loader",
-            "fields": {"order_id": {"extract": "id"}},
-        },
-        "sources": {
-            "customers": {
-                "loader": "tests.conftest.mock_loader",
-                "key": "id",
-                "params": {"ids": {"$keys": {"as": "set"}}},
-                "fields": {
-                    "customer_id": {
-                        "extract": "id",
-                        "relation": {"steps": [{"from": "orders.order_id", "to": "customers.id"}]},
-                    }
-                },
-            }
-        },
-        "output": {"fields": [{"field": "id"}]},
-    }
-
-    _assert_validation_errors(config, "Output field data_key 'id' is ambiguous; add source or use field_id")
-
-
-def test_validator_output_fields_data_key_with_source() -> None:
-    validator = validator_module.ConfigValidator()
-    config = {
-        "name": "demo",
-        "main_source": {
-            "source_id": "orders",
-            "loader": "tests.conftest.mock_loader",
-            "fields": {"order_id": {"extract": "id"}},
-        },
-        "sources": {
-            "customers": {
-                "loader": "tests.conftest.mock_loader",
-                "key": "id",
-                "params": {"ids": {"$keys": {"as": "set"}}},
-                "fields": {
-                    "customer_id": {
-                        "extract": "id",
-                        "relation": {"steps": [{"from": "orders.order_id", "to": "customers.id"}]},
-                    }
-                },
-            }
-        },
-        "output": {"fields": [{"field": "id", "source": "customers"}]},
-    }
-
-    validator.validate(config)
+    config["output"] = {"fields": ["order_id"]}
+    _assert_validation_errors(config, "Legacy YAML syntax is not supported: top-level 'output'")
 
 
 def test_validator_rejects_derived_source_field_id_overlap() -> None:

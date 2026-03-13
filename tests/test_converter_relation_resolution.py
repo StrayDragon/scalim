@@ -3,7 +3,6 @@ from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 from scalim.dsl.by_yaml.schema_dsl.models import (
     DemandConfig,
     MainSourceConfig,
-    OutputConfig,
     RelationConfig,
     RelationStepConfig,
     SourceConfig,
@@ -39,7 +38,6 @@ def _make_config() -> DemandConfig:
             value_cast=None,
         ),
     }
-    output = OutputConfig(fields=["customer_name"])
     return DemandConfig(
         name="demo",
         main_source=_make_main_source(),
@@ -47,7 +45,6 @@ def _make_config() -> DemandConfig:
         source_fields=source_fields,
         derived_fields={},
         relations=relations,
-        output=output,
     )
 
 

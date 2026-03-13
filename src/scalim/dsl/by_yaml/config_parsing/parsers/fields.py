@@ -13,8 +13,7 @@ from ...schema_dsl.models import (
 )
 from ..call_by import extract_call_by_dependencies
 from ..field_extract import derive_source_field_data_key
-from ..field_index import OutputFieldErrors, OutputFieldResolver, build_source_data_key_index
-from ..models import AliasIndex, FieldDef, FieldDefIndex, RawDemand, collect_field_defs, field_def_key
+from ..models import FieldDef, FieldDefIndex, RawDemand, collect_field_defs, field_def_key
 from ..security import extract_compute_dependencies
 from .relations import ParserRelationsMixin
 from .results import ParsedFieldsResult
@@ -26,17 +25,18 @@ class ParserFieldsMixin(ParserRelationsMixin):
         self,
         raw: RawDemand,
         main_source_id: str,
-        raw_output_fields: object,
+        required_field_ids: Optional[List[str]],
         relations: Dict[str, RelationConfig],
+        *,
+        field_def_index: Optional[FieldDefIndex] = None,
     ) -> ParsedFieldsResult:
-        index = self._collect_field_defs(raw, main_source_id)
-        output_field_ids, selected_defs, overrides = self._resolve_output_fields(
-            raw_output_fields,
-            index.field_defs,
-            index.defs_by_id,
-            index.alias_index,
-        )
-        source_field_id_map = self._build_source_field_id_map(index.field_defs, overrides)
+        index = field_def_index or self._collect_field_defs(raw, main_source_id)
+        self._ensure_unique_field_ids(index.field_defs)
+
+        selected_defs = self._select_field_defs(required_field_ids, index.defs_by_id, index.field_defs)
+        output_field_ids = list(required_field_ids) if required_field_ids is not None else None
+
+        source_field_id_map = self._build_source_field_id_map(index.field_defs)
         required_defs = self._collect_required_field_defs(selected_defs, index.defs_by_id)
         order_by_defs = self._collect_order_by_field_defs(raw, main_source_id, index.defs_by_id)
         if order_by_defs:
@@ -44,7 +44,6 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
         source_fields, derived_fields, main_source_fields, source_fields_by_source = self._build_field_configs(
             required_defs,
-            overrides,
             main_source_id,
             relations,
         )
@@ -58,6 +57,31 @@ class ParserFieldsMixin(ParserRelationsMixin):
             source_field_id_map=source_field_id_map,
             field_def_index=index,
         )
+
+    def _select_field_defs(
+        self,
+        required_field_ids: Optional[List[str]],
+        defs_by_id: Dict[str, List[FieldDef]],
+        all_field_defs: List[FieldDef],
+    ) -> List[FieldDef]:
+        if required_field_ids is None:
+            return list(all_field_defs)
+
+        selected: List[FieldDef] = []
+        for fid in required_field_ids:
+            matched = defs_by_id.get(fid, [])
+            if not matched:
+                msg = "Required field '{}' is not defined".format(fid)
+                raise ValueError(msg)
+            if len(matched) > 1:
+                msg = (
+                    "Field '{}' is defined multiple times; field_id must be unique (output.fields disambiguation has been removed)".format(
+                        fid
+                    )
+                )
+                raise ValueError(msg)
+            selected.append(matched[0])
+        return selected
 
     def _collect_order_by_field_defs(
         self,
@@ -106,7 +130,6 @@ class ParserFieldsMixin(ParserRelationsMixin):
     def _build_field_configs(
         self,
         required_defs: List[FieldDef],
-        overrides: Dict[Tuple[str, Optional[str], str, int], Dict[str, Any]],
         main_source_id: str,
         relations: Dict[str, RelationConfig],
     ) -> Tuple[
@@ -122,9 +145,6 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
         for field_def in required_defs:
             field_data = dict(field_def.data)
-            override = overrides.get(field_def_key(field_def))
-            if override:
-                field_data.update(override)
 
             if field_def.kind == FIELD_KIND_DERIVED:
                 derived_fields[field_def.field_id] = self._parse_derived_field(field_def.field_id, field_data)
@@ -143,7 +163,6 @@ class ParserFieldsMixin(ParserRelationsMixin):
     def _build_source_field_id_map(
         self,
         field_defs: List[FieldDef],
-        overrides: Dict[Tuple[str, Optional[str], str, int], Dict[str, Any]],
     ) -> Dict[str, Dict[str, str]]:
         source_field_id_map: Dict[str, Dict[str, str]] = {}
         for field_def in field_defs:
@@ -153,59 +172,11 @@ class ParserFieldsMixin(ParserRelationsMixin):
             if not source_id:
                 continue
             field_data = dict(field_def.data)
-            override = overrides.get(field_def_key(field_def))
-            if override:
-                field_data.update(override)
             extract_raw = field_data.get(SOURCE_FIELD_KEYS["extract"])
             extract_expr = None if extract_raw is None else str(extract_raw)
             data_key = derive_source_field_data_key(field_id=field_def.field_id, extract=extract_expr)
             source_field_id_map.setdefault(source_id, {})[field_def.field_id] = data_key
         return source_field_id_map
-
-    def _resolve_output_fields(
-        self,
-        raw_output_fields: object,
-        field_defs: List[FieldDef],
-        defs_by_id: Dict[str, List[FieldDef]],
-        alias_index: AliasIndex,
-    ) -> Tuple[Optional[List[str]], List[FieldDef], Dict[Tuple[str, Optional[str], str, int], Dict[str, Any]]]:
-        overrides: Dict[Tuple[str, Optional[str], str, int], Dict[str, Any]] = {}
-
-        if raw_output_fields is None:
-            if not field_defs:
-                return None, [], overrides
-            self._ensure_unique_field_ids(field_defs)
-            return None, list(field_defs), overrides
-
-        output_field_items = list_or_none(raw_output_fields)
-        if output_field_items is None:
-            msg = "output.fields must be a list"
-            raise TypeError(msg)
-
-        defs_by_data_key_by_source = build_source_data_key_index(field_defs)
-        resolver = OutputFieldResolver(
-            defs_by_id=defs_by_id,
-            defs_by_data_key_by_source=defs_by_data_key_by_source,
-            alias_index=alias_index,
-            errors=OutputFieldErrors(),
-        )
-        selected_defs: List[FieldDef] = []
-        for idx, item in enumerate(output_field_items):
-            field_def, override, _entry_kind = resolver.resolve_entry(item, idx)
-            if field_def is None:  # pragma: no cover
-                continue  # pragma: no cover
-            selected_defs.append(field_def)
-            if override:
-                field_key = field_def_key(field_def)
-                existing = overrides.get(field_key)
-                if existing is not None and existing != override:
-                    msg = "Output field '{}' has conflicting overrides".format(field_def.field_id)
-                    raise ValueError(msg)
-                overrides[field_key] = override
-
-        self._ensure_unique_output_defs(selected_defs)
-        output_field_ids = [field_def.field_id for field_def in selected_defs]
-        return output_field_ids, selected_defs, overrides
 
     def _ensure_unique_field_ids(self, field_defs: List[FieldDef]) -> None:
         seen: Dict[str, FieldDef] = {}
@@ -215,21 +186,10 @@ class ParserFieldsMixin(ParserRelationsMixin):
                 seen[field_def.field_id] = field_def
                 continue
             if existing is not field_def:
-                msg = "Field '{}' is defined multiple times; output.fields is required to disambiguate ({})".format(
-                    field_def.field_id,
-                    "note: top-level output is optional",
-                )
-                raise ValueError(msg)
-
-    def _ensure_unique_output_defs(self, field_defs: List[FieldDef]) -> None:
-        seen: Dict[str, FieldDef] = {}
-        for field_def in field_defs:
-            existing = seen.get(field_def.field_id)
-            if existing is None:
-                seen[field_def.field_id] = field_def
-                continue
-            if existing is not field_def:
-                msg = "Output field '{}' maps to multiple definitions; use unique field_id".format(field_def.field_id)
+                msg = (
+                    "Field '{}' is defined multiple times; field_id must be unique "
+                    "(output.fields disambiguation has been removed; rename the field_id)"
+                ).format(field_def.field_id)
                 raise ValueError(msg)
 
     def _collect_required_field_defs(

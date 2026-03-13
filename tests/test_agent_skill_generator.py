@@ -189,7 +189,7 @@ def test_generated_syntax_catalog_covers_top_level_and_definitions(tmp_path: Pat
     assert "## Top-Level Fields" in catalog
     assert "## Definitions" in catalog
     assert "### `main_source`" in catalog
-    assert "### `output`" in catalog
+    assert "### `outputs`" in catalog
     assert "### `observability`" in catalog
     assert "### `source`" in catalog
 

@@ -61,12 +61,6 @@ relations:
     steps:
       - from: main.ref_id
         to: preload.id
-
-output:
-  path: ""
-  fields:
-    - ref_id
-    - preload.value
 """
         )
         .format(
@@ -628,12 +622,6 @@ relations:
     steps:
       - from: main.ref_id
         to: preload.id
-
-output:
-  path: ""
-  fields:
-    - ref_id
-    - preload.value
 """
         ).lstrip(),
     )

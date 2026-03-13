@@ -2,12 +2,34 @@ from typing import Any, Dict, FrozenSet, List, Optional, Set
 
 from ....ob.presets.viz import VizObserver, VizObserverConfig
 from ....planning.builder import PlanBuilder
+from ..config_parsing.errors import ConfigValidationError
 from ..config_parsing.loader import YamlDemandLoader
+from ..schema_dsl.models import DemandConfig
 from .compiler import compile  # noqa: A004
 from .contracts import RunOptions
 
 
-def resolve_required_field_ids(
+def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str]:
+    outputs = config.outputs
+    if not outputs:
+        return []
+
+    primary = outputs[0]
+    aggregate = primary.aggregate
+    if aggregate is None:
+        if not primary.fields:
+            return []
+        return list(primary.fields)
+
+    metric_ids = sorted(aggregate.metrics.keys())
+
+    resolved = list(aggregate.group_by) + list(metric_ids)
+    if aggregate.rank_by:
+        resolved.append(aggregate.rank_field_id or "rank")
+    return resolved
+
+
+def resolve_required_field_ids(  # noqa: C901
     yaml_path: str,
     *,
     allowed_modules: FrozenSet[str],
@@ -20,7 +42,13 @@ def resolve_required_field_ids(
     )
     compilation = compile(yaml_path, options=options)
 
-    targets = list(output_fields) if output_fields is not None else list(compilation.request.export_layout.field_ids)
+    if output_fields is not None:
+        targets = list(output_fields)
+    elif compilation.request.output_composition is not None:
+        # 启用 `YAML` `outputs` 时,单输出的 `export_layout` 会被忽略且可能为空;默认用需求字段全集.
+        targets = list(compilation.demand_ir.fields.keys())
+    else:
+        targets = list(compilation.request.export_layout.field_ids)
     plan = PlanBuilder(compilation.demand_ir).build(targets=targets)
 
     required_fields: Set[str] = set()
@@ -64,7 +92,12 @@ def build_viz_observer(
     )
     compilation = compile(yaml_path, options=options)
 
-    targets = list(output_fields) if output_fields is not None else list(compilation.request.export_layout.field_ids)
+    if output_fields is not None:
+        targets = list(output_fields)
+    elif compilation.request.output_composition is not None:
+        targets = list(compilation.demand_ir.fields.keys())
+    else:
+        targets = list(compilation.request.export_layout.field_ids)
     plan = PlanBuilder(compilation.demand_ir).build(targets=targets)
 
     actual_config = config or VizObserverConfig()
@@ -73,12 +106,16 @@ def build_viz_observer(
 
 def load_output_config(yaml_path: str) -> Dict[str, Any]:
     loader = YamlDemandLoader()
-    config = loader.load(yaml_path)
+    try:
+        config = loader.load(yaml_path)
+    except ConfigValidationError:
+        raise
+    except ValueError as exc:
+        msg = str(exc)
+        raise ConfigValidationError(msg, errors=[msg]) from exc
 
     params = config.main_source.params
-    output_fields: List[str] = []
-    if config.output and config.output.fields:
-        output_fields = list(config.output.fields)
+    output_fields = _default_output_fields_from_primary_output(config)
 
     field_name_mapping: Dict[str, str] = {}
     for field_id, field_config in config.source_fields.items():
@@ -92,6 +129,35 @@ def load_output_config(yaml_path: str) -> Dict[str, Any]:
         "params": params,
         "field_name_mapping": field_name_mapping,
         "output_fields": output_fields,
+        "outputs": [
+            {
+                "name": str(t.name),
+                "from": str(t.from_) if t.from_ else None,
+                "where": str(t.where) if t.where else None,
+                "requires": list(t.requires or ()),
+                "fields": list(t.fields) if t.fields is not None else None,
+                "aggregate": (
+                    None
+                    if t.aggregate is None
+                    else {
+                        "group_by": list(t.aggregate.group_by),
+                        "metric_ids": sorted(t.aggregate.metrics.keys()),
+                        "rank_by": str(t.aggregate.rank_by) if t.aggregate.rank_by else None,
+                        "rank_field_id": str(t.aggregate.rank_field_id or "rank"),
+                    }
+                ),
+                "container": (
+                    None
+                    if t.container is None
+                    else {
+                        "type": str(t.container.type),
+                        "path": str(t.container.path),
+                        "sheet": str(t.container.sheet) if t.container.sheet else None,
+                    }
+                ),
+            }
+            for t in (config.outputs or ())
+        ],
     }
 
 

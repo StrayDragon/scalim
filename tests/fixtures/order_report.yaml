@@ -180,17 +180,3 @@ fields:
     compute: "(amount - cost) / amount * 100 if amount > 0 else 0"
 
   # endregion
-
-output:
-  format: csv
-  path: ./.tmp/output/order_report.csv
-  encoding: utf-8
-  streaming: true
-  include_header: true
-  fields:
-    - order_id
-    - customers.customer_name
-    - amount
-    - cost
-    - profit
-    - countries.country_name

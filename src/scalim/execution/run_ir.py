@@ -527,14 +527,35 @@ def _assemble_outputs(
         run_batch_size=batch_size,
         instrumentation=instrumentation,
     )
-    counting_sink = _wrap_sink_for_row_count(composition_plan.sink, stats)
+
+    router_sink = composition_plan.sink
+    composed_sink: ISink = router_sink
+    if request.sink is not None:
+        try:
+            composed_sink = _create_tee_sink(router_sink, request.sink)
+        except ValueError as e:
+            msg = (
+                "Incompatible sinks for tee: composed_sink={}({}) vs sink={}({}). "
+                "Both sinks must be IRowSink (output_composition only supports streaming row sinks). "
+                "Hint: use InMemoryRowSink (or another IRowSink) when teeing with composed outputs."
+            ).format(
+                type(router_sink).__name__,
+                _describe_sink_kind(router_sink),
+                type(request.sink).__name__,
+                _describe_sink_kind(request.sink),
+            )
+            with contextlib.suppress(Exception):
+                router_sink.close()
+            raise ValueError(msg) from e
+
+    counting_sink = _wrap_sink_for_row_count(composed_sink, stats)
     outputs = composition_plan.output_paths
     output_path = _select_primary_output_path(outputs, composition_spec) if outputs else None
     return _OutputAssembly(
         counting_sink=counting_sink,
         output_path=output_path,
         outputs=outputs,
-        composition_router=composition_plan.sink,
+        composition_router=router_sink,
     )
 
 

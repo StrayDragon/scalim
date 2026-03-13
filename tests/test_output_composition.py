@@ -17,6 +17,7 @@ from scalim.execution.output_composition import (
 )
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, run_ir
 from scalim.sinks.sink_excel import ExcelWorkbookSink
+from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
 from tests.cases.minimal_ir import build_minimal_ir_case
 
 
@@ -137,6 +138,60 @@ def test_run_ir_output_composition_workbook_detail_and_summary(tmp_path: Path) -
     fp = meta_kv.get("derived.summary_by_source.fingerprint")
     assert isinstance(fp, str)
     assert len(fp) == 40
+
+
+def test_run_ir_output_composition_can_tee_to_row_sink(tmp_path: Path) -> None:
+    case = build_minimal_ir_case()
+    rows = case.main_rows()
+
+    out = tmp_path / "report.xlsx"
+
+    detail = OutputTargetSpec(
+        target_id="detail",
+        layout=ExportLayout(field_ids=("order_id", "order_source", "amount", "cost", "profit"), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Detail"),
+        is_primary=True,
+    )
+    spec = OutputCompositionSpec(targets=(detail,), derived_targets=(), meta_sheet=None, audit_sheet=None, failure_policy="all_fail")
+
+    sink = InMemoryRowSink()
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=sink,
+        output_composition=spec,
+        parallel_mode="seq",
+    )
+
+    result = run_ir(case.demand, request)
+    captured = sink.get_data()
+    assert captured
+    assert len(captured) == result.total_rows == len(rows)
+    assert "order_id" in captured[0]
+
+
+def test_run_ir_output_composition_rejects_column_sink_for_tee(tmp_path: Path) -> None:
+    case = build_minimal_ir_case()
+
+    out = tmp_path / "report.xlsx"
+    detail = OutputTargetSpec(
+        target_id="detail",
+        layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Detail"),
+        is_primary=True,
+    )
+    spec = OutputCompositionSpec(targets=(detail,), derived_targets=(), meta_sheet=None, audit_sheet=None, failure_policy="all_fail")
+
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=InMemoryColumnSink(["order_id"]),
+        output_composition=spec,
+        parallel_mode="seq",
+    )
+
+    with pytest.raises(ValueError, match=r"output_composition only supports streaming row sinks"):
+        _ = run_ir(case.demand, request)
 
 
 def test_output_composition_primary_only_disables_failed_derived(tmp_path: Path) -> None:

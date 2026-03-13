@@ -50,9 +50,6 @@ sources:
   $import: common.sources
   customers:
     lookup_chunk_size: 10
-output:
-  fields:
-    - order_id
 """.lstrip(),
         encoding="utf-8",
     )
@@ -99,9 +96,6 @@ main_source:
     order_id: {}
 sources:
   $import: [a.sources, b.sources]
-output:
-  fields:
-    - order_id
 """.lstrip(),
         encoding="utf-8",
     )
@@ -114,9 +108,11 @@ def test_imports_list_replace(tmp_path) -> None:
     frag = tmp_path / "frag.yaml"
     frag.write_text(
         """
-output:
-  fields:
-    - a
+base:
+  outputs:
+    - name: detail
+      container: {type: csv, path: ./a.csv}
+      fields: [a]
 """.lstrip(),
         encoding="utf-8",
     )
@@ -126,29 +122,32 @@ output:
 name: demo
 imports:
   f: ./frag.yaml
+$import: f.base
 main_source:
   source_id: orders
   loader: tests.conftest.mock_loader
 sources: {}
-output:
-  $import: f.output
-  fields:
-    - b
+outputs:
+  - name: detail
+    container: {type: csv, path: ./b.csv}
+    fields: [b]
 """.lstrip(),
         encoding="utf-8",
     )
 
     expanded = load_and_expand_imports(demand)
-    assert expanded["output"]["fields"] == ["b"]
+    assert expanded["outputs"][0]["fields"] == ["b"]
 
 
 def test_imports_type_mismatch_fails_fast(tmp_path) -> None:
     frag = tmp_path / "frag.yaml"
     frag.write_text(
         """
-output:
-  fields:
-    - a
+base:
+  outputs:
+    - name: detail
+      container: {type: csv, path: ./a.csv}
+      fields: [a]
 """.lstrip(),
         encoding="utf-8",
     )
@@ -158,12 +157,12 @@ output:
 name: demo
 imports:
   f: ./frag.yaml
-$import: f
+$import: f.base
 main_source:
   source_id: orders
   loader: tests.conftest.mock_loader
 sources: {}
-output: "oops"
+outputs: "oops"
 """.lstrip(),
         encoding="utf-8",
     )
@@ -171,7 +170,7 @@ output: "oops"
     with pytest.raises(YamlImportExpansionError) as exc:
         _ = load_and_expand_imports(demand)
     assert "Type mismatch" in str(exc.value)
-    assert exc.value.logical_path == "output"
+    assert exc.value.logical_path == "outputs"
 
 
 @pytest.mark.parametrize(
@@ -313,9 +312,6 @@ main_source:
     order_id: {}
 sources:
   $import: common.sources
-output:
-  fields:
-    - order_id
 """.lstrip(),
         encoding="utf-8",
     )
@@ -498,8 +494,8 @@ def test_imports_deep_merge_override_list_replaces_prior_list(tmp_path) -> None:
     a = tmp_path / "a.yaml"
     a.write_text(
         """
-output:
-  fields:
+demo:
+  items:
     - a
 """.lstrip(),
         encoding="utf-8",
@@ -507,8 +503,8 @@ output:
     b = tmp_path / "b.yaml"
     b.write_text(
         """
-output:
-  fields:
+demo:
+  items:
     - b
 """.lstrip(),
         encoding="utf-8",
@@ -519,13 +515,13 @@ output:
 imports:
   a: ./a.yaml
   b: ./b.yaml
-output:
-  $import: [a.output, b.output]
+demo:
+  $import: [a.demo, b.demo]
 """.lstrip(),
         encoding="utf-8",
     )
     expanded = load_and_expand_imports(demand)
-    assert expanded["output"]["fields"] == ["b"]
+    assert expanded["demo"]["items"] == ["b"]
 
 
 def test_imports_deep_merge_override_type_mismatch_fails_fast(tmp_path) -> None:
@@ -606,7 +602,7 @@ def test_imports_import_must_be_str_or_list_of_str(tmp_path) -> None:
         """
 imports:
   f: ./frag.yaml
-output:
+demo:
   $import: 1
 """.lstrip(),
         encoding="utf-8",
@@ -624,7 +620,7 @@ def test_imports_import_list_entries_must_be_strings(tmp_path) -> None:
         """
 imports:
   f: ./frag.yaml
-output:
+demo:
   $import: [f, 1]
 """.lstrip(),
         encoding="utf-8",
@@ -669,8 +665,6 @@ main_source:
   loader: tests.conftest.mock_loader
 sources:
   $import: missing
-output:
-  fields: []
 """.lstrip(),
         encoding="utf-8",
     )

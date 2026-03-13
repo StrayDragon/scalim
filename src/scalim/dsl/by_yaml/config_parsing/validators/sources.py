@@ -175,7 +175,22 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         if raw < 1:
             self._add_error(errors, "'{}' must be >= 1 when provided".format(_F.BATCH_SIZE), path=_F.BATCH_SIZE)
 
-    def _validate_legacy_fields(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901
+    def _validate_legacy_fields(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912
+        if "output" in config:
+            self._add_error(
+                errors,
+                (
+                    "Legacy YAML syntax is not supported: top-level 'output'. "
+                    "Upgrade to 'outputs' (list) and move output settings into 'outputs.*.container'.\n\n"
+                    "Minimal migration:\n"
+                    "  outputs:\n"
+                    "    - name: detail\n"
+                    "      container: {type: workbook, path: ./output/report.xlsx, sheet: Detail}\n"
+                    "      fields: [field_id, ...]"
+                ),
+                path="output",
+            )
+
         for key in config:
             if key in LEGACY_FIELDS:
                 self._add_error(errors, "Legacy field '{}' is not allowed".format(key), path=str(key))

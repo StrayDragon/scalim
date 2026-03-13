@@ -1,5 +1,3 @@
-import yaml
-
 import pytest
 
 from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
@@ -7,7 +5,7 @@ from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 
 
-def test_loader_parses_output_fields_and_dependencies() -> None:
+def test_loader_parses_outputs_fields_and_injects_dependencies() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -23,27 +21,37 @@ main_source:
       extract: unit_price
     extra: &extra
       extract: extra
+    channel: &channel
+      extract: channel
 sources: {}
 fields:
   total: &total
     name: Total
     compute: "quantity * unit_price"
-output:
-  fields:
-    - *order_id
-    - field_id: total
-      name: Total Override
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields: [order_id, total]
+  - name: direct_detail
+    from: detail
+    where: "extra == 1"
 """
     loader = YamlDemandLoader()
     config = loader.load_string(yaml_content)
 
-    assert config.output is not None
-    assert config.output.fields == ["order_id", "total"]
+    assert len(config.outputs) == 2
+    assert config.outputs[0].name == "detail"
+    assert config.outputs[0].fields == ("order_id", "total")
+    assert config.outputs[1].name == "direct_detail"
+    assert config.outputs[1].fields == ("order_id", "total")
+    assert config.outputs[1].requires == ("extra",)
+
     assert "order_id" in config.source_fields
     assert "quantity" in config.source_fields
     assert "unit_price" in config.source_fields
-    assert "extra" not in config.source_fields
-    assert config.derived_fields["total"].name == "Total Override"
+    assert "extra" in config.source_fields  # injected by outputs.*.where requires
+    assert "channel" not in config.source_fields
+    assert config.derived_fields["total"].name == "Total"
 
 
 def test_validator_allows_missing_top_level_fields() -> None:
@@ -72,37 +80,7 @@ def test_validator_rejects_top_level_source_fields() -> None:
     assert any("Derived field 'order_id' must declare compute/call_by" in msg for msg in exc.value.errors)
 
 
-def test_validator_output_fields_accepts_alias_and_explicit() -> None:
-    yaml_content = """
-name: demo
-main_source:
-  source_id: orders
-  loader: tests.conftest.mock_loader
-  fields:
-    order_id: &order_id
-      extract: order_id
-      name: Order ID
-    order_date: &order_date
-      extract: order_date
-      name: Order Date
-sources: {}
-fields:
-  total: &total
-    name: Total
-    compute: "order_id + 1"
-output:
-  fields:
-    - *order_id
-    - *order_date
-    - field_id: total
-      name: Total Override
-"""
-    config = yaml.safe_load(yaml_content)
-    validator = ConfigValidator()
-    validator.validate(config)
-
-
-def test_validator_output_fields_ambiguous_across_sources() -> None:
+def test_validator_rejects_duplicate_field_ids_across_sources() -> None:
     validator = ConfigValidator()
     config = {
         "name": "demo",
@@ -125,16 +103,12 @@ def test_validator_output_fields_ambiguous_across_sources() -> None:
                 "fields": {"name": {"extract": "name", "relation": {"steps": [{"from": "orders.id", "to": "s2.id"}]}}},
             },
         },
-        "output": {"fields": [{"field_id": "name"}]},
     }
 
     with pytest.raises(ConfigValidationError) as exc:
         validator.validate(config)
 
-    assert any(
-        "Output field 'name' is ambiguous; use 'source.field_id' sugar or add source to explicit field_id object" in msg
-        for msg in exc.value.errors
-    )
+    assert any("Field 'name' is defined multiple times" in msg for msg in exc.value.errors)
 
 
 def test_validator_v3_allows_duplicate_field_values_in_source() -> None:
@@ -150,7 +124,6 @@ def test_validator_v3_allows_duplicate_field_values_in_source() -> None:
             },
         },
         "sources": {},
-        "output": {"fields": [{"field_id": "id_a"}]},
     }
 
     validator.validate(config)

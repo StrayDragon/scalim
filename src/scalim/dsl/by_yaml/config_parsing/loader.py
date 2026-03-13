@@ -15,13 +15,15 @@ else:
     )
 
 from ..schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
-from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_KEYS, DemandConfig
+from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_EXTRA_SHEET_KEYS, DemandConfig, OutputExtraSheetConfig
 from .imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
 from .parsers.guardrails import ParserGuardrailsMixin
 from .parsers.output import ParserOutputMixin
+from .parsers.outputs import ParserOutputsMixin
 from .parsers.results import ParsedFieldsResult
+from .parsers.utils import mapping_or_none, str_or_none
 
 __all__ = [
     "ParsedFieldsResult",
@@ -41,6 +43,7 @@ def _create_validator() -> "ConfigValidator":
 
 class YamlDemandLoader(
     ParserFieldsMixin,
+    ParserOutputsMixin,
     ParserOutputMixin,
     ParserGuardrailsMixin,
 ):
@@ -104,16 +107,28 @@ class YamlDemandLoader(
         main_source = self._parse_main_source(raw)
         sources = self._parse_sources(raw)
         relations = self._parse_relations(raw)
-        raw_output_fields = None
-        raw_output = raw.get_mapping(DEMAND_KEYS["output"])
-        if raw_output is not None:
-            raw_output_fields = raw_output.get(OUTPUT_KEYS["fields"])
+        field_def_index = self._collect_field_defs(raw, main_source.source_id)
+        outputs, required_field_ids = self._parse_outputs(raw, field_def_index=field_def_index)
 
-        parsed_fields = self._parse_fields(raw, main_source.source_id, raw_output_fields, relations)
+        parsed_fields = self._parse_fields(
+            raw,
+            main_source.source_id,
+            required_field_ids,
+            relations,
+            field_def_index=field_def_index,
+        )
         main_source = self._with_main_source_fields(main_source, parsed_fields.main_source_fields)
         sources = self._with_source_fields(sources, parsed_fields.source_fields_by_source)
 
-        output = self._parse_output(raw.data, parsed_fields.output_fields)
+        failure_policy = str(raw.data.get(DEMAND_KEYS["failure_policy"], "all_fail") or "all_fail")
+        if failure_policy not in ("all_fail", "primary_only"):
+            msg = "failure_policy must be 'all_fail' or 'primary_only'"
+            raise ValueError(msg)
+
+        include_full_error_message = bool(raw.data.get(DEMAND_KEYS["include_full_error_message"], False))
+        meta = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["meta"]), key="meta")
+        audit = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["audit"]), key="audit")
+
         observability = self._parse_observability(raw.data)
         guardrails = self._parse_guardrails(raw.data, parsed_fields.field_def_index)
 
@@ -129,6 +144,28 @@ class YamlDemandLoader(
             source_field_id_map=parsed_fields.source_field_id_map,
             relations=relations,
             guardrails=guardrails,
-            output=output,
+            outputs=outputs,
+            failure_policy=failure_policy,
+            include_full_error_message=include_full_error_message,
+            meta=meta,
+            audit=audit,
             observability=observability,
+        )
+
+    def _parse_extra_sheet(self, raw_value: object, *, key: str) -> Optional[OutputExtraSheetConfig]:
+        if raw_value is None or raw_value is False:
+            return None
+        if raw_value is True:
+            return OutputExtraSheetConfig()
+
+        sheet_dict = mapping_or_none(raw_value)
+        if sheet_dict is None:
+            msg = "{} must be a boolean or an object".format(key)
+            raise TypeError(msg)
+
+        return OutputExtraSheetConfig(
+            path=str_or_none(sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["path"])),
+            sheet=str_or_none(sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["sheet"])),
+            allow_formulas=sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["allow_formulas"]),
+            write_lock=sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["write_lock"]),
         )

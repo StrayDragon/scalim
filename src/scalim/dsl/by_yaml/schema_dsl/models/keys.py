@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..constants import SCHEMA_META_KEY, SCHEMA_OMIT_KEY
 from .demand import DemandConfig
-from .field import DerivedFieldConfig, OutputConfig, SourceFieldConfig
+from .field import DerivedFieldConfig, SourceFieldConfig
 from .guardrails import GuardrailsComputeConfig, GuardrailsConfig, GuardrailsLoaderConfig, GuardrailsRelationsConfig
 from .lookup_bind_relation import (
     BindConfig,
@@ -26,6 +26,13 @@ from .observability import (
     RowGapConfig,
     TraceConfig,
     VizConfig,
+)
+from .outputs import (
+    OutputAggregateConfig,
+    OutputAggregateMetricConfig,
+    OutputContainerConfig,
+    OutputExtraSheetConfig,
+    OutputTargetConfig,
 )
 from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, SourceConfig
 
@@ -76,7 +83,11 @@ SOURCE_KEYS = _build_key_map(SourceConfig)
 MAIN_SOURCE_KEYS = _build_key_map(MainSourceConfig)
 SOURCE_FIELD_KEYS = _build_key_map(SourceFieldConfig)
 DERIVED_FIELD_KEYS = _build_key_map(DerivedFieldConfig)
-OUTPUT_KEYS = _build_key_map(OutputConfig)
+OUTPUT_CONTAINER_KEYS = _build_key_map(OutputContainerConfig)
+OUTPUT_AGGREGATE_METRIC_KEYS = _build_key_map(OutputAggregateMetricConfig)
+OUTPUT_AGGREGATE_KEYS = _build_key_map(OutputAggregateConfig)
+OUTPUT_TARGET_KEYS = _build_key_map(OutputTargetConfig)
+OUTPUT_EXTRA_SHEET_KEYS = _build_key_map(OutputExtraSheetConfig)
 PERFORMANCE_KEYS = _build_key_map(PerformanceConfig)
 PERFORMANCE_REPORT_KEYS = _build_key_map(PerformanceReportConfig)
 PERFORMANCE_THRESHOLDS_KEYS = _build_key_map(PerformanceThresholdsConfig)

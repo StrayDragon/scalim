@@ -9,6 +9,8 @@ main_source:
     order_id:
       name: 订单ID
 
-output:
-  path: ./output/minimal_order_report.csv
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/minimal_order_report.csv}
+    fields: [order_id]
 `;

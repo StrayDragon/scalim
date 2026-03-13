@@ -57,11 +57,6 @@ sources:
               to: pays.pay_id
             - from: pays.country_id
               to: countries.country_id
-output:
-  fields:
-    - field_id: country_name
-    - field_id: pay_method
-    - field_id: country_id
 """,
     )
 

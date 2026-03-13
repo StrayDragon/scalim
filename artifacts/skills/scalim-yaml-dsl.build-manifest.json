@@ -61,7 +61,11 @@
       "main_source",
       "memory_opt",
       "observability",
-      "output",
+      "output_aggregate",
+      "output_aggregate_metric",
+      "output_container",
+      "output_extra_sheet",
+      "output_target",
       "performance",
       "performance_report",
       "performance_thresholds",
@@ -235,14 +239,18 @@
       "fields",
       "relations",
       "guardrails",
-      "output",
+      "outputs",
+      "failure_policy",
+      "include_full_error_message",
+      "meta",
+      "audit",
       "observability"
     ]
   },
   "inputs": [
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "785cd637febf4cd021bfb2593061e9d1635f82a4d7d32a394f10c47c97d9d33c"
+      "sha256": "024648a8a9e00bdb7af5e54da480a865221939f3ef5f341b028259435cc73896"
     },
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
@@ -302,7 +310,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "27d657fcb107628d5d47b3bca9c43b1216b01b1635273a10024b3db3f89bf1a0"
+      "sha256": "4caf36df224f5922e9e81968918675a5bcb509dd38784b99964ddf41528354c2"
     }
   ],
   "outputs": [
@@ -312,7 +320,7 @@
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "4880b7a0296e5888568b8780ceb2ee4ecf95460178924c1f81243a709d16e5c5"
+      "sha256": "f66e8dc873d54ae2c142eb2a58518a8d89d5a08f066737320b1eed6597977561"
     },
     {
       "path": "references/generated/example-full/ecommerce_report_fragments.yaml",
@@ -320,7 +328,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "bb1f91b389587755fcac0a3877abf26648d5d43f9212851e227b9bf66403b998"
+      "sha256": "d43384e24be19a4b8d003dc72eaefc0488da18f746817d15c0170e9520746683"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

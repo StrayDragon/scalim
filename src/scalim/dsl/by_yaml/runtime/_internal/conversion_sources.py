@@ -1,4 +1,3 @@
-from collections import deque
 from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from .....spec.ir.aliases import NormalizedLookupKeySpec
@@ -103,34 +102,10 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         return compute_engine
 
     def _resolve_required_field_ids(self, config: DemandConfig) -> Optional[Set[str]]:
-        if config.output is None or not config.output.fields:
-            return None
-
-        output_fields = [str(item) for item in config.output.fields]
-        required: Set[str] = set(output_fields)
-        queue: "deque[str]" = deque(field_id for field_id in output_fields if field_id in config.derived_fields)
-
-        while queue:
-            field_id = queue.popleft()
-            derived = config.derived_fields.get(field_id)
-            if derived is None:
-                continue
-            for dep in derived.depends_on:
-                if dep in required:
-                    continue
-                required.add(dep)
-                if dep in config.derived_fields:
-                    queue.append(dep)
-
-        for item in config.main_source.order_by:
-            raw = str(item).strip()
-            if not raw:
-                continue
-            field_id = raw[1:] if raw.startswith("-") else raw
-            if field_id:
-                required.add(field_id)
-
-        return required
+        _ = config
+        # 由编译后的 `ExecutionPlan` 决定实际目标字段集合;此处不做二次过滤.
+        # 注意: `YAML` 的 `outputs`/`where`/`aggregate` 依赖字段注入(`required fields`)在 `outputs` → `OutputCompositionSpec` 阶段完成.
+        return None
 
     def _convert_main_source(self, config: MainSourceConfig) -> MainSourceIr:
         if not config.source_id:

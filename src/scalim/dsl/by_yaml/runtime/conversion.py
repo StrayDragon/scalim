@@ -96,24 +96,12 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
         self._relation_steps = relation_steps
         self._relation_adjacency = self._build_relation_adjacency(relation_steps)
 
-        required_field_ids = self._resolve_required_field_ids(config)
-        if required_field_ids is not None:
-            known_fields = set(config.source_fields.keys()) | set(config.derived_fields.keys())
-            missing = required_field_ids - known_fields
-            if missing:
-                msg = "Output fields reference unknown fields: {}".format(", ".join(sorted(missing)))
-                raise ConversionError(msg)
-
         fields_ir: List[Union[FieldIr, DerivedFieldIr]] = []
 
-        for field_id, field_config in config.source_fields.items():
-            if required_field_ids is not None and field_id not in required_field_ids:
-                continue
+        for field_config in config.source_fields.values():
             fields_ir.append(self._convert_source_field(field_config, config))
 
-        for field_id, derived_config in config.derived_fields.items():
-            if required_field_ids is not None and field_id not in required_field_ids:
-                continue
+        for derived_config in config.derived_fields.values():
             fields_ir.append(self._convert_derived_field(derived_config))
 
         return DemandIr.from_irs(

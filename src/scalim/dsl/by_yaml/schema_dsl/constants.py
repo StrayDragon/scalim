@@ -638,7 +638,11 @@ DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "fields",
     "relations",
     "guardrails",
-    "output",
+    "outputs",
+    "failure_policy",
+    "include_full_error_message",
+    "meta",
+    "audit",
     "observability",
 ]
 FIELD_DERIVED_CONDITIONS = [

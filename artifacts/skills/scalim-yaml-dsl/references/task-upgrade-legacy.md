@@ -35,6 +35,10 @@
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-derived-outputs-set-aggregations/`
   - Spec: `openspec/specs/derived-outputs/spec.md`
+- 2026-03-13: yaml-dsl-outputs
+  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-dsl-outputs.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-outputs/`
+  - Spec: `openspec/specs/yaml-dsl-schema/spec.md`
 - 2026-03-13: yaml-reuse-workflow
   - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-reuse-workflow.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-imports/`
@@ -137,6 +141,8 @@ params:
 
 ```yaml
 output:
+  format: csv
+  path: ./output/report.csv
   fields:
     - order_id
     - customer_name
@@ -145,20 +151,16 @@ output:
 新写法:
 
 ```yaml
-output:
-  fields:
-    - field_id: order_id
-    - field_id: customer_name
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/report.csv}
+    fields: [order_id, customer_name]
 ```
 
-或直接用 alias:
+说明:
 
-```yaml
-output:
-  fields:
-    - *order_id
-    - *customer_name
-```
+- `output:` 顶层字段已移除(不再支持兼容层);必须升级为 `outputs:`(有序列表)
+- MVP 语法中 `outputs.*.fields` 只支持 field_id 字符串列表(不再支持对象/alias 形态)
 
 ### 6. relation 引用
 
@@ -176,7 +178,7 @@ output:
 2. 规范化 `main_source` / `sources` / 顶层 `fields`
 3. 把 `fields.*.field` 全部升级为 `fields.*.extract`
 4. 把所有 `bind` / `to_bind` 改成 `params` 模板中的 `$keys` / `$rows` 指令节点
-5. 重写 `output.fields`
+5. 把 `output:` 顶层字段升级为 `outputs:`
 6. 检查 relation steps 是否还在写 `data_key`
 7. 跑校验并修掉剩余错误
 

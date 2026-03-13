@@ -74,3 +74,70 @@ fields:
   amount_yuan: &amount_yuan
     name: 金额(元)
     compute: "amount_cent / 100"
+
+meta: true
+audit: true
+
+outputs:
+  - name: direct
+    container:
+      type: workbook
+      path: /tmp/scalim_mvp_demo.xlsx
+      sheet: direct
+      header_fields_output_by: name
+      allow_formulas: true
+      write_lock: true
+    fields:
+      - order_id
+      - user_id
+      - cs_id
+      - group_name
+      - cs_name
+      - wechat_name
+      - institution_code
+      - institution_name
+      - channel
+      - pay_datetime
+      - amount_cent
+      - amount_yuan
+      - is_quick_pay
+    where: "channel == 'direct'"
+
+  - name: partner
+    container:
+      type: workbook
+      path: /tmp/scalim_mvp_demo.xlsx
+      sheet: partner
+      header_fields_output_by: name
+      allow_formulas: true
+      write_lock: true
+    fields:
+      - order_id
+      - user_id
+      - cs_id
+      - group_name
+      - cs_name
+      - wechat_name
+      - institution_code
+      - institution_name
+      - channel
+      - pay_datetime
+      - amount_cent
+      - amount_yuan
+      - is_quick_pay
+    where: "channel == 'partner'"
+
+  - name: by_cs
+    container:
+      type: workbook
+      path: /tmp/scalim_mvp_demo.xlsx
+      sheet: by_cs
+      header_fields_output_by: name
+      allow_formulas: true
+      write_lock: true
+    aggregate:
+      group_by: [cs_id, cs_name, group_name]
+      metrics:
+        order_cnt: {op: count}
+        sum_amount_yuan: {op: sum, field: amount_yuan}
+        user_cnt: {op: count_distinct, field: user_id}

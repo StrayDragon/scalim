@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from typing import ClassVar, Dict, Optional
+from typing import ClassVar, Dict, Optional, Tuple
 
 from ..constants import (
     DEFAULT_BATCH_SIZE,
@@ -14,10 +14,11 @@ from ..constants import (
     schema_omit,
     schema_ref,
 )
-from .field import DerivedFieldConfig, OutputConfig, SourceFieldConfig
+from .field import DerivedFieldConfig, SourceFieldConfig
 from .guardrails import GuardrailsConfig
 from .lookup_bind_relation import RelationConfig
 from .observability import ObservabilityConfig
+from .outputs import OutputExtraSheetConfig, OutputTargetConfig
 from .source import LoaderRetryConfig, MainSourceConfig, SourceConfig
 
 
@@ -122,21 +123,85 @@ class DemandConfig:
     )
     """运行时护栏配置(可选)."""
 
-    output: Optional[OutputConfig] = dataclass_field(
-        default=None,
+    outputs: Tuple[OutputTargetConfig, ...] = dataclass_field(
+        default_factory=tuple,
         metadata=schema_meta(
-            desc="输出配置",
+            desc="输出目标列表(多 sheet 分发 + 派生汇总)",
             md=(
-                "输出配置.\n\n"
-                "- 可选: 不写 `output` 时使用默认输出策略\n"
-                "- 推荐: 把 `YAML` 当模板使用,在 Python 调用侧用 `overrides.output.*` 覆盖输出策略\n"
-                "- 默认 `format: csv`\n"
-                "- 字段重复时需要显式 `output.fields` 进行消歧"
+                "输出目标列表(有序).\n\n"
+                "- 通过 `where` 分发到不同 sheet\n"
+                "- 通过 `aggregate` 声明派生汇总输出\n"
+                "- 通过 `from` 复用字段集合与容器配置\n"
+                "- 不再支持旧写法: 顶层 `output:`"
             ),
-            ref="output",
+            min_items=0,
+            examples=[
+                [
+                    {
+                        "name": "detail",
+                        "container": {"type": "workbook", "path": "./output/report.xlsx", "sheet": "明细"},
+                        "fields": ["order_id", "user_id"],
+                    }
+                ]
+            ],
         ),
     )
-    """输出配置(可选)."""
+    """输出目标列表(有序)."""
+
+    failure_policy: str = dataclass_field(
+        default="all_fail",
+        metadata=schema_meta(
+            desc="多输出失败策略(all_fail/primary_only)",
+            md=("多输出失败策略.\n\n- `all_fail`: 任一目标失败即失败\n- `primary_only`: 非主输出失败将被禁用但不阻断主输出"),
+            choices=["all_fail", "primary_only"],
+            default="all_fail",
+            examples=["all_fail"],
+        ),
+    )
+    """多输出失败策略."""
+
+    include_full_error_message: bool = dataclass_field(
+        default=False,
+        metadata=schema_meta(
+            desc="包含完整错误信息(可能包含敏感信息;默认 false)",
+            md="包含完整错误信息(可能包含敏感信息;默认 false).",
+            default=False,
+            examples=[False],
+        ),
+    )
+    """是否包含完整错误信息."""
+
+    meta: Optional[OutputExtraSheetConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={
+                "oneOf": [
+                    {"type": "boolean"},
+                    {"$ref": "#/definitions/output_extra_sheet"},
+                ]
+            },
+            desc="可选:启用 meta sheet(写入运行信息与统计)",
+            md=("可选:启用 meta sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径"),
+            examples=[True, {"sheet": "__meta__"}],
+        ),
+    )
+    """可选:启用 `meta` 工作表."""
+
+    audit: Optional[OutputExtraSheetConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={
+                "oneOf": [
+                    {"type": "boolean"},
+                    {"$ref": "#/definitions/output_extra_sheet"},
+                ]
+            },
+            desc="可选:启用 audit sheet(写入目标失败等审计信息)",
+            md=("可选:启用 audit sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径"),
+            examples=[True, {"sheet": "__audit__"}],
+        ),
+    )
+    """可选:启用 `audit` 工作表."""
 
     observability: Optional[ObservabilityConfig] = dataclass_field(
         default=None,

@@ -26,16 +26,53 @@ imports:
 # ==============================================================================
 
 _templates:
-  # 输出字段模板: 用于 output.fields 的显式条目/merge 覆盖
-  output_field_product_name: &output_field_product_name
-    field_id: product_name
-    source: products
-    name: 产品名称(模板)
+  # 输出模板: composed outputs(workbook) + 字段列表复用
+  workbook_container_base: &workbook_container_base
+    type: workbook
+    path: ./.tmp/output/ecommerce_report.xlsx
+    header_fields_output_by: name
+    allow_formulas: true
+    write_lock: true
 
-  output_field_customer_level: &output_field_customer_level
-    field_id: customer_level
-    source: customers
-    name: 会员等级(模板)
+  detail_fields: &detail_fields
+    - order_id
+    - order_date
+    - quantity
+    - unit_price
+    - discount_rate
+    - customer_name
+    - customer_phone
+    - registration_date
+    - customer_level
+    - customer_name_rows_cached
+    - customer_level_rows_cached
+    - customer_name_rows_nocache
+    - customer_level_rows_nocache
+    - rows_name_match
+    - rows_level_match
+    - product_name
+    - product_brand
+    - product_cost
+    - product_category_id
+    - category_name
+    - warehouse_name
+    - region_name_value
+    - region_name_display
+    - region_manager
+    - promotion_name
+    - promotion_discount
+    - no_promotion
+    - payment_method_name
+    - payment_fee_rate_candidates
+    - logistics_name
+    - logistics_speed
+    - price_adjustment
+    - shipping_fee
+    - tax_rate
+    - order_amount
+    - profit
+    - tax_amount
+    - final_price
 
   # 关系步骤模板: 复用/merge 展示
   step_orders_to_customers: &step_orders_to_customers
@@ -177,14 +214,14 @@ relations:
   orders_to_categories: &orders_to_categories
     steps:
       - *step_orders_to_products
-      - from: products.product_category_id
+      - from: products.category_id
         to: categories.category_id
 
   orders_to_regions: &orders_to_regions
     steps:
       - from: orders.warehouse_id
         to: warehouses.warehouse_id
-      - from: warehouses.region_id
+      - from: warehouses.warehouse_region_id
         to: regions.region_id
 
   # 复合键关联
@@ -279,9 +316,8 @@ sources:
       product_cost: &product_cost
         name: 产品成本
         relation: orders_to_products
-      product_category_id: &product_category_id
+      category_id: &category_id
         name: 产品分类ID
-        extract: category_id
         relation: orders_to_products
 
   categories:
@@ -301,7 +337,7 @@ sources:
     params:
       ids: {$keys: {as: set}}
     fields:
-      region_id:
+      warehouse_region_id:
         name: 区域ID
         extract: region_id
         relation: orders_to_warehouses
@@ -455,58 +491,36 @@ fields:
     compute: "customer_level_rows_cached == customer_level_rows_nocache"
 
 # ==============================================================================
-# 输出配置
+# 输出配置(composed outputs)
 # ==============================================================================
 
-output:
-  format: csv
-  path: ./.tmp/output/ecommerce_report.csv
-  encoding: utf-8
-  streaming: true
-  include_header: true
-  header_fields_output_by: name
-  fields:
-    - order_id
-    - order_date
-    - field_id: quantity
-      name: 数量(输出覆写)
-    - unit_price
-    - discount_rate
-    - customers.customer_name
-    - customer_phone
-    - registration_date
-    - *output_field_customer_level
-    - *customer_name_rows_cached
-    - *customer_level_rows_cached
-    - *customer_name_rows_nocache
-    - *customer_level_rows_nocache
-    - *rows_name_match
-    - *rows_level_match
-    - { <<: *output_field_product_name, name: 产品名称(输出覆写) }
-    - *product_brand
-    - *product_cost
-    # data_key 选择器示例: 按 loader data_key(category_id) + source 定位到 products.product_category_id
-    - field: category_id
-      source: products
-    - *category_name
-    - *warehouse_name
-    - *region_name_value
-    - *region_name_display
-    - *region_manager
-    - *promotion_name
-    - *promotion_discount
-    - *no_promotion
-    - *payment_method_name
-    - *payment_fee_rate_candidates
-    - *logistics_name
-    - *logistics_speed
-    - *price_adjustment
-    - *shipping_fee
-    - *tax_rate
-    - *order_amount
-    - *profit
-    - *tax_amount
-    - *final_price
+meta: true
+audit: true
+
+outputs:
+  - name: detail
+    container:
+      <<: *workbook_container_base
+      sheet: 订单明细
+    fields: *detail_fields
+
+  - name: no_promo
+    container:
+      <<: *workbook_container_base
+      sheet: 无促销明细
+    fields: *detail_fields
+    where: "no_promotion"
+
+  - name: by_region
+    container:
+      <<: *workbook_container_base
+      sheet: 区域汇总
+    aggregate:
+      group_by: [region_name_display]
+      metrics:
+        order_cnt: {op: count}
+        sum_order_amount: {op: sum, field: order_amount}
+        customer_cnt: {op: count_distinct, field: customer_id}
 
 # ==============================================================================
 # 可观测性配置

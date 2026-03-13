@@ -26,9 +26,6 @@ from scalim.ob._internal.manager_capture import ObserverManagerCaptureMixin
 from scalim.ob._internal.manager_emit import ObserverManagerEmitMixin
 from scalim.planning.plan import ExecutionPlan
 from scalim.execution.context import BatchContext
-from scalim.dsl.by_yaml.config_parsing.models import FieldDef
-from scalim.dsl.by_yaml.config_parsing.validators._internal.validator_fields_output import ValidatorFieldOutputMixin
-from scalim.dsl.by_yaml.schema_dsl.constants import FIELD_KIND_DERIVED
 from scalim.events.catalog import EVENT_PIPELINE_START
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets._internal import viz_config as viz_config_module
@@ -39,11 +36,6 @@ from scalim.ob.presets.viz import VizObserver
 class _BrokenLen:
     def __len__(self) -> int:
         raise TypeError("no len")
-
-
-class _OutputValidator(ValidatorFieldOutputMixin):
-    def _add_error(self, errors: List[Tuple[str, str]], message: str, *, path: str) -> None:
-        errors.append((message, path))
 
 
 class _NoopObserver(Observer):
@@ -101,20 +93,6 @@ class _EmitOnlyManager(ObserverManagerEmitMixin):
 
     def _sample_result(self, _result: Any) -> Any:
         return None
-
-
-def test_validator_output_source_ambiguity_skips_non_source_field() -> None:
-    validator = _OutputValidator()
-    errors: List[Tuple[str, str]] = []
-
-    validator._validate_output_field_source_ambiguity(
-        FieldDef(field_id="derived_only", kind=FIELD_KIND_DERIVED, data={}, source_id=None),
-        "string",
-        {"": {"derived_only"}},
-        errors,
-    )
-
-    assert errors == []
 
 
 def test_internal_viz_handler_helpers_cover_guard_branches() -> None:

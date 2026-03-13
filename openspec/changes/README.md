@@ -37,24 +37,26 @@
 - `yaml-relative-import-paths` 已归档：`openspec/changes/archive/2026-03-11-yaml-relative-import-paths/`
 - `doc-system-workflow` 已归档：`openspec/changes/archive/2026-03-12-doc-system-workflow/`
 - `qa-hardening` 已归档：`openspec/changes/archive/2026-03-12-qa-hardening/`
+- `yaml-dsl-outputs` 已归档：`openspec/changes/archive/2026-03-13-yaml-dsl-outputs/`
 
 ## 待实现分组（按推荐顺序）
 
 1) **Group: demand DSL 语法收敛（breaking）**
-- `yaml-dsl-micro-tunes`
+- `yaml-dsl-micro-tunes` (Done)
 
 2) **Group: YAML 复用与编排（共享路径解析能力）**
-- `yaml-dsl-imports`（建议先落地 `path_aliases`/import 展开）
-- `yaml-dsl-workflow`（复用 `path_aliases`，实现 runs 编排 + shared preload cache）
+- `yaml-dsl-imports`（建议先落地 `path_aliases`/import 展开） (Done)
+- `yaml-dsl-workflow`（复用 `path_aliases`，实现 runs 编排 + shared preload cache） (Done)
 
 3) **Group: source normalize 形状补齐（减少 wrapper）**
-- `yaml-source-normalize-shapes`
+- `yaml-source-normalize-shapes` (Done)
 
 4) **Group: 派生聚合 set 口径原语（去状态壳打底）**
-- `derived-outputs-set-aggregations`
+- `derived-outputs-set-aggregations` (Done)
 
 5) **Group: outputs/workbook 编排面（YAML authoring surface）**
-- `yaml-dsl-outputs`
+- `yaml-dsl-outputs` (Done)
 
 6) **Group: 工具链侧改良（不阻塞主线）**
 - `prompt-eval-workflow` **DELAYED**（移除 DELAYED 标记后才允许实现；在此之前不得实现）
+- `frontend-yaml-dsl-editor-adaptations` **DELAYED**（移除 DELAYED 标记后才允许实现；在此之前不得实现）

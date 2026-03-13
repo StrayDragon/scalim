@@ -18,7 +18,7 @@
 - 同类报表的“分发/汇总编排”无法在 YAML 中复用与沉淀
 
 提供了一个最小脱敏可运行样例用于对齐边界:
-`openspec/changes/yaml-dsl-outputs/acceptance/mvp_demo/README.md`
+`openspec/changes/archive/2026-03-13-yaml-dsl-outputs/acceptance/mvp_demo/README.md`
 其中 baseline 目前用“最薄 Python sink”兜住 multi-sheet 分发,正是本 change 要消灭的 glue.
 
 ## What Changes

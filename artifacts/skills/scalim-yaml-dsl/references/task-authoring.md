@@ -4,13 +4,13 @@
 
 - 用户要新建 YAML DSL
 - 用户要把一段业务逻辑改写成 YAML DSL
-- 用户要在现有 YAML 上增删 source / relation / output / observability
+- 用户要在现有 YAML 上增删 source / relation / outputs / observability
 
 ## 工作顺序
 
 1. 先确认目标字段和最终输出接口
 2. 识别 `main_source` 与所有辅助 `sources`
-3. 先定义源字段,再定义 relation,最后再写顶层派生字段和 `output.fields`
+3. 先定义源字段,再定义 relation,最后再写顶层派生字段和 `outputs`
 4. 先跑 `schema validate`,再跑 `validate`
 
 ## 推荐骨架
@@ -57,12 +57,10 @@ fields:
     name: 利润
     compute: "amount - cost"
 
-output:
-  fields:
-    - order_id
-    - customers.customer_name
-    - amount
-    - profit
+outputs:
+  - name: detail
+    container: {type: csv, path: ./output/my_report.csv, header_fields_output_by: name}
+    fields: [order_id, customer_name, amount, profit]
 ```
 
 ## 关键规则
@@ -79,10 +77,9 @@ output:
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
 - 动态入参用 `sources.<id>.params` 模板内联指令节点表达(`$keys` / `$rows`)
 - 运行期变量用 `runtime_vars` 注入并在 `params` 中用 `{$runtime: <name>}` 指令节点引用
-- `output.fields` 支持 string sugar/对象/alias(可混用):
-  - `field_id` (例: `order_id`)
-  - `source.field_id` (例: `orders.order_id`,用于消歧;仅支持二段式)
-- 跨 source 同名 `field_id` 时,`output.fields` 里必须显式指定 `source`(`source.field_id` 或 `{field_id: ..., source: ...}`)
+- `outputs` 是 **有序列表**(顺序决定 primary 输出); 每个 output 必填唯一 `name`,可用 `from` 复用字段集合与容器配置
+- `outputs.*.fields` 是 field_id 字符串列表; field_id 必须全局唯一(不再支持 `source.field_id` 消歧)
+- 分发过滤用 `outputs.*.where`(安全表达式); where 依赖字段会被注入到 required fields
 
 ## 相对模块引用(可选)
 
@@ -107,7 +104,7 @@ retry:
 
 ## 设计偏好
 
-- 优先把 YAML 当模板使用,输出路径尽量交给 Python `overrides.output.*`
+- 输出路径在 `outputs.*.container.path` 显式声明; 多目标共享同一 workbook 时建议开启 `write_lock: true`
 - 优先使用 string ref / string sugar;仅在需要大段复用/覆写时再用 anchor
 - 输出字段优先显式声明(避免隐式全量导出);简单场景可用 string sugar
 - 只有在 DSL 无法表达时才退回 Python
