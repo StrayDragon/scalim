@@ -32,7 +32,7 @@
 
 - [x] 6.1 更新与 `yaml-source-normalize` 相关的文档/说明(作者视角: 何时用 `take_first`/`project_fields`/`map_values`/`call_by`)
 - [x] 6.2 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
-- [x] 6.3 新增升级指南: `docs/doc/yaml-dsl/upgrades/YYYY-MM-DD-yaml-source-normalize-shapes.md`,并运行 `just gen` 注入升级索引
+- [x] 6.3 新增升级指南: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-source-normalize-shapes.md`,并运行 `just gen` 注入升级索引
 - [x] 6.4 通过: `just gen`
 - [x] 6.5 通过: `just qa`
 - [x] 6.6 通过: `just openspec-check`

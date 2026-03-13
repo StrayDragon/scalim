@@ -129,5 +129,5 @@ sources:
 
 1) 实现语法与 validator/schema 更新,并补齐测试与 fixtures 覆盖
 2) 一步到位升级仓内所有 YAML 示例/fixtures/skills/frontend examples
-3) 新增升级指南: `docs/doc/yaml-dsl/upgrades/2026-03-12-yaml-dsl-micro-tunes.md`,并运行 `just gen-docs` 注入索引
+3) 新增升级指南: `docs/doc/yaml-dsl/upgrades/2026-03-13-demand-dsl-breaking.md`,并运行 `just gen-docs` 注入索引
 4) 跑通门禁: `just gen` + `just qa` + `just openspec-check`

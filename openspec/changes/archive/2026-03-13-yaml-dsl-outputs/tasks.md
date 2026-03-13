@@ -63,7 +63,7 @@
 
 - [x] 7.1 盘点下游适配与同步修改: 读取 `.tmp/known-outer-paths-using-this-package.txt` 并列出需要同步的下游目录(输出/文档中不得引用文件内容)
   - 已读取 `.tmp/known-outer-paths-using-this-package.txt`; 按隐私规则不在此处展开其内容,仅保留该路径引用.
-- [x] 7.2 新增升级指南: `docs/doc/yaml-dsl/upgrades/YYYY-MM-DD-yaml-dsl-outputs.md`,并运行 `just gen` 注入升级索引
+- [x] 7.2 新增升级指南: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-dsl-outputs.md`,并运行 `just gen` 注入升级索引
 - [x] 7.3 通过: `just gen`
 - [x] 7.4 通过: `just qa`
 - [x] 7.5 通过: `just openspec-check`
