@@ -370,6 +370,21 @@ def _render_yaml_dsl_upgrade_pages(repo_root: Path, docs_dir: Path) -> Dict[Path
     return expected
 
 
+def _cleanup_yaml_dsl_upgrades_dir(docs_dir: Path) -> List[Path]:
+    """清空 `upgrades` 生成目录(保留 `index.md`),避免遗留文件导致不一致."""
+    upgrades_dir = (docs_dir / "yaml-dsl" / "upgrades").resolve()
+    if not upgrades_dir.exists():
+        return []
+
+    removed: List[Path] = []
+    for path in sorted(upgrades_dir.glob("*.md"), key=lambda item: item.name):
+        if path.name == "index.md":
+            continue
+        path.unlink()
+        removed.append(path)
+    return removed
+
+
 def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, str]:
     expected: Dict[Path, str] = {
         docs_dir / "yaml-dsl" / "schema-reference.gen.md": _render_yaml_schema_reference(repo_root),
@@ -483,8 +498,18 @@ def main(argv: Iterable[str] | None = None) -> int:
         return 0
 
     changed: List[Path] = []
+    changed.extend(_cleanup_yaml_dsl_upgrades_dir(docs_dir))
     changed.extend(_sync_generated_markdown(expected_gen_md))
     changed.extend(_sync_injected_docs(expected_injected))
+
+    unique_changed: List[Path] = []
+    seen: set[Path] = set()
+    for path in changed:
+        if path in seen:
+            continue
+        seen.add(path)
+        unique_changed.append(path)
+    changed = unique_changed
 
     if changed:
         sys.stdout.write("已更新:\n")
