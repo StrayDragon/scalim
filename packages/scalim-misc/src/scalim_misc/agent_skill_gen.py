@@ -60,6 +60,7 @@ REFERENCES_ROOT_REL = Path("references")
 SYNTAX_CATALOG_REL = REFERENCES_ROOT_REL / "syntax-catalog.gen.md"
 CLI_LSP_REFERENCE_REL = GENERATED_ROOT_REL / "cli-lsp-reference.gen.md"
 CANONICAL_EXAMPLE_OUTPUT_REL = GENERATED_ROOT_REL / "example-full" / "ecommerce_report.gen.yaml"
+UPGRADES_NOTES_REL = GENERATED_ROOT_REL / "yaml-dsl-upgrades.gen.md"
 
 SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
 CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
@@ -120,10 +121,12 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     canonical_example_fragments = build_canonical_example_fragments(repo_root)
     validate_canonical_example(repo_root, canonical_example_text, fragments=canonical_example_fragments)
 
+    upgrades_root = repo_root / UPGRADES_DOCS_ROOT_REL
     generated_files = {
         SYNTAX_CATALOG_REL: render_syntax_catalog(schema, syntax_specs),
         CLI_LSP_REFERENCE_REL: render_cli_lsp_reference(repo_root, command_docs, cli_specs),
         CANONICAL_EXAMPLE_OUTPUT_REL: canonical_example_text,
+        UPGRADES_NOTES_REL: render_yaml_dsl_upgrades_notes(repo_root, upgrades_root),
     }
     for fragment_name, fragment_text in canonical_example_fragments.items():
         fragment_rel = GENERATED_ROOT_REL / "example-full" / fragment_name
@@ -495,6 +498,106 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
         if item["spec_path"]:
             lines.append("  - Spec: `{}`".format(item["spec_path"]))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
+    """从 upgrades 文档提取“变更摘要/迁移清单”片段,供 skill 使用(避免重复维护规则)."""
+    if not upgrades_root.exists():
+        return "# YAML DSL Upgrades (Generated)\n\n未找到 upgrades 文档目录: `{}`\n".format(
+            path_to_posix(upgrades_root.relative_to(repo_root))
+        )
+
+    docs = []
+    for path in sorted(upgrades_root.glob("*.md"), key=lambda item: item.name):
+        if path.name == "index.md":
+            continue
+        content = read_text(path)
+        title = extract_markdown_h1(content) or path.name
+        doc_rel = path_to_posix(path.relative_to(repo_root))
+        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/")
+        spec_path = extract_backtick_path(content, prefix="openspec/specs/")
+
+        summary_lines = extract_markdown_section_lines(content, heading_prefix="## 变更摘要", max_lines=16)
+        migration_lines = extract_markdown_section_lines(content, heading_prefix="## Migration Checklist", max_lines=24)
+        if not migration_lines:
+            migration_lines = extract_markdown_section_lines(content, heading_prefix="## 升级建议", max_lines=24)
+
+        docs.append(
+            {
+                "title": title,
+                "doc_rel": doc_rel,
+                "openspec_archive": openspec_archive,
+                "spec_path": spec_path,
+                "summary_lines": summary_lines,
+                "migration_lines": migration_lines,
+            }
+        )
+
+    lines = [
+        "# YAML DSL Upgrades (Generated)",
+        "",
+        "此文档由 `scripts/gen-agent-skill.py` 自动生成,来源: `docs/doc/yaml-dsl/upgrades/`。",
+        "用于在使用 skill 时快速定位 breaking/migration,避免在多处重复维护易变规则。",
+        "",
+    ]
+
+    if not docs:
+        lines.append("- (未发现升级文档)")
+        return "\n".join(lines).rstrip() + "\n"
+
+    for item in docs:
+        lines.extend(
+            [
+                "## {}".format(item["title"]),
+                "- Docs: `{}`".format(item["doc_rel"]),
+            ]
+        )
+        if item["openspec_archive"]:
+            lines.append("- OpenSpec: `{}`".format(item["openspec_archive"]))
+        if item["spec_path"]:
+            lines.append("- Spec: `{}`".format(item["spec_path"]))
+
+        summary = item["summary_lines"] or []
+        if summary:
+            lines.append("- Summary:")
+            lines.extend(["  {}".format(l.strip()) for l in summary])
+
+        migration = item["migration_lines"] or []
+        if migration:
+            lines.append("- Migration:")
+            lines.extend(["  {}".format(l.strip()) for l in migration])
+
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def extract_markdown_section_lines(text: str, *, heading_prefix: str, max_lines: int) -> List[str]:
+    collecting = False
+    in_code_block = False
+    buffer: List[str] = []
+    for line in text.splitlines():
+        if line.startswith(heading_prefix):
+            collecting = True
+            continue
+        if collecting and line.startswith("## "):
+            break
+        if not collecting:
+            continue
+
+        stripped = line.rstrip()
+        if stripped.strip().startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+        if not stripped.strip():
+            continue
+
+        buffer.append(stripped)
+        if len(buffer) >= max_lines:
+            break
+    return buffer
 
 
 def extract_markdown_h1(text: str) -> str:

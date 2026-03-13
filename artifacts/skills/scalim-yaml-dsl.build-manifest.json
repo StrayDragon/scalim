@@ -327,6 +327,10 @@
       "sha256": "aef6fecbc986e199c9cbdf796e6e47cd71f8dc3f0897d65c0c7c95271eb1f670"
     },
     {
+      "path": "references/generated/yaml-dsl-upgrades.gen.md",
+      "sha256": "d3770b2c8855d1ce11f533fbe53c9cb2b528635e31199cbea968e3232b01b599"
+    },
+    {
       "path": "references/syntax-catalog.gen.md",
       "sha256": "d43384e24be19a4b8d003dc72eaefc0488da18f746817d15c0170e9520746683"
     }

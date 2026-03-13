@@ -46,12 +46,12 @@
 - `sources`
 - `relations`
 - 顶层派生字段
-- `output.fields` 的字段编排
+- `outputs.*.fields` 的字段编排
 - 可直接复用的 BLL/服务 loader 引用
 
 ### 先留在 Python
 
-- 多 sheet Excel 组装
+- 复杂 workbook 组装(例如跨 sheet 公式/样式/引用,或需要复用旧导出器能力)
 - 多轮 runtime state / state map
 - compare 路由
 - 回滚观察逻辑
@@ -111,11 +111,12 @@ main_source:
 
 ## 多 sheet 宽表场景
 
-如果本质是“同一份宽表分发到多个 sheet”:
+如果本质是“同一份宽表分发到多个 sheet”,优先直接用 YAML `outputs` 表达:
 
-- 先用 YAML 描述整张宽表
-- Python 只负责最终多 sheet 组装
-- 这样以后如果框架原生支持同宽表分 sheet,迁移面最小
+- 先用 YAML 描述整张宽表(字段/关联/派生字段)
+- 用多个 `outputs` + `where` 分发到不同 sheet
+- 多目标共享同一 workbook 时,为每个 output 显式设置 `container.sheet` 并建议开启 `write_lock: true`
+- 只有在需要复杂格式/样式/跨 sheet 自定义公式等能力时,才保留薄 Python 组装层
 
 ## 方案阶段输出要求
 

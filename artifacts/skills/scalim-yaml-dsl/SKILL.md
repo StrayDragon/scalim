@@ -11,6 +11,8 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
+- 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
+- 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)
 - 需要全量语法/API: 读 [references/syntax-catalog.gen.md](references/syntax-catalog.gen.md) 和 [references/generated/cli-lsp-reference.gen.md](references/generated/cli-lsp-reference.gen.md)
 - 需要完整 canonical example: 读 [references/generated/example-full/ecommerce_report.gen.yaml](references/generated/example-full/ecommerce_report.gen.yaml)
 
@@ -33,8 +35,9 @@ LSP 头部优先用 `schema path` 的输出,不要猜路径。完整 canonical e
 
 - 顶层 `fields` 只放派生字段,必须使用 `compute` 或 `call_by`
 - `main_source.fields` / `sources.<id>.fields` 只放源字段,不要把派生逻辑塞进去
-- `relations.*.steps.from/to` 写 `field_id`,不要写 loader `data_key`
-- `output.fields` 只能写显式对象或 YAML alias,不要写纯字符串
+- `relations.*.steps.from/to` 写 YAML 的字段 ID(不要写 loader 的 `data_key`)
+- 不要硬记/猜语法: 以 schema / 生成文档为准(需要时看 `references/syntax-catalog.gen.md`、`references/generated/cli-lsp-reference.gen.md`、`references/generated/example-full/ecommerce_report.gen.yaml`)
+- 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证
 

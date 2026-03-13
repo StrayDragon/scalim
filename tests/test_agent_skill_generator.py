@@ -39,6 +39,7 @@ def test_build_generates_generated_references_only(tmp_path: Path) -> None:
         "references/generated/cli-lsp-reference.gen.md",
         "references/generated/example-full/ecommerce_report.gen.yaml",
         "references/generated/example-full/ecommerce_report_fragments.yaml",
+        "references/generated/yaml-dsl-upgrades.gen.md",
         "references/syntax-catalog.gen.md",
     ]
 
@@ -49,6 +50,7 @@ def test_build_generates_generated_references_only(tmp_path: Path) -> None:
         "references/generated/cli-lsp-reference.gen.md",
         "references/generated/example-full/ecommerce_report.gen.yaml",
         "references/generated/example-full/ecommerce_report_fragments.yaml",
+        "references/generated/yaml-dsl-upgrades.gen.md",
         "references/syntax-catalog.gen.md",
     ]
     assert "path_normalization" not in payload

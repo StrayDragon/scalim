@@ -65,18 +65,27 @@ uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
 
 - 按 [task-upgrade-legacy.md](task-upgrade-legacy.md) 直接改到新结构
 
-### `output.fields must be explicit field object`
+### `Legacy YAML syntax is not supported: top-level 'output'. ...`
 
-- 把字符串写法改成 alias 或显式对象
+- 顶层 `output:` 已移除;必须升级为 `outputs:`(list)
+- 把输出参数移到 `outputs.*.container`,把输出字段移到 `outputs.*.fields`
+- 参考: [task-upgrade-legacy.md](task-upgrade-legacy.md) / `docs/doc/yaml-dsl/upgrades/`(按批次阅读迁移说明)
 
-### `output.fields is required to disambiguate`
+### `Field 'xxx' is defined multiple times; field_id must be unique ...`
 
-- 有重名字段,需要在 `output.fields` 中显式选择
-- 必要时补 `source`
+- `field_id` 必须全局唯一: 不再允许通过输出层做消歧
+- 处理方式:
+  1) 先在字段定义处重命名(例如 `customer_name` → `customer_name_customer`)
+  2) 再在 `outputs.*.fields` 引用新的 `field_id`
+
+### `Legacy \`$runtime.<name>\` placeholder is not supported; use \`{$runtime: <name>}\``
+
+- 把所有 `$runtime.xxx` 替换为 `{$runtime: xxx}`
+- 运行期变量由 Python 调用方传入 `runtime_vars={...}`; YAML 里只声明引用
 
 ### relation 相关错误
 
-- 确认 `from` / `to` 使用的是 `field_id`
+- 确认 `from` / `to` 使用的是 `source.field_id`(或 list),不要写 loader 的 `data_key`
 - 确认 relation 链路连续
 - 确认 `sources.<id>.key` 与 step 右侧匹配
 

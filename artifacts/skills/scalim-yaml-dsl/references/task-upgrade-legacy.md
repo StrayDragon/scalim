@@ -12,6 +12,12 @@
 - 不保留兼容层
 - 升级后立刻跑 `schema validate` 与 `validate`
 
+## 如何定位需要看的升级批次
+
+1) 先跑 `schema validate --strict` 与 `validate --strict`,取第一条错误的 `path + message`
+2) 优先读生成的 upgrades 摘要: `references/generated/yaml-dsl-upgrades.gen.md`
+3) 再按摘要里的 docs 路径打开对应批次的完整升级文档(`docs/doc/yaml-dsl/upgrades/*.md`)
+
 ## YAML DSL 升级批次索引 (自动生成)
 
 <!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->
@@ -135,7 +141,7 @@ params:
 - `$rows` 会触发 rows barrier.在 `parallel_mode="adaptive"` 下,该层 LoadRef 会按串行执行.
 - `cache_mode: preload_forever` 的 source 禁止在 `params` 中使用 `$keys/$rows`.
 
-### 5. `output.fields`
+### 5. 顶层 `output` → `outputs`
 
 旧写法:
 
@@ -160,17 +166,20 @@ outputs:
 说明:
 
 - `output:` 顶层字段已移除(不再支持兼容层);必须升级为 `outputs:`(有序列表)
-- MVP 语法中 `outputs.*.fields` 只支持 field_id 字符串列表(不再支持对象/alias 形态)
+- `outputs.*.fields` 推荐优先用 `field_id` 字符串列表;允许的结构以当前 schema 为准(需要时查 `docs/doc/yaml-dsl/schema-reference.gen.md` 与 `references/syntax-catalog.gen.md`)
 
 ### 6. relation 引用
 
-- `relation` 不要写字符串 relation_id
-- 用 YAML alias 或内联 `steps`
+- `relation` 支持 string ref/alias/内联 `steps`:
+  - `relation: <relation_id>` 引用 `relations.<relation_id>`
+  - `relation: *anchor` (YAML alias)
+  - `relation: {steps: [...]}` (内联)
+- 推荐优先用 string ref(可读性更好;也更方便从 alias 迁移)
 
 ### 7. step 字段选择
 
-- `steps.from` / `steps.to` 使用 `field_id`
-- 即使 loader 真实列名不同,这里仍然写 YAML key
+- `steps.from` / `steps.to` 使用 `source.field_id`(或 list)
+- 即使 loader 真实列名不同,这里仍然写 YAML 的 `field_id`
 
 ## 升级顺序
 
@@ -195,8 +204,12 @@ uv run scalim-cli yaml-dsl validate <file.yaml> --strict
   - 删除旧字段,改写到当前入口结构
 - `Derived field 'xxx' must declare compute/call_by`
   - 如果它是源字段,请移回 `main_source.fields`/`sources.*.fields`;如果它是派生字段,请补 `compute` 或 `call_by`
-- `output.fields[0] must be explicit field object`
-  - 把字符串改成 alias 或显式对象
+- `Legacy YAML syntax is not supported: top-level 'output'. ...`
+  - 顶层 `output:` 已移除;按本页第 5 节升级为 `outputs:` 并把输出参数移到 `outputs.*.container`
+- `Legacy \`$runtime.<name>\` placeholder is not supported; use \`{$runtime: <name>}\``
+  - 把所有 `$runtime.xxx` 全量替换为 `{$runtime: xxx}`
+- `Field 'xxx' is defined multiple times; field_id must be unique ...`
+  - 先在 `main_source.fields/sources.*.fields/fields` 中把重名 `field_id` 重命名,再在 `outputs.*.fields` 引用新 `field_id`
 - `Unknown field`
   - 先查 typo,再查是否仍在使用旧字段名
 
