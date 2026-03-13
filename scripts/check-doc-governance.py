@@ -75,42 +75,37 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
         return ["missing directory: {}".format(ssot_dir)]
 
     ssot_files = sorted(p for p in ssot_dir.glob("*.md") if p.is_file())
+    expected_docs_names = {"{}.gen.md".format(p.stem) for p in ssot_files}
+
     docs_files = sorted(p for p in docs_dir.glob("*.md") if p.exists())
 
-    ssot_names = {p.name for p in ssot_files}
     docs_names = {p.name for p in docs_files if p.name != "index.md"}
 
-    missing_links = sorted(ssot_names - docs_names)
-    if missing_links:
+    missing_pages = sorted(expected_docs_names - docs_names)
+    if missing_pages:
         errors.append(
-            "missing docs symlinks under {}:\n{}".format(
+            "missing docs pages under {}:\n{}".format(
                 docs_dir,
-                "\n".join("- {}".format(name) for name in missing_links),
+                "\n".join("- {}".format(name) for name in missing_pages),
             )
         )
 
-    unexpected = sorted(docs_names - ssot_names)
+    unexpected = sorted(docs_names - expected_docs_names)
     if unexpected:
         errors.append(
-            "unexpected markdown files under {} (expected symlinks to SSOT):\n{}".format(
+            "unexpected markdown files under {} (expected generated copies from SSOT):\n{}".format(
                 docs_dir,
                 "\n".join("- {}".format(name) for name in unexpected),
             )
         )
 
-    for name in sorted(ssot_names & docs_names):
-        link_path = docs_dir / name
-        expected_target = ssot_dir / name
-        if not link_path.is_symlink():
-            errors.append("`{}` MUST be a symlink to `{}`.".format(link_path, expected_target))
+    for name in sorted(expected_docs_names & docs_names):
+        doc_path = docs_dir / name
+        if doc_path.is_symlink():
+            errors.append("`{}` MUST be a regular file (zensical does not build symlinked markdown).".format(doc_path))
             continue
-        try:
-            resolved = link_path.resolve()
-        except Exception as exc:  # pragma: no cover
-            errors.append("failed to resolve symlink `{}`: {}".format(link_path, exc))
-            continue
-        if resolved != expected_target.resolve():
-            errors.append("`{}` MUST point to `{}` (got `{}`).".format(link_path, expected_target, resolved))
+        if not doc_path.is_file():
+            errors.append("`{}` MUST be a file.".format(doc_path))
 
     return errors
 

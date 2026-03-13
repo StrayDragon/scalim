@@ -1,1 +1,0 @@
-../../../../artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-source-normalize-shapes.md

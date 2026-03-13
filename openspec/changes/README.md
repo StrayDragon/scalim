@@ -16,6 +16,7 @@
 
 4) **每组必须交付“升级指南”，并接入自动索引**
 - 在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 新增一篇升级文档（文件名建议 `YYYY-MM-DD-<group>.md`；docs-site 同名页通过软链引用,不重复维护）。
+- 在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 新增一篇升级文档（文件名建议 `YYYY-MM-DD-<group>.md`；docs-site 同名页由 SSOT 自动生成,不重复维护；运行 `just gen-docs`）。
 - 文档中用反引号写出：
   - 对应归档目录：`openspec/changes/archive/YYYY-MM-DD-<change>/`
   - 对应主规范：`openspec/specs/<spec>/spec.md`
