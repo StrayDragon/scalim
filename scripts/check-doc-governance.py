@@ -63,11 +63,64 @@ def _check_repo_guide_single_link(root: Path) -> list[str]:
     return []
 
 
+def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
+    errors: list[str] = []
+
+    docs_dir = root / "docs" / "doc" / "yaml-dsl" / "upgrades"
+    ssot_dir = root / "artifacts" / "skills" / "scalim-yaml-dsl" / "references" / "upgrades"
+
+    if not docs_dir.exists():
+        return ["missing directory: {}".format(docs_dir)]
+    if not ssot_dir.exists():
+        return ["missing directory: {}".format(ssot_dir)]
+
+    ssot_files = sorted(p for p in ssot_dir.glob("*.md") if p.is_file())
+    docs_files = sorted(p for p in docs_dir.glob("*.md") if p.exists())
+
+    ssot_names = {p.name for p in ssot_files}
+    docs_names = {p.name for p in docs_files if p.name != "index.md"}
+
+    missing_links = sorted(ssot_names - docs_names)
+    if missing_links:
+        errors.append(
+            "missing docs symlinks under {}:\n{}".format(
+                docs_dir,
+                "\n".join("- {}".format(name) for name in missing_links),
+            )
+        )
+
+    unexpected = sorted(docs_names - ssot_names)
+    if unexpected:
+        errors.append(
+            "unexpected markdown files under {} (expected symlinks to SSOT):\n{}".format(
+                docs_dir,
+                "\n".join("- {}".format(name) for name in unexpected),
+            )
+        )
+
+    for name in sorted(ssot_names & docs_names):
+        link_path = docs_dir / name
+        expected_target = ssot_dir / name
+        if not link_path.is_symlink():
+            errors.append("`{}` MUST be a symlink to `{}`.".format(link_path, expected_target))
+            continue
+        try:
+            resolved = link_path.resolve()
+        except Exception as exc:  # pragma: no cover
+            errors.append("failed to resolve symlink `{}`: {}".format(link_path, exc))
+            continue
+        if resolved != expected_target.resolve():
+            errors.append("`{}` MUST point to `{}` (got `{}`).".format(link_path, expected_target, resolved))
+
+    return errors
+
+
 def main() -> int:
     root = _repo_root()
     errors: list[str] = []
     errors.extend(_check_claude_symlink(root))
     errors.extend(_check_repo_guide_single_link(root))
+    errors.extend(_check_yaml_dsl_upgrades_ssot(root))
 
     if errors:
         sys.stderr.write("文档治理一致性检查失败:\n")

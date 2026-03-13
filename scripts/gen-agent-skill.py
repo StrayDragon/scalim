@@ -8,7 +8,7 @@
 - 只生成 `artifacts/skills/scalim-yaml-dsl/references/*.gen.*`、
   `artifacts/skills/scalim-yaml-dsl/references/generated/` 与构建清单.
 - 若存在 `artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`,
-  会在约定的“标记区块”内注入“升级批次索引”(来源: `docs/doc/yaml-dsl/upgrades/`).
+  会在约定的“标记区块”内注入“升级批次索引”(来源: `artifacts/skills/scalim-yaml-dsl/references/upgrades/`).
 - 语法目录来自 `src/scalim/dsl/by_yaml/schema/demand.gen.json`.
 - CLI/LSP 参考来自 `src/scalim/cli/yaml_dsl.py`.
 - 部分需求索引摘要来自 `openspec/specs/`.

@@ -45,9 +45,9 @@ python3 scripts/scan-downstream-yaml-dsl.py
 
 - 从每个 `line-<N>.json` 中提取 `issues[].message` 的前几个关键词/短语,按“同类错误”聚类
 - 对每一类错误,用 upgrades 文档找到对应的迁移批次与迁移方式:
-  - 入口: `docs/doc/yaml-dsl/upgrades/`
+  - 入口: `artifacts/skills/scalim-yaml-dsl/references/upgrades/`
   - 或从 skill 的升级索引进入: `references/task-upgrade-legacy.md` (包含自动注入的升级批次索引)
-  - 需要快速全文检索时: `rg -n "<keyword>" docs/doc/yaml-dsl/upgrades/*.md`
+  - 需要快速全文检索时: `rg -n "<keyword>" artifacts/skills/scalim-yaml-dsl/references/upgrades/*.md`
 
 ### B. 上游稳定后: 一步到位升级下游(不保留兼容)
 

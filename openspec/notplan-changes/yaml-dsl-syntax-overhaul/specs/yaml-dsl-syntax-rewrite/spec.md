@@ -59,4 +59,4 @@
 
 #### Scenario: 升级文档可被 skill 索引
 - **WHEN** 维护者完成一次 breaking 语法变更并归档 change
-- **THEN** `docs/doc/yaml-dsl/upgrades/` MUST 增加升级指南并可被 skill references 自动索引
+- **THEN** `artifacts/skills/scalim-yaml-dsl/references/upgrades/` MUST 增加升级指南并可被 skill references 自动索引

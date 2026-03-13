@@ -17,6 +17,10 @@ from scalim_misc.markdown_inject import InjectBlockSpec, replace_markdown_inject
 USER_GUIDE_SOURCE_FIELD_EXTRACT_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-source-field-extract -->"
 USER_GUIDE_SOURCE_FIELD_EXTRACT_END = "<!-- END AUTOGEN:yaml-dsl-source-field-extract -->"
 
+UPGRADES_INDEX_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades-index -->"
+UPGRADES_INDEX_END = "<!-- END AUTOGEN:yaml-dsl-upgrades-index -->"
+UPGRADES_SSOT_DIR_REL = Path("artifacts") / "skills" / "scalim-yaml-dsl" / "references" / "upgrades"
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -330,6 +334,22 @@ def _render_openspec_index(repo_root: Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _render_yaml_dsl_upgrades_index(repo_root: Path) -> str:
+    ssot_dir = (repo_root / UPGRADES_SSOT_DIR_REL).resolve()
+    if not ssot_dir.exists():
+        return "- (未发现升级文档)\n"
+
+    docs: List[str] = []
+    for path in sorted(ssot_dir.glob("*.md"), key=lambda item: item.name):
+        title = _extract_markdown_h1(_read_text(path)) or path.name
+        docs.append("- [{}]({})".format(title, path.name))
+
+    if not docs:
+        docs.append("- (未发现升级文档)")
+
+    return "\n".join(docs).rstrip() + "\n"
+
+
 def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, str]:
     return {
         docs_dir / "yaml-dsl" / "schema-reference.gen.md": _render_yaml_schema_reference(repo_root),
@@ -380,7 +400,21 @@ def _expected_injected_docs(repo_root: Path, docs_dir: Path) -> Dict[Path, str]:
         ),
         content=SOURCE_FIELD_EXTRACT_MD,
     )
-    return {user_guide: updated}
+    expected: Dict[Path, str] = {user_guide: updated}
+
+    upgrades_index = docs_dir / "yaml-dsl" / "upgrades" / "index.md"
+    original = _read_text(upgrades_index)
+    updated = replace_markdown_injected_block(
+        original,
+        spec=InjectBlockSpec(
+            begin_marker=UPGRADES_INDEX_BEGIN,
+            end_marker=UPGRADES_INDEX_END,
+            label=str(upgrades_index),
+        ),
+        content=_render_yaml_dsl_upgrades_index(repo_root),
+    )
+    expected[upgrades_index] = updated
+    return expected
 
 
 def _check_injected_docs(expected: Dict[Path, str]) -> List[Tuple[Path, str]]:

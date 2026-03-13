@@ -16,41 +16,41 @@
 
 1) 先跑 `schema validate --strict` 与 `validate --strict`,取第一条错误的 `path + message`
 2) 优先读生成的 upgrades 摘要: `references/generated/yaml-dsl-upgrades.gen.md`
-3) 再按摘要里的 docs 路径打开对应批次的完整升级文档(`docs/doc/yaml-dsl/upgrades/*.md`)
+3) 再按摘要里的路径打开对应批次的完整升级文档(`references/upgrades/*.md`)
 
 ## YAML DSL 升级批次索引 (自动生成)
 
 <!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->
 - 2026-03-10: yaml-field-extract
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-field-extract.md`
+  - SSOT: `references/upgrades/2026-03-10-yaml-field-extract.md`
   - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-field-extract/`
   - Spec: `openspec/specs/yaml-field-extract/spec.md`
 - 2026-03-10: yaml-source-normalize
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-source-normalize.md`
+  - SSOT: `references/upgrades/2026-03-10-yaml-source-normalize.md`
   - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-source-normalize/`
   - Spec: `openspec/specs/demand-dsl/spec.md`
 - 2026-03-11: yaml-params-template
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-11-yaml-params-template.md`
+  - SSOT: `references/upgrades/2026-03-11-yaml-params-template.md`
   - OpenSpec: `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
   - Spec: `openspec/specs/demand-dsl/spec.md`
 - 2026-03-13: demand-dsl-breaking
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-demand-dsl-breaking.md`
+  - SSOT: `references/upgrades/2026-03-13-demand-dsl-breaking.md`
   - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
   - Spec: `openspec/specs/demand-dsl/spec.md`
 - 2026-03-13: derived-outputs-set-aggregations
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
+  - SSOT: `references/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-derived-outputs-set-aggregations/`
   - Spec: `openspec/specs/derived-outputs/spec.md`
 - 2026-03-13: yaml-dsl-outputs
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-dsl-outputs.md`
+  - SSOT: `references/upgrades/2026-03-13-yaml-dsl-outputs.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-outputs/`
   - Spec: `openspec/specs/yaml-dsl-schema/spec.md`
 - 2026-03-13: yaml-reuse-workflow
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-reuse-workflow.md`
+  - SSOT: `references/upgrades/2026-03-13-yaml-reuse-workflow.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-imports/`
   - Spec: `openspec/specs/yaml-dsl-imports/spec.md`
 - 2026-03-13: yaml-source-normalize-shapes
-  - Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
+  - SSOT: `references/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
   - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-source-normalize-shapes/`
   - Spec: `openspec/specs/yaml-source-normalize/spec.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->

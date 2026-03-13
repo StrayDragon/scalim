@@ -15,7 +15,7 @@
 - 输出/文档/规范中**不得引用其内容**（只能引用该文件路径本身）。
 
 4) **每组必须交付“升级指南”，并接入自动索引**
-- 在 `docs/doc/yaml-dsl/upgrades/` 新增一篇升级文档（文件名建议 `YYYY-MM-DD-<group>.md`）。
+- 在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 新增一篇升级文档（文件名建议 `YYYY-MM-DD-<group>.md`；docs-site 同名页通过软链引用,不重复维护）。
 - 文档中用反引号写出：
   - 对应归档目录：`openspec/changes/archive/YYYY-MM-DD-<change>/`
   - 对应主规范：`openspec/specs/<spec>/spec.md`

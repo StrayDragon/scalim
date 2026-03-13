@@ -13,7 +13,7 @@
 
 手工维护的 `SKILL.md` 与非 generated references 一般不由这里写入或重排.
 例外: 若存在手工 reference `references/task-upgrade-legacy.md`,生成器会在约定的 marker 区块内
-注入“升级批次索引”,用于把 `docs/doc/yaml-dsl/upgrades/` 的升级文档同步到 skill 参考中.
+注入“升级批次索引”,用于把 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 的升级文档同步到 skill 参考中.
 """
 
 import hashlib
@@ -66,7 +66,7 @@ SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen
 CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
 CANONICAL_EXAMPLE_SOURCE_REL = Path("notebooks") / "marimo" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_report.yaml"
 
-UPGRADES_DOCS_ROOT_REL = Path("docs") / "doc" / "yaml-dsl" / "upgrades"
+UPGRADES_SSOT_ROOT_REL = Path("artifacts") / "skills" / "scalim-yaml-dsl" / "references" / "upgrades"
 UPGRADE_LEGACY_REFERENCE_REL = REFERENCES_ROOT_REL / "task-upgrade-legacy.md"
 UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->"
 UPGRADES_INDEX_END_MARKER = "<!-- END AUTOGEN:yaml-dsl-upgrades -->"
@@ -121,7 +121,7 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     canonical_example_fragments = build_canonical_example_fragments(repo_root)
     validate_canonical_example(repo_root, canonical_example_text, fragments=canonical_example_fragments)
 
-    upgrades_root = repo_root / UPGRADES_DOCS_ROOT_REL
+    upgrades_root = repo_root / UPGRADES_SSOT_ROOT_REL
     generated_files = {
         SYNTAX_CATALOG_REL: render_syntax_catalog(schema, syntax_specs),
         CLI_LSP_REFERENCE_REL: render_cli_lsp_reference(repo_root, command_docs, cli_specs),
@@ -442,7 +442,7 @@ def render_cli_lsp_reference(
 
 def sync_upgrade_legacy_reference(repo_root: Path, skill_dir: Path) -> None:
     """将升级批次索引注入到手工 reference 中(若存在)."""
-    upgrades_root = repo_root / UPGRADES_DOCS_ROOT_REL
+    upgrades_root = repo_root / UPGRADES_SSOT_ROOT_REL
     if not upgrades_root.exists():
         return
 
@@ -473,9 +473,11 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
         if path.name == "index.md":
             continue
         title = extract_markdown_h1(read_text(path)) or path.name
-        doc_rel = path_to_posix(path.relative_to(repo_root))
+        doc_rel = path_to_posix(REFERENCES_ROOT_REL / "upgrades" / path.name)
         content = read_text(path)
-        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/")
+        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/") or extract_backtick_path(
+            content, prefix="openspec/changes/"
+        )
         spec_path = extract_backtick_path(content, prefix="openspec/specs/")
         docs.append(
             {
@@ -492,7 +494,7 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
     lines = []
     for item in docs:
         lines.append("- {}".format(item["title"]))
-        lines.append("  - Docs: `{}`".format(item["doc_rel"]))
+        lines.append("  - SSOT: `{}`".format(item["doc_rel"]))
         if item["openspec_archive"]:
             lines.append("  - OpenSpec: `{}`".format(item["openspec_archive"]))
         if item["spec_path"]:
@@ -513,8 +515,10 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
             continue
         content = read_text(path)
         title = extract_markdown_h1(content) or path.name
-        doc_rel = path_to_posix(path.relative_to(repo_root))
-        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/")
+        doc_rel = path_to_posix(REFERENCES_ROOT_REL / "upgrades" / path.name)
+        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/") or extract_backtick_path(
+            content, prefix="openspec/changes/"
+        )
         spec_path = extract_backtick_path(content, prefix="openspec/specs/")
 
         summary_lines = extract_markdown_section_lines(content, heading_prefix="## 变更摘要", max_lines=16)
@@ -536,7 +540,7 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
     lines = [
         "# YAML DSL Upgrades (Generated)",
         "",
-        "此文档由 `scripts/gen-agent-skill.py` 自动生成,来源: `docs/doc/yaml-dsl/upgrades/`。",
+        "此文档由 `scripts/gen-agent-skill.py` 自动生成,来源: `references/upgrades/`。",
         "用于在使用 skill 时快速定位 breaking/migration,避免在多处重复维护易变规则。",
         "",
     ]
@@ -549,7 +553,7 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
         lines.extend(
             [
                 "## {}".format(item["title"]),
-                "- Docs: `{}`".format(item["doc_rel"]),
+                "- SSOT: `{}`".format(item["doc_rel"]),
             ]
         )
         if item["openspec_archive"]:

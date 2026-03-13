@@ -1,10 +1,10 @@
 # YAML DSL Upgrades (Generated)
 
-此文档由 `scripts/gen-agent-skill.py` 自动生成,来源: `docs/doc/yaml-dsl/upgrades/`。
+此文档由 `scripts/gen-agent-skill.py` 自动生成,来源: `references/upgrades/`。
 用于在使用 skill 时快速定位 breaking/migration,避免在多处重复维护易变规则。
 
 ## 2026-03-10: yaml-field-extract
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-field-extract.md`
+- SSOT: `references/upgrades/2026-03-10-yaml-field-extract.md`
 - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-field-extract/`
 - Spec: `openspec/specs/yaml-field-extract/spec.md`
 - Summary:
@@ -20,7 +20,7 @@
   - `openspec/specs/yaml-field-extract/spec.md`
 
 ## 2026-03-10: yaml-source-normalize
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-10-yaml-source-normalize.md`
+- SSOT: `references/upgrades/2026-03-10-yaml-source-normalize.md`
 - OpenSpec: `openspec/changes/archive/2026-03-10-yaml-source-normalize/`
 - Spec: `openspec/specs/demand-dsl/spec.md`
 - Summary:
@@ -39,7 +39,7 @@
   - `openspec/specs/yaml-dsl-agent-guidance/spec.md`
 
 ## 2026-03-11: yaml-params-template
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-11-yaml-params-template.md`
+- SSOT: `references/upgrades/2026-03-11-yaml-params-template.md`
 - OpenSpec: `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
 - Spec: `openspec/specs/demand-dsl/spec.md`
 - Summary:
@@ -61,7 +61,7 @@
   - `openspec/specs/source-relations/spec.md`
 
 ## 2026-03-13: demand-dsl-breaking
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-demand-dsl-breaking.md`
+- SSOT: `references/upgrades/2026-03-13-demand-dsl-breaking.md`
 - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
 - Spec: `openspec/specs/demand-dsl/spec.md`
 - Summary:
@@ -87,7 +87,7 @@
   3) (可选) 将 `output.fields` 的简单场景升级为 string list sugar
 
 ## 2026-03-13: derived-outputs-set-aggregations
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
+- SSOT: `references/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
 - OpenSpec: `openspec/changes/archive/2026-03-13-derived-outputs-set-aggregations/`
 - Spec: `openspec/specs/derived-outputs/spec.md`
 - Summary:
@@ -110,7 +110,7 @@
   - 若必须使用 `first/last`,确保运行在 `parallel_mode="seq"` 以保持确定性与可对拍。
 
 ## 2026-03-13: yaml-dsl-outputs
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-dsl-outputs.md`
+- SSOT: `references/upgrades/2026-03-13-yaml-dsl-outputs.md`
 - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-outputs/`
 - Spec: `openspec/specs/yaml-dsl-schema/spec.md`
 - Summary:
@@ -141,7 +141,7 @@
   7) (可选) 启用 `meta: true` / `audit: true` 以输出对拍信息
 
 ## 2026-03-13: yaml-reuse-workflow
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-reuse-workflow.md`
+- SSOT: `references/upgrades/2026-03-13-yaml-reuse-workflow.md`
 - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-imports/`
 - Spec: `openspec/specs/yaml-dsl-imports/spec.md`
 - Summary:
@@ -168,7 +168,7 @@
   4) 若启用 `share_preload_cache=true`,确保同一 `source_id` 的 preload 规格在所有 runs 中一致
 
 ## 2026-03-13: yaml-source-normalize-shapes
-- Docs: `docs/doc/yaml-dsl/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
+- SSOT: `references/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
 - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-source-normalize-shapes/`
 - Spec: `openspec/specs/yaml-source-normalize/spec.md`
 - Summary:
