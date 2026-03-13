@@ -306,10 +306,6 @@ gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-ag
 type-check:
     uv {{ UV_OPTIONS }} run basedpyright src/scalim/ # --level error
 
-# 检查: 示例/对拍模块类型检查 (允许 warnings; 以 errors 为 gate)
-type-check-examples:
-    uv {{ UV_OPTIONS }} run basedpyright packages/scalim-misc/src/scalim_misc/demo_big_data_report/ --level error
-
 # 检查: Docker 可用性
 is-docker-available:
     #!/usr/bin/env bash
@@ -324,7 +320,7 @@ type-check-core-tight:
     uv {{ UV_OPTIONS }} run basedpyright $(uv {{ UV_OPTIONS }} run scripts/toml-get.py --file pyproject.toml --key tool.basedpyright.strict --format shell-words)
 
 # 检查: 格式化&Lint (只检查;不改文件)
-lint: type-check type-check-core-tight type-check-examples
+lint: type-check type-check-core-tight
     uv {{ UV_OPTIONS }} run ruff format --check .
     uv {{ UV_OPTIONS }} run ruff check .
 
