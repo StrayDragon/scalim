@@ -11,7 +11,7 @@ def test_ecommerce_yaml_relation_steps_support_field_id_alias(ecommerce_config_s
 
     compilation = compile_yaml(
         str(yaml_path),
-        allowed_modules=frozenset(["notebooks.marimo.demo_big_data_report._loaders"]),
+        allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
         runtime_vars={"order_ids": []},
     )
 

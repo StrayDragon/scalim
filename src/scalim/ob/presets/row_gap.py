@@ -102,6 +102,18 @@ class RowGapObserver(EventDispatchObserver):
                 self._primary_count,
             )
 
+    @property
+    def total_expected(self) -> int:
+        return self._total_expected
+
+    @property
+    def total_actual(self) -> int:
+        return self._total_actual
+
+    @property
+    def total_missing(self) -> int:
+        return self._total_missing
+
     @staticmethod
     def _result_size(result: Any) -> int:
         if isinstance(result, Sized):

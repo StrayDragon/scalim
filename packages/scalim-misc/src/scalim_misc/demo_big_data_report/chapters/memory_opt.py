@@ -1,8 +1,6 @@
-from __future__ import annotations
-
-import os
 import tempfile
-from typing import Any, Dict, List, Sequence
+from pathlib import Path
+from typing import Any, Dict, List
 
 from scalim.execution import ScalimEngine
 from scalim.ob.manager import ObserverManager
@@ -11,10 +9,9 @@ from scalim.planning import PlanBuilder
 from scalim.sinks.sink_csv import BlockColumnCSVSink, ColumnCSVSink
 from scalim.sinks.sink_memory import InMemoryColumnSink
 
-from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.demo_big_data_report._shared import TARGET_FIELDS_FULL, build_ecommerce_model
-from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
-
+from ..loaders import ECommerceConfig, set_config
+from ..shared import TARGET_FIELDS_FULL, build_ecommerce_model
+from ..verification import VerificationResult, verify_scalim_output
 from ._types import ChapterResult
 
 
@@ -32,8 +29,10 @@ def run_memory_optimization(cfg: ECommerceConfig, *, batch_size: int = 50, write
     engine = ScalimEngine(demand=demand, plan=plan, observer_manager=observer_manager, batch_size=int(batch_size))
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        col_csv = os.path.join(tmpdir, "column.csv")
-        with ColumnCSVSink(col_csv, field_names=targets) as sink:
+        tmpdir_path = Path(tmpdir)
+
+        col_csv = tmpdir_path / "column.csv"
+        with ColumnCSVSink(str(col_csv), field_names=targets) as sink:
             engine.run(main_rows=None, sink=sink)
 
         # 用内存 `sink` 再跑一遍做对拍(避免解析 `CSV` 的类型损失)
@@ -45,9 +44,9 @@ def run_memory_optimization(cfg: ECommerceConfig, *, batch_size: int = 50, write
         verification: VerificationResult = verify_scalim_output(results, fields_to_check=targets)
 
         # `BlockColumnCSVSink`: 仅用于演示,这里强制 `write_delay=0`,避免集成对拍变慢
-        block_csv = os.path.join(tmpdir, "block.csv")
+        block_csv = tmpdir_path / "block.csv"
         engine3 = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
-        with BlockColumnCSVSink(block_csv, field_names=targets[:10], write_delay=float(write_delay)) as block_sink:
+        with BlockColumnCSVSink(str(block_csv), field_names=targets[:10], write_delay=float(write_delay)) as block_sink:
             engine3.run(main_rows=None, sink=block_sink)
 
     passed = bool(verification.passed and len(memory_observer.column_write_events) > 0)

@@ -96,7 +96,7 @@ _templates:
 
 main_source:
   source_id: orders
-  loader: "notebooks.marimo.demo_big_data_report._loaders:load_orders"
+  loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
   params:
     # runtime_vars 注入示例: 由调用方传入 `runtime_vars={"order_ids": [...]}`.
     # 为空列表时 loader 仍会读取全量订单(见 `load_orders` 实现),用于保证 canonical demo 可直接运行.
@@ -225,7 +225,7 @@ relations:
 
 sources:
   customers:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_customers"
     key: customer_id
     lookup_chunk_size: 5
     params:
@@ -249,7 +249,7 @@ sources:
         relation: orders_to_customers
 
   customers_rows_cached:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers_by_rows"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_customers_by_rows"
     key: customer_id
     params:
       rows: {$rows: {cache_mode: batch}}
@@ -264,7 +264,7 @@ sources:
         relation: orders_to_customers_rows_cache
 
   customers_rows_nocache:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers_by_rows"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_customers_by_rows"
     key: customer_id
     params:
       rows: {$rows: {cache_mode: none}}
@@ -278,7 +278,7 @@ sources:
         relation: orders_to_customers_rows_nocache
 
   products:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_products"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_products"
     key: product_id
     lookup_cast:
       name: int
@@ -308,7 +308,7 @@ sources:
         relation: orders_to_products
 
   categories:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_categories"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_categories"
     key: category_id
     params:
       ids: {$keys: {as: set}}
@@ -319,7 +319,7 @@ sources:
         relation: orders_to_categories
 
   warehouses:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_warehouses"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_warehouses"
     key: warehouse_id
     params:
       ids: {$keys: {as: set}}
@@ -335,7 +335,7 @@ sources:
         relation: orders_to_warehouses
 
   regions:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_regions"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_regions"
     key: region_id
     params:
       ids: {$keys: {as: set}}
@@ -357,7 +357,7 @@ sources:
         relation: orders_to_regions
 
   region_pricing:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_region_pricing"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_region_pricing"
     key: [region_id, product_category_id]
     cache_mode: preload_forever
     fields:
@@ -375,7 +375,7 @@ sources:
         relation: orders_to_region_pricing
 
   promotions:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_promotions"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_promotions"
     key: promotion_id
     cache_mode: preload_forever
     params:
@@ -397,7 +397,7 @@ sources:
         relation: orders_to_promotions
 
   payment_methods:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_payment_methods"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_payment_methods"
     key: payment_method_id
     cache_mode: preload_forever
     normalize:
@@ -411,7 +411,7 @@ sources:
         relation: orders_to_payment_methods
 
   payment_methods_candidates:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_payment_methods_candidates"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_payment_methods_candidates"
     key: payment_method_id
     cache_mode: preload_forever
     normalize:
@@ -431,7 +431,7 @@ sources:
         relation: orders_to_payment_methods_candidates
 
   logistics:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_logistics"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_logistics"
     key: logistics_id
     cache_mode: preload_forever
     fields:
@@ -455,7 +455,7 @@ fields:
 
   profit: &profit
     name: 利润
-    call_by: "notebooks.marimo.demo_big_data_report._loaders:calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)"
+    call_by: "scalim_misc.demo_big_data_report.loaders:calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)"
 
   tax_amount: &tax_amount
     name: 税费
@@ -463,7 +463,7 @@ fields:
 
   final_price: &final_price
     name: 最终价格
-    call_by: "notebooks.marimo.demo_big_data_report._loaders:calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)"
+    call_by: "scalim_misc.demo_big_data_report.loaders:calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)"
 
   no_promotion: &no_promotion
     name: 无促销

@@ -1,8 +1,7 @@
-from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional
-
 from collections import UserDict
+from dataclasses import dataclass
 from types import MappingProxyType, SimpleNamespace
+from typing import Any, Dict, List, Mapping, Optional
 
 
 class _GetItemRow:

@@ -7,23 +7,22 @@ class TransientError(RuntimeError):
     pass
 
 
-_CALL_COUNT = 0
+_call_count_state = {"count": 0}
 
 
 def reset() -> None:
-    global _CALL_COUNT
-    _CALL_COUNT = 0
+    _call_count_state["count"] = 0
 
 
 def get_call_count() -> int:
-    return _CALL_COUNT
+    return int(_call_count_state["count"])
 
 
 def load_orders(**_kwargs: Any) -> List[Any]:
-    global _CALL_COUNT
-    _CALL_COUNT += 1
-    if _CALL_COUNT == 1:
-        raise TransientError("模拟瞬态失败")
+    _call_count_state["count"] += 1
+    if _call_count_state["count"] == 1:
+        msg = "模拟瞬态失败"
+        raise TransientError(msg)
     return [{"order_id": 1}]
 
 

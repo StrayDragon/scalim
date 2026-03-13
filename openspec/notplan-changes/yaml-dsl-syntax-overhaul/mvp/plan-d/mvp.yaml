@@ -5,7 +5,7 @@ description: |
 sources:
   - id: orders
     main: true
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_orders"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
     params:
       ids: {$runtime: order_ids}
       field_keys: [order_id, order_date, quantity, unit_price, discount_rate, customer_id, product_id]
@@ -28,7 +28,7 @@ sources:
         name: 产品ID
 
   - id: customers
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_customers"
     key: customer_id
     params:
       ids: {$keys: {as: list}}
@@ -41,7 +41,7 @@ sources:
         via: orders_to_customers
 
   - id: products
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_products"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_products"
     key: product_id
     lookup_cast: {name: int}
     params:
@@ -75,7 +75,7 @@ derive:
   - id: profit
     name: 利润
     call:
-      ref: "notebooks.marimo.demo_big_data_report._loaders:calc_profit"
+      ref: "scalim_misc.demo_big_data_report.loaders:calc_profit"
       kwargs:
         order_amount: order_amount
         product_cost: products.product_cost

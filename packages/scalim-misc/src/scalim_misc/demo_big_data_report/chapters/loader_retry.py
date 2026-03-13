@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import tempfile
 import textwrap
 from pathlib import Path
@@ -9,8 +7,7 @@ from scalim.dsl.by_yaml import run
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim.sinks.sink_memory import InMemoryRowSink
 
-from notebooks.marimo.demo_big_data_report.by_yaml_dsl import _loader_retry_demo_mod as demo_mod
-
+from ..by_yaml_dsl import loader_retry_demo_mod as demo_mod
 from ._types import ChapterResult
 
 
@@ -22,7 +19,7 @@ def run_loader_retry() -> ChapterResult:
 
         main_source:
           source_id: orders
-          loader: "notebooks.marimo.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod:load_orders"
+          loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod:load_orders"
           fields:
             order_id:
               {}
@@ -50,14 +47,14 @@ def run_loader_retry() -> ChapterResult:
 
         main_source:
           source_id: orders
-          loader: "notebooks.marimo.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod:load_orders"
+          loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod:load_orders"
           fields:
             order_id:
               {}
         """
     ).lstrip()
 
-    allowed_modules = frozenset(["notebooks.marimo.demo_big_data_report.by_yaml_dsl._loader_retry_demo_mod"])
+    allowed_modules = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod"])
 
     with tempfile.TemporaryDirectory() as tmpdir:
         yaml_no_retry_path = Path(tmpdir) / "no_retry.yaml"
@@ -84,7 +81,8 @@ def run_loader_retry() -> ChapterResult:
             sink=sink_with_retry,
             loader_retry=injected_retry,
         )
-        with_retry_ok = sink_with_retry.get_data() == [{"order_id": 1}] and demo_mod.get_call_count() == 2
+        expected_call_count = 2
+        with_retry_ok = sink_with_retry.get_data() == [{"order_id": 1}] and demo_mod.get_call_count() == expected_call_count
 
     passed = bool(no_retry_ok and with_retry_ok)
     summary = "no_retry_ok={} with_retry_ok={}".format(no_retry_ok, with_retry_ok)

@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from scalim.dsl.by_yaml import compile as compile_yaml
 from scalim.dsl.by_yaml import run as run_yaml
@@ -11,15 +9,15 @@ from scalim.dsl.by_yaml.config_parsing.imports import load_and_expand_imports
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.typedefs import RowData
 
-from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.demo_big_data_report._shared import TARGET_FIELDS_FULL
-from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
-
+from ..loaders import ECommerceConfig, set_config
+from ..shared import TARGET_FIELDS_FULL
+from ..verification import VerificationResult, verify_scalim_output
 from ._types import ChapterResult
 
 
-def _extract_verifiable_fields(rows: List[Dict[str, Any]]) -> List[str]:
+def _extract_verifiable_fields(rows: Sequence[RowData]) -> List[str]:
     if not rows:
         return []
     keys = set(rows[0].keys())
@@ -30,7 +28,7 @@ def run_yaml_dsl(cfg: ECommerceConfig, *, yaml_path: Path, runtime_vars: Optiona
     """YAML DSL 主线: `compile`/`run` + 内存 `sink` + 对拍 + `rows-binding` 对拍字段校验."""
     set_config(cfg)
 
-    loader_module = "notebooks.marimo.demo_big_data_report._loaders"
+    loader_module = "scalim_misc.demo_big_data_report.loaders"
     allowed_modules = frozenset([loader_module])
     runtime_vars = runtime_vars or {"order_ids": []}
 

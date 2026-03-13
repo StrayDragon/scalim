@@ -6,7 +6,7 @@ batch_size: 100
 
 main_source:
   source_id: orders
-  loader: "notebooks.marimo.demo_big_data_report._loaders:load_orders"
+  loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
   params:
     ids: {$runtime: order_ids}
     field_keys: [order_id, order_date, quantity, unit_price, discount_rate, customer_id, product_id]
@@ -34,7 +34,7 @@ relations:
 
 sources:
   customers:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_customers"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_customers"
     key: customer_id
     params:
       ids: {$keys: {as: list}}
@@ -47,7 +47,7 @@ sources:
         relation: orders_to_customers
 
   products:
-    loader: "notebooks.marimo.demo_big_data_report._loaders:load_products"
+    loader: "scalim_misc.demo_big_data_report.loaders:load_products"
     key: product_id
     lookup_cast: {name: int}
     params:
@@ -68,7 +68,7 @@ derive:
 
   profit:
     name: 利润
-    call_by: "notebooks.marimo.demo_big_data_report._loaders:calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)"
+    call_by: "scalim_misc.demo_big_data_report.loaders:calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)"
 
 output:
   format: csv

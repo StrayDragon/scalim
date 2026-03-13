@@ -5,13 +5,13 @@ from scalim.typedefs import RowData
 
 
 def load_orders_small(limit: int = 20) -> List[RowData]:
-    from notebooks.marimo.demo_big_data_report._loaders import load_orders
+    from scalim_misc.demo_big_data_report.loaders import load_orders
 
     return list(load_orders())[: int(limit)]
 
 
 def verify_ecommerce_results(results: Sequence[RowData], *, fields_to_check: Sequence[str]) -> Tuple[bool, str]:
-    from notebooks.marimo.demo_big_data_report._verification import verify_scalim_output
+    from scalim_misc.demo_big_data_report.verification import verify_scalim_output
 
     verification = verify_scalim_output(list(results), fields_to_check=list(fields_to_check))
     return bool(verification.passed), str(verification.summary)
@@ -19,7 +19,7 @@ def verify_ecommerce_results(results: Sequence[RowData], *, fields_to_check: Seq
 
 @contextmanager
 def ecommerce_small_config_guard() -> Iterator[None]:
-    from notebooks.marimo.demo_big_data_report._shared import ECommerceConfig, get_config, set_config
+    from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
 
     prev = get_config()
     cfg = ECommerceConfig(
@@ -41,7 +41,7 @@ def ecommerce_small_config_guard() -> Iterator[None]:
 
 
 def build_ecommerce_model_small() -> "object":
-    from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
+    from scalim_misc.demo_big_data_report.shared import build_ecommerce_model
 
     with ecommerce_small_config_guard():
         return build_ecommerce_model()

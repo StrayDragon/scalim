@@ -22,7 +22,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--allowed-modules",
-        default="notebooks.marimo.demo_big_data_report._loaders",
+        default="scalim_misc.demo_big_data_report.loaders",
         help="Comma-separated allowed modules for YAML compilation.",
     )
     parser.add_argument(

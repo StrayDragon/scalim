@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, Sequence
 
 from scalim.execution import ScalimEngine
 from scalim.ob.manager import ObserverManager
@@ -10,10 +8,9 @@ from scalim.ob.presets.row_gap import RowGapObserver
 from scalim.planning import PlanBuilder
 from scalim.sinks.sink_memory import InMemoryColumnSink
 
-from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.demo_big_data_report._shared import TARGET_FIELDS_FULL, build_ecommerce_model
-from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
-
+from ..loaders import ECommerceConfig, set_config
+from ..shared import build_ecommerce_model
+from ..verification import VerificationResult, verify_scalim_output
 from ._types import ChapterResult
 
 
@@ -49,7 +46,7 @@ def run_observability(cfg: ECommerceConfig, *, targets: Sequence[str], batch_siz
         verification.passed,
         len(trace_observer.batches),
         len(metrics.loader_stats),
-        row_gap_observer._total_expected,
+        row_gap_observer.total_expected,
     )
     if not verification.passed:
         summary = summary + "\n" + verification.summary
@@ -59,8 +56,8 @@ def run_observability(cfg: ECommerceConfig, *, targets: Sequence[str], batch_siz
         "verification": verification,
         "trace_batches": len(trace_observer.batches),
         "loader_metrics_count": len(metrics.loader_stats),
-        "row_gap_total_expected": row_gap_observer._total_expected,
-        "row_gap_total_actual": row_gap_observer._total_actual,
-        "row_gap_total_missing": row_gap_observer._total_missing,
+        "row_gap_total_expected": row_gap_observer.total_expected,
+        "row_gap_total_actual": row_gap_observer.total_actual,
+        "row_gap_total_missing": row_gap_observer.total_missing,
     }
     return ChapterResult(chapter_id="observability", passed=passed, summary=summary, details=details)

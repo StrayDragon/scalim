@@ -250,7 +250,7 @@
   "inputs": [
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "024648a8a9e00bdb7af5e54da480a865221939f3ef5f341b028259435cc73896"
+      "sha256": "6fe308bdd16485efb9d3af315d927858f81377c08e20ac3882bef3dc1361ebb9"
     },
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
@@ -320,7 +320,7 @@
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "f66e8dc873d54ae2c142eb2a58518a8d89d5a08f066737320b1eed6597977561"
+      "sha256": "7a66ff85b1e1be14cd87423fcdff58722c263971887ece914ddf5971696c11da"
     },
     {
       "path": "references/generated/example-full/ecommerce_report_fragments.yaml",

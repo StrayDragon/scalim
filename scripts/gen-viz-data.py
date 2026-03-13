@@ -213,7 +213,7 @@ def main(argv: List[str]) -> int:
     _ensure_repo_root_on_syspath()
     args = _parse_args(argv)
     yaml_path = args.yaml_path
-    allowed_modules = frozenset(["notebooks.marimo.demo_big_data_report._loaders"])
+    allowed_modules = frozenset(["scalim_misc.demo_big_data_report.loaders"])
 
     scenarios = _normalize_scenarios(args.scenarios)
     trace_enabled = args.mode == "events+trace"

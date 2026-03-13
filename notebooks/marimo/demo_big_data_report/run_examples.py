@@ -18,7 +18,7 @@ repo_root_str = str(repo_root)
 if repo_root_str not in sys.path:
     sys.path.insert(0, repo_root_str)
 
-from notebooks.marimo.demo_big_data_report.chapters.registry import run_all_chapters
+from scalim_misc.demo_big_data_report.chapters.registry import run_all_chapters
 
 
 def _configure_logging() -> None:
@@ -35,7 +35,9 @@ def _configure_logging() -> None:
 def main() -> int:
     _configure_logging()
 
-    results = run_all_chapters()
+    demo_dir = Path(__file__).parent
+    yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
+    results = run_all_chapters(yaml_path=yaml_path)
     failed = [r for r in results if not r.passed]
 
     for r in results:

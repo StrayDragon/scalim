@@ -1,50 +1,50 @@
-from __future__ import annotations
-
-import os
 import tempfile
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
-from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink
+from scalim.sinks.sink_csv import ColumnCSVSink, CSVSink
 from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
+from scalim.typedefs import RowData
 
-from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
-from notebooks.marimo.demo_big_data_report._verification import (
+from ..loaders import ECommerceConfig, set_config
+from ..shared import build_ecommerce_model
+from ..verification import (
     VerificationResult,
     compare_csv_files,
     export_to_csv,
     python_build_order_report,
     verify_scalim_output,
 )
-
 from ._types import ChapterResult
 
 
-def _run_engine_to_rows(cfg: ECommerceConfig, targets: Sequence[str], *, batch_size: int) -> List[Dict[str, Any]]:
+def _run_engine_to_rows(cfg: ECommerceConfig, targets: Sequence[str], *, batch_size: int) -> List[RowData]:
     set_config(cfg)
     demand = build_ecommerce_model(cfg)
     plan = PlanBuilder(demand).build(targets=list(targets))
     engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
     with InMemoryRowSink() as sink:
-        engine.run(main_rows=None, sink=sink)
-        return sink.get_data()
+        _ = engine.run(main_rows=None, sink=sink)
+        rows: List[RowData] = sink.get_data()
+        return rows
 
 
-def _run_engine_to_columns(cfg: ECommerceConfig, targets: Sequence[str], *, batch_size: int) -> List[Dict[str, Any]]:
+def _run_engine_to_columns(cfg: ECommerceConfig, targets: Sequence[str], *, batch_size: int) -> List[RowData]:
     set_config(cfg)
     demand = build_ecommerce_model(cfg)
     plan = PlanBuilder(demand).build(targets=list(targets))
     engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
     with InMemoryColumnSink(field_names=list(targets)) as sink:
-        engine.run(main_rows=None, sink=sink)
-        return sink.get_rows()
+        _ = engine.run(main_rows=None, sink=sink)
+        rows: List[RowData] = sink.get_rows()
+        return rows
 
 
 def _optional_pandas_rows(
-    results: List[Dict[str, Any]], *, targets: Sequence[str]
+    results: Sequence[RowData], *, targets: Sequence[str]
 ) -> Tuple[bool, Optional[VerificationResult], Optional[VerificationResult]]:
     try:
         import pandas as pd  # noqa: PLC0415
@@ -53,7 +53,7 @@ def _optional_pandas_rows(
 
     df = pd.DataFrame(results)
     df = df[list(targets)]
-    rows = df.to_dict("records")
+    rows = cast("Any", df).to_dict(orient="records")
     vr = verify_scalim_output(rows, fields_to_check=list(targets))
     return True, vr, vr
 
@@ -73,32 +73,33 @@ def run_sinks(cfg: ECommerceConfig, *, targets: Sequence[str], batch_size: int =
     # `CSV`: 输出文件与纯 `Python` 对照组做对拍
     py_results = python_build_order_report(targets_list)
     with tempfile.TemporaryDirectory() as tmpdir:
-        scalim_csv = os.path.join(tmpdir, "scalim.csv")
-        python_csv = os.path.join(tmpdir, "python.csv")
-        export_to_csv(col_results, scalim_csv, targets_list)
-        export_to_csv(py_results, python_csv, targets_list)
-        csv_matched, csv_diff = compare_csv_files(scalim_csv, python_csv)
+        tmpdir_path = Path(tmpdir)
+        scalim_csv = tmpdir_path / "scalim.csv"
+        python_csv = tmpdir_path / "python.csv"
+        export_to_csv(col_results, str(scalim_csv), targets_list)
+        export_to_csv(py_results, str(python_csv), targets_list)
+        csv_matched, csv_diff = compare_csv_files(str(scalim_csv), str(python_csv))
 
         # 额外: 真实 `CSVSink`/`ColumnCSVSink` 输出(仅校验能跑通 + 行数一致)
-        csv_row_path = os.path.join(tmpdir, "row_sink.csv")
-        csv_col_path = os.path.join(tmpdir, "col_sink.csv")
+        csv_row_path = tmpdir_path / "row_sink.csv"
+        csv_col_path = tmpdir_path / "col_sink.csv"
 
         set_config(cfg)
         demand = build_ecommerce_model(cfg)
         plan = PlanBuilder(demand).build(targets=targets_list)
         engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
-        with CSVSink(csv_row_path, field_names=targets_list) as sink_row:
+        with CSVSink(str(csv_row_path), field_names=targets_list) as sink_row:
             _ = sink_row
             engine.run(main_rows=None, sink=sink_row)
 
         engine2 = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
-        with ColumnCSVSink(csv_col_path, field_names=targets_list) as sink_col:
+        with ColumnCSVSink(str(csv_col_path), field_names=targets_list) as sink_col:
             _ = sink_col
             engine2.run(main_rows=None, sink=sink_col)
 
-        with open(csv_row_path, encoding="utf-8") as f:
+        with csv_row_path.open(encoding="utf-8") as f:
             row_lines = sum(1 for _ in f) - 1
-        with open(csv_col_path, encoding="utf-8") as f:
+        with csv_col_path.open(encoding="utf-8") as f:
             col_lines = sum(1 for _ in f) - 1
 
     pandas_available, vr_pd_row, vr_pd_col = _optional_pandas_rows(col_results, targets=targets_list)

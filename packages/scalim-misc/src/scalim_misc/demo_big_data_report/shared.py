@@ -8,8 +8,6 @@
 业务场景说明请参考 _loaders.py
 """
 
-from __future__ import annotations
-
 from typing import Any, Dict, List, Optional, Tuple
 
 from scalim.spec.ir import (
@@ -27,7 +25,7 @@ from scalim.spec.ir import (
 )
 from scalim.typedefs import SourceSpecIrCacheMode
 
-from notebooks.marimo.demo_big_data_report._loaders import (
+from .loaders import (
     ECommerceConfig,
     calc_final_price,
     calc_order_amount,
@@ -49,15 +47,15 @@ from notebooks.marimo.demo_big_data_report._loaders import (
 
 # 重新导出
 __all__ = [
+    "TARGET_FIELDS_BASIC",
+    "TARGET_FIELDS_DERIVED",
+    "TARGET_FIELDS_FULL",
+    "TARGET_FIELDS_RELATIONS",
     "ECommerceConfig",
-    "set_config",
-    "get_config",
     "build_ecommerce_model",
     "build_target_sets",
-    "TARGET_FIELDS_FULL",
-    "TARGET_FIELDS_BASIC",
-    "TARGET_FIELDS_RELATIONS",
-    "TARGET_FIELDS_DERIVED",
+    "get_config",
+    "set_config",
 ]
 
 
@@ -344,7 +342,7 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
     # 构建 DemandIr
     # ========================================================================
 
-    demand = DemandIr.from_irs(
+    return DemandIr.from_irs(
         sources=[
             customers_source,
             products_source,
@@ -362,18 +360,16 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         batch_size_hint=100,
     )
 
-    return demand
-
 
 def build_target_sets() -> Dict[str, List[str]]:
     """构建预定义的目标字段集"""
     return {
         "full": TARGET_FIELDS_FULL,
         "basic": TARGET_FIELDS_BASIC,
-        "relations_only": TARGET_FIELDS_BASIC + TARGET_FIELDS_RELATIONS,
-        "derived_only": TARGET_FIELDS_BASIC + TARGET_FIELDS_DERIVED,
-        "single_level": TARGET_FIELDS_BASIC
-        + [
+        "relations_only": [*TARGET_FIELDS_BASIC, *TARGET_FIELDS_RELATIONS],
+        "derived_only": [*TARGET_FIELDS_BASIC, *TARGET_FIELDS_DERIVED],
+        "single_level": [
+            *TARGET_FIELDS_BASIC,
             "customer_name",
             "customer_phone",
             "product_name",
@@ -382,15 +378,15 @@ def build_target_sets() -> Dict[str, List[str]]:
             "payment_method_name",
             "logistics_name",
         ],
-        "multi_level": TARGET_FIELDS_BASIC
-        + [
+        "multi_level": [
+            *TARGET_FIELDS_BASIC,
             "category_name",
             "region_name",
             "region_name_display",
             "region_manager",
         ],
-        "composite_key": TARGET_FIELDS_BASIC
-        + [
+        "composite_key": [
+            *TARGET_FIELDS_BASIC,
             "price_adjustment",
             "shipping_fee",
             "tax_rate",

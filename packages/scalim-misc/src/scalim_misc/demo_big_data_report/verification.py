@@ -12,7 +12,7 @@
 使用方法:
 
 ```python
-from _verification import verify_scalim_output, DetailedVerification
+from scalim_misc.demo_big_data_report.verification import DetailedVerification, verify_scalim_output
 
 # 基础验证
 result = verify_scalim_output(scalim_results, target_fields)
@@ -25,14 +25,20 @@ assert report.all_passed, report.summary
 ```
 """
 
-from __future__ import annotations
-
+import csv
+import tempfile
+import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from scalim.execution import ScalimEngine
+from scalim.planning import PlanBuilder
+from scalim.sinks.sink_memory import InMemoryColumnSink
 from scalim.spec.ir.sources import SourceNormalizeIr
+from scalim.typedefs import RowData
 
-from notebooks.marimo.demo_big_data_report._loaders import (
+from .loaders import (
     calc_final_price,
     calc_order_amount,
     calc_profit,
@@ -48,6 +54,7 @@ from notebooks.marimo.demo_big_data_report._loaders import (
     load_regions,
     load_warehouses,
 )
+from .shared import build_ecommerce_model
 
 
 @dataclass
@@ -270,14 +277,13 @@ class _PythonJoinEngine:
         return [self.build_expected(o) for o in orders]
 
     def get_expected_stats(self) -> Dict[str, FieldStats]:
-        orders = self._load("orders", load_orders)
         all_expected = self.build_all_expected()
 
         stats: Dict[str, FieldStats] = {}
         if not all_expected:
             return stats
 
-        for field_name in all_expected[0].keys():
+        for field_name in all_expected[0]:
             fs = FieldStats(field_name=field_name)
             values: List[Any] = []
             for row in all_expected:
@@ -287,7 +293,7 @@ class _PythonJoinEngine:
                     fs.null_count += 1
                 else:
                     values.append(val)
-            fs.distinct_count = len(set(str(v) for v in values))
+            fs.distinct_count = len({str(v) for v in values})
             fs.sample_values = values[:5]
             stats[field_name] = fs
 
@@ -308,10 +314,11 @@ def _values_equal(expected: Any, actual: Any, tolerance: float = 0.01) -> bool:
 
 
 def verify_scalim_output(
-    scalim_output: List[Dict[str, Any]],
-    fields_to_check: Optional[List[str]] = None,
+    scalim_output: Sequence[RowData],
+    fields_to_check: Optional[Sequence[str]] = None,
     tolerance: float = 0.01,
     max_mismatches: int = 10,
+    *,
     collect_field_stats: bool = True,
 ) -> VerificationResult:
     """验证 Scalim 输出结果
@@ -342,7 +349,7 @@ def verify_scalim_output(
             continue
 
         checked += 1
-        check_fields = fields_to_check if fields_to_check else list(expected.keys())
+        check_fields = fields_to_check or list(expected.keys())
 
         for fname in check_fields:
             if fname not in expected:
@@ -366,7 +373,7 @@ def verify_scalim_output(
                         field_stats[fname].expected_null_count += 1
                     if act_val is None:
                         field_stats[fname].actual_null_count += 1
-                    if len(field_stats[fname].sample_mismatches) < 3:
+                    if len(field_stats[fname].sample_mismatches) < _SAMPLE_MISMATCH_LIMIT:
                         field_stats[fname].sample_mismatches.append({"pk": pk, "expected": exp_val, "actual": act_val})
 
                 if len(mismatches) < max_mismatches:
@@ -377,14 +384,15 @@ def verify_scalim_output(
         summary = "All {} rows validated successfully.".format(checked)
     else:
         lines = ["{} mismatches found:".format(len(mismatches))]
-        for m in mismatches[:5]:
+        for m in mismatches[:_SUMMARY_MISMATCH_LIMIT]:
             lines.append("  PK={}, {}: {} != {}".format(m["pk"], m["field"], m["expected"], m["actual"]))
-        if len(mismatches) > 5:
-            lines.append("  ... and {} more".format(len(mismatches) - 5))
+        if len(mismatches) > _SUMMARY_MISMATCH_LIMIT:
+            lines.append("  ... and {} more".format(len(mismatches) - _SUMMARY_MISMATCH_LIMIT))
         summary = "\n".join(lines)
 
+    total_rows = len(scalim_output)
     return VerificationResult(
-        passed=passed, total_rows=len(scalim_output), checked_rows=checked, mismatches=mismatches, summary=summary, field_stats=field_stats
+        passed=passed, total_rows=total_rows, checked_rows=checked, mismatches=mismatches, summary=summary, field_stats=field_stats
     )
 
 
@@ -398,7 +406,7 @@ class DetailedVerification:
     - 性能统计
     """
 
-    def __init__(self, scalim_output: List[Dict[str, Any]], fields_to_check: Optional[List[str]] = None, tolerance: float = 0.01) -> None:
+    def __init__(self, scalim_output: Sequence[RowData], fields_to_check: Optional[Sequence[str]] = None, tolerance: float = 0.01) -> None:
         self.scalim_output = scalim_output
         self.fields_to_check = fields_to_check
         self.tolerance = tolerance
@@ -433,21 +441,17 @@ class DetailedVerification:
         return verify_scalim_output(self.scalim_output, fields_to_check=fields, tolerance=self.tolerance, max_mismatches=20)
 
     def run_full_verification(self) -> DetailedVerificationReport:
-        import time
-
         start_time = time.time()
 
         row_match, expected_rows, actual_rows = self.verify_row_count()
 
         # 一次性验证所有字段(避免重复构建预期结果)
-        check_fields = (
-            self.fields_to_check if self.fields_to_check else list(self._get_expected()[0].keys()) if self._get_expected() else []
-        )
+        check_fields = self.fields_to_check or (list(self._get_expected()[0].keys()) if self._get_expected() else [])
         full_result = verify_scalim_output(self.scalim_output, fields_to_check=check_fields, tolerance=self.tolerance, max_mismatches=100)
 
         # 从完整结果中提取每个字段的状态
         field_results: Dict[str, VerificationResult] = {}
-        mismatched_fields = {m.get("field") for m in full_result.mismatches if "field" in m}
+        mismatched_fields = {str(m.get("field")) for m in full_result.mismatches if m.get("field")}
         for fname in check_fields:
             field_passed = fname not in mismatched_fields
             field_results[fname] = VerificationResult(
@@ -582,13 +586,13 @@ def get_relation_type_summary(result: VerificationResult) -> List[Dict[str, str]
     return summary
 
 
-def quick_verify(scalim_output: List[Dict[str, Any]], fields: Optional[List[str]] = None) -> bool:
+def quick_verify(scalim_output: Sequence[RowData], fields: Optional[Sequence[str]] = None) -> bool:
     """快速验证 - 返回布尔值,适合断言使用"""
     result = verify_scalim_output(scalim_output, fields_to_check=fields)
     return result.passed
 
 
-def assert_scalim_correct(scalim_output: List[Dict[str, Any]], fields: Optional[List[str]] = None, msg: str = "") -> None:
+def assert_scalim_correct(scalim_output: Sequence[RowData], fields: Optional[Sequence[str]] = None, msg: str = "") -> None:
     """断言 Scalim 输出正确 - 失败时抛出详细异常"""
     result = verify_scalim_output(scalim_output, fields_to_check=fields, max_mismatches=20)
     if not result.passed:
@@ -623,14 +627,18 @@ def python_build_order_report(target_fields: List[str]) -> List[Dict[str, Any]]:
     return [{k: v for k, v in row.items() if k in target_fields} for row in all_results]
 
 
-def export_to_csv(data: List[Dict[str, Any]], filepath: str, fields: List[str]) -> None:
-    """导出数据到 CSV 文件"""
-    import csv
+_CSV_FLOAT_TOLERANCE = 0.01
+_SAMPLE_MISMATCH_LIMIT = 3
+_SUMMARY_MISMATCH_LIMIT = 5
 
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+
+def export_to_csv(data: Sequence[RowData], filepath: str, fields: Sequence[str]) -> None:
+    """导出数据到 CSV 文件"""
+    output_path = Path(filepath)
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(fields), extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(data)
+        writer.writerows([dict(row) for row in data])
 
 
 def compare_csv_files(file1: str, file2: str) -> Tuple[bool, str]:
@@ -639,9 +647,9 @@ def compare_csv_files(file1: str, file2: str) -> Tuple[bool, str]:
     Returns:
         (是否相同, 差异描述)
     """
-    import csv
-
-    with open(file1, "r", encoding="utf-8") as f1, open(file2, "r", encoding="utf-8") as f2:
+    file1_path = Path(file1)
+    file2_path = Path(file2)
+    with file1_path.open("r", encoding="utf-8") as f1, file2_path.open("r", encoding="utf-8") as f2:
         reader1 = list(csv.DictReader(f1))
         reader2 = list(csv.DictReader(f2))
 
@@ -650,12 +658,12 @@ def compare_csv_files(file1: str, file2: str) -> Tuple[bool, str]:
 
     differences = []
     for i, (row1, row2) in enumerate(zip(reader1, reader2)):
-        for key in row1.keys():
+        for key in row1:
             v1, v2 = row1.get(key), row2.get(key)
             # 浮点数比较
             try:
                 f1, f2 = float(v1 or 0), float(v2 or 0)
-                if abs(f1 - f2) > 0.01:
+                if abs(f1 - f2) > _CSV_FLOAT_TOLERANCE:
                     differences.append("行{} 字段{}: {} vs {}".format(i, key, v1, v2))
             except (ValueError, TypeError):
                 if v1 != v2:
@@ -676,23 +684,18 @@ class _ReverseSortValue:
     def __lt__(self, other: "_ReverseSortValue") -> bool:
         return other.value < self.value
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, _ReverseSortValue):
-            return False
-        return self.value == other.value
-
 
 @dataclass
 class OrderByVerificationResult:
     passed: bool
-    order_by: List[str]
+    order_by: Tuple[str, ...]
     message: str
 
 
-def verify_order_by(scalim_output: List[Dict[str, Any]], order_by: List[str]) -> OrderByVerificationResult:
+def verify_order_by(scalim_output: Sequence[RowData], order_by: Sequence[str]) -> OrderByVerificationResult:
     """验证输出顺序是否满足 order_by."""
     if not order_by:
-        return OrderByVerificationResult(passed=True, order_by=order_by, message="order_by is empty")
+        return OrderByVerificationResult(passed=True, order_by=tuple(order_by), message="order_by is empty")
     indices = list(range(len(scalim_output)))
     for raw_key in reversed(order_by):
         key = raw_key.strip()
@@ -701,11 +704,11 @@ def verify_order_by(scalim_output: List[Dict[str, Any]], order_by: List[str]) ->
         descending = key.startswith("-")
         field_key = key[1:] if descending else key
 
-        def _sort_key(idx: int) -> Tuple[int, Any]:
-            value = scalim_output[idx].get(field_key)
+        def _sort_key(idx: int, *, _field_key: str = field_key, _descending: bool = descending) -> Tuple[int, Any]:
+            value = scalim_output[idx].get(_field_key)
             if value is None:
                 return (1, 0)
-            if descending:
+            if _descending:
                 return (0, _ReverseSortValue(value))
             return (0, value)
 
@@ -713,11 +716,11 @@ def verify_order_by(scalim_output: List[Dict[str, Any]], order_by: List[str]) ->
     expected = indices
     actual = list(range(len(scalim_output)))
     if expected == actual:
-        return OrderByVerificationResult(passed=True, order_by=order_by, message="order_by matched")
+        return OrderByVerificationResult(passed=True, order_by=tuple(order_by), message="order_by matched")
 
     mismatch_at = next((idx for idx, expected_idx in enumerate(expected) if expected_idx != idx), -1)
     message = "order_by mismatch at position {}".format(mismatch_at)
-    return OrderByVerificationResult(passed=False, order_by=order_by, message=message)
+    return OrderByVerificationResult(passed=False, order_by=tuple(order_by), message=message)
 
 
 @dataclass
@@ -735,7 +738,7 @@ class FileComparisonResult:
         return "{}: {} 行\n{}".format(status, self.row_count, self.diff_summary)
 
 
-def run_parallel_comparison(target_fields: List[str], output_dir: str = "/tmp") -> FileComparisonResult:
+def run_parallel_comparison(target_fields: List[str], output_dir: Optional[str] = None) -> FileComparisonResult:
     """运行并行对比测试
 
     同时用 Scalim 框架和纯 Python 实现处理相同数据,
@@ -748,16 +751,8 @@ def run_parallel_comparison(target_fields: List[str], output_dir: str = "/tmp") 
     Returns:
         FileComparisonResult 对象
     """
-    import os
-
-    from scalim.execution import ScalimEngine
-    from scalim.planning import PlanBuilder
-    from scalim.sinks.sink_memory import InMemoryColumnSink
-
-    try:
-        from ._shared import build_ecommerce_model
-    except ImportError:
-        from _shared import build_ecommerce_model
+    if output_dir is None:
+        output_dir = tempfile.gettempdir()
 
     # 1. Scalim 框架执行
     model = build_ecommerce_model()
@@ -765,22 +760,27 @@ def run_parallel_comparison(target_fields: List[str], output_dir: str = "/tmp") 
     engine = ScalimEngine(demand=model, plan=plan, batch_size=100)
 
     with InMemoryColumnSink(field_names=target_fields) as sink:
-        engine.run(main_rows=load_orders(), sink=sink)
+        _ = engine.run(main_rows=load_orders(), sink=sink)
         scalim_results = sink.get_rows()
 
     # 2. 纯 Python 执行
     python_results = python_build_order_report(target_fields)
 
     # 3. 导出 CSV
-    scalim_csv = os.path.join(output_dir, "scalim_output.csv")
-    python_csv = os.path.join(output_dir, "python_output.csv")
+    output_dir_path = Path(output_dir)
+    scalim_csv = output_dir_path / "scalim_output.csv"
+    python_csv = output_dir_path / "python_output.csv"
 
-    export_to_csv(scalim_results, scalim_csv, target_fields)
-    export_to_csv(python_results, python_csv, target_fields)
+    export_to_csv(scalim_results, str(scalim_csv), target_fields)
+    export_to_csv(python_results, str(python_csv), target_fields)
 
     # 4. 对比文件
-    matched, diff_summary = compare_csv_files(scalim_csv, python_csv)
+    matched, diff_summary = compare_csv_files(str(scalim_csv), str(python_csv))
 
     return FileComparisonResult(
-        matched=matched, scalim_file=scalim_csv, python_file=python_csv, row_count=len(scalim_results), diff_summary=diff_summary
+        matched=matched,
+        scalim_file=str(scalim_csv),
+        python_file=str(python_csv),
+        row_count=len(scalim_results),
+        diff_summary=diff_summary,
     )

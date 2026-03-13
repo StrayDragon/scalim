@@ -1,16 +1,13 @@
-from __future__ import annotations
-
 import time
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.sinks.sink_memory import InMemoryColumnSink
 
-from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, load_orders, set_config
-from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
-from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_order_by, verify_scalim_output
-
+from ..loaders import ECommerceConfig, load_orders, set_config
+from ..shared import build_ecommerce_model
+from ..verification import VerificationResult, verify_order_by, verify_scalim_output
 from ._types import ChapterResult
 
 
@@ -35,7 +32,7 @@ def run_basics(
     engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
     start = time.time()
     with InMemoryColumnSink(field_names=targets_list) as sink:
-        engine.run(main_rows=main_rows, sink=sink)
+        _ = engine.run(main_rows=main_rows, sink=sink)
         results = sink.get_rows()
     elapsed = time.time() - start
 

@@ -6,11 +6,13 @@
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
-from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, get_config, load_orders, set_config
-from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
-from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
+from scalim.typedefs import RowData
+
+from .loaders import ECommerceConfig, get_config, load_orders, set_config
+from .shared import build_ecommerce_model
+from .verification import VerificationResult, verify_scalim_output
 
 
 @dataclass(frozen=True)
@@ -65,7 +67,7 @@ def run_case(
     batch_size: int = 50,
     row_limit_override: Optional[int] = None,
     fields_to_check: Optional[Sequence[str]] = None,
-) -> Tuple[List[Dict[str, Any]], VerificationResult]:
+) -> Tuple[List[RowData], VerificationResult]:
     """运行一个示例用例,并用纯 Python 对照组对输出做验证.
 
     Returns:
@@ -84,7 +86,7 @@ def run_case(
 
         row_limit = int(row_limit_override) if row_limit_override is not None else int(case.row_limit)
         main_rows = list(load_orders())[:row_limit]
-        results = list(engine.run(main_rows=main_rows))
+        results: List[RowData] = list(engine.run(main_rows=main_rows))
 
         check_fields = list(fields_to_check) if fields_to_check is not None else list(case.targets)
         verification = verify_scalim_output(results, fields_to_check=check_fields)

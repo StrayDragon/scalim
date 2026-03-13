@@ -194,6 +194,8 @@ max-args = 16
 "docs/snippets/*.py" = ["ALL"]
 "scripts/*.py" = ["ALL"]
 "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py" = ["ALL"]
+"packages/scalim-misc/src/scalim_misc/demo_big_data_report/loaders.py" = ["FBT001", "FBT002"]
+"packages/scalim-misc/src/scalim_misc/demo_big_data_report/verification.py" = ["C901", "PLR0912"]
 "src/scalim/vendor/compact/typing_extensionsx.py" = ["TID251"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]

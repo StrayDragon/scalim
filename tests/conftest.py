@@ -37,8 +37,8 @@ def engine_factory(example_model):
 
 @pytest.fixture(scope="module")
 def ecommerce_config_small():
-    from notebooks.marimo.demo_big_data_report._cases import build_test_config_small
-    from notebooks.marimo.demo_big_data_report._shared import get_config, set_config
+    from scalim_misc.demo_big_data_report.cases import build_test_config_small
+    from scalim_misc.demo_big_data_report.loaders import get_config, set_config
 
     prev = get_config()
     cfg = build_test_config_small()
@@ -51,6 +51,6 @@ def ecommerce_config_small():
 
 @pytest.fixture(scope="module")
 def ecommerce_model_small(ecommerce_config_small):
-    from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
+    from scalim_misc.demo_big_data_report.shared import build_ecommerce_model
 
     return build_ecommerce_model(ecommerce_config_small)

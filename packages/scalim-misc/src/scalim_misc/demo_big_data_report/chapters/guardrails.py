@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any, Dict, List, Sequence
 
 from scalim.events.catalog import EVENT_ERROR
@@ -10,18 +8,20 @@ from scalim.ob.observer import EventDispatchObserver
 from scalim.planning import PlanBuilder
 from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, KeyIr, LoaderIr, MainSourceIr, SourceIr
 
-from notebooks.marimo.demo_big_data_report._guardrails_demo_loaders import (
+from ..guardrails_demo_loaders import (
     load_guardrails_demo_main_rows,
     load_guardrails_demo_ref_table,
 )
-
 from ._types import ChapterResult
 
 
-class _ErrorCollector(EventDispatchObserver):
-    event_types = {EVENT_ERROR}
+def _to_int(value: Any) -> int:
+    return int(value)
 
+
+class _ErrorCollector(EventDispatchObserver):
     def __init__(self) -> None:
+        self.event_types = {EVENT_ERROR}
         self.errors: List[Any] = []
 
     def on_error(self, payload: Any) -> None:
@@ -35,7 +35,7 @@ def _build_demand() -> DemandIr:
 
     fields: Sequence[Any] = [
         FieldIr(field_id="ref_id", name="ref_id", source=main_source),
-        FieldIr(field_id="a", name="a", source=main_source, transform=int),
+        FieldIr(field_id="a", name="a", source=main_source, transform=_to_int),
         FieldIr(field_id="b", name="b", source=main_source),
         DerivedFieldIr(field_id="ratio", name="ratio", dependencies=("a", "b"), calculator=lambda a, b: a / b),
         FieldIr(field_id="ref_value", name="ref_value", source=ref_source, data_key="value", relation=rel_to_ref),

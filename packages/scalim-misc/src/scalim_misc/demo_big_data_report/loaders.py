@@ -23,8 +23,6 @@
 6. 小表关联: `orders` -> `promotions`、`payment_methods`、`logistics`
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -83,18 +81,22 @@ class ECommerceConfig:
 
 
 # 全局配置实例
-_CONFIG = ECommerceConfig()
+class _ConfigState:
+    def __init__(self) -> None:
+        self.config = ECommerceConfig()
+
+
+_config_state = _ConfigState()
 
 
 def set_config(config: ECommerceConfig) -> None:
     """设置全局配置"""
-    global _CONFIG
-    _CONFIG = config
+    _config_state.config = config
 
 
 def get_config() -> ECommerceConfig:
     """获取全局配置"""
-    return _CONFIG
+    return _config_state.config
 
 
 # ============================================================================
@@ -210,8 +212,7 @@ def load_orders(
         day_of_year = (i % 365) + 1
         month = (day_of_year - 1) // 30 + 1
         day = (day_of_year - 1) % 30 + 1
-        if month > 12:
-            month = 12
+        month = min(month, 12)
         order_date = "2024-{:02d}-{:02d}".format(month, min(day, 28))
 
         row: Dict[str, Any] = {

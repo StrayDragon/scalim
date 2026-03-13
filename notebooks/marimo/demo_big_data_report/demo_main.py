@@ -15,7 +15,7 @@ def _(mo):
         - 章节代码可复用: 既能演示,也能当集成对拍 runner 的实现
 
         结构:
-        - `chapters/`: 每个章节一个可调用的 `run_*()` 函数
+        - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/chapters/`: 每个章节一个可调用的 `run_*()` 函数
         - `run_examples.py`: `just examples` 的 gate 入口(快速对拍)
         - `by_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
         """
@@ -35,7 +35,7 @@ def _():
     import sys
     from pathlib import Path
 
-    # `marimo` 运行/导出时,显式把仓库根目录加入 `sys.path`,确保 `notebooks.*` 可被导入.
+    # `marimo` 运行/导出时,显式把仓库根目录加入 `sys.path`,方便相对路径访问示例资源.
     repo_root = Path(__file__).resolve().parents[3]
     repo_root_str = str(repo_root)
     if repo_root_str not in sys.path:
@@ -109,10 +109,10 @@ def _(mo):
 
 
 @app.cell
-def _():
-    from notebooks.marimo.demo_big_data_report.chapters.registry import run_all_chapters
+def _(yaml_path):
+    from scalim_misc.demo_big_data_report.chapters.registry import run_all_chapters
 
-    chapter_results = run_all_chapters()
+    chapter_results = run_all_chapters(yaml_path=yaml_path)
     return chapter_results
 
 
@@ -151,7 +151,7 @@ def _(Path, yaml_path):
     from scalim.sinks.sink_memory import InMemoryRowSink
 
     # 注意: `run()` 需要 `allowlist` 配置
-    _loaders_module = "notebooks.marimo.demo_big_data_report._loaders"
+    _loaders_module = "scalim_misc.demo_big_data_report.loaders"
 
     try:
         sink = InMemoryRowSink()

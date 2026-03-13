@@ -1,26 +1,25 @@
-from __future__ import annotations
-
 from typing import Any, Dict, List, Sequence
 
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.sinks.sink_memory import InMemoryColumnSink
+from scalim.typedefs import RowData
 
-from notebooks.marimo.demo_big_data_report._loaders import ECommerceConfig, set_config
-from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
-from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
-
+from ..loaders import ECommerceConfig, set_config
+from ..shared import build_ecommerce_model
+from ..verification import VerificationResult, verify_scalim_output
 from ._types import ChapterResult
 
 
-def _run(cfg: ECommerceConfig, targets: Sequence[str], *, parallel_mode: str, batch_size: int) -> List[Dict[str, Any]]:
+def _run(cfg: ECommerceConfig, targets: Sequence[str], *, parallel_mode: str, batch_size: int) -> List[RowData]:
     set_config(cfg)
     demand = build_ecommerce_model(cfg)
     plan = PlanBuilder(demand).build(targets=list(targets))
     engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size), parallel_mode=parallel_mode)
     with InMemoryColumnSink(field_names=list(targets)) as sink:
-        engine.run(main_rows=None, sink=sink)
-        return sink.get_rows()
+        _ = engine.run(main_rows=None, sink=sink)
+        rows: List[RowData] = sink.get_rows()
+        return rows
 
 
 def run_parallel_mode(cfg: ECommerceConfig, *, targets: Sequence[str], batch_size: int = 50) -> ChapterResult:

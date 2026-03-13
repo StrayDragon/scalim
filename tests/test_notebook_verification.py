@@ -1,6 +1,6 @@
 import pytest
 
-from notebooks.marimo.demo_big_data_report._cases import run_case
+from scalim_misc.demo_big_data_report.cases import run_case
 
 
 pytestmark = pytest.mark.slow

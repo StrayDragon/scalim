@@ -35,9 +35,9 @@ def test_row_gap_data_loader_tracks_missing_and_summary(caplog) -> None:
         hook.on_loader_call(data_event)
         hook.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.5))
 
-    assert hook._total_expected == 3
-    assert hook._total_actual == 1
-    assert hook._total_missing == 2
+    assert hook.total_expected == 3
+    assert hook.total_actual == 1
+    assert hook.total_missing == 2
     assert any((ROW_GAP_LOG_SUMMARY % (3, 1, 2, None)) == record.getMessage() for record in caplog.records)
 
 
@@ -75,4 +75,4 @@ def test_row_gap_ignores_untracked_loader_and_unhashable_keys(caplog) -> None:
         hook.on_loader_call(untracked_event)
         hook.on_loader_call(bad_key_event)
 
-    assert hook._total_expected == 1
+    assert hook.total_expected == 1

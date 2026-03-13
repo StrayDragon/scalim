@@ -1,10 +1,7 @@
 """多输出组合/派生汇总示例的共享执行与对拍逻辑."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from scalim.execution.output_composition import (
@@ -18,11 +15,10 @@ from scalim.execution.output_composition import (
 )
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 
-from notebooks.marimo.demo_big_data_report._cases import build_test_config_small
-from notebooks.marimo.demo_big_data_report._loaders import get_config, set_config
-from notebooks.marimo.demo_big_data_report._shared import build_ecommerce_model
-from notebooks.marimo.demo_big_data_report._verification import VerificationResult, verify_scalim_output
-
+from .cases import build_test_config_small
+from .loaders import get_config, set_config
+from .shared import build_ecommerce_model
+from .verification import VerificationResult, verify_scalim_output
 
 DETAIL_FIELDS: Tuple[str, ...] = (
     "order_id",
@@ -45,7 +41,7 @@ _SHEET_DETAIL = "Detail"
 _SHEET_SUMMARY = "Summary"
 _SHEET_META = "Meta"
 _SHEET_AUDIT = "Audit"
-_DECIMAL_ZERO = Decimal("0")
+_DECIMAL_ZERO = Decimal(0)
 
 
 @dataclass
@@ -171,7 +167,7 @@ def run_derived_outputs_demo(output_path: str) -> DerivedOutputsDemoResult:
 
 
 def _read_workbook_sheet_names(path: str) -> List[str]:
-    from openpyxl import load_workbook
+    from openpyxl import load_workbook  # noqa: PLC0415
 
     workbook = load_workbook(filename=str(path), read_only=True, data_only=True)
     try:
@@ -181,7 +177,7 @@ def _read_workbook_sheet_names(path: str) -> List[str]:
 
 
 def _read_sheet_rows_as_dicts(path: str, sheet_name: str) -> List[Dict[str, Any]]:
-    from openpyxl import load_workbook
+    from openpyxl import load_workbook  # noqa: PLC0415
 
     workbook = load_workbook(filename=str(path), read_only=True, data_only=True)
     try:
