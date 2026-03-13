@@ -253,17 +253,39 @@ openspec-check: openspec-sanitize
 bump-versions VERSION="" CONFIRM="":
     #!/usr/bin/env bash
     set -euo pipefail
-    args=()
-    if [ -n "{{ VERSION }}" ]; then
-        args+=( --version "{{ VERSION }}" )
+    version="{{ VERSION }}"
+    confirm="{{ CONFIRM }}"
+    apply=""
+
+    if [ "$confirm" = "YES" ] || [ "$confirm" = "CONFIRM=YES" ]; then
+        apply="YES"
+    elif [ -n "$confirm" ]; then
+        echo "[warn] confirm token ignored (expected 'YES'):" "$confirm" >&2
     fi
-    if [ "{{ CONFIRM }}" = "YES" ] || [ "{{ CONFIRM }}" = "CONFIRM=YES" ]; then
+
+    # 主包版本优先用 `uv version` 管理,避免忘记 re-lock.
+    if [ -n "$version" ]; then
+        if [ -n "$apply" ]; then
+            uv {{ UV_OPTIONS }} version "$version"
+            uv {{ UV_OPTIONS }} run python scripts/gen-project-constants.py
+        else
+            uv {{ UV_OPTIONS }} version --dry-run "$version"
+        fi
+    fi
+
+    args=()
+    if [ -n "$version" ]; then
+        args+=( --version "$version" )
+    fi
+    if [ -n "$apply" ]; then
         args+=( --apply )
-    elif [ -n "{{ CONFIRM }}" ]; then
-        echo "[warn] confirm token ignored (expected 'YES'):" "{{ CONFIRM }}" >&2
     fi
     uv {{ UV_OPTIONS }} run python scripts/bump-versions.py "${args[@]}"
-    uv {{ UV_OPTIONS }} version "${args[@]}"
+
+    # bump 子包后需要更新 workspace lock,否则 `uv lock --check` 会失败.
+    if [ -n "$apply" ]; then
+        uv {{ UV_OPTIONS }} lock
+    fi
 
 # 生成: Agent Skill 数据
 gen-agent-skill:
