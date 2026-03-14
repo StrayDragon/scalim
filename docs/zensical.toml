@@ -12,6 +12,7 @@ nav = [
   { "首页" = "index.md" },
   { "从这里开始" = [
     "getting-started/index.md",
+    { "主线教程: demo_big_data_report" = "getting-started/demo-big-data-report.md" },
     { "写 YAML" = "yaml-dsl/index.md" },
 	    { "YAML 语法速查" = "yaml-dsl/syntax.md" },
 	    { "YAML 用户指南" = "yaml-dsl/user-guide.md" },
