@@ -489,7 +489,8 @@ outputs:
     container:
       <<: *workbook_container_base
       sheet: 订单明细
-    fields: *detail_fields
+    fields:
+      - *detail_fields
 
   - name: no_promo
     container:

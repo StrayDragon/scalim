@@ -2042,14 +2042,38 @@
         "fields": {
           "type": "array",
           "items": {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                      "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                      "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1
+              }
+            ]
           },
           "minItems": 1,
-          "description": "明细输出字段顺序(field_id 列表)",
-          "markdownDescription": "明细输出字段顺序(field_id 列表).\n\n- 派生汇总输出(aggregate)不允许 fields\n- 可通过 `from` 继承",
+          "description": "明细输出字段顺序(field_id 列表; 支持 YAML alias)",
+          "markdownDescription": "明细输出字段顺序(`field_id` 列表).\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    container: {type: csv, path: ./out.csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n- 派生汇总输出(aggregate)不允许 fields\n- 可通过 `from` 继承",
           "examples": [
             [
               "order_id",

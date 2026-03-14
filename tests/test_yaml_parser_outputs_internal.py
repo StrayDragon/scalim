@@ -1,7 +1,7 @@
 import pytest
 
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.models import AliasIndex, FieldDefIndex, RawDemand
+from scalim.dsl.by_yaml.config_parsing.models import AliasIndex, FieldDef, FieldDefIndex, RawDemand
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
 from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputAggregateConfig,
@@ -41,6 +41,7 @@ def test_parse_outputs_rejects_non_list_and_non_object_items() -> None:
 def test_parse_output_target_rejects_fields_non_list() -> None:
     loader = YamlDemandLoader()
     engine = SecureComputeEngine()
+    field_index = _dummy_field_index()
 
     raw_target = {
         "name": "detail",
@@ -53,8 +54,58 @@ def test_parse_output_target_rejects_fields_non_list() -> None:
             raw_target,
             idx=0,
             outputs_key="outputs",
+            field_def_index=field_index,
             known_field_ids={"order_id"},
             engine=engine,
+        )
+
+
+def test_resolve_output_field_ref_rejects_non_str_and_non_mapping() -> None:
+    loader = YamlDemandLoader()
+    field_index = _dummy_field_index()
+
+    with pytest.raises(TypeError, match=r"outputs\.0\.fields\.0 must be field_id string"):
+        _ = loader._resolve_output_field_ref(  # type: ignore[attr-defined]
+            1,
+            outputs_key="outputs",
+            output_idx=0,
+            field_path="0",
+            field_def_index=field_index,
+        )
+
+
+def test_resolve_output_field_ref_rejects_unresolvable_object() -> None:
+    loader = YamlDemandLoader()
+    field_defs = [
+        FieldDef(field_id="order_id", kind="source", data={"extract": "order_id"}, source_id="orders"),
+    ]
+    field_index = FieldDefIndex(field_defs=field_defs, defs_by_id={"order_id": field_defs}, alias_index=AliasIndex())
+
+    with pytest.raises(ValueError, match=r"outputs\.0\.fields\.0 cannot resolve object to a unique field_id"):
+        _ = loader._resolve_output_field_ref(  # type: ignore[attr-defined]
+            {"extract": "missing"},
+            outputs_key="outputs",
+            output_idx=0,
+            field_path="0",
+            field_def_index=field_index,
+        )
+
+
+def test_resolve_output_field_ref_rejects_ambiguous_content_match() -> None:
+    loader = YamlDemandLoader()
+    field_defs = [
+        FieldDef(field_id="a", kind="source", data={"extract": "id"}, source_id="orders"),
+        FieldDef(field_id="b", kind="source", data={"extract": "id"}, source_id="orders"),
+    ]
+    field_index = FieldDefIndex(field_defs=field_defs, defs_by_id={"a": [field_defs[0]], "b": [field_defs[1]]}, alias_index=AliasIndex())
+
+    with pytest.raises(ValueError, match=r"outputs\.0\.fields\.0 is ambiguous; object matches multiple field_id values"):
+        _ = loader._resolve_output_field_ref(  # type: ignore[attr-defined]
+            {"extract": "id"},
+            outputs_key="outputs",
+            output_idx=0,
+            field_path="0",
+            field_def_index=field_index,
         )
 
 

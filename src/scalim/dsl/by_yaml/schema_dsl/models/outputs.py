@@ -363,9 +363,50 @@ class OutputTargetConfig:
     fields: Optional[Tuple[str, ...]] = dataclass_field(
         default=None,
         metadata=schema_meta(
-            schema={"type": "array", "items": FIELD_ID_STRING_SCHEMA, "minItems": 1},
-            desc="明细输出字段顺序(field_id 列表)",
-            md=("明细输出字段顺序(field_id 列表).\n\n- 派生汇总输出(aggregate)不允许 fields\n- 可通过 `from` 继承"),
+            schema={
+                "type": "array",
+                "items": {
+                    "anyOf": [
+                        FIELD_ID_STRING_SCHEMA,
+                        {"type": "object"},
+                        {
+                            "type": "array",
+                            "items": {
+                                "anyOf": [
+                                    FIELD_ID_STRING_SCHEMA,
+                                    {"type": "object"},
+                                ]
+                            },
+                            "minItems": 1,
+                        },
+                    ]
+                },
+                "minItems": 1,
+            },
+            desc="明细输出字段顺序(field_id 列表; 支持 YAML alias)",
+            md=(
+                "明细输出字段顺序(`field_id` 列表).\n\n"
+                "支持两种等价写法:\n\n"
+                "1) 直接写 `field_id` 字符串:\n\n"
+                "```yaml\n"
+                "fields: [order_id, total]\n"
+                "```\n\n"
+                "2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n"
+                "```yaml\n"
+                "main_source:\n"
+                "  fields:\n"
+                "    quantity: &quantity {extract: quantity}\n"
+                "outputs:\n"
+                "  - name: detail\n"
+                "    container: {type: csv, path: ./out.csv}\n"
+                "    fields:\n"
+                "      - *quantity\n"
+                '      - "order_id"\n'
+                "```\n\n"
+                "注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n"
+                "- 派生汇总输出(aggregate)不允许 fields\n"
+                "- 可通过 `from` 继承"
+            ),
             examples=[["order_id", "user_id"]],
         ),
     )

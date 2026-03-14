@@ -54,6 +54,161 @@ outputs:
     assert config.derived_fields["total"].name == "Total"
 
 
+def test_loader_allows_outputs_fields_yaml_alias_items() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id: &order_id
+      extract: order_id
+    user_id:
+      extract: user_id
+    quantity: &quantity
+      extract: quantity
+    unit_price: &unit_price
+      extract: unit_price
+sources:
+  users:
+    loader: tests.conftest.mock_loader
+    key: user_id
+    fields:
+      user_name: &user_name
+        extract: name
+        relation:
+          steps:
+            - from: orders.user_id
+              to: users.user_id
+fields:
+  total: &total
+    compute: "quantity * unit_price"
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields:
+      - *order_id
+      - *user_name
+      - *total
+"""
+    loader = YamlDemandLoader()
+    config = loader.load_string(yaml_content)
+
+    assert len(config.outputs) == 1
+    assert config.outputs[0].fields == ("order_id", "user_name", "total")
+
+
+def test_loader_allows_outputs_fields_content_match_when_identity_lost() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    quantity: &quantity
+      extract: quantity
+sources: {}
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields:
+      - {extract: quantity}
+"""
+    loader = YamlDemandLoader()
+    config = loader.load_string(yaml_content)
+
+    assert len(config.outputs) == 1
+    assert config.outputs[0].fields == ("quantity",)
+
+
+def test_validator_rejects_outputs_fields_object_when_ambiguous() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    a:
+      extract: id
+    b:
+      extract: id
+sources: {}
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields:
+      - {extract: id}
+"""
+    loader = YamlDemandLoader()
+    with pytest.raises(ConfigValidationError) as exc:
+        loader.load_string(yaml_content)
+
+    assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
+    assert any("ambiguous object entry" in msg for msg in exc.value.errors)
+    assert any("a" in msg and "b" in msg for msg in exc.value.errors)
+
+
+def test_validator_rejects_outputs_fields_object_when_not_found() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    quantity:
+      extract: quantity
+sources: {}
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields:
+      - {extract: missing}
+"""
+    loader = YamlDemandLoader()
+    with pytest.raises(ConfigValidationError) as exc:
+        loader.load_string(yaml_content)
+
+    assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
+    assert any("cannot resolve object to a unique field_id" in msg for msg in exc.value.errors)
+
+
+def test_validator_rejects_outputs_fields_non_str_and_non_object_item() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs:
+  - name: detail
+    container: {type: csv, path: ./out.csv}
+    fields:
+      - 1
+"""
+    loader = YamlDemandLoader()
+    with pytest.raises(ConfigValidationError) as exc:
+        loader.load_string(yaml_content)
+
+    assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
+    assert any("must be field_id string" in msg for msg in exc.value.errors)
+
+
+def test_validator_outputs_object_ref_check_skips_non_object_outputs_items() -> None:
+    validator = ConfigValidator()
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.conftest.mock_loader"},
+        "sources": {},
+        "outputs": [1],
+    }
+
+    with pytest.raises(ConfigValidationError):
+        validator.validate(config)
+
+
 def test_validator_allows_missing_top_level_fields() -> None:
     validator = ConfigValidator()
     config = {

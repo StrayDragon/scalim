@@ -57,6 +57,54 @@ class ParserOutputsMixin:
             msg = "{}={!r} is invalid; expected identifier like [a-zA-Z_][a-zA-Z0-9_]*".format(path, value)
             raise ValueError(msg)
 
+    def _resolve_output_field_ref(
+        self,
+        item: object,
+        *,
+        outputs_key: str,
+        output_idx: int,
+        field_path: str,
+        field_def_index: FieldDefIndex,
+    ) -> str:
+        if isinstance(item, str):
+            return item.strip()
+
+        typed = mapping_or_none(item)
+        if typed is None:
+            msg = "{}.{}.fields.{} must be field_id string, YAML alias(object), or YAML alias(list)".format(
+                outputs_key, output_idx, field_path
+            )
+            raise TypeError(msg)
+
+        direct = field_def_index.alias_index.get(typed)
+        if direct is not None:
+            return direct.field_id
+
+        # 当 YAML `alias` 的对象 `identity` 丢失(例如 `YAML merge` 产生新对象)时,允许基于内容做兜底匹配(仅唯一匹配时通过).
+        matches = [fd for fd in field_def_index.field_defs if fd.data == typed]
+        path = "{}.{}.fields.{}".format(outputs_key, output_idx, field_path)
+        if not matches:
+            msg = "{} cannot resolve object to a unique field_id; prefer string field_id".format(path)
+            raise ValueError(msg)
+        if len(matches) > 1:
+            candidates = sorted({m.field_id for m in matches})
+            msg = "{} is ambiguous; object matches multiple field_id values: {}. Use string field_id to disambiguate.".format(
+                path,
+                ", ".join(candidates),
+            )
+            raise ValueError(msg)
+        return matches[0].field_id
+
+    def _walk_output_field_items(self, item: object, *, field_path: str) -> List[Tuple[str, object]]:
+        nested = list_or_none(item)
+        if nested is None:
+            return [(field_path, item)]
+        out: List[Tuple[str, object]] = []
+        for idx, sub in enumerate(nested):
+            sub_path = "{}.{}".format(field_path, idx) if field_path else str(idx)
+            out.extend(self._walk_output_field_items(sub, field_path=sub_path))
+        return out
+
     def _parse_outputs(  # noqa: C901, PLR0915
         self,
         raw: RawDemand,
@@ -87,6 +135,7 @@ class ParserOutputsMixin:
                     item_dict,
                     idx=idx,
                     outputs_key=outputs_key,
+                    field_def_index=field_def_index,
                     known_field_ids=known_field_ids,
                     engine=engine,
                 )
@@ -149,6 +198,7 @@ class ParserOutputsMixin:
         *,
         idx: int,
         outputs_key: str,
+        field_def_index: FieldDefIndex,
         known_field_ids: Set[str],
         engine: SecureComputeEngine,
     ) -> OutputTargetConfig:
@@ -171,8 +221,21 @@ class ParserOutputsMixin:
             raise TypeError(msg)
         fields: Optional[Tuple[str, ...]] = None
         if fields_list is not None:
-            normalized = [str(item or "").strip() for item in fields_list if str(item or "").strip()]
-            fields = tuple(normalized) if normalized else ()
+            normalized_fields: List[str] = []
+            flattened: List[Tuple[str, object]] = []
+            for outer_idx, field_item in enumerate(fields_list):
+                flattened.extend(self._walk_output_field_items(field_item, field_path=str(outer_idx)))
+            for field_path, field_item in flattened:
+                field_id = self._resolve_output_field_ref(
+                    field_item,
+                    outputs_key=outputs_key,
+                    output_idx=idx,
+                    field_path=field_path,
+                    field_def_index=field_def_index,
+                )
+                if field_id:
+                    normalized_fields.append(field_id)
+            fields = tuple(normalized_fields) if normalized_fields else ()
 
         where = str_or_none(raw_target.get(OUTPUT_TARGET_KEYS["where"]))
         where = _non_empty_str(where) or None

@@ -156,7 +156,7 @@ Sources:
 - `$import`: $import 引用(支持 string 或 string list)
 - `aggregate`: ref=output_aggregate; 可选:派生汇总配置(声明后视为 derived output)
 - `container`: ref=output_container; 输出容器配置(workbook/csv)
-- `fields`: type=array[string]; 明细输出字段顺序(field_id 列表)
+- `fields`: type=array; 明细输出字段顺序(field_id 列表; 支持 YAML alias)
 - `from`: type=string; 可选:继承来源输出(name)
 - `name` (required): type=string; 输出名称(name)
 - `where`: type=string; 可选:过滤表达式(安全表达式)

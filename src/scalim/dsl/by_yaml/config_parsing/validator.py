@@ -24,9 +24,10 @@ else:
     MappingNode = _yaml_nodes.MappingNode
     SequenceNode = _yaml_nodes.SequenceNode
 
+from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_TARGET_KEYS
 from .errors import ConfigValidationError
 from .imports import contains_import_syntax
-from .models import RawDemand, ensure_mapping
+from .models import FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
 from .validators.fields import ValidatorFieldsMixin
@@ -152,12 +153,92 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._step_allowed_fields_by_source = self._collect_step_allowed_fields(raw.data, main_source_id)
         relation_paths = self._validate_relations(raw.data, errors, sources_info, main_source_id)
         self._validate_fields(raw, errors, sources_info, main_source_id, relation_paths)
+        self._validate_outputs_fields_object_refs(raw, errors, main_source_id=main_source_id)
 
         if enable_jsonschema_validation:
             self._validate_with_jsonschema(raw.data, errors)
         self._validate_unknown_fields(raw.data, errors, strict=strict_unknown_fields)
 
         return ValidationReport(issues=errors)
+
+    def _outputs_fields_object_item_error(self, field_def_index: FieldDefIndex, item: object) -> Optional[str]:
+        if not isinstance(item, dict):
+            return "must be field_id string, YAML alias(object), or YAML alias(list)"
+
+        typed = cast("Dict[str, Any]", item)
+        direct = field_def_index.alias_index.get(typed)
+        if direct is not None:
+            return None
+
+        matches = [fd for fd in field_def_index.field_defs if fd.data == typed]
+        if not matches:
+            return "cannot resolve object to a unique field_id; prefer string field_id"
+        if len(matches) > 1:
+            candidates = sorted({m.field_id for m in matches})
+            return "ambiguous object entry; matches multiple field_id values: {}. Use string field_id to disambiguate.".format(
+                ", ".join(candidates)
+            )
+        return None
+
+    def _validate_outputs_fields_list_object_refs(
+        self,
+        fields_list: List[Any],
+        errors: List[ValidationIssue],
+        *,
+        base_path: str,
+        field_def_index: FieldDefIndex,
+    ) -> None:
+        def _walk(item: object, *, path: str) -> List[Tuple[str, object]]:
+            if isinstance(item, list):
+                out: List[Tuple[str, object]] = []
+                for idx, sub in enumerate(cast("List[object]", item)):
+                    out.extend(_walk(sub, path="{}.{}".format(path, idx)))
+                return out
+            return [(path, item)]
+
+        for field_idx, item in enumerate(fields_list):
+            root_path = "{}.{}".format(base_path, field_idx)
+            for leaf_path, leaf in _walk(item, path=root_path):
+                if isinstance(leaf, str):
+                    continue
+                msg = self._outputs_fields_object_item_error(field_def_index, leaf)
+                if msg:
+                    self._add_error(errors, msg, path=leaf_path)
+
+    def _validate_outputs_fields_object_refs(
+        self,
+        raw: RawDemand,
+        errors: List[ValidationIssue],
+        *,
+        main_source_id: str,
+    ) -> None:
+        # 注意: `jsonschema` 校验是可选项; `schema-only` 校验不应阻断 `YAML` `alias` 写法.
+        # 这里做语义校验,确保 `outputs[*].fields` 的 `object` 条目可解析为唯一 `field_id`.
+        field_def_index = collect_field_defs(raw, main_source_id=main_source_id)
+
+        outputs_key = DEMAND_KEYS["outputs"]
+        outputs_raw = raw.data.get(outputs_key)
+        if not isinstance(outputs_raw, list):
+            return
+        outputs_list = cast("List[Any]", outputs_raw)
+
+        fields_key = OUTPUT_TARGET_KEYS["fields"]
+
+        for output_idx, output_raw in enumerate(outputs_list):
+            if not isinstance(output_raw, dict):
+                continue
+            output_dict = cast("Dict[str, Any]", output_raw)
+            fields_raw = output_dict.get(fields_key)
+            if not isinstance(fields_raw, list):
+                continue
+            fields_list = cast("List[Any]", fields_raw)
+            base_path = "{}.{}.{}".format(outputs_key, output_idx, fields_key)
+            self._validate_outputs_fields_list_object_refs(
+                fields_list,
+                errors,
+                base_path=base_path,
+                field_def_index=field_def_index,
+            )
 
     def _load_schema(self) -> Dict[str, Any]:
         if self._schema is None:
