@@ -1,63 +1,59 @@
-# OpenSpec Changes: 分组实施计划
+# OpenSpec Changes: 工作区与归档
 
-本目录用于承载**未归档**的 change（proposal/design/spec/tasks）。我们按“组”推进实现：一组可能对应一个 change，也可能把多个强耦合 change 合并落地，以避免语义漂移与反复迁移成本。
+本目录用于承载**未归档**的 change（proposal/design/spec/tasks）。
 
-## 全局约束（每组都必须满足）
+- 工作区（未归档）: `openspec/changes/<change>/`
+- 归档区（已完成）: `openspec/changes/archive/YYYY-MM-DD-<change>/`
+
+> 说明: change 目录下的 `specs/` 为“delta spec”（只描述本 change 引入/修改的规范片段）；实现完成后会同步回 `openspec/specs/`。
+
+## 约束（SSOT）
+
+### A) 语义/接口类 change（YAML DSL / CLI / runtime 行为）
 
 1) **Breaking 一步到位**
 - 除非需求明确要求兼容，否则不保留旧写法兼容分支；仓内所有旧写法一次性升级（YAML 示例/fixtures/notebooks/skills/frontend examples 等）。
 
-2) **每组必须更新 canonical demo**
-- 必须改造 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`，确保新语义在可运行的真实配置里被覆盖。
+2) **覆盖 canonical demo**
+- 只要 change 会影响 YAML authoring surface/语义，就必须更新并回归：
+  - `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
 
-3) **每组必须做下游适配盘点（脱敏规则）**
+3) **下游适配盘点（脱敏规则）**
 - 允许读取 `.tmp/known-outer-paths-using-this-package.txt` 用于盘点下游适配与同步修改。
 - 输出/文档/规范中**不得引用其内容**（只能引用该文件路径本身）。
 
-4) **每组必须交付“升级指南”，并接入自动索引**
-- 在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 新增一篇升级文档（文件名建议 `YYYY-MM-DD-<group>.md`；docs-site 同名页通过软链引用,不重复维护）。
-- 在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 新增一篇升级文档（文件名建议 `YYYY-MM-DD-<group>.md`；docs-site 同名页由 SSOT 自动生成,不重复维护；运行 `just gen-docs`）。
-- 文档中用反引号写出：
+4) **升级指南 + 自动索引**
+- 若 change 引入 breaking/migration，需要在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 新增一篇升级文档（文件名建议 `YYYY-MM-DD-<group>.md`）。
+- 跑 `just gen`/`just gen-docs` 让 docs-site 与 skill references 的索引自动更新（避免手工维护）。
+- 升级文档中用反引号写出：
   - 对应归档目录：`openspec/changes/archive/YYYY-MM-DD-<change>/`
   - 对应主规范：`openspec/specs/<spec>/spec.md`
-- 跑 `just gen` 让 `artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md` 自动注入升级索引（避免手工维护）。
 
-5) **验收与归档流程**
-- 每组完成后必须跑通：
+5) **验收与归档**
+- 归档前必须跑通：
   - `just gen`
-  - `just qa`（包含前端构建检查）
-- 然后将该组涉及的 change 归档到 `openspec/changes/archive/YYYY-MM-DD-.../`，等待 review。
+  - `just qa`
+  - `just openspec-check`
+- 完成后将 change 目录移动到 `openspec/changes/archive/YYYY-MM-DD-.../`。
 
-## 已完成
+### B) 工具链/文档类 change
 
-- `yaml-field-extract` 已归档：`openspec/changes/archive/2026-03-10-yaml-field-extract/`
-- `yaml-source-normalize` 已归档：`openspec/changes/archive/2026-03-10-yaml-source-normalize/`
-- `yaml-inline-dynamic-params` 已归档：`openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
-- `yaml-loader-params-template` 已归档：`openspec/changes/archive/2026-03-11-yaml-loader-params-template/`
-- `add-derived-outputs` 已归档：`openspec/changes/archive/2026-03-11-add-derived-outputs/`
-- `yaml-relative-import-paths` 已归档：`openspec/changes/archive/2026-03-11-yaml-relative-import-paths/`
-- `doc-system-workflow` 已归档：`openspec/changes/archive/2026-03-12-doc-system-workflow/`
-- `qa-hardening` 已归档：`openspec/changes/archive/2026-03-12-qa-hardening/`
-- `yaml-dsl-outputs` 已归档：`openspec/changes/archive/2026-03-13-yaml-dsl-outputs/`
+- 仍需通过 `just qa` / `just openspec-check`；是否需要升级指南、canonical demo 覆盖按实际影响决定。
 
-## 待实现分组（按推荐顺序）
+## 当前未归档 changes
 
-1) **Group: demand DSL 语法收敛（breaking）**
-- `yaml-dsl-micro-tunes` (Done)
+1) `frontend-yaml-dsl-editor-adaptations/`
+- 目标: 让编辑器模板/outline/visual 与最新 schema/validate 语义一致。
+- 当前状态见 `openspec/changes/frontend-yaml-dsl-editor-adaptations/tasks.md`（如仍标记 DELAYED, 先确认后端语义已稳定再开启实现）。
 
-2) **Group: YAML 复用与编排（共享路径解析能力）**
-- `yaml-dsl-imports`（建议先落地 `path_aliases`/import 展开） (Done)
-- `yaml-dsl-workflow`（复用 `path_aliases`，实现 runs 编排 + shared preload cache） (Done)
+2) `prompt-eval-workflow/`
+- 目标: 建立确定性 prompt-eval core（先做静态/边界用例, 后续再扩展模型评测）。
+- 当前状态见 `openspec/changes/prompt-eval-workflow/tasks.md`（按该 tasks 约束执行）。
 
-3) **Group: source normalize 形状补齐（减少 wrapper）**
-- `yaml-source-normalize-shapes` (Done)
+## 已归档（索引）
 
-4) **Group: 派生聚合 set 口径原语（去状态壳打底）**
-- `derived-outputs-set-aggregations` (Done)
-
-5) **Group: outputs/workbook 编排面（YAML authoring surface）**
-- `yaml-dsl-outputs` (Done)
-
-6) **Group: 工具链侧改良（不阻塞主线）**
-- `prompt-eval-workflow` **DELAYED**（移除 DELAYED 标记后才允许实现；在此之前不得实现）
-- `frontend-yaml-dsl-editor-adaptations` **DELAYED**（移除 DELAYED 标记后才允许实现；在此之前不得实现）
+- 完整列表见 `openspec/changes/archive/`。
+- 近期归档（示例）:
+  - `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
+  - `openspec/changes/archive/2026-03-14-docs-demo-big-data-report-mainline/`
+  - `openspec/changes/archive/2026-03-14-marimo-reexport-learning-suite/`
