@@ -39,6 +39,7 @@ nav = [
   ] },
   { "参与开发" = [
     "dev/index.md",
+    { "Prompt 评测(workflow)" = "dev/prompt-eval.md" },
     { "仓库开发约定" = "dev/repo-guide.md" },
     { "文档治理" = "dev/doc-governance.md" },
     { "如何阅读本项目" = "getting-started/reading-guide.md" },

@@ -19,6 +19,9 @@
 just type-check
 just test
 just lintfix
+just prompt-eval
 ```
 
 Dev Container 配置见: [Dev Container](devcontainer.md).
+
+更多: [Prompt 评测(workflow)](prompt-eval.md)
