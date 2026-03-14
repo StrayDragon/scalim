@@ -234,7 +234,7 @@ def _effective_existing_path(root: Path, file_patch: FilePatch) -> Optional[Path
 
 
 def _autogen_block_ranges(text: str) -> List[Tuple[str, int, int]]:
-    # Returned ranges are inclusive (1-based line numbers).
+    # 返回的区间为闭区间(行号为 `1-based`).
     ranges: List[Tuple[str, int, int]] = []
     begin_stack: List[Tuple[str, int]] = []
 
@@ -270,7 +270,7 @@ def _validate_generated_file_boundary(file_patches: Sequence[FilePatch], *, allo
             issues.append(
                 Issue(
                     code="generated_file",
-                    message="Patch touches a `*.gen.*` path; generated files MUST NOT be edited by hand.",
+                    message="补丁涉及 `*.gen.*` 路径; 生成文件禁止手改.",
                     path=fp.new_path,
                 )
             )
@@ -293,7 +293,7 @@ def _validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root
 
             for line in hunk.lines:
                 if not line:
-                    # Defensive: malformed diff line without prefix.
+                    # 防御性处理: 补丁行缺少前缀.
                     continue
                 prefix = line[0]
                 if prefix == " ":
@@ -306,7 +306,7 @@ def _validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root
                         issues.append(
                             Issue(
                                 code="autogen_block",
-                                message="Patch edits injected AUTOGEN block `{}`; edit SSOT and re-run `just gen-docs`.".format(block_id),
+                                message="补丁修改了注入的 `AUTOGEN` 块 `{}`; 请修改 SSOT 并重新运行 `just gen-docs`.".format(block_id),
                                 path=fp.new_path,
                                 line=old_line,
                             )
@@ -314,13 +314,13 @@ def _validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root
                     old_line += 1
                     continue
                 if prefix == "+":
-                    # Additions do not advance old_line; treat insertion point as current old_line.
+                    # `+` 行不会推进 `old_line`; 插入点按当前 `old_line` 处理.
                     block_id = _is_in_ranges(old_line, ranges)
                     if block_id is not None:
                         issues.append(
                             Issue(
                                 code="autogen_block",
-                                message="Patch inserts into injected AUTOGEN block `{}`; edit SSOT and re-run `just gen-docs`.".format(
+                                message="补丁向注入的 `AUTOGEN` 块 `{}` 中插入内容; 请修改 SSOT 并重新运行 `just gen-docs`.".format(
                                     block_id
                                 ),
                                 path=fp.new_path,
@@ -338,19 +338,19 @@ def _validate_file_assert(case: Case, *, root: Path) -> Tuple[bool, Tuple[Issue,
     must_contain = case.inputs.get("must_contain") or []
 
     if not rel:
-        return False, (Issue(code="case_error", message="file_assert case missing inputs.file", path=str(case.case_dir)),)
+        return False, (Issue(code="case_error", message="file_assert 用例缺少 `inputs.file`", path=str(case.case_dir)),)
     if not isinstance(must_contain, list) or not all(isinstance(x, str) for x in must_contain):
-        return False, (Issue(code="case_error", message="file_assert inputs.must_contain must be a string list", path=str(case.case_dir)),)
+        return False, (Issue(code="case_error", message="file_assert `inputs.must_contain` 必须是字符串列表", path=str(case.case_dir)),)
 
     path = root / rel
     if not path.exists():
-        return False, (Issue(code="file_missing", message="Required file not found", path=rel),)
+        return False, (Issue(code="file_missing", message="缺少必需文件", path=rel),)
 
     text = _read_text(path)
     violations: List[Issue] = []
     for needle in must_contain:
         if needle not in text:
-            violations.append(Issue(code="missing_text", message="Missing required snippet: {}".format(needle), path=rel))
+            violations.append(Issue(code="missing_text", message="缺少必需片段: {}".format(needle), path=rel))
     return not violations, tuple(violations)
 
 
@@ -358,11 +358,11 @@ def _validate_diff_case(case: Case, *, root: Path) -> Tuple[bool, Tuple[Issue, .
     patch_file = str(case.inputs.get("patch_file") or "").strip()
     allow_gen = bool(case.inputs.get("allow_gen_files", False))
     if not patch_file:
-        return False, (Issue(code="case_error", message="diff case missing inputs.patch_file", path=str(case.case_dir)),)
+        return False, (Issue(code="case_error", message="`diff` 用例缺少 `inputs.patch_file`", path=str(case.case_dir)),)
 
     patch_path = case.case_dir / patch_file
     if not patch_path.exists():
-        return False, (Issue(code="file_missing", message="Patch file not found", path=str(patch_path)),)
+        return False, (Issue(code="file_missing", message="找不到补丁文件", path=str(patch_path)),)
 
     file_patches = _parse_patch(_read_text(patch_path))
 
@@ -382,7 +382,7 @@ def _validate_diff_case(case: Case, *, root: Path) -> Tuple[bool, Tuple[Issue, .
         mismatch.append(
             Issue(
                 code="unexpected_pass" if observed_ok else "unexpected_failure",
-                message="Expected ok={}, observed ok={}.".format(expected_ok, observed_ok),
+                message="期望 ok={}，实际 ok={}.".format(expected_ok, observed_ok),
             )
         )
 
@@ -390,7 +390,7 @@ def _validate_diff_case(case: Case, *, root: Path) -> Tuple[bool, Tuple[Issue, .
         actual_codes = {i.code for i in violations}
         missing = [c for c in expected_codes if c not in actual_codes]
         if missing:
-            mismatch.append(Issue(code="missing_expected_issue", message="Missing expected violation codes: {}".format(", ".join(missing))))
+            mismatch.append(Issue(code="missing_expected_issue", message="缺少期望的违规 `code`: {}".format(", ".join(missing))))
 
     return not mismatch, tuple(violations + mismatch)
 
@@ -425,7 +425,7 @@ def run_cases(cases: Sequence[Case], *, root: Path) -> List[CaseResult]:
                 mismatch.append(
                     Issue(
                         code="unexpected_pass" if observed_ok else "unexpected_failure",
-                        message="Expected ok={}, observed ok={}.".format(expected_ok, observed_ok),
+                        message="期望 ok={}，实际 ok={}.".format(expected_ok, observed_ok),
                     )
                 )
             case_ok = not mismatch
@@ -452,7 +452,7 @@ def run_cases(cases: Sequence[Case], *, root: Path) -> List[CaseResult]:
                     expected_ok=expected_ok,
                     observed_ok=False,
                     violations=(),
-                    issues=(Issue(code="case_error", message="Unknown case kind: {}".format(case.kind), path=str(case.case_dir)),),
+                    issues=(Issue(code="case_error", message="未知的用例类型: {}".format(case.kind), path=str(case.case_dir)),),
                 )
             )
 
@@ -513,7 +513,7 @@ def _print_summary(results: Sequence[CaseResult]) -> None:
                 print("  - [{}] {}{}".format(issue.code, issue.message, where))
 
     print("")
-    print("Cases: total={} passed={} failed={}".format(total, passed, failed))
+    print("用例统计: 总计={} 通过={} 失败={}".format(total, passed, failed))
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -531,13 +531,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     out_dir = root / args.output_dir
 
     if args.llm:
-        print("[error] LLM suite is not configured yet. Run deterministic core with: just prompt-eval")
+        print("[错误] LLM 套件尚未配置. 请先运行确定性 `core`: `just prompt-eval`")
         return 2
 
     cases = discover_cases(cases_root)
     results = run_cases(cases, root=root)
 
-    # Always write outputs (CI uploads `.tmp/artifacts/`).
+    # 总是写出产物(CI 会上传 `.tmp/artifacts/`).
     _safe_rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -562,7 +562,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     _print_summary(results)
 
     if not ok:
-        print("[error] prompt-eval failed; see {}".format(out_dir / "failures.md"), file=sys.stderr)
+        print("[错误] `prompt-eval` 执行失败; 详见 {}".format(out_dir / "failures.md"), file=sys.stderr)
         return 1
 
     return 0
