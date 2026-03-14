@@ -4,9 +4,9 @@
 
 因此需要引入一套可复现的 prompt 评测/回归工作流,把关键交互用例固化为自动化评测,并提供稳定入口用于本地与 CI 运行,同时把结果以确定性方式输出到受控目录以便回归对比。
 
-**Status: READY**
+**Status: DELAYED**
 
-该 change 已进入实现阶段: 默认只跑确定性 core; 模型评测层保持可选。
+该 change 已完成确定性 core 与 CI 非阻塞集成; promptfoo/LLM 层需要额外配置后再继续。
 
 ## Goals / Non-Goals
 

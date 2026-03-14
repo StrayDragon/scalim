@@ -1,4 +1,4 @@
-**Status: READY**: 可开始实现本 tasks（先实现确定性 core; 模型评测保持可选层,不作为默认依赖）。
+**Status: DELAYED**: 已完成确定性 core 与 CI 非阻塞集成; 5.*(promptfoo/LLM) 依赖额外配置(密钥/网络/版本 pin 等)暂无法推进。
 
 ## 1. 运行入口与产物输出
 
