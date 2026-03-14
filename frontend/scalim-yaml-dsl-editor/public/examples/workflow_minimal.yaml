@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=../schema/workflow.gen.json
+
+workflow:
+  runs:
+    - id: demo
+      demand: ./demand.yaml
+

@@ -23,17 +23,34 @@
 
   const SCHEMA_PATH_STORAGE_KEY = "scalim_yaml_dsl_editor_schema_header_path";
   const DEFAULT_SCHEMA_PATH = "../schema/demand.gen.json";
+  const WORKFLOW_SCHEMA_PATH = "../schema/workflow.gen.json";
 
   const SEMANTIC_MODE_STORAGE_KEY = "scalim_yaml_dsl_editor_semantic_mode";
 
   const onNewMinimal = () => {
+    appState.schemaHeaderPath = DEFAULT_SCHEMA_PATH;
+    persistSchemaPath();
     appState.yamlText = MINIMAL_TEMPLATE;
   };
 
   const onLoadOrderReport = async () => {
-    const res = await fetch("/examples/order_report.yaml", { cache: "no-cache" });
+    const isWorkflow = String(appState.schemaHeaderPath || "").toLowerCase().includes("workflow.gen.json");
+    const url = isWorkflow ? "/examples/workflow_minimal.yaml" : "/examples/order_report.yaml";
+    appState.schemaHeaderPath = isWorkflow ? WORKFLOW_SCHEMA_PATH : DEFAULT_SCHEMA_PATH;
+    persistSchemaPath();
+    const res = await fetch(url, { cache: "no-cache" });
     if (!res.ok) return;
     appState.yamlText = await res.text();
+    ensureSchemaHeader();
+  };
+
+  const onLoadSnippets = async () => {
+    appState.schemaHeaderPath = DEFAULT_SCHEMA_PATH;
+    persistSchemaPath();
+    const res = await fetch("/examples/imports_normalize.yaml", { cache: "no-cache" });
+    if (!res.ok) return;
+    appState.yamlText = await res.text();
+    ensureSchemaHeader();
   };
 
   const ensureSchemaHeader = () => {
@@ -105,6 +122,7 @@
     const next = schemaPathDraft.trim() || DEFAULT_SCHEMA_PATH;
     appState.schemaHeaderPath = next;
     persistSchemaPath();
+    ensureSchemaHeader();
     closeSchemaConfig();
   };
 
@@ -145,7 +163,8 @@
   };
 
   const onSave = () => {
-    downloadText("demand.yaml", appState.yamlText, "text/yaml;charset=utf-8");
+    const isWorkflow = String(appState.schemaHeaderPath || "").toLowerCase().includes("workflow.gen.json");
+    downloadText(isWorkflow ? "workflow.yaml" : "demand.yaml", appState.yamlText, "text/yaml;charset=utf-8");
   };
 
   const onCopy = async () => {
@@ -205,6 +224,7 @@
   <div class="flex items-center gap-2">
     <Button variant="secondary" on:click={onNewMinimal}>新建最小模板</Button>
     <Button variant="secondary" on:click={onLoadOrderReport}>载入示例</Button>
+    <Button variant="secondary" on:click={onLoadSnippets}>载入片段</Button>
     <div class="relative inline-flex items-center gap-1">
       <Button
         variant="outline"
@@ -251,6 +271,12 @@
             <div class="mt-2 rounded-lg border bg-slate-50 px-2 py-1 font-mono text-[10px] text-slate-600">
               # yaml-language-server: $schema={schemaPathDraft.trim() || DEFAULT_SCHEMA_PATH}
             </div>
+          </div>
+
+          <div class="mt-2 flex items-center gap-2">
+            <Button variant="outline" size="sm" on:click={() => (schemaPathDraft = DEFAULT_SCHEMA_PATH)}>demand</Button>
+            <Button variant="outline" size="sm" on:click={() => (schemaPathDraft = WORKFLOW_SCHEMA_PATH)}>workflow</Button>
+            <div class="text-[11px] text-slate-500">保存后会同步更新 YAML 头部</div>
           </div>
 
           <div class="mt-3 flex items-center justify-between gap-2">

@@ -139,6 +139,7 @@ export const validateSemantic = (config: unknown, opts?: SemanticValidateOptions
   const sourcesInfo: Record<string, { bind: boolean; preload: boolean }> = {};
   if (sources) {
     for (const [sourceId, sourceDataRaw] of Object.entries(sources)) {
+      if (sourceId === "$import") continue;
       const basePath = "sources." + sourceId;
       if (!isRecord(sourceDataRaw)) {
         addIssue("error", "Source '" + sourceId + "' must be a mapping", basePath);
@@ -215,6 +216,7 @@ export const validateSemantic = (config: unknown, opts?: SemanticValidateOptions
 
   if (relations) {
     for (const [relId, relDataRaw] of Object.entries(relations)) {
+      if (relId === "$import") continue;
       const basePath = "relations." + relId;
       if (!isRecord(relDataRaw)) {
         addIssue("error", "Relation '" + relId + "' must be a mapping", basePath);
@@ -323,4 +325,3 @@ export const validateSemantic = (config: unknown, opts?: SemanticValidateOptions
 
   return issues;
 };
-

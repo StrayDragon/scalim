@@ -20,7 +20,10 @@ pnpm preview
 
 ## 资源同步
 
-编辑器使用 canonical schema:`src/scalim/dsl/by_yaml/schema/demand.gen.json`.
+编辑器使用 canonical schema:
+
+- `src/scalim/dsl/by_yaml/schema/demand.gen.json`
+- `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
 
 在仓库根目录执行:
 
@@ -28,14 +31,26 @@ pnpm preview
 just gen-yaml-dsl-editor-schema
 ```
 
-会把 schema 同步到:`frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json`.
-同时也会同步到:`frontend/scalim-yaml-dsl-editor/src/schema/demand.gen.json`(用于打包内置).
+会把 schema 同步到:
+
+- `frontend/scalim-yaml-dsl-editor/public/schema/*.gen.json`
+- `frontend/scalim-yaml-dsl-editor/src/schema/*.gen.json`(用于打包内置)
+
+并在 `pnpm build` 后出现在 `frontend/scalim-yaml-dsl-editor/dist/schema/*.gen.json`(来自 `public/`).
+
+注意:不要手改 `*.gen.json`。`just qa`/CI 会捕获 `src/`、`public/`、`dist/` 的 drift。
 
 ## 校验层级(schema + semantic)
 
-- **schema 校验(默认)**:Monaco + `demand.gen.json`(补全/hover/类型与结构校验,schema 在打包时内置;不依赖运行时 fetch).
+- **schema 校验(默认)**:Monaco + YAML 顶部 `# yaml-language-server: $schema=...`(支持 demand/workflow). schema 在打包时内置(`src/schema/*.gen.json`),运行时 fetch 仅作为 fallback(`/schema/*.gen.json`).
 - **semantic 校验(local,纯前端内置)**:补充关系链路、source 引用、bind/to_bind 要求、loader ref 格式等跨字段规则(持续增强中,暂不追求与 `scalim-cli` 100% 一致).
 - **semantic 校验(exact,可选)**:通过 Pyodide 在浏览器内运行 `scalim` 的 Python 校验逻辑,对齐 `scalim-cli yaml-dsl validate`(WebWorker 内执行,失败自动降级到 local).
+
+## 模板 / 示例
+
+- 顶栏 **新建最小模板**:生成 demand YAML 的最小可运行配置(使用 `outputs:`;不包含旧顶层键 `output:`)。
+- 顶栏 **载入示例**:根据当前 `$schema` 选择载入 demand 的 `order_report.yaml` 或 workflow 的 `workflow_minimal.yaml`。
+- 顶栏 **载入片段**:载入 `imports/$import`、runtime vars 指令节点、`normalize.kind` 的示例(`imports` 片段文件不会在浏览器侧被解析;用于写法参考与 schema 校验)。
 
 ## 可选:Pyodide 精确语义校验(semantic: exact)
 
