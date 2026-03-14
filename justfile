@@ -393,7 +393,7 @@ examples-big-data:
 
 # 运行示例: 运行所有示例
 examples:
-    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python notebooks/marimo/demo_big_data_report/run_examples.py
+    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python notebooks/marimo/run_examples.py
 
 alias example := examples
 

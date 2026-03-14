@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: demo_big_data_report_workflow_fixture_demand
+description: 小规模 deterministic workflow fixture demand (for `just examples`)
+
+batch_size: 10
+
+main_source:
+  source_id: orders
+  loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
+  fields:
+    order_id: {extract: order_id, name: 订单ID}
+    customer_id: {extract: customer_id, name: 客户ID}
+    payment_method_id: {extract: payment_method_id, name: 支付方式ID}
+
+sources:
+  preload_counter:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_workflow_preload_counter_table"
+    key: id
+    cache_mode: preload_forever
+

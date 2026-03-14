@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/workflow.gen.json
+
+workflow:
+  runs:
+    - id: r1
+      demand: workflow_fixture_demand.yaml
+    - id: r2
+      demand: workflow_fixture_demand.yaml
+  options:
+    max_concurrency: 2
+    failure_policy: all_fail
+    share_preload_cache: true
+

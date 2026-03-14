@@ -6,6 +6,7 @@ from ..cases import build_test_config_small
 from ..shared import TARGET_FIELDS_FULL
 from ._types import ChapterResult
 from .basics import run_basics
+from .derived_set_aggregations import run_derived_set_aggregations
 from .diagnostics import run_diagnostics
 from .guardrails import run_guardrails
 from .loader_retry import run_loader_retry
@@ -14,6 +15,7 @@ from .observability import run_observability
 from .output_composition import run_output_composition
 from .parallel_mode import run_parallel_mode
 from .sinks import run_sinks
+from .workflow_yaml import run_workflow_yaml
 from .yaml_dsl import run_yaml_dsl
 
 
@@ -31,6 +33,7 @@ def run_all_chapters(*, yaml_path: Path, slow_ok: bool = False) -> List[ChapterR
 
     results.append(run_basics(cfg, targets=TARGET_FIELDS_FULL, batch_size=10))
     results.append(run_yaml_dsl(cfg, yaml_path=yaml_path))
+    results.append(run_workflow_yaml(cfg, workflow_yaml_path=yaml_path.parent / "workflow_fixture.yaml"))
     results.append(run_sinks(cfg, targets=TARGET_FIELDS_FULL[:12], batch_size=10))
     results.append(run_memory_optimization(cfg, batch_size=10, write_delay=0.0))
     results.append(run_observability(cfg, targets=TARGET_FIELDS_FULL[:12], batch_size=10))
@@ -40,5 +43,6 @@ def run_all_chapters(*, yaml_path: Path, slow_ok: bool = False) -> List[ChapterR
     results.append(run_loader_retry())
     with tempfile.TemporaryDirectory() as tmpdir:
         results.append(run_output_composition(Path(tmpdir)))
+        results.append(run_derived_set_aggregations(Path(tmpdir)))
 
     return results

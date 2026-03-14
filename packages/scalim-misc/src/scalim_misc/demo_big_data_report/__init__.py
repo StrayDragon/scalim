@@ -2,7 +2,7 @@
 
 此包承载可复用的“章节实现/对拍/对照组验证/示例数据加载器”,供:
 - `notebooks/marimo/demo_big_data_report/demo_main.py` (交互教程)
-- `notebooks/marimo/demo_big_data_report/run_examples.py` (`just examples` 对拍 gate)
+- `notebooks/marimo/run_examples.py` (`just examples` 对拍 gate)
 - `tests/` (复用同一套示例用例与验证逻辑)
 """
 

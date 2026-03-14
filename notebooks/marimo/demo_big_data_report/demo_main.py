@@ -16,7 +16,7 @@ def _(mo):
 
         结构:
         - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/chapters/`: 每个章节一个可调用的 `run_*()` 函数
-        - `run_examples.py`: `just examples` 的 gate 入口(快速对拍)
+        - `notebooks/marimo/run_examples.py`: `just examples` 的 gate 入口(快速对拍)
         - `by_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
         """
     )
