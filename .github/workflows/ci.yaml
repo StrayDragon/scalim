@@ -52,3 +52,41 @@ jobs:
           name: artifacts
           path: .tmp/artifacts/
           if-no-files-found: warn
+
+  prompt-eval:
+    # Non-blocking for now. Upgrade to gating when:
+    # - core suite is stable across refactors
+    # - coverage includes key skills + governance boundaries
+    # - drift policy for LLM suite is defined
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Set up justfile
+        uses: extractions/setup-just@v3
+
+      - name: Install dependencies
+        run: uv sync --dev --locked
+
+      - name: Prompt Eval (Core)
+        run: just prompt-eval-check
+
+      - name: Upload prompt-eval artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompt-eval
+          path: .tmp/artifacts/prompt-eval/
+          if-no-files-found: warn
