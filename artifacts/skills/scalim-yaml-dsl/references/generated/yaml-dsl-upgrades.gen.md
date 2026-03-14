@@ -190,3 +190,18 @@
   - `mapping[key -> nested_dict]` → 优先用 `project_fields`
   2) 若业务存在 int/enum key 的 nested dict,用 bracket path 表达(例如 `"[1].x"`)
   3) 只有在 declarative normalize 无法表达且不想引入 wrapper module 时,再使用 `normalize.call_by`
+
+## 2026-03-14: yaml-dsl-output-fields-alias
+- SSOT: `references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md`
+- OpenSpec: `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
+- Spec: `openspec/specs/yaml-dsl-schema/spec.md`
+- Summary:
+  本批次增强 `outputs.*.fields` 的 authoring surface,允许通过 YAML anchors/aliases 复用字段对象或字段列表,减少重复维护点:
+  - `outputs.*.fields` 的条目允许为 `field_id` 字符串(保持现有写法不变)
+  - `outputs.*.fields` 的条目允许为 YAML alias(object): 直接引用“已定义字段对象”(展开后为 dict),解析器会将其推导为对应的 `field_id`
+  - `outputs.*.fields` 支持 YAML alias(list) 与嵌套列表: 会递归展开/flatten,最终归一化为 `field_id` 字符串列表
+  OpenSpec 归档变更（含 proposal/design/spec/tasks）:
+  - `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
+  对应主规范(节选):
+  - `openspec/specs/yaml-dsl-schema/spec.md`
+  - `openspec/specs/yaml-dsl-cli-validation/spec.md`

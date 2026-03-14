@@ -37,8 +37,9 @@ just gen-yaml-dsl-editor-schema
 
 ## 使用要点
 
-- 顶栏:新建模板 / 载入示例 / 插入 `$schema` header / 导入/导出/复制
+- 顶栏:Schema Picker(demand/workflow) / 新建模板 / 载入示例&片段 / 一键插入 `$schema` header / 导入/导出/复制
 - `strict`:把未知字段等“潜在问题”提升为 error(便于导出前收敛质量)
+- Visual:基于 schema 的结构化视图(含 `outputs`),并支持对部分节点做最小文本补丁(round-trip)
 - Outline:基于 YAML AST 的快速导航(支持 anchors/comments 的位置保留)
 - Issues:统一展示 schema/unknown-fields/(optional)semantic issues,并支持点击跳转
 

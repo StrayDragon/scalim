@@ -53,6 +53,10 @@
   - SSOT: `references/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
   - OpenSpec: `openspec/changes/archive/2026-03-12-yaml-source-normalize-shapes/`
   - Spec: `openspec/specs/yaml-source-normalize/spec.md`
+- 2026-03-14: yaml-dsl-output-fields-alias
+  - SSOT: `references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
+  - Spec: `openspec/specs/yaml-dsl-schema/spec.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

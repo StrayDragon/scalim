@@ -19,10 +19,13 @@
   - [`artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md)
+  - [`artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md)
 - 受控生成 references:
   - [`artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md`](#code=artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md`](#code=artifacts/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`](#code=artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml)
+  - [`artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md`](#code=artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md) (breaking/migration 快速索引)
+  - `artifacts/skills/scalim-yaml-dsl/references/upgrades/*.md` (升级指南 SSOT; docs-site 对应页面由此生成)
 
 使用时通常需要把整个目录 `artifacts/skills/scalim-yaml-dsl/` 交给你的 Agent 系统. `SKILL.md` 只负责任务路由,细节说明在 `references/` 中按需读取.
 其中 generated references 由 `scripts/gen-agent-skill.py` 基于 schema、CLI 与相关 `openspec/specs/` 自动摘录生成,manual references 则保留人工维护的任务预设与迁移 heuristics.
