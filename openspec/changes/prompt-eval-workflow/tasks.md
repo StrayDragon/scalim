@@ -1,4 +1,4 @@
-**Status: DELAYED**: 在 `openspec/changes/README.md` 移除 DELAYED 标记之前,不得开始实现本 tasks。
+**Status: READY**: 可开始实现本 tasks（先实现确定性 core; 模型评测保持可选层,不作为默认依赖）。
 
 ## 1. 运行入口与产物输出
 
