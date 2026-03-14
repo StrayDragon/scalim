@@ -444,7 +444,7 @@ def _build_observer_and_hook_managers(
         observer_manager.register(observer)
 
     if viz_config is not None:
-        observer_manager.register(VizObserver.from_plan(plan, viz_config))
+        observer_manager.register(VizObserver.from_plan(plan, viz_config, output_composition=request.output_composition))
 
     hook_manager = HookManager(fallback_logger_enabled=fallback_logger_enabled)
     for hook in component_hooks:

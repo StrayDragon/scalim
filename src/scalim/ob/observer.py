@@ -15,6 +15,7 @@ from ..events.catalog import (
     EVENT_LOADER_CALL,
     EVENT_LOADER_RETRY,
     EVENT_LOADER_SLIM,
+    EVENT_OUTPUT_TARGET_END,
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
     EVENT_RELATION_LOOKUP,
@@ -45,6 +46,7 @@ _DISPATCH_MAP = {
     EVENT_RELATION_LOOKUP: "on_relation_lookup",
     EVENT_STAGE_SPAN: "on_stage_span",
     EVENT_ADAPTIVE_SCHEDULER_DECISION: "on_adaptive_scheduler_decision",
+    EVENT_OUTPUT_TARGET_END: "on_output_target_end",
 }
 
 

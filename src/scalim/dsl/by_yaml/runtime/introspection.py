@@ -101,7 +101,7 @@ def build_viz_observer(
     plan = PlanBuilder(compilation.demand_ir).build(targets=targets)
 
     actual_config = config or VizObserverConfig()
-    return VizObserver.from_plan(plan, actual_config)
+    return VizObserver.from_plan(plan, actual_config, output_composition=compilation.request.output_composition)
 
 
 def load_output_config(yaml_path: str) -> Dict[str, Any]:

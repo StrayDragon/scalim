@@ -13,6 +13,7 @@ from ....events.events import (
     FieldSlimEvent,
     LoaderCallEvent,
     LoaderSlimEvent,
+    OutputTargetEndEvent,
     PipelineEndEvent,
     PipelineStartEvent,
     RelationLookupEvent,
@@ -386,5 +387,32 @@ class VizObserverHandlerMixin(ABC):
         self._emit_event(
             "adaptive_scheduler_decision",
             {"type": "batch", "id": "batch:{}".format(event.batch_num)},
+            payload,
+        )
+
+    def on_output_target_end(self, event: OutputTargetEndEvent) -> None:
+        if not self.config.is_enabled():
+            return
+        if self._events_emitter is None:
+            return
+        summary: Dict[str, Any] = {
+            "target_id": event.target_id,
+            "row_count": int(event.row_count),
+            "error_count": int(event.error_count),
+            "duration_ms": int(event.duration * 1000),
+            "disabled": bool(event.disabled),
+        }
+        if event.output_path:
+            summary["output_path"] = str(event.output_path)
+        if event.sheet_name:
+            summary["sheet_name"] = str(event.sheet_name)
+        if event.error_type:
+            summary["error_type"] = str(event.error_type)
+        if event.error_message:
+            summary["error_message"] = str(event.error_message)
+        payload = self._select_payload(summary, {}, {"data": asdict(event)})
+        self._emit_event(
+            "output_target_finished",
+            {"type": "output_target", "id": "output_target:{}".format(event.target_id)},
             payload,
         )

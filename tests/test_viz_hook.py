@@ -3,10 +3,13 @@
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from scalim.events.catalog import EVENT_OUTPUT_TARGET_END
+from scalim.events.event import Event
 from scalim.events.events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
@@ -18,6 +21,7 @@ from scalim.events.events import (
     FieldSlimEvent,
     LoaderCallEvent,
     LoaderSlimEvent,
+    OutputTargetEndEvent,
     PipelineEndEvent,
     PipelineStartEvent,
     RelationLookupEvent,
@@ -25,6 +29,8 @@ from scalim.events.events import (
     RowWriteEvent,
     StageSpanEvent,
 )
+from scalim.execution.output_composition import AuditSheetSpec, MetaSheetSpec, OutputCompositionSpec, OutputTargetSpec
+from scalim.execution.output_contracts import ExportLayout, OutputSpec
 from scalim.ob.presets._internal import viz_config as viz_config_module
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets.viz import VizEventEmitter, VizObserver, VizObserverConfig
@@ -191,6 +197,24 @@ def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
     hook.on_field_slim(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0))
     hook.on_loader_slim(LoaderSlimEvent(loader_name="orders", original_keys=2, extracted_fields=["order_id"], batch_num=1))
     hook.on_batch_end(BatchEndEvent(batch_num=1, duration=0.02))
+    hook.on_event(
+        Event(
+            event_type=EVENT_OUTPUT_TARGET_END,
+            timestamp=0.0,
+            run_id="run_test",
+            payload=OutputTargetEndEvent(
+                target_id="summary",
+                output_path="/tmp/demo.xlsx",
+                sheet_name="Summary",
+                row_count=10,
+                error_count=1,
+                duration=1.2,
+                disabled=False,
+                error_type="ValueError",
+                error_message="boom",
+            ),
+        )
+    )
     hook.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.3))
 
     assert snapshot_path.exists()
@@ -200,12 +224,62 @@ def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
     events = [json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     event_types = {evt["event_type"] for evt in events}
     assert {"run_started", "run_finished", "error", "diagnostic_warning"} <= event_types
+    assert "output_target_finished" in event_types
     assert "row_written" not in event_types
     assert "field_computed" not in event_types
+
+    output_events = [evt for evt in events if evt.get("event_type") == "output_target_finished"]
+    assert output_events
+    output_event = output_events[-1]
+    assert output_event["node_ref"]["type"] == "output_target"
+    assert output_event["node_ref"]["id"] == "output_target:summary"
+    payload = output_event.get("payload") or {}
+    assert payload.get("target_id") == "summary"
+    assert payload.get("row_count") == 10
+    assert payload.get("error_count") == 1
+    assert payload.get("duration_ms") == 1200
+    assert payload.get("output_path") == "/tmp/demo.xlsx"
+    assert payload.get("sheet_name") == "Summary"
+    assert payload.get("error_type") == "ValueError"
+    assert payload.get("error_message") == "boom"
 
     trace_events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     trace_event_types = {evt["event_type"] for evt in trace_events}
     assert {"row_written", "row_released", "field_computed"} <= trace_event_types
+
+
+def test_viz_output_target_end_handler_branches(tmp_path: Path) -> None:
+    disabled = VizObserver(config=VizObserverConfig())
+    disabled.on_output_target_end(
+        OutputTargetEndEvent(
+            target_id="t1",
+            output_path="/tmp/demo.xlsx",
+            sheet_name="Sheet1",
+            row_count=0,
+            error_count=0,
+            duration=0.0,
+            disabled=False,
+            error_type=None,
+            error_message=None,
+        )
+    )
+
+    output_path = tmp_path / "events.jsonl"
+    enabled = VizObserver(config=VizObserverConfig(output_path=str(output_path)), snapshot={"meta": {}})
+    enabled.on_output_target_end(
+        OutputTargetEndEvent(
+            target_id="t1",
+            output_path="/tmp/demo.xlsx",
+            sheet_name="Sheet1",
+            row_count=0,
+            error_count=0,
+            duration=0.0,
+            disabled=False,
+            error_type=None,
+            error_message=None,
+        )
+    )
+    assert not output_path.exists()
 
 
 def test_viz_observer_hook_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -286,6 +360,220 @@ def test_viz_observer_hook_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         snapshot={"meta": {}},
     )
     hook._write_snapshot_if_needed()
+
+
+def test_viz_observer_from_plan_augments_output_targets(tmp_path: Path) -> None:
+    class DummyPlan:
+        def to_viz_graph_snapshot(self) -> dict:
+            return {
+                "meta": {},
+                "nodes": [
+                    {"id": "field:order_id", "type": "field", "data": {"label": "order_id"}, "position": {"x": 0, "y": 0}},
+                    {"id": "field:profit", "type": "field", "data": {"label": "profit"}, "position": {"x": 0, "y": 0}},
+                ],
+                "edges": [],
+                "stages": [],
+            }
+
+    output_composition = OutputCompositionSpec(
+        targets=(
+            OutputTargetSpec(
+                target_id="main",
+                layout=ExportLayout(field_ids=("order_id", "profit")),
+                output=OutputSpec(format="csv", path=str(tmp_path / "out.csv")),
+                predicate=None,
+                is_primary=True,
+                requires=None,
+            ),
+        ),
+        derived_targets=(),
+        meta_sheet=None,
+        audit_sheet=None,
+        failure_policy="all_fail",
+        include_full_error_message=False,
+    )
+
+    observer = VizObserver.from_plan(DummyPlan(), VizObserverConfig(), output_composition=output_composition)
+    snapshot = observer.snapshot
+    assert snapshot is not None
+    nodes = snapshot.get("nodes") or []
+    edges = snapshot.get("edges") or []
+
+    output_nodes = [n for n in nodes if n.get("type") == "output_target"]
+    assert any(n.get("id") == "output_target:main" for n in output_nodes)
+
+    edge_types = {(e.get("source"), e.get("target"), e.get("type")) for e in edges}
+    assert ("field:order_id", "output_target:main", "composed_from") in edge_types
+    assert ("field:profit", "output_target:main", "composed_from") in edge_types
+
+
+def test_viz_output_composition_snapshot_helpers_cover_branches() -> None:
+    import scalim.ob.presets.viz as viz_module
+
+    assert viz_module._get_snapshot_node_ids({"nodes": {"id": "nope"}}) == set()
+    assert viz_module._get_snapshot_node_ids({"nodes": [{"id": "a"}, {"id": 1}, {}]}) == {"a", "1"}
+
+    snapshot = {"nodes": [{"id": "x"}]}
+    assert viz_module._ensure_snapshot_list(snapshot, "nodes") is snapshot["nodes"]
+
+    snapshot2: dict = {"edges": "nope"}
+    edges = viz_module._ensure_snapshot_list(snapshot2, "edges")
+    assert edges == []
+    assert snapshot2["edges"] is edges
+
+    edge_keys = viz_module._get_snapshot_edge_keys(
+        [
+            {"source": "a", "target": "b", "type": "t"},
+            {"source": "", "target": "b", "type": "t"},
+            {"source": "a", "target": "", "type": "t"},
+            {"source": "a", "target": "b", "type": ""},
+        ]
+    )
+    assert edge_keys == {("a", "b", "t")}
+
+    assert viz_module._as_optional_text(None) is None
+    assert viz_module._as_optional_text("") is None
+    assert viz_module._as_optional_text(123) == "123"
+
+    assert viz_module._describe_output_spec(None) == (None, None)
+    assert viz_module._describe_output_spec(SimpleNamespace(path="/tmp/out", sheet_name="")) == ("/tmp/out", None)
+
+    nodes: list = []
+    node_ids = set()
+    viz_module._add_output_target_node(
+        nodes,
+        node_ids,
+        target_id="t1",
+        kind="direct",
+        output_path="/tmp/out",
+        sheet_name=None,
+        is_primary=True,
+    )
+    viz_module._add_output_target_node(
+        nodes,
+        node_ids,
+        target_id="t1",
+        kind="direct",
+        output_path="/tmp/out",
+        sheet_name=None,
+        is_primary=True,
+    )
+    assert [n.get("id") for n in nodes] == ["output_target:t1"]
+
+    assert viz_module._iter_unique_field_ids(["a", "", "a"], requires=("b", "a")) == ("a", "b")
+
+    edges = []
+    edge_keys_set = set()
+    node_ids_edges = set(["field:a"])
+    viz_module._maybe_add_output_target_edge(edges, edge_keys_set, node_ids_edges, source_field_id="a", target_id="t1")
+    assert edges == []
+
+    node_ids_edges.add("output_target:t1")
+    viz_module._maybe_add_output_target_edge(edges, edge_keys_set, node_ids_edges, source_field_id="a", target_id="t1")
+    viz_module._maybe_add_output_target_edge(edges, edge_keys_set, node_ids_edges, source_field_id="a", target_id="t1")
+    assert len(edges) == 1
+
+    nodes = []
+    node_ids = set()
+    viz_module._append_output_target_nodes_for_targets(
+        nodes,
+        node_ids,
+        targets=[
+            SimpleNamespace(target_id=None),
+            SimpleNamespace(target_id="t2", output=None, is_primary=False),
+        ],
+        kind="direct",
+    )
+    assert any(n.get("id") == "output_target:t2" for n in nodes)
+
+    nodes = []
+    node_ids = set()
+    viz_module._append_output_target_node_for_sheet(nodes, node_ids, sheet=SimpleNamespace(target_id=None), kind="meta_sheet")
+    assert nodes == []
+    viz_module._append_output_target_node_for_sheet(
+        nodes,
+        node_ids,
+        sheet=SimpleNamespace(
+            target_id="meta",
+            output=OutputSpec(format="excel", path="/tmp/out.xlsx", sheet_name="FromOutput"),
+            sheet_name="",
+        ),
+        kind="meta_sheet",
+    )
+    meta_node = [n for n in nodes if n.get("id") == "output_target:meta"][0]
+    assert meta_node.get("data", {}).get("sheet_name") == "FromOutput"
+
+    edges = []
+    edge_keys_set = set()
+    node_ids = set(["field:a", "field:b", "output_target:t3"])
+    viz_module._append_output_target_edges_for_direct_targets(
+        edges,
+        edge_keys_set,
+        node_ids,
+        targets=[
+            SimpleNamespace(target_id=None),
+            SimpleNamespace(target_id="t_skip_layout", layout=None, requires=None),
+            SimpleNamespace(target_id="t3", layout=ExportLayout(field_ids=("a",)), requires=("b",)),
+        ],
+    )
+    assert {(e.get("source"), e.get("target")) for e in edges} == {("field:a", "output_target:t3"), ("field:b", "output_target:t3")}
+
+    class DummyDerived:
+        def __init__(self, fields):
+            self._fields = fields
+
+        def required_fields(self):
+            return self._fields
+
+    edges = []
+    edge_keys_set = set()
+    node_ids = set(["field:x", "field:y", "field:z", "output_target:d_ok"])
+    viz_module._append_output_target_edges_for_derived_targets(
+        edges,
+        edge_keys_set,
+        node_ids,
+        targets=[
+            SimpleNamespace(target_id=None),
+            SimpleNamespace(target_id="d_none", derived=None, requires=None),
+            SimpleNamespace(target_id="d_no_method", derived=SimpleNamespace(), requires=None),
+            SimpleNamespace(target_id="d_ok", derived=DummyDerived(["x", "y"]), requires=("z",)),
+        ],
+    )
+    assert {(e.get("source"), e.get("target")) for e in edges} == {
+        ("field:x", "output_target:d_ok"),
+        ("field:y", "output_target:d_ok"),
+        ("field:z", "output_target:d_ok"),
+    }
+
+    assert (
+        viz_module.augment_viz_graph_snapshot_for_output_composition(
+            {},
+            output_composition=SimpleNamespace(targets=(), derived_targets=(), meta_sheet=None, audit_sheet=None),
+        )
+        == {}
+    )
+
+    snapshot = {"meta": {}, "nodes": [{"id": "field:a", "type": "field", "data": {}, "position": {"x": 0, "y": 0}}], "edges": []}
+    output_composition = OutputCompositionSpec(
+        targets=(),
+        derived_targets=(),
+        meta_sheet=MetaSheetSpec(
+            target_id="meta",
+            output=OutputSpec(format="excel", path="/tmp/out.xlsx", sheet_name="meta-from-output"),
+            sheet_name="__meta__",
+        ),
+        audit_sheet=AuditSheetSpec(
+            target_id="audit",
+            output=OutputSpec(format="excel", path="/tmp/out.xlsx", sheet_name="audit-from-output"),
+            sheet_name="__audit__",
+        ),
+        failure_policy="all_fail",
+        include_full_error_message=False,
+    )
+    snapshot = viz_module.augment_viz_graph_snapshot_for_output_composition(snapshot, output_composition=output_composition)
+    nodes = snapshot.get("nodes") or []
+    assert any(n.get("id") == "output_target:meta" for n in nodes)
+    assert any(n.get("id") == "output_target:audit" for n in nodes)
 
 
 def test_viz_output_path_truncates_by_default_and_append_is_opt_in(tmp_path: Path) -> None:
