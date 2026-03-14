@@ -1315,10 +1315,16 @@ const seqSpans = (
   };
 };
 
-const ensureOutputMap = (root: Node | null): YAMLMap | null => {
+const ensurePrimaryOutputTargetMap = (root: Node | null): YAMLMap | null => {
+  const outputsNode = getIn(root, ["outputs"]);
+  if (outputsNode && isSeq(outputsNode)) {
+    const items = ((outputsNode as YAMLSeq).items as Node[]) || [];
+    const first = items[0];
+    if (first && isMap(first)) return first as YAMLMap;
+  }
   const outputNode = getIn(root, ["output"]);
-  if (!outputNode || !isMap(outputNode)) return null;
-  return outputNode as YAMLMap;
+  if (outputNode && isMap(outputNode)) return outputNode as YAMLMap;
+  return null;
 };
 
 const renderOutputFieldLine = (itemIndent: string, item: { kind: "alias"; anchor: string } | { kind: "field_id"; fieldId: string }): string => {
@@ -1341,12 +1347,12 @@ const insertIntoOutputFields = (
   const root = (doc?.contents as Node | null) || null;
   if (!root) return { ok: false, error: "YAML document is empty" };
 
-  const outputMap = ensureOutputMap(root);
-  if (!outputMap) return { ok: false, error: "patch: output mapping not found", plan: { kind: "rewrite", reason: "missing output" } };
+  const outputMap = ensurePrimaryOutputTargetMap(root);
+  if (!outputMap) return { ok: false, error: "patch: output target not found", plan: { kind: "rewrite", reason: "missing output" } };
 
   const fieldsPair = findPairInMap(outputMap, "fields");
   if (!fieldsPair) {
-    // Create output.fields as a block sequence.
+    // Create fields as a block sequence.
     const firstPair = (outputMap.items as Array<Pair<ParsedNode, ParsedNode | null>>)[0];
     const firstKeyOffset = firstPair ? nodeStartOffset(firstPair.key) : null;
     const keyIndentSpaces = firstKeyOffset != null ? countIndentSpaces(yamlText, firstKeyOffset) : 2;
@@ -1356,9 +1362,9 @@ const insertIntoOutputFields = (
   }
 
   const valueNode = (fieldsPair.value as Node | null) || null;
-  if (!valueNode) return { ok: false, error: "patch: output.fields is empty", plan: { kind: "rewrite", reason: "missing node" } };
+  if (!valueNode) return { ok: false, error: "patch: fields is empty", plan: { kind: "rewrite", reason: "missing node" } };
   if (!isSeq(valueNode)) {
-    return { ok: false, error: "patch: output.fields is not a list", plan: { kind: "rewrite", reason: "non-sequence" } };
+    return { ok: false, error: "patch: fields is not a list", plan: { kind: "rewrite", reason: "non-sequence" } };
   }
 
   const seqNode = valueNode as YAMLSeq;
@@ -1370,7 +1376,7 @@ const insertIntoOutputFields = (
     const itemIndent = " ".repeat(keyIndentSpaces + 2);
     const range = (seqNode as any).range;
     if (!Array.isArray(range) || typeof range[0] !== "number" || typeof range[2] !== "number") {
-      return { ok: false, error: "patch: output.fields missing range", plan: { kind: "rewrite", reason: "missing range" } };
+      return { ok: false, error: "patch: fields missing range", plan: { kind: "rewrite", reason: "missing range" } };
     }
     const start = range[0] as number;
     const end = range[2] as number;
@@ -1419,14 +1425,14 @@ export const removeOutputFieldAt = (yamlText: string, index: number): PatchResul
   const root = (doc?.contents as Node | null) || null;
   if (!root) return { ok: false, error: "YAML document is empty" };
 
-  const outputMap = ensureOutputMap(root);
-  if (!outputMap) return { ok: false, error: "patch: output mapping not found", plan: { kind: "rewrite", reason: "missing output" } };
+  const outputMap = ensurePrimaryOutputTargetMap(root);
+  if (!outputMap) return { ok: false, error: "patch: output target not found", plan: { kind: "rewrite", reason: "missing output" } };
   const fieldsPair = findPairInMap(outputMap, "fields");
   if (!fieldsPair) return { ok: true, text: yamlText, plan: { kind: "safe" } };
 
   const valueNode = (fieldsPair.value as Node | null) || null;
   if (!valueNode || !isSeq(valueNode)) {
-    return { ok: false, error: "patch: output.fields is not a list", plan: { kind: "rewrite", reason: "non-sequence" } };
+    return { ok: false, error: "patch: fields is not a list", plan: { kind: "rewrite", reason: "non-sequence" } };
   }
 
   const seqNode = valueNode as YAMLSeq;
@@ -1466,14 +1472,14 @@ export const moveOutputField = (yamlText: string, from: number, to: number): Pat
   const root = (doc?.contents as Node | null) || null;
   if (!root) return { ok: false, error: "YAML document is empty" };
 
-  const outputMap = ensureOutputMap(root);
-  if (!outputMap) return { ok: false, error: "patch: output mapping not found", plan: { kind: "rewrite", reason: "missing output" } };
+  const outputMap = ensurePrimaryOutputTargetMap(root);
+  if (!outputMap) return { ok: false, error: "patch: output target not found", plan: { kind: "rewrite", reason: "missing output" } };
   const fieldsPair = findPairInMap(outputMap, "fields");
-  if (!fieldsPair) return { ok: false, error: "patch: output.fields not found" };
+  if (!fieldsPair) return { ok: false, error: "patch: fields not found" };
 
   const valueNode = (fieldsPair.value as Node | null) || null;
   if (!valueNode || !isSeq(valueNode)) {
-    return { ok: false, error: "patch: output.fields is not a list", plan: { kind: "rewrite", reason: "non-sequence" } };
+    return { ok: false, error: "patch: fields is not a list", plan: { kind: "rewrite", reason: "non-sequence" } };
   }
 
   const seqNode = valueNode as YAMLSeq;

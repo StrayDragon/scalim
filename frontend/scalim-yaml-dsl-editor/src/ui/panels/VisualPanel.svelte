@@ -53,12 +53,14 @@
   let addParamKindDraft = $state<Exclude<ParamKind, "complex">>("string");
   let addParamValueDraft = $state<string>("");
 
-  let outputFormatDraft = $state<string>("");
-  let outputPathDraft = $state<string>("");
-  let outputEncodingDraft = $state<string>("");
-  let outputFormatPresent = $state<boolean>(false);
-  let outputPathPresent = $state<boolean>(false);
-  let outputEncodingPresent = $state<boolean>(false);
+  let primaryOutputPresent = $state<boolean>(false);
+  let primaryOutputNameDraft = $state<string>("");
+  let primaryOutputContainerTypeDraft = $state<string>("");
+  let primaryOutputContainerPathDraft = $state<string>("");
+  let primaryOutputContainerEncodingDraft = $state<string>("");
+  let primaryOutputContainerSheetDraft = $state<string>("");
+  let primaryOutputContainerEncodingPresent = $state<boolean>(false);
+  let primaryOutputContainerSheetPresent = $state<boolean>(false);
 
   const parseParamKind = (value: any): ParamKind => {
     if (value == null) return "null";
@@ -104,13 +106,21 @@
     }
     paramsDrafts = nextParams;
 
-    const output = (data.output && typeof data.output === "object") ? data.output : {};
-    outputFormatPresent = Object.prototype.hasOwnProperty.call(output, "format");
-    outputFormatDraft = typeof output.format === "string" ? output.format : "";
-    outputPathPresent = Object.prototype.hasOwnProperty.call(output, "path");
-    outputPathDraft = typeof output.path === "string" ? output.path : "";
-    outputEncodingPresent = Object.prototype.hasOwnProperty.call(output, "encoding");
-    outputEncodingDraft = typeof output.encoding === "string" ? output.encoding : "";
+    const outputs = Array.isArray(data.outputs) ? data.outputs : [];
+    primaryOutputPresent = Boolean(outputs[0] && typeof outputs[0] === "object" && !Array.isArray(outputs[0]));
+    const output0 = primaryOutputPresent ? outputs[0] : {};
+    primaryOutputNameDraft = typeof (output0 as any).name === "string" ? String((output0 as any).name) : "";
+
+    const container = ((output0 as any).container && typeof (output0 as any).container === "object" && !Array.isArray((output0 as any).container))
+      ? (output0 as any).container
+      : {};
+
+    primaryOutputContainerTypeDraft = typeof (container as any).type === "string" ? String((container as any).type) : "";
+    primaryOutputContainerPathDraft = typeof (container as any).path === "string" ? String((container as any).path) : "";
+    primaryOutputContainerEncodingPresent = Object.prototype.hasOwnProperty.call(container, "encoding");
+    primaryOutputContainerEncodingDraft = typeof (container as any).encoding === "string" ? String((container as any).encoding) : "";
+    primaryOutputContainerSheetPresent = Object.prototype.hasOwnProperty.call(container, "sheet");
+    primaryOutputContainerSheetDraft = typeof (container as any).sheet === "string" ? String((container as any).sheet) : "";
   };
 
   $effect(() => {
@@ -576,94 +586,126 @@
 	              type="button"
 	              class="cursor-pointer text-xs font-semibold text-slate-800 transition-colors hover:text-slate-900 hover:underline decoration-slate-200 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
 	              title="点击定位到 YAML"
-	              onclick={() => requestJump("output")}
+	              onclick={() => requestJump("outputs")}
 	            >
-	              Output
+	              Outputs
 	            </button>
 	          </div>
 
-	          <div class="grid grid-cols-1 gap-2">
-	            <div class="group text-xs text-slate-700">
-	              <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-	                <label for="v-output_format" class="font-medium">output.format</label>
-                  <div class="flex items-center gap-1">
-                    {#if !isRequired(["output", "format"]) && outputFormatPresent}
-                      <button
-                        type="button"
-                        class="rounded-md border bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                        title="移除 output.format(从 YAML 删除)"
-                        aria-label="remove output.format"
-                        onclick={() => removePath(["output", "format"])}
-                      >
-                        ×
-                      </button>
-                    {/if}
-	                  <SchemaHint text={helpText(["output", "format"])} label="output.format" />
+            {#if !primaryOutputPresent}
+              <div class="rounded-lg border bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                未检测到 <span class="font-mono">outputs[0]</span>。请使用“新建最小模板”或手动添加 <span class="font-mono">outputs:</span>。
+              </div>
+            {:else}
+	            <div class="grid grid-cols-1 gap-2">
+                <div class="group text-xs text-slate-700">
+                  <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                    <label for="v-output0_name" class="font-medium">outputs[0].name</label>
+                    <div class="flex items-center gap-1">
+                      <SchemaHint text={helpText(["outputs", "0", "name"])} label="outputs[0].name" />
+                    </div>
                   </div>
-	              </div>
-	              <input
-	                id="v-output_format"
-	                name="output.format"
-	                class="sx-input w-full"
-	                bind:value={outputFormatDraft}
-	                onblur={() => applyOptionalString(["output", "format"], outputFormatDraft)}
-              />
-            </div>
+                  <input
+                    id="v-output0_name"
+                    name="outputs[0].name"
+                    class="sx-input w-full"
+                    bind:value={primaryOutputNameDraft}
+                    onblur={() => applyOptionalString(["outputs", "0", "name"], primaryOutputNameDraft)}
+                  />
+                </div>
 
-	            <div class="group text-xs text-slate-700">
-	              <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-	                <label for="v-output_path" class="font-medium">output.path</label>
-                  <div class="flex items-center gap-1">
-                    {#if !isRequired(["output", "path"]) && outputPathPresent}
-                      <button
-                        type="button"
-                        class="rounded-md border bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                        title="移除 output.path(从 YAML 删除)"
-                        aria-label="remove output.path"
-                        onclick={() => removePath(["output", "path"])}
-                      >
-                        ×
-                      </button>
-                    {/if}
-	                  <SchemaHint text={helpText(["output", "path"])} label="output.path" />
+                <div class="group text-xs text-slate-700">
+                  <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                    <label for="v-output0_container_type" class="font-medium">outputs[0].container.type</label>
+                    <SchemaHint text={helpText(["outputs", "0", "container", "type"])} label="outputs[0].container.type" />
                   </div>
-	              </div>
-	              <input
-	                id="v-output_path"
-	                name="output.path"
-	                class="sx-input w-full"
-	                bind:value={outputPathDraft}
-	                onblur={() => applyOptionalString(["output", "path"], outputPathDraft)}
-              />
-            </div>
+                  <select
+                    id="v-output0_container_type"
+                    name="outputs[0].container.type"
+                    class="sx-select w-full"
+                    value={primaryOutputContainerTypeDraft || "csv"}
+                    onchange={(e) => {
+                      const v = (e.target as HTMLSelectElement).value;
+                      primaryOutputContainerTypeDraft = v;
+                      applyScalar(["outputs", "0", "container", "type"], v);
+                    }}
+                  >
+                    <option value="csv">csv</option>
+                    <option value="workbook">workbook</option>
+                  </select>
+                </div>
 
-	            <div class="group text-xs text-slate-700">
-	              <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-	                <label for="v-output_encoding" class="font-medium">output.encoding</label>
-                  <div class="flex items-center gap-1">
-                    {#if !isRequired(["output", "encoding"]) && outputEncodingPresent}
-                      <button
-                        type="button"
-                        class="rounded-md border bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                        title="移除 output.encoding(从 YAML 删除)"
-                        aria-label="remove output.encoding"
-                        onclick={() => removePath(["output", "encoding"])}
-                      >
-                        ×
-                      </button>
-                    {/if}
-	                  <SchemaHint text={helpText(["output", "encoding"])} label="output.encoding" />
+                <div class="group text-xs text-slate-700">
+                  <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                    <label for="v-output0_container_path" class="font-medium">outputs[0].container.path</label>
+                    <SchemaHint text={helpText(["outputs", "0", "container", "path"])} label="outputs[0].container.path" />
                   </div>
-	              </div>
-	              <input
-	                id="v-output_encoding"
-	                name="output.encoding"
-	                class="sx-input w-full"
-	                bind:value={outputEncodingDraft}
-	                onblur={() => applyOptionalString(["output", "encoding"], outputEncodingDraft)}
-              />
-            </div>
-          </div>
+                  <input
+                    id="v-output0_container_path"
+                    name="outputs[0].container.path"
+                    class="sx-input w-full"
+                    bind:value={primaryOutputContainerPathDraft}
+                    onblur={() => applyOptionalString(["outputs", "0", "container", "path"], primaryOutputContainerPathDraft)}
+                  />
+                </div>
+
+                <div class="group text-xs text-slate-700">
+                  <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                    <label for="v-output0_container_encoding" class="font-medium">outputs[0].container.encoding</label>
+                    <div class="flex items-center gap-1">
+                      {#if !isRequired(["outputs", "0", "container", "encoding"]) && primaryOutputContainerEncodingPresent}
+                        <button
+                          type="button"
+                          class="rounded-md border bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                          title="移除 outputs[0].container.encoding(从 YAML 删除)"
+                          aria-label="remove outputs[0].container.encoding"
+                          onclick={() => removePath(["outputs", "0", "container", "encoding"])}
+                        >
+                          ×
+                        </button>
+                      {/if}
+                      <SchemaHint text={helpText(["outputs", "0", "container", "encoding"])} label="outputs[0].container.encoding" />
+                    </div>
+                  </div>
+                  <input
+                    id="v-output0_container_encoding"
+                    name="outputs[0].container.encoding"
+                    class="sx-input w-full"
+                    bind:value={primaryOutputContainerEncodingDraft}
+                    onblur={() => applyOptionalString(["outputs", "0", "container", "encoding"], primaryOutputContainerEncodingDraft)}
+                  />
+                </div>
+
+                {#if primaryOutputContainerTypeDraft === "workbook" || primaryOutputContainerSheetPresent}
+                  <div class="group text-xs text-slate-700">
+                    <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                      <label for="v-output0_container_sheet" class="font-medium">outputs[0].container.sheet</label>
+                      <div class="flex items-center gap-1">
+                        {#if !isRequired(["outputs", "0", "container", "sheet"]) && primaryOutputContainerSheetPresent}
+                          <button
+                            type="button"
+                            class="rounded-md border bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                            title="移除 outputs[0].container.sheet(从 YAML 删除)"
+                            aria-label="remove outputs[0].container.sheet"
+                            onclick={() => removePath(["outputs", "0", "container", "sheet"])}
+                          >
+                            ×
+                          </button>
+                        {/if}
+                        <SchemaHint text={helpText(["outputs", "0", "container", "sheet"])} label="outputs[0].container.sheet" />
+                      </div>
+                    </div>
+                    <input
+                      id="v-output0_container_sheet"
+                      name="outputs[0].container.sheet"
+                      class="sx-input w-full"
+                      bind:value={primaryOutputContainerSheetDraft}
+                      onblur={() => applyOptionalString(["outputs", "0", "container", "sheet"], primaryOutputContainerSheetDraft)}
+                    />
+                  </div>
+                {/if}
+              </div>
+            {/if}
         </section>
 
         <OutputFieldsEditor />

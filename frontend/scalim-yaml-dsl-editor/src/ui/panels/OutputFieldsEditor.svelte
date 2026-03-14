@@ -25,12 +25,12 @@
 
   const fieldsHelp = $derived(() => {
     if (!demandSchema) return "";
-    return schemaDescriptionForPath(demandSchema, ["output", "fields"]);
+    return schemaDescriptionForPath(demandSchema, ["outputs", "0", "fields"]);
   });
 
   const headerByHelp = $derived(() => {
     if (!demandSchema) return "";
-    return schemaDescriptionForPath(demandSchema, ["output", "header_fields_output_by"]);
+    return schemaDescriptionForPath(demandSchema, ["outputs", "0", "container", "header_fields_output_by"]);
   });
 
   const current = $derived(() => readOutputFields(appState.yamlText, appState.yamlLocations));
@@ -39,6 +39,20 @@
     const cur = current();
     return cur.ok ? cur.headerBy : "field_id";
   });
+  const currentKind = $derived(() => {
+    const cur = current();
+    return cur.ok ? cur.kind : "outputs";
+  });
+  const fieldsKey = $derived(() => (currentKind() === "outputs" ? "outputs.0.fields" : "output.fields"));
+  const headerByKey = $derived(() =>
+    currentKind() === "outputs" ? "outputs.0.container.header_fields_output_by" : "output.header_fields_output_by"
+  );
+  const fieldsPath = $derived(() => (currentKind() === "outputs" ? ["outputs", "0", "fields"] : ["output", "fields"]));
+  const headerByPath = $derived(() =>
+    currentKind() === "outputs" ? ["outputs", "0", "container", "header_fields_output_by"] : ["output", "header_fields_output_by"]
+  );
+  const fieldsLabel = $derived(() => (currentKind() === "outputs" ? "outputs[0].fields" : "output.fields"));
+  const headerByLabel = $derived(() => (currentKind() === "outputs" ? "outputs[0].container.header_fields_output_by" : "output.header_fields_output_by"));
   const currentItems = $derived(() => {
     const cur = current();
     return cur.ok ? cur.items : [];
@@ -47,8 +61,8 @@
     const cur = current();
     return cur.ok ? "" : cur.error;
   });
-  const fieldsPresent = $derived(() => Boolean(appState.yamlLocations && (appState.yamlLocations as any)["output.fields"]));
-  const headerByPresent = $derived(() => Boolean(appState.yamlLocations && (appState.yamlLocations as any)["output.header_fields_output_by"]));
+  const fieldsPresent = $derived(() => Boolean(appState.yamlLocations && (appState.yamlLocations as any)[fieldsKey()]));
+  const headerByPresent = $derived(() => Boolean(appState.yamlLocations && (appState.yamlLocations as any)[headerByKey()]));
   const candidates = $derived(() => collectFieldCandidates(appState.yamlText));
 
   const visibleCandidates = $derived(() => {
@@ -82,7 +96,7 @@
   };
 
   const jumpToFields = () => {
-    const loc = lookupYamlLocation("output.fields", appState.yamlLocations);
+    const loc = lookupYamlLocation(fieldsKey(), appState.yamlLocations);
     if (!loc) return;
     revealInYaml(loc.line, loc.column);
   };
@@ -92,10 +106,10 @@
     const items = cur.ok ? cur.items : [];
     const idx = items.length;
     if (cand.anchor) {
-      applyPatch(insertOutputFieldAliasAt(appState.yamlText, idx, cand.anchor), "Insert output.fields[" + String(idx) + "]");
+      applyPatch(insertOutputFieldAliasAt(appState.yamlText, idx, cand.anchor), "Insert " + fieldsLabel() + "[" + String(idx) + "]");
       return;
     }
-    applyPatch(insertOutputFieldIdAt(appState.yamlText, idx, cand.fieldId), "Insert output.fields[" + String(idx) + "]");
+    applyPatch(insertOutputFieldIdAt(appState.yamlText, idx, cand.fieldId), "Insert " + fieldsLabel() + "[" + String(idx) + "]");
   };
 
   const onAddCustom = () => {
@@ -103,23 +117,23 @@
     if (!id) return;
     const cur = current();
     const items = cur.ok ? cur.items : [];
-    applyPatch(insertOutputFieldIdAt(appState.yamlText, items.length, id), "Insert output.fields[" + String(items.length) + "]");
+    applyPatch(insertOutputFieldIdAt(appState.yamlText, items.length, id), "Insert " + fieldsLabel() + "[" + String(items.length) + "]");
     customFieldId = "";
   };
 
   const onRemove = (idx: number) => {
-    applyPatch(removeOutputFieldAt(appState.yamlText, idx), "Remove output.fields[" + String(idx) + "]");
+    applyPatch(removeOutputFieldAt(appState.yamlText, idx), "Remove " + fieldsLabel() + "[" + String(idx) + "]");
   };
 
   const onMove = (from: number, to: number) => {
-    applyPatch(moveOutputField(appState.yamlText, from, to), "Move output.fields[" + String(from) + "]");
+    applyPatch(moveOutputField(appState.yamlText, from, to), "Move " + fieldsLabel() + "[" + String(from) + "]");
   };
 
   const onHeaderBy = (value: string) => {
     const v: OutputHeaderBy = value === "name" ? "name" : "field_id";
     applyPatch(
-      setScalarAtPathDeep(appState.yamlText, ["output", "header_fields_output_by"], v, { createMissing: true }),
-      "Update output.header_fields_output_by"
+      setScalarAtPathDeep(appState.yamlText, headerByPath(), v, { createMissing: true }),
+      "Update " + headerByLabel()
     );
   };
 
@@ -169,14 +183,14 @@
         <button
           type="button"
           class="rounded-md border bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-          title="移除 output.fields(从 YAML 删除)"
-          aria-label="remove output.fields"
-          onclick={() => removePath(["output", "fields"])}
+          title={"移除 " + fieldsLabel() + "(从 YAML 删除)"}
+          aria-label={"remove " + fieldsLabel()}
+          onclick={() => removePath(fieldsPath())}
         >
           ×
         </button>
       {/if}
-      <SchemaHint text={fieldsHelp()} label="output.fields" />
+      <SchemaHint text={fieldsHelp()} label={fieldsLabel()} />
       {#if currentOk()}
         <Badge variant="outline">{currentItems().length}</Badge>
       {/if}
@@ -197,14 +211,14 @@
           <button
             type="button"
             class="rounded-md border bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-            title="移除 output.header_fields_output_by(恢复默认)"
-            aria-label="remove output.header_fields_output_by"
-            onclick={() => removePath(["output", "header_fields_output_by"])}
+            title={"移除 " + headerByLabel() + "(恢复默认)"}
+            aria-label={"remove " + headerByLabel()}
+            onclick={() => removePath(headerByPath())}
           >
             ×
           </button>
         {/if}
-        <SchemaHint text={headerByHelp()} label="output.header_fields_output_by" />
+        <SchemaHint text={headerByHelp()} label={headerByLabel()} />
       {/if}
     </div>
   </div>
@@ -232,7 +246,7 @@
 
     <div class="flex flex-col gap-1">
       {#if currentItems().length === 0}
-        <div class="rounded-lg border bg-slate-50 px-3 py-2 text-xs text-slate-600">暂无 output.fields(可从下方添加)</div>
+        <div class="rounded-lg border bg-slate-50 px-3 py-2 text-xs text-slate-600">暂无 {fieldsLabel()}(可从下方添加)</div>
       {:else}
         {#each currentItems() as item, idx (item.id)}
           <div

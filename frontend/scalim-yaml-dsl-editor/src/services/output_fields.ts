@@ -31,7 +31,7 @@ export type OutputFieldItem = {
 };
 
 export type OutputFieldsRead =
-  | { ok: true; headerBy: OutputHeaderBy; items: OutputFieldItem[] }
+  | { ok: true; kind: "outputs" | "output"; basePathKey: string; present: boolean; headerBy: OutputHeaderBy; items: OutputFieldItem[] }
   | { ok: false; error: string };
 
 export type FieldCandidate = {
@@ -96,7 +96,15 @@ const scalarString = (node: Node | null): string => {
   return String((s as any).value ?? "");
 };
 
-const readHeaderBy = (outputMap: YAMLMap): OutputHeaderBy => {
+const readHeaderBy = (outputMap: YAMLMap, kind: "outputs" | "output"): OutputHeaderBy => {
+  if (kind === "outputs") {
+    const containerNode = getIn(outputMap as any, ["container"]);
+    if (!containerNode || !isMap(containerNode)) return "field_id";
+    const pair = findPairInMap(containerNode as any, "header_fields_output_by");
+    const value = scalarString(((pair?.value as Node | null) || null) as Node | null).trim();
+    return value === "name" ? "name" : "field_id";
+  }
+
   const pair = findPairInMap(outputMap, "header_fields_output_by");
   const value = scalarString(((pair?.value as Node | null) || null) as Node | null).trim();
   return value === "name" ? "name" : "field_id";
@@ -129,13 +137,97 @@ export const readOutputFields = (yamlText: string, locations?: YamlLocationIndex
   const root = (doc?.contents as Node | null) || null;
   if (!root) return { ok: false, error: "YAML document is empty" };
 
+  const outputsNode = getIn(root, ["outputs"]);
+  if (outputsNode && isSeq(outputsNode)) {
+    const items = ((outputsNode as YAMLSeq).items as Node[]) || [];
+    const first = items[0];
+    if (first && isMap(first)) {
+      const outputMap = first as YAMLMap;
+      const headerBy = readHeaderBy(outputMap, "outputs");
+
+      const fieldsNode = getIn(outputMap as any, ["fields"]);
+      if (!fieldsNode || !isSeq(fieldsNode)) return { ok: true, kind: "outputs", basePathKey: "outputs.0", present: true, headerBy, items: [] };
+      const seqNode = fieldsNode as YAMLSeq;
+
+      const outItems: OutputFieldItem[] = [];
+      const seqItems = (seqNode.items as Node[]) || [];
+      for (let i = 0; i < seqItems.length; i += 1) {
+        const node = seqItems[i];
+        const raw = nodeLineText(yamlText, node);
+        const id = "outputs.0.fields." + String(i);
+        const loc = locations ? lookupYamlLocation(id, locations) : null;
+
+        if (isAlias(node)) {
+          const aliasNode = node as unknown as Alias;
+          const anchor = String(aliasNode.source || "");
+          const name = resolveAliasName(aliasNode, doc);
+          const label = "*" + anchor + (name ? " — " + name : "");
+          outItems.push({
+            id,
+            kind: "alias",
+            label,
+            raw,
+            anchor,
+            fieldId: anchor,
+            name,
+            line: loc?.line,
+            column: loc?.column
+          });
+          continue;
+        }
+
+        if (isMap(node)) {
+          const mapNode = node as YAMLMap;
+          const out = mapFieldIdName(mapNode);
+          const label = out.fieldId ? out.fieldId + (out.name ? " — " + out.name : "") : "(field)";
+          outItems.push({
+            id,
+            kind: "map",
+            label,
+            raw,
+            fieldId: out.fieldId || undefined,
+            name: out.name || undefined,
+            line: loc?.line,
+            column: loc?.column
+          });
+          continue;
+        }
+
+        if (isScalar(node)) {
+          const value = scalarString(node);
+          outItems.push({
+            id,
+            kind: "scalar",
+            label: value,
+            raw,
+            line: loc?.line,
+            column: loc?.column
+          });
+          continue;
+        }
+
+        outItems.push({
+          id,
+          kind: "unknown",
+          label: "(unknown)",
+          raw,
+          line: loc?.line,
+          column: loc?.column
+        });
+      }
+
+      return { ok: true, kind: "outputs", basePathKey: "outputs.0", present: true, headerBy, items: outItems };
+    }
+    return { ok: true, kind: "outputs", basePathKey: "outputs.0", present: false, headerBy: "field_id", items: [] };
+  }
+
   const outputNode = getIn(root, ["output"]);
-  if (!outputNode || !isMap(outputNode)) return { ok: true, headerBy: "field_id", items: [] };
+  if (!outputNode || !isMap(outputNode)) return { ok: true, kind: "outputs", basePathKey: "outputs.0", present: false, headerBy: "field_id", items: [] };
   const outputMap = outputNode as YAMLMap;
-  const headerBy = readHeaderBy(outputMap);
+  const headerBy = readHeaderBy(outputMap, "output");
 
   const fieldsNode = getIn(outputMap as any, ["fields"]);
-  if (!fieldsNode || !isSeq(fieldsNode)) return { ok: true, headerBy, items: [] };
+  if (!fieldsNode || !isSeq(fieldsNode)) return { ok: true, kind: "output", basePathKey: "output", present: true, headerBy, items: [] };
   const seqNode = fieldsNode as YAMLSeq;
 
   const items: OutputFieldItem[] = [];
@@ -143,7 +235,8 @@ export const readOutputFields = (yamlText: string, locations?: YamlLocationIndex
   for (let i = 0; i < seqItems.length; i += 1) {
     const node = seqItems[i];
     const raw = nodeLineText(yamlText, node);
-    const loc = locations ? lookupYamlLocation("output.fields." + String(i), locations) : null;
+    const id = "output.fields." + String(i);
+    const loc = locations ? lookupYamlLocation(id, locations) : null;
 
     if (isAlias(node)) {
       const aliasNode = node as unknown as Alias;
@@ -151,7 +244,7 @@ export const readOutputFields = (yamlText: string, locations?: YamlLocationIndex
       const name = resolveAliasName(aliasNode, doc);
       const label = "*" + anchor + (name ? " — " + name : "");
       items.push({
-        id: "output.fields." + String(i),
+        id,
         kind: "alias",
         label,
         raw,
@@ -169,7 +262,7 @@ export const readOutputFields = (yamlText: string, locations?: YamlLocationIndex
       const out = mapFieldIdName(mapNode);
       const label = out.fieldId ? out.fieldId + (out.name ? " — " + out.name : "") : "(field)";
       items.push({
-        id: "output.fields." + String(i),
+        id,
         kind: "map",
         label,
         raw,
@@ -184,7 +277,7 @@ export const readOutputFields = (yamlText: string, locations?: YamlLocationIndex
     if (isScalar(node)) {
       const value = scalarString(node);
       items.push({
-        id: "output.fields." + String(i),
+        id,
         kind: "scalar",
         label: value,
         raw,
@@ -195,7 +288,7 @@ export const readOutputFields = (yamlText: string, locations?: YamlLocationIndex
     }
 
     items.push({
-      id: "output.fields." + String(i),
+      id,
       kind: "unknown",
       label: "(unknown)",
       raw,
@@ -204,7 +297,7 @@ export const readOutputFields = (yamlText: string, locations?: YamlLocationIndex
     });
   }
 
-  return { ok: true, headerBy, items };
+  return { ok: true, kind: "output", basePathKey: "output", present: true, headerBy, items };
 };
 
 const collectFieldsFromMap = (mapNode: YAMLMap, origin: string): FieldCandidate[] => {
@@ -296,4 +389,3 @@ export const computeHeaderPreview = (
 
   return { headers, duplicates };
 };
-

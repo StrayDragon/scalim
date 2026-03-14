@@ -157,6 +157,53 @@ const outlineForMapKeys = (root: Node | null, basePath: string, locations: YamlL
   return items;
 };
 
+const findPairInMap = (mapNode: YAMLMap, key: string): Pair<ParsedNode, ParsedNode | null> | null => {
+  for (const pair of mapNode.items as Array<Pair<ParsedNode, ParsedNode | null>>) {
+    const k = scalarKeyToString(pair.key as any);
+    if (k === key) return pair;
+  }
+  return null;
+};
+
+const scalarString = (node: Node | null): string => {
+  if (!node || !isScalar(node)) return "";
+  return String((node as any).value ?? "");
+};
+
+const outlineForSeqItems = (
+  root: Node | null,
+  basePath: string,
+  locations: YamlLocationIndex,
+  depth: number,
+  opts?: { labelPrefix?: string; nameKey?: string }
+): OutlineTarget[] => {
+  const node = getNodeAtPath(root, basePath ? basePath.split(".") : []);
+  if (!node || !isSeq(node)) return [];
+  const seqNode = node as YAMLSeq;
+  const items: OutlineTarget[] = [];
+  const prefix = String(opts?.labelPrefix || "").trim();
+  const nameKey = String(opts?.nameKey || "name").trim() || "name";
+
+  const seqItems = (seqNode.items as Node[]) || [];
+  for (let i = 0; i < seqItems.length; i += 1) {
+    const itemNode = seqItems[i];
+    const path = basePath ? basePath + "." + String(i) : String(i);
+    const loc = getYamlLocationExact(path, locations);
+    if (!loc) continue;
+
+    let label = prefix ? prefix + "[" + String(i) + "]" : "[" + String(i) + "]";
+    if (itemNode && isMap(itemNode)) {
+      const namePair = findPairInMap(itemNode as any, nameKey);
+      const nameValue = scalarString(((namePair?.value as Node | null) || null) as Node | null).trim();
+      if (nameValue) label = nameValue;
+    }
+
+    items.push({ id: path, label, depth, line: loc.line, column: loc.column });
+  }
+
+  return items;
+};
+
 export const indexYamlText = (yamlText: string): { locations: YamlLocationIndex; outline: OutlineTarget[] } => {
   const lineStarts = buildLineStarts(yamlText);
   let doc: any;
@@ -171,11 +218,13 @@ export const indexYamlText = (yamlText: string): { locations: YamlLocationIndex;
   const outline: OutlineTarget[] = [];
   const sections = [
     { path: "name", label: "name" },
+    { path: "imports", label: "imports" },
+    { path: "$import", label: "$import" },
     { path: "main_source", label: "main_source" },
     { path: "sources", label: "sources" },
     { path: "relations", label: "relations" },
     { path: "fields", label: "fields" },
-    { path: "output", label: "output" },
+    { path: "outputs", label: "outputs" },
     { path: "observability", label: "observability" },
     { path: "guardrails", label: "guardrails" }
   ];
@@ -204,6 +253,14 @@ export const indexYamlText = (yamlText: string): { locations: YamlLocationIndex;
         }))
       );
     }
+    if (sec.path === "imports") {
+      outline.push(
+        ...outlineForMapKeys(((doc?.contents as Node | null) || null) as Node | null, "imports", locations, 1).map((it) => ({
+          ...it,
+          label: "imports." + it.label
+        }))
+      );
+    }
     if (sec.path === "relations") {
       outline.push(
         ...outlineForMapKeys(((doc?.contents as Node | null) || null) as Node | null, "relations", locations, 1).map((it) => ({
@@ -219,6 +276,9 @@ export const indexYamlText = (yamlText: string): { locations: YamlLocationIndex;
           label: "fields." + it.label
         }))
       );
+    }
+    if (sec.path === "outputs") {
+      outline.push(...outlineForSeqItems(((doc?.contents as Node | null) || null) as Node | null, "outputs", locations, 1, { labelPrefix: "outputs" }));
     }
   }
 
