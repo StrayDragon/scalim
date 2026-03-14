@@ -42,6 +42,7 @@ _frontend-check DIR LABEL:
 # 检查: YAML DSL 编辑器 (install + lint + build)
 frontend-yaml-dsl-editor-check:
     just _frontend-check frontend/scalim-yaml-dsl-editor frontend-yaml-dsl-editor-check
+    uv {{ UV_OPTIONS }} run python scripts/check-yaml-dsl-editor-dist-schema.py
 
 # 检查: Scalim Viz 前端 (install + lint + build)
 frontend-scalim-viz-check:
@@ -114,10 +115,49 @@ schema-drift-check: gen-yaml-dsl-editor-schema
         echo "  - commit the updated generated schema file"
         exit 1
     fi
+    if ! git diff --exit-code -- src/scalim/dsl/by_yaml/schema/workflow.gen.json >/dev/null; then
+        echo ""
+        echo "YAML DSL schema drift detected:"
+        echo "  - src/scalim/dsl/by_yaml/schema/workflow.gen.json has uncommitted changes"
+        echo ""
+        echo "Fix:"
+        echo "  - commit the updated generated schema file"
+        exit 1
+    fi
     if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json >/dev/null; then
         echo ""
         echo "YAML DSL editor schema drift detected:"
         echo "  - frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json has uncommitted changes"
+        echo ""
+        echo "Fix:"
+        echo "  - run: just gen-yaml-dsl-editor-schema"
+        echo "  - commit the updated frontend schema file"
+        exit 1
+    fi
+    if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/src/schema/demand.gen.json >/dev/null; then
+        echo ""
+        echo "YAML DSL editor schema drift detected:"
+        echo "  - frontend/scalim-yaml-dsl-editor/src/schema/demand.gen.json has uncommitted changes"
+        echo ""
+        echo "Fix:"
+        echo "  - run: just gen-yaml-dsl-editor-schema"
+        echo "  - commit the updated frontend schema file"
+        exit 1
+    fi
+    if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/public/schema/workflow.gen.json >/dev/null; then
+        echo ""
+        echo "YAML DSL editor schema drift detected:"
+        echo "  - frontend/scalim-yaml-dsl-editor/public/schema/workflow.gen.json has uncommitted changes"
+        echo ""
+        echo "Fix:"
+        echo "  - run: just gen-yaml-dsl-editor-schema"
+        echo "  - commit the updated frontend schema file"
+        exit 1
+    fi
+    if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/src/schema/workflow.gen.json >/dev/null; then
+        echo ""
+        echo "YAML DSL editor schema drift detected:"
+        echo "  - frontend/scalim-yaml-dsl-editor/src/schema/workflow.gen.json has uncommitted changes"
         echo ""
         echo "Fix:"
         echo "  - run: just gen-yaml-dsl-editor-schema"
