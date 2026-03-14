@@ -243,6 +243,7 @@ def main(argv: List[str]) -> int:
             payload_policy=payload_policy,
             sample_size=args.sample_size,
             run_name="demo_big_data_report/{}".format(scenario),
+            env="demo",
         )
 
         parallel_mode = _parallel_mode_for_scenario(scenario)
