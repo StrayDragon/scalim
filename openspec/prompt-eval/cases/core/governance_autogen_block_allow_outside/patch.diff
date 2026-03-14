@@ -1,0 +1,12 @@
+diff --git a/openspec/prompt-eval/fixtures/doc_with_autogen.md b/openspec/prompt-eval/fixtures/doc_with_autogen.md
+index 0000000..1111111 100644
+--- a/openspec/prompt-eval/fixtures/doc_with_autogen.md
++++ b/openspec/prompt-eval/fixtures/doc_with_autogen.md
+@@ -1,5 +1,5 @@
+ # Fixture: AUTOGEN block
+ 
+-Intro line
++Intro line updated
+ 
+ <!-- BEGIN AUTOGEN:demo -->
+

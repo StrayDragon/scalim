@@ -1,0 +1,19 @@
+{
+  "id": "agents_md_hard_rules_present",
+  "title": "AGENTS hard rules and entrypoints are present",
+  "kind": "file_assert",
+  "inputs": {
+    "file": "AGENTS.md",
+    "must_contain": [
+      "`just qa`",
+      "`just gen-docs`",
+      "`just openspec-check`",
+      "Any file containing `.gen.` is generated",
+      "BEGIN AUTOGEN"
+    ]
+  },
+  "expect": {
+    "ok": true
+  }
+}
+

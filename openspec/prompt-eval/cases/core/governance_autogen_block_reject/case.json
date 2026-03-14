@@ -1,0 +1,13 @@
+{
+  "id": "governance_autogen_block_reject",
+  "title": "Reject edits inside injected AUTOGEN blocks",
+  "kind": "diff",
+  "inputs": {
+    "patch_file": "patch.diff"
+  },
+  "expect": {
+    "ok": false,
+    "issue_codes": ["autogen_block"]
+  }
+}
+

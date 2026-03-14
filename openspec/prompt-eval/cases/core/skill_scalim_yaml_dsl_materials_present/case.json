@@ -1,0 +1,18 @@
+{
+  "id": "skill_scalim_yaml_dsl_materials_present",
+  "title": "scalim-yaml-dsl skill references canonical materials",
+  "kind": "file_assert",
+  "inputs": {
+    "file": "artifacts/skills/scalim-yaml-dsl/SKILL.md",
+    "must_contain": [
+      "references/syntax-catalog.gen.md",
+      "references/generated/cli-lsp-reference.gen.md",
+      "references/generated/example-full/ecommerce_report.gen.yaml",
+      "schema path"
+    ]
+  },
+  "expect": {
+    "ok": true
+  }
+}
+

@@ -1,0 +1,13 @@
+{
+  "id": "governance_generated_files_reject",
+  "title": "Reject touching `*.gen.*` paths by default",
+  "kind": "diff",
+  "inputs": {
+    "patch_file": "patch.diff"
+  },
+  "expect": {
+    "ok": false,
+    "issue_codes": ["generated_file"]
+  }
+}
+

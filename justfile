@@ -397,6 +397,18 @@ examples:
 
 alias example := examples
 
+# Prompt 评测: 确定性 core(不依赖密钥/网络/Node). 输出到 `.tmp/artifacts/prompt-eval/`
+prompt-eval:
+    uv {{ UV_OPTIONS }} run python scripts/prompt-eval.py
+
+# Prompt 评测: CI/check 模式(确定性 core + 受控输出)
+prompt-eval-check:
+    uv {{ UV_OPTIONS }} run python scripts/prompt-eval.py --check
+
+# Prompt 评测: 可选模型层(独立入口; 当前仅占位)
+prompt-eval-llm:
+    uv {{ UV_OPTIONS }} run python scripts/prompt-eval.py --llm
+
 # QA: 仅py轻量的检查
 quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 

@@ -1,0 +1,8 @@
+diff --git a/docs/doc/yaml-dsl/schema-reference.gen.md b/docs/doc/yaml-dsl/schema-reference.gen.md
+index 0000000..1111111 100644
+--- a/docs/doc/yaml-dsl/schema-reference.gen.md
++++ b/docs/doc/yaml-dsl/schema-reference.gen.md
+@@ -1,1 +1,1 @@
+-old
++new
+

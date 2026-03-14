@@ -1,0 +1,12 @@
+{
+  "id": "governance_autogen_block_allow_outside",
+  "title": "Allow edits outside AUTOGEN blocks",
+  "kind": "diff",
+  "inputs": {
+    "patch_file": "patch.diff"
+  },
+  "expect": {
+    "ok": true
+  }
+}
+
