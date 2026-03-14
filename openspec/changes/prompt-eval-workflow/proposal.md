@@ -4,7 +4,7 @@
 
 因此需要引入一套可复现的 prompt 评测/回归工作流,把关键交互用例固化为自动化评测,并提供稳定入口用于本地与 CI 运行。
 
-**Status: DELAYED**: 在 `openspec/changes/README.md` 移除 DELAYED 标记之前,不得开始实现本 change。
+**Status: READY**: 已具备确定性 core runner 与 `just prompt-eval` 入口; 模型评测层仍为可选后续扩展。
 
 ## What Changes
 
