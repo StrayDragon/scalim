@@ -75,6 +75,8 @@ config = VizObserverConfig(
     trace_enabled=False,        # true => 额外输出 viz_trace.jsonl
     payload_policy="summary",   # 或 sample/full/none
     append=False,               # 仅当显式 output_path/snapshot_path 时需要;默认覆盖避免跨 run 混写
+    run_name="wf:run-003",      # (可选) 更可读的稳定 run 标识,优先于 run_id 展示
+    env="prod",                 # (可选) 环境标识,用于 UI 展示
 )
 
 # 若已有 ExecutionPlan:
@@ -98,6 +100,8 @@ observability:
     append: false
     payload_policy: summary
     sample_size: 5
+    run_name: wf:run-003   # 推荐: workflow 场景使用 workflow run id
+    env: prod              # 可选: 用于 UI 展示/对拍
 ```
 
 ### 事件体量建议
@@ -106,6 +110,20 @@ observability:
 - `trace_enabled=true` 时会额外输出 `viz_trace.jsonl` 的高频 trace(字段/行级/lookup 等),建议在 UI 中按需加载并配合过滤/步进使用
 
 如果仅配置 `output_dir` / `output_path` / `snapshot_path` / `use_default_output_dir`,可省略 `enabled`,系统会自动开启.
+
+### workflow 多 runs 建议
+
+- workflow 会产生多次独立运行,每次运行默认落到独立的 `<run_id>` 子目录.
+- 为了在 UI 中更可读、更稳定地对拍 runs,建议显式设置:
+  - `observability.viz.run_name`: 语义化且稳定的 run 标识(例如 workflow run id)
+  - `observability.viz.env`: 环境标识(如 `dev`/`staging`/`prod`)
+- UI 展示优先级: `run_name` > `run_id`(fallback).
+
+### outputs(多输出组合)回放口径
+
+当启用 outputs/多输出组合(output composition)时:
+- VizGraphSnapshot 依赖图会包含 `output_target:<target_id>` 节点,并通过 `composed_from` 边连接其输入字段.
+- 事件流会输出 `output_target_finished` 事件,用于展示每个输出目标的写出统计与失败状态(行数/耗时/错误/禁用/路径/sheet/错误信息).
 
 ## 5. 从 YAML 构建 VizObserver(便捷方式)
 
