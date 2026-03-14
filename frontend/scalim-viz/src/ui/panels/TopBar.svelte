@@ -13,6 +13,8 @@
     relayoutNodes,
     resetView,
     runId,
+    runEnv,
+    runLabel,
     setPlaybackIndex,
     stageOptions,
     state,
@@ -77,7 +79,15 @@
       <div class="min-w-0">
         <div class="flex items-center gap-2">
           <div class="font-mono font-semibold">Scalim Viz</div>
-          <div class="max-w-[240px] truncate text-[11px] text-slate-500" title={runId()}>Run: {runId()}</div>
+          <div
+            class="max-w-[320px] truncate text-[11px] text-slate-500"
+            title={runLabel() !== runId() ? `run_id: ${runId()}` : runId()}
+          >
+            Run: {runLabel()}
+          </div>
+          {#if runEnv()}
+            <div class="text-[11px] text-slate-500" title="meta.viz.env">Env: {runEnv()}</div>
+          {/if}
         </div>
         <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
           <span>模式: {modeLabel()}</span>

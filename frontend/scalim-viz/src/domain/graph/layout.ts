@@ -27,8 +27,9 @@ const TYPE_ORDER: { [key: string]: number } = {
   stage: 0,
   field: 1,
   derived: 2,
-  loader: 3,
-  source: 4,
+  output_target: 3,
+  loader: 4,
+  source: 5,
   default: 9
 };
 
@@ -104,6 +105,7 @@ export function layoutSnapshot(snapshot: VizGraphSnapshot): LayoutResult {
   if (!levels.length) {
     levels.push(0);
   }
+  const outputLevel = (levels[levels.length - 1] ?? 0) + 1;
 
   const levelNodes = new Map<number, string[]>();
   const loaderIds: string[] = [];
@@ -381,6 +383,9 @@ export function layoutSnapshot(snapshot: VizGraphSnapshot): LayoutResult {
     let stageLevel: number | null = null;
     if (nodeType === 'stage') {
       continue;
+    }
+    if (nodeType === "output_target") {
+      stageLevel = outputLevel;
     }
     if (nodeType === 'field' || nodeType === 'derived') {
       const fieldKey = nodeId.startsWith('field:') ? nodeId.replace('field:', '') : data.field_key;

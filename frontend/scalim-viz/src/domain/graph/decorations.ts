@@ -7,6 +7,7 @@ const NODE_SIZE_FALLBACK: { [key: string]: { width: number; height: number } } =
   loader: { width: 170, height: 68 },
   field: { width: 170, height: 68 },
   derived: { width: 170, height: 68 },
+  output_target: { width: 180, height: 72 },
   default: { width: 160, height: 64 }
 };
 
@@ -146,7 +147,7 @@ export const updateStageBands = (nodes: Node[], levels?: Set<number>) => {
   const bounds = new Map<number, { minX: number; minY: number; maxX: number; maxY: number }>();
 
   for (const node of nodes) {
-    if (node.type === "stage_band" || node.type === "stage") continue;
+    if (node.type === "stage_band" || node.type === "stage" || node.type === "output_target") continue;
     if ((node as any).hidden) continue;
     if ((node.data as any)?.sequence_hidden) continue;
     const level = getStageLevel(node);
@@ -330,6 +331,10 @@ export const buildSequenceVisibility = (nodes: Node[], baseEdges: Edge[], data: 
   for (const evt of data) {
     const nodeId = evt.node_ref?.id ?? "";
     if (!nodeId) continue;
+    if (nodeId.startsWith("output_target:")) {
+      visible.add(nodeId);
+      continue;
+    }
     if (nodeId.startsWith("loader:")) {
       visible.add(nodeId);
       const sourceKey = nodeId.slice("loader:".length);
@@ -414,7 +419,18 @@ export const updateNodesFromEvents = (baseNodes: Node[], data: VizEvent[]) => {
     }
     nextData.last_event_type = evt.event_type;
     nextData.last_event_at = evt.timestamp;
-    nextData.status = statusFromEvent(evt.event_type);
+    let status = statusFromEvent(evt.event_type);
+    if (evt.event_type === "output_target_finished") {
+      const payload = evt.payload ?? {};
+      const errorCount = Number((payload as any)?.error_count ?? 0);
+      const disabled = Boolean((payload as any)?.disabled);
+      if ((Number.isFinite(errorCount) && errorCount > 0) || disabled) {
+        status = "error";
+      } else {
+        status = "success";
+      }
+    }
+    nextData.status = status;
     return { ...node, data: nextData };
   });
 };

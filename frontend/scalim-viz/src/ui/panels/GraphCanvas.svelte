@@ -6,6 +6,7 @@
   import LoaderNode from "$nodes/LoaderNode.svelte";
   import FieldNode from "$nodes/FieldNode.svelte";
   import DerivedNode from "$nodes/DerivedNode.svelte";
+  import OutputTargetNode from "$nodes/OutputTargetNode.svelte";
   import PlanNode from "$nodes/PlanNode.svelte";
   import StageNode from "$nodes/StageNode.svelte";
   import StageBandNode from "$nodes/StageBandNode.svelte";
@@ -15,6 +16,7 @@
     loader: LoaderNode,
     field: FieldNode,
     derived: DerivedNode,
+    output_target: OutputTargetNode,
     plan: PlanNode,
     stage: StageNode,
     stage_band: StageBandNode,

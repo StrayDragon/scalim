@@ -27,6 +27,7 @@
     selectedNodeEventMessage,
     selectedNodeEventTone,
     selectedNodeLastEvent,
+    selectedNodeLastEventIndex,
     selectedStageSummary,
     snapshotStats,
     hasSelection
@@ -332,6 +333,50 @@
               </span>
             </div>
           {/if}
+          {#if nodeSummary()?.data?.target_id}
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-slate-500">target_id</span>
+              <span
+                class="font-mono text-[11px] max-w-[160px] truncate"
+                title={String(nodeSummary()?.data?.target_id ?? "")}
+              >
+                {String(nodeSummary()?.data?.target_id)}
+              </span>
+            </div>
+          {/if}
+          {#if nodeSummary()?.data?.kind}
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-slate-500">kind</span>
+              <span
+                class="font-mono text-[11px] max-w-[160px] truncate"
+                title={String(nodeSummary()?.data?.kind ?? "")}
+              >
+                {String(nodeSummary()?.data?.kind)}
+              </span>
+            </div>
+          {/if}
+          {#if nodeSummary()?.data?.sheet_name}
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-slate-500">sheet_name</span>
+              <span
+                class="font-mono text-[11px] max-w-[160px] truncate"
+                title={String(nodeSummary()?.data?.sheet_name ?? "")}
+              >
+                {String(nodeSummary()?.data?.sheet_name)}
+              </span>
+            </div>
+          {/if}
+          {#if nodeSummary()?.data?.output_path}
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-slate-500">output_path</span>
+              <span
+                class="font-mono text-[11px] max-w-[160px] truncate"
+                title={String(nodeSummary()?.data?.output_path ?? "")}
+              >
+                {String(nodeSummary()?.data?.output_path)}
+              </span>
+            </div>
+          {/if}
           {#if nodeSummary()?.data?.source_id}
             <div class="flex items-center justify-between">
               <span class="text-[11px] text-slate-500">source_id</span>
@@ -380,17 +425,31 @@
     {/if}
 
     {#if selectedNodeLastEvent()}
+      {@const selectedIndex = selectedNodeLastEventIndex()}
+      {@const items = getEventSummaryItems(selectedNodeLastEvent())}
       <div class="flex flex-col gap-2 text-xs text-slate-600">
         <div class="text-[11px] uppercase tracking-wide text-slate-400">节点最新事件</div>
         <div class="rounded-lg border border-slate-200 bg-white/70 px-2 py-2 flex flex-col gap-1">
           <div class="flex items-center justify-between">
             <span class="text-[11px] text-slate-500">event_type</span>
-            <Badge
-              variant={badgeVariantFromStatus(statusFromEvent(selectedNodeLastEvent()!.event_type))}
-              className="font-mono"
-            >
-              {selectedNodeLastEvent()!.event_type}
-            </Badge>
+            <div class="flex items-center gap-2">
+              {#if selectedIndex !== null && selectedIndex !== undefined}
+                <button
+                  type="button"
+                  class="text-[10px] text-blue-500 hover:text-blue-600"
+                  title="跳转到该事件"
+                  on:click={() => jumpToEventIndex(selectedIndex)}
+                >
+                  跳转
+                </button>
+              {/if}
+              <Badge
+                variant={badgeVariantFromStatus(statusFromEvent(selectedNodeLastEvent()!.event_type))}
+                className="font-mono"
+              >
+                {selectedNodeLastEvent()!.event_type}
+              </Badge>
+            </div>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-[11px] text-slate-500">timestamp</span>
@@ -398,6 +457,32 @@
               >{formatTimestamp(selectedNodeLastEvent()!.timestamp)}</span
             >
           </div>
+          {#if items.length}
+            <div class="mt-1 grid grid-cols-1 gap-2">
+              {#each items as item}
+                <div class="flex flex-col gap-1 rounded-md border border-slate-200 bg-white/70 px-2 py-1 text-[11px] leading-snug">
+                  <span class="text-[10px] uppercase tracking-wide text-slate-400">{item.label}</span>
+                  <div class="flex items-start justify-between gap-2">
+                    <span
+                      class="flex-1 break-words text-[11px] font-mono leading-snug text-slate-700"
+                      title={item.value}
+                    >
+                      {item.value}
+                    </span>
+                    {#if isExpandableValue(item.value)}
+                      <button
+                        type="button"
+                        class="shrink-0 text-[10px] text-blue-500 hover:text-blue-600"
+                        on:click={(event) => openValueDialog(item.label, item.value, event.currentTarget as HTMLElement)}
+                      >
+                        查看
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
           {#if selectedNodeEventMessage()}
             <div class={`text-[11px] ${selectedNodeEventTone()}`}>{selectedNodeEventMessage()}</div>
           {/if}

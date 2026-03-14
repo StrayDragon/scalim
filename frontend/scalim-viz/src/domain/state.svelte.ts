@@ -48,6 +48,8 @@ export const state = $state({
   status: "未加载",
   runSources: [] as RunSource[],
   activeRunId: "",
+  runName: "",
+  runEnv: "",
   directoryLabel: "",
   mode: "idle" as "idle" | "replay",
   viewMode: "graph" as "graph" | "timeline",
@@ -350,6 +352,8 @@ export const resetGraphState = () => {
   state.nodes = [];
   state.edges = [];
   state.baseEdges = [];
+  state.runName = "";
+  state.runEnv = "";
   state.planHighlightNodeIds = [];
   state.planSelectedLayerIndex = null;
   state.planSelectedTaskId = "";
@@ -737,6 +741,22 @@ export const getEventMessage = (evt: VizEvent | null) => {
     if (duration) parts.push(`dur=${duration}`);
     return parts.length ? `执行完成 (${parts.join(", ")})` : "执行完成";
   }
+  if (evt.event_type === "output_target_finished") {
+    const targetId = String(payload.target_id ?? "").trim();
+    const rows = payload.row_count ?? null;
+    const errors = payload.error_count ?? null;
+    const duration = payload.duration_ms !== undefined ? `${payload.duration_ms}ms` : null;
+    const sheet = String(payload.sheet_name ?? "").trim();
+    const disabled = payload.disabled === true;
+    const parts: string[] = [];
+    if (rows !== null) parts.push(`rows=${rows}`);
+    if (errors !== null) parts.push(`errors=${errors}`);
+    if (duration) parts.push(`dur=${duration}`);
+    if (sheet) parts.push(`sheet=${sheet}`);
+    if (disabled) parts.push("disabled");
+    const label = targetId ? `输出 ${targetId} 完成` : "输出完成";
+    return parts.length ? `${label} (${parts.join(", ")})` : label;
+  }
   if (evt.event_type === "batch_started") {
     const num = payload.batch_num ?? null;
     const rows = payload.row_count ?? null;
@@ -835,6 +855,15 @@ export const getEventTone = (evt: VizEvent | null) => {
   if (!evt) return "text-slate-500";
   if (evt.event_type === "error") return "text-rose-600";
   if (evt.event_type === "diagnostic_warning") return "text-amber-600";
+  if (evt.event_type === "output_target_finished") {
+    const payload = evt.payload ?? {};
+    const errorCount = Number((payload as any)?.error_count ?? 0);
+    const disabled = Boolean((payload as any)?.disabled);
+    if ((Number.isFinite(errorCount) && errorCount > 0) || disabled) {
+      return "text-rose-600";
+    }
+    return "text-emerald-700";
+  }
   return "text-slate-500";
 };
 
@@ -844,6 +873,7 @@ export const getEventActionLabel = (eventType: string) => {
     run_finished: "执行完成",
     batch_started: "开始批次",
     batch_finished: "完成批次",
+    output_target_finished: "输出目标完成",
     loader_called: "加载数据",
     field_computed: "计算字段",
     column_written: "写出字段",
@@ -1159,6 +1189,16 @@ export const getEventSummaryItems = (evt: VizEvent | null) => {
     push("pool_wait_ms_total", (payload as any)?.pool_wait_ms_total);
     push("pool_wait_ms_max", (payload as any)?.pool_wait_ms_max);
     push("pool_wait_count", (payload as any)?.pool_wait_count);
+  } else if (evt.event_type === "output_target_finished") {
+    push("target", payload.target_id);
+    push("行数", payload.row_count);
+    push("错误", payload.error_count);
+    push("禁用", payload.disabled);
+    push("耗时", payload.duration_ms !== undefined ? `${payload.duration_ms}ms` : null);
+    push("sheet", payload.sheet_name);
+    push("path", payload.output_path);
+    push("error_type", payload.error_type);
+    push("error_message", payload.error_message);
   }
   return items;
 };
@@ -1228,6 +1268,9 @@ export const handleNodeDragStop = ({ targetNode, nodes: dragNodes }: { targetNod
 
 const applySnapshot = (data: VizGraphSnapshot) => {
   state.snapshot = data;
+  const vizMeta = (data?.meta as any)?.viz ?? null;
+  state.runName = typeof vizMeta?.run_name === "string" ? String(vizMeta.run_name) : "";
+  state.runEnv = typeof vizMeta?.env === "string" ? String(vizMeta.env) : "";
   const layout = layoutSnapshot(data);
   state.nodes = layout.nodes;
   state.baseEdges = layout.edges;
@@ -1776,6 +1819,14 @@ const runIdValue = $derived(() => {
   return events[events.length - 1]?.run_id || "N/A";
 });
 export const runId = () => runIdValue();
+const runLabelValue = $derived(() => {
+  const name = String(state.runName || "").trim();
+  if (name) return name;
+  return runIdValue();
+});
+export const runLabel = () => runLabelValue();
+const runEnvValue = $derived(() => String(state.runEnv || "").trim());
+export const runEnv = () => runEnvValue();
 const snapshotStatsValue = $derived(() => (state.snapshot ? summarizeSnapshot(state.snapshot) : null));
 export const snapshotStats = () => snapshotStatsValue();
 const modeLabelValue = $derived(() => (state.mode === "replay" ? "回放" : "未运行"));
@@ -1802,6 +1853,9 @@ const stageOptionsValue = $derived(() => {
     }
   }
   for (const node of state.nodes) {
+    if (node.type === "output_target") {
+      continue;
+    }
     const level = getStageLevel(node);
     if (level !== null && !labelByLevel.has(level)) {
       labelByLevel.set(level, `stage ${level}`);
@@ -1834,6 +1888,17 @@ const selectedNodeLastEventValue = $derived(() => {
   return null;
 });
 export const selectedNodeLastEvent = () => selectedNodeLastEventValue();
+const selectedNodeLastEventIndexValue = $derived(() => {
+  if (!state.selectedNodeId || !state.events.length) return null;
+  for (let i = state.events.length - 1; i >= 0; i -= 1) {
+    const evt = state.events[i];
+    if (evt?.node_ref?.id === state.selectedNodeId) {
+      return i;
+    }
+  }
+  return null;
+});
+export const selectedNodeLastEventIndex = () => selectedNodeLastEventIndexValue();
 const selectedStageSummaryValue = $derived(() => {
   if (!state.selectedStageLevel) return null;
   const level = state.selectedStageLevel;
