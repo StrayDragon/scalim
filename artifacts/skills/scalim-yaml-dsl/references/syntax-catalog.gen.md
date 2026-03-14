@@ -82,6 +82,9 @@
   - `_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform
   - schema 说明源代码级 `normalize` 及其执行顺序
   - schema keeps `normalize` out of `main_source`
+  - `outputs.*.fields` 支持 YAML alias 条目
+  - alias identity 失败时允许唯一内容匹配
+  - schema 允许 `outputs.*.fields` 包含 object 条目
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`
 - Purpose: 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
@@ -558,7 +561,7 @@
 - Properties:
   - `name` (required): `string`
   - `$import`: `string` | `array`, oneOf(2)
-  - `fields`: `array`, items `string`
+  - `fields`: `array`, items `string` | `object` | `array`, anyOf(3)
   - `aggregate`: allOf(1)
   - `container`: allOf(1)
   - `from`: `string`

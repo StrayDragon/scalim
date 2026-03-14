@@ -49,6 +49,7 @@
   - 校验命令输出与 schema 一致性
   - CLI 校验输出包含源码位置
   - Linter/编译器风格输出
+  - validate 对 `outputs.*.fields` object 条目给出可行动诊断
 ### `yaml-dsl-editor-core`
 - Source: `openspec/specs/yaml-dsl-editor-core/spec.md`
 - Purpose: 定义 YAML DSL 编辑器的核心能力:文本优先编辑、Visual 双向同步、统一校验模型、roundtrip 稳定性与可选 exact(Pyodide)语义校验.
@@ -79,10 +80,14 @@
 ## Command Details
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
-- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
+- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
+                                    [--verbose]
+                                    yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file
+usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
+                                    [--verbose]
+                                    yaml_file
 
 positional arguments:
   yaml_file             YAML 文件路径
@@ -98,10 +103,14 @@ options:
 
 ### `yaml-dsl schema validate`
 - Help: Validate YAML DSL via JSON Schema
-- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
+- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
+                                           [--json] [--verbose]
+                                           yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file
+usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
+                                           [--json] [--verbose]
+                                           yaml_file
 
 positional arguments:
   yaml_file             YAML 文件路径

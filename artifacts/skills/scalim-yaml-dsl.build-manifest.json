@@ -11,7 +11,8 @@
           "运行时 validator 错误列表包含 issue path",
           "校验命令输出与 schema 一致性",
           "CLI 校验输出包含源码位置",
-          "Linter/编译器风格输出"
+          "Linter/编译器风格输出",
+          "validate 对 `outputs.*.fields` object 条目给出可行动诊断"
         ],
         "slug": "yaml-dsl-cli-validation"
       },
@@ -103,7 +104,10 @@
           "retry 字段纳入 JSON Schema 与 hover 指引",
           "`_templates.retry.*` 受 schema 校验但 `_templates` 其它内容保持 freeform",
           "schema 说明源代码级 `normalize` 及其执行顺序",
-          "schema keeps `normalize` out of `main_source`"
+          "schema keeps `normalize` out of `main_source`",
+          "`outputs.*.fields` 支持 YAML alias 条目",
+          "alias identity 失败时允许唯一内容匹配",
+          "schema 允许 `outputs.*.fields` 包含 object 条目"
         ],
         "slug": "yaml-dsl-schema"
       },
@@ -250,7 +254,7 @@
   "inputs": [
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "6fe308bdd16485efb9d3af315d927858f81377c08e20ac3882bef3dc1361ebb9"
+      "sha256": "ea10ea49e4078696bef5bda9336d2e0292bf6e03abc22b7c78d0d8ab260509ac"
     },
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
@@ -294,7 +298,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
-      "sha256": "135918fe01a030898dcbefd0e170e6e10d8e2f4b7d687643989d56e28eaa7954"
+      "sha256": "54c7d8a6f53b56c075d713bc3433d20fa2c8849aee415ed502b35cafdafb93af"
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
@@ -302,7 +306,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "e8e86377e145227336c61a1f3aebe81d13c6975d3ea48616203e4c5ab215e352"
+      "sha256": "fc61cec8dc054c54d315e71b4670494f578900d1e12956eef5834f7df02b3205"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
@@ -310,17 +314,17 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "4caf36df224f5922e9e81968918675a5bcb509dd38784b99964ddf41528354c2"
+      "sha256": "ecebf6ad055ed91ed8b1a5916f51c19beb10679173f692588cd60c5ccd84db09"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "23182558611ebfb8e3ff8606790a3c351bb706966f0e9677b463ffa0de213805"
+      "sha256": "b1cf8309a2af2b96c244e2031962fb3d5bcc07aa135638c3a13aa0a76f168cd8"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "7a66ff85b1e1be14cd87423fcdff58722c263971887ece914ddf5971696c11da"
+      "sha256": "84e9b7d67f8b0708d5a9577ba7769e45fbd9f45ebd8659d7aec380a5f00f43bf"
     },
     {
       "path": "references/generated/example-full/ecommerce_report_fragments.yaml",
@@ -332,7 +336,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "d43384e24be19a4b8d003dc72eaefc0488da18f746817d15c0170e9520746683"
+      "sha256": "2d1269bb076ecf0bbba12e89ea63308f613f48ed93cc36a7e3f58499de5651d9"
     }
   ],
   "skill_name": "scalim-yaml-dsl"
