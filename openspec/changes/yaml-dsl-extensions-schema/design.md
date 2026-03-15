@@ -1,6 +1,6 @@
 ## Context
 
-本 change 只解决 “schema/loader 接受 `extensions`” 的前置条件;扩展解析、合并与执行在后续 changes 实现(见 `openspec/changes/yaml-dsl-extensibility-preproposal/` 的 umbrella 设计)。
+本 change 只解决 “schema/loader 接受 `extensions`” 的前置条件;扩展解析、合并与执行在后续 changes 实现(见 `openspec/changes/archive/2026-03-15-yaml-dsl-extensibility-preproposal/` 的 umbrella 设计)。
 
 关键约束:
 

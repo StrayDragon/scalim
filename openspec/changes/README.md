@@ -62,7 +62,7 @@
   - `openspec/changes/yaml-dsl-extensions-output-format-registry/`
   - `openspec/changes/yaml-dsl-extensions-custom-aggregates/`
   - `openspec/changes/yaml-dsl-extensions-analyze-cli/`
-- Umbrella/reference: `openspec/changes/yaml-dsl-extensibility-preproposal/`（Review & Split 已完成,保留设计与全量 delta spec 作为参考）
+- Umbrella/reference: `openspec/changes/archive/2026-03-15-yaml-dsl-extensibility-preproposal/`（Review & Split 已完成,保留设计与全量 delta spec 作为参考）
 
 2) `prompt-eval-workflow/`
 - 目标: 建立确定性 prompt-eval core（先做静态/边界用例, 后续再扩展模型评测）。
@@ -72,6 +72,7 @@
 
 - 完整列表见 `openspec/changes/archive/`。
 - 近期归档（示例）:
+  - `openspec/changes/archive/2026-03-15-yaml-dsl-extensibility-preproposal/`
   - `openspec/changes/archive/2026-03-15-frontend-yaml-dsl-editor-adaptations/`
   - `openspec/changes/archive/2026-03-15-scalim-viz-workflow-adaptations/`
   - `openspec/changes/archive/2026-03-15-marimo-notebooks-examples-suite/`

@@ -4,7 +4,7 @@
 
 umbrella 设计见:
 
-- `openspec/changes/yaml-dsl-extensibility-preproposal/design.md` 的 Decision 8/8.1/8.2
+- `openspec/changes/archive/2026-03-15-yaml-dsl-extensibility-preproposal/design.md` 的 Decision 8/8.1/8.2
 
 ## Decisions
 

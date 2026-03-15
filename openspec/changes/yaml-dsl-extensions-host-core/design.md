@@ -6,7 +6,7 @@ compute/output/aggregate/transform/analyze 的“具体运行语义”由后续 
 
 完整 umbrella 设计见:
 
-- `openspec/changes/yaml-dsl-extensibility-preproposal/design.md`
+- `openspec/changes/archive/2026-03-15-yaml-dsl-extensibility-preproposal/design.md`
 
 ## YAML Inputs (subset)
 
