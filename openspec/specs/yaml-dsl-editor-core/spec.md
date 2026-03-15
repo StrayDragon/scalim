@@ -40,7 +40,7 @@
 系统 MUST 提供可视化结构化编辑能力,并与 YAML 文本编辑保持双向同步:可视化 UI 的修改应实时反映到 YAML;用户直接编辑 YAML 时,可视化 UI 应基于解析结果刷新显示.
 
 #### Scenario: Visual 修改实时体现在 YAML
-- **WHEN** 用户在可视化 UI 中修改某个字段(例如 `output.path`)
+- **WHEN** 用户在可视化 UI 中修改某个字段(例如 `outputs[0].container.sheet`)
 - **THEN** YAML 文本应实时更新为等价变更
 
 #### Scenario: YAML 修改刷新 Visual
@@ -74,18 +74,34 @@
 
 系统 MUST 支持从本地导入 YAML 文件、将当前编辑内容导出为 YAML 文件,并提供“从模板新建”的起步体验(最小可运行配置 + 常见完整示例骨架).
 
-#### Scenario: 从模板新建
+#### Scenario: 从模板新建生成 `outputs` 最小配置
 - **WHEN** 用户选择“新建(最小模板)”
-- **THEN** 系统生成包含 `name`、`main_source` 与 `output` 的最小 YAML
-- **THEN** 系统将模板内容载入编辑器并可立即进行补全与校验
+- **THEN** 系统 MUST 生成包含 `name`、`main_source` 与 `outputs` 的最小 YAML
+- **AND** 该 YAML MUST 不包含旧顶层键 `output`
+- **AND** 该 YAML MUST 可通过 canonical schema 的 schema-only 校验
+- **AND** 系统将模板内容载入编辑器并可立即进行补全与校验
 
 ### Requirement: Outline 与快速导航
 
-系统 MUST 提供对 YAML DSL 结构的 outline(例如:top-level、main_source、sources、relations、fields、output、observability、guardrails),并支持点击导航到对应 YAML 文本位置.
+系统 MUST 提供对 YAML DSL 结构的 outline(例如:top-level、main_source、sources、relations、fields、outputs、observability、guardrails),并支持点击导航到对应 YAML 文本位置.
+
+#### Scenario: outline 展示并可定位 `outputs`
+- **GIVEN** YAML 顶层包含 `outputs`
+- **WHEN** 用户在 outline 中点击 `outputs`
+- **THEN** 系统 MUST 将视图定位到 YAML 中对应的 `outputs` 块
 
 #### Scenario: 通过 outline 跳转
 - **WHEN** 用户在 outline 中点击 `sources.customers.fields`
 - **THEN** 系统将光标/视图定位到 YAML 中对应的块位置
+
+### Requirement: 可选多 schema 选择(demand vs workflow)
+
+系统 MUST 支持对当前文档选择并应用 schema,至少覆盖 demand 与 workflow 两类 YAML,并让补全/hover/校验与 issue 定位复用同一套 UI 模型.
+
+#### Scenario: workflow YAML 使用 workflow schema 校验
+- **GIVEN** 用户打开一份 workflow YAML 文本
+- **WHEN** 用户选择 workflow schema(或系统根据文件类型自动选择)
+- **THEN** 系统 MUST 使用 workflow schema 提供 schema-only 校验与 hover
 
 ### Requirement: 可视化辅助视图(关系与依赖)
 
@@ -149,7 +165,7 @@ exact 执行边界 MUST 使用 `validate_yaml_text_json(...)`(或等价稳定 AP
 仅在无法安全补丁时允许大范围重写.
 
 #### Scenario: 标量修改不重写全文
-- **WHEN** 用户仅修改 `name` 或 `output.path`
+- **WHEN** 用户仅修改 `name` 或 `outputs[0].container.sheet`
 - **THEN** 系统 SHOULD 仅应用局部补丁并保留注释/排版
 
 ### Requirement: 重写前必须 diff 预览并显式确认

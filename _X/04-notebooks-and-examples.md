@@ -73,14 +73,22 @@ notebooks 大量逻辑并不在 notebooks 本身，而在：
 
 ---
 
-## 4) 覆盖矩阵(SSOT)：`notebooks/marimo/coverage_matrix.md`
+## 4) 覆盖报告(SSOT, generated)：`notebooks/marimo/marimo_coverage.gen.md`
 
-该文件明确把“能力点”映射到回归入口，避免示例碎片化：
+该文件用于把 “notebooks 示例套件” 映射到可执行回归入口，避免示例碎片化，并为 CI 提供可检查的 drift 守护。
 
-- Public API(re-export) 覆盖：`scalim.dsl.by_yaml`/`scalim.spec.ir`/`scalim.planning`/`scalim.execution`/`scalim.ob`
-- YAML DSL 能力点覆盖：outputs/workflow/normalize/micro-tunes 等
+它由脚本生成，不手工维护：
 
-如果你要删 notebooks，建议把这个矩阵迁移到更合适的位置(例如 `docs/doc/dev/` 或 `tests/` 里作为回归设计文档)，否则后续很容易出现“删了示例但不知道覆盖缺口”的回归风险。
+- 生成脚本：`scripts/gen-marimo-coverage.py`
+- 生成：`just gen-marimo-coverage`
+- 漂移检查：`just marimo-coverage-drift-check`（已纳入 `just qa`）
+
+覆盖口径(事实)：
+
+- marimo hubs / chapters / canonical YAML fixtures
+- `packages/scalim-misc` 中的 SSOT(章节/示例实现)
+- headless runner：`notebooks/marimo/run_examples.py`
+- pytest 复用点(如存在)
 
 ---
 
@@ -138,9 +146,8 @@ notebooks 大量逻辑并不在 notebooks 本身，而在：
 
 - `justfile` 中 `check:` recipe 不再依赖 `examples`
 - 删除 `packages/scalim-misc/src/scalim_misc/demo_big_data_report` 与 `examples/public_api` 套件(或外置)
-- 在 `tests/` 中补齐你认为不可失去的覆盖点(建议直接参考 coverage_matrix 逐项落到测试)
+- 在 `tests/` 中补齐你认为不可失去的覆盖点(建议直接参考 `notebooks/marimo/marimo_coverage.gen.md` 逐项落到测试)
 
 风险：
 
 - 需要你对“最小不可删能力”有明确清单，否则容易在后续演进中丢失端到端回归信号。
-

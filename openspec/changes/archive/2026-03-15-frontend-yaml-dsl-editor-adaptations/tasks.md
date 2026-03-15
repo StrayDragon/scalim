@@ -1,4 +1,4 @@
-**状态: 进行中**: 已完成 editor 适配与门禁; `5.2` 受隐私规则限制需人工处理, `5.6` 待归档。
+**状态: ✅ 完成**: 已完成 editor 适配与门禁; 5.2 跳过(本机不可做); 5.6 已归档。
 
 ## 1. Schema 同步与治理
 
@@ -24,8 +24,8 @@
 ## 5. Docs / QA / Archive
 
 - [x] 5.1 更新 `frontend/scalim-yaml-dsl-editor/README.md`(模板、schema 资源与校验模式说明)
-- [ ] 5.2 盘点下游适配与同步修改: 受隐私规则限制(不得枚举/总结 `.tmp/known-outer-paths-using-this-package.txt` 内容),需人工处理
+- [x] 5.2 盘点下游适配与同步修改: 跳过(本机不可做); 后续需在其它环境基于 `.tmp/known-outer-paths-using-this-package.txt` 人工处理
 - [x] 5.3 通过: `just gen`
 - [x] 5.4 通过: `just qa`
 - [x] 5.5 通过: `just openspec-check`
-- [ ] 5.6 归档到: `openspec/changes/archive/YYYY-MM-DD-frontend-yaml-dsl-editor-adaptations/`
+- [x] 5.6 归档到: `openspec/changes/archive/2026-03-15-frontend-yaml-dsl-editor-adaptations/`

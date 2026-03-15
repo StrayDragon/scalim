@@ -42,22 +42,37 @@
 
 ## 当前未归档 changes
 
-1) `frontend-yaml-dsl-editor-adaptations/`
-- 目标: 让编辑器模板/outline/visual 与最新 schema/validate 语义一致。
-- 当前状态见 `openspec/changes/frontend-yaml-dsl-editor-adaptations/tasks.md`（当前为“进行中”; 剩余 5.2/5.6 需处理与归档）。
+> 推荐处理顺序(Next):
+> `yaml-dsl-extensions-schema` →
+> `yaml-dsl-extensions-host-core` →
+> `yaml-dsl-extensions-transformers` →
+> `yaml-dsl-extensions-compute` →
+> `yaml-dsl-extensions-output-format-registry` →
+> `yaml-dsl-extensions-custom-aggregates` →
+> `yaml-dsl-extensions-analyze-cli` →
+> `prompt-eval-workflow`
+
+1) YAML DSL extensions 系列（由 preproposal 拆分）
+- 目标: 将 `extensions` 扩展方案按“底座 → 功能面”拆分为可实施的 changes,逐步落地并保持 `just qa` 可用。
+- 当前实现入口(SSOT):
+  - `openspec/changes/yaml-dsl-extensions-schema/`
+  - `openspec/changes/yaml-dsl-extensions-host-core/`
+  - `openspec/changes/yaml-dsl-extensions-transformers/`
+  - `openspec/changes/yaml-dsl-extensions-compute/`
+  - `openspec/changes/yaml-dsl-extensions-output-format-registry/`
+  - `openspec/changes/yaml-dsl-extensions-custom-aggregates/`
+  - `openspec/changes/yaml-dsl-extensions-analyze-cli/`
+- Umbrella/reference: `openspec/changes/yaml-dsl-extensibility-preproposal/`（Review & Split 已完成,保留设计与全量 delta spec 作为参考）
 
 2) `prompt-eval-workflow/`
 - 目标: 建立确定性 prompt-eval core（先做静态/边界用例, 后续再扩展模型评测）。
 - 当前状态见 `openspec/changes/prompt-eval-workflow/tasks.md`（当前为 DELAYED; 5.* 模型层需额外配置,暂不作为默认门禁）。
 
-3) `yaml-dsl-extensibility-preproposal/`
-- 目标: pre-proposal：YAML-first extensibility surfaces（trusted YAML + Python extensions），用于评审并拆分后续可实施的 changes。
-- 当前状态见 `openspec/changes/yaml-dsl-extensibility-preproposal/tasks.md`（优先 Review & Split）。
-
 ## 已归档（索引）
 
 - 完整列表见 `openspec/changes/archive/`。
 - 近期归档（示例）:
+  - `openspec/changes/archive/2026-03-15-frontend-yaml-dsl-editor-adaptations/`
   - `openspec/changes/archive/2026-03-15-scalim-viz-workflow-adaptations/`
   - `openspec/changes/archive/2026-03-15-marimo-notebooks-examples-suite/`
   - `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
