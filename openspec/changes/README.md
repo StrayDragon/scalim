@@ -44,16 +44,22 @@
 
 1) `frontend-yaml-dsl-editor-adaptations/`
 - 目标: 让编辑器模板/outline/visual 与最新 schema/validate 语义一致。
-- 当前状态见 `openspec/changes/frontend-yaml-dsl-editor-adaptations/tasks.md`（如仍标记 DELAYED, 先确认后端语义已稳定再开启实现）。
+- 当前状态见 `openspec/changes/frontend-yaml-dsl-editor-adaptations/tasks.md`（当前为“进行中”; 剩余 5.2/5.6 需处理与归档）。
 
 2) `prompt-eval-workflow/`
 - 目标: 建立确定性 prompt-eval core（先做静态/边界用例, 后续再扩展模型评测）。
-- 当前状态见 `openspec/changes/prompt-eval-workflow/tasks.md`（按该 tasks 约束执行）。
+- 当前状态见 `openspec/changes/prompt-eval-workflow/tasks.md`（当前为 DELAYED; 5.* 模型层需额外配置,暂不作为默认门禁）。
+
+3) `yaml-dsl-extensibility-preproposal/`
+- 目标: pre-proposal：YAML-first extensibility surfaces（trusted YAML + Python extensions），用于评审并拆分后续可实施的 changes。
+- 当前状态见 `openspec/changes/yaml-dsl-extensibility-preproposal/tasks.md`（优先 Review & Split）。
 
 ## 已归档（索引）
 
 - 完整列表见 `openspec/changes/archive/`。
 - 近期归档（示例）:
+  - `openspec/changes/archive/2026-03-15-scalim-viz-workflow-adaptations/`
+  - `openspec/changes/archive/2026-03-15-marimo-notebooks-examples-suite/`
   - `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
   - `openspec/changes/archive/2026-03-14-docs-demo-big-data-report-mainline/`
   - `openspec/changes/archive/2026-03-14-marimo-reexport-learning-suite/`

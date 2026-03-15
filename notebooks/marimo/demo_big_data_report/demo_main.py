@@ -15,7 +15,9 @@ def _(mo):
         - 章节代码可复用: 既能演示,也能当集成对拍 runner 的实现
 
         结构:
+        - `notebooks/marimo/index.py`: notebooks 总入口(hub)
         - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/chapters/`: 每个章节一个可调用的 `run_*()` 函数
+        - `chapters/*.py`: 每章一本 Marimo notebook(薄封装,1:1 对齐上面的 `run_*()`)
         - `notebooks/marimo/run_examples.py`: `just examples` 的 gate 入口(快速对拍)
         - `by_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
         """
@@ -35,20 +37,43 @@ def _():
     import sys
     from pathlib import Path
 
-    # `marimo` 运行/导出时,显式把仓库根目录加入 `sys.path`,方便相对路径访问示例资源.
-    repo_root = Path(__file__).resolve().parents[3]
-    repo_root_str = str(repo_root)
-    if repo_root_str not in sys.path:
-        sys.path.insert(0, repo_root_str)
+    from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
 
-    return Path
+    # `marimo` 运行/导出时,显式把仓库根目录加入 `sys.path`,方便相对路径访问示例资源.
+    repo_root = ensure_repo_root_on_sys_path(__file__)
+    _ = sys
+    return Path, repo_root
 
 
 @app.cell
-def _(Path):
+def _(Path, repo_root):
     demo_dir = Path(__file__).parent
     yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
-    return demo_dir, yaml_path
+    chapters_dir = demo_dir / "chapters"
+    _ = repo_root
+    return chapters_dir, demo_dir, yaml_path
+
+
+@app.cell(hide_code=True)
+def _(chapters_dir, mo):
+    chapter_files = []
+    if chapters_dir.exists():
+        chapter_files = sorted([p.name for p in chapters_dir.glob("*.py")])
+
+    lines = ["- `chapters/{}`".format(name) for name in chapter_files]
+    mo.md(
+        r"""
+        ---
+        ## 章节导航
+
+        每章 notebook 都是对 `scalim-misc` 章节 SSOT 的薄封装：用于讲解/展示 + 交互排障。
+        """
+    )
+    if lines:
+        mo.md("\n".join(lines))
+    else:
+        mo.callout(mo.md("`chapters/` 目录尚未生成。"), kind="warn")
+    return chapter_files, lines
 
 
 @app.cell(hide_code=True)

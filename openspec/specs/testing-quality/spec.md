@@ -296,17 +296,18 @@
 - **THEN** 派生聚合示例 MUST 被执行
 - **AND** 示例 MUST 通过对拍验证且结果确定(输出顺序/数值口径稳定)
 
-### Requirement: coverage_matrix.md 作为可检查的“用户功能组合覆盖(cov)”口径
-系统 MUST 提供 `notebooks/marimo/coverage_matrix.md` 作为 SSOT,用于把“公开入口 + YAML DSL 能力清单”映射到具体回归点:
+### Requirement: marimo_coverage.gen.md 作为可检查的 examples coverage 报告
+系统 MUST 提供 `notebooks/marimo/marimo_coverage.gen.md` 作为 SSOT,用于将 `notebooks/marimo/` 下的示例套件回归点映射到:
 
-- MUST 覆盖上述 5 个稳定入口模块(至少列出模块名与对应 notebook/章节/回归点)
-- MUST 覆盖 YAML DSL 的两套 schema 能力清单:
-  - demand YAML(`demand.gen.json`)
-  - workflow YAML(`workflow.gen.json`)
-- MUST 能表达“组合覆盖(cov)”(例如近期归档变更引入的关键组合场景)与其对应回归点
+- Marimo notebooks(教学入口)
+- `packages/scalim-misc` 的 SSOT chapters/examples(执行真相)
+- headless runner(`notebooks/marimo/run_examples.py`)与 pytest 复用点(如存在)
+- canonical YAML fixtures 与其 schema 绑定(至少 demand/workflow 两类 schema)
 
-#### Scenario: coverage_matrix.md 存在并包含入口清单
+该 coverage 报告 MUST 由脚本 `scripts/gen-marimo-coverage.py` 生成,不得手工维护.
+
+#### Scenario: coverage 报告存在且可再生
 - **WHEN** 维护者检查 `notebooks/marimo/` 目录
-- **THEN** MUST 存在 `notebooks/marimo/coverage_matrix.md`
-- **AND** 该文件 MUST 明确列出 5 个稳定入口模块与 demand/workflow 能力清单的覆盖映射
-
+- **THEN** MUST 存在 `notebooks/marimo/marimo_coverage.gen.md`
+- **AND** 运行 `just gen-marimo-coverage` MUST 能稳定生成相同内容
+- **AND** 运行 `just marimo-coverage-drift-check` MUST 在无漂移时返回 0

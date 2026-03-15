@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -43,17 +44,61 @@ def _configure_logging() -> None:
         logging.getLogger(name).setLevel(logging.ERROR if name == "scalim.sinks.sink_csv" else logging.WARNING)
 
 
-def main() -> int:
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Scalim examples runner (headless, deterministic).")
+    parser.add_argument(
+        "--suite",
+        action="append",
+        choices=["demo_big_data_report", "example_public_api"],
+        help="Run only selected suite(s). Can be repeated.",
+    )
+    parser.add_argument(
+        "--chapter",
+        action="append",
+        help="Run only selected demo chapter id(s). Only applies to demo_big_data_report. Can be repeated.",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List available suites/chapters and exit.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
     _configure_logging()
+
+    args = _parse_args(list(argv or sys.argv[1:]))
+    suites = set(args.suite or ["demo_big_data_report", "example_public_api"])
+
+    if args.list:
+        from scalim_misc.demo_big_data_report.chapters.registry import all_chapter_ids
+
+        print("套件:")
+        for suite_id in sorted(suites):
+            print("- {}".format(suite_id))
+        print("\n`demo_big_data_report` 章节:")
+        for chapter_id in all_chapter_ids():
+            print("- {}".format(chapter_id))
+        return 0
 
     demo_dir = Path(__file__).parent / "demo_big_data_report"
     yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
-    demo_results = run_all_chapters(yaml_path=yaml_path)
-    demo_examples = coerce_demo_chapter_results(suite_id="demo_big_data_report", results=demo_results)
 
-    public_api_examples = run_public_api_examples()
+    all_results = []
 
-    all_results = [*demo_examples, *public_api_examples]
+    if "demo_big_data_report" in suites:
+        if args.chapter:
+            from scalim_misc.demo_big_data_report.chapters.registry import run_selected_chapters
+
+            demo_results = run_selected_chapters(yaml_path=yaml_path, chapter_ids=args.chapter)
+        else:
+            demo_results = run_all_chapters(yaml_path=yaml_path)
+        demo_examples = coerce_demo_chapter_results(suite_id="demo_big_data_report", results=demo_results)
+        all_results.extend(demo_examples)
+
+    if "example_public_api" in suites:
+        all_results.extend(run_public_api_examples())
 
     for line in format_results(all_results):
         print(line)

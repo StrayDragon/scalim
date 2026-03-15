@@ -96,6 +96,16 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/loader-retry-policy/spec.md)
 - Summary: TBD - created by archiving change add-loader-retry-policy. Update Purpose after archive.
 
+### `marimo-demo-big-data-report-chapters`
+- Title: marimo-demo-big-data-report-chapters Specification
+- Source: [spec.md](#code=openspec/specs/marimo-demo-big-data-report-chapters/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 `demo_big_data_report` 主线示例在 `notebooks/marimo/` 下的章节化组织要求:以 `demo_main.py` 作为 hub,每个 SSOT chapter 对应一本 Marimo notebook,并与 headless runner/pytest 同源对拍.
+
+### `marimo-notebooks-examples-suite`
+- Title: marimo-notebooks-examples-suite Specification
+- Source: [spec.md](#code=openspec/specs/marimo-notebooks-examples-suite/spec.md)
+- Summary: **状态: ✅ 已实现** 定义仓库内 `notebooks/marimo/` 的示例/教学套件治理边界:Marimo notebooks 作为唯一交互载体,headless runner/pytest 作为确定性回归入口,并要求执行真相下沉到 `packages/scalim-misc`.
+
 ### `misc`
 - Title: misc Specification
 - Source: [spec.md](#code=openspec/specs/misc/spec.md)

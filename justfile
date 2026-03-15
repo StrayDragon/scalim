@@ -331,6 +331,14 @@ bump-versions VERSION="" CONFIRM="":
 gen-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py
 
+# 生成: notebooks/marimo 覆盖报告（generated）
+gen-marimo-coverage:
+    uv {{ UV_OPTIONS }} run python scripts/gen-marimo-coverage.py
+
+# 检查: notebooks/marimo 覆盖报告是否有 drift
+marimo-coverage-drift-check:
+    uv {{ UV_OPTIONS }} run python scripts/gen-marimo-coverage.py --check
+
 # 生成: 文档站点受控生成物(含 injected blocks)
 gen-docs:
     uv {{ UV_OPTIONS }} run python scripts/gen-docs.py
@@ -340,7 +348,7 @@ docs-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
 
 # 生成: 所有需要生成的数据
-gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-agent-skill gen-viz-data gen-viz-schedule-plan gen-docs
+gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-agent-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
 
 # 检查: 类型检查
 type-check:
@@ -450,7 +458,7 @@ prompt-eval-llm:
     uv {{ UV_OPTIONS }} run python scripts/prompt-eval.py --llm
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check doc-governance-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 
