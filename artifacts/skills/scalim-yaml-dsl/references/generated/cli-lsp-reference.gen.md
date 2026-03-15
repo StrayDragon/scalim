@@ -62,6 +62,7 @@
   - 编辑器暴露与 canonical schema 语义一致的 `extract`
   - 导入/导出与模板新建
   - Outline 与快速导航
+  - 可选多 schema 选择(demand vs workflow)
   - 可视化辅助视图(关系与依赖)
   - 统一 issue 数据模型与定位能力
   - 默认提供 schema-only 校验并支持 strict

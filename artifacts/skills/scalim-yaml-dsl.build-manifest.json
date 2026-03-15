@@ -27,6 +27,7 @@
           "编辑器暴露与 canonical schema 语义一致的 `extract`",
           "导入/导出与模板新建",
           "Outline 与快速导航",
+          "可选多 schema 选择(demand vs workflow)",
           "可视化辅助视图(关系与依赖)",
           "统一 issue 数据模型与定位能力",
           "默认提供 schema-only 校验并支持 strict",
@@ -302,7 +303,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
-      "sha256": "42518df6e32afb7d07b7c14071ed71265a73424ff5fcf1674f4d573b77363051"
+      "sha256": "972780001775d8741bb6ee9e5aa8c5ef39bf4f62c638f237dfad95a7c5c49f3f"
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
@@ -320,7 +321,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "b1cf8309a2af2b96c244e2031962fb3d5bcc07aa135638c3a13aa0a76f168cd8"
+      "sha256": "a4db9651cdf0ed72f6aedda722dd69b1c6ef79d9940d20e04d9f6eabc4aad02b"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
