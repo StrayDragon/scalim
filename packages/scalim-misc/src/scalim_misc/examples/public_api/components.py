@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from scalim.events.catalog import EVENT_LOADER_CALL, EVENT_PIPELINE_END, EVENT_PIPELINE_START
-from scalim.events.event import Event
 from scalim.execution.run_ir import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.hooks.base import BaseHook
 from scalim.ob.observer import Observer
@@ -12,6 +11,9 @@ from scalim.sinks.sink_memory import InMemoryRowSink
 
 from .._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from ._fixtures import build_minimal_public_api_ir
+
+if TYPE_CHECKING:
+    from scalim.events.event import Event
 
 
 @dataclass
@@ -22,27 +24,25 @@ class _HookStats:
 
 
 class _CounterHook(BaseHook):
-    event_types: Optional[Set[str]] = {EVENT_PIPELINE_START, EVENT_PIPELINE_END, EVENT_LOADER_CALL}
-
     def __init__(self) -> None:
+        self.event_types: Optional[Set[str]] = {EVENT_PIPELINE_START, EVENT_PIPELINE_END, EVENT_LOADER_CALL}
         self.stats = _HookStats()
 
-    def on_pipeline_start(self, event: Any) -> None:  # noqa: ANN401
+    def on_pipeline_start(self, event: Any) -> None:
         self.stats.pipeline_start += 1
 
-    def on_pipeline_end(self, event: Any) -> None:  # noqa: ANN401
+    def on_pipeline_end(self, event: Any) -> None:
         self.stats.pipeline_end += 1
 
-    def on_loader_call(self, event: Any) -> None:  # noqa: ANN401
+    def on_loader_call(self, event: Any) -> None:
         loader_name = getattr(event, "loader_name", None)
         if loader_name:
             self.stats.loader_calls.append(str(loader_name))
 
 
 class _TraceObserver(Observer):
-    event_types: Optional[Set[str]] = {EVENT_PIPELINE_START, EVENT_PIPELINE_END, EVENT_LOADER_CALL}
-
     def __init__(self) -> None:
+        self.event_types: Optional[Set[str]] = {EVENT_PIPELINE_START, EVENT_PIPELINE_END, EVENT_LOADER_CALL}
         self.seen_event_types: List[str] = []
 
     def on_event(self, event: Event) -> None:
