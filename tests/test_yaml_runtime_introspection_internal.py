@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from scalim.dsl.by_yaml.runtime import introspection as runtime_introspection
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, OutputAggregateConfig, OutputAggregateMetricConfig, OutputTargetConfig
+from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, OutputAggregateConfig, OutputAggregateFieldConfig, OutputTargetConfig
 from scalim.ob.presets.viz import VizObserver
 
 
@@ -17,9 +17,20 @@ def test_default_output_fields_primary_detail_no_fields_returns_empty_list() -> 
 def test_default_output_fields_primary_aggregate_includes_metrics_and_rank_field() -> None:
     agg = OutputAggregateConfig(
         group_by=("a",),
-        metrics={"m": OutputAggregateMetricConfig(op="count")},
-        rank_by="m",
-        rank_field_id="r",
+        fields={
+            "m": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "r": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "m",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+        },
     )
     config = DemandConfig(outputs=(OutputTargetConfig(name="agg", aggregate=agg),))
     assert runtime_introspection._default_output_fields_from_primary_output(config) == ["a", "m", "r"]  # noqa: SLF001

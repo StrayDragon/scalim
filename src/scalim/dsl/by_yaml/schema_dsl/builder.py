@@ -95,7 +95,6 @@ class SchemaBuilder:
             "field": self._build_field_definition(),
             "relation": self._build_definition(types_mod.RelationConfig),
             "output_container": self._build_definition(types_mod.OutputContainerConfig),
-            "output_aggregate_metric": self._build_definition(types_mod.OutputAggregateMetricConfig),
             "output_aggregate": self._build_definition(types_mod.OutputAggregateConfig),
             "output_target": self._build_definition(types_mod.OutputTargetConfig),
             "output_extra_sheet": self._build_definition(types_mod.OutputExtraSheetConfig),

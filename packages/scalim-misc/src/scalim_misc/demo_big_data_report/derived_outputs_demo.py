@@ -12,6 +12,7 @@ from scalim.execution.output_composition import (
     MetaSheetSpec,
     OutputCompositionSpec,
     OutputTargetSpec,
+    RankFieldSpec,
 )
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 
@@ -103,8 +104,7 @@ def run_derived_outputs_demo(output_path: str) -> DerivedOutputsDemoResult:
                             AggMetricSpec(out_field_id="sum_amount", op="sum", field_id="order_amount"),
                             AggMetricSpec(out_field_id="sum_profit", op="sum", field_id="profit"),
                         ),
-                        rank_by="sum_profit",
-                        rank_order="desc",
+                        rank_fields=(RankFieldSpec(out_field_id="rank", kind="row_number", by="sum_profit", order="desc"),),
                         max_groups=100,
                     ),
                     output_layout=summary_layout,

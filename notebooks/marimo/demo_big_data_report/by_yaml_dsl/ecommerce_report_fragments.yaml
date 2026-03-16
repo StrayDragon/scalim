@@ -30,8 +30,7 @@ agg_by_region_guardrails:
   distinct_on_overflow: truncate
 
 metric_order_cnt:
-  op: count
+  count: {}
 
 metric_sum_order_amount:
-  op: sum
-  field: order_amount
+  sum: {field: order_amount}

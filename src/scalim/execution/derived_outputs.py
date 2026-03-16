@@ -4,7 +4,7 @@ import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..typedefs import FieldValue, RowData
@@ -106,6 +106,34 @@ class AggMetricSpec:
     field_id: Optional[str] = None
     field_ids: Optional[Tuple[str, ...]] = None
     threshold: Optional[object] = None
+
+
+@dataclass(frozen=True)
+class RankFieldSpec:
+    """聚合输出中的排名字段定义(在 `finalize` 阶段计算)."""
+
+    out_field_id: str
+    kind: str
+    by: str
+    partition_by: Tuple[str, ...] = ()
+    order: str = "desc"
+    order_by: Tuple[str, ...] = ()
+    top_k: int = 0
+    top_k_mode: str = "rank"
+
+
+PostFieldCalculator = Callable[[RowData], FieldValue]
+
+
+@dataclass(frozen=True)
+class PostFieldSpec:
+    """聚合后派生字段定义(在 `finalize` 阶段计算)."""
+
+    out_field_id: str
+    kind: str
+    dependencies: Tuple[str, ...]
+    fingerprint: str
+    calculator: PostFieldCalculator
 
 
 _DECIMAL_ZERO = Decimal(0)
@@ -658,38 +686,32 @@ class GroupByAggregator(IRowAggregator):
 
 
 class RankedGroupByAggregator(IRowAggregator):
-    """`GroupBy` + `finalize` 阶段排序/排名.
+    """`GroupBy` + `finalize` 阶段排名/派生字段.
 
-    说明:
-    - 排名仅在 `finalize` 阶段执行(单线程),用于保持结果确定性.
-    - 平局时(`tie-break`)使用 `group_by` 键的稳定字符串键,避免对拍误报.
+    约束:
+    - 排名与聚合后派生字段仅在 `finalize` 阶段执行(单线程),用于保持结果确定性.
+    - 输出稳定性: 当 `order_by` 不足以区分行时,以 `group_by` 键的稳定字符串键作为最后的 `tie-break`.
     """
 
     _base: GroupByAggregator
     _group_by: Tuple[str, ...]
-    _rank_by: str
-    _rank_field_id: str
-    _order: str
-    _top_k: int
+    _rank_fields: Tuple[RankFieldSpec, ...]
+    _post_fields: Tuple[PostFieldSpec, ...]
 
     def __init__(
         self,
         *,
         group_by: Sequence[str],
         metrics: Sequence[AggMetricSpec],
-        rank_by: str,
-        rank_field_id: str = "rank",
-        order: str = "desc",
-        top_k: int = 0,
+        rank_fields: Sequence[RankFieldSpec] = (),
+        post_fields: Sequence[PostFieldSpec] = (),
         max_groups: int = 0,
         max_distinct: int = 0,
         distinct_on_overflow: str = "error",
     ) -> None:
         self._group_by = tuple(str(item) for item in group_by)
-        self._rank_by = str(rank_by)
-        self._rank_field_id = str(rank_field_id)
-        self._order = str(order or "desc").lower()
-        self._top_k = int(top_k) if top_k else 0
+        self._rank_fields = tuple(rank_fields)
+        self._post_fields = tuple(post_fields)
         self._base = GroupByAggregator(
             group_by=self._group_by,
             metrics=metrics,
@@ -708,37 +730,147 @@ class RankedGroupByAggregator(IRowAggregator):
 
     @override
     def finalize_rows(self) -> List[RowData]:
-        # 将 `base` 输出显式转为可变 `dict`,以便追加 `rank` 字段.
         rows: List[Dict[str, FieldValue]] = [dict(r) for r in self._base.finalize_rows()]
+        if not rows:
+            return []
 
-        def _rank_value_key(v: object) -> Tuple[int, Decimal, str]:
-            # `None` 永远排在最后;其余尽量按数值排序(失败时回退为稳定字符串键).
-            if v is None:
-                return (1, _DECIMAL_ZERO, "")
-            dec = _to_decimal(cast("NonNullFieldValue", v))
-            if dec is not None:
-                return (0, dec, "")
-            return (0, _DECIMAL_ZERO, _stable_sort_key(v))
+        for spec in self._rank_fields:
+            self._apply_rank_field(rows, spec)
 
-        def _row_sort_key(r: RowData) -> Tuple[int, Decimal, str, str]:
-            group_key = tuple(r.get(fid) for fid in self._group_by)
-            is_none, num_dec, s = _rank_value_key(r.get(self._rank_by))
-            if self._order != "asc":
-                num_dec = -num_dec
-            return (is_none, num_dec, s, _stable_group_key_tuple(group_key))
+        primary_rank = self._select_primary_rank_spec()
+        if primary_rank is not None:
+            rows = self._apply_top_k_and_sort(rows, primary_rank)
 
-        rows.sort(key=_row_sort_key)
+        for post in self._post_fields:
+            for row in rows:
+                row[str(post.out_field_id)] = post.calculator(row)
 
-        if self._top_k > 0:
-            rows = rows[: int(self._top_k)]
-
-        for idx, row in enumerate(rows):
-            row[self._rank_field_id] = int(idx) + 1
         return list(rows)
+
+    def _select_primary_rank_spec(self) -> Optional[RankFieldSpec]:
+        if not self._rank_fields:
+            return None
+        with_top_k = [r for r in self._rank_fields if int(r.top_k) > 0]
+        if with_top_k:
+            return with_top_k[0]
+        # 按 `out_field_id` 稳定选择一个,用于稳定输出顺序.
+        return sorted(self._rank_fields, key=lambda r: str(r.out_field_id))[0]
+
+    def _apply_top_k_and_sort(self, rows: List[Dict[str, FieldValue]], spec: RankFieldSpec) -> List[Dict[str, FieldValue]]:
+        partitions: Dict[Tuple[FieldValue, ...], List[Dict[str, FieldValue]]] = {}
+        for row in rows:
+            key = self._partition_key(row, spec)
+            partitions.setdefault(key, []).append(row)
+
+        ordered: List[Dict[str, FieldValue]] = []
+        for p_key in sorted(partitions.keys(), key=_stable_group_key_tuple):
+            bucket = partitions[p_key]
+            bucket.sort(key=lambda r: self._row_sort_key(r, spec))
+            if int(spec.top_k) > 0:
+                k = int(spec.top_k)
+                if str(spec.top_k_mode or "rank").lower() == "rows":
+                    bucket = bucket[:k]
+                else:
+                    out_key = str(spec.out_field_id)
+                    bucket = [r for r in bucket if int(r.get(out_key) or 0) <= k]
+            ordered.extend(bucket)
+
+        return ordered
+
+    def _partition_key(self, row: Dict[str, FieldValue], spec: RankFieldSpec) -> Tuple[FieldValue, ...]:
+        if not spec.partition_by:
+            return ()
+        return tuple(row.get(str(fid)) for fid in spec.partition_by)
+
+    def _row_sort_key(self, row: Dict[str, FieldValue], spec: RankFieldSpec) -> Tuple[object, ...]:
+        desc = str(spec.order or "desc").lower() != "asc"
+        order_fields = tuple(str(x) for x in (spec.order_by or ())) or (str(spec.by),)
+        key_parts: List[object] = []
+        for fid in order_fields:
+            key_parts.extend(self._value_sort_key(row.get(fid), desc=desc))
+        group_key = tuple(row.get(fid) for fid in self._group_by)
+        key_parts.append(_stable_group_key_tuple(group_key))
+        return tuple(key_parts)
+
+    def _value_sort_key(self, value: object, *, desc: bool) -> Tuple[int, int, "_ReversibleValue"]:
+        # `None` 永远排在最后;其余尽量按数值排序(失败时回退为稳定字符串键).
+        if value is None:
+            return (1, 0, _ReversibleValue(_DECIMAL_ZERO, desc=False))
+        dec = _to_decimal(cast("NonNullFieldValue", value))
+        if dec is not None:
+            return (0, 0, _ReversibleValue(dec, desc=desc))
+        return (0, 1, _ReversibleValue(_stable_sort_key(value), desc=desc))
+
+    def _apply_rank_field(self, rows: List[Dict[str, FieldValue]], spec: RankFieldSpec) -> None:
+        partitions: Dict[Tuple[FieldValue, ...], List[Dict[str, FieldValue]]] = {}
+        for row in rows:
+            key = self._partition_key(row, spec)
+            partitions.setdefault(key, []).append(row)
+
+        kind = str(spec.kind or "").strip()
+        out_key = str(spec.out_field_id)
+        by_key = str(spec.by)
+
+        for p_key in sorted(partitions.keys(), key=_stable_group_key_tuple):
+            bucket = partitions[p_key]
+            bucket.sort(key=lambda r: self._row_sort_key(r, spec))
+            if kind == "row_number":
+                for idx, row in enumerate(bucket):
+                    row[out_key] = int(idx) + 1
+                continue
+
+            prev_sig = None
+            last_rank = 0
+            for idx, row in enumerate(bucket):
+                sig = _stable_sort_key(row.get(by_key))
+                if idx == 0:
+                    last_rank = 1
+                elif sig != prev_sig:
+                    if kind == "rank":
+                        last_rank = int(idx) + 1
+                    else:
+                        last_rank += 1
+                row[out_key] = int(last_rank)
+                prev_sig = sig
 
     @override
     def diagnostics(self) -> AggregatorDiagnostics:
         return self._base.diagnostics()
+
+
+class _ReversibleValue:
+    desc: bool
+    value: Union[Decimal, str]
+
+    __slots__: Tuple[str, str] = ("desc", "value")
+
+    def __init__(self, value: Union[Decimal, str], *, desc: bool) -> None:
+        self.value = value
+        self.desc = bool(desc)
+
+    @override
+    def __hash__(self) -> int:
+        return hash((self.desc, self.value))
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, _ReversibleValue):  # pragma: no cover
+            return NotImplemented  # type: ignore[return-value]
+        if isinstance(self.value, Decimal) and isinstance(other.value, Decimal):  # noqa: SIM114
+            result = other.value < self.value if self.desc else self.value < other.value
+        elif isinstance(self.value, str) and isinstance(other.value, str):
+            result = other.value < self.value if self.desc else self.value < other.value
+        else:
+            # 防御性兜底: 理论上不会发生(由 `_value_sort_key` 保证类型一致),但这里仍保持确定性.
+            left = "{}:{}".format(type(self.value).__name__, str(self.value))
+            right = "{}:{}".format(type(other.value).__name__, str(other.value))
+            result = right < left if self.desc else left < right
+        return bool(result)
+
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, _ReversibleValue):  # pragma: no cover
+            return False
+        return bool(self.desc) == bool(other.desc) and self.value == other.value
 
 
 class DedupByThenAggregator(IRowAggregator):

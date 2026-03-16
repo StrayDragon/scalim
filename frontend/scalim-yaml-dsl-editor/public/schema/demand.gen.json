@@ -1827,97 +1827,6 @@
       ],
       "additionalProperties": false
     },
-    "output_aggregate_metric": {
-      "type": "object",
-      "properties": {
-        "op": {
-          "type": "string",
-          "description": "聚合算子",
-          "markdownDescription": "聚合算子.\n\n- `count`/`sum`/`min`/`max`\n- `count_true`/`count_true_gte`\n- `count_distinct`",
-          "enum": [
-            "count",
-            "sum",
-            "min",
-            "max",
-            "count_true",
-            "count_true_gte",
-            "count_distinct"
-          ],
-          "examples": [
-            "count",
-            "sum"
-          ]
-        },
-        "field": {
-          "type": "string",
-          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "输入字段(field_id)",
-          "markdownDescription": "输入字段(field_id).",
-          "examples": [
-            "order_id",
-            "amount_yuan"
-          ]
-        },
-        "fields": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
-          },
-          "minItems": 1,
-          "description": "输入字段列表(field_id 列表)",
-          "markdownDescription": "输入字段列表(field_id 列表).",
-          "examples": [
-            [
-              "user_id",
-              "device_id"
-            ]
-          ]
-        },
-        "threshold": {
-          "description": "阈值(部分算子需要)",
-          "markdownDescription": "阈值(部分算子需要;例如 `count_true_gte`)."
-        },
-        "$import": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
-            }
-          ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
-          "examples": [
-            "common.sources",
-            [
-              "common.sources",
-              "other.sources"
-            ]
-          ]
-        }
-      },
-      "anyOf": [
-        {
-          "required": [
-            "op"
-          ]
-        },
-        {
-          "required": [
-            "$import"
-          ]
-        }
-      ],
-      "additionalProperties": false
-    },
     "output_aggregate": {
       "type": "object",
       "properties": {
@@ -1931,7 +1840,7 @@
           },
           "minItems": 1,
           "description": "分组字段列表",
-          "markdownDescription": "分组字段列表(field_id 列表).",
+          "markdownDescription": "分组字段列表(`field_id` 列表).\n\n- `group_by` 引用的是输入行字段(`field_id`),来自 `where` 过滤后的行流\n- 每个唯一的 group key 组合会产生 1 行聚合输出\n- `partition_by`(排名分区)要求为 `group_by` 子集,用于保证聚合输出可解释性",
           "examples": [
             [
               "cs_id",
@@ -1939,7 +1848,7 @@
             ]
           ]
         },
-        "metrics": {
+        "fields": {
           "type": "object",
           "minProperties": 1,
           "propertyNames": {
@@ -1949,10 +1858,687 @@
             "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
           },
           "additionalProperties": {
-            "$ref": "#/definitions/output_aggregate_metric"
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "count"
+                ],
+                "properties": {
+                  "count": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "可选:输入字段(field_id);提供时统计非空值个数",
+                        "markdownDescription": "可选:输入字段(`field_id`);提供时统计非空值个数.",
+                        "examples": [
+                          "order_id"
+                        ]
+                      }
+                    },
+                    "description": "count: 行数(或非空值数)",
+                    "markdownDescription": "行数/计数指标.\n\n- `count: {}`: 统计组内行数\n- `count: {field: <field_id>}`: 统计组内该字段非空值个数\n\n执行阶段: 聚合指标(先于排名/派生字段).",
+                    "examples": [
+                      {},
+                      {
+                        "field": "order_id"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sum"
+                ],
+                "properties": {
+                  "sum": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "输入字段(field_id)",
+                        "markdownDescription": "输入字段(`field_id`).",
+                        "examples": [
+                          "amount_yuan"
+                        ]
+                      }
+                    },
+                    "description": "sum: 数值求和",
+                    "markdownDescription": "数值求和指标.\n\n- 跳过 `None`\n- 对非数值输入尽量做安全转换(失败则跳过)\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "examples": [
+                      {
+                        "field": "amount_yuan"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "min"
+                ],
+                "properties": {
+                  "min": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "输入字段(field_id)",
+                        "markdownDescription": "输入字段(`field_id`).",
+                        "examples": [
+                          "amount_yuan"
+                        ]
+                      }
+                    },
+                    "description": "min: 最小值",
+                    "markdownDescription": "最小值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "examples": [
+                      {
+                        "field": "amount_yuan"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "max"
+                ],
+                "properties": {
+                  "max": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "输入字段(field_id)",
+                        "markdownDescription": "输入字段(`field_id`).",
+                        "examples": [
+                          "amount_yuan"
+                        ]
+                      }
+                    },
+                    "description": "max: 最大值",
+                    "markdownDescription": "最大值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "examples": [
+                      {
+                        "field": "amount_yuan"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "count_true"
+                ],
+                "properties": {
+                  "count_true": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "输入字段(field_id)",
+                        "markdownDescription": "输入字段(`field_id`).",
+                        "examples": [
+                          "is_paid"
+                        ]
+                      }
+                    },
+                    "description": "count_true: 统计 truthy 行数",
+                    "markdownDescription": "统计组内某字段为 truthy 的行数.\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "examples": [
+                      {
+                        "field": "is_paid"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "count_true_gte"
+                ],
+                "properties": {
+                  "count_true_gte": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "field",
+                      "threshold"
+                    ],
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "输入字段(field_id)",
+                        "markdownDescription": "输入字段(`field_id`).",
+                        "examples": [
+                          "amount_yuan"
+                        ]
+                      },
+                      "threshold": {
+                        "description": "阈值(>= threshold 为 true)",
+                        "markdownDescription": "阈值(>= threshold 为 true).",
+                        "examples": [
+                          0,
+                          100,
+                          99.5
+                        ]
+                      }
+                    },
+                    "description": "count_true_gte: 统计数值 >= 阈值的行数",
+                    "markdownDescription": "统计组内某字段数值 >= 阈值的行数.\n\n参数:\n- `field`: 输入字段(`field_id`).\n- `threshold`: 阈值.",
+                    "examples": [
+                      {
+                        "field": "amount_yuan",
+                        "threshold": 100
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "count_distinct"
+                ],
+                "properties": {
+                  "count_distinct": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "oneOf": [
+                      {
+                        "required": [
+                          "field"
+                        ],
+                        "not": {
+                          "required": [
+                            "fields"
+                          ]
+                        }
+                      },
+                      {
+                        "required": [
+                          "fields"
+                        ],
+                        "not": {
+                          "required": [
+                            "field"
+                          ]
+                        }
+                      }
+                    ],
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "输入字段(field_id)",
+                        "markdownDescription": "输入字段(`field_id`).",
+                        "examples": [
+                          "user_id"
+                        ]
+                      },
+                      "fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                        },
+                        "minItems": 1,
+                        "description": "复合去重键(字段列表)",
+                        "markdownDescription": "复合去重键(`field_id` 列表).",
+                        "examples": [
+                          [
+                            "user_id",
+                            "item_id"
+                          ]
+                        ]
+                      }
+                    },
+                    "description": "count_distinct: 去重计数",
+                    "markdownDescription": "去重计数指标.\n\n- 支持单字段去重: `field`\n- 支持复合键去重: `fields`\n- 去重护栏由 `max_distinct`/`distinct_on_overflow` 控制\n\n约束:\n- 必须且只能提供 `field` 或 `fields` 之一.",
+                    "examples": [
+                      {
+                        "field": "user_id"
+                      },
+                      {
+                        "fields": [
+                          "user_id",
+                          "item_id"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "row_number"
+                ],
+                "properties": {
+                  "row_number": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "by"
+                    ],
+                    "properties": {
+                      "by": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "用于排序的字段(引用 group_by 或聚合指标字段)",
+                        "markdownDescription": "用于排序的字段(引用 `group_by` 或聚合指标字段).",
+                        "examples": [
+                          "sum_amount"
+                        ]
+                      },
+                      "partition_by": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                        },
+                        "minItems": 1,
+                        "description": "可选:排名分区字段列表(必须是 group_by 子集)",
+                        "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "examples": [
+                          [
+                            "region_id"
+                          ]
+                        ]
+                      },
+                      "order": {
+                        "type": "string",
+                        "enum": [
+                          "asc",
+                          "desc"
+                        ],
+                        "default": "desc",
+                        "description": "排序方向(asc/desc)",
+                        "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+                        "examples": [
+                          "desc"
+                        ]
+                      },
+                      "order_by": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                        },
+                        "minItems": 1,
+                        "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
+                        "markdownDescription": "可选:稳定排序字段列表.\n\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "examples": [
+                          [
+                            "sum_amount",
+                            "cs_id"
+                          ]
+                        ]
+                      },
+                      "top_k": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0,
+                        "description": "可选:每个分区保留前 K 个(0 表示不限制)",
+                        "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "examples": [
+                          0,
+                          100
+                        ]
+                      },
+                      "top_k_mode": {
+                        "type": "string",
+                        "enum": [
+                          "rank",
+                          "rows"
+                        ],
+                        "default": "rank",
+                        "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
+                        "markdownDescription": "top_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`",
+                        "examples": [
+                          "rank"
+                        ]
+                      }
+                    },
+                    "description": "row_number: 连续序号(不合并并列)",
+                    "markdownDescription": "连续序号(1..N),不合并并列.\n\n- `by`: 用于排序(并列不合并)\n- `partition_by`: 分区内重置序号(必须是 `group_by` 子集)\n\n执行阶段: 排名字段(在聚合指标之后).",
+                    "examples": [
+                      {
+                        "by": "sum_amount",
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rank"
+                ],
+                "properties": {
+                  "rank": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "by"
+                    ],
+                    "properties": {
+                      "by": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
+                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
+                        "examples": [
+                          "sum_amount"
+                        ]
+                      },
+                      "partition_by": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                        },
+                        "minItems": 1,
+                        "description": "可选:排名分区字段列表(必须是 group_by 子集)",
+                        "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "examples": [
+                          [
+                            "region_id"
+                          ]
+                        ]
+                      },
+                      "order": {
+                        "type": "string",
+                        "enum": [
+                          "asc",
+                          "desc"
+                        ],
+                        "default": "desc",
+                        "description": "排序方向(asc/desc)",
+                        "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+                        "examples": [
+                          "desc"
+                        ]
+                      },
+                      "order_by": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                        },
+                        "minItems": 1,
+                        "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
+                        "markdownDescription": "可选:稳定排序字段列表.\n\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "examples": [
+                          [
+                            "sum_amount",
+                            "cs_id"
+                          ]
+                        ]
+                      },
+                      "top_k": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0,
+                        "description": "可选:每个分区保留前 K 个(0 表示不限制)",
+                        "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "examples": [
+                          0,
+                          100
+                        ]
+                      },
+                      "top_k_mode": {
+                        "type": "string",
+                        "enum": [
+                          "rank",
+                          "rows"
+                        ],
+                        "default": "rank",
+                        "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
+                        "markdownDescription": "top_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`",
+                        "examples": [
+                          "rank"
+                        ]
+                      }
+                    },
+                    "description": "rank: SQL rank(并列共享名次,后续跳号)",
+                    "markdownDescription": "SQL `rank` 语义: (1,1,3...).\n\n- 并列判断只由 `by` 的值决定(不要用 `order_by` 打散并列)\n- `order_by` 仅用于输出稳定排序与 `top_k_mode=rows` 的确定性 tie-break\n\n执行阶段: 排名字段(在聚合指标之后).",
+                    "examples": [
+                      {
+                        "by": "sum_amount",
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dense_rank"
+                ],
+                "properties": {
+                  "dense_rank": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "by"
+                    ],
+                    "properties": {
+                      "by": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
+                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
+                        "examples": [
+                          "sum_amount"
+                        ]
+                      },
+                      "partition_by": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                        },
+                        "minItems": 1,
+                        "description": "可选:排名分区字段列表(必须是 group_by 子集)",
+                        "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "examples": [
+                          [
+                            "region_id"
+                          ]
+                        ]
+                      },
+                      "order": {
+                        "type": "string",
+                        "enum": [
+                          "asc",
+                          "desc"
+                        ],
+                        "default": "desc",
+                        "description": "排序方向(asc/desc)",
+                        "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+                        "examples": [
+                          "desc"
+                        ]
+                      },
+                      "order_by": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                        },
+                        "minItems": 1,
+                        "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
+                        "markdownDescription": "可选:稳定排序字段列表.\n\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "examples": [
+                          [
+                            "sum_amount",
+                            "cs_id"
+                          ]
+                        ]
+                      },
+                      "top_k": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0,
+                        "description": "可选:每个分区保留前 K 个(0 表示不限制)",
+                        "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "examples": [
+                          0,
+                          100
+                        ]
+                      },
+                      "top_k_mode": {
+                        "type": "string",
+                        "enum": [
+                          "rank",
+                          "rows"
+                        ],
+                        "default": "rank",
+                        "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
+                        "markdownDescription": "top_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`",
+                        "examples": [
+                          "rank"
+                        ]
+                      }
+                    },
+                    "description": "dense_rank: SQL dense_rank(并列共享名次,后续不跳号)",
+                    "markdownDescription": "SQL `dense_rank` 语义: (1,1,2...).\n\n- 并列判断只由 `by` 的值决定(不要用 `order_by` 打散并列)\n- `order_by` 仅用于输出稳定排序与 `top_k_mode=rows` 的确定性 tie-break\n\n执行阶段: 排名字段(在聚合指标之后).",
+                    "examples": [
+                      {
+                        "by": "sum_amount",
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "score_by_rank"
+                ],
+                "properties": {
+                  "score_by_rank": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "rank_field": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "description": "可选:引用的排名字段(out_field_id);缺省为 'rank'",
+                        "markdownDescription": "可选:引用的排名字段(out_field_id);缺省为 `rank`.",
+                        "examples": [
+                          "rank"
+                        ]
+                      },
+                      "base": {
+                        "description": "可选:基础分数(base)",
+                        "markdownDescription": "可选:基础分数(base).",
+                        "examples": [
+                          100
+                        ]
+                      },
+                      "step": {
+                        "description": "可选:每名次衰减(step)",
+                        "markdownDescription": "可选:每名次衰减(step).",
+                        "examples": [
+                          3
+                        ]
+                      }
+                    },
+                    "description": "score_by_rank: 基于 rank 计算 score",
+                    "markdownDescription": "基于排名字段计算 score(聚合后派生字段).\n\n默认公式:\n- `score = base - (rank - 1) * step`\n\n参数:\n- `rank_field`: 引用的排名字段(out_field_id),缺省为 `rank`\n- `base`: 基础分数(缺省 0)\n- `step`: 每名次衰减(缺省 1)\n\n执行阶段: 聚合后派生字段(在聚合指标与排名字段之后).",
+                    "examples": [
+                      {
+                        "rank_field": "rank",
+                        "base": 100,
+                        "step": 3
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "call_by"
+                ],
+                "properties": {
+                  "call_by": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "call_by: 聚合后派生字段的 hotfix 口子(安全引用,受 allowlist 约束)",
+                    "markdownDescription": "聚合后派生字段的 hotfix 口子(受 allowlist 约束).\n\n- 执行顺序: 聚合指标 → 排名字段 → `call_by`\n- 只可引用聚合输出行内的字段(例如 `group_by`/聚合指标/排名字段)\n- 不可引用明细行字段(聚合前状态不可用)\n\n示例:\n```yaml\nscore: {call_by: \"pkg.mod:fn(rank=rank, base=100, step=3)\"}\n```",
+                    "examples": [
+                      "pkg.mod:fn(rank=rank, base=100, step=3)"
+                    ]
+                  }
+                }
+              }
+            ]
           },
-          "description": "聚合指标映射(key 为 out_field_id)",
-          "markdownDescription": "聚合指标映射(key 为 out_field_id)."
+          "description": "聚合输出字段映射(key 为 out_field_id)",
+          "markdownDescription": "聚合输出字段映射(key 为 out_field_id).\n\n- map key 是输出字段 ID\n- map value 是“该字段如何产生”的声明,必须且只能选择一个 producer key\n- producer key 分三类:\n  1) 聚合指标函数(例如 `count`/`sum`/`count_distinct`)\n  2) 排名函数(例如 `row_number`/`rank`/`dense_rank`)\n  3) 聚合后派生字段(例如 `score_by_rank`/`call_by`)\n\n执行顺序:\n- 先聚合指标 → 再排名字段 → 再聚合后派生字段\n\n可引用字段范围(概念上):\n- 排名/派生字段可以引用 `group_by`/聚合指标/排名字段\n- 不可引用明细行的中间状态(聚合前数据不会被保留)"
         },
         "max_groups": {
           "type": "integer",
@@ -1989,48 +2575,6 @@
             "error"
           ]
         },
-        "rank_by": {
-          "type": "string",
-          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "可选:按某个输出字段排序生成 rank/top_k",
-          "markdownDescription": "可选:按某个输出字段排序生成 rank/top_k (字段为 out_field_id).",
-          "examples": [
-            "sum_amount"
-          ]
-        },
-        "rank_field_id": {
-          "type": "string",
-          "description": "rank 输出字段名",
-          "markdownDescription": "rank 输出字段名.",
-          "default": "rank",
-          "examples": [
-            "rank"
-          ]
-        },
-        "rank_order": {
-          "type": "string",
-          "description": "rank 排序方向(asc/desc)",
-          "markdownDescription": "rank 排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
-          "enum": [
-            "asc",
-            "desc"
-          ],
-          "default": "desc",
-          "examples": [
-            "desc"
-          ]
-        },
-        "top_k": {
-          "type": "integer",
-          "description": "top_k 限制(0 表示不限制)",
-          "markdownDescription": "top_k 限制(0 表示不限制).",
-          "minimum": 0,
-          "default": 0,
-          "examples": [
-            0,
-            100
-          ]
-        },
         "$import": {
           "oneOf": [
             {
@@ -2059,7 +2603,7 @@
         {
           "required": [
             "group_by",
-            "metrics"
+            "fields"
           ]
         },
         {
@@ -2147,7 +2691,7 @@
         "where": {
           "type": "string",
           "description": "可选:过滤表达式(安全表达式)",
-          "markdownDescription": "可选:过滤表达式(安全表达式).\n\n- 仅支持受限表达式(禁止任意 import)\n- 编译期静态提取依赖字段并注入 required fields",
+          "markdownDescription": "可选:行级过滤谓词(安全表达式),等价 SQL `WHERE`.\n\n执行阶段:\n- 明细输出: 写出前对每行执行,命中才写入该 output\n- 聚合输出: `group_by` 之前对每行执行,只有命中的行参与聚合\n\n变量来源:\n- 表达式可引用当前行的字段值,来自 demand 的 `fields.<field_id>`(包含 relation/derived 后的字段)\n- 系统会在编译期静态提取表达式依赖字段并注入 required fields\n- 只保证表达式引用到的字段会被准备;未引用字段可能为 `None`\n\n限制:\n- 仅支持受限表达式(禁止任意 import)\n- `where` 是按行过滤/路由,不是“是否启用 sheet/output”的开关;该能力应由未来独立字段提供(例如 `enabled_if`)\n- `where` 不能引用聚合后输出字段(例如 `aggregate.fields.*` 产生的指标/排名/派生字段)",
           "examples": [
             "channel == 'direct'"
           ]

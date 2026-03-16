@@ -29,7 +29,6 @@ from .observability import (
 )
 from .outputs import (
     OutputAggregateConfig,
-    OutputAggregateMetricConfig,
     OutputContainerConfig,
     OutputExtraSheetConfig,
     OutputTargetConfig,
@@ -84,7 +83,6 @@ MAIN_SOURCE_KEYS = _build_key_map(MainSourceConfig)
 SOURCE_FIELD_KEYS = _build_key_map(SourceFieldConfig)
 DERIVED_FIELD_KEYS = _build_key_map(DerivedFieldConfig)
 OUTPUT_CONTAINER_KEYS = _build_key_map(OutputContainerConfig)
-OUTPUT_AGGREGATE_METRIC_KEYS = _build_key_map(OutputAggregateMetricConfig)
 OUTPUT_AGGREGATE_KEYS = _build_key_map(OutputAggregateConfig)
 OUTPUT_TARGET_KEYS = _build_key_map(OutputTargetConfig)
 OUTPUT_EXTRA_SHEET_KEYS = _build_key_map(OutputExtraSheetConfig)

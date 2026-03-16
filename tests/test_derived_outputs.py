@@ -137,19 +137,98 @@ def test_group_by_aggregator_validation_and_ranked_finalize_branches() -> None:
     agg = mod.RankedGroupByAggregator(
         group_by=("g",),
         metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
-        rank_by="g",
-        top_k=1,
+        rank_fields=(
+            mod.RankFieldSpec(
+                out_field_id="rank",
+                kind="dense_rank",
+                by="cnt",
+                order="desc",
+                top_k=1,
+                top_k_mode="rank",
+            ),
+        ),
+        post_fields=(
+            mod.PostFieldSpec(
+                out_field_id="score",
+                kind="test",
+                dependencies=("rank",),
+                fingerprint="score=rank*10",
+                calculator=lambda row: int(row.get("rank") or 0) * 10,
+            ),
+        ),
     )
     assert agg.required_fields() == ("g",)
 
-    obj = object()
-    agg.accumulate({"g": None})
-    agg.accumulate({"g": obj})
-    agg.accumulate({"g": "app"})
+    agg.accumulate({"g": "a"})
+    agg.accumulate({"g": "a"})
+    agg.accumulate({"g": "b"})
+    agg.accumulate({"g": "b"})
+    agg.accumulate({"g": "c"})
     rows = agg.finalize_rows()
-    assert len(rows) == 1
-    assert rows[0]["rank"] == 1
+    # top_k_mode=rank expands ties (a/b both cnt=2)
+    assert rows == [
+        {"g": "a", "cnt": 2, "rank": 1, "score": 10},
+        {"g": "b", "cnt": 2, "rank": 1, "score": 10},
+    ]
     assert agg.diagnostics().meta["group_count"] == 3
+
+
+def test_ranked_group_by_aggregator_partition_and_top_k_rows_mode() -> None:
+    agg = mod.RankedGroupByAggregator(
+        group_by=("region", "g"),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+        rank_fields=(
+            mod.RankFieldSpec(
+                out_field_id="rank",
+                kind="rank",
+                by="cnt",
+                partition_by=("region",),
+                order="desc",
+                order_by=("cnt", "g"),
+                top_k=1,
+                top_k_mode="rows",
+            ),
+        ),
+    )
+
+    agg.accumulate({"region": "r1", "g": "a"})
+    agg.accumulate({"region": "r1", "g": "a"})
+    agg.accumulate({"region": "r1", "g": "b"})
+
+    agg.accumulate({"region": "r2", "g": "a"})
+    agg.accumulate({"region": "r2", "g": "b"})
+
+    rows = agg.finalize_rows()
+    # r1: cnt(a)=2, cnt(b)=1 -> keep a
+    # r2: cnt(a)=1, cnt(b)=1 -> order_by desc (g: b > a) -> keep b
+    assert rows == [
+        {"region": "r1", "g": "a", "cnt": 2, "rank": 1},
+        {"region": "r2", "g": "b", "cnt": 1, "rank": 1},
+    ]
+
+
+def test_ranked_group_by_aggregator_finalize_empty_returns_empty_list() -> None:
+    agg = mod.RankedGroupByAggregator(group_by=("g",), metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),))
+    assert agg.finalize_rows() == []
+
+
+def test_ranked_group_by_aggregator_without_rank_fields_skips_primary_rank() -> None:
+    agg = mod.RankedGroupByAggregator(group_by=("g",), metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),))
+    agg.accumulate({"g": "a"})
+    assert agg.finalize_rows() == [{"g": "a", "cnt": 1}]
+
+
+def test_ranked_group_by_aggregator_value_sort_key_none_branch() -> None:
+    agg = mod.RankedGroupByAggregator(group_by=("g",), metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),))
+    key = agg._value_sort_key(None, desc=False)  # noqa: SLF001
+    assert key[0] == 1
+
+
+def test_reversible_value_hash_and_mixed_type_lt_fallback_branch() -> None:
+    left = mod._ReversibleValue(Decimal("1"), desc=False)  # noqa: SLF001
+    right = mod._ReversibleValue("x", desc=False)  # noqa: SLF001
+    assert isinstance(hash(left), int)
+    assert (left < right) in (True, False)
 
 
 def test_aggregating_row_sink_close_and_closed_guards() -> None:

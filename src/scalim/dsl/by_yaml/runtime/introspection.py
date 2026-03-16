@@ -8,6 +8,9 @@ from ..schema_dsl.models import DemandConfig
 from .compiler import compile  # noqa: A004
 from .contracts import RunOptions
 
+_AGG_FUNC_KEYS = ("count", "sum", "min", "max", "count_true", "count_true_gte", "count_distinct")
+_RANK_FUNC_KEYS = ("row_number", "rank", "dense_rank")
+
 
 def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str]:
     outputs = config.outputs
@@ -21,12 +24,10 @@ def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str
             return []
         return list(primary.fields)
 
-    metric_ids = sorted(aggregate.metrics.keys())
-
-    resolved = list(aggregate.group_by) + list(metric_ids)
-    if aggregate.rank_by:
-        resolved.append(aggregate.rank_field_id or "rank")
-    return resolved
+    metric_ids = sorted([fid for fid, cfg in aggregate.fields.items() if str(cfg.producer_key) in _AGG_FUNC_KEYS])
+    rank_ids = sorted([fid for fid, cfg in aggregate.fields.items() if str(cfg.producer_key) in _RANK_FUNC_KEYS])
+    post_ids = sorted([fid for fid, cfg in aggregate.fields.items() if str(cfg.producer_key) in ("score_by_rank", "call_by")])
+    return list(aggregate.group_by) + metric_ids + rank_ids + post_ids
 
 
 def resolve_required_field_ids(  # noqa: C901
@@ -141,9 +142,13 @@ def load_output_config(yaml_path: str) -> Dict[str, Any]:
                     if t.aggregate is None
                     else {
                         "group_by": list(t.aggregate.group_by),
-                        "metric_ids": sorted(t.aggregate.metrics.keys()),
-                        "rank_by": str(t.aggregate.rank_by) if t.aggregate.rank_by else None,
-                        "rank_field_id": str(t.aggregate.rank_field_id or "rank"),
+                        "metric_ids": sorted([fid for fid, cfg in t.aggregate.fields.items() if str(cfg.producer_key) in _AGG_FUNC_KEYS]),
+                        "rank_field_ids": sorted(
+                            [fid for fid, cfg in t.aggregate.fields.items() if str(cfg.producer_key) in _RANK_FUNC_KEYS]
+                        ),
+                        "post_field_ids": sorted(
+                            [fid for fid, cfg in t.aggregate.fields.items() if str(cfg.producer_key) in ("score_by_rank", "call_by")]
+                        ),
                     }
                 ),
                 "container": (

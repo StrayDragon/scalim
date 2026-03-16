@@ -166,3 +166,35 @@ def test_doc_texts_first_non_empty_line_blank_returns_empty() -> None:
 def test_doc_texts_build_generated_doc_block_handles_empty_and_non_empty() -> None:
     assert yaml_doc_texts.build_generated_doc_block([]) == ""
     assert yaml_doc_texts.build_generated_doc_block(["a", "b"]) == "a\nb\n"
+
+
+def test_generated_schema_outputs_where_and_aggregate_hovers_are_detailed() -> None:
+    schema = load_schema(_schema_path("demand.gen.json"))
+
+    output_target = schema["definitions"]["output_target"]
+    where_schema = output_target["properties"]["where"]
+    where_md = where_schema.get("markdownDescription") or ""
+    assert "行级" in where_md
+    assert "group_by" in where_md
+    assert "fields.<field_id>" in where_md
+
+    agg = schema["definitions"]["output_aggregate"]
+    assert "metrics" not in agg["properties"]
+
+    group_by_md = agg["properties"]["group_by"].get("markdownDescription") or ""
+    assert "where" in group_by_md
+
+    fields_md = agg["properties"]["fields"].get("markdownDescription") or ""
+    assert "producer key" in fields_md
+    assert "执行顺序" in fields_md
+
+    one_of = agg["properties"]["fields"]["additionalProperties"]["oneOf"]
+    sum_schema = next(item["properties"]["sum"] for item in one_of if "sum" in item.get("properties", {}))
+    sum_md = sum_schema.get("markdownDescription") or ""
+    assert "参数" in sum_md
+    assert "`field`" in sum_md
+
+    dense_rank_schema = next(item["properties"]["dense_rank"] for item in one_of if "dense_rank" in item.get("properties", {}))
+    dense_rank_md = dense_rank_schema.get("markdownDescription") or ""
+    assert "并列" in dense_rank_md
+    assert "`by`" in dense_rank_md

@@ -13,6 +13,7 @@ from scalim.execution.output_composition import (
     MetaSheetSpec,
     OutputCompositionSpec,
     OutputTargetSpec,
+    RankFieldSpec,
     build_output_composition,
 )
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, run_ir
@@ -257,8 +258,7 @@ def test_ranked_summary_orders_and_adds_rank(tmp_path: Path) -> None:
         derived=DerivedGroupBySpec(
             group_by=("order_source",),
             metrics=(AggMetricSpec(out_field_id="sum_amount", op="sum", field_id="amount"),),
-            rank_by="sum_amount",
-            rank_order="desc",
+            rank_fields=(RankFieldSpec(out_field_id="rank", kind="dense_rank", by="sum_amount", order="desc"),),
         ),
         output_layout=ExportLayout(field_ids=("order_source", "sum_amount", "rank"), header_names=None),
         output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Rank"),
@@ -706,11 +706,11 @@ def test_two_stage_group_by_spec_methods_and_build(tmp_path: Path) -> None:
         stage1=DerivedGroupBySpec(
             group_by=("g",),
             metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
-            rank_by="cnt",
+            rank_fields=(RankFieldSpec(out_field_id="rank", kind="dense_rank", by="cnt", order="desc"),),
         ),
         stage2=stage2,
     )
-    with pytest.raises(ValueError, match="does not support rank_by"):
+    with pytest.raises(ValueError, match="two_stage_group_by does not support rank/post fields"):
         bad.validate_parallel_mode("seq")
 
     out = tmp_path / "report.xlsx"

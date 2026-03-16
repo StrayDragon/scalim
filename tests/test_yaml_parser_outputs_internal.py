@@ -5,8 +5,7 @@ from scalim.dsl.by_yaml.config_parsing.models import AliasIndex, FieldDef, Field
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
 from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputAggregateConfig,
-    OutputAggregateMetricConfig,
-    OutputAggregateMetricConfig as MetricCfg,
+    OutputAggregateFieldConfig,
     OutputContainerConfig,
     OutputTargetConfig,
 )
@@ -134,73 +133,153 @@ def test_parse_output_aggregate_defensive_checks() -> None:
     loader = YamlDemandLoader()
 
     with pytest.raises(TypeError, match=r"aggregate\.group_by must be a list"):
-        _ = loader._parse_output_aggregate({"group_by": "order_id", "metrics": {"cnt": {"op": "count"}}}, base_path="aggregate")
+        _ = loader._parse_output_aggregate({"group_by": "order_id", "fields": {"cnt": {"count": {}}}}, base_path="aggregate")
 
-    with pytest.raises(TypeError, match=r"aggregate\.metrics must be an object"):
-        _ = loader._parse_output_aggregate({"group_by": ["order_id"], "metrics": 1}, base_path="aggregate")
+    with pytest.raises(TypeError, match=r"aggregate\.fields must be an object"):
+        _ = loader._parse_output_aggregate({"group_by": ["order_id"], "fields": 1}, base_path="aggregate")
 
-    # invalid metric entries are skipped defensively
-    agg = loader._parse_output_aggregate({"group_by": ["order_id"], "metrics": {"": {"op": "count"}, "cnt": 1}}, base_path="aggregate")
-    assert agg.metrics == {}
+    with pytest.raises(ValueError, match=r"aggregate\.metrics was removed; use aggregate\.fields"):
+        _ = loader._parse_output_aggregate({"group_by": ["order_id"], "metrics": {"cnt": {"op": "count"}}}, base_path="aggregate")
 
     with pytest.raises(ValueError, match=r"max_groups must be >= 0"):
         _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "metrics": {"cnt": {"op": "count"}}, "max_groups": -1},
+            {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "max_groups": -1},
             base_path="aggregate",
         )
 
     with pytest.raises(ValueError, match=r"max_distinct must be >= 0"):
         _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "metrics": {"cnt": {"op": "count"}}, "max_distinct": -1},
+            {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "max_distinct": -1},
             base_path="aggregate",
         )
 
     with pytest.raises(ValueError, match=r"distinct_on_overflow='bad' is invalid"):
         _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "metrics": {"cnt": {"op": "count"}}, "distinct_on_overflow": "bad"},
+            {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "distinct_on_overflow": "bad"},
             base_path="aggregate",
         )
 
-    with pytest.raises(ValueError, match=r"rank_order='bad' is invalid"):
+    with pytest.raises(ValueError, match=r"aggregate\.rank_by was removed"):
         _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "metrics": {"cnt": {"op": "count"}}, "rank_order": "bad"},
+            {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "rank_by": "cnt"},
             base_path="aggregate",
         )
 
-    with pytest.raises(ValueError, match=r"top_k must be >= 0"):
-        _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "metrics": {"cnt": {"op": "count"}}, "top_k": -1},
-            base_path="aggregate",
-        )
+    parsed = loader._parse_output_aggregate(
+        {"group_by": ["order_id"], "fields": {"": {"count": {}}, "cnt": {"count": {}}}},
+        base_path="aggregate",
+    )
+    assert parsed.fields
+    assert "cnt" in parsed.fields
+    assert "" not in parsed.fields
 
 
-def test_parse_output_aggregate_metric_defensive_checks() -> None:
+def test_parse_output_aggregate_field_defensive_checks() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(TypeError, match=r"metric\.fields must be a list"):
-        _ = loader._parse_output_aggregate_metric({"op": "count_distinct", "fields": "user_id"}, base_path="metric")
+    with pytest.raises(TypeError, match=r"agg\.fields\.x must be an object"):
+        _ = loader._parse_output_aggregate_field(1, base_path="agg.fields.x")  # type: ignore[arg-type]
 
-    with pytest.raises(ValueError, match=r"metric\.op is required"):
-        _ = loader._parse_output_aggregate_metric({}, base_path="metric")
+    with pytest.raises(ValueError, match=r"agg\.fields\.x must not be empty"):
+        _ = loader._parse_output_aggregate_field({}, base_path="agg.fields.x")
 
-    with pytest.raises(ValueError, match=r"op='bad' is invalid"):
-        _ = loader._parse_output_aggregate_metric({"op": "bad"}, base_path="metric")
+    with pytest.raises(ValueError, match=r"must contain exactly 1 producer key"):
+        _ = loader._parse_output_aggregate_field({"count": {}, "sum": {"field": "v"}}, base_path="agg.fields.x")
 
-    with pytest.raises(ValueError, match=r"field is required for op='sum'"):
-        _ = loader._parse_output_aggregate_metric({"op": "sum"}, base_path="metric")
+    with pytest.raises(ValueError, match=r"unknown producer key"):
+        _ = loader._parse_output_aggregate_field({"bad": {}}, base_path="agg.fields.x")
 
-    with pytest.raises(ValueError, match=r"threshold is required for op='count_true_gte'"):
-        _ = loader._parse_output_aggregate_metric({"op": "count_true_gte", "field": "order_id"}, base_path="metric")
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.sum must be an object"):
+        _ = loader._parse_output_aggregate_field({"sum": 1}, base_path="agg.fields.x")
 
-    with pytest.raises(ValueError, match=r"does not allow both field and fields"):
-        _ = loader._parse_output_aggregate_metric({"op": "count_distinct", "field": "user_id", "fields": ["user_id"]}, base_path="metric")
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.sum\.field is required"):
+        _ = loader._parse_output_aggregate_field({"sum": {}}, base_path="agg.fields.x")
 
-    with pytest.raises(ValueError, match=r"requires field or fields"):
-        _ = loader._parse_output_aggregate_metric({"op": "count_distinct"}, base_path="metric")
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.by is required"):
+        _ = loader._parse_output_aggregate_field({"rank": {}}, base_path="agg.fields.x")
 
-    # normalization of `fields`
-    metric = loader._parse_output_aggregate_metric({"op": "count_distinct", "fields": ["user_id", ""]}, base_path="metric")
-    assert metric.field_ids == ("user_id",)
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.call_by must be a string"):
+        _ = loader._parse_output_aggregate_field({"call_by": {}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.call_by must not be empty"):
+        _ = loader._parse_output_aggregate_field({"call_by": "   "}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.call_by is invalid"):
+        _ = loader._parse_output_aggregate_field({"call_by": "bad"}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x must not be empty"):
+        _ = loader._parse_output_aggregate_field({"   ": {}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.count has unknown keys: bad"):
+        _ = loader._parse_output_aggregate_field({"count": {"bad": 1}}, base_path="agg.fields.x")
+
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.count_distinct\.fields must be a list"):
+        _ = loader._parse_output_aggregate_field({"count_distinct": {"fields": "a"}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_true_gte\.threshold is required"):
+        _ = loader._parse_output_aggregate_field({"count_true_gte": {"field": "v"}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_distinct does not allow both field and fields"):
+        _ = loader._parse_output_aggregate_field({"count_distinct": {"field": "a", "fields": ["b"]}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_distinct requires field or fields"):
+        _ = loader._parse_output_aggregate_field({"count_distinct": {}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_distinct\.fields must not be empty"):
+        _ = loader._parse_output_aggregate_field(
+            {"count_distinct": {"field": "a", "fields": []}},
+            base_path="agg.fields.x",
+        )
+
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.rank must be an object"):
+        _ = loader._parse_output_aggregate_field({"rank": 1}, base_path="agg.fields.x")  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank has unknown keys: bad"):
+        _ = loader._parse_output_aggregate_field({"rank": {"by": "cnt", "bad": 1}}, base_path="agg.fields.x")
+
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.rank\.partition_by must be a list"):
+        _ = loader._parse_output_aggregate_field({"rank": {"by": "cnt", "partition_by": "a"}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.partition_by must not be empty"):
+        _ = loader._parse_output_aggregate_field(
+            {"rank": {"by": "cnt", "partition_by": [" "]}},
+            base_path="agg.fields.x",
+        )
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.order='bad' is invalid"):
+        _ = loader._parse_output_aggregate_field({"rank": {"by": "cnt", "order": "bad"}}, base_path="agg.fields.x")
+
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.rank\.order_by must be a list"):
+        _ = loader._parse_output_aggregate_field({"rank": {"by": "cnt", "order_by": "a"}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.order_by must not be empty"):
+        _ = loader._parse_output_aggregate_field({"rank": {"by": "cnt", "order_by": [" "]}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.top_k must be >= 0"):
+        _ = loader._parse_output_aggregate_field({"rank": {"by": "cnt", "top_k": -1}}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.top_k_mode='bad' is invalid"):
+        _ = loader._parse_output_aggregate_field({"rank": {"by": "cnt", "top_k_mode": "bad"}}, base_path="agg.fields.x")
+
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.score_by_rank must be an object"):
+        _ = loader._parse_output_aggregate_field({"score_by_rank": "x"}, base_path="agg.fields.x")
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.score_by_rank has unknown keys: bad"):
+        _ = loader._parse_output_aggregate_field({"score_by_rank": {"bad": 1}}, base_path="agg.fields.x")
+
+    parsed = loader._parse_output_aggregate_field(
+        {
+            "rank": {
+                "by": "cnt",
+                "partition_by": ["g"],
+                "order_by": ["cnt", "g"],
+            }
+        },
+        base_path="agg.fields.x",
+    )
+    assert parsed.producer_key == "rank"
+    assert parsed.config["partition_by"] == ("g",)
+    assert parsed.config["order_by"] == ("cnt", "g")
 
 
 def test_parse_where_requires_defensive_blank_and_errors() -> None:
@@ -243,59 +322,238 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         return OutputTargetConfig(name="detail", container=container, fields=("order_id",))
 
     # aggregate.group_by empty
-    agg = OutputAggregateConfig(group_by=(), metrics={"cnt": MetricCfg(op="count")})
+    agg = OutputAggregateConfig(group_by=(), fields={"cnt": OutputAggregateFieldConfig(producer_key="count", config={})})
     with pytest.raises(ValueError, match=r"aggregate\.group_by cannot be empty"):
         loader._validate_outputs_semantics(
             [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
         )
 
-    # aggregate.metrics empty
-    agg = OutputAggregateConfig(group_by=("order_id",), metrics={})
-    with pytest.raises(ValueError, match=r"aggregate\.metrics cannot be empty"):
+    # aggregate.fields empty
+    agg = OutputAggregateConfig(group_by=("order_id",), fields={})
+    with pytest.raises(ValueError, match=r"aggregate\.fields cannot be empty"):
         loader._validate_outputs_semantics(
             [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
         )
 
     # overlap between group_by and metric ids
-    agg = OutputAggregateConfig(group_by=("dup",), metrics={"dup": MetricCfg(op="count")})
-    with pytest.raises(ValueError, match=r"metrics ids conflict with group_by"):
+    agg = OutputAggregateConfig(group_by=("dup",), fields={"dup": OutputAggregateFieldConfig(producer_key="count", config={})})
+    with pytest.raises(ValueError, match=r"fields ids conflict with group_by"):
         loader._validate_outputs_semantics([OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"dup"})
 
-    # rank_field_id conflicts with group_by
-    agg = OutputAggregateConfig(group_by=("order_id",), metrics={"cnt": MetricCfg(op="count")}, rank_field_id="order_id")
-    with pytest.raises(ValueError, match=r"rank_field_id conflicts with group_by"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
-
     # group_by unknown
-    agg = OutputAggregateConfig(group_by=("missing",), metrics={"cnt": MetricCfg(op="count")})
+    agg = OutputAggregateConfig(group_by=("missing",), fields={"cnt": OutputAggregateFieldConfig(producer_key="count", config={})})
     with pytest.raises(ValueError, match=r"group_by reference unknown fields"):
         loader._validate_outputs_semantics([OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids=set())
 
-    # metrics reference unknown fields
-    agg = OutputAggregateConfig(group_by=("order_id",), metrics={"sum_amount": MetricCfg(op="sum", field_id="missing")})
-    with pytest.raises(ValueError, match=r"metrics reference unknown fields"):
+    # agg metric reference unknown input fields
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "sum_amount": OutputAggregateFieldConfig(producer_key="sum", config={"field": "missing"}),
+        },
+    )
+    with pytest.raises(ValueError, match=r"fields reference unknown input fields"):
         loader._validate_outputs_semantics(
             [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
         )
 
-    # rank_by must be group_by or metric ids
-    agg = OutputAggregateConfig(group_by=("order_id",), metrics={"cnt": MetricCfg(op="count")}, rank_by="bad")
-    with pytest.raises(ValueError, match=r"aggregate\.rank_by='bad'"):
+    # rank.by must be group_by field or agg metric id
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "rank": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "bad",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"by='bad'"):
         loader._validate_outputs_semantics(
             [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
         )
 
-    # rank_field_id conflicts with metrics id
-    agg = OutputAggregateConfig(group_by=("order_id",), metrics={"rank": MetricCfg(op="count")}, rank_field_id="rank")
-    with pytest.raises(ValueError, match=r"rank_field_id conflicts with metrics id"):
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "rank": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "cnt",
+                    "partition_by": ("missing",),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"partition_by must be a subset of group_by"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
+        )
+
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "rank": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "cnt",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 1,
+                    "top_k_mode": "rows",
+                },
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"top_k_mode='rows' requires order_by"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
+        )
+
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "rank": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "cnt",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": ("cnt",),
+                    "top_k": 1,
+                    "top_k_mode": "rows",
+                },
+            ),
+            "score": OutputAggregateFieldConfig(
+                producer_key="score_by_rank",
+                config={"rank_field": "missing"},
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"score_by_rank rank_field='missing'"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
+        )
+
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "rank": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "cnt",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": ("cnt",),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+            "score": OutputAggregateFieldConfig(
+                producer_key="call_by",
+                config="pkg.mod:fn(x=missing)",
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"call_by reference unknown fields"):
         loader._validate_outputs_semantics(
             [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
         )
 
     # workbook share loop: len(names) <= 1 path should short-circuit (covers `continue`)
     loader._validate_outputs_semantics([_detail()], known_field_ids={"order_id"})
+
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "rank": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "order_id",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"must include at least one aggregation function field"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
+        )
+
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "rank": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "cnt",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": ("missing",),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"order_by reference unknown agg output fields"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
+        )
+
+    agg = OutputAggregateConfig(
+        group_by=("order_id",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "r1": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "cnt",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 1,
+                    "top_k_mode": "rank",
+                },
+            ),
+            "r2": OutputAggregateFieldConfig(
+                producer_key="rank",
+                config={
+                    "by": "cnt",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 1,
+                    "top_k_mode": "rank",
+                },
+            ),
+        },
+    )
+    with pytest.raises(ValueError, match=r"supports top_k on at most one rank field"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
+        )
 
 
 def test_validate_outputs_semantics_shared_workbook_loop_skips_non_workbook_targets() -> None:
@@ -326,8 +584,8 @@ def test_collect_required_field_ids_from_aggregate_includes_fields_list() -> Non
     loader = YamlDemandLoader()
     agg = OutputAggregateConfig(
         group_by=("order_id",),
-        metrics={
-            "distinct_users": OutputAggregateMetricConfig(op="count_distinct", field_ids=("user_id", "device_id")),
+        fields={
+            "distinct_users": OutputAggregateFieldConfig(producer_key="count_distinct", config={"fields": ("user_id", "device_id")}),
         },
     )
     required = loader._collect_required_field_ids_from_aggregate(agg)

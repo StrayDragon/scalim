@@ -107,21 +107,10 @@ Sources:
 ### `output_aggregate`
 - `$import`: $import 引用(支持 string 或 string list)
 - `distinct_on_overflow`: type=string; default=error; enum=error|truncate; distinct 护栏溢出策略(error/truncate)
+- `fields`: type=object; 聚合输出字段映射(key 为 out_field_id)
 - `group_by`: type=array[string]; 分组字段列表
 - `max_distinct`: type=integer; default=0; max_distinct 护栏(0 表示不限制)
 - `max_groups`: type=integer; default=0; max_groups 护栏(0 表示不限制)
-- `metrics`: type=object; 聚合指标映射(key 为 out_field_id)
-- `rank_by`: type=string; 可选:按某个输出字段排序生成 rank/top_k
-- `rank_field_id`: type=string; default=rank; rank 输出字段名
-- `rank_order`: type=string; default=desc; enum=asc|desc; rank 排序方向(asc/desc)
-- `top_k`: type=integer; default=0; top_k 限制(0 表示不限制)
-
-### `output_aggregate_metric`
-- `$import`: $import 引用(支持 string 或 string list)
-- `field`: type=string; 输入字段(field_id)
-- `fields`: type=array[string]; 输入字段列表(field_id 列表)
-- `op`: type=string; enum=count|sum|min|max|count_true|count_true_gte|count_distinct; 聚合算子
-- `threshold`: 阈值(部分算子需要)
 
 ### `output_container`
 - `$import`: $import 引用(支持 string 或 string list)

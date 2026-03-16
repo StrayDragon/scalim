@@ -184,8 +184,8 @@ outputs:
     fields: [order_id]
     aggregate:
       group_by: [order_id]
-      metrics:
-        order_cnt: {op: count, field: order_id}
+      fields:
+        order_cnt: {count: {field: order_id}}
 """
     with pytest.raises(ValueError, match="does not allow fields"):
         _ = _load(yaml_content)

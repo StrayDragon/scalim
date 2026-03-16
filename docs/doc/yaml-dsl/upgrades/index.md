@@ -22,4 +22,5 @@
 - [2026-03-13: yaml-reuse-workflow](2026-03-13-yaml-reuse-workflow.gen.md)
 - [2026-03-13: yaml-source-normalize-shapes](2026-03-13-yaml-source-normalize-shapes.gen.md)
 - [2026-03-14: yaml-dsl-output-fields-alias](2026-03-14-yaml-dsl-output-fields-alias.gen.md)
+- [2026-03-16: yaml-dsl-outputs-aggregate-fields](2026-03-16-yaml-dsl-outputs-aggregate-fields.gen.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

@@ -19,7 +19,6 @@ from .keys import (
     NORMALIZE_KEYS,
     OBSERVABILITY_KEYS,
     OUTPUT_AGGREGATE_KEYS,
-    OUTPUT_AGGREGATE_METRIC_KEYS,
     OUTPUT_CONTAINER_KEYS,
     OUTPUT_EXTRA_SHEET_KEYS,
     OUTPUT_TARGET_KEYS,
@@ -60,7 +59,7 @@ from .observability import (
 )
 from .outputs import (
     OutputAggregateConfig,
-    OutputAggregateMetricConfig,
+    OutputAggregateFieldConfig,
     OutputContainerConfig,
     OutputExtraSheetConfig,
     OutputTargetConfig,
@@ -110,7 +109,6 @@ __all__ = [
     "NORMALIZE_KEYS",
     "OBSERVABILITY_KEYS",
     "OUTPUT_AGGREGATE_KEYS",
-    "OUTPUT_AGGREGATE_METRIC_KEYS",
     "OUTPUT_CONTAINER_KEYS",
     "OUTPUT_EXTRA_SHEET_KEYS",
     "OUTPUT_TARGET_KEYS",
@@ -154,7 +152,7 @@ __all__ = [
     "ObservabilityConfig",
     "ObservabilityRaw",
     "OutputAggregateConfig",
-    "OutputAggregateMetricConfig",
+    "OutputAggregateFieldConfig",
     "OutputContainerConfig",
     "OutputExtraSheetConfig",
     "OutputTargetConfig",

@@ -22,7 +22,9 @@ from .derived_outputs import (
     DedupByThenAggregator,
     GroupByAggregator,
     IRowAggregator,
+    PostFieldSpec,
     RankedGroupByAggregator,
+    RankFieldSpec,
     TwoStageGroupByAggregator,
     fingerprint_for_meta,
 )
@@ -74,19 +76,39 @@ def _metric_fingerprint_part(m: AggMetricSpec) -> str:
     return "{}|op={}|field_id={}|field_ids={}|threshold={}".format(str(m.out_field_id), str(m.op), field_id, field_ids, threshold)
 
 
+def _rank_field_fingerprint_part(r: RankFieldSpec) -> str:
+    return "{}|kind={}|by={}|partition_by={}|order={}|order_by={}|top_k={}|top_k_mode={}".format(
+        str(r.out_field_id),
+        str(r.kind),
+        str(r.by),
+        ",".join(str(x) for x in (r.partition_by or ())),
+        str(r.order),
+        ",".join(str(x) for x in (r.order_by or ())),
+        int(r.top_k),
+        str(r.top_k_mode),
+    )
+
+
+def _post_field_fingerprint_part(p: PostFieldSpec) -> str:
+    return "{}|kind={}|deps={}|fingerprint={}".format(
+        str(p.out_field_id),
+        str(p.kind),
+        ",".join(str(x) for x in (p.dependencies or ())),
+        str(p.fingerprint),
+    )
+
+
 @dataclass(frozen=True)
 class DerivedGroupBySpec(IDerivedAggregationSpec):
     """派生汇总输出(内置 `group_by`)."""
 
     group_by: Tuple[str, ...]
     metrics: Tuple[AggMetricSpec, ...]
+    rank_fields: Tuple[RankFieldSpec, ...] = ()
+    post_fields: Tuple[PostFieldSpec, ...] = ()
     max_groups: int = 0
     max_distinct: int = 0
     distinct_on_overflow: str = "error"
-    rank_by: Optional[str] = None
-    rank_field_id: str = "rank"
-    rank_order: str = "desc"
-    top_k: int = 0
 
     @override
     def required_fields(self) -> Tuple[str, ...]:
@@ -101,14 +123,15 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
         parts.append("max_groups=" + str(int(self.max_groups)))
         parts.append("max_distinct=" + str(int(self.max_distinct)))
         parts.append("distinct_on_overflow=" + str(self.distinct_on_overflow or "error").lower())
-        if self.rank_by:
-            parts.append("rank_by=" + str(self.rank_by))
-            parts.append("rank_field_id=" + str(self.rank_field_id))
-            parts.append("rank_order=" + str(self.rank_order))
-            parts.append("top_k=" + str(int(self.top_k)))
         parts.append("metrics=")
         for m in self.metrics:
             parts.append("  " + _metric_fingerprint_part(m))
+        parts.append("rank_fields=")
+        for r in sorted(self.rank_fields, key=lambda x: str(x.out_field_id)):
+            parts.append("  " + _rank_field_fingerprint_part(r))
+        parts.append("post_fields=")
+        for p in sorted(self.post_fields, key=lambda x: str(x.out_field_id)):
+            parts.append("  " + _post_field_fingerprint_part(p))
         return tuple(parts)
 
     @override
@@ -121,14 +144,12 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
 
     @override
     def build_aggregator(self) -> IRowAggregator:
-        if self.rank_by:
+        if self.rank_fields or self.post_fields:
             return RankedGroupByAggregator(
                 group_by=self.group_by,
                 metrics=self.metrics,
-                rank_by=str(self.rank_by),
-                rank_field_id=str(self.rank_field_id),
-                order=str(self.rank_order),
-                top_k=int(self.top_k),
+                rank_fields=self.rank_fields,
+                post_fields=self.post_fields,
                 max_groups=int(self.max_groups),
                 max_distinct=int(self.max_distinct),
                 distinct_on_overflow=str(self.distinct_on_overflow),
@@ -238,8 +259,8 @@ class TwoStageGroupBySpec(IDerivedAggregationSpec):
 
     @override
     def validate_parallel_mode(self, parallel_mode: str) -> None:
-        if self.stage1.rank_by or self.stage2.rank_by:
-            msg = "two_stage_group_by does not support rank_by in stage specs"
+        if self.stage1.rank_fields or self.stage1.post_fields or self.stage2.rank_fields or self.stage2.post_fields:
+            msg = "two_stage_group_by does not support rank/post fields in stage specs"
             raise ValueError(msg)
         self.stage1.validate_parallel_mode(parallel_mode)
         self.stage2.validate_parallel_mode(parallel_mode)
