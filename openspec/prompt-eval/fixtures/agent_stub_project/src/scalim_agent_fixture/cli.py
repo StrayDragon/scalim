@@ -128,7 +128,7 @@ def _cmd_missing(_args: argparse.Namespace) -> int:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="scalim-cli")
+    parser = argparse.ArgumentParser(prog=Path(sys.argv[0]).name)
     subparsers = parser.add_subparsers(dest="command")
 
     yaml_dsl = subparsers.add_parser("yaml-dsl", help="fixture-only YAML DSL utilities")

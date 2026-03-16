@@ -18,6 +18,7 @@
     - 配置 SSOT: `openspec/prompt-eval/promptfoo/promptfooconfig.agent.yaml`
     - workspace fixture: `openspec/prompt-eval/fixtures/agent_stub_project/`
     - assertions: `openspec/prompt-eval/promptfoo/assertions/`
+    - fixture CLI: workspace 内部命令为 `scalim-fixture-cli`；同时在 workspace venv 中生成 `scalim-cli` shim 以兼容 skill 文档中的命令模板
 
 ## 前置条件
 
@@ -79,3 +80,14 @@ T1 配置 SSOT: `openspec/prompt-eval/promptfoo/promptfooconfig.agent.yaml`
 - 更换用户常用 provider: 直接替换 `providers` 配置(保持 output_schema 与 assertions 可用)
 
 如果 promptfoo 报 provider 依赖缺失(例如 `openai:codex-sdk`),需要先安装对应依赖包(例如 `@openai/codex-sdk`)。
+
+## 排错: `scalim-cli` 被污染/劫持
+
+如果你发现 `which scalim-cli` 指向仓库 `.venv/bin/scalim-cli`,但其实际入口来自 prompt-eval fixture(例如导入 `scalim_agent_fixture`),说明你的开发 venv 曾被误装过 fixture。
+
+恢复方式(示例):
+
+```bash
+uv pip uninstall scalim-agent-fixture
+uv pip install -e .
+```

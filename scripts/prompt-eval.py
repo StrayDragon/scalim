@@ -449,8 +449,8 @@ def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, 
     workspace_dir.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(str(fixture_dir), str(workspace_dir))
 
-    # Pre-create a local uv environment and install the fixture project so that
-    # `uv run scalim-cli ...` resolves to the workspace-local entrypoint (not any global one).
+    # Pre-create a local uv environment and generate venv-local entrypoints so that
+    # `uv run scalim-cli ...` resolves to the workspace-local stub (not any global one).
     try:
         uv_env = dict(environ)
         active_venv = uv_env.pop("VIRTUAL_ENV", None)
@@ -460,7 +460,49 @@ def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, 
             uv_env["PATH"] = ":".join(p for p in path_raw.split(":") if p and p != venv_bin)
 
         subprocess.check_call(["uv", "-q", "venv"], cwd=str(workspace_dir), env=uv_env)
-        subprocess.check_call(["uv", "-q", "pip", "install", "-e", "."], cwd=str(workspace_dir), env=uv_env)
+
+        # NOTE: do not resolve symlinks here. `uv venv` may symlink the venv python to a
+        # uv-managed interpreter; for our use, we only need the venv-local path for the
+        # shebang in generated scripts.
+        workspace_python = workspace_dir / ".venv" / "bin" / "python"
+        if not workspace_python.exists():
+            raise RuntimeError("agent workspace python not found: {}".format(workspace_python))
+
+        venv_bin_dir = workspace_dir / ".venv" / "bin"
+        src_dir = workspace_dir / "src"
+        if not src_dir.exists():
+            raise RuntimeError("agent workspace fixture src missing: {}".format(src_dir))
+
+        # Avoid `uv pip install -e .` here: it introduces build dependencies (e.g. setuptools)
+        # and can require network access to PyPI, which makes prompt-eval dry-runs flaky.
+        # Instead, we create venv-local console scripts that import fixture code from `./src`.
+        script = "\n".join(
+            [
+                "#!{}".format(workspace_python),
+                "# -*- coding: utf-8 -*-",
+                "import sys",
+                "from pathlib import Path",
+                "",
+                "",
+                "def _main() -> int:",
+                "    root = Path(__file__).resolve().parents[2]",
+                "    sys.path.insert(0, str(root / \"src\"))",
+                "    from scalim_agent_fixture.cli import main",
+                "    return int(main())",
+                "",
+                "",
+                "if __name__ == \"__main__\":",
+                "    raise SystemExit(_main())",
+                "",
+            ]
+        )
+
+        # The fixture registers `scalim-fixture-cli` only. Create a workspace-local `scalim-cli`
+        # shim so the agent can still follow the skill doc templates unchanged.
+        for entrypoint in ("scalim-fixture-cli", "scalim-cli"):
+            path = venv_bin_dir / entrypoint
+            path.write_text(script, encoding="utf-8")
+            path.chmod(0o755)
     except FileNotFoundError:
         raise RuntimeError("Missing required dependency: `uv` (for agent workspace setup).")
     except subprocess.CalledProcessError as e:
