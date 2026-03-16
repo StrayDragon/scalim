@@ -10,7 +10,7 @@
 
 `notebooks/marimo/` 实际包含两类东西：
 
-1) **marimo UI**(交互讲解)：例如 `notebooks/marimo/demo_big_data_report/demo_main.py`、`notebooks/marimo/example_public_api/index.py`
+1) **marimo UI**(交互讲解)：例如 `notebooks/marimo/demo_big_data_report/demo_main.py`、`notebooks/marimo/example_public_api/*.py`
 2) **headless runner**(回归门禁)：`notebooks/marimo/run_examples.py`
 
 `just examples` 的入口就是 runner：

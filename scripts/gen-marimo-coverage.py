@@ -132,7 +132,6 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     hubs = [
         ("hub", "notebooks/marimo/index.py", notebooks_root / "index.py"),
         ("hub", "demo_big_data_report/demo_main.py", demo_root / "demo_main.py"),
-        ("hub", "example_public_api/index.py", public_root / "index.py"),
     ]
     for kind, item_id, path in hubs:
         ok = path.exists()

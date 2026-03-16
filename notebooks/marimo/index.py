@@ -56,7 +56,6 @@ def _(mo):
           - hub: `notebooks/marimo/demo_big_data_report/demo_main.py`
           - chapters: `notebooks/marimo/demo_big_data_report/chapters/*.py`
         - `example_public_api/`
-          - hub: `notebooks/marimo/example_public_api/index.py`
           - chapters: `notebooks/marimo/example_public_api/*.py`
         """
     )
