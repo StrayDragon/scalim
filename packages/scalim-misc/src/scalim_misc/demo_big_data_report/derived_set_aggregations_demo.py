@@ -49,6 +49,40 @@ class DerivedSetAggregationsDemoResult:
         raise AssertionError(self.message)
 
 
+def verify_derived_set_aggregations_workbook(workbook_path: str) -> "DerivedSetAggregationsDemoResult":
+    """对拍验证 `run_ir(..., output_composition=...)` 写出的 workbook 内容(不执行引擎)."""
+    workbook_path = str(workbook_path)
+    detail_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DETAIL)
+    distinct_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DISTINCT)
+    dedup_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DEDUP)
+    two_stage_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_TWO_STAGE)
+
+    expected_distinct_rows = _expected_distinct_by_payment(detail_rows)
+    expected_dedup_rows = _expected_dedup_then_group(detail_rows)
+    expected_two_stage_rows = _expected_two_stage_hist(detail_rows)
+
+    ok1, msg1 = _compare_rows(distinct_rows, expected_distinct_rows, ("payment_method_name", "customer_cnt"))
+    ok2, msg2 = _compare_rows(dedup_rows, expected_dedup_rows, ("payment_method_name", "customer_cnt"))
+    ok3, msg3 = _compare_rows(two_stage_rows, expected_two_stage_rows, ("order_cnt", "customer_cnt"))
+
+    passed = bool(ok1 and ok2 and ok3)
+    message = "{}\n{}\n{}".format(msg1, msg2, msg3)
+
+    return DerivedSetAggregationsDemoResult(
+        workbook_path=workbook_path,
+        sheet_names=_read_workbook_sheet_names(workbook_path),
+        detail_rows=detail_rows,
+        distinct_rows=distinct_rows,
+        dedup_rows=dedup_rows,
+        two_stage_rows=two_stage_rows,
+        expected_distinct_rows=expected_distinct_rows,
+        expected_dedup_rows=expected_dedup_rows,
+        expected_two_stage_rows=expected_two_stage_rows,
+        passed=passed,
+        message=message,
+    )
+
+
 def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregationsDemoResult:
     workbook_path = str(output_path)
     prev_config = get_config()
@@ -175,35 +209,7 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
             ),
         )
 
-        detail_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DETAIL)
-        distinct_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DISTINCT)
-        dedup_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DEDUP)
-        two_stage_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_TWO_STAGE)
-
-        expected_distinct_rows = _expected_distinct_by_payment(detail_rows)
-        expected_dedup_rows = _expected_dedup_then_group(detail_rows)
-        expected_two_stage_rows = _expected_two_stage_hist(detail_rows)
-
-        ok1, msg1 = _compare_rows(distinct_rows, expected_distinct_rows, ("payment_method_name", "customer_cnt"))
-        ok2, msg2 = _compare_rows(dedup_rows, expected_dedup_rows, ("payment_method_name", "customer_cnt"))
-        ok3, msg3 = _compare_rows(two_stage_rows, expected_two_stage_rows, ("order_cnt", "customer_cnt"))
-
-        passed = bool(ok1 and ok2 and ok3)
-        message = f"{msg1}\n{msg2}\n{msg3}"
-
-        result = DerivedSetAggregationsDemoResult(
-            workbook_path=workbook_path,
-            sheet_names=_read_workbook_sheet_names(workbook_path),
-            detail_rows=detail_rows,
-            distinct_rows=distinct_rows,
-            dedup_rows=dedup_rows,
-            two_stage_rows=two_stage_rows,
-            expected_distinct_rows=expected_distinct_rows,
-            expected_dedup_rows=expected_dedup_rows,
-            expected_two_stage_rows=expected_two_stage_rows,
-            passed=passed,
-            message=message,
-        )
+        result = verify_derived_set_aggregations_workbook(workbook_path)
         result.raise_if_failed()
         return result
     finally:

@@ -16,8 +16,8 @@ def _(mo):
 
         结构:
         - `notebooks/marimo/index.py`: notebooks 总入口(hub)
-        - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/chapters/`: 每个章节一个可调用的 `run_*()` 函数
-        - `chapters/*.py`: 每章一本 Marimo notebook(薄封装,1:1 对齐上面的 `run_*()`)
+        - `chapters/*.py`: 每章一本 Marimo notebook(用户第一: 含 `run_<chapter_id>()` SSOT 入口)
+        - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/`: fixtures/oracle/工具函数(不承载教学主流程)
         - `notebooks/marimo/run_examples.py`: `just examples` 的 gate 入口(快速对拍)
         - `by_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
         """
@@ -66,7 +66,10 @@ def _(chapters_dir, mo):
         ---
         ## 章节导航
 
-        每章 notebook 都是对 `scalim-misc` 章节 SSOT 的薄封装：用于讲解/展示 + 交互排障。
+        每章 notebook 同时承担两件事:
+
+        1) **教学/交互**: 展示过程 + UI 组件 + 失败定位
+        2) **集成对拍 SSOT**: 提供 `run_<chapter_id>()` 供 `just examples`/pytest 复用
         """
     )
     if lines:
@@ -135,15 +138,23 @@ def _(mo):
 
 @app.cell
 def _(yaml_path):
-    from scalim_misc.demo_big_data_report.chapters.registry import run_all_chapters
+    from notebooks.marimo.demo_big_data_report.chapters.registry import run_all_chapters
 
-    chapter_results = run_all_chapters(yaml_path=yaml_path)
+    _ = yaml_path
+    chapter_results = run_all_chapters()
     return chapter_results
 
 
 @app.cell
 def _(chapter_results, mo):
-    rows = [{"chapter": r.chapter_id, "passed": r.passed, "summary": r.summary.splitlines()[0]} for r in chapter_results]
+    rows = [
+        {
+            "chapter": str(r.example_id).split("/", 1)[1] if "/" in str(r.example_id) else str(r.example_id),
+            "passed": r.passed,
+            "summary": str(r.summary or "").splitlines()[0] if r.summary else "",
+        }
+        for r in chapter_results
+    ]
     mo.ui.table(rows, selection=None)
     return rows
 

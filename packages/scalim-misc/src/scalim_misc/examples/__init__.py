@@ -1,17 +1,19 @@
-"""`scalim_misc.examples`: 可复用的示例/回归套件实现.
+"""`scalim_misc.examples`: notebooks/examples gate shared helpers.
 
 说明:
-- `notebooks/marimo/` 负责交互与讲解
-- 本包负责可运行、可回归、可复用的章节/用例逻辑(供 `just examples` / pytest 复用)
+- `notebooks/marimo/` 是教学入口 + SSOT 执行入口
+- 本包仅保留 headless 复用的“结果结构 + runner 工具函数”
 """
 
 from ._types import EXAMPLE_KIND_FIXTURE, EXAMPLE_KIND_ORACLE, EXAMPLE_KIND_SMOKE, ExampleResult
-from .harness import run_public_api_examples
+from .harness import exit_code, format_results, summarize_failures
 
 __all__ = [
     "EXAMPLE_KIND_FIXTURE",
     "EXAMPLE_KIND_ORACLE",
     "EXAMPLE_KIND_SMOKE",
     "ExampleResult",
-    "run_public_api_examples",
+    "exit_code",
+    "format_results",
+    "summarize_failures",
 ]

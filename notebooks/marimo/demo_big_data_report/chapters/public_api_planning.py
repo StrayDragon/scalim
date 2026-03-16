@@ -1,0 +1,124 @@
+import marimo
+
+from typing import Any, Dict
+
+from notebooks.marimo._support.public_api import (
+    check_public_all_coverage,
+    coverage_failure_summary,
+    coverage_to_details,
+)
+from scalim import planning as api
+from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
+from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
+
+__generated_with = "0.20.2"
+app = marimo.App(width="full")
+
+_COVERED_PUBLIC_ALL = {
+    "ComputeOperatorIr",
+    "ExecutionPlan",
+    "LoadOperatorIr",
+    "LoadRefOperatorIr",
+    "OperatorType",
+    "PlanBuilder",
+    "PlanMetadata",
+    "PlanOperatorIr",
+    "Stage",
+}
+
+
+def run_public_api_planning() -> ExampleResult:
+    coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
+    if not coverage.ok:
+        return ExampleResult(
+            example_id="demo_big_data_report/public_api_planning",
+            passed=False,
+            kind=EXAMPLE_KIND_ORACLE,
+            summary=coverage_failure_summary(coverage),
+            details=coverage_to_details(coverage),
+        )
+
+    symbols = {name: getattr(api, name) for name in api.__all__}
+    demand_ir = build_minimal_public_api_ir()
+    plan = api.PlanBuilder(demand_ir).build(targets=["value_plus_one"])
+
+    passed = bool(plan.target_fields == ["value_plus_one"] and plan.field_order and plan.field_order[-1] == "value_plus_one")
+    summary = "targets={} field_order={}".format(plan.target_fields, ",".join(plan.field_order))
+    details: Dict[str, Any] = {
+        "field_order": plan.field_order,
+        "stages": plan.stages,
+        "metadata": plan.metadata,
+        "symbols_count": len(symbols),
+    }
+    return ExampleResult(
+        example_id="demo_big_data_report/public_api_planning",
+        passed=passed,
+        kind=EXAMPLE_KIND_ORACLE,
+        summary=summary,
+        details=details,
+    )
+
+
+def run_chapter() -> ExampleResult:
+    return run_public_api_planning()
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+        # demo_big_data_report / public_api_planning
+
+        本章目标:
+        - 覆盖 `scalim.planning.__all__` 的最小可运行示例
+        - 演示 `PlanBuilder.build(...)` 的最小闭环
+
+        SSOT:
+        - `notebooks/marimo/demo_big_data_report/chapters/public_api_planning.py::run_public_api_planning`
+
+        Gate:
+        - `just examples`
+        """
+    )
+    return
+
+
+@app.cell
+def _():
+    import marimo as mo
+
+    return (mo,)
+
+
+@app.cell
+def _():
+    from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
+    _ = ensure_repo_root_on_sys_path(__file__)
+    return
+
+
+@app.cell
+def _():
+    result = run_public_api_planning()
+    return (result,)
+
+
+@app.cell(hide_code=True)
+def _(mo, result):
+    mo.callout(mo.md("## {}".format("PASS" if result.passed else "FAIL")), kind="success" if result.passed else "danger")
+    mo.md("```\n{}\n```".format(result.summary))
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo, result):
+    from scalim_misc.notebook_support.results_view import details_to_rows
+
+    rows = details_to_rows(result.details)
+    mo.ui.table(rows, selection=None)
+    return (rows,)
+
+
+if __name__ == "__main__":
+    app.run()

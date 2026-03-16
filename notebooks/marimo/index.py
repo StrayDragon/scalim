@@ -17,7 +17,7 @@ def _(mo):
 
         目录约定(前缀即意图):
         - `demo_*`: 端到端主线 demo（覆盖更多组合 cov，必须 deterministic）
-        - `example_*`: 稳定 public surface 的最小可运行示例（小数据、快回归）
+        - `example_*`: （预留）稳定 public surface 的最小可运行示例（小数据、快回归）
         - `tutor_*`: 长篇教学 notebook（默认不纳入 gate；如要纳入必须 deterministic 且小数据）
         """
     )
@@ -55,8 +55,9 @@ def _(mo):
         - `demo_big_data_report/`
           - hub: `notebooks/marimo/demo_big_data_report/demo_main.py`
           - chapters: `notebooks/marimo/demo_big_data_report/chapters/*.py`
-        - `example_public_api/`
-          - chapters: `notebooks/marimo/example_public_api/*.py`
+
+        说明:
+        - public API 覆盖章节已并入 `demo_big_data_report/chapters/`（以 `scalim.*.__all__` 做 100% 覆盖断言）
         """
     )
     return

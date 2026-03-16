@@ -104,7 +104,7 @@ Sources:
 ### `marimo-notebooks-examples-suite`
 - Title: marimo-notebooks-examples-suite Specification
 - Source: [spec.md](#code=openspec/specs/marimo-notebooks-examples-suite/spec.md)
-- Summary: **状态: ✅ 已实现** 定义仓库内 `notebooks/marimo/` 的示例/教学套件治理边界:Marimo notebooks 作为唯一交互载体,headless runner/pytest 作为确定性回归入口,并要求执行真相下沉到 `packages/scalim-misc`.
+- Summary: **状态: ✅ 已实现** 定义仓库内 `notebooks/marimo/` 的示例/教学套件治理边界:Marimo notebooks 作为唯一交互载体,headless runner/pytest 作为确定性回归入口,并要求执行真相来源位于 notebooks(同源复用).
 
 ### `misc`
 - Title: misc Specification

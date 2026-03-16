@@ -218,8 +218,8 @@
 - **WHEN** 开发者运行 `just qa`(或相关 py36 检查任务)
 - **THEN** 命令 MUST 失败并提示需要安装/启动 docker
 
-### Requirement: `notebooks/marimo/` 提供以稳定 re-export 入口为索引的 `example_public_api` 套件
-系统 MUST 在 `notebooks/marimo/` 下提供 `example_public_api` 套件,用于面向框架用户展示与回归以下稳定入口模块(以其 `__all__` 为覆盖清单来源):
+### Requirement: 稳定公开入口模块 `__all__` 必须被 examples gate 100% 覆盖
+系统 MUST 将以下稳定公开入口模块的 `__all__` 视为“面向框架用户的公开 API 覆盖清单”，并在 `notebooks/marimo/demo_big_data_report/chapters/` 的主线章节中提供 deterministic 的最小可运行示例以覆盖其全部导出符号：
 
 - `scalim.dsl.by_yaml`
 - `scalim.spec.ir`
@@ -227,30 +227,19 @@
 - `scalim.execution`
 - `scalim.ob`
 
-`example_public_api` MUST 至少包含:
+覆盖要求：
 
-- 一份“主线串联” notebook,用于说明如何运行示例/如何阅读覆盖矩阵/如何定位失败
-- 每个稳定入口模块至少一份 notebook,覆盖其 `__all__` 导出符号的最小可运行用法与关键边界说明
+- 每个入口模块 MUST 至少对应一个纳入 `just examples` 的章节 notebook。
+- 每个章节 MUST 在执行时对其覆盖清单做断言：当模块 `__all__` 增加新符号而章节未更新时，该章节 MUST fail-fast 并给出可定位 summary（提示缺失符号集合）。
+- 系统 MUST 额外提供至少一个章节演示扩展点（例如 hook/observer/events 或 `components` 注入），并将其纳入 `just examples` 的回归范围。
 
-#### Scenario: `example_public_api` 目录存在且可发现
-- **WHEN** 维护者检查 `notebooks/marimo/` 目录
-- **THEN** 目录下 MUST 存在 `notebooks/marimo/example_public_api/`
-- **AND** 该目录下 MUST 存在一份主线 notebook 与每个稳定入口模块对应的 notebook
-
-### Requirement: `example_public_api` 的示例执行与对拍不依赖 marimo UI
-系统 MUST 将 `example_public_api` 的可运行示例与对拍逻辑下沉到 `packages/scalim-misc/`,并提供一个 headless runner 供 `just examples` 与 pytest 复用:
-
-- runner MUST 不依赖 marimo UI
-- runner MUST 为每个章节输出 PASS/FAIL 与可定位的 summary
-- 底层实现 MUST 组织在 `packages/scalim-misc/src/scalim_misc/examples/` 下,专门承接 `notebooks/marimo/example_*` 的可复用逻辑
-
-#### Scenario: runner 可在 CI 中执行并给出可定位输出
-- **WHEN** 开发者运行 `just examples`(或等价入口)
-- **THEN** runner MUST 执行 `example_public_api` 的章节并输出章节级 PASS/FAIL
-- **AND** 当存在失败时,输出 MUST 包含可定位的章节 id 与失败摘要
+#### Scenario: `__all__` 新增符号但未被章节覆盖时 fail-fast
+- **GIVEN** 某稳定入口模块的 `__all__` 增加了新符号
+- **WHEN** 开发者运行 `just examples`
+- **THEN** 对应公开入口覆盖章节 MUST 失败并报告缺失符号集合
 
 ### Requirement: 产物/数据输出示例必须提供 deterministic oracle
-当 `example_public_api` 的某个章节产生数据结果或文件产物时,系统 MUST 提供 deterministic oracle 用于对拍:
+当纳入 `just examples` 的某个章节产生数据结果或文件产物时,系统 MUST 提供 deterministic oracle 用于对拍:
 
 - oracle MUST 优先通过运行时计算得到 expected(小数据确定性)
 - 当需要固化 expected fixtures 时,必须在章节或测试中明确其来源与更新策略
@@ -263,13 +252,12 @@
 ### Requirement: `just examples` 入口收敛为 `notebooks/marimo/run_examples.py`
 系统 MUST 将 `just examples` 的执行入口收敛为单一脚本 `notebooks/marimo/run_examples.py`,并使其覆盖:
 
-- `demo_big_data_report` 的示例/对拍
-- `example_public_api` 的示例/对拍
+- `demo_big_data_report` 的示例/对拍（包含其集成的公开入口覆盖章节与扩展点演示）
 
-#### Scenario: `just examples` 统一入口覆盖两类示例
+#### Scenario: `just examples` 统一入口覆盖主线示例
 - **WHEN** 开发者运行 `just examples`
 - **THEN** 系统 MUST 执行 `notebooks/marimo/run_examples.py`
-- **AND** 该 runner MUST 同时覆盖 `demo_big_data_report` 与 `example_public_api` 的回归点
+- **AND** 该 runner MUST 覆盖 `demo_big_data_report` 的全部回归点
 
 ### Requirement: `demo_big_data_report` 覆盖 workflow YAML 的可运行对拍
 系统 MUST 在 `demo_big_data_report` 主线中提供至少一个 deterministic 的 workflow YAML 示例,并将其纳入 `just examples` 的对拍回归范围。
@@ -300,7 +288,7 @@
 系统 MUST 提供 `notebooks/marimo/marimo_coverage.gen.md` 作为 SSOT,用于将 `notebooks/marimo/` 下的示例套件回归点映射到:
 
 - Marimo notebooks(教学入口)
-- `packages/scalim-misc` 的 SSOT chapters/examples(执行真相)
+- notebooks 侧 SSOT 入口/实现文件（执行真相）
 - headless runner(`notebooks/marimo/run_examples.py`)与 pytest 复用点(如存在)
 - canonical YAML fixtures 与其 schema 绑定(至少 demand/workflow 两类 schema)
 

@@ -1,39 +1,4 @@
-# marimo-notebooks-examples-suite Specification
-
-**状态: ✅ 已实现**
-
-## Purpose
-定义仓库内 `notebooks/marimo/` 的示例/教学套件治理边界:Marimo notebooks 作为唯一交互载体,headless runner/pytest 作为确定性回归入口,并要求执行真相来源位于 notebooks(同源复用).
-
-## Context
-示例体系需要同时满足“可学”(交互讲解)与“可测”(确定性回归).若 UI 与 headless 执行路径分叉,将形成第二套真相并导致 drift/门禁碎片化.
-
-## Related Code (as implemented)
-- `notebooks/marimo/index.py` (示例 hub/导航与约定说明)
-- `notebooks/marimo/run_examples.py` (`just examples` headless runner)
-- `scripts/gen-marimo-coverage.py` + `notebooks/marimo/marimo_coverage.gen.md` (覆盖报告生成与 drift-check)
-- `packages/scalim-misc/src/scalim_misc/notebook_support/*` (notebook 复用 helper; 不依赖 marimo)
-
-## Requirements
-### Requirement: 示例 notebooks 以 Marimo 为唯一交互载体
-系统 MUST 将 `notebooks/marimo/` 作为示例/教程的交互载体目录;其中用于教学展示的示例 notebooks MUST 为 Marimo notebook(即包含 `marimo.App`).
-
-系统 MAY 在 `notebooks/marimo/` 下保留非 Marimo 的 headless 脚本,但该脚本 MUST 明确定位为 runner/工具脚本,不得承担交互教学入口职责(例如 `notebooks/marimo/run_examples.py`).
-
-#### Scenario: 示例 notebooks 可被识别为 Marimo
-- **WHEN** 维护者枚举 `notebooks/marimo/**.py` 中用于教学展示的 notebooks
-- **THEN** 这些 notebooks 文件内容 MUST 包含 `marimo.App`
-
-### Requirement: 每个示例套件必须同时具备“教学入口”和“回归入口”
-系统 MUST 将示例套件拆分为两层并保持同源:
-
-1) **教学入口**: Marimo notebooks,用于逐章讲解与交互查看结果
-2) **回归入口**: headless runner/pytest,用于确定性对拍与 CI 集成
-
-#### Scenario: 套件具备双入口
-- **WHEN** 维护者为某个示例套件新增一个可运行章节
-- **THEN** 该章节 MUST 同时具备一个 Marimo notebook 入口
-- **AND** MUST 同时具备一个可被 headless runner 执行的 SSOT 用例入口
+## ADDED Requirements
 
 ### Requirement: 示例 SSOT 必须位于 notebooks 且可被 headless 复用
 系统 MUST 将 `notebooks/marimo/` 下纳入 examples gate 的示例/章节执行真相来源定义为“可被导入调用的 Python 入口函数”，且该入口 MUST 位于 notebooks 侧（例如同一 notebook 模块内的 `run_*()`，或 notebooks 侧的纯 Python 支撑模块）。
@@ -49,14 +14,17 @@
 - **THEN** 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 `notebooks/marimo/run_examples.py` 与 pytest 复用
 - **AND** 该 notebook 的交互执行路径 MUST 调用同一入口函数得到结果并展示
 
+## MODIFIED Requirements
+
 ### Requirement: Marimo notebooks 必须是薄封装,不得形成第二套真相
 每个 Marimo notebook MUST 通过调用对应的 SSOT `run_*()`/example case 来执行核心逻辑并展示结果.
 
-Marimo notebook MUST NOT 在 notebook 内部复制实现一套独立的示例执行主路径(例如自行构建与执行整套 demo 引擎链路作为章节唯一真相),以避免与 SSOT 漂移.
+Marimo notebook MUST NOT 在 notebook 内部复制实现一套独立的示例执行主路径(例如以 cell 代码绕开 SSOT 入口、仅在 UI 模式下生效的分支逻辑),以避免与 headless runner/pytest 执行路径漂移.
 
 #### Scenario: notebook 调用 SSOT 入口
 - **WHEN** 读者在 marimo 中运行任一示例章节 notebook
 - **THEN** notebook 的核心执行入口 MUST 来自 notebooks 侧的 SSOT `run_*()`/example case
+- **AND** headless runner/pytest MUST 复用同一 SSOT 入口执行对拍回归
 
 ### Requirement: `just examples` 继续通过 headless runner 执行示例对拍
 系统 MUST 提供一个 headless runner 作为 `just examples` 的单一入口,并保证 runner 不依赖 marimo UI.
@@ -67,15 +35,6 @@ runner MUST 输出可定位的 PASS/FAIL 与章节级 summary,并以非零退出
 - **WHEN** 开发者运行 `just examples`(或等价入口)
 - **THEN** headless runner MUST 执行示例套件并输出章节级 PASS/FAIL 与 summary
 - **AND** 当存在失败时,进程退出码 MUST 非零
-
-### Requirement: canonical YAML SSOT 路径保持不变
-系统 MUST 保持 canonical YAML SSOT 文件路径不变,至少包括:
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml`
-
-#### Scenario: canonical YAML 路径稳定
-- **WHEN** 维护者检查上述 canonical YAML 文件路径
-- **THEN** 文件 MUST 存在且路径未被移动或重命名
 
 ### Requirement: marimo_coverage.gen.md 明确映射“notebooks → SSOT → gate”
 系统 MUST 维护 `notebooks/marimo/marimo_coverage.gen.md` 作为可检查的 SSOT 报告,用于将示例套件的回归点映射到:
@@ -90,3 +49,11 @@ runner MUST 输出可定位的 PASS/FAIL 与章节级 summary,并以非零退出
 - **WHEN** 维护者新增或调整一个示例/章节回归点
 - **THEN** 运行 `just gen-marimo-coverage` MUST 更新 `notebooks/marimo/marimo_coverage.gen.md`
 - **AND** `just marimo-coverage-drift-check` MUST 在 CI 中可用且能检测到 drift
+
+## REMOVED Requirements
+
+### Requirement: SSOT 执行与对拍逻辑必须下沉到 `packages/scalim-misc`
+**Reason**: 本变更将 notebooks 重新定义为“用户第一”的教学与执行真相来源；教学主流程代码需要在 notebook 中可见且可照抄改写，`scalim-misc` 仅保留 fixtures/oracle/工具函数。
+
+**Migration**: 将 `packages/scalim-misc` 中承载教学主流程的 `run_*()`/example case 迁移到 notebooks 侧 SSOT 入口（同 notebook 或 notebooks 侧支撑模块），并更新 `notebooks/marimo/run_examples.py`、pytest 与 `scripts/gen-marimo-coverage.py` 以复用 notebooks 侧入口。
+

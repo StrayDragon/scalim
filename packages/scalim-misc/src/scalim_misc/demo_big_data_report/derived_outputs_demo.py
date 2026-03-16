@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from scalim.execution.output_composition import (
     AggMetricSpec,
@@ -67,6 +67,40 @@ class DerivedOutputsDemoResult:
             return
         msg = "多输出组合示例对拍失败:\n{}\n{}".format(self.detail_verification.summary, self.summary_message)
         raise AssertionError(msg)
+
+
+def verify_derived_outputs_workbook(
+    workbook_path: str,
+    *,
+    outputs: Optional[Dict[str, str]] = None,
+    total_rows: Optional[int] = None,
+) -> "DerivedOutputsDemoResult":
+    """对拍验证 `run_ir(..., output_composition=...)` 写出的 workbook 内容(不执行引擎).
+
+    说明:
+    - 该函数只读取文件并做 deterministic 验证,便于 notebooks 作为教学 SSOT 复用
+    - `outputs/total_rows` 可选: 由执行期结果透传用于 debug 展示
+    """
+    workbook_path = str(workbook_path)
+    detail_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DETAIL)
+    summary_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_SUMMARY)
+    expected_summary_rows = _build_expected_summary_rows(detail_rows)
+    detail_verification = verify_scalim_output(detail_rows, fields_to_check=list(DETAIL_FIELDS))
+    summary_ok, summary_message = _compare_summary_rows(summary_rows, expected_summary_rows)
+
+    resolved_total_rows = int(total_rows) if total_rows is not None else len(detail_rows)
+    return DerivedOutputsDemoResult(
+        workbook_path=workbook_path,
+        outputs=dict(outputs or {}),
+        sheet_names=_read_workbook_sheet_names(workbook_path),
+        total_rows=int(resolved_total_rows),
+        detail_rows=detail_rows,
+        summary_rows=summary_rows,
+        expected_summary_rows=expected_summary_rows,
+        detail_verification=detail_verification,
+        summary_ok=bool(summary_ok),
+        summary_message=str(summary_message),
+    )
 
 
 def run_derived_outputs_demo(output_path: str) -> DerivedOutputsDemoResult:
@@ -142,23 +176,10 @@ def run_derived_outputs_demo(output_path: str) -> DerivedOutputsDemoResult:
             ),
         )
 
-        detail_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DETAIL)
-        summary_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_SUMMARY)
-        expected_summary_rows = _build_expected_summary_rows(detail_rows)
-        detail_verification = verify_scalim_output(detail_rows, fields_to_check=list(DETAIL_FIELDS))
-        summary_ok, summary_message = _compare_summary_rows(summary_rows, expected_summary_rows)
-
-        demo_result = DerivedOutputsDemoResult(
-            workbook_path=workbook_path,
+        demo_result = verify_derived_outputs_workbook(
+            workbook_path,
             outputs=dict(result.outputs or {}),
-            sheet_names=_read_workbook_sheet_names(workbook_path),
             total_rows=int(result.total_rows),
-            detail_rows=detail_rows,
-            summary_rows=summary_rows,
-            expected_summary_rows=expected_summary_rows,
-            detail_verification=detail_verification,
-            summary_ok=summary_ok,
-            summary_message=summary_message,
         )
         demo_result.raise_if_failed()
         return demo_result
@@ -265,4 +286,5 @@ __all__ = [
     "SUMMARY_FIELDS",
     "DerivedOutputsDemoResult",
     "run_derived_outputs_demo",
+    "verify_derived_outputs_workbook",
 ]

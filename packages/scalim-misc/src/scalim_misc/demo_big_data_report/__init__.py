@@ -1,9 +1,8 @@
-"""Scalim `demo_big_data_report` 教程与集成对拍模块.
+"""Scalim `demo_big_data_report` notebooks shared fixtures/oracle/helpers.
 
-此包承载可复用的“章节实现/对拍/对照组验证/示例数据加载器”,供:
-- `notebooks/marimo/demo_big_data_report/demo_main.py` (交互教程)
-- `notebooks/marimo/run_examples.py` (`just examples` 对拍 gate)
-- `tests/` (复用同一套示例用例与验证逻辑)
+说明:
+- 教学主流程与可运行 SSOT 位于 `notebooks/marimo/demo_big_data_report/`
+- 本包仅保留可复用的 fixture 数据/loader、oracle/verification 与少量工具函数
 """
 
 from .loaders import ECommerceConfig, get_config, set_config

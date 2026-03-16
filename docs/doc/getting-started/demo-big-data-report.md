@@ -14,6 +14,12 @@
 
 这些路径是“稳定入口”: 文档与回归门禁会围绕它们组织。
 
+章节集合包含:
+
+- 主线 demo 章节（例如 `basics/yaml_dsl/...`）
+- public API 覆盖章节（`public_api_*`；对 `scalim.*.__all__` 做 fail-fast 覆盖断言）
+- 扩展点演示（例如 `public_api_hooks_events`：hook/observer/events/components 注入）
+
 ## 2) 怎么跑(推荐命令)
 
 ### 2.1 跑示例 + 对拍(推荐;与 CI 一致)
@@ -60,4 +66,3 @@ just gen-docs
 ```
 
 最终以 `just qa` 的漂移门禁为准。
-

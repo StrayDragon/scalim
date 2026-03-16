@@ -6,9 +6,8 @@
 
 用于替代手工维护的 `notebooks/marimo/coverage_matrix.md`。
 该报告从以下来源推导并生成:
-- `packages/scalim-misc/src/scalim_misc/**` 下的 SSOT 注册表
-- `notebooks/marimo/**` 的 `notebooks` 文件树
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/**` 的 YAML 固定示例(真值)
+- `notebooks/marimo/**` 的 `notebooks` 文件树(教学入口 + `SSOT` 执行入口)
+- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/**` 的 `YAML` 固定示例(真值)
 """
 
 from __future__ import annotations
@@ -97,22 +96,9 @@ def _find_demo_notebook_for_chapter(chapters_dir: Path, chapter_id: str) -> Opti
 
 
 def _load_demo_chapter_ids() -> List[str]:
-    from scalim_misc.demo_big_data_report.chapters.registry import all_chapter_ids  # noqa: PLC0415
+    from notebooks.marimo.demo_big_data_report.chapters.registry import all_chapter_ids  # noqa: PLC0415
 
     return list(all_chapter_ids())
-
-
-def _load_public_api_cases() -> List[Tuple[str, str]]:
-    """返回 `(module_basename, kind)` 列表。"""
-    from scalim_misc.examples.public_api import iter_public_api_examples  # noqa: PLC0415
-
-    out: List[Tuple[str, str]] = []
-    for example_id, kind, _fn in iter_public_api_examples():
-        # `example_id` 形如: `public_api/<module>`
-        parts = str(example_id).split("/", 1)
-        module = parts[1] if len(parts) == 2 else str(example_id)
-        out.append((module, str(kind)))
-    return out
 
 
 def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
@@ -122,11 +108,10 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     notebooks_root = root / "notebooks" / "marimo"
     demo_root = notebooks_root / "demo_big_data_report"
     demo_chapters_dir = demo_root / "chapters"
-    public_root = notebooks_root / "example_public_api"
 
     gate_runner = notebooks_root / "run_examples.py"
-    pytest_public_api = root / "tests" / "test_example_public_api_suite.py"
     pytest_demo_chapters = root / "tests" / "test_demo_big_data_report_chapters.py"
+    pytest_public_api = root / "tests" / "test_example_public_api_suite.py"
 
     # --- 入口页 ---
     hubs = [
@@ -180,17 +165,15 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
         )
 
     # --- 主线章节 ---
-    demo_ssot_dir = root / "packages" / "scalim-misc" / "src" / "scalim_misc" / "demo_big_data_report" / "chapters"
     chapter_ids = _load_demo_chapter_ids()
     for chapter_id in chapter_ids:
         notebook = _find_demo_notebook_for_chapter(demo_chapters_dir, chapter_id) if demo_chapters_dir.exists() else None
-        ssot = demo_ssot_dir / "{}.py".format(chapter_id)
-        ok = bool(notebook and ssot.exists() and gate_runner.exists())
+        ssot = notebook
+        pytest_path = pytest_public_api if chapter_id.startswith("public_api_") else pytest_demo_chapters
+        ok = bool(notebook and gate_runner.exists())
         note_parts: List[str] = []
         if not notebook:
             note_parts.append("missing_notebook")
-        if not ssot.exists():
-            note_parts.append("missing_ssot")
         if not gate_runner.exists():
             note_parts.append("missing_gate")
         rows.append(
@@ -198,35 +181,9 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
                 kind="demo_chapter",
                 item_id="demo_big_data_report/{}".format(chapter_id),
                 notebook=notebook,
-                ssot=ssot if ssot.exists() else None,
+                ssot=ssot,
                 gate=gate_runner if gate_runner.exists() else None,
-                pytest=pytest_demo_chapters if pytest_demo_chapters.exists() else None,
-                ok=ok,
-                notes=",".join(note_parts),
-            )
-        )
-
-    # --- 公共入口示例 ---
-    public_ssot_dir = root / "packages" / "scalim-misc" / "src" / "scalim_misc" / "examples" / "public_api"
-    for module, kind in _load_public_api_cases():
-        notebook = public_root / "{}.py".format(module)
-        ssot = public_ssot_dir / "{}.py".format(module)
-        ok = bool(notebook.exists() and ssot.exists() and gate_runner.exists())
-        note_parts = []
-        if not notebook.exists():
-            note_parts.append("missing_notebook")
-        if not ssot.exists():
-            note_parts.append("missing_ssot")
-        if not gate_runner.exists():
-            note_parts.append("missing_gate")
-        rows.append(
-            _Row(
-                kind="public_api",
-                item_id="public_api/{} ({})".format(module, kind),
-                notebook=notebook if notebook.exists() else None,
-                ssot=ssot if ssot.exists() else None,
-                gate=gate_runner if gate_runner.exists() else None,
-                pytest=pytest_public_api if pytest_public_api.exists() else None,
+                pytest=pytest_path if pytest_path.exists() else None,
                 ok=ok,
                 notes=",".join(note_parts),
             )

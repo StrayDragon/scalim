@@ -8,7 +8,6 @@
 
 覆盖:
 - `demo_big_data_report`(主线示例)
-- `example_public_api`(公共入口示例/回归套件)
 """
 
 from __future__ import annotations
@@ -23,14 +22,8 @@ repo_root_str = str(repo_root)
 if repo_root_str not in sys.path:
     sys.path.insert(0, repo_root_str)
 
-from scalim_misc.demo_big_data_report.chapters.registry import run_all_chapters
-from scalim_misc.examples.harness import (
-    coerce_demo_chapter_results,
-    exit_code,
-    format_results,
-    run_public_api_examples,
-    summarize_failures,
-)
+from notebooks.marimo.demo_big_data_report.chapters.registry import run_all_chapters, run_selected_chapters
+from scalim_misc.examples.harness import exit_code, format_results, summarize_failures
 
 
 def _configure_logging() -> None:
@@ -49,7 +42,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--suite",
         action="append",
-        choices=["demo_big_data_report", "example_public_api"],
+        choices=["demo_big_data_report"],
         help="Run only selected suite(s). Can be repeated.",
     )
     parser.add_argument(
@@ -69,10 +62,10 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging()
 
     args = _parse_args(list(argv or sys.argv[1:]))
-    suites = set(args.suite or ["demo_big_data_report", "example_public_api"])
+    suites = set(args.suite or ["demo_big_data_report"])
 
     if args.list:
-        from scalim_misc.demo_big_data_report.chapters.registry import all_chapter_ids
+        from notebooks.marimo.demo_big_data_report.chapters.registry import all_chapter_ids
 
         print("套件:")
         for suite_id in sorted(suites):
@@ -82,23 +75,14 @@ def main(argv: list[str] | None = None) -> int:
             print("- {}".format(chapter_id))
         return 0
 
-    demo_dir = Path(__file__).parent / "demo_big_data_report"
-    yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
-
     all_results = []
 
     if "demo_big_data_report" in suites:
         if args.chapter:
-            from scalim_misc.demo_big_data_report.chapters.registry import run_selected_chapters
-
-            demo_results = run_selected_chapters(yaml_path=yaml_path, chapter_ids=args.chapter)
+            demo_results = run_selected_chapters(chapter_ids=args.chapter)
         else:
-            demo_results = run_all_chapters(yaml_path=yaml_path)
-        demo_examples = coerce_demo_chapter_results(suite_id="demo_big_data_report", results=demo_results)
-        all_results.extend(demo_examples)
-
-    if "example_public_api" in suites:
-        all_results.extend(run_public_api_examples())
+            demo_results = run_all_chapters()
+        all_results.extend(demo_results)
 
     for line in format_results(all_results):
         print(line)
