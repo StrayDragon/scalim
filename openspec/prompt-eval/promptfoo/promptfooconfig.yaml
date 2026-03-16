@@ -1,0 +1,178 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: "scalim prompt-eval (LLM suite)"
+sharing: false
+writeLatestResults: false
+
+evaluateOptions:
+  cache: true
+  maxConcurrency: 2
+  showProgressBar: false
+
+providers:
+  - id: "openai:chat:gpt-5.1-codex-mini"
+    label: "openai:chat:gpt-5.1-codex-mini"
+    config:
+      temperature: 0
+      seed: 0
+      # Keep responses small to reduce token cost.
+      max_tokens: 700
+
+prompts:
+  - id: "scalim_yaml_dsl_route_A"
+    label: "scalim-yaml-dsl routing (A)"
+    raw: |
+      (上方已注入 `scalim-yaml-dsl` skill 文档; 你必须遵守其中硬规则,并且只引用其中提到的 canonical materials。)
+
+      你正在处理一个虚构但真实的工程需求。请输出**最小**可执行的行动方案,并满足:
+
+      1) 先判断任务类型(写/升级/排错/迁移/下游适配/批次 breaking 定位)
+      2) 只列出你会读取的最少 reference 文件(必须用 skill 文档里出现过的相对路径)
+      3) 给出最小可执行命令(必须来自 skill 文档里列出的命令模板)
+      4) 最后给 3-6 条 next steps(避免长文)
+
+      用户需求:
+      {{task}}
+
+  - id: "scalim_yaml_dsl_route_B"
+    label: "scalim-yaml-dsl routing (B)"
+    raw: |
+      (上方已注入 `scalim-yaml-dsl` skill 文档; 你必须遵守其中硬规则,并且只引用其中提到的 canonical materials。)
+
+      你是一个“YAML DSL skill 路由器”。只输出一个 JSON 对象,不写额外解释、不写 Markdown、不写代码块:
+
+      {
+        "task_kind": "<one of: authoring|upgrade_legacy|validate_debug|report_migration|downstream_adaptation|breaking_batch_locate>",
+        "references": ["<path>", "..."],
+        "commands": ["<cmd>", "..."],
+        "next_steps": ["<step>", "..."]
+      }
+
+      约束:
+      - `references` 3 个以内,且每个必须来自 skill 文档出现过的相对路径
+      - `commands` 2 个以内,且每个必须来自 skill 文档列出的命令模板(允许把 `<file.yaml>` 替换成真实文件名)
+      - `next_steps` 3-6 条,每条一句话
+
+      用户需求:
+      {{task}}
+
+  - id: "doc_governance_patch"
+    label: "doc governance boundary patch"
+    raw: |
+      你需要对一个 markdown 文件做最小修改,但必须遵守 doc governance 边界:
+
+      - 不要修改任何 `*.gen.*` 文件
+      - 不要修改 `<!-- BEGIN AUTOGEN:<id> -->` 与 `<!-- END AUTOGEN:<id> -->` 之间的内容
+
+      你只能输出**一段** git unified diff,不写任何解释文字。
+
+      目标文件路径: {{file_path}}
+      目标文件当前内容:
+      ```md
+      {{file_content}}
+      ```
+
+      修改要求:
+      {{change_request}}
+
+tests:
+  - description: "yaml-dsl: validate/debug routing"
+    prompts:
+      - "scalim_yaml_dsl_route_A"
+      - "scalim_yaml_dsl_route_B"
+    vars:
+      expected_task_kind: "validate_debug"
+      task: |
+        我写了一个 `report.gen.yaml` (仓库外),准备在本地接入 LSP。
+        `yaml-dsl schema validate` 报错说 `$schema` 路径不对。
+        我不想猜路径,希望你给出最小排错步骤与要看的材料。
+    options:
+      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
+
+  - description: "yaml-dsl: upgrade legacy routing"
+    prompts:
+      - "scalim_yaml_dsl_route_A"
+      - "scalim_yaml_dsl_route_B"
+    vars:
+      expected_task_kind: "upgrade_legacy"
+      task: |
+        我有一份旧的 YAML DSL,大量逻辑塞在 `main_source.fields` 里,并且有人要求我“尽量兼容旧写法”。
+        但我没有被明确要求兼容,我只想一步到位升级到当前结构,并给出最小验证命令。
+        你会怎么看材料? 如何组织升级步骤?
+    options:
+      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
+
+  - description: "yaml-dsl: authoring routing"
+    prompts:
+      - "scalim_yaml_dsl_route_A"
+      - "scalim_yaml_dsl_route_B"
+    vars:
+      expected_task_kind: "authoring"
+      task: |
+        我需要新写一个 YAML DSL 报表,包含一张 `orders` 主表和一张 `users` 维表,要做一些派生字段(比如 `is_new_user`)。
+        我不想硬记语法,只想按最小材料/最小命令把骨架先跑通并通过校验。
+        你会先看哪些 reference? 用什么命令做最小验证?
+    options:
+      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
+
+  - description: "yaml-dsl: report migration routing"
+    prompts:
+      - "scalim_yaml_dsl_route_A"
+      - "scalim_yaml_dsl_route_B"
+    vars:
+      expected_task_kind: "report_migration"
+      task: |
+        我们有一批旧的报表脚本(不是 YAML),现在要渐进迁移到 YAML DSL。
+        我需要一个“分阶段”的最小迁移方案: 先保证本地能 validate,再逐步替换数据处理逻辑。
+        你会先读哪些材料? 下一步最小命令是什么?
+    options:
+      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
+
+  - description: "yaml-dsl: breaking batch locate routing"
+    prompts:
+      - "scalim_yaml_dsl_route_A"
+      - "scalim_yaml_dsl_route_B"
+    vars:
+      expected_task_kind: "breaking_batch_locate"
+      task: |
+        我升级了一批 YAML DSL 文件后,出现了很多 breaking。
+        我不想逐个文件瞎改,想先按“升级批次”快速定位可能的 breaking 点,然后分批修复。
+        你会先看哪些 reference? 用什么命令快速验证?
+    options:
+      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
+
+  - description: "doc governance: patch outside AUTOGEN block"
+    prompts:
+      - "doc_governance_patch"
+    vars:
+      file_path: "openspec/prompt-eval/fixtures/doc_with_autogen.md"
+      file_content: |
+        # Fixture: AUTOGEN block
+
+        Intro line
+
+        <!-- BEGIN AUTOGEN:demo -->
+        generated line 1
+        generated line 2
+        <!-- END AUTOGEN:demo -->
+
+        Footer line
+      change_request: "把 `Intro line` 改成 `Intro line updated`。其他内容不动。"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_doc_governance_patch.py:get_assert"

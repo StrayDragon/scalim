@@ -28,6 +28,57 @@ just prompt-eval-check
   - `cases.jsonl`: 逐用例结果
   - `failures.md`: 失败摘要(用于快速定位)
 
-## LLM 套件(延后)
+## LLM 套件(T0; promptfoo)
 
-`just prompt-eval-llm` 当前仅占位: 会返回非 0 并提示需要额外配置. 请先使用确定性 core (`just prompt-eval`) 收敛用例与回归口径.
+LLM 套件已接入 `promptfoo`(仅本地运行; 不是 `just prompt-eval` 的硬依赖)。
+
+### 前置条件
+
+- 本机安装 `promptfoo` 且版本与 pin 一致: `openspec/prompt-eval/promptfoo/promptfoo-version.txt`
+- 已设置 OpenAI 相关环境变量(例如 `OPENAI_API_KEY`)
+
+### 运行
+
+```bash
+just prompt-eval-llm
+```
+
+为了避免误消耗 token,建议先 dry-run:
+
+```bash
+PROMPT_EVAL_LLM_DRY_RUN=1 just prompt-eval-llm
+```
+
+### A/B: baseline vs candidate
+
+用 git ref(标签/commit)做 baseline,与当前工作区(candidate)对拍,不需要 checkout/stash:
+
+```bash
+PROMPT_EVAL_LLM_BASELINE_REF=<tag-or-sha> just prompt-eval-llm
+```
+
+产物:
+
+- `.tmp/artifacts/prompt-eval/llm/ab/baseline/`
+- `.tmp/artifacts/prompt-eval/llm/ab/candidate/`
+- `.tmp/artifacts/prompt-eval/llm/ab/compare.json`
+
+更多本地使用说明与省钱开关见: `openspec/prompt-eval/promptfoo/README.md`
+
+### 仓库外临时目录(避免 uv/.venv 冲突)
+
+LLM 套件可以把产物写到仓库外(例如 `/tmp`)。
+
+```bash
+just prompt-eval-llm-tmp
+```
+
+## Coding agent 套件(T1; 昂贵)
+
+本仓库也提供了一个更昂贵的 coding-agent 套件(基于 promptfoo + agent provider; 低频回归用)。
+
+```bash
+PROMPT_EVAL_LLM_DRY_RUN=1 just prompt-eval-agent-tmp /tmp/scalim-prompt-eval-agent
+```
+
+详细说明见: [Prompt 评测: Coding agent (T1)](prompt-eval-agent.md)

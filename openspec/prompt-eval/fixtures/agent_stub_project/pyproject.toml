@@ -1,0 +1,10 @@
+[project]
+name = "scalim-agent-fixture"
+version = "0.0.0"
+description = "prompt-eval agent fixture (stub scalim-cli)"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+scalim-cli = "scalim_agent_fixture.cli:main"
+

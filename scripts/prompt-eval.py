@@ -2,34 +2,34 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
-import re
 import shutil
 import subprocess
 import sys
+import tarfile
+from os import environ
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from prompt_eval.diff_validation import (
+    Issue,
+    parse_patch,
+    read_text,
+    validate_generated_file_boundary,
+    validate_injected_block_boundary,
+)
+
 _RUNNER_NAME = "prompt-eval"
 _RUNNER_VERSION = "0.1.0"
-
-_AUTOGEN_BEGIN_RE = re.compile(r"<!--\s*BEGIN AUTOGEN:([A-Za-z0-9_.-]+)\s*-->")
-_AUTOGEN_END_RE = re.compile(r"<!--\s*END AUTOGEN:([A-Za-z0-9_.-]+)\s*-->")
-
-_DIFF_FILE_RE = re.compile(r"^diff --git a/(.+) b/(.+)$")
-_DIFF_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_SKILL_DOC_ENV = "SCALIM_PROMPT_EVAL_SKILL_DOC_PATH"
+_AGENT_WORKDIR_SCHEMA_HEADER = "__SCALIM_AGENT_WORKDIR_SCHEMA_HEADER__"
+_AGENT_WORKDIR_DERIVED_FIELDS = "__SCALIM_AGENT_WORKDIR_DERIVED_FIELDS__"
 
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
-
-
-def _read_text(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return path.read_text(encoding="utf-8", errors="ignore")
 
 
 def _safe_rmtree(path: Path) -> None:
@@ -44,22 +44,6 @@ def _git_head(root: Path) -> Optional[str]:
         return None
     value = out.decode("utf-8", errors="ignore").strip()
     return value or None
-
-
-@dataclass(frozen=True)
-class Issue:
-    code: str
-    message: str
-    path: Optional[str] = None
-    line: Optional[int] = None
-
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"code": self.code, "message": self.message}
-        if self.path is not None:
-            payload["path"] = self.path
-        if self.line is not None:
-            payload["line"] = self.line
-        return payload
 
 
 @dataclass(frozen=True)
@@ -96,25 +80,8 @@ class CaseResult:
         }
 
 
-@dataclass(frozen=True)
-class DiffHunk:
-    old_start: int
-    new_start: int
-    lines: Tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class FilePatch:
-    old_path: str
-    new_path: str
-    hunks: Tuple[DiffHunk, ...]
-
-    def paths(self) -> Tuple[str, str]:
-        return (self.old_path, self.new_path)
-
-
 def _load_case(path: Path) -> Case:
-    raw = json.loads(_read_text(path))
+    raw = json.loads(read_text(path))
 
     if not isinstance(raw, dict):
         msg = "invalid case.json (expected object): {}".format(path)
@@ -156,183 +123,6 @@ def discover_cases(cases_root: Path) -> List[Case]:
     return cases
 
 
-def _parse_patch(text: str) -> Tuple[FilePatch, ...]:
-    file_patches: List[FilePatch] = []
-
-    current_old: Optional[str] = None
-    current_new: Optional[str] = None
-    current_hunks: List[DiffHunk] = []
-    current_hunk_lines: List[str] = []
-    current_hunk_old_start: Optional[int] = None
-    current_hunk_new_start: Optional[int] = None
-
-    def _flush_hunk() -> None:
-        nonlocal current_hunk_lines, current_hunk_old_start, current_hunk_new_start
-        if current_hunk_old_start is None or current_hunk_new_start is None:
-            current_hunk_lines = []
-            current_hunk_old_start = None
-            current_hunk_new_start = None
-            return
-        current_hunks.append(
-            DiffHunk(
-                old_start=current_hunk_old_start,
-                new_start=current_hunk_new_start,
-                lines=tuple(current_hunk_lines),
-            )
-        )
-        current_hunk_lines = []
-        current_hunk_old_start = None
-        current_hunk_new_start = None
-
-    def _flush_file() -> None:
-        nonlocal current_old, current_new, current_hunks
-        _flush_hunk()
-        if current_old is None or current_new is None:
-            current_hunks = []
-            current_old = None
-            current_new = None
-            return
-        file_patches.append(FilePatch(old_path=current_old, new_path=current_new, hunks=tuple(current_hunks)))
-        current_hunks = []
-        current_old = None
-        current_new = None
-
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip("\n")
-
-        file_m = _DIFF_FILE_RE.match(line)
-        if file_m:
-            _flush_file()
-            current_old = file_m.group(1)
-            current_new = file_m.group(2)
-            continue
-
-        hunk_m = _DIFF_HUNK_RE.match(line)
-        if hunk_m and current_old is not None and current_new is not None:
-            _flush_hunk()
-            current_hunk_old_start = int(hunk_m.group(1))
-            current_hunk_new_start = int(hunk_m.group(3))
-            continue
-
-        if current_hunk_old_start is not None and current_hunk_new_start is not None:
-            current_hunk_lines.append(line)
-
-    _flush_file()
-    return tuple(file_patches)
-
-
-def _has_gen_path(paths: Iterable[str]) -> bool:
-    return any(".gen." in p for p in paths)
-
-
-def _effective_existing_path(root: Path, file_patch: FilePatch) -> Optional[Path]:
-    candidates = [root / file_patch.new_path, root / file_patch.old_path]
-    for c in candidates:
-        if c.exists() and c.is_file():
-            return c
-    return None
-
-
-def _autogen_block_ranges(text: str) -> List[Tuple[str, int, int]]:
-    # 返回的区间为闭区间(行号为 `1-based`).
-    ranges: List[Tuple[str, int, int]] = []
-    begin_stack: List[Tuple[str, int]] = []
-
-    for idx, line in enumerate(text.splitlines(), start=1):
-        begin_m = _AUTOGEN_BEGIN_RE.search(line)
-        if begin_m:
-            begin_stack.append((begin_m.group(1), idx))
-            continue
-        end_m = _AUTOGEN_END_RE.search(line)
-        if end_m:
-            block_id = end_m.group(1)
-            if begin_stack and begin_stack[-1][0] == block_id:
-                _, begin_idx = begin_stack.pop()
-                ranges.append((block_id, begin_idx, idx))
-            continue
-
-    return ranges
-
-
-def _is_in_ranges(line_no: int, ranges: Sequence[Tuple[str, int, int]]) -> Optional[str]:
-    for block_id, begin, end in ranges:
-        if begin <= line_no <= end:
-            return block_id
-    return None
-
-
-def _validate_generated_file_boundary(file_patches: Sequence[FilePatch], *, allow_gen: bool) -> List[Issue]:
-    if allow_gen:
-        return []
-    issues: List[Issue] = []
-    for fp in file_patches:
-        if _has_gen_path(fp.paths()):
-            issues.append(
-                Issue(
-                    code="generated_file",
-                    message="补丁涉及 `*.gen.*` 路径; 生成文件禁止手改.",
-                    path=fp.new_path,
-                )
-            )
-    return issues
-
-
-def _validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root: Path) -> List[Issue]:
-    issues: List[Issue] = []
-    for fp in file_patches:
-        base_path = _effective_existing_path(root, fp)
-        if base_path is None:
-            continue
-        ranges = _autogen_block_ranges(_read_text(base_path))
-        if not ranges:
-            continue
-
-        for hunk in fp.hunks:
-            old_line = hunk.old_start
-            new_line = hunk.new_start
-
-            for line in hunk.lines:
-                if not line:
-                    # 防御性处理: 补丁行缺少前缀.
-                    continue
-                prefix = line[0]
-                if prefix == " ":
-                    old_line += 1
-                    new_line += 1
-                    continue
-                if prefix == "-":
-                    block_id = _is_in_ranges(old_line, ranges)
-                    if block_id is not None:
-                        issues.append(
-                            Issue(
-                                code="autogen_block",
-                                message="补丁修改了注入的 `AUTOGEN` 块 `{}`; 请修改 SSOT 并重新运行 `just gen-docs`.".format(block_id),
-                                path=fp.new_path,
-                                line=old_line,
-                            )
-                        )
-                    old_line += 1
-                    continue
-                if prefix == "+":
-                    # `+` 行不会推进 `old_line`; 插入点按当前 `old_line` 处理.
-                    block_id = _is_in_ranges(old_line, ranges)
-                    if block_id is not None:
-                        issues.append(
-                            Issue(
-                                code="autogen_block",
-                                message="补丁向注入的 `AUTOGEN` 块 `{}` 中插入内容; 请修改 SSOT 并重新运行 `just gen-docs`.".format(
-                                    block_id
-                                ),
-                                path=fp.new_path,
-                                line=old_line,
-                            )
-                        )
-                    new_line += 1
-                    continue
-
-    return issues
-
-
 def _validate_file_assert(case: Case, *, root: Path) -> Tuple[bool, Tuple[Issue, ...]]:
     rel = str(case.inputs.get("file") or "").strip()
     must_contain = case.inputs.get("must_contain") or []
@@ -346,7 +136,7 @@ def _validate_file_assert(case: Case, *, root: Path) -> Tuple[bool, Tuple[Issue,
     if not path.exists():
         return False, (Issue(code="file_missing", message="缺少必需文件", path=rel),)
 
-    text = _read_text(path)
+    text = read_text(path)
     violations: List[Issue] = []
     for needle in must_contain:
         if needle not in text:
@@ -364,11 +154,16 @@ def _validate_diff_case(case: Case, *, root: Path) -> Tuple[bool, Tuple[Issue, .
     if not patch_path.exists():
         return False, (Issue(code="file_missing", message="找不到补丁文件", path=str(patch_path)),)
 
-    file_patches = _parse_patch(_read_text(patch_path))
+    file_patches = parse_patch(read_text(patch_path))
+    if not file_patches:
+        return (
+            False,
+            (Issue(code="patch_parse", message="无法解析补丁(缺少 `diff --git a/... b/...` 头).", path=str(patch_path)),),
+        )
 
     violations: List[Issue] = []
-    violations.extend(_validate_generated_file_boundary(file_patches, allow_gen=allow_gen))
-    violations.extend(_validate_injected_block_boundary(file_patches, root=root))
+    violations.extend(validate_generated_file_boundary(file_patches, allow_gen=allow_gen))
+    violations.extend(validate_injected_block_boundary(file_patches, root=root))
 
     observed_ok = not violations
     expected_ok = bool(case.expect.get("ok", True))
@@ -494,6 +289,851 @@ def _write_failures_md(path: Path, results: Sequence[CaseResult]) -> None:
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
+def _write_promptfoo_failures_md(path: Path, payload: Dict[str, Any]) -> None:
+    results = (payload.get("results") or {}).get("results") or []
+    if not isinstance(results, list) or not results:
+        path.write_text("# prompt-eval-llm failures\n\n(no failures)\n", encoding="utf-8")
+        return
+
+    failed = [r for r in results if isinstance(r, dict) and not r.get("success", False)]
+    if not failed:
+        path.write_text("# prompt-eval-llm failures\n\n(no failures)\n", encoding="utf-8")
+        return
+
+    def _s(v: Any, *, max_len: int = 900) -> str:
+        text = str(v or "")
+        if len(text) > max_len:
+            return text[: max_len - 3] + "..."
+        return text
+
+    lines: List[str] = ["# prompt-eval-llm failures", ""]
+    for r in failed:
+        prompt_label = ((r.get("prompt") or {}) if isinstance(r.get("prompt"), dict) else {}).get("label") or ""
+        provider_id = ((r.get("provider") or {}) if isinstance(r.get("provider"), dict) else {}).get("id") or ""
+        test_desc = ((r.get("testCase") or {}) if isinstance(r.get("testCase"), dict) else {}).get("description") or ""
+        error = r.get("error") or ""
+        grading = r.get("gradingResult") or {}
+
+        reason = ""
+        if error:
+            reason = error
+        elif isinstance(grading, dict):
+            reason = grading.get("reason") or ""
+
+        lines.append("## {}".format(_s(test_desc, max_len=200)))
+        lines.append("")
+        if prompt_label:
+            lines.append("- prompt: {}".format(_s(prompt_label, max_len=200)))
+        if provider_id:
+            lines.append("- provider: {}".format(_s(provider_id, max_len=200)))
+        if reason:
+            lines.append("- reason: {}".format(_s(reason)))
+        else:
+            lines.append("- reason: (no reason)")
+        lines.append("")
+
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def _promptfoo_version() -> Optional[str]:
+    try:
+        out = subprocess.check_output(["promptfoo", "--version"])
+    except Exception:
+        return None
+    value = out.decode("utf-8", errors="ignore").strip()
+    return value or None
+
+
+def _file_url(path: Path) -> str:
+    return "file://{}".format(path.as_posix())
+
+
+def _rel_or_abs(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
+def _extract_git_archive(*, root: Path, ref: str, rel_path: str, dest_dir: Path) -> None:
+    try:
+        blob = subprocess.check_output(["git", "archive", ref, rel_path], cwd=str(root))
+    except subprocess.CalledProcessError as e:
+        msg = "git archive failed for ref={} path={}: {}".format(ref, rel_path, e)
+        raise RuntimeError(msg)
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:*") as tf:
+        tf.extractall(path=str(dest_dir))
+
+
+def _materialize_skill_snapshot_candidate(*, root: Path, dest_dir: Path) -> Path:
+    src = root / "artifacts/skills/scalim-yaml-dsl"
+    if not src.exists() or not src.is_dir():
+        msg = "candidate skill directory not found: {}".format(src)
+        raise FileNotFoundError(msg)
+
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    out_dir = dest_dir / "scalim-yaml-dsl"
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    shutil.copytree(str(src), str(out_dir))
+    skill_md = out_dir / "SKILL.md"
+    if not skill_md.exists():
+        msg = "candidate SKILL.md not found after snapshot: {}".format(skill_md)
+        raise FileNotFoundError(msg)
+    return skill_md
+
+
+def _materialize_skill_snapshot_baseline(*, root: Path, ref: str, dest_dir: Path) -> Path:
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    _extract_git_archive(root=root, ref=ref, rel_path="artifacts/skills/scalim-yaml-dsl", dest_dir=dest_dir)
+
+    extracted = dest_dir / "artifacts/skills/scalim-yaml-dsl"
+    if not extracted.exists():
+        msg = "baseline skill directory not found in git archive output: {} (ref={})".format(extracted, ref)
+        raise FileNotFoundError(msg)
+
+    out_dir = dest_dir / "scalim-yaml-dsl"
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    shutil.move(str(extracted), str(out_dir))
+
+    artifacts_dir = dest_dir / "artifacts"
+    if artifacts_dir.exists():
+        shutil.rmtree(artifacts_dir)
+
+    skill_md = out_dir / "SKILL.md"
+    if not skill_md.exists():
+        msg = "baseline SKILL.md not found after snapshot: {} (ref={})".format(skill_md, ref)
+        raise FileNotFoundError(msg)
+    return skill_md
+
+
+def _render_promptfoo_config_for_skill(*, ssot_path: Path, dest_path: Path, skill_md_path: Path) -> None:
+    ssot_text = read_text(ssot_path)
+    needle = "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    if needle not in ssot_text:
+        msg = "promptfoo SSOT config missing expected prefix reference: {}".format(needle)
+        raise RuntimeError(msg)
+    rendered = ssot_text.replace(needle, _file_url(skill_md_path))
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    dest_path.write_text(rendered, encoding="utf-8")
+
+
+def _render_promptfoo_config_with_replacements(*, ssot_path: Path, dest_path: Path, replacements: Dict[str, str]) -> None:
+    ssot_text = read_text(ssot_path)
+    rendered = ssot_text
+    for needle, value in replacements.items():
+        if needle not in rendered:
+            msg = "promptfoo SSOT config missing placeholder: {}".format(needle)
+            raise RuntimeError(msg)
+        rendered = rendered.replace(needle, value)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    dest_path.write_text(rendered, encoding="utf-8")
+
+
+def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, scenario: str) -> None:
+    fixture_dir = root / "openspec/prompt-eval/fixtures/agent_stub_project"
+    if not fixture_dir.exists():
+        msg = "agent fixture missing: {}".format(fixture_dir)
+        raise FileNotFoundError(msg)
+    if workspace_dir.exists():
+        shutil.rmtree(workspace_dir)
+    workspace_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(str(fixture_dir), str(workspace_dir))
+
+    # Pre-create a local uv environment and install the fixture project so that
+    # `uv run scalim-cli ...` resolves to the workspace-local entrypoint (not any global one).
+    try:
+        uv_env = dict(environ)
+        active_venv = uv_env.pop("VIRTUAL_ENV", None)
+        if active_venv:
+            venv_bin = str(Path(active_venv) / "bin")
+            path_raw = uv_env.get("PATH") or ""
+            uv_env["PATH"] = ":".join(p for p in path_raw.split(":") if p and p != venv_bin)
+
+        subprocess.check_call(["uv", "-q", "venv"], cwd=str(workspace_dir), env=uv_env)
+        subprocess.check_call(["uv", "-q", "pip", "install", "-e", "."], cwd=str(workspace_dir), env=uv_env)
+    except FileNotFoundError:
+        raise RuntimeError("Missing required dependency: `uv` (for agent workspace setup).")
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError("Failed to set up agent workspace uv environment: {}".format(e))
+
+    schema_dir = workspace_dir / "schema"
+    schema_dir.mkdir(parents=True, exist_ok=True)
+    schema_path = (schema_dir / "demand.gen.json").resolve()
+    schema_path.write_text("{\"type\":\"object\"}\n", encoding="utf-8")
+
+    reports_dir = workspace_dir / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    if scenario == "schema_header":
+        yaml_path = reports_dir / "schema_header_bad.gen.yaml"
+        yaml_path.write_text(
+            "\n".join(
+                [
+                    "# yaml-language-server: $schema=/wrong/path/demand.gen.json",
+                    "",
+                    "main_source:",
+                    "  fields:",
+                    "    raw_a:",
+                    "      data_key: raw_a",
+                    "fields:",
+                    "  derived_x:",
+                    "    compute: raw_a",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    elif scenario == "derived_fields":
+        yaml_path = reports_dir / "derived_fields_bad.gen.yaml"
+        yaml_path.write_text(
+            "\n".join(
+                [
+                    "# yaml-language-server: $schema={}".format(schema_path),
+                    "",
+                    "main_source:",
+                    "  fields:",
+                    "    raw_a:",
+                    "      data_key: raw_a",
+                    "    derived_total:",
+                    "      compute: raw_a",
+                    "fields: {}",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    else:
+        msg = "unknown agent scenario: {}".format(scenario)
+        raise ValueError(msg)
+
+    skill_dest = workspace_dir / "artifacts/skills/scalim-yaml-dsl"
+    skill_dest.parent.mkdir(parents=True, exist_ok=True)
+    if skill_dest.exists():
+        shutil.rmtree(skill_dest)
+    shutil.copytree(str(skill_dir), str(skill_dest))
+
+
+def _setup_agent_workspaces(*, root: Path, workspaces_root: Path, skill_dir: Path) -> Dict[str, str]:
+    workspaces_root.mkdir(parents=True, exist_ok=True)
+    replacements: Dict[str, str] = {}
+
+    schema_ws = workspaces_root / "schema_header_fix"
+    _setup_agent_workspace(root=root, workspace_dir=schema_ws, skill_dir=skill_dir, scenario="schema_header")
+    replacements[_AGENT_WORKDIR_SCHEMA_HEADER] = str(schema_ws)
+
+    derived_ws = workspaces_root / "derived_fields_upgrade"
+    _setup_agent_workspace(root=root, workspace_dir=derived_ws, skill_dir=skill_dir, scenario="derived_fields")
+    replacements[_AGENT_WORKDIR_DERIVED_FIELDS] = str(derived_ws)
+
+    return replacements
+
+
+def _promptfoo_common_cmd(*, config_path: Path, out_path: Path) -> List[str]:
+    cmd = [
+        "promptfoo",
+        "eval",
+        "-c",
+        str(config_path),
+        "-o",
+        str(out_path),
+        "--no-share",
+        "--no-progress-bar",
+        "--no-table",
+    ]
+
+    max_concurrency = environ.get("PROMPT_EVAL_LLM_MAX_CONCURRENCY")
+    if max_concurrency:
+        cmd.extend(["-j", max_concurrency])
+
+    filter_first_n = environ.get("PROMPT_EVAL_LLM_FILTER_FIRST_N")
+    if filter_first_n:
+        cmd.extend(["-n", filter_first_n])
+
+    filter_pattern = environ.get("PROMPT_EVAL_LLM_FILTER_PATTERN")
+    if filter_pattern:
+        cmd.extend(["--filter-pattern", filter_pattern])
+
+    filter_prompts = environ.get("PROMPT_EVAL_LLM_FILTER_PROMPTS")
+    if filter_prompts:
+        cmd.extend(["--filter-prompts", filter_prompts])
+
+    if environ.get("PROMPT_EVAL_LLM_NO_CACHE") == "1":
+        cmd.append("--no-cache")
+
+    return cmd
+
+
+def _run_promptfoo_once(
+    *,
+    root: Path,
+    output_dir: Path,
+    config_path: Path,
+    actual_version: str,
+    pinned_version: Optional[str],
+    git_head: Optional[str],
+    check: bool,
+    variant: Optional[str],
+    baseline_ref: Optional[str],
+    skill_md_path: Optional[Path],
+) -> Tuple[int, Dict[str, Any]]:
+    work_dir = output_dir / "promptfoo-workdir"
+    promptfoo_out = output_dir / "promptfoo-output.json"
+    summary_path = output_dir / "summary.json"
+    failures_path = output_dir / "failures.md"
+
+    # Keep `work_dir` persistent to reuse promptfoo's cache across runs (saves tokens).
+    output_dir.mkdir(parents=True, exist_ok=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    for artifact in (summary_path, promptfoo_out, failures_path):
+        if artifact.exists():
+            artifact.unlink()
+
+    # Validate config before spending tokens.
+    try:
+        subprocess.check_call(["promptfoo", "validate", "config", "-c", str(config_path)], cwd=str(work_dir))
+    except subprocess.CalledProcessError:
+        print("[错误] promptfoo 配置校验失败: {}".format(config_path), file=sys.stderr)
+        return 2, {}
+
+    dry_run = environ.get("PROMPT_EVAL_LLM_DRY_RUN") == "1"
+    if dry_run:
+        summary: Dict[str, Any] = {
+            "runner": {"name": _RUNNER_NAME, "version": _RUNNER_VERSION},
+            "mode": "check" if check else "run",
+            "git": {"head": git_head},
+            "promptfoo": {
+                "version": actual_version,
+                "pinned": pinned_version,
+                "config": _rel_or_abs(config_path, root),
+                "output": _rel_or_abs(promptfoo_out, root),
+            },
+            "ok": True,
+            "dry_run": True,
+        }
+        if variant is not None:
+            summary["variant"] = variant
+        if baseline_ref is not None:
+            summary["baseline_ref"] = baseline_ref
+        if skill_md_path is not None:
+            summary["skill_doc"] = _rel_or_abs(skill_md_path, root)
+        _write_json(summary_path, summary)
+        return 0, summary
+
+    cmd = _promptfoo_common_cmd(config_path=config_path, out_path=promptfoo_out)
+
+    env = dict(environ)
+    active_venv = env.pop("VIRTUAL_ENV", None)
+    if active_venv:
+        venv_bin = str(Path(active_venv) / "bin")
+        path_raw = env.get("PATH") or ""
+        env["PATH"] = ":".join(p for p in path_raw.split(":") if p and p != venv_bin)
+    env.setdefault("PROMPTFOO_PYTHON", sys.executable)
+    env.setdefault("PROMPTFOO_DISABLE_SHARING", "1")
+    env.setdefault("PROMPTFOO_DISABLE_SHARE_EMAIL_REQUEST", "1")
+    if skill_md_path is not None:
+        env[_SKILL_DOC_ENV] = str(skill_md_path)
+
+    rc = subprocess.call(cmd, cwd=str(work_dir), env=env)
+
+    summary = {
+        "runner": {"name": _RUNNER_NAME, "version": _RUNNER_VERSION},
+        "mode": "check" if check else "run",
+        "git": {"head": git_head},
+        "promptfoo": {
+            "version": actual_version,
+            "pinned": pinned_version,
+            "config": _rel_or_abs(config_path, root),
+            "output": _rel_or_abs(promptfoo_out, root),
+        },
+        "ok": rc == 0,
+    }
+    if variant is not None:
+        summary["variant"] = variant
+    if baseline_ref is not None:
+        summary["baseline_ref"] = baseline_ref
+    if skill_md_path is not None:
+        summary["skill_doc"] = _rel_or_abs(skill_md_path, root)
+
+    if promptfoo_out.exists():
+        try:
+            payload = json.loads(read_text(promptfoo_out))
+        except Exception as e:
+            summary["parse_error"] = str(e)
+        else:
+            stats = (payload.get("results") or {}).get("stats") or {}
+            summary["stats"] = stats
+            summary["evalId"] = payload.get("evalId")
+            _write_promptfoo_failures_md(failures_path, payload)
+
+    _write_json(summary_path, summary)
+    return rc, summary
+
+
+def _load_promptfoo_rows(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rows = (payload.get("results") or {}).get("results") or []
+    if not isinstance(rows, list):
+        return []
+    return [r for r in rows if isinstance(r, dict)]
+
+
+def _row_key(row: Dict[str, Any]) -> str:
+    prompt = row.get("prompt") or {}
+    provider = row.get("provider") or {}
+    test_case = row.get("testCase") or {}
+    prompt_id = ""
+    prompt_label = ""
+    provider_id = ""
+    test_desc = ""
+    if isinstance(prompt, dict):
+        prompt_id = str(prompt.get("id") or "")
+        prompt_label = str(prompt.get("label") or "")
+    if isinstance(provider, dict):
+        provider_id = str(provider.get("id") or "")
+    if isinstance(test_case, dict):
+        test_desc = str(test_case.get("description") or "")
+    return "{}||{}||{}||{}".format(test_desc, prompt_id or prompt_label, prompt_label, provider_id)
+
+
+def _row_summary(row: Dict[str, Any]) -> Dict[str, Any]:
+    prompt = row.get("prompt") or {}
+    provider = row.get("provider") or {}
+    test_case = row.get("testCase") or {}
+    grading = row.get("gradingResult") or {}
+
+    def _get(d: Any, key: str) -> Any:
+        return d.get(key) if isinstance(d, dict) else None
+
+    score = row.get("score")
+    if score is None:
+        score = _get(grading, "score")
+
+    reason = row.get("error")
+    if not reason:
+        reason = _get(grading, "reason")
+
+    return {
+        "test": _get(test_case, "description") or "",
+        "prompt_id": _get(prompt, "id") or "",
+        "prompt_label": _get(prompt, "label") or "",
+        "provider": _get(provider, "id") or "",
+        "success": bool(row.get("success", False)),
+        "score": float(score) if score is not None else None,
+        "reason": str(reason or "")[:900],
+    }
+
+
+def _compare_promptfoo_outputs(*, baseline_path: Path, candidate_path: Path) -> Dict[str, Any]:
+    def _load(path: Path) -> Dict[str, Any]:
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(read_text(path))
+        except Exception:
+            return {}
+
+    baseline_payload = _load(baseline_path)
+    candidate_payload = _load(candidate_path)
+
+    baseline_rows = { _row_key(r): r for r in _load_promptfoo_rows(baseline_payload) }
+    candidate_rows = { _row_key(r): r for r in _load_promptfoo_rows(candidate_payload) }
+
+    regressions: List[Dict[str, Any]] = []
+    improvements: List[Dict[str, Any]] = []
+    changed_score: List[Dict[str, Any]] = []
+    unchanged_failures: List[Dict[str, Any]] = []
+    unchanged_passes: List[Dict[str, Any]] = []
+    missing_in_candidate: List[Dict[str, Any]] = []
+    missing_in_baseline: List[Dict[str, Any]] = []
+
+    all_keys = sorted(set(baseline_rows.keys()) | set(candidate_rows.keys()))
+    for key in all_keys:
+        b = baseline_rows.get(key)
+        c = candidate_rows.get(key)
+        if b is None and c is not None:
+            missing_in_baseline.append(_row_summary(c))
+            continue
+        if c is None and b is not None:
+            missing_in_candidate.append(_row_summary(b))
+            continue
+        if b is None or c is None:
+            continue
+
+        bs = bool(b.get("success", False))
+        cs = bool(c.get("success", False))
+        bsum = _row_summary(b)
+        csum = _row_summary(c)
+
+        if bs and not cs:
+            regressions.append({"baseline": bsum, "candidate": csum})
+        elif not bs and cs:
+            improvements.append({"baseline": bsum, "candidate": csum})
+        else:
+            # both pass or both fail
+            bscore = bsum.get("score")
+            cscore = csum.get("score")
+            if bscore is not None and cscore is not None and abs(float(bscore) - float(cscore)) > 1e-9:
+                changed_score.append({"baseline": bsum, "candidate": csum, "delta": float(cscore) - float(bscore)})
+            if bs and cs:
+                unchanged_passes.append({"baseline": bsum, "candidate": csum})
+            else:
+                unchanged_failures.append({"baseline": bsum, "candidate": csum})
+
+    return {
+        "baseline": {"evalId": baseline_payload.get("evalId"), "stats": ((baseline_payload.get("results") or {}).get("stats") or {})},
+        "candidate": {"evalId": candidate_payload.get("evalId"), "stats": ((candidate_payload.get("results") or {}).get("stats") or {})},
+        "diff": {
+            "regressions": regressions,
+            "improvements": improvements,
+            "changed_score": changed_score,
+            "unchanged_failures": unchanged_failures,
+            "unchanged_passes": unchanged_passes,
+            "missing_in_candidate": missing_in_candidate,
+            "missing_in_baseline": missing_in_baseline,
+        },
+    }
+
+
+def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: Optional[str], check: bool) -> int:
+    config_dir = root / "openspec/prompt-eval/promptfoo"
+    ssot_config_path = config_dir / "promptfooconfig.agent.yaml"
+    pinned_version_path = config_dir / "promptfoo-version.txt"
+
+    agent_out_dir = output_base_dir / "agent"
+    agent_out_dir.mkdir(parents=True, exist_ok=True)
+
+    actual_version = _promptfoo_version()
+    if actual_version is None:
+        print("[错误] 找不到可执行的 `promptfoo` (请先在本机安装).", file=sys.stderr)
+        return 2
+
+    pinned_version = pinned_version_path.read_text(encoding="utf-8").strip() if pinned_version_path.exists() else ""
+    if pinned_version and actual_version != pinned_version and environ.get("PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY") != "1":
+        print(
+            "[错误] promptfoo 版本不匹配: pinned={} actual={}. (如需跳过,设置 `PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY=1`)".format(
+                pinned_version, actual_version
+            ),
+            file=sys.stderr,
+        )
+        return 2
+
+    baseline_ref = str(environ.get("PROMPT_EVAL_LLM_BASELINE_REF") or "").strip()
+    if baseline_ref:
+        snapshots_dir = agent_out_dir / "snapshots"
+        workspaces_dir = agent_out_dir / "workspaces"
+        ab_dir = agent_out_dir / "ab"
+        compare_path = ab_dir / "compare.json"
+
+        if compare_path.exists():
+            compare_path.unlink()
+        if snapshots_dir.exists():
+            shutil.rmtree(snapshots_dir)
+        if workspaces_dir.exists():
+            shutil.rmtree(workspaces_dir)
+
+        try:
+            candidate_skill_md = _materialize_skill_snapshot_candidate(root=root, dest_dir=snapshots_dir / "candidate")
+            baseline_skill_md = _materialize_skill_snapshot_baseline(root=root, ref=baseline_ref, dest_dir=snapshots_dir / "baseline")
+        except Exception as e:
+            print("[错误] 无法生成 skill 快照: {}".format(e), file=sys.stderr)
+            return 2
+
+        baseline_replacements = _setup_agent_workspaces(
+            root=root,
+            workspaces_root=workspaces_dir / "baseline",
+            skill_dir=baseline_skill_md.parent,
+        )
+        candidate_replacements = _setup_agent_workspaces(
+            root=root,
+            workspaces_root=workspaces_dir / "candidate",
+            skill_dir=candidate_skill_md.parent,
+        )
+
+        baseline_cfg = ab_dir / "baseline/promptfooconfig.yaml"
+        candidate_cfg = ab_dir / "candidate/promptfooconfig.yaml"
+        try:
+            _render_promptfoo_config_with_replacements(ssot_path=ssot_config_path, dest_path=baseline_cfg, replacements=baseline_replacements)
+            _render_promptfoo_config_with_replacements(ssot_path=ssot_config_path, dest_path=candidate_cfg, replacements=candidate_replacements)
+        except Exception as e:
+            print("[错误] 无法渲染 promptfoo config: {}".format(e), file=sys.stderr)
+            return 2
+
+        rc_base, base_summary = _run_promptfoo_once(
+            root=root,
+            output_dir=ab_dir / "baseline",
+            config_path=baseline_cfg,
+            actual_version=actual_version,
+            pinned_version=pinned_version or None,
+            git_head=git_head,
+            check=check,
+            variant="baseline",
+            baseline_ref=baseline_ref,
+            skill_md_path=None,
+        )
+        rc_cand, cand_summary = _run_promptfoo_once(
+            root=root,
+            output_dir=ab_dir / "candidate",
+            config_path=candidate_cfg,
+            actual_version=actual_version,
+            pinned_version=pinned_version or None,
+            git_head=git_head,
+            check=check,
+            variant="candidate",
+            baseline_ref=baseline_ref,
+            skill_md_path=None,
+        )
+
+        if (ab_dir / "baseline/promptfoo-output.json").exists() and (ab_dir / "candidate/promptfoo-output.json").exists():
+            payload = _compare_promptfoo_outputs(
+                baseline_path=ab_dir / "baseline/promptfoo-output.json",
+                candidate_path=ab_dir / "candidate/promptfoo-output.json",
+            )
+            payload["meta"] = {
+                "baseline_ref": baseline_ref,
+                "candidate_head": git_head,
+                "promptfoo_version": actual_version,
+                "promptfoo_pinned": pinned_version or None,
+            }
+            _write_json(compare_path, payload)
+
+        top_summary: Dict[str, Any] = {
+            "runner": {"name": _RUNNER_NAME, "version": _RUNNER_VERSION},
+            "mode": "check" if check else "run",
+            "git": {"head": git_head},
+            "baseline_ref": baseline_ref,
+            "variants": {
+                "baseline": {
+                    "summary": _rel_or_abs(ab_dir / "baseline/summary.json", root),
+                    "output": _rel_or_abs(ab_dir / "baseline/promptfoo-output.json", root),
+                },
+                "candidate": {
+                    "summary": _rel_or_abs(ab_dir / "candidate/summary.json", root),
+                    "output": _rel_or_abs(ab_dir / "candidate/promptfoo-output.json", root),
+                },
+            },
+            "compare": _rel_or_abs(compare_path, root) if compare_path.exists() else None,
+            "ok": (rc_base == 0 and rc_cand == 0),
+            "dry_run": environ.get("PROMPT_EVAL_LLM_DRY_RUN") == "1",
+        }
+        if base_summary:
+            top_summary["baseline_summary"] = base_summary
+        if cand_summary:
+            top_summary["candidate_summary"] = cand_summary
+        _write_json(agent_out_dir / "summary.json", top_summary)
+
+        allow_failure = environ.get("PROMPT_EVAL_LLM_ALLOW_FAILURE") == "1"
+        fatal = (rc_base == 2) or (rc_cand == 2)
+        if fatal:
+            return 2
+        if (rc_base != 0 or rc_cand != 0) and not allow_failure:
+            return 1
+        return 0
+
+    # Candidate-only mode.
+    snapshots_dir = agent_out_dir / "snapshots"
+    workspaces_dir = agent_out_dir / "workspaces"
+    if snapshots_dir.exists():
+        shutil.rmtree(snapshots_dir)
+    if workspaces_dir.exists():
+        shutil.rmtree(workspaces_dir)
+
+    try:
+        candidate_skill_md = _materialize_skill_snapshot_candidate(root=root, dest_dir=snapshots_dir / "candidate")
+    except Exception as e:
+        print("[错误] 无法生成 skill 快照: {}".format(e), file=sys.stderr)
+        return 2
+
+    replacements = _setup_agent_workspaces(
+        root=root,
+        workspaces_root=workspaces_dir / "candidate",
+        skill_dir=candidate_skill_md.parent,
+    )
+    rendered_cfg = agent_out_dir / "promptfooconfig.yaml"
+    try:
+        _render_promptfoo_config_with_replacements(ssot_path=ssot_config_path, dest_path=rendered_cfg, replacements=replacements)
+    except Exception as e:
+        print("[错误] 无法渲染 promptfoo config: {}".format(e), file=sys.stderr)
+        return 2
+
+    rc, _summary = _run_promptfoo_once(
+        root=root,
+        output_dir=agent_out_dir,
+        config_path=rendered_cfg,
+        actual_version=actual_version,
+        pinned_version=pinned_version or None,
+        git_head=git_head,
+        check=check,
+        variant="candidate",
+        baseline_ref=None,
+        skill_md_path=None,
+    )
+
+    allow_failure = environ.get("PROMPT_EVAL_LLM_ALLOW_FAILURE") == "1"
+    if rc != 0 and not allow_failure:
+        if rc == 2:
+            return 2
+        return 1
+    return 0
+
+
+def _run_promptfoo_llm_suite(*, root: Path, output_base_dir: Path, git_head: Optional[str], check: bool) -> int:
+    config_dir = root / "openspec/prompt-eval/promptfoo"
+    ssot_config_path = config_dir / "promptfooconfig.yaml"
+    pinned_version_path = config_dir / "promptfoo-version.txt"
+
+    llm_out_dir = output_base_dir / "llm"
+    llm_out_dir.mkdir(parents=True, exist_ok=True)
+
+    actual_version = _promptfoo_version()
+    if actual_version is None:
+        print("[错误] 找不到可执行的 `promptfoo` (请先在本机安装).", file=sys.stderr)
+        return 2
+
+    pinned_version = pinned_version_path.read_text(encoding="utf-8").strip() if pinned_version_path.exists() else ""
+    if pinned_version and actual_version != pinned_version and environ.get("PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY") != "1":
+        print(
+            "[错误] promptfoo 版本不匹配: pinned={} actual={}. (如需跳过,设置 `PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY=1`)".format(
+                pinned_version, actual_version
+            ),
+            file=sys.stderr,
+        )
+        return 2
+
+    baseline_ref = str(environ.get("PROMPT_EVAL_LLM_BASELINE_REF") or "").strip()
+    if baseline_ref:
+        snapshots_dir = llm_out_dir / "snapshots"
+        ab_dir = llm_out_dir / "ab"
+        compare_path = ab_dir / "compare.json"
+
+        if compare_path.exists():
+            compare_path.unlink()
+
+        if snapshots_dir.exists():
+            shutil.rmtree(snapshots_dir)
+
+        try:
+            candidate_skill_md = _materialize_skill_snapshot_candidate(root=root, dest_dir=snapshots_dir / "candidate")
+            baseline_skill_md = _materialize_skill_snapshot_baseline(
+                root=root, ref=baseline_ref, dest_dir=snapshots_dir / "baseline"
+            )
+        except Exception as e:
+            print("[错误] 无法生成 skill 快照: {}".format(e), file=sys.stderr)
+            return 2
+
+        baseline_cfg = ab_dir / "baseline/promptfooconfig.yaml"
+        candidate_cfg = ab_dir / "candidate/promptfooconfig.yaml"
+
+        try:
+            _render_promptfoo_config_for_skill(ssot_path=ssot_config_path, dest_path=baseline_cfg, skill_md_path=baseline_skill_md)
+            _render_promptfoo_config_for_skill(ssot_path=ssot_config_path, dest_path=candidate_cfg, skill_md_path=candidate_skill_md)
+        except Exception as e:
+            print("[错误] 无法渲染 promptfoo config: {}".format(e), file=sys.stderr)
+            return 2
+
+        rc_base, base_summary = _run_promptfoo_once(
+            root=root,
+            output_dir=ab_dir / "baseline",
+            config_path=baseline_cfg,
+            actual_version=actual_version,
+            pinned_version=pinned_version or None,
+            git_head=git_head,
+            check=check,
+            variant="baseline",
+            baseline_ref=baseline_ref,
+            skill_md_path=baseline_skill_md,
+        )
+        rc_cand, cand_summary = _run_promptfoo_once(
+            root=root,
+            output_dir=ab_dir / "candidate",
+            config_path=candidate_cfg,
+            actual_version=actual_version,
+            pinned_version=pinned_version or None,
+            git_head=git_head,
+            check=check,
+            variant="candidate",
+            baseline_ref=baseline_ref,
+            skill_md_path=candidate_skill_md,
+        )
+
+        if (ab_dir / "baseline/promptfoo-output.json").exists() and (ab_dir / "candidate/promptfoo-output.json").exists():
+            payload = _compare_promptfoo_outputs(
+                baseline_path=ab_dir / "baseline/promptfoo-output.json",
+                candidate_path=ab_dir / "candidate/promptfoo-output.json",
+            )
+            payload["meta"] = {
+                "baseline_ref": baseline_ref,
+                "candidate_head": git_head,
+                "promptfoo_version": actual_version,
+                "promptfoo_pinned": pinned_version or None,
+            }
+            _write_json(compare_path, payload)
+
+        top_summary: Dict[str, Any] = {
+            "runner": {"name": _RUNNER_NAME, "version": _RUNNER_VERSION},
+            "mode": "check" if check else "run",
+            "git": {"head": git_head},
+            "baseline_ref": baseline_ref,
+            "variants": {
+                "baseline": {
+                    "summary": _rel_or_abs(ab_dir / "baseline/summary.json", root),
+                    "output": _rel_or_abs(ab_dir / "baseline/promptfoo-output.json", root),
+                },
+                "candidate": {
+                    "summary": _rel_or_abs(ab_dir / "candidate/summary.json", root),
+                    "output": _rel_or_abs(ab_dir / "candidate/promptfoo-output.json", root),
+                },
+            },
+            "compare": _rel_or_abs(compare_path, root) if compare_path.exists() else None,
+            "ok": (rc_base == 0 and rc_cand == 0),
+            "dry_run": environ.get("PROMPT_EVAL_LLM_DRY_RUN") == "1",
+        }
+        if base_summary:
+            top_summary["baseline_summary"] = base_summary
+        if cand_summary:
+            top_summary["candidate_summary"] = cand_summary
+        _write_json(llm_out_dir / "summary.json", top_summary)
+
+        allow_failure = environ.get("PROMPT_EVAL_LLM_ALLOW_FAILURE") == "1"
+        fatal = (rc_base == 2) or (rc_cand == 2)
+        if fatal:
+            return 2
+        if (rc_base != 0 or rc_cand != 0) and not allow_failure:
+            return 1
+        return 0
+
+    rc, summary = _run_promptfoo_once(
+        root=root,
+        output_dir=llm_out_dir,
+        config_path=ssot_config_path,
+        actual_version=actual_version,
+        pinned_version=pinned_version or None,
+        git_head=git_head,
+        check=check,
+        variant=None,
+        baseline_ref=None,
+        skill_md_path=None,
+    )
+
+    if summary:
+        _write_json(llm_out_dir / "summary.json", summary)
+
+    allow_failure = environ.get("PROMPT_EVAL_LLM_ALLOW_FAILURE") == "1"
+    if rc != 0 and not allow_failure:
+        if rc == 2:
+            return 2
+        return 1
+    return 0
+
+
 def _print_summary(results: Sequence[CaseResult]) -> None:
     total = len(results)
     passed = sum(1 for r in results if r.ok)
@@ -524,15 +1164,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--output-dir", default=".tmp/artifacts/prompt-eval", help="Output directory (default: .tmp/artifacts/prompt-eval)")
     parser.add_argument("--check", action="store_true", help="CI mode: deterministic core only")
     parser.add_argument("--llm", action="store_true", help="Enable optional LLM suite (requires extra tooling; not enabled by default)")
+    parser.add_argument("--llm-agent", action="store_true", help="Enable optional LLM agent suite (promptfoo + coding agent; expensive)")
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     root = _repo_root()
     cases_root = root / args.cases_root
     out_dir = root / args.output_dir
 
-    if args.llm:
-        print("[错误] LLM 套件尚未配置. 请先运行确定性 `core`: `just prompt-eval`")
+    if args.llm and args.llm_agent:
+        print("[错误] `--llm` 与 `--llm-agent` 互斥,请只选一个.", file=sys.stderr)
         return 2
+
+    if args.llm_agent:
+        head = _git_head(root)
+        return _run_promptfoo_agent_suite(root=root, output_base_dir=out_dir, git_head=head, check=args.check)
+
+    if args.llm:
+        head = _git_head(root)
+        return _run_promptfoo_llm_suite(root=root, output_base_dir=out_dir, git_head=head, check=args.check)
 
     cases = discover_cases(cases_root)
     results = run_cases(cases, root=root)

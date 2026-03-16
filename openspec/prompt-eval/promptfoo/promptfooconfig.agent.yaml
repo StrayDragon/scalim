@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: "scalim prompt-eval (Agent suite)"
+sharing: false
+writeLatestResults: false
+
+evaluateOptions:
+  # Agent tasks depend on working-dir state; avoid cache surprises by default.
+  cache: false
+  maxConcurrency: 1
+  showProgressBar: false
+
+tracing:
+  enabled: true
+  otlp:
+    http:
+      enabled: true
+      host: "127.0.0.1"
+      port: 4318
+      acceptFormats:
+        - json
+
+providers:
+  - id: "openai:codex-sdk"
+    label: "openai:codex-sdk"
+    config:
+      model: "gpt-5.1-codex-mini"
+      sandbox_mode: "workspace-write"
+      skip_git_repo_check: true
+      network_access_enabled: false
+      web_search_enabled: false
+      cli_env:
+        VIRTUAL_ENV: ""
+      enable_streaming: true
+      max_turns: 12
+      output_schema:
+        type: "object"
+        additionalProperties: false
+        required:
+          - ok
+          - summary
+          - commands_ran
+          - files_changed
+        properties:
+          ok:
+            type: "boolean"
+          summary:
+            type: "string"
+          commands_ran:
+            type: "array"
+            items:
+              type: "string"
+          files_changed:
+            type: "array"
+            items:
+              type: "string"
+
+prompts:
+  - id: "scalim_yaml_dsl_agent_task"
+    label: "scalim-yaml-dsl agent task"
+    raw: |
+      你是一个本地 coding agent,在一个隔离工作区内完成任务。
+
+      硬规则:
+      - 必须先阅读 `artifacts/skills/scalim-yaml-dsl/SKILL.md` 并遵守其中硬规则(只读最少材料,不要全量扫文档)
+      - 只能在当前 working directory 内读写文件与执行命令
+      - 必须运行至少 1 条来自 skill 文档中的命令模板(例如 `uv run scalim-cli yaml-dsl ...`)
+      - 只跑最少命令,避免浪费时间/成本
+
+      任务:
+      {{task}}
+
+      目标文件(相对路径):
+      {{yaml_rel_path}}
+
+      最终仅输出一个 JSON 对象,符合 output_schema; 不要输出解释文字。
+
+tests:
+  - description: "agent: schema header fix via schema path"
+    vars:
+      workdir: "__SCALIM_AGENT_WORKDIR_SCHEMA_HEADER__"
+      yaml_rel_path: "reports/schema_header_bad.gen.yaml"
+      task: |
+        `yaml-dsl schema validate` 失败,提示 `$schema` 路径不对。
+        你需要用 `uv run scalim-cli yaml-dsl schema path` 获取正确的 schema 绝对路径,
+        把它写入 YAML 的 `# yaml-language-server: $schema=...` 头部,然后再次 schema validate 直到通过。
+    options:
+      working_dir: "__SCALIM_AGENT_WORKDIR_SCHEMA_HEADER__"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_agent_schema_header.py:get_assert"
+      - type: "trajectory:step-count"
+        value:
+          type: "command"
+          pattern: "uv*scalim-cli*yaml-dsl*"
+          min: 1
+          max: 8
+
+  - description: "agent: move derived fields to top-level fields"
+    vars:
+      workdir: "__SCALIM_AGENT_WORKDIR_DERIVED_FIELDS__"
+      yaml_rel_path: "reports/derived_fields_bad.gen.yaml"
+      task: |
+        `yaml-dsl validate` 失败,因为有人把派生逻辑塞进了 `main_source.fields`。
+        你需要按 skill 文档的硬规则,把派生字段移到顶层 `fields` 中(使用 `compute` 或 `call_by`),
+        并确保 `main_source` 中不再出现 `compute/call_by`。
+        最后运行 `uv run scalim-cli yaml-dsl validate <file>` 确认通过。
+    options:
+      working_dir: "__SCALIM_AGENT_WORKDIR_DERIVED_FIELDS__"
+    assert:
+      - type: "python"
+        value: "file://assertions/validate_agent_derived_fields.py:get_assert"
+      - type: "trajectory:step-count"
+        value:
+          type: "command"
+          pattern: "uv*scalim-cli*yaml-dsl*"
+          min: 1
+          max: 10

@@ -457,6 +457,18 @@ prompt-eval-check:
 prompt-eval-llm:
     uv {{ UV_OPTIONS }} run python scripts/prompt-eval.py --llm
 
+# Prompt 评测: 可选模型层(在仓库外的临时目录; 避免 uv/.venv 冲突)
+prompt-eval-llm-tmp OUTPUT_DIR="/tmp/scalim-prompt-eval":
+    python scripts/prompt-eval.py --llm --output-dir "{{ OUTPUT_DIR }}"
+
+# Prompt 评测: 可选 coding-agent 套件(promptfoo + agent; 昂贵)
+prompt-eval-agent:
+    uv {{ UV_OPTIONS }} run python scripts/prompt-eval.py --llm-agent
+
+# Prompt 评测: coding-agent 套件(仓库外临时目录; 避免 uv/.venv 冲突)
+prompt-eval-agent-tmp OUTPUT_DIR="/tmp/scalim-prompt-eval-agent":
+    python scripts/prompt-eval.py --llm-agent --output-dir "{{ OUTPUT_DIR }}"
+
 # QA: 仅py轻量的检查
 quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 

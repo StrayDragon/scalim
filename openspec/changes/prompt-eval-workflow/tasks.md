@@ -1,4 +1,4 @@
-**Status: DELAYED**: 已完成确定性 core 与 CI 非阻塞集成; 5.*(promptfoo/LLM) 依赖额外配置(密钥/网络/版本 pin 等)暂无法推进。
+**Status: READY**: 已完成确定性 core 与 CI 非阻塞集成; `promptfoo`/LLM 套件已本地接入(可选层,不影响 `just prompt-eval` 的确定性 core)。
 
 ## 1. 运行入口与产物输出
 
@@ -27,8 +27,8 @@
 
 ## 5. 可选模型评测(后续扩展)
 
-- [ ] 5.1 采用 `promptfoo` 作为模型评测 runner,并 pin 版本(可复现),保持为可选层(不成为 `just prompt-eval` 的硬依赖)
-- [ ] 5.2 建立 `promptfoo` 配置 SSOT 目录与最小样例(仅占位,不追求覆盖率)
-- [ ] 5.3 增加端到端模型交互用例: YAML DSL skill 的分流与引用材料选择
-- [ ] 5.4 增加端到端模型交互用例: doc governance 边界在真实交互中的遵守(对 diff 应用同一套验证器)
-- [ ] 5.5 固定模型参数与回归对比口径(例如 temperature/seed/评分阈值),并将模型评测输出隔离到独立子目录(例如 `.tmp/artifacts/prompt-eval/llm/`),早期只作为观察信号
+- [x] 5.1 采用 `promptfoo` 作为模型评测 runner,并 pin 版本(可复现),保持为可选层(不成为 `just prompt-eval` 的硬依赖)
+- [x] 5.2 建立 `promptfoo` 配置 SSOT 目录与最小样例(仅占位,不追求覆盖率)
+- [x] 5.3 增加端到端模型交互用例: YAML DSL skill 的分流与引用材料选择
+- [x] 5.4 增加端到端模型交互用例: doc governance 边界在真实交互中的遵守(对 diff 应用同一套验证器)
+- [x] 5.5 固定模型参数与回归对比口径(例如 temperature/seed/评分阈值),并将模型评测输出隔离到独立子目录(例如 `.tmp/artifacts/prompt-eval/llm/`),早期只作为观察信号

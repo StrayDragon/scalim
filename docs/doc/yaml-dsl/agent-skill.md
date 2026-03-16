@@ -77,3 +77,16 @@ skill 中的 canonical example 故意不带 YAML LSP 头。需要编辑器补全
 generated 产物清单与输入/输出校验和在:
 
 - [`artifacts/skills/scalim-yaml-dsl.build-manifest.json`](#code=artifacts/skills/scalim-yaml-dsl.build-manifest.json)
+
+## 5. 贡献者:如何评估 skill 效果(prompt-eval)
+
+本仓库提供 `prompt-eval` 用于对 skill 做回归评估:
+
+- 确定性 core(不耗 token): `just prompt-eval`
+- promptfoo(T0; prompt 级别): `just prompt-eval-llm`
+- coding agent(T1; 更昂贵,更贴近真实用户): `just prompt-eval-agent`
+
+文档见:
+
+- [Prompt 评测(workflow)](../dev/prompt-eval.md)
+- [Prompt 评测: Coding agent (T1)](../dev/prompt-eval-agent.md)
