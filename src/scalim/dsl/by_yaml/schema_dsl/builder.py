@@ -124,7 +124,8 @@ class SchemaBuilder:
             "description": types_mod.DEMAND_SCHEMA_META["description"],
             "$comment": self.GENERATED_SCHEMA_COMMENT,
             "type": "object",
-            "required": list(types_mod.DEMAND_SCHEMA_REQUIRED),
+            # `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
+            "anyOf": [{"required": list(types_mod.DEMAND_SCHEMA_REQUIRED)}, {"required": [_IMPORT_KEY]}],
             "properties": self._build_demand_properties(),
             "definitions": definitions,
         }
@@ -248,7 +249,7 @@ class SchemaBuilder:
             "propertyNames": {"type": "string", "pattern": r"^[a-zA-Z_][a-zA-Z0-9_]*$"},
             "additionalProperties": {
                 "type": "string",
-                "pattern": r"^(\./)?[^/\\\\:]+\\.ya?ml$",
+                "pattern": r"^(\./)?[^/\\:]+\.ya?ml$",
             },
         }
 
@@ -262,7 +263,8 @@ class SchemaBuilder:
 
         required = getattr(cls, "SCHEMA_REQUIRED", ())
         if required:
-            schema["required"] = list(required)
+            # `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
+            schema["anyOf"] = [{"required": list(required)}, {"required": [_IMPORT_KEY]}]
 
         additional_props = getattr(cls, "SCHEMA_ADDITIONAL_PROPERTIES", None)
         if additional_props is not None:

@@ -5,9 +5,18 @@
   "description": "Scalim 框架 YAML 需求配置定义 Schema",
   "$comment": "自动生成, 请勿手动修改. 生成脚本: scripts/gen-yaml-dsl-schema.py",
   "type": "object",
-  "required": [
-    "name",
-    "main_source"
+  "anyOf": [
+    {
+      "required": [
+        "name",
+        "main_source"
+      ]
+    },
+    {
+      "required": [
+        "$import"
+      ]
+    }
   ],
   "properties": {
     "name": {
@@ -28,7 +37,7 @@
       },
       "additionalProperties": {
         "type": "string",
-        "pattern": "^(\\./)?[^/\\\\\\\\:]+\\\\.ya?ml$"
+        "pattern": "^(\\./)?[^/\\\\:]+\\.ya?ml$"
       }
     },
     "$import": {
@@ -411,9 +420,18 @@
           ]
         }
       },
-      "required": [
-        "source_id",
-        "loader"
+      "anyOf": [
+        {
+          "required": [
+            "source_id",
+            "loader"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
       ],
       "additionalProperties": false
     },
@@ -1077,9 +1095,18 @@
           ]
         }
       },
-      "required": [
-        "loader",
-        "key"
+      "anyOf": [
+        {
+          "required": [
+            "loader",
+            "key"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
       ],
       "additionalProperties": false
     },
@@ -1654,8 +1681,17 @@
           ]
         }
       },
-      "required": [
-        "steps"
+      "anyOf": [
+        {
+          "required": [
+            "steps"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
       ],
       "additionalProperties": false
     },
@@ -1776,9 +1812,18 @@
           ]
         }
       },
-      "required": [
-        "type",
-        "path"
+      "anyOf": [
+        {
+          "required": [
+            "type",
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
       ],
       "additionalProperties": false
     },
@@ -1859,8 +1904,17 @@
           ]
         }
       },
-      "required": [
-        "op"
+      "anyOf": [
+        {
+          "required": [
+            "op"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
       ],
       "additionalProperties": false
     },
@@ -2001,9 +2055,18 @@
           ]
         }
       },
-      "required": [
-        "group_by",
-        "metrics"
+      "anyOf": [
+        {
+          "required": [
+            "group_by",
+            "metrics"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
       ],
       "additionalProperties": false
     },
@@ -2122,8 +2185,17 @@
           ]
         }
       },
-      "required": [
-        "name"
+      "anyOf": [
+        {
+          "required": [
+            "name"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
       ],
       "additionalProperties": false
     },

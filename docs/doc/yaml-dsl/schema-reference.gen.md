@@ -9,14 +9,14 @@ Sources:
 此页用于快速对齐 YAML DSL 的字段集合与 `required` 边界.
 
 ## Top-Level Fields
-- `name` (required): type=string; 需求配置名称. - 必填, 用于标识当前配置
+- `name`: type=string; 需求配置名称. - 必填, 用于标识当前配置
 - `imports`: type=object; 片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V1 仅支持同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml` - 禁止: 绝对路径/父目录/子目录/alias 前缀
 - `$import`: $import 引用. - string: `<alias>(.<segment>)*` - list: 按顺序合并,后者覆盖前者,最终再被本地覆盖 - 仅支持 mapping 片段 - V1 仅支持同级文件导入(见顶层 `imports`)
 - `_templates`: type=object; YAML anchor 模板集合. - 仅用于 YAML 复用(anchors) - 常用于 `fields` / `relations` / `retry`
 - `description`: type=string; 配置描述(可选).
 - `batch_size`: 批处理大小. - 未声明时使用默认值 - `null` 表示禁用分批(单批执行) - `>=1` 的整数表示固定分批大小
 - `retry`: ref=loader_retry; Loader retry 策略. - 默认关闭: `enabled: false` - 启用后会对 loader 调用的瞬态错误做有限重试 - 需要提供 `should_retry` 回调(安全引用),用于决定是否重试 - 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5
-- `main_source` (required): ref=main_source; 主数据源配置. - 必填: `source_id`, `loader` - `source_id` 不能出现在 `sources` 中 - `fields` 仅允许源字段(禁止 `compute`) - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)
+- `main_source`: ref=main_source; 主数据源配置. - 必填: `source_id`, `loader` - `source_id` 不能出现在 `sources` 中 - `fields` 仅允许源字段(禁止 `compute`) - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)
 - `sources`: type=object; 数据源配置映射, key 为 `source_id`. - 每个 source 必填: `loader`, `key` - 不允许包含 `main_source.source_id` - `fields` 仅允许源字段(禁止 `compute`)
 - `fields`: type=object; 字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用
 - `relations`: type=object; 命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`
@@ -80,15 +80,13 @@ Sources:
 - `renderer`: type=string; default=pretty; enum=pretty|logger; 日志渲染器(pretty/logger)
 
 ### `main_source`
-
-- Required: `loader`, `source_id`
 - `$import`: $import 引用(支持 string 或 string list)
 - `fields`: type=object; 主数据源字段配置映射, key 为 field_id
-- `loader` (required): type=string; Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)
+- `loader`: type=string; Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)
 - `order_by`: type=array[string]; 主数据源批次内排序字段列表(仅主数据源字段)
 - `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)
 - `retry`: ref=loader_retry; Loader retry 策略(可选;默认关闭)
-- `source_id` (required): type=string; 主数据源的 source_id
+- `source_id`: type=string; 主数据源的 source_id
 
 ### `memory_opt`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -107,40 +105,34 @@ Sources:
 - `viz`: ref=viz; Scalim Viz 可视化输出配置
 
 ### `output_aggregate`
-
-- Required: `group_by`, `metrics`
 - `$import`: $import 引用(支持 string 或 string list)
 - `distinct_on_overflow`: type=string; default=error; enum=error|truncate; distinct 护栏溢出策略(error/truncate)
-- `group_by` (required): type=array[string]; 分组字段列表
+- `group_by`: type=array[string]; 分组字段列表
 - `max_distinct`: type=integer; default=0; max_distinct 护栏(0 表示不限制)
 - `max_groups`: type=integer; default=0; max_groups 护栏(0 表示不限制)
-- `metrics` (required): type=object; 聚合指标映射(key 为 out_field_id)
+- `metrics`: type=object; 聚合指标映射(key 为 out_field_id)
 - `rank_by`: type=string; 可选:按某个输出字段排序生成 rank/top_k
 - `rank_field_id`: type=string; default=rank; rank 输出字段名
 - `rank_order`: type=string; default=desc; enum=asc|desc; rank 排序方向(asc/desc)
 - `top_k`: type=integer; default=0; top_k 限制(0 表示不限制)
 
 ### `output_aggregate_metric`
-
-- Required: `op`
 - `$import`: $import 引用(支持 string 或 string list)
 - `field`: type=string; 输入字段(field_id)
 - `fields`: type=array[string]; 输入字段列表(field_id 列表)
-- `op` (required): type=string; enum=count|sum|min|max|count_true|count_true_gte|count_distinct; 聚合算子
+- `op`: type=string; enum=count|sum|min|max|count_true|count_true_gte|count_distinct; 聚合算子
 - `threshold`: 阈值(部分算子需要)
 
 ### `output_container`
-
-- Required: `path`, `type`
 - `$import`: $import 引用(支持 string 或 string list)
 - `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(仅 workbook)
 - `encoding`: type=string; default=utf-8; 文件编码(CSV 输出使用)
 - `header_fields_output_by`: type=string; default=field_id; enum=field_id|name; 表头字段名来源: field_id/name
 - `include_header`: type=boolean; default=true; 包含表头行
-- `path` (required): type=string; 输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)
+- `path`: type=string; 输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)
 - `sheet`: type=string; Excel sheet 名称(仅 workbook)
 - `streaming`: type=boolean; default=true; 启用流式输出(必须为 true)
-- `type` (required): type=string; enum=workbook|csv; 输出容器类型(workbook/csv)
+- `type`: type=string; enum=workbook|csv; 输出容器类型(workbook/csv)
 - `write_lock`: type=boolean; default=false; 写锁(仅 workbook)
 
 ### `output_extra_sheet`
@@ -151,14 +143,12 @@ Sources:
 - `write_lock`: type=boolean; 可选:写锁(缺省使用 primary workbook 的容器配置)
 
 ### `output_target`
-
-- Required: `name`
 - `$import`: $import 引用(支持 string 或 string list)
 - `aggregate`: ref=output_aggregate; 可选:派生汇总配置(声明后视为 derived output)
 - `container`: ref=output_container; 输出容器配置(workbook/csv)
 - `fields`: type=array; 明细输出字段顺序(field_id 列表; 支持 YAML alias)
 - `from`: type=string; 可选:继承来源输出(name)
-- `name` (required): type=string; 输出名称(name)
+- `name`: type=string; 输出名称(name)
 - `where`: type=string; 可选:过滤表达式(安全表达式)
 
 ### `performance`
@@ -181,10 +171,8 @@ Sources:
 - `memory_increase_warn`: 内存增长告警阈值(MB)
 
 ### `relation`
-
-- Required: `steps`
 - `$import`: $import 引用(支持 string 或 string list)
-- `steps` (required): type=array[object]; 按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])
+- `steps`: type=array[object]; 按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])
 
 ### `relation_report`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -207,13 +195,11 @@ Sources:
 - `sample_limit`: type=integer; default=5; 缺口采样数量
 
 ### `source`
-
-- Required: `key`, `loader`
 - `$import`: $import 引用(支持 string 或 string list)
 - `cache_mode`: type=string; default=none; enum=none|preload_forever; 缓存模式:none=不缓存,preload_forever=预加载永久缓存
 - `fields`: type=object; 数据源字段配置映射, key 为 field_id
-- `key` (required): 该 source loader 返回映射的 key 字段(支持复合键 tuple)
-- `loader` (required): type=string; Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)
+- `key`: 该 source loader 返回映射的 key 字段(支持复合键 tuple)
+- `loader`: type=string; Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)
 - `lookup_cast`: type=object; 归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}
 - `lookup_chunk_size`: keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)
 - `normalize`: type=object; 源代码级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)

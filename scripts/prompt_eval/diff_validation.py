@@ -243,4 +243,3 @@ def validate_patch_text(patch_text: str, *, root: Path, allow_gen: bool) -> List
     issues.extend(validate_generated_file_boundary(file_patches, allow_gen=allow_gen))
     issues.extend(validate_injected_block_boundary(file_patches, root=root))
     return issues
-

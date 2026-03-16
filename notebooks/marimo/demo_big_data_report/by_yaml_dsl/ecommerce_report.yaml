@@ -510,6 +510,79 @@ outputs:
         sum_order_amount: {op: sum, field: order_amount}
         customer_cnt: {op: count_distinct, field: customer_id}
 
+  # ==============================================================================
+  # 派生汇总输出(aggregate)示例: where/算子/guardrails/rank/top_k/多字段 group_by
+  # ==============================================================================
+
+  - name: by_region_no_promo
+    container:
+      <<: *workbook_container_base
+      sheet: 区域汇总-无促销
+    where: "no_promotion"
+    aggregate:
+      group_by: [region_name_display]
+      metrics:
+        order_cnt: {op: count}
+        sum_order_amount: {op: sum, field: order_amount}
+        customer_cnt: {op: count_distinct, field: customer_id}
+
+  - name: by_region_ops
+    container:
+      <<: *workbook_container_base
+      sheet: 区域汇总-算子
+    aggregate:
+      group_by: [region_name_display]
+      # guardrails 示例(设为 0 表示不限制)
+      max_groups: 1000
+      max_distinct: 10000
+      distinct_on_overflow: truncate
+      metrics:
+        order_cnt: {op: count}
+        order_cnt_has_promo: {op: count, field: promotion_id}
+        sum_order_amount: {op: sum, field: order_amount}
+        min_order_amount: {op: min, field: order_amount}
+        max_order_amount: {op: max, field: order_amount}
+        no_promo_cnt: {op: count_true, field: no_promotion}
+        big_order_cnt: {op: count_true_gte, field: order_amount, threshold: 1000}
+        customer_cnt: {op: count_distinct, field: customer_id}
+        customer_product_cnt: {op: count_distinct, fields: [customer_id, product_id]}
+
+  - name: by_region_import
+    container:
+      <<: *workbook_container_base
+      sheet: 区域汇总-$import
+    aggregate:
+      $import: fragments.agg_by_region_guardrails
+      metrics:
+        order_cnt: {$import: fragments.metric_order_cnt}
+        sum_order_amount: {$import: fragments.metric_sum_order_amount}
+        customer_cnt: {op: count_distinct, field: customer_id}
+
+  - name: by_region_top_amount
+    container:
+      <<: *workbook_container_base
+      sheet: 区域Top-金额
+    aggregate:
+      group_by: [region_name_display]
+      metrics:
+        order_cnt: {op: count}
+        sum_order_amount: {op: sum, field: order_amount}
+      rank_by: sum_order_amount
+      rank_field_id: rank
+      rank_order: desc
+      top_k: 5
+
+  - name: by_region_category
+    container:
+      <<: *workbook_container_base
+      sheet: 区域x分类
+    aggregate:
+      group_by: [region_name_display, category_name]
+      metrics:
+        order_cnt: {op: count}
+        sum_order_amount: {op: sum, field: order_amount}
+        customer_cnt: {op: count_distinct, field: customer_id}
+
 # ==============================================================================
 # 可观测性配置
 # ==============================================================================

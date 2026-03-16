@@ -146,6 +146,16 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/performance-observability/spec.md)
 - Summary: **状态: ✅ 已实现** PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断.
 
+### `prompt-eval-fixture-cli`
+- Title: prompt-eval-fixture-cli Specification
+- Source: [spec.md](#code=openspec/specs/prompt-eval-fixture-cli/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 prompt-eval coding-agent workspace 的 fixture CLI 隔离策略,确保其不覆盖仓库真实 `scalim-cli`,同时保持 workspace 内 `uv run scalim-cli ...` 命令模板可复现,并避免对 PyPI build 依赖/网络造成的 dry-run 波动。
+
+### `prompt-eval-workflow`
+- Title: prompt-eval-workflow Specification
+- Source: [spec.md](#code=openspec/specs/prompt-eval-workflow/spec.md)
+- Summary: **状态: ✅ 已实现** 定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。
+
 ### `runtime-guardrails`
 - Title: runtime-guardrails Specification
 - Source: [spec.md](#code=openspec/specs/runtime-guardrails/spec.md)

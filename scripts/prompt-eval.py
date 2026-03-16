@@ -449,8 +449,8 @@ def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, 
     workspace_dir.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(str(fixture_dir), str(workspace_dir))
 
-    # Pre-create a local uv environment and generate venv-local entrypoints so that
-    # `uv run scalim-cli ...` resolves to the workspace-local stub (not any global one).
+    # 预先创建本地 `uv` 虚拟环境并生成虚拟环境内的入口脚本,确保
+    # `uv run scalim-cli ...` 会解析到工作区内的 `stub`(而不是任何全局安装的版本)。
     try:
         uv_env = dict(environ)
         active_venv = uv_env.pop("VIRTUAL_ENV", None)
@@ -461,21 +461,20 @@ def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, 
 
         subprocess.check_call(["uv", "-q", "venv"], cwd=str(workspace_dir), env=uv_env)
 
-        # NOTE: do not resolve symlinks here. `uv venv` may symlink the venv python to a
-        # uv-managed interpreter; for our use, we only need the venv-local path for the
-        # shebang in generated scripts.
+        # 注意:这里不要解析符号链接。`uv venv` 可能把虚拟环境的 `python` 符号链接到 `uv` 管理的解释器;
+        # 对我们来说,只需要虚拟环境内的路径,用于生成脚本的 `shebang` 行。
         workspace_python = workspace_dir / ".venv" / "bin" / "python"
         if not workspace_python.exists():
-            raise RuntimeError("agent workspace python not found: {}".format(workspace_python))
+            raise RuntimeError("智能体工作区的 `python` 不存在: {}".format(workspace_python))
 
         venv_bin_dir = workspace_dir / ".venv" / "bin"
         src_dir = workspace_dir / "src"
         if not src_dir.exists():
-            raise RuntimeError("agent workspace fixture src missing: {}".format(src_dir))
+            raise RuntimeError("智能体工作区的样例源码目录不存在: {}".format(src_dir))
 
-        # Avoid `uv pip install -e .` here: it introduces build dependencies (e.g. setuptools)
-        # and can require network access to PyPI, which makes prompt-eval dry-runs flaky.
-        # Instead, we create venv-local console scripts that import fixture code from `./src`.
+        # 避免在这里执行 `uv pip install -e .`: 它会引入构建依赖(例如 `setuptools`),
+        # 并可能需要访问 `PyPI` 网络,导致 `prompt-eval` 的 `dry-run` 不稳定。
+        # 这里改为生成虚拟环境内的命令行脚本,从 `./src` 直接导入 `fixture` 代码。
         script = "\n".join(
             [
                 "#!{}".format(workspace_python),
@@ -486,32 +485,32 @@ def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, 
                 "",
                 "def _main() -> int:",
                 "    root = Path(__file__).resolve().parents[2]",
-                "    sys.path.insert(0, str(root / \"src\"))",
+                '    sys.path.insert(0, str(root / "src"))',
                 "    from scalim_agent_fixture.cli import main",
                 "    return int(main())",
                 "",
                 "",
-                "if __name__ == \"__main__\":",
+                'if __name__ == "__main__":',
                 "    raise SystemExit(_main())",
                 "",
             ]
         )
 
-        # The fixture registers `scalim-fixture-cli` only. Create a workspace-local `scalim-cli`
-        # shim so the agent can still follow the skill doc templates unchanged.
+        # `fixture` 只注册 `scalim-fixture-cli`。这里额外创建一个工作区内的 `scalim-cli` 垫片脚本,
+        # 让执行器仍可按技能文档的模板命令原样执行。
         for entrypoint in ("scalim-fixture-cli", "scalim-cli"):
             path = venv_bin_dir / entrypoint
             path.write_text(script, encoding="utf-8")
             path.chmod(0o755)
     except FileNotFoundError:
-        raise RuntimeError("Missing required dependency: `uv` (for agent workspace setup).")
+        raise RuntimeError("缺少必需依赖: `uv`(用于智能体工作区初始化)。")
     except subprocess.CalledProcessError as e:
-        raise RuntimeError("Failed to set up agent workspace uv environment: {}".format(e))
+        raise RuntimeError("初始化智能体工作区的 `uv` 虚拟环境失败: {}".format(e))
 
     schema_dir = workspace_dir / "schema"
     schema_dir.mkdir(parents=True, exist_ok=True)
     schema_path = (schema_dir / "demand.gen.json").resolve()
-    schema_path.write_text("{\"type\":\"object\"}\n", encoding="utf-8")
+    schema_path.write_text('{"type":"object"}\n', encoding="utf-8")
 
     reports_dir = workspace_dir / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -633,18 +632,18 @@ def _run_promptfoo_once(
     summary_path = output_dir / "summary.json"
     failures_path = output_dir / "failures.md"
 
-    # Keep `work_dir` persistent to reuse promptfoo's cache across runs (saves tokens).
+    # 保持 `work_dir` 持久化,复用 `promptfoo` 的缓存(减少重复运行的 `token`/时间开销)。
     output_dir.mkdir(parents=True, exist_ok=True)
     work_dir.mkdir(parents=True, exist_ok=True)
     for artifact in (summary_path, promptfoo_out, failures_path):
         if artifact.exists():
             artifact.unlink()
 
-    # Validate config before spending tokens.
+    # 先校验配置,再开始消耗 `token`。
     try:
         subprocess.check_call(["promptfoo", "validate", "config", "-c", str(config_path)], cwd=str(work_dir))
     except subprocess.CalledProcessError:
-        print("[错误] promptfoo 配置校验失败: {}".format(config_path), file=sys.stderr)
+        print("[错误] `promptfoo` 配置校验失败: {}".format(config_path), file=sys.stderr)
         return 2, {}
 
     dry_run = environ.get("PROMPT_EVAL_LLM_DRY_RUN") == "1"
@@ -786,8 +785,8 @@ def _compare_promptfoo_outputs(*, baseline_path: Path, candidate_path: Path) -> 
     baseline_payload = _load(baseline_path)
     candidate_payload = _load(candidate_path)
 
-    baseline_rows = { _row_key(r): r for r in _load_promptfoo_rows(baseline_payload) }
-    candidate_rows = { _row_key(r): r for r in _load_promptfoo_rows(candidate_payload) }
+    baseline_rows = {_row_key(r): r for r in _load_promptfoo_rows(baseline_payload)}
+    candidate_rows = {_row_key(r): r for r in _load_promptfoo_rows(candidate_payload)}
 
     regressions: List[Dict[str, Any]] = []
     improvements: List[Dict[str, Any]] = []
@@ -820,7 +819,7 @@ def _compare_promptfoo_outputs(*, baseline_path: Path, candidate_path: Path) -> 
         elif not bs and cs:
             improvements.append({"baseline": bsum, "candidate": csum})
         else:
-            # both pass or both fail
+            # 两边都通过或都失败
             bscore = bsum.get("score")
             cscore = csum.get("score")
             if bscore is not None and cscore is not None and abs(float(bscore) - float(cscore)) > 1e-9:
@@ -861,7 +860,7 @@ def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: O
     pinned_version = pinned_version_path.read_text(encoding="utf-8").strip() if pinned_version_path.exists() else ""
     if pinned_version and actual_version != pinned_version and environ.get("PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY") != "1":
         print(
-            "[错误] promptfoo 版本不匹配: pinned={} actual={}. (如需跳过,设置 `PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY=1`)".format(
+            "[错误] `promptfoo` 版本不匹配: 锁定={} 实际={}. (如需跳过,设置 `PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY=1`)".format(
                 pinned_version, actual_version
             ),
             file=sys.stderr,
@@ -886,7 +885,7 @@ def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: O
             candidate_skill_md = _materialize_skill_snapshot_candidate(root=root, dest_dir=snapshots_dir / "candidate")
             baseline_skill_md = _materialize_skill_snapshot_baseline(root=root, ref=baseline_ref, dest_dir=snapshots_dir / "baseline")
         except Exception as e:
-            print("[错误] 无法生成 skill 快照: {}".format(e), file=sys.stderr)
+            print("[错误] 无法生成技能快照: {}".format(e), file=sys.stderr)
             return 2
 
         baseline_replacements = _setup_agent_workspaces(
@@ -903,10 +902,14 @@ def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: O
         baseline_cfg = ab_dir / "baseline/promptfooconfig.yaml"
         candidate_cfg = ab_dir / "candidate/promptfooconfig.yaml"
         try:
-            _render_promptfoo_config_with_replacements(ssot_path=ssot_config_path, dest_path=baseline_cfg, replacements=baseline_replacements)
-            _render_promptfoo_config_with_replacements(ssot_path=ssot_config_path, dest_path=candidate_cfg, replacements=candidate_replacements)
+            _render_promptfoo_config_with_replacements(
+                ssot_path=ssot_config_path, dest_path=baseline_cfg, replacements=baseline_replacements
+            )
+            _render_promptfoo_config_with_replacements(
+                ssot_path=ssot_config_path, dest_path=candidate_cfg, replacements=candidate_replacements
+            )
         except Exception as e:
-            print("[错误] 无法渲染 promptfoo config: {}".format(e), file=sys.stderr)
+            print("[错误] 无法渲染 `promptfoo` 配置: {}".format(e), file=sys.stderr)
             return 2
 
         rc_base, base_summary = _run_promptfoo_once(
@@ -980,7 +983,7 @@ def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: O
             return 1
         return 0
 
-    # Candidate-only mode.
+    # 仅候选模式。
     snapshots_dir = agent_out_dir / "snapshots"
     workspaces_dir = agent_out_dir / "workspaces"
     if snapshots_dir.exists():
@@ -991,7 +994,7 @@ def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: O
     try:
         candidate_skill_md = _materialize_skill_snapshot_candidate(root=root, dest_dir=snapshots_dir / "candidate")
     except Exception as e:
-        print("[错误] 无法生成 skill 快照: {}".format(e), file=sys.stderr)
+        print("[错误] 无法生成技能快照: {}".format(e), file=sys.stderr)
         return 2
 
     replacements = _setup_agent_workspaces(
@@ -1003,7 +1006,7 @@ def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: O
     try:
         _render_promptfoo_config_with_replacements(ssot_path=ssot_config_path, dest_path=rendered_cfg, replacements=replacements)
     except Exception as e:
-        print("[错误] 无法渲染 promptfoo config: {}".format(e), file=sys.stderr)
+        print("[错误] 无法渲染 `promptfoo` 配置: {}".format(e), file=sys.stderr)
         return 2
 
     rc, _summary = _run_promptfoo_once(
@@ -1043,7 +1046,7 @@ def _run_promptfoo_llm_suite(*, root: Path, output_base_dir: Path, git_head: Opt
     pinned_version = pinned_version_path.read_text(encoding="utf-8").strip() if pinned_version_path.exists() else ""
     if pinned_version and actual_version != pinned_version and environ.get("PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY") != "1":
         print(
-            "[错误] promptfoo 版本不匹配: pinned={} actual={}. (如需跳过,设置 `PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY=1`)".format(
+            "[错误] `promptfoo` 版本不匹配: 锁定={} 实际={}. (如需跳过,设置 `PROMPT_EVAL_PROMPTFOO_VERSION_ALLOW_ANY=1`)".format(
                 pinned_version, actual_version
             ),
             file=sys.stderr,
@@ -1064,11 +1067,9 @@ def _run_promptfoo_llm_suite(*, root: Path, output_base_dir: Path, git_head: Opt
 
         try:
             candidate_skill_md = _materialize_skill_snapshot_candidate(root=root, dest_dir=snapshots_dir / "candidate")
-            baseline_skill_md = _materialize_skill_snapshot_baseline(
-                root=root, ref=baseline_ref, dest_dir=snapshots_dir / "baseline"
-            )
+            baseline_skill_md = _materialize_skill_snapshot_baseline(root=root, ref=baseline_ref, dest_dir=snapshots_dir / "baseline")
         except Exception as e:
-            print("[错误] 无法生成 skill 快照: {}".format(e), file=sys.stderr)
+            print("[错误] 无法生成技能快照: {}".format(e), file=sys.stderr)
             return 2
 
         baseline_cfg = ab_dir / "baseline/promptfooconfig.yaml"
@@ -1078,7 +1079,7 @@ def _run_promptfoo_llm_suite(*, root: Path, output_base_dir: Path, git_head: Opt
             _render_promptfoo_config_for_skill(ssot_path=ssot_config_path, dest_path=baseline_cfg, skill_md_path=baseline_skill_md)
             _render_promptfoo_config_for_skill(ssot_path=ssot_config_path, dest_path=candidate_cfg, skill_md_path=candidate_skill_md)
         except Exception as e:
-            print("[错误] 无法渲染 promptfoo config: {}".format(e), file=sys.stderr)
+            print("[错误] 无法渲染 `promptfoo` 配置: {}".format(e), file=sys.stderr)
             return 2
 
         rc_base, base_summary = _run_promptfoo_once(
