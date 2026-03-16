@@ -29,4 +29,3 @@ Dev Container 配置见: [Dev Container](devcontainer.md).
 
 - [Prompt 评测(workflow)](prompt-eval.md)
 - [Prompt 评测: Coding agent (T1)](prompt-eval-agent.md)
-- [仓库精简报告(目录/门禁/SSOT)](repo-slimming/index.md)
