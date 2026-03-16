@@ -68,6 +68,14 @@
 - 目标: 建立确定性 prompt-eval core（先做静态/边界用例, 后续再扩展模型评测）。
 - 当前状态见 `openspec/changes/prompt-eval-workflow/tasks.md`（当前为 DELAYED; 5.* 模型层需额外配置,暂不作为默认门禁）。
 
+3) `workflow-dag-context-passing/`
+- 目标: 将 workflow 从“并发批量执行 runs”扩展为更直觉的 DAG 编排,并提供 run 间 `ctx`/runtime_vars 传递能力(便于多阶段流水线与 scalim-viz 工作流视图)。
+- 当前状态: **DELAYED**（proposal + 最小 delta spec 占位; 未进入设计/任务拆解）。
+
+4) `workflow-shared-output-containers/`
+- 目标: 支持多 demand 合并到同一个最终 workbook/csv（多 demand 单/多 sheet），通过 workflow 统一管理共享输出容器资源与写出/追加语义。
+- 当前状态: **DELAYED**（proposal + 最小 delta spec 占位; 未进入设计/任务拆解）。
+
 ## 已归档（索引）
 
 - 完整列表见 `openspec/changes/archive/`。
