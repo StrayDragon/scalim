@@ -147,14 +147,24 @@ def _write_workflow_yaml(
     max_concurrency: int = 1,
     failure_policy: str = "all_fail",
     cache_pool: Optional[Dict[str, Any]] = None,
+    ctx: Optional[Dict[str, Any]] = None,
 ) -> Path:
     run_lines = []
     for item in runs:
-        deps = item.get("deps") or []
-        deps_lines = ""
-        if deps:
-            deps_lines = "\n      deps:\n{}".format("\n".join(["        - {}".format(d) for d in deps]))
-        run_lines.append("    - id: {}\n      demand: {}{}".format(item["id"], item["demand"], deps_lines))
+        depends_on = item.get("depends_on") or []
+        depends_on_lines = ""
+        if depends_on:
+            depends_on_lines = "\n      depends_on:\n{}".format("\n".join(["        - {}".format(d) for d in depends_on]))
+
+        init_vars = cast("Optional[Dict[str, object]]", item.get("init_vars"))
+        init_vars_lines = ""
+        if init_vars:
+            rendered = []
+            for key, value in init_vars.items():
+                rendered.append("        {}: {}".format(str(key), json.dumps(value)))
+            init_vars_lines = "\n      init_vars:\n{}".format("\n".join(rendered))
+
+        run_lines.append("    - id: {}\n      demand: {}{}{}".format(item["id"], item["demand"], depends_on_lines, init_vars_lines))
 
     cache_pool_lines = ""
     if cache_pool is not None:
@@ -187,6 +197,13 @@ def _write_workflow_yaml(
             over_budget_policy=over_budget_policy,
             pin_lines=pin_lines,
         )
+
+    ctx_lines = ""
+    if ctx is not None:
+        ctx_lines = ("\n    ctx:\n      max_value_bytes: {max_value_bytes}\n      max_bytes: {max_bytes}").format(
+            max_value_bytes=int(ctx.get("max_value_bytes", 65536)),
+            max_bytes=int(ctx.get("max_bytes", 1048576)),
+        )
     return _write_text(
         tmp_path / "workflow.yaml",
         (
@@ -198,6 +215,7 @@ workflow:
     max_concurrency: {max_concurrency}
     failure_policy: {failure_policy}
 {cache_pool_lines}
+{ctx_lines}
 """
         )
         .format(
@@ -205,6 +223,7 @@ workflow:
             max_concurrency=max_concurrency,
             failure_policy=failure_policy,
             cache_pool_lines=cache_pool_lines.rstrip(),
+            ctx_lines=ctx_lines.rstrip(),
         )
         .lstrip(),
     )
@@ -229,7 +248,7 @@ workflow:
         _ = load_workflow_config(str(workflow_path))
 
 
-def test_load_workflow_config_rejects_unknown_deps(tmp_path: Path) -> None:
+def test_load_workflow_config_rejects_unknown_depends_on(tmp_path: Path) -> None:
     workflow_path = _write_text(
         tmp_path / "wf.yaml",
         (
@@ -240,17 +259,17 @@ workflow:
       demand: a.yaml
     - id: b
       demand: b.yaml
-      deps: [nope]
+      depends_on: [nope]
 """
         ).lstrip(),
     )
 
     with pytest.raises(WorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
-    assert "Unknown run.deps id" in str(excinfo.value)
+    assert "Unknown run.depends_on id" in str(excinfo.value)
 
 
-def test_load_workflow_config_rejects_deps_cycles(tmp_path: Path) -> None:
+def test_load_workflow_config_rejects_depends_on_cycles(tmp_path: Path) -> None:
     workflow_path = _write_text(
         tmp_path / "wf.yaml",
         (
@@ -259,17 +278,18 @@ workflow:
   runs:
     - id: a
       demand: a.yaml
-      deps: [b]
+      depends_on: [b]
     - id: b
       demand: b.yaml
-      deps: [a]
+      depends_on: [a]
 """
         ).lstrip(),
     )
 
     with pytest.raises(WorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
-    assert "cycles" in str(excinfo.value)
+    assert "cycle_path" in str(excinfo.value)
+    assert '["a", "b", "a"]' in str(excinfo.value)
 
 
 def test_run_workflow_primary_only_collects_errors(tmp_path: Path) -> None:
@@ -354,7 +374,7 @@ def test_workflow_outcomes_are_in_declared_order(tmp_path: Path) -> None:
     assert [o.run_id for o in result.outcomes] == ["slow", "fast"]
 
 
-def test_workflow_dag_respects_deps_under_concurrency(tmp_path: Path) -> None:
+def test_workflow_dag_respects_depends_on_under_concurrency(tmp_path: Path) -> None:
     _ = _write_demand_yaml(
         tmp_path,
         file_name="a.yaml",
@@ -374,7 +394,7 @@ def test_workflow_dag_respects_deps_under_concurrency(tmp_path: Path) -> None:
 
     wf = _write_workflow_yaml(
         tmp_path,
-        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml", "deps": ["a"]}],
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml", "depends_on": ["a"]}],
         max_concurrency=2,
         failure_policy="primary_only",
     )
@@ -390,6 +410,185 @@ def test_workflow_dag_respects_deps_under_concurrency(tmp_path: Path) -> None:
     by_end = {e.payload.workflow_node_id: e for e in end}
 
     assert by_start["b"].seq > by_end["a"].seq
+
+
+def test_workflow_ctx_init_vars_are_resolved_after_prereq_completion(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="up.yaml",
+        name="up",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_slow",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="down.yaml",
+        name="down",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+        preload_params_yaml=(
+            """
+params:
+  p:
+    $init_var: token
+"""
+        ).strip(),
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "up", "demand": "up.yaml"},
+            {
+                "id": "down",
+                "demand": "down.yaml",
+                "depends_on": ["up"],
+                "init_vars": {
+                    "token": {
+                        "$ctx": {"node": "up", "key": "total_rows"},
+                    }
+                },
+            },
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    recorder = _WorkflowEventRecorder()
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    assert not result.errors()
+
+    start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
+    end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    by_start = {e.payload.workflow_node_id: e for e in start}
+    by_end = {e.payload.workflow_node_id: e for e in end}
+    assert by_start["down"].seq > by_end["up"].seq
+
+
+def test_workflow_ctx_ref_outside_depends_on_closure_fails_fast(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="c.yaml",
+        name="c",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {
+                "id": "c",
+                "demand": "c.yaml",
+                "init_vars": {"token": {"$ctx": {"node": "a", "key": "total_rows"}}},
+            },
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    with pytest.raises(WorkflowConfigError, match="declare depends_on"):
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+
+
+def test_workflow_ctx_ref_node_self_fails_fast(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {
+                "id": "a",
+                "demand": "a.yaml",
+                "init_vars": {"token": {"$ctx": {"node": "a", "key": "total_rows"}}},
+            }
+        ],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    with pytest.raises(WorkflowConfigError, match="node=self"):
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+
+
+def test_workflow_ctx_ref_unknown_node_fails_fast(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {
+                "id": "b",
+                "demand": "b.yaml",
+                "init_vars": {"token": {"$ctx": {"node": "nope", "key": "total_rows"}}},
+            },
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    with pytest.raises(WorkflowConfigError, match="Unknown ctx node"):
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+
+
+def test_workflow_ctx_guardrails_fail_fast(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+        ctx={"max_value_bytes": 1, "max_bytes": 10},
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert result.errors()
+    assert result.outcomes[0].error is not None
+    assert result.outcomes[0].error.exc_type == "WorkflowConfigError"
+    assert "max_value_bytes" in result.outcomes[0].error.message
 
 
 def test_workflow_primary_only_cancels_downstream_when_dep_fails(tmp_path: Path) -> None:
@@ -414,7 +613,7 @@ def test_workflow_primary_only_cancels_downstream_when_dep_fails(tmp_path: Path)
         tmp_path,
         runs=[
             {"id": "bad", "demand": "bad.yaml"},
-            {"id": "down", "demand": "down.yaml", "deps": ["bad"]},
+            {"id": "down", "demand": "down.yaml", "depends_on": ["bad"]},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -548,7 +747,7 @@ def test_workflow_all_fail_skips_already_cancelled_nodes_on_late_terminal(tmp_pa
         runs=[
             {"id": "bad", "demand": "bad.yaml"},
             {"id": "slow", "demand": "slow.yaml"},
-            {"id": "child", "demand": "child.yaml", "deps": ["bad", "slow"]},
+            {"id": "child", "demand": "child.yaml", "depends_on": ["bad", "slow"]},
         ],
         max_concurrency=2,
         failure_policy="all_fail",
@@ -1013,7 +1212,7 @@ def test_cache_pool_calls_node_done_on_compile_error_and_cancelled_dependents(tm
     )
     wf = _write_workflow_yaml(
         tmp_path,
-        runs=[{"id": "bad", "demand": "bad.yaml"}, {"id": "ok", "demand": "ok.yaml", "deps": ["bad"]}],
+        runs=[{"id": "bad", "demand": "bad.yaml"}, {"id": "ok", "demand": "ok.yaml", "depends_on": ["bad"]}],
         max_concurrency=1,
         failure_policy="primary_only",
         cache_pool=_cache_pool_config(conflict_policy="warn", release_policy="dag_refcount", max_entries=10),
@@ -1085,6 +1284,44 @@ workflow:
         ).lstrip()
     )
     jsonschema.validate(ok_cache_pool, schema)
+
+    ok_ctx_and_depends_on = yaml.safe_load(
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: b
+      demand: b.yaml
+      depends_on: [a]
+      init_vars:
+        token:
+          $ctx:
+            node: a
+            key: total_rows
+  options:
+    ctx:
+      max_value_bytes: 65536
+      max_bytes: 1048576
+"""
+        ).lstrip()
+    )
+    jsonschema.validate(ok_ctx_and_depends_on, schema)
+
+    bad_legacy_deps = yaml.safe_load(
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+      deps: [b]
+"""
+        ).lstrip()
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(bad_legacy_deps, schema)
 
     bad = yaml.safe_load(
         (
@@ -1408,45 +1645,146 @@ def test_load_workflow_config_from_mapping_accepts_null_options() -> None:
     assert cfg.options.max_concurrency == 1
 
 
-def test_load_workflow_config_from_mapping_rejects_deps_not_list() -> None:
-    with pytest.raises(WorkflowConfigError, match="run.deps must be a list"):
+def test_load_workflow_config_from_mapping_accepts_ctx_options() -> None:
+    cfg = load_workflow_config_from_mapping(
+        {
+            "workflow": {
+                "runs": [{"id": "a", "demand": "a.yaml"}],
+                "options": {
+                    "ctx": {
+                        "max_value_bytes": 2,
+                        "max_bytes": 3,
+                    }
+                },
+            }
+        }
+    )
+    assert cfg.options.ctx.max_value_bytes == 2
+    assert cfg.options.ctx.max_bytes == 3
+
+
+@pytest.mark.parametrize(
+    ("ctx", "path"),
+    [
+        ([], "workflow.options.ctx"),
+        ({"max_value_bytes": 0, "max_bytes": 1}, "workflow.options.ctx.max_value_bytes"),
+        ({"max_value_bytes": "nope", "max_bytes": 1}, "workflow.options.ctx.max_value_bytes"),
+        ({"max_value_bytes": 1, "max_bytes": 0}, "workflow.options.ctx.max_bytes"),
+        ({"max_value_bytes": 1, "max_bytes": "nope"}, "workflow.options.ctx.max_bytes"),
+        ({"max_value_bytes": True, "max_bytes": 1}, "workflow.options.ctx.max_value_bytes"),
+        ({"max_value_bytes": 1, "max_bytes": True}, "workflow.options.ctx.max_bytes"),
+    ],
+)
+def test_load_workflow_config_from_mapping_rejects_invalid_ctx_options(ctx: object, path: str) -> None:
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config_from_mapping(
+            {
+                "workflow": {
+                    "runs": [{"id": "a", "demand": "a.yaml"}],
+                    "options": {
+                        "ctx": ctx,
+                    },
+                }
+            }
+        )
+    assert excinfo.value.path == path
+
+
+def test_load_workflow_config_from_mapping_rejects_legacy_deps_field() -> None:
+    with pytest.raises(WorkflowConfigError, match="run\\.deps was removed; use run\\.depends_on") as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
                     "runs": [
-                        {"id": "a", "demand": "a.yaml", "deps": "nope"},
+                        {"id": "a", "demand": "a.yaml", "deps": ["b"]},
+                    ]
+                }
+            }
+        )
+    assert excinfo.value.path == "workflow.runs.0.deps"
+
+
+def test_load_workflow_config_from_mapping_rejects_depends_on_not_list() -> None:
+    with pytest.raises(WorkflowConfigError, match="run\\.depends_on must be a list"):
+        _ = load_workflow_config_from_mapping(
+            {
+                "workflow": {
+                    "runs": [
+                        {"id": "a", "demand": "a.yaml", "depends_on": "nope"},
                     ]
                 }
             }
         )
 
 
-def test_load_workflow_config_from_mapping_rejects_deps_empty_item() -> None:
-    with pytest.raises(WorkflowConfigError, match="deps items must be non-empty"):
+def test_load_workflow_config_from_mapping_rejects_depends_on_empty_item() -> None:
+    with pytest.raises(WorkflowConfigError, match="depends_on items must be non-empty"):
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
                     "runs": [
                         {"id": "a", "demand": "a.yaml"},
-                        {"id": "b", "demand": "b.yaml", "deps": [""]},
+                        {"id": "b", "demand": "b.yaml", "depends_on": [""]},
                     ]
                 }
             }
         )
 
 
-def test_load_workflow_config_from_mapping_rejects_deps_duplicates() -> None:
-    with pytest.raises(WorkflowConfigError, match="must not contain duplicates"):
+def test_load_workflow_config_from_mapping_dedups_depends_on_preserves_first_order() -> None:
+    cfg = load_workflow_config_from_mapping(
+        {
+            "workflow": {
+                "runs": [
+                    {"id": "a", "demand": "a.yaml"},
+                    {"id": "b", "demand": "b.yaml", "depends_on": ["a", "a"]},
+                ]
+            }
+        }
+    )
+    assert cfg.runs[1].depends_on == ("a",)
+
+
+def test_load_workflow_config_from_mapping_accepts_forward_depends_on() -> None:
+    cfg = load_workflow_config_from_mapping(
+        {
+            "workflow": {
+                "runs": [
+                    {"id": "b", "demand": "b.yaml", "depends_on": ["a"]},
+                    {"id": "a", "demand": "a.yaml"},
+                ]
+            }
+        }
+    )
+    assert [r.id for r in cfg.runs] == ["b", "a"]
+
+
+def test_load_workflow_config_from_mapping_rejects_init_vars_not_mapping() -> None:
+    with pytest.raises(WorkflowConfigError, match="run\\.init_vars must be a mapping") as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
                     "runs": [
-                        {"id": "a", "demand": "a.yaml"},
-                        {"id": "b", "demand": "b.yaml", "deps": ["a", "a"]},
+                        {"id": "a", "demand": "a.yaml", "init_vars": []},
                     ]
                 }
             }
         )
+    assert excinfo.value.path == "workflow.runs.0.init_vars"
+
+
+def test_load_workflow_config_from_mapping_rejects_init_vars_key_invalid() -> None:
+    with pytest.raises(WorkflowConfigError, match="run\\.init_vars keys must be non-empty strings") as excinfo:
+        _ = load_workflow_config_from_mapping(
+            {
+                "workflow": {
+                    "runs": [
+                        {"id": "a", "demand": "a.yaml", "init_vars": {"": 1}},
+                    ]
+                }
+            }
+        )
+    assert excinfo.value.path == "workflow.runs.0.init_vars"
 
 
 def test_load_workflow_config_from_mapping_accepts_null_resources() -> None:
@@ -1471,9 +1809,9 @@ def test_load_workflow_config_from_mapping_rejects_resources_key_invalid() -> No
         _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "resources": {"": {"kind": "x"}}}})
 
 
-def test_load_workflow_config_from_mapping_rejects_self_deps() -> None:
+def test_load_workflow_config_from_mapping_rejects_self_depends_on() -> None:
     with pytest.raises(WorkflowConfigError, match="self dependency"):
-        _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml", "deps": ["a"]}]}})
+        _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml", "depends_on": ["a"]}]}})
 
 
 def test_run_workflow_requires_workflow_path(tmp_path: Path) -> None:
@@ -1580,6 +1918,132 @@ def test_workflow_entrypoints_artifacts_directory_enforces_visibility() -> None:
 
     with pytest.raises(KeyError, match="Unknown artifact"):
         _ = artifacts_dir.get("b", "a", "missing")  # noqa: SLF001
+
+
+def test_workflow_entrypoints_ensure_json_like_variants() -> None:
+    assert entrypoints_mod._ensure_json_like(None, path="x") is None  # noqa: SLF001
+    assert entrypoints_mod._ensure_json_like(True, path="x") is True  # noqa: SLF001
+    assert entrypoints_mod._ensure_json_like(1, path="x") == 1  # noqa: SLF001
+    assert entrypoints_mod._ensure_json_like("s", path="x") == "s"  # noqa: SLF001
+    assert entrypoints_mod._ensure_json_like(1.5, path="x") == 1.5  # noqa: SLF001
+
+    assert entrypoints_mod._ensure_json_like([1, {"k": 2}], path="x") == [1, {"k": 2}]  # noqa: SLF001
+    assert entrypoints_mod._ensure_json_like((1, 2), path="x") == [1, 2]  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="finite"):
+        _ = entrypoints_mod._ensure_json_like(float("inf"), path="x")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="dict key"):
+        _ = entrypoints_mod._ensure_json_like({1: "x"}, path="x")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="JSON-like"):
+        _ = entrypoints_mod._ensure_json_like(object(), path="x")  # noqa: SLF001
+
+
+def test_workflow_entrypoints_ctx_store_total_bytes_guardrail() -> None:
+    from scalim.spec.ir.workflow import (
+        WorkflowArtifactsIr,
+        WorkflowCtxOptionsIr,
+        WorkflowEdgeIr,
+        WorkflowIr,
+        WorkflowNodeIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+    )
+
+    ir = WorkflowIr(
+        nodes=(WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="a.yaml"),),
+        edges=(),
+        options=WorkflowOptionsIr(ctx=WorkflowCtxOptionsIr(max_value_bytes=1000, max_bytes=5)),
+        resources={},
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": ()}),
+    )
+    ctx_store = entrypoints_mod._WorkflowCtxStore(ir)  # noqa: SLF001
+    ctx_store.publish("a", "k1", "x", path="x")  # noqa: SLF001
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        ctx_store.publish("a", "k2", "y", path="x")  # noqa: SLF001
+    assert excinfo.value.path == "workflow.options.ctx.max_bytes"
+
+
+def test_workflow_entrypoints_ctx_store_resolve_errors() -> None:
+    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+
+    ir = WorkflowIr(
+        nodes=(
+            WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="a.yaml"),
+            WorkflowNodeIr(node_id="b", node_type=WorkflowNodeType.DEMAND, decl_order=1, deps=("a",), demand_path="b.yaml"),
+        ),
+        edges=(WorkflowEdgeIr(from_node_id="a", to_node_id="b"),),
+        options=WorkflowOptionsIr(),
+        resources={},
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "b": ()}),
+    )
+    ctx_store = entrypoints_mod._WorkflowCtxStore(ir)  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="node=self"):
+        _ = ctx_store.resolve("a", node="a", key="k", path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="not visible"):
+        _ = ctx_store.resolve("a", node="b", key="k", path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="Unknown ctx key"):
+        _ = ctx_store.resolve("b", node="a", key="missing", path="p")  # noqa: SLF001
+
+
+def test_workflow_entrypoints_iter_ctx_directives_variants() -> None:
+    with pytest.raises(WorkflowConfigError, match="directive must be a mapping"):
+        _ = entrypoints_mod._iter_ctx_directives({"$ctx": "nope"}, path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.node"):
+        _ = entrypoints_mod._iter_ctx_directives({"$ctx": {"node": "", "key": "k"}}, path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.key"):
+        _ = entrypoints_mod._iter_ctx_directives({"$ctx": {"node": "a", "key": ""}}, path="p")  # noqa: SLF001
+
+    assert entrypoints_mod._iter_ctx_directives({"outer": {"$ctx": {"node": "a", "key": "k"}}}, path="p") == [  # noqa: SLF001
+        ("a", "k"),
+    ]
+    assert entrypoints_mod._iter_ctx_directives([{"$ctx": {"node": "a", "key": "k"}}], path="p") == [  # noqa: SLF001
+        ("a", "k"),
+    ]
+
+
+def test_workflow_entrypoints_render_ctx_directives_variants() -> None:
+    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+
+    ir = WorkflowIr(
+        nodes=(
+            WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="a.yaml"),
+            WorkflowNodeIr(node_id="b", node_type=WorkflowNodeType.DEMAND, decl_order=1, deps=("a",), demand_path="b.yaml"),
+        ),
+        edges=(WorkflowEdgeIr(from_node_id="a", to_node_id="b"),),
+        options=WorkflowOptionsIr(),
+        resources={},
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "b": ()}),
+    )
+    ctx_store = entrypoints_mod._WorkflowCtxStore(ir)  # noqa: SLF001
+    ctx_store.publish("a", "k", 1, path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="directive must be a mapping"):
+        _ = entrypoints_mod._render_ctx_directives({"$ctx": "nope"}, consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.node"):
+        _ = entrypoints_mod._render_ctx_directives({"$ctx": {"node": "", "key": "k"}}, consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
+
+    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.key"):
+        _ = entrypoints_mod._render_ctx_directives({"$ctx": {"node": "a", "key": ""}}, consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
+
+    assert (
+        entrypoints_mod._render_ctx_directives(
+            {"outer": {"$ctx": {"node": "a", "key": "k"}}}, consumer_node_id="b", ctx_store=ctx_store, path="p"
+        )  # noqa: SLF001
+        == {"outer": 1}
+    )
+    assert (
+        entrypoints_mod._render_ctx_directives([{"$ctx": {"node": "a", "key": "k"}}], consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
+        == [1]
+    )
+    assert entrypoints_mod._render_ctx_directives(1, consumer_node_id="b", ctx_store=ctx_store, path="p") == 1  # noqa: SLF001
 
 
 def test_cache_pool_single_run_accepts_lookup_cast_and_normalize(tmp_path: Path) -> None:

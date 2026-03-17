@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Optional, Tuple
 
@@ -18,6 +18,7 @@ class WorkflowNodeIr:
     decl_order: int
     deps: Tuple[str, ...] = ()
     demand_path: Optional[str] = None
+    init_vars: Optional[Dict[str, object]] = None
 
 
 @dataclass(frozen=True)
@@ -47,10 +48,17 @@ class WorkflowCachePoolIr:
 
 
 @dataclass(frozen=True)
+class WorkflowCtxOptionsIr:
+    max_value_bytes: int = 65536
+    max_bytes: int = 1048576
+
+
+@dataclass(frozen=True)
 class WorkflowOptionsIr:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
     cache_pool: Optional[WorkflowCachePoolIr] = None
+    ctx: WorkflowCtxOptionsIr = field(default_factory=WorkflowCtxOptionsIr)
 
 
 @dataclass(frozen=True)

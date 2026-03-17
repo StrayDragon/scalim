@@ -1,10 +1,9 @@
-import heapq
 import json
 import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
 from ...vendor.compact.importlibx import require_optional_dependency
 
@@ -44,7 +43,14 @@ class WorkflowConfigError(ValueError):
 class WorkflowRun:
     id: str
     demand: str
-    deps: Tuple[str, ...] = ()
+    depends_on: Tuple[str, ...] = ()
+    init_vars: Optional[Dict[str, object]] = None
+
+
+@dataclass(frozen=True)
+class WorkflowCtxOptions:
+    max_value_bytes: int = 65536
+    max_bytes: int = 1048576
 
 
 @dataclass(frozen=True)
@@ -52,6 +58,7 @@ class WorkflowOptions:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
     cache_pool: Optional["WorkflowCachePoolOptions"] = None
+    ctx: WorkflowCtxOptions = dataclass_field(default_factory=WorkflowCtxOptions)
 
 
 @dataclass(frozen=True)
@@ -248,7 +255,11 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
         run_dict = cast("Dict[str, Any]", item)
         run_id_raw = run_dict.get("id")
         demand_raw = run_dict.get("demand")
-        deps_raw = run_dict.get("deps")
+        if "deps" in run_dict:
+            msg = "run.deps was removed; use run.depends_on"
+            raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
+        depends_on_raw = run_dict.get("depends_on")
+        init_vars_raw = run_dict.get("init_vars")
         run_id = str(run_id_raw or "").strip()
         if not run_id:
             msg = "run.id must be a non-empty string"
@@ -262,25 +273,42 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
             msg = "run.demand must be a non-empty string"
             raise WorkflowConfigError(msg, path="{}.demand".format(item_path))
 
-        deps: Tuple[str, ...] = ()
-        if deps_raw is not None:
-            if not isinstance(deps_raw, list):
-                msg = "run.deps must be a list of strings"
-                raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
-            deps_list: List[str] = []
-            for dep_idx, dep in enumerate(cast("List[Any]", deps_raw)):
-                dep_path = "{}.deps.{}".format(item_path, dep_idx)
+        depends_on: Tuple[str, ...] = ()
+        if depends_on_raw is not None:
+            if not isinstance(depends_on_raw, list):
+                msg = "run.depends_on must be a list of strings"
+                raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
+            depends_on_list: List[str] = []
+            for dep_idx, dep in enumerate(cast("List[Any]", depends_on_raw)):
+                dep_path = "{}.depends_on.{}".format(item_path, dep_idx)
                 dep_id = str(dep or "").strip() if isinstance(dep, str) else ""
                 if not dep_id:
-                    msg = "run.deps items must be non-empty strings"
+                    msg = "run.depends_on items must be non-empty strings"
                     raise WorkflowConfigError(msg, path=dep_path)
-                deps_list.append(dep_id)
-            if len(set(deps_list)) != len(deps_list):
-                msg = "run.deps must not contain duplicates"
-                raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
-            deps = tuple(deps_list)
+                depends_on_list.append(dep_id)
+            # 去重:保留首次出现的顺序,不得影响确定性与可测试性.
+            seen: Set[str] = set()
+            dedup: List[str] = []
+            for dep_id in depends_on_list:
+                if dep_id in seen:
+                    continue
+                seen.add(dep_id)
+                dedup.append(dep_id)
+            depends_on = tuple(dedup)
 
-        runs.append(WorkflowRun(id=run_id, demand=demand, deps=deps))
+        init_vars: Optional[Dict[str, object]] = None
+        if init_vars_raw is not None:
+            if not isinstance(init_vars_raw, dict):
+                msg = "run.init_vars must be a mapping"
+                raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
+            init_vars = {}
+            for key, value in cast("Dict[Any, Any]", init_vars_raw).items():
+                if not isinstance(key, str) or not key.strip():
+                    msg = "run.init_vars keys must be non-empty strings"
+                    raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
+                init_vars[str(key)] = value
+
+        runs.append(WorkflowRun(id=run_id, demand=demand, depends_on=depends_on, init_vars=init_vars))
 
     _validate_workflow_deps(runs, seen_ids=seen_ids)
 
@@ -328,6 +356,45 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
     if failure_policy not in _FAILURE_POLICIES:
         msg = "workflow.options.failure_policy must be one of: {}".format("/".join(_FAILURE_POLICIES))
         raise WorkflowConfigError(msg, path="workflow.options.failure_policy")
+
+    ctx = WorkflowCtxOptions()
+    ctx_raw = options_dict.get("ctx")
+    if ctx_raw is not None:
+        if not isinstance(ctx_raw, dict):
+            msg = "workflow.options.ctx must be a mapping"
+            raise WorkflowConfigError(msg, path="workflow.options.ctx")
+        ctx_dict = cast("Dict[str, Any]", ctx_raw)
+
+        max_value_bytes_raw = ctx_dict.get("max_value_bytes", 65536)
+        if isinstance(max_value_bytes_raw, bool) or not isinstance(max_value_bytes_raw, (int, float, str)):
+            msg = "workflow.options.ctx.max_value_bytes must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
+        try:
+            max_value_bytes = int(max_value_bytes_raw)
+        except (TypeError, ValueError) as exc:
+            msg = "workflow.options.ctx.max_value_bytes must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes") from exc
+        if max_value_bytes < 1:
+            msg = "workflow.options.ctx.max_value_bytes must be >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
+
+        max_bytes_raw = ctx_dict.get("max_bytes", 1048576)
+        if isinstance(max_bytes_raw, bool) or not isinstance(max_bytes_raw, (int, float, str)):
+            msg = "workflow.options.ctx.max_bytes must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
+        try:
+            max_bytes = int(max_bytes_raw)
+        except (TypeError, ValueError) as exc:
+            msg = "workflow.options.ctx.max_bytes must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes") from exc
+        if max_bytes < 1:
+            msg = "workflow.options.ctx.max_bytes must be >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
+
+        ctx = WorkflowCtxOptions(
+            max_value_bytes=max_value_bytes,
+            max_bytes=max_bytes,
+        )
 
     if "share_preload_cache" in options_dict:
         msg = "workflow.options.share_preload_cache was removed; use workflow.options.cache_pool"
@@ -418,6 +485,7 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
             max_concurrency=max_concurrency,
             failure_policy=failure_policy,
             cache_pool=cache_pool,
+            ctx=ctx,
         ),
         resources=resources,
     )
@@ -440,45 +508,57 @@ def _validate_workflow_deps_references(
     run_ids = set(seen_ids.keys())
     for idx, run in enumerate(runs):
         item_path = "workflow.runs.{}".format(idx)
-        for dep_id in run.deps:
+        for dep_id in run.depends_on:
             if dep_id == run.id:
-                msg = "run.deps must not include self dependency: '{}'".format(dep_id)
-                raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
+                msg = "run.depends_on must not include self dependency: '{}'".format(dep_id)
+                raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
             if dep_id not in run_ids:
-                msg = "Unknown run.deps id '{}'".format(dep_id)
-                raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
+                msg = "Unknown run.depends_on id '{}'".format(dep_id)
+                raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
 
 
-def _validate_workflow_deps_no_cycles(
+def _validate_workflow_deps_no_cycles(  # noqa: C901
     runs: Sequence[WorkflowRun],
     *,
     seen_ids: Mapping[str, int],
 ) -> None:
-    in_degree: Dict[str, int] = {run.id: len(run.deps) for run in runs}
-    dependents: Dict[str, List[str]] = {run.id: [] for run in runs}
-    for run in runs:
-        for dep_id in run.deps:
-            dependents[dep_id].append(run.id)
+    by_id: Dict[str, WorkflowRun] = {run.id: run for run in runs}
+    ordered_ids = sorted(by_id.keys(), key=lambda rid: int(seen_ids.get(rid, 0)))
 
-    heap: List[Tuple[int, str]] = []
-    for run_id, deg in in_degree.items():
-        if deg == 0:
-            heap.append((int(seen_ids.get(run_id, 0)), run_id))
-    heapq.heapify(heap)
+    visiting: Set[str] = set()
+    visited: Set[str] = set()
+    stack: List[str] = []
 
-    visited_count = 0
-    while heap:
-        _order, node_id = heapq.heappop(heap)
-        visited_count += 1
-        for child_id in dependents.get(node_id, []):
-            in_degree[child_id] -= 1
-            if in_degree[child_id] == 0:
-                heapq.heappush(heap, (int(seen_ids.get(child_id, 0)), child_id))
+    def dfs(node_id: str) -> Optional[List[str]]:
+        visiting.add(node_id)
+        stack.append(node_id)
+        run = by_id[node_id]
+        for dep_id in run.depends_on:
+            if dep_id not in by_id:
+                continue  # pragma: no cover
+            if dep_id in visited:
+                continue
+            if dep_id in visiting:
+                if dep_id in stack:
+                    idx = stack.index(dep_id)
+                    return [*stack[idx:], dep_id]
+                return [dep_id, node_id, dep_id]  # pragma: no cover
+            found = dfs(dep_id)
+            if found is not None:
+                return found
 
-    if visited_count != len(in_degree):
-        cycle_nodes = [run_id for run_id, deg in in_degree.items() if deg > 0]
-        msg = "workflow deps must not contain cycles (cycle_nodes={})".format(",".join(sorted(cycle_nodes)))
-        raise WorkflowConfigError(msg, path="workflow.runs[*].deps")
+        visiting.remove(node_id)
+        visited.add(node_id)
+        _ = stack.pop()
+        return None
+
+    for node_id in ordered_ids:
+        if node_id in visited:
+            continue
+        found = dfs(node_id)
+        if found is not None:
+            msg = "workflow depends_on must not contain cycles (cycle_path={})".format(json.dumps(found, ensure_ascii=False))
+            raise WorkflowConfigError(msg, path="workflow.runs[*].depends_on")
 
 
 __all__ = [

@@ -228,6 +228,34 @@ class SchemaBuilder:
                     "description": "workflow-scope cache pool 配置(可选)",
                     "markdownDescription": "workflow-scope cache pool 配置(可选).",
                 },
+                "ctx": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "max_value_bytes": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "default": 65536,
+                                    "description": "ctx 单 key 最大字节数(>=1)",
+                                    "markdownDescription": "ctx 单 key 最大字节数(>=1).",
+                                },
+                                "max_bytes": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "default": 1048576,
+                                    "description": "ctx 总量最大字节数(>=1)",
+                                    "markdownDescription": "ctx 总量最大字节数(>=1).",
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                    "description": "workflow-level ctx 护栏配置(可选)",
+                    "markdownDescription": "workflow-level ctx 护栏配置(可选).",
+                },
             },
             "additionalProperties": False,
         }
@@ -252,12 +280,25 @@ class SchemaBuilder:
                         "- 可通过 Python 入口注入 path_aliases 解析 `@/...` 或 `ALIAS:/...`"
                     ),
                 },
-                "deps": {
+                "depends_on": {
                     "type": "array",
                     "items": {"type": "string", "minLength": 1},
                     "default": [],
                     "description": "显式依赖 run.id 列表(可选)",
                     "markdownDescription": "显式依赖 `run.id` 列表(可选).",
+                },
+                "init_vars": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "propertyNames": {"type": "string", "minLength": 1},
+                            "additionalProperties": True,
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                    "description": "demand compile-time init_vars(可选,支持 $ctx 指令)",
+                    "markdownDescription": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令).",
                 },
             },
             "additionalProperties": False,

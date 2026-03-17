@@ -1,6 +1,9 @@
 import concurrent.futures
 import contextlib
-from dataclasses import dataclass
+import json
+import math
+import threading
+from dataclasses import dataclass, replace
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from ....events.catalog import (
@@ -26,6 +29,7 @@ from ....spec.ir.workflow import (
     WorkflowCachePoolBudgetIr,
     WorkflowCachePoolIr,
     WorkflowCachePoolPinIr,
+    WorkflowCtxOptionsIr,
     WorkflowEdgeIr,
     WorkflowIr,
     WorkflowNodeIr,
@@ -116,6 +120,251 @@ class _WorkflowArtifactsDirectory:
         return by_artifact[artifact_key]
 
 
+def _ensure_json_like(value: object, *, path: str) -> object:
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            msg = "ctx value must be JSON-like (float must be finite)"
+            raise WorkflowConfigError(msg, path=path)
+        return value
+    if isinstance(value, list):
+        return [_ensure_json_like(v, path=path) for v in cast("List[object]", value)]
+    if isinstance(value, tuple):
+        return [_ensure_json_like(v, path=path) for v in cast("Tuple[object, ...]", value)]
+    if isinstance(value, dict):
+        mapping = cast("Dict[object, object]", value)
+        out: Dict[str, object] = {}
+        for raw_key, raw_value in mapping.items():
+            if not isinstance(raw_key, str) or not raw_key.strip():
+                msg = "ctx value must be JSON-like (dict key must be non-empty str)"
+                raise WorkflowConfigError(msg, path=path)
+            out[str(raw_key)] = _ensure_json_like(raw_value, path=path)
+        return out
+    msg = "ctx value must be JSON-like (None/bool/int/float/str/list/dict[str, ...]), got {}".format(type(value).__name__)
+    raise WorkflowConfigError(msg, path=path)
+
+
+def _json_value_size_bytes(value: object) -> int:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return len(payload)
+
+
+class _WorkflowCtxStore:
+    _guardrails: WorkflowCtxOptionsIr
+    _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
+    _values_by_producer_node_id: Dict[str, Dict[str, object]]
+    _value_bytes_by_producer_node_id: Dict[str, Dict[str, int]]
+    _total_bytes: int
+    _lock: threading.Lock
+
+    def __init__(self, workflow_ir: WorkflowIr) -> None:
+        self._guardrails = workflow_ir.options.ctx
+        deps_by_node_id = {node.node_id: node.deps for node in workflow_ir.nodes}
+        cache: Dict[str, Set[str]] = {}
+
+        def _visible(node_id: str) -> Set[str]:
+            cached = cache.get(node_id)
+            if cached is not None:
+                return cached
+            out: Set[str] = set()
+            for dep_id in deps_by_node_id.get(node_id, ()):
+                out.add(str(dep_id))
+                out.update(_visible(str(dep_id)))
+            cache[node_id] = out
+            return out
+
+        visible: Dict[str, FrozenSet[str]] = {}
+        for node in workflow_ir.nodes:
+            visible[node.node_id] = frozenset(_visible(node.node_id))
+
+        self._visible_by_consumer_node_id = visible
+        self._values_by_producer_node_id = {}
+        self._value_bytes_by_producer_node_id = {}
+        self._total_bytes = 0
+        self._lock = threading.Lock()
+
+    def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
+        return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
+
+    def publish_default_summary(self, producer_node_id: str, result: ExecutionResult) -> None:
+        node_id = str(producer_node_id)
+        self.publish(node_id, "output_path", result.output_path, path="workflow.options.ctx")
+        self.publish(node_id, "total_rows", int(result.total_rows), path="workflow.options.ctx")
+        self.publish(node_id, "duration_secs", float(result.duration), path="workflow.options.ctx")
+
+    def publish(self, producer_node_id: str, key: str, value: object, *, path: str) -> None:
+        node_id = str(producer_node_id)
+        ctx_key = str(key)
+        ctx_value = _ensure_json_like(value, path=path)
+
+        value_bytes = _json_value_size_bytes(ctx_value)
+        max_value_bytes = int(self._guardrails.max_value_bytes)
+        if value_bytes > max_value_bytes:
+            msg = "ctx value too large: node={}, key={}, bytes={} > max_value_bytes={}".format(
+                node_id, ctx_key, value_bytes, max_value_bytes
+            )
+            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
+
+        with self._lock:
+            by_key = self._values_by_producer_node_id.setdefault(node_id, {})
+            by_key_bytes = self._value_bytes_by_producer_node_id.setdefault(node_id, {})
+            prev_bytes = int(by_key_bytes.get(ctx_key, 0))
+
+            next_total = int(self._total_bytes) - prev_bytes + int(value_bytes)
+            max_bytes = int(self._guardrails.max_bytes)
+            if next_total > max_bytes:
+                msg = "ctx total bytes exceeded: adding node={}, key={} would make total_bytes={} > max_bytes={}".format(
+                    node_id,
+                    ctx_key,
+                    next_total,
+                    max_bytes,
+                )
+                raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
+
+            by_key[ctx_key] = ctx_value
+            by_key_bytes[ctx_key] = int(value_bytes)
+            self._total_bytes = int(next_total)
+
+    def resolve(self, consumer_node_id: str, *, node: str, key: str, path: str) -> object:
+        consumer = str(consumer_node_id)
+        producer = str(node)
+        ctx_key = str(key)
+
+        if producer == consumer:
+            msg = "$ctx does not allow node=self (node_id={})".format(consumer)
+            raise WorkflowConfigError(msg, path=path)
+
+        visible = self.visible_producer_node_ids(consumer)
+        if producer not in visible:
+            msg = "ctx key '{}' from node '{}' is not visible to node '{}' (declare depends_on)".format(ctx_key, producer, consumer)
+            raise WorkflowConfigError(msg, path=path)
+
+        with self._lock:
+            by_key = self._values_by_producer_node_id.get(producer) or {}
+            if ctx_key not in by_key:
+                msg = "Unknown ctx key '{}' for node '{}'".format(ctx_key, producer)
+                raise WorkflowConfigError(msg, path=path)
+            return by_key[ctx_key]
+
+
+def _iter_ctx_directives(value: object, *, path: str) -> List[Tuple[str, str]]:
+    out: List[Tuple[str, str]] = []
+    if isinstance(value, dict):
+        mapping = cast("Dict[object, object]", value)
+        if len(mapping) == 1 and "$ctx" in mapping:
+            directive = mapping.get("$ctx")
+            if not isinstance(directive, dict):
+                msg = "$ctx directive must be a mapping"
+                raise WorkflowConfigError(msg, path=path)
+            directive_dict = cast("Dict[str, object]", directive)
+            node_raw = directive_dict.get("node")
+            key_raw = directive_dict.get("key")
+            node_id = str(node_raw or "").strip() if isinstance(node_raw, str) else ""
+            ctx_key = str(key_raw or "").strip() if isinstance(key_raw, str) else ""
+            if not node_id:
+                msg = "$ctx.node must be a non-empty string"
+                raise WorkflowConfigError(msg, path=path)
+            if not ctx_key:
+                msg = "$ctx.key must be a non-empty string"
+                raise WorkflowConfigError(msg, path=path)
+            out.append((node_id, ctx_key))
+            return out
+        for raw_key, raw_value in mapping.items():
+            child_path = "{}.{}".format(path, str(raw_key))
+            out.extend(_iter_ctx_directives(raw_value, path=child_path))
+        return out
+
+    if isinstance(value, list):
+        for idx, item in enumerate(cast("List[object]", value)):
+            child_path = "{}.{}".format(path, idx)
+            out.extend(_iter_ctx_directives(item, path=child_path))
+    return out
+
+
+def _render_ctx_directives(value: object, *, consumer_node_id: str, ctx_store: _WorkflowCtxStore, path: str) -> object:
+    if isinstance(value, dict):
+        mapping = cast("Dict[object, object]", value)
+        if len(mapping) == 1 and "$ctx" in mapping:
+            directive = mapping.get("$ctx")
+            if not isinstance(directive, dict):
+                msg = "$ctx directive must be a mapping"
+                raise WorkflowConfigError(msg, path=path)
+            directive_dict = cast("Dict[str, object]", directive)
+            node_raw = directive_dict.get("node")
+            key_raw = directive_dict.get("key")
+            node_id = str(node_raw or "").strip() if isinstance(node_raw, str) else ""
+            ctx_key = str(key_raw or "").strip() if isinstance(key_raw, str) else ""
+            if not node_id:
+                msg = "$ctx.node must be a non-empty string"
+                raise WorkflowConfigError(msg, path=path)
+            if not ctx_key:
+                msg = "$ctx.key must be a non-empty string"
+                raise WorkflowConfigError(msg, path=path)
+            value = ctx_store.resolve(str(consumer_node_id), node=node_id, key=ctx_key, path=path)
+            return _ensure_json_like(value, path=path)
+
+        out: Dict[object, object] = {}
+        for raw_key, raw_value in mapping.items():
+            child_path = "{}.{}".format(path, str(raw_key))
+            out[raw_key] = _render_ctx_directives(raw_value, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=child_path)
+        return out
+
+    if isinstance(value, list):
+        items = cast("List[object]", value)
+        return [
+            _render_ctx_directives(item, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path="{}.{}".format(path, idx))
+            for idx, item in enumerate(items)
+        ]
+
+    return value
+
+
+def _render_workflow_init_vars(
+    init_vars: Optional[Dict[str, object]],
+    *,
+    consumer_node_id: str,
+    ctx_store: _WorkflowCtxStore,
+    path_prefix: str,
+) -> Dict[str, object]:
+    if init_vars is None:
+        return {}
+    out: Dict[str, object] = {}
+    for key, value in init_vars.items():
+        item_path = "{}.{}".format(path_prefix, key)
+        rendered = _render_ctx_directives(value, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=item_path)
+        out[str(key)] = _ensure_json_like(rendered, path=item_path)
+    return out
+
+
+def _validate_workflow_ctx_refs(workflow_ir: WorkflowIr, *, ctx_store: _WorkflowCtxStore) -> None:
+    node_ids = {str(node.node_id) for node in workflow_ir.nodes}
+    for node in workflow_ir.nodes:
+        node_id = str(node.node_id)
+        init_vars = cast("Optional[Dict[str, object]]", getattr(node, "init_vars", None))
+        if not init_vars:
+            continue
+        visible = ctx_store.visible_producer_node_ids(node_id)
+        prefix = "workflow.runs.{}.init_vars".format(int(node.decl_order))
+        for key, value in init_vars.items():
+            item_path = "{}.{}".format(prefix, key)
+            for ref_node_id, _ref_key in _iter_ctx_directives(value, path=item_path):
+                if ref_node_id == node_id:
+                    msg = "$ctx does not allow node=self (node_id={})".format(node_id)
+                    raise WorkflowConfigError(msg, path=item_path)
+                if ref_node_id not in node_ids:
+                    msg = "Unknown ctx node '{}'".format(ref_node_id)
+                    raise WorkflowConfigError(msg, path=item_path)
+                if ref_node_id not in visible:
+                    msg = "ctx reference to node '{}' is not visible to node '{}' (declare depends_on)".format(ref_node_id, node_id)
+                    raise WorkflowConfigError(msg, path=item_path)
+
+
 class WorkflowRunFailedError(RuntimeError):
     run_id: str
     demand_path: str
@@ -155,6 +404,8 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         path_aliases=path_aliases,
     )
     artifacts_dir = _WorkflowArtifactsDirectory(workflow_ir)
+    ctx_store = _WorkflowCtxStore(workflow_ir)
+    _validate_workflow_ctx_refs(workflow_ir, ctx_store=ctx_store)
 
     options = RunOptions(
         allowed_modules=allowed_modules,
@@ -369,7 +620,19 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                     _emit_workflow_node_start(node_id, demand_path=demand_path)
 
                     try:
-                        compilation = compile_demand(demand_path, options=options)
+                        node_options = options
+                        node_init_vars = _render_workflow_init_vars(
+                            getattr(node, "init_vars", None),
+                            consumer_node_id=str(node_id),
+                            ctx_store=ctx_store,
+                            path_prefix="workflow.runs.{}.init_vars".format(int(node.decl_order)),
+                        )
+                        if node_init_vars:
+                            merged = dict(options.init_vars or {})
+                            merged.update(node_init_vars)
+                            node_options = replace(options, init_vars=merged)
+
+                        compilation = compile_demand(demand_path, options=node_options)
                     except Exception as exc:  # noqa: BLE001
                         err = WorkflowRunError(
                             run_id=str(node_id),
@@ -403,6 +666,9 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                     try:
                         core = fut.result()
                         comp = cast("Any", compilation)
+                        artifacts_dir.publish(str(node_id), "output_path", core.output_path)
+                        artifacts_dir.publish(str(node_id), "outputs", core.outputs)
+                        ctx_store.publish_default_summary(str(node_id), core)
                         outcomes[idx] = WorkflowRunOutcome(
                             run_id=str(node_id),
                             demand_path=str(demand_path),
@@ -411,8 +677,6 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                         )
                         node_state[str(node_id)] = "done"
                         _emit_workflow_node_end(str(node_id), demand_path=str(demand_path), status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
-                        artifacts_dir.publish(str(node_id), "output_path", core.output_path)
-                        artifacts_dir.publish(str(node_id), "outputs", core.outputs)
                         if workflow_cache_pool is not None:
                             workflow_cache_pool.on_workflow_node_done(str(node_id))
                         _on_terminal(str(node_id), ok=True)
@@ -492,7 +756,10 @@ def _compile_workflow_ir(
             run_id=run.id,
         )
         node_id = str(run.id)
-        deps = tuple(str(d) for d in (getattr(run, "deps", ()) or ()))
+        deps = tuple(str(d) for d in (getattr(run, "depends_on", ()) or ()))
+        init_vars = cast("Optional[Dict[str, object]]", getattr(run, "init_vars", None))
+        if init_vars is not None:
+            init_vars = dict(init_vars)
         nodes.append(
             WorkflowNodeIr(
                 node_id=node_id,
@@ -500,6 +767,7 @@ def _compile_workflow_ir(
                 decl_order=int(idx),
                 deps=deps,
                 demand_path=str(demand_path),
+                init_vars=init_vars,
             )
         )
         for dep_id in deps:
@@ -521,10 +789,19 @@ def _compile_workflow_ir(
             pin=pins,
         )
 
+    raw_ctx = getattr(wf_obj.options, "ctx", None)
+    ctx = WorkflowCtxOptionsIr()
+    if raw_ctx is not None:
+        ctx = WorkflowCtxOptionsIr(
+            max_value_bytes=int(raw_ctx.max_value_bytes),
+            max_bytes=int(raw_ctx.max_bytes),
+        )
+
     options = WorkflowOptionsIr(
         max_concurrency=int(wf_obj.options.max_concurrency),
         failure_policy=str(wf_obj.options.failure_policy or "all_fail"),
         cache_pool=cache_pool,
+        ctx=ctx,
     )
 
     artifacts = WorkflowArtifactsIr(slots_by_node_id=slots_by_node_id)
