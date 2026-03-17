@@ -8,6 +8,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tupl
 
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..typedefs import FieldValue, RowData
+from ..utils import graph as graph_utils
 from ..vendor.compact.typing_extensionsx import override
 
 
@@ -134,6 +135,122 @@ class PostFieldSpec:
     dependencies: Tuple[str, ...]
     fingerprint: str
     calculator: PostFieldCalculator
+
+
+@dataclass(frozen=True)
+class FinalizeDagPlanItem:
+    out_field_id: str
+    producer_key: str
+    dependencies: Tuple[str, ...]
+    phase: str
+
+
+@dataclass(frozen=True)
+class FinalizeDagPlan:
+    """聚合 `finalize` `DAG` 执行计划(确定性).
+
+    - `items` 使用稳定拓扑序.
+    - `phase` 用于在 `top_k/sort` 前后分段执行:
+      - `pre_top_k`: 计算 `rank` 字段及其上游依赖(全量行).
+      - `post_top_k`: 计算其余派生字段(过滤后行).
+    """
+
+    items: Tuple[FinalizeDagPlanItem, ...]
+
+    @property
+    def pre_top_k_ids(self) -> Tuple[str, ...]:
+        return tuple(item.out_field_id for item in self.items if str(item.phase) == "pre_top_k")
+
+    @property
+    def post_top_k_ids(self) -> Tuple[str, ...]:
+        return tuple(item.out_field_id for item in self.items if str(item.phase) == "post_top_k")
+
+
+def _ordered_unique(items: Sequence[str]) -> Tuple[str, ...]:
+    seen: Set[str] = set()
+    ordered: List[str] = []
+    for item in items:
+        key = str(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(key)
+    return tuple(ordered)
+
+
+def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields: Sequence[PostFieldSpec]) -> FinalizeDagPlan:
+    """构建 `finalize` `DAG` 计划(稳定拓扑序 + 依赖列表).
+
+    依赖方向约定: A 依赖 B 表示 A -> B, 因此 B 必须在 A 之前计算.
+    """
+
+    rank_by_id: Dict[str, RankFieldSpec] = {str(r.out_field_id): r for r in rank_fields}
+    post_by_id: Dict[str, PostFieldSpec] = {str(p.out_field_id): p for p in post_fields}
+
+    node_ids: Set[str] = set(rank_by_id.keys()) | set(post_by_id.keys())
+    if not node_ids:
+        return FinalizeDagPlan(items=())
+
+    deps_by_id: Dict[str, Tuple[str, ...]] = {}
+    producer_by_id: Dict[str, str] = {}
+    for node_id in node_ids:
+        rank_spec = rank_by_id.get(node_id)
+        if rank_spec is not None:
+            order_fields = tuple(str(x) for x in (rank_spec.order_by or ())) or (str(rank_spec.by),)
+            deps = _ordered_unique((str(rank_spec.by), *tuple(order_fields)))
+            deps_by_id[node_id] = deps
+            producer_by_id[node_id] = str(rank_spec.kind)
+            continue
+        post_spec = post_by_id[node_id]
+        deps_by_id[node_id] = tuple(str(x) for x in (post_spec.dependencies or ()))
+        producer_by_id[node_id] = str(post_spec.kind)
+
+    def _get_derived_deps(node_id: str) -> Tuple[str, ...]:
+        raw_deps = deps_by_id.get(str(node_id), ())
+        return tuple(d for d in raw_deps if d in node_ids)
+
+    try:
+        topo_order = graph_utils.topological_sort(node_ids, _get_derived_deps)
+    except graph_utils.CyclicDependencyError as exc:
+        cycles = getattr(exc, "cycles", None) or ()
+        cycle = cycles[0] if cycles else ()
+        chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"
+        msg = "Aggregate finalize fields has cyclic dependency: {}".format(chain)
+        raise ValueError(msg) from exc
+
+    # `rank_fields` 存在时:
+    # - 在 `top_k/sort` 之前计算所有 `rank` 字段及其上游依赖(包含 `rank-after-post` 链路).
+    # `rank_fields` 不存在时:
+    # - 不存在 `top_k/sort` 阶段,所有派生字段在全量行上计算.
+    pre_top_k_set = set(node_ids)
+    if rank_by_id:
+        pre_top_k_set = graph_utils.collect_dependencies(rank_by_id.keys(), _get_derived_deps, include_target=True)
+
+    # `items` 表示最终“可执行计划”: 先 `pre_top_k`, 再 `post_top_k`, 并保持组内稳定拓扑序.
+    ordered_pre = [node_id for node_id in topo_order if node_id in pre_top_k_set]
+    ordered_post = [node_id for node_id in topo_order if node_id not in pre_top_k_set]
+
+    items: List[FinalizeDagPlanItem] = []
+    for node_id in ordered_pre:
+        items.append(
+            FinalizeDagPlanItem(
+                out_field_id=str(node_id),
+                producer_key=producer_by_id.get(str(node_id), ""),
+                dependencies=deps_by_id.get(str(node_id), ()),
+                phase="pre_top_k",
+            )
+        )
+    for node_id in ordered_post:
+        items.append(
+            FinalizeDagPlanItem(
+                out_field_id=str(node_id),
+                producer_key=producer_by_id.get(str(node_id), ""),
+                dependencies=deps_by_id.get(str(node_id), ()),
+                phase="post_top_k",
+            )
+        )
+
+    return FinalizeDagPlan(items=tuple(items))
 
 
 _DECIMAL_ZERO = Decimal(0)
@@ -697,6 +814,7 @@ class RankedGroupByAggregator(IRowAggregator):
     _group_by: Tuple[str, ...]
     _rank_fields: Tuple[RankFieldSpec, ...]
     _post_fields: Tuple[PostFieldSpec, ...]
+    _finalize_plan: FinalizeDagPlan
 
     def __init__(
         self,
@@ -712,6 +830,7 @@ class RankedGroupByAggregator(IRowAggregator):
         self._group_by = tuple(str(item) for item in group_by)
         self._rank_fields = tuple(rank_fields)
         self._post_fields = tuple(post_fields)
+        self._finalize_plan = build_finalize_dag_plan(rank_fields=self._rank_fields, post_fields=self._post_fields)
         self._base = GroupByAggregator(
             group_by=self._group_by,
             metrics=metrics,
@@ -729,21 +848,45 @@ class RankedGroupByAggregator(IRowAggregator):
         self._base.accumulate(row)
 
     @override
-    def finalize_rows(self) -> List[RowData]:
+    def finalize_rows(self) -> List[RowData]:  # noqa: C901
         rows: List[Dict[str, FieldValue]] = [dict(r) for r in self._base.finalize_rows()]
         if not rows:
             return []
 
-        for spec in self._rank_fields:
-            self._apply_rank_field(rows, spec)
+        rank_by_id: Dict[str, RankFieldSpec] = {str(r.out_field_id): r for r in self._rank_fields}
+        post_by_id: Dict[str, PostFieldSpec] = {str(p.out_field_id): p for p in self._post_fields}
+
+        for fid in self._finalize_plan.pre_top_k_ids:
+            rank_spec = rank_by_id.get(str(fid))
+            if rank_spec is not None:
+                self._apply_rank_field(rows, rank_spec)
+                continue
+
+            post_spec = post_by_id.get(str(fid))
+            if post_spec is None:  # pragma: no cover
+                msg = "Unknown finalize field id: {!r}".format(fid)
+                raise ValueError(msg)
+            out_key = str(post_spec.out_field_id)
+            for row in rows:
+                row[out_key] = post_spec.calculator(row)
 
         primary_rank = self._select_primary_rank_spec()
         if primary_rank is not None:
             rows = self._apply_top_k_and_sort(rows, primary_rank)
 
-        for post in self._post_fields:
+        for fid in self._finalize_plan.post_top_k_ids:
+            rank_spec = rank_by_id.get(str(fid))
+            if rank_spec is not None:  # pragma: no cover
+                self._apply_rank_field(rows, rank_spec)
+                continue
+
+            post_spec = post_by_id.get(str(fid))
+            if post_spec is None:  # pragma: no cover
+                msg = "Unknown finalize field id: {!r}".format(fid)
+                raise ValueError(msg)
+            out_key = str(post_spec.out_field_id)
             for row in rows:
-                row[str(post.out_field_id)] = post.calculator(row)
+                row[out_key] = post_spec.calculator(row)
 
         return list(rows)
 

@@ -129,7 +129,9 @@
           "YAML DSL 增加 loader retry 配置入口",
           "`_templates.retry` 用于复用通用策略",
           "`should_retry` 引用解析与 allowlist",
-          "`normalize` is allowed on `sources.*` and rejected on `main_source`"
+          "`normalize` is allowed on `sources.*` and rejected on `main_source`",
+          "aggregate derived fields MUST support dependency-driven evaluation (DAG)",
+          "aggregate fields MUST support safe compute derived fields (`compute`)"
         ],
         "slug": "demand-dsl"
       },
@@ -265,7 +267,7 @@
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
-      "sha256": "463ba759c19c1e2af562d802b1229cf5bab90096fe15c70460321b893b4f4059"
+      "sha256": "26f2c22f73f7d78468c6b9cb88e114968605d55551b843d6ee14fa8fc9d46493"
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
@@ -317,7 +319,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "3c1b543b9f89345b766743a157afc7d900fdf78e0851d7f803ba313895706a85"
+      "sha256": "976e785595847db12848587f1ff2cfaa98bbbd7a571eead8f35258e5eac805d2"
     }
   ],
   "outputs": [
@@ -339,7 +341,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "a12ea799bc6432fb6d8ea1991acf73c8e45efbce6f05e6309d918618bd986224"
+      "sha256": "7890cd4e063f401cee8592dd6eb8752e6a4b1f281b8c40500939d27ff048c564"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

@@ -19,7 +19,7 @@ from ....execution.run_ir import export_layout_from_demand_ir
 from ....spec.ir.demand import DemandIr
 from ....typedefs import FieldValue, RowData
 from ..config_parsing.call_by import CallByParseError, CallByValue, ParsedCallBy, parse_call_by
-from ..config_parsing.security import SecureComputeEngine
+from ..config_parsing.security import ComputeExpressionError, SecureComputeEngine, SecurityError
 from ..schema_dsl.models import (
     DemandConfig,
     OutputAggregateConfig,
@@ -177,6 +177,40 @@ def _compile_score_by_rank_post_field(
     )
 
 
+def _compile_compute_post_field(
+    *,
+    out_field_id: str,
+    cfg: Dict[str, Any],
+    engine: SecureComputeEngine,
+) -> PostFieldSpec:
+    expr = str(cfg.get("expression") or "").strip()
+    deps = tuple(str(x) for x in cast("Tuple[str, ...]", cfg.get("dependencies") or ()))
+    if not expr:
+        msg = "aggregate.fields.{} has invalid compute config: missing expression".format(out_field_id)
+        raise ValueError(msg)
+
+    try:
+        raw_calculator = cast("Callable[..., object]", engine.compile(expr, deps))
+    except (ComputeExpressionError, SecurityError) as exc:
+        msg = "aggregate.fields.{} has invalid compute expression: {}".format(out_field_id, exc)
+        raise ValueError(msg) from exc
+
+    dep_keys = deps
+
+    def calculator(row: RowData, c: Callable[..., object] = raw_calculator) -> FieldValue:
+        values = [row.get(key) for key in dep_keys]
+        result = c(*values)
+        return _ensure_field_value(result, field_id=str(out_field_id), producer="compute")
+
+    return PostFieldSpec(
+        out_field_id=str(out_field_id),
+        kind="compute",
+        dependencies=deps,
+        fingerprint=expr,
+        calculator=calculator,
+    )
+
+
 def _get_field_name(field_id: str, demand_ir: DemandIr) -> str:
     field_ir = demand_ir.fields.get(field_id)
     name = getattr(field_ir, "name", "") or ""
@@ -268,7 +302,12 @@ def _metric_spec_from_agg_field(*, out_field_id: str, producer_key: str, cfg: Di
     )
 
 
-def _derived_group_by_spec_from_yaml(cfg: OutputAggregateConfig, *, resolver: SecurePythonReferenceResolver) -> DerivedGroupBySpec:
+def _derived_group_by_spec_from_yaml(
+    cfg: OutputAggregateConfig,
+    *,
+    resolver: SecurePythonReferenceResolver,
+    compute_engine: SecureComputeEngine,
+) -> DerivedGroupBySpec:
     metric_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _AGG_FUNC_KEYS])
     metrics = tuple(
         _metric_spec_from_agg_field(
@@ -315,6 +354,14 @@ def _derived_group_by_spec_from_yaml(cfg: OutputAggregateConfig, *, resolver: Se
                     cfg=cast("Dict[str, Any]", field_cfg.config),
                 )
             )
+        elif producer_key == "compute":
+            post_specs.append(
+                _compile_compute_post_field(
+                    out_field_id=str(out_field_id),
+                    cfg=cast("Dict[str, Any]", field_cfg.config),
+                    engine=compute_engine,
+                )
+            )
 
     return DerivedGroupBySpec(
         group_by=tuple(str(x) for x in cfg.group_by),
@@ -330,7 +377,7 @@ def _derived_group_by_spec_from_yaml(cfg: OutputAggregateConfig, *, resolver: Se
 def _derived_output_layout_fields(cfg: OutputAggregateConfig) -> Tuple[str, ...]:
     metric_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _AGG_FUNC_KEYS])
     rank_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _RANK_FUNC_KEYS])
-    post_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in ("score_by_rank", "call_by")])
+    post_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in ("score_by_rank", "call_by", "compute")])
     fields: List[str] = list(cfg.group_by) + metric_ids + rank_ids + post_ids
     return tuple(str(x) for x in fields)
 
@@ -441,7 +488,7 @@ def compile_output_composition_from_yaml(  # noqa: C901
             continue
 
         agg = out_cfg.aggregate
-        derived = _derived_group_by_spec_from_yaml(agg, resolver=resolver)
+        derived = _derived_group_by_spec_from_yaml(agg, resolver=resolver, compute_engine=engine)
         out_layout_fields = tuple(str(x) for x in out_cfg.fields) if out_cfg.fields is not None else _derived_output_layout_fields(agg)
         out_layout = _export_layout_for_derived(
             demand_ir=demand_ir,

@@ -25,6 +25,7 @@ from .derived_outputs import (
     RankedGroupByAggregator,
     RankFieldSpec,
     TwoStageGroupByAggregator,
+    build_finalize_dag_plan,
     fingerprint_for_meta,
 )
 from .output_contracts import ExportLayout, OutputSpec
@@ -134,6 +135,18 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
         parts.append("post_fields=")
         for p in sorted(self.post_fields, key=lambda x: str(x.out_field_id)):
             parts.append("  " + _post_field_fingerprint_part(p))
+        parts.append("finalize_dag_plan=")
+        plan = build_finalize_dag_plan(rank_fields=self.rank_fields, post_fields=self.post_fields)
+        for item in plan.items:
+            deps = ",".join(str(x) for x in (item.dependencies or ()))
+            parts.append(
+                "  {}|producer_key={}|phase={}|deps={}".format(
+                    str(item.out_field_id),
+                    str(item.producer_key),
+                    str(item.phase),
+                    deps,
+                )
+            )
         return tuple(parts)
 
     @override

@@ -101,6 +101,8 @@
   - `_templates.retry` 用于复用通用策略
   - `should_retry` 引用解析与 allowlist
   - `normalize` is allowed on `sources.*` and rejected on `main_source`
+  - aggregate derived fields MUST support dependency-driven evaluation (DAG)
+  - aggregate fields MUST support safe compute derived fields (`compute`)
 ### `source-relations`
 - Source: `openspec/specs/source-relations/spec.md`
 - Purpose: 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.

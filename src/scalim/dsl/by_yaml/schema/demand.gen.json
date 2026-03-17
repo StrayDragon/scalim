@@ -2374,8 +2374,8 @@
                             "type": "object"
                           }
                         ],
-                        "description": "用于排序的字段(引用 group_by 或聚合指标字段)",
-                        "markdownDescription": "用于排序的字段(引用 `group_by` 或聚合指标字段).",
+                        "description": "用于排序的字段(引用 group_by 或 aggregate.fields 任意字段,含派生字段)",
+                        "markdownDescription": "用于排序的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
                         "examples": [
                           "sum_amount"
                         ]
@@ -2549,8 +2549,8 @@
                             "type": "object"
                           }
                         ],
-                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
-                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
+                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或 aggregate.fields 任意字段,含派生字段)",
+                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
                         "examples": [
                           "sum_amount"
                         ]
@@ -2724,8 +2724,8 @@
                             "type": "object"
                           }
                         ],
-                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
-                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
+                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或 aggregate.fields 任意字段,含派生字段)",
+                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
                         "examples": [
                           "sum_amount"
                         ]
@@ -2918,7 +2918,7 @@
                       }
                     },
                     "description": "score_by_rank: 基于 rank 计算 score",
-                    "markdownDescription": "基于排名字段计算 score(聚合后派生字段).\n\n默认公式:\n- `score = base - (rank - 1) * step`\n\n参数:\n- `rank_field`: 引用的排名字段(out_field_id),缺省为 `rank`\n- `base`: 基础分数(缺省 0)\n- `step`: 每名次衰减(缺省 1)\n\n执行阶段: 聚合后派生字段(在聚合指标与排名字段之后).",
+                    "markdownDescription": "基于排名字段计算 score(聚合后派生字段).\n\n默认公式:\n- `score = base - (rank - 1) * step`\n\n参数:\n- `rank_field`: 引用的排名字段(out_field_id),缺省为 `rank`\n- `base`: 基础分数(缺省 0)\n- `step`: 每名次衰减(缺省 1)\n\n执行语义: 聚合后派生字段 DAG 的一个节点(按依赖驱动在 finalize 阶段计算).",
                     "examples": [
                       {
                         "rank_field": "rank",
@@ -2951,9 +2951,39 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "call_by: 聚合后派生字段的 hotfix 口子(安全引用,受 allowlist 约束)",
-                    "markdownDescription": "聚合后派生字段的 hotfix 口子(受 allowlist 约束).\n\n- 执行顺序: 聚合指标 → 排名字段 → `call_by`\n- 只可引用聚合输出行内的字段(例如 `group_by`/聚合指标/排名字段)\n- 不可引用明细行字段(聚合前状态不可用)\n\n示例:\n```yaml\nscore: {call_by: \"pkg.mod:fn(rank=rank, base=100, step=3)\"}\n```",
+                    "markdownDescription": "聚合后派生字段的 hotfix 口子(受 allowlist 约束).\n\n- 与 `compute` 一样属于聚合后派生字段,会与 rank/其它派生字段一起组成 DAG\n- 只可引用聚合输出行内字段: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 不可引用明细行字段(聚合前状态不可用)\n- 若存在循环依赖,编译期会报错并给出依赖链路\n\n示例:\n```yaml\nscore: {call_by: \"pkg.mod:fn(rank=rank, base=100, step=3)\"}\n```",
                     "examples": [
                       "pkg.mod:fn(rank=rank, base=100, step=3)"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "compute"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
+                  "compute": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "compute: 聚合后派生字段安全表达式(推荐)",
+                    "markdownDescription": "安全表达式派生字段(推荐).\n\n- 语法与 `fields.*.compute` / `where` 一致\n- 变量名为聚合输出行字段 ID: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 会参与 aggregate DAG: 按依赖驱动计算; 循环依赖会在编译期报错\n- 适合 ratio/求和/加权等简单派生; 复杂逻辑可用 `call_by`(仍受 allowlist 约束)",
+                    "examples": [
+                      "sum_a / sum_b",
+                      "score1 + score2"
                     ]
                   }
                 }
@@ -2961,7 +2991,7 @@
             ]
           },
           "description": "聚合输出字段映射(key 为 out_field_id)",
-          "markdownDescription": "聚合输出字段映射(key 为 out_field_id).\n\n- map key 是输出字段 ID\n- map value 是“该字段如何产生”的声明,必须且只能选择一个 producer key\n- producer key 分三类:\n  1) 聚合指标函数(例如 `count`/`sum`/`count_distinct`)\n  2) 排名函数(例如 `row_number`/`rank`/`dense_rank`)\n  3) 聚合后派生字段(例如 `score_by_rank`/`call_by`)\n\n执行顺序:\n- 先聚合指标 → 再排名字段 → 再聚合后派生字段\n\n可引用字段范围(概念上):\n- 排名/派生字段可以引用 `group_by`/聚合指标/排名字段\n- 不可引用明细行的中间状态(聚合前数据不会被保留)"
+          "markdownDescription": "聚合输出字段映射(key 为 out_field_id).\n\n- map key 是输出字段 ID\n- map value 是“该字段如何产生”的声明,必须且只能选择一个 producer key\n- producer key 分三类:\n  1) 聚合指标函数(例如 `count`/`sum`/`count_distinct`)\n  2) 排名函数(例如 `row_number`/`rank`/`dense_rank`)\n  3) 聚合后派生字段(例如 `compute`/`score_by_rank`/`call_by`)\n\n执行顺序/语义(依赖驱动 DAG):\n- `rank` + 聚合后派生字段统一视为同一套 DAG,在 finalize 阶段按拓扑序执行\n- 引用范围: `group_by` + `aggregate.fields` 任意 out_field_id(含派生字段)\n- 系统会在编译期构建依赖图,检测循环依赖并给出依赖链路\n- `top_k/sort` 会在计算完所有 rank 字段及其上游依赖后执行; 其余派生字段可在过滤后计算\n\n边界:\n- 不可引用明细行字段(除 `group_by`);聚合前中间状态不会被保留"
         },
         "max_groups": {
           "type": "integer",

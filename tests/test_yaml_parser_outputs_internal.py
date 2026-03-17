@@ -119,6 +119,7 @@ def test_parse_output_aggregate_field_rejects_non_str_name() -> None:
     loader = YamlDemandLoader()
     field_index = _dummy_field_index()
     agg_field_index = loader._build_aggregate_field_index({})
+    engine = SecureComputeEngine()
 
     with pytest.raises(TypeError, match=r"aggregate\.fields\.cnt\.name must be a string"):
         _ = loader._parse_output_aggregate_field(  # type: ignore[attr-defined]
@@ -126,6 +127,7 @@ def test_parse_output_aggregate_field_rejects_non_str_name() -> None:
             base_path="aggregate.fields.cnt",
             field_def_index=field_index,
             agg_field_index=agg_field_index,
+            engine=engine,
         )
 
 
@@ -199,22 +201,30 @@ def test_parse_output_container_defensive_checks(raw, base_path, exc_type, match
 def test_parse_output_aggregate_defensive_checks() -> None:
     loader = YamlDemandLoader()
     field_index = _dummy_field_index()
+    engine = SecureComputeEngine()
 
     with pytest.raises(TypeError, match=r"aggregate\.group_by must be a list"):
         _ = loader._parse_output_aggregate(
             {"group_by": "order_id", "fields": {"cnt": {"count": {}}}},
             base_path="aggregate",
             field_def_index=field_index,
+            engine=engine,
         )
 
     with pytest.raises(TypeError, match=r"aggregate\.fields must be an object"):
-        _ = loader._parse_output_aggregate({"group_by": ["order_id"], "fields": 1}, base_path="aggregate", field_def_index=field_index)
+        _ = loader._parse_output_aggregate(
+            {"group_by": ["order_id"], "fields": 1},
+            base_path="aggregate",
+            field_def_index=field_index,
+            engine=engine,
+        )
 
     with pytest.raises(ValueError, match=r"aggregate\.metrics was removed; use aggregate\.fields"):
         _ = loader._parse_output_aggregate(
             {"group_by": ["order_id"], "metrics": {"cnt": {"op": "count"}}},
             base_path="aggregate",
             field_def_index=field_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"max_groups must be >= 0"):
@@ -222,6 +232,7 @@ def test_parse_output_aggregate_defensive_checks() -> None:
             {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "max_groups": -1},
             base_path="aggregate",
             field_def_index=field_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"max_distinct must be >= 0"):
@@ -229,6 +240,7 @@ def test_parse_output_aggregate_defensive_checks() -> None:
             {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "max_distinct": -1},
             base_path="aggregate",
             field_def_index=field_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"distinct_on_overflow='bad' is invalid"):
@@ -236,6 +248,7 @@ def test_parse_output_aggregate_defensive_checks() -> None:
             {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "distinct_on_overflow": "bad"},
             base_path="aggregate",
             field_def_index=field_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"aggregate\.rank_by was removed"):
@@ -243,12 +256,14 @@ def test_parse_output_aggregate_defensive_checks() -> None:
             {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "rank_by": "cnt"},
             base_path="aggregate",
             field_def_index=field_index,
+            engine=engine,
         )
 
     parsed = loader._parse_output_aggregate(
         {"group_by": ["order_id"], "fields": {"": {"count": {}}, "cnt": {"count": {}}}},
         base_path="aggregate",
         field_def_index=field_index,
+        engine=engine,
     )
     assert parsed.fields
     assert "cnt" in parsed.fields
@@ -259,6 +274,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
     loader = YamlDemandLoader()
     field_index = _dummy_field_index()
     agg_index = loader._build_aggregate_field_index({})
+    engine = SecureComputeEngine()
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x must be an object"):
         _ = loader._parse_output_aggregate_field(  # type: ignore[arg-type]
@@ -266,10 +282,17 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x must not be empty"):
-        _ = loader._parse_output_aggregate_field({}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index)
+        _ = loader._parse_output_aggregate_field(
+            {},
+            base_path="agg.fields.x",
+            field_def_index=field_index,
+            agg_field_index=agg_index,
+            engine=engine,
+        )
 
     with pytest.raises(ValueError, match=r"must contain exactly 1 producer key"):
         _ = loader._parse_output_aggregate_field(
@@ -277,26 +300,39 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"unknown producer key"):
         _ = loader._parse_output_aggregate_field(
-            {"bad": {}}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index
+            {"bad": {}}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index, engine=engine
         )
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x\.sum must be an object"):
         _ = loader._parse_output_aggregate_field(
-            {"sum": 1}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index
+            {"sum": 1},
+            base_path="agg.fields.x",
+            field_def_index=field_index,
+            agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.sum\.field is required"):
         _ = loader._parse_output_aggregate_field(
-            {"sum": {}}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index
+            {"sum": {}},
+            base_path="agg.fields.x",
+            field_def_index=field_index,
+            agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.by is required"):
         _ = loader._parse_output_aggregate_field(
-            {"rank": {}}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index
+            {"rank": {}},
+            base_path="agg.fields.x",
+            field_def_index=field_index,
+            agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x\.call_by must be a string"):
@@ -305,6 +341,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.call_by must not be empty"):
@@ -313,6 +350,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.call_by is invalid"):
@@ -321,11 +359,39 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
+        )
+
+    with pytest.raises(TypeError, match=r"agg\.fields\.x\.compute must be a string"):
+        _ = loader._parse_output_aggregate_field(
+            {"compute": {}},
+            base_path="agg.fields.x",
+            field_def_index=field_index,
+            agg_field_index=agg_index,
+            engine=engine,
+        )
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.compute must not be empty"):
+        _ = loader._parse_output_aggregate_field(
+            {"compute": "   "},
+            base_path="agg.fields.x",
+            field_def_index=field_index,
+            agg_field_index=agg_index,
+            engine=engine,
+        )
+
+    with pytest.raises(ValueError, match=r"agg\.fields\.x\.compute is invalid"):
+        _ = loader._parse_output_aggregate_field(
+            {"compute": "a +"},
+            base_path="agg.fields.x",
+            field_def_index=field_index,
+            agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x must not be empty"):
         _ = loader._parse_output_aggregate_field(
-            {"   ": {}}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index
+            {"   ": {}}, base_path="agg.fields.x", field_def_index=field_index, agg_field_index=agg_index, engine=engine
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.count has unknown keys: bad"):
@@ -334,6 +400,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x\.count_distinct\.fields must be a list"):
@@ -342,6 +409,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_true_gte\.threshold is required"):
@@ -350,6 +418,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_distinct does not allow both field and fields"):
@@ -358,6 +427,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_distinct requires field or fields"):
@@ -366,6 +436,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.count_distinct\.fields must not be empty"):
@@ -374,6 +445,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x\.rank must be an object"):
@@ -382,6 +454,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank has unknown keys: bad"):
@@ -390,6 +463,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x\.rank\.partition_by must be a list"):
@@ -398,6 +472,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.partition_by must not be empty"):
@@ -406,6 +481,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.order='bad' is invalid"):
@@ -414,6 +490,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x\.rank\.order_by must be a list"):
@@ -422,6 +499,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.order_by must not be empty"):
@@ -430,6 +508,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.top_k must be >= 0"):
@@ -438,6 +517,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.rank\.top_k_mode='bad' is invalid"):
@@ -446,6 +526,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(TypeError, match=r"agg\.fields\.x\.score_by_rank must be an object"):
@@ -454,6 +535,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     with pytest.raises(ValueError, match=r"agg\.fields\.x\.score_by_rank has unknown keys: bad"):
@@ -462,6 +544,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             base_path="agg.fields.x",
             field_def_index=field_index,
             agg_field_index=agg_index,
+            engine=engine,
         )
 
     parsed = loader._parse_output_aggregate_field(
@@ -475,6 +558,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
         base_path="agg.fields.x",
         field_def_index=field_index,
         agg_field_index=agg_index,
+        engine=engine,
     )
     assert parsed.producer_key == "rank"
     assert parsed.config["partition_by"] == ("g",)
@@ -483,6 +567,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
 
 def test_parse_output_aggregate_supports_object_alias_field_refs_and_agg_field_refs() -> None:
     loader = YamlDemandLoader()
+    engine = SecureComputeEngine()
 
     group_def = {"extract": "group"}
     amount_def = {"extract": "amount"}
@@ -517,6 +602,7 @@ def test_parse_output_aggregate_supports_object_alias_field_refs_and_agg_field_r
         },
         base_path="agg",
         field_def_index=field_index,
+        engine=engine,
     )
 
     assert parsed.group_by == ("group",)
@@ -802,6 +888,108 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
     with pytest.raises(ValueError, match=r"supports top_k on at most one rank field"):
         loader._validate_outputs_semantics(
             [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
+        )
+
+
+def test_validate_outputs_semantics_allows_aggregate_dag_rank_by_compute_post_depends_on_post_and_rank_after_post() -> None:
+    loader = YamlDemandLoader()
+    container = OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")
+
+    agg = OutputAggregateConfig(
+        group_by=("g",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "ratio": OutputAggregateFieldConfig(
+                producer_key="compute",
+                config={"expression": "cnt + 1", "dependencies": ("cnt",)},
+            ),
+            "rank1": OutputAggregateFieldConfig(
+                producer_key="dense_rank",
+                config={
+                    "by": "ratio",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": ("ratio",),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+            "score1": OutputAggregateFieldConfig(
+                producer_key="score_by_rank",
+                config={"rank_field": "rank1"},
+            ),
+            "total": OutputAggregateFieldConfig(
+                producer_key="compute",
+                config={"expression": "score1 + 1", "dependencies": ("score1",)},
+            ),
+            "rank2": OutputAggregateFieldConfig(
+                producer_key="dense_rank",
+                config={
+                    "by": "total",
+                    "partition_by": (),
+                    "order": "desc",
+                    "order_by": (),
+                    "top_k": 0,
+                    "top_k_mode": "rank",
+                },
+            ),
+        },
+    )
+
+    loader._validate_outputs_semantics(
+        [OutputTargetConfig(name="agg", container=container, aggregate=agg)],
+        known_field_ids={"g"},
+    )
+
+
+def test_validate_outputs_semantics_rejects_compute_referencing_unknown_agg_fields() -> None:
+    loader = YamlDemandLoader()
+    container = OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")
+
+    agg = OutputAggregateConfig(
+        group_by=("g",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "x": OutputAggregateFieldConfig(
+                producer_key="compute",
+                config={
+                    "expression": "missing + 1",
+                    "dependencies": ("missing",),
+                },
+            ),
+        },
+    )
+
+    with pytest.raises(ValueError, match=r"compute reference unknown fields"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)],
+            known_field_ids={"g"},
+        )
+
+
+def test_validate_outputs_semantics_aggregate_dag_cycle_detection_is_actionable() -> None:
+    loader = YamlDemandLoader()
+    container = OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")
+
+    agg = OutputAggregateConfig(
+        group_by=("g",),
+        fields={
+            "cnt": OutputAggregateFieldConfig(producer_key="count", config={}),
+            "a": OutputAggregateFieldConfig(
+                producer_key="compute",
+                config={"expression": "b + 1", "dependencies": ("b",)},
+            ),
+            "b": OutputAggregateFieldConfig(
+                producer_key="compute",
+                config={"expression": "a + 1", "dependencies": ("a",)},
+            ),
+        },
+    )
+
+    with pytest.raises(ValueError, match=r"cyclic dependency"):
+        loader._validate_outputs_semantics(
+            [OutputTargetConfig(name="agg", container=container, aggregate=agg)],
+            known_field_ids={"g"},
         )
 
 

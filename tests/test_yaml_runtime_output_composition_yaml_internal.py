@@ -229,3 +229,37 @@ def test_score_by_rank_post_field_handles_missing_rank_and_invalid_rank_types() 
 
     with pytest.raises(TypeError, match=r"requires integer rank"):
         _ = spec.calculator({"rank": "oops"})
+
+
+def test_compile_compute_post_field_executes_expression_and_validates_result_type() -> None:
+    engine = SecureComputeEngine()
+
+    spec = oc_yaml._compile_compute_post_field(  # noqa: SLF001
+        out_field_id="v",
+        cfg={"expression": "a + b", "dependencies": ("a", "b")},
+        engine=engine,
+    )
+    assert spec.dependencies == ("a", "b")
+    assert spec.calculator({"a": Decimal("1.5"), "b": 2}) == Decimal("3.5")
+
+    bad_type = oc_yaml._compile_compute_post_field(  # noqa: SLF001
+        out_field_id="v",
+        cfg={"expression": "[]", "dependencies": ()},
+        engine=engine,
+    )
+    with pytest.raises(TypeError, match=r"unsupported value type"):
+        _ = bad_type.calculator({})
+
+    with pytest.raises(ValueError, match=r"invalid compute expression"):
+        _ = oc_yaml._compile_compute_post_field(  # noqa: SLF001
+            out_field_id="v",
+            cfg={"expression": "a +", "dependencies": ("a",)},
+            engine=engine,
+        )
+
+    with pytest.raises(ValueError, match=r"missing expression"):
+        _ = oc_yaml._compile_compute_post_field(  # noqa: SLF001
+            out_field_id="v",
+            cfg={"expression": "   ", "dependencies": ()},
+            engine=engine,
+        )

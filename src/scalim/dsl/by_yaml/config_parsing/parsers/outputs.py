@@ -2,6 +2,7 @@ import re
 from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
+from .....utils import graph as graph_utils
 from ...schema_dsl.constants import (
     DEFAULT_OUTPUT_ENCODING,
     DEFAULT_OUTPUT_HEADER_BY,
@@ -28,7 +29,7 @@ _OUTPUT_CONTAINER_TYPES = ("workbook", "csv")
 _OUTPUT_HEADER_BY_ENUM = ("field_id", "name")
 _AGG_FUNC_KEYS = ("count", "sum", "min", "max", "count_true", "count_true_gte", "count_distinct")
 _RANK_FUNC_KEYS = ("row_number", "rank", "dense_rank")
-_POST_FUNC_KEYS = ("score_by_rank", "call_by")
+_POST_FUNC_KEYS = ("score_by_rank", "call_by", "compute")
 _AGG_DISTINCT_ON_OVERFLOW_ENUM = ("error", "truncate")
 _AGG_RANK_ORDER_ENUM = ("asc", "desc")
 _AGG_RANK_TOP_K_MODE_ENUM = ("rank", "rows")
@@ -293,6 +294,7 @@ class ParserOutputsMixin:
                 agg_raw,
                 base_path="{}.{}.aggregate".format(outputs_key, idx),
                 field_def_index=field_def_index,
+                engine=engine,
             )
             if agg_raw
             else None
@@ -386,6 +388,7 @@ class ParserOutputsMixin:
         *,
         base_path: str,
         field_def_index: FieldDefIndex,
+        engine: SecureComputeEngine,
     ) -> OutputAggregateConfig:
         if "metrics" in raw:
             msg = "{}.metrics was removed; use {}.fields".format(base_path, base_path)
@@ -428,6 +431,7 @@ class ParserOutputsMixin:
                 base_path="{}.fields.{}".format(base_path, out_field_id),
                 field_def_index=field_def_index,
                 agg_field_index=agg_field_index,
+                engine=engine,
             )
 
         max_groups = int(raw.get(OUTPUT_AGGREGATE_KEYS["max_groups"], 0) or 0)
@@ -463,6 +467,7 @@ class ParserOutputsMixin:
         base_path: str,
         field_def_index: FieldDefIndex,
         agg_field_index: _AggregateFieldIndex,
+        engine: SecureComputeEngine,
     ) -> OutputAggregateFieldConfig:
         typed = mapping_or_none(raw)
         if typed is None:
@@ -521,6 +526,12 @@ class ParserOutputsMixin:
                 base_path=base_path,
                 field_def_index=field_def_index,
                 agg_field_index=agg_field_index,
+            )
+        elif producer_key == "compute":
+            cfg = self._parse_output_aggregate_field_compute(
+                producer_value,
+                base_path=base_path,
+                engine=engine,
             )
         else:
             allowed = ", ".join(list(_AGG_FUNC_KEYS) + list(_RANK_FUNC_KEYS) + list(_POST_FUNC_KEYS))
@@ -746,6 +757,24 @@ class ParserOutputsMixin:
             raise ValueError(msg) from exc
         return call_by
 
+    def _parse_output_aggregate_field_compute(self, raw: object, *, base_path: str, engine: SecureComputeEngine) -> Dict[str, Any]:
+        if not isinstance(raw, str):
+            msg = "{}.compute must be a string".format(base_path)
+            raise TypeError(msg)
+        expr = str(raw or "").strip()
+        if not expr:
+            msg = "{}.compute must not be empty".format(base_path)
+            raise ValueError(msg)
+
+        deps = tuple(str(x) for x in extract_compute_dependencies(expr))
+        try:
+            _ = engine.compile(expr, deps)
+        except (ComputeExpressionError, SecurityError) as exc:
+            msg = "{}.compute is invalid: {}".format(base_path, exc)
+            raise ValueError(msg) from exc
+
+        return {"expression": expr, "dependencies": deps}
+
     def _parse_output_aggregate_field_score_by_rank(
         self,
         raw: object,
@@ -883,7 +912,8 @@ class ParserOutputsMixin:
                     msg = "outputs.{}.aggregate.fields reference unknown input fields: {}".format(name, ", ".join(sorted(set(missing))))
                     raise ValueError(msg)
 
-                allowed_agg_out_fields = set(agg.group_by) | set(metric_field_ids)
+                # 排名/派生字段允许引用 `aggregate.group_by` + `aggregate.fields` 任意字段(含派生字段).
+                allowed_agg_out_fields = set(agg.group_by) | set(agg_field_ids)
 
                 if t.fields is not None:
                     if not t.fields:
@@ -903,7 +933,7 @@ class ParserOutputsMixin:
                     rank_cfg = cast("Dict[str, Any]", cfg.config)
                     by = str(rank_cfg.get("by") or "").strip()
                     if by not in allowed_agg_out_fields:
-                        msg = "outputs.{}.aggregate.fields.{}.{} by={!r} must reference group_by fields or agg metric fields: {}".format(
+                        msg = "outputs.{}.aggregate.fields.{}.{} by={!r} must reference group_by fields or aggregate.fields ids: {}".format(
                             name,
                             fid,
                             cfg.producer_key,
@@ -971,7 +1001,7 @@ class ParserOutputsMixin:
                     if cfg.producer_key == "call_by":
                         call_by = str(cfg.config or "").strip()
                         deps = extract_call_by_dependencies(call_by)
-                        allowed = set(agg.group_by) | set(metric_field_ids) | set(rank_field_ids)
+                        allowed = set(agg.group_by) | set(agg_field_ids)
                         missing = [d for d in deps if d not in allowed]
                         if missing:
                             msg = "outputs.{}.aggregate.fields.{}.call_by reference unknown fields: {}".format(
@@ -981,6 +1011,73 @@ class ParserOutputsMixin:
                             )
                             raise ValueError(msg)
                         continue
+
+                    if cfg.producer_key == "compute":
+                        compute_cfg = cast("Dict[str, Any]", cfg.config)
+                        compute_deps = cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
+                        allowed = set(agg.group_by) | set(agg_field_ids)
+                        missing = [d for d in compute_deps if d not in allowed]
+                        if missing:
+                            msg = "outputs.{}.aggregate.fields.{}.compute reference unknown fields: {}".format(
+                                name,
+                                fid,
+                                ", ".join(sorted(set(missing))),
+                            )
+                            raise ValueError(msg)
+                        continue
+
+                # 依赖 `DAG`: 检测循环依赖并给出可操作错误.
+                derived_ids = set(rank_field_ids) | set(post_field_ids)
+                if derived_ids:
+                    deps_by_id: Dict[str, Tuple[str, ...]] = {}
+                    for fid in derived_ids:
+                        cfg = agg.fields[fid]
+                        producer_key = str(cfg.producer_key)
+                        derived_deps: Tuple[str, ...] = ()
+
+                        if producer_key in _RANK_FUNC_KEYS:
+                            rank_cfg = cast("Dict[str, Any]", cfg.config)
+                            by = str(rank_cfg.get("by") or "").strip()
+                            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())
+                            deps_list: List[str] = []
+                            if by:
+                                deps_list.append(by)
+                            if order_by:
+                                deps_list.extend([str(x) for x in order_by])
+                            # `order_by` 缺省时,语义等价于 `[by]`.
+                            derived_deps = tuple(_ordered_unique([str(x) for x in deps_list if str(x)]))
+
+                        elif producer_key == "score_by_rank":
+                            score_cfg = cast("Dict[str, Any]", cfg.config)
+                            rf = str(score_cfg.get("rank_field") or "rank").strip() or "rank"
+                            derived_deps = (rf,)
+
+                        elif producer_key == "call_by":
+                            call_by = str(cfg.config or "").strip()
+                            derived_deps = tuple(str(x) for x in extract_call_by_dependencies(call_by))
+
+                        elif producer_key == "compute":
+                            compute_cfg = cast("Dict[str, Any]", cfg.config)
+                            derived_deps = cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
+
+                        deps_by_id[fid] = derived_deps
+
+                    def _get_derived_deps(
+                        node_id: str,
+                        deps_map: Dict[str, Tuple[str, ...]] = deps_by_id,
+                        node_set: Set[str] = derived_ids,
+                    ) -> Tuple[str, ...]:
+                        raw_deps = deps_map.get(node_id, ())
+                        return tuple(d for d in raw_deps if d in node_set)
+
+                    try:
+                        _ = graph_utils.topological_sort(derived_ids, _get_derived_deps)
+                    except graph_utils.CyclicDependencyError as exc:
+                        cycles = getattr(exc, "cycles", None) or ()
+                        cycle = cycles[0] if cycles else ()
+                        chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"
+                        msg = "outputs.{}.aggregate.fields has cyclic dependency: {}".format(name, chain)
+                        raise ValueError(msg) from exc
 
         for path, names in workbook_targets_by_path.items():
             if len(names) <= 1:
