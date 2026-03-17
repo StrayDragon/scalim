@@ -90,14 +90,10 @@
 ## Command Details
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
-- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
-                                    [--verbose]
-                                    yaml_file`
+- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
-                                    [--verbose]
-                                    yaml_file
+usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file
 
 positional arguments:
   yaml_file             YAML 文件路径
@@ -113,14 +109,10 @@ options:
 
 ### `yaml-dsl schema validate`
 - Help: Validate YAML DSL via JSON Schema
-- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
-                                           [--json] [--verbose]
-                                           yaml_file`
+- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
-                                           [--json] [--verbose]
-                                           yaml_file
+usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict] [--json] [--verbose] yaml_file
 
 positional arguments:
   yaml_file             YAML 文件路径

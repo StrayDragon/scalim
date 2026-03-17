@@ -105,7 +105,7 @@ def run_public_api_hooks_events() -> ExampleResult:
         "rows": rows,
     }
     return ExampleResult(
-        example_id="demo_big_data_report/public_api_hooks_events",
+        example_id="demo_big_data_report/ch180_public_api_hooks_events",
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -121,13 +121,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / public_api_hooks_events
+        # demo_big_data_report / ch180_public_api_hooks_events
 
         本章目标:
         - 演示扩展点: hook / observer / events / components 注入
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/public_api_hooks_events.py::run_public_api_hooks_events`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch180_public_api_hooks_events.py::run_public_api_hooks_events`
 
         Gate:
         - `just examples`

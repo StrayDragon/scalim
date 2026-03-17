@@ -55,7 +55,7 @@ def run_yaml_dsl(
         except ConfigValidationError as exc:
             summary = "ConfigValidator failed: {}".format(exc)
             return ExampleResult(
-                example_id="demo_big_data_report/yaml_dsl",
+                example_id="demo_big_data_report/ch020_yaml_dsl",
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary=summary,
@@ -85,7 +85,7 @@ def run_yaml_dsl(
         rows = sink.get_data()
         if not rows:
             return ExampleResult(
-                example_id="demo_big_data_report/yaml_dsl",
+                example_id="demo_big_data_report/ch020_yaml_dsl",
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary="YAML run produced no rows",
@@ -123,7 +123,7 @@ def run_yaml_dsl(
             "rows_match_failures": mismatch,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/yaml_dsl",
+            example_id="demo_big_data_report/ch020_yaml_dsl",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -141,14 +141,14 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / yaml_dsl
+        # demo_big_data_report / ch020_yaml_dsl
 
         本章目标:
         - 演示 canonical YAML 的加载/编译/执行闭环(含对拍)
         - 作为 YAML DSL 语义回归的可交互入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/yaml_dsl.py::run_yaml_dsl`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch020_yaml_dsl.py::run_yaml_dsl`
 
         Gate:
         - `just examples`（跑全量）

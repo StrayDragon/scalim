@@ -91,7 +91,7 @@ def run_loader_retry() -> ExampleResult:
     summary = "no_retry_ok={} with_retry_ok={}".format(no_retry_ok, with_retry_ok)
     details: Dict[str, Any] = {"call_count": demo_mod.get_call_count()}
     return ExampleResult(
-        example_id="demo_big_data_report/loader_retry",
+        example_id="demo_big_data_report/ch100_loader_retry",
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -107,13 +107,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / loader_retry
+        # demo_big_data_report / ch100_loader_retry
 
         本章目标:
         - 演示 YAML DSL 的 loader retry 策略：不开启则失败/开启后可恢复
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/loader_retry.py::run_loader_retry`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch100_loader_retry.py::run_loader_retry`
 
         Gate:
         - `just examples`（跑全量）

@@ -65,7 +65,7 @@ def run_basics(
             "order_by": order_by,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/basics",
+            example_id="demo_big_data_report/ch010_basics",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -83,14 +83,14 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / basics
+        # demo_big_data_report / ch010_basics
 
         本章目标:
         - 走一遍最小主线：`IR → Plan → Engine → Sink`
         - 对拍(oracle)失败时可在本 notebook 里交互定位
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/basics.py::run_basics`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch010_basics.py::run_basics`
 
         Gate:
         - `just examples`（跑全量）

@@ -55,7 +55,7 @@ def run_public_api_spec_ir() -> ExampleResult:
     coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
     if not coverage.ok:
         return ExampleResult(
-            example_id="demo_big_data_report/public_api_spec_ir",
+            example_id="demo_big_data_report/ch140_public_api_spec_ir",
             passed=False,
             kind=EXAMPLE_KIND_ORACLE,
             summary=coverage_failure_summary(coverage),
@@ -96,7 +96,7 @@ def run_public_api_spec_ir() -> ExampleResult:
         "symbols_count": len(symbols),
     }
     return ExampleResult(
-        example_id="demo_big_data_report/public_api_spec_ir",
+        example_id="demo_big_data_report/ch140_public_api_spec_ir",
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -112,14 +112,14 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / public_api_spec_ir
+        # demo_big_data_report / ch140_public_api_spec_ir
 
         本章目标:
         - 覆盖 `scalim.spec.ir.__all__` 的最小可运行示例
         - 演示 IR 构建 + `run_ir` 执行链路
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/public_api_spec_ir.py::run_public_api_spec_ir`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch140_public_api_spec_ir.py::run_public_api_spec_ir`
 
         Gate:
         - `just examples`

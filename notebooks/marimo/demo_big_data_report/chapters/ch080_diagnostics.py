@@ -61,7 +61,7 @@ def run_diagnostics(cfg: Optional[ECommerceConfig] = None) -> ExampleResult:
             "cached_sources": cached_sources,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/diagnostics",
+            example_id="demo_big_data_report/ch080_diagnostics",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -79,13 +79,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / diagnostics
+        # demo_big_data_report / ch080_diagnostics
 
         本章目标:
         - 不执行引擎,对 IR/relations/derived 字段等做静态诊断统计
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/diagnostics.py::run_diagnostics`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch080_diagnostics.py::run_diagnostics`
 
         Gate:
         - `just examples`（跑全量）

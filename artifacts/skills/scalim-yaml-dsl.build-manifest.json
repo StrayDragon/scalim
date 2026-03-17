@@ -315,7 +315,7 @@
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "c14259ad61b3ff8e594a6b8734a911c0c0c8b40d58301544576f400d81b8791f"
+      "sha256": "345cba2ce27b19a8e3684a99e176821590e0c185640d120f7a03bc44eca462e5"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
@@ -325,7 +325,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "8e213581fe8e1c8b0dbdd65e572f1ac12fbf81b7137a3f9f31a7a3fe070b516c"
+      "sha256": "d1d06c56d7714d48cc94448852c43793a6bd784cbe06dad5becf96981f9b688b"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",

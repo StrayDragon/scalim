@@ -131,7 +131,7 @@ def run_output_composition(*, tmp_path: Optional[Path] = None) -> ExampleResult:
     finally:
         set_config(prev_config)
     return ExampleResult(
-        example_id="demo_big_data_report/output_composition",
+        example_id="demo_big_data_report/ch110_output_composition",
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -147,13 +147,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / output_composition
+        # demo_big_data_report / ch110_output_composition
 
         本章目标:
         - 演示 composed outputs(workbook) 的端到端写出与对拍口径
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/output_composition.py::run_output_composition`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch110_output_composition.py::run_output_composition`
 
         Gate:
         - `just examples`（跑全量）

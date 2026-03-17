@@ -43,7 +43,7 @@ def run_workflow_yaml(
         except Exception as exc:  # noqa: BLE001
             summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)
             return ExampleResult(
-                example_id="demo_big_data_report/workflow_yaml",
+                example_id="demo_big_data_report/ch030_workflow_yaml",
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary=summary,
@@ -66,7 +66,7 @@ def run_workflow_yaml(
             "outcomes": result.outcomes,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/workflow_yaml",
+            example_id="demo_big_data_report/ch030_workflow_yaml",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -84,14 +84,14 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / workflow_yaml
+        # demo_big_data_report / ch030_workflow_yaml
 
         本章目标:
         - 演示 workflow YAML 的可运行对拍入口(含 `share_preload_cache`)
         - 为 workflow 场景提供可交互排障入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/workflow_yaml.py::run_workflow_yaml`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch030_workflow_yaml.py::run_workflow_yaml`
 
         Gate:
         - `just examples`（跑全量）

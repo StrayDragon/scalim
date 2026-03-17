@@ -75,7 +75,7 @@ def run_observability(
             "row_gap_total_missing": row_gap_observer.total_missing,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/observability",
+            example_id="demo_big_data_report/ch060_observability",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -93,13 +93,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / observability
+        # demo_big_data_report / ch060_observability
 
         本章目标:
         - 演示 observability 相关路径的最小回归入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/observability.py::run_observability`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch060_observability.py::run_observability`
 
         Gate:
         - `just examples`（跑全量）

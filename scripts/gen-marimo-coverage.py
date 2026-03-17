@@ -169,7 +169,7 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     for chapter_id in chapter_ids:
         notebook = _find_demo_notebook_for_chapter(demo_chapters_dir, chapter_id) if demo_chapters_dir.exists() else None
         ssot = notebook
-        pytest_path = pytest_public_api if chapter_id.startswith("public_api_") else pytest_demo_chapters
+        pytest_path = pytest_public_api if "public_api_" in chapter_id else pytest_demo_chapters
         ok = bool(notebook and gate_runner.exists())
         note_parts: List[str] = []
         if not notebook:

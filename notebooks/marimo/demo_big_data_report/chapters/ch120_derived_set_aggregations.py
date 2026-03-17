@@ -175,7 +175,7 @@ def run_derived_set_aggregations(*, tmp_path: Optional[Path] = None) -> ExampleR
     finally:
         set_config(prev_config)
     return ExampleResult(
-        example_id="demo_big_data_report/derived_set_aggregations",
+        example_id="demo_big_data_report/ch120_derived_set_aggregations",
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -191,13 +191,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / derived_set_aggregations
+        # demo_big_data_report / ch120_derived_set_aggregations
 
         本章目标:
         - 演示派生聚合 set 口径的关键原语与护栏边界(可对拍)
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/derived_set_aggregations.py::run_derived_set_aggregations`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch120_derived_set_aggregations.py::run_derived_set_aggregations`
 
         Gate:
         - `just examples`（跑全量）

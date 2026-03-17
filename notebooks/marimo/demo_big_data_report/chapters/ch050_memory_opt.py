@@ -76,7 +76,7 @@ def run_memory_optimization(
             "field_slim_events": len(memory_observer.field_slim_events),
         }
         return ExampleResult(
-            example_id="demo_big_data_report/memory_opt",
+            example_id="demo_big_data_report/ch050_memory_opt",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -94,13 +94,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / memory_opt
+        # demo_big_data_report / ch050_memory_opt
 
         本章目标:
         - 演示内存/写出相关优化路径的最小回归入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/memory_opt.py::run_memory_optimization`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch050_memory_opt.py::run_memory_optimization`
 
         Gate:
         - `just examples`（跑全量）

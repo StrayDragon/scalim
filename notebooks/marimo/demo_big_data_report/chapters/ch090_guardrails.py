@@ -96,7 +96,7 @@ def run_guardrails() -> ExampleResult:
     summary = "quiet_rows_ok={} guardrail_codes_ok={} fast_fail_ok={}".format(quiet_rows_ok, codes_ok, fast_fail_ok)
     details: Dict[str, Any] = {"codes": codes, "rows": rows}
     return ExampleResult(
-        example_id="demo_big_data_report/guardrails",
+        example_id="demo_big_data_report/ch090_guardrails",
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -112,13 +112,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / guardrails
+        # demo_big_data_report / ch090_guardrails
 
         本章目标:
         - 演示 runtime guardrails 的 quiet 模式与可对拍边界
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/guardrails.py::run_guardrails`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch090_guardrails.py::run_guardrails`
 
         Gate:
         - `just examples`（跑全量）

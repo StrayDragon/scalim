@@ -7,64 +7,74 @@ from scalim_misc.examples.public_api._coverage import (
     coverage_failure_summary,
     coverage_to_details,
 )
-from scalim.events.catalog import EVENT_PIPELINE_END, EVENT_PIPELINE_START
-from scalim import ob as api
-from scalim_misc.examples._types import EXAMPLE_KIND_SMOKE, ExampleResult
+from scalim import planning as api
+from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
+from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
 
 _COVERED_PUBLIC_ALL = {
-    "Observability",
+    "ComputeOperatorIr",
+    "ExecutionPlan",
+    "LoadOperatorIr",
+    "LoadRefOperatorIr",
+    "OperatorType",
+    "PlanBuilder",
+    "PlanMetadata",
+    "PlanOperatorIr",
+    "Stage",
 }
 
 
-def run_public_api_ob() -> ExampleResult:
+def run_public_api_planning() -> ExampleResult:
     coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
     if not coverage.ok:
         return ExampleResult(
-            example_id="demo_big_data_report/public_api_ob",
+            example_id="demo_big_data_report/ch150_public_api_planning",
             passed=False,
-            kind=EXAMPLE_KIND_SMOKE,
+            kind=EXAMPLE_KIND_ORACLE,
             summary=coverage_failure_summary(coverage),
             details=coverage_to_details(coverage),
         )
 
     symbols = {name: getattr(api, name) for name in api.__all__}
-    ob = api.Observability()
-    manager = ob.build_manager(mode="capture")
-    manager.emit_pipeline_start(targets=["item_id"], batch_size=2)
-    manager.emit_pipeline_end(total_batches=1, total_duration=0.01)
+    demand_ir = build_minimal_public_api_ir()
+    plan = api.PlanBuilder(demand_ir).build(targets=["value_plus_one"])
 
-    events = manager.drain_events()
-    passed = bool([e.event_type for e in events] == [EVENT_PIPELINE_START, EVENT_PIPELINE_END])
-    summary = "events={} types={}".format(len(events), ",".join(e.event_type for e in events))
-    details: Dict[str, Any] = {"event_types": [e.event_type for e in events], "symbols_count": len(symbols)}
+    passed = bool(plan.target_fields == ["value_plus_one"] and plan.field_order and plan.field_order[-1] == "value_plus_one")
+    summary = "targets={} field_order={}".format(plan.target_fields, ",".join(plan.field_order))
+    details: Dict[str, Any] = {
+        "field_order": plan.field_order,
+        "stages": plan.stages,
+        "metadata": plan.metadata,
+        "symbols_count": len(symbols),
+    }
     return ExampleResult(
-        example_id="demo_big_data_report/public_api_ob",
+        example_id="demo_big_data_report/ch150_public_api_planning",
         passed=passed,
-        kind=EXAMPLE_KIND_SMOKE,
+        kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
         details=details,
     )
 
 
 def run_chapter() -> ExampleResult:
-    return run_public_api_ob()
+    return run_public_api_planning()
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / public_api_ob
+        # demo_big_data_report / ch150_public_api_planning
 
         本章目标:
-        - 覆盖 `scalim.ob.__all__` 的最小可运行示例
-        - 演示 capture manager + 事件序列断言
+        - 覆盖 `scalim.planning.__all__` 的最小可运行示例
+        - 演示 `PlanBuilder.build(...)` 的最小闭环
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/public_api_ob.py::run_public_api_ob`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch150_public_api_planning.py::run_public_api_planning`
 
         Gate:
         - `just examples`
@@ -90,7 +100,7 @@ def _():
 
 @app.cell
 def _():
-    result = run_public_api_ob()
+    result = run_public_api_planning()
     return (result,)
 
 

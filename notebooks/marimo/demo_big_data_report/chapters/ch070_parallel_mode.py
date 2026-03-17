@@ -58,7 +58,7 @@ def run_parallel_mode(
             "verify_adaptive": vr_adaptive,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/parallel_mode",
+            example_id="demo_big_data_report/ch070_parallel_mode",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -76,13 +76,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / parallel_mode
+        # demo_big_data_report / ch070_parallel_mode
 
         本章目标:
         - 演示并行执行相关配置与行为的最小回归入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/parallel_mode.py::run_parallel_mode`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch070_parallel_mode.py::run_parallel_mode`
 
         Gate:
         - `just examples`（跑全量）

@@ -53,4 +53,3 @@ def coverage_to_details(coverage: PublicAllCoverage) -> Dict[str, Any]:
         "missing": list(coverage.missing),
         "stale": list(coverage.stale),
     }
-

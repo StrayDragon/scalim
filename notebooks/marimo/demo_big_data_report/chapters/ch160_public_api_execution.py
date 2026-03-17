@@ -25,7 +25,7 @@ def run_public_api_execution() -> ExampleResult:
     coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
     if not coverage.ok:
         return ExampleResult(
-            example_id="demo_big_data_report/public_api_execution",
+            example_id="demo_big_data_report/ch160_public_api_execution",
             passed=False,
             kind=EXAMPLE_KIND_ORACLE,
             summary=coverage_failure_summary(coverage),
@@ -45,7 +45,7 @@ def run_public_api_execution() -> ExampleResult:
     summary = "rows={}".format(len(rows))
     details: Dict[str, Any] = {"first_row": rows[0] if rows else None, "symbols_count": len(symbols)}
     return ExampleResult(
-        example_id="demo_big_data_report/public_api_execution",
+        example_id="demo_big_data_report/ch160_public_api_execution",
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -61,14 +61,14 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / public_api_execution
+        # demo_big_data_report / ch160_public_api_execution
 
         本章目标:
         - 覆盖 `scalim.execution.__all__` 的最小可运行示例
         - 演示 `ScalimEngine` 创建/运行/内存 sink
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/public_api_execution.py::run_public_api_execution`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch160_public_api_execution.py::run_public_api_execution`
 
         Gate:
         - `just examples`

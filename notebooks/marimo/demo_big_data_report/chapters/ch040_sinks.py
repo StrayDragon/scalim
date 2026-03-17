@@ -145,7 +145,7 @@ def run_sinks(
             "verify_pandas_col": vr_pd_col,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/sinks",
+            example_id="demo_big_data_report/ch040_sinks",
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -163,13 +163,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / sinks
+        # demo_big_data_report / ch040_sinks
 
         本章目标:
         - 演示多种 sink 的使用与输出形态
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/sinks.py::run_sinks`
+        - `notebooks/marimo/demo_big_data_report/chapters/ch040_sinks.py::run_sinks`
 
         Gate:
         - `just examples`（跑全量）
