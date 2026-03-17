@@ -3,7 +3,7 @@ import json
 import threading
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import ProxyHandler, build_opener
 
 import scalim.cli.yaml_dsl as yaml_dsl
 from scalim.cli import yaml_dsl_lsp
@@ -70,6 +70,7 @@ def test_resolve_schema_ref_supports_url_base_dir_base_and_full_json(tmp_path) -
 
 def test_schema_serve_serves_schema_and_blocks_traversal() -> None:
     server, port, schema_filenames = yaml_dsl_lsp.create_schema_http_server(host="127.0.0.1", port=0)
+    opener = build_opener(ProxyHandler({}))
 
     thread = threading.Thread(target=server.serve_forever)
     thread.daemon = True
@@ -77,12 +78,12 @@ def test_schema_serve_serves_schema_and_blocks_traversal() -> None:
 
     try:
         assert "demand.gen.json" in schema_filenames
-        with urlopen("http://127.0.0.1:{}/demand.gen.json".format(port)) as res:
+        with opener.open("http://127.0.0.1:{}/demand.gen.json".format(port)) as res:
             assert res.getcode() == 200
             payload = json.loads(res.read().decode("utf-8"))
             assert isinstance(payload, dict)
 
-        with urlopen("http://127.0.0.1:{}/..%2Fpyproject.toml".format(port)) as _res:
+        with opener.open("http://127.0.0.1:{}/..%2Fpyproject.toml".format(port)) as _res:
             raise AssertionError("expected traversal to be blocked")
     except HTTPError as exc:
         assert exc.code == 404

@@ -783,7 +783,7 @@ def _run_schema_path(_args: argparse.Namespace) -> int:
 
 def _run_schema_serve(args: argparse.Namespace) -> int:
     host = str(args.host or yaml_dsl_lsp.DEFAULT_SCHEMA_SERVE_HOST)
-    port = int(args.port or yaml_dsl_lsp.DEFAULT_SCHEMA_SERVE_PORT)
+    port = int(args.port)
     try:
         server, actual_port, schema_filenames = yaml_dsl_lsp.create_schema_http_server(host=host, port=port)
     except OSError as exc:
