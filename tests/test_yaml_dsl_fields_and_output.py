@@ -98,6 +98,105 @@ outputs:
     assert config.outputs[0].fields == ("order_id", "user_name", "total")
 
 
+def test_loader_allows_outputs_fields_in_aggregate_output_and_resolves_alias() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    customer_id: &customer_id
+      extract: customer_id
+    amount:
+      extract: amount
+    channel:
+      extract: channel
+sources: {}
+outputs:
+  - name: summary
+    container: {type: csv, path: ./out.csv}
+    where: "channel == 'direct'"
+    aggregate:
+      group_by:
+        - *customer_id
+      fields:
+        sum_amount: &sum_amount {sum: {field: amount}}
+        rank: &rank {dense_rank: {by: *sum_amount}}
+    fields:
+      - *rank
+      - *customer_id
+      - *sum_amount
+"""
+    loader = YamlDemandLoader()
+    config = loader.load_string(yaml_content)
+
+    assert len(config.outputs) == 1
+    assert config.outputs[0].aggregate is not None
+    assert config.outputs[0].fields == ("rank", "customer_id", "sum_amount")
+
+
+def test_loader_allows_outputs_fields_in_aggregate_output_content_match_when_identity_lost() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    customer_id:
+      extract: customer_id
+    amount:
+      extract: amount
+sources: {}
+outputs:
+  - name: summary
+    container: {type: csv, path: ./out.csv}
+    aggregate:
+      group_by: [customer_id]
+      fields:
+        sum_amount: {sum: {field: amount}}
+        rank: {dense_rank: {by: sum_amount}}
+    fields:
+      - {dense_rank: {by: sum_amount}}
+      - {sum: {field: amount}}
+"""
+    loader = YamlDemandLoader()
+    config = loader.load_string(yaml_content)
+
+    assert len(config.outputs) == 1
+    assert config.outputs[0].aggregate is not None
+    assert config.outputs[0].fields == ("rank", "sum_amount")
+
+
+def test_validator_rejects_outputs_fields_unknown_aggregate_out_field_id() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    customer_id:
+      extract: customer_id
+    amount:
+      extract: amount
+sources: {}
+outputs:
+  - name: summary
+    container: {type: csv, path: ./out.csv}
+    aggregate:
+      group_by: [customer_id]
+      fields:
+        sum_amount: {sum: {field: amount}}
+    fields: [customer_id, unknown]
+    """
+    loader = YamlDemandLoader()
+    with pytest.raises(ValueError) as exc:
+        loader.load_string(yaml_content)
+
+    msg = str(exc.value)
+    assert "outputs.summary.fields" in msg
+    assert "reference unknown aggregate output fields" in msg
+
+
 def test_loader_allows_outputs_fields_content_match_when_identity_lost() -> None:
     yaml_content = """
 name: demo

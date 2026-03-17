@@ -168,7 +168,7 @@ outputs:
         _ = _load(yaml_content)
 
 
-def test_loader_rejects_aggregate_output_with_fields() -> None:
+def test_loader_allows_aggregate_output_with_fields_for_layout() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -181,14 +181,16 @@ sources: {}
 outputs:
   - name: by_id
     container: {type: workbook, path: ./out.xlsx, sheet: Summary}
-    fields: [order_id]
     aggregate:
       group_by: [order_id]
       fields:
         order_cnt: {count: {field: order_id}}
+    fields: [order_id, order_cnt]
 """
-    with pytest.raises(ValueError, match="does not allow fields"):
-        _ = _load(yaml_content)
+    config = _load(yaml_content)
+    assert len(config.outputs) == 1
+    assert config.outputs[0].aggregate is not None
+    assert config.outputs[0].fields == ("order_id", "order_cnt")
 
 
 def test_loader_rejects_shared_workbook_missing_sheet() -> None:

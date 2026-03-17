@@ -45,6 +45,7 @@ def test_export_layout_for_derived_field_id_header_has_no_header_names() -> None
 
     layout = oc_yaml._export_layout_for_derived(  # noqa: SLF001
         demand_ir=demand_ir,
+        agg=OutputAggregateConfig(group_by=(), fields={}),
         field_ids=["a"],
         header_fields_output_by="field_id",
     )
@@ -57,6 +58,7 @@ def test_export_layout_for_derived_name_header_without_diffs_has_no_header_names
 
     layout = oc_yaml._export_layout_for_derived(  # noqa: SLF001
         demand_ir=demand_ir,
+        agg=OutputAggregateConfig(group_by=(), fields={}),
         field_ids=["a"],
         header_fields_output_by="name",
     )

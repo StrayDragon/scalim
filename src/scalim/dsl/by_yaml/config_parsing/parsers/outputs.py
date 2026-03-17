@@ -89,7 +89,7 @@ class ParserOutputsMixin:
             alias_index.add(field_dict, out_field_id)
         return _AggregateFieldIndex(field_defs=field_defs, alias_index=alias_index)
 
-    def _resolve_field_ref(  # noqa: C901
+    def _resolve_field_ref(
         self,
         item: object,
         *,
@@ -272,6 +272,32 @@ class ParserOutputsMixin:
             self._parse_output_container(container_raw, base_path="{}.{}.container".format(outputs_key, idx)) if container_raw else None
         )
 
+        where = str_or_none(raw_target.get(OUTPUT_TARGET_KEYS["where"]))
+        where = _non_empty_str(where) or None
+        requires = self._parse_where_requires(
+            where,
+            output_name=name,
+            known_field_ids=known_field_ids,
+            engine=engine,
+            path="{}.{}.where".format(outputs_key, idx),
+        )
+
+        agg_raw = mapping_or_none(raw_target.get(OUTPUT_TARGET_KEYS["aggregate"]))
+        agg_field_index = None
+        if agg_raw is not None:
+            raw_agg_fields = mapping_or_none(agg_raw.get(OUTPUT_AGGREGATE_KEYS["fields"]))
+            if raw_agg_fields is not None:
+                agg_field_index = self._build_aggregate_field_index(raw_agg_fields)
+        aggregate = (
+            self._parse_output_aggregate(
+                agg_raw,
+                base_path="{}.{}.aggregate".format(outputs_key, idx),
+                field_def_index=field_def_index,
+            )
+            if agg_raw
+            else None
+        )
+
         fields_raw = raw_target.get(OUTPUT_TARGET_KEYS["fields"])
         fields_list = list_or_none(fields_raw)
         if fields_raw is not None and fields_list is None:
@@ -284,37 +310,25 @@ class ParserOutputsMixin:
             for outer_idx, field_item in enumerate(fields_list):
                 flattened.extend(self._walk_output_field_items(field_item, field_path=str(outer_idx)))
             for field_path, field_item in flattened:
-                field_id = self._resolve_output_field_ref(
-                    field_item,
-                    outputs_key=outputs_key,
-                    output_idx=idx,
-                    field_path=field_path,
-                    field_def_index=field_def_index,
-                )
+                if aggregate is None:
+                    field_id = self._resolve_output_field_ref(
+                        field_item,
+                        outputs_key=outputs_key,
+                        output_idx=idx,
+                        field_path=field_path,
+                        field_def_index=field_def_index,
+                    )
+                else:
+                    path = "{}.{}.fields.{}".format(outputs_key, idx, field_path)
+                    field_id = self._resolve_field_ref(
+                        field_item,
+                        path=path,
+                        field_def_index=field_def_index,
+                        agg_field_index=agg_field_index,
+                    )
                 if field_id:
                     normalized_fields.append(field_id)
             fields = tuple(normalized_fields) if normalized_fields else ()
-
-        where = str_or_none(raw_target.get(OUTPUT_TARGET_KEYS["where"]))
-        where = _non_empty_str(where) or None
-        requires = self._parse_where_requires(
-            where,
-            output_name=name,
-            known_field_ids=known_field_ids,
-            engine=engine,
-            path="{}.{}.where".format(outputs_key, idx),
-        )
-
-        agg_raw = mapping_or_none(raw_target.get(OUTPUT_TARGET_KEYS["aggregate"]))
-        aggregate = (
-            self._parse_output_aggregate(
-                agg_raw,
-                base_path="{}.{}.aggregate".format(outputs_key, idx),
-                field_def_index=field_def_index,
-            )
-            if agg_raw
-            else None
-        )
 
         return OutputTargetConfig(
             name=name,
@@ -366,7 +380,7 @@ class ParserOutputsMixin:
             write_lock=write_lock,
         )
 
-    def _parse_output_aggregate(  # noqa: C901
+    def _parse_output_aggregate(  # noqa: C901, PLR0912
         self,
         raw: Dict[str, Any],
         *,
@@ -442,7 +456,7 @@ class ParserOutputsMixin:
             distinct_on_overflow=distinct_on_overflow,
         )
 
-    def _parse_output_aggregate_field(  # noqa: C901
+    def _parse_output_aggregate_field(  # noqa: C901, PLR0912
         self,
         raw: object,
         *,
@@ -458,10 +472,20 @@ class ParserOutputsMixin:
             msg = "{} must not be empty".format(base_path)
             raise ValueError(msg)
 
+        display_name = ""
+        if "name" in typed:
+            name_raw = typed.get("name")
+            if name_raw is not None and not isinstance(name_raw, str):
+                msg = "{}.name must be a string".format(base_path)
+                raise TypeError(msg)
+            display_name = _non_empty_str(name_raw) if name_raw is not None else ""
+
         normalized: List[Tuple[str, object]] = []
         for k, v in typed.items():
             key = str(k or "").strip()
             if not key:
+                continue
+            if key == "name":
                 continue
             normalized.append((key, v))
 
@@ -503,7 +527,7 @@ class ParserOutputsMixin:
             msg = "{} has unknown producer key {!r}; expected one of: {}".format(base_path, producer_key, allowed)
             raise ValueError(msg)
 
-        return OutputAggregateFieldConfig(producer_key=producer_key, config=cfg)
+        return OutputAggregateFieldConfig(producer_key=producer_key, config=cfg, name=display_name)
 
     def _parse_output_aggregate_field_agg(  # noqa: C901, PLR0912, PLR0915
         self,
@@ -599,7 +623,7 @@ class ParserOutputsMixin:
 
         return out
 
-    def _parse_output_aggregate_field_rank(  # noqa: C901
+    def _parse_output_aggregate_field_rank(  # noqa: C901, PLR0912, PLR0915
         self,
         producer_key: str,
         raw: object,
@@ -827,9 +851,6 @@ class ParserOutputsMixin:
                     msg = "outputs.{}.fields reference unknown fields: {}".format(name, ", ".join(sorted(set(unknown_fields))))
                     raise ValueError(msg)
             else:
-                if t.fields is not None:
-                    msg = "outputs.{} is an aggregate output and does not allow fields".format(name)
-                    raise ValueError(msg)
                 agg = t.aggregate
                 if not agg.group_by:
                     msg = "outputs.{}.aggregate.group_by cannot be empty".format(name)
@@ -863,6 +884,18 @@ class ParserOutputsMixin:
                     raise ValueError(msg)
 
                 allowed_agg_out_fields = set(agg.group_by) | set(metric_field_ids)
+
+                if t.fields is not None:
+                    if not t.fields:
+                        msg = "outputs.{}.fields must not be empty".format(name)
+                        raise ValueError(msg)
+                    allowed_layout_fields = set(agg.group_by) | set(agg_field_ids)
+                    unknown_layout_fields = [fid for fid in t.fields if fid not in allowed_layout_fields]
+                    if unknown_layout_fields:
+                        msg = "outputs.{}.fields reference unknown aggregate output fields: {}".format(
+                            name, ", ".join(sorted(set(unknown_layout_fields)))
+                        )
+                        raise ValueError(msg)
 
                 rank_with_top_k: List[str] = []
                 for fid in rank_field_ids:

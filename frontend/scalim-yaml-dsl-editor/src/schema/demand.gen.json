@@ -1832,15 +1832,39 @@
       "properties": {
         "group_by": {
           "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
-          },
           "minItems": 1,
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                      "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                      "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1
+              }
+            ]
+          },
           "description": "分组字段列表",
-          "markdownDescription": "分组字段列表(`field_id` 列表).\n\n- `group_by` 引用的是输入行字段(`field_id`),来自 `where` 过滤后的行流\n- 每个唯一的 group key 组合会产生 1 行聚合输出\n- `partition_by`(排名分区)要求为 `group_by` 子集,用于保证聚合输出可解释性",
+          "markdownDescription": "分组字段列表(`field_id` 列表; 支持 YAML alias).\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\ngroup_by: [cs_id, cs_name]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    cs_id: &cs_id {extract: cs_id}\noutputs:\n  - name: by_cs\n    aggregate:\n      group_by:\n        - *cs_id\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n- `group_by` 引用的是输入行字段(`field_id`),来自 `where` 过滤后的行流\n- 每个唯一的 group key 组合会产生 1 行聚合输出\n- `partition_by`(排名分区)要求为 `group_by` 子集,用于保证聚合输出可解释性",
           "examples": [
             [
               "cs_id",
@@ -1866,13 +1890,33 @@
                   "count"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "count": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "可选:输入字段(field_id);提供时统计非空值个数",
                         "markdownDescription": "可选:输入字段(`field_id`);提供时统计非空值个数.",
                         "examples": [
@@ -1898,6 +1942,17 @@
                   "sum"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "sum": {
                     "type": "object",
                     "additionalProperties": false,
@@ -1906,8 +1961,17 @@
                     ],
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "输入字段(field_id)",
                         "markdownDescription": "输入字段(`field_id`).",
                         "examples": [
@@ -1932,6 +1996,17 @@
                   "min"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "min": {
                     "type": "object",
                     "additionalProperties": false,
@@ -1940,8 +2015,17 @@
                     ],
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "输入字段(field_id)",
                         "markdownDescription": "输入字段(`field_id`).",
                         "examples": [
@@ -1966,6 +2050,17 @@
                   "max"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "max": {
                     "type": "object",
                     "additionalProperties": false,
@@ -1974,8 +2069,17 @@
                     ],
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "输入字段(field_id)",
                         "markdownDescription": "输入字段(`field_id`).",
                         "examples": [
@@ -2000,6 +2104,17 @@
                   "count_true"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "count_true": {
                     "type": "object",
                     "additionalProperties": false,
@@ -2008,8 +2123,17 @@
                     ],
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "输入字段(field_id)",
                         "markdownDescription": "输入字段(`field_id`).",
                         "examples": [
@@ -2034,6 +2158,17 @@
                   "count_true_gte"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "count_true_gte": {
                     "type": "object",
                     "additionalProperties": false,
@@ -2043,8 +2178,17 @@
                     ],
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "输入字段(field_id)",
                         "markdownDescription": "输入字段(`field_id`).",
                         "examples": [
@@ -2079,6 +2223,17 @@
                   "count_distinct"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "count_distinct": {
                     "type": "object",
                     "additionalProperties": false,
@@ -2106,8 +2261,17 @@
                     ],
                     "properties": {
                       "field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "输入字段(field_id)",
                         "markdownDescription": "输入字段(`field_id`).",
                         "examples": [
@@ -2117,10 +2281,34 @@
                       "fields": {
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                            },
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                                  },
+                                  {
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          ]
                         },
                         "minItems": 1,
                         "description": "复合去重键(字段列表)",
@@ -2156,6 +2344,17 @@
                   "row_number"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "row_number": {
                     "type": "object",
                     "additionalProperties": false,
@@ -2164,8 +2363,17 @@
                     ],
                     "properties": {
                       "by": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "用于排序的字段(引用 group_by 或聚合指标字段)",
                         "markdownDescription": "用于排序的字段(引用 `group_by` 或聚合指标字段).",
                         "examples": [
@@ -2175,10 +2383,34 @@
                       "partition_by": {
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                            },
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                                  },
+                                  {
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          ]
                         },
                         "minItems": 1,
                         "description": "可选:排名分区字段列表(必须是 group_by 子集)",
@@ -2205,10 +2437,34 @@
                       "order_by": {
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                            },
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                                  },
+                                  {
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          ]
                         },
                         "minItems": 1,
                         "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
@@ -2263,6 +2519,17 @@
                   "rank"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "rank": {
                     "type": "object",
                     "additionalProperties": false,
@@ -2271,8 +2538,17 @@
                     ],
                     "properties": {
                       "by": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
                         "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
                         "examples": [
@@ -2282,10 +2558,34 @@
                       "partition_by": {
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                            },
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                                  },
+                                  {
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          ]
                         },
                         "minItems": 1,
                         "description": "可选:排名分区字段列表(必须是 group_by 子集)",
@@ -2312,10 +2612,34 @@
                       "order_by": {
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                            },
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                                  },
+                                  {
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          ]
                         },
                         "minItems": 1,
                         "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
@@ -2370,6 +2694,17 @@
                   "dense_rank"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "dense_rank": {
                     "type": "object",
                     "additionalProperties": false,
@@ -2378,8 +2713,17 @@
                     ],
                     "properties": {
                       "by": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
                         "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
                         "examples": [
@@ -2389,10 +2733,34 @@
                       "partition_by": {
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                            },
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                                  },
+                                  {
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          ]
                         },
                         "minItems": 1,
                         "description": "可选:排名分区字段列表(必须是 group_by 子集)",
@@ -2419,10 +2787,34 @@
                       "order_by": {
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-                          "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-                          "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                            },
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                                    "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                                    "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                                  },
+                                  {
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          ]
                         },
                         "minItems": 1,
                         "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
@@ -2477,13 +2869,33 @@
                   "score_by_rank"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "score_by_rank": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "rank_field": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ],
                         "description": "可选:引用的排名字段(out_field_id);缺省为 'rank'",
                         "markdownDescription": "可选:引用的排名字段(out_field_id);缺省为 `rank`.",
                         "examples": [
@@ -2524,6 +2936,17 @@
                   "call_by"
                 ],
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "examples": [
+                      "订单量",
+                      "积分",
+                      "排名"
+                    ]
+                  },
                   "call_by": {
                     "type": "string",
                     "minLength": 1,
@@ -2679,8 +3102,8 @@
             ]
           },
           "minItems": 1,
-          "description": "明细输出字段顺序(field_id 列表; 支持 YAML alias)",
-          "markdownDescription": "明细输出字段顺序(`field_id` 列表).\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    container: {type: csv, path: ./out.csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n- 派生汇总输出(aggregate)不允许 fields\n- 可通过 `from` 继承",
+          "description": "输出字段顺序(field_id/out_field_id 列表; 支持 YAML alias)",
+          "markdownDescription": "输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    container: {type: csv, path: ./out.csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.",
           "examples": [
             [
               "order_id",

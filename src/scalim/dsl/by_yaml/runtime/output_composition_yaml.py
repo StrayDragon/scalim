@@ -185,9 +185,23 @@ def _get_field_name(field_id: str, demand_ir: DemandIr) -> str:
     return field_id
 
 
+def _get_derived_field_name(field_id: str, demand_ir: DemandIr, agg: OutputAggregateConfig) -> str:
+    field_ir = demand_ir.fields.get(field_id)
+    if field_ir is not None:
+        return _get_field_name(field_id, demand_ir)
+
+    agg_field = agg.fields.get(field_id)
+    if agg_field is not None:
+        name = str(getattr(agg_field, "name", "") or "").strip()
+        if name and name != field_id:
+            return name
+    return field_id
+
+
 def _export_layout_for_derived(
     *,
     demand_ir: DemandIr,
+    agg: OutputAggregateConfig,
     field_ids: Sequence[str],
     header_fields_output_by: str,
 ) -> ExportLayout:
@@ -198,7 +212,7 @@ def _export_layout_for_derived(
     names: List[str] = []
     has_diff = False
     for fid in normalized:
-        resolved = _get_field_name(fid, demand_ir)
+        resolved = _get_derived_field_name(fid, demand_ir, agg)
         if resolved != fid:
             has_diff = True
         names.append(resolved)
@@ -428,9 +442,10 @@ def compile_output_composition_from_yaml(  # noqa: C901
 
         agg = out_cfg.aggregate
         derived = _derived_group_by_spec_from_yaml(agg, resolver=resolver)
-        out_layout_fields = _derived_output_layout_fields(agg)
+        out_layout_fields = tuple(str(x) for x in out_cfg.fields) if out_cfg.fields is not None else _derived_output_layout_fields(agg)
         out_layout = _export_layout_for_derived(
             demand_ir=demand_ir,
+            agg=agg,
             field_ids=out_layout_fields,
             header_fields_output_by=str(container.header_fields_output_by),
         )

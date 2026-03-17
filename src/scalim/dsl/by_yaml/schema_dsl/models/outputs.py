@@ -33,6 +33,21 @@ _FIELD_REF_LIST_ITEM_SCHEMA = {
         },
     ]
 }
+_AGG_OUT_FIELD_NAME_SCHEMA = {
+    "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "可选:表头显示名(仅对 aggregate 字段生效)",
+        "markdownDescription": (
+            "可选:表头显示名.\n\n"
+            "- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n"
+            "- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n"
+            "- 允许重复 name(用于复刻重复表头合同)\n"
+            "- 缺省/为空时回退为 out_field_id"
+        ),
+        "examples": ["订单量", "积分", "排名"],
+    }
+}
 
 
 @dataclass(frozen=True)
@@ -170,6 +185,7 @@ class OutputAggregateFieldConfig:
 
     producer_key: str
     config: Any
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -244,6 +260,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["count"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "count": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -263,7 +280,7 @@ class OutputAggregateConfig:
                                         "执行阶段: 聚合指标(先于排名/派生字段)."
                                     ),
                                     "examples": [{}, {"field": "order_id"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -271,6 +288,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["sum"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "sum": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -291,7 +309,7 @@ class OutputAggregateConfig:
                                         "参数:\n- `field`: 输入字段(`field_id`)."
                                     ),
                                     "examples": [{"field": "amount_yuan"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -299,6 +317,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["min"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "min": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -314,7 +333,7 @@ class OutputAggregateConfig:
                                     "description": "min: 最小值",
                                     "markdownDescription": "最小值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).",
                                     "examples": [{"field": "amount_yuan"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -322,6 +341,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["max"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "max": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -337,7 +357,7 @@ class OutputAggregateConfig:
                                     "description": "max: 最大值",
                                     "markdownDescription": "最大值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).",
                                     "examples": [{"field": "amount_yuan"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -345,6 +365,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["count_true"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "count_true": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -360,7 +381,7 @@ class OutputAggregateConfig:
                                     "description": "count_true: 统计 truthy 行数",
                                     "markdownDescription": ("统计组内某字段为 truthy 的行数.\n\n参数:\n- `field`: 输入字段(`field_id`)."),
                                     "examples": [{"field": "is_paid"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -368,6 +389,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["count_true_gte"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "count_true_gte": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -390,7 +412,7 @@ class OutputAggregateConfig:
                                         "统计组内某字段数值 >= 阈值的行数.\n\n参数:\n- `field`: 输入字段(`field_id`).\n- `threshold`: 阈值."
                                     ),
                                     "examples": [{"field": "amount_yuan", "threshold": 100}],
-                                }
+                                },
                             },
                         },
                         {
@@ -398,6 +420,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["count_distinct"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "count_distinct": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -436,7 +459,7 @@ class OutputAggregateConfig:
                                         "约束:\n- 必须且只能提供 `field` 或 `fields` 之一."
                                     ),
                                     "examples": [{"field": "user_id"}, {"fields": ["user_id", "item_id"]}],
-                                }
+                                },
                             },
                         },
                         {
@@ -444,6 +467,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["row_number"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "row_number": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -512,7 +536,7 @@ class OutputAggregateConfig:
                                         "执行阶段: 排名字段(在聚合指标之后)."
                                     ),
                                     "examples": [{"by": "sum_amount", "order": "desc"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -520,6 +544,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["rank"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "rank": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -588,7 +613,7 @@ class OutputAggregateConfig:
                                         "执行阶段: 排名字段(在聚合指标之后)."
                                     ),
                                     "examples": [{"by": "sum_amount", "order": "desc"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -596,6 +621,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["dense_rank"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "dense_rank": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -664,7 +690,7 @@ class OutputAggregateConfig:
                                         "执行阶段: 排名字段(在聚合指标之后)."
                                     ),
                                     "examples": [{"by": "sum_amount", "order": "desc"}],
-                                }
+                                },
                             },
                         },
                         {
@@ -672,6 +698,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["score_by_rank"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "score_by_rank": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -705,7 +732,7 @@ class OutputAggregateConfig:
                                         "执行阶段: 聚合后派生字段(在聚合指标与排名字段之后)."
                                     ),
                                     "examples": [{"rank_field": "rank", "base": 100, "step": 3}],
-                                }
+                                },
                             },
                         },
                         {
@@ -713,6 +740,7 @@ class OutputAggregateConfig:
                             "additionalProperties": False,
                             "required": ["call_by"],
                             "properties": {
+                                **_AGG_OUT_FIELD_NAME_SCHEMA,
                                 "call_by": {
                                     "type": "string",
                                     "minLength": 1,
@@ -728,7 +756,7 @@ class OutputAggregateConfig:
                                         "```"
                                     ),
                                     "examples": ["pkg.mod:fn(rank=rank, base=100, step=3)"],
-                                }
+                                },
                             },
                         },
                     ]
@@ -851,9 +879,14 @@ class OutputTargetConfig:
                 },
                 "minItems": 1,
             },
-            desc="明细输出字段顺序(field_id 列表; 支持 YAML alias)",
+            desc="输出字段顺序(field_id/out_field_id 列表; 支持 YAML alias)",
             md=(
-                "明细输出字段顺序(`field_id` 列表).\n\n"
+                "输出字段顺序(`field_id/out_field_id` 列表).\n\n"
+                "两类输出的语义:\n\n"
+                "- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n"
+                "- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n"
+                "  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n"
+                "  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n"
                 "支持两种等价写法:\n\n"
                 "1) 直接写 `field_id` 字符串:\n\n"
                 "```yaml\n"
@@ -872,13 +905,12 @@ class OutputTargetConfig:
                 '      - "order_id"\n'
                 "```\n\n"
                 "注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n"
-                "- 派生汇总输出(aggregate)不允许 fields\n"
-                "- 可通过 `from` 继承"
+                "可通过 `from` 继承."
             ),
             examples=[["order_id", "user_id"]],
         ),
     )
-    """可选:明细输出字段顺序(`field_id` 列表)."""
+    """可选:输出字段顺序(`field_id` 列表)."""
 
     where: Optional[str] = dataclass_field(
         default=None,

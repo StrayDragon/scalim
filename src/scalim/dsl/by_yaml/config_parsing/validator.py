@@ -161,23 +161,57 @@ class ConfigValidator(ValidatorFieldsMixin):
 
         return ValidationReport(issues=errors)
 
-    def _outputs_fields_object_item_error(self, field_def_index: FieldDefIndex, item: object) -> Optional[str]:
+    def _build_aggregate_field_index(self, aggregate: Dict[str, Any]) -> Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]:
+        fields_raw = aggregate.get("fields")
+        if not isinstance(fields_raw, dict):
+            return {}, []
+        fields_dict = cast("Dict[object, object]", fields_raw)
+
+        alias_index: Dict[int, str] = {}
+        field_defs: List[Tuple[str, Dict[str, Any]]] = []
+        for out_field_id_raw, field_raw in fields_dict.items():
+            out_field_id = str(out_field_id_raw or "").strip()
+            if not out_field_id:
+                continue
+            if not isinstance(field_raw, dict):
+                continue
+            field_dict = cast("Dict[str, Any]", field_raw)
+            alias_index[id(field_dict)] = out_field_id
+            field_defs.append((out_field_id, field_dict))
+        return alias_index, field_defs
+
+    def _outputs_fields_object_item_error(
+        self,
+        field_def_index: FieldDefIndex,
+        item: object,
+        *,
+        agg_field_index: Optional[Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]] = None,
+    ) -> Optional[str]:
         if not isinstance(item, dict):
             return "must be field_id string, YAML alias(object), or YAML alias(list)"
 
         typed = cast("Dict[str, Any]", item)
+        if agg_field_index is not None:
+            alias_index, _ = agg_field_index
+            if alias_index.get(id(typed)) is not None:
+                return None
+
         direct = field_def_index.alias_index.get(typed)
         if direct is not None:
             return None
 
-        matches = [fd for fd in field_def_index.field_defs if fd.data == typed]
+        matches: List[str] = []
+        if agg_field_index is not None:
+            _, field_defs = agg_field_index
+            matches.extend([out_field_id for out_field_id, data in field_defs if data == typed])
+        matches.extend([fd.field_id for fd in field_def_index.field_defs if fd.data == typed])
+
         if not matches:
             return "cannot resolve object to a unique field_id; prefer string field_id"
-        if len(matches) > 1:
-            candidates = sorted({m.field_id for m in matches})
-            return "ambiguous object entry; matches multiple field_id values: {}. Use string field_id to disambiguate.".format(
-                ", ".join(candidates)
-            )
+
+        unique = sorted(set(matches))
+        if len(unique) > 1:
+            return "ambiguous object entry; matches multiple id values: {}. Use string field_id to disambiguate.".format(", ".join(unique))
         return None
 
     def _validate_outputs_fields_list_object_refs(
@@ -187,6 +221,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         *,
         base_path: str,
         field_def_index: FieldDefIndex,
+        agg_field_index: Optional[Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]] = None,
     ) -> None:
         def _walk(item: object, *, path: str) -> List[Tuple[str, object]]:
             if isinstance(item, list):
@@ -201,7 +236,7 @@ class ConfigValidator(ValidatorFieldsMixin):
             for leaf_path, leaf in _walk(item, path=root_path):
                 if isinstance(leaf, str):
                     continue
-                msg = self._outputs_fields_object_item_error(field_def_index, leaf)
+                msg = self._outputs_fields_object_item_error(field_def_index, leaf, agg_field_index=agg_field_index)
                 if msg:
                     self._add_error(errors, msg, path=leaf_path)
 
@@ -232,12 +267,19 @@ class ConfigValidator(ValidatorFieldsMixin):
             if not isinstance(fields_raw, list):
                 continue
             fields_list = cast("List[Any]", fields_raw)
+
+            agg_field_index = None
+            agg_raw = output_dict.get("aggregate")
+            if isinstance(agg_raw, dict):
+                agg_field_index = self._build_aggregate_field_index(cast("Dict[str, Any]", agg_raw))
+
             base_path = "{}.{}.{}".format(outputs_key, output_idx, fields_key)
             self._validate_outputs_fields_list_object_refs(
                 fields_list,
                 errors,
                 base_path=base_path,
                 field_def_index=field_def_index,
+                agg_field_index=agg_field_index,
             )
 
     def _load_schema(self) -> Dict[str, Any]:
