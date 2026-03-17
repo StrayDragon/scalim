@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, cast
 
 from ..vendor.compact.importlibx import import_module, require_optional_dependency
+from . import yaml_dsl_lsp
 
 if TYPE_CHECKING:
     import yaml
@@ -103,6 +104,17 @@ def register(subparsers: Any) -> None:
     schema_path_parser = schema_subparsers.add_parser("path", help="Print JSON Schema path")
     schema_path_parser.set_defaults(func=_run_schema_path)
 
+    schema_serve_parser = yaml_subparsers.add_parser("schema-serve", help="Serve built-in YAML DSL JSON Schema via HTTP")
+    _add_schema_serve_args(schema_serve_parser)
+    schema_serve_parser.set_defaults(func=_run_schema_serve)
+
+    upsert_parser = yaml_subparsers.add_parser(
+        "upsert-lsp-comment",
+        help="Upsert IntelliJ-compatible YAML $schema modeline comment",
+    )
+    _add_upsert_lsp_comment_args(upsert_parser)
+    upsert_parser.set_defaults(func=_run_upsert_lsp_comment)
+
 
 def _set_help_default(parser: argparse.ArgumentParser) -> None:
     def _show_help(_args: argparse.Namespace) -> int:
@@ -126,6 +138,34 @@ def _add_schema_validate_args(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("--strict", action="store_true", help="严格模式: 将未知字段视为错误")
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     _ = parser.add_argument("--verbose", "-v", action="store_true", help="显示详细错误信息")
+
+
+def _add_schema_serve_args(parser: argparse.ArgumentParser) -> None:
+    _ = parser.add_argument("--port", type=int, default=yaml_dsl_lsp.DEFAULT_SCHEMA_SERVE_PORT, help="HTTP server 端口")
+    _ = parser.add_argument("--host", type=str, default=yaml_dsl_lsp.DEFAULT_SCHEMA_SERVE_HOST, help="HTTP server 监听地址")
+
+
+def _add_upsert_lsp_comment_args(parser: argparse.ArgumentParser) -> None:
+    _ = parser.add_argument(
+        "paths",
+        type=Path,
+        nargs="+",
+        help="一个或多个 YAML 文件路径",
+    )
+    _ = parser.add_argument(
+        "--type",
+        dest="schema_type",
+        type=str,
+        default=yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE,
+        help="Schema 类型(例如 demand/workflow)",
+    )
+    _ = parser.add_argument(
+        "--schema-path",
+        dest="schema_path",
+        type=str,
+        default=yaml_dsl_lsp.DEFAULT_SCHEMA_PATH,
+        help="Schema base URL/dir 或完整 .json URL/path(默认 http://localhost:62831)",
+    )
 
 
 def _default_schema_path() -> Path:
@@ -739,3 +779,74 @@ def _run_schema_path(_args: argparse.Namespace) -> int:
         return 1
     _write_line(str(schema_path))
     return 0
+
+
+def _run_schema_serve(args: argparse.Namespace) -> int:
+    host = str(args.host or yaml_dsl_lsp.DEFAULT_SCHEMA_SERVE_HOST)
+    port = int(args.port or yaml_dsl_lsp.DEFAULT_SCHEMA_SERVE_PORT)
+    try:
+        server, actual_port, schema_filenames = yaml_dsl_lsp.create_schema_http_server(host=host, port=port)
+    except OSError as exc:
+        _emit_error("Schema server 启动失败: {}".format(exc), json_output=False)
+        return 1
+
+    yaml_dsl_lsp.print_schema_serve_banner(host=host, port=actual_port, schema_filenames=schema_filenames)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        server.server_close()
+    return 0
+
+
+def _run_upsert_lsp_comment(args: argparse.Namespace) -> int:
+    schema_type = str(getattr(args, "schema_type", yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE) or yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE)
+    schema_path = str(getattr(args, "schema_path", yaml_dsl_lsp.DEFAULT_SCHEMA_PATH) or yaml_dsl_lsp.DEFAULT_SCHEMA_PATH)
+
+    try:
+        schema_ref = yaml_dsl_lsp.resolve_schema_ref(schema_type, schema_path)
+    except ValueError as exc:
+        _emit_error(str(exc), json_output=False)
+        return 1
+
+    schema_modeline = yaml_dsl_lsp.make_schema_modeline(schema_ref)
+
+    exit_code = 0
+    changed: List[Path] = []
+    unchanged: List[Path] = []
+
+    paths = cast("List[Path]", list(getattr(args, "paths", []) or []))
+    for raw_path in paths:
+        path = raw_path
+        if not path.exists():
+            _write_line_stderr("错误: YAML 文件不存在: {}".format(path))
+            exit_code = 1
+            continue
+        if not path.is_file():
+            _write_line_stderr("错误: 不是文件: {}".format(path))
+            exit_code = 1
+            continue
+
+        result = yaml_dsl_lsp.upsert_schema_modeline_file(path, schema_modeline=schema_modeline)
+        if result.error:
+            _write_line_stderr("错误: {} ({})".format(result.error, path))
+            exit_code = 1
+            continue
+        if result.changed:
+            changed.append(path)
+            _write_line("UPDATED {}".format(path))
+        else:
+            unchanged.append(path)
+            _write_line("OK {}".format(path))
+
+    if changed or unchanged:
+        _write_line("")
+        _write_line(
+            "Summary: {} updated, {} ok".format(
+                len(changed),
+                len(unchanged),
+            )
+        )
+
+    return exit_code

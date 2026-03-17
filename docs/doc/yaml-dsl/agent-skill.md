@@ -9,7 +9,7 @@
     - 默认产物目录:[`artifacts/skills/scalim-yaml-dsl/`](#code=artifacts/skills/scalim-yaml-dsl/)
     - 若改动 schema/示例来源/输出目录结构,需要同步更新本页
 
-仓库内置一份 **Scalim YAML DSL 的集成AI环境(Agent Skill)**,目的是把“任务分流 + 校验入口 + 全量 generated catalog + 渐进迁移 playbook”整理成可直接喂给 Agent 的材料,降低写错 YAML、误用旧写法与错误下沉 Python 逻辑的概率.
+仓库里维护了一套 **Scalim YAML DSL 的 Agent Skill**: 把任务分流、最小命令入口、校验入口、生成的 catalog、迁移 playbook 放在同一个目录里,方便直接交给智能助手用,少踩坑。
 
 ## 1. 产物在哪里(直接用)
 
@@ -27,19 +27,19 @@
   - [`artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md`](#code=artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md) (breaking/migration 快速索引)
   - `artifacts/skills/scalim-yaml-dsl/references/upgrades/*.md` (升级指南 SSOT; docs-site 对应页面由此生成)
 
-使用时通常需要把整个目录 `artifacts/skills/scalim-yaml-dsl/` 交给你的 Agent 系统. `SKILL.md` 只负责任务路由,细节说明在 `references/` 中按需读取.
-其中 generated references 由 `scripts/gen-agent-skill.py` 基于 schema、CLI 与相关 `openspec/specs/` 自动摘录生成,manual references 则保留人工维护的任务预设与迁移 heuristics.
+一般把整个目录 `artifacts/skills/scalim-yaml-dsl/` 交给你的 Agent 就行: `SKILL.md` 负责分流,细节再按需从 `references/` 读取。
+`references/generated/` 由 `scripts/gen-agent-skill.py` 根据 schema、CLI 与相关 `openspec/specs/` 自动摘录生成; `references/` 里的 task 文档则保留人工维护的任务预设与迁移经验.
 
 ## 2. 怎么让智能助手用它写/改 YAML
 
-一种通用的用法(不绑定具体工具):
+常见用法(不绑定具体工具):
 
 1. 把 `SKILL.md` 作为“任务路由与最小命令入口”
 2. 让助手按任务类型读取对应 reference,不要默认把所有 generated catalog 一次性塞进上下文
 3. 让助手先对齐 schema 约束,再用 `validate` 收敛语义问题
 4. 让助手输出 YAML 或迁移方案时同时附上“已验证什么 / 未验证什么”
 
-生成或修改 YAML 后,建议跑一次校验:
+写完/改完 YAML 后,建议跑一遍校验:
 
 - 仓库内语义校验(内置 validator): `uv run scalim-cli yaml-dsl validate path/to/config.yaml`
 - 仓库内 schema-only(更快): `uv run scalim-cli yaml-dsl schema validate path/to/config.yaml`
@@ -48,10 +48,13 @@
 - 查询 schema 路径(仓库内): `uv run scalim-cli yaml-dsl schema path`
 - 查询 schema 路径(仓库外): `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
 
-skill 中的 canonical example 故意不带 YAML LSP 头。需要编辑器补全时,再把 `schema path` 查询结果按本机环境写成:
+skill 中的 canonical example 故意不带头部(也就是 schema modeline)。本地编辑时,我们一般用下面这套“团队通用”的做法(先开 schema server,再批量写入头部):
+
+- 启动本机 schema server(默认 `--host 0.0.0.0 --port 62831`): `uv run scalim-cli yaml-dsl schema-serve`
+- 批量插入/更新头部(统一写 IntelliJ 兼容 modeline,并会识别/升级 legacy `yaml-language-server` 头): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
 
 ```yaml
-# yaml-language-server: $schema=/absolute/path/to/demand.gen.json
+# $schema: http://localhost:62831/demand.gen.json
 ```
 
 不要把 `.venv/...` 或 `site-packages/...` 这类机器相关路径固化进共享示例文件.

@@ -43,22 +43,21 @@
 - OpenSpec: `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
 - Spec: `openspec/specs/demand-dsl/spec.md`
 - Summary:
-  这次升级把 loader 的调用参数语义收敛到一个入口: `params` kwargs 模板(支持在任意嵌套位置注入运行时值),并引入 `runtime_vars` 作为编译期注入来源。
+  这次升级把 loader 的调用参数语义收敛到一个入口: `params` kwargs 模板(支持在任意嵌套位置注入运行时值),并引入 `init_vars` 作为编译期注入来源。
   - `main_source.params` / `sources.<id>.params` 统一视为“kwargs 模板”
   - 新增模板指令节点:
   - `{$keys: {as: set|list}}`: 注入 lookup keys
   - `{$rows: {cache_mode: batch|none}}`: 注入 batch rows(并影响调度与复用语义)
-  - 新增 `runtime_vars` 注入与 `{$runtime: <name>}` 指令节点(编译期解析;不做子串插值)
+  - 新增 `init_vars` 注入与 `{$init_var: <name>}` 指令节点(编译期解析;不做子串插值)
   - **BREAKING**: `bind` / `to_bind` 已从稳定 YAML authoring surface 移除(出现即 fail-fast)
-  - **BREAKING**: `cache_mode: preload_forever` 的预加载语义收敛:
-  - 若 `sources.<id>.params` 非空: 预加载透传渲染后的 kwargs
-  - 若为空: 预加载保持零参调用
+  - **BREAKING**: `cache_mode: preload_forever` 的预加载语义收敛: 预加载阶段会复用 `sources.<id>.params` 并透传渲染后的 kwargs(禁用 `$keys/$rows`)
   OpenSpec 归档变更（含 proposal/design/spec/tasks）:
   - `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
   - `openspec/changes/archive/2026-03-11-yaml-loader-params-template/`
   对应主规范(节选):
   - `openspec/specs/demand-dsl/spec.md`
   - `openspec/specs/source-relations/spec.md`
+  - `openspec/specs/yaml-dsl-schema/spec.md`
 
 ## 2026-03-13: demand-dsl-breaking
 - SSOT: `references/upgrades/2026-03-13-demand-dsl-breaking.md`
@@ -70,7 +69,7 @@
   - `output.fields` 支持 string sugar:
   - `field_id` (例: `order_id`)
   - `source.field_id` (例: `customers.customer_name`;用于消歧;仅支持二段式)
-  - **BREAKING**: runtime vars 统一为指令节点 `{$runtime: <name>}`;旧写法 `$runtime.<name>` 不再允许
+  - **BREAKING**: init vars 统一为指令节点 `{$init_var: <name>}`;旧写法 `$runtime.<name>`/`{$runtime: <name>}` 不再允许
   OpenSpec 归档变更（含 proposal/design/spec/tasks）:
   - `openspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
   对应主规范(节选):
@@ -82,7 +81,7 @@
   下游同步盘点:
   - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）
 - Migration:
-  1) 全量把 `$runtime.<name>` 占位符替换为 `{$runtime: <name>}`
+  1) 全量把 `$runtime.<name>` 占位符替换为 `{$init_var: <name>}`
   2) (可选) 将字段的 `relation: *anchor` 升级为 `relation: <relation_id>`
   3) (可选) 将 `output.fields` 的简单场景升级为 string list sugar
 
@@ -205,3 +204,17 @@
   对应主规范(节选):
   - `openspec/specs/yaml-dsl-schema/spec.md`
   - `openspec/specs/yaml-dsl-cli-validation/spec.md`
+
+## 2026-03-16: yaml-dsl-outputs-aggregate-fields
+- SSOT: `references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md`
+- OpenSpec: `openspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`
+- Summary:
+  本批次重做 `outputs.*.aggregate` 的最小语法,让“最终输出字段(field_id)”成为主体,并补齐 finalize 排名/派生字段能力:
+  - `outputs.*.where` 字段名不变(语义不变),但 editor hover 文案会明确其为 **行级过滤谓词**(不是 sheet enable 开关)
+  - **BREAKING**: `outputs.*.aggregate.metrics` → `outputs.*.aggregate.fields`(不做兼容别名,一次性升级)
+  - **BREAKING**: `aggregate.fields.<out_field_id>` 使用“函数当 key”的写法,替代旧 `{op: ...}` 映射
+  - **NEW**: `aggregate.fields` 同时支持:
+  - 排名字段: `row_number` / `rank` / `dense_rank`(支持 `partition_by` / `order_by` / `top_k_mode`)
+  - 聚合后派生字段: `score_by_rank`(内置) 与 `call_by`(hotfix 口子,受 allowlist 约束)
+  OpenSpec 工件:
+  - `openspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`

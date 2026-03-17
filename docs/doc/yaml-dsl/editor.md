@@ -4,7 +4,7 @@
     - 写 YAML 配置并希望获得补全/校验的使用方
     - 需要启用更严格语义校验(exact, Pyodide)的开发者
 
-`frontend/scalim-yaml-dsl-editor/` 是一个 **text-first** 的 YAML DSL 编辑器:默认纯前端运行(不依赖 Python),提供基于 canonical schema 的补全/hover/schema 校验,并可选启用精确语义校验(Pyodide)。
+`frontend/scalim-yaml-dsl-editor/` 是一个 **text-first** 的 YAML DSL 编辑器: 默认纯前端运行,不依赖 Python。它提供基于 canonical schema 的补全/hover/schema 校验; 需要时也可以开启 Pyodide,做更严格的语义校验。
 
 ## 快速开始
 
@@ -14,26 +14,28 @@ pnpm install
 pnpm dev
 ```
 
-默认端口:`5174`(strictPort).
+默认端口是 `5174`(strictPort)。
 
 ## Schema 同步
 
-编辑器内置使用 `src/scalim/dsl/by_yaml/schema/*.gen.json` 的前端拷贝版本:
+编辑器用的是 `src/scalim/dsl/by_yaml/schema/*.gen.json` 的前端拷贝:
 
 ```bash
 just gen-yaml-dsl-editor-schema
 ```
 
-会生成/同步:
+会生成/同步这些文件:
 
 - `frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json`
 - `frontend/scalim-yaml-dsl-editor/public/schema/workflow.gen.json`
 
-提示: 若要在编辑器中校验 workflow YAML,可在文件头使用:
+想在编辑器里校验 workflow YAML,可以在文件头加一行:
 
 ```yaml
-# yaml-language-server: $schema=../schema/workflow.gen.json
+# $schema: ../schema/workflow.gen.json
 ```
+
+我们统一使用 IntelliJ 兼容的 `# $schema: ...` 格式。手头如果还是旧的 `# yaml-language-server: $schema=...`,也建议顺手升级一下。
 
 ## 使用要点
 

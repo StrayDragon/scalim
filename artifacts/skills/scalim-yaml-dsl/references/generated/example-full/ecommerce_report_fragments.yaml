@@ -18,3 +18,19 @@ main_source_params:
     - logistics_id
     - region_id
     - product_category_id
+
+# ==============================================================================
+# aggregate 示例片段(供 `ecommerce_report.yaml` 通过 `$import` 引用)
+# ==============================================================================
+
+agg_by_region_guardrails:
+  group_by: [region_name_display]
+  max_groups: 1000
+  max_distinct: 10000
+  distinct_on_overflow: truncate
+
+metric_order_cnt:
+  count: {}
+
+metric_sum_order_amount:
+  sum: {field: order_amount}

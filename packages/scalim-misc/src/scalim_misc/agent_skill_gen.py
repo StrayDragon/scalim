@@ -204,6 +204,8 @@ def build_canonical_example(repo_root: Path) -> str:
             continue
         if stripped.startswith("# yaml-language-server: $schema="):
             continue
+        if stripped.startswith("# $schema:"):
+            continue
         lines.append(raw_line)
 
     return "\n".join(lines).strip() + "\n"
@@ -382,6 +384,10 @@ def render_cli_lsp_reference(
         "- `uv run {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl schema show`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
+        "- `uv run {cli} yaml-dsl schema-serve`".format(cli=_project_constants.CLI_NAME),
+        "- `uv run {cli} yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`".format(
+            cli=_project_constants.CLI_NAME
+        ),
         "",
         "### External",
         '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate <file.yaml>`'.format(
@@ -400,6 +406,14 @@ def render_cli_lsp_reference(
             dist=_project_constants.DIST_NAME,
             cli=_project_constants.CLI_NAME,
         ),
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema-serve`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
         "",
         "## Validate Layering",
         "- `yaml-dsl validate`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.",
@@ -407,7 +421,11 @@ def render_cli_lsp_reference(
         "",
         "## LSP / Schema Header",
         "- Repo schema path: `{}`".format(repo_schema_path),
-        "- Canonical example: 故意不写 `yaml-language-server` 头,避免把本机路径固化进共享 YAML.",
+        "- Canonical example: 故意不写 schema 头(`# $schema: ...`),避免把本机路径固化进共享 YAML.",
+        "- 本机启动 schema server(默认端口 `62831`): `uv run {cli} yaml-dsl schema-serve`".format(cli=_project_constants.CLI_NAME),
+        "- 批量写入/更新头部(统一写 IntelliJ 兼容 modeline,并会识别/升级 legacy `yaml-language-server` 头): `uv run {cli} yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`".format(
+            cli=_project_constants.CLI_NAME
+        ),
         "- Repo query: `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
         '- External query: `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
             dist=_project_constants.DIST_NAME,
@@ -416,7 +434,7 @@ def render_cli_lsp_reference(
         "- Python fallback: `python -c \"import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/by_yaml/schema/demand.gen.json'))\"`",
         "- 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.",
         "```yaml",
-        "# yaml-language-server: $schema=/absolute/path/to/demand.gen.json",
+        "# $schema: http://localhost:62831/demand.gen.json",
         "```",
     ]
 

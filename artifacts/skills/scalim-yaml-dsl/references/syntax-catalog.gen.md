@@ -8,14 +8,14 @@
 - Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`
 
 ## Top-Level Fields
-- `name` (required)
+- `name`
 - `imports`
 - `$import`
 - `_templates`
 - `description`
 - `batch_size`
 - `retry`
-- `main_source` (required)
+- `main_source`
 - `sources`
 - `fields`
 - `relations`
@@ -39,7 +39,6 @@
 - `memory_opt`
 - `observability`
 - `output_aggregate`
-- `output_aggregate_metric`
 - `output_container`
 - `output_extra_sheet`
 - `output_target`
@@ -188,7 +187,6 @@
 
 ## Top-Level Field Details
 ### `name`
-- Required: `true`
 - Type: `string`
 - Description:
   需求配置名称.
@@ -263,7 +261,6 @@
   - 1. ref `#/definitions/loader_retry`
 
 ### `main_source`
-- Required: `true`
 - Description:
   主数据源配置.
   
@@ -467,14 +464,17 @@
 - Definition path: `definitions.main_source`
 - Type: `object`
 - `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
   - `retry`: allOf(1)
   - `fields`: `object`, properties `$import`
-  - `loader` (required): `string`
+  - `loader`: `string`
   - `order_by`: `array`, items `string`
   - `params`: `object`, properties `$import`
-  - `source_id` (required): `string`
+  - `source_id`: `string`
 
 ### `memory_opt`
 - Definition path: `definitions.memory_opt`
@@ -504,43 +504,34 @@
 - Definition path: `definitions.output_aggregate`
 - Type: `object`
 - `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
+  - `fields`: `object`
   - `distinct_on_overflow`: `string`, enum `error`, `truncate`
-  - `group_by` (required): `array`, items `string`
+  - `group_by`: `array`, items `string`
   - `max_distinct`: `integer`
   - `max_groups`: `integer`
-  - `metrics` (required): `object`
-  - `rank_by`: `string`
-  - `rank_field_id`: `string`
-  - `rank_order`: `string`, enum `asc`, `desc`
-  - `top_k`: `integer`
-
-### `output_aggregate_metric`
-- Definition path: `definitions.output_aggregate_metric`
-- Type: `object`
-- `additionalProperties`: `false`
-- Properties:
-  - `$import`: `string` | `array`, oneOf(2)
-  - `fields`: `array`, items `string`
-  - `field`: `string`
-  - `op` (required): `string`, enum `count`, `sum`, `min`, `max`, `count_true`, `count_true_gte`, `count_distinct`
-  - `threshold`: 阈值(部分算子需要)
 
 ### `output_container`
 - Definition path: `definitions.output_container`
 - Type: `object`
 - `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
   - `allow_formulas`: `boolean`
   - `encoding`: `string`
   - `header_fields_output_by`: `string`, enum `field_id`, `name`
   - `include_header`: `boolean`
-  - `path` (required): `string`
+  - `path`: `string`
   - `sheet`: `string`
   - `streaming`: `boolean`
-  - `type` (required): `string`, enum `workbook`, `csv`
+  - `type`: `string`, enum `workbook`, `csv`
   - `write_lock`: `boolean`
 
 ### `output_extra_sheet`
@@ -558,8 +549,11 @@
 - Definition path: `definitions.output_target`
 - Type: `object`
 - `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
 - Properties:
-  - `name` (required): `string`
+  - `name`: `string`
   - `$import`: `string` | `array`, oneOf(2)
   - `fields`: `array`, items `string` | `object` | `array`, anyOf(3)
   - `aggregate`: allOf(1)
@@ -602,9 +596,12 @@
 - Definition path: `definitions.relation`
 - Type: `object`
 - `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
-  - `steps` (required): `array`, items `object`, properties `from`, `lookup_cast`, `to`
+  - `steps`: `array`, items `object`, properties `from`, `lookup_cast`, `to`
 
 ### `relation_report`
 - Definition path: `definitions.relation_report`
@@ -642,13 +639,16 @@
 - Definition path: `definitions.source`
 - Type: `object`
 - `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
   - `retry`: allOf(1)
   - `fields`: `object`, properties `$import`
   - `cache_mode`: `string`, enum `none`, `preload_forever`
-  - `key` (required): `string` | `array`, oneOf(2)
-  - `loader` (required): `string`
+  - `key`: `string` | `array`, oneOf(2)
+  - `loader`: `string`
   - `lookup_cast`: `object`, properties `name`, `sep`
   - `lookup_chunk_size`: `integer` | `null`, oneOf(2)
   - `normalize`: `object`, properties `fields`, `call_by`, `key_field`, `kind`, `on_conflict`, `on_empty`, `on_missing`, `steps`, allOf(1)

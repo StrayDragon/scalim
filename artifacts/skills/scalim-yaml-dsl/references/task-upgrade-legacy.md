@@ -57,6 +57,9 @@
   - SSOT: `references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md`
   - OpenSpec: `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
   - Spec: `openspec/specs/yaml-dsl-schema/spec.md`
+- 2026-03-16: yaml-dsl-outputs-aggregate-fields
+  - SSOT: `references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md`
+  - OpenSpec: `openspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

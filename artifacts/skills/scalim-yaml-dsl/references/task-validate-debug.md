@@ -44,10 +44,17 @@ uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
 
 ## LSP / 编辑器
 
-优先把 `schema path` 的绝对路径写入头部:
+我们默认用 IntelliJ 兼容的 schema modeline(对 VS Code / yaml-language-server 也能用),格式如下:
 
 ```yaml
-# yaml-language-server: $schema=/absolute/path/to/demand.gen.json
+# $schema: <urlOrPathToTheSchema>
+```
+
+如果你在本仓库里工作,推荐这条最省事的链路:
+
+```bash
+uv run scalim-cli yaml-dsl schema-serve
+uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>
 ```
 
 完整 canonical example 故意不自带这个头,避免把 `.venv/...`、`site-packages/...` 或仓库私有相对路径固化进共享 YAML。

@@ -143,6 +143,7 @@ def test_generated_example_omits_yaml_lsp_header(tmp_path: Path) -> None:
 
     first_line = yaml_path.read_text(encoding="utf-8").splitlines()[0]
     assert not first_line.startswith("# yaml-language-server: $schema=")
+    assert not first_line.startswith("# $schema:")
 
 
 def test_generated_cli_reference_has_required_commands_and_paths(tmp_path: Path) -> None:
@@ -163,8 +164,10 @@ def test_generated_cli_reference_has_required_commands_and_paths(tmp_path: Path)
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>' in cli_ref
     assert "uv run scalim-cli yaml-dsl schema path" in cli_ref
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path' in cli_ref
-    assert "Canonical example: 故意不写 `yaml-language-server` 头" in cli_ref
-    assert "# yaml-language-server: $schema=/absolute/path/to/demand.gen.json" in cli_ref
+    assert "uv run scalim-cli yaml-dsl schema-serve" in cli_ref
+    assert "uv run scalim-cli yaml-dsl upsert-lsp-comment" in cli_ref
+    assert "Canonical example: 故意不写 schema 头" in cli_ref
+    assert "# $schema: http://localhost:62831/demand.gen.json" in cli_ref
     assert "python -c" in cli_ref
     assert ".venv/..." in cli_ref
 

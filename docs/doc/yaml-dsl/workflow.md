@@ -4,7 +4,7 @@
     - 需要把“多条 demand + Python glue”收敛为可复用编排入口的使用方
     - 需要统一 runs 粒度并发/失败策略/共享 preload cache 的开发者
 
-本页描述 **workflow YAML**(编排文件)的语法与 Python 运行入口.注意 workflow YAML 与 demand YAML 是两套配置:
+这页讲 **workflow YAML**(编排文件)的语法,以及对应的 Python 运行入口。workflow YAML 和 demand YAML 是两套配置:
 
 - demand YAML: `name/main_source/sources/relations/fields/...`
 - workflow YAML: `workflow.runs/options`(只负责“编排多个 demand”)
@@ -12,7 +12,7 @@
 ## 1) 最小结构
 
 ```yaml
-# yaml-language-server: $schema=../schema/workflow.gen.json
+# $schema: ../schema/workflow.gen.json
 
 workflow:
   runs:
@@ -46,7 +46,7 @@ workflow:
 
 ## 3) Python 运行入口
 
-本 change **不扩展 CLI**;提供 Python 入口:
+当前暂不扩展 CLI; 先用 Python 入口:
 
 ```python
 from scalim.dsl.by_yaml import run_workflow
@@ -77,4 +77,3 @@ for outcome in result.outcomes:
 - 系统会在执行任一 run 之前做“规格签名一致性”预检查:
   - 若同一 `source_id` 在不同 runs 的 preload 规格不一致(例如 loader/params/normalize/key/lookup_cast 等关键字段不同),将 fail-fast 报错
   - 错误信息会包含冲突 run id 与差异点
-

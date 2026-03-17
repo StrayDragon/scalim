@@ -64,7 +64,6 @@
       "memory_opt",
       "observability",
       "output_aggregate",
-      "output_aggregate_metric",
       "output_container",
       "output_extra_sheet",
       "output_target",
@@ -88,7 +87,7 @@
           "output 字段 hover 指引明确可选与 overrides 推荐写法",
           "schema hover 提供常见错误与迁移提示",
           "schema hover documents `$keys/$rows` directive nodes under `params`",
-          "`params` hover documents `{$init_var: <name>}` and preload params behavior",
+          "`params` hover documents `{$runtime: <name>}` and preload params behavior",
           "顶层 schema 字段(guardrails)",
           "observability.logging 支持 renderer/preset 字段",
           "schema hover 说明 loader 引用支持相对模块语法",
@@ -119,7 +118,7 @@
           "unknown fields 诊断提供 suggestions(CLI/库一致)",
           "Loader 引用解析与 allowlist",
           "Source/Bind 结构与 keys 分片参数",
-          "loader params templates support `{$init_var: <name>}` directives",
+          "loader params templates support `{$runtime: <name>}` directives",
           "字段/关系表达式默认行为",
           "main_source 批次排序配置",
           "顶层 batch_size 语义统一且可显式禁用分批",
@@ -255,15 +254,15 @@
   "inputs": [
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "ea10ea49e4078696bef5bda9336d2e0292bf6e03abc22b7c78d0d8ab260509ac"
+      "sha256": "2e285c21024a4649bd11c8abba8a6fbe3a130a33c8220e4f7d8e398815797e39"
     },
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
-      "sha256": "b0935683155878fb84025f4a0c91e8178a447f971b3aa3e410c54df6be89efcf"
+      "sha256": "c75ef15e1fa1638177bf3f5684da7f37d67beb78d0cc395ab85fbc0be8fc2324"
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
-      "sha256": "928cbf4b93d30e90bef90d127129ad9668574221fd1753d8905b8832c2defbcf"
+      "sha256": "463ba759c19c1e2af562d802b1229cf5bab90096fe15c70460321b893b4f4059"
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
@@ -307,37 +306,37 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "fc61cec8dc054c54d315e71b4670494f578900d1e12956eef5834f7df02b3205"
+      "sha256": "9e0c24d356756c9470c857d556263d2a97c119d272faf802cb16e078dd3cc394"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "c5cbee6581b03888c0236473e6076468d426eb71cab32c7799ac73c6d0056d36"
+      "sha256": "c14259ad61b3ff8e594a6b8734a911c0c0c8b40d58301544576f400d81b8791f"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "ecebf6ad055ed91ed8b1a5916f51c19beb10679173f692588cd60c5ccd84db09"
+      "sha256": "3d39cba0d61f15b8ec72632c01542680ff7aa8b688d655906f43087bca51ebd6"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "a4db9651cdf0ed72f6aedda722dd69b1c6ef79d9940d20e04d9f6eabc4aad02b"
+      "sha256": "e4625c1b74d896b775b51b2d485093ad1e7817bfed77e19566aa9ff99c99c2ee"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "84e9b7d67f8b0708d5a9577ba7769e45fbd9f45ebd8659d7aec380a5f00f43bf"
+      "sha256": "ae000fe30330a530b1def77f01846ec42809bee645dbc0508054e7a614d55eeb"
     },
     {
       "path": "references/generated/example-full/ecommerce_report_fragments.yaml",
-      "sha256": "aef6fecbc986e199c9cbdf796e6e47cd71f8dc3f0897d65c0c7c95271eb1f670"
+      "sha256": "c75ef15e1fa1638177bf3f5684da7f37d67beb78d0cc395ab85fbc0be8fc2324"
     },
     {
       "path": "references/generated/yaml-dsl-upgrades.gen.md",
-      "sha256": "567227a76cd4052676668b3a6b31998f557302391eb47d4671d944fbe74059a0"
+      "sha256": "85020614cf1e4660faef713fb74bbb42cbce8fbdb421689e3dd339b555b1ad68"
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "2d1269bb076ecf0bbba12e89ea63308f613f48ed93cc36a7e3f58499de5651d9"
+      "sha256": "5156ef2e8ed0e216b0befcd0a11708f660c10eb895480af4b289c3699ac37bfc"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

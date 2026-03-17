@@ -14,12 +14,16 @@
 - `uv run scalim-cli yaml-dsl schema validate <file.yaml>`
 - `uv run scalim-cli yaml-dsl schema show`
 - `uv run scalim-cli yaml-dsl schema path`
+- `uv run scalim-cli yaml-dsl schema-serve`
+- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
 
 ### External
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema show`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema-serve`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
 
 ## Validate Layering
 - `yaml-dsl validate`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.
@@ -27,13 +31,15 @@
 
 ## LSP / Schema Header
 - Repo schema path: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
-- Canonical example: 故意不写 `yaml-language-server` 头,避免把本机路径固化进共享 YAML.
+- Canonical example: 故意不写 schema 头(`# $schema: ...`),避免把本机路径固化进共享 YAML.
+- 本机启动 schema server(默认端口 `62831`): `uv run scalim-cli yaml-dsl schema-serve`
+- 批量写入/更新头部(统一写 IntelliJ 兼容 modeline,并会识别/升级 legacy `yaml-language-server` 头): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
 - Repo query: `uv run scalim-cli yaml-dsl schema path`
 - External query: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
 - Python fallback: `python -c "import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/by_yaml/schema/demand.gen.json'))"`
 - 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.
 ```yaml
-# yaml-language-server: $schema=/absolute/path/to/demand.gen.json
+# $schema: http://localhost:62831/demand.gen.json
 ```
 
 ## OpenSpec Requirement Map

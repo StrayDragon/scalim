@@ -9,7 +9,7 @@
 本设计在不引入新依赖、不改变现有校验命令行为的前提下,补齐两块“就地可用”的工程化能力:
 
 1) **schema-serve**: 用 stdlib `http.server` 把内置 schema 以 HTTP 形式暴露出来,便于 `$schema=http://127.0.0.1:.../demand.gen.json` 直接被 LSP 拉取。
-2) **upsert-lsp-comment**: 对用户给定的一组 YAML 文件,自动插入/更新 `# yaml-language-server: $schema=...` 头部,避免手工维护。
+2) **upsert-lsp-comment**: 对用户给定的一组 YAML 文件,自动插入/更新 IntelliJ 兼容的 `# $schema: ...` modeline(并可升级旧的 `# yaml-language-server: $schema=...`),避免手工维护。
 
 约束:
 - 运行时兼容 Python 3.6
@@ -68,9 +68,23 @@
 
 行为约定:
 - 在前 N 行(建议 N=10)内,按顺序扫描:
-  - 若遇到 `# yaml-language-server:` 行,则将该行替换为期望 header 并立即结束(仅当不一致时写入)
+  - 若遇到 `# yaml-language-server:` 或 `# $schema:` 行,则将该行替换为期望 header 并立即结束(仅当不一致时写入)
   - 若遇到第一行非空且非 `#` 开头内容,停止扫描并视为“无 header”
 - 若无 header,则把 header 插入为第一行,并在其后补一个空行(保持可读性)
+
+### Decision: upsert-lsp-comment 写入统一使用 IntelliJ 兼容格式
+
+为了团队在 VS Code/IntelliJ 等混合环境下能用同一种 schema header workaround,`upsert-lsp-comment` SHALL 统一写入:
+
+`# $schema: <schema-ref>`
+
+并将旧的 YAML language server 格式视为可升级输入:
+
+`# yaml-language-server: $schema=<schema-ref>`
+
+实现要点:
+- 扫描时同时识别两种 schema modeline
+- 写入时一律输出 IntelliJ 兼容格式(即使原文件使用了 yaml-language-server modeline)
 
 ### Decision: `--schema-path` 支持“base URL/dir”与“full URL/file”两种输入
 
