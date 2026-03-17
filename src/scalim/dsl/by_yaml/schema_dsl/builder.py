@@ -186,6 +186,13 @@ class SchemaBuilder:
                         "- 可通过 Python 入口注入 path_aliases 解析 `@/...` 或 `ALIAS:/...`"
                     ),
                 },
+                "deps": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                    "default": [],
+                    "description": "显式依赖 run.id 列表(可选)",
+                    "markdownDescription": "显式依赖 `run.id` 列表(可选).",
+                },
             },
             "additionalProperties": False,
         }
@@ -200,6 +207,12 @@ class SchemaBuilder:
                     "items": run_item,
                 },
                 "options": options,
+                "resources": {
+                    "type": "object",
+                    "description": "workflow-scope resources (v0 placeholder)",
+                    "markdownDescription": "workflow-scope resources (v0 placeholder).",
+                    "additionalProperties": True,
+                },
             },
             "additionalProperties": False,
         }

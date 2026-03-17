@@ -191,6 +191,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/testing-quality/spec.md)
 - Summary: **状态: ✅ 已实现** 定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现.
 
+### `workflow-ir`
+- Title: workflow-ir Specification
+- Source: [spec.md](#code=openspec/specs/workflow-ir/spec.md)
+- Summary: TBD - created by archiving change c18-workflow-ir-roadmap. Update Purpose after archive.
+
 ### `workflow-observability-bridge`
 - Title: workflow-observability-bridge Specification
 - Source: [spec.md](#code=openspec/specs/workflow-observability-bridge/spec.md)

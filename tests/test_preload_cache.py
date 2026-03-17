@@ -1,4 +1,6 @@
 import pickle
+import threading
+import time
 
 from scalim.execution.preload_cache import PreloadCache
 
@@ -33,3 +35,30 @@ def test_preload_cache_supports_basic_mapping_protocol_and_pickle_roundtrip() ->
 
     restored.__setstate__({"_data": []})  # type: ignore[attr-defined]
     assert len(restored) == 0
+
+
+def test_preload_cache_get_or_load_returns_cached_value_inside_lock() -> None:
+    cache = PreloadCache()
+    barrier = threading.Barrier(2)
+    calls = []
+
+    def _load():  # type: ignore[no-untyped-def]
+        calls.append(1)
+        time.sleep(0.05)
+        return {1: {"value": "z"}}
+
+    results = []
+
+    def _worker() -> None:
+        barrier.wait()
+        results.append(cache.get_or_load("src", _load))
+
+    t1 = threading.Thread(target=_worker)
+    t2 = threading.Thread(target=_worker)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    assert results == [{1: {"value": "z"}}, {1: {"value": "z"}}]
+    assert len(calls) == 1
