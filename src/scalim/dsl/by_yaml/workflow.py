@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 
 from ...vendor.compact.importlibx import require_optional_dependency
 
@@ -25,6 +25,14 @@ _CACHE_POOL_PIN_KINDS = ("preload_forever",)
 
 _ALIAS_DEMAND_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):/(.+)$")
 
+_INTERNAL_NODE_ID_PREFIX = "__wf__"
+_RESOURCE_GROUP_KEYS = ("workbooks", "csvs", "sheetbooks")
+_WRITE_TO_KEYS = ("workbook_sheet", "workbook_append", "csv_append", "sheetbook_sheet", "sheetbook_append")
+_WRITE_TO_ON_CONFLICT_POLICIES = ("error", "overwrite", "skip")
+_WRITE_TO_ALIGN_BY = ("field_id", "header")
+_WRITE_TO_HEADER_POLICIES = ("once", "always", "never")
+_WRITE_TO_ON_MISMATCH_POLICIES = ("error", "warn", "skip")
+
 
 class WorkflowConfigError(ValueError):
     path: str
@@ -39,12 +47,86 @@ class WorkflowConfigError(ValueError):
         return "{} (path={})".format(message, self.path)
 
 
+def _safe_load_yaml_no_duplicates(text: str) -> object:
+    """对 `yaml.safe_load` 增加重复 `key` 检测.
+
+    需求: `workflow` 需要对资源 `id` 冲突等场景做提前校验; 这要求在解析阶段保留并检测重复 `key`.
+    """
+
+    class _Loader(yaml.SafeLoader):  # type: ignore[name-defined]
+        pass
+
+    def _construct_mapping(loader: object, node: object, deep: bool = False) -> Dict[object, object]:  # noqa: FBT001, FBT002
+        mapping: Dict[object, object] = {}
+        pairs = cast("Any", node).value
+        for key_node, value_node in pairs:
+            key = cast("Any", loader).construct_object(key_node, deep=deep)
+            if key in mapping:
+                msg = "Duplicate key in YAML mapping: {!r}".format(key)
+                raise ValueError(msg)
+            value = cast("Any", loader).construct_object(value_node, deep=deep)
+            mapping[key] = value
+        return mapping
+
+    _Loader.add_constructor(  # type: ignore[attr-defined]
+        cast("Any", yaml).resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        _construct_mapping,
+    )
+    return cast("Any", yaml).load(text, Loader=_Loader)
+
+
+@dataclass(frozen=True)
+class WorkflowWorkbookResource:
+    path: str
+
+
+@dataclass(frozen=True)
+class WorkflowCsvResource:
+    path: str
+
+
+@dataclass(frozen=True)
+class WorkflowResources:
+    workbooks: Dict[str, WorkflowWorkbookResource] = dataclass_field(default_factory=dict)
+    csvs: Dict[str, WorkflowCsvResource] = dataclass_field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class WorkflowWriteToWorkbookSheet:
+    workbook: str
+    sheet: str
+    output: str
+    on_conflict: str = "error"
+
+
+@dataclass(frozen=True)
+class WorkflowWriteToWorkbookAppend:
+    workbook: str
+    sheet: str
+    output: str
+    align_by: str = "field_id"
+    header_policy: str = "once"
+    on_mismatch: str = "error"
+
+
+@dataclass(frozen=True)
+class WorkflowWriteToCsvAppend:
+    csv: str
+    output: str
+    header_policy: str = "once"
+    on_mismatch: str = "error"
+
+
+WorkflowWriteTo = Union[WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend, WorkflowWriteToCsvAppend]
+
+
 @dataclass(frozen=True)
 class WorkflowRun:
     id: str
     demand: str
     depends_on: Tuple[str, ...] = ()
     init_vars: Optional[Dict[str, object]] = None
+    write_to: Optional[WorkflowWriteTo] = None
 
 
 @dataclass(frozen=True)
@@ -85,10 +167,11 @@ class WorkflowCachePoolOptions:
 class WorkflowConfig:
     runs: Tuple[WorkflowRun, ...]
     options: WorkflowOptions
-    resources: Dict[str, object] = dataclass_field(default_factory=dict)
+    resources: WorkflowResources = dataclass_field(default_factory=WorkflowResources)
 
 
 def load_workflow_config(workflow_yaml_path: str) -> WorkflowConfig:
+    msg: str
     yaml_path = Path(str(workflow_yaml_path or "")).expanduser()
     try:
         text = yaml_path.read_text(encoding="utf-8")
@@ -97,7 +180,7 @@ def load_workflow_config(workflow_yaml_path: str) -> WorkflowConfig:
         raise WorkflowConfigError(msg, path="(file)") from exc
 
     try:
-        loaded = yaml.safe_load(text)
+        loaded = _safe_load_yaml_no_duplicates(text)
     except Exception as exc:
         msg = "YAML parse error: {}: {}".format(type(exc).__name__, exc)
         raise WorkflowConfigError(msg, path="(root)") from exc
@@ -116,6 +199,7 @@ def resolve_workflow_demand_path(
     path_aliases: Optional[Mapping[str, str]] = None,
     run_id: Optional[str] = None,
 ) -> Path:
+    msg: str
     raw = str(demand or "").strip()
     if not raw:
         msg = "run.demand must be a non-empty string"
@@ -162,6 +246,7 @@ def _resolve_alias_path(
     path_aliases: Optional[Mapping[str, str]],
     run_id: Optional[str],
 ) -> Path:
+    msg: str
     aliases = path_aliases or {}
     base_raw = aliases.get(alias)
     if base_raw is None:
@@ -198,7 +283,7 @@ def validate_workflow_yaml_text_json(
 
 def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
     try:
-        yaml_data = yaml.safe_load(yaml_text)
+        yaml_data = _safe_load_yaml_no_duplicates(yaml_text)
     except Exception as exc:  # noqa: BLE001
         return {
             "ok": False,
@@ -234,6 +319,7 @@ def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
 
 def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  # noqa: C901, PLR0912, PLR0915
     """从已解析的 `mapping` 加载 `workflow` 配置(用于文本校验/编辑器等无文件系统场景)."""
+    msg: str
     wf_raw = root.get("workflow")
     if not isinstance(wf_raw, dict):
         msg = "Missing required mapping 'workflow'"
@@ -260,9 +346,13 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
             raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
         depends_on_raw = run_dict.get("depends_on")
         init_vars_raw = run_dict.get("init_vars")
+        write_to_raw = run_dict.get("write_to")
         run_id = str(run_id_raw or "").strip()
         if not run_id:
             msg = "run.id must be a non-empty string"
+            raise WorkflowConfigError(msg, path="{}.id".format(item_path))
+        if run_id.startswith(_INTERNAL_NODE_ID_PREFIX):
+            msg = "run.id must not start with reserved prefix '{}'".format(_INTERNAL_NODE_ID_PREFIX)
             raise WorkflowConfigError(msg, path="{}.id".format(item_path))
         if run_id in seen_ids:
             msg = "Duplicate run.id '{}'".format(run_id)
@@ -308,7 +398,130 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
                     raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
                 init_vars[str(key)] = value
 
-        runs.append(WorkflowRun(id=run_id, demand=demand, depends_on=depends_on, init_vars=init_vars))
+        write_to: Optional[WorkflowWriteTo] = None
+        if write_to_raw is not None:
+            if not isinstance(write_to_raw, dict):
+                msg = "run.write_to must be a mapping"
+                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+
+            write_to_mapping: Dict[str, object] = {}
+            for raw_key, raw_value in cast("Dict[Any, Any]", write_to_raw).items():
+                if not isinstance(raw_key, str) or not raw_key.strip():
+                    msg = "run.write_to keys must be non-empty strings"
+                    raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+                write_to_mapping[str(raw_key)] = raw_value
+
+            raw_keys = set(write_to_mapping.keys())
+            unknown_keys = sorted(k for k in raw_keys if k not in _WRITE_TO_KEYS)
+            if unknown_keys:
+                msg = "run.write_to contains unknown keys: {}".format(",".join(unknown_keys))
+                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+
+            present = [k for k in _WRITE_TO_KEYS if write_to_mapping.get(k) is not None]
+            if len(present) != 1:
+                msg = "run.write_to must contain exactly one of: {}".format("/".join(_WRITE_TO_KEYS))
+                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+
+            kind = str(present[0])
+            cfg_raw = write_to_mapping.get(kind)
+            if not isinstance(cfg_raw, dict):
+                msg = "run.write_to.{} must be a mapping".format(kind)
+                raise WorkflowConfigError(msg, path="{}.write_to.{}".format(item_path, kind))
+            cfg_any = cast("Dict[Any, Any]", cfg_raw)
+            cfg: Dict[str, object] = {}
+            for cfg_key, cfg_value in cfg_any.items():
+                if not isinstance(cfg_key, str) or not cfg_key.strip():
+                    msg = "run.write_to.{} keys must be non-empty strings".format(kind)
+                    raise WorkflowConfigError(msg, path="{}.write_to.{}".format(item_path, kind))
+                cfg[str(cfg_key)] = cfg_value
+
+            if kind == "workbook_sheet":
+                workbook = str(cfg.get("workbook", "") or "").strip()
+                sheet = str(cfg.get("sheet", "") or "").strip()
+                output_id = str(cfg.get("output", "") or "").strip()
+                on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
+                if not workbook:
+                    msg = "run.write_to.workbook_sheet.workbook must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.workbook".format(item_path))
+                if not sheet:
+                    msg = "run.write_to.workbook_sheet.sheet must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.sheet".format(item_path))
+                if not output_id:
+                    msg = "run.write_to.workbook_sheet.output must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.output".format(item_path))
+                if on_conflict not in _WRITE_TO_ON_CONFLICT_POLICIES:
+                    msg = "run.write_to.workbook_sheet.on_conflict must be one of: {}".format("/".join(_WRITE_TO_ON_CONFLICT_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.on_conflict".format(item_path))
+                write_to = WorkflowWriteToWorkbookSheet(
+                    workbook=workbook,
+                    sheet=sheet,
+                    output=output_id,
+                    on_conflict=on_conflict,
+                )
+
+            elif kind == "workbook_append":
+                workbook = str(cfg.get("workbook", "") or "").strip()
+                sheet = str(cfg.get("sheet", "") or "").strip()
+                output_id = str(cfg.get("output", "") or "").strip()
+                align_by = str(cfg.get("align_by", "field_id") or "field_id").strip()
+                header_policy = str(cfg.get("header_policy", "once") or "once").strip()
+                on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
+                if not workbook:
+                    msg = "run.write_to.workbook_append.workbook must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.workbook".format(item_path))
+                if not sheet:
+                    msg = "run.write_to.workbook_append.sheet must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.sheet".format(item_path))
+                if not output_id:
+                    msg = "run.write_to.workbook_append.output must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.output".format(item_path))
+                if align_by not in _WRITE_TO_ALIGN_BY:
+                    msg = "run.write_to.workbook_append.align_by must be one of: {}".format("/".join(_WRITE_TO_ALIGN_BY))
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.align_by".format(item_path))
+                if header_policy not in _WRITE_TO_HEADER_POLICIES:
+                    msg = "run.write_to.workbook_append.header_policy must be one of: {}".format("/".join(_WRITE_TO_HEADER_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.header_policy".format(item_path))
+                if on_mismatch not in _WRITE_TO_ON_MISMATCH_POLICIES:
+                    msg = "run.write_to.workbook_append.on_mismatch must be one of: {}".format("/".join(_WRITE_TO_ON_MISMATCH_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.on_mismatch".format(item_path))
+                write_to = WorkflowWriteToWorkbookAppend(
+                    workbook=workbook,
+                    sheet=sheet,
+                    output=output_id,
+                    align_by=align_by,
+                    header_policy=header_policy,
+                    on_mismatch=on_mismatch,
+                )
+
+            elif kind == "csv_append":
+                csv_id = str(cfg.get("csv", "") or "").strip()
+                output_id = str(cfg.get("output", "") or "").strip()
+                header_policy = str(cfg.get("header_policy", "once") or "once").strip()
+                on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
+                if not csv_id:
+                    msg = "run.write_to.csv_append.csv must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.csv".format(item_path))
+                if not output_id:
+                    msg = "run.write_to.csv_append.output must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.output".format(item_path))
+                if header_policy not in _WRITE_TO_HEADER_POLICIES:
+                    msg = "run.write_to.csv_append.header_policy must be one of: {}".format("/".join(_WRITE_TO_HEADER_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.header_policy".format(item_path))
+                if on_mismatch not in _WRITE_TO_ON_MISMATCH_POLICIES:
+                    msg = "run.write_to.csv_append.on_mismatch must be one of: {}".format("/".join(_WRITE_TO_ON_MISMATCH_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.on_mismatch".format(item_path))
+                write_to = WorkflowWriteToCsvAppend(
+                    csv=csv_id,
+                    output=output_id,
+                    header_policy=header_policy,
+                    on_mismatch=on_mismatch,
+                )
+
+            else:
+                msg = "run.write_to.{} is not supported in this build".format(kind)
+                raise WorkflowConfigError(msg, path="{}.write_to.{}".format(item_path, kind))
+
+        runs.append(WorkflowRun(id=run_id, demand=demand, depends_on=depends_on, init_vars=init_vars, write_to=write_to))
 
     _validate_workflow_deps(runs, seen_ids=seen_ids)
 
@@ -318,12 +531,89 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
     if not isinstance(resources_raw, dict):
         msg = "workflow.resources must be a mapping"
         raise WorkflowConfigError(msg, path="workflow.resources")
-    resources: Dict[str, object] = {}
-    for key, value in cast("Dict[Any, Any]", resources_raw).items():
-        if not isinstance(key, str) or not key.strip():
+    resources_dict = cast("Dict[str, Any]", resources_raw)
+
+    for raw_key in resources_dict:
+        if not isinstance(raw_key, str) or not raw_key.strip():
             msg = "workflow.resources keys must be non-empty strings"
             raise WorkflowConfigError(msg, path="workflow.resources")
-        resources[str(key)] = value
+
+    unknown_resource_groups = sorted(k for k in resources_dict if str(k) not in _RESOURCE_GROUP_KEYS)
+    if unknown_resource_groups:
+        msg = "workflow.resources contains unknown keys: {}".format(",".join(str(k) for k in unknown_resource_groups))
+        raise WorkflowConfigError(msg, path="workflow.resources")
+
+    workbooks_raw = resources_dict.get("workbooks", {})
+    if workbooks_raw is None:
+        workbooks_raw = {}
+    if not isinstance(workbooks_raw, dict):
+        msg = "workflow.resources.workbooks must be a mapping"
+        raise WorkflowConfigError(msg, path="workflow.resources.workbooks")
+
+    csvs_raw = resources_dict.get("csvs", {})
+    if csvs_raw is None:
+        csvs_raw = {}
+    if not isinstance(csvs_raw, dict):
+        msg = "workflow.resources.csvs must be a mapping"
+        raise WorkflowConfigError(msg, path="workflow.resources.csvs")
+
+    workbooks: Dict[str, WorkflowWorkbookResource] = {}
+    for raw_id, raw_cfg in cast("Dict[Any, Any]", workbooks_raw).items():
+        resource_id = str(raw_id or "").strip() if isinstance(raw_id, str) else ""
+        item_path = "workflow.resources.workbooks.{}".format(resource_id or "(invalid)")
+        if not resource_id:
+            msg = "workflow.resources.workbooks keys must be non-empty strings"
+            raise WorkflowConfigError(msg, path="workflow.resources.workbooks")
+        if not isinstance(raw_cfg, dict):
+            msg = "workflow.resources.workbooks.<id> must be a mapping"
+            raise WorkflowConfigError(msg, path=item_path)
+        cfg = cast("Dict[str, Any]", raw_cfg)
+        path_raw = cfg.get("path")
+        path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
+        if not path_text:
+            msg = "workflow.resources.workbooks.<id>.path must be a non-empty string"
+            raise WorkflowConfigError(msg, path="{}.path".format(item_path))
+        workbooks[resource_id] = WorkflowWorkbookResource(path=path_text)
+
+    csvs: Dict[str, WorkflowCsvResource] = {}
+    for raw_id, raw_cfg in cast("Dict[Any, Any]", csvs_raw).items():
+        resource_id = str(raw_id or "").strip() if isinstance(raw_id, str) else ""
+        item_path = "workflow.resources.csvs.{}".format(resource_id or "(invalid)")
+        if not resource_id:
+            msg = "workflow.resources.csvs keys must be non-empty strings"
+            raise WorkflowConfigError(msg, path="workflow.resources.csvs")
+        if not isinstance(raw_cfg, dict):
+            msg = "workflow.resources.csvs.<id> must be a mapping"
+            raise WorkflowConfigError(msg, path=item_path)
+        cfg = cast("Dict[str, Any]", raw_cfg)
+        path_raw = cfg.get("path")
+        path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
+        if not path_text:
+            msg = "workflow.resources.csvs.<id>.path must be a non-empty string"
+            raise WorkflowConfigError(msg, path="{}.path".format(item_path))
+        csvs[resource_id] = WorkflowCsvResource(path=path_text)
+
+    overlap = sorted(set(workbooks.keys()).intersection(set(csvs.keys())))
+    if overlap:
+        msg = "workflow.resources ids must be unique across workbooks/csvs: {}".format(",".join(overlap))
+        raise WorkflowConfigError(msg, path="workflow.resources")
+
+    resources = WorkflowResources(workbooks=workbooks, csvs=csvs)
+
+    for idx, run in enumerate(runs):
+        if run.write_to is None:
+            continue
+        item_path = "workflow.runs.{}".format(idx)
+        if isinstance(run.write_to, (WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend)):
+            workbook_id = str(getattr(run.write_to, "workbook", "") or "")
+            if workbook_id not in resources.workbooks:
+                msg = "Unknown workbook resource id '{}'".format(workbook_id)
+                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+        if isinstance(run.write_to, WorkflowWriteToCsvAppend):
+            csv_id = str(getattr(run.write_to, "csv", "") or "")
+            if csv_id not in resources.csvs:
+                msg = "Unknown csv resource id '{}'".format(csv_id)
+                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
 
     options_raw = wf.get("options", {})
     if options_raw is None:
@@ -505,6 +795,7 @@ def _validate_workflow_deps_references(
     *,
     seen_ids: Mapping[str, int],
 ) -> None:
+    msg: str
     run_ids = set(seen_ids.keys())
     for idx, run in enumerate(runs):
         item_path = "workflow.runs.{}".format(idx)
@@ -522,6 +813,7 @@ def _validate_workflow_deps_no_cycles(  # noqa: C901
     *,
     seen_ids: Mapping[str, int],
 ) -> None:
+    msg: str
     by_id: Dict[str, WorkflowRun] = {run.id: run for run in runs}
     ordered_ids = sorted(by_id.keys(), key=lambda rid: int(seen_ids.get(rid, 0)))
 
@@ -568,7 +860,12 @@ __all__ = [
     "WorkflowConfig",
     "WorkflowConfigError",
     "WorkflowOptions",
+    "WorkflowResources",
     "WorkflowRun",
+    "WorkflowWriteTo",
+    "WorkflowWriteToCsvAppend",
+    "WorkflowWriteToWorkbookAppend",
+    "WorkflowWriteToWorkbookSheet",
     "load_workflow_config",
     "load_workflow_config_from_mapping",
     "resolve_workflow_demand_path",

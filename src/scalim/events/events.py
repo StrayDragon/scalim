@@ -521,6 +521,68 @@ class WorkflowCacheEvictEvent:
     reason: str
 
 
+@dataclass(frozen=True)
+class WorkflowResourceCreateEvent:
+    """工作流资源 `create` 事件.
+
+    用于表达工作流级共享资源(例如 `workbook`/`csv`/`sheetbook`)被创建/初始化.
+    """
+
+    workflow_exec_id: str
+    workflow_node_id: str
+    resource_type: str
+    resource_id: str
+    path: str
+
+
+@dataclass(frozen=True)
+class WorkflowResourceWriteEvent:
+    """工作流资源 `write` 事件.
+
+    用于表达某个 `workflow node` 对共享资源执行了一次写入意图.
+    """
+
+    workflow_exec_id: str
+    workflow_node_id: str
+    resource_type: str
+    resource_id: str
+    path: str
+    write_kind: str
+    action: str
+    input_node_id: Optional[str] = None
+    input_output_id: Optional[str] = None
+    sheet: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class WorkflowResourceCommitEvent:
+    """工作流资源 `commit` 事件.
+
+    用于表达 `workflow` 成功结束时共享资源的原子落盘.
+    """
+
+    workflow_exec_id: str
+    workflow_node_id: str
+    resource_type: str
+    resource_id: str
+    path: str
+
+
+@dataclass(frozen=True)
+class WorkflowResourceDiscardEvent:
+    """工作流资源 `discard` 事件.
+
+    用于表达 `workflow` 失败结束时共享资源被丢弃(不产生部分提交的最终文件).
+    """
+
+    workflow_exec_id: str
+    workflow_node_id: str
+    resource_type: str
+    resource_id: str
+    path: str
+    reason: str
+
+
 __all__ = [
     "AdaptiveSchedulerDecisionEvent",
     "BatchEndEvent",
@@ -546,4 +608,8 @@ __all__ = [
     "WorkflowNodeCancelledEvent",
     "WorkflowNodeEndEvent",
     "WorkflowNodeStartEvent",
+    "WorkflowResourceCommitEvent",
+    "WorkflowResourceCreateEvent",
+    "WorkflowResourceDiscardEvent",
+    "WorkflowResourceWriteEvent",
 ]

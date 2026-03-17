@@ -4,6 +4,7 @@ import json
 import math
 import threading
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from ....events.catalog import (
@@ -25,6 +26,8 @@ from ....ob.components import split_components
 from ....ob.hub import InstrumentationHub
 from ....ob.observability import Observability
 from ....spec.ir.workflow import (
+    AppendSheetNodeIr,
+    WorkflowAnyNodeIr,
     WorkflowArtifactsIr,
     WorkflowCachePoolBudgetIr,
     WorkflowCachePoolIr,
@@ -35,11 +38,21 @@ from ....spec.ir.workflow import (
     WorkflowNodeIr,
     WorkflowNodeType,
     WorkflowOptionsIr,
+    WorkflowResourceIr,
+    WriteSheetNodeIr,
 )
 from ..config_parsing.loader import YamlDemandLoader
-from ..workflow import WorkflowConfigError, load_workflow_config, resolve_workflow_demand_path
+from ..workflow import (
+    WorkflowConfigError,
+    WorkflowWriteToCsvAppend,
+    WorkflowWriteToWorkbookAppend,
+    WorkflowWriteToWorkbookSheet,
+    load_workflow_config,
+    resolve_workflow_demand_path,
+)
 from .compiler import compile as compile_demand
 from .contracts import RunOptions, RunOverrides, RunResult
+from .workflow_resources import WorkflowResourceManager, WorkflowWriteError
 
 
 @dataclass(frozen=True)
@@ -74,6 +87,7 @@ class WorkflowResult:
 class _WorkflowArtifactsDirectory:
     _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
     _values_by_producer_node_id: Dict[str, Dict[str, object]]
+    _lock: threading.Lock
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
         deps_by_node_id = {node.node_id: node.deps for node in workflow_ir.nodes}
@@ -96,13 +110,15 @@ class _WorkflowArtifactsDirectory:
 
         self._visible_by_consumer_node_id = visible
         self._values_by_producer_node_id = {}
+        self._lock = threading.Lock()
 
     def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
         return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
 
     def publish(self, producer_node_id: str, artifact_id: str, value: object) -> None:
-        by_artifact = self._values_by_producer_node_id.setdefault(str(producer_node_id), {})
-        by_artifact[str(artifact_id)] = value
+        with self._lock:
+            by_artifact = self._values_by_producer_node_id.setdefault(str(producer_node_id), {})
+            by_artifact[str(artifact_id)] = value
 
     def get(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> object:
         consumer = str(consumer_node_id)
@@ -113,11 +129,12 @@ class _WorkflowArtifactsDirectory:
             msg = "Artifact '{}' from node '{}' is not visible to node '{}' (declare deps)".format(artifact_key, producer, consumer)
             raise ValueError(msg)
 
-        by_artifact = self._values_by_producer_node_id.get(producer)
-        if by_artifact is None or artifact_key not in by_artifact:
-            msg = "Unknown artifact '{}' for node '{}'".format(artifact_key, producer)
-            raise KeyError(msg)
-        return by_artifact[artifact_key]
+        with self._lock:
+            by_artifact = self._values_by_producer_node_id.get(producer)
+            if by_artifact is None or artifact_key not in by_artifact:
+                msg = "Unknown artifact '{}' for node '{}'".format(artifact_key, producer)
+                raise KeyError(msg)
+            return by_artifact[artifact_key]
 
 
 def _ensure_json_like(value: object, *, path: str) -> object:
@@ -450,14 +467,36 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             consumers_by_logical_key=consumers_by_logical_key,
         )
 
-    def _emit_workflow_node_start(node_id: str, *, demand_path: str) -> None:
+    workbook_defs: Dict[str, str] = {}
+    csv_defs: Dict[str, str] = {}
+    for res in workflow_ir.resources:
+        if str(res.resource_type) == "workbook":
+            workbook_defs[str(res.resource_id)] = str(res.path)
+        elif str(res.resource_type) == "csv":
+            csv_defs[str(res.resource_id)] = str(res.path)
+
+    resource_manager = WorkflowResourceManager(
+        workflow_exec_id=workflow_exec_id,
+        instrumentation=workflow_instrumentation,
+        workbook_defs=workbook_defs,
+        csv_defs=csv_defs,
+    )
+    resources_finalized = False
+
+    def _node_type_str(node: WorkflowAnyNodeIr) -> str:
+        raw = getattr(node, "node_type", "")
+        return str(getattr(raw, "value", raw))
+
+    def _emit_workflow_node_start(node: WorkflowAnyNodeIr) -> None:
+        node_id = str(getattr(node, "node_id", ""))
+        demand_path = getattr(node, "demand_path", None)
         _ = workflow_instrumentation.emit(
             EVENT_WORKFLOW_NODE_START,
             WorkflowNodeStartEvent(
                 workflow_exec_id=workflow_exec_id,
                 workflow_node_id=str(node_id),
-                node_type="demand",
-                demand_path=str(demand_path),
+                node_type=_node_type_str(node),
+                demand_path=str(demand_path) if demand_path is not None else None,
             ),
             meta={
                 "workflow_exec_id": workflow_exec_id,
@@ -465,7 +504,9 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             },
         )
 
-    def _emit_workflow_node_end(node_id: str, *, demand_path: str, status: str, exc: Optional[BaseException]) -> None:
+    def _emit_workflow_node_end(node: WorkflowAnyNodeIr, *, status: str, exc: Optional[BaseException]) -> None:
+        node_id = str(getattr(node, "node_id", ""))
+        demand_path = getattr(node, "demand_path", None)
         error_type = None
         error_message = None
         if status != WORKFLOW_NODE_END_STATUS_OK and exc is not None:
@@ -476,9 +517,9 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             WorkflowNodeEndEvent(
                 workflow_exec_id=workflow_exec_id,
                 workflow_node_id=str(node_id),
-                node_type="demand",
+                node_type=_node_type_str(node),
                 status=str(status),
-                demand_path=str(demand_path),
+                demand_path=str(demand_path) if demand_path is not None else None,
                 error_type=error_type,
                 error_message=error_message,
             ),
@@ -488,16 +529,18 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             },
         )
 
-    def _emit_workflow_node_cancelled(node_id: str, *, demand_path: str, reason: str, message: str) -> None:
+    def _emit_workflow_node_cancelled(node: WorkflowAnyNodeIr, *, reason: str, message: str) -> None:
+        node_id = str(getattr(node, "node_id", ""))
+        demand_path = getattr(node, "demand_path", None)
         _ = workflow_instrumentation.emit(
             EVENT_WORKFLOW_NODE_CANCELLED,
             WorkflowNodeCancelledEvent(
                 workflow_exec_id=workflow_exec_id,
                 workflow_node_id=str(node_id),
-                node_type="demand",
+                node_type=_node_type_str(node),
                 reason=str(reason),
                 message=str(message),
-                demand_path=str(demand_path),
+                demand_path=str(demand_path) if demand_path is not None else None,
             ),
             meta={
                 "workflow_exec_id": workflow_exec_id,
@@ -525,7 +568,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             },
         )
 
-    node_by_id: Dict[str, WorkflowNodeIr] = {node.node_id: node for node in workflow_ir.nodes}
+    node_by_id: Dict[str, WorkflowAnyNodeIr] = {node.node_id: node for node in workflow_ir.nodes}
     index_by_node_id: Dict[str, int] = {node.node_id: int(node.decl_order) for node in workflow_ir.nodes}
 
     dependents_by_node_id: Dict[str, List[str]] = {}
@@ -548,12 +591,12 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
 
     failed: Optional[WorkflowRunOutcome] = None
     failed_exc: Optional[BaseException] = None
-    submitted: Dict["concurrent.futures.Future[ExecutionResult]", Tuple[str, str, object]] = {}
+    submitted: Dict["concurrent.futures.Future[Any]", Tuple[str, WorkflowAnyNodeIr, Optional[str], Optional[object]]] = {}
 
     def _cancel_node(node_id: str, *, reason: str, message: str) -> None:
         idx = index_by_node_id[str(node_id)]
         node = node_by_id[str(node_id)]
-        demand_path = str(node.demand_path or "")
+        demand_path = str(getattr(node, "demand_path", "") or "")
         outcomes[idx] = WorkflowRunOutcome(
             run_id=str(node_id),
             demand_path=demand_path,
@@ -566,12 +609,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             ),
         )
         node_state[str(node_id)] = "cancelled"
-        _emit_workflow_node_cancelled(
-            node_id,
-            demand_path=demand_path,
-            reason=reason,
-            message=message,
-        )
+        _emit_workflow_node_cancelled(node, reason=reason, message=message)
         if workflow_cache_pool is not None:
             workflow_cache_pool.on_workflow_node_done(str(node_id))
 
@@ -609,74 +647,168 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrency) as executor:
 
+            def _run_write_node(node: WorkflowAnyNodeIr) -> None:  # noqa: C901
+                if isinstance(node, WriteSheetNodeIr):
+                    outputs_obj = artifacts_dir.get(str(node.node_id), str(node.input_node_id), "outputs")
+                    outputs = cast("Optional[Dict[str, str]]", outputs_obj)
+                    if not outputs:
+                        msg = "write node requires demand outputs mapping: input_node_id={!r}".format(str(node.input_node_id))
+                        raise WorkflowWriteError(msg)
+                    output_path = outputs.get(str(node.input_output_id))
+                    if not output_path:
+                        msg = "Unknown demand output id: input_node_id={!r}, output_id={!r}".format(
+                            str(node.input_node_id),
+                            str(node.input_output_id),
+                        )
+                        raise WorkflowWriteError(msg)
+                    if not str(output_path).lower().endswith(".csv"):
+                        msg = "write_to currently only supports CSV outputs: output_path={!r}".format(str(output_path))
+                        raise WorkflowWriteError(msg)
+                    resource_manager.apply_workbook_sheet(
+                        workflow_node_id=str(node.node_id),
+                        workbook_id=str(node.resource_id),
+                        sheet=str(node.sheet),
+                        input_node_id=str(node.input_node_id),
+                        input_output_id=str(node.input_output_id),
+                        input_csv_path=str(output_path),
+                        on_conflict=str(node.on_conflict or "error"),
+                    )
+                    return
+
+                if isinstance(node, AppendSheetNodeIr):
+                    outputs_obj = artifacts_dir.get(str(node.node_id), str(node.input_node_id), "outputs")
+                    outputs = cast("Optional[Dict[str, str]]", outputs_obj)
+                    if not outputs:
+                        msg = "append node requires demand outputs mapping: input_node_id={!r}".format(str(node.input_node_id))
+                        raise WorkflowWriteError(msg)
+                    output_path = outputs.get(str(node.input_output_id))
+                    if not output_path:
+                        msg = "Unknown demand output id: input_node_id={!r}, output_id={!r}".format(
+                            str(node.input_node_id),
+                            str(node.input_output_id),
+                        )
+                        raise WorkflowWriteError(msg)
+                    if not str(output_path).lower().endswith(".csv"):
+                        msg = "write_to currently only supports CSV outputs: output_path={!r}".format(str(output_path))
+                        raise WorkflowWriteError(msg)
+
+                    if str(node.resource_type) == "workbook":
+                        if not node.sheet:  # pragma: no cover
+                            msg = "append_sheet requires sheet for workbook resource (resource_id={!r})".format(
+                                str(node.resource_id)
+                            )  # pragma: no cover
+                            raise WorkflowWriteError(msg)  # pragma: no cover
+                        resource_manager.apply_workbook_append(
+                            workflow_node_id=str(node.node_id),
+                            workbook_id=str(node.resource_id),
+                            sheet=str(node.sheet),
+                            input_node_id=str(node.input_node_id),
+                            input_output_id=str(node.input_output_id),
+                            input_csv_path=str(output_path),
+                            align_by=str(node.align_by or "field_id"),
+                            header_policy=str(node.header_policy or "once"),
+                            on_mismatch=str(node.on_mismatch or "error"),
+                        )
+                        return
+
+                    if str(node.resource_type) == "csv":
+                        resource_manager.apply_csv_append(
+                            workflow_node_id=str(node.node_id),
+                            csv_id=str(node.resource_id),
+                            input_node_id=str(node.input_node_id),
+                            input_output_id=str(node.input_output_id),
+                            input_csv_path=str(output_path),
+                            header_policy=str(node.header_policy or "once"),
+                            on_mismatch=str(node.on_mismatch or "error"),
+                        )
+                        return
+
+                    msg = "Unsupported append_sheet resource_type: {!r}".format(str(node.resource_type))  # pragma: no cover
+                    raise WorkflowWriteError(msg)  # pragma: no cover
+
+                msg = "Unsupported workflow node type: {}".format(type(node).__name__)  # pragma: no cover
+                raise WorkflowWriteError(msg)  # pragma: no cover
+
             def _try_submit_ready() -> None:
                 nonlocal failed, failed_exc
                 while ready_queue and len(submitted) < max_concurrency and (failed is None or failure_policy != "all_fail"):
                     node_id = ready_queue.pop(0)
                     node = node_by_id[str(node_id)]
-                    demand_path = str(node.demand_path or "")
-
                     node_state[str(node_id)] = "running"
-                    _emit_workflow_node_start(node_id, demand_path=demand_path)
+                    _emit_workflow_node_start(node)
 
-                    try:
-                        node_options = options
-                        node_init_vars = _render_workflow_init_vars(
-                            getattr(node, "init_vars", None),
-                            consumer_node_id=str(node_id),
-                            ctx_store=ctx_store,
-                            path_prefix="workflow.runs.{}.init_vars".format(int(node.decl_order)),
-                        )
-                        if node_init_vars:
-                            merged = dict(options.init_vars or {})
-                            merged.update(node_init_vars)
-                            node_options = replace(options, init_vars=merged)
+                    if getattr(node, "node_type", None) == WorkflowNodeType.DEMAND:
+                        demand_path = str(getattr(node, "demand_path", "") or "")
+                        try:
+                            node_options = options
+                            node_init_vars = _render_workflow_init_vars(
+                                getattr(node, "init_vars", None),
+                                consumer_node_id=str(node_id),
+                                ctx_store=ctx_store,
+                                path_prefix="workflow.runs.{}.init_vars".format(int(node.decl_order)),
+                            )
+                            if node_init_vars:
+                                merged = dict(options.init_vars or {})
+                                merged.update(node_init_vars)
+                                node_options = replace(options, init_vars=merged)
 
-                        compilation = compile_demand(demand_path, options=node_options)
-                    except Exception as exc:  # noqa: BLE001
-                        err = WorkflowRunError(
-                            run_id=str(node_id),
-                            demand_path=demand_path,
-                            exc_type=type(exc).__name__,
-                            message=str(exc),
-                        )
-                        outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=demand_path, result=None, error=err)
-                        outcomes[index_by_node_id[str(node_id)]] = outcome
-                        node_state[str(node_id)] = "failed"
-                        _emit_workflow_node_end(node_id, demand_path=demand_path, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
-                        if workflow_cache_pool is not None:
-                            workflow_cache_pool.on_workflow_node_done(str(node_id))
-                        _on_terminal(str(node_id), ok=False)
-                        if failure_policy == "all_fail" and failed is None:
-                            failed = outcome
-                            failed_exc = exc
-                            _cancel_all_not_started_due_to_all_fail()
+                            compilation = compile_demand(demand_path, options=node_options)
+                        except Exception as exc:  # noqa: BLE001
+                            err = WorkflowRunError(
+                                run_id=str(node_id),
+                                demand_path=demand_path,
+                                exc_type=type(exc).__name__,
+                                message=str(exc),
+                                diff=getattr(exc, "diff", None),
+                            )
+                            outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=demand_path, result=None, error=err)
+                            outcomes[index_by_node_id[str(node_id)]] = outcome
+                            node_state[str(node_id)] = "failed"
+                            _emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+                            if workflow_cache_pool is not None:
+                                workflow_cache_pool.on_workflow_node_done(str(node_id))
+                            _on_terminal(str(node_id), ok=False)
+                            if failure_policy == "all_fail" and failed is None:
+                                failed = outcome
+                                failed_exc = exc
+                                _cancel_all_not_started_due_to_all_fail()
+                            continue
+
+                        fut = executor.submit(_run_one, compilation, str(node_id))
+                        submitted[fut] = (str(node_id), node, str(demand_path), compilation)
                         continue
 
-                    fut = executor.submit(_run_one, compilation, str(node_id))
-                    submitted[fut] = (str(node_id), demand_path, compilation)
+                    fut = executor.submit(_run_write_node, node)
+                    submitted[fut] = (str(node_id), node, None, None)
 
             _try_submit_ready()
 
             while submitted:
                 done, _pending = concurrent.futures.wait(submitted.keys(), return_when=concurrent.futures.FIRST_COMPLETED)
                 for fut in done:
-                    node_id, demand_path, compilation = submitted.pop(fut)
+                    node_id, node, demand_path, compilation = submitted.pop(fut)
                     idx = index_by_node_id.get(str(node_id), 0)
                     try:
-                        core = fut.result()
-                        comp = cast("Any", compilation)
-                        artifacts_dir.publish(str(node_id), "output_path", core.output_path)
-                        artifacts_dir.publish(str(node_id), "outputs", core.outputs)
-                        ctx_store.publish_default_summary(str(node_id), core)
-                        outcomes[idx] = WorkflowRunOutcome(
-                            run_id=str(node_id),
-                            demand_path=str(demand_path),
-                            result=RunResult(core, config=comp.config, yaml_path=str(demand_path), sink=None),
-                            error=None,
-                        )
+                        result_obj = fut.result()
+
+                        if getattr(node, "node_type", None) == WorkflowNodeType.DEMAND:
+                            core = cast("ExecutionResult", result_obj)
+                            comp = cast("Any", compilation)
+                            demand_yaml_path = str(demand_path or "")
+                            artifacts_dir.publish(str(node_id), "output_path", core.output_path)
+                            artifacts_dir.publish(str(node_id), "outputs", core.outputs)
+                            ctx_store.publish_default_summary(str(node_id), core)
+                            outcomes[idx] = WorkflowRunOutcome(
+                                run_id=str(node_id),
+                                demand_path=demand_yaml_path,
+                                result=RunResult(core, config=comp.config, yaml_path=demand_yaml_path, sink=None),
+                                error=None,
+                            )
+                        else:
+                            outcomes[idx] = WorkflowRunOutcome(run_id=str(node_id), demand_path="", result=None, error=None)
+
                         node_state[str(node_id)] = "done"
-                        _emit_workflow_node_end(str(node_id), demand_path=str(demand_path), status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
+                        _emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
                         if workflow_cache_pool is not None:
                             workflow_cache_pool.on_workflow_node_done(str(node_id))
                         _on_terminal(str(node_id), ok=True)
@@ -685,14 +817,15 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                             raise WorkflowConfigError(str(exc), path=exc.path) from exc
                         err = WorkflowRunError(
                             run_id=str(node_id),
-                            demand_path=str(demand_path),
+                            demand_path=str(demand_path or ""),
                             exc_type=type(exc).__name__,
                             message=str(exc),
+                            diff=getattr(exc, "diff", None),
                         )
-                        outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=str(demand_path), result=None, error=err)
+                        outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=str(demand_path or ""), result=None, error=err)
                         outcomes[idx] = outcome
                         node_state[str(node_id)] = "failed"
-                        _emit_workflow_node_end(str(node_id), demand_path=str(demand_path), status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+                        _emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
                         if workflow_cache_pool is not None:
                             workflow_cache_pool.on_workflow_node_done(str(node_id))
                         _on_terminal(str(node_id), ok=False)
@@ -707,7 +840,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         for idx, outcome in enumerate(outcomes):
             if outcome is None:  # pragma: no cover
                 node_id = str(workflow_ir.nodes[idx].node_id)  # pragma: no cover
-                demand_path = str(workflow_ir.nodes[idx].demand_path)  # pragma: no cover
+                demand_path = str(getattr(workflow_ir.nodes[idx], "demand_path", "") or "")  # pragma: no cover
                 missing = WorkflowRunOutcome(  # pragma: no cover
                     run_id=node_id,
                     demand_path=demand_path,
@@ -717,6 +850,20 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                 final_outcomes.append(missing)  # pragma: no cover
                 continue  # pragma: no cover
             final_outcomes.append(outcome)
+
+        try:
+            has_errors = any(o.error is not None for o in final_outcomes)
+            if has_errors:
+                discard_node_id = failed.run_id if failed is not None else "__wf__discard"
+                resource_manager.discard_all(workflow_node_id=str(discard_node_id), reason="workflow_failed")
+            else:
+                resource_manager.commit_all()
+            resources_finalized = True
+        except WorkflowWriteError as exc:
+            with contextlib.suppress(Exception):
+                resource_manager.discard_all(workflow_node_id="__wf__discard", reason="resource_commit_failed")
+            resources_finalized = True
+            raise WorkflowConfigError(str(exc), path="workflow.resources") from exc
 
         result = WorkflowResult(outcomes=tuple(final_outcomes))
 
@@ -729,6 +876,9 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
 
         return result
     finally:
+        if not resources_finalized:
+            with contextlib.suppress(Exception):
+                resource_manager.discard_all(workflow_node_id="__wf__discard", reason="workflow_finally")
         if workflow_cache_pool is not None:
             with contextlib.suppress(Exception):
                 workflow_cache_pool.close()
@@ -736,7 +886,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             workflow_observer_manager.close()
 
 
-def _compile_workflow_ir(
+def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
     wf: object,
     *,
     workflow_yaml_path: str,
@@ -744,9 +894,46 @@ def _compile_workflow_ir(
 ) -> WorkflowIr:
     wf_obj = cast("Any", wf)
 
-    nodes: List[WorkflowNodeIr] = []
+    nodes: List[WorkflowAnyNodeIr] = []
     edges: List[WorkflowEdgeIr] = []
     slots_by_node_id: Dict[str, Tuple[str, ...]] = {}
+
+    wf_path = Path(str(workflow_yaml_path or "")).expanduser().resolve(strict=False)
+    base_dir = wf_path.parent
+
+    resources: List[WorkflowResourceIr] = []
+    raw_resources = getattr(wf_obj, "resources", None)
+    if raw_resources is not None:
+        for workbook_id, wb in getattr(raw_resources, "workbooks", {}).items():
+            raw_path = str(getattr(wb, "path", "") or "").strip()
+            resolved = (
+                (base_dir / raw_path).resolve(strict=False)
+                if raw_path and not Path(raw_path).is_absolute()
+                else Path(raw_path).resolve(strict=False)
+            )
+            resources.append(
+                WorkflowResourceIr(
+                    resource_id=str(workbook_id),
+                    resource_type="workbook",
+                    path=str(resolved),
+                    options=None,
+                )
+            )
+        for csv_id, csv_cfg in getattr(raw_resources, "csvs", {}).items():
+            raw_path = str(getattr(csv_cfg, "path", "") or "").strip()
+            resolved = (
+                (base_dir / raw_path).resolve(strict=False)
+                if raw_path and not Path(raw_path).is_absolute()
+                else Path(raw_path).resolve(strict=False)
+            )
+            resources.append(
+                WorkflowResourceIr(
+                    resource_id=str(csv_id),
+                    resource_type="csv",
+                    path=str(resolved),
+                    options=None,
+                )
+            )
 
     for idx, run in enumerate(wf_obj.runs):
         demand_path = resolve_workflow_demand_path(
@@ -756,7 +943,7 @@ def _compile_workflow_ir(
             run_id=run.id,
         )
         node_id = str(run.id)
-        deps = tuple(str(d) for d in (getattr(run, "depends_on", ()) or ()))
+        run_deps = tuple(str(d) for d in (getattr(run, "depends_on", ()) or ()))
         init_vars = cast("Optional[Dict[str, object]]", getattr(run, "init_vars", None))
         if init_vars is not None:
             init_vars = dict(init_vars)
@@ -765,14 +952,92 @@ def _compile_workflow_ir(
                 node_id=node_id,
                 node_type=WorkflowNodeType.DEMAND,
                 decl_order=int(idx),
-                deps=deps,
+                deps=run_deps,
                 demand_path=str(demand_path),
                 init_vars=init_vars,
             )
         )
-        for dep_id in deps:
+        for dep_id in run_deps:
             edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=node_id))
         slots_by_node_id[node_id] = ("output_path", "outputs")
+
+    last_write_node_id_by_resource: Dict[Tuple[str, str], str] = {}
+    for idx, run in enumerate(wf_obj.runs):
+        write_to = getattr(run, "write_to", None)
+        if write_to is None:
+            continue
+
+        node_id = "{}write.{}".format("__wf__", int(idx))
+        decl_order = len(nodes)
+        write_deps: List[str] = [str(run.id)]
+        resource_type = ""
+        resource_id = ""
+
+        node: WorkflowAnyNodeIr
+        if isinstance(write_to, WorkflowWriteToWorkbookSheet):
+            resource_type = "workbook"
+            resource_id = str(write_to.workbook)
+            sheet_name = str(write_to.sheet)
+            on_conflict = str(write_to.on_conflict or "error")
+            node = WriteSheetNodeIr(
+                node_id=str(node_id),
+                node_type=WorkflowNodeType.WRITE_SHEET,
+                decl_order=int(decl_order),
+                deps=(),
+                resource_type=resource_type,
+                resource_id=resource_id,
+                sheet=sheet_name,
+                input_node_id=str(run.id),
+                input_output_id=str(write_to.output),
+                on_conflict=on_conflict,
+            )
+        elif isinstance(write_to, WorkflowWriteToWorkbookAppend):
+            resource_type = "workbook"
+            resource_id = str(write_to.workbook)
+            node = AppendSheetNodeIr(
+                node_id=str(node_id),
+                node_type=WorkflowNodeType.APPEND_SHEET,
+                decl_order=int(decl_order),
+                deps=(),
+                resource_type=resource_type,
+                resource_id=resource_id,
+                sheet=str(write_to.sheet),
+                input_node_id=str(run.id),
+                input_output_id=str(write_to.output),
+                align_by=str(write_to.align_by or "field_id"),
+                header_policy=str(write_to.header_policy or "once"),
+                on_mismatch=str(write_to.on_mismatch or "error"),
+            )
+        elif isinstance(write_to, WorkflowWriteToCsvAppend):
+            resource_type = "csv"
+            resource_id = str(write_to.csv)
+            node = AppendSheetNodeIr(
+                node_id=str(node_id),
+                node_type=WorkflowNodeType.APPEND_SHEET,
+                decl_order=int(decl_order),
+                deps=(),
+                resource_type=resource_type,
+                resource_id=resource_id,
+                sheet=None,
+                input_node_id=str(run.id),
+                input_output_id=str(write_to.output),
+                align_by="header",
+                header_policy=str(write_to.header_policy or "once"),
+                on_mismatch=str(write_to.on_mismatch or "error"),
+            )
+        else:  # pragma: no cover
+            continue  # pragma: no cover
+
+        resource_key = (resource_type, resource_id)
+        prev_write_id = last_write_node_id_by_resource.get(resource_key)
+        if prev_write_id is not None:
+            write_deps.append(str(prev_write_id))
+        last_write_node_id_by_resource[resource_key] = str(node_id)
+
+        node = replace(node, deps=tuple(write_deps))
+        nodes.append(node)
+        for dep_id in write_deps:
+            edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
 
     cache_pool = None
     raw_cache_pool = getattr(wf_obj.options, "cache_pool", None)
@@ -805,13 +1070,12 @@ def _compile_workflow_ir(
     )
 
     artifacts = WorkflowArtifactsIr(slots_by_node_id=slots_by_node_id)
-    resources = cast("Dict[str, object]", getattr(wf_obj, "resources", {}) or {})
-
+    resources_sorted = sorted(resources, key=lambda r: (str(r.resource_type), str(r.resource_id)))
     return WorkflowIr(
         nodes=tuple(nodes),
         edges=tuple(edges),
         options=options,
-        resources=resources,
+        resources=tuple(resources_sorted),
         artifacts=artifacts,
     )
 

@@ -28,6 +28,10 @@ from .events import (
     WorkflowNodeCancelledEvent,
     WorkflowNodeEndEvent,
     WorkflowNodeStartEvent,
+    WorkflowResourceCommitEvent,
+    WorkflowResourceCreateEvent,
+    WorkflowResourceDiscardEvent,
+    WorkflowResourceWriteEvent,
 )
 
 # endregion
@@ -58,6 +62,11 @@ EVENT_WORKFLOW_NODE_CANCELLED = "workflow_node_cancelled"
 EVENT_WORKFLOW_CACHE_ACQUIRE = "workflow_cache_acquire"
 EVENT_WORKFLOW_CACHE_RELEASE = "workflow_cache_release"
 EVENT_WORKFLOW_CACHE_EVICT = "workflow_cache_evict"
+
+EVENT_WORKFLOW_RESOURCE_CREATE = "workflow_resource_create"
+EVENT_WORKFLOW_RESOURCE_WRITE = "workflow_resource_write"
+EVENT_WORKFLOW_RESOURCE_COMMIT = "workflow_resource_commit"
+EVENT_WORKFLOW_RESOURCE_DISCARD = "workflow_resource_discard"
 
 WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED = "dependency_failed"
 WORKFLOW_NODE_CANCELLED_REASON_UPSTREAM_CANCELLED = "upstream_cancelled"
@@ -290,6 +299,38 @@ _EVENT_CATALOG: List[EventDescriptor] = [
         payload_policy="full",
         payload_type=WorkflowCacheEvictEvent.__name__,
     ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_RESOURCE_CREATE,
+        summary="workflow resource create",
+        key_fields=("workflow_node_id", "resource_type", "resource_id"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowResourceCreateEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_RESOURCE_WRITE,
+        summary="workflow resource write",
+        key_fields=("workflow_node_id", "resource_type", "resource_id", "write_kind", "action"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowResourceWriteEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_RESOURCE_COMMIT,
+        summary="workflow resource commit",
+        key_fields=("workflow_node_id", "resource_type", "resource_id"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowResourceCommitEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_RESOURCE_DISCARD,
+        summary="workflow resource discard",
+        key_fields=("workflow_node_id", "resource_type", "resource_id", "reason"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowResourceDiscardEvent.__name__,
+    ),
 ]
 
 
@@ -326,6 +367,10 @@ __all__ = [
     "EVENT_WORKFLOW_NODE_CANCELLED",
     "EVENT_WORKFLOW_NODE_END",
     "EVENT_WORKFLOW_NODE_START",
+    "EVENT_WORKFLOW_RESOURCE_COMMIT",
+    "EVENT_WORKFLOW_RESOURCE_CREATE",
+    "EVENT_WORKFLOW_RESOURCE_DISCARD",
+    "EVENT_WORKFLOW_RESOURCE_WRITE",
     "WORKFLOW_EVENT_PREFIXES",
     "WORKFLOW_EVENT_PREFIX_CACHE",
     "WORKFLOW_EVENT_PREFIX_NODE",

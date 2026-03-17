@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 
 class WorkflowNodeType(str, Enum):
@@ -12,6 +12,14 @@ class WorkflowNodeType(str, Enum):
 
 
 @dataclass(frozen=True)
+class WorkflowResourceIr:
+    resource_id: str
+    resource_type: str
+    path: str
+    options: Optional[Dict[str, object]] = None
+
+
+@dataclass(frozen=True)
 class WorkflowNodeIr:
     node_id: str
     node_type: WorkflowNodeType
@@ -19,6 +27,36 @@ class WorkflowNodeIr:
     deps: Tuple[str, ...] = ()
     demand_path: Optional[str] = None
     init_vars: Optional[Dict[str, object]] = None
+
+
+@dataclass(frozen=True)
+class WriteSheetNodeIr:
+    node_id: str
+    node_type: WorkflowNodeType
+    decl_order: int
+    deps: Tuple[str, ...] = ()
+    resource_type: str = ""
+    resource_id: str = ""
+    sheet: str = ""
+    input_node_id: str = ""
+    input_output_id: str = ""
+    on_conflict: str = "error"
+
+
+@dataclass(frozen=True)
+class AppendSheetNodeIr:
+    node_id: str
+    node_type: WorkflowNodeType
+    decl_order: int
+    deps: Tuple[str, ...] = ()
+    resource_type: str = ""
+    resource_id: str = ""
+    sheet: Optional[str] = None
+    input_node_id: str = ""
+    input_output_id: str = ""
+    align_by: str = "field_id"
+    header_policy: str = "once"
+    on_mismatch: str = "error"
 
 
 @dataclass(frozen=True)
@@ -66,10 +104,13 @@ class WorkflowArtifactsIr:
     slots_by_node_id: Dict[str, Tuple[str, ...]]
 
 
+WorkflowAnyNodeIr = Union[WorkflowNodeIr, WriteSheetNodeIr, AppendSheetNodeIr]
+
+
 @dataclass(frozen=True)
 class WorkflowIr:
-    nodes: Tuple[WorkflowNodeIr, ...]
+    nodes: Tuple[WorkflowAnyNodeIr, ...]
     edges: Tuple[WorkflowEdgeIr, ...]
     options: WorkflowOptionsIr
-    resources: Dict[str, object]
+    resources: Tuple[WorkflowResourceIr, ...]
     artifacts: WorkflowArtifactsIr

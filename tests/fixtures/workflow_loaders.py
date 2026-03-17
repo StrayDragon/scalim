@@ -46,3 +46,34 @@ def load_preload_table_alt(**kwargs: object) -> Dict[int, Mapping[str, object]]:
     with _LOCK:
         _PRELOAD_CALLS += 1
     return {1: {"id": 1, "value": "alt"}}
+
+
+def load_table_a_fast() -> Iterable[Mapping[str, object]]:
+    return [
+        {"id": "a1", "value": "A1"},
+        {"id": "a2", "value": "A2"},
+    ]
+
+
+def load_table_b_fast() -> Iterable[Mapping[str, object]]:
+    return [
+        {"id": "b1", "value": "B1"},
+        {"id": "b2", "value": "B2"},
+    ]
+
+
+def load_table_c_slow() -> Iterable[Mapping[str, object]]:
+    time.sleep(0.05)
+    return [
+        {"id": "c1", "value": "C1"},
+    ]
+
+
+def load_table_mismatch() -> Iterable[Mapping[str, object]]:
+    return [
+        {"id": "m1", "other": "X"},
+    ]
+
+
+def load_table_raises() -> Iterable[Mapping[str, object]]:
+    raise ValueError("boom")

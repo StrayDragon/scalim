@@ -260,6 +260,181 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
 
+        workbook_resource: Dict[str, Any] = {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "workbook 输出路径(非空字符串)",
+                    "markdownDescription": "workbook 输出路径(非空字符串).",
+                    "examples": ["./out/report.xlsx"],
+                }
+            },
+            "additionalProperties": False,
+        }
+
+        csv_resource: Dict[str, Any] = {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "csv 输出路径(非空字符串)",
+                    "markdownDescription": "csv 输出路径(非空字符串).",
+                    "examples": ["./out/report.csv"],
+                }
+            },
+            "additionalProperties": False,
+        }
+
+        write_to_workbook_sheet: Dict[str, Any] = {
+            "type": "object",
+            "required": ["workbook", "sheet", "output"],
+            "properties": {
+                "workbook": {"type": "string", "minLength": 1},
+                "sheet": {"type": "string", "minLength": 1},
+                "output": {"type": "string", "minLength": 1},
+                "on_conflict": {
+                    "type": "string",
+                    "enum": ["error", "overwrite", "skip"],
+                    "default": "error",
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        write_to_workbook_append: Dict[str, Any] = {
+            "type": "object",
+            "required": ["workbook", "sheet", "output"],
+            "properties": {
+                "workbook": {"type": "string", "minLength": 1},
+                "sheet": {"type": "string", "minLength": 1},
+                "output": {"type": "string", "minLength": 1},
+                "align_by": {
+                    "type": "string",
+                    "enum": ["field_id", "header"],
+                    "default": "field_id",
+                },
+                "header_policy": {
+                    "type": "string",
+                    "enum": ["once", "always", "never"],
+                    "default": "once",
+                },
+                "on_mismatch": {
+                    "type": "string",
+                    "enum": ["error", "warn", "skip"],
+                    "default": "error",
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        write_to_csv_append: Dict[str, Any] = {
+            "type": "object",
+            "required": ["csv", "output"],
+            "properties": {
+                "csv": {"type": "string", "minLength": 1},
+                "output": {"type": "string", "minLength": 1},
+                "header_policy": {
+                    "type": "string",
+                    "enum": ["once", "always", "never"],
+                    "default": "once",
+                },
+                "on_mismatch": {
+                    "type": "string",
+                    "enum": ["error", "warn", "skip"],
+                    "default": "error",
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        # 占位符: 由 `workflow-sheetbook-resources` (`c40`) 定义.
+        write_to_sheetbook_sheet: Dict[str, Any] = {
+            "type": "object",
+            "required": ["sheetbook", "sheet", "output"],
+            "properties": {
+                "sheetbook": {"type": "string", "minLength": 1},
+                "sheet": {"type": "string", "minLength": 1},
+                "output": {"type": "string", "minLength": 1},
+                "on_conflict": {
+                    "type": "string",
+                    "enum": ["error", "overwrite", "skip"],
+                    "default": "error",
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        # 占位符: 由 `workflow-sheetbook-resources` (`c40`) 定义.
+        write_to_sheetbook_append: Dict[str, Any] = {
+            "type": "object",
+            "required": ["sheetbook", "sheet", "output"],
+            "properties": {
+                "sheetbook": {"type": "string", "minLength": 1},
+                "sheet": {"type": "string", "minLength": 1},
+                "output": {"type": "string", "minLength": 1},
+                "align_by": {
+                    "type": "string",
+                    "enum": ["field_id", "header"],
+                    "default": "field_id",
+                },
+                "header_policy": {
+                    "type": "string",
+                    "enum": ["once", "always", "never"],
+                    "default": "once",
+                },
+                "on_mismatch": {
+                    "type": "string",
+                    "enum": ["error", "warn", "skip"],
+                    "default": "error",
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        write_to: Dict[str, Any] = {
+            "oneOf": [
+                {"type": "null"},
+                {
+                    "type": "object",
+                    "required": ["workbook_sheet"],
+                    "properties": {"workbook_sheet": write_to_workbook_sheet},
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "required": ["workbook_append"],
+                    "properties": {"workbook_append": write_to_workbook_append},
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "required": ["csv_append"],
+                    "properties": {"csv_append": write_to_csv_append},
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "required": ["sheetbook_sheet"],
+                    "properties": {"sheetbook_sheet": write_to_sheetbook_sheet},
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "required": ["sheetbook_append"],
+                    "properties": {"sheetbook_append": write_to_sheetbook_append},
+                    "additionalProperties": False,
+                },
+            ],
+            "default": None,
+            "description": "共享输出写入意图简写(可选)",
+            "markdownDescription": ("共享输出写入意图简写(可选).\n\n- MUST 恰好选择一个 write intent\n- `sheetbook_*` 由后续变更定义"),
+        }
+
         run_item: Dict[str, Any] = {
             "type": "object",
             "required": ["id", "demand"],
@@ -300,6 +475,7 @@ class SchemaBuilder:
                     "description": "demand compile-time init_vars(可选,支持 $ctx 指令)",
                     "markdownDescription": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令).",
                 },
+                "write_to": write_to,
             },
             "additionalProperties": False,
         }
@@ -316,9 +492,23 @@ class SchemaBuilder:
                 "options": options,
                 "resources": {
                     "type": "object",
-                    "description": "workflow-scope resources (v0 placeholder)",
-                    "markdownDescription": "workflow-scope resources (v0 placeholder).",
-                    "additionalProperties": True,
+                    "properties": {
+                        "workbooks": {
+                            "type": "object",
+                            "default": {},
+                            "propertyNames": {"type": "string", "minLength": 1},
+                            "additionalProperties": workbook_resource,
+                        },
+                        "csvs": {
+                            "type": "object",
+                            "default": {},
+                            "propertyNames": {"type": "string", "minLength": 1},
+                            "additionalProperties": csv_resource,
+                        },
+                    },
+                    "description": "workflow-scope shared output resources",
+                    "markdownDescription": "workflow-scope shared output resources.",
+                    "additionalProperties": False,
                 },
             },
             "additionalProperties": False,
