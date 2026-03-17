@@ -1,5 +1,5 @@
 import re
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 from ...schema_dsl.constants import (
@@ -51,7 +51,88 @@ def _non_empty_str(raw: object) -> str:
     return str(raw).strip()
 
 
+@dataclass(frozen=True)
+class _AggregateFieldDef:
+    out_field_id: str
+    data: Dict[str, Any]
+
+
+class _AggregateAliasIndex:
+    def __init__(self) -> None:
+        self._by_obj_id: Dict[int, str] = {}
+
+    def add(self, data: Dict[str, Any], out_field_id: str) -> None:
+        self._by_obj_id[id(data)] = out_field_id
+
+    def get(self, item: Dict[str, Any]) -> Optional[str]:
+        return self._by_obj_id.get(id(item))
+
+
+@dataclass(frozen=True)
+class _AggregateFieldIndex:
+    field_defs: List[_AggregateFieldDef]
+    alias_index: _AggregateAliasIndex
+
+
 class ParserOutputsMixin:
+    def _build_aggregate_field_index(self, raw_fields: Dict[str, Any]) -> _AggregateFieldIndex:
+        field_defs: List[_AggregateFieldDef] = []
+        alias_index = _AggregateAliasIndex()
+        for out_field_id_raw, field_raw in raw_fields.items():
+            out_field_id = str(out_field_id_raw or "").strip()
+            if not out_field_id:
+                continue
+            if not isinstance(field_raw, dict):
+                continue
+            field_dict = cast("Dict[str, Any]", field_raw)
+            field_defs.append(_AggregateFieldDef(out_field_id=out_field_id, data=field_dict))
+            alias_index.add(field_dict, out_field_id)
+        return _AggregateFieldIndex(field_defs=field_defs, alias_index=alias_index)
+
+    def _resolve_field_ref(  # noqa: C901
+        self,
+        item: object,
+        *,
+        path: str,
+        field_def_index: FieldDefIndex,
+        agg_field_index: Optional[_AggregateFieldIndex] = None,
+    ) -> str:
+        if isinstance(item, str):
+            return item.strip()
+
+        typed = mapping_or_none(item)
+        if typed is None:
+            msg = "{} must be field_id string, YAML alias(object), or YAML alias(list)".format(path)
+            raise TypeError(msg)
+
+        if agg_field_index is not None:
+            out_field_id = agg_field_index.alias_index.get(typed)
+            if out_field_id is not None:
+                return out_field_id
+
+        direct = field_def_index.alias_index.get(typed)
+        if direct is not None:
+            return direct.field_id
+
+        # 当 YAML `alias` 的对象 `identity` 丢失(例如 `YAML merge` 产生新对象)时,允许基于内容做兜底匹配(仅唯一匹配时通过).
+        matches: List[str] = []
+        if agg_field_index is not None:
+            matches.extend([fd.out_field_id for fd in agg_field_index.field_defs if fd.data == typed])
+        matches.extend([fd.field_id for fd in field_def_index.field_defs if fd.data == typed])
+
+        if not matches:
+            msg = "{} cannot resolve object to a unique field_id; prefer string field_id".format(path)
+            raise ValueError(msg)
+
+        unique = sorted(set(matches))
+        if len(unique) > 1:
+            msg = "{} is ambiguous; object matches multiple field_id values: {}. Use string field_id to disambiguate.".format(
+                path,
+                ", ".join(unique),
+            )
+            raise ValueError(msg)
+        return unique[0]
+
     def _validate_output_name(self, value: str, *, path: str) -> None:
         if not value:
             msg = "{} is required".format(path)
@@ -69,34 +150,8 @@ class ParserOutputsMixin:
         field_path: str,
         field_def_index: FieldDefIndex,
     ) -> str:
-        if isinstance(item, str):
-            return item.strip()
-
-        typed = mapping_or_none(item)
-        if typed is None:
-            msg = "{}.{}.fields.{} must be field_id string, YAML alias(object), or YAML alias(list)".format(
-                outputs_key, output_idx, field_path
-            )
-            raise TypeError(msg)
-
-        direct = field_def_index.alias_index.get(typed)
-        if direct is not None:
-            return direct.field_id
-
-        # 当 YAML `alias` 的对象 `identity` 丢失(例如 `YAML merge` 产生新对象)时,允许基于内容做兜底匹配(仅唯一匹配时通过).
-        matches = [fd for fd in field_def_index.field_defs if fd.data == typed]
         path = "{}.{}.fields.{}".format(outputs_key, output_idx, field_path)
-        if not matches:
-            msg = "{} cannot resolve object to a unique field_id; prefer string field_id".format(path)
-            raise ValueError(msg)
-        if len(matches) > 1:
-            candidates = sorted({m.field_id for m in matches})
-            msg = "{} is ambiguous; object matches multiple field_id values: {}. Use string field_id to disambiguate.".format(
-                path,
-                ", ".join(candidates),
-            )
-            raise ValueError(msg)
-        return matches[0].field_id
+        return self._resolve_field_ref(item, path=path, field_def_index=field_def_index)
 
     def _walk_output_field_items(self, item: object, *, field_path: str) -> List[Tuple[str, object]]:
         nested = list_or_none(item)
@@ -251,7 +306,15 @@ class ParserOutputsMixin:
         )
 
         agg_raw = mapping_or_none(raw_target.get(OUTPUT_TARGET_KEYS["aggregate"]))
-        aggregate = self._parse_output_aggregate(agg_raw, base_path="{}.{}.aggregate".format(outputs_key, idx)) if agg_raw else None
+        aggregate = (
+            self._parse_output_aggregate(
+                agg_raw,
+                base_path="{}.{}.aggregate".format(outputs_key, idx),
+                field_def_index=field_def_index,
+            )
+            if agg_raw
+            else None
+        )
 
         return OutputTargetConfig(
             name=name,
@@ -303,7 +366,13 @@ class ParserOutputsMixin:
             write_lock=write_lock,
         )
 
-    def _parse_output_aggregate(self, raw: Dict[str, Any], *, base_path: str) -> OutputAggregateConfig:  # noqa: C901
+    def _parse_output_aggregate(  # noqa: C901
+        self,
+        raw: Dict[str, Any],
+        *,
+        base_path: str,
+        field_def_index: FieldDefIndex,
+    ) -> OutputAggregateConfig:
         if "metrics" in raw:
             msg = "{}.metrics was removed; use {}.fields".format(base_path, base_path)
             raise ValueError(msg)
@@ -317,12 +386,24 @@ class ParserOutputsMixin:
         if group_by_list is None:
             msg = "{}.group_by must be a list".format(base_path)
             raise TypeError(msg)
-        group_by = tuple(str(item or "").strip() for item in group_by_list if str(item or "").strip())
+        group_by: List[str] = []
+        for outer_idx, field_item in enumerate(group_by_list):
+            flattened = self._walk_output_field_items(field_item, field_path=str(outer_idx))
+            for field_path, leaf in flattened:
+                field_id = self._resolve_field_ref(
+                    leaf,
+                    path="{}.group_by.{}".format(base_path, field_path),
+                    field_def_index=field_def_index,
+                )
+                if field_id:
+                    group_by.append(field_id)
+        group_by_t = tuple(group_by)
 
         fields_raw = mapping_or_none(raw.get(OUTPUT_AGGREGATE_KEYS["fields"]))
         if fields_raw is None:
             msg = "{}.fields must be an object".format(base_path)
             raise TypeError(msg)
+        agg_field_index = self._build_aggregate_field_index(fields_raw)
         fields: Dict[str, OutputAggregateFieldConfig] = {}
         for out_field_id_raw, field_raw in fields_raw.items():
             out_field_id = str(out_field_id_raw or "").strip()
@@ -331,6 +412,8 @@ class ParserOutputsMixin:
             fields[out_field_id] = self._parse_output_aggregate_field(
                 field_raw,
                 base_path="{}.fields.{}".format(base_path, out_field_id),
+                field_def_index=field_def_index,
+                agg_field_index=agg_field_index,
             )
 
         max_groups = int(raw.get(OUTPUT_AGGREGATE_KEYS["max_groups"], 0) or 0)
@@ -352,7 +435,7 @@ class ParserOutputsMixin:
             raise ValueError(msg)
 
         return OutputAggregateConfig(
-            group_by=group_by,
+            group_by=group_by_t,
             fields=fields,
             max_groups=max_groups,
             max_distinct=max_distinct,
@@ -364,6 +447,8 @@ class ParserOutputsMixin:
         raw: object,
         *,
         base_path: str,
+        field_def_index: FieldDefIndex,
+        agg_field_index: _AggregateFieldIndex,
     ) -> OutputAggregateFieldConfig:
         typed = mapping_or_none(raw)
         if typed is None:
@@ -390,13 +475,29 @@ class ParserOutputsMixin:
 
         producer_key, producer_value = normalized[0]
         if producer_key in _AGG_FUNC_KEYS:
-            cfg = self._parse_output_aggregate_field_agg(producer_key, producer_value, base_path=base_path)
+            cfg = self._parse_output_aggregate_field_agg(
+                producer_key,
+                producer_value,
+                base_path=base_path,
+                field_def_index=field_def_index,
+            )
         elif producer_key in _RANK_FUNC_KEYS:
-            cfg = self._parse_output_aggregate_field_rank(producer_key, producer_value, base_path=base_path)
+            cfg = self._parse_output_aggregate_field_rank(
+                producer_key,
+                producer_value,
+                base_path=base_path,
+                field_def_index=field_def_index,
+                agg_field_index=agg_field_index,
+            )
         elif producer_key == "call_by":
             cfg = self._parse_output_aggregate_field_call_by(producer_value, base_path=base_path)
         elif producer_key == "score_by_rank":
-            cfg = self._parse_output_aggregate_field_score_by_rank(producer_value, base_path=base_path)
+            cfg = self._parse_output_aggregate_field_score_by_rank(
+                producer_value,
+                base_path=base_path,
+                field_def_index=field_def_index,
+                agg_field_index=agg_field_index,
+            )
         else:
             allowed = ", ".join(list(_AGG_FUNC_KEYS) + list(_RANK_FUNC_KEYS) + list(_POST_FUNC_KEYS))
             msg = "{} has unknown producer key {!r}; expected one of: {}".format(base_path, producer_key, allowed)
@@ -405,7 +506,12 @@ class ParserOutputsMixin:
         return OutputAggregateFieldConfig(producer_key=producer_key, config=cfg)
 
     def _parse_output_aggregate_field_agg(  # noqa: C901, PLR0912, PLR0915
-        self, producer_key: str, raw: object, *, base_path: str
+        self,
+        producer_key: str,
+        raw: object,
+        *,
+        base_path: str,
+        field_def_index: FieldDefIndex,
     ) -> Dict[str, Any]:
         args = mapping_or_none(raw)
         if args is None:
@@ -436,8 +542,16 @@ class ParserOutputsMixin:
 
         out: Dict[str, Any] = {}
         if "field" in args:
-            field_id = _non_empty_str(args.get("field"))
-            out["field"] = field_id or None
+            raw_field = args.get("field")
+            if raw_field is None:
+                out["field"] = None
+            else:
+                field_id = self._resolve_field_ref(
+                    raw_field,
+                    path="{}.{}.field".format(base_path, producer_key),
+                    field_def_index=field_def_index,
+                )
+                out["field"] = field_id or None
         if "fields" in args:
             raw_fields = args.get("fields")
             fields_list = list_or_none(raw_fields)
@@ -445,8 +559,18 @@ class ParserOutputsMixin:
                 msg = "{}.{}.fields must be a list".format(base_path, producer_key)
                 raise TypeError(msg)
             if fields_list is not None:
-                normalized = [str(item or "").strip() for item in fields_list if str(item or "").strip()]
-                out["fields"] = tuple(normalized) if normalized else ()
+                normalized_fields: List[str] = []
+                for outer_idx, field_item in enumerate(fields_list):
+                    flattened = self._walk_output_field_items(field_item, field_path=str(outer_idx))
+                    for field_path, leaf in flattened:
+                        fid = self._resolve_field_ref(
+                            leaf,
+                            path="{}.{}.fields.{}".format(base_path, producer_key, field_path),
+                            field_def_index=field_def_index,
+                        )
+                        if fid:
+                            normalized_fields.append(fid)
+                out["fields"] = tuple(normalized_fields) if normalized_fields else ()
 
         if required_keys:
             for k in required_keys:
@@ -475,7 +599,15 @@ class ParserOutputsMixin:
 
         return out
 
-    def _parse_output_aggregate_field_rank(self, producer_key: str, raw: object, *, base_path: str) -> Dict[str, Any]:  # noqa: C901
+    def _parse_output_aggregate_field_rank(  # noqa: C901
+        self,
+        producer_key: str,
+        raw: object,
+        *,
+        base_path: str,
+        field_def_index: FieldDefIndex,
+        agg_field_index: _AggregateFieldIndex,
+    ) -> Dict[str, Any]:
         args = mapping_or_none(raw)
         if args is None:
             msg = "{}.{} must be an object".format(base_path, producer_key)
@@ -487,7 +619,16 @@ class ParserOutputsMixin:
             msg = "{}.{} has unknown keys: {}".format(base_path, producer_key, ", ".join(unknown))
             raise ValueError(msg)
 
-        by = _non_empty_str(args.get("by"))
+        raw_by = args.get("by")
+        if raw_by is None:
+            msg = "{}.{}.by is required".format(base_path, producer_key)
+            raise ValueError(msg)
+        by = self._resolve_field_ref(
+            raw_by,
+            path="{}.{}.by".format(base_path, producer_key),
+            field_def_index=field_def_index,
+            agg_field_index=agg_field_index,
+        )
         if not by:
             msg = "{}.{}.by is required".format(base_path, producer_key)
             raise ValueError(msg)
@@ -498,11 +639,21 @@ class ParserOutputsMixin:
             raise TypeError(msg)
         partition_by: Tuple[str, ...] = ()
         if partition_by_list is not None:
-            normalized = [str(item or "").strip() for item in partition_by_list if str(item or "").strip()]
-            if not normalized:
+            normalized_partition_by: List[str] = []
+            for outer_idx, part_item in enumerate(partition_by_list):
+                flattened = self._walk_output_field_items(part_item, field_path=str(outer_idx))
+                for field_path, leaf in flattened:
+                    fid = self._resolve_field_ref(
+                        leaf,
+                        path="{}.{}.partition_by.{}".format(base_path, producer_key, field_path),
+                        field_def_index=field_def_index,
+                    )
+                    if fid:
+                        normalized_partition_by.append(fid)
+            if not normalized_partition_by:
                 msg = "{}.{}.partition_by must not be empty".format(base_path, producer_key)
                 raise ValueError(msg)
-            partition_by = tuple(normalized)
+            partition_by = tuple(normalized_partition_by)
 
         order = str(args.get("order") or "desc").lower()
         if order not in _AGG_RANK_ORDER_ENUM:
@@ -515,11 +666,22 @@ class ParserOutputsMixin:
             raise TypeError(msg)
         order_by: Tuple[str, ...] = ()
         if order_by_list is not None:
-            normalized = [str(item or "").strip() for item in order_by_list if str(item or "").strip()]
-            if not normalized:
+            normalized_order_by: List[str] = []
+            for outer_idx, order_item in enumerate(order_by_list):
+                flattened = self._walk_output_field_items(order_item, field_path=str(outer_idx))
+                for field_path, leaf in flattened:
+                    fid = self._resolve_field_ref(
+                        leaf,
+                        path="{}.{}.order_by.{}".format(base_path, producer_key, field_path),
+                        field_def_index=field_def_index,
+                        agg_field_index=agg_field_index,
+                    )
+                    if fid:
+                        normalized_order_by.append(fid)
+            if not normalized_order_by:
                 msg = "{}.{}.order_by must not be empty".format(base_path, producer_key)
                 raise ValueError(msg)
-            order_by = tuple(normalized)
+            order_by = tuple(normalized_order_by)
 
         top_k = int(args.get("top_k", 0) or 0)
         if top_k < 0:
@@ -560,7 +722,14 @@ class ParserOutputsMixin:
             raise ValueError(msg) from exc
         return call_by
 
-    def _parse_output_aggregate_field_score_by_rank(self, raw: object, *, base_path: str) -> Dict[str, Any]:
+    def _parse_output_aggregate_field_score_by_rank(
+        self,
+        raw: object,
+        *,
+        base_path: str,
+        field_def_index: FieldDefIndex,
+        agg_field_index: _AggregateFieldIndex,
+    ) -> Dict[str, Any]:
         args = mapping_or_none(raw)
         if args is None:
             msg = "{}.score_by_rank must be an object".format(base_path)
@@ -570,8 +739,17 @@ class ParserOutputsMixin:
         if unknown:
             msg = "{}.score_by_rank has unknown keys: {}".format(base_path, ", ".join(unknown))
             raise ValueError(msg)
-        rank_field = str_or_none(args.get("rank_field"))
-        rank_field = _non_empty_str(rank_field) or None
+        rank_field = None
+        if "rank_field" in args:
+            rank_field_raw = args.get("rank_field")
+            if rank_field_raw is not None:
+                rank_field = self._resolve_field_ref(
+                    rank_field_raw,
+                    path="{}.score_by_rank.rank_field".format(base_path),
+                    field_def_index=field_def_index,
+                    agg_field_index=agg_field_index,
+                )
+                rank_field = _non_empty_str(rank_field) or None
         return {
             "rank_field": rank_field,
             "base": args.get("base"),

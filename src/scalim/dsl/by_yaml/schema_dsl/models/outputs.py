@@ -21,6 +21,19 @@ _OUTPUT_NAME_SCHEMA = {
     "examples": ["detail", "direct_detail", "by_cs"],
 }
 
+_FIELD_REF_OR_ALIAS_SCHEMA = {"anyOf": [FIELD_ID_STRING_SCHEMA, {"type": "object"}]}
+_FIELD_REF_LIST_ITEM_SCHEMA = {
+    "anyOf": [
+        FIELD_ID_STRING_SCHEMA,
+        {"type": "object"},
+        {
+            "type": "array",
+            "items": _FIELD_REF_OR_ALIAS_SCHEMA,
+            "minItems": 1,
+        },
+    ]
+}
+
 
 @dataclass(frozen=True)
 class OutputContainerConfig:
@@ -173,10 +186,41 @@ class OutputAggregateConfig:
     group_by: Tuple[str, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
-            schema={"type": "array", "items": FIELD_ID_STRING_SCHEMA, "minItems": 1},
+            schema={
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "anyOf": [
+                        FIELD_ID_STRING_SCHEMA,
+                        {"type": "object"},
+                        {
+                            "type": "array",
+                            "items": {"anyOf": [FIELD_ID_STRING_SCHEMA, {"type": "object"}]},
+                            "minItems": 1,
+                        },
+                    ]
+                },
+            },
             desc="分组字段列表",
             md=(
-                "分组字段列表(`field_id` 列表).\n\n"
+                "分组字段列表(`field_id` 列表; 支持 YAML alias).\n\n"
+                "支持两种等价写法:\n\n"
+                "1) 直接写 `field_id` 字符串:\n\n"
+                "```yaml\n"
+                "group_by: [cs_id, cs_name]\n"
+                "```\n\n"
+                "2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n"
+                "```yaml\n"
+                "main_source:\n"
+                "  fields:\n"
+                "    cs_id: &cs_id {extract: cs_id}\n"
+                "outputs:\n"
+                "  - name: by_cs\n"
+                "    aggregate:\n"
+                "      group_by:\n"
+                "        - *cs_id\n"
+                "```\n\n"
+                "注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n"
                 "- `group_by` 引用的是输入行字段(`field_id`),来自 `where` 过滤后的行流\n"
                 "- 每个唯一的 group key 组合会产生 1 行聚合输出\n"
                 "- `partition_by`(排名分区)要求为 `group_by` 子集,用于保证聚合输出可解释性"
@@ -205,7 +249,7 @@ class OutputAggregateConfig:
                                     "additionalProperties": False,
                                     "properties": {
                                         "field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "可选:输入字段(field_id);提供时统计非空值个数",
                                             "markdownDescription": "可选:输入字段(`field_id`);提供时统计非空值个数.",
                                             "examples": ["order_id"],
@@ -233,7 +277,7 @@ class OutputAggregateConfig:
                                     "required": ["field"],
                                     "properties": {
                                         "field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "输入字段(field_id)",
                                             "markdownDescription": "输入字段(`field_id`).",
                                             "examples": ["amount_yuan"],
@@ -261,7 +305,7 @@ class OutputAggregateConfig:
                                     "required": ["field"],
                                     "properties": {
                                         "field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "输入字段(field_id)",
                                             "markdownDescription": "输入字段(`field_id`).",
                                             "examples": ["amount_yuan"],
@@ -284,7 +328,7 @@ class OutputAggregateConfig:
                                     "required": ["field"],
                                     "properties": {
                                         "field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "输入字段(field_id)",
                                             "markdownDescription": "输入字段(`field_id`).",
                                             "examples": ["amount_yuan"],
@@ -307,7 +351,7 @@ class OutputAggregateConfig:
                                     "required": ["field"],
                                     "properties": {
                                         "field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "输入字段(field_id)",
                                             "markdownDescription": "输入字段(`field_id`).",
                                             "examples": ["is_paid"],
@@ -330,7 +374,7 @@ class OutputAggregateConfig:
                                     "required": ["field", "threshold"],
                                     "properties": {
                                         "field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "输入字段(field_id)",
                                             "markdownDescription": "输入字段(`field_id`).",
                                             "examples": ["amount_yuan"],
@@ -369,14 +413,14 @@ class OutputAggregateConfig:
                                     ],
                                     "properties": {
                                         "field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "输入字段(field_id)",
                                             "markdownDescription": "输入字段(`field_id`).",
                                             "examples": ["user_id"],
                                         },
                                         "fields": {
                                             "type": "array",
-                                            "items": FIELD_ID_STRING_SCHEMA,
+                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
                                             "minItems": 1,
                                             "description": "复合去重键(字段列表)",
                                             "markdownDescription": "复合去重键(`field_id` 列表).",
@@ -406,14 +450,14 @@ class OutputAggregateConfig:
                                     "required": ["by"],
                                     "properties": {
                                         "by": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "用于排序的字段(引用 group_by 或聚合指标字段)",
                                             "markdownDescription": "用于排序的字段(引用 `group_by` 或聚合指标字段).",
                                             "examples": ["sum_amount"],
                                         },
                                         "partition_by": {
                                             "type": "array",
-                                            "items": FIELD_ID_STRING_SCHEMA,
+                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
                                             "minItems": 1,
                                             "description": "可选:排名分区字段列表(必须是 group_by 子集)",
                                             "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
@@ -429,7 +473,7 @@ class OutputAggregateConfig:
                                         },
                                         "order_by": {
                                             "type": "array",
-                                            "items": FIELD_ID_STRING_SCHEMA,
+                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
                                             "minItems": 1,
                                             "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
                                             "markdownDescription": (
@@ -482,14 +526,14 @@ class OutputAggregateConfig:
                                     "required": ["by"],
                                     "properties": {
                                         "by": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
                                             "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
                                             "examples": ["sum_amount"],
                                         },
                                         "partition_by": {
                                             "type": "array",
-                                            "items": FIELD_ID_STRING_SCHEMA,
+                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
                                             "minItems": 1,
                                             "description": "可选:排名分区字段列表(必须是 group_by 子集)",
                                             "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
@@ -505,7 +549,7 @@ class OutputAggregateConfig:
                                         },
                                         "order_by": {
                                             "type": "array",
-                                            "items": FIELD_ID_STRING_SCHEMA,
+                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
                                             "minItems": 1,
                                             "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
                                             "markdownDescription": (
@@ -558,14 +602,14 @@ class OutputAggregateConfig:
                                     "required": ["by"],
                                     "properties": {
                                         "by": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或聚合指标字段)",
                                             "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或聚合指标字段).",
                                             "examples": ["sum_amount"],
                                         },
                                         "partition_by": {
                                             "type": "array",
-                                            "items": FIELD_ID_STRING_SCHEMA,
+                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
                                             "minItems": 1,
                                             "description": "可选:排名分区字段列表(必须是 group_by 子集)",
                                             "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
@@ -581,7 +625,7 @@ class OutputAggregateConfig:
                                         },
                                         "order_by": {
                                             "type": "array",
-                                            "items": FIELD_ID_STRING_SCHEMA,
+                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
                                             "minItems": 1,
                                             "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
                                             "markdownDescription": (
@@ -633,7 +677,7 @@ class OutputAggregateConfig:
                                     "additionalProperties": False,
                                     "properties": {
                                         "rank_field": {
-                                            **FIELD_ID_STRING_SCHEMA,
+                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
                                             "description": "可选:引用的排名字段(out_field_id);缺省为 'rank'",
                                             "markdownDescription": "可选:引用的排名字段(out_field_id);缺省为 `rank`.",
                                             "examples": ["rank"],
