@@ -50,4 +50,32 @@ else
 fi
 
 PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python -m compileall -q "$repo_root/src/scalim"
-PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python -c "from scalim.dsl.by_yaml import Compilation, RunOverrides; from scalim.execution import ScalimEngine; from scalim.ob import Observability; from scalim.planning import PlanBuilder; from scalim.spec.ir import DemandIr; from scalim.vendor.compact.typing_extensionsx import Self, override; _ = (Compilation, DemandIr, Observability, PlanBuilder, RunOverrides, ScalimEngine, Self, override); print('检查通过: typing-extensions 4.1.1')"
+PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python - <<'PY'
+# 说明:
+# - 该检查刻意不安装 openpyxl/pandas 等可选依赖,用于捕获“import 时炸”的回归.
+# - compileall 仅能发现语法问题; import smoke test 才能覆盖注解求值差异等问题(Python 3.6 典型坑).
+
+from scalim.dsl.by_yaml import *  # noqa: F401,F403
+from scalim.dsl.by_yaml.runtime import workflow_entrypoints  # noqa: F401
+from scalim.execution import ScalimEngine  # noqa: F401
+from scalim.execution import output_composition  # noqa: F401
+from scalim.execution.preload_cache import PreloadCache  # noqa: F401
+from scalim.ob import Observability  # noqa: F401
+from scalim.planning import PlanBuilder  # noqa: F401
+from scalim.spec.ir import DemandIr  # noqa: F401
+from scalim.vendor.compact.typing_extensionsx import Self, override  # noqa: F401
+
+_ = (
+    DemandIr,
+    Observability,
+    PlanBuilder,
+    PreloadCache,
+    ScalimEngine,
+    Self,
+    output_composition,
+    override,
+    workflow_entrypoints,
+)
+
+print("检查通过: py36 + typing-extensions 4.1.1 + workflow import smoke")
+PY

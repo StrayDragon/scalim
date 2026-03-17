@@ -1,7 +1,6 @@
 import threading
-from collections.abc import Iterator
 from collections.abc import MutableMapping as MutableMappingABC
-from typing import TYPE_CHECKING, Callable, Dict
+from typing import TYPE_CHECKING, Callable, Dict, Iterator
 
 from ..typedefs import LoaderResultMapping
 from ..vendor.compact.typing_extensionsx import override

@@ -218,6 +218,18 @@
 - **WHEN** 开发者运行 `just qa`(或相关 py36 检查任务)
 - **THEN** 命令 MUST 失败并提示需要安装/启动 docker
 
+### Requirement: py36-typingext-check MUST include workflow import smoke test
+系统 MUST 在 `py36-typingext-check`（docker 的 Python 3.6 + `typing-extensions==4.1.1` 隔离环境）中执行以下门禁:
+
+- 对 `src/scalim/` 执行 `compileall`
+- 对关键入口与 workflow 实现模块执行 import smoke test（至少覆盖 `scalim.dsl.by_yaml.runtime.workflow_entrypoints`）
+
+该门禁 MUST 能在 “import 时炸（例如注解求值不兼容）” 的场景下 fail-fast。
+
+#### Scenario: import-time annotation incompatibility fails the gate
+- **WHEN** 任一关键模块在 Python 3.6 import 阶段因注解求值/语义差异抛错
+- **THEN** `py36-typingext-check` MUST 失败
+
 ### Requirement: 稳定公开入口模块 `__all__` 必须被 examples gate 100% 覆盖
 系统 MUST 将以下稳定公开入口模块的 `__all__` 视为“面向框架用户的公开 API 覆盖清单”，并在 `notebooks/marimo/demo_big_data_report/chapters/` 的主线章节中提供 deterministic 的最小可运行示例以覆盖其全部导出符号：
 

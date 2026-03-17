@@ -5,7 +5,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from .._project_constants import VERSION as SCALIM_VERSION
 from ..events.catalog import EVENT_OUTPUT_TARGET_END
@@ -13,7 +13,6 @@ from ..events.events import OutputTargetEndEvent
 from ..ob.hub import InstrumentationHub
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..sinks.sink_csv import CSVSink
-from ..sinks.sink_excel import ExcelSink, ExcelWorkbookSink
 from ..typedefs import RowData
 from ..vendor.compact.typing_extensionsx import override
 from .derived_outputs import (
@@ -33,6 +32,9 @@ from .output_contracts import ExportLayout, OutputSpec
 OutputRowPredicate = Callable[[RowData], bool]
 
 _logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from ..sinks.sink_excel import ExcelWorkbookSink
 
 
 @dataclass(frozen=True)
@@ -426,7 +428,9 @@ def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
     )
 
 
-def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> ExcelSink:
+def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink:
+    from ..sinks.sink_excel import ExcelSink  # noqa: PLC0415
+
     field_names = list(layout.field_ids)
     header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
     sheet_name = str(output.sheet_name) if output.sheet_name else "Sheet1"
@@ -507,7 +511,7 @@ class RouterRowSink(BaseRowSink):
 
     _routes: List[_RouteState]
     _failure_policy: str
-    _workbook_resources: List[ExcelWorkbookSink]
+    _workbook_resources: List["ExcelWorkbookSink"]
     _meta_target: Optional[_FinalTargetState]
     _audit_target: Optional[_FinalTargetState]
     _emit_events: bool
@@ -531,7 +535,7 @@ class RouterRowSink(BaseRowSink):
         *,
         routes: Sequence[_RouteState],
         failure_policy: str,
-        workbook_resources: Sequence[ExcelWorkbookSink],
+        workbook_resources: Sequence["ExcelWorkbookSink"],
         meta_target: Optional[_FinalTargetState] = None,
         audit_target: Optional[_FinalTargetState] = None,
         emit_events: bool = False,
@@ -879,7 +883,7 @@ def _create_row_sink_for_composed_output(
     target_id: str,
     output: OutputSpec,
     layout: ExportLayout,
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
+    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> Tuple[IRowSink, _RowCounter]:
     fmt = (output.format or "csv").lower()
     if not output.path:
@@ -901,6 +905,8 @@ def _create_row_sink_for_composed_output(
 
         counter = _RowCounter()
         if output.sheet_name:
+            from ..sinks.sink_excel import ExcelWorkbookSink  # noqa: PLC0415
+
             path = str(output.path)
             wb = workbook_by_path.get(path)
             if wb is None:
@@ -960,7 +966,7 @@ def _append_direct_target_routes(
     routes: List[_RouteState],
     output_paths: Dict[str, str],
     targets: Sequence[OutputTargetSpec],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
+    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> None:
     for t in targets:
         sink, counter = _create_row_sink_for_composed_output(
@@ -1029,7 +1035,7 @@ def _append_derived_target_routes(
     routes: List[_RouteState],
     output_paths: Dict[str, str],
     targets: Sequence[DerivedOutputTargetSpec],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
+    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
     run_parallel_mode: str,
 ) -> None:
     for t in targets:
@@ -1070,7 +1076,7 @@ def _maybe_create_meta_target(
     *,
     meta_sheet: Optional[MetaSheetSpec],
     output_paths: Dict[str, str],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
+    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> Optional[_FinalTargetState]:
     if meta_sheet is None:
         return None
@@ -1106,7 +1112,7 @@ def _maybe_create_audit_target(
     *,
     audit_sheet: Optional[AuditSheetSpec],
     output_paths: Dict[str, str],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
+    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> Optional[_FinalTargetState]:
     if audit_sheet is None:
         return None
@@ -1179,7 +1185,7 @@ def build_output_composition(
     failure_policy = _normalize_failure_policy(spec.failure_policy)
     _validate_excel_workbook_sheet_names(spec)
 
-    workbook_by_path: Dict[str, ExcelWorkbookSink] = {}
+    workbook_by_path: Dict[str, "ExcelWorkbookSink"] = {}
     output_paths: Dict[str, str] = {}
 
     routes: List[_RouteState] = []
