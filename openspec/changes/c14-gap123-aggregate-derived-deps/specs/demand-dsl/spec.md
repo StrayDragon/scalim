@@ -19,3 +19,19 @@
 - **WHEN** demand 被编译并运行
 - **THEN** 编译期校验 MUST 通过,且 `all_integral` MUST 使用依赖字段的计算结果
 
+### Requirement: aggregate fields MUST support safe compute derived fields (`compute`)
+系统 MUST 支持在 `outputs.*.aggregate.fields.<out_field_id>` 中声明 `compute: <expression>` 以产生聚合后派生字段,并满足:
+
+- `compute` MUST 使用安全表达式引擎执行(与 `where`/顶层 `fields.*.compute` 一致的安全边界)
+- `compute` 的依赖字段 MUST 在编译期被提取并用于 DAG 执行计划与循环依赖诊断
+- `compute` 字段 MUST 可被 `rank.by`/`rank.order_by` 与其它派生字段(`compute`/`call_by`/`score_by_rank`)引用
+
+#### Scenario: compute ratio then rank-by-ratio is supported
+- **GIVEN** ratio 在 aggregate 内由 `compute` 产生(例如 `ratio = sum_a / sum_b`)
+- **WHEN** rank 字段以 `by: ratio` 引用该派生字段
+- **THEN** 编译期校验 MUST 通过,且运行时 MUST 产生稳定可预测的排名结果
+
+#### Scenario: compute depends on post is supported
+- **GIVEN** `total` 的 `compute` 引用其它 post 字段(例如 `s1`/`s2`)
+- **WHEN** demand 被编译并运行
+- **THEN** 编译期校验 MUST 通过,且 `total` MUST 使用依赖字段的计算结果
