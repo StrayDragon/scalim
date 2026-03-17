@@ -1,6 +1,6 @@
 # region imports
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from .manager import ObserverManager
 from .observer import Observer
@@ -35,7 +35,13 @@ class Observability:
     def register(self, observer: Observer) -> None:
         self.observers.append(observer)
 
-    def build_manager(self, *, run_id: Optional[str] = None, mode: str = "process") -> ObserverManager:
+    def build_manager(
+        self,
+        *,
+        run_id: Optional[str] = None,
+        event_meta_defaults: Optional[Dict[str, Any]] = None,
+        mode: str = "process",
+    ) -> ObserverManager:
         return ObserverManager(
             observers=list(self.observers),
             enable_debugging=self.enable_debugging,
@@ -43,6 +49,7 @@ class Observability:
             loader_result_policy=self.loader_result_policy,
             loader_result_sample_size=self.loader_result_sample_size,
             run_id=run_id,
+            event_meta_defaults=event_meta_defaults,
             mode=mode,
         )
 

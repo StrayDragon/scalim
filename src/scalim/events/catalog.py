@@ -22,6 +22,9 @@ from .events import (
     RowReleaseEvent,
     RowWriteEvent,
     StageSpanEvent,
+    WorkflowNodeCancelledEvent,
+    WorkflowNodeEndEvent,
+    WorkflowNodeStartEvent,
 )
 
 # endregion
@@ -44,6 +47,26 @@ EVENT_RELATION_LOOKUP = "relation_lookup"
 EVENT_STAGE_SPAN = "stage_span"
 EVENT_ADAPTIVE_SCHEDULER_DECISION = "adaptive_scheduler_decision"
 EVENT_OUTPUT_TARGET_END = "output_target_end"
+
+EVENT_WORKFLOW_NODE_START = "workflow_node_start"
+EVENT_WORKFLOW_NODE_END = "workflow_node_end"
+EVENT_WORKFLOW_NODE_CANCELLED = "workflow_node_cancelled"
+
+WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED = "dependency_failed"
+WORKFLOW_NODE_CANCELLED_REASON_UPSTREAM_CANCELLED = "upstream_cancelled"
+WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL = "policy_all_fail"
+
+WORKFLOW_NODE_END_STATUS_OK = "ok"
+WORKFLOW_NODE_END_STATUS_ERROR = "error"
+
+WORKFLOW_EVENT_PREFIX_NODE = "workflow_node_"
+WORKFLOW_EVENT_PREFIX_CACHE = "workflow_cache_"
+WORKFLOW_EVENT_PREFIX_RESOURCE = "workflow_resource_"
+WORKFLOW_EVENT_PREFIXES = (
+    WORKFLOW_EVENT_PREFIX_NODE,
+    WORKFLOW_EVENT_PREFIX_CACHE,
+    WORKFLOW_EVENT_PREFIX_RESOURCE,
+)
 
 
 @dataclass(frozen=True)
@@ -212,6 +235,30 @@ _EVENT_CATALOG: List[EventDescriptor] = [
         payload_policy="full",
         payload_type=OutputTargetEndEvent.__name__,
     ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_NODE_START,
+        summary="workflow 节点开始",
+        key_fields=("workflow_node_id", "node_type"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowNodeStartEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_NODE_END,
+        summary="workflow 节点结束",
+        key_fields=("workflow_node_id", "node_type", "status"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowNodeEndEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_NODE_CANCELLED,
+        summary="workflow 节点取消",
+        key_fields=("workflow_node_id", "node_type", "reason"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowNodeCancelledEvent.__name__,
+    ),
 ]
 
 
@@ -242,6 +289,18 @@ __all__ = [
     "EVENT_ROW_RELEASE",
     "EVENT_ROW_WRITE",
     "EVENT_STAGE_SPAN",
+    "EVENT_WORKFLOW_NODE_CANCELLED",
+    "EVENT_WORKFLOW_NODE_END",
+    "EVENT_WORKFLOW_NODE_START",
+    "WORKFLOW_EVENT_PREFIXES",
+    "WORKFLOW_EVENT_PREFIX_CACHE",
+    "WORKFLOW_EVENT_PREFIX_NODE",
+    "WORKFLOW_EVENT_PREFIX_RESOURCE",
+    "WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED",
+    "WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL",
+    "WORKFLOW_NODE_CANCELLED_REASON_UPSTREAM_CANCELLED",
+    "WORKFLOW_NODE_END_STATUS_ERROR",
+    "WORKFLOW_NODE_END_STATUS_OK",
     "EventDescriptor",
     "get_event_catalog",
     "get_event_catalog_map",

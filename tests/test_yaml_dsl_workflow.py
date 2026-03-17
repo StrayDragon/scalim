@@ -1,11 +1,22 @@
 import json
 import sys
+import threading
 from pathlib import Path
+from typing import Any, Dict, List
 
 import pytest
 
 from scalim.dsl.by_yaml import run_workflow
 from scalim.dsl.by_yaml.runtime import workflow_entrypoints as entrypoints_mod
+from scalim.events.catalog import (
+    EVENT_PIPELINE_START,
+    EVENT_WORKFLOW_NODE_CANCELLED,
+    EVENT_WORKFLOW_NODE_END,
+    EVENT_WORKFLOW_NODE_START,
+)
+from scalim.hooks.base import BaseHook
+from scalim.ob.manager import ObserverManager
+from scalim.ob.observer import Observer
 from scalim.dsl.by_yaml.workflow import (
     WorkflowConfigError,
     load_workflow_config,
@@ -17,6 +28,23 @@ from tests.fixtures import workflow_loaders
 
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])
+
+
+class _WorkflowEventRecorder(Observer):
+    event_types = {
+        EVENT_PIPELINE_START,
+        EVENT_WORKFLOW_NODE_START,
+        EVENT_WORKFLOW_NODE_END,
+        EVENT_WORKFLOW_NODE_CANCELLED,
+    }
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.events: List[Any] = []
+
+    def on_event(self, event) -> None:  # type: ignore[override]
+        with self._lock:
+            self.events.append(event)
 
 
 def _write_text(path: Path, text: str) -> Path:
@@ -209,6 +237,149 @@ def test_workflow_outcomes_are_in_declared_order(tmp_path: Path) -> None:
 
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert [o.run_id for o in result.outcomes] == ["slow", "fast"]
+
+
+def test_workflow_observability_bridge_injects_meta_and_emits_workflow_events(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="slow.yaml",
+        name="slow",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_slow",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="fast.yaml",
+        name="fast",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "slow", "demand": "slow.yaml"}, {"id": "fast", "demand": "fast.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+        share_preload_cache=False,
+    )
+
+    recorder = _WorkflowEventRecorder()
+    _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+
+    workflow_start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
+    workflow_end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    pipeline_start = [e for e in recorder.events if e.event_type == EVENT_PIPELINE_START]
+
+    assert {e.payload.workflow_node_id for e in workflow_start} == {"slow", "fast"}
+    assert {e.payload.workflow_node_id for e in workflow_end} == {"slow", "fast"}
+    assert {e.meta.get("workflow_node_id") for e in pipeline_start} == {"slow", "fast"}
+
+    workflow_exec_id = workflow_start[0].meta.get("workflow_exec_id")
+    assert workflow_exec_id
+
+    for event in workflow_start + workflow_end:
+        assert event.run_id == workflow_exec_id
+        assert event.meta.get("workflow_exec_id") == workflow_exec_id
+        assert event.meta.get("workflow_node_id") in {"slow", "fast"}
+        assert event.payload.workflow_exec_id == workflow_exec_id
+
+    for event in pipeline_start:
+        assert event.meta.get("workflow_exec_id") == workflow_exec_id
+        assert event.meta.get("workflow_node_id") in {"slow", "fast"}
+        assert event.run_id != workflow_exec_id
+        assert str(event.run_id).startswith("run_")
+        assert event.seq >= 1
+
+
+def test_workflow_observability_bridge_emits_cancelled_reason_for_all_fail(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="bad.yaml",
+        name="bad",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_raises",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "bad", "demand": "bad.yaml"}, {"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+        share_preload_cache=False,
+    )
+
+    recorder = _WorkflowEventRecorder()
+    with pytest.raises(Exception):
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+
+    cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
+    assert len(cancelled) == 1
+    assert cancelled[0].payload.workflow_node_id == "ok"
+    assert cancelled[0].payload.reason == "policy_all_fail"
+    assert "failure_policy=all_fail" in cancelled[0].payload.message
+
+
+def test_observer_manager_workflow_attribution_keys_fail_fast_on_override() -> None:
+    manager = ObserverManager(
+        run_id="x",
+        event_meta_defaults={
+            "workflow_exec_id": "wf_1",
+            "workflow_node_id": "a",
+        },
+    )
+    with pytest.raises(ValueError, match="workflow attribution"):
+        manager.emit_event("x", 1, meta={"workflow_node_id": "b"})
+
+
+def test_observer_manager_workflow_attribution_meta_merges_non_reserved_meta() -> None:
+    manager = ObserverManager(
+        run_id="x",
+        event_meta_defaults={
+            "workflow_exec_id": "wf_1",
+            "workflow_node_id": "a",
+        },
+    )
+    event = manager.emit_event("x", 1, meta={"worker_id": "w1"})
+    assert event.meta == {
+        "workflow_exec_id": "wf_1",
+        "workflow_node_id": "a",
+        "worker_id": "w1",
+    }
+
+
+def test_workflow_observability_bridge_registers_hooks(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="fast.yaml",
+        name="fast",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "fast", "demand": "fast.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+        share_preload_cache=False,
+    )
+
+    class _HookRecorder(BaseHook):
+        def __init__(self) -> None:
+            self._lock = threading.Lock()
+            self.events: List[Any] = []
+
+        def on_event(self, event) -> None:  # type: ignore[override]
+            with self._lock:
+                self.events.append(event)
+
+    hook = _HookRecorder()
+    _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[hook])
+    assert any(e.event_type == EVENT_WORKFLOW_NODE_START for e in hook.events)
 
 
 def test_share_preload_cache_loads_once(tmp_path: Path) -> None:

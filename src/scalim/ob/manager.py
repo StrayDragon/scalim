@@ -3,7 +3,7 @@
 import logging
 import threading
 from collections import deque
-from typing import Deque, Dict, List, Optional, Set, Tuple
+from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
 from ..events.event import Event, generate_run_id
 from ._internal.common import (
@@ -54,6 +54,7 @@ class ObserverManager(
     loader_result_policy: str
     loader_result_sample_size: int
     run_id: str
+    _event_meta_defaults: Optional[Dict[str, Any]]
     mode: str
     max_recorded_events: Optional[int]
     capture_overflow_policy: str
@@ -71,6 +72,7 @@ class ObserverManager(
         loader_result_policy: str = "full",
         loader_result_sample_size: int = 5,
         run_id: Optional[str] = None,
+        event_meta_defaults: Optional[Dict[str, Any]] = None,
         mode: str = "process",
         max_recorded_events: Optional[int] = DEFAULT_MAX_RECORDED_EVENTS,
         capture_overflow_policy: str = "raise",
@@ -88,6 +90,7 @@ class ObserverManager(
         self.loader_result_policy = self._normalize_loader_result_policy(loader_result_policy)
         self.loader_result_sample_size = max(1, loader_result_sample_size)
         self.run_id = run_id or generate_run_id()
+        self._event_meta_defaults = dict(event_meta_defaults) if event_meta_defaults else None
         self.mode = mode
         self.max_recorded_events = self._normalize_max_recorded_events(max_recorded_events)
         self.capture_overflow_policy = self._normalize_capture_overflow_policy(capture_overflow_policy)

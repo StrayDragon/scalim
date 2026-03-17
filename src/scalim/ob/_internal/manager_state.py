@@ -43,6 +43,7 @@ class ObserverManagerStateMixin(ABC):
         _ = state_map.setdefault("_observers_for_unknown_event_type", ())
         _ = state_map.setdefault("_capture_event_types", None)
         _ = state_map.setdefault("_capture_unknown_event_types", False)
+        _ = state_map.setdefault("_event_meta_defaults", None)
         _ = state_map.setdefault("max_recorded_events", DEFAULT_MAX_RECORDED_EVENTS)
         _ = state_map.setdefault("capture_overflow_policy", "raise")
 

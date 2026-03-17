@@ -395,6 +395,81 @@ class AdaptiveSchedulerDecisionEvent:
     """按池统计的等待次数(可选)."""
 
 
+@dataclass(frozen=True)
+class WorkflowNodeStartEvent:
+    """工作流节点开始事件.
+
+    该事件用于表达工作流编排层已调度/开始执行某个节点.
+    """
+
+    workflow_exec_id: str
+    """`workflow_exec_id`: 工作流执行标识(一次调用内稳定)."""
+
+    workflow_node_id: str
+    """`workflow_node_id`: 工作流节点稳定 `id`(对 `demand` 节点等于工作流 `YAML` 的 `runs[*].id`)."""
+
+    node_type: str
+    """节点类型(例如 `demand`)."""
+
+    demand_path: Optional[str] = None
+    """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
+
+
+@dataclass(frozen=True)
+class WorkflowNodeEndEvent:
+    """工作流节点结束事件.
+
+    该事件用于表达工作流编排层已完成某个节点的执行(成功或失败).
+    """
+
+    workflow_exec_id: str
+    """`workflow_exec_id`: 工作流执行标识(一次调用内稳定)."""
+
+    workflow_node_id: str
+    """`workflow_node_id`: 工作流节点稳定 `id`(对 `demand` 节点等于工作流 `YAML` 的 `runs[*].id`)."""
+
+    node_type: str
+    """节点类型(例如 `demand`)."""
+
+    status: str
+    """结束状态(例如 `ok`/`error`)."""
+
+    demand_path: Optional[str] = None
+    """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
+
+    error_type: Optional[str] = None
+    """失败时的异常类型(可选)."""
+
+    error_message: Optional[str] = None
+    """失败时的异常消息(可选)."""
+
+
+@dataclass(frozen=True)
+class WorkflowNodeCancelledEvent:
+    """工作流节点取消事件.
+
+    该事件用于表达工作流编排层决定取消某个节点的执行(例如因失败策略取消未开始节点).
+    """
+
+    workflow_exec_id: str
+    """`workflow_exec_id`: 工作流执行标识(一次调用内稳定)."""
+
+    workflow_node_id: str
+    """`workflow_node_id`: 工作流节点稳定 `id`(对 `demand` 节点等于工作流 `YAML` 的 `runs[*].id`)."""
+
+    node_type: str
+    """节点类型(例如 `demand`)."""
+
+    reason: str
+    """取消原因标识(例如 `dependency_failed` / `upstream_cancelled` / `policy_all_fail`)."""
+
+    message: str
+    """可读的诊断说明(用于排障)."""
+
+    demand_path: Optional[str] = None
+    """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
+
+
 __all__ = [
     "AdaptiveSchedulerDecisionEvent",
     "BatchEndEvent",
@@ -414,4 +489,7 @@ __all__ = [
     "RowReleaseEvent",
     "RowWriteEvent",
     "StageSpanEvent",
+    "WorkflowNodeCancelledEvent",
+    "WorkflowNodeEndEvent",
+    "WorkflowNodeStartEvent",
 ]

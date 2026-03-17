@@ -191,6 +191,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/testing-quality/spec.md)
 - Summary: **状态: ✅ 已实现** 定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现.
 
+### `workflow-observability-bridge`
+- Title: workflow-observability-bridge Specification
+- Source: [spec.md](#code=openspec/specs/workflow-observability-bridge/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
+
 ### `yaml-dsl-agent-guidance`
 - Title: yaml-dsl-agent-guidance Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-agent-guidance/spec.md)

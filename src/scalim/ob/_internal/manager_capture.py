@@ -82,6 +82,7 @@ class ObserverManagerCaptureMixin:
             loader_result_policy=self.loader_result_policy,
             loader_result_sample_size=self.loader_result_sample_size,
             run_id=self.run_id,
+            event_meta_defaults=getattr(self, "_event_meta_defaults", None),
             mode="capture",
             max_recorded_events=self.max_recorded_events,
             capture_overflow_policy=self.capture_overflow_policy,

@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..hooks.base import HookManager, IExecutionHook
 from ..ob.components import split_components
@@ -430,6 +430,7 @@ def _build_observer_and_hook_managers(
     *,
     plan: ExecutionPlan,
     request: ExecutionRequest,
+    event_meta_defaults: Optional[Dict[str, Any]] = None,
 ) -> Tuple["ObserverManager", HookManager]:
     fallback_logger_enabled = False
     viz_config: Optional[VizObserverConfig] = None
@@ -437,7 +438,7 @@ def _build_observer_and_hook_managers(
         fallback_logger_enabled = request.observability.fallback_logger_enabled
         viz_config = request.observability.viz_config
 
-    observer_manager = Observability(fallback_logger_enabled=fallback_logger_enabled).build_manager()
+    observer_manager = Observability(fallback_logger_enabled=fallback_logger_enabled).build_manager(event_meta_defaults=event_meta_defaults)
 
     component_observers, component_hooks = split_components(request.components)
     for observer in component_observers:
@@ -595,12 +596,13 @@ def run_ir(
     demand_ir: DemandIr,
     request: ExecutionRequest,
     engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+    event_meta_defaults: Optional[Dict[str, Any]] = None,
 ) -> ExecutionResult:
     start_time = time.perf_counter()
     wall_start_time = time.time()
 
     plan = _build_execution_plan(demand_ir, request)
-    observer_manager, hook_manager = _build_observer_and_hook_managers(plan=plan, request=request)
+    observer_manager, hook_manager = _build_observer_and_hook_managers(plan=plan, request=request, event_meta_defaults=event_meta_defaults)
 
     stats = InternalStatsCollector()
     batch_size = request.batch_size if request.batch_size is not None else demand_ir.batch_size_hint

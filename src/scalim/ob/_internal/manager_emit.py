@@ -3,6 +3,7 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
+from ...events.attribution import WORKFLOW_ATTRIBUTION_META_KEYS
 from ...events.catalog import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
@@ -64,6 +65,23 @@ class ObserverManagerEmitMixin(ABC):
     _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
     _diagnostic_warning_emitted: bool = False
     _seq: int = 0
+    _event_meta_defaults: Optional[Dict[str, Any]] = None
+
+    def _merge_event_meta_defaults(self, meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        defaults = getattr(self, "_event_meta_defaults", None)
+        if not defaults:
+            return meta or {}
+        if not meta:
+            return dict(defaults)
+
+        for key in WORKFLOW_ATTRIBUTION_META_KEYS:
+            if key in defaults and key in meta:
+                msg = "Event.meta key '{}' is reserved for workflow attribution and cannot be overridden.".format(key)
+                raise ValueError(msg)
+
+        merged = dict(defaults)
+        merged.update(meta)
+        return merged
 
     @abstractmethod
     def _record_event(self, event: Event) -> None: ...
@@ -148,12 +166,13 @@ class ObserverManagerEmitMixin(ABC):
             self._safe_call(observer, observer.on_event, event)
 
     def emit_event(self, event_type: str, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
+        merged_meta = self._merge_event_meta_defaults(meta)
         event = Event(
             event_type=event_type,
             timestamp=now_ts(),
             run_id=self.run_id,
             payload=payload,
-            meta=meta or {},
+            meta=merged_meta,
             seq=self._next_seq(),
         )
         self.emit(event)

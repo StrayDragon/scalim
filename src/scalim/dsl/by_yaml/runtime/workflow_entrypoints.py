@@ -1,10 +1,25 @@
 import concurrent.futures
+import contextlib
 from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, List, Mapping, MutableMapping, Optional, Sequence, Tuple, cast
 
+from ....events.catalog import (
+    EVENT_WORKFLOW_NODE_CANCELLED,
+    EVENT_WORKFLOW_NODE_END,
+    EVENT_WORKFLOW_NODE_START,
+    WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
+    WORKFLOW_NODE_END_STATUS_ERROR,
+    WORKFLOW_NODE_END_STATUS_OK,
+)
+from ....events.event import generate_run_id
+from ....events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
 from ....execution.engine import ScalimEngine
 from ....execution.preload_cache import PreloadCache
 from ....execution.run_ir import ExecutionResult, run_ir
+from ....hooks.base import HookManager
+from ....ob.components import split_components
+from ....ob.hub import InstrumentationHub
+from ....ob.observability import Observability
 from ....spec.ir.binding import LoaderCallContextIr
 from ....typedefs import LoaderCallKwargs
 from ..params_template import (
@@ -81,6 +96,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         raise WorkflowConfigError(msg, path="(file)")
 
     wf = load_workflow_config(workflow_path)
+    workflow_exec_id = generate_run_id(prefix="wf")
 
     runs: List[Tuple[int, str, str]] = []
     for idx, run in enumerate(wf.runs):
@@ -121,100 +137,190 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
     max_concurrency = int(wf.options.max_concurrency)
     failure_policy = str(wf.options.failure_policy or "all_fail")
 
+    # 工作流层事件:复用 `hooks`/`observers` 分发通道,并以 `workflow_exec_id` 作为 `run_id` 分区.
+    component_observers, component_hooks = split_components(components)
+    workflow_observer_manager = Observability().build_manager(run_id=workflow_exec_id)
+    for observer in component_observers:
+        workflow_observer_manager.register(observer)
+    workflow_hook_manager = HookManager()
+    for hook in component_hooks:
+        workflow_hook_manager.register(hook)
+    workflow_instrumentation = InstrumentationHub(
+        hook_manager=workflow_hook_manager,
+        observer_manager=workflow_observer_manager,
+    )
+
+    def _emit_workflow_node_start(node_id: str, *, demand_path: str) -> None:
+        _ = workflow_instrumentation.emit(
+            EVENT_WORKFLOW_NODE_START,
+            WorkflowNodeStartEvent(
+                workflow_exec_id=workflow_exec_id,
+                workflow_node_id=str(node_id),
+                node_type="demand",
+                demand_path=str(demand_path),
+            ),
+            meta={
+                "workflow_exec_id": workflow_exec_id,
+                "workflow_node_id": str(node_id),
+            },
+        )
+
+    def _emit_workflow_node_end(node_id: str, *, demand_path: str, status: str, exc: Optional[BaseException]) -> None:
+        error_type = None
+        error_message = None
+        if status != WORKFLOW_NODE_END_STATUS_OK and exc is not None:
+            error_type = type(exc).__name__
+            error_message = str(exc)
+        _ = workflow_instrumentation.emit(
+            EVENT_WORKFLOW_NODE_END,
+            WorkflowNodeEndEvent(
+                workflow_exec_id=workflow_exec_id,
+                workflow_node_id=str(node_id),
+                node_type="demand",
+                status=str(status),
+                demand_path=str(demand_path),
+                error_type=error_type,
+                error_message=error_message,
+            ),
+            meta={
+                "workflow_exec_id": workflow_exec_id,
+                "workflow_node_id": str(node_id),
+            },
+        )
+
+    def _emit_workflow_node_cancelled(node_id: str, *, demand_path: str, reason: str, message: str) -> None:
+        _ = workflow_instrumentation.emit(
+            EVENT_WORKFLOW_NODE_CANCELLED,
+            WorkflowNodeCancelledEvent(
+                workflow_exec_id=workflow_exec_id,
+                workflow_node_id=str(node_id),
+                node_type="demand",
+                reason=str(reason),
+                message=str(message),
+                demand_path=str(demand_path),
+            ),
+            meta={
+                "workflow_exec_id": workflow_exec_id,
+                "workflow_node_id": str(node_id),
+            },
+        )
+
     def _engine_factory(**kwargs: object) -> ScalimEngine:
         if shared_cache is None:
             return ScalimEngine(**cast("Any", kwargs))
         return ScalimEngine(**cast("Any", kwargs), preloaded_cache=cast("Any", shared_cache))
 
-    def _run_one(compilation: object) -> ExecutionResult:
+    def _run_one(compilation: object, workflow_node_id: str) -> ExecutionResult:
         comp = cast("Any", compilation)
-        return run_ir(comp.demand_ir, comp.request, engine_factory=_engine_factory)
+        return run_ir(
+            comp.demand_ir,
+            comp.request,
+            engine_factory=_engine_factory,
+            event_meta_defaults={
+                "workflow_exec_id": workflow_exec_id,
+                "workflow_node_id": str(workflow_node_id),
+            },
+        )
 
     failed: Optional[WorkflowRunOutcome] = None
     failed_exc: Optional[BaseException] = None
     submitted: Dict["concurrent.futures.Future[ExecutionResult]", Tuple[int, str, str, object]] = {}
     pending_queue: List[Tuple[int, str, str, object]] = list(compiled)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrency) as executor:
-        while pending_queue and len(submitted) < max_concurrency:
-            item = pending_queue.pop(0)
-            idx, run_id, demand_path, compilation = item
-            fut = executor.submit(_run_one, compilation)
-            submitted[fut] = item
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrency) as executor:
+            while pending_queue and len(submitted) < max_concurrency:
+                item = pending_queue.pop(0)
+                idx, run_id, demand_path, compilation = item
+                _emit_workflow_node_start(run_id, demand_path=demand_path)
+                fut = executor.submit(_run_one, compilation, run_id)
+                submitted[fut] = item
 
-        while submitted:
-            done, _pending = concurrent.futures.wait(submitted.keys(), return_when=concurrent.futures.FIRST_COMPLETED)
-            for fut in done:
-                idx, run_id, demand_path, compilation = submitted.pop(fut)
-                try:
-                    core = fut.result()
-                    comp = cast("Any", compilation)
-                    outcomes[idx] = WorkflowRunOutcome(
-                        run_id=run_id,
-                        demand_path=demand_path,
-                        result=RunResult(core, config=comp.config, yaml_path=demand_path, sink=None),
-                        error=None,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    err = WorkflowRunError(
-                        run_id=run_id,
-                        demand_path=demand_path,
-                        exc_type=type(exc).__name__,
-                        message=str(exc),
-                    )
-                    outcome = WorkflowRunOutcome(run_id=run_id, demand_path=demand_path, result=None, error=err)
-                    outcomes[idx] = outcome
-                    if failure_policy == "all_fail" and failed is None:
-                        failed = outcome
-                        failed_exc = exc
-                        # 失败后不再提交新的 `run`; 同时取消尚未开始的任务.
-                        for next_item in pending_queue:
-                            next_idx, next_run_id, next_demand_path, _ = next_item
-                            outcomes[next_idx] = WorkflowRunOutcome(
-                                run_id=next_run_id,
-                                demand_path=next_demand_path,
-                                result=None,
-                                error=WorkflowRunError(
+            while submitted:
+                done, _pending = concurrent.futures.wait(submitted.keys(), return_when=concurrent.futures.FIRST_COMPLETED)
+                for fut in done:
+                    idx, run_id, demand_path, compilation = submitted.pop(fut)
+                    try:
+                        core = fut.result()
+                        comp = cast("Any", compilation)
+                        outcomes[idx] = WorkflowRunOutcome(
+                            run_id=run_id,
+                            demand_path=demand_path,
+                            result=RunResult(core, config=comp.config, yaml_path=demand_path, sink=None),
+                            error=None,
+                        )
+                        _emit_workflow_node_end(run_id, demand_path=demand_path, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
+                    except Exception as exc:  # noqa: BLE001
+                        err = WorkflowRunError(
+                            run_id=run_id,
+                            demand_path=demand_path,
+                            exc_type=type(exc).__name__,
+                            message=str(exc),
+                        )
+                        outcome = WorkflowRunOutcome(run_id=run_id, demand_path=demand_path, result=None, error=err)
+                        outcomes[idx] = outcome
+                        _emit_workflow_node_end(run_id, demand_path=demand_path, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+                        if failure_policy == "all_fail" and failed is None:
+                            failed = outcome
+                            failed_exc = exc
+                            # 失败后不再提交新的 `run`; 同时取消尚未开始的任务.
+                            for next_item in pending_queue:
+                                next_idx, next_run_id, next_demand_path, _ = next_item
+                                outcomes[next_idx] = WorkflowRunOutcome(
                                     run_id=next_run_id,
                                     demand_path=next_demand_path,
-                                    exc_type="WorkflowCancelled",
+                                    result=None,
+                                    error=WorkflowRunError(
+                                        run_id=next_run_id,
+                                        demand_path=next_demand_path,
+                                        exc_type="WorkflowCancelled",
+                                        message="Cancelled due to failure_policy=all_fail",
+                                    ),
+                                )
+                                _emit_workflow_node_cancelled(
+                                    next_run_id,
+                                    demand_path=next_demand_path,
+                                    reason=WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
                                     message="Cancelled due to failure_policy=all_fail",
-                                ),
-                            )
-                        pending_queue = []
+                                )
+                            pending_queue = []
 
-                if failed is None:
-                    while pending_queue and len(submitted) < max_concurrency:
-                        item = pending_queue.pop(0)
-                        _, _, _, compilation2 = item
-                        fut2 = executor.submit(_run_one, compilation2)
-                        submitted[fut2] = item
+                    if failed is None:
+                        while pending_queue and len(submitted) < max_concurrency:
+                            item = pending_queue.pop(0)
+                            _idx2, run_id2, demand_path2, compilation2 = item
+                            _emit_workflow_node_start(run_id2, demand_path=demand_path2)
+                            fut2 = executor.submit(_run_one, compilation2, run_id2)
+                            submitted[fut2] = item
 
-    final_outcomes: List[WorkflowRunOutcome] = []
-    for idx, outcome in enumerate(outcomes):
-        if outcome is None:  # pragma: no cover
-            run_id = str(compiled[idx][1])  # pragma: no cover
-            demand_path = str(compiled[idx][2])  # pragma: no cover
-            missing = WorkflowRunOutcome(  # pragma: no cover
-                run_id=run_id,
-                demand_path=demand_path,
-                result=None,
-                error=WorkflowRunError(run_id=run_id, demand_path=demand_path, exc_type="Unknown", message="Missing outcome"),
-            )
-            final_outcomes.append(missing)  # pragma: no cover
-            continue  # pragma: no cover
-        final_outcomes.append(outcome)
+        final_outcomes: List[WorkflowRunOutcome] = []
+        for idx, outcome in enumerate(outcomes):
+            if outcome is None:  # pragma: no cover
+                run_id = str(compiled[idx][1])  # pragma: no cover
+                demand_path = str(compiled[idx][2])  # pragma: no cover
+                missing = WorkflowRunOutcome(  # pragma: no cover
+                    run_id=run_id,
+                    demand_path=demand_path,
+                    result=None,
+                    error=WorkflowRunError(run_id=run_id, demand_path=demand_path, exc_type="Unknown", message="Missing outcome"),
+                )
+                final_outcomes.append(missing)  # pragma: no cover
+                continue  # pragma: no cover
+            final_outcomes.append(outcome)
 
-    result = WorkflowResult(outcomes=tuple(final_outcomes))
+        result = WorkflowResult(outcomes=tuple(final_outcomes))
 
-    if failed is not None and failure_policy == "all_fail":
-        msg = "Workflow run failed (run_id={}, demand_path={})".format(failed.run_id, failed.demand_path)
-        exc = WorkflowRunFailedError(msg, run_id=failed.run_id, demand_path=failed.demand_path)
-        if failed_exc is not None:
-            exc.__cause__ = failed_exc
-        raise exc
+        if failed is not None and failure_policy == "all_fail":
+            msg = "Workflow run failed (run_id={}, demand_path={})".format(failed.run_id, failed.demand_path)
+            exc = WorkflowRunFailedError(msg, run_id=failed.run_id, demand_path=failed.demand_path)
+            if failed_exc is not None:
+                exc.__cause__ = failed_exc
+            raise exc
 
-    return result
+        return result
+    finally:
+        with contextlib.suppress(Exception):
+            workflow_observer_manager.close()
 
 
 def _normalize_python_reference(reference: str, *, base_module_path: Optional[str]) -> str:
