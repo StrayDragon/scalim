@@ -6,7 +6,7 @@
 - **一致性/冲突策略**: 当不同 run 的 preload 规格不一致时是 fail-fast、warn,还是隔离为不同缓存项?
 - **内存策略**: 缓存容量与生命周期如何控制(尤其是宽表/大维表,或未来 dataset/index 工件)?
 
-随着 `c10-workflow-ir-roadmap` 推进 workflow IR + DAG/compile-on-ready,现有 `share_preload_cache` 的强假设会逐渐不成立:
+随着 `workflow-ir-roadmap` 推进 workflow IR + DAG/compile-on-ready,现有 `share_preload_cache` 的强假设会逐渐不成立:
 - 当前实现要求“执行任一 run 前先编译全部 runs 并做全量 preload 规格冲突预检查”,但 DAG/ctx 注入会让部分 signature 在启动时不可得。
 - 共享缓存的生命周期当前近似“整场 workflow 常驻”,无法在无引用后释放,对大规模 workflow 不友好。
 
@@ -49,7 +49,7 @@
 
 - **Non-goals (for this change)**:
   - 不引入跨进程/跨机器的分布式缓存
-  - 不在本 change 内落地 dataset/rows 工件复用(由 `c60-workflow-artifact-datasets` 负责),但 cache pool 将作为其内存治理底座
+  - 不在本 change 内落地 dataset/rows 工件复用(由 `workflow-artifact-datasets` 负责),但 cache pool 将作为其内存治理底座
 
 ## Capabilities
 

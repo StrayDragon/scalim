@@ -36,6 +36,8 @@ context: |
   - 统一使用 `c<priority>-<kebab-case>` 形式,例如 `c10-workflow-ir-roadmap`
   - `priority` 建议按 10 递增(预留 `c0-`/`c5-` 等插队位),便于从名称直观看出推进顺序
   - `openspec/changes/archive/` 中的历史归档不做重命名
+  提案引用约定:
+  - 当在其它提案/文档中引用某个 change 时,仅使用其 `<kebab-case>` 名称(不带 `c<priority>-` 前缀),避免优先级调整导致跨文档引用漂移
 
 rules:
   proposal:

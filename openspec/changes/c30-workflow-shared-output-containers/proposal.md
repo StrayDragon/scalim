@@ -14,7 +14,7 @@
 
 > 本 change 作为 workflow 的后置提案,计划标记为 **DELAYED**。  
 > 为通过 `openspec validate`/门禁,本 change 提供最小 delta spec 占位(不代表已进入实现阶段)。
-> 说明: 本 change 预期落到 `c10-workflow-ir-roadmap` 定义的 workflow IR/节点系统之上(以 output/resource 节点表达),避免在现有 `run_workflow()` 直接执行器上引入不可扩展的特例。
+> 说明: 本 change 预期落到 `workflow-ir-roadmap` 定义的 workflow IR/节点系统之上(以 output/resource 节点表达),避免在现有 `run_workflow()` 直接执行器上引入不可扩展的特例。
 
 - **New**: workflow 级“共享输出容器”(resources)概念,用于多 demand 合并输出
   - 例如声明一个共享 workbook/csv 资源,由 workflow 统一创建/关闭/落盘(只保存一次,原子替换)
@@ -38,7 +38,7 @@
 
 ### Recommended Direction (MVP)
 
-- 该 change 推荐建立在 `c20-workflow-dag-context-passing` 之上(同一套 DAG 调度 + ctx),优先落地 **workbook 多 sheet** 与 **csv append** 两条路径。
+- 该 change 推荐建立在 `workflow-dag-context-passing` 之上(同一套 DAG 调度 + ctx),优先落地 **workbook 多 sheet** 与 **csv append** 两条路径。
 - MVP 优先选择“按资源互斥串行写入”的路线(避免在 workflow 内引入大体量 in-memory dataset 传递)：
   - 多个 run 可以并发编译/执行,但对同一共享资源(workbook/csv)的写入 MUST 串行化并遵循声明顺序
   - 共享资源在 workflow 末尾统一 commit/原子落盘,失败时按 `failure_policy` 决定是否丢弃或保留部分内容

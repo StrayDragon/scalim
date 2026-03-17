@@ -36,20 +36,19 @@
   - 现有 workflow YAML 将演进为“编译到 Workflow IR 的语法前端”
   - 语法本身并非本 change 的优先交付,但需要在后续 changes 中与 IR 对齐
 
-- **Active**: 变量注入命名修正 (`c0-yaml-init-vars`)
-  - 将 `{$runtime: <name>}`/`runtime_vars` 更名为 `{$init_var: <name>}`/`init_vars`
-  - 一次性升级旧写法(不做兼容兜底),并保持“编译期解析 + 不透明 literal”语义不变
+- **Done**: yaml-init-vars（变量注入命名修正,已归档）
+  - 已将 `{$runtime: <name>}`/`runtime_vars` 更名为 `{$init_var: <name>}`/`init_vars`
+  - workflow 相关 changes 统一沿用该命名与边界(编译期解析 + 不透明 literal)
 
-- **Planned**: workflow-scope cache 设计升级
+- **Active**: workflow-cache-pool（workflow-scope cache 设计升级）
   - 当前 `options.share_preload_cache: bool` 过于窄化
-  - 后续将引入可配置的“缓存池/生命周期管理”(按需获取、引用归零自动释放),以更精细地控制内存与复用边界
+  - 将引入可配置的“缓存池/生命周期管理”(按需获取、引用归零自动释放),以更精细地控制内存与复用边界
 
 - **Roadmap (follow-up changes, suggested)**:
-  - `c0-yaml-init-vars`: 将 `{$runtime: ...}` 更名并同步 Python API 命名(一次性升级旧写法)
-  - `c20-workflow-dag-context-passing`: DAG 编排 + scalar ctx 传递(依赖 IR 底座后落地)
-  - `c30-workflow-shared-output-containers`: 共享输出容器/写出节点(建议落到 output/resource 节点体系)
-  - `c50-workflow-cache-pool`: workflow-scope 缓存池/生命周期/内存策略(替代单一 bool 开关)
-  - `c60-workflow-artifact-datasets`: dataset/rows 级上游产物复用(内置 loader 方案 + key index 契约)
+  - `workflow-cache-pool`: workflow-scope 缓存池/生命周期/内存策略(替代单一 bool 开关)
+  - `workflow-dag-context-passing`: DAG 编排 + scalar ctx 传递(依赖 IR 底座后落地)
+  - `workflow-shared-output-containers`: 共享输出容器/写出节点(建议落到 output/resource 节点体系)
+  - `workflow-artifact-datasets`: dataset/rows 级上游产物复用(内置 loader 方案 + key index 契约)
 
 ## Capabilities
 
@@ -59,7 +58,7 @@
 
 ### Modified Capabilities
 - `yaml-dsl-workflow`: workflow YAML 从“直接执行器配置”演进为“编译到 Workflow IR 的语法前端”(后续 changes 推进)
-- `yaml-runtime-vars`: 变量注入命名修正由 `c0-yaml-init-vars` 落地(`{$init_var: ...}` / `init_vars`),workflow 相关 change 统一沿用该命名
+- `yaml-runtime-vars`: 变量注入命名已统一为 `{$init_var: ...}` / `init_vars`(workflow 相关 change 统一沿用)
 - `source-cache`: 将 workflow 级共享缓存从单一 bool 开关演进为可配置缓存池与生命周期(后续 changes 推进)
 
 ## Impact

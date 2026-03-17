@@ -1,6 +1,6 @@
 ## Why
 
-当前 `workflow` YAML 只能将多个独立 demand 做“并发批量执行”(max_concurrency / failure_policy / share_preload_cache)，但无法表达 run 之间的依赖关系与数据/上下文传递。实际落地时，用户往往只能回到 Python glue（手工串行、读写中间文件、拼 init_vars），导致：
+当前 `workflow` YAML 只能将多个独立 demand 做“并发批量执行”(max_concurrency / failure_policy / share_preload_cache；该共享缓存能力将由 `workflow-cache-pool` 演进为 cache pool)，但无法表达 run 之间的依赖关系与数据/上下文传递。实际落地时，用户往往只能回到 Python glue（手工串行、读写中间文件、拼 init_vars），导致：
 
 - 报表“多阶段流水线”难以用 YAML 直观表达与复用
 - workflow 语义在 UI（scalim-viz）里也难以被可视化为可读的 DAG
@@ -9,7 +9,7 @@
 
 > 本 change 仅做提案，计划标记为 **DELAYED**；先确立方向与需求边界，再决定是否进入实现排期。
 > 为通过 `openspec validate`/门禁,本 change 同时提供最小 delta spec 占位(不代表已进入实现阶段)。
-> 说明: 本 change 预期落到 `c10-workflow-ir-roadmap` 定义的 workflow IR/节点系统之上,而非在现有 `run_workflow()` 直接执行器上持续打补丁；YAML 语法细节可后置为“编译到 IR 的前端”。
+> 说明: 本 change 预期落到 `workflow-ir-roadmap` 定义的 workflow IR/节点系统之上,而非在现有 `run_workflow()` 直接执行器上持续打补丁；YAML 语法细节可后置为“编译到 IR 的前端”。
 
 - **New**: workflow runs 支持 DAG 编排（依赖关系）
   - 为 `workflow.runs[*]` 增加可选的依赖字段（例如 `depends_on: [run_id, ...]`）
@@ -31,7 +31,7 @@
 
 - 先把 workflow 的“编排单元”抽象为 **run-level DAG**（仅 demand runs），并把 ctx 传递限定为 JSON-like 的小对象。
 - 让 `ctx → init_vars` 仍发生在 **编译期**（复用现有 `{$init_var: ...}` 解析规则），因此编译需要做到“按依赖就绪再编译并执行”。
-- 该 change 作为 `c30-workflow-shared-output-containers` 的基础设施：后者的“写出节点/资源互斥/确定性写入”将复用同一套 DAG 调度与 ctx 存储。
+- 该 change 作为 `workflow-shared-output-containers` 的基础设施：后者的“写出节点/资源互斥/确定性写入”将复用同一套 DAG 调度与 ctx 存储。
 
 ### MVP Example (YAML)
 
@@ -51,7 +51,6 @@ workflow:
   options:
     max_concurrency: 4
     failure_policy: all_fail
-    share_preload_cache: true
 ```
 
 ## Capabilities
