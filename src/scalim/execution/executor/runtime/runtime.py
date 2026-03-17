@@ -17,6 +17,7 @@ from ....spec.ir.sources import MainSourceIr
 from ....typedefs import LoaderResultMapping, LookupKey, ParallelMode, RowData
 from ...guardrails import GuardrailsPolicy
 from ...loader_retry import LoaderRetryPolicies
+from ...workflow_cache_pool import WorkflowCachePool
 from ..helpers.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
 from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
 
@@ -36,6 +37,8 @@ class ExecutionRuntime:
     """执行运行时 - 共享资源"""
 
     preloaded_cache: MutableMapping[str, LoaderResultMapping]
+    workflow_cache_pool: Optional[WorkflowCachePool]
+    workflow_node_id: Optional[str]
     _preload_source_ids: FrozenSet[str]
     load_ref_cache: Dict[LoadRefCacheKey, LoadRefCacheEntry]
     key_normalize_cache: Dict[RelationSignature, Dict[Tuple[Hashable, Tuple[str, ...]], Optional[LookupKey]]]
@@ -75,8 +78,12 @@ class ExecutionRuntime:
         parallel_mode: ParallelMode = "seq",
         max_workers: int = 0,
         preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
+        workflow_cache_pool: Optional[WorkflowCachePool] = None,
+        workflow_node_id: Optional[str] = None,
     ) -> None:
         self.preloaded_cache = preloaded_cache if preloaded_cache is not None else {}
+        self.workflow_cache_pool = workflow_cache_pool
+        self.workflow_node_id = str(workflow_node_id) if workflow_node_id is not None else None
         self.load_ref_cache = {}
         self.key_normalize_cache = {}
         self.hook_manager = hook_manager

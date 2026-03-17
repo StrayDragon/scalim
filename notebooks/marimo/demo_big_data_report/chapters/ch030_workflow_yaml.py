@@ -87,7 +87,7 @@ def _(mo):
         # demo_big_data_report / ch030_workflow_yaml
 
         本章目标:
-        - 演示 workflow YAML 的可运行对拍入口(含 `share_preload_cache`)
+        - 演示 workflow YAML 的可运行对拍入口(含 `cache_pool`)
         - 为 workflow 场景提供可交互排障入口
 
         SSOT:

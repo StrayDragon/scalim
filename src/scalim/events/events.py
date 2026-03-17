@@ -1,7 +1,7 @@
 # region imports
 
 from dataclasses import dataclass
-from typing import Any, Dict, Hashable, List, Optional
+from typing import Any, Dict, Hashable, List, Optional, Tuple
 
 from ..typedefs import RelationLookupResult
 
@@ -470,6 +470,57 @@ class WorkflowNodeCancelledEvent:
     """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
 
 
+@dataclass(frozen=True)
+class WorkflowCacheAcquireEvent:
+    """工作流缓存 `acquire` 事件.
+
+    用于表达某个工作流节点获取(`acquire`)了一个 `cache pool` 条目.
+    """
+
+    workflow_exec_id: str
+    workflow_node_id: str
+    cache_kind: str
+    source_id: str
+    signature_digest: str
+    cache_status: str
+    conflict_policy: str
+    conflict_detected: bool = False
+    conflict_diff_fields: Tuple[str, ...] = ()
+    conflict_target_signature_digest: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class WorkflowCacheReleaseEvent:
+    """工作流缓存 `release` 事件.
+
+    用于表达某个工作流节点释放(`release`)了其持有的 `cache pool` 条目引用.
+    """
+
+    workflow_exec_id: str
+    workflow_node_id: str
+    cache_kind: str
+    source_id: str
+    signature_digest: str
+    remaining_consumers: int
+    release_policy: str
+    is_pinned: bool = False
+
+
+@dataclass(frozen=True)
+class WorkflowCacheEvictEvent:
+    """工作流缓存 `evict` 事件.
+
+    用于表达 `cache pool` 中的某个条目被淘汰/释放.
+    """
+
+    workflow_exec_id: str
+    workflow_node_id: str
+    cache_kind: str
+    source_id: str
+    signature_digest: str
+    reason: str
+
+
 __all__ = [
     "AdaptiveSchedulerDecisionEvent",
     "BatchEndEvent",
@@ -489,6 +540,9 @@ __all__ = [
     "RowReleaseEvent",
     "RowWriteEvent",
     "StageSpanEvent",
+    "WorkflowCacheAcquireEvent",
+    "WorkflowCacheEvictEvent",
+    "WorkflowCacheReleaseEvent",
     "WorkflowNodeCancelledEvent",
     "WorkflowNodeEndEvent",
     "WorkflowNodeStartEvent",

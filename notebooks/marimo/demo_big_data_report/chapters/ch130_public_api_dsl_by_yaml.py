@@ -84,7 +84,12 @@ workflow:
       demand: demand.yaml
   options:
     max_concurrency: 2
-    share_preload_cache: true
+    cache_pool:
+      conflict_policy: error
+      release_policy: dag_refcount
+      budget:
+        max_entries: 16
+        over_budget_policy: fail_fast
 """
         _write_text(workflow_path, workflow_yaml)
 

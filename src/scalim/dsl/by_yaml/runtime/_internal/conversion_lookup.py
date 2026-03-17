@@ -41,9 +41,12 @@ class LookupCastRegistry:
 
     def build(self, lookup_cast: LookupCastConfig, *, is_multi: bool) -> LookupKeyCast:
         base = self._get_base_cast(lookup_cast)
+        meta: Dict[str, object] = {}
+        if lookup_cast.name == "sep_first":
+            meta["sep"] = lookup_cast.sep or ","
         if not is_multi:
-            return NamedLookupCast(lookup_cast.name, base)
-        return NamedLookupCast(lookup_cast.name, self._wrap_multi(base))
+            return NamedLookupCast(lookup_cast.name, base, meta=meta)
+        return NamedLookupCast(lookup_cast.name, self._wrap_multi(base), meta=meta)
 
     def _get_base_cast(self, lookup_cast: LookupCastConfig) -> LookupKeyCast:
         if lookup_cast.name == "sep_first":

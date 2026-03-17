@@ -3,7 +3,7 @@
 import math
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import List, Optional, Sequence, Tuple, Union, cast
+from typing import Dict, List, Optional, Sequence, Tuple, Union, cast
 
 from ..spec.ir.aliases import LookupKeyCast
 from ..typedefs import LookupKey
@@ -27,9 +27,11 @@ class NamedLookupCast:
     """用于给 `lookup_cast` 打标签的可调用包装器,提供稳定名称."""
 
     scalim_lookup_cast_name: str
+    scalim_lookup_cast_meta: Dict[str, object]
 
-    def __init__(self, name: str, fn: LookupKeyCast) -> None:
+    def __init__(self, name: str, fn: LookupKeyCast, *, meta: Optional[Dict[str, object]] = None) -> None:
         self.scalim_lookup_cast_name = name
+        self.scalim_lookup_cast_meta = dict(meta or {})
         self._fn: LookupKeyCast = fn
 
     def __call__(self, value: object) -> Optional[LookupKey]:

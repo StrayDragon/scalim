@@ -325,7 +325,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "d1d06c56d7714d48cc94448852c43793a6bd784cbe06dad5becf96981f9b688b"
+      "sha256": "8e213581fe8e1c8b0dbdd65e572f1ac12fbf81b7137a3f9f31a7a3fe070b516c"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -337,7 +337,7 @@
     },
     {
       "path": "references/generated/yaml-dsl-upgrades.gen.md",
-      "sha256": "85020614cf1e4660faef713fb74bbb42cbce8fbdb421689e3dd339b555b1ad68"
+      "sha256": "33a7bd8970d1a7f53d3d5a77c2c0409d3b3a1423b12801734bc3dbbdc9ace247"
     },
     {
       "path": "references/syntax-catalog.gen.md",

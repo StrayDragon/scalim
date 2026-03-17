@@ -27,10 +27,30 @@ class WorkflowEdgeIr:
 
 
 @dataclass(frozen=True)
+class WorkflowCachePoolBudgetIr:
+    max_entries: int
+    over_budget_policy: str
+
+
+@dataclass(frozen=True)
+class WorkflowCachePoolPinIr:
+    kind: str
+    source_id: str
+
+
+@dataclass(frozen=True)
+class WorkflowCachePoolIr:
+    conflict_policy: str
+    release_policy: str
+    budget: WorkflowCachePoolBudgetIr
+    pin: Tuple[WorkflowCachePoolPinIr, ...] = ()
+
+
+@dataclass(frozen=True)
 class WorkflowOptionsIr:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
-    share_preload_cache: bool = False
+    cache_pool: Optional[WorkflowCachePoolIr] = None
 
 
 @dataclass(frozen=True)

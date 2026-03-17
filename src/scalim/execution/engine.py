@@ -1,7 +1,7 @@
 # region imports
 
 import threading
-from typing import Iterable, MutableMapping, Optional, Sequence
+from typing import TYPE_CHECKING, Iterable, MutableMapping, Optional, Sequence
 
 from ..hooks.base import HookManager
 from ..ob.manager import ObserverManager
@@ -17,6 +17,9 @@ from .pipeline.base.pipeline import Pipeline, SeqPipeline
 from .pipeline.overrides import PipelineOverrides
 
 # endregion
+
+if TYPE_CHECKING:
+    from .workflow_cache_pool import WorkflowCachePool
 
 
 class ScalimEngine:
@@ -48,6 +51,8 @@ class ScalimEngine:
         guardrails: Optional[GuardrailsPolicy] = None,
         loader_retry: Optional[LoaderRetryPolicies] = None,
         preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
+        workflow_cache_pool: Optional["WorkflowCachePool"] = None,
+        workflow_node_id: Optional[str] = None,
     ) -> None:
         """初始化 `ScalimEngine` 计算引擎.
 
@@ -102,6 +107,8 @@ class ScalimEngine:
             parallel_mode=parallel_mode,
             max_workers=max_workers,
             preloaded_cache=preloaded_cache,
+            workflow_cache_pool=workflow_cache_pool,
+            workflow_node_id=workflow_node_id,
         )
         executor = BatchExecutor(plan, runtime, overrides=pipeline_overrides)
 

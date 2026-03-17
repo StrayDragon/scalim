@@ -3,12 +3,12 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的跨 runs 共享 `preload_forever` 预加载缓存.
+提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).
 
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/dsl/by_yaml/workflow.py` (workflow config 解析 + demand 路径解析)
 - `src/IMPL_ROOT/dsl/by_yaml/runtime/workflow_entrypoints.py` (run_workflow 实现)
-- `src/IMPL_ROOT/execution/preload_cache.py` (workflow-scope PreloadCache)
+- `src/IMPL_ROOT/execution/workflow_cache_pool.py` (workflow-scope cache pool)
 - `src/IMPL_ROOT/dsl/by_yaml/schema/workflow.gen.json` (workflow schema)
 
 ## Requirements
@@ -17,7 +17,7 @@
 系统 MUST 支持一种独立于 demand 的 workflow YAML 语法,用于声明多个 demand 的编排执行。
 workflow MUST 包含:
 - `workflow.runs`: run 列表,每项包含 `id` 与 `demand` 路径
-- `workflow.options`: 运行选项,包含 `max_concurrency`、`failure_policy`、`share_preload_cache`
+- `workflow.options`: 运行选项,包含 `max_concurrency`、`failure_policy`、`cache_pool`(可选)
 
 #### Scenario: workflow file passes schema validation
 - **WHEN** workflow YAML 同时包含 `workflow.runs` 与 `workflow.options`
@@ -55,25 +55,18 @@ workflow 返回值 MUST 提供“按 runs 对齐”的结果集合:返回集合�
 - **WHEN** `max_concurrency>1` 导致 runs 并发执行
 - **THEN** workflow 返回的结果集合顺序 MUST 与 `workflow.runs` 的声明顺序一致
 
-### Requirement: share_preload_cache reuses preload_forever sources across runs
-当 `share_preload_cache=true` 时,系统 MUST 在同一次 workflow 执行内跨 runs 共享 `cache_mode: preload_forever` 的预加载结果。
-系统 MUST 确保同一 `source_id` 的 preload 结果最多加载一次并被复用。
+### Requirement: workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)
+系统 MUST 将 workflow 的共享缓存配置入口收敛到结构化的 `workflow.options.cache_pool`,并移除 `workflow.options.share_preload_cache`.
 
-#### Scenario: preload_forever is loaded once
-- **GIVEN** 两个不同 run 的 demand 都包含 `sources.dim` 且 `cache_mode: preload_forever`
-- **WHEN** workflow 执行且 `share_preload_cache=true`
-- **THEN** `dim` loader MUST 在整个 workflow 中最多被调用一次
+#### Scenario: cache_pool config passes schema validation
+- **WHEN** workflow YAML 包含 `workflow.options.cache_pool`
+- **THEN** schema-only 校验 MUST 通过
 
-### Requirement: preload cache conflicts fail fast
-当 `share_preload_cache=true` 时,系统 MUST 对同一 `source_id` 的 preload 规格执行一致性校验(至少包含 loader 引用与渲染后的 params 与 normalize 等关键字段)。
-系统 MUST 在执行任一 run 之前完成上述一致性预检查(避免运行长时间后才因冲突失败)。
-若不同 runs 中同一 `source_id` 的规格不一致,系统 MUST fail-fast 报错并指出冲突 runs 与差异字段。
+#### Scenario: share_preload_cache is rejected
+- **WHEN** workflow YAML 包含 `workflow.options.share_preload_cache`
+- **THEN** 系统 MUST fail-fast 报错(提示迁移到 `workflow.options.cache_pool`)
 
-#### Scenario: conflicting preload spec is rejected before execution
-- **GIVEN** run A 的 `sources.dim.loader` 与 run B 的 `sources.dim.loader` 不同(或 params/normalize 不同)
-- **WHEN** workflow 启动且 `share_preload_cache=true`
-- **THEN** workflow MUST 报错并包含 run A/run B 的冲突信息
-- **AND** workflow MUST 不执行任何 run
+NOTE: cache pool 的语义(冲突策略/生命周期/预算/可观测性)由 `workflow-cache-pool` 能力规范定义.
 
 ### Requirement: workflow entrypoints MUST be importable under Python 3.6
 系统 MUST 保证在 Python 3.6 + `typing-extensions==4.1.1` 的最小依赖环境中, workflow 入口实现模块可被导入:

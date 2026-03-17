@@ -1,7 +1,7 @@
 import concurrent.futures
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Dict, FrozenSet, List, Mapping, MutableMapping, Optional, Sequence, Set, Tuple, cast
+from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from ....events.catalog import (
     EVENT_WORKFLOW_NODE_CANCELLED,
@@ -15,28 +15,27 @@ from ....events.catalog import (
 from ....events.event import generate_run_id
 from ....events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
 from ....execution.engine import ScalimEngine
-from ....execution.preload_cache import PreloadCache
 from ....execution.run_ir import ExecutionResult, run_ir
+from ....execution.workflow_cache_pool import WorkflowCachePool, WorkflowCachePoolError
 from ....hooks.base import HookManager
 from ....ob.components import split_components
 from ....ob.hub import InstrumentationHub
 from ....ob.observability import Observability
-from ....spec.ir.binding import LoaderCallContextIr
-from ....spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
-from ....typedefs import LoaderCallKwargs
-from ..config_parsing.loader import YamlDemandLoader
-from ..params_template import (
-    ParamsTemplateCompileError,
-    ParamsTemplateRenderError,
-    compile_params_template,
+from ....spec.ir.workflow import (
+    WorkflowArtifactsIr,
+    WorkflowCachePoolBudgetIr,
+    WorkflowCachePoolIr,
+    WorkflowCachePoolPinIr,
+    WorkflowEdgeIr,
+    WorkflowIr,
+    WorkflowNodeIr,
+    WorkflowNodeType,
+    WorkflowOptionsIr,
 )
-from ..reference_syntax import parse_python_reference
+from ..config_parsing.loader import YamlDemandLoader
 from ..workflow import WorkflowConfigError, load_workflow_config, resolve_workflow_demand_path
 from .compiler import compile as compile_demand
 from .contracts import RunOptions, RunOverrides, RunResult
-from .references import ResolverError, derive_base_module_path
-
-_MIN_SHARED_PRELOAD_SIGNATURE_RUNS = 2
 
 
 @dataclass(frozen=True)
@@ -172,14 +171,6 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         init_vars=init_vars,
     )
 
-    shared_cache: Optional[MutableMapping[str, Any]] = None
-    if workflow_ir.options.share_preload_cache:
-        _precheck_shared_preload_specs(
-            [(node.node_id, str(node.demand_path)) for node in workflow_ir.nodes if node.demand_path is not None],
-            init_vars=init_vars,
-        )
-        shared_cache = PreloadCache()
-
     outcomes: List[Optional[WorkflowRunOutcome]] = [None for _ in range(len(workflow_ir.nodes))]
     max_concurrency = int(workflow_ir.options.max_concurrency)
     failure_policy = str(workflow_ir.options.failure_policy or "all_fail")
@@ -196,6 +187,17 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         hook_manager=workflow_hook_manager,
         observer_manager=workflow_observer_manager,
     )
+
+    workflow_cache_pool: Optional[WorkflowCachePool] = None
+    if workflow_ir.options.cache_pool is not None:
+        logical_keys_by_node_id, consumers_by_logical_key = _derive_cache_pool_consumers(workflow_ir)
+        workflow_cache_pool = WorkflowCachePool(
+            workflow_exec_id=workflow_exec_id,
+            instrumentation=workflow_instrumentation,
+            config=workflow_ir.options.cache_pool,
+            logical_keys_by_node_id=logical_keys_by_node_id,
+            consumers_by_logical_key=consumers_by_logical_key,
+        )
 
     def _emit_workflow_node_start(node_id: str, *, demand_path: str) -> None:
         _ = workflow_instrumentation.emit(
@@ -252,13 +254,16 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             },
         )
 
-    def _engine_factory(**kwargs: object) -> ScalimEngine:
-        if shared_cache is None:
-            return ScalimEngine(**cast("Any", kwargs))
-        return ScalimEngine(**cast("Any", kwargs), preloaded_cache=cast("Any", shared_cache))
-
     def _run_one(compilation: object, workflow_node_id: str) -> ExecutionResult:
         comp = cast("Any", compilation)
+
+        def _engine_factory(**kwargs: object) -> ScalimEngine:
+            return ScalimEngine(
+                **cast("Any", kwargs),
+                workflow_cache_pool=workflow_cache_pool,
+                workflow_node_id=str(workflow_node_id),
+            )
+
         return run_ir(
             comp.demand_ir,
             comp.request,
@@ -316,6 +321,8 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             reason=reason,
             message=message,
         )
+        if workflow_cache_pool is not None:
+            workflow_cache_pool.on_workflow_node_done(str(node_id))
 
     def _on_terminal(node_id: str, *, ok: bool) -> None:
         for child_id in dependents_by_node_id.get(str(node_id), []):
@@ -374,6 +381,8 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                         outcomes[index_by_node_id[str(node_id)]] = outcome
                         node_state[str(node_id)] = "failed"
                         _emit_workflow_node_end(node_id, demand_path=demand_path, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+                        if workflow_cache_pool is not None:
+                            workflow_cache_pool.on_workflow_node_done(str(node_id))
                         _on_terminal(str(node_id), ok=False)
                         if failure_policy == "all_fail" and failed is None:
                             failed = outcome
@@ -404,8 +413,12 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                         _emit_workflow_node_end(str(node_id), demand_path=str(demand_path), status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
                         artifacts_dir.publish(str(node_id), "output_path", core.output_path)
                         artifacts_dir.publish(str(node_id), "outputs", core.outputs)
+                        if workflow_cache_pool is not None:
+                            workflow_cache_pool.on_workflow_node_done(str(node_id))
                         _on_terminal(str(node_id), ok=True)
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
+                        if isinstance(exc, WorkflowCachePoolError):
+                            raise WorkflowConfigError(str(exc), path=exc.path) from exc
                         err = WorkflowRunError(
                             run_id=str(node_id),
                             demand_path=str(demand_path),
@@ -416,6 +429,8 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                         outcomes[idx] = outcome
                         node_state[str(node_id)] = "failed"
                         _emit_workflow_node_end(str(node_id), demand_path=str(demand_path), status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+                        if workflow_cache_pool is not None:
+                            workflow_cache_pool.on_workflow_node_done(str(node_id))
                         _on_terminal(str(node_id), ok=False)
                         if failure_policy == "all_fail" and failed is None:
                             failed = outcome
@@ -450,6 +465,9 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
 
         return result
     finally:
+        if workflow_cache_pool is not None:
+            with contextlib.suppress(Exception):
+                workflow_cache_pool.close()
         with contextlib.suppress(Exception):
             workflow_observer_manager.close()
 
@@ -488,10 +506,25 @@ def _compile_workflow_ir(
             edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=node_id))
         slots_by_node_id[node_id] = ("output_path", "outputs")
 
+    cache_pool = None
+    raw_cache_pool = getattr(wf_obj.options, "cache_pool", None)
+    if raw_cache_pool is not None:
+        budget = WorkflowCachePoolBudgetIr(
+            max_entries=int(raw_cache_pool.budget.max_entries),
+            over_budget_policy=str(raw_cache_pool.budget.over_budget_policy),
+        )
+        pins = tuple(WorkflowCachePoolPinIr(kind=str(pin.kind), source_id=str(pin.source_id)) for pin in (raw_cache_pool.pin or ()))
+        cache_pool = WorkflowCachePoolIr(
+            conflict_policy=str(raw_cache_pool.conflict_policy),
+            release_policy=str(raw_cache_pool.release_policy),
+            budget=budget,
+            pin=pins,
+        )
+
     options = WorkflowOptionsIr(
         max_concurrency=int(wf_obj.options.max_concurrency),
         failure_policy=str(wf_obj.options.failure_policy or "all_fail"),
-        share_preload_cache=bool(wf_obj.options.share_preload_cache),
+        cache_pool=cache_pool,
     )
 
     artifacts = WorkflowArtifactsIr(slots_by_node_id=slots_by_node_id)
@@ -506,199 +539,36 @@ def _compile_workflow_ir(
     )
 
 
-def _normalize_python_reference(reference: str, *, base_module_path: Optional[str]) -> str:
-    raw = str(reference or "").strip()
-    if not raw or not raw.startswith("."):
-        return raw
+def _derive_cache_pool_consumers(
+    workflow_ir: WorkflowIr,
+) -> Tuple[Dict[str, FrozenSet[Tuple[str, str]]], Dict[Tuple[str, str], FrozenSet[str]]]:
+    """基于 `workflow IR` + `demand YAML` 推导缓存消费者集合上界.
 
-    if base_module_path is None:
-        msg = "Relative reference '{}' requires base_module_path".format(raw)
-        raise ResolverError(msg)
-
-    parsed = parse_python_reference(raw)
-    absolute_module_path = _normalize_relative_module_path(parsed.module_path, base_module_path=base_module_path, reference=raw)
-    if parsed.style == "class":
-        return "{}:{}".format(absolute_module_path, ".".join(parsed.attr_path))
-    return "{}.{}".format(absolute_module_path, parsed.entry_attr)
-
-
-def _normalize_relative_module_path(module_path: str, *, base_module_path: str, reference: str) -> str:
-    dot_count = 0
-    for ch in module_path:
-        if ch != ".":
-            break
-        dot_count += 1
-
-    rest = module_path[dot_count:]
-    base_parts = [p for p in str(base_module_path).split(".") if p] if base_module_path else []
-    up_levels = dot_count - 1
-    if up_levels > len(base_parts):
-        msg = "Relative reference '{}' escapes base_module_path='{}'".format(reference, base_module_path)
-        raise ResolverError(msg)
-
-    prefix_parts = base_parts[: len(base_parts) - up_levels] if up_levels else base_parts
-    rest_parts = rest.split(".")
-    absolute_parts = prefix_parts + rest_parts
-    return ".".join(absolute_parts)
-
-
-def _render_preload_forever_params(
-    source_id: str,
-    *,
-    params: object,
-    init_vars: Optional[Dict[str, object]],
-    path: str,
-) -> LoaderCallKwargs:
-    try:
-        template = compile_params_template(
-            params,
-            path=path,
-            init_vars=cast("Optional[Mapping[str, Any]]", init_vars),
-            allow_keys=False,
-            allow_rows=False,
-        )
-    except ParamsTemplateCompileError as exc:
-        raise WorkflowConfigError(str(exc), path=path) from exc
-
-    if template.is_empty_mapping():
-        return {}
-
-    try:
-        return template.render_kwargs(LoaderCallContextIr(source_id=source_id, is_ref_loader=False), path=path)
-    except ParamsTemplateRenderError as exc:
-        raise WorkflowConfigError(str(exc), path=path) from exc
-
-
-def _ensure_json_like(value: object, *, path: str) -> object:
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, (list, tuple)):
-        return [_ensure_json_like(v, path=path) for v in cast("Sequence[object]", value)]
-    if isinstance(value, dict):
-        out: Dict[str, object] = {}
-        for k, v in cast("Dict[object, object]", value).items():
-            if not isinstance(k, str):
-                msg = "Signature value must be JSON-like (dict key must be str)"
-                raise WorkflowConfigError(msg, path=path)
-            out[k] = _ensure_json_like(v, path=path)
-        return out
-    msg = "Signature value must be JSON-like (None/bool/int/float/str/list/tuple/dict[str, ...]), got {}".format(type(value).__name__)
-    raise WorkflowConfigError(msg, path=path)
-
-
-@dataclass(frozen=True)
-class _PreloadSpecSignature:
-    loader_ref: str
-    params: object
-    normalize: Optional[Dict[str, object]]
-    key: object
-    lookup_cast: Optional[Dict[str, object]]
-
-    def as_dict(self) -> Dict[str, object]:
-        payload: Dict[str, object] = {
-            "loader_ref": self.loader_ref,
-            "params": self.params,
-            "normalize": self.normalize or None,
-            "key": self.key,
-            "lookup_cast": self.lookup_cast or None,
-        }
-        return payload
-
-
-def _diff_signature_fields(left: _PreloadSpecSignature, right: _PreloadSpecSignature) -> List[str]:
-    diff: List[str] = []
-    left_dict = left.as_dict()
-    right_dict = right.as_dict()
-    for key in sorted(left_dict.keys()):
-        if left_dict.get(key) != right_dict.get(key):
-            diff.append(str(key))
-    return diff
-
-
-def _precheck_shared_preload_specs(  # noqa: C901
-    runs: Sequence[Tuple[str, str]],
-    *,
-    init_vars: Optional[Dict[str, object]],
-) -> None:
-    by_source: Dict[str, List[Tuple[str, str, _PreloadSpecSignature]]] = {}
+    `v0`: 仅覆盖 `cache_mode=preload_forever` 的 `sources`,按 `(kind, source_id)` 聚合.
+    """
 
     loader = YamlDemandLoader()
 
-    for run_id, demand_path in runs:
-        config = loader.load(str(demand_path))
-        yaml_path = str(demand_path)
+    logical_keys_by_node_id: Dict[str, FrozenSet[Tuple[str, str]]] = {}
+    consumers_by_logical_key: Dict[Tuple[str, str], Set[str]] = {}
 
-        base_module_path: Optional[str] = None
-        for source in config.sources.values():
-            if str(source.cache_mode) != "preload_forever":
-                continue
-            if str(source.loader or "").strip().startswith("."):
-                base_module_path = derive_base_module_path(yaml_path)
-                break
+    for node in workflow_ir.nodes:
+        node_id = str(node.node_id)
+        keys: Set[Tuple[str, str]] = set()
+        demand_path = getattr(node, "demand_path", None)
+        if demand_path is not None:
+            config = loader.load(str(demand_path))
+            for source_id, source in getattr(config, "sources", {}).items():
+                if str(getattr(source, "cache_mode", "") or "") != "preload_forever":
+                    continue
+                logical_key = ("preload_forever", str(source_id))
+                keys.add(logical_key)
+                consumers_by_logical_key.setdefault(logical_key, set()).add(node_id)
 
-        for source_id, source in config.sources.items():
-            if str(source.cache_mode) != "preload_forever":
-                continue
+        logical_keys_by_node_id[node_id] = frozenset(keys)
 
-            loader_ref = _normalize_python_reference(str(source.loader), base_module_path=base_module_path)
-            params_path = "sources.{}.params".format(source_id)
-            rendered_params = _render_preload_forever_params(
-                source_id,
-                params=source.params,
-                init_vars=init_vars,
-                path=params_path,
-            )
-
-            signature = _PreloadSpecSignature(
-                loader_ref=str(loader_ref),
-                params=_ensure_json_like(rendered_params, path=params_path),
-                normalize=_normalize_source_normalize(source.normalize, path="sources.{}.normalize".format(source_id)),
-                key=_ensure_json_like(source.key, path="sources.{}.key".format(source_id)),
-                lookup_cast=_normalize_source_lookup_cast(source.lookup_cast, path="sources.{}.lookup_cast".format(source_id)),
-            )
-            by_source.setdefault(str(source_id), []).append((run_id, yaml_path, signature))
-
-    for source_id, items in sorted(by_source.items(), key=lambda item: str(item[0])):
-        if len(items) < _MIN_SHARED_PRELOAD_SIGNATURE_RUNS:
-            continue
-        base_run_id, _, base_sig = items[0]
-        for other_run_id, _, other_sig in items[1:]:
-            if base_sig == other_sig:
-                continue
-            diff = _diff_signature_fields(base_sig, other_sig)
-            msg = "preload_forever spec conflict for source_id='{}': run '{}' vs run '{}' (diff={})".format(
-                source_id,
-                base_run_id,
-                other_run_id,
-                ",".join(diff) if diff else "?",
-            )
-            raise WorkflowConfigError(
-                msg,
-                path="workflow.options.share_preload_cache",
-            )
-
-
-def _normalize_source_normalize(value: object, *, path: str) -> Optional[Dict[str, object]]:
-    if value is None:
-        return None
-    norm = cast("Any", value)
-    payload: Dict[str, object] = {
-        "kind": _ensure_json_like(getattr(norm, "kind", None), path=path),
-        "key_field": _ensure_json_like(getattr(norm, "key_field", None), path=path),
-        "on_conflict": _ensure_json_like(getattr(norm, "on_conflict", None), path=path),
-    }
-    return cast("Dict[str, object]", _ensure_json_like(payload, path=path))
-
-
-def _normalize_source_lookup_cast(value: object, *, path: str) -> Optional[Dict[str, object]]:
-    if value is None:
-        return None
-    cast_cfg = cast("Any", value)
-    payload: Dict[str, object] = {
-        "name": _ensure_json_like(getattr(cast_cfg, "name", None), path=path),
-        "sep": _ensure_json_like(getattr(cast_cfg, "sep", None), path=path),
-    }
-    return cast("Dict[str, object]", _ensure_json_like(payload, path=path))
+    consumers_frozen = {key: frozenset(sorted(node_ids)) for key, node_ids in consumers_by_logical_key.items()}
+    return logical_keys_by_node_id, consumers_frozen
 
 
 __all__ = [

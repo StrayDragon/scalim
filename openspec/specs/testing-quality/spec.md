@@ -276,7 +276,7 @@
 
 该 workflow 示例 MUST 至少覆盖:
 - `scalim.dsl.by_yaml.run_workflow(...)` 的运行入口
-- `workflow.options.share_preload_cache=true` 的共享 `preload_forever` 行为(需可对拍/可断言)
+- 启用 `workflow.options.cache_pool` 的共享 `preload_forever` 行为(需可对拍/可断言)
 
 #### Scenario: workflow 示例在 examples gate 中通过
 - **WHEN** 开发者运行 `just examples`(或等价 `notebooks/marimo/run_examples.py`)

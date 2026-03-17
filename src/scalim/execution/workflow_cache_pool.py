@@ -1,0 +1,484 @@
+import hashlib
+import json
+import math
+import threading
+from collections import OrderedDict
+from dataclasses import dataclass, field
+from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
+
+from ..events.catalog import (
+    EVENT_DIAGNOSTIC_WARNING,
+    EVENT_WORKFLOW_CACHE_ACQUIRE,
+    EVENT_WORKFLOW_CACHE_EVICT,
+    EVENT_WORKFLOW_CACHE_RELEASE,
+)
+from ..events.events import DiagnosticWarningEvent, WorkflowCacheAcquireEvent, WorkflowCacheEvictEvent, WorkflowCacheReleaseEvent
+from ..ob.hub import InstrumentationHub
+from ..spec.ir.sources import SourceIr
+from ..spec.ir.workflow import WorkflowCachePoolIr
+from ..typedefs import LoaderCallKwargs, LoaderResultMapping
+
+
+class WorkflowCachePoolError(RuntimeError):
+    path: str
+
+    def __init__(self, message: str, *, path: str) -> None:
+        super(WorkflowCachePoolError, self).__init__(str(message))
+        self.path = str(path or "")
+
+
+def _ensure_json_like(value: object, *, path: str) -> object:
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            msg = "Signature value must be JSON-like (float must be finite)"
+            raise WorkflowCachePoolError(msg, path=path)
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_ensure_json_like(v, path=path) for v in cast("Sequence[object]", value)]
+    if isinstance(value, dict):
+        out: Dict[str, object] = {}
+        for k, v in cast("Dict[object, object]", value).items():
+            if not isinstance(k, str):
+                msg = "Signature value must be JSON-like (dict key must be str)"
+                raise WorkflowCachePoolError(msg, path=path)
+            out[str(k)] = _ensure_json_like(v, path=path)
+        return out
+    msg = "Signature value must be JSON-like (None/bool/int/float/str/list/tuple/dict[str, ...]), got {}".format(type(value).__name__)
+    raise WorkflowCachePoolError(msg, path=path)
+
+
+def _normalize_json_like(value: object) -> object:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, list):
+        items = cast("List[object]", value)
+        return [_normalize_json_like(item) for item in items]
+    if isinstance(value, dict):
+        mapping = cast("Dict[object, object]", value)
+        out: Dict[str, object] = {}
+        for raw_key in sorted(mapping.keys(), key=str):
+            out[str(raw_key)] = _normalize_json_like(mapping[raw_key])
+        return out
+    return value
+
+
+def _canonical_json_dumps(value: object) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _format_callable_reference(fn: object) -> str:
+    module = str(getattr(fn, "__module__", "") or "").strip()
+    qualname = str(getattr(fn, "__qualname__", "") or "").strip()
+    name = str(getattr(fn, "__name__", "") or "").strip()
+
+    if not module or module == "builtins":
+        return qualname or name or repr(fn)
+    if qualname and "." in qualname and "<locals>" not in qualname:
+        return "{}:{}".format(module, qualname)
+    entry = qualname or name
+    if entry:
+        return "{}.{}".format(module, entry)
+    return module
+
+
+def _lookup_cast_signature(cast_fn: object) -> Optional[Dict[str, object]]:
+    if cast_fn is None:
+        return None
+    name = getattr(cast_fn, "scalim_lookup_cast_name", None)
+    if isinstance(name, str) and name.strip():
+        payload: Dict[str, object] = {"name": str(name)}
+        meta = getattr(cast_fn, "scalim_lookup_cast_meta", None)
+        if isinstance(meta, dict):
+            meta_dict = cast("Dict[object, object]", meta)
+            for k, v in meta_dict.items():
+                if k == "name":
+                    continue
+                if isinstance(k, str) and k.strip():
+                    payload[str(k)] = _ensure_json_like(v, path="(lookup_cast)")
+        return payload
+
+    # 兜底: 尽量保持稳定且 `JSON-safe`.
+    return {
+        "callable": _format_callable_reference(cast_fn),
+    }
+
+
+@dataclass(frozen=True)
+class WorkflowCacheEntrySignature:
+    kind: str
+    source_id: str
+    loader_ref: str
+    rendered_params: object
+    normalize: Optional[Dict[str, object]] = None
+    key: object = None
+    lookup_cast: Optional[Dict[str, object]] = None
+
+    def logical_key(self) -> Tuple[str, str]:
+        return (str(self.kind), str(self.source_id))
+
+    def as_dict(self) -> Dict[str, object]:
+        return {
+            "kind": str(self.kind),
+            "source_id": str(self.source_id),
+            "loader_ref": str(self.loader_ref),
+            "rendered_params": self.rendered_params,
+            "normalize": self.normalize or None,
+            "key": self.key,
+            "lookup_cast": self.lookup_cast or None,
+        }
+
+    def canonical_key(self) -> str:
+        normalized = _normalize_json_like(self.as_dict())
+        return _canonical_json_dumps(normalized)
+
+    def digest(self) -> str:
+        payload = self.canonical_key().encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()[:16]
+
+
+def build_preload_forever_signature(source: SourceIr, *, rendered_params: LoaderCallKwargs) -> WorkflowCacheEntrySignature:
+    params_path = "sources.{}.params".format(source.source_id)
+    params = _normalize_json_like(_ensure_json_like(rendered_params, path=params_path))
+
+    normalize_dict: Optional[Dict[str, object]] = None
+    if source.normalize is not None:
+        norm = source.normalize
+        normalize_payload = cast(
+            "Dict[str, object]",
+            _ensure_json_like(
+                {
+                    "kind": getattr(norm, "kind", None),
+                    "key_field": getattr(norm, "key_field", None),
+                    "on_conflict": getattr(norm, "on_conflict", None),
+                    "on_empty": getattr(norm, "on_empty", None),
+                    "on_missing": getattr(norm, "on_missing", None),
+                    "fields": [
+                        {
+                            "name": getattr(rule, "name", None),
+                            "from_key": getattr(rule, "from_key", None),
+                            "extract_expr": getattr(rule, "extract_expr", None),
+                            "extract_segments": list(getattr(rule, "extract_segments", ()) or ()),
+                        }
+                        for rule in getattr(norm, "fields", ()) or ()
+                    ],
+                },
+                path="sources.{}.normalize".format(source.source_id),
+            ),
+        )
+        normalize_dict = cast("Dict[str, object]", _normalize_json_like(normalize_payload))
+
+    signature = WorkflowCacheEntrySignature(
+        kind="preload_forever",
+        source_id=str(source.source_id),
+        loader_ref=_format_callable_reference(source.loader_spec.callable),
+        rendered_params=params,
+        normalize=normalize_dict,
+        key=_normalize_json_like(_ensure_json_like(source.key.key, path="sources.{}.key".format(source.source_id))),
+        lookup_cast=_lookup_cast_signature(getattr(source.key, "cast", None)),
+    )
+    # 校验顶层 `JSON-like` 结构.
+    _ = _ensure_json_like(signature.as_dict(), path="(signature)")
+    return signature
+
+
+def diff_signature_fields(left: WorkflowCacheEntrySignature, right: WorkflowCacheEntrySignature) -> List[str]:
+    diff: List[str] = []
+    left_dict = left.as_dict()
+    right_dict = right.as_dict()
+    for key in sorted(left_dict.keys()):
+        if left_dict.get(key) != right_dict.get(key):
+            diff.append(str(key))
+    return diff
+
+
+@dataclass
+class _CacheEntry:
+    signature: WorkflowCacheEntrySignature
+    value: Optional[LoaderResultMapping] = None
+    loading: bool = False
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+class WorkflowCachePool:
+    _workflow_exec_id: str
+    _instrumentation: InstrumentationHub
+    _conflict_policy: str
+    _release_policy: str
+    _max_entries: int
+    _over_budget_policy: str
+    _pinned_logical_keys: FrozenSet[Tuple[str, str]]
+    _logical_keys_by_node_id: Mapping[str, FrozenSet[Tuple[str, str]]]
+    _remaining_consumers_by_logical_key: Dict[Tuple[str, str], Set[str]]
+    _entries: "OrderedDict[str, _CacheEntry]"
+    _signature_keys_by_logical_key: Dict[Tuple[str, str], Set[str]]
+    _acquired_by_node_id: Dict[str, Set[str]]
+    _done_node_ids: Set[str]
+    _lock: threading.Lock
+
+    def __init__(
+        self,
+        *,
+        workflow_exec_id: str,
+        instrumentation: InstrumentationHub,
+        config: WorkflowCachePoolIr,
+        logical_keys_by_node_id: Mapping[str, FrozenSet[Tuple[str, str]]],
+        consumers_by_logical_key: Mapping[Tuple[str, str], FrozenSet[str]],
+    ) -> None:
+        self._workflow_exec_id = str(workflow_exec_id)
+        self._instrumentation = instrumentation
+        self._conflict_policy = str(config.conflict_policy)
+        self._release_policy = str(config.release_policy)
+        self._max_entries = int(config.budget.max_entries)
+        self._over_budget_policy = str(config.budget.over_budget_policy)
+        self._pinned_logical_keys = frozenset((str(p.kind), str(p.source_id)) for p in (config.pin or ()))
+
+        self._logical_keys_by_node_id = {
+            str(node_id): frozenset((str(kind), str(source_id)) for kind, source_id in keys)
+            for node_id, keys in logical_keys_by_node_id.items()
+        }
+        self._remaining_consumers_by_logical_key = {
+            (str(kind), str(source_id)): {str(node_id) for node_id in consumers}
+            for (kind, source_id), consumers in consumers_by_logical_key.items()
+        }
+
+        self._entries = OrderedDict()
+        self._signature_keys_by_logical_key = {}
+        self._acquired_by_node_id = {}
+        self._done_node_ids = set()
+        self._lock = threading.Lock()
+
+    def get_or_load(
+        self,
+        signature: WorkflowCacheEntrySignature,
+        *,
+        workflow_node_id: str,
+        load_fn: Callable[[], LoaderResultMapping],
+    ) -> LoaderResultMapping:
+        node_id = str(workflow_node_id)
+        logical_key = signature.logical_key()
+        signature_key = signature.canonical_key()
+        signature_digest = signature.digest()
+
+        conflict_diff: Optional[List[str]] = None
+        conflict_target_digest: Optional[str] = None
+
+        with self._lock:
+            existing_keys = self._signature_keys_by_logical_key.get(logical_key, set())
+            if existing_keys and signature_key not in existing_keys:
+                first_key = next(iter(existing_keys))
+                first_entry = self._entries.get(first_key)
+                if first_entry is not None:
+                    conflict_diff = diff_signature_fields(first_entry.signature, signature)
+                    conflict_target_digest = first_entry.signature.digest()
+
+                if self._conflict_policy == "error":
+                    msg = "cache_pool signature conflict for kind='{}', source_id='{}' (diff={})".format(
+                        logical_key[0],
+                        logical_key[1],
+                        ",".join(conflict_diff or []),
+                    )
+                    raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.conflict_policy")
+
+                # `warn/separate`: 允许并行存在多个条目,但需要可诊断(含差异摘要).
+                warn_msg = "cache_pool signature conflict for kind='{}', source_id='{}' (policy={}, diff={})".format(
+                    logical_key[0],
+                    logical_key[1],
+                    self._conflict_policy,
+                    ",".join(conflict_diff or []),
+                )
+                _ = self._instrumentation.emit(
+                    EVENT_DIAGNOSTIC_WARNING,
+                    DiagnosticWarningEvent(
+                        message=warn_msg,
+                        source_id=str(logical_key[1]),
+                        field_id=None,
+                        lookup_key=None,
+                        row_id=None,
+                    ),
+                    meta={
+                        "workflow_exec_id": self._workflow_exec_id,
+                        "workflow_node_id": node_id,
+                    },
+                )
+
+            entry = self._entries.get(signature_key)
+            cache_status = "hit" if entry is not None and entry.value is not None else "miss"
+            if entry is None:
+                self._ensure_budget_for_new_entry(workflow_node_id=node_id)
+                entry = _CacheEntry(signature=signature)
+                self._entries[signature_key] = entry
+                self._signature_keys_by_logical_key.setdefault(logical_key, set()).add(signature_key)
+
+            self._acquired_by_node_id.setdefault(node_id, set()).add(signature_key)
+            self._entries.move_to_end(signature_key)
+
+            _ = self._instrumentation.emit(
+                EVENT_WORKFLOW_CACHE_ACQUIRE,
+                WorkflowCacheAcquireEvent(
+                    workflow_exec_id=self._workflow_exec_id,
+                    workflow_node_id=node_id,
+                    cache_kind=str(logical_key[0]),
+                    source_id=str(logical_key[1]),
+                    signature_digest=signature_digest,
+                    cache_status=cache_status,
+                    conflict_policy=str(self._conflict_policy),
+                    conflict_detected=bool(conflict_diff),
+                    conflict_diff_fields=tuple(conflict_diff or ()),
+                    conflict_target_signature_digest=conflict_target_digest,
+                ),
+                meta={
+                    "workflow_exec_id": self._workflow_exec_id,
+                    "workflow_node_id": node_id,
+                },
+            )
+
+        # 加载过程由每条目锁(`per-entry lock`)保护.
+        with entry.lock:
+            if entry.value is not None:
+                return entry.value
+            entry.loading = True
+            try:
+                loaded = load_fn()
+                entry.value = loaded
+                return loaded
+            finally:
+                entry.loading = False
+
+    def on_workflow_node_done(self, workflow_node_id: str) -> None:
+        node_id = str(workflow_node_id)
+
+        with self._lock:
+            if node_id in self._done_node_ids:
+                return
+            self._done_node_ids.add(node_id)
+
+            acquired = self._acquired_by_node_id.pop(node_id, set())
+            self._emit_release_events(node_id=node_id, acquired_signature_keys=acquired)
+            evict_reasons = self._collect_refcount_evictions(node_id=node_id)
+            for signature_key, reason in evict_reasons.items():
+                self._evict_entry(signature_key, workflow_node_id=node_id, reason=reason)
+
+    def _emit_release_events(self, *, node_id: str, acquired_signature_keys: Set[str]) -> None:
+        for signature_key in acquired_signature_keys:
+            entry = self._entries.get(signature_key)
+            if entry is None:
+                continue
+            logical_key = entry.signature.logical_key()
+            remaining = len(self._remaining_consumers_by_logical_key.get(logical_key, set()))
+            _ = self._instrumentation.emit(
+                EVENT_WORKFLOW_CACHE_RELEASE,
+                WorkflowCacheReleaseEvent(
+                    workflow_exec_id=self._workflow_exec_id,
+                    workflow_node_id=node_id,
+                    cache_kind=str(logical_key[0]),
+                    source_id=str(logical_key[1]),
+                    signature_digest=entry.signature.digest(),
+                    remaining_consumers=remaining,
+                    release_policy=str(self._release_policy),
+                    is_pinned=logical_key in self._pinned_logical_keys,
+                ),
+                meta={
+                    "workflow_exec_id": self._workflow_exec_id,
+                    "workflow_node_id": node_id,
+                },
+            )
+
+    def _collect_refcount_evictions(self, *, node_id: str) -> Dict[str, str]:
+        evict_reasons: Dict[str, str] = {}
+        for logical_key in self._logical_keys_by_node_id.get(node_id, frozenset()):
+            remaining = self._remaining_consumers_by_logical_key.get(logical_key)
+            if remaining is None:
+                continue
+            remaining.discard(node_id)
+            if remaining:
+                continue
+            if self._release_policy != "dag_refcount":
+                continue
+            if logical_key in self._pinned_logical_keys:
+                continue
+            for signature_key in list(self._signature_keys_by_logical_key.get(logical_key, set())):
+                evict_reasons[signature_key] = "refcount_zero"
+        return evict_reasons
+
+    def close(self) -> None:
+        with self._lock:
+            for signature_key in list(self._entries.keys()):
+                self._evict_entry(signature_key, workflow_node_id="workflow_end", reason="workflow_end")
+
+    def _ensure_budget_for_new_entry(self, *, workflow_node_id: str) -> None:
+        if self._max_entries < 1:  # pragma: no cover
+            msg = "cache_pool budget.max_entries must be >= 1"
+            raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.max_entries")
+        if len(self._entries) < self._max_entries:
+            return
+
+        if self._over_budget_policy == "fail_fast":
+            msg = "cache_pool over budget: max_entries={} (over_budget_policy=fail_fast)".format(self._max_entries)
+            raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+
+        if self._over_budget_policy != "evict_lru":
+            msg = "cache_pool over_budget_policy '{}' is not supported".format(self._over_budget_policy)
+            raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+
+        evicted = self._evict_lru_idle(workflow_node_id=workflow_node_id)
+        if not evicted:
+            msg = "cache_pool over budget: max_entries={} (no evictable refcount=0 entries)".format(self._max_entries)
+            raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+
+    def _evict_lru_idle(self, *, workflow_node_id: str) -> bool:
+        for signature_key, entry in list(self._entries.items()):
+            logical_key = entry.signature.logical_key()
+            if logical_key in self._pinned_logical_keys:
+                continue
+            if entry.loading:
+                continue
+            remaining = self._remaining_consumers_by_logical_key.get(logical_key, set())
+            if remaining:
+                continue
+            self._evict_entry(signature_key, workflow_node_id=workflow_node_id, reason="budget_lru")
+            return True
+        return False
+
+    def _evict_entry(self, signature_key: str, *, workflow_node_id: str, reason: str) -> None:
+        entry = self._entries.pop(signature_key, None)
+        if entry is None:
+            return
+        logical_key = entry.signature.logical_key()
+        keys = self._signature_keys_by_logical_key.get(logical_key)
+        if keys is not None:
+            keys.discard(signature_key)
+            if not keys:
+                _ = self._signature_keys_by_logical_key.pop(logical_key, None)
+                _ = self._remaining_consumers_by_logical_key.pop(logical_key, None)
+
+        _ = self._instrumentation.emit(
+            EVENT_WORKFLOW_CACHE_EVICT,
+            WorkflowCacheEvictEvent(
+                workflow_exec_id=self._workflow_exec_id,
+                workflow_node_id=str(workflow_node_id),
+                cache_kind=str(logical_key[0]),
+                source_id=str(logical_key[1]),
+                signature_digest=entry.signature.digest(),
+                reason=str(reason),
+            ),
+            meta={
+                "workflow_exec_id": self._workflow_exec_id,
+                "workflow_node_id": str(workflow_node_id),
+            },
+        )
+
+
+__all__ = [
+    "WorkflowCacheEntrySignature",
+    "WorkflowCachePool",
+    "WorkflowCachePoolError",
+    "build_preload_forever_signature",
+    "diff_signature_fields",
+]

@@ -191,6 +191,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/testing-quality/spec.md)
 - Summary: **状态: ✅ 已实现** 定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现.
 
+### `workflow-cache-pool`
+- Title: workflow-cache-pool Specification
+- Source: [spec.md](#code=openspec/specs/workflow-cache-pool/spec.md)
+- Summary: **状态: ✅ 已实现** 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
+
 ### `workflow-ir`
 - Title: workflow-ir Specification
 - Source: [spec.md](#code=openspec/specs/workflow-ir/spec.md)
@@ -234,7 +239,7 @@ Sources:
 ### `yaml-dsl-workflow`
 - Title: yaml-dsl-workflow Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow/spec.md)
-- Summary: **状态: ✅ 已实现** 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的跨 runs 共享 `preload_forever` 预加载缓存.
+- Summary: **状态: ✅ 已实现** 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).
 
 ### `yaml-field-extract`
 - Title: yaml-field-extract Specification

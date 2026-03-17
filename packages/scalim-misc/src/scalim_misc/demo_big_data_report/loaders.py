@@ -107,7 +107,7 @@ def load_workflow_preload_counter_table() -> Dict[int, Dict[str, Any]]:
     """用于 `workflow` fixture 的 `preload_forever` source.
 
     该 loader 的作用是提供一个轻量且确定性的“可观察”信号:
-    - `share_preload_cache=true` 时,同一 workflow 内多次 run 应只调用一次该 loader
+    - 启用 `workflow.options.cache_pool` 时,同一 workflow 内多次 run 应只调用一次该 loader
     """
     _WORKFLOW_PRELOAD_COUNTER["calls"] = int(_WORKFLOW_PRELOAD_COUNTER["calls"]) + 1
     return {0: {"id": 0, "name": "preload_counter"}}

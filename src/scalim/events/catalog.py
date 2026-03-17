@@ -22,6 +22,9 @@ from .events import (
     RowReleaseEvent,
     RowWriteEvent,
     StageSpanEvent,
+    WorkflowCacheAcquireEvent,
+    WorkflowCacheEvictEvent,
+    WorkflowCacheReleaseEvent,
     WorkflowNodeCancelledEvent,
     WorkflowNodeEndEvent,
     WorkflowNodeStartEvent,
@@ -51,6 +54,10 @@ EVENT_OUTPUT_TARGET_END = "output_target_end"
 EVENT_WORKFLOW_NODE_START = "workflow_node_start"
 EVENT_WORKFLOW_NODE_END = "workflow_node_end"
 EVENT_WORKFLOW_NODE_CANCELLED = "workflow_node_cancelled"
+
+EVENT_WORKFLOW_CACHE_ACQUIRE = "workflow_cache_acquire"
+EVENT_WORKFLOW_CACHE_RELEASE = "workflow_cache_release"
+EVENT_WORKFLOW_CACHE_EVICT = "workflow_cache_evict"
 
 WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED = "dependency_failed"
 WORKFLOW_NODE_CANCELLED_REASON_UPSTREAM_CANCELLED = "upstream_cancelled"
@@ -259,6 +266,30 @@ _EVENT_CATALOG: List[EventDescriptor] = [
         payload_policy="full",
         payload_type=WorkflowNodeCancelledEvent.__name__,
     ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_CACHE_ACQUIRE,
+        summary="workflow cache acquire",
+        key_fields=("workflow_node_id", "cache_kind", "source_id", "cache_status"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowCacheAcquireEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_CACHE_RELEASE,
+        summary="workflow cache release",
+        key_fields=("workflow_node_id", "cache_kind", "source_id", "remaining_consumers"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowCacheReleaseEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_CACHE_EVICT,
+        summary="workflow cache evict",
+        key_fields=("workflow_node_id", "cache_kind", "source_id", "reason"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowCacheEvictEvent.__name__,
+    ),
 ]
 
 
@@ -289,6 +320,9 @@ __all__ = [
     "EVENT_ROW_RELEASE",
     "EVENT_ROW_WRITE",
     "EVENT_STAGE_SPAN",
+    "EVENT_WORKFLOW_CACHE_ACQUIRE",
+    "EVENT_WORKFLOW_CACHE_EVICT",
+    "EVENT_WORKFLOW_CACHE_RELEASE",
     "EVENT_WORKFLOW_NODE_CANCELLED",
     "EVENT_WORKFLOW_NODE_END",
     "EVENT_WORKFLOW_NODE_START",

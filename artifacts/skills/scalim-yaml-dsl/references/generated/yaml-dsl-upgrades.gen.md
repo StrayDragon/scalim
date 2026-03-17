@@ -147,7 +147,7 @@
   本批次聚焦 YAML DSL 的“复用与编排”能力:
   - demand YAML 新增跨文件复用: 顶层 `imports` + 任意 mapping 内 `$import`(编译期展开)
   - 新增 workflow YAML + Python 入口 `scalim.dsl.by_yaml.run_workflow(...)` 编排多个 demand
-  - workflow 可选启用 `share_preload_cache`: 跨 runs 共享 `cache_mode: preload_forever` 的预加载结果,并在启动前做规格冲突预检查
+  - workflow 可选启用 `cache_pool`: 跨 nodes 共享 `cache_mode: preload_forever` 的预加载结果,并通过 signature + 冲突策略治理复用边界（`share_preload_cache` 已移除）
   OpenSpec 归档变更（含 proposal/design/spec/tasks）:
   - `openspec/changes/archive/2026-03-13-yaml-dsl-imports/`
   - `openspec/changes/archive/2026-03-13-yaml-dsl-workflow/`
@@ -164,7 +164,8 @@
   1) (可选) 将重复的 mapping 片段抽到同级 fragment YAML,在主文件用 `imports/$import` 复用
   2) 确保所有使用 `imports/$import` 的场景都走“文件路径入口”(不要走纯文本入口)
   3) 需要多 demand 编排时,新增 workflow YAML 并从 Python 调用 `run_workflow(...)`
-  4) 若启用 `share_preload_cache=true`,确保同一 `source_id` 的 preload 规格在所有 runs 中一致
+  4) 若启用 `workflow.options.cache_pool`,确保同一逻辑 key 下的 signature 边界符合预期（必要时用 `conflict_policy=separate|warn` 作为迁移窗口）
+  5) 注意: `workflow.options.share_preload_cache` 已移除,请升级到 `cache_pool`
 
 ## 2026-03-13: yaml-source-normalize-shapes
 - SSOT: `references/upgrades/2026-03-13-yaml-source-normalize-shapes.md`

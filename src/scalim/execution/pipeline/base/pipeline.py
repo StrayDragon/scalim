@@ -32,6 +32,7 @@ from ...executor.batch.executor import BatchExecutor
 from ...executor.helpers.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
 from ...executor.runtime.runtime import ExecutionRuntime
 from ...loader_retry import CALLSITE_MAIN_SOURCE, CALLSITE_PRELOAD_FOREVER, call_with_loader_retry
+from ...workflow_cache_pool import build_preload_forever_signature
 from ..overrides import PipelineOverrides, chunk_iterable
 from ._adaptive_pool import maybe_create_adaptive_pool
 from ._row_emission import RowEmissionCoordinator
@@ -226,6 +227,18 @@ class Pipeline(ABC):
                     return result_mapping
 
                 cache = self.runtime.preloaded_cache
+                cache_pool = self.runtime.workflow_cache_pool
+                workflow_node_id = self.runtime.workflow_node_id
+                if cache_pool is not None and workflow_node_id is not None:
+                    signature = build_preload_forever_signature(source, rendered_params=call_kwargs)
+                    result_mapping = cache_pool.get_or_load(
+                        signature,
+                        workflow_node_id=workflow_node_id,
+                        load_fn=_load_preload_forever_source,
+                    )
+                    cache[source_id] = result_mapping
+                    continue
+
                 get_or_load = getattr(cache, "get_or_load", None)
                 if callable(get_or_load):
                     result_mapping = cast("LoaderResultMapping", get_or_load(source_id, _load_preload_forever_source))

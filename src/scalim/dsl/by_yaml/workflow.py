@@ -19,6 +19,10 @@ else:
 
 
 _FAILURE_POLICIES = ("all_fail", "primary_only")
+_CACHE_POOL_CONFLICT_POLICIES = ("error", "separate", "warn")
+_CACHE_POOL_RELEASE_POLICIES = ("dag_refcount", "workflow_end")
+_CACHE_POOL_OVER_BUDGET_POLICIES = ("fail_fast", "evict_lru")
+_CACHE_POOL_PIN_KINDS = ("preload_forever",)
 
 _ALIAS_DEMAND_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):/(.+)$")
 
@@ -47,7 +51,27 @@ class WorkflowRun:
 class WorkflowOptions:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
-    share_preload_cache: bool = False
+    cache_pool: Optional["WorkflowCachePoolOptions"] = None
+
+
+@dataclass(frozen=True)
+class WorkflowCachePoolBudget:
+    max_entries: int
+    over_budget_policy: str
+
+
+@dataclass(frozen=True)
+class WorkflowCachePoolPin:
+    kind: str
+    source_id: str
+
+
+@dataclass(frozen=True)
+class WorkflowCachePoolOptions:
+    conflict_policy: str
+    release_policy: str
+    budget: WorkflowCachePoolBudget
+    pin: Tuple[WorkflowCachePoolPin, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -305,14 +329,95 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
         msg = "workflow.options.failure_policy must be one of: {}".format("/".join(_FAILURE_POLICIES))
         raise WorkflowConfigError(msg, path="workflow.options.failure_policy")
 
-    share_preload_cache = bool(options_dict.get("share_preload_cache", False))
+    if "share_preload_cache" in options_dict:
+        msg = "workflow.options.share_preload_cache was removed; use workflow.options.cache_pool"
+        raise WorkflowConfigError(msg, path="workflow.options.share_preload_cache")
+
+    cache_pool: Optional[WorkflowCachePoolOptions] = None
+    cache_pool_raw = options_dict.get("cache_pool")
+    if cache_pool_raw is not None:
+        if not isinstance(cache_pool_raw, dict):
+            msg = "workflow.options.cache_pool must be a mapping"
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool")
+        cache_pool_dict = cast("Dict[str, Any]", cache_pool_raw)
+
+        conflict_policy = str(cache_pool_dict.get("conflict_policy", "") or "").strip()
+        if conflict_policy not in _CACHE_POOL_CONFLICT_POLICIES:
+            msg = "workflow.options.cache_pool.conflict_policy must be one of: {}".format("/".join(_CACHE_POOL_CONFLICT_POLICIES))
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.conflict_policy")
+
+        release_policy = str(cache_pool_dict.get("release_policy", "") or "").strip()
+        if release_policy not in _CACHE_POOL_RELEASE_POLICIES:
+            msg = "workflow.options.cache_pool.release_policy must be one of: {}".format("/".join(_CACHE_POOL_RELEASE_POLICIES))
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.release_policy")
+
+        budget_raw = cache_pool_dict.get("budget")
+        if not isinstance(budget_raw, dict):
+            msg = "workflow.options.cache_pool.budget must be a mapping"
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget")
+        budget_dict = cast("Dict[str, Any]", budget_raw)
+
+        max_entries_raw = budget_dict.get("max_entries")
+        if isinstance(max_entries_raw, bool) or not isinstance(max_entries_raw, (int, float, str)):
+            msg = "workflow.options.cache_pool.budget.max_entries must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
+        try:
+            max_entries = int(max_entries_raw)
+        except (TypeError, ValueError) as exc:
+            msg = "workflow.options.cache_pool.budget.max_entries must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries") from exc
+        if max_entries < 1:
+            msg = "workflow.options.cache_pool.budget.max_entries must be >= 1"
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
+
+        over_budget_policy = str(budget_dict.get("over_budget_policy", "") or "").strip()
+        if over_budget_policy not in _CACHE_POOL_OVER_BUDGET_POLICIES:
+            msg = "workflow.options.cache_pool.budget.over_budget_policy must be one of: {}".format(
+                "/".join(_CACHE_POOL_OVER_BUDGET_POLICIES)
+            )
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+
+        budget = WorkflowCachePoolBudget(
+            max_entries=max_entries,
+            over_budget_policy=over_budget_policy,
+        )
+
+        pin_raw = cache_pool_dict.get("pin")
+        if pin_raw is None:
+            pin_raw = []
+        if not isinstance(pin_raw, list):
+            msg = "workflow.options.cache_pool.pin must be a list of mappings"
+            raise WorkflowConfigError(msg, path="workflow.options.cache_pool.pin")
+        pins: List[WorkflowCachePoolPin] = []
+        for idx, item in enumerate(cast("List[Any]", pin_raw)):
+            pin_path = "workflow.options.cache_pool.pin.{}".format(idx)
+            if not isinstance(item, dict):
+                msg = "workflow.options.cache_pool.pin items must be mappings"
+                raise WorkflowConfigError(msg, path=pin_path)
+            pin_dict = cast("Dict[str, Any]", item)
+            kind = str(pin_dict.get("kind", "") or "").strip()
+            if kind not in _CACHE_POOL_PIN_KINDS:
+                msg = "workflow.options.cache_pool.pin[*].kind must be one of: {}".format("/".join(_CACHE_POOL_PIN_KINDS))
+                raise WorkflowConfigError(msg, path="{}.kind".format(pin_path))
+            source_id = str(pin_dict.get("source_id", "") or "").strip()
+            if not source_id:
+                msg = "workflow.options.cache_pool.pin[*].source_id must be a non-empty string"
+                raise WorkflowConfigError(msg, path="{}.source_id".format(pin_path))
+            pins.append(WorkflowCachePoolPin(kind=kind, source_id=source_id))
+
+        cache_pool = WorkflowCachePoolOptions(
+            conflict_policy=conflict_policy,
+            release_policy=release_policy,
+            budget=budget,
+            pin=tuple(pins),
+        )
 
     return WorkflowConfig(
         runs=tuple(runs),
         options=WorkflowOptions(
             max_concurrency=max_concurrency,
             failure_policy=failure_policy,
-            share_preload_cache=share_preload_cache,
+            cache_pool=cache_pool,
         ),
         resources=resources,
     )
@@ -377,6 +482,9 @@ def _validate_workflow_deps_no_cycles(
 
 
 __all__ = [
+    "WorkflowCachePoolBudget",
+    "WorkflowCachePoolOptions",
+    "WorkflowCachePoolPin",
     "WorkflowConfig",
     "WorkflowConfigError",
     "WorkflowOptions",

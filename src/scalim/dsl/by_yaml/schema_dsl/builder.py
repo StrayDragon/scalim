@@ -137,6 +137,72 @@ class SchemaBuilder:
 
     def build_workflow_schema(self) -> Dict[str, Any]:
         types_mod = self._types
+        cache_pool_pin_item: Dict[str, Any] = {
+            "type": "object",
+            "required": ["kind", "source_id"],
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": ["preload_forever"],
+                    "description": "pin kind(v0 仅允许 preload_forever)",
+                    "markdownDescription": "pin kind(v0 仅允许 `preload_forever`).",
+                },
+                "source_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "pin 的 source_id",
+                    "markdownDescription": "pin 的 `source_id`.",
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        cache_pool: Dict[str, Any] = {
+            "type": "object",
+            "required": ["conflict_policy", "release_policy", "budget"],
+            "properties": {
+                "conflict_policy": {
+                    "type": "string",
+                    "enum": ["error", "separate", "warn"],
+                    "description": "signature 冲突策略(error/separate/warn)",
+                    "markdownDescription": "signature 冲突策略(`error`/`separate`/`warn`).",
+                },
+                "release_policy": {
+                    "type": "string",
+                    "enum": ["dag_refcount", "workflow_end"],
+                    "description": "释放策略(dag_refcount/workflow_end)",
+                    "markdownDescription": "释放策略(`dag_refcount`/`workflow_end`).",
+                },
+                "budget": {
+                    "type": "object",
+                    "required": ["max_entries", "over_budget_policy"],
+                    "properties": {
+                        "max_entries": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "cache pool entry 数量预算(>=1)",
+                            "markdownDescription": "cache pool entry 数量预算(>=1).",
+                        },
+                        "over_budget_policy": {
+                            "type": "string",
+                            "enum": ["fail_fast", "evict_lru"],
+                            "description": "超限策略(fail_fast/evict_lru)",
+                            "markdownDescription": "超限策略(`fail_fast`/`evict_lru`).",
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+                "pin": {
+                    "type": "array",
+                    "items": cache_pool_pin_item,
+                    "default": [],
+                    "description": "pin 列表(可选)",
+                    "markdownDescription": "pin 列表(可选).",
+                },
+            },
+            "additionalProperties": False,
+        }
+
         options: Dict[str, Any] = {
             "type": "object",
             "properties": {
@@ -156,11 +222,11 @@ class SchemaBuilder:
                         "失败策略.\n\n- `all_fail`: 任一 run 失败即失败\n- `primary_only`: 失败 run 被跳过但 workflow 继续"
                     ),
                 },
-                "share_preload_cache": {
-                    "type": "boolean",
-                    "default": False,
-                    "description": "跨 runs 共享 preload_forever cache",
-                    "markdownDescription": "跨 runs 共享 `cache_mode: preload_forever` 的预加载缓存(仅同一次 workflow 内).",
+                "cache_pool": {
+                    "oneOf": [cache_pool, {"type": "null"}],
+                    "default": None,
+                    "description": "workflow-scope cache pool 配置(可选)",
+                    "markdownDescription": "workflow-scope cache pool 配置(可选).",
                 },
             },
             "additionalProperties": False,

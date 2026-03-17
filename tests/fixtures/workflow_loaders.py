@@ -31,7 +31,8 @@ def load_main_raises() -> Iterable[Mapping[str, object]]:
     raise ValueError("boom")
 
 
-def load_preload_table() -> Dict[int, Mapping[str, object]]:
+def load_preload_table(**kwargs: object) -> Dict[int, Mapping[str, object]]:
+    _ = kwargs
     global _PRELOAD_CALLS
     with _LOCK:
         _PRELOAD_CALLS += 1
@@ -39,7 +40,8 @@ def load_preload_table() -> Dict[int, Mapping[str, object]]:
     return {1: {"id": 1, "value": "ok"}}
 
 
-def load_preload_table_alt() -> Dict[int, Mapping[str, object]]:
+def load_preload_table_alt(**kwargs: object) -> Dict[int, Mapping[str, object]]:
+    _ = kwargs
     global _PRELOAD_CALLS
     with _LOCK:
         _PRELOAD_CALLS += 1
