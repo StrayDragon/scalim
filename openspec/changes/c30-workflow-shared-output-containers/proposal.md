@@ -14,6 +14,7 @@
 
 > 本 change 作为 workflow 的后置提案,计划标记为 **DELAYED**。  
 > 为通过 `openspec validate`/门禁,本 change 提供最小 delta spec 占位(不代表已进入实现阶段)。
+> 说明: 本 change 预期落到 `c10-workflow-ir-roadmap` 定义的 workflow IR/节点系统之上(以 output/resource 节点表达),避免在现有 `run_workflow()` 直接执行器上引入不可扩展的特例。
 
 - **New**: workflow 级“共享输出容器”(resources)概念,用于多 demand 合并输出
   - 例如声明一个共享 workbook/csv 资源,由 workflow 统一创建/关闭/落盘(只保存一次,原子替换)
@@ -22,7 +23,7 @@
 - **New**: 将 workflow 视为 DAG 编排的一种承载(“demand 只是节点类型之一”)
   - `demand` 节点: 运行一个 demand(可并发),产出可引用的 artifacts(例如 output_target 的行流/统计信息/ctx)
   - `write_sheet`/`append_sheet` 节点: 将一个或多个 demand 的 output_target 写入共享 workbook 的 sheet(或写入共享 csv)
-  - 可选的轻量 `ctx_compute` 节点: 在 workflow ctx 上做小计算/映射,用于下游 runtime_vars 注入(避免把所有逻辑塞进 demand)
+  - 可选的轻量 `ctx_compute` 节点: 在 workflow ctx 上做小计算/映射,用于下游 init_vars 注入(避免把所有逻辑塞进 demand)
 
 - **New**: 多 demand → 单 workbook 多 sheet 的直觉写法
   - 支持把每个 run 的某个 output 写到一个 sheet
@@ -37,7 +38,7 @@
 
 ### Recommended Direction (MVP)
 
-- 该 change 推荐建立在 `workflow-dag-context-passing` 之上(同一套 DAG 调度 + ctx),优先落地 **workbook 多 sheet** 与 **csv append** 两条路径。
+- 该 change 推荐建立在 `c20-workflow-dag-context-passing` 之上(同一套 DAG 调度 + ctx),优先落地 **workbook 多 sheet** 与 **csv append** 两条路径。
 - MVP 优先选择“按资源互斥串行写入”的路线(避免在 workflow 内引入大体量 in-memory dataset 传递)：
   - 多个 run 可以并发编译/执行,但对同一共享资源(workbook/csv)的写入 MUST 串行化并遵循声明顺序
   - 共享资源在 workflow 末尾统一 commit/原子落盘,失败时按 `failure_policy` 决定是否丢弃或保留部分内容

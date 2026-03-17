@@ -2,7 +2,7 @@
 
 - [ ] 1.1 设计并扩展 workflow JSON Schema: `workflow.resources`(workbooks/csvs) + `workflow.runs[*].write_to`(workbook_sheet/csv)并保持旧配置兼容
 - [ ] 1.2 扩展 workflow 配置模型与解析器,补齐语义校验(资源 id 唯一/引用合法/字段组合合法/冲突策略枚举)
-- [ ] 1.3 明确本 change 与 `workflow-dag-context-passing` 的依赖关系,并在实现中复用同一套 DAG 调度/确定性顺序
+- [ ] 1.3 明确本 change 与 `c20-workflow-dag-context-passing` 的依赖关系,并在实现中复用同一套 DAG 调度/确定性顺序
 
 ## 2. Resource Runtime (Workbook / CSV)
 
@@ -36,4 +36,3 @@
 - [ ] 6.2 覆盖并回归 canonical demo: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`(如 workflow authoring surface 受影响)
 - [ ] 6.3 若 schema 影响 editor/前端,同步生成并校验 workflow schema 的分发文件(按既有脚本与漂移门禁)
 - [ ] 6.4 通过门禁: `just qa` + `just openspec-check`
-

@@ -14,7 +14,7 @@
 - 优先复用现有 sink/IR 体系(保持 demand 心智模型),避免引入“workflow 内存数据集图”。
 - 文档/生成边界必须在实现前收敛(哪些手写/哪些生成/哪些 injected-block),并给出 drift gate。
 
-与 `workflow-dag-context-passing` 的关系:
+与 `c20-workflow-dag-context-passing` 的关系:
 - 共享输出容器的“写出节点/资源互斥/确定性顺序”本质上依赖 DAG 编排与确定性调度。
 - 推荐将本 change 设计为“在 DAG 调度器之上增加资源管理与写出语义”。
 
@@ -214,4 +214,3 @@ workflow:
     max_concurrency: 8
     failure_policy: primary_only
 ```
-

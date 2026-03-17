@@ -32,11 +32,15 @@ context: |
   规范校验命令: `openspec validate --all --strict --no-interactive`.
   提交前缀建议: `fix:`、`tests:`、`doc:`、`PROJECT_DIST_NAME:`、`sync`、`tmp`.
   示例策略: 优先扩展现有 demo/YAML:,再新增文件.
+  Active changes 命名规范(仅对 `openspec/changes/` 下未归档变更生效):
+  - 统一使用 `c<priority>-<kebab-case>` 形式,例如 `c10-workflow-ir-roadmap`
+  - `priority` 建议按 10 递增(预留 `c0-`/`c5-` 等插队位),便于从名称直观看出推进顺序
+  - `openspec/changes/archive/` 中的历史归档不做重命名
 
 rules:
   proposal:
-    - 若变更涉及 docs/specs/skills,proposal MUST 明确: 哪些文件是 SSOT、哪些是生成物/注入区块,以及对应生成入口(脚本或 `just` 目标).
+    - "若变更涉及 docs/specs/skills,proposal MUST 明确: 哪些文件是 SSOT、哪些是生成物/注入区块,以及对应生成入口(脚本或 `just` 目标)."
   design:
-    - design MUST 在实现前收敛文档/生成边界(哪些写手工,哪些生成,哪些是 injected-block)并给出 drift gate 方案.
+    - "design MUST 在实现前收敛文档/生成边界(哪些写手工,哪些生成,哪些是 injected-block)并给出 drift gate 方案."
   tasks:
-    - tasks MUST 对每个生成物/注入区块写清楚: SSOT、生成入口(优先 `just gen-docs`)与验收口径(例如 drift check/`just qa`).
+    - "tasks MUST 对每个生成物/注入区块写清楚: SSOT、生成入口(优先 `just gen-docs`)与验收口径(例如 drift check/`just qa`)."

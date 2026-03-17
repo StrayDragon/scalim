@@ -1,6 +1,6 @@
 ## Why
 
-当前 `workflow` YAML 只能将多个独立 demand 做“并发批量执行”(max_concurrency / failure_policy / share_preload_cache)，但无法表达 run 之间的依赖关系与数据/上下文传递。实际落地时，用户往往只能回到 Python glue（手工串行、读写中间文件、拼 runtime_vars），导致：
+当前 `workflow` YAML 只能将多个独立 demand 做“并发批量执行”(max_concurrency / failure_policy / share_preload_cache)，但无法表达 run 之间的依赖关系与数据/上下文传递。实际落地时，用户往往只能回到 Python glue（手工串行、读写中间文件、拼 init_vars），导致：
 
 - 报表“多阶段流水线”难以用 YAML 直观表达与复用
 - workflow 语义在 UI（scalim-viz）里也难以被可视化为可读的 DAG
@@ -9,6 +9,7 @@
 
 > 本 change 仅做提案，计划标记为 **DELAYED**；先确立方向与需求边界，再决定是否进入实现排期。
 > 为通过 `openspec validate`/门禁,本 change 同时提供最小 delta spec 占位(不代表已进入实现阶段)。
+> 说明: 本 change 预期落到 `c10-workflow-ir-roadmap` 定义的 workflow IR/节点系统之上,而非在现有 `run_workflow()` 直接执行器上持续打补丁；YAML 语法细节可后置为“编译到 IR 的前端”。
 
 - **New**: workflow runs 支持 DAG 编排（依赖关系）
   - 为 `workflow.runs[*]` 增加可选的依赖字段（例如 `depends_on: [run_id, ...]`）
@@ -18,7 +19,7 @@
 
 - **New**: workflow 级 `ctx`（上下文）传递（将上游 run 的产物用于下游 demand 输入）
   - workflow 在一次执行过程中维护一个“run 级上下文存储”（以 run_id 为命名空间）
-  - 允许下游 run 将上游 ctx 注入为本次 demand 的 `runtime_vars`（从而复用 demand 侧现有 `{$runtime: ...}` 能力）
+  - 允许下游 run 将上游 ctx 注入为本次 demand 的 `init_vars`（从而复用 demand 侧现有 `{$init_var: ...}` 能力）
   - **最小化落地优先级建议**（避免过早引入“内存数据集图”复杂度）：
     1) 先支持“标量/小集合”的 ctx（例如 ids、路径、参数、统计摘要）
     2) 大体量数据集（rows/dataset）作为后续扩展候选，需 guardrails（内存上限、序列化边界、可对拍策略）
@@ -29,8 +30,8 @@
 ### Recommended Direction (MVP)
 
 - 先把 workflow 的“编排单元”抽象为 **run-level DAG**（仅 demand runs），并把 ctx 传递限定为 JSON-like 的小对象。
-- 让 `ctx → runtime_vars` 仍发生在 **编译期**（复用现有 `{$runtime: ...}` 解析规则），因此编译需要做到“按依赖就绪再编译并执行”。
-- 该 change 作为 `workflow-shared-output-containers` 的基础设施：后者的“写出节点/资源互斥/确定性写入”将复用同一套 DAG 调度与 ctx 存储。
+- 让 `ctx → init_vars` 仍发生在 **编译期**（复用现有 `{$init_var: ...}` 解析规则），因此编译需要做到“按依赖就绪再编译并执行”。
+- 该 change 作为 `c30-workflow-shared-output-containers` 的基础设施：后者的“写出节点/资源互斥/确定性写入”将复用同一套 DAG 调度与 ctx 存储。
 
 ### MVP Example (YAML)
 
@@ -44,7 +45,7 @@ workflow:
     - id: report_users
       demand: ./report_users.demand.yaml
       depends_on: [extract_users]
-      runtime_vars:
+      init_vars:
         users_csv_path:
           $ctx: extract_users.output_path
   options:
@@ -65,7 +66,7 @@ workflow:
 
 - YAML authoring surface：
   - workflow YAML 增加少量字段即可表达“多阶段流水线”（更接近用户直觉）
-  - demand YAML 本身不需要为 ctx 传递新增入口（优先复用 `runtime_vars` 与 `{$runtime: ...}`）
+  - demand YAML 本身不需要为 ctx 传递新增入口（优先复用 `init_vars` 与 `{$init_var: ...}`）
 - Runtime：
   - 需要在 `run_workflow` 调度层引入 DAG 调度与 ctx 生命周期管理（并发安全 + 确定性）
   - 需要增加静态校验（无环、依赖引用合法、失败策略在依赖场景下的规则）

@@ -3,11 +3,11 @@
 现状(已实现,见 `openspec/specs/yaml-dsl-workflow/spec.md`):
 - workflow YAML 仅支持 runs 列表 + 有限并发 + failure_policy + share_preload_cache。
 - `run_workflow()` 当前在执行前会 **先编译所有 runs**,随后用线程池做队列并发。
-- demand 侧 `{$runtime: <name>}`/`$runtime` 指令在 **编译期**解析: runtime_vars 需要在编译时给齐(见 `src/scalim/dsl/by_yaml/params_template.py`)。
+- demand 侧 `{$init_var: <name>}`/`$init_var` 指令在 **编译期**解析: init_vars 需要在编译时给齐(见 `src/scalim/dsl/by_yaml/params_template.py`;命名修正在 `c0-yaml-init-vars`)。
 
 为什么这会阻塞 DAG/ctx:
 - 有依赖关系时,调度不再是“简单队列”;需要建图、拓扑调度与 cycle 检测。
-- ctx 传递要求“上游完成后,下游才能拿到注入到 runtime_vars 的值”。但 runtime_vars 又在编译期使用,因此下游 demand 必须 **就绪后再编译**。
+- ctx 传递要求“上游完成后,下游才能拿到注入到 init_vars 的值”。但 init_vars 又在编译期使用,因此下游 demand 必须 **就绪后再编译**。
 
 约束/相关方:
 - 运行时需兼容 Python 3.6。
@@ -22,7 +22,7 @@
 
 **Goals:**
 - 为 `workflow.runs[*]` 增加依赖字段,使 workflow 可被解释为 DAG。
-- 提供 run-scoped ctx(以 run_id 命名空间),允许把上游 ctx 注入为下游 run 的 runtime_vars(复用 `$runtime` 解析机制)。
+- 提供 run-scoped ctx(以 run_id 命名空间),允许把上游 ctx 注入为下游 run 的 init_vars(复用 `$init_var` 解析机制)。
 - 静态校验: run_id 引用合法、无环,并在执行前 fail-fast。
 - 并发下确定性:
   - 就绪节点选择顺序稳定
@@ -36,7 +36,7 @@
 
 ## Decisions
 
-### 1) YAML authoring surface: run-level DAG + ctx → runtime_vars (Recommended)
+### 1) YAML authoring surface: run-level DAG + ctx → init_vars (Recommended)
 
 在 `workflow.runs[*]` 上增加三个可选字段(字段名为提案,最终可讨论调整):
 
@@ -44,15 +44,15 @@
 - 默认空列表。
 - 依赖语义: 只有当依赖 runs **成功完成**后当前 run 才能进入可运行队列。
 
-2) `runtime_vars: { <name>: <value> }`
+2) `init_vars: { <name>: <value> }`
 - run-scoped,仅对该 run 生效。
-- 与 Python 入口的 `runtime_vars` 合并(建议规则: run-scoped 覆盖同名 key)。
+- 与 Python 入口的 `init_vars` 合并(建议规则: run-scoped 覆盖同名 key)。
 
 3) workflow ctx 引用值(仅在 workflow YAML 中使用)
-- 推荐提供一个与 `$runtime` 同风格的“单键指令节点”用于引用 ctx:
+- 推荐提供一个与 `$init_var` 同风格的“单键指令节点”用于引用 ctx:
 
 ```yaml
-runtime_vars:
+init_vars:
   users_csv_path:
     $ctx: extract_users.output_path
 ```
@@ -76,7 +76,7 @@ ctx 值约束:
 - B) 不引入 `$ctx` 指令,改用结构化引用:
 
 ```yaml
-runtime_vars:
+init_vars:
   users_csv_path:
     from_ctx:
       run: extract_users
@@ -101,16 +101,16 @@ runtime_vars:
 - 返回顺序:
   - `WorkflowResult.outcomes` 顺序仍按 `workflow.runs` 声明顺序稳定对齐
 
-### 3) Compilation strategy: compile on-ready (because runtime_vars are compile-time)
+### 3) Compilation strategy: compile on-ready (because init_vars are compile-time)
 
-现实现是“先编译所有 runs 再执行”。在引入 ctx 注入后,下游 run 的 runtime_vars 可能依赖上游 run 的 ctx,因此推荐:
-- demand 编译延迟到 run 进入可执行状态之后(依赖已满足且 runtime_vars 已解析)
+现实现是“先编译所有 runs 再执行”。在引入 ctx 注入后,下游 run 的 init_vars 可能依赖上游 run 的 ctx,因此推荐:
+- demand 编译延迟到 run 进入可执行状态之后(依赖已满足且 init_vars 已解析)
 - 仍可以在执行前做轻量的 fail-fast:
   - demand path 解析与存在性检查(可选 strict)
   - schema-only 校验(如果 workflow/demand 校验器可用)
 
 备选方案(更复杂,不推荐作为 MVP):
-- A) 两阶段编译: 先编译出“包含未解析 `$runtime` 指令”的 IR,运行前再注入并冻结。
+- A) 两阶段编译: 先编译出“包含未解析 `$init_var` 指令”的 IR,运行前再注入并冻结。
   - 需要调整 `params_template` 的契约(目前 RuntimeDirectiveNode 明确要求编译期 resolve)。
   - 会把许多错误从“编译期”推迟到“运行期”,降低 fail-fast 能力。
 
@@ -132,12 +132,12 @@ runtime_vars:
 
 现实现的 `share_preload_cache` 预检查要求“执行任一 run 前先编译全部 runs 并对比 preload 规格签名”。
 在 DAG/ctx 场景下:
-- 若某些 run 的 preload params 使用 `$runtime` 且该 runtime_vars 来自 `$ctx`,则其签名在 workflow 启动时不可得。
+- 若某些 run 的 preload params 使用 `$init_var` 且该 init_vars 来自 `$ctx`,则其签名在 workflow 启动时不可得。
 
 推荐的 MVP 处理方式(二选一,需要在实现前定案):
 - A) **增量预检查**: 当某个 run 在真正执行前刚编译完成,再对其 preload 规格签名做一次“与已见签名对比”的 fail-fast 检查。
   - 保留“尽量早失败”的性质,但不再保证“在执行任一 run 前就完成全量预检查”。
-- B) **约束组合**: 当 `share_preload_cache=true` 时,禁止使用 `$ctx` 驱动会影响 preload 签名的 runtime_vars(或更粗暴: 禁止任何 `$ctx` runtime_vars)。
+- B) **约束组合**: 当 `share_preload_cache=true` 时,禁止使用 `$ctx` 驱动会影响 preload 签名的 init_vars(或更粗暴: 禁止任何 `$ctx` init_vars)。
   - 保留原 spec 的强 fail-fast,但限制可用性。
 
 该点建议在提案讨论中明确,必要时通过 delta spec 补充约束或更新主规范。
@@ -167,8 +167,8 @@ runtime_vars:
 建议拆成可回归的增量里程碑(即使最终一次性落地也按此验收):
 
 1) 仅引入 `depends_on` + cycle detection + DAG 调度(不做 ctx)
-2) 引入 ctx 自动暴露(仅 meta) + run-scoped runtime_vars(仅字面量)
-3) 引入 `$ctx` 引用 + ctx → runtime_vars 注入(带 JSON-like/size guardrails)
+2) 引入 ctx 自动暴露(仅 meta) + run-scoped init_vars(仅字面量)
+3) 引入 `$ctx` 引用 + ctx → init_vars 注入(带 JSON-like/size guardrails)
 4) 处理 `share_preload_cache` 与 `$ctx` 的组合语义并补齐 spec/测试
 5) 更新 docs/fixtures,并为 scalim-viz 提供可视化所需的稳定结构(如需要,另起 change)
 
@@ -200,7 +200,7 @@ workflow:
     failure_policy: primary_only
 ```
 
-### Example B: ctx → runtime_vars injection (path passing)
+### Example B: ctx → init_vars injection (path passing)
 
 workflow:
 
@@ -212,7 +212,7 @@ workflow:
     - id: report_users
       demand: ./report_users.demand.yaml
       depends_on: [extract_users]
-      runtime_vars:
+      init_vars:
         users_csv_path:
           $ctx: extract_users.output_path
   options:
@@ -220,7 +220,7 @@ workflow:
     failure_policy: all_fail
 ```
 
-downstream demand uses existing `$runtime`:
+downstream demand uses existing `$init_var`:
 
 ```yaml
 name: report_users
@@ -230,6 +230,5 @@ main_source:
   loader: myapp.loaders:load_users_csv
   params:
     path:
-      $runtime: users_csv_path
+      $init_var: users_csv_path
 ```
-
