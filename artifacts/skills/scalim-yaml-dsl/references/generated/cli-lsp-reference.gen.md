@@ -56,6 +56,9 @@
   - CLI 校验输出包含源码位置
   - Linter/编译器风格输出
   - validate 对 `outputs.*.fields` object 条目给出可行动诊断
+  - CLI provides a local HTTP server for YAML DSL JSON Schemas
+  - CLI can upsert schema modeline in YAML files (IntelliJ compatible)
+  - upsert-lsp-comment resolves schema reference from type + schema-path
 ### `yaml-dsl-editor-core`
 - Source: `openspec/specs/yaml-dsl-editor-core/spec.md`
 - Purpose: 定义 YAML DSL 编辑器的核心能力:文本优先编辑、Visual 双向同步、统一校验模型、roundtrip 稳定性与可选 exact(Pyodide)语义校验.

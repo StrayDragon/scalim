@@ -1,6 +1,6 @@
 {
   "meta": {
-    "created_at": 1773583870.2360668,
+    "created_at": 1773740797.7793858,
     "target_fields": [
       "order_id",
       "order_date",
@@ -40,7 +40,9 @@
       "profit",
       "tax_amount",
       "final_price",
-      "customer_id"
+      "customer_id",
+      "product_id",
+      "promotion_id"
     ]
   },
   "targets": [
@@ -82,7 +84,9 @@
     "profit",
     "tax_amount",
     "final_price",
-    "customer_id"
+    "customer_id",
+    "product_id",
+    "promotion_id"
   ],
   "load_ref": {
     "op_count": 25,

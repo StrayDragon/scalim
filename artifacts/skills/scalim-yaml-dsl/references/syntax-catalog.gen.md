@@ -511,7 +511,7 @@
   - `$import`: `string` | `array`, oneOf(2)
   - `fields`: `object`
   - `distinct_on_overflow`: `string`, enum `error`, `truncate`
-  - `group_by`: `array`, items `string`
+  - `group_by`: `array`, items `string` | `object` | `array`, anyOf(3)
   - `max_distinct`: `integer`
   - `max_groups`: `integer`
 

@@ -320,6 +320,20 @@
       }
     },
     {
+      "id": "field:product_id",
+      "type": "field",
+      "data": {
+        "label": "产品ID",
+        "field_key": "product_id",
+        "source_id": "orders",
+        "is_ref": false
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
       "id": "field:product_name",
       "type": "field",
       "data": {
@@ -354,6 +368,20 @@
         "field_key": "promotion_discount",
         "source_id": "promotions",
         "is_ref": true
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "field:promotion_id",
+      "type": "field",
+      "data": {
+        "label": "促销ID",
+        "field_key": "promotion_id",
+        "source_id": "orders",
+        "is_ref": false
       },
       "position": {
         "x": 0,
@@ -728,6 +756,86 @@
       }
     },
     {
+      "id": "output_target:by_region_category",
+      "type": "output_target",
+      "data": {
+        "label": "by_region_category",
+        "target_id": "by_region_category",
+        "kind": "derived",
+        "is_primary": false,
+        "output_path": "./.tmp/output/ecommerce_report.xlsx",
+        "sheet_name": "区域x分类"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "output_target:by_region_import",
+      "type": "output_target",
+      "data": {
+        "label": "by_region_import",
+        "target_id": "by_region_import",
+        "kind": "derived",
+        "is_primary": false,
+        "output_path": "./.tmp/output/ecommerce_report.xlsx",
+        "sheet_name": "区域汇总-$import"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "output_target:by_region_no_promo",
+      "type": "output_target",
+      "data": {
+        "label": "by_region_no_promo",
+        "target_id": "by_region_no_promo",
+        "kind": "derived",
+        "is_primary": false,
+        "output_path": "./.tmp/output/ecommerce_report.xlsx",
+        "sheet_name": "区域汇总-无促销"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "output_target:by_region_ops",
+      "type": "output_target",
+      "data": {
+        "label": "by_region_ops",
+        "target_id": "by_region_ops",
+        "kind": "derived",
+        "is_primary": false,
+        "output_path": "./.tmp/output/ecommerce_report.xlsx",
+        "sheet_name": "区域汇总-算子"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "output_target:by_region_top_amount",
+      "type": "output_target",
+      "data": {
+        "label": "by_region_top_amount",
+        "target_id": "by_region_top_amount",
+        "kind": "derived",
+        "is_primary": false,
+        "output_path": "./.tmp/output/ecommerce_report.xlsx",
+        "sheet_name": "区域Top-金额"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
       "id": "output_target:detail",
       "type": "output_target",
       "data": {
@@ -995,6 +1103,15 @@
       }
     },
     {
+      "id": "e_out:field:category_name:output_target:by_region_category:composed_from",
+      "source": "field:category_name",
+      "target": "output_target:by_region_category",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
       "id": "e_out:field:category_name:output_target:detail:composed_from",
       "source": "field:category_name",
       "target": "output_target:detail",
@@ -1088,6 +1205,42 @@
       "id": "e_out:field:customer_id:output_target:by_region:composed_from",
       "source": "field:customer_id",
       "target": "output_target:by_region",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:customer_id:output_target:by_region_category:composed_from",
+      "source": "field:customer_id",
+      "target": "output_target:by_region_category",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:customer_id:output_target:by_region_import:composed_from",
+      "source": "field:customer_id",
+      "target": "output_target:by_region_import",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:customer_id:output_target:by_region_no_promo:composed_from",
+      "source": "field:customer_id",
+      "target": "output_target:by_region_no_promo",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:customer_id:output_target:by_region_ops:composed_from",
+      "source": "field:customer_id",
+      "target": "output_target:by_region_ops",
       "type": "composed_from",
       "data": {
         "type": "composed_from"
@@ -1355,6 +1508,24 @@
       }
     },
     {
+      "id": "e_out:field:no_promotion:output_target:by_region_no_promo:composed_from",
+      "source": "field:no_promotion",
+      "target": "output_target:by_region_no_promo",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:no_promotion:output_target:by_region_ops:composed_from",
+      "source": "field:no_promotion",
+      "target": "output_target:by_region_ops",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
       "id": "e_out:field:no_promotion:output_target:detail:composed_from",
       "source": "field:no_promotion",
       "target": "output_target:detail",
@@ -1403,6 +1574,51 @@
       "id": "e_out:field:order_amount:output_target:by_region:composed_from",
       "source": "field:order_amount",
       "target": "output_target:by_region",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:order_amount:output_target:by_region_category:composed_from",
+      "source": "field:order_amount",
+      "target": "output_target:by_region_category",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:order_amount:output_target:by_region_import:composed_from",
+      "source": "field:order_amount",
+      "target": "output_target:by_region_import",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:order_amount:output_target:by_region_no_promo:composed_from",
+      "source": "field:order_amount",
+      "target": "output_target:by_region_no_promo",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:order_amount:output_target:by_region_ops:composed_from",
+      "source": "field:order_amount",
+      "target": "output_target:by_region_ops",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:order_amount:output_target:by_region_top_amount:composed_from",
+      "source": "field:order_amount",
+      "target": "output_target:by_region_top_amount",
       "type": "composed_from",
       "data": {
         "type": "composed_from"
@@ -1670,6 +1886,15 @@
       }
     },
     {
+      "id": "e_out:field:product_id:output_target:by_region_ops:composed_from",
+      "source": "field:product_id",
+      "target": "output_target:by_region_ops",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
       "id": "e_out:field:product_name:output_target:detail:composed_from",
       "source": "field:product_name",
       "target": "output_target:detail",
@@ -1739,6 +1964,15 @@
       "type": "depends_on",
       "data": {
         "type": "depends_on"
+      }
+    },
+    {
+      "id": "e_out:field:promotion_id:output_target:by_region_ops:composed_from",
+      "source": "field:promotion_id",
+      "target": "output_target:by_region_ops",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
       }
     },
     {
@@ -1880,6 +2114,51 @@
       "id": "e_out:field:region_name_display:output_target:by_region:composed_from",
       "source": "field:region_name_display",
       "target": "output_target:by_region",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:region_name_display:output_target:by_region_category:composed_from",
+      "source": "field:region_name_display",
+      "target": "output_target:by_region_category",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:region_name_display:output_target:by_region_import:composed_from",
+      "source": "field:region_name_display",
+      "target": "output_target:by_region_import",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:region_name_display:output_target:by_region_no_promo:composed_from",
+      "source": "field:region_name_display",
+      "target": "output_target:by_region_no_promo",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:region_name_display:output_target:by_region_ops:composed_from",
+      "source": "field:region_name_display",
+      "target": "output_target:by_region_ops",
+      "type": "composed_from",
+      "data": {
+        "type": "composed_from"
+      }
+    },
+    {
+      "id": "e_out:field:region_name_display:output_target:by_region_top_amount:composed_from",
+      "source": "field:region_name_display",
+      "target": "output_target:by_region_top_amount",
       "type": "composed_from",
       "data": {
         "type": "composed_from"
@@ -2273,7 +2552,25 @@
       }
     },
     {
-      "id": "e64:loader:orders:field:quantity:loads_from",
+      "id": "e64:loader:orders:field:product_id:loads_from",
+      "source": "loader:orders",
+      "target": "field:product_id",
+      "type": "loads_from",
+      "data": {
+        "type": "loads_from"
+      }
+    },
+    {
+      "id": "e65:loader:orders:field:promotion_id:loads_from",
+      "source": "loader:orders",
+      "target": "field:promotion_id",
+      "type": "loads_from",
+      "data": {
+        "type": "loads_from"
+      }
+    },
+    {
+      "id": "e66:loader:orders:field:quantity:loads_from",
       "source": "loader:orders",
       "target": "field:quantity",
       "type": "loads_from",
@@ -2282,7 +2579,7 @@
       }
     },
     {
-      "id": "e65:loader:orders:field:unit_price:loads_from",
+      "id": "e67:loader:orders:field:unit_price:loads_from",
       "source": "loader:orders",
       "target": "field:unit_price",
       "type": "loads_from",
@@ -2291,7 +2588,7 @@
       }
     },
     {
-      "id": "e66:loader:payment_methods:field:payment_method_name:ref_lookup",
+      "id": "e68:loader:payment_methods:field:payment_method_name:ref_lookup",
       "source": "loader:payment_methods",
       "target": "field:payment_method_name",
       "type": "ref_lookup",
@@ -2300,7 +2597,7 @@
       }
     },
     {
-      "id": "e67:loader:payment_methods_candidates:field:payment_fee_rate_candidates:ref_lookup",
+      "id": "e69:loader:payment_methods_candidates:field:payment_fee_rate_candidates:ref_lookup",
       "source": "loader:payment_methods_candidates",
       "target": "field:payment_fee_rate_candidates",
       "type": "ref_lookup",
@@ -2309,7 +2606,7 @@
       }
     },
     {
-      "id": "e68:loader:products:field:product_brand:ref_lookup",
+      "id": "e70:loader:products:field:product_brand:ref_lookup",
       "source": "loader:products",
       "target": "field:product_brand",
       "type": "ref_lookup",
@@ -2318,7 +2615,7 @@
       }
     },
     {
-      "id": "e69:loader:products:field:product_cost:ref_lookup",
+      "id": "e71:loader:products:field:product_cost:ref_lookup",
       "source": "loader:products",
       "target": "field:product_cost",
       "type": "ref_lookup",
@@ -2327,7 +2624,7 @@
       }
     },
     {
-      "id": "e70:loader:products:field:product_name:ref_lookup",
+      "id": "e72:loader:products:field:product_name:ref_lookup",
       "source": "loader:products",
       "target": "field:product_name",
       "type": "ref_lookup",
@@ -2336,7 +2633,7 @@
       }
     },
     {
-      "id": "e71:loader:promotions:field:promotion_discount:ref_lookup",
+      "id": "e73:loader:promotions:field:promotion_discount:ref_lookup",
       "source": "loader:promotions",
       "target": "field:promotion_discount",
       "type": "ref_lookup",
@@ -2345,7 +2642,7 @@
       }
     },
     {
-      "id": "e72:loader:promotions:field:promotion_name:ref_lookup",
+      "id": "e74:loader:promotions:field:promotion_name:ref_lookup",
       "source": "loader:promotions",
       "target": "field:promotion_name",
       "type": "ref_lookup",
@@ -2354,7 +2651,7 @@
       }
     },
     {
-      "id": "e73:loader:region_pricing:field:price_adjustment:ref_lookup",
+      "id": "e75:loader:region_pricing:field:price_adjustment:ref_lookup",
       "source": "loader:region_pricing",
       "target": "field:price_adjustment",
       "type": "ref_lookup",
@@ -2363,7 +2660,7 @@
       }
     },
     {
-      "id": "e74:loader:region_pricing:field:shipping_fee:ref_lookup",
+      "id": "e76:loader:region_pricing:field:shipping_fee:ref_lookup",
       "source": "loader:region_pricing",
       "target": "field:shipping_fee",
       "type": "ref_lookup",
@@ -2372,7 +2669,7 @@
       }
     },
     {
-      "id": "e75:loader:region_pricing:field:tax_rate:ref_lookup",
+      "id": "e77:loader:region_pricing:field:tax_rate:ref_lookup",
       "source": "loader:region_pricing",
       "target": "field:tax_rate",
       "type": "ref_lookup",
@@ -2381,7 +2678,7 @@
       }
     },
     {
-      "id": "e76:loader:regions:field:region_manager:ref_lookup",
+      "id": "e78:loader:regions:field:region_manager:ref_lookup",
       "source": "loader:regions",
       "target": "field:region_manager",
       "type": "ref_lookup",
@@ -2390,7 +2687,7 @@
       }
     },
     {
-      "id": "e77:loader:regions:field:region_name_display:ref_lookup",
+      "id": "e79:loader:regions:field:region_name_display:ref_lookup",
       "source": "loader:regions",
       "target": "field:region_name_display",
       "type": "ref_lookup",
@@ -2399,7 +2696,7 @@
       }
     },
     {
-      "id": "e78:loader:regions:field:region_name_value:ref_lookup",
+      "id": "e80:loader:regions:field:region_name_value:ref_lookup",
       "source": "loader:regions",
       "target": "field:region_name_value",
       "type": "ref_lookup",
@@ -2408,7 +2705,7 @@
       }
     },
     {
-      "id": "e79:loader:warehouses:field:warehouse_name:ref_lookup",
+      "id": "e81:loader:warehouses:field:warehouse_name:ref_lookup",
       "source": "loader:warehouses",
       "target": "field:warehouse_name",
       "type": "ref_lookup",
@@ -2417,7 +2714,7 @@
       }
     },
     {
-      "id": "e80:source:categories:loader:categories:loads_from",
+      "id": "e82:source:categories:loader:categories:loads_from",
       "source": "source:categories",
       "target": "loader:categories",
       "type": "loads_from",
@@ -2426,7 +2723,7 @@
       }
     },
     {
-      "id": "e81:source:customers:loader:customers:loads_from",
+      "id": "e83:source:customers:loader:customers:loads_from",
       "source": "source:customers",
       "target": "loader:customers",
       "type": "loads_from",
@@ -2435,7 +2732,7 @@
       }
     },
     {
-      "id": "e82:source:customers_rows_cached:loader:customers_rows_cached:loads_from",
+      "id": "e84:source:customers_rows_cached:loader:customers_rows_cached:loads_from",
       "source": "source:customers_rows_cached",
       "target": "loader:customers_rows_cached",
       "type": "loads_from",
@@ -2444,7 +2741,7 @@
       }
     },
     {
-      "id": "e83:source:customers_rows_nocache:loader:customers_rows_nocache:loads_from",
+      "id": "e85:source:customers_rows_nocache:loader:customers_rows_nocache:loads_from",
       "source": "source:customers_rows_nocache",
       "target": "loader:customers_rows_nocache",
       "type": "loads_from",
@@ -2453,7 +2750,7 @@
       }
     },
     {
-      "id": "e84:source:logistics:loader:logistics:loads_from",
+      "id": "e86:source:logistics:loader:logistics:loads_from",
       "source": "source:logistics",
       "target": "loader:logistics",
       "type": "loads_from",
@@ -2462,7 +2759,7 @@
       }
     },
     {
-      "id": "e85:source:orders:loader:orders:loads_from",
+      "id": "e87:source:orders:loader:orders:loads_from",
       "source": "source:orders",
       "target": "loader:orders",
       "type": "loads_from",
@@ -2471,7 +2768,7 @@
       }
     },
     {
-      "id": "e86:source:payment_methods:loader:payment_methods:loads_from",
+      "id": "e88:source:payment_methods:loader:payment_methods:loads_from",
       "source": "source:payment_methods",
       "target": "loader:payment_methods",
       "type": "loads_from",
@@ -2480,7 +2777,7 @@
       }
     },
     {
-      "id": "e87:source:payment_methods_candidates:loader:payment_methods_candidates:loads_from",
+      "id": "e89:source:payment_methods_candidates:loader:payment_methods_candidates:loads_from",
       "source": "source:payment_methods_candidates",
       "target": "loader:payment_methods_candidates",
       "type": "loads_from",
@@ -2489,7 +2786,7 @@
       }
     },
     {
-      "id": "e88:source:products:loader:products:loads_from",
+      "id": "e90:source:products:loader:products:loads_from",
       "source": "source:products",
       "target": "loader:products",
       "type": "loads_from",
@@ -2498,7 +2795,7 @@
       }
     },
     {
-      "id": "e89:source:promotions:loader:promotions:loads_from",
+      "id": "e91:source:promotions:loader:promotions:loads_from",
       "source": "source:promotions",
       "target": "loader:promotions",
       "type": "loads_from",
@@ -2507,7 +2804,7 @@
       }
     },
     {
-      "id": "e90:source:region_pricing:loader:region_pricing:loads_from",
+      "id": "e92:source:region_pricing:loader:region_pricing:loads_from",
       "source": "source:region_pricing",
       "target": "loader:region_pricing",
       "type": "loads_from",
@@ -2516,7 +2813,7 @@
       }
     },
     {
-      "id": "e91:source:regions:loader:regions:loads_from",
+      "id": "e93:source:regions:loader:regions:loads_from",
       "source": "source:regions",
       "target": "loader:regions",
       "type": "loads_from",
@@ -2525,7 +2822,7 @@
       }
     },
     {
-      "id": "e92:source:warehouses:loader:warehouses:loads_from",
+      "id": "e94:source:warehouses:loader:warehouses:loads_from",
       "source": "source:warehouses",
       "target": "loader:warehouses",
       "type": "loads_from",
@@ -2534,7 +2831,7 @@
       }
     },
     {
-      "id": "e93:stage:stage_0:field:category_id:in_stage",
+      "id": "e95:stage:stage_0:field:category_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:category_id",
       "type": "in_stage",
@@ -2543,7 +2840,7 @@
       }
     },
     {
-      "id": "e94:stage:stage_0:field:customer_id:in_stage",
+      "id": "e96:stage:stage_0:field:customer_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:customer_id",
       "type": "in_stage",
@@ -2552,7 +2849,7 @@
       }
     },
     {
-      "id": "e95:stage:stage_0:field:discount_rate:in_stage",
+      "id": "e97:stage:stage_0:field:discount_rate:in_stage",
       "source": "stage:stage_0",
       "target": "field:discount_rate",
       "type": "in_stage",
@@ -2561,7 +2858,7 @@
       }
     },
     {
-      "id": "e96:stage:stage_0:field:logistics_id:in_stage",
+      "id": "e98:stage:stage_0:field:logistics_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:logistics_id",
       "type": "in_stage",
@@ -2570,7 +2867,7 @@
       }
     },
     {
-      "id": "e97:stage:stage_0:field:order_date:in_stage",
+      "id": "e99:stage:stage_0:field:order_date:in_stage",
       "source": "stage:stage_0",
       "target": "field:order_date",
       "type": "in_stage",
@@ -2579,7 +2876,7 @@
       }
     },
     {
-      "id": "e98:stage:stage_0:field:order_id:in_stage",
+      "id": "e100:stage:stage_0:field:order_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:order_id",
       "type": "in_stage",
@@ -2588,7 +2885,7 @@
       }
     },
     {
-      "id": "e99:stage:stage_0:field:payment_method_id:in_stage",
+      "id": "e101:stage:stage_0:field:payment_method_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:payment_method_id",
       "type": "in_stage",
@@ -2597,7 +2894,7 @@
       }
     },
     {
-      "id": "e100:stage:stage_0:field:product_category_id:in_stage",
+      "id": "e102:stage:stage_0:field:product_category_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:product_category_id",
       "type": "in_stage",
@@ -2606,7 +2903,7 @@
       }
     },
     {
-      "id": "e101:stage:stage_0:field:product_id:in_stage",
+      "id": "e103:stage:stage_0:field:product_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:product_id",
       "type": "in_stage",
@@ -2615,7 +2912,7 @@
       }
     },
     {
-      "id": "e102:stage:stage_0:field:promotion_id:in_stage",
+      "id": "e104:stage:stage_0:field:promotion_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:promotion_id",
       "type": "in_stage",
@@ -2624,7 +2921,7 @@
       }
     },
     {
-      "id": "e103:stage:stage_0:field:quantity:in_stage",
+      "id": "e105:stage:stage_0:field:quantity:in_stage",
       "source": "stage:stage_0",
       "target": "field:quantity",
       "type": "in_stage",
@@ -2633,7 +2930,7 @@
       }
     },
     {
-      "id": "e104:stage:stage_0:field:region_id:in_stage",
+      "id": "e106:stage:stage_0:field:region_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:region_id",
       "type": "in_stage",
@@ -2642,7 +2939,7 @@
       }
     },
     {
-      "id": "e105:stage:stage_0:field:unit_price:in_stage",
+      "id": "e107:stage:stage_0:field:unit_price:in_stage",
       "source": "stage:stage_0",
       "target": "field:unit_price",
       "type": "in_stage",
@@ -2651,7 +2948,7 @@
       }
     },
     {
-      "id": "e106:stage:stage_0:field:warehouse_id:in_stage",
+      "id": "e108:stage:stage_0:field:warehouse_id:in_stage",
       "source": "stage:stage_0",
       "target": "field:warehouse_id",
       "type": "in_stage",
@@ -2660,7 +2957,7 @@
       }
     },
     {
-      "id": "e107:stage:stage_1:field:category_name:in_stage",
+      "id": "e109:stage:stage_1:field:category_name:in_stage",
       "source": "stage:stage_1",
       "target": "field:category_name",
       "type": "in_stage",
@@ -2669,7 +2966,7 @@
       }
     },
     {
-      "id": "e108:stage:stage_1:field:customer_level:in_stage",
+      "id": "e110:stage:stage_1:field:customer_level:in_stage",
       "source": "stage:stage_1",
       "target": "field:customer_level",
       "type": "in_stage",
@@ -2678,7 +2975,7 @@
       }
     },
     {
-      "id": "e109:stage:stage_1:field:customer_level_rows_cached:in_stage",
+      "id": "e111:stage:stage_1:field:customer_level_rows_cached:in_stage",
       "source": "stage:stage_1",
       "target": "field:customer_level_rows_cached",
       "type": "in_stage",
@@ -2687,7 +2984,7 @@
       }
     },
     {
-      "id": "e110:stage:stage_1:field:customer_level_rows_nocache:in_stage",
+      "id": "e112:stage:stage_1:field:customer_level_rows_nocache:in_stage",
       "source": "stage:stage_1",
       "target": "field:customer_level_rows_nocache",
       "type": "in_stage",
@@ -2696,7 +2993,7 @@
       }
     },
     {
-      "id": "e111:stage:stage_1:field:customer_name:in_stage",
+      "id": "e113:stage:stage_1:field:customer_name:in_stage",
       "source": "stage:stage_1",
       "target": "field:customer_name",
       "type": "in_stage",
@@ -2705,7 +3002,7 @@
       }
     },
     {
-      "id": "e112:stage:stage_1:field:customer_name_rows_cached:in_stage",
+      "id": "e114:stage:stage_1:field:customer_name_rows_cached:in_stage",
       "source": "stage:stage_1",
       "target": "field:customer_name_rows_cached",
       "type": "in_stage",
@@ -2714,7 +3011,7 @@
       }
     },
     {
-      "id": "e113:stage:stage_1:field:customer_name_rows_nocache:in_stage",
+      "id": "e115:stage:stage_1:field:customer_name_rows_nocache:in_stage",
       "source": "stage:stage_1",
       "target": "field:customer_name_rows_nocache",
       "type": "in_stage",
@@ -2723,7 +3020,7 @@
       }
     },
     {
-      "id": "e114:stage:stage_1:field:customer_phone:in_stage",
+      "id": "e116:stage:stage_1:field:customer_phone:in_stage",
       "source": "stage:stage_1",
       "target": "field:customer_phone",
       "type": "in_stage",
@@ -2732,7 +3029,7 @@
       }
     },
     {
-      "id": "e115:stage:stage_1:field:logistics_name:in_stage",
+      "id": "e117:stage:stage_1:field:logistics_name:in_stage",
       "source": "stage:stage_1",
       "target": "field:logistics_name",
       "type": "in_stage",
@@ -2741,7 +3038,7 @@
       }
     },
     {
-      "id": "e116:stage:stage_1:field:logistics_speed:in_stage",
+      "id": "e118:stage:stage_1:field:logistics_speed:in_stage",
       "source": "stage:stage_1",
       "target": "field:logistics_speed",
       "type": "in_stage",
@@ -2750,7 +3047,7 @@
       }
     },
     {
-      "id": "e117:stage:stage_1:field:order_amount:in_stage",
+      "id": "e119:stage:stage_1:field:order_amount:in_stage",
       "source": "stage:stage_1",
       "target": "field:order_amount",
       "type": "in_stage",
@@ -2759,7 +3056,7 @@
       }
     },
     {
-      "id": "e118:stage:stage_1:field:payment_fee_rate_candidates:in_stage",
+      "id": "e120:stage:stage_1:field:payment_fee_rate_candidates:in_stage",
       "source": "stage:stage_1",
       "target": "field:payment_fee_rate_candidates",
       "type": "in_stage",
@@ -2768,7 +3065,7 @@
       }
     },
     {
-      "id": "e119:stage:stage_1:field:payment_method_name:in_stage",
+      "id": "e121:stage:stage_1:field:payment_method_name:in_stage",
       "source": "stage:stage_1",
       "target": "field:payment_method_name",
       "type": "in_stage",
@@ -2777,7 +3074,7 @@
       }
     },
     {
-      "id": "e120:stage:stage_1:field:price_adjustment:in_stage",
+      "id": "e122:stage:stage_1:field:price_adjustment:in_stage",
       "source": "stage:stage_1",
       "target": "field:price_adjustment",
       "type": "in_stage",
@@ -2786,7 +3083,7 @@
       }
     },
     {
-      "id": "e121:stage:stage_1:field:product_brand:in_stage",
+      "id": "e123:stage:stage_1:field:product_brand:in_stage",
       "source": "stage:stage_1",
       "target": "field:product_brand",
       "type": "in_stage",
@@ -2795,7 +3092,7 @@
       }
     },
     {
-      "id": "e122:stage:stage_1:field:product_cost:in_stage",
+      "id": "e124:stage:stage_1:field:product_cost:in_stage",
       "source": "stage:stage_1",
       "target": "field:product_cost",
       "type": "in_stage",
@@ -2804,7 +3101,7 @@
       }
     },
     {
-      "id": "e123:stage:stage_1:field:product_name:in_stage",
+      "id": "e125:stage:stage_1:field:product_name:in_stage",
       "source": "stage:stage_1",
       "target": "field:product_name",
       "type": "in_stage",
@@ -2813,7 +3110,7 @@
       }
     },
     {
-      "id": "e124:stage:stage_1:field:promotion_discount:in_stage",
+      "id": "e126:stage:stage_1:field:promotion_discount:in_stage",
       "source": "stage:stage_1",
       "target": "field:promotion_discount",
       "type": "in_stage",
@@ -2822,7 +3119,7 @@
       }
     },
     {
-      "id": "e125:stage:stage_1:field:promotion_name:in_stage",
+      "id": "e127:stage:stage_1:field:promotion_name:in_stage",
       "source": "stage:stage_1",
       "target": "field:promotion_name",
       "type": "in_stage",
@@ -2831,7 +3128,7 @@
       }
     },
     {
-      "id": "e126:stage:stage_1:field:region_manager:in_stage",
+      "id": "e128:stage:stage_1:field:region_manager:in_stage",
       "source": "stage:stage_1",
       "target": "field:region_manager",
       "type": "in_stage",
@@ -2840,7 +3137,7 @@
       }
     },
     {
-      "id": "e127:stage:stage_1:field:region_name_display:in_stage",
+      "id": "e129:stage:stage_1:field:region_name_display:in_stage",
       "source": "stage:stage_1",
       "target": "field:region_name_display",
       "type": "in_stage",
@@ -2849,7 +3146,7 @@
       }
     },
     {
-      "id": "e128:stage:stage_1:field:region_name_value:in_stage",
+      "id": "e130:stage:stage_1:field:region_name_value:in_stage",
       "source": "stage:stage_1",
       "target": "field:region_name_value",
       "type": "in_stage",
@@ -2858,7 +3155,7 @@
       }
     },
     {
-      "id": "e129:stage:stage_1:field:registration_date:in_stage",
+      "id": "e131:stage:stage_1:field:registration_date:in_stage",
       "source": "stage:stage_1",
       "target": "field:registration_date",
       "type": "in_stage",
@@ -2867,7 +3164,7 @@
       }
     },
     {
-      "id": "e130:stage:stage_1:field:shipping_fee:in_stage",
+      "id": "e132:stage:stage_1:field:shipping_fee:in_stage",
       "source": "stage:stage_1",
       "target": "field:shipping_fee",
       "type": "in_stage",
@@ -2876,7 +3173,7 @@
       }
     },
     {
-      "id": "e131:stage:stage_1:field:tax_rate:in_stage",
+      "id": "e133:stage:stage_1:field:tax_rate:in_stage",
       "source": "stage:stage_1",
       "target": "field:tax_rate",
       "type": "in_stage",
@@ -2885,7 +3182,7 @@
       }
     },
     {
-      "id": "e132:stage:stage_1:field:warehouse_name:in_stage",
+      "id": "e134:stage:stage_1:field:warehouse_name:in_stage",
       "source": "stage:stage_1",
       "target": "field:warehouse_name",
       "type": "in_stage",
@@ -2894,7 +3191,7 @@
       }
     },
     {
-      "id": "e133:stage:stage_2:field:final_price:in_stage",
+      "id": "e135:stage:stage_2:field:final_price:in_stage",
       "source": "stage:stage_2",
       "target": "field:final_price",
       "type": "in_stage",
@@ -2903,7 +3200,7 @@
       }
     },
     {
-      "id": "e134:stage:stage_2:field:no_promotion:in_stage",
+      "id": "e136:stage:stage_2:field:no_promotion:in_stage",
       "source": "stage:stage_2",
       "target": "field:no_promotion",
       "type": "in_stage",
@@ -2912,7 +3209,7 @@
       }
     },
     {
-      "id": "e135:stage:stage_2:field:profit:in_stage",
+      "id": "e137:stage:stage_2:field:profit:in_stage",
       "source": "stage:stage_2",
       "target": "field:profit",
       "type": "in_stage",
@@ -2921,7 +3218,7 @@
       }
     },
     {
-      "id": "e136:stage:stage_2:field:rows_level_match:in_stage",
+      "id": "e138:stage:stage_2:field:rows_level_match:in_stage",
       "source": "stage:stage_2",
       "target": "field:rows_level_match",
       "type": "in_stage",
@@ -2930,7 +3227,7 @@
       }
     },
     {
-      "id": "e137:stage:stage_2:field:rows_name_match:in_stage",
+      "id": "e139:stage:stage_2:field:rows_name_match:in_stage",
       "source": "stage:stage_2",
       "target": "field:rows_name_match",
       "type": "in_stage",
@@ -2939,7 +3236,7 @@
       }
     },
     {
-      "id": "e138:stage:stage_2:field:tax_amount:in_stage",
+      "id": "e140:stage:stage_2:field:tax_amount:in_stage",
       "source": "stage:stage_2",
       "target": "field:tax_amount",
       "type": "in_stage",
@@ -2950,7 +3247,7 @@
   ],
   "meta": {
     "schema_version": "vizgraph/v1",
-    "created_at": 1773583868.886668,
+    "created_at": 1773740796.4833183,
     "target_fields": [
       "order_id",
       "order_date",
@@ -2990,13 +3287,15 @@
       "profit",
       "tax_amount",
       "final_price",
-      "customer_id"
+      "customer_id",
+      "product_id",
+      "promotion_id"
     ],
     "metadata": {
-      "total_fields": 39,
+      "total_fields": 41,
       "total_sources": 13,
       "total_loaders": 12,
-      "pruned_fields": -7,
+      "pruned_fields": -5,
       "max_depth": 2,
       "has_derived_fields": true,
       "has_ref_fields": true,

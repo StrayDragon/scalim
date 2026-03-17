@@ -12,7 +12,10 @@
           "校验命令输出与 schema 一致性",
           "CLI 校验输出包含源码位置",
           "Linter/编译器风格输出",
-          "validate 对 `outputs.*.fields` object 条目给出可行动诊断"
+          "validate 对 `outputs.*.fields` object 条目给出可行动诊断",
+          "CLI provides a local HTTP server for YAML DSL JSON Schemas",
+          "CLI can upsert schema modeline in YAML files (IntelliJ compatible)",
+          "upsert-lsp-comment resolves schema reference from type + schema-path"
         ],
         "slug": "yaml-dsl-cli-validation"
       },
@@ -298,7 +301,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
-      "sha256": "54c7d8a6f53b56c075d713bc3433d20fa2c8849aee415ed502b35cafdafb93af"
+      "sha256": "2d869ebe85971675cd75751f14b8355b10fa790fd8b8fa556689795369973909"
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
@@ -314,13 +317,13 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "3d39cba0d61f15b8ec72632c01542680ff7aa8b688d655906f43087bca51ebd6"
+      "sha256": "3c1b543b9f89345b766743a157afc7d900fdf78e0851d7f803ba313895706a85"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "e4625c1b74d896b775b51b2d485093ad1e7817bfed77e19566aa9ff99c99c2ee"
+      "sha256": "8e213581fe8e1c8b0dbdd65e572f1ac12fbf81b7137a3f9f31a7a3fe070b516c"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -336,7 +339,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "5156ef2e8ed0e216b0befcd0a11708f660c10eb895480af4b289c3699ac37bfc"
+      "sha256": "a12ea799bc6432fb6d8ea1991acf73c8e45efbce6f05e6309d918618bd986224"
     }
   ],
   "skill_name": "scalim-yaml-dsl"
