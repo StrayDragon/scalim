@@ -108,7 +108,7 @@ Sources:
 - `$import`: $import 引用(支持 string 或 string list)
 - `distinct_on_overflow`: type=string; default=error; enum=error|truncate; distinct 护栏溢出策略(error/truncate)
 - `fields`: type=object; 聚合输出字段映射(key 为 out_field_id)
-- `group_by`: type=array[string]; 分组字段列表
+- `group_by`: type=array; 分组字段列表
 - `max_distinct`: type=integer; default=0; max_distinct 护栏(0 表示不限制)
 - `max_groups`: type=integer; default=0; max_groups 护栏(0 表示不限制)
 
@@ -135,7 +135,7 @@ Sources:
 - `$import`: $import 引用(支持 string 或 string list)
 - `aggregate`: ref=output_aggregate; 可选:派生汇总配置(声明后视为 derived output)
 - `container`: ref=output_container; 输出容器配置(workbook/csv)
-- `fields`: type=array; 明细输出字段顺序(field_id 列表; 支持 YAML alias)
+- `fields`: type=array; 输出字段顺序(field_id/out_field_id 列表; 支持 YAML alias)
 - `from`: type=string; 可选:继承来源输出(name)
 - `name`: type=string; 输出名称(name)
 - `where`: type=string; 可选:过滤表达式(安全表达式)
