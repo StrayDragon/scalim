@@ -26,6 +26,33 @@
 - **Non-breaking**: 不配置新字段时，保留现有 workflow 行为
   - 仍是“runs 列表 + 并发上限 + 失败策略 + 可选共享 preload_forever cache”
 
+### Recommended Direction (MVP)
+
+- 先把 workflow 的“编排单元”抽象为 **run-level DAG**（仅 demand runs），并把 ctx 传递限定为 JSON-like 的小对象。
+- 让 `ctx → runtime_vars` 仍发生在 **编译期**（复用现有 `{$runtime: ...}` 解析规则），因此编译需要做到“按依赖就绪再编译并执行”。
+- 该 change 作为 `workflow-shared-output-containers` 的基础设施：后者的“写出节点/资源互斥/确定性写入”将复用同一套 DAG 调度与 ctx 存储。
+
+### MVP Example (YAML)
+
+```yaml
+# yaml-language-server: $schema=../schema/workflow.gen.json
+
+workflow:
+  runs:
+    - id: extract_users
+      demand: ./extract_users.demand.yaml
+    - id: report_users
+      demand: ./report_users.demand.yaml
+      depends_on: [extract_users]
+      runtime_vars:
+        users_csv_path:
+          $ctx: extract_users.output_path
+  options:
+    max_concurrency: 4
+    failure_policy: all_fail
+    share_preload_cache: true
+```
+
 ## Capabilities
 
 ### New Capabilities

@@ -35,6 +35,41 @@
 
 - **Non-breaking**: 不配置新字段时,保持现有 workflow 语义不变
 
+### Recommended Direction (MVP)
+
+- 该 change 推荐建立在 `workflow-dag-context-passing` 之上(同一套 DAG 调度 + ctx),优先落地 **workbook 多 sheet** 与 **csv append** 两条路径。
+- MVP 优先选择“按资源互斥串行写入”的路线(避免在 workflow 内引入大体量 in-memory dataset 传递)：
+  - 多个 run 可以并发编译/执行,但对同一共享资源(workbook/csv)的写入 MUST 串行化并遵循声明顺序
+  - 共享资源在 workflow 末尾统一 commit/原子落盘,失败时按 `failure_policy` 决定是否丢弃或保留部分内容
+
+### MVP Example (YAML)
+
+```yaml
+# yaml-language-server: $schema=../schema/workflow.gen.json
+
+workflow:
+  resources:
+    workbooks:
+      report:
+        path: ./out/report.xlsx
+  runs:
+    - id: orders
+      demand: ./orders.demand.yaml
+      write_to:
+        workbook_sheet:
+          workbook: report
+          sheet: Orders
+    - id: customers
+      demand: ./customers.demand.yaml
+      write_to:
+        workbook_sheet:
+          workbook: report
+          sheet: Customers
+  options:
+    max_concurrency: 4
+    failure_policy: all_fail
+```
+
 ## Capabilities
 
 ### New Capabilities
