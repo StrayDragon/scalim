@@ -72,7 +72,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
     batch_size: Optional[int] = None,
     parallel_mode: str = "seq",
     max_workers: int = 0,
-    runtime_vars: Optional[Dict[str, object]] = None,
+    init_vars: Optional[Dict[str, object]] = None,
     path_aliases: Optional[Mapping[str, str]] = None,
 ) -> WorkflowResult:
     workflow_path = str(workflow_yaml_path or "").strip()
@@ -104,7 +104,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         batch_size=batch_size,
         parallel_mode=cast("Any", parallel_mode),
         max_workers=int(max_workers),
-        runtime_vars=runtime_vars,
+        init_vars=init_vars,
     )
 
     compiled: List[Tuple[int, str, str, object]] = []
@@ -114,7 +114,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
 
     shared_cache: Optional[MutableMapping[str, Any]] = None
     if wf.options.share_preload_cache:
-        _precheck_shared_preload_specs(compiled, runtime_vars=runtime_vars)
+        _precheck_shared_preload_specs(compiled, init_vars=init_vars)
         shared_cache = PreloadCache()
 
     outcomes: List[Optional[WorkflowRunOutcome]] = [None for _ in range(len(compiled))]
@@ -257,14 +257,14 @@ def _render_preload_forever_params(
     source_id: str,
     *,
     params: object,
-    runtime_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, object]],
     path: str,
 ) -> LoaderCallKwargs:
     try:
         template = compile_params_template(
             params,
             path=path,
-            runtime_vars=cast("Optional[Mapping[str, Any]]", runtime_vars),
+            init_vars=cast("Optional[Mapping[str, Any]]", init_vars),
             allow_keys=False,
             allow_rows=False,
         )
@@ -329,7 +329,7 @@ def _diff_signature_fields(left: _PreloadSpecSignature, right: _PreloadSpecSigna
 def _precheck_shared_preload_specs(  # noqa: C901
     compiled: Sequence[Tuple[int, str, str, object]],
     *,
-    runtime_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, object]],
 ) -> None:
     by_source: Dict[str, List[Tuple[str, str, _PreloadSpecSignature]]] = {}
 
@@ -355,7 +355,7 @@ def _precheck_shared_preload_specs(  # noqa: C901
             rendered_params = _render_preload_forever_params(
                 source_id,
                 params=source.params,
-                runtime_vars=runtime_vars,
+                init_vars=init_vars,
                 path=params_path,
             )
 

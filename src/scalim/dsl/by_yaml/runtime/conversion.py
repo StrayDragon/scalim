@@ -24,7 +24,7 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
     _relation_adjacency: Optional[Dict[str, List[StepInfo]]]
     _source_field_id_map: Optional[Dict[str, Dict[str, str]]]
     _source_data_key_map: Optional[Dict[str, Dict[str, List[str]]]]
-    _runtime_vars: Optional[Mapping[str, object]]
+    _init_vars: Optional[Mapping[str, object]]
 
     @classmethod
     def from_allowlist(
@@ -46,7 +46,7 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
         self,
         resolver: Optional[PythonReferenceResolver] = None,
         compute_engine: Optional[SecureComputeEngine] = None,
-        runtime_vars: Optional[Mapping[str, object]] = None,
+        init_vars: Optional[Mapping[str, object]] = None,
         *,
         allow_unsafe_resolver: bool = False,
     ) -> None:
@@ -62,7 +62,7 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
         self._allow_unsafe_resolver = allow_unsafe
         self._resolver = resolved
         self._compute_engine = compute_engine or SecureComputeEngine()
-        self._runtime_vars = runtime_vars
+        self._init_vars = init_vars
         self._lookup_casts = LookupCastRegistry()
         self._sources_ir = {}
         self._main_source_ir = None

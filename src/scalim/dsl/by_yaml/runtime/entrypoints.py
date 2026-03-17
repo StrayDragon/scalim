@@ -26,7 +26,7 @@ def run(
     batch_size: Optional[int] = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
-    runtime_vars: Optional[Dict[str, object]] = None,
+    init_vars: Optional[Dict[str, object]] = None,
 ) -> RunResult:
     """运行 `YAML DSL`,并支持显式覆盖项与输出 `sink`.
 
@@ -53,7 +53,7 @@ def run(
         batch_size=batch_size,
         parallel_mode=parallel_mode,
         max_workers=max_workers,
-        runtime_vars=runtime_vars,
+        init_vars=init_vars,
     )
     compilation = _compile(yaml_path, options=options)
     core = run_ir(compilation.demand_ir, compilation.request)
@@ -74,7 +74,7 @@ def compile(  # noqa: A001
     batch_size: Optional[int] = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
-    runtime_vars: Optional[Dict[str, object]] = None,
+    init_vars: Optional[Dict[str, object]] = None,
 ) -> Compilation:
     options = RunOptions(
         allowed_modules=allowed_modules,
@@ -88,7 +88,7 @@ def compile(  # noqa: A001
         batch_size=batch_size,
         parallel_mode=parallel_mode,
         max_workers=max_workers,
-        runtime_vars=runtime_vars,
+        init_vars=init_vars,
     )
     return _compile(yaml_path, options=options)
 

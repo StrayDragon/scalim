@@ -253,9 +253,9 @@ def compile_ir(
     config: DemandConfig,
     *,
     resolver: SecurePythonReferenceResolver,
-    runtime_vars: Optional[Dict[str, object]] = None,
+    init_vars: Optional[Dict[str, object]] = None,
 ) -> DemandIr:
-    converter = ConfigToIRConverter(resolver=resolver, runtime_vars=runtime_vars)
+    converter = ConfigToIRConverter(resolver=resolver, init_vars=init_vars)
     return converter.convert(config)
 
 
@@ -339,7 +339,7 @@ def compile(  # noqa: A001
         allowed_functions=options.allowed_functions,
         base_module_path=base_module_path,
     )
-    demand_ir = compile_ir(config, resolver=resolver, runtime_vars=options.runtime_vars)
+    demand_ir = compile_ir(config, resolver=resolver, init_vars=options.init_vars)
     request = build_request(config, demand_ir, options=options, resolver=resolver)
     return Compilation(
         config=config,

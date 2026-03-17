@@ -88,9 +88,9 @@ workflow:
 """
         _write_text(workflow_path, workflow_yaml)
 
-        runtime_vars = {"order_ids": []}
+        init_vars = {"order_ids": []}
 
-        compilation: api.Compilation = api.compile(str(demand_path), allowed_modules=_ALLOWED_MODULES, runtime_vars=runtime_vars)
+        compilation: api.Compilation = api.compile(str(demand_path), allowed_modules=_ALLOWED_MODULES, init_vars=init_vars)
         if not compilation.demand_ir.fields:
             return ExampleResult(
                 example_id="demo_big_data_report/public_api_dsl_by_yaml",
@@ -107,7 +107,7 @@ workflow:
             allowed_modules=_ALLOWED_MODULES,
             sink=sink,
             overrides=overrides,
-            runtime_vars=runtime_vars,
+            init_vars=init_vars,
         )
         rows = sink.get_data()
         if not rows:
@@ -121,7 +121,7 @@ workflow:
 
         options = api.RunOptions(
             allowed_modules=_ALLOWED_MODULES,
-            runtime_vars=runtime_vars,
+            init_vars=init_vars,
             overrides=overrides,
         )
         _ = options.parallel_mode
@@ -131,7 +131,7 @@ workflow:
             str(workflow_path),
             allowed_modules=_ALLOWED_MODULES,
             max_workers=0,
-            runtime_vars=runtime_vars,
+            init_vars=init_vars,
         )
         preload_calls = get_preload_counter_calls()
         errors = wf.errors()

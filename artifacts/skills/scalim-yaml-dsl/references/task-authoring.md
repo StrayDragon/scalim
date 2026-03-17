@@ -25,8 +25,8 @@ main_source:
   source_id: orders
   loader: "myapp.loaders:load_orders"
   params:
-    # 运行期变量注入示例: 由 Python 调用方传入 `runtime_vars={"end_dt": ...}`.
-    end_dt: {$runtime: end_dt}
+    # 初始化变量注入示例: 由 Python 调用方传入 `init_vars={"end_dt": ...}`.
+    end_dt: {$init_var: end_dt}
   fields:
     order_id:
       name: 订单ID
@@ -76,7 +76,7 @@ outputs:
   - `relation: {steps: [...]}` (内联)
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
 - 动态入参用 `sources.<id>.params` 模板内联指令节点表达(`$keys` / `$rows`)
-- 运行期变量用 `runtime_vars` 注入并在 `params` 中用 `{$runtime: <name>}` 指令节点引用
+- 初始化变量用 `init_vars` 注入并在 `params` 中用 `{$init_var: <name>}` 指令节点引用
 - `outputs` 是 **有序列表**(顺序决定 primary 输出); 每个 output 必填唯一 `name`,可用 `from` 复用字段集合与容器配置
 - `outputs.*.fields` 是字段选择列表;推荐优先用 `field_id` 字符串以保持稳定与可维护性(允许的形态以 schema 为准)
 - `field_id` 必须全局唯一(不再依赖输出层做消歧)

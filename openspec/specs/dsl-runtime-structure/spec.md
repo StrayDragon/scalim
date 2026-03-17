@@ -27,14 +27,14 @@ by_yaml runtime MUST NOT 直接承担执行编排主流程(如 plan 构建、eng
 - **THEN** 运行编排应委托 execution 层统一入口,而非在 by_yaml/runtime 内部自行拼装完整执行链
 
 ### Requirement: by_yaml runtime compiles `runtime_vars` into loader params templates
-系统 SHALL 扩展 by_yaml runtime 的对外入口 `run/compile` 与 `RunOptions`,允许调用方提供可选的 `runtime_vars` 用于 loader 参数模板注入.
-adapter MUST 在 `DemandConfig -> DemandIr` 转换前完成 `{$runtime: <name>}` 指令节点解析,以确保:
-- `DemandIr` 内持有的静态 params 可包含运行期对象(例如 `datetime`)
-- execution 层无需理解 `$runtime` 指令语法
+系统 SHALL 扩展 by_yaml runtime 的对外入口 `run/compile` 与 `RunOptions`,允许调用方提供可选的 `init_vars` 用于 loader 参数模板注入.
+adapter MUST 在 `DemandConfig -> DemandIr` 转换前完成 `{$init_var: <name>}` 指令节点解析,以确保:
+- `DemandIr` 内持有的静态 params 可包含初始化对象(例如 `datetime`)
+- execution 层无需理解 `$init_var` 指令语法
 - preload 与 ref loader 共用同一份编译后的 params template representation,而不是各自维护一套 params 透传逻辑
 
 #### Scenario: 编译期完成占位符解析
-- **WHEN** 调用方执行 `compile(..., runtime_vars=...)`
+- **WHEN** 调用方执行 `compile(..., init_vars=...)`
 - **THEN** adapter 返回的 `Compilation.demand_ir` MUST 已反映占位符解析后的 params 值
 - **AND** execution 层不需要再做二次解析
 
@@ -300,3 +300,4 @@ by_yaml runtime compiler MUST 将 YAML/RunOptions 的 `batch_size` 编译为 `Ex
 - **WHEN** 维护者重构 `runtime/conversion.py`
 - **THEN** Config→IR 转换、运行请求映射与辅助 registry 逻辑 MUST 具备可独立验证的边界
 - **AND** 现有 YAML runtime 入口行为 MUST 与重构前保持一致
+

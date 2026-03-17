@@ -9,7 +9,8 @@ from ...vendor.compact.typing_extensionsx import override
 _RUNTIME_PREFIX = "$runtime."
 _RUNTIME_VAR_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
-_DIRECTIVE_RUNTIME = "$runtime"
+_DIRECTIVE_INIT_VAR = "$init_var"
+_DIRECTIVE_RUNTIME = "$runtime"  # 旧写法: 已废弃,直接拒绝
 _DIRECTIVE_KEYS = "$keys"
 _DIRECTIVE_ROWS = "$rows"
 
@@ -58,7 +59,7 @@ def _path_index(path: str, idx: int) -> str:
 
 def _deepcopy_literal(value: RuntimeValue) -> RuntimeValue:
     # 这里刻意只对常见容器做深拷贝,避免对任意对象进行 `deepcopy`.
-    # `runtime_vars` 可能注入任意对象(例如 `datetime`/`Decimal` 等),应按“不透明字面值”透传.
+    # `init_vars` 可能注入任意对象(例如 `datetime`/`Decimal` 等),应按“不透明字面值”透传.
     if isinstance(value, dict):
         copied: Dict[object, RuntimeValue] = {}
         for k, v in cast("Mapping[object, RuntimeValue]", value).items():
@@ -158,7 +159,7 @@ class RuntimeDirectiveNode(_NodeBase):
     @override
     def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
         _ = (ctx, path)
-        msg = "`$runtime` directive must be resolved at compile time; provide runtime_vars when compiling the params template"
+        msg = "`$init_var` directive must be resolved at compile time; provide init_vars when compiling the params template"
         raise ParamsTemplateRenderError(msg, path=path)
 
 
@@ -192,7 +193,7 @@ class CompiledParamsTemplate:
 
 @dataclass(frozen=True)
 class _CompileOptions:
-    runtime_vars: Optional[Mapping[str, RuntimeValue]]
+    init_vars: Optional[Mapping[str, RuntimeValue]]
     allow_keys: bool
     allow_rows: bool
 
@@ -240,17 +241,29 @@ def _maybe_compile_runtime_literal(
 
     var_name = node_value[len(_RUNTIME_PREFIX) :]
     if not var_name:
-        msg = "Legacy `$runtime.<name>` placeholder is not supported; use `{$runtime: <name>}`"
+        msg = "Legacy `$runtime.<name>` placeholder is not supported; use `{$init_var: <name>}`"
         raise ParamsTemplateCompileError(msg, path=node_path)
     if not _RUNTIME_VAR_RE.match(var_name):
-        msg = (
-            "Legacy `$runtime.<name>` placeholder is not supported; invalid runtime var name '{}' (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(
-                var_name
-            )
+        msg = "Legacy `$runtime.<name>` placeholder is not supported; invalid init var name '{}' (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(
+            var_name
         )
         raise ParamsTemplateCompileError(msg, path=node_path)
 
-    msg = "Legacy `$runtime.{}` placeholder is not supported; use `{{$runtime: {}}}`".format(var_name, var_name)
+    msg = "Legacy `$runtime.{}` placeholder is not supported; use `{{$init_var: {}}}`".format(var_name, var_name)
+    raise ParamsTemplateCompileError(msg, path=node_path)
+
+
+def _compile_legacy_runtime_directive_node(
+    mapping_dict: Dict[object, object],
+    *,
+    node_path: str,
+) -> Node:
+    var_name_raw = mapping_dict.get(_DIRECTIVE_RUNTIME)
+    if isinstance(var_name_raw, str) and var_name_raw and _RUNTIME_VAR_RE.match(var_name_raw):
+        msg = "Legacy `{{$runtime: {}}}` directive is not supported; migrate to `{{$init_var: {}}}`".format(var_name_raw, var_name_raw)
+        raise ParamsTemplateCompileError(msg, path=node_path)
+
+    msg = "Legacy `{$runtime: <name>}` directive is not supported; migrate to `{$init_var: <name>}`"
     raise ParamsTemplateCompileError(msg, path=node_path)
 
 
@@ -261,19 +274,19 @@ def _compile_runtime_directive_node(
     opts: _CompileOptions,
     resolve_runtime: bool,
 ) -> Node:
-    var_name_raw = mapping_dict.get(_DIRECTIVE_RUNTIME)
+    var_name_raw = mapping_dict.get(_DIRECTIVE_INIT_VAR)
     if not isinstance(var_name_raw, str) or not var_name_raw:
-        msg = "`$runtime` value must be a non-empty string"
-        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_RUNTIME))
+        msg = "`$init_var` value must be a non-empty string"
+        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
     if not _RUNTIME_VAR_RE.match(var_name_raw):
-        msg = "`$runtime` value '{}' is invalid (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(var_name_raw)
-        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_RUNTIME))
+        msg = "`$init_var` value '{}' is invalid (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(var_name_raw)
+        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
 
     if resolve_runtime:
-        if opts.runtime_vars is None or var_name_raw not in opts.runtime_vars:
-            msg = "Missing runtime var: {}".format(var_name_raw)
+        if opts.init_vars is None or var_name_raw not in opts.init_vars:
+            msg = "Missing init var: {}".format(var_name_raw)
             raise ParamsTemplateCompileError(msg, path=node_path)
-        return LiteralNode(opts.runtime_vars[var_name_raw])
+        return LiteralNode(opts.init_vars[var_name_raw])
 
     return RuntimeDirectiveNode(name=var_name_raw)
 
@@ -319,7 +332,9 @@ def _maybe_compile_directive_node(
     resolve_runtime: bool,
 ) -> Optional[Node]:
     directive_key: Optional[str] = None
-    if _DIRECTIVE_RUNTIME in mapping_dict:
+    if _DIRECTIVE_INIT_VAR in mapping_dict:
+        directive_key = _DIRECTIVE_INIT_VAR
+    elif _DIRECTIVE_RUNTIME in mapping_dict:
         directive_key = _DIRECTIVE_RUNTIME
     elif _DIRECTIVE_KEYS in mapping_dict:
         directive_key = _DIRECTIVE_KEYS
@@ -329,10 +344,14 @@ def _maybe_compile_directive_node(
         return None
 
     if len(mapping_dict) != 1:
-        msg = "Directive node must be a single-key mapping: `{}`, `{}` or `{}`".format(_DIRECTIVE_RUNTIME, _DIRECTIVE_KEYS, _DIRECTIVE_ROWS)
+        msg = "Directive node must be a single-key mapping: `{}`, `{}` or `{}`".format(
+            _DIRECTIVE_INIT_VAR, _DIRECTIVE_KEYS, _DIRECTIVE_ROWS
+        )
         raise ParamsTemplateCompileError(msg, path=node_path)
 
     if directive_key == _DIRECTIVE_RUNTIME:
+        return _compile_legacy_runtime_directive_node(mapping_dict, node_path=node_path)
+    if directive_key == _DIRECTIVE_INIT_VAR:
         return _compile_runtime_directive_node(mapping_dict, node_path=node_path, opts=opts, resolve_runtime=resolve_runtime)
     if directive_key == _DIRECTIVE_KEYS:
         return _compile_keys_directive_node(mapping_dict, node_path=node_path, opts=opts, state=state)
@@ -431,7 +450,7 @@ def compile_params_template(
     value: object,
     *,
     path: str,
-    runtime_vars: Optional[Mapping[str, RuntimeValue]] = None,
+    init_vars: Optional[Mapping[str, RuntimeValue]] = None,
     resolve_runtime: bool = True,
     allow_keys: bool = True,
     allow_rows: bool = True,
@@ -439,12 +458,12 @@ def compile_params_template(
     """将加载器 `params` 模板编译为类型化的 `IR`.
 
     说明:
-    - `{$runtime: <name>}` 在编译期解析并落成不透明的 `LiteralNode`(后续不会再按结构扫描其内部内容).
+    - `{$init_var: <name>}` 在编译期解析并落成不透明的 `LiteralNode`(后续不会再按结构扫描其内部内容).
     - `$keys`/`$rows` 为保留指令节点,仅允许以“单键字典”形式出现.
     - 编译后的模板渲染是纯函数: 不会原地修改 `YAML` 解析对象(避免锚点/别名共享对象被污染).
     """
 
-    opts = _CompileOptions(runtime_vars=runtime_vars, allow_keys=allow_keys, allow_rows=allow_rows)
+    opts = _CompileOptions(init_vars=init_vars, allow_keys=allow_keys, allow_rows=allow_rows)
     state = _CompileState()
     root = _compile_params_template_node(value, node_path=path, opts=opts, state=state, resolve_runtime=resolve_runtime)
     return CompiledParamsTemplate(

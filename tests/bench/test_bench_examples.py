@@ -270,7 +270,7 @@ def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
             str(yaml_path),
             allowed_modules=allowed_modules,
             overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
-            runtime_vars={"order_ids": []},
+            init_vars={"order_ids": []},
         )
 
     runner = BenchmarkRunner(benchmark)

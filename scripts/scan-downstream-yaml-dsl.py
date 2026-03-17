@@ -38,7 +38,7 @@ _CANDIDATE_TOPLEVEL_RE = re.compile(r"(?m)^(main_source|sources|fields|relations
 _WORKFLOW_RE = re.compile(r"(?m)^workflow:")
 
 _PATTERNS: Dict[str, re.Pattern[str]] = {
-    "legacy_runtime_vars": re.compile(r"\$runtime\."),
+    "legacy_runtime_placeholder": re.compile(r"\$runtime\."),
     "top_level_output": re.compile(r"(?m)^output:"),
     "legacy_bind": re.compile(r"(?m)^(bind|to_bind):"),
     "legacy_field_kw": re.compile(r"(?m)^\s*field\s*:"),
@@ -481,7 +481,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for r in results:
         status = "通过" if r.ok else "失败"
         print(
-            "行 {}: {} | YAML 文件={} (需求={}, 工作流={}) | 校验 通过/失败={}/{} | 命中: `runtime_vars`={} `output`={} `bind`={} `field_kw`={}".format(
+            "行 {}: {} | YAML 文件={} (需求={}, 工作流={}) | 校验 通过/失败={}/{} | 命中: `legacy_$runtime`={} `output`={} `bind`={} `field_kw`={}".format(
                 r.line_no,
                 status,
                 r.candidate_yaml_files,
@@ -489,7 +489,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 r.workflow_files,
                 r.validate_ok,
                 r.validate_fail,
-                r.pattern_hits["legacy_runtime_vars"],
+                r.pattern_hits["legacy_runtime_placeholder"],
                 r.pattern_hits["top_level_output"],
                 r.pattern_hits["legacy_bind"],
                 r.pattern_hits["legacy_field_kw"],

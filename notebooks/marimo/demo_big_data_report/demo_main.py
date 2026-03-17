@@ -191,12 +191,12 @@ def _(Path, yaml_path):
 
     try:
         sink = InMemoryRowSink()
-        _runtime_vars = {"order_ids": []}
+        _init_vars = {"order_ids": []}
         result = run(
             str(yaml_path),
             allowed_modules=frozenset([_loaders_module]),
             sink=sink,
-            runtime_vars=_runtime_vars,
+            init_vars=_init_vars,
         )
         print("✅ `run()` 执行成功!")
         print("   总行数:", result.total_rows)

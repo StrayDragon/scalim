@@ -294,7 +294,7 @@ class SourceConfig:
                 "- `none`: 不缓存\n"
                 "- `preload_forever`: 预加载并长期缓存\n"
                 "- 设为 `preload_forever` 时,预加载阶段会执行一次 loader 并将结果缓存\n"
-                "- 若 `sources.<id>.params` 非空,预加载调用会透传 kwargs;为空则保持零参调用\n"
+                "- 预加载阶段同样会复用编译后的 `sources.<id>.params` kwargs 模板(禁用 `$keys/$rows`)\n"
                 "- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`"
             ),
             choices=["none", "preload_forever"],
@@ -329,7 +329,7 @@ class SourceConfig:
         default_factory=dict,
         metadata=schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props={}),
     )
-    """传递给加载器的 `kwargs` 模板(编译期解析 `{$runtime: <name>}`,运行期渲染 `$keys/$rows`)."""
+    """传递给加载器的 `kwargs` 模板(编译期解析 `{$init_var: <name>}`,运行期渲染 `$keys/$rows`)."""
 
 
 @dataclass(frozen=True)

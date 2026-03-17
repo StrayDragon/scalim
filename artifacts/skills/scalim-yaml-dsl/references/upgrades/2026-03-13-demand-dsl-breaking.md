@@ -8,7 +8,7 @@
 - `output.fields` 支持 string sugar:
   - `field_id` (例: `order_id`)
   - `source.field_id` (例: `customers.customer_name`;用于消歧;仅支持二段式)
-- **BREAKING**: runtime vars 统一为指令节点 `{$runtime: <name>}`;旧写法 `$runtime.<name>` 不再允许
+- **BREAKING**: init vars 统一为指令节点 `{$init_var: <name>}`;旧写法 `$runtime.<name>`/`{$runtime: <name>}` 不再允许
 
 OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 - `openspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
@@ -23,7 +23,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）
 
-## Breaking: runtime vars 指令化
+## Breaking: init vars 指令化
 
 旧写法(不再允许,出现即 fail-fast):
 
@@ -36,16 +36,16 @@ params:
 
 ```yaml
 params:
-  end_dt: {$runtime: end_dt}
+  end_dt: {$init_var: end_dt}
 ```
 
 说明:
 
-- `{$runtime: <name>}` 是“单键映射指令节点”,与 `$keys/$rows` 同属一类模板 AST
-- 仅解析指令节点;**不做子串插值**(例如 `"and t > $runtime.end_dt"` 会被当作普通字符串透传)
+- `{$init_var: <name>}` 是“单键映射指令节点”,与 `$keys/$rows` 同属一类模板 AST
+- 仅解析指令节点;**不做子串插值**(例如 `"and t > $init_var.end_dt"` 会被当作普通字符串透传)
 
 ## Migration Checklist
 
-1) 全量把 `$runtime.<name>` 占位符替换为 `{$runtime: <name>}`
+1) 全量把 `$runtime.<name>` 占位符替换为 `{$init_var: <name>}`
 2) (可选) 将字段的 `relation: *anchor` 升级为 `relation: <relation_id>`
 3) (可选) 将 `output.fields` 的简单场景升级为 string list sugar

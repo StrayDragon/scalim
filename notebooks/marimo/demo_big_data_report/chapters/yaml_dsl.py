@@ -33,7 +33,7 @@ def run_yaml_dsl(
     cfg: Optional[ECommerceConfig] = None,
     *,
     yaml_path: Optional[Path] = None,
-    runtime_vars: Optional[Dict[str, object]] = None,
+    init_vars: Optional[Dict[str, object]] = None,
 ) -> ExampleResult:
     if cfg is None:
         cfg = build_test_config_small()
@@ -45,7 +45,7 @@ def run_yaml_dsl(
     try:
         loader_module = "scalim_misc.demo_big_data_report.loaders"
         allowed_modules = frozenset([loader_module])
-        runtime_vars = runtime_vars or {"order_ids": []}
+        init_vars = init_vars or {"order_ids": []}
 
         # 1) 语义校验: ConfigValidator + YamlDemandLoader
         validator = ConfigValidator()
@@ -68,7 +68,7 @@ def run_yaml_dsl(
         compilation = compile_yaml(
             str(yaml_path),
             allowed_modules=allowed_modules,
-            runtime_vars=runtime_vars,
+            init_vars=init_vars,
         )
 
         # 3) `run`: 用内存 `sink` 获取行数据
@@ -78,7 +78,7 @@ def run_yaml_dsl(
             str(yaml_path),
             allowed_modules=allowed_modules,
             sink=sink,
-            runtime_vars=runtime_vars,
+            init_vars=init_vars,
         )
         elapsed = time.time() - start
 

@@ -85,7 +85,7 @@ def _eval_call_by_value(*, field_id: str, value: CallByValue, field_values: Dict
 class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigToIRConversionRelationMixin):
     _resolver: Optional[PythonReferenceResolver] = None
     _compute_engine: Optional[SecureComputeEngine] = None
-    _runtime_vars: Optional[Mapping[str, object]] = None
+    _init_vars: Optional[Mapping[str, object]] = None
 
     def _require_resolver(self) -> PythonReferenceResolver:
         resolver = self._resolver
@@ -119,12 +119,12 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         loader_fn = cast("MainSourceRowIterableCallable", self._require_resolver().resolve(config.loader))
         order_by = self._convert_main_source_order_by(config.order_by)
 
-        runtime_vars = self._runtime_vars
+        init_vars = self._init_vars
         try:
             template = compile_params_template(
                 config.params,
                 path="main_source.params",
-                runtime_vars=runtime_vars,
+                init_vars=init_vars,
                 allow_keys=False,
                 allow_rows=False,
             )
@@ -406,13 +406,13 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         *,
         cache_mode: SourceSpecIrCacheMode,
     ) -> Optional["BindingIr"]:
-        runtime_vars = self._runtime_vars
+        init_vars = self._init_vars
         allow_directives = cache_mode != SourceSpecIrCacheMode.PRELOAD_FOREVER
         try:
             template = compile_params_template(
                 source_config.params,
                 path="sources.{}.params".format(source_config.source_id),
-                runtime_vars=runtime_vars,
+                init_vars=init_vars,
                 allow_keys=allow_directives,
                 allow_rows=allow_directives,
             )

@@ -91,7 +91,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             _ = compile_params_template(
                 params_dict or {},
                 path=path,
-                resolve_runtime=False,  # `runtime_vars` 在 `run/compile` 时提供,`YAML` 校验阶段不解析.
+                resolve_runtime=False,  # `init_vars` 在 `run/compile` 时提供,`YAML` 校验阶段不解析.
                 allow_keys=allow_directives,
                 allow_rows=allow_directives,
             )

@@ -38,7 +38,7 @@ def run_workflow_yaml(
             result = run_workflow(
                 str(workflow_yaml_path),
                 allowed_modules=allowed_modules,
-                runtime_vars={"order_ids": []},
+                init_vars={"order_ids": []},
             )
         except Exception as exc:  # noqa: BLE001
             summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)

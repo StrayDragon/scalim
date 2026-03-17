@@ -11,7 +11,7 @@ def test_output_fields_yaml_alias_list_is_flattened(ecommerce_config_small) -> N
     compilation = compile_yaml(
         str(yaml_path),
         allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
-        runtime_vars={"order_ids": []},
+        init_vars={"order_ids": []},
     )
     comp = compilation
     assert comp.request.output_composition is not None

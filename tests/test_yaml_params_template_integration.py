@@ -187,7 +187,7 @@ sources:
     assert call_kwargs.get("flag") == 1
 
 
-def test_run_runtime_vars_injects_python_objects_into_main_source_params(tmp_path: Path) -> None:
+def test_run_init_vars_injects_python_objects_into_main_source_params(tmp_path: Path) -> None:
     loaders.reset_calls()
     yaml_path = _write_yaml(
         tmp_path,
@@ -197,7 +197,7 @@ main_source:
   source_id: orders
   loader: tests.params_template_loaders:load_orders_main
   params:
-    end_dt: {$runtime: end_dt}
+    end_dt: {$init_var: end_dt}
   fields:
     order_id:
       extract: order_id
@@ -210,9 +210,53 @@ main_source:
         str(yaml_path),
         allowed_modules=frozenset(["tests.params_template_loaders"]),
         sink=sink,
-        runtime_vars={"end_dt": end_dt},
+        init_vars={"end_dt": end_dt},
     )
 
     assert loaders.CALL_COUNTS.get("orders") == 1
     call_kwargs = loaders.CALL_KWARGS["orders"][0]
     assert call_kwargs.get("end_dt") == end_dt
+
+
+def test_run_init_vars_injects_values_into_source_params(tmp_path: Path) -> None:
+    loaders.reset_calls()
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: t
+main_source:
+  source_id: orders
+  loader: tests.params_template_loaders:load_orders_main
+  fields:
+    order_id:
+      extract: order_id
+    customer_id:
+      extract: customer_id
+
+sources:
+  customers:
+    loader: tests.params_template_loaders:load_customers_static
+    key: customer_id
+    params:
+      group_by: {$init_var: group_by}
+    fields:
+      customer_level:
+        extract: level
+        relation:
+          steps:
+            - from: orders.customer_id
+              to: customers.customer_id
+""",
+    )
+
+    sink = InMemoryRowSink()
+    _ = run(
+        str(yaml_path),
+        allowed_modules=frozenset(["tests.params_template_loaders"]),
+        sink=sink,
+        init_vars={"group_by": "level"},
+    )
+
+    assert loaders.CALL_COUNTS.get("customers_static") == 1
+    call_kwargs = loaders.CALL_KWARGS["customers_static"][0]
+    assert call_kwargs.get("group_by") == "level"

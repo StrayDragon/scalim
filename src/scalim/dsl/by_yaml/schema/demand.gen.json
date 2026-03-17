@@ -375,8 +375,8 @@
               ]
             }
           },
-          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)",
-          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$runtime: <name>}` 指令节点(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$runtime: <name>}` 指令节点(单键映射;inline/block 等价)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$runtime: <name>}`",
+          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)",
+          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$init_var: <name>}` 指令节点(编译期解析为调用方提供的 `init_vars[<name>]`)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$init_var: <name>}` 指令节点(单键映射;inline/block 等价;编译期解析为 `init_vars[<name>]`)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 预加载阶段会复用同一份编译后的 `sources.<id>.params` 模板并透传 kwargs\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `{$runtime: <name>}` 指令节点已不支持,请改用 `{$init_var: <name>}`\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$init_var: <name>}`",
           "additionalProperties": {}
         },
         "retry": {
@@ -990,7 +990,7 @@
         "cache_mode": {
           "type": "string",
           "description": "缓存模式:none=不缓存,preload_forever=预加载永久缓存",
-          "markdownDescription": "缓存模式.\n\n- `none`: 不缓存\n- `preload_forever`: 预加载并长期缓存\n- 设为 `preload_forever` 时,预加载阶段会执行一次 loader 并将结果缓存\n- 若 `sources.<id>.params` 非空,预加载调用会透传 kwargs;为空则保持零参调用\n- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`",
+          "markdownDescription": "缓存模式.\n\n- `none`: 不缓存\n- `preload_forever`: 预加载并长期缓存\n- 设为 `preload_forever` 时,预加载阶段会执行一次 loader 并将结果缓存\n- 预加载阶段同样会复用编译后的 `sources.<id>.params` kwargs 模板(禁用 `$keys/$rows`)\n- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`",
           "enum": [
             "none",
             "preload_forever"
@@ -1067,8 +1067,8 @@
               ]
             }
           },
-          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)",
-          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$runtime: <name>}` 指令节点(编译期解析)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$runtime: <name>}` 指令节点(单键映射;inline/block 等价)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 若 `sources.<id>.params` 非空,预加载时透传 kwargs\n  - 若为空,预加载时保持零参调用\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$runtime: <name>}`",
+          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)",
+          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$init_var: <name>}` 指令节点(编译期解析为调用方提供的 `init_vars[<name>]`)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$init_var: <name>}` 指令节点(单键映射;inline/block 等价;编译期解析为 `init_vars[<name>]`)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 预加载阶段会复用同一份编译后的 `sources.<id>.params` 模板并透传 kwargs\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `{$runtime: <name>}` 指令节点已不支持,请改用 `{$init_var: <name>}`\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$init_var: <name>}`",
           "additionalProperties": {}
         },
         "$import": {

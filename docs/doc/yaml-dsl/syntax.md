@@ -153,15 +153,15 @@ YAML 里引用 Python 的地方主要有两类:
 - 推荐优先使用 string ref,减少对 YAML anchors/alias 的依赖
 - 使用 alias 时,alias 必须先在 `relations` 里定义(这是 YAML 的约束)
 
-## 6. params 模板: `$keys` / `$rows` / `{$runtime: ...}`
+## 6. params 模板: `$keys` / `$rows` / `{$init_var: ...}`
 
 Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 
 - `main_source.params`: 直接以 kwargs 传给 main source loader
-  - 支持 `{$runtime: <name>}` 指令节点(编译期解析)
+  - 支持 `{$init_var: <name>}` 指令节点(编译期解析)
   - 禁止 `$keys/$rows`
 - `sources.<id>.params`: loader kwargs 模板
-  - 支持 `{$runtime: <name>}` 指令节点(编译期解析;单键映射;不做子串插值)
+  - 支持 `{$init_var: <name>}` 指令节点(编译期解析;单键映射;不做子串插值)
   - 支持 `$keys` 注入 lookup keys(可出现在任意嵌套位置):
     - `{$keys: {as: set|list}}`(默认 set)
     - `$keys.as=list` 会输出稳定顺序列表; composite key 注入为 tuple 元素

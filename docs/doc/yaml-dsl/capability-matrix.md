@@ -36,7 +36,7 @@
 |---|---|---|---|
 | `main_source.source_id` | `DemandIr.main_source.source_id` | 必填;不可与 `sources` key 冲突 | - |
 | `main_source.loader` | `DemandIr.main_source.loader` | 必须通过 allowlist 解析(安全边界) | 用 `allowed_modules/allowed_functions` 放行 |
-| `main_source.params` | `DemandIr.main_source.params` | 仅允许静态值 + `{$runtime: <name>}`;禁止 `$keys/$rows` | 把动态输入放 `runtime_vars` 里,并在调用 `run/compile` 时传入 |
+| `main_source.params` | `DemandIr.main_source.params` | 仅允许静态值 + `{$init_var: <name>}`;禁止 `$keys/$rows` | 把动态输入放 `init_vars` 里,并在调用 `run/compile` 时传入 |
 | `main_source.retry` | `ExecutionRequest.loader_retry` (by_loader 覆盖) | `enabled=true` 需要 `should_retry` | 用 `run(..., loader_retry=...)` 做 driver override |
 | `main_source.order_by` | `MainSourceIr.order_by` | 仅批次内写入顺序;每项支持 `-field` 表示 desc | 若需要更复杂排序,在 loader 内排序 |
 | `main_source.fields.*` | `FieldIr` (source=main) | 仅源字段;禁止 `compute/call_by` | 复杂派生逻辑放 `fields.*`(derived) |
@@ -89,7 +89,7 @@
 | 能力 | 对应对象 | 为什么不在 YAML | 推荐用法 |
 |---|---|---|---|
 | allowlist | `SecurePythonReferenceResolver` | 安全边界(运行环境/组织策略差异大) | `scalim.dsl.by_yaml.run(..., allowed_modules=..., allowed_functions=...)` 或 CLI flags |
-| `runtime_vars` | `RunOptions.runtime_vars` | 运行时输入,不应写死在共享 YAML | `run(..., runtime_vars={...})` |
+| `init_vars` | `RunOptions.init_vars` | 运行时输入,不应写死在共享 YAML | `run(..., init_vars={...})` |
 | 并行模式/并发数 | `ExecutionRequest.parallel_mode/max_workers` | 与环境/资源相关,容易导致不可复现 | `run(..., parallel_mode=\"seq|adaptive\", max_workers=...)` |
 | 自定义 sink | `ExecutionRequest.sink` | sink 往往是运行环境能力(文件系统/内存/对象存储) | `run(..., sink=InMemoryRowSink())` 等 |
 | 完全自定义 outputs | `ExecutionRequest.output_composition` | 组合输出属于执行装配层,复杂度高 | `run(..., output_composition=...)` |
@@ -109,4 +109,4 @@
 1) **先把“缺口”分类**: 哪些是“执行环境参数”(更适合 CLI/Python options),哪些是“需求本体”(更适合 YAML/IR)。
 2) **优先补最小可迁移面**: 例如把 `FieldPresentationIr` 先收敛成一小组 YAML 可表达的 `presentation` 子集(Excel number_format/width/align),其余仍 Python-only。
 3) **复杂装配保持 Python-only,但做稳定扩展点**: 例如为 outputs 引入受控 `extensions` 或把更多 derived targets 以 OpenSpec changes 逐步落地到 YAML,避免一次性暴露完整 IR。
-4) **把 “Not in YAML” 的运行期参数在 CLI/教程里显式化**: 例如 `parallel_mode/max_workers/runtime_vars` 的推荐默认值与可复现策略。
+4) **把 “Not in YAML” 的运行期参数在 CLI/教程里显式化**: 例如 `parallel_mode/max_workers/init_vars` 的推荐默认值与可复现策略。

@@ -210,8 +210,8 @@ uv run scalim-cli yaml-dsl validate <file.yaml> --strict
   - 如果它是源字段,请移回 `main_source.fields`/`sources.*.fields`;如果它是派生字段,请补 `compute` 或 `call_by`
 - `Legacy YAML syntax is not supported: top-level 'output'. ...`
   - 顶层 `output:` 已移除;按本页第 5 节升级为 `outputs:` 并把输出参数移到 `outputs.*.container`
-- `Legacy \`$runtime.<name>\` placeholder is not supported; use \`{$runtime: <name>}\``
-  - 把所有 `$runtime.xxx` 全量替换为 `{$runtime: xxx}`
+- `Legacy \`$runtime.<name>\` placeholder is not supported; use \`{$init_var: <name>}\``
+  - 把所有 `$runtime.xxx` 全量替换为 `{$init_var: xxx}`
 - `Field 'xxx' is defined multiple times; field_id must be unique ...`
   - 先在 `main_source.fields/sources.*.fields/fields` 中把重名 `field_id` 重命名,再在 `outputs.*.fields` 引用新 `field_id`
 - `Unknown field`

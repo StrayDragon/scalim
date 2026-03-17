@@ -98,7 +98,7 @@ main_source:
   source_id: orders
   loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
   params:
-    # runtime_vars 注入示例: 由调用方传入 `runtime_vars={"order_ids": [...]}`.
+    # init_vars 注入示例: 由调用方传入 `init_vars={"order_ids": [...]}`.
     # 为空列表时 loader 仍会读取全量订单(见 `load_orders` 实现),用于保证 canonical demo 可直接运行.
     $import: fragments.main_source_params
   order_by:

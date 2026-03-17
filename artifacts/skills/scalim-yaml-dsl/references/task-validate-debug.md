@@ -78,10 +78,10 @@ uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
   1) 先在字段定义处重命名(例如 `customer_name` → `customer_name_customer`)
   2) 再在 `outputs.*.fields` 引用新的 `field_id`
 
-### `Legacy \`$runtime.<name>\` placeholder is not supported; use \`{$runtime: <name>}\``
+### `Legacy \`$runtime.<name>\` placeholder is not supported; use \`{$init_var: <name>}\``
 
-- 把所有 `$runtime.xxx` 替换为 `{$runtime: xxx}`
-- 运行期变量由 Python 调用方传入 `runtime_vars={...}`; YAML 里只声明引用
+- 把所有 `$runtime.xxx` 替换为 `{$init_var: xxx}`
+- 初始化变量由 Python 调用方传入 `init_vars={...}`; YAML 里只声明引用
 
 ### relation 相关错误
 

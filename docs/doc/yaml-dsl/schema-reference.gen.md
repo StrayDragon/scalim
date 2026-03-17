@@ -84,7 +84,7 @@ Sources:
 - `fields`: type=object; 主数据源字段配置映射, key 为 field_id
 - `loader`: type=string; Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)
 - `order_by`: type=array[string]; 主数据源批次内排序字段列表(仅主数据源字段)
-- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)
+- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)
 - `retry`: ref=loader_retry; Loader retry 策略(可选;默认关闭)
 - `source_id`: type=string; 主数据源的 source_id
 
@@ -192,7 +192,7 @@ Sources:
 - `lookup_cast`: type=object; 归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}
 - `lookup_chunk_size`: keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)
 - `normalize`: type=object; 源代码级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)
-- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$runtime: <name>}`; sources 支持 `$keys/$rows`)
+- `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)
 - `retry`: ref=loader_retry; Loader retry 策略(可选;默认关闭)
 
 ### `source_field_inline`

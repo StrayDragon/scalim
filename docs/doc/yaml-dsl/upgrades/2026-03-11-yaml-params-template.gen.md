@@ -7,17 +7,15 @@ Sources:
 
 ## 变更摘要
 
-这次升级把 loader 的调用参数语义收敛到一个入口: `params` kwargs 模板(支持在任意嵌套位置注入运行时值),并引入 `runtime_vars` 作为编译期注入来源。
+这次升级把 loader 的调用参数语义收敛到一个入口: `params` kwargs 模板(支持在任意嵌套位置注入运行时值),并引入 `init_vars` 作为编译期注入来源。
 
 - `main_source.params` / `sources.<id>.params` 统一视为“kwargs 模板”
 - 新增模板指令节点:
   - `{$keys: {as: set|list}}`: 注入 lookup keys
   - `{$rows: {cache_mode: batch|none}}`: 注入 batch rows(并影响调度与复用语义)
-- 新增 `runtime_vars` 注入与 `{$runtime: <name>}` 指令节点(编译期解析;不做子串插值)
+- 新增 `init_vars` 注入与 `{$init_var: <name>}` 指令节点(编译期解析;不做子串插值)
 - **BREAKING**: `bind` / `to_bind` 已从稳定 YAML authoring surface 移除(出现即 fail-fast)
-- **BREAKING**: `cache_mode: preload_forever` 的预加载语义收敛:
-  - 若 `sources.<id>.params` 非空: 预加载透传渲染后的 kwargs
-  - 若为空: 预加载保持零参调用
+- **BREAKING**: `cache_mode: preload_forever` 的预加载语义收敛: 预加载阶段会复用 `sources.<id>.params` 并透传渲染后的 kwargs(禁用 `$keys/$rows`)
 
 OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 - `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
@@ -109,14 +107,14 @@ params:
 - `$rows` 会触发 rows barrier: `parallel_mode="adaptive"` 下该层 LoadRef 串行执行
 - `$rows.cache_mode=none` 会禁用批次内 relation 复用(每个字段各自调用 loader)
 
-### Step 2: 用 `runtime_vars` 注入运行期变量
+### Step 2: 用 `init_vars` 注入初始化变量
 
 YAML:
 
 ```yaml
 main_source:
   params:
-    end_dt: {$runtime: end_dt}
+    end_dt: {$init_var: end_dt}
 ```
 
 Python:
@@ -128,18 +126,18 @@ from scalim.dsl.by_yaml import run
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    runtime_vars={"end_dt": datetime(2024, 1, 31)},
+    init_vars={"end_dt": datetime(2024, 1, 31)},
 )
 ```
 
 提示:
 
-- 仅解析 `{$runtime: <name>}` 指令节点(单键映射);不做子串插值
-- 缺失 runtime var 会在编译期 fail-fast,错误信息包含配置路径(例如 `sources.foo.params.params.end_dt`)
+- 仅解析 `{$init_var: <name>}` 指令节点(单键映射);不做子串插值
+- 缺失 init var 会在编译期 fail-fast,错误信息包含配置路径(例如 `sources.foo.params.params.end_dt`)
 
 ## 常见报错与修复
 
 - `Legacy YAML syntax is not supported: 'sources.<id>.bind'` / `...to_bind...`
   - 修复: 按错误中的示例把绑定迁移到 `sources.<id>.params` 的 `$keys/$rows` 指令节点
-- `Missing runtime var: <name> (path=...)`
-  - 修复: `run(..., runtime_vars={...})` 补齐该 key,或把 YAML 中的占位符改为普通字面值
+- `Missing init var: <name> (path=...)`
+  - 修复: `run(..., init_vars={...})` 补齐该 key,或把 YAML 中的占位符改为普通字面值

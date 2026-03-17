@@ -3,7 +3,7 @@
 # Keep it in the same directory to satisfy V1 path constraints (same-directory fragments only).
 
 main_source_params:
-  ids: {$runtime: order_ids}
+  ids: {$init_var: order_ids}
   field_keys:
     - order_id
     - order_date

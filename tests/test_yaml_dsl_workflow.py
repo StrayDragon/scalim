@@ -549,7 +549,7 @@ def test_workflow_entrypoints_internal_helpers_are_covered() -> None:
         entrypoints_mod._render_preload_forever_params(  # noqa: SLF001
             "src",
             params={},
-            runtime_vars=None,
+            init_vars=None,
             path="sources.src.params",
         )
         == {}
@@ -559,7 +559,7 @@ def test_workflow_entrypoints_internal_helpers_are_covered() -> None:
         _ = entrypoints_mod._render_preload_forever_params(  # noqa: SLF001
             "src",
             params={"$keys": None},
-            runtime_vars=None,
+            init_vars=None,
             path="sources.src.params",
         )
 
@@ -567,7 +567,7 @@ def test_workflow_entrypoints_internal_helpers_are_covered() -> None:
         _ = entrypoints_mod._render_preload_forever_params(  # noqa: SLF001
             "src",
             params=1,
-            runtime_vars=None,
+            init_vars=None,
             path="sources.src.params",
         )
 
