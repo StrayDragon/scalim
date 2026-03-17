@@ -12,22 +12,19 @@
 
 ## What Changes
 
-> 本 change 作为 workflow 的后置提案,计划标记为 **DELAYED**。  
-> 为通过 `openspec validate`/门禁,本 change 提供最小 delta spec 占位(不代表已进入实现阶段)。
-> 说明: 本 change 预期落到 `workflow-ir-roadmap` 定义的 workflow IR/节点系统之上(以 output/resource 节点表达),避免在现有 `run_workflow()` 直接执行器上引入不可扩展的特例。
+说明: 本 change 建立在 `workflow-ir-roadmap` 的 workflow IR/节点系统之上(以 output/resource 节点表达),避免在现有 `run_workflow()` 直接执行器上引入不可扩展的特例。
 
 - **New**: workflow 级“共享输出容器”(resources)概念,用于多 demand 合并输出
   - 例如声明一个共享 workbook/csv 资源,由 workflow 统一创建/关闭/落盘(只保存一次,原子替换)
   - 多个 demand 的输出目标不再各自写文件,而是通过 workflow 的写出节点写入共享容器
 
 - **New**: 将 workflow 视为 DAG 编排的一种承载(“demand 只是节点类型之一”)
-  - `demand` 节点: 运行一个 demand(可并发),产出可引用的 artifacts(例如 output_target 的行流/统计信息/ctx)
-  - `write_sheet`/`append_sheet` 节点: 将一个或多个 demand 的 output_target 写入共享 workbook 的 sheet(或写入共享 csv)
-  - 可选的轻量 `ctx_compute` 节点: 在 workflow ctx 上做小计算/映射,用于下游 init_vars 注入(避免把所有逻辑塞进 demand)
+  - `demand` 节点: 运行一个 demand(可并发),产出可引用的 artifacts(例如某个 output_target),并发布轻量 ctx 摘要(例如 output_path/total_rows)
+  - `write_sheet`/`append_sheet` 节点: 将一个或多个 demand 的输出写入共享 workbook/csv
 
 - **New**: 多 demand → 单 workbook 多 sheet 的直觉写法
   - 支持把每个 run 的某个 output 写到一个 sheet
-  - 提供默认 sheet 命名约定(例如 `{run_id}:{output_name}`)与冲突策略(error/overwrite/skip)
+  - sheet 名 MUST 显式指定；当发生冲突时按可配置策略处理(error/overwrite/skip)
 
 - **New**: 多 demand → 单 sheet 的合并/追加语义
   - append 模式(行追加)为优先落地目标
@@ -41,7 +38,13 @@
 - 该 change 推荐建立在 `workflow-dag-context-passing` 之上(同一套 DAG 调度 + ctx),优先落地 **workbook 多 sheet** 与 **csv append** 两条路径。
 - MVP 优先选择“按资源互斥串行写入”的路线(避免在 workflow 内引入大体量 in-memory dataset 传递)：
   - 多个 run 可以并发编译/执行,但对同一共享资源(workbook/csv)的写入 MUST 串行化并遵循声明顺序
-  - 共享资源在 workflow 末尾统一 commit/原子落盘,失败时按 `failure_policy` 决定是否丢弃或保留部分内容
+  - 共享资源在 workflow 末尾统一 commit/原子落盘,失败时 MUST discard（不支持 partial commit,避免“部分写入但语义不清”的灰区）
+
+- **SSOT**: 写出节点是独立 node 类型（不是 demand 的后处理）
+  - YAML authoring surface 可提供 `runs[*].write_to` 等简写,但编译后 MUST 解糖为独立的 `write_sheet`/`append_sheet` 节点,以便：
+    - 对共享资源做互斥/串行化与确定性顺序控制
+    - 在 workflow-level 发出 resource 生命周期事件（create/write/commit/discard）并复用 `workflow_exec_id` / `workflow_node_id` 归因
+    - 允许后续扩展“多输入合并/字段对齐策略/失败恢复”而不污染 demand 运行边界
 
 ### MVP Example (YAML)
 
@@ -60,12 +63,14 @@ workflow:
         workbook_sheet:
           workbook: report
           sheet: Orders
+          output: detail
     - id: customers
       demand: ./customers.demand.yaml
       write_to:
         workbook_sheet:
           workbook: report
           sheet: Customers
+          output: detail
   options:
     max_concurrency: 4
     failure_policy: all_fail
@@ -90,3 +95,14 @@ workflow:
   - 需要明确 `failure_policy` 在“部分节点已写出/尚未落盘”场景下的行为(建议默认延迟落盘以保持原子性)
 - Viz:
   - workflow DAG 与资源/写出节点将更适合在 scalim-viz 上表达为“编排层视图”(便于排障与复用)
+
+- Spec / schema / docs governance:
+  - SSOT:
+    - workflow schema DSL 与 hover 文案: `src/scalim/dsl/by_yaml/schema_dsl/**`
+    - workflow runtime 行为: `src/scalim/dsl/by_yaml/runtime/**`
+  - Generated（禁止手改）：
+    - `src/scalim/dsl/by_yaml/schema/workflow.gen.json`（通过 `just gen-yaml-dsl-schema` 生成）
+    - docs 中的 `.gen.` 与 injected blocks（通过 `just gen-docs` 生成）
+  - Gates:
+    - `just qa`
+    - `just openspec-check`

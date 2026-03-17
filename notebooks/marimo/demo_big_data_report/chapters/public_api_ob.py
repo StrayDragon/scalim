@@ -2,7 +2,7 @@ import marimo
 
 from typing import Any, Dict
 
-from notebooks.marimo._support.public_api import (
+from scalim_misc.examples.public_api._coverage import (
     check_public_all_coverage,
     coverage_failure_summary,
     coverage_to_details,

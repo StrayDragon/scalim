@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Set, Tuple
 
 
 @dataclass(frozen=True)
@@ -53,3 +53,4 @@ def coverage_to_details(coverage: PublicAllCoverage) -> Dict[str, Any]:
         "missing": list(coverage.missing),
         "stale": list(coverage.stale),
     }
+

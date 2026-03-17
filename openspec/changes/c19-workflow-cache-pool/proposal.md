@@ -14,8 +14,6 @@
 
 ## What Changes
 
-> 本 change 仅提出方向与边界,不在 proposal 阶段锁死 YAML 语法细节；workflow YAML 作为 frontend,最终应编译到 workflow IR 上的 cache pool 配置。
-
 - **New**: workflow-scope cache pool (缓存池)概念
   - workflow runtime 维护一个 cache pool,作为跨节点/跨 run 的共享缓存容器
   - cache pool 负责:
@@ -25,31 +23,34 @@
 
 - **New**: 缓存条目 signature 与冲突策略
   - 对 preload_forever 等缓存条目,系统 MUST 以“可复现的 signature”作为缓存 key 的一部分(例如: `source_id + loader_ref + rendered_params + normalize + loader_call_context`)
+  - **关键一致性约束**: signature MUST 基于“已渲染的 params”（已解析 `{$init_var: ...}` / 后续的 `{$ctx: ...}`）,而不是模板本身
+    - 这使 cache pool 与 `workflow-dag-context-passing` 的 compile-on-ready 兼容：当 node 就绪并完成渲染后才计算 signature 并决定复用/隔离/报错
   - 提供可配置的冲突策略(提案级方向):
     - `error`(默认/严格): 与当前行为一致,发现同 `source_id` 不同 signature 则 fail-fast
     - `separate`: 允许同 `source_id` 存在多个 signature,互不复用(适合渐进迁移/避免误伤)
     - `warn`: 继续执行但记录可观测告警(仅用于 debug/迁移窗口)
 
 - **New**: 生命周期与“无引用自动释放”
-  - cache pool SHOULD 支持基于 workflow DAG 的引用计数:
+  - cache pool MUST 支持基于 workflow DAG 的引用计数:
     - 当某个缓存条目被某个 run 获取时计数 +1
     - 当该 run 结束且其后续不再需要该条目时计数 -1
     - 计数归零后,缓存条目可被释放(或进入 LRU 等待淘汰)
-  - 提供 `pin`/`release_policy` 等策略控制(例如固定到 workflow 结束,或按 refcount 释放)
+  - 提供 `release_policy` 与 `pin` 等机制控制(例如固定到 workflow 结束,或按 refcount 释放)
 
 - **New**: 容量/内存策略(guardrails)
-  - cache pool SHOULD 支持预算配置(例如 `max_entries`/`max_bytes`/`max_value_bytes`)
-  - 当预算超限时,系统 MUST 有明确策略:
+  - cache pool MUST 支持预算配置(至少 `max_entries`)
+  - 当预算超限时,系统 MUST 按明确策略处理:
     - fail-fast(严格护栏),或
     - 淘汰(例如 LRU,且仅淘汰 refcount=0 的条目)
 
-- **BREAKING (planned)**: `options.share_preload_cache` 演进为 `options.cache_pool`(或等价 IR 字段)
+- **BREAKING**: `options.share_preload_cache` 演进为 `options.cache_pool`
   - 旧字段会被移除,并在仓内一次性升级 workflow YAML(不保留兼容兜底)
   - `share_preload_cache=true` 的能力由 cache pool 的默认配置覆盖(例如 preload compartment 开启共享 + 严格冲突策略)
 
 - **Non-goals (for this change)**:
   - 不引入跨进程/跨机器的分布式缓存
   - 不在本 change 内落地 dataset/rows 工件复用(由 `workflow-artifact-datasets` 负责),但 cache pool 将作为其内存治理底座
+  - 不在本 change 内锁死 cache 事件集合的细节实现；事件契约与归因字段由 `workflow-observability-bridge` 统一收敛,cache pool 只需保证可挂载 acquire/release/evict 等生命周期事件点
 
 ## Capabilities
 
@@ -76,3 +77,25 @@
   - Generated (禁止手改):
     - `src/scalim/dsl/by_yaml/schema/workflow.gen.json` (由 `scripts/gen-yaml-dsl-schema.py`/`just gen-yaml-dsl-schema`)
     - docs 中的 `.gen.` 与 injected blocks (由 `just gen-docs`)
+
+### Proposed YAML surface (SSOT)
+
+`options.share_preload_cache` 被移除,统一使用结构化的 cache pool 配置:
+
+```yaml
+workflow:
+  options:
+    cache_pool:
+      conflict_policy: error # error|separate|warn
+      release_policy: dag_refcount # dag_refcount|workflow_end
+      budget:
+        max_entries: 64
+        over_budget_policy: fail_fast # fail_fast|evict_lru
+      pin:
+        - kind: preload_forever
+          source_id: dim_table
+```
+
+约束:
+- `cache_pool` 缺省为关闭（不共享缓存）
+- `conflict_policy=warn` 时,系统 MUST 将冲突条目按 signature 隔离（等价于 `separate`）并产生可观测告警

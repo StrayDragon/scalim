@@ -1,7 +1,7 @@
 ## Why
 
 workflow 将按优先级逐步演进到 DAG 编排、cache pool、共享输出容器等能力。但现有 hooks/observers 体系以“单次 demand 执行(run)”为边界，workflow 层缺少一个稳定的“观测桥接层”，导致：
-- demand 事件流无法稳定归因到 workflow YAML 的 `runs[*].id`（scalim-viz/排障 join 困难）
+- demand 事件流无法稳定归因到 workflow YAML 的 `runs[*].id`（即 workflow node id；scalim-viz/排障 join 困难）
 - 共享缓存/资源复用会改变事件可见性（例如 preload 复用时可能没有任何 loader_call 事件），让观察数据难以解释
 - workflow 未来引入 condition/selector/output 等非-demand 节点后，这些节点的调度/取消/资源动作缺少可观测事件
 
@@ -10,7 +10,9 @@ workflow 将按优先级逐步演进到 DAG 编排、cache pool、共享输出�
 ## What Changes
 
 - **New**: workflow 事件归因（attribution）能力
-  - workflow 执行时为每个 demand run/节点提供稳定的归因字段（例如 `workflow_exec_id`、`workflow_run_id`、`workflow_node_id`）
+  - workflow 执行时为每个 workflow 节点提供稳定的归因字段：
+    - `workflow_exec_id`: 标识一次 workflow 执行（同一次调用内稳定）
+    - `workflow_node_id`: 标识该事件来自哪个 workflow 节点（对 demand 节点等于 workflow YAML 的 `runs[*].id`）
   - 归因信息以 **增量 `Event.meta` 字段** 的形式提供，不改写既有 `Event.run_id` 语义
 
 - **New**: workflow-level 观测事件（不依赖 demand 事件）
@@ -20,7 +22,7 @@ workflow 将按优先级逐步演进到 DAG 编排、cache pool、共享输出�
 - **New**: hooks/observers 兼容契约（workflow 演进的硬约束）
   - workflow MUST 保持 “run = 一次 demand 执行” 的 hooks/observers 行为语义不变（仍复用 `run_ir()` 执行边界）
   - `components` MUST 仍是对外唯一装配入口（不引入新的 workflow 开关绕过装配）
-  - 并发下组件复用的约束必须被明确：当 `max_concurrency>1` 时，components SHOULD 线程安全或无状态；否则应降级为串行或使用未来的 factory/provider 机制
+  - 并发下组件复用的约束必须被明确：当 `max_concurrency>1` 时，components MUST 线程安全或无状态；否则行为未定义且不保证正确性（应将 `max_concurrency` 降为 1）
 
 - **Non-Goals**
   - 不引入新的 demand DSL 概念（例如不在 demand 里新增 workflow 专用语法）
@@ -32,7 +34,7 @@ workflow 将按优先级逐步演进到 DAG 编排、cache pool、共享输出�
 - `workflow-observability-bridge`: 定义 workflow 执行归因字段（写入 `Event.meta`）与 workflow-level 事件契约，用于将 demand 事件流关联回 workflow DAG，并为 cache/resource 生命周期提供可观测入口
 
 ### Modified Capabilities
-- `yaml-dsl-workflow`: workflow 执行在可观测性层面需要提供 run 归因信息（例如 `workflow_run_id`），并明确 hooks/observers 在 workflow 并发下的组件复用约束
+- `yaml-dsl-workflow`: workflow 执行在可观测性层面需要提供节点归因信息（`workflow_exec_id` / `workflow_node_id`），并明确 hooks/observers 在 workflow 并发下的组件复用约束
 - `hooks-observability-structure`: 增补“事件归因字段注入/合并”的规范边界（保持 wants-gated 与热路径语义不变）
 
 ## Impact
