@@ -55,8 +55,22 @@ class OutputContainerConfig:
     SCHEMA_NAME: ClassVar[str] = "output_container"
     """输出容器配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("type", "path")
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("type",)
     """该配置对象在 `YAML` 中的必填字段列表."""
+
+    SCHEMA_ALL_OF: ClassVar[Tuple[Dict[str, Any], ...]] = (
+        {
+            # `workbook` 输出必须显式提供非空 `path`.
+            "if": {"properties": {"type": {"const": "workbook"}}},
+            "then": {"required": ["path"]},
+        },
+        {
+            # 生成的 `JSON Schema` 为工作流托管的临时 `CSV` 输出允许空字符串; 但对 `workbook` 禁止该形态.
+            "if": {"properties": {"type": {"const": "workbook"}}},
+            "then": {"properties": {"path": {"not": {"type": "string", "maxLength": 0}}}},
+        },
+    )
+    """用于约束: `workbook` 输出必须显式提供非空 `path`; 仅 `csv` 允许省略/为空."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
@@ -83,6 +97,11 @@ class OutputContainerConfig:
                         "description": "输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)",
                     },
                     {
+                        "type": "string",
+                        "maxLength": 0,
+                        "description": "空字符串表示 pathless CSV 输出(仅 workflow 托管 writes 场景可用)",
+                    },
+                    {
                         "type": "object",
                         "properties": {
                             "$init_var": {
@@ -96,13 +115,16 @@ class OutputContainerConfig:
                         "description": "运行时动态路径: {$init_var: <name>}",
                     },
                 ],
-                "description": "输出文件路径(支持静态字符串或 {$init_var: <name>} 动态注入)",
+                "description": "输出文件路径(支持静态字符串/空字符串 或 {$init_var: <name>} 动态注入)",
                 "markdownDescription": (
                     "输出文件路径.\n\n"
                     "- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n"
                     "- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n"
                     "- 可能覆盖同名文件\n"
                     "- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\n"
+                    "workflow 托管临时输出(pathless;仅 `csv`):\n"
+                    "- 当 `type: csv` 且该 output 仅用于 workflow `writes` 消费时,允许省略/留空 `path`\n"
+                    "- standalone demand 编译/运行会 fail-fast; 需要在 workflow 中运行或显式提供 `path`\n\n"
                     "动态注入:\n"
                     "- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n"
                     "- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n"
@@ -111,12 +133,14 @@ class OutputContainerConfig:
                     "```yaml\n"
                     "path: ./output/report.xlsx\n"
                     "path: {$init_var: output_path}\n"
+                    'path: ""  # pathless csv (workflow-managed only)\n'
                     "```"
                 ),
                 "examples": [
                     "./output/report.xlsx",
                     "./output/report.csv",
                     {"$init_var": "output_path"},
+                    "",
                 ],
             }
         ),

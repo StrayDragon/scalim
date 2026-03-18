@@ -65,258 +65,260 @@
                 "description": "demand compile-time init_vars(可选,支持 $ctx 指令)",
                 "markdownDescription": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令)."
               },
-              "write_to": {
-                "oneOf": [
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "workbook_sheet"
-                    ],
-                    "properties": {
-                      "workbook_sheet": {
-                        "type": "object",
-                        "required": [
-                          "workbook",
-                          "sheet",
-                          "output"
-                        ],
-                        "properties": {
-                          "workbook": {
-                            "type": "string",
-                            "minLength": 1
+              "writes": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "workbook_sheet"
+                      ],
+                      "properties": {
+                        "workbook_sheet": {
+                          "type": "object",
+                          "required": [
+                            "workbook",
+                            "sheet",
+                            "output"
+                          ],
+                          "properties": {
+                            "workbook": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "sheet": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "output": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "on_conflict": {
+                              "type": "string",
+                              "enum": [
+                                "error",
+                                "overwrite",
+                                "skip"
+                              ],
+                              "default": "error"
+                            }
                           },
-                          "sheet": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "output": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "on_conflict": {
-                            "type": "string",
-                            "enum": [
-                              "error",
-                              "overwrite",
-                              "skip"
-                            ],
-                            "default": "error"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "workbook_append"
-                    ],
-                    "properties": {
-                      "workbook_append": {
-                        "type": "object",
-                        "required": [
-                          "workbook",
-                          "sheet",
-                          "output"
-                        ],
-                        "properties": {
-                          "workbook": {
-                            "type": "string",
-                            "minLength": 1
+                    {
+                      "type": "object",
+                      "required": [
+                        "workbook_append"
+                      ],
+                      "properties": {
+                        "workbook_append": {
+                          "type": "object",
+                          "required": [
+                            "workbook",
+                            "sheet",
+                            "output"
+                          ],
+                          "properties": {
+                            "workbook": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "sheet": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "output": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "align_by": {
+                              "type": "string",
+                              "enum": [
+                                "field_id",
+                                "header"
+                              ],
+                              "default": "field_id"
+                            },
+                            "header_policy": {
+                              "type": "string",
+                              "enum": [
+                                "once",
+                                "always",
+                                "never"
+                              ],
+                              "default": "once"
+                            },
+                            "on_mismatch": {
+                              "type": "string",
+                              "enum": [
+                                "error",
+                                "warn",
+                                "skip"
+                              ],
+                              "default": "error"
+                            }
                           },
-                          "sheet": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "output": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "align_by": {
-                            "type": "string",
-                            "enum": [
-                              "field_id",
-                              "header"
-                            ],
-                            "default": "field_id"
-                          },
-                          "header_policy": {
-                            "type": "string",
-                            "enum": [
-                              "once",
-                              "always",
-                              "never"
-                            ],
-                            "default": "once"
-                          },
-                          "on_mismatch": {
-                            "type": "string",
-                            "enum": [
-                              "error",
-                              "warn",
-                              "skip"
-                            ],
-                            "default": "error"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "csv_append"
-                    ],
-                    "properties": {
-                      "csv_append": {
-                        "type": "object",
-                        "required": [
-                          "csv",
-                          "output"
-                        ],
-                        "properties": {
-                          "csv": {
-                            "type": "string",
-                            "minLength": 1
+                    {
+                      "type": "object",
+                      "required": [
+                        "csv_append"
+                      ],
+                      "properties": {
+                        "csv_append": {
+                          "type": "object",
+                          "required": [
+                            "csv",
+                            "output"
+                          ],
+                          "properties": {
+                            "csv": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "output": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "header_policy": {
+                              "type": "string",
+                              "enum": [
+                                "once",
+                                "always",
+                                "never"
+                              ],
+                              "default": "once"
+                            },
+                            "on_mismatch": {
+                              "type": "string",
+                              "enum": [
+                                "error",
+                                "warn",
+                                "skip"
+                              ],
+                              "default": "error"
+                            }
                           },
-                          "output": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "header_policy": {
-                            "type": "string",
-                            "enum": [
-                              "once",
-                              "always",
-                              "never"
-                            ],
-                            "default": "once"
-                          },
-                          "on_mismatch": {
-                            "type": "string",
-                            "enum": [
-                              "error",
-                              "warn",
-                              "skip"
-                            ],
-                            "default": "error"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "sheetbook_sheet"
-                    ],
-                    "properties": {
-                      "sheetbook_sheet": {
-                        "type": "object",
-                        "required": [
-                          "sheetbook",
-                          "sheet",
-                          "output"
-                        ],
-                        "properties": {
-                          "sheetbook": {
-                            "type": "string",
-                            "minLength": 1
+                    {
+                      "type": "object",
+                      "required": [
+                        "sheetbook_sheet"
+                      ],
+                      "properties": {
+                        "sheetbook_sheet": {
+                          "type": "object",
+                          "required": [
+                            "sheetbook",
+                            "sheet",
+                            "output"
+                          ],
+                          "properties": {
+                            "sheetbook": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "sheet": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "output": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "on_conflict": {
+                              "type": "string",
+                              "enum": [
+                                "error",
+                                "overwrite",
+                                "skip"
+                              ],
+                              "default": "error"
+                            }
                           },
-                          "sheet": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "output": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "on_conflict": {
-                            "type": "string",
-                            "enum": [
-                              "error",
-                              "overwrite",
-                              "skip"
-                            ],
-                            "default": "error"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "sheetbook_append"
-                    ],
-                    "properties": {
-                      "sheetbook_append": {
-                        "type": "object",
-                        "required": [
-                          "sheetbook",
-                          "sheet",
-                          "output"
-                        ],
-                        "properties": {
-                          "sheetbook": {
-                            "type": "string",
-                            "minLength": 1
+                    {
+                      "type": "object",
+                      "required": [
+                        "sheetbook_append"
+                      ],
+                      "properties": {
+                        "sheetbook_append": {
+                          "type": "object",
+                          "required": [
+                            "sheetbook",
+                            "sheet",
+                            "output"
+                          ],
+                          "properties": {
+                            "sheetbook": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "sheet": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "output": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "align_by": {
+                              "type": "string",
+                              "enum": [
+                                "field_id",
+                                "header"
+                              ],
+                              "default": "field_id"
+                            },
+                            "header_policy": {
+                              "type": "string",
+                              "enum": [
+                                "once",
+                                "always",
+                                "never"
+                              ],
+                              "default": "once"
+                            },
+                            "on_mismatch": {
+                              "type": "string",
+                              "enum": [
+                                "error",
+                                "warn",
+                                "skip"
+                              ],
+                              "default": "error"
+                            }
                           },
-                          "sheet": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "output": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "align_by": {
-                            "type": "string",
-                            "enum": [
-                              "field_id",
-                              "header"
-                            ],
-                            "default": "field_id"
-                          },
-                          "header_policy": {
-                            "type": "string",
-                            "enum": [
-                              "once",
-                              "always",
-                              "never"
-                            ],
-                            "default": "once"
-                          },
-                          "on_mismatch": {
-                            "type": "string",
-                            "enum": [
-                              "error",
-                              "warn",
-                              "skip"
-                            ],
-                            "default": "error"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                ],
-                "default": null,
-                "description": "共享输出写入意图简写(可选)",
-                "markdownDescription": "共享输出写入意图简写(可选).\n\n- MUST 恰好选择一个 write intent"
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "写入意图单条声明(item 必须恰好选择一个 intent key)",
+                  "markdownDescription": "写入意图单条声明.\n\n- item MUST 恰好选择一个 intent key"
+                },
+                "default": [],
+                "description": "共享输出写入意图列表(可选)",
+                "markdownDescription": "共享输出写入意图列表(可选).\n\n- 缺省/空数组表示无写入意图\n- 每个 item MUST 恰好选择一个 write intent\n- 写入顺序 SSOT: run 顺序 + writes 顺序"
               }
             },
             "additionalProperties": false

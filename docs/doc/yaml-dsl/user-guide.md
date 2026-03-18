@@ -253,6 +253,12 @@ relations:
         to: customers.customer_id   # 下游字段
 ```
 
+补充: main_source 侧 join key 允许使用受限的 derived fields:
+
+- 仅允许在 `from` 侧引用顶层 `fields.*` 派生字段(语法仍为 `source.field`),且 `source` 必须等于 `main_source.source_id`
+- 该 derived field 必须是 **pre-relation 可计算**(依赖闭包不能包含 ref 字段/带 relation 的字段),否则会在编译/校验阶段 fail-fast
+- `to` 侧仍不允许引用 derived fields
+
 **支持多种关联类型**:
 
 - **单级关联**: `A → B`
@@ -1714,6 +1720,18 @@ converter = ConfigToIRConverter(allow_unsafe_resolver=True)
 **3. compute / call_by 的边界**:
 
 - `compute` 使用受限 AST 表达式引擎(禁止 attribute/subscript/dunder 等逃逸),并默认启用**资源上限**来阻断配置构造型 DoS(如表达式过长、AST 过大/过深、过大的常量字面量、repeat/range 等)
+- `compute` 不支持方法调用/attribute call(例如 `.get()` / `.strip()`),遇到此类需求推荐改用 `call_by` 迁移到 Python 函数(同样受 reference + allowlist 约束):
+
+```yaml
+fields:
+  # ❌ 不被允许: method call
+  city:
+    compute: "address.get('city', '')"
+
+  # ✅ 推荐: call_by
+  city:
+    call_by: "myapp.transforms:dict_get(mapping=address, key='city', default='')"
+```
 - `call_by` 可将复杂逻辑移到 Python 函数,但同样走 reference + allowlist.建议将可执行函数收敛到受控模块并使用函数级 allowlist 精确放行.
 
 **compute limits(可选覆盖)**:

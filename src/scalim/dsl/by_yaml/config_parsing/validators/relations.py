@@ -26,6 +26,8 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         if main_source_id:
             sources_set.add(main_source_id)
 
+        derived_field_ids = self._collect_declared_field_names(config.get(_F.FIELDS))
+
         relation_paths: Dict[str, List[Tuple[str, str, bool]]] = {}
         for rel_id_raw, rel_data_raw in relations_raw.items():
             rel_id = str(rel_id_raw)
@@ -35,7 +37,14 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                 continue
 
             steps_raw = rel_dict.get(_F.STEPS)
-            steps = self._validate_steps(steps_raw, sources_set, errors, "relations.{}".format(rel_id))
+            steps = self._validate_steps(
+                steps_raw,
+                sources_set,
+                errors,
+                "relations.{}".format(rel_id),
+                main_source_id=main_source_id,
+                derived_field_ids=derived_field_ids,
+            )
             relation_paths[rel_id] = steps
 
         return relation_paths
@@ -46,6 +55,9 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         sources_set: Set[str],
         errors: List[ValidationIssue],
         context: str,
+        *,
+        main_source_id: str = "",
+        derived_field_ids: Optional[Set[str]] = None,
     ) -> List[Tuple[str, str, bool]]:
         steps_list = list_or_none(steps_raw)
         if steps_list is None:
@@ -92,6 +104,9 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                 )
 
             if self._step_allowed_fields_by_source:
+                derived_allowed = (
+                    derived_field_ids if derived_field_ids is not None and main_source_id and from_source == main_source_id else None
+                )
                 self._validate_step_field_names(
                     from_source,
                     from_fields,
@@ -99,6 +114,7 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                     errors,
                     "{} steps[{}]".format(context, idx),
                     "{}.{}".format(step_path, _F.FROM),
+                    derived_allowed_fields=derived_allowed,
                 )
                 self._validate_step_field_names(
                     to_source,
@@ -155,6 +171,7 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         errors: List[ValidationIssue],
         context: str,
         path: str,
+        derived_allowed_fields: Optional[Set[str]] = None,
     ) -> None:
         if source_id not in sources_set:
             return
@@ -163,6 +180,8 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
             return
         for field_name in fields:
             if field_name in allowed:
+                continue
+            if derived_allowed_fields is not None and field_name in derived_allowed_fields:
                 continue
             base_msg = (
                 "{} references unknown field '{}.{}'; "

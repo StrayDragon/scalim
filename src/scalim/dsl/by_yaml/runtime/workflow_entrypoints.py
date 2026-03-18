@@ -2,6 +2,7 @@ import concurrent.futures
 import contextlib
 import json
 import math
+import shutil
 import threading
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -44,6 +45,7 @@ from ....spec.ir.workflow import (
 from ..config_parsing.loader import YamlDemandLoader
 from ..workflow import (
     WorkflowConfigError,
+    WorkflowWriteTo,
     WorkflowWriteToCsvAppend,
     WorkflowWriteToSheetbookAppend,
     WorkflowWriteToSheetbookSheet,
@@ -54,6 +56,8 @@ from ..workflow import (
 )
 from .compiler import compile as compile_demand
 from .contracts import RunOptions, RunOverrides, RunResult
+from .output_composition_yaml import PathlessCsvOutputError
+from .output_path_resolve import resolve_output_container_path
 from .workflow_loaders import workflow_loader_context
 from .workflow_resources import SheetBookDef, WorkflowResourceManager, WorkflowWriteError
 
@@ -505,6 +509,130 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
     )
     resources_finalized = False
 
+    reserved_xlsx_paths: Set[str] = set()
+    for res in workflow_ir.resources:
+        if str(res.resource_type) not in {"workbook", "sheetbook"}:
+            continue
+        res_path = str(res.path or "").strip()
+        if not res_path:
+            continue
+        reserved_xlsx_paths.add(str(Path(res_path).expanduser().resolve(strict=False)))
+
+    workbook_writers_by_abs_path: Dict[str, List[str]] = {}
+
+    write_output_ids_by_run_id: Dict[str, FrozenSet[str]] = {}
+    tmp_write_output_ids: Dict[str, Set[str]] = {}
+    for node in workflow_ir.nodes:
+        if isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
+            tmp_write_output_ids.setdefault(str(node.input_node_id), set()).add(str(node.input_output_id))
+    write_output_ids_by_run_id = {run_id: frozenset(sorted(ids)) for run_id, ids in tmp_write_output_ids.items()}
+
+    managed_temp_dirs_by_run_id: Dict[str, Path] = {}
+    wf_config_path = Path(str(workflow_path)).expanduser().resolve(strict=False)
+    managed_temp_root = wf_config_path.parent / ".scalim" / "workflow" / str(workflow_exec_id) / "managed_temp_outputs"
+
+    def _as_abs_path(raw_path: str) -> str:
+        return str(Path(str(raw_path)).expanduser().resolve(strict=False))
+
+    def _collect_workbook_output_paths(cfg: object, *, init_vars: Optional[Dict[str, object]]) -> Set[str]:
+        raw_paths: Set[str] = set()
+
+        default_workbook_path: Optional[str] = None
+        for idx, out_cfg in enumerate(getattr(cfg, "outputs", ()) or ()):
+            container = getattr(out_cfg, "container", None)
+            if container is None:
+                continue  # pragma: no cover
+            if str(getattr(container, "type", "") or "").lower() != "workbook":
+                continue
+            path_str = resolve_output_container_path(
+                getattr(container, "path", None),
+                init_vars=init_vars,
+                path="outputs.{}.container.path".format(int(idx)),
+            )
+            raw_paths.add(path_str)
+            if default_workbook_path is None:
+                default_workbook_path = path_str
+
+        for extra in (getattr(cfg, "meta", None), getattr(cfg, "audit", None)):
+            if extra is None:
+                continue
+            p = str(getattr(extra, "path", "") or "").strip()
+            if p:
+                raw_paths.add(p)
+            elif default_workbook_path:
+                raw_paths.add(default_workbook_path)
+
+        abs_paths: Set[str] = set()
+        for raw_path in raw_paths:
+            abs_paths.add(_as_abs_path(str(raw_path)))
+        return abs_paths
+
+    def _precheck_and_register_workbook_output_paths(
+        *,
+        run_id: str,
+        demand_config: object,
+        init_vars: Optional[Dict[str, object]],
+    ) -> None:
+        abs_paths = _collect_workbook_output_paths(demand_config, init_vars=init_vars)
+        for abs_path in sorted(abs_paths):
+            if abs_path in reserved_xlsx_paths:
+                msg = (
+                    "Excel output path is reserved by workflow shared resources (use resources + write nodes): "
+                    + "run_id={!r}, path={!r}".format(str(run_id), str(abs_path))
+                )
+                raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+
+            existing = workbook_writers_by_abs_path.get(abs_path)
+            if existing is not None and str(run_id) not in existing:
+                nodes = list(existing)
+                nodes.append(str(run_id))
+                msg = "Excel output path collision across workflow nodes: run_id={!r}, path={!r}, nodes={}".format(
+                    str(run_id),
+                    str(abs_path),
+                    ",".join(nodes),
+                )
+                raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+
+            if existing is None:
+                workbook_writers_by_abs_path[abs_path] = [str(run_id)]
+
+    def _compile_demand_node(node: WorkflowNodeIr) -> object:
+        node_id = str(node.node_id)
+        demand_path = str(getattr(node, "demand_path", "") or "")
+
+        node_options = options
+        node_init_vars = _render_workflow_init_vars(
+            getattr(node, "init_vars", None),
+            consumer_node_id=node_id,
+            ctx_store=ctx_store,
+            path_prefix="workflow.runs.{}.init_vars".format(int(node.decl_order)),
+        )
+        if node_init_vars:
+            merged = dict(options.init_vars or {})
+            merged.update(node_init_vars)
+            node_options = replace(node_options, init_vars=merged)
+
+        managed_output_ids = write_output_ids_by_run_id.get(node_id)
+        if managed_output_ids:
+            run_temp_dir = managed_temp_root / node_id
+            run_temp_dir.mkdir(parents=True, exist_ok=True)
+            managed_temp_dirs_by_run_id[node_id] = run_temp_dir
+            overrides = {output_id: str(run_temp_dir / "{}.csv".format(output_id)) for output_id in sorted(managed_output_ids)}
+            node_options = replace(node_options, output_container_path_overrides=overrides)
+
+        try:
+            compilation = compile_demand(demand_path, options=node_options)
+        except PathlessCsvOutputError as exc:
+            msg = "run_id={!r}: {}".format(node_id, str(exc))
+            raise WorkflowConfigError(msg, path=str(exc.config_path)) from exc
+
+        _precheck_and_register_workbook_output_paths(
+            run_id=node_id,
+            demand_config=getattr(compilation, "config", None),
+            init_vars=getattr(node_options, "init_vars", None),
+        )
+        return compilation
+
     def _node_type_str(node: WorkflowAnyNodeIr) -> str:
         raw = getattr(node, "node_type", "")
         return str(getattr(raw, "value", raw))
@@ -691,7 +819,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                         )
                         raise WorkflowWriteError(msg)
                     if not str(output_path).lower().endswith(".csv"):
-                        msg = "write_to currently only supports CSV outputs: output_path={!r}".format(str(output_path))
+                        msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
                         raise WorkflowWriteError(msg)
                     if str(node.resource_type) == "workbook":
                         resource_manager.apply_workbook_sheet(
@@ -733,7 +861,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                         )
                         raise WorkflowWriteError(msg)
                     if not str(output_path).lower().endswith(".csv"):
-                        msg = "write_to currently only supports CSV outputs: output_path={!r}".format(str(output_path))
+                        msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
                         raise WorkflowWriteError(msg)
 
                     if str(node.resource_type) == "workbook":
@@ -803,19 +931,9 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                     if getattr(node, "node_type", None) == WorkflowNodeType.DEMAND:
                         demand_path = str(getattr(node, "demand_path", "") or "")
                         try:
-                            node_options = options
-                            node_init_vars = _render_workflow_init_vars(
-                                getattr(node, "init_vars", None),
-                                consumer_node_id=str(node_id),
-                                ctx_store=ctx_store,
-                                path_prefix="workflow.runs.{}.init_vars".format(int(node.decl_order)),
-                            )
-                            if node_init_vars:
-                                merged = dict(options.init_vars or {})
-                                merged.update(node_init_vars)
-                                node_options = replace(options, init_vars=merged)
-
-                            compilation = compile_demand(demand_path, options=node_options)
+                            compilation = _compile_demand_node(cast("WorkflowNodeIr", node))
+                        except WorkflowConfigError:
+                            raise
                         except Exception as exc:  # noqa: BLE001
                             err = WorkflowRunError(
                                 run_id=str(node_id),
@@ -942,6 +1060,17 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         if not resources_finalized:
             with contextlib.suppress(Exception):
                 resource_manager.discard_all(workflow_node_id="__wf__discard", reason="workflow_finally")
+        if managed_temp_dirs_by_run_id:
+            for temp_dir in managed_temp_dirs_by_run_id.values():
+                shutil.rmtree(str(temp_dir), ignore_errors=True)
+            with contextlib.suppress(Exception):
+                managed_temp_root.rmdir()
+            with contextlib.suppress(Exception):
+                managed_temp_root.parent.rmdir()
+            with contextlib.suppress(Exception):
+                managed_temp_root.parent.parent.rmdir()
+            with contextlib.suppress(Exception):
+                managed_temp_root.parent.parent.parent.rmdir()
         if workflow_cache_pool is not None:
             with contextlib.suppress(Exception):
                 workflow_cache_pool.close()
@@ -1067,6 +1196,7 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
         slots_by_node_id[node_id] = ("output_path", "outputs")
 
     loader = YamlDemandLoader()
+    demand_cfg_by_run_id: Dict[str, object] = {}
     workbook_writers_by_abs_path: Dict[str, Set[str]] = {}
     for node_id, yaml_path in demand_yaml_paths_by_run_id.items():
         try:
@@ -1079,6 +1209,8 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
             )
             raise WorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
 
+        demand_cfg_by_run_id[str(node_id)] = cfg
+
         raw_paths: Set[str] = set()
         for out_cfg in getattr(cfg, "outputs", ()) or ():
             container = getattr(out_cfg, "container", None)
@@ -1086,7 +1218,10 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
                 continue  # pragma: no cover
             if str(getattr(container, "type", "") or "").lower() != "workbook":
                 continue
-            p = str(getattr(container, "path", "") or "").strip()
+            raw = getattr(container, "path", None)
+            if isinstance(raw, dict):
+                continue
+            p = str(raw or "").strip()
             if p:
                 raw_paths.add(p)
 
@@ -1097,7 +1232,10 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
                 continue  # pragma: no cover
             if str(getattr(container, "type", "") or "").lower() != "workbook":
                 continue
-            p = str(getattr(container, "path", "") or "").strip()
+            raw = getattr(container, "path", None)
+            if isinstance(raw, dict):
+                continue
+            p = str(raw or "").strip()
             if p:
                 default_workbook_path = p
                 break
@@ -1131,122 +1269,167 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
         raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
 
     last_write_node_id_by_resource: Dict[Tuple[str, str], str] = {}
-    sheetbook_write_node_id_by_run_id: Dict[str, str] = {}
-    for idx, run in enumerate(wf_obj.runs):
-        write_to = getattr(run, "write_to", None)
-        if write_to is None:
+    sheetbook_write_node_ids_by_run_id: Dict[str, List[str]] = {}
+    for run_idx, run in enumerate(wf_obj.runs):
+        writes = cast("Tuple[WorkflowWriteTo, ...]", tuple(getattr(run, "writes", ()) or ()))
+        if not writes:
             continue
 
-        node_id = "{}write.{}".format("__wf__", int(idx))
-        decl_order = len(nodes)
-        write_deps: List[str] = [str(run.id)]
-        resource_type = ""
-        resource_id = ""
+        output_type_by_id: Dict[str, str] = {}
+        cfg = demand_cfg_by_run_id.get(str(run.id))
+        if cfg is not None:
+            for out_cfg in getattr(cfg, "outputs", ()) or ():
+                out_id = str(getattr(out_cfg, "name", "") or "").strip()
+                container = getattr(out_cfg, "container", None)
+                out_type = str(getattr(container, "type", "") or "")
+                if out_id:
+                    output_type_by_id[out_id] = out_type
 
-        node: WorkflowAnyNodeIr
-        if isinstance(write_to, WorkflowWriteToWorkbookSheet):
-            resource_type = "workbook"
-            resource_id = str(write_to.workbook)
-            sheet_name = str(write_to.sheet)
-            on_conflict = str(write_to.on_conflict or "error")
-            node = WriteSheetNodeIr(
-                node_id=str(node_id),
-                node_type=WorkflowNodeType.WRITE_SHEET,
-                decl_order=int(decl_order),
-                deps=(),
-                resource_type=resource_type,
-                resource_id=resource_id,
-                sheet=sheet_name,
-                input_node_id=str(run.id),
-                input_output_id=str(write_to.output),
-                on_conflict=on_conflict,
-            )
-        elif isinstance(write_to, WorkflowWriteToWorkbookAppend):
-            resource_type = "workbook"
-            resource_id = str(write_to.workbook)
-            node = AppendSheetNodeIr(
-                node_id=str(node_id),
-                node_type=WorkflowNodeType.APPEND_SHEET,
-                decl_order=int(decl_order),
-                deps=(),
-                resource_type=resource_type,
-                resource_id=resource_id,
-                sheet=str(write_to.sheet),
-                input_node_id=str(run.id),
-                input_output_id=str(write_to.output),
-                align_by=str(write_to.align_by or "field_id"),
-                header_policy=str(write_to.header_policy or "once"),
-                on_mismatch=str(write_to.on_mismatch or "error"),
-            )
-        elif isinstance(write_to, WorkflowWriteToCsvAppend):
-            resource_type = "csv"
-            resource_id = str(write_to.csv)
-            node = AppendSheetNodeIr(
-                node_id=str(node_id),
-                node_type=WorkflowNodeType.APPEND_SHEET,
-                decl_order=int(decl_order),
-                deps=(),
-                resource_type=resource_type,
-                resource_id=resource_id,
-                sheet=None,
-                input_node_id=str(run.id),
-                input_output_id=str(write_to.output),
-                align_by="header",
-                header_policy=str(write_to.header_policy or "once"),
-                on_mismatch=str(write_to.on_mismatch or "error"),
-            )
-        elif isinstance(write_to, WorkflowWriteToSheetbookSheet):
-            resource_type = "sheetbook"
-            resource_id = str(write_to.sheetbook)
-            sheet_name = str(write_to.sheet)
-            on_conflict = str(write_to.on_conflict or "error")
-            node = WriteSheetNodeIr(
-                node_id=str(node_id),
-                node_type=WorkflowNodeType.WRITE_SHEET,
-                decl_order=int(decl_order),
-                deps=(),
-                resource_type=resource_type,
-                resource_id=resource_id,
-                sheet=sheet_name,
-                input_node_id=str(run.id),
-                input_output_id=str(write_to.output),
-                on_conflict=on_conflict,
-            )
-            sheetbook_write_node_id_by_run_id[str(run.id)] = str(node_id)
-        elif isinstance(write_to, WorkflowWriteToSheetbookAppend):
-            resource_type = "sheetbook"
-            resource_id = str(write_to.sheetbook)
-            node = AppendSheetNodeIr(
-                node_id=str(node_id),
-                node_type=WorkflowNodeType.APPEND_SHEET,
-                decl_order=int(decl_order),
-                deps=(),
-                resource_type=resource_type,
-                resource_id=resource_id,
-                sheet=str(write_to.sheet),
-                input_node_id=str(run.id),
-                input_output_id=str(write_to.output),
-                align_by=str(write_to.align_by or "field_id"),
-                header_policy=str(write_to.header_policy or "once"),
-                on_mismatch=str(write_to.on_mismatch or "error"),
-            )
-            sheetbook_write_node_id_by_run_id[str(run.id)] = str(node_id)
-        else:  # pragma: no cover
-            continue  # pragma: no cover
+        def _intent_kind(value: object) -> str:
+            if isinstance(value, WorkflowWriteToWorkbookSheet):
+                return "workbook_sheet"
+            if isinstance(value, WorkflowWriteToWorkbookAppend):
+                return "workbook_append"
+            if isinstance(value, WorkflowWriteToCsvAppend):
+                return "csv_append"
+            if isinstance(value, WorkflowWriteToSheetbookSheet):
+                return "sheetbook_sheet"
+            if isinstance(value, WorkflowWriteToSheetbookAppend):
+                return "sheetbook_append"
+            return "unknown"  # pragma: no cover
 
-        resource_key = (resource_type, resource_id)
-        prev_write_id = last_write_node_id_by_resource.get(resource_key)
-        if prev_write_id is not None:
-            write_deps.append(str(prev_write_id))
-        last_write_node_id_by_resource[resource_key] = str(node_id)
+        for write_idx, intent in enumerate(writes):
+            kind = _intent_kind(intent)
+            output_id = str(getattr(intent, "output", "") or "").strip()
+            resource_type = ""
+            resource_id = ""
 
-        node = replace(node, deps=tuple(write_deps))
-        nodes.append(node)
-        for dep_id in write_deps:
-            edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
+            if isinstance(intent, (WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend)):
+                resource_type = "workbook"
+                resource_id = str(getattr(intent, "workbook", "") or "")
+            elif isinstance(intent, WorkflowWriteToCsvAppend):
+                resource_type = "csv"
+                resource_id = str(getattr(intent, "csv", "") or "")
+            elif isinstance(intent, (WorkflowWriteToSheetbookSheet, WorkflowWriteToSheetbookAppend)):
+                resource_type = "sheetbook"
+                resource_id = str(getattr(intent, "sheetbook", "") or "")
+
+            if output_id not in output_type_by_id:
+                msg = (
+                    "Unknown demand output id referenced by workflow writes: "
+                    "run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}"
+                ).format(str(run.id), str(kind), str(resource_id), str(output_id))
+                raise WorkflowConfigError(
+                    msg,
+                    path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), str(kind)),
+                )
+            if str(output_type_by_id.get(output_id, "")).lower() != "csv":
+                msg = (
+                    "workflow writes currently only supports CSV outputs: run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}"
+                ).format(str(run.id), str(kind), str(resource_id), str(output_id))
+                raise WorkflowConfigError(
+                    msg,
+                    path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), str(kind)),
+                )
+
+            node_id = "{}write.{}.{}".format("__wf__", str(run.id), int(write_idx))
+            decl_order = len(nodes)
+            write_deps: List[str] = [str(run.id)]
+
+            node: WorkflowAnyNodeIr
+            if isinstance(intent, WorkflowWriteToWorkbookSheet):
+                sheet_name = str(intent.sheet)
+                on_conflict = str(intent.on_conflict or "error")
+                node = WriteSheetNodeIr(
+                    node_id=str(node_id),
+                    node_type=WorkflowNodeType.WRITE_SHEET,
+                    decl_order=int(decl_order),
+                    deps=(),
+                    resource_type=resource_type,
+                    resource_id=str(resource_id),
+                    sheet=sheet_name,
+                    input_node_id=str(run.id),
+                    input_output_id=str(output_id),
+                    on_conflict=on_conflict,
+                )
+            elif isinstance(intent, WorkflowWriteToWorkbookAppend):
+                node = AppendSheetNodeIr(
+                    node_id=str(node_id),
+                    node_type=WorkflowNodeType.APPEND_SHEET,
+                    decl_order=int(decl_order),
+                    deps=(),
+                    resource_type=resource_type,
+                    resource_id=str(resource_id),
+                    sheet=str(intent.sheet),
+                    input_node_id=str(run.id),
+                    input_output_id=str(output_id),
+                    align_by=str(intent.align_by or "field_id"),
+                    header_policy=str(intent.header_policy or "once"),
+                    on_mismatch=str(intent.on_mismatch or "error"),
+                )
+            elif isinstance(intent, WorkflowWriteToCsvAppend):
+                node = AppendSheetNodeIr(
+                    node_id=str(node_id),
+                    node_type=WorkflowNodeType.APPEND_SHEET,
+                    decl_order=int(decl_order),
+                    deps=(),
+                    resource_type=resource_type,
+                    resource_id=str(resource_id),
+                    sheet=None,
+                    input_node_id=str(run.id),
+                    input_output_id=str(output_id),
+                    align_by="header",
+                    header_policy=str(intent.header_policy or "once"),
+                    on_mismatch=str(intent.on_mismatch or "error"),
+                )
+            elif isinstance(intent, WorkflowWriteToSheetbookSheet):
+                sheet_name = str(intent.sheet)
+                on_conflict = str(intent.on_conflict or "error")
+                node = WriteSheetNodeIr(
+                    node_id=str(node_id),
+                    node_type=WorkflowNodeType.WRITE_SHEET,
+                    decl_order=int(decl_order),
+                    deps=(),
+                    resource_type=resource_type,
+                    resource_id=str(resource_id),
+                    sheet=sheet_name,
+                    input_node_id=str(run.id),
+                    input_output_id=str(output_id),
+                    on_conflict=on_conflict,
+                )
+                sheetbook_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
+            elif isinstance(intent, WorkflowWriteToSheetbookAppend):
+                node = AppendSheetNodeIr(
+                    node_id=str(node_id),
+                    node_type=WorkflowNodeType.APPEND_SHEET,
+                    decl_order=int(decl_order),
+                    deps=(),
+                    resource_type=resource_type,
+                    resource_id=str(resource_id),
+                    sheet=str(intent.sheet),
+                    input_node_id=str(run.id),
+                    input_output_id=str(output_id),
+                    align_by=str(intent.align_by or "field_id"),
+                    header_policy=str(intent.header_policy or "once"),
+                    on_mismatch=str(intent.on_mismatch or "error"),
+                )
+                sheetbook_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
+            else:  # pragma: no cover
+                continue  # pragma: no cover
+
+            resource_key = (resource_type, str(resource_id))
+            prev_write_id = last_write_node_id_by_resource.get(resource_key)
+            if prev_write_id is not None:
+                write_deps.append(str(prev_write_id))
+            last_write_node_id_by_resource[resource_key] = str(node_id)
+
+            node = replace(node, deps=tuple(write_deps))
+            nodes.append(node)
+            for dep_id in write_deps:
+                edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
 
     # `sheetbook` 可作为输入: 为直接依赖该生产者的节点增加对其写入节点的依赖,确保读取时已写入.
-    for producer_node_id, write_node_id in sheetbook_write_node_id_by_run_id.items():
+    for producer_node_id, write_node_ids in sheetbook_write_node_ids_by_run_id.items():
         for consumer_node_id in direct_dependents_by_run_id.get(str(producer_node_id), []):
             pos = demand_node_pos_by_run_id.get(str(consumer_node_id))
             if pos is None:
@@ -1255,10 +1438,12 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
             if not isinstance(consumer, WorkflowNodeIr):
                 continue  # pragma: no cover
             deps: List[str] = list(consumer.deps or ())
-            if str(write_node_id) not in deps:
-                deps.append(str(write_node_id))
+            for write_node_id in write_node_ids:
+                if str(write_node_id) not in deps:
+                    deps.append(str(write_node_id))
+                    edges.append(WorkflowEdgeIr(from_node_id=str(write_node_id), to_node_id=str(consumer_node_id)))
+            if deps != list(consumer.deps or ()):
                 nodes[int(pos)] = replace(consumer, deps=tuple(deps))
-                edges.append(WorkflowEdgeIr(from_node_id=str(write_node_id), to_node_id=str(consumer_node_id)))
 
     cache_pool = None
     raw_cache_pool = getattr(wf_obj.options, "cache_pool", None)

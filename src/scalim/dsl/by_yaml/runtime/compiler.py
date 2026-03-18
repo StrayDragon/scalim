@@ -269,7 +269,13 @@ def build_request(
     output_overrides = options.overrides.output if options.overrides is not None else None
     yaml_output_composition = None
     if options.output_composition is None and config.outputs:
-        yaml_output_composition = compile_output_composition_from_yaml(config, demand_ir, resolver=resolver, init_vars=options.init_vars)
+        yaml_output_composition = compile_output_composition_from_yaml(
+            config,
+            demand_ir,
+            resolver=resolver,
+            init_vars=options.init_vars,
+            output_container_path_overrides=options.output_container_path_overrides,
+        )
     output_composition = options.output_composition or yaml_output_composition
 
     # 单输出模式: 仍可通过 `overrides.output.*` 控制输出. 当启用 `outputs`/`output_composition` 时, `export_layout`/`output` 会被忽略.

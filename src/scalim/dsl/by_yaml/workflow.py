@@ -27,11 +27,11 @@ _ALIAS_DEMAND_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):/(.+)$")
 
 _INTERNAL_NODE_ID_PREFIX = "__wf__"
 _RESOURCE_GROUP_KEYS = ("workbooks", "csvs", "sheetbooks")
-_WRITE_TO_KEYS = ("workbook_sheet", "workbook_append", "csv_append", "sheetbook_sheet", "sheetbook_append")
-_WRITE_TO_ON_CONFLICT_POLICIES = ("error", "overwrite", "skip")
-_WRITE_TO_ALIGN_BY = ("field_id", "header")
-_WRITE_TO_HEADER_POLICIES = ("once", "always", "never")
-_WRITE_TO_ON_MISMATCH_POLICIES = ("error", "warn", "skip")
+_WRITE_INTENT_KEYS = ("workbook_sheet", "workbook_append", "csv_append", "sheetbook_sheet", "sheetbook_append")
+_WRITE_INTENT_ON_CONFLICT_POLICIES = ("error", "overwrite", "skip")
+_WRITE_INTENT_ALIGN_BY = ("field_id", "header")
+_WRITE_INTENT_HEADER_POLICIES = ("once", "always", "never")
+_WRITE_INTENT_ON_MISMATCH_POLICIES = ("error", "warn", "skip")
 _EXCEL_SHEET_NAME_MAX_LEN = 31
 _EXCEL_SHEET_NAME_INVALID_CHARS = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
 
@@ -171,7 +171,7 @@ class WorkflowRun:
     demand: str
     depends_on: Tuple[str, ...] = ()
     init_vars: Optional[Dict[str, object]] = None
-    write_to: Optional[WorkflowWriteTo] = None
+    writes: Tuple[WorkflowWriteTo, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -410,7 +410,13 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
             raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
         depends_on_raw = run_dict.get("depends_on")
         init_vars_raw = run_dict.get("init_vars")
-        write_to_raw = run_dict.get("write_to")
+        if "write_to" in run_dict:
+            msg = (
+                "run.write_to was removed; use run.writes (list of intents). "
+                "Migration: write_to: {<kind>: <cfg>} -> writes: [{<kind>: <cfg>}]"
+            )
+            raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+        writes_raw = run_dict.get("writes")
         run_id = str(run_id_raw or "").strip()
         if not run_id:
             msg = "run.id must be a non-empty string"
@@ -462,184 +468,208 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
                     raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
                 init_vars[str(key)] = value
 
-        write_to: Optional[WorkflowWriteTo] = None
-        if write_to_raw is not None:
-            if not isinstance(write_to_raw, dict):
-                msg = "run.write_to must be a mapping"
-                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+        writes: Tuple[WorkflowWriteTo, ...] = ()
+        if writes_raw is not None:
+            if not isinstance(writes_raw, list):
+                msg = "run.writes must be a list of intents"
+                raise WorkflowConfigError(msg, path="{}.writes".format(item_path))
 
-            write_to_mapping: Dict[str, object] = {}
-            for raw_key, raw_value in cast("Dict[Any, Any]", write_to_raw).items():
-                if not isinstance(raw_key, str) or not raw_key.strip():
-                    msg = "run.write_to keys must be non-empty strings"
-                    raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
-                write_to_mapping[str(raw_key)] = raw_value
+            parsed: List[WorkflowWriteTo] = []
+            for write_idx, write_raw in enumerate(cast("List[Any]", writes_raw)):
+                write_path = "{}.writes.{}".format(item_path, int(write_idx))
+                if not isinstance(write_raw, dict):
+                    msg = "write intent must be a mapping"
+                    raise WorkflowConfigError(msg, path=write_path)
 
-            raw_keys = set(write_to_mapping.keys())
-            unknown_keys = sorted(k for k in raw_keys if k not in _WRITE_TO_KEYS)
-            if unknown_keys:
-                msg = "run.write_to contains unknown keys: {}".format(",".join(unknown_keys))
-                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+                intent_mapping: Dict[str, object] = {}
+                for raw_key, raw_value in cast("Dict[Any, Any]", write_raw).items():
+                    if not isinstance(raw_key, str) or not raw_key.strip():
+                        msg = "write intent keys must be non-empty strings"
+                        raise WorkflowConfigError(msg, path=write_path)
+                    intent_mapping[str(raw_key)] = raw_value
 
-            present = [k for k in _WRITE_TO_KEYS if write_to_mapping.get(k) is not None]
-            if len(present) != 1:
-                msg = "run.write_to must contain exactly one of: {}".format("/".join(_WRITE_TO_KEYS))
-                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+                if len(intent_mapping) != 1:
+                    msg = "write intent must contain exactly one of: {}".format("/".join(_WRITE_INTENT_KEYS))
+                    raise WorkflowConfigError(msg, path=write_path)
 
-            kind = str(present[0])
-            cfg_raw = write_to_mapping.get(kind)
-            if not isinstance(cfg_raw, dict):
-                msg = "run.write_to.{} must be a mapping".format(kind)
-                raise WorkflowConfigError(msg, path="{}.write_to.{}".format(item_path, kind))
-            cfg_any = cast("Dict[Any, Any]", cfg_raw)
-            cfg: Dict[str, object] = {}
-            for cfg_key, cfg_value in cfg_any.items():
-                if not isinstance(cfg_key, str) or not cfg_key.strip():
-                    msg = "run.write_to.{} keys must be non-empty strings".format(kind)
-                    raise WorkflowConfigError(msg, path="{}.write_to.{}".format(item_path, kind))
-                cfg[str(cfg_key)] = cfg_value
+                kind = next(iter(intent_mapping.keys()))
+                if kind not in _WRITE_INTENT_KEYS:
+                    msg = "write intent contains unknown key: {}".format(kind)
+                    raise WorkflowConfigError(msg, path=write_path)
 
-            if kind == "workbook_sheet":
-                workbook = str(cfg.get("workbook", "") or "").strip()
-                sheet = str(cfg.get("sheet", "") or "").strip()
-                output_id = str(cfg.get("output", "") or "").strip()
-                on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
-                if not workbook:
-                    msg = "run.write_to.workbook_sheet.workbook must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.workbook".format(item_path))
-                if not sheet:
-                    msg = "run.write_to.workbook_sheet.sheet must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.sheet".format(item_path))
-                if not output_id:
-                    msg = "run.write_to.workbook_sheet.output must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.output".format(item_path))
-                if on_conflict not in _WRITE_TO_ON_CONFLICT_POLICIES:
-                    msg = "run.write_to.workbook_sheet.on_conflict must be one of: {}".format("/".join(_WRITE_TO_ON_CONFLICT_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_sheet.on_conflict".format(item_path))
-                write_to = WorkflowWriteToWorkbookSheet(
-                    workbook=workbook,
-                    sheet=sheet,
-                    output=output_id,
-                    on_conflict=on_conflict,
-                )
+                cfg_raw = intent_mapping.get(kind)
+                if not isinstance(cfg_raw, dict):
+                    msg = "run.writes.{} must be a mapping".format(kind)
+                    raise WorkflowConfigError(msg, path="{}.{}".format(write_path, kind))
+                cfg_any = cast("Dict[Any, Any]", cfg_raw)
+                cfg: Dict[str, object] = {}
+                for cfg_key, cfg_value in cfg_any.items():
+                    if not isinstance(cfg_key, str) or not cfg_key.strip():
+                        msg = "run.writes.{} keys must be non-empty strings".format(kind)
+                        raise WorkflowConfigError(msg, path="{}.{}".format(write_path, kind))
+                    cfg[str(cfg_key)] = cfg_value
 
-            elif kind == "workbook_append":
-                workbook = str(cfg.get("workbook", "") or "").strip()
-                sheet = str(cfg.get("sheet", "") or "").strip()
-                output_id = str(cfg.get("output", "") or "").strip()
-                align_by = str(cfg.get("align_by", "field_id") or "field_id").strip()
-                header_policy = str(cfg.get("header_policy", "once") or "once").strip()
-                on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
-                if not workbook:
-                    msg = "run.write_to.workbook_append.workbook must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.workbook".format(item_path))
-                if not sheet:
-                    msg = "run.write_to.workbook_append.sheet must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.sheet".format(item_path))
-                if not output_id:
-                    msg = "run.write_to.workbook_append.output must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.output".format(item_path))
-                if align_by not in _WRITE_TO_ALIGN_BY:
-                    msg = "run.write_to.workbook_append.align_by must be one of: {}".format("/".join(_WRITE_TO_ALIGN_BY))
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.align_by".format(item_path))
-                if header_policy not in _WRITE_TO_HEADER_POLICIES:
-                    msg = "run.write_to.workbook_append.header_policy must be one of: {}".format("/".join(_WRITE_TO_HEADER_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.header_policy".format(item_path))
-                if on_mismatch not in _WRITE_TO_ON_MISMATCH_POLICIES:
-                    msg = "run.write_to.workbook_append.on_mismatch must be one of: {}".format("/".join(_WRITE_TO_ON_MISMATCH_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.workbook_append.on_mismatch".format(item_path))
-                write_to = WorkflowWriteToWorkbookAppend(
-                    workbook=workbook,
-                    sheet=sheet,
-                    output=output_id,
-                    align_by=align_by,
-                    header_policy=header_policy,
-                    on_mismatch=on_mismatch,
-                )
+                if kind == "workbook_sheet":
+                    workbook = str(cfg.get("workbook", "") or "").strip()
+                    sheet = str(cfg.get("sheet", "") or "").strip()
+                    output_id = str(cfg.get("output", "") or "").strip()
+                    on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
+                    if not workbook:
+                        msg = "run.writes.workbook_sheet.workbook must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.workbook_sheet.workbook".format(write_path))
+                    if not sheet:
+                        msg = "run.writes.workbook_sheet.sheet must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.workbook_sheet.sheet".format(write_path))
+                    if not output_id:
+                        msg = "run.writes.workbook_sheet.output must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.workbook_sheet.output".format(write_path))
+                    if on_conflict not in _WRITE_INTENT_ON_CONFLICT_POLICIES:
+                        msg = "run.writes.workbook_sheet.on_conflict must be one of: {}".format(
+                            "/".join(_WRITE_INTENT_ON_CONFLICT_POLICIES)
+                        )
+                        raise WorkflowConfigError(msg, path="{}.workbook_sheet.on_conflict".format(write_path))
+                    parsed.append(
+                        WorkflowWriteToWorkbookSheet(
+                            workbook=workbook,
+                            sheet=sheet,
+                            output=output_id,
+                            on_conflict=on_conflict,
+                        )
+                    )
 
-            elif kind == "csv_append":
-                csv_id = str(cfg.get("csv", "") or "").strip()
-                output_id = str(cfg.get("output", "") or "").strip()
-                header_policy = str(cfg.get("header_policy", "once") or "once").strip()
-                on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
-                if not csv_id:
-                    msg = "run.write_to.csv_append.csv must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.csv".format(item_path))
-                if not output_id:
-                    msg = "run.write_to.csv_append.output must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.output".format(item_path))
-                if header_policy not in _WRITE_TO_HEADER_POLICIES:
-                    msg = "run.write_to.csv_append.header_policy must be one of: {}".format("/".join(_WRITE_TO_HEADER_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.header_policy".format(item_path))
-                if on_mismatch not in _WRITE_TO_ON_MISMATCH_POLICIES:
-                    msg = "run.write_to.csv_append.on_mismatch must be one of: {}".format("/".join(_WRITE_TO_ON_MISMATCH_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.csv_append.on_mismatch".format(item_path))
-                write_to = WorkflowWriteToCsvAppend(
-                    csv=csv_id,
-                    output=output_id,
-                    header_policy=header_policy,
-                    on_mismatch=on_mismatch,
-                )
+                elif kind == "workbook_append":
+                    workbook = str(cfg.get("workbook", "") or "").strip()
+                    sheet = str(cfg.get("sheet", "") or "").strip()
+                    output_id = str(cfg.get("output", "") or "").strip()
+                    align_by = str(cfg.get("align_by", "field_id") or "field_id").strip()
+                    header_policy = str(cfg.get("header_policy", "once") or "once").strip()
+                    on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
+                    if not workbook:
+                        msg = "run.writes.workbook_append.workbook must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.workbook_append.workbook".format(write_path))
+                    if not sheet:
+                        msg = "run.writes.workbook_append.sheet must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.workbook_append.sheet".format(write_path))
+                    if not output_id:
+                        msg = "run.writes.workbook_append.output must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.workbook_append.output".format(write_path))
+                    if align_by not in _WRITE_INTENT_ALIGN_BY:
+                        msg = "run.writes.workbook_append.align_by must be one of: {}".format("/".join(_WRITE_INTENT_ALIGN_BY))
+                        raise WorkflowConfigError(msg, path="{}.workbook_append.align_by".format(write_path))
+                    if header_policy not in _WRITE_INTENT_HEADER_POLICIES:
+                        msg = "run.writes.workbook_append.header_policy must be one of: {}".format("/".join(_WRITE_INTENT_HEADER_POLICIES))
+                        raise WorkflowConfigError(msg, path="{}.workbook_append.header_policy".format(write_path))
+                    if on_mismatch not in _WRITE_INTENT_ON_MISMATCH_POLICIES:
+                        msg = "run.writes.workbook_append.on_mismatch must be one of: {}".format(
+                            "/".join(_WRITE_INTENT_ON_MISMATCH_POLICIES)
+                        )
+                        raise WorkflowConfigError(msg, path="{}.workbook_append.on_mismatch".format(write_path))
+                    parsed.append(
+                        WorkflowWriteToWorkbookAppend(
+                            workbook=workbook,
+                            sheet=sheet,
+                            output=output_id,
+                            align_by=align_by,
+                            header_policy=header_policy,
+                            on_mismatch=on_mismatch,
+                        )
+                    )
 
-            elif kind == "sheetbook_sheet":
-                sheetbook_id = str(cfg.get("sheetbook", "") or "").strip()
-                sheet = str(cfg.get("sheet", "") or "").strip()
-                output_id = str(cfg.get("output", "") or "").strip()
-                on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
-                if not sheetbook_id:
-                    msg = "run.write_to.sheetbook_sheet.sheetbook must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_sheet.sheetbook".format(item_path))
-                _validate_excel_sheet_name(sheet, path="{}.write_to.sheetbook_sheet.sheet".format(item_path))
-                if not output_id:
-                    msg = "run.write_to.sheetbook_sheet.output must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_sheet.output".format(item_path))
-                if on_conflict not in _WRITE_TO_ON_CONFLICT_POLICIES:
-                    msg = "run.write_to.sheetbook_sheet.on_conflict must be one of: {}".format("/".join(_WRITE_TO_ON_CONFLICT_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_sheet.on_conflict".format(item_path))
-                write_to = WorkflowWriteToSheetbookSheet(
-                    sheetbook=sheetbook_id,
-                    sheet=sheet,
-                    output=output_id,
-                    on_conflict=on_conflict,
-                )
+                elif kind == "csv_append":
+                    csv_id = str(cfg.get("csv", "") or "").strip()
+                    output_id = str(cfg.get("output", "") or "").strip()
+                    header_policy = str(cfg.get("header_policy", "once") or "once").strip()
+                    on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
+                    if not csv_id:
+                        msg = "run.writes.csv_append.csv must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.csv_append.csv".format(write_path))
+                    if not output_id:
+                        msg = "run.writes.csv_append.output must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.csv_append.output".format(write_path))
+                    if header_policy not in _WRITE_INTENT_HEADER_POLICIES:
+                        msg = "run.writes.csv_append.header_policy must be one of: {}".format("/".join(_WRITE_INTENT_HEADER_POLICIES))
+                        raise WorkflowConfigError(msg, path="{}.csv_append.header_policy".format(write_path))
+                    if on_mismatch not in _WRITE_INTENT_ON_MISMATCH_POLICIES:
+                        msg = "run.writes.csv_append.on_mismatch must be one of: {}".format("/".join(_WRITE_INTENT_ON_MISMATCH_POLICIES))
+                        raise WorkflowConfigError(msg, path="{}.csv_append.on_mismatch".format(write_path))
+                    parsed.append(
+                        WorkflowWriteToCsvAppend(
+                            csv=csv_id,
+                            output=output_id,
+                            header_policy=header_policy,
+                            on_mismatch=on_mismatch,
+                        )
+                    )
 
-            elif kind == "sheetbook_append":
-                sheetbook_id = str(cfg.get("sheetbook", "") or "").strip()
-                sheet = str(cfg.get("sheet", "") or "").strip()
-                output_id = str(cfg.get("output", "") or "").strip()
-                align_by = str(cfg.get("align_by", "field_id") or "field_id").strip()
-                header_policy = str(cfg.get("header_policy", "once") or "once").strip()
-                on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
-                if not sheetbook_id:
-                    msg = "run.write_to.sheetbook_append.sheetbook must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.sheetbook".format(item_path))
-                _validate_excel_sheet_name(sheet, path="{}.write_to.sheetbook_append.sheet".format(item_path))
-                if not output_id:
-                    msg = "run.write_to.sheetbook_append.output must be a non-empty string"
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.output".format(item_path))
-                if align_by not in _WRITE_TO_ALIGN_BY:
-                    msg = "run.write_to.sheetbook_append.align_by must be one of: {}".format("/".join(_WRITE_TO_ALIGN_BY))
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.align_by".format(item_path))
-                if header_policy not in _WRITE_TO_HEADER_POLICIES:
-                    msg = "run.write_to.sheetbook_append.header_policy must be one of: {}".format("/".join(_WRITE_TO_HEADER_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.header_policy".format(item_path))
-                if on_mismatch not in _WRITE_TO_ON_MISMATCH_POLICIES:
-                    msg = "run.write_to.sheetbook_append.on_mismatch must be one of: {}".format("/".join(_WRITE_TO_ON_MISMATCH_POLICIES))
-                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.on_mismatch".format(item_path))
-                write_to = WorkflowWriteToSheetbookAppend(
-                    sheetbook=sheetbook_id,
-                    sheet=sheet,
-                    output=output_id,
-                    align_by=align_by,
-                    header_policy=header_policy,
-                    on_mismatch=on_mismatch,
-                )
+                elif kind == "sheetbook_sheet":
+                    sheetbook_id = str(cfg.get("sheetbook", "") or "").strip()
+                    sheet = str(cfg.get("sheet", "") or "").strip()
+                    output_id = str(cfg.get("output", "") or "").strip()
+                    on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
+                    if not sheetbook_id:
+                        msg = "run.writes.sheetbook_sheet.sheetbook must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_sheet.sheetbook".format(write_path))
+                    _validate_excel_sheet_name(sheet, path="{}.sheetbook_sheet.sheet".format(write_path))
+                    if not output_id:
+                        msg = "run.writes.sheetbook_sheet.output must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_sheet.output".format(write_path))
+                    if on_conflict not in _WRITE_INTENT_ON_CONFLICT_POLICIES:
+                        msg = "run.writes.sheetbook_sheet.on_conflict must be one of: {}".format(
+                            "/".join(_WRITE_INTENT_ON_CONFLICT_POLICIES)
+                        )
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_sheet.on_conflict".format(write_path))
+                    parsed.append(
+                        WorkflowWriteToSheetbookSheet(
+                            sheetbook=sheetbook_id,
+                            sheet=sheet,
+                            output=output_id,
+                            on_conflict=on_conflict,
+                        )
+                    )
 
-            else:  # pragma: no cover
-                msg = "run.write_to contains unknown keys: {}".format(kind)  # pragma: no cover
-                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))  # pragma: no cover
+                elif kind == "sheetbook_append":
+                    sheetbook_id = str(cfg.get("sheetbook", "") or "").strip()
+                    sheet = str(cfg.get("sheet", "") or "").strip()
+                    output_id = str(cfg.get("output", "") or "").strip()
+                    align_by = str(cfg.get("align_by", "field_id") or "field_id").strip()
+                    header_policy = str(cfg.get("header_policy", "once") or "once").strip()
+                    on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
+                    if not sheetbook_id:
+                        msg = "run.writes.sheetbook_append.sheetbook must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_append.sheetbook".format(write_path))
+                    _validate_excel_sheet_name(sheet, path="{}.sheetbook_append.sheet".format(write_path))
+                    if not output_id:
+                        msg = "run.writes.sheetbook_append.output must be a non-empty string"
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_append.output".format(write_path))
+                    if align_by not in _WRITE_INTENT_ALIGN_BY:
+                        msg = "run.writes.sheetbook_append.align_by must be one of: {}".format("/".join(_WRITE_INTENT_ALIGN_BY))
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_append.align_by".format(write_path))
+                    if header_policy not in _WRITE_INTENT_HEADER_POLICIES:
+                        msg = "run.writes.sheetbook_append.header_policy must be one of: {}".format("/".join(_WRITE_INTENT_HEADER_POLICIES))
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_append.header_policy".format(write_path))
+                    if on_mismatch not in _WRITE_INTENT_ON_MISMATCH_POLICIES:
+                        msg = "run.writes.sheetbook_append.on_mismatch must be one of: {}".format(
+                            "/".join(_WRITE_INTENT_ON_MISMATCH_POLICIES)
+                        )
+                        raise WorkflowConfigError(msg, path="{}.sheetbook_append.on_mismatch".format(write_path))
+                    parsed.append(
+                        WorkflowWriteToSheetbookAppend(
+                            sheetbook=sheetbook_id,
+                            sheet=sheet,
+                            output=output_id,
+                            align_by=align_by,
+                            header_policy=header_policy,
+                            on_mismatch=on_mismatch,
+                        )
+                    )
 
-        runs.append(WorkflowRun(id=run_id, demand=demand, depends_on=depends_on, init_vars=init_vars, write_to=write_to))
+                else:  # pragma: no cover
+                    msg = "write intent contains unknown key: {}".format(kind)  # pragma: no cover
+                    raise WorkflowConfigError(msg, path=write_path)  # pragma: no cover
+
+            writes = tuple(parsed)
+
+        runs.append(WorkflowRun(id=run_id, demand=demand, depends_on=depends_on, init_vars=init_vars, writes=writes))
 
     _validate_workflow_deps(runs, seen_ids=seen_ids)
 
@@ -795,24 +825,58 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
     resources = WorkflowResources(workbooks=workbooks, csvs=csvs, sheetbooks=sheetbooks)
 
     for idx, run in enumerate(runs):
-        if run.write_to is None:
+        if not run.writes:
             continue
+
+        def _intent_kind(value: object) -> str:
+            if isinstance(value, WorkflowWriteToWorkbookSheet):
+                return "workbook_sheet"
+            if isinstance(value, WorkflowWriteToWorkbookAppend):
+                return "workbook_append"
+            if isinstance(value, WorkflowWriteToCsvAppend):
+                return "csv_append"
+            if isinstance(value, WorkflowWriteToSheetbookSheet):
+                return "sheetbook_sheet"
+            if isinstance(value, WorkflowWriteToSheetbookAppend):
+                return "sheetbook_append"
+            return "unknown"  # pragma: no cover
+
         item_path = "workflow.runs.{}".format(idx)
-        if isinstance(run.write_to, (WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend)):
-            workbook_id = str(getattr(run.write_to, "workbook", "") or "")
-            if workbook_id not in resources.workbooks:
-                msg = "Unknown workbook resource id '{}'".format(workbook_id)
-                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
-        if isinstance(run.write_to, WorkflowWriteToCsvAppend):
-            csv_id = str(getattr(run.write_to, "csv", "") or "")
-            if csv_id not in resources.csvs:
-                msg = "Unknown csv resource id '{}'".format(csv_id)
-                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
-        if isinstance(run.write_to, (WorkflowWriteToSheetbookSheet, WorkflowWriteToSheetbookAppend)):
-            sheetbook_id = str(getattr(run.write_to, "sheetbook", "") or "")
-            if sheetbook_id not in resources.sheetbooks:
-                msg = "Unknown sheetbook resource id '{}'".format(sheetbook_id)
-                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+        for write_idx, intent in enumerate(run.writes):
+            kind = _intent_kind(intent)
+
+            if isinstance(intent, (WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend)):
+                workbook_id = str(getattr(intent, "workbook", "") or "")
+                if workbook_id not in resources.workbooks:
+                    msg = "Unknown workbook resource id: run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}".format(
+                        str(run.id),
+                        kind,
+                        workbook_id,
+                        str(getattr(intent, "output", "") or ""),
+                    )
+                    raise WorkflowConfigError(msg, path="{}.writes.{}.{}.workbook".format(item_path, int(write_idx), kind))
+
+            if isinstance(intent, WorkflowWriteToCsvAppend):
+                csv_id = str(getattr(intent, "csv", "") or "")
+                if csv_id not in resources.csvs:
+                    msg = "Unknown csv resource id: run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}".format(
+                        str(run.id),
+                        kind,
+                        csv_id,
+                        str(getattr(intent, "output", "") or ""),
+                    )
+                    raise WorkflowConfigError(msg, path="{}.writes.{}.{}.csv".format(item_path, int(write_idx), kind))
+
+            if isinstance(intent, (WorkflowWriteToSheetbookSheet, WorkflowWriteToSheetbookAppend)):
+                sheetbook_id = str(getattr(intent, "sheetbook", "") or "")
+                if sheetbook_id not in resources.sheetbooks:
+                    msg = "Unknown sheetbook resource id: run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}".format(
+                        str(run.id),
+                        kind,
+                        sheetbook_id,
+                        str(getattr(intent, "output", "") or ""),
+                    )
+                    raise WorkflowConfigError(msg, path="{}.writes.{}.{}.sheetbook".format(item_path, int(write_idx), kind))
 
     options_raw = wf.get("options", {})
     if options_raw is None:

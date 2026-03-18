@@ -448,9 +448,8 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
 
-        write_to: Dict[str, Any] = {
+        write_intent_item: Dict[str, Any] = {
             "oneOf": [
-                {"type": "null"},
                 {
                     "type": "object",
                     "required": ["workbook_sheet"],
@@ -482,9 +481,21 @@ class SchemaBuilder:
                     "additionalProperties": False,
                 },
             ],
-            "default": None,
-            "description": "共享输出写入意图简写(可选)",
-            "markdownDescription": "共享输出写入意图简写(可选).\n\n- MUST 恰好选择一个 write intent",
+            "description": "写入意图单条声明(item 必须恰好选择一个 intent key)",
+            "markdownDescription": "写入意图单条声明.\n\n- item MUST 恰好选择一个 intent key",
+        }
+
+        writes: Dict[str, Any] = {
+            "type": "array",
+            "items": write_intent_item,
+            "default": [],
+            "description": "共享输出写入意图列表(可选)",
+            "markdownDescription": (
+                "共享输出写入意图列表(可选).\n\n"
+                "- 缺省/空数组表示无写入意图\n"
+                "- 每个 item MUST 恰好选择一个 write intent\n"
+                "- 写入顺序 SSOT: run 顺序 + writes 顺序"
+            ),
         }
 
         run_item: Dict[str, Any] = {
@@ -527,7 +538,7 @@ class SchemaBuilder:
                     "description": "demand compile-time init_vars(可选,支持 $ctx 指令)",
                     "markdownDescription": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令).",
                 },
-                "write_to": write_to,
+                "writes": writes,
             },
             "additionalProperties": False,
         }

@@ -587,6 +587,35 @@ def test_validator_relations_edges() -> None:
     assert not errors
 
 
+def test_validator_allows_main_source_relation_from_derived_field_but_rejects_to_side() -> None:
+    validator = validator_module.ConfigValidator()
+    validator._step_allowed_fields_by_source = {"orders": {"id"}, "customers": {"id"}}
+
+    errors = []
+    validator._validate_relations(
+        {
+            "fields": {"_broadcast_key": {"compute": "1"}},
+            "relations": {"r1": {"steps": [{"from": "orders._broadcast_key", "to": "customers.id"}]}},
+        },
+        errors,
+        {"customers": {"preload": False}},
+        "orders",
+    )
+    assert not errors
+
+    errors = []
+    validator._step_allowed_fields_by_source = {"orders": {"id"}}
+    validator._validate_steps(
+        [{"from": "orders.id", "to": "orders._broadcast_key"}],
+        {"orders"},
+        errors,
+        "ctx",
+        main_source_id="orders",
+        derived_field_ids=set(["_broadcast_key"]),
+    )
+    assert any("references unknown field" in msg for msg in _messages(errors))
+
+
 def test_validator_steps_edges() -> None:
     validator = validator_module.ConfigValidator()
 

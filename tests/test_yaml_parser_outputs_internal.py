@@ -182,7 +182,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
     [
         ({"path": "./out.csv"}, "outputs.0.container", ValueError, r"outputs\.0\.container\.type is required"),
         ({"type": "bad", "path": "./out.csv"}, "outputs.0.container", ValueError, r"type='bad' is invalid"),
-        ({"type": "csv"}, "outputs.0.container", ValueError, r"path is required"),
+        ({"type": "workbook"}, "outputs.0.container", ValueError, r"path is required for workbook outputs"),
         (
             {"type": "csv", "path": {"$init_var": "out_path", "other": 1}},
             "outputs.0.container",
@@ -202,7 +202,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
             r"path\.\$init_var must be a non-empty string",
         ),
         ({"type": "csv", "path": {"$init_var": " "}}, "outputs.0.container", TypeError, r"path\.\$init_var must be a non-empty string"),
-        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a non-empty string or"),
+        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a string"),
         (
             {"type": "csv", "path": "./out.csv", "header_fields_output_by": "bad"},
             "outputs.0.container",
@@ -226,6 +226,15 @@ def test_parse_output_container_defensive_checks(raw, base_path, exc_type, match
     loader = YamlDemandLoader()
     with pytest.raises(exc_type, match=match):
         _ = loader._parse_output_container(raw, base_path=base_path)
+
+
+def test_parse_output_container_allows_pathless_csv() -> None:
+    loader = YamlDemandLoader()
+    container = loader._parse_output_container(
+        {"type": "csv"},
+        base_path="outputs.0.container",
+    )
+    assert container.path == ""
 
 
 def test_parse_output_container_accepts_init_var_mapping_path() -> None:

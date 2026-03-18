@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
@@ -21,17 +20,56 @@ from ....spec.ir.demand import DemandIr
 from ....typedefs import FieldValue, RowData
 from ..config_parsing.call_by import CallByParseError, CallByValue, ParsedCallBy, parse_call_by
 from ..config_parsing.security import ComputeExpressionError, SecureComputeEngine, SecurityError
-from ..init_var_nodes import parse_init_var_mapping_node
 from ..schema_dsl.models import (
     DemandConfig,
     OutputAggregateConfig,
     OutputContainerConfig,
     OutputExtraSheetConfig,
 )
+from .output_path_resolve import resolve_output_container_path
 from .references import SecurePythonReferenceResolver
 
 _AGG_FUNC_KEYS: Tuple[str, ...] = ("count", "sum", "min", "max", "count_true", "count_true_gte", "count_distinct")
 _RANK_FUNC_KEYS: Tuple[str, ...] = ("row_number", "rank", "dense_rank")
+
+
+class PathlessCsvOutputError(ValueError):
+    output_id: str
+    config_path: str
+
+    def __init__(self, message: str, *, output_id: str, config_path: str) -> None:
+        super(PathlessCsvOutputError, self).__init__(message)
+        self.output_id = str(output_id)
+        self.config_path = str(config_path)
+
+
+def _is_pathless_container_path(raw: object) -> bool:
+    if raw is None:
+        return True
+    if isinstance(raw, dict):
+        return False
+    return not str(raw).strip()
+
+
+def _resolve_output_container_path_with_overrides(
+    container: OutputContainerConfig,
+    *,
+    output_id: str,
+    config_path: str,
+    init_vars: Optional[Dict[str, object]],
+    output_container_path_overrides: Optional[Dict[str, str]],
+) -> str:
+    if str(container.type).lower() == "csv" and _is_pathless_container_path(container.path):
+        override = output_container_path_overrides.get(output_id) if output_container_path_overrides else None
+        resolved_override = str(override or "").strip()
+        if not resolved_override:
+            msg = (
+                "Pathless CSV output is only allowed when workflow manages temp outputs for writes "
+                "(set outputs.*.container.path or run via workflow writes): output_id={!r}, path={}"
+            ).format(output_id, config_path)
+            raise PathlessCsvOutputError(msg, output_id=output_id, config_path=config_path)
+        return resolved_override
+    return resolve_output_container_path(container.path, init_vars=init_vars, path=config_path)
 
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
@@ -256,46 +294,6 @@ def _export_layout_for_derived(
     return ExportLayout(field_ids=normalized, header_names=tuple(names))
 
 
-def _resolve_output_container_path(
-    raw: object,
-    *,
-    init_vars: Optional[Dict[str, object]],
-    path: str,
-) -> str:
-    if isinstance(raw, dict):
-        var_name = parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)
-        if init_vars is None or var_name not in init_vars:
-            msg = "Missing init_var '{}' for {}".format(var_name, path)
-            raise ValueError(msg)
-        raw_value = init_vars[var_name]
-        if raw_value is None:
-            msg = "{} init_var '{}' resolved to None".format(path, var_name)
-            raise ValueError(msg)
-        if isinstance(raw_value, os.PathLike):
-            resolved_raw = os.fspath(raw_value)
-        elif isinstance(raw_value, str):
-            resolved_raw = raw_value
-        else:
-            msg = "{} init_var '{}' must be str or os.PathLike, got {}".format(path, var_name, type(raw_value).__name__)
-            raise TypeError(msg)
-
-        resolved = str(resolved_raw).strip()
-        if not resolved:
-            msg = "{} init_var '{}' resolved to an empty string".format(path, var_name)
-            raise ValueError(msg)
-        return resolved
-
-    if raw is None:
-        msg = "{} is required".format(path)
-        raise ValueError(msg)
-
-    resolved = str(os.fspath(raw) if isinstance(raw, os.PathLike) else raw).strip()
-    if not resolved:
-        msg = "{} is required".format(path)
-        raise ValueError(msg)
-    return resolved
-
-
 def _output_spec_from_container(container: OutputContainerConfig, *, path: str) -> OutputSpec:
     fmt = "excel" if str(container.type).lower() == "workbook" else "csv"
     sheet_name = str(container.sheet) if container.sheet else None
@@ -468,6 +466,7 @@ def compile_output_composition_from_yaml(
     *,
     resolver: SecurePythonReferenceResolver,
     init_vars: Optional[Dict[str, object]] = None,
+    output_container_path_overrides: Optional[Dict[str, str]] = None,
 ) -> Optional[OutputCompositionSpec]:
     outputs = config.outputs
     if not outputs:
@@ -495,10 +494,13 @@ def compile_output_composition_from_yaml(
             msg = "outputs.{} missing container".format(out_cfg.name)
             raise ValueError(msg)
 
-        container_path = _resolve_output_container_path(
-            container.path,
+        container_path_key = "outputs.{}.container.path".format(idx)
+        container_path = _resolve_output_container_path_with_overrides(
+            container,
+            output_id=str(out_cfg.name),
+            config_path=container_path_key,
             init_vars=init_vars,
-            path="outputs.{}.container.path".format(idx),
+            output_container_path_overrides=output_container_path_overrides,
         )
         output_spec = _output_spec_from_container(container, path=container_path)
         if workbook_default_path is None and str(output_spec.format) == "excel":
@@ -584,4 +586,7 @@ def compile_output_composition_from_yaml(
     )
 
 
-__all__ = ["compile_output_composition_from_yaml"]
+__all__ = [
+    "PathlessCsvOutputError",
+    "compile_output_composition_from_yaml",
+]

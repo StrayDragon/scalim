@@ -1718,6 +1718,11 @@
               "description": "输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)"
             },
             {
+              "type": "string",
+              "maxLength": 0,
+              "description": "空字符串表示 pathless CSV 输出(仅 workflow 托管 writes 场景可用)"
+            },
+            {
               "type": "object",
               "properties": {
                 "$init_var": {
@@ -1733,14 +1738,15 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "输出文件路径(支持静态字符串或 {$init_var: <name>} 动态注入)",
-          "markdownDescription": "输出文件路径.\n\n- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n- 可能覆盖同名文件\n- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\n动态注入:\n- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n- 缺失 `init_vars[<name>]` 时会 fail-fast\n\n示例:\n```yaml\npath: ./output/report.xlsx\npath: {$init_var: output_path}\n```",
+          "description": "输出文件路径(支持静态字符串/空字符串 或 {$init_var: <name>} 动态注入)",
+          "markdownDescription": "输出文件路径.\n\n- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n- 可能覆盖同名文件\n- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\nworkflow 托管临时输出(pathless;仅 `csv`):\n- 当 `type: csv` 且该 output 仅用于 workflow `writes` 消费时,允许省略/留空 `path`\n- standalone demand 编译/运行会 fail-fast; 需要在 workflow 中运行或显式提供 `path`\n\n动态注入:\n- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n- 缺失 `init_vars[<name>]` 时会 fail-fast\n\n示例:\n```yaml\npath: ./output/report.xlsx\npath: {$init_var: output_path}\npath: \"\"  # pathless csv (workflow-managed only)\n```",
           "examples": [
             "./output/report.xlsx",
             "./output/report.csv",
             {
               "$init_var": "output_path"
-            }
+            },
+            ""
           ]
         },
         "sheet": {
@@ -1838,8 +1844,7 @@
       "anyOf": [
         {
           "required": [
-            "type",
-            "path"
+            "type"
           ]
         },
         {
@@ -1848,7 +1853,42 @@
           ]
         }
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "workbook"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "workbook"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "path": {
+                "not": {
+                  "type": "string",
+                  "maxLength": 0
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "output_aggregate": {
       "type": "object",

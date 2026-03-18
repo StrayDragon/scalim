@@ -201,6 +201,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-ir/spec.md)
 - Summary: TBD - created by archiving change c18-workflow-ir-roadmap. Update Purpose after archive.
 
+### `workflow-managed-temp-outputs`
+- Title: workflow-managed-temp-outputs Specification
+- Source: [spec.md](#code=openspec/specs/workflow-managed-temp-outputs/spec.md)
+- Summary: TBD - created by archiving change c50-workflow-managed-temp-outputs. Update Purpose after archive.
+
 ### `workflow-observability-bridge`
 - Title: workflow-observability-bridge Specification
 - Source: [spec.md](#code=openspec/specs/workflow-observability-bridge/spec.md)

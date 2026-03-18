@@ -360,7 +360,7 @@ class ParserOutputsMixin:
         elif isinstance(path_raw, str):
             path = path_raw.strip()
         else:
-            msg = "{}.path must be a non-empty string or {{$init_var: <name>}}".format(base_path)
+            msg = "{}.path must be a string (empty allowed for workflow-managed CSV) or {{$init_var: <name>}}".format(base_path)
             raise TypeError(msg)
         sheet = str_or_none(raw.get(OUTPUT_CONTAINER_KEYS["sheet"]))
         sheet = _non_empty_str(sheet) or None
@@ -377,8 +377,8 @@ class ParserOutputsMixin:
         if typ not in _OUTPUT_CONTAINER_TYPES:
             msg = "{}.type={!r} is invalid; expected one of: {}".format(base_path, typ, ", ".join(_OUTPUT_CONTAINER_TYPES))
             raise ValueError(msg)
-        if not path:
-            msg = "{}.path is required".format(base_path)
+        if typ == "workbook" and not path:
+            msg = "{}.path is required for workbook outputs".format(base_path)
             raise ValueError(msg)
         if header_by not in _OUTPUT_HEADER_BY_ENUM:
             msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(

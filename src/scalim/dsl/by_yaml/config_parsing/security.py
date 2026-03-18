@@ -145,6 +145,7 @@ class ExpressionValidator:
             ast.Compare: self._validate_compare_node,
             ast.IfExp: self._validate_ifexp_node,
             ast.Call: self._validate_call_node,
+            ast.Attribute: self._validate_attribute_node,
             ast.BoolOp: self._validate_boolop_node,
             ast.List: self._validate_sequence_node,
             ast.Tuple: self._validate_sequence_node,
@@ -208,8 +209,15 @@ class ExpressionValidator:
 
     def _validate_call_node(self, node: ast.AST) -> None:
         typed = cast("ast.Call", node)
+        if isinstance(typed.func, ast.Attribute):
+            msg = (
+                "Method calls (attribute calls) are not allowed in compute expressions "
+                "(e.g. obj.get(...), s.strip(...)); move this logic to call_by "
+                '(allowlisted), e.g. call_by: "myapp.module:fn(value=value, ctx=$ctx)"'
+            )
+            raise SecurityError(msg)
         if not isinstance(typed.func, ast.Name):
-            msg = "Only simple function calls are allowed"
+            msg = "Only simple function calls are allowed (use call_by for complex logic)"
             raise SecurityError(msg)
         func_name = typed.func.id
         if func_name not in self._allowed_functions:
@@ -220,6 +228,14 @@ class ExpressionValidator:
         if typed.keywords:
             msg = "Keyword arguments are not allowed in expressions"
             raise SecurityError(msg)
+
+    def _validate_attribute_node(self, node: ast.AST) -> None:
+        typed = cast("ast.Attribute", node)
+        msg = (
+            "Attribute access is not allowed in compute expressions (got attribute={!r}); "
+            'move this logic to call_by (allowlisted), e.g. call_by: "myapp.module:fn(value=value, ctx=$ctx)"'
+        ).format(str(getattr(typed, "attr", "")))
+        raise SecurityError(msg)
 
     def _validate_boolop_node(self, node: ast.AST) -> None:
         typed = cast("ast.BoolOp", node)

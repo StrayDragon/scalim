@@ -64,7 +64,7 @@ def test_forbidden_call_patterns() -> None:
     with pytest.raises(SecurityError):
         engine.compile("max(a=1)", ())
 
-    with pytest.raises(SecurityError):
+    with pytest.raises(SecurityError, match="call_by"):
         engine.compile("obj.method()", ("obj",))
 
     with pytest.raises(SecurityError):
@@ -72,6 +72,27 @@ def test_forbidden_call_patterns() -> None:
 
     with pytest.raises(SecurityError):
         engine.compile("data[0]", ("data",))
+
+
+def test_method_calls_are_rejected_with_call_by_migration_hint() -> None:
+    engine = SecureComputeEngine()
+
+    with pytest.raises(SecurityError) as excinfo:
+        engine.compile("mapping.get('k', None)", ("mapping",))
+    assert "method call" in str(excinfo.value).lower() or "method calls" in str(excinfo.value).lower()
+    assert "call_by" in str(excinfo.value)
+
+    with pytest.raises(SecurityError) as excinfo2:
+        engine.compile("s.strip()", ("s",))
+    assert "method call" in str(excinfo2.value).lower() or "method calls" in str(excinfo2.value).lower()
+    assert "call_by" in str(excinfo2.value)
+
+
+def test_non_name_calls_are_rejected_with_call_by_guidance() -> None:
+    engine = SecureComputeEngine()
+
+    with pytest.raises(SecurityError, match=r"Only simple function calls are allowed.*call_by"):
+        engine.compile("(a + b)()", ("a", "b"))
 
 
 @pytest.mark.parametrize(

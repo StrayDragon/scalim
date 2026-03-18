@@ -118,7 +118,7 @@ Sources:
 - `encoding`: type=string; default=utf-8; 文件编码(CSV 输出使用)
 - `header_fields_output_by`: type=string; default=field_id; enum=field_id|name; 表头字段名来源: field_id/name
 - `include_header`: type=boolean; default=true; 包含表头行
-- `path`: 输出文件路径(支持静态字符串或 {$init_var: <name>} 动态注入)
+- `path`: 输出文件路径(支持静态字符串/空字符串 或 {$init_var: <name>} 动态注入)
 - `sheet`: type=string; Excel sheet 名称(仅 workbook)
 - `streaming`: type=boolean; default=true; 启用流式输出(必须为 true)
 - `type`: type=string; enum=workbook|csv; 输出容器类型(workbook/csv)

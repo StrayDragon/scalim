@@ -13,17 +13,18 @@
   - `workflow.resources.sheetbooks.<sheetbook_id>.budget.max_total_cells` MUST 为正整数
   - `workflow.resources.sheetbooks.<sheetbook_id>.export_xlsx.path` MAY 存在且 MUST 为非空字符串
   - `workflow.resources.sheetbooks.<sheetbook_id>.export_xlsx.write_lock` MAY 存在且 MUST 为 bool
-- 写入简写（每个 demand run 最多声明一个 write intent）:
-  - `workflow.runs[*].write_to.sheetbook_sheet` MAY 存在（写入/覆盖 sheet）
-  - `workflow.runs[*].write_to.sheetbook_append` MAY 存在（追加写入 sheet）
-  - 同一个 run MUST NOT 同时声明 `sheetbook_sheet` 与 `sheetbook_append`
-  - 同一个 run MUST NOT 同时声明 sheetbook write intent 与 workbook/csv write intent（write_to 下最多一个 intent key）
-- `write_to.sheetbook_sheet` 对象字段 MUST 满足:
+- 写入简写（每个 demand run 可声明 0..N 条 write intents）:
+  - `workflow.runs[*].writes` MAY 存在且 MUST 为数组
+  - `workflow.runs[*].writes[*]` MUST 恰好包含一个 intent key
+  - 对 sheetbook 相关 intent:
+    - `workflow.runs[*].writes[*].sheetbook_sheet` MAY 存在（写入/覆盖 sheet）
+    - `workflow.runs[*].writes[*].sheetbook_append` MAY 存在（追加写入 sheet）
+- `writes[*].sheetbook_sheet` 对象字段 MUST 满足:
   - `sheetbook`: sheetbook resource id
   - `sheet`: sheet 名（非空字符串）
   - `output`: 上游 demand 的 output id
   - `on_conflict` MAY 存在且 MUST 为 `error|overwrite|skip` 之一（默认 `error`）
-- `write_to.sheetbook_append` 对象字段 MUST 满足:
+- `writes[*].sheetbook_append` 对象字段 MUST 满足:
   - `sheetbook`: sheetbook resource id
   - `sheet`: sheet 名（非空字符串）
   - `output`: 上游 demand 的 output id
@@ -32,7 +33,7 @@
   - `on_mismatch` MAY 存在且 MUST 为 `error|warn|skip` 之一（默认 `error`）
 
 #### Scenario: sheetbook authoring surface passes schema validation
-- **WHEN** workflow YAML 包含 `workflow.resources.sheetbooks` 与 `workflow.runs[*].write_to.sheetbook_sheet`
+- **WHEN** workflow YAML 包含 `workflow.resources.sheetbooks` 与 `workflow.runs[*].writes[*].sheetbook_sheet`
 - **THEN** schema-only 校验 MUST 通过
 
 ### Requirement: workflow MUST support in-memory sheetbook resources
@@ -50,11 +51,11 @@
 系统 MUST 支持将多个上游节点的输出写入同一个 sheetbook,并保证写入行为确定性与冲突安全:
 
 - 对同一个 sheetbook 的写入 MUST 互斥/串行化,不得依赖并发完成时序
-- 写入顺序 MUST 由 workflow YAML 的 runs 列表顺序决定（以 write intent 的声明顺序为 SSOT）
+- 写入顺序 MUST 由 workflow YAML 的声明顺序决定（以 runs 列表顺序为一级 SSOT,以 `writes` 列表顺序为二级 SSOT）
 - 当发生 sheet 名冲突/写入重复/字段对齐冲突时,系统 MUST fail-fast 并提供可诊断摘要
 
 #### Scenario: deterministic order does not depend on completion timing
-- **GIVEN** 两个并发执行的上游节点都写入同一个 sheetbook 的不同 sheet
+- **GIVEN** 两个并发执行的上游节点都写入同一个 sheetbook 的不同 sheet,且每个节点声明多条 `writes`
 - **WHEN** 多次执行同一个 workflow
 - **THEN** 生成的 sheet 顺序与内容 MUST 可复现
 
@@ -100,6 +101,29 @@
 - **WHEN** workflow 被编译/校验
 - **THEN** 系统 MUST fail-fast 并报告冲突路径与节点 id
 
+#### Scenario: dynamic init_vars output path participates in collision checks using resolved path
+- **GIVEN** workflow 包含两个 runs: A 与 B
+- **AND** run A 的 demand 声明 `outputs[0].container.path={$init_var: output_path}`
+- **AND** run B 的 demand 声明 `outputs[0].container.path={$init_var: output_path}`
+- **AND** workflow 运行时为 A 注入 `init_vars={"output_path": "./out/a.xlsx"}`
+- **AND** workflow 运行时为 B 注入 `init_vars={"output_path": "./out/b.xlsx"}`
+- **WHEN** workflow 执行并物化编译每个 node
+- **THEN** 系统 MUST NOT 将 `{$init_var: output_path}` 的字面结构字符串化后参与 collision 判断
+- **AND** 系统 MUST 以最终解析后的绝对路径（`./out/a.xlsx` 与 `./out/b.xlsx`）作为判定基准
+
+#### Scenario: dynamic ctx-derived output path fails-fast before write
+- **GIVEN** run B 的 demand 输出路径由 `workflow.runs[B].init_vars` 使用 `$ctx` 引用 run A 的运行摘要并拼装得到
+- **WHEN** run B 的 node 被物化编译且其 `init_vars` 已完成 `$ctx` 渲染
+- **THEN** 系统 MUST 在实际写入发生前对渲染后的最终路径执行 reserved/collision 检查
+- **AND** 若触发冲突,系统 MUST fail-fast 并报告最终 path 与冲突 nodes
+
+#### Scenario: reserved xlsx paths are checked using resolved dynamic path
+- **GIVEN** workflow 声明 `workflow.resources.sheetbooks.report.export_xlsx.path=./out/report.xlsx`
+- **AND** 某个 run 的 demand 声明 `outputs[0].container.path={$init_var: output_path}`
+- **AND** 该 run 的 `init_vars={"output_path": "./out/report.xlsx"}`
+- **WHEN** workflow 物化编译该 run 且准备执行写入
+- **THEN** 系统 MUST fail-fast 并报告该路径被 workflow shared resources 保留（必须使用 resources + write nodes）
+
 ### Requirement: sheetbook lifecycle MUST be observable and joinable
 系统 MUST 为 sheetbook 资源的关键生命周期动作提供可观测事件/钩子点,以便排障与可视化:
 
@@ -115,3 +139,4 @@
 - **WHEN** observer 订阅 workflow-level 事件流
 - **THEN** observer MUST 能观测到 sheetbook export 事件
 - **AND** 该事件 MUST 携带 `workflow_exec_id` 以 join 回同一次 workflow 执行
+

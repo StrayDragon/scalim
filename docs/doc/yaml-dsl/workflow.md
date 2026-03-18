@@ -154,9 +154,9 @@ workflow:
 
 - `workflow.options.share_preload_cache` 已移除,请改用 `workflow.options.cache_pool`
 
-## 6) `resources` + `write_to`: 声明共享输出资源并写入
+## 6) `resources` + `writes`: 声明共享输出资源并写入
 
-workflow YAML 支持在 workflow scope 声明共享输出资源,并通过 run 的 `write_to` 声明写入 intent:
+workflow YAML 支持在 workflow scope 声明共享输出资源,并通过 run 的 `writes` 列表声明 0..N 条写入意图:
 
 - `workflow.resources.workbooks.<id>.path`: 共享 workbook 输出路径
 - `workflow.resources.csvs.<id>.path`: 共享 csv 输出路径
@@ -164,13 +164,13 @@ workflow YAML 支持在 workflow scope 声明共享输出资源,并通过 run �
   - `budget.max_sheets/max_total_cells` 为必填护栏
   - `export_xlsx.path` 可选,用于 workflow 结束时导出为最终 xlsx
 
-`runs[*].write_to` 为互斥 intent: 同一个 run 下最多声明一个 intent key:
+`runs[*].writes` 为写入意图数组(缺省/空数组表示无写入意图),每个 item MUST 恰好包含一个 intent key:
 
 - `workbook_sheet` / `workbook_append`
 - `csv_append`
 - `sheetbook_sheet` / `sheetbook_append`
 
-示例: 将某个 run 的 output 写入共享 sheetbook 并在末尾导出:
+示例: 同一个 run 产出两个 outputs,并通过两条 `writes` 写入同一个 sheetbook 的不同 sheet,在末尾导出:
 
 ```yaml
 workflow:
@@ -186,19 +186,28 @@ workflow:
   runs:
     - id: main
       demand: ./main.yaml
-      write_to:
-        sheetbook_sheet:
-          sheetbook: report
-          sheet: Summary
-          output: default
-          on_conflict: error
+      writes:
+        - sheetbook_sheet:
+            sheetbook: report
+            sheet: Metrics
+            output: metrics
+            on_conflict: error
+        - sheetbook_sheet:
+            sheetbook: report
+            sheet: Detail
+            output: detail
+            on_conflict: error
 ```
 
 注意:
 
-- `write_to` 目前只支持消费 CSV outputs: `write_to.*.output` 指向的 demand output 需要生成 `.csv` 文件(通常在上游 demand 用 `outputs.*.container.type: csv`). workbook 输出暂不支持直接作为 write_to 输入.
-- 写入顺序以 `workflow.runs` 声明顺序为准(不依赖并发完成时序),以保证确定性
+- `writes` 目前只支持消费 CSV outputs: `writes[*].*.output` 指向的 demand output 需要生成 `.csv` 文件(通常在上游 demand 用 `outputs.*.container.type: csv`). workbook 输出暂不支持直接作为 write node 输入.
+- 写入顺序 SSOT: 以 `workflow.runs` 声明顺序为一级,以 `writes` 声明顺序为二级(同一共享资源互斥串行,不依赖并发完成时序),以保证确定性
 - 当存在潜在的输出路径冲突(多个 nodes 写同一路径)时,系统会在写入发生前 fail-fast
+
+迁移:
+
+- `runs[*].write_to` 已移除,请改用 `writes: [{<kind>: <cfg>}]`；旧写法会 fail-fast 并给出可复制的迁移提示
 
 ## 7) Python 运行入口
 
