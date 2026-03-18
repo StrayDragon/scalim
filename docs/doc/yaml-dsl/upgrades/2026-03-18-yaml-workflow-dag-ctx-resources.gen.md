@@ -51,7 +51,5 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
    - workflow YAML 只支持 schema-only 校验(仓库内建议显式指定 schema):
      - `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
    - 编辑器补全/hover:
-     - `uv run scalim-cli yaml-dsl schema-serve`
-     - `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+     - `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 7) 运行期验证: 用 Python 入口跑一次最小 workflow,验证 DAG/ctx/resources/write_to 的运行期 fail-fast 行为是否符合预期
-

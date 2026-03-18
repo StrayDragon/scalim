@@ -29,13 +29,14 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 仓库内查询 schema 绝对路径: `uv run scalim-cli yaml-dsl schema path`
 - 仓库外查询 schema 绝对路径: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
 
-完整 canonical example 故意不带头部(也就是 schema modeline)。本地编辑时,我们一般用下面这套“团队通用”的做法(先开 schema server,再批量写入头部):
+完整 canonical example 故意不带头部(也就是 schema modeline)。本地编辑时,我们一般用下面这套“团队通用”的做法(直接批量写入头部,不依赖内置 schema server):
 
-- 启动本机 schema server(默认 `--host 0.0.0.0 --port 62831`): `uv run scalim-cli yaml-dsl schema-serve`
-- 批量插入/更新头部(统一写 IntelliJ 兼容 modeline,并会识别/升级 legacy `yaml-language-server` 头): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
+- 批量插入/更新头部(默认同时写 Red Hat + JetBrains 两种 modeline; 用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
+- workflow YAML 同理: `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ```yaml
-# $schema: http://localhost:62831/demand.gen.json
+# yaml-language-server: $schema=.../demand.gen.json
+# $schema: .../demand.gen.json
 ```
 
 工作时遵守这些硬规则:

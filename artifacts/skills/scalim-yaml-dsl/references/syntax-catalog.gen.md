@@ -776,7 +776,7 @@
 
 ### Validation
 - Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
-- LSP header: `# $schema: http://localhost:62831/workflow.gen.json` (use `yaml-dsl schema-serve` + `upsert-lsp-comment --type workflow`)
+- LSP header: `# yaml-language-server: $schema=.../workflow.gen.json` 或 `# $schema: .../workflow.gen.json` (推荐用 `yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`)
 
 ### `workflow`
 - Required: `true`

@@ -24,12 +24,12 @@ uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schem
 本地编辑器补全/hover:
 
 ```bash
-uv run scalim-cli yaml-dsl schema-serve
-uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>
+uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>
 ```
 
 ```yaml
-# $schema: http://localhost:62831/workflow.gen.json
+# yaml-language-server: $schema=.../workflow.gen.json
+# $schema: .../workflow.gen.json
 ```
 
 ## 工作顺序(推荐)
@@ -126,4 +126,3 @@ run_workflow(
 
 - 要么每个 demand 输出到唯一路径
 - 要么把共享输出收敛到 `workflow.resources.*` + `write_to` 的机制,避免多方直接写同一路径
-

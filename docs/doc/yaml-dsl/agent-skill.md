@@ -51,21 +51,22 @@
 - 查询 schema 路径(仓库内): `uv run scalim-cli yaml-dsl schema path`
 - 查询 schema 路径(仓库外): `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
 
-skill 中的 canonical example 故意不带头部(也就是 schema modeline)。本地编辑时,我们一般用下面这套“团队通用”的做法(先开 schema server,再批量写入头部):
+skill 中的 canonical example 故意不带头部(也就是 schema modeline)。本地编辑时,我们一般用下面这套“团队通用”的做法(直接批量写入头部,不依赖内置 schema server):
 
-- 启动本机 schema server(默认 `--host 0.0.0.0 --port 62831`): `uv run scalim-cli yaml-dsl schema-serve`
-- 批量插入/更新头部(统一写 IntelliJ 兼容 modeline,并会识别/升级 legacy `yaml-language-server` 头): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
+- 批量插入/更新头部(默认同时写 Red Hat + JetBrains 两种 modeline; 用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
 
 ```yaml
-# $schema: http://localhost:62831/demand.gen.json
+# yaml-language-server: $schema=.../demand.gen.json
+# $schema: .../demand.gen.json
 ```
 
 workflow YAML 同理,只是 `--type` 与 schema 文件名不同:
 
-- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ```yaml
-# $schema: http://localhost:62831/workflow.gen.json
+# yaml-language-server: $schema=.../workflow.gen.json
+# $schema: .../workflow.gen.json
 ```
 
 不要把 `.venv/...` 或 `site-packages/...` 这类机器相关路径固化进共享示例文件.

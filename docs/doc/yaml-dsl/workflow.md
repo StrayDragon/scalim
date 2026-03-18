@@ -17,19 +17,20 @@ workflow YAML **只有 schema-only 校验**(没有 `yaml-dsl validate` 这层 in
 uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml
 ```
 
-本地编辑时,推荐用 schema server + modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):
+本地编辑时,推荐直接批量写入 schema modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):
 
-- 启动 schema server: `uv run scalim-cli yaml-dsl schema-serve`
-- 批量写入/更新 `$schema` 头部: `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+- 批量写入/更新 `$schema` 头部(默认同时写 Red Hat + JetBrains 两种 modeline; 用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ```yaml
-# $schema: http://localhost:62831/workflow.gen.json
+# yaml-language-server: $schema=.../workflow.gen.json
+# $schema: .../workflow.gen.json
 ```
 
 ## 1) 最小结构
 
 ```yaml
-# $schema: http://localhost:62831/workflow.gen.json
+# yaml-language-server: $schema=.../workflow.gen.json
+# $schema: .../workflow.gen.json
 
 workflow:
   runs:

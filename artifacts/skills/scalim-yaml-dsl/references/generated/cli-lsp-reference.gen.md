@@ -16,18 +16,16 @@
 - `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
 - `uv run scalim-cli yaml-dsl schema show`
 - `uv run scalim-cli yaml-dsl schema path`
-- `uv run scalim-cli yaml-dsl schema-serve`
-- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
-- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
+- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ### External
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema show`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
-- `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema-serve`
-- `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
-- `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ## Validate Layering
 - `yaml-dsl validate`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.
@@ -38,16 +36,17 @@
 - Repo schema path: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
 - Workflow schema path: `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
 - Canonical example: 故意不写 schema 头(`# $schema: ...`),避免把本机路径固化进共享 YAML.
-- 本机启动 schema server(默认端口 `62831`): `uv run scalim-cli yaml-dsl schema-serve`
-- 批量写入/更新头部(统一写 IntelliJ 兼容 modeline,并会识别/升级 legacy `yaml-language-server` 头): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`
-- Workflow modeline: `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+- 批量写入/更新头部(默认同时写 Red Hat + JetBrains modeline; 可用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
+- Workflow modeline: `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 - Repo query: `uv run scalim-cli yaml-dsl schema path`
 - External query: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
 - Python fallback: `python -c "import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/by_yaml/schema/demand.gen.json'))"`
 - 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.
 ```yaml
-# $schema: http://localhost:62831/demand.gen.json
-# $schema: http://localhost:62831/workflow.gen.json
+# yaml-language-server: $schema=.../demand.gen.json
+# $schema: .../demand.gen.json
+# yaml-language-server: $schema=.../workflow.gen.json
+# $schema: .../workflow.gen.json
 ```
 
 ## OpenSpec Requirement Map
@@ -64,7 +63,6 @@
   - CLI 校验输出包含源码位置
   - Linter/编译器风格输出
   - validate 对 `outputs.*.fields` object 条目给出可行动诊断
-  - CLI provides a local HTTP server for YAML DSL JSON Schemas
   - CLI can upsert schema modeline in YAML files (IntelliJ compatible)
   - upsert-lsp-comment resolves schema reference from type + schema-path
 ### `yaml-dsl-editor-core`

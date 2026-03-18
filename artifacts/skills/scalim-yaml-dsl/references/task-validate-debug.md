@@ -44,17 +44,17 @@ uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
 
 ## LSP / 编辑器
 
-我们默认用 IntelliJ 兼容的 schema modeline(对 VS Code / yaml-language-server 也能用),格式如下:
+我们默认同时写入 Red Hat YAML Language Server 与 JetBrains/IntelliJ 都能识别的 schema modeline,格式如下:
 
 ```yaml
+# yaml-language-server: $schema=<urlOrPathToTheSchema>
 # $schema: <urlOrPathToTheSchema>
 ```
 
 如果你在本仓库里工作,推荐这条最省事的链路:
 
 ```bash
-uv run scalim-cli yaml-dsl schema-serve
-uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>
+uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>
 ```
 
 完整 canonical example 故意不自带这个头,避免把 `.venv/...`、`site-packages/...` 或仓库私有相对路径固化进共享 YAML。

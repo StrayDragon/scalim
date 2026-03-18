@@ -18,7 +18,8 @@
 ## 推荐骨架(带 DAG/ctx/resources/write_to)
 
 ```yaml
-# $schema: http://localhost:62831/workflow.gen.json
+# yaml-language-server: $schema=.../workflow.gen.json
+# $schema: .../workflow.gen.json
 
 workflow:
   resources:
@@ -114,7 +115,5 @@ uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schem
 编辑器补全/hover 建议:
 
 ```bash
-uv run scalim-cli yaml-dsl schema-serve
-uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>
+uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>
 ```
-
