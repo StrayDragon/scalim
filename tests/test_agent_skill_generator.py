@@ -158,16 +158,20 @@ def test_generated_cli_reference_has_required_commands_and_paths(tmp_path: Path)
     assert "src/scalim/cli/yaml_dsl.py" in cli_ref
     assert "src/scalim/_project_constants.py" in cli_ref
     assert "src/scalim/dsl/by_yaml/schema/demand.gen.json" in cli_ref
+    assert "src/scalim/dsl/by_yaml/schema/workflow.gen.json" in cli_ref
     assert "uv run scalim-cli yaml-dsl validate <file.yaml>" in cli_ref
     assert "uv run scalim-cli yaml-dsl schema validate <file.yaml>" in cli_ref
+    assert "uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>" in cli_ref
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>' in cli_ref
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>' in cli_ref
     assert "uv run scalim-cli yaml-dsl schema path" in cli_ref
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path' in cli_ref
     assert "uv run scalim-cli yaml-dsl schema-serve" in cli_ref
     assert "uv run scalim-cli yaml-dsl upsert-lsp-comment" in cli_ref
+    assert "--type workflow" in cli_ref
     assert "Canonical example: 故意不写 schema 头" in cli_ref
     assert "# $schema: http://localhost:62831/demand.gen.json" in cli_ref
+    assert "# $schema: http://localhost:62831/workflow.gen.json" in cli_ref
     assert "python -c" in cli_ref
     assert ".venv/..." in cli_ref
 
@@ -197,6 +201,12 @@ def test_generated_syntax_catalog_covers_top_level_and_definitions(tmp_path: Pat
     assert "### `outputs`" in catalog
     assert "### `observability`" in catalog
     assert "### `source`" in catalog
+    assert "## Workflow YAML (Generated)" in catalog
+    assert "workflow.runs[*].depends_on" in catalog
+    assert "workflow.runs[*].init_vars" in catalog
+    assert "workflow.runs[*].write_to" in catalog
+    assert "workflow.options.ctx" in catalog
+    assert "workflow.resources.sheetbooks" in catalog
 
 
 def test_manual_skill_contract_matches_generated_layout() -> None:
@@ -215,13 +225,16 @@ def test_manual_skill_contract_matches_generated_layout() -> None:
     agent_skill_gen.validate_frontmatter(frontmatter["name"], frontmatter["description"])
 
     assert "references/task-authoring.md" in text
+    assert "references/task-workflow-authoring.md" in text
     assert "references/task-upgrade-legacy.md" in text
     assert "references/task-validate-debug.md" in text
+    assert "references/task-workflow-validate-debug.md" in text
     assert "references/task-report-migration-playbook.md" in text
     assert "references/syntax-catalog.gen.md" in text
     assert "references/generated/cli-lsp-reference.gen.md" in text
     assert "references/generated/example-full/ecommerce_report.gen.yaml" in text
-    assert "uv run scalim-cli yaml-dsl validate <file.yaml>" in text
+    assert "uv run scalim-cli yaml-dsl validate <demand.yaml>" in text
+    assert "uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>" in text
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>' in text
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path' in text
     assert "完整 canonical example 故意不带头部" in text

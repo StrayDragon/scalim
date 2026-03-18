@@ -6,7 +6,7 @@
 `scalim-yaml-dsl.build-manifest.json`.
 
 生成内容分层如下:
-- 语法目录: `src/scalim/dsl/by_yaml/schema/demand.gen.json` 为唯一语法真相
+- 语法目录: `src/scalim/dsl/by_yaml/schema/demand.gen.json` 与 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 为语法真相
 - CLI/LSP 参考: `src/scalim/cli/yaml_dsl.py` 为唯一命令真相
 - 规范摘要: `openspec/specs/` 中相关 spec 作为维护来源,自动摘录 requirement 索引
 - canonical example: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
@@ -63,6 +63,7 @@ CANONICAL_EXAMPLE_OUTPUT_REL = GENERATED_ROOT_REL / "example-full" / "ecommerce_
 UPGRADES_NOTES_REL = GENERATED_ROOT_REL / "yaml-dsl-upgrades.gen.md"
 
 SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
+WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
 CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
 CANONICAL_EXAMPLE_SOURCE_REL = Path("notebooks") / "marimo" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_report.yaml"
 
@@ -74,9 +75,14 @@ UPGRADES_INDEX_END_MARKER = "<!-- END AUTOGEN:yaml-dsl-upgrades -->"
 SYNTAX_SPEC_RELS = (
     Path("openspec") / "specs" / "yaml-dsl-schema" / "spec.md",
     Path("openspec") / "specs" / "demand-dsl" / "spec.md",
+    Path("openspec") / "specs" / "yaml-dsl-workflow" / "spec.md",
     Path("openspec") / "specs" / "source-relations" / "spec.md",
     Path("openspec") / "specs" / "field-compute" / "spec.md",
     Path("openspec") / "specs" / "source-cache" / "spec.md",
+    Path("openspec") / "specs" / "workflow-cache-pool" / "spec.md",
+    Path("openspec") / "specs" / "workflow-shared-output-containers" / "spec.md",
+    Path("openspec") / "specs" / "workflow-sheetbook-resources" / "spec.md",
+    Path("openspec") / "specs" / "workflow-observability-bridge" / "spec.md",
     Path("openspec") / "specs" / "runtime-pruning" / "spec.md",
     Path("openspec") / "specs" / "loader-retry-policy" / "spec.md",
     Path("openspec") / "specs" / "runtime-guardrails" / "spec.md",
@@ -110,10 +116,12 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
         raise GenerationError("拒绝写入到用户技能目录下.")
 
     schema_path = repo_root / SCHEMA_REL
+    workflow_schema_path = repo_root / WORKFLOW_SCHEMA_REL
     cli_path = repo_root / CLI_SOURCE_REL
     canonical_example_source = repo_root / CANONICAL_EXAMPLE_SOURCE_REL
 
     schema = load_json_file(schema_path, "schema")
+    workflow_schema = load_json_file(workflow_schema_path, "workflow schema")
     syntax_specs = load_spec_summaries(repo_root, SYNTAX_SPEC_RELS)
     cli_specs = load_spec_summaries(repo_root, CLI_SPEC_RELS)
     command_docs = build_yaml_dsl_command_docs()
@@ -123,7 +131,7 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
 
     upgrades_root = repo_root / UPGRADES_SSOT_ROOT_REL
     generated_files = {
-        SYNTAX_CATALOG_REL: render_syntax_catalog(schema, syntax_specs),
+        SYNTAX_CATALOG_REL: render_syntax_catalog(schema, workflow_schema, syntax_specs),
         CLI_LSP_REFERENCE_REL: render_cli_lsp_reference(repo_root, command_docs, cli_specs),
         CANONICAL_EXAMPLE_OUTPUT_REL: canonical_example_text,
         UPGRADES_NOTES_REL: render_yaml_dsl_upgrades_notes(repo_root, upgrades_root),
@@ -137,7 +145,9 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     outputs = [skill_dir / rel_path for rel_path in sorted(generated_files.keys(), key=lambda item: str(item))]
     fragment_inputs = [canonical_example_source.parent / name for name in sorted(canonical_example_fragments)]
     inputs = (
-        [schema_path, cli_path, canonical_example_source] + fragment_inputs + [repo_root / rel for rel in SYNTAX_SPEC_RELS + CLI_SPEC_RELS]
+        [schema_path, workflow_schema_path, cli_path, canonical_example_source]
+        + fragment_inputs
+        + [repo_root / rel for rel in SYNTAX_SPEC_RELS + CLI_SPEC_RELS]
     )
 
     manifest = build_manifest(
@@ -145,7 +155,7 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
         skill_dir=skill_dir,
         inputs=inputs,
         outputs=outputs,
-        coverage_index=build_coverage_index(schema, syntax_specs, cli_specs, command_docs),
+        coverage_index=build_coverage_index(schema, workflow_schema, syntax_specs, cli_specs, command_docs),
     )
     write_text(build_manifest_path(output_root), dump_json(manifest))
     return manifest
@@ -303,7 +313,11 @@ def validate_canonical_example(repo_root: Path, yaml_text: str, *, fragments: Di
             raise GenerationError("唯一完整示例未通过 `schema` 校验: {}: {}".format(path, error.message))
 
 
-def render_syntax_catalog(schema: Dict[str, Any], spec_summaries: Sequence[Dict[str, Any]]) -> str:
+def render_syntax_catalog(
+    schema: Dict[str, Any],
+    workflow_schema: Dict[str, Any],
+    spec_summaries: Sequence[Dict[str, Any]],
+) -> str:
     properties = schema.get("properties", {})
     definitions = schema.get("definitions", {})
     top_level_fields = list(yaml_schema_constants.DEMAND_SCHEMA_PROPERTIES_ORDER)
@@ -319,7 +333,8 @@ def render_syntax_catalog(schema: Dict[str, Any], spec_summaries: Sequence[Dict[
         "此文档由 `scripts/gen-agent-skill.py` 自动生成.",
         "",
         "## Canonical Sources",
-        "- Schema: `{}`".format(path_to_posix(SCHEMA_REL)),
+        "- Demand schema: `{}`".format(path_to_posix(SCHEMA_REL)),
+        "- Workflow schema: `{}`".format(path_to_posix(WORKFLOW_SCHEMA_REL)),
         "- Canonical example: `{}`".format(path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL)),
         "- Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`",
         "",
@@ -349,7 +364,61 @@ def render_syntax_catalog(schema: Dict[str, Any], spec_summaries: Sequence[Dict[
         entry_lines.insert(1, "- Definition path: `definitions.{}`".format(definition_name))
         lines.extend(entry_lines)
 
+    lines.extend(render_workflow_syntax_catalog(workflow_schema))
+
     return "\n".join(lines).rstrip() + "\n"
+
+
+def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]:
+    top_required = set(workflow_schema.get("required", []) or [])
+    workflow_entry = workflow_schema.get("properties", {}).get("workflow", {})
+    workflow_required = "workflow" in top_required
+
+    workflow_props = workflow_entry.get("properties", {}) if isinstance(workflow_entry, dict) else {}
+    runs_schema = workflow_props.get("runs", {}) if isinstance(workflow_props, dict) else {}
+    run_item_schema = runs_schema.get("items", {}) if isinstance(runs_schema, dict) else {}
+    run_props = run_item_schema.get("properties", {}) if isinstance(run_item_schema, dict) else {}
+    write_to_schema = run_props.get("write_to", {}) if isinstance(run_props, dict) else {}
+    options_schema = workflow_props.get("options", {}) if isinstance(workflow_props, dict) else {}
+    resources_schema = workflow_props.get("resources", {}) if isinstance(workflow_props, dict) else {}
+
+    lines = [
+        "",
+        "## Workflow YAML (Generated)",
+        "",
+        "### Key Paths",
+        "- `workflow.runs` (required)",
+        "- `workflow.runs[*].id` (required)",
+        "- `workflow.runs[*].demand` (required)",
+        "- `workflow.runs[*].depends_on` (optional)",
+        "- `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)",
+        "- `workflow.runs[*].write_to` (optional; oneOf intents)",
+        "- `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)",
+        "- `workflow.options.ctx` (optional; ctx guardrails)",
+        "- `workflow.options.cache_pool` (optional; workflow-scope cache pool)",
+        "- `workflow.resources` (optional; workbooks/csvs/sheetbooks)",
+        "- `workflow.resources.workbooks` (optional; shared workbook outputs)",
+        "- `workflow.resources.csvs` (optional; shared csv outputs)",
+        "- `workflow.resources.sheetbooks` (optional; in-memory sheetbook outputs)",
+        "",
+        "### Validation",
+        "- Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`",
+        "- LSP header: `# $schema: http://localhost:62831/workflow.gen.json` (use `yaml-dsl schema-serve` + `upsert-lsp-comment --type workflow`)",
+        "",
+    ]
+
+    if isinstance(workflow_entry, dict):
+        lines.extend(render_schema_entry("`workflow`", workflow_entry, required=workflow_required, level=3))
+    if isinstance(run_item_schema, dict) and run_item_schema:
+        lines.extend(render_schema_entry("`workflow.runs[*]`", run_item_schema, required=False, level=3))
+    if isinstance(write_to_schema, dict) and write_to_schema:
+        lines.extend(render_schema_entry("`workflow.runs[*].write_to`", write_to_schema, required=False, level=3))
+    if isinstance(options_schema, dict) and options_schema:
+        lines.extend(render_schema_entry("`workflow.options`", options_schema, required=False, level=3))
+    if isinstance(resources_schema, dict) and resources_schema:
+        lines.extend(render_schema_entry("`workflow.resources`", resources_schema, required=False, level=3))
+
+    return lines
 
 
 def render_cli_lsp_reference(
@@ -358,6 +427,7 @@ def render_cli_lsp_reference(
     spec_summaries: Sequence[Dict[str, Any]],
 ) -> str:
     repo_schema_path = path_to_posix(SCHEMA_REL)
+    workflow_repo_schema_path = path_to_posix(WORKFLOW_SCHEMA_REL)
     default_schema_path = yaml_dsl_cli._default_schema_path().resolve()
     try:
         default_schema_repo_rel = path_to_posix(default_schema_path.relative_to(repo_root))
@@ -375,17 +445,25 @@ def render_cli_lsp_reference(
         "## Canonical Sources",
         "- CLI implementation: `{}`".format(path_to_posix(CLI_SOURCE_REL)),
         "- Project identity constants: `src/scalim/_project_constants.py`",
-        "- Schema file: `{}`".format(repo_schema_path),
+        "- Demand schema file: `{}`".format(repo_schema_path),
+        "- Workflow schema file: `{}`".format(workflow_repo_schema_path),
         "- Canonical example: `{}`".format(path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL)),
         "",
         "## Command Variants",
         "### Repo",
         "- `uv run {cli} yaml-dsl validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+        "- `uv run {cli} yaml-dsl schema validate --schema {workflow_schema} <workflow.yaml>`".format(
+            cli=_project_constants.CLI_NAME,
+            workflow_schema=workflow_repo_schema_path,
+        ),
         "- `uv run {cli} yaml-dsl schema show`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl schema-serve`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`".format(
+            cli=_project_constants.CLI_NAME
+        ),
+        "- `uv run {cli} yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`".format(
             cli=_project_constants.CLI_NAME
         ),
         "",
@@ -414,16 +492,25 @@ def render_cli_lsp_reference(
             dist=_project_constants.DIST_NAME,
             cli=_project_constants.CLI_NAME,
         ),
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
         "",
         "## Validate Layering",
         "- `yaml-dsl validate`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.",
         "- `yaml-dsl schema validate`: 使用 JSON Schema,更适合 schema-only 校验、编辑器/LSP 对齐与 unknown-field strict 收敛.",
+        "- workflow YAML: 仅支持 `yaml-dsl schema validate --schema .../workflow.gen.json`(不得对 workflow YAML 运行 `yaml-dsl validate`).",
         "",
         "## LSP / Schema Header",
         "- Repo schema path: `{}`".format(repo_schema_path),
+        "- Workflow schema path: `{}`".format(workflow_repo_schema_path),
         "- Canonical example: 故意不写 schema 头(`# $schema: ...`),避免把本机路径固化进共享 YAML.",
         "- 本机启动 schema server(默认端口 `62831`): `uv run {cli} yaml-dsl schema-serve`".format(cli=_project_constants.CLI_NAME),
         "- 批量写入/更新头部(统一写 IntelliJ 兼容 modeline,并会识别/升级 legacy `yaml-language-server` 头): `uv run {cli} yaml-dsl upsert-lsp-comment --type demand --schema-path http://localhost:62831 <paths...>`".format(
+            cli=_project_constants.CLI_NAME
+        ),
+        "- Workflow modeline: `uv run {cli} yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`".format(
             cli=_project_constants.CLI_NAME
         ),
         "- Repo query: `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
@@ -435,6 +522,7 @@ def render_cli_lsp_reference(
         "- 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.",
         "```yaml",
         "# $schema: http://localhost:62831/demand.gen.json",
+        "# $schema: http://localhost:62831/workflow.gen.json",
         "```",
     ]
 
@@ -846,6 +934,7 @@ def extract_markdown_section(text: str, heading: str) -> str:
 
 def build_coverage_index(
     schema: Dict[str, Any],
+    workflow_schema: Dict[str, Any],
     syntax_specs: Sequence[Dict[str, Any]],
     cli_specs: Sequence[Dict[str, Any]],
     command_docs: Sequence[Dict[str, Any]],
@@ -859,10 +948,54 @@ def build_coverage_index(
     return {
         "top_level_fields": top_level_fields,
         "definitions": sorted(schema.get("definitions", {}).keys()),
+        "workflow_fields": build_workflow_field_paths(workflow_schema),
         "syntax_specs": [{"slug": item["slug"], "path": item["path"], "requirements": item["requirements"]} for item in syntax_specs],
         "cli_specs": [{"slug": item["slug"], "path": item["path"], "requirements": item["requirements"]} for item in cli_specs],
         "commands": [" ".join(item["tokens"]) for item in command_docs],
     }
+
+
+def build_workflow_field_paths(workflow_schema: Dict[str, Any]) -> List[str]:
+    """Extract a stable list of key workflow field paths for coverage tracking."""
+    workflow_entry = workflow_schema.get("properties", {}).get("workflow", {})
+    if not isinstance(workflow_entry, dict):
+        return []
+    workflow_props = workflow_entry.get("properties", {})
+    if not isinstance(workflow_props, dict):
+        return []
+
+    paths = ["workflow"]
+    for key in ("runs", "options", "resources"):
+        if key in workflow_props:
+            paths.append("workflow.{}".format(key))
+
+    runs = workflow_props.get("runs", {})
+    if isinstance(runs, dict):
+        item = runs.get("items", {})
+        if isinstance(item, dict):
+            item_props = item.get("properties", {})
+            if isinstance(item_props, dict):
+                for key in ("id", "demand", "depends_on", "init_vars", "write_to"):
+                    if key in item_props:
+                        paths.append("workflow.runs[*].{}".format(key))
+
+    options = workflow_props.get("options", {})
+    if isinstance(options, dict):
+        option_props = options.get("properties", {})
+        if isinstance(option_props, dict):
+            for key in ("max_concurrency", "failure_policy", "cache_pool", "ctx"):
+                if key in option_props:
+                    paths.append("workflow.options.{}".format(key))
+
+    resources = workflow_props.get("resources", {})
+    if isinstance(resources, dict):
+        res_props = resources.get("properties", {})
+        if isinstance(res_props, dict):
+            for key in ("workbooks", "csvs", "sheetbooks"):
+                if key in res_props:
+                    paths.append("workflow.resources.{}".format(key))
+
+    return paths
 
 
 def sync_generated_files(skill_dir: Path, generated_files: Dict[Path, str]) -> None:

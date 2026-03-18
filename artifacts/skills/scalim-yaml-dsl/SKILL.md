@@ -8,8 +8,10 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 先识别任务类型,只读取最少的 reference:
 
 - 新写或改写 YAML: 读 [references/task-authoring.md](references/task-authoring.md)
+- 新写或改写 workflow YAML(编排多 demand / resources / write_to): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
+- 校验、订正、排错 workflow YAML: 读 [references/task-workflow-validate-debug.md](references/task-workflow-validate-debug.md)
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
 - 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)
@@ -19,8 +21,9 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 
 先给出最小可执行命令,再开始分析或改 YAML:
 
-- 仓库内完整校验: `uv run scalim-cli yaml-dsl validate <file.yaml>`
-- 仓库内 schema 校验: `uv run scalim-cli yaml-dsl schema validate <file.yaml>`
+- demand YAML 仓库内完整校验: `uv run scalim-cli yaml-dsl validate <demand.yaml>`
+- demand YAML 仓库内 schema 校验: `uv run scalim-cli yaml-dsl schema validate <demand.yaml>`
+- workflow YAML 仓库内 schema 校验(只支持 schema-only; 必须显式 schema 路径): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
 - 仓库外完整校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`
 - 仓库外 schema 校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>`
 - 仓库内查询 schema 绝对路径: `uv run scalim-cli yaml-dsl schema path`
@@ -43,6 +46,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 不要硬记/猜语法: 以 schema / 生成文档为准(需要时看 `references/syntax-catalog.gen.md`、`references/generated/cli-lsp-reference.gen.md`、`references/generated/example-full/ecommerce_report.gen.yaml`)
 - 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
+- workflow YAML 没有 internal validator: 不要对 workflow YAML 运行 `yaml-dsl validate`,只用 `yaml-dsl schema validate --schema .../workflow.gen.json` 做 schema-only 校验
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证
 
 只在需要时再读大 reference,不要默认把全量 catalog 和 playbook 一起塞进上下文。

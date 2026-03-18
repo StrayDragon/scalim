@@ -60,6 +60,10 @@
 - 2026-03-16: yaml-dsl-outputs-aggregate-fields
   - SSOT: `references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md`
   - OpenSpec: `openspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`
+- 2026-03-18: yaml-workflow-dag-ctx-resources
+  - SSOT: `references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md`
+  - OpenSpec: `openspec/changes/archive/2026-03-18-c20-workflow-dag-context-passing/`
+  - Spec: `openspec/specs/yaml-dsl-workflow/spec.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

@@ -16,8 +16,10 @@
 - 技能入口:[`artifacts/skills/scalim-yaml-dsl/SKILL.md`](#code=artifacts/skills/scalim-yaml-dsl/SKILL.md)
 - 手工 task references:
   - [`artifacts/skills/scalim-yaml-dsl/references/task-authoring.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-authoring.md)
+  - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-authoring.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-authoring.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md)
+  - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md)
 - 受控生成 references:
@@ -41,8 +43,9 @@
 
 写完/改完 YAML 后,建议跑一遍校验:
 
-- 仓库内语义校验(内置 validator): `uv run scalim-cli yaml-dsl validate path/to/config.yaml`
-- 仓库内 schema-only(更快): `uv run scalim-cli yaml-dsl schema validate path/to/config.yaml`
+- demand YAML 仓库内语义校验(内置 validator): `uv run scalim-cli yaml-dsl validate path/to/demand.yaml`
+- demand YAML 仓库内 schema-only(更快): `uv run scalim-cli yaml-dsl schema validate path/to/demand.yaml`
+- workflow YAML 仅支持 schema-only 校验(需显式指定 workflow schema): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml`
 - 仓库外语义校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate path/to/config.yaml`
 - 仓库外 schema-only: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate path/to/config.yaml`
 - 查询 schema 路径(仓库内): `uv run scalim-cli yaml-dsl schema path`
@@ -55,6 +58,14 @@ skill 中的 canonical example 故意不带头部(也就是 schema modeline)。�
 
 ```yaml
 # $schema: http://localhost:62831/demand.gen.json
+```
+
+workflow YAML 同理,只是 `--type` 与 schema 文件名不同:
+
+- `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+
+```yaml
+# $schema: http://localhost:62831/workflow.gen.json
 ```
 
 不要把 `.venv/...` 或 `site-packages/...` 这类机器相关路径固化进共享示例文件.

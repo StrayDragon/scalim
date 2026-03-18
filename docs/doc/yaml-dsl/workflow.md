@@ -7,12 +7,29 @@
 这页讲 **workflow YAML**(编排文件)的语法,以及对应的 Python 运行入口。workflow YAML 和 demand YAML 是两套配置:
 
 - demand YAML: `name/main_source/sources/relations/fields/...`
-- workflow YAML: `workflow.runs/options`(只负责“编排多个 demand”)
+- workflow YAML: `workflow.runs/options/resources`(只负责“编排多个 demand”与“声明共享输出资源”)
+
+## 0) 校验与编辑器($schema)配置
+
+workflow YAML **只有 schema-only 校验**(没有 `yaml-dsl validate` 这层 internal validator). 仓库内校验建议显式指定 workflow schema:
+
+```bash
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml
+```
+
+本地编辑时,推荐用 schema server + modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):
+
+- 启动 schema server: `uv run scalim-cli yaml-dsl schema-serve`
+- 批量写入/更新 `$schema` 头部: `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --schema-path http://localhost:62831 <paths...>`
+
+```yaml
+# $schema: http://localhost:62831/workflow.gen.json
+```
 
 ## 1) 最小结构
 
 ```yaml
-# $schema: ../schema/workflow.gen.json
+# $schema: http://localhost:62831/workflow.gen.json
 
 workflow:
   runs:
@@ -51,32 +68,64 @@ workflow:
   - `"@/x/y.yaml"` (alias 为 `"@"`)
   - `"ALIAS:/x/y.yaml"` (alias 为 `"ALIAS"`)
 
-## 3) Python 运行入口
+## 3) `depends_on` + `init_vars`: DAG 与上下文注入
 
-当前暂不扩展 CLI; 先用 Python 入口:
+`workflow.runs[*].depends_on` 用于声明 runs 间的 **显式 DAG 依赖**(按 run id 引用):
 
-```python
-from scalim.dsl.by_yaml import run_workflow
-
-result = run_workflow(
-    "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    path_aliases={"@": "/abs/project_root"},
-)
-
-for outcome in result.outcomes:
-    if outcome.error is not None:
-        print("FAILED:", outcome.run_id, outcome.error.message)
-    else:
-        print("OK:", outcome.run_id, outcome.result.total_rows)
+```yaml
+workflow:
+  runs:
+    - id: extract_orders
+      demand: ./extract_orders.yaml
+    - id: agg_orders
+      demand: ./agg_orders.yaml
+      depends_on: [extract_orders]
 ```
 
-失败策略:
+- 语义约束(启动前 fail-fast):
+  - deps 引用的 run id 必须存在
+  - 必须无环(有 cycle 会报出可读的环路径)
 
-- `all_fail`: 任一 run 失败会抛出异常(包装为 `WorkflowRunFailedError`,并通过 `__cause__` 关联原异常)
-- `primary_only`: workflow 继续执行,返回值 `outcomes` 中包含成功/失败的可检查结构
+`workflow.runs[*].init_vars` 用于为该 run 对应的 demand 注入 init vars(在 demand 编译期可通过 `{$init_var: ...}` 引用).
 
-## 4) `cache_pool`: workflow-scope cache pool
+当 run 依赖上游时,`init_vars` 里允许使用 `$ctx` 指令读取上游 ctx(详见下一节),写法为 **对象节点**(不是字符串插值):
+
+```yaml
+workflow:
+  runs:
+    - id: a
+      demand: ./a.yaml
+    - id: b
+      demand: ./b.yaml
+      depends_on: [a]
+      init_vars:
+        a_output_path: {$ctx: {node: a, key: output_path}}
+```
+
+## 4) `ctx`: workflow-level ctx store（跨节点小体量数据）
+
+workflow 在一次执行中维护 workflow-level ctx store,用于在依赖边上传递小体量 JSON-like 数据.
+
+- ctx 以 `workflow_node_id` 为命名空间(对 demand 节点即 `runs[*].id`)
+- ctx 只能在 **依赖闭包**内读取(没有声明依赖的节点不能读上游)
+- 系统禁止把 rows/dataset/大型输出塞进 ctx; 大对象必须走 artifacts/resources 路径
+- 护栏可通过 `workflow.options.ctx` 配置:
+
+```yaml
+workflow:
+  options:
+    ctx:
+      max_value_bytes: 65536
+      max_bytes: 1048576
+```
+
+需求节点完成时会发布一组稳定的默认 ctx keys(用于减少 Python glue):
+
+- `output_path`(string|null)
+- `total_rows`(int|null)
+- `duration_secs`(float; seconds)
+
+## 5) `cache_pool`: workflow-scope cache pool
 
 当 `workflow.options.cache_pool` 存在时:
 
@@ -102,3 +151,78 @@ for outcome in result.outcomes:
 迁移:
 
 - `workflow.options.share_preload_cache` 已移除,请改用 `workflow.options.cache_pool`
+
+## 6) `resources` + `write_to`: 声明共享输出资源并写入
+
+workflow YAML 支持在 workflow scope 声明共享输出资源,并通过 run 的 `write_to` 声明写入 intent:
+
+- `workflow.resources.workbooks.<id>.path`: 共享 workbook 输出路径
+- `workflow.resources.csvs.<id>.path`: 共享 csv 输出路径
+- `workflow.resources.sheetbooks.<id>`: 共享 sheetbook 资源(内存工作簿) + 可选 `export_xlsx`
+  - `budget.max_sheets/max_total_cells` 为必填护栏
+  - `export_xlsx.path` 可选,用于 workflow 结束时导出为最终 xlsx
+
+`runs[*].write_to` 为互斥 intent: 同一个 run 下最多声明一个 intent key:
+
+- `workbook_sheet` / `workbook_append`
+- `csv_append`
+- `sheetbook_sheet` / `sheetbook_append`
+
+示例: 将某个 run 的 output 写入共享 sheetbook 并在末尾导出:
+
+```yaml
+workflow:
+  resources:
+    sheetbooks:
+      report:
+        budget:
+          max_sheets: 16
+          max_total_cells: 2000000
+        export_xlsx:
+          path: ./out/report.xlsx
+          write_lock: true
+  runs:
+    - id: main
+      demand: ./main.yaml
+      write_to:
+        sheetbook_sheet:
+          sheetbook: report
+          sheet: Summary
+          output: default
+          on_conflict: error
+```
+
+注意:
+
+- 写入顺序以 `workflow.runs` 声明顺序为准(不依赖并发完成时序),以保证确定性
+- 当存在潜在的输出路径冲突(多个 nodes 写同一路径)时,系统会在写入发生前 fail-fast
+
+## 7) Python 运行入口
+
+当前暂不扩展 workflow runner CLI; 先用 Python 入口:
+
+```python
+from scalim.dsl.by_yaml import run_workflow
+
+result = run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    path_aliases={"@": "/abs/project_root"},
+)
+
+for outcome in result.outcomes:
+    if outcome.error is not None:
+        print("FAILED:", outcome.run_id, outcome.error.message)
+    else:
+        print("OK:", outcome.run_id, outcome.result.total_rows)
+```
+
+失败策略:
+
+- `all_fail`: 任一 run 失败会抛出异常(包装为 `WorkflowRunFailedError`,并通过 `__cause__` 关联原异常)
+- `primary_only`: workflow 继续执行,返回值 `outcomes` 中包含成功/失败的可检查结构
+
+并发契约:
+
+- 当 `max_concurrency>1` 时,同一 `components` 列表中的 hook/observer 实例可能被并发复用; components 必须线程安全或无状态
+- 否则行为未定义;调用方可将 `max_concurrency` 降为 `1`

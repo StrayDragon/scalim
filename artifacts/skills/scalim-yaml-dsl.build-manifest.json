@@ -136,6 +136,26 @@
         "slug": "demand-dsl"
       },
       {
+        "path": "openspec/specs/yaml-dsl-workflow/spec.md",
+        "requirements": [
+          "Workflow YAML declares runs and options",
+          "Runs execute demand YAML via existing compilation pipeline",
+          "Workflow enforces failure_policy",
+          "max_concurrency limits parallel runs deterministically",
+          "workflow nodes declare explicit DAG deps via `depends_on`",
+          "workflow provides a workflow-level ctx store (namespaced by `workflow_node_id`)",
+          "ctx guardrails MUST be configurable via `workflow.options.ctx`",
+          "demand nodes MUST publish a minimal default ctx summary",
+          "`$ctx` directives are resolved during compile-on-ready materialization",
+          "failure propagation cancels downstream nodes deterministically",
+          "workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)",
+          "workflow entrypoints MUST be importable under Python 3.6",
+          "workflow emits workflow-level events and injects attribution for demand events",
+          "max_concurrency>1 requires thread-safe or stateless components"
+        ],
+        "slug": "yaml-dsl-workflow"
+      },
+      {
         "path": "openspec/specs/source-relations/spec.md",
         "requirements": [
           "steps 结构与 relation 解析/推断规则",
@@ -174,6 +194,55 @@
           "preload cache stores normalized source results"
         ],
         "slug": "source-cache"
+      },
+      {
+        "path": "openspec/specs/workflow-cache-pool/spec.md",
+        "requirements": [
+          "workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)",
+          "workflow provides a cache pool with signature-based keys",
+          "cache pool defines an explicit conflict policy",
+          "cache pool supports lifecycle management and auto-release",
+          "cache pool refcount MUST be derived from Workflow IR when available",
+          "cache pool enforces budgets with a clear policy",
+          "cache pool MUST be observable via workflow-level events"
+        ],
+        "slug": "workflow-cache-pool"
+      },
+      {
+        "path": "openspec/specs/workflow-shared-output-containers/spec.md",
+        "requirements": [
+          "workflow YAML exposes a stable authoring surface for shared resources and write intents",
+          "workflow declares shared output resources at workflow scope",
+          "shared output is written via explicit workflow write nodes",
+          "writes to shared resources are deterministic and serialized",
+          "append/merge semantics are explicit and verifiable",
+          "shared resources commit atomically at workflow end",
+          "shared resource lifecycle MUST be observable"
+        ],
+        "slug": "workflow-shared-output-containers"
+      },
+      {
+        "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
+        "requirements": [
+          "workflow YAML exposes a stable authoring surface for sheetbooks",
+          "workflow MUST support in-memory sheetbook resources",
+          "writes to a sheetbook MUST be deterministic and conflict-safe",
+          "workflow MUST support exporting a sheetbook to an Excel workbook atomically",
+          "demand nodes MUST be able to consume sheetbook sheet rows via a built-in loader",
+          "workflow MUST precheck Excel output-path collisions across nodes",
+          "sheetbook lifecycle MUST be observable and joinable"
+        ],
+        "slug": "workflow-sheetbook-resources"
+      },
+      {
+        "path": "openspec/specs/workflow-observability-bridge/spec.md",
+        "requirements": [
+          "workflow attributes demand events for stable DAG correlation",
+          "workflow provides workflow-level observability events",
+          "workflow preserves demand hooks/observers semantics",
+          "workflow event catalog is extensible for cache/resources"
+        ],
+        "slug": "workflow-observability-bridge"
       },
       {
         "path": "openspec/specs/runtime-pruning/spec.md",
@@ -254,6 +323,24 @@
       "meta",
       "audit",
       "observability"
+    ],
+    "workflow_fields": [
+      "workflow",
+      "workflow.runs",
+      "workflow.options",
+      "workflow.resources",
+      "workflow.runs[*].id",
+      "workflow.runs[*].demand",
+      "workflow.runs[*].depends_on",
+      "workflow.runs[*].init_vars",
+      "workflow.runs[*].write_to",
+      "workflow.options.max_concurrency",
+      "workflow.options.failure_policy",
+      "workflow.options.cache_pool",
+      "workflow.options.ctx",
+      "workflow.resources.workbooks",
+      "workflow.resources.csvs",
+      "workflow.resources.sheetbooks"
     ]
   },
   "inputs": [
@@ -302,6 +389,22 @@
       "sha256": "d5204d27c56ba975c420234ee3149c172d0e867b8ec26398ce3ae70008e5f04f"
     },
     {
+      "path": "openspec/specs/workflow-cache-pool/spec.md",
+      "sha256": "f9db5d3e4bb9e3de386577821566634d0dd273e5f28a032f077223406de08e3f"
+    },
+    {
+      "path": "openspec/specs/workflow-observability-bridge/spec.md",
+      "sha256": "bb7d976b24872851dbf3a223617dc44b6a202fb264db1c57f560dde52a74f1b4"
+    },
+    {
+      "path": "openspec/specs/workflow-shared-output-containers/spec.md",
+      "sha256": "cb763467b924a7739859ad971aa071f0a331c9784169a6358b4caa90fed43254"
+    },
+    {
+      "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
+      "sha256": "7a1239c57a7660cfb8a2df5b0cd7029d73d4b0200a50d5deae5d772b188bbf5b"
+    },
+    {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
       "sha256": "2d869ebe85971675cd75751f14b8355b10fa790fd8b8fa556689795369973909"
     },
@@ -314,18 +417,26 @@
       "sha256": "9e0c24d356756c9470c857d556263d2a97c119d272faf802cb16e078dd3cc394"
     },
     {
+      "path": "openspec/specs/yaml-dsl-workflow/spec.md",
+      "sha256": "7112969f1ab54f05492648b46c92c8937cd55e8a013c4a7970581d1bb2854998"
+    },
+    {
       "path": "src/scalim/cli/yaml_dsl.py",
       "sha256": "345cba2ce27b19a8e3684a99e176821590e0c185640d120f7a03bc44eca462e5"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
       "sha256": "976e785595847db12848587f1ff2cfaa98bbbd7a571eead8f35258e5eac805d2"
+    },
+    {
+      "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
+      "sha256": "86b5b601b31a0f4cd2ec40dcb4f82b9291766ab08c1f4bf775e76582cd6d2502"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "8e213581fe8e1c8b0dbdd65e572f1ac12fbf81b7137a3f9f31a7a3fe070b516c"
+      "sha256": "1208adf0d953424e79825c061446d718b8663e004000eaf613e9af5b779ad543"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -337,11 +448,11 @@
     },
     {
       "path": "references/generated/yaml-dsl-upgrades.gen.md",
-      "sha256": "33a7bd8970d1a7f53d3d5a77c2c0409d3b3a1423b12801734bc3dbbdc9ace247"
+      "sha256": "c837aa7fa2ff57034235e2a0f0b49e73b5660186e8fa490ef4e1ae5dba8246fc"
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "7890cd4e063f401cee8592dd6eb8752e6a4b1f281b8c40500939d27ff048c564"
+      "sha256": "de51fa281afa539d13d776e89827d0fb24bb3fd9858fe3280b345da5c780476b"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

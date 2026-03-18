@@ -3,7 +3,8 @@
 此文档由 `scripts/gen-agent-skill.py` 自动生成.
 
 ## Canonical Sources
-- Schema: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
+- Demand schema: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
+- Workflow schema: `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
 - Canonical example: `references/generated/example-full/ecommerce_report.gen.yaml`
 - Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`
 
@@ -103,6 +104,24 @@
   - `normalize` is allowed on `sources.*` and rejected on `main_source`
   - aggregate derived fields MUST support dependency-driven evaluation (DAG)
   - aggregate fields MUST support safe compute derived fields (`compute`)
+### `yaml-dsl-workflow`
+- Source: `openspec/specs/yaml-dsl-workflow/spec.md`
+- Purpose: 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).
+- Requirements:
+  - Workflow YAML declares runs and options
+  - Runs execute demand YAML via existing compilation pipeline
+  - Workflow enforces failure_policy
+  - max_concurrency limits parallel runs deterministically
+  - workflow nodes declare explicit DAG deps via `depends_on`
+  - workflow provides a workflow-level ctx store (namespaced by `workflow_node_id`)
+  - ctx guardrails MUST be configurable via `workflow.options.ctx`
+  - demand nodes MUST publish a minimal default ctx summary
+  - `$ctx` directives are resolved during compile-on-ready materialization
+  - failure propagation cancels downstream nodes deterministically
+  - workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)
+  - workflow entrypoints MUST be importable under Python 3.6
+  - workflow emits workflow-level events and injects attribution for demand events
+  - max_concurrency>1 requires thread-safe or stateless components
 ### `source-relations`
 - Source: `openspec/specs/source-relations/spec.md`
 - Purpose: 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.
@@ -137,6 +156,47 @@
   - 关联加载优先命中缓存
   - 计划元数据记录缓存源
   - preload cache stores normalized source results
+### `workflow-cache-pool`
+- Source: `openspec/specs/workflow-cache-pool/spec.md`
+- Purpose: 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
+- Requirements:
+  - workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)
+  - workflow provides a cache pool with signature-based keys
+  - cache pool defines an explicit conflict policy
+  - cache pool supports lifecycle management and auto-release
+  - cache pool refcount MUST be derived from Workflow IR when available
+  - cache pool enforces budgets with a clear policy
+  - cache pool MUST be observable via workflow-level events
+### `workflow-shared-output-containers`
+- Source: `openspec/specs/workflow-shared-output-containers/spec.md`
+- Purpose: TBD - created by archiving change c30-workflow-shared-output-containers. Update Purpose after archive.
+- Requirements:
+  - workflow YAML exposes a stable authoring surface for shared resources and write intents
+  - workflow declares shared output resources at workflow scope
+  - shared output is written via explicit workflow write nodes
+  - writes to shared resources are deterministic and serialized
+  - append/merge semantics are explicit and verifiable
+  - shared resources commit atomically at workflow end
+  - shared resource lifecycle MUST be observable
+### `workflow-sheetbook-resources`
+- Source: `openspec/specs/workflow-sheetbook-resources/spec.md`
+- Purpose: 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`write_to.sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
+- Requirements:
+  - workflow YAML exposes a stable authoring surface for sheetbooks
+  - workflow MUST support in-memory sheetbook resources
+  - writes to a sheetbook MUST be deterministic and conflict-safe
+  - workflow MUST support exporting a sheetbook to an Excel workbook atomically
+  - demand nodes MUST be able to consume sheetbook sheet rows via a built-in loader
+  - workflow MUST precheck Excel output-path collisions across nodes
+  - sheetbook lifecycle MUST be observable and joinable
+### `workflow-observability-bridge`
+- Source: `openspec/specs/workflow-observability-bridge/spec.md`
+- Purpose: 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
+- Requirements:
+  - workflow attributes demand events for stable DAG correlation
+  - workflow provides workflow-level observability events
+  - workflow preserves demand hooks/observers semantics
+  - workflow event catalog is extensible for cache/resources
 ### `runtime-pruning`
 - Source: `openspec/specs/runtime-pruning/spec.md`
 - Purpose: PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用.
@@ -695,3 +755,77 @@
   - `snapshot_path`: `string`
   - `trace_enabled`: `boolean`
   - `use_default_output_dir`: `boolean`
+
+
+## Workflow YAML (Generated)
+
+### Key Paths
+- `workflow.runs` (required)
+- `workflow.runs[*].id` (required)
+- `workflow.runs[*].demand` (required)
+- `workflow.runs[*].depends_on` (optional)
+- `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)
+- `workflow.runs[*].write_to` (optional; oneOf intents)
+- `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)
+- `workflow.options.ctx` (optional; ctx guardrails)
+- `workflow.options.cache_pool` (optional; workflow-scope cache pool)
+- `workflow.resources` (optional; workbooks/csvs/sheetbooks)
+- `workflow.resources.workbooks` (optional; shared workbook outputs)
+- `workflow.resources.csvs` (optional; shared csv outputs)
+- `workflow.resources.sheetbooks` (optional; in-memory sheetbook outputs)
+
+### Validation
+- Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
+- LSP header: `# $schema: http://localhost:62831/workflow.gen.json` (use `yaml-dsl schema-serve` + `upsert-lsp-comment --type workflow`)
+
+### `workflow`
+- Required: `true`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `options`: `object`, properties `failure_policy`, `cache_pool`, `ctx`, `max_concurrency`
+  - `resources`: `object`, properties `csvs`, `sheetbooks`, `workbooks`
+  - `runs` (required): `array`, items `object`, properties `demand`, `depends_on`, `id`, `init_vars`, `write_to`
+
+### `workflow.runs[*]`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `demand` (required): `string`
+  - `depends_on`: `array`, items `string`
+  - `id` (required): `string`
+  - `init_vars`: `object` | `null`, oneOf(2)
+  - `write_to`: `null` | `object` | `object` | `object` | `object` | `object`, oneOf(6)
+
+### `workflow.runs[*].write_to`
+- Type: `null` | `object` | `object` | `object` | `object` | `object`
+- Description:
+  共享输出写入意图简写(可选).
+  
+  - MUST 恰好选择一个 write intent
+- `oneOf`:
+  - 1. `null`
+  - 2. `object`, properties `workbook_sheet`
+  - 3. `object`, properties `workbook_append`
+  - 4. `object`, properties `csv_append`
+  - 5. `object`, properties `sheetbook_sheet`
+  - 6. `object`, properties `sheetbook_append`
+
+### `workflow.options`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `failure_policy`: `string`, enum `all_fail`, `primary_only`
+  - `cache_pool`: `object` | `null`, oneOf(2)
+  - `ctx`: `object` | `null`, oneOf(2)
+  - `max_concurrency`: `integer`
+
+### `workflow.resources`
+- Type: `object`
+- Description:
+  workflow-scope shared output resources.
+- `additionalProperties`: `false`
+- Properties:
+  - `csvs`: `object`
+  - `sheetbooks`: `object`
+  - `workbooks`: `object`

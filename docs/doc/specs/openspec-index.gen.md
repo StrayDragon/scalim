@@ -214,7 +214,7 @@ Sources:
 ### `workflow-sheetbook-resources`
 - Title: workflow-sheetbook-resources Specification
 - Source: [spec.md](#code=openspec/specs/workflow-sheetbook-resources/spec.md)
-- Summary: TBD - created by archiving change c40-workflow-sheetbook-resources. Update Purpose after archive.
+- Summary: **状态: ✅ 已实现** 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`write_to.sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
 
 ### `yaml-dsl-agent-guidance`
 - Title: yaml-dsl-agent-guidance Specification
