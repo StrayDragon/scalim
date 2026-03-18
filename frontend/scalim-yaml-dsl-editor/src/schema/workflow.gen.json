@@ -316,7 +316,7 @@
                 ],
                 "default": null,
                 "description": "共享输出写入意图简写(可选)",
-                "markdownDescription": "共享输出写入意图简写(可选).\n\n- MUST 恰好选择一个 write intent\n- `sheetbook_*` 由后续变更定义"
+                "markdownDescription": "共享输出写入意图简写(可选).\n\n- MUST 恰好选择一个 write intent"
               }
             },
             "additionalProperties": false
@@ -520,6 +520,78 @@
                     "examples": [
                       "./out/report.csv"
                     ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "sheetbooks": {
+              "type": "object",
+              "default": {},
+              "propertyNames": {
+                "type": "string",
+                "minLength": 1
+              },
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "budget"
+                ],
+                "properties": {
+                  "budget": {
+                    "type": "object",
+                    "required": [
+                      "max_sheets",
+                      "max_total_cells"
+                    ],
+                    "properties": {
+                      "max_sheets": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "sheetbook budget: max_sheets(正整数)",
+                        "markdownDescription": "sheetbook budget: `max_sheets`(正整数).",
+                        "examples": [
+                          32
+                        ]
+                      },
+                      "max_total_cells": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "sheetbook budget: max_total_cells(正整数)",
+                        "markdownDescription": "sheetbook budget: `max_total_cells`(正整数).",
+                        "examples": [
+                          5000000
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "export_xlsx": {
+                    "type": "object",
+                    "required": [
+                      "path"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "导出 xlsx 路径(非空字符串)",
+                        "markdownDescription": "导出 xlsx 路径(非空字符串).",
+                        "examples": [
+                          "./out/report.xlsx"
+                        ]
+                      },
+                      "write_lock": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "导出阶段启用写锁(可选)",
+                        "markdownDescription": "导出阶段启用写锁(可选).",
+                        "examples": [
+                          true
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false

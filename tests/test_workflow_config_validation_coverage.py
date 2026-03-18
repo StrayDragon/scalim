@@ -88,10 +88,18 @@ def test_workflow_run_id_rejects_internal_prefix() -> None:
         ({"csv_append": {"csv": "c"}}, "output must be a non-empty string"),
         ({"csv_append": {"csv": "c", "output": "o", "header_policy": "bad"}}, "header_policy must be one of"),
         ({"csv_append": {"csv": "c", "output": "o", "on_mismatch": "bad"}}, "on_mismatch must be one of"),
-        (
-            {"sheetbook_sheet": {"sheetbook": "sb", "sheet": "S", "output": "o"}},
-            "is not supported in this build",
-        ),
+        ({"sheetbook_sheet": {"sheet": "S", "output": "o"}}, "sheetbook must be a non-empty string"),
+        ({"sheetbook_sheet": {"sheetbook": "sb", "output": "o"}}, "sheet name must be a non-empty string"),
+        ({"sheetbook_sheet": {"sheetbook": "sb", "sheet": "S"}}, "output must be a non-empty string"),
+        ({"sheetbook_sheet": {"sheetbook": "sb", "sheet": "Bad:Name", "output": "o"}}, "invalid characters"),
+        ({"sheetbook_sheet": {"sheetbook": "sb", "sheet": "x" * 32, "output": "o"}}, "too long"),
+        ({"sheetbook_sheet": {"sheetbook": "sb", "sheet": "S", "output": "o", "on_conflict": "bad"}}, "on_conflict must be one of"),
+        ({"sheetbook_sheet": {"sheetbook": "sb", "sheet": "S", "output": "o"}}, "Unknown sheetbook resource id"),
+        ({"sheetbook_append": {"sheet": "S", "output": "o"}}, "sheetbook must be a non-empty string"),
+        ({"sheetbook_append": {"sheetbook": "sb", "sheet": "S"}}, "output must be a non-empty string"),
+        ({"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "o", "align_by": "bad"}}, "align_by must be one of"),
+        ({"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "o", "header_policy": "bad"}}, "header_policy must be one of"),
+        ({"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "o", "on_mismatch": "bad"}}, "on_mismatch must be one of"),
     ],
 )
 def test_load_workflow_config_from_mapping_write_to_errors(write_to_raw: Any, match: str) -> None:
@@ -107,14 +115,44 @@ def test_load_workflow_config_from_mapping_write_to_errors(write_to_raw: Any, ma
         ({"oops": {}}, "contains unknown keys"),
         ({"workbooks": "nope"}, "workbooks must be a mapping"),
         ({"csvs": "nope"}, "csvs must be a mapping"),
+        ({"sheetbooks": "nope"}, "sheetbooks must be a mapping"),
         ({"workbooks": {1: {"path": "a.xlsx"}}}, "workbooks keys must be non-empty strings"),
         ({"workbooks": {"report": "nope"}}, "workbooks.<id> must be a mapping"),
         ({"workbooks": {"report": {}}}, "workbooks.<id>.path must be a non-empty string"),
         ({"csvs": {1: {"path": "a.csv"}}}, "csvs keys must be non-empty strings"),
         ({"csvs": {"merged": "nope"}}, "csvs.<id> must be a mapping"),
         ({"csvs": {"merged": {}}}, "csvs.<id>.path must be a non-empty string"),
+        ({"sheetbooks": {1: {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}, "sheetbooks keys must be non-empty strings"),
+        ({"sheetbooks": {"sb": "nope"}}, "sheetbooks.<id> must be a mapping"),
+        ({"sheetbooks": {"sb": {}}}, "budget must be a mapping"),
+        ({"sheetbooks": {"sb": {"budget": {}}}}, "max_sheets must be an integer"),
+        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1}}}}, "max_total_cells must be an integer"),
+        ({"sheetbooks": {"sb": {"budget": {"max_sheets": "nope", "max_total_cells": 1}}}}, "max_sheets must be an integer"),
+        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": "nope"}}}}, "max_total_cells must be an integer"),
+        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 0, "max_total_cells": 1}}}}, "max_sheets must be"),
+        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 0}}}}, "max_total_cells must be"),
+        (
+            {"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}},
+            "export_xlsx must be a mapping",
+        ),
+        (
+            {"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {}}}},
+            "export_xlsx.path must be a non-empty string",
+        ),
+        (
+            {
+                "sheetbooks": {
+                    "sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "write_lock": "nope"}}
+                }
+            },
+            "write_lock must be a bool",
+        ),
         (
             {"workbooks": {"same": {"path": "a.xlsx"}}, "csvs": {"same": {"path": "a.csv"}}},
+            "ids must be unique",
+        ),
+        (
+            {"workbooks": {"same": {"path": "a.xlsx"}}, "sheetbooks": {"same": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}},
             "ids must be unique",
         ),
     ],
@@ -128,10 +166,11 @@ def test_load_workflow_config_from_mapping_resources_errors(resources_raw: Any, 
 
 def test_load_workflow_config_from_mapping_allows_null_resource_groups() -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"workbooks": None, "csvs": None}
+    root["workflow"]["resources"] = {"workbooks": None, "csvs": None, "sheetbooks": None}
     cfg = load_workflow_config_from_mapping(root)
     assert cfg.resources.workbooks == {}
     assert cfg.resources.csvs == {}
+    assert cfg.resources.sheetbooks == {}
 
 
 def test_load_workflow_config_from_mapping_validates_unknown_workbook_reference() -> None:
@@ -150,6 +189,24 @@ def test_load_workflow_config_from_mapping_validates_unknown_csv_reference() -> 
         _ = load_workflow_config_from_mapping(root)
 
 
+def test_load_workflow_config_from_mapping_validates_unknown_sheetbook_reference() -> None:
+    root = _base_root()
+    root["workflow"]["resources"] = {"sheetbooks": {"ok": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}
+    root["workflow"]["runs"][0]["write_to"] = {"sheetbook_sheet": {"sheetbook": "nope", "sheet": "S", "output": "detail"}}
+    with pytest.raises(WorkflowConfigError, match="Unknown sheetbook resource id"):
+        _ = load_workflow_config_from_mapping(root)
+
+
+def test_load_workflow_config_from_mapping_accepts_sheetbook_append_surface() -> None:
+    root = _base_root()
+    root["workflow"]["resources"] = {"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 10}}}}
+    root["workflow"]["runs"][0]["write_to"] = {"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "detail"}}
+    cfg = load_workflow_config_from_mapping(root)
+    write_to = cfg.runs[0].write_to
+    assert write_to is not None
+    assert type(write_to).__name__ == "WorkflowWriteToSheetbookAppend"
+
+
 def test_load_workflow_config_from_mapping_workbooks_raw_none_branch_is_exercised() -> None:
     root = _base_root()
     root["workflow"]["resources"] = {"workbooks": None}
@@ -162,3 +219,10 @@ def test_load_workflow_config_from_mapping_csvs_raw_none_branch_is_exercised() -
     root["workflow"]["resources"] = {"csvs": None}
     cfg = load_workflow_config_from_mapping(copy.deepcopy(root))
     assert cfg.resources.csvs == {}
+
+
+def test_load_workflow_config_from_mapping_sheetbooks_raw_none_branch_is_exercised() -> None:
+    root = _base_root()
+    root["workflow"]["resources"] = {"sheetbooks": None}
+    cfg = load_workflow_config_from_mapping(copy.deepcopy(root))
+    assert cfg.resources.sheetbooks == {}

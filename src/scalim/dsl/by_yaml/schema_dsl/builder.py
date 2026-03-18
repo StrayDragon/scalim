@@ -352,7 +352,60 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
 
-        # 占位符: 由 `workflow-sheetbook-resources` (`c40`) 定义.
+        sheetbook_budget: Dict[str, Any] = {
+            "type": "object",
+            "required": ["max_sheets", "max_total_cells"],
+            "properties": {
+                "max_sheets": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "sheetbook budget: max_sheets(正整数)",
+                    "markdownDescription": "sheetbook budget: `max_sheets`(正整数).",
+                    "examples": [32],
+                },
+                "max_total_cells": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "sheetbook budget: max_total_cells(正整数)",
+                    "markdownDescription": "sheetbook budget: `max_total_cells`(正整数).",
+                    "examples": [5000000],
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        sheetbook_export_xlsx: Dict[str, Any] = {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "导出 xlsx 路径(非空字符串)",
+                    "markdownDescription": "导出 xlsx 路径(非空字符串).",
+                    "examples": ["./out/report.xlsx"],
+                },
+                "write_lock": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "导出阶段启用写锁(可选)",
+                    "markdownDescription": "导出阶段启用写锁(可选).",
+                    "examples": [True],
+                },
+            },
+            "additionalProperties": False,
+        }
+
+        sheetbook_resource: Dict[str, Any] = {
+            "type": "object",
+            "required": ["budget"],
+            "properties": {
+                "budget": sheetbook_budget,
+                "export_xlsx": sheetbook_export_xlsx,
+            },
+            "additionalProperties": False,
+        }
+
         write_to_sheetbook_sheet: Dict[str, Any] = {
             "type": "object",
             "required": ["sheetbook", "sheet", "output"],
@@ -369,7 +422,6 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
 
-        # 占位符: 由 `workflow-sheetbook-resources` (`c40`) 定义.
         write_to_sheetbook_append: Dict[str, Any] = {
             "type": "object",
             "required": ["sheetbook", "sheet", "output"],
@@ -432,7 +484,7 @@ class SchemaBuilder:
             ],
             "default": None,
             "description": "共享输出写入意图简写(可选)",
-            "markdownDescription": ("共享输出写入意图简写(可选).\n\n- MUST 恰好选择一个 write intent\n- `sheetbook_*` 由后续变更定义"),
+            "markdownDescription": "共享输出写入意图简写(可选).\n\n- MUST 恰好选择一个 write intent",
         }
 
         run_item: Dict[str, Any] = {
@@ -504,6 +556,12 @@ class SchemaBuilder:
                             "default": {},
                             "propertyNames": {"type": "string", "minLength": 1},
                             "additionalProperties": csv_resource,
+                        },
+                        "sheetbooks": {
+                            "type": "object",
+                            "default": {},
+                            "propertyNames": {"type": "string", "minLength": 1},
+                            "additionalProperties": sheetbook_resource,
                         },
                     },
                     "description": "workflow-scope shared output resources",

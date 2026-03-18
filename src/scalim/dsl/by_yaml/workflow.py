@@ -32,6 +32,8 @@ _WRITE_TO_ON_CONFLICT_POLICIES = ("error", "overwrite", "skip")
 _WRITE_TO_ALIGN_BY = ("field_id", "header")
 _WRITE_TO_HEADER_POLICIES = ("once", "always", "never")
 _WRITE_TO_ON_MISMATCH_POLICIES = ("error", "warn", "skip")
+_EXCEL_SHEET_NAME_MAX_LEN = 31
+_EXCEL_SHEET_NAME_INVALID_CHARS = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
 
 
 class WorkflowConfigError(ValueError):
@@ -86,9 +88,28 @@ class WorkflowCsvResource:
 
 
 @dataclass(frozen=True)
+class WorkflowSheetbookBudget:
+    max_sheets: int
+    max_total_cells: int
+
+
+@dataclass(frozen=True)
+class WorkflowSheetbookExportXlsx:
+    path: str
+    write_lock: bool = False
+
+
+@dataclass(frozen=True)
+class WorkflowSheetbookResource:
+    budget: WorkflowSheetbookBudget
+    export_xlsx: Optional[WorkflowSheetbookExportXlsx] = None
+
+
+@dataclass(frozen=True)
 class WorkflowResources:
     workbooks: Dict[str, WorkflowWorkbookResource] = dataclass_field(default_factory=dict)
     csvs: Dict[str, WorkflowCsvResource] = dataclass_field(default_factory=dict)
+    sheetbooks: Dict[str, WorkflowSheetbookResource] = dataclass_field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -117,7 +138,31 @@ class WorkflowWriteToCsvAppend:
     on_mismatch: str = "error"
 
 
-WorkflowWriteTo = Union[WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend, WorkflowWriteToCsvAppend]
+@dataclass(frozen=True)
+class WorkflowWriteToSheetbookSheet:
+    sheetbook: str
+    sheet: str
+    output: str
+    on_conflict: str = "error"
+
+
+@dataclass(frozen=True)
+class WorkflowWriteToSheetbookAppend:
+    sheetbook: str
+    sheet: str
+    output: str
+    align_by: str = "field_id"
+    header_policy: str = "once"
+    on_mismatch: str = "error"
+
+
+WorkflowWriteTo = Union[
+    WorkflowWriteToWorkbookSheet,
+    WorkflowWriteToWorkbookAppend,
+    WorkflowWriteToCsvAppend,
+    WorkflowWriteToSheetbookSheet,
+    WorkflowWriteToSheetbookAppend,
+]
 
 
 @dataclass(frozen=True)
@@ -315,6 +360,25 @@ def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
         }
 
     return {"ok": True, "errors": [], "warnings": []}
+
+
+def _validate_excel_sheet_name(value: str, *, path: str) -> None:
+    """校验 `Excel` `sheet` 名合法性(用于 `sheetbook` 资源).
+
+    注意: `workbook` 的 `sheet` 名限制主要由 `openpyxl` 约束,这里对 `sheetbook` 做显式 `fail-fast`.
+    """
+    msg: str
+    name = str(value or "").strip()
+    if not name:
+        msg = "sheet name must be a non-empty string"
+        raise WorkflowConfigError(msg, path=path)
+    if len(name) > _EXCEL_SHEET_NAME_MAX_LEN:
+        msg = "sheet name is too long (max_len={}): {!r}".format(_EXCEL_SHEET_NAME_MAX_LEN, name)
+        raise WorkflowConfigError(msg, path=path)
+    invalid = sorted(ch for ch in name if ch in _EXCEL_SHEET_NAME_INVALID_CHARS)
+    if invalid:
+        msg = "sheet name contains invalid characters: {!r}".format("".join(invalid))
+        raise WorkflowConfigError(msg, path=path)
 
 
 def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  # noqa: C901, PLR0912, PLR0915
@@ -517,9 +581,63 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
                     on_mismatch=on_mismatch,
                 )
 
-            else:
-                msg = "run.write_to.{} is not supported in this build".format(kind)
-                raise WorkflowConfigError(msg, path="{}.write_to.{}".format(item_path, kind))
+            elif kind == "sheetbook_sheet":
+                sheetbook_id = str(cfg.get("sheetbook", "") or "").strip()
+                sheet = str(cfg.get("sheet", "") or "").strip()
+                output_id = str(cfg.get("output", "") or "").strip()
+                on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
+                if not sheetbook_id:
+                    msg = "run.write_to.sheetbook_sheet.sheetbook must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_sheet.sheetbook".format(item_path))
+                _validate_excel_sheet_name(sheet, path="{}.write_to.sheetbook_sheet.sheet".format(item_path))
+                if not output_id:
+                    msg = "run.write_to.sheetbook_sheet.output must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_sheet.output".format(item_path))
+                if on_conflict not in _WRITE_TO_ON_CONFLICT_POLICIES:
+                    msg = "run.write_to.sheetbook_sheet.on_conflict must be one of: {}".format("/".join(_WRITE_TO_ON_CONFLICT_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_sheet.on_conflict".format(item_path))
+                write_to = WorkflowWriteToSheetbookSheet(
+                    sheetbook=sheetbook_id,
+                    sheet=sheet,
+                    output=output_id,
+                    on_conflict=on_conflict,
+                )
+
+            elif kind == "sheetbook_append":
+                sheetbook_id = str(cfg.get("sheetbook", "") or "").strip()
+                sheet = str(cfg.get("sheet", "") or "").strip()
+                output_id = str(cfg.get("output", "") or "").strip()
+                align_by = str(cfg.get("align_by", "field_id") or "field_id").strip()
+                header_policy = str(cfg.get("header_policy", "once") or "once").strip()
+                on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
+                if not sheetbook_id:
+                    msg = "run.write_to.sheetbook_append.sheetbook must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.sheetbook".format(item_path))
+                _validate_excel_sheet_name(sheet, path="{}.write_to.sheetbook_append.sheet".format(item_path))
+                if not output_id:
+                    msg = "run.write_to.sheetbook_append.output must be a non-empty string"
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.output".format(item_path))
+                if align_by not in _WRITE_TO_ALIGN_BY:
+                    msg = "run.write_to.sheetbook_append.align_by must be one of: {}".format("/".join(_WRITE_TO_ALIGN_BY))
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.align_by".format(item_path))
+                if header_policy not in _WRITE_TO_HEADER_POLICIES:
+                    msg = "run.write_to.sheetbook_append.header_policy must be one of: {}".format("/".join(_WRITE_TO_HEADER_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.header_policy".format(item_path))
+                if on_mismatch not in _WRITE_TO_ON_MISMATCH_POLICIES:
+                    msg = "run.write_to.sheetbook_append.on_mismatch must be one of: {}".format("/".join(_WRITE_TO_ON_MISMATCH_POLICIES))
+                    raise WorkflowConfigError(msg, path="{}.write_to.sheetbook_append.on_mismatch".format(item_path))
+                write_to = WorkflowWriteToSheetbookAppend(
+                    sheetbook=sheetbook_id,
+                    sheet=sheet,
+                    output=output_id,
+                    align_by=align_by,
+                    header_policy=header_policy,
+                    on_mismatch=on_mismatch,
+                )
+
+            else:  # pragma: no cover
+                msg = "run.write_to contains unknown keys: {}".format(kind)  # pragma: no cover
+                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))  # pragma: no cover
 
         runs.append(WorkflowRun(id=run_id, demand=demand, depends_on=depends_on, init_vars=init_vars, write_to=write_to))
 
@@ -557,6 +675,13 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
         msg = "workflow.resources.csvs must be a mapping"
         raise WorkflowConfigError(msg, path="workflow.resources.csvs")
 
+    sheetbooks_raw = resources_dict.get("sheetbooks", {})
+    if sheetbooks_raw is None:
+        sheetbooks_raw = {}
+    if not isinstance(sheetbooks_raw, dict):
+        msg = "workflow.resources.sheetbooks must be a mapping"
+        raise WorkflowConfigError(msg, path="workflow.resources.sheetbooks")
+
     workbooks: Dict[str, WorkflowWorkbookResource] = {}
     for raw_id, raw_cfg in cast("Dict[Any, Any]", workbooks_raw).items():
         resource_id = str(raw_id or "").strip() if isinstance(raw_id, str) else ""
@@ -593,12 +718,81 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
             raise WorkflowConfigError(msg, path="{}.path".format(item_path))
         csvs[resource_id] = WorkflowCsvResource(path=path_text)
 
-    overlap = sorted(set(workbooks.keys()).intersection(set(csvs.keys())))
-    if overlap:
-        msg = "workflow.resources ids must be unique across workbooks/csvs: {}".format(",".join(overlap))
+    sheetbooks: Dict[str, WorkflowSheetbookResource] = {}
+    for raw_id, raw_cfg in cast("Dict[Any, Any]", sheetbooks_raw).items():
+        resource_id = str(raw_id or "").strip() if isinstance(raw_id, str) else ""
+        item_path = "workflow.resources.sheetbooks.{}".format(resource_id or "(invalid)")
+        if not resource_id:
+            msg = "workflow.resources.sheetbooks keys must be non-empty strings"
+            raise WorkflowConfigError(msg, path="workflow.resources.sheetbooks")
+        if not isinstance(raw_cfg, dict):
+            msg = "workflow.resources.sheetbooks.<id> must be a mapping"
+            raise WorkflowConfigError(msg, path=item_path)
+        cfg = cast("Dict[str, Any]", raw_cfg)
+
+        budget_raw = cfg.get("budget")
+        if not isinstance(budget_raw, dict):
+            msg = "workflow.resources.sheetbooks.<id>.budget must be a mapping"
+            raise WorkflowConfigError(msg, path="{}.budget".format(item_path))
+        budget_dict = cast("Dict[str, Any]", budget_raw)
+
+        max_sheets_raw = budget_dict.get("max_sheets")
+        max_total_cells_raw = budget_dict.get("max_total_cells")
+        if isinstance(max_sheets_raw, bool) or not isinstance(max_sheets_raw, (int, float, str)):
+            msg = "workflow.resources.sheetbooks.<id>.budget.max_sheets must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path))
+        if isinstance(max_total_cells_raw, bool) or not isinstance(max_total_cells_raw, (int, float, str)):
+            msg = "workflow.resources.sheetbooks.<id>.budget.max_total_cells must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path))
+        try:
+            max_sheets = int(max_sheets_raw)
+        except (TypeError, ValueError) as exc:
+            msg = "workflow.resources.sheetbooks.<id>.budget.max_sheets must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path)) from exc
+        try:
+            max_total_cells = int(max_total_cells_raw)
+        except (TypeError, ValueError) as exc:
+            msg = "workflow.resources.sheetbooks.<id>.budget.max_total_cells must be an integer >= 1"
+            raise WorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path)) from exc
+        if max_sheets < 1:
+            msg = "workflow.resources.sheetbooks.<id>.budget.max_sheets must be >= 1"
+            raise WorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path))
+        if max_total_cells < 1:
+            msg = "workflow.resources.sheetbooks.<id>.budget.max_total_cells must be >= 1"
+            raise WorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path))
+
+        budget = WorkflowSheetbookBudget(max_sheets=max_sheets, max_total_cells=max_total_cells)
+
+        export_xlsx = None
+        export_raw = cfg.get("export_xlsx")
+        if export_raw is not None:
+            if not isinstance(export_raw, dict):
+                msg = "workflow.resources.sheetbooks.<id>.export_xlsx must be a mapping"
+                raise WorkflowConfigError(msg, path="{}.export_xlsx".format(item_path))
+            export_dict = cast("Dict[str, Any]", export_raw)
+            path_raw = export_dict.get("path")
+            path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
+            if not path_text:
+                msg = "workflow.resources.sheetbooks.<id>.export_xlsx.path must be a non-empty string"
+                raise WorkflowConfigError(msg, path="{}.export_xlsx.path".format(item_path))
+            write_lock_raw = export_dict.get("write_lock", False)
+            if not isinstance(write_lock_raw, bool):
+                msg = "workflow.resources.sheetbooks.<id>.export_xlsx.write_lock must be a bool"
+                raise WorkflowConfigError(msg, path="{}.export_xlsx.write_lock".format(item_path))
+            export_xlsx = WorkflowSheetbookExportXlsx(path=path_text, write_lock=bool(write_lock_raw))
+
+        sheetbooks[resource_id] = WorkflowSheetbookResource(budget=budget, export_xlsx=export_xlsx)
+
+    overlap_workbooks_csvs = set(workbooks.keys()).intersection(set(csvs.keys()))
+    overlap_workbooks_sheetbooks = set(workbooks.keys()).intersection(set(sheetbooks.keys()))
+    overlap_csvs_sheetbooks = set(csvs.keys()).intersection(set(sheetbooks.keys()))
+    overlap_all_set: Set[str] = set(overlap_workbooks_csvs).union(overlap_workbooks_sheetbooks, overlap_csvs_sheetbooks)
+    overlap_all = sorted(overlap_all_set)
+    if overlap_all:
+        msg = "workflow.resources ids must be unique across workbooks/csvs/sheetbooks: {}".format(",".join(overlap_all))
         raise WorkflowConfigError(msg, path="workflow.resources")
 
-    resources = WorkflowResources(workbooks=workbooks, csvs=csvs)
+    resources = WorkflowResources(workbooks=workbooks, csvs=csvs, sheetbooks=sheetbooks)
 
     for idx, run in enumerate(runs):
         if run.write_to is None:
@@ -613,6 +807,11 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
             csv_id = str(getattr(run.write_to, "csv", "") or "")
             if csv_id not in resources.csvs:
                 msg = "Unknown csv resource id '{}'".format(csv_id)
+                raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+        if isinstance(run.write_to, (WorkflowWriteToSheetbookSheet, WorkflowWriteToSheetbookAppend)):
+            sheetbook_id = str(getattr(run.write_to, "sheetbook", "") or "")
+            if sheetbook_id not in resources.sheetbooks:
+                msg = "Unknown sheetbook resource id '{}'".format(sheetbook_id)
                 raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
 
     options_raw = wf.get("options", {})
@@ -864,6 +1063,8 @@ __all__ = [
     "WorkflowRun",
     "WorkflowWriteTo",
     "WorkflowWriteToCsvAppend",
+    "WorkflowWriteToSheetbookAppend",
+    "WorkflowWriteToSheetbookSheet",
     "WorkflowWriteToWorkbookAppend",
     "WorkflowWriteToWorkbookSheet",
     "load_workflow_config",
