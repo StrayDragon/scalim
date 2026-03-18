@@ -336,6 +336,29 @@ def test_config_validator_reports_jsonschema_internal_error_as_warning(monkeypat
     assert any("JSONSchema validation failed unexpectedly" in issue.message for issue in warnings)
 
 
+def test_config_validator_jsonschema_validate_fn_hook_short_circuits() -> None:
+    called = []
+
+    def _validate_fn(_config: object, _schema: object) -> None:
+        called.append("ok")
+
+    config = {
+        "name": "demo",
+        "main_source": {
+            "source_id": "orders",
+            "loader": "tests.conftest.mock_loader",
+        },
+        "sources": {},
+    }
+
+    report = ConfigValidator(jsonschema_validate_fn=_validate_fn).validate_report(
+        dict(config),
+        enable_jsonschema_validation=True,
+    )
+    assert called
+    assert report.ok() is True
+
+
 def test_validate_yaml_text_json_roundtrip() -> None:
     raw = validate_yaml_text_json("name: [\n")
     payload = json.loads(raw)

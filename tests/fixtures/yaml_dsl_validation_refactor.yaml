@@ -1,0 +1,13 @@
+name: 123
+main_source:
+  source_id: 456
+  loader: tests.conftest.mock_loader
+sources: {}
+outputs:
+  - name: detail
+    container:
+      type: workbook
+      path: {$init_var: output_path, other: 1}
+      unknown_field: 1
+    fields:
+      - order_id

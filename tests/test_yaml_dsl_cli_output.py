@@ -186,6 +186,47 @@ main_source:
     assert any("JSONSchema is not available" in item["message"] for item in payload["warnings"])
 
 
+def test_yaml_dsl_validate_still_flags_outputs_container_path_init_var_shape_errors_without_jsonschema(
+    tmp_path,
+    capsys,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(validator_mod, "HAS_JSONSCHEMA", False)
+    monkeypatch.setattr(validator_mod, "jsonschema", None)
+
+    yaml_path = tmp_path / "invalid_outputs_path.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs:
+  - name: detail
+    container:
+      type: workbook
+      path: {$init_var: output_path, other: 1}
+      unknown_field: 1
+    fields:
+      - order_id
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    code = yaml_dsl._run_validate(_args(yaml_path, json_output=True))
+    assert code == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    errors = payload["errors"]
+    paths = {item["path"] for item in errors}
+    assert "outputs.0.container.path" in paths
+    assert "outputs.0.container.unknown_field" in paths
+
+
 def test_yaml_dsl_validate_allows_missing_sources(tmp_path, capsys) -> None:
     yaml_path = tmp_path / "minimal.yaml"
     yaml_path.write_text(

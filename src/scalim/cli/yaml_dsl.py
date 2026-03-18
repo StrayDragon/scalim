@@ -18,6 +18,7 @@ else:
     )
 
 from ..dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
+from ..dsl.by_yaml.config_parsing.jsonschema_issues import JsonSchemaCollectorError, collect_jsonschema_validation_issues
 from ..dsl.by_yaml.config_parsing.unknown_fields import find_unknown_fields
 from ..dsl.by_yaml.config_parsing.validator import ConfigValidator, attach_locations, build_yaml_location_index
 from ..dsl.by_yaml.config_parsing.validator import YamlValidationIssue as Issue
@@ -223,13 +224,6 @@ def _issues_to_rows(issues: Iterable[Any]) -> List[Issue]:
         suggestions = list(getattr(issue, "suggestions", []) or [])
         rows.append(Issue(path=path, message=message, suggestions=suggestions))
     return rows
-
-
-def _format_error_path(error: Any) -> str:
-    absolute_path = getattr(error, "absolute_path", None)
-    if absolute_path:
-        return ".".join(str(p) for p in absolute_path)
-    return "(root)"
 
 
 def _write_line(text: str) -> None:
@@ -692,35 +686,21 @@ def _collect_schema_issues(
     args: argparse.Namespace,
     jsonschema_module: Any,
 ) -> Tuple[List[Issue], List[Issue]]:
-    validator_factory = getattr(jsonschema_module, "Draft7Validator", None)
-    if not callable(validator_factory):
-        errors = [Issue(path="(root)", message="jsonschema Draft7Validator unavailable")]
+    try:
+        issues = collect_jsonschema_validation_issues(
+            yaml_data,
+            schema,
+            jsonschema_module=jsonschema_module,
+            include_context=bool(args.verbose),
+            filter_additional_properties=True,
+        )
+    except JsonSchemaCollectorError as exc:
+        errors = [Issue(path="(root)", message=str(exc))]
         return errors, []
-    validator = validator_factory(schema)
-    iter_errors = getattr(validator, "iter_errors", None)
-    if not callable(iter_errors):
-        errors = [Issue(path="(root)", message="jsonschema validator missing iter_errors")]
-        return errors, []
-    errors_iter = iter_errors(yaml_data)
-    errors_raw = list(cast("Iterable[Any]", errors_iter))
 
-    errors: List[Issue] = []
-    for error in sorted(errors_raw, key=lambda err: str(list(getattr(err, "absolute_path", [])))):
-        path = _format_error_path(error)
-        message = getattr(error, "message", str(error))
-        errors.append(Issue(path=path, message=message))
-
-        context = getattr(error, "context", None)
-        if args.verbose and context:
-            for ctx in context:
-                ctx_path = _format_error_path(ctx)
-                ctx_message = getattr(ctx, "message", str(ctx))
-                errors.append(Issue(path=ctx_path, message="↳ {}".format(ctx_message)))
-
+    errors = _issues_to_rows(issues)
     errors.extend(_find_legacy_field_errors(yaml_data))
-
-    unknowns = _issues_to_rows(find_unknown_fields(yaml_data, schema))
-    errors.extend(unknowns)
+    errors.extend(_issues_to_rows(find_unknown_fields(yaml_data, schema)))
     return errors, []
 
 

@@ -21,12 +21,12 @@ from ....spec.ir.demand import DemandIr
 from ....typedefs import FieldValue, RowData
 from ..config_parsing.call_by import CallByParseError, CallByValue, ParsedCallBy, parse_call_by
 from ..config_parsing.security import ComputeExpressionError, SecureComputeEngine, SecurityError
+from ..init_var_nodes import parse_init_var_mapping_node
 from ..schema_dsl.models import (
     DemandConfig,
     OutputAggregateConfig,
     OutputContainerConfig,
     OutputExtraSheetConfig,
-    OutputTargetConfig,
 )
 from .references import SecurePythonReferenceResolver
 
@@ -263,19 +263,7 @@ def _resolve_output_container_path(
     path: str,
 ) -> str:
     if isinstance(raw, dict):
-        init_var_raw = raw.get("$init_var")
-        extra_keys = sorted([str(k) for k in raw.keys() if k != "$init_var"])
-        if extra_keys:
-            msg = "{} only supports {{$init_var: <name>}}; unexpected keys: {}".format(path, ", ".join(extra_keys))
-            raise ValueError(msg)
-        if init_var_raw is None:
-            msg = "{} only supports {{$init_var: <name>}}; missing '$init_var'".format(path)
-            raise ValueError(msg)
-        if not isinstance(init_var_raw, str) or not init_var_raw.strip():
-            msg = "{}.$init_var must be a non-empty string".format(path)
-            raise TypeError(msg)
-
-        var_name = init_var_raw.strip()
+        var_name = parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)
         if init_vars is None or var_name not in init_vars:
             msg = "Missing init_var '{}' for {}".format(var_name, path)
             raise ValueError(msg)
@@ -463,7 +451,18 @@ def _compile_extra_sheet(
     )
 
 
-def compile_output_composition_from_yaml(  # noqa: C901
+def _validate_extra_sheet_target_names(config: DemandConfig) -> None:
+    outputs = config.outputs or ()
+    reserved = {str(t.name) for t in outputs}
+    if config.meta is not None and "meta" in reserved:
+        msg = "outputs.*.name cannot be 'meta' when meta sheet is enabled"
+        raise ValueError(msg)
+    if config.audit is not None and "audit" in reserved:
+        msg = "outputs.*.name cannot be 'audit' when audit sheet is enabled"
+        raise ValueError(msg)
+
+
+def compile_output_composition_from_yaml(
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
@@ -477,21 +476,14 @@ def compile_output_composition_from_yaml(  # noqa: C901
             raise ValueError(msg)
         return None
 
-    reserved = {str(t.name) for t in outputs}
-    if config.meta is not None and "meta" in reserved:
-        msg = "outputs.*.name cannot be 'meta' when meta sheet is enabled"
-        raise ValueError(msg)
-    if config.audit is not None and "audit" in reserved:
-        msg = "outputs.*.name cannot be 'audit' when audit sheet is enabled"
-        raise ValueError(msg)
+    _validate_extra_sheet_target_names(config)
 
     engine = SecureComputeEngine()
 
     direct_targets: List[OutputTargetSpec] = []
     derived_targets: List[DerivedOutputTargetSpec] = []
     workbook_default_path: Optional[str] = None
-    workbook_default_allow_formulas = False
-    workbook_default_write_lock = False
+    workbook_default_allow_formulas = workbook_default_write_lock = False
 
     for idx, out_cfg in enumerate(outputs):
         is_primary = idx == 0

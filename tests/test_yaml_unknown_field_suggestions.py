@@ -65,6 +65,58 @@ def test_find_unknown_fields_reports_paths_and_suggestions() -> None:
     assert by_path["empty.x"].suggestions == ()
 
 
+def test_find_unknown_fields_traverses_array_items_and_oneof_branch() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "outputs": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "container": {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string"},
+                                "path": {
+                                    "oneOf": [
+                                        {"type": "string"},
+                                        {
+                                            "type": "object",
+                                            "properties": {"$init_var": {"type": "string"}},
+                                            "additionalProperties": False,
+                                        },
+                                    ]
+                                },
+                            },
+                            "additionalProperties": False,
+                        }
+                    },
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "additionalProperties": False,
+    }
+
+    yaml_data = {
+        "outputs": [
+            {
+                "container": {
+                    "type": "workbook",
+                    "path": {"$init_var": "out_path", "other": 1},
+                    "unknown_field": 1,
+                }
+            }
+        ]
+    }
+
+    issues = find_unknown_fields(yaml_data, schema)
+    paths = {issue.path for issue in issues}
+    assert "outputs.0.container.unknown_field" in paths
+    assert "outputs.0.container.path.other" in paths
+
+
 def test_find_unknown_fields_returns_empty_for_unknown_schema_shape() -> None:
     assert find_unknown_fields([], {}) == []
     assert find_unknown_fields({"a": 1}, {"type": "object"}) == []

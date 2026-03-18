@@ -24,9 +24,11 @@ else:
     MappingNode = _yaml_nodes.MappingNode
     SequenceNode = _yaml_nodes.SequenceNode
 
-from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_TARGET_KEYS
+from ..init_var_nodes import InitVarNodeTypeError, InitVarNodeValueError, parse_init_var_mapping_node
+from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_CONTAINER_KEYS, OUTPUT_TARGET_KEYS
 from .errors import ConfigValidationError
 from .imports import contains_import_syntax
+from .jsonschema_issues import JsonSchemaCollectorError, collect_jsonschema_validation_issues
 from .models import FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
@@ -154,9 +156,10 @@ class ConfigValidator(ValidatorFieldsMixin):
         relation_paths = self._validate_relations(raw.data, errors, sources_info, main_source_id)
         self._validate_fields(raw, errors, sources_info, main_source_id, relation_paths)
         self._validate_outputs_fields_object_refs(raw, errors, main_source_id=main_source_id)
+        self._validate_outputs_container_paths(raw.data, errors)
 
         if enable_jsonschema_validation:
-            self._validate_with_jsonschema(raw.data, errors)
+            self._validate_with_jsonschema(raw.data, errors, filter_additional_properties=strict_unknown_fields)
         self._validate_unknown_fields(raw.data, errors, strict=strict_unknown_fields)
 
         return ValidationReport(issues=errors)
@@ -291,7 +294,13 @@ class ConfigValidator(ValidatorFieldsMixin):
             raise RuntimeError(msg)
         return self._schema
 
-    def _validate_with_jsonschema(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+    def _validate_with_jsonschema(
+        self,
+        config: Dict[str, Any],
+        errors: List[ValidationIssue],
+        *,
+        filter_additional_properties: bool,
+    ) -> None:
         if not HAS_JSONSCHEMA or jsonschema is None:  # pragma: no cover
             # `JSONSchema` 校验是可选项. 某些旧运行时可能存在但因依赖版本不匹配(例如旧 `attrs`)而不可用,因此这里不能直接失败.
             hint = ""
@@ -303,12 +312,29 @@ class ConfigValidator(ValidatorFieldsMixin):
             return
         try:
             schema = self._load_schema()
-            validate_fn = self._jsonschema_validate_fn or jsonschema.validate
-            _ = validate_fn(config, schema)
+            validate_fn = self._jsonschema_validate_fn
+
+            # 为兼容测试注入,保留 `jsonschema_validate_fn` 钩子(单条 `ValidationError`).
+            if validate_fn is not None:
+                _ = validate_fn(config, schema)
+                return
+
+            issues = collect_jsonschema_validation_issues(
+                config,
+                schema,
+                jsonschema_module=jsonschema,
+                include_context=False,
+                filter_additional_properties=bool(filter_additional_properties),
+            )
+            for issue in issues:
+                self._add_error(errors, issue.message, path=issue.path)
         except jsonschema.ValidationError as e:  # type: ignore[union-attr]
             absolute_path = getattr(e, "absolute_path", None)
             path = ".".join(str(p) for p in absolute_path) if absolute_path else ""
             self._add_error(errors, "Schema validation error: {}".format(e.message), path=path)
+        except JsonSchemaCollectorError as exc:
+            msg = "JSONSchema validation failed unexpectedly: {}: {}".format(type(exc).__name__, exc)
+            errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
         except Exception as exc:  # noqa: BLE001
             msg = "JSONSchema validation failed unexpectedly: {}: {}".format(type(exc).__name__, exc)
             errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
@@ -329,6 +355,35 @@ class ConfigValidator(ValidatorFieldsMixin):
                     suggestions=unknown.suggestions,
                 )
             )
+
+    def _validate_outputs_container_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+        outputs_raw: Any = config.get(DEMAND_KEYS["outputs"])
+        if not isinstance(outputs_raw, list):
+            return
+
+        outputs = cast("List[Any]", outputs_raw)
+        for output_idx, output_raw in enumerate(outputs):
+            output_dict = cast("Optional[Dict[str, Any]]", output_raw if isinstance(output_raw, dict) else None)
+            if output_dict is None:
+                continue
+            container_raw: Any = output_dict.get(OUTPUT_TARGET_KEYS["container"])
+            container_dict = cast("Optional[Dict[str, Any]]", container_raw if isinstance(container_raw, dict) else None)
+            if container_dict is None:
+                continue
+
+            path_raw: Any = container_dict.get(OUTPUT_CONTAINER_KEYS["path"])
+            if not isinstance(path_raw, dict):
+                continue
+            base_path = "{}.{}.{}.{}".format(
+                DEMAND_KEYS["outputs"],
+                output_idx,
+                OUTPUT_TARGET_KEYS["container"],
+                OUTPUT_CONTAINER_KEYS["path"],
+            )
+            try:
+                _ = parse_init_var_mapping_node(cast("Dict[str, Any]", path_raw), path=base_path)
+            except (InitVarNodeValueError, InitVarNodeTypeError) as exc:
+                self._add_error(errors, exc.reason, path=exc.path)
 
 
 YamlLocationIndex = Dict[str, Tuple[int, int]]

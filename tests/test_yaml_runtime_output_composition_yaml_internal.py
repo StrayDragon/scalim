@@ -170,7 +170,9 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
         )
     )
     with pytest.raises(ValueError, match=r"unexpected keys: other"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"})
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
+        )
 
     config = DemandConfig(
         outputs=(
@@ -182,7 +184,9 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
         )
     )
     with pytest.raises(ValueError, match=r"missing '\$init_var'"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"})
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
+        )
 
     config = DemandConfig(
         outputs=(
@@ -194,7 +198,9 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
         )
     )
     with pytest.raises(TypeError, match=r"\$init_var must be a non-empty string"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"})
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
+        )
 
 
 def test_compile_output_composition_validates_init_var_value_types_and_normalizes_path() -> None:
