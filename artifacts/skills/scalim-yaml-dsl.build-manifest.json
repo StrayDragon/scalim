@@ -421,11 +421,11 @@
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "b154cad823259d8729e08bd077651012aa7b6be329109a16a7c56f1ddeda7a1e"
+      "sha256": "7affe309b3a0d78bd9e551823a91780fe4720258c21e91743fb0b98623db7608"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "976e785595847db12848587f1ff2cfaa98bbbd7a571eead8f35258e5eac805d2"
+      "sha256": "76bb80b563a7749793c38c7f204acc59e92e0f24ccd66911e463024a7c5d0434"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
@@ -435,7 +435,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "a47989bb73635f5207ccb6d7737bbb10837ac4d93f7c5cb775ca3b8064f6c965"
+      "sha256": "ee5f064eaaae561c442e3b330f6566c6c119445c51a698de90d30f44db37a76d"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -451,7 +451,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "78bde48e8a8c69181a0efd72ce5ac901d2bf338317e3cc66034d57eab3ce12b0"
+      "sha256": "1bff5e4191737c253272e00c0586003d3c8ec43ac0dfc35876f0d65942ba33f2"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

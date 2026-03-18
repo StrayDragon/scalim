@@ -1,10 +1,10 @@
 import argparse
 import json
-import logging
 import re
 from pathlib import Path
 
 import scalim.cli.yaml_dsl as yaml_dsl
+import scalim.dsl.by_yaml.config_parsing.validator as validator_mod
 
 
 def _write_yaml(path: Path) -> None:
@@ -27,7 +27,6 @@ def _args(path: Path, *, json_output: bool) -> argparse.Namespace:
     return argparse.Namespace(
         yaml_file=path,
         schema=None,
-        strict=False,
         json=json_output,
         verbose=False,
     )
@@ -127,10 +126,10 @@ fields:
     )
 
     code = yaml_dsl._run_validate(_args(yaml_path, json_output=False))
-    assert code == 0
+    assert code == 1
 
     out = capsys.readouterr().out
-    assert "WARN" in out
+    assert "ERROR" in out
     assert "Unknown field" in out
     assert "commpute" in out
     assert "help: compute" in out
@@ -159,20 +158,32 @@ output:
     assert code == 1
 
     out = capsys.readouterr().out
-    assert "Schema validation error" not in out
     assert "Legacy YAML syntax is not supported: top-level 'output'" in out
     assert "ERROR" in out
 
 
-def test_yaml_dsl_validate_does_not_log_jsonschema_skip_noise(tmp_path, caplog) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.dsl.by_yaml.validator")
+def test_yaml_dsl_validate_warns_when_jsonschema_missing_but_still_succeeds(tmp_path, capsys, monkeypatch) -> None:
+    monkeypatch.setattr(validator_mod, "HAS_JSONSCHEMA", False)
+    monkeypatch.setattr(validator_mod, "jsonschema", None)
 
-    yaml_path = tmp_path / "demo.yaml"
-    _write_yaml(yaml_path)
+    yaml_path = tmp_path / "minimal.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+""".lstrip(),
+        encoding="utf-8",
+    )
 
-    yaml_dsl._run_validate(_args(yaml_path, json_output=False))
+    code = yaml_dsl._run_validate(_args(yaml_path, json_output=True))
+    assert code == 0
 
-    assert "JSONSchema is not available" not in caplog.text
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["errors"] == []
+    assert any("JSONSchema is not available" in item["message"] for item in payload["warnings"])
 
 
 def test_yaml_dsl_validate_allows_missing_sources(tmp_path, capsys) -> None:

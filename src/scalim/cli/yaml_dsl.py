@@ -123,7 +123,6 @@ def _set_help_default(parser: argparse.ArgumentParser) -> None:
 def _add_validate_args(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("yaml_file", type=Path, help="YAML 文件路径")
     _ = parser.add_argument("--schema", "-s", type=Path, default=None, help="JSON Schema 文件路径")
-    _ = parser.add_argument("--strict", action="store_true", help="严格模式: 将未知字段视为错误")
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     _ = parser.add_argument("--verbose", "-v", action="store_true", help="显示详细错误信息")
 
@@ -131,7 +130,6 @@ def _add_validate_args(parser: argparse.ArgumentParser) -> None:
 def _add_schema_validate_args(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("yaml_file", type=Path, help="YAML 文件路径")
     _ = parser.add_argument("--schema", "-s", type=Path, default=None, help="JSON Schema 文件路径")
-    _ = parser.add_argument("--strict", action="store_true", help="严格模式: 将未知字段视为错误")
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     _ = parser.add_argument("--verbose", "-v", action="store_true", help="显示详细错误信息")
 
@@ -551,8 +549,8 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0
     validator = ConfigValidator(schema_path=str(schema_path))
     report = validator.validate_report(
         yaml_data_dict,
-        strict_unknown_fields=bool(args.strict),
-        enable_jsonschema_validation=False,
+        strict_unknown_fields=True,
+        enable_jsonschema_validation=True,
     )
     errors = _issues_to_rows(report.errors())
     warnings = _issues_to_rows(report.warnings())
@@ -560,7 +558,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0
     errors = attach_locations(errors, locations)
     warnings = attach_locations(warnings, locations)
 
-    ok = (not errors) and (not (bool(args.strict) and warnings))
+    ok = not errors
 
     if args.json:
         payload = ValidationPayload(
@@ -616,7 +614,7 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
         errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
         return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=None)
     errors, warnings = _collect_schema_issues(yaml_data_dict, schema, args, jsonschema_module)
-    ok = not errors and not (args.strict and warnings)
+    ok = not errors
     source_lines: Optional[List[str]] = None
     locations: Dict[str, Tuple[int, int]] = {}
     try:
@@ -722,13 +720,8 @@ def _collect_schema_issues(
     errors.extend(_find_legacy_field_errors(yaml_data))
 
     unknowns = _issues_to_rows(find_unknown_fields(yaml_data, schema))
-    warnings: List[Issue] = []
-    if args.strict and unknowns:
-        errors.extend(unknowns)
-    else:
-        warnings.extend(unknowns)
-
-    return errors, warnings
+    errors.extend(unknowns)
+    return errors, []
 
 
 def _emit_schema_result(

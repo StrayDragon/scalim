@@ -14,7 +14,7 @@
 
 ## 如何定位需要看的升级批次
 
-1) 先跑 `schema validate --strict` 与 `validate --strict`,取第一条错误的 `path + message`
+1) 先跑 `schema validate` 与 `validate`(默认 strict unknown fields),取第一条错误的 `path + message`
 2) 优先读生成的 upgrades 摘要: `references/generated/yaml-dsl-upgrades.gen.md`
 3) 再按摘要里的路径打开对应批次的完整升级文档(`references/upgrades/*.md`)
 
@@ -205,8 +205,8 @@ outputs:
 ## 最小自检
 
 ```bash
-uv run scalim-cli yaml-dsl schema validate <file.yaml> --strict
-uv run scalim-cli yaml-dsl validate <file.yaml> --strict
+uv run scalim-cli yaml-dsl schema validate <file.yaml>
+uv run scalim-cli yaml-dsl validate <file.yaml>
 ```
 
 ## 常见报错到修复动作

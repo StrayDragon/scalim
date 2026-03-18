@@ -629,14 +629,27 @@ def run_ir(
         engine_factory=engine_factory,
     )
 
+    run_ok = False
     try:
         _ = engine.run(sink=output_assembly.counting_sink)
+        run_ok = True
     finally:
         # 尽力清理: 即使 `engine`/`pipeline` 在关闭前失败也要执行.
-        with contextlib.suppress(Exception):
-            output_assembly.counting_sink.close()
-        with contextlib.suppress(Exception):
-            observer_manager.close()
+        #
+        # 语义:
+        # - `engine.run(...)` 成功: `sink.close()` 失败必须传播(输出落盘/提交的真实成功标准).
+        # - `engine.run(...)` 失败: `sink.close()` 尽力而为,不得覆盖原异常.
+        if run_ok:
+            try:
+                output_assembly.counting_sink.close()
+            finally:
+                with contextlib.suppress(Exception):
+                    observer_manager.close()
+        else:
+            with contextlib.suppress(Exception):
+                output_assembly.counting_sink.close()
+            with contextlib.suppress(Exception):
+                observer_manager.close()
 
     output_target_stats: Optional[List["OutputTargetStats"]] = None
     if output_assembly.composition_router is not None:

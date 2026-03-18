@@ -1,10 +1,12 @@
 import pytest
 
+from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ConversionError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_str
 from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
 from tests.yaml_fixtures import make_yaml_config
@@ -129,8 +131,10 @@ fields:
     [
         ("int", "3", 3),
         ("str", 3, "3"),
+        ("int", None, None),
+        ("str", None, None),
     ],
-    ids=["int-cast", "str-cast"],
+    ids=["int-cast", "str-cast", "int-none", "str-none"],
 )
 def test_converter_value_cast_applies(value_cast: str, input_value, expected) -> None:
     yaml_content = make_yaml_config(
@@ -153,6 +157,17 @@ fields:
     field = demand_ir.fields["order_id"]
     assert field.transform is not None
     assert field.transform(input_value) == expected
+
+
+def test_value_cast_str_none_does_not_break_compute_if_falsy_guard() -> None:
+    # Regression: before the fix, cast_str(None) == "None" (truthy), which would make the expression take the true-branch
+    # and crash at float("None").
+    engine = SecureComputeEngine()
+    calc = engine.compile(
+        "str(round(float(ratio) * 100, 2)) + '%' if ratio else '0.0%'",
+        ("ratio",),
+    )
+    assert calc(cast_str(None)) == "0.0%"
 
 
 def test_converter_private_value_cast_raises() -> None:

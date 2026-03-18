@@ -77,8 +77,8 @@ sources:
 
 ### Step 0: 先跑校验定位问题
 
-- `uv run scalim-cli yaml-dsl schema validate <file.yaml> --strict`
-- `uv run scalim-cli yaml-dsl validate <file.yaml> --strict`
+- `uv run scalim-cli yaml-dsl schema validate <file.yaml>`(默认 strict unknown fields)
+- `uv run scalim-cli yaml-dsl validate <file.yaml>`(默认 strict unknown fields;无 jsonschema 时会给 warning 但不影响内部语义校验)
 
 ### Step 1: 把 `bind/to_bind` 迁移为 `params` 模板指令
 

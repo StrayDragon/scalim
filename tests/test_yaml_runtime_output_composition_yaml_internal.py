@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -105,20 +106,10 @@ def test_compile_extra_sheet_requires_workbook_path() -> None:
             target_id="meta",
             cfg=OutputExtraSheetConfig(),
             default_sheet="__meta__",
-            default_workbook_container=None,
+            default_workbook_path=None,
+            default_allow_formulas=False,
+            default_write_lock=False,
         )
-
-
-def test_first_workbook_container_skips_none_container() -> None:
-    outputs = (
-        OutputTargetConfig(name="a", container=None),
-        OutputTargetConfig(name="b", container=OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")),
-    )
-
-    container = oc_yaml._first_workbook_container(outputs)  # noqa: SLF001
-    assert container is not None
-    assert container.type == "workbook"
-    assert container.path == "./out.xlsx"
 
 
 def test_compile_output_composition_meta_audit_requires_outputs() -> None:
@@ -130,6 +121,145 @@ def test_compile_output_composition_meta_audit_requires_outputs() -> None:
 
 def test_compile_output_composition_returns_none_when_no_outputs() -> None:
     assert oc_yaml.compile_output_composition_from_yaml(DemandConfig(), _make_demand_ir(), resolver=_resolver()) is None
+
+
+def test_compile_output_composition_resolves_output_container_path_init_var() -> None:
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path={"$init_var": "output_path"}, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(),
+        resolver=_resolver(),
+        init_vars={"output_path": "./out.xlsx"},
+    )
+    assert spec is not None
+    assert spec.targets[0].output.path == "./out.xlsx"
+
+
+def test_compile_output_composition_requires_output_container_path_init_var_value() -> None:
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path={"$init_var": "output_path"}, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+
+    with pytest.raises(ValueError, match=r"outputs\.0\.container\.path"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+
+
+def test_compile_output_composition_rejects_output_container_path_init_var_shape_errors() -> None:
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path={"$init_var": "out_path", "other": 1}, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+    with pytest.raises(ValueError, match=r"unexpected keys: other"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"})
+
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path={}, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+    with pytest.raises(ValueError, match=r"missing '\$init_var'"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"})
+
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path={"$init_var": " "}, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+    with pytest.raises(TypeError, match=r"\$init_var must be a non-empty string"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"})
+
+
+def test_compile_output_composition_validates_init_var_value_types_and_normalizes_path() -> None:
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path={"$init_var": "out_path"}, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(),
+        resolver=_resolver(),
+        init_vars={"out_path": " ./out.xlsx "},
+    )
+    assert spec is not None
+    assert spec.targets[0].output.path == "./out.xlsx"
+
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(),
+        resolver=_resolver(),
+        init_vars={"out_path": Path("output/out.xlsx")},
+    )
+    assert spec is not None
+    assert spec.targets[0].output.path == "output/out.xlsx"
+
+    with pytest.raises(ValueError, match=r"resolved to None"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": None})
+
+    with pytest.raises(TypeError, match=r"must be str or os\.PathLike"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": 1})
+
+    with pytest.raises(ValueError, match=r"resolved to an empty string"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "   "})
+
+
+def test_compile_output_composition_rejects_empty_or_missing_container_path_values() -> None:
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path=None, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+    with pytest.raises(ValueError, match=r"is required"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="workbook", path="   ", sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+    with pytest.raises(ValueError, match=r"is required"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
 
 
 def test_compile_output_composition_meta_output_name_is_reserved() -> None:

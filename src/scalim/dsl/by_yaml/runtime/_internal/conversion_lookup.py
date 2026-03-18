@@ -11,7 +11,9 @@ _SOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 CALL_BY_CTX_KEY = "$ctx"
 
 
-def cast_int(value: object) -> int:
+def cast_int(value: object) -> Optional[int]:
+    if value is None:
+        return None
     try:
         return int(value)  # pyright: ignore[reportArgumentType]
     except ValueError:
@@ -21,7 +23,9 @@ def cast_int(value: object) -> int:
         raise TypeError(msg) from exc
 
 
-def cast_str(value: object) -> str:
+def cast_str(value: object) -> Optional[str]:
+    if value is None:
+        return None
     return str(value)
 
 

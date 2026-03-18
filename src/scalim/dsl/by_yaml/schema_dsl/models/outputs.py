@@ -72,21 +72,52 @@ class OutputContainerConfig:
     )
     """输出容器类型."""
 
-    path: str = dataclass_field(
+    path: Any = dataclass_field(
         default="",
         metadata=schema_meta(
             schema={
-                "type": "string",
-                "minLength": 1,
-                "description": "输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)",
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)",
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "$init_var": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                            }
+                        },
+                        "required": ["$init_var"],
+                        "additionalProperties": False,
+                        "description": "运行时动态路径: {$init_var: <name>}",
+                    },
+                ],
+                "description": "输出文件路径(支持静态字符串或 {$init_var: <name>} 动态注入)",
                 "markdownDescription": (
                     "输出文件路径.\n\n"
                     "- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n"
                     "- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n"
                     "- 可能覆盖同名文件\n"
-                    "- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出"
+                    "- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\n"
+                    "动态注入:\n"
+                    "- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n"
+                    "- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n"
+                    "- 缺失 `init_vars[<name>]` 时会 fail-fast\n\n"
+                    "示例:\n"
+                    "```yaml\n"
+                    "path: ./output/report.xlsx\n"
+                    "path: {$init_var: output_path}\n"
+                    "```"
                 ),
-                "examples": ["./output/report.xlsx", "./output/report.csv"],
+                "examples": [
+                    "./output/report.xlsx",
+                    "./output/report.csv",
+                    {"$init_var": "output_path"},
+                ],
             }
         ),
     )

@@ -96,12 +96,12 @@
 ## Command Details
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
-- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
+- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--json]
                                     [--verbose]
                                     yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--strict] [--json]
+usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--json]
                                     [--verbose]
                                     yaml_file
 
@@ -112,20 +112,19 @@ options:
   -h, --help            show this help message and exit
   --schema SCHEMA, -s SCHEMA
                         JSON Schema 文件路径
-  --strict              严格模式: 将未知字段视为错误
   --json                输出 JSON 结果
   --verbose, -v         显示详细错误信息
 ```
 
 ### `yaml-dsl schema validate`
 - Help: Validate YAML DSL via JSON Schema
-- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
-                                           [--json] [--verbose]
+- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--json]
+                                           [--verbose]
                                            yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--strict]
-                                           [--json] [--verbose]
+usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--json]
+                                           [--verbose]
                                            yaml_file
 
 positional arguments:
@@ -135,7 +134,6 @@ options:
   -h, --help            show this help message and exit
   --schema SCHEMA, -s SCHEMA
                         JSON Schema 文件路径
-  --strict              严格模式: 将未知字段视为错误
   --json                输出 JSON 结果
   --verbose, -v         显示详细错误信息
 ```

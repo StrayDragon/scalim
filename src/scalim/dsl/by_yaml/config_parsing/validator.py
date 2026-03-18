@@ -555,7 +555,7 @@ def validate_yaml_text(
     errors = attach_locations(errors, locations)
     warnings = attach_locations(warnings, locations)
 
-    ok = (not errors) and (not (strict_unknown_fields and warnings))
+    ok = not errors
     return YamlValidationResult(ok=bool(ok), errors=errors, warnings=warnings)
 
 

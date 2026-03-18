@@ -153,12 +153,24 @@ result = run(
 )
 ```
 
-`init_vars` 注入(用于解析 `params` 中的 `{$init_var: <name>}` 指令节点):
+`init_vars` 注入(用于解析 `{$init_var: <name>}` 指令节点;**对象节点**、仅编译期解析一次、不做子串插值):
 
 ```yaml
 main_source:
   params:
     end_dt: {$init_var: end_dt}
+```
+
+`outputs.*.container.path` 也支持同样的注入语法:
+
+```yaml
+outputs:
+  - name: detail
+    container:
+      type: workbook
+      path: {$init_var: output_path}
+      sheet: 明细
+    fields: [order_id]
 ```
 
 ```python
@@ -167,9 +179,20 @@ from datetime import datetime
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    init_vars={"end_dt": datetime(2024, 1, 31)},
+    init_vars={
+        "end_dt": datetime(2024, 1, 31),
+        "output_path": "./output/report.xlsx",
+    },
 )
 ```
+
+指令节点范围约束(稳定 authoring surface):
+
+| 位置 | `{$init_var: ...}` | `{$keys: ...}` | `{$rows: ...}` |
+|---|---|---|---|
+| `main_source.params` | ✅ | ❌ | ❌ |
+| `sources.<id>.params` | ✅ | ✅ | ✅ |
+| `outputs.*.container.path` | ✅ | ❌ | ❌ |
 
 ---
 

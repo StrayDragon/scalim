@@ -149,6 +149,69 @@ def test_run_ir_closes_sink_on_exception() -> None:
     assert sink.closed is True
 
 
+def test_run_ir_raises_when_sink_close_fails_after_successful_run() -> None:
+    class _CloseExplodingSink(BaseRowSink):
+        def __init__(self) -> None:
+            self.rows = []
+            self.closed = False
+
+        @override
+        def write_row(self, row) -> None:  # type: ignore[override]
+            self.rows.append(dict(row))
+
+        @override
+        def close(self) -> None:
+            self.closed = True
+            raise RuntimeError("close boom")
+
+    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+    sink = _CloseExplodingSink()
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=sink,
+    )
+
+    with pytest.raises(RuntimeError, match="close boom"):
+        _ = run_ir(demand_ir, request)
+    assert sink.rows == [{"order_id": 1}]
+    assert sink.closed is True
+
+
+def test_run_ir_suppresses_sink_close_error_when_engine_run_fails() -> None:
+    class _ExplodingSink(BaseRowSink):
+        def __init__(self) -> None:
+            self.closed = False
+
+        @override
+        def write_row(self, row) -> None:  # type: ignore[override]
+            _ = row
+            raise RuntimeError("run boom")
+
+        @override
+        def close(self) -> None:
+            self.closed = True
+            raise RuntimeError("close boom")
+
+    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+    sink = _ExplodingSink()
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=sink,
+    )
+
+    with pytest.raises(RuntimeError, match="run boom"):
+        _ = run_ir(demand_ir, request)
+    assert sink.closed is True
+
+
 def test_create_tee_sink_column_mode_delegates_to_both_sinks() -> None:
     primary = InMemoryColumnSink(field_names=["id"])
     secondary = InMemoryColumnSink(field_names=["id"])

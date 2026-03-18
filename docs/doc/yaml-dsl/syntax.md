@@ -169,6 +169,19 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
     - `{$rows: {cache_mode: batch|none}}`(默认 batch)
     - `$rows.cache_mode=none` 会禁用批次内 relation 复用(每个字段各自调用 loader)
 
+指令节点范围约束(稳定 authoring surface):
+
+| 位置 | `{$init_var: ...}` | `{$keys: ...}` | `{$rows: ...}` |
+|---|---|---|---|
+| `main_source.params` | ✅ | ❌ | ❌ |
+| `sources.<id>.params` | ✅ | ✅ | ✅ |
+| `outputs.*.container.path` | ✅ | ❌ | ❌ |
+
+补充:
+
+- `{$init_var: <name>}` 是**对象节点**(单键 mapping),仅在编译期解析一次为 `init_vars[<name>]`。
+- 系统不会对字符串做任何子串替换(例如 `"x=$init_var.end_dt"` 会保持原样字符串).
+
 执行语义上,`$rows` 会影响调度边界:
 
 - `parallel_mode="adaptive"` 时,调度器会把 `$rows` 视为 barrier,该层直接串行执行(见 [并行模式](../architecture/parallel-modes.md)).
@@ -179,6 +192,7 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 
 - 每个 output 必填唯一 `name`(供 `from` 引用)
 - `container` 描述输出容器(workbook/csv)与路径/工作表等
+- `container.path` 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
 - 明细输出使用 `fields: [field_id, ...]` 指定导出列顺序
 - `where` 是安全表达式,用于分发过滤;其依赖字段会在编译期注入 required fields
 - 派生汇总输出使用 `aggregate`(与 `fields` 互斥)
@@ -221,13 +235,13 @@ outputs:
 1. 结构校验(JSON Schema):
 
 ```bash
-scalim-cli yaml-dsl schema validate path/to/file.yaml --strict --verbose
+scalim-cli yaml-dsl schema validate path/to/file.yaml --verbose
 ```
 
 2. 语义校验(内置 validator,会做更多规则检查):
 
 ```bash
-scalim-cli yaml-dsl validate path/to/file.yaml --strict --verbose
+scalim-cli yaml-dsl validate path/to/file.yaml --verbose
 ```
 
 如果你看到 “legacy field 不允许” 这类错误,通常来自 CLI 的兼容性限制.

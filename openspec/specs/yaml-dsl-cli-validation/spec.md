@@ -15,30 +15,34 @@
 - `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` (schema input for schema-only validation and unknown-field checks)
 
 ## Implementation Notes (Current Behavior)
-- `PROJECT_CLI_NAME yaml-dsl validate` 走内部语义 validator(`ConfigValidator.validate_report(...)`)并输出 linter 风格诊断(含 `path:line[:column]`).
-- `PROJECT_CLI_NAME yaml-dsl schema validate` 走 JSON Schema(`jsonschema` 可选依赖)并补充 unknown fields/legacy fields 的诊断.
+- `PROJECT_CLI_NAME yaml-dsl validate` 走内部语义 validator(`ConfigValidator.validate_report(...)`)并输出 linter 风格诊断(含 `path:line[:column]`);当 `jsonschema` 可用时会执行 JSONSchema 校验补充结构/类型诊断,不可用/异常时以 warning 形式提示并继续.
+- `PROJECT_CLI_NAME yaml-dsl schema validate` 走 JSON Schema(依赖 `jsonschema`)并补充 unknown fields/legacy fields 的诊断.
 - CLI 的 `--json` 输出提供结构化 payload(含 `ok`/`errors`/`warnings`/`yaml_path`/`schema_path`)供脚本化消费.
 ## Requirements
 ### Requirement: CLI validate 与 schema validate 职责边界(避免重复诊断)
 系统 SHALL 将 YAML DSL 校验命令明确分层:
 
-- `PROJECT_CLI_NAME yaml-dsl validate` SHALL 仅使用内部语义校验器(internal validator)进行校验与诊断输出.
-- `PROJECT_CLI_NAME yaml-dsl validate` MUST NOT 依赖 `jsonschema` 可选依赖(即使未安装 `jsonschema` 也不得输出“缺少依赖/跳过校验”的噪音日志).
-- `PROJECT_CLI_NAME yaml-dsl schema validate` SHALL 作为 JSON Schema 校验入口,输出 schema 相关诊断(包含 schema 结构错误与 unknown fields).
+- `PROJECT_CLI_NAME yaml-dsl validate` SHALL 使用内部语义校验器(internal validator)作为主校验入口,并输出可行动诊断(含定位信息)。
+- `PROJECT_CLI_NAME yaml-dsl validate` SHOULD 在 `jsonschema` 可用时执行 JSONSchema 校验以补充结构/类型诊断,但 MUST NOT **依赖** `jsonschema`:
+  - 当运行环境未安装 `jsonschema`(或依赖不兼容/校验非预期失败)时,命令 MUST 输出 warning(可定位到 `(schema)`),并继续执行内部语义校验与 unknown-fields 检查。
+  - warnings MUST NOT 使 validate 失败(退出码/`ok` 仅由 errors 决定)。
+- `PROJECT_CLI_NAME yaml-dsl schema validate` SHALL 作为 schema-only 校验入口,用于显式运行 JSON Schema 校验与 unknown-fields 诊断。
 
-#### Scenario: validate 不输出 schema 校验错误
-- **WHEN** YAML 配置在 `output.fields` 中包含字符串条目(例如 `"order_id"`)
-- **THEN** `PROJECT_CLI_NAME yaml-dsl validate` 输出应仅包含内部 validator 的可行动诊断
-- **THEN** 输出中 MUST NOT 包含 `"Schema validation error"` 文案
-
-#### Scenario: validate 不依赖 jsonschema
+#### Scenario: validate 在无 jsonschema 环境仍可用且不失败
 - **GIVEN** 运行环境未安装 `jsonschema`
-- **WHEN** 用户运行 `PROJECT_CLI_NAME yaml-dsl validate` 校验 YAML DSL 配置
-- **THEN** 命令应正常执行(以内部语义校验为准)且不得输出“jsonschema 不可用/跳过”等警告噪音
+- **WHEN** 用户运行 `PROJECT_CLI_NAME yaml-dsl validate` 校验一个在内部语义校验层面有效的 YAML DSL 配置
+- **THEN** 命令应正常执行并返回成功
+- **AND** 输出中 MUST 包含一条 warning 说明 JSONSchema 不可用且已跳过 schema 校验
+
+#### Scenario: validate 可报告 init_var 节点形态错误
+- **GIVEN** `outputs[0].container.path` 为 object 且包含额外键(例如 `{$init_var: output_path, other: 1}`)
+- **WHEN** 用户运行 `PROJECT_CLI_NAME yaml-dsl validate <yaml>`
+- **THEN** 校验 MUST 失败
+- **AND** 错误定位 MUST 指向 `outputs.0.container.path`
 
 ### Requirement: CLI Schema-Only Validation
-系统 SHALL 提供 `PROJECT_CLI_NAME yaml-dsl schema validate` 命令,使用 JSON Schema 校验 YAML DSL 配置并支持 `--schema`、`--strict`、`--json` 参数.
-该命令在严格模式下将未知字段视为错误并返回非零退出码.
+系统 SHALL 提供 `PROJECT_CLI_NAME yaml-dsl schema validate` 命令,使用 JSON Schema 校验 YAML DSL 配置并支持 `--schema`、`--json` 参数.
+该命令默认将未知字段视为错误并返回非零退出码(不再需要 `--strict`).
 
 #### Scenario: schema-only 校验命令
 - **WHEN** 用户运行 `PROJECT_CLI_NAME yaml-dsl schema validate` 校验配置
@@ -56,10 +60,10 @@
 - **THEN** 输出 schema 的绝对路径
 
 ### Requirement: 严格未知字段校验
-系统 SHALL 在 `PROJECT_CLI_NAME yaml-dsl validate --strict` 模式下将未知字段视为校验错误,并在错误输出中包含未知字段路径.
+系统 SHALL 在 `PROJECT_CLI_NAME yaml-dsl validate` 默认模式下将未知字段视为校验错误,并在错误输出中包含未知字段路径(不再提供 `--strict`).
 
 #### Scenario: 严格模式未知字段
-- **WHEN** YAML 配置包含未知字段且使用 `PROJECT_CLI_NAME yaml-dsl validate --strict`
+- **WHEN** YAML 配置包含未知字段且用户运行 `PROJECT_CLI_NAME yaml-dsl validate`
 - **THEN** 校验命令失败并报告未知字段路径
 
 ### Requirement: 运行时 validator 错误列表包含 issue path

@@ -69,6 +69,7 @@
 |---|---|---|---|
 | `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | 启用后会忽略单输出的 `overrides.output.*` | 用 `run(..., output_composition=...)` 完全覆盖 YAML outputs |
 | `outputs.*.container` | `OutputTargetSpec.output` (`OutputSpec`) | 目前仅 `workbook/csv` 两类容器 | 其它 sink 用 `run(..., sink=...)` |
+| `outputs.*.container.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast | 用 Python 侧 `init_vars` 注入或改用固定路径 |
 | `outputs.*.fields` | `ExportLayout.field_ids` | 支持 `field_id` string + YAML alias(object/list)并 flatten | 若 alias identity 丢失且内容匹配歧义,改用 string `field_id` |
 | `outputs.*.where` | `OutputTargetSpec.predicate` | 安全表达式;依赖字段静态提取注入 required fields | 复杂分发逻辑放到 loader/derived field 里生成路由字段 |
 | `outputs.*.aggregate` | `DerivedOutputTargetSpec.derived`(group_by) | 当前 YAML 只暴露 `group_by+metrics` 这一类派生汇总 | 更复杂派生输出装配走 Python-only `OutputCompositionSpec` |

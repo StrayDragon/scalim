@@ -345,7 +345,29 @@ class ParserOutputsMixin:
     def _parse_output_container(self, raw: Dict[str, Any], *, base_path: str) -> OutputContainerConfig:
         type_raw = raw.get(OUTPUT_CONTAINER_KEYS["type"])
         typ = _non_empty_str(type_raw).lower()
-        path = _non_empty_str(raw.get(OUTPUT_CONTAINER_KEYS["path"]))
+        path_raw = raw.get(OUTPUT_CONTAINER_KEYS["path"])
+        path: Any
+        if isinstance(path_raw, dict):
+            init_var_raw = path_raw.get("$init_var")
+            extra_keys = sorted([k for k in path_raw.keys() if k != "$init_var"])
+            if extra_keys:
+                msg = "{}.path only supports {{$init_var: <name>}}; unexpected keys: {}".format(base_path, ", ".join(extra_keys))
+                raise ValueError(msg)
+            if init_var_raw is None:
+                msg = "{}.path only supports {{$init_var: <name>}}; missing '$init_var'".format(base_path)
+                raise ValueError(msg)
+            if not isinstance(init_var_raw, str) or not init_var_raw.strip():
+                msg = "{}.path.$init_var must be a non-empty string".format(base_path)
+                raise TypeError(msg)
+            path = {"$init_var": init_var_raw.strip()}
+        else:
+            if path_raw is None:
+                path = ""
+            elif isinstance(path_raw, str):
+                path = path_raw.strip()
+            else:
+                msg = "{}.path must be a non-empty string or {{$init_var: <name>}}".format(base_path)
+                raise TypeError(msg)
         sheet = str_or_none(raw.get(OUTPUT_CONTAINER_KEYS["sheet"]))
         sheet = _non_empty_str(sheet) or None
         encoding = _non_empty_str(raw.get(OUTPUT_CONTAINER_KEYS["encoding"])) or DEFAULT_OUTPUT_ENCODING

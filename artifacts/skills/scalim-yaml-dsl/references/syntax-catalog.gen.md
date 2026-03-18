@@ -590,7 +590,7 @@
   - `encoding`: `string`
   - `header_fields_output_by`: `string`, enum `field_id`, `name`
   - `include_header`: `boolean`
-  - `path`: `string`
+  - `path`: `string` | `object`, oneOf(2)
   - `sheet`: `string`
   - `streaming`: `boolean`
   - `type`: `string`, enum `workbook`, `csv`

@@ -12,15 +12,15 @@
 ### 仓库内
 
 ```bash
-uv run scalim-cli yaml-dsl schema validate <file.yaml> --strict
-uv run scalim-cli yaml-dsl validate <file.yaml> --strict
+uv run scalim-cli yaml-dsl schema validate <file.yaml>
+uv run scalim-cli yaml-dsl validate <file.yaml>
 ```
 
 ### 仓库外
 
 ```bash
-uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml> --strict
-uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml> --strict
+uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>
+uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>
 ```
 
 ### 查询 schema 路径
@@ -34,10 +34,11 @@ uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
 
 - `schema validate`
   - 检查 JSON Schema 结构
-  - 检查 unknown fields
+  - 检查 unknown fields(默认 strict: unknown field 直接作为 error)
   - 更适合快速收敛字段名、结构、枚举和类型
 - `validate`
   - 检查运行时语义
+  - 会尽可能执行 JSONSchema 校验作为补充(缺依赖/非预期失败时给 warning,但不影响内部语义校验)
   - 更适合抓 relation 链路、派生字段、输出字段歧义、旧写法限制
 
 不要只跑其中一个。
@@ -66,7 +67,7 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 
 - 先检查拼写
 - 再检查是不是旧字段名
-- 需要时加 `--strict` 让问题尽早变成 error
+- 默认就是 strict(未知字段直接是 error);不需要额外参数
 
 ### `Legacy field 'xxx' is not allowed`
 
@@ -123,7 +124,6 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 ## 交付时必须写清楚
 
 - 已跑哪些命令
-- 是否用了 `--strict`
 - schema header 是否已校正
 - 是否缺 `jsonschema`、`openpyxl`、真实数据库、下游服务或 allowlist 上下文
 - 静态校验已过,还是仅完成了 schema 校验,还是两者都过

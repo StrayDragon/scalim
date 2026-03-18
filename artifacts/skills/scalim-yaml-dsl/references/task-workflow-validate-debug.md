@@ -17,7 +17,7 @@ uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schem
 更强诊断:
 
 ```bash
-uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json --strict --verbose <workflow.yaml>
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json --verbose <workflow.yaml>
 uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json --json <workflow.yaml>
 ```
 
@@ -35,7 +35,7 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style al
 ## 工作顺序(推荐)
 
 1. 确认你在校验的是 workflow YAML,并且使用了 workflow schema(`--schema .../workflow.gen.json`)
-2. 先用 `schema validate --strict` 收敛结构/未知字段问题
+2. 先用 `schema validate` 收敛结构/未知字段问题(默认 strict unknown fields)
 3. schema 过了但 workflow 仍失败时,用 Python 入口跑一次,定位运行期的 fail-fast 校验(例如 cycle、ctx 越界、输出路径冲突等)
 
 ```python

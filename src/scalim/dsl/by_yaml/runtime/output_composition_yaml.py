@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
@@ -255,14 +256,66 @@ def _export_layout_for_derived(
     return ExportLayout(field_ids=normalized, header_names=tuple(names))
 
 
-def _output_spec_from_container(container: OutputContainerConfig) -> OutputSpec:
+def _resolve_output_container_path(
+    raw: object,
+    *,
+    init_vars: Optional[Dict[str, object]],
+    path: str,
+) -> str:
+    if isinstance(raw, dict):
+        init_var_raw = raw.get("$init_var")
+        extra_keys = sorted([str(k) for k in raw.keys() if k != "$init_var"])
+        if extra_keys:
+            msg = "{} only supports {{$init_var: <name>}}; unexpected keys: {}".format(path, ", ".join(extra_keys))
+            raise ValueError(msg)
+        if init_var_raw is None:
+            msg = "{} only supports {{$init_var: <name>}}; missing '$init_var'".format(path)
+            raise ValueError(msg)
+        if not isinstance(init_var_raw, str) or not init_var_raw.strip():
+            msg = "{}.$init_var must be a non-empty string".format(path)
+            raise TypeError(msg)
+
+        var_name = init_var_raw.strip()
+        if init_vars is None or var_name not in init_vars:
+            msg = "Missing init_var '{}' for {}".format(var_name, path)
+            raise ValueError(msg)
+        raw_value = init_vars[var_name]
+        if raw_value is None:
+            msg = "{} init_var '{}' resolved to None".format(path, var_name)
+            raise ValueError(msg)
+        if isinstance(raw_value, os.PathLike):
+            resolved_raw = os.fspath(raw_value)
+        elif isinstance(raw_value, str):
+            resolved_raw = raw_value
+        else:
+            msg = "{} init_var '{}' must be str or os.PathLike, got {}".format(path, var_name, type(raw_value).__name__)
+            raise TypeError(msg)
+
+        resolved = str(resolved_raw).strip()
+        if not resolved:
+            msg = "{} init_var '{}' resolved to an empty string".format(path, var_name)
+            raise ValueError(msg)
+        return resolved
+
+    if raw is None:
+        msg = "{} is required".format(path)
+        raise ValueError(msg)
+
+    resolved = str(os.fspath(raw) if isinstance(raw, os.PathLike) else raw).strip()
+    if not resolved:
+        msg = "{} is required".format(path)
+        raise ValueError(msg)
+    return resolved
+
+
+def _output_spec_from_container(container: OutputContainerConfig, *, path: str) -> OutputSpec:
     fmt = "excel" if str(container.type).lower() == "workbook" else "csv"
     sheet_name = str(container.sheet) if container.sheet else None
     if fmt != "excel":
         sheet_name = None
     return OutputSpec(
         format=fmt,
-        path=str(container.path),
+        path=path,
         encoding=str(container.encoding),
         streaming=bool(container.streaming),
         include_header=bool(container.include_header),
@@ -387,17 +440,11 @@ def _compile_extra_sheet(
     target_id: str,
     cfg: OutputExtraSheetConfig,
     default_sheet: str,
-    default_workbook_container: Optional[OutputContainerConfig],
+    default_workbook_path: Optional[str],
+    default_allow_formulas: bool,
+    default_write_lock: bool,
 ) -> Tuple[OutputSpec, str]:
-    default_workbook_path = None
-    default_allow_formulas = False
-    default_write_lock = False
-    if default_workbook_container is not None:
-        default_workbook_path = str(default_workbook_container.path) if default_workbook_container.path else None
-        default_allow_formulas = bool(default_workbook_container.allow_formulas)
-        default_write_lock = bool(default_workbook_container.write_lock)
-
-    path = str(cfg.path) if cfg.path else (str(default_workbook_path) if default_workbook_path else "")
+    path = str(cfg.path).strip() if cfg.path else (str(default_workbook_path) if default_workbook_path else "")
     if not path:
         msg = "{} requires a workbook path (set {}.path or provide at least one workbook output)".format(target_id, target_id)
         raise ValueError(msg)
@@ -416,21 +463,12 @@ def _compile_extra_sheet(
     )
 
 
-def _first_workbook_container(outputs: Sequence[OutputTargetConfig]) -> Optional[OutputContainerConfig]:
-    for t in outputs:
-        c = t.container
-        if c is None:
-            continue
-        if str(c.type).lower() == "workbook" and c.path:
-            return c
-    return None
-
-
 def compile_output_composition_from_yaml(  # noqa: C901
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
     resolver: SecurePythonReferenceResolver,
+    init_vars: Optional[Dict[str, object]] = None,
 ) -> Optional[OutputCompositionSpec]:
     outputs = config.outputs
     if not outputs:
@@ -451,6 +489,9 @@ def compile_output_composition_from_yaml(  # noqa: C901
 
     direct_targets: List[OutputTargetSpec] = []
     derived_targets: List[DerivedOutputTargetSpec] = []
+    workbook_default_path: Optional[str] = None
+    workbook_default_allow_formulas = False
+    workbook_default_write_lock = False
 
     for idx, out_cfg in enumerate(outputs):
         is_primary = idx == 0
@@ -462,7 +503,16 @@ def compile_output_composition_from_yaml(  # noqa: C901
             msg = "outputs.{} missing container".format(out_cfg.name)
             raise ValueError(msg)
 
-        output_spec = _output_spec_from_container(container)
+        container_path = _resolve_output_container_path(
+            container.path,
+            init_vars=init_vars,
+            path="outputs.{}.container.path".format(idx),
+        )
+        output_spec = _output_spec_from_container(container, path=container_path)
+        if workbook_default_path is None and str(output_spec.format) == "excel":
+            workbook_default_path = container_path
+            workbook_default_allow_formulas = bool(container.allow_formulas)
+            workbook_default_write_lock = bool(container.write_lock)
 
         predicate = None
         if out_cfg.where:
@@ -508,15 +558,15 @@ def compile_output_composition_from_yaml(  # noqa: C901
             )
         )
 
-    workbook_default = _first_workbook_container(outputs)
-
     meta_sheet_spec = None
     if config.meta is not None:
         meta_out, meta_sheet_name = _compile_extra_sheet(
             target_id="meta",
             cfg=config.meta,
             default_sheet="__meta__",
-            default_workbook_container=workbook_default,
+            default_workbook_path=workbook_default_path,
+            default_allow_formulas=workbook_default_allow_formulas,
+            default_write_lock=workbook_default_write_lock,
         )
         meta_sheet_spec = MetaSheetSpec(target_id="meta", output=meta_out, sheet_name=meta_sheet_name)
 
@@ -526,7 +576,9 @@ def compile_output_composition_from_yaml(  # noqa: C901
             target_id="audit",
             cfg=config.audit,
             default_sheet="__audit__",
-            default_workbook_container=workbook_default,
+            default_workbook_path=workbook_default_path,
+            default_allow_formulas=workbook_default_allow_formulas,
+            default_write_lock=workbook_default_write_lock,
         )
         audit_sheet_spec = AuditSheetSpec(target_id="audit", output=audit_out, sheet_name=audit_sheet_name)
 

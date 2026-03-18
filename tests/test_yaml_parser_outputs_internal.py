@@ -184,18 +184,50 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         ({"type": "bad", "path": "./out.csv"}, "outputs.0.container", ValueError, r"type='bad' is invalid"),
         ({"type": "csv"}, "outputs.0.container", ValueError, r"path is required"),
         (
+            {"type": "csv", "path": {"$init_var": "out_path", "other": 1}},
+            "outputs.0.container",
+            ValueError,
+            r"only supports \{\$init_var: <name>\}; unexpected keys: other",
+        ),
+        (
+            {"type": "csv", "path": {}},
+            "outputs.0.container",
+            ValueError,
+            r"only supports \{\$init_var: <name>\}; missing '\$init_var'",
+        ),
+        ({"type": "csv", "path": {"$init_var": " "}}, "outputs.0.container", TypeError, r"path\.\$init_var must be a non-empty string"),
+        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a non-empty string or"),
+        (
             {"type": "csv", "path": "./out.csv", "header_fields_output_by": "bad"},
             "outputs.0.container",
             ValueError,
             r"header_fields_output_by='bad' is invalid",
         ),
     ],
-    ids=["missing-type", "bad-type", "missing-path", "bad-header-by"],
+    ids=[
+        "missing-type",
+        "bad-type",
+        "missing-path",
+        "init-var-extra-keys",
+        "init-var-missing-key",
+        "init-var-empty-name",
+        "path-bad-type",
+        "bad-header-by",
+    ],
 )
 def test_parse_output_container_defensive_checks(raw, base_path, exc_type, match) -> None:
     loader = YamlDemandLoader()
     with pytest.raises(exc_type, match=match):
         _ = loader._parse_output_container(raw, base_path=base_path)
+
+
+def test_parse_output_container_accepts_init_var_mapping_path() -> None:
+    loader = YamlDemandLoader()
+    container = loader._parse_output_container(
+        {"type": "csv", "path": {"$init_var": " output_path "}},
+        base_path="outputs.0.container",
+    )
+    assert container.path == {"$init_var": "output_path"}
 
 
 def test_parse_output_aggregate_defensive_checks() -> None:
