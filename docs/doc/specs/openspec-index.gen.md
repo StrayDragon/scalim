@@ -211,6 +211,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-shared-output-containers/spec.md)
 - Summary: TBD - created by archiving change c30-workflow-shared-output-containers. Update Purpose after archive.
 
+### `workflow-sheetbook-resources`
+- Title: workflow-sheetbook-resources Specification
+- Source: [spec.md](#code=openspec/specs/workflow-sheetbook-resources/spec.md)
+- Summary: TBD - created by archiving change c40-workflow-sheetbook-resources. Update Purpose after archive.
+
 ### `yaml-dsl-agent-guidance`
 - Title: yaml-dsl-agent-guidance Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-agent-guidance/spec.md)
