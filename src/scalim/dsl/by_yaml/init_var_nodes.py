@@ -42,16 +42,19 @@ def parse_init_var_mapping_node(raw: Dict[str, Any], *, path: str) -> str:
     - 运行时解析(例如检查 `init_vars` 是否包含该变量)由调用方处理.
     """
 
-    init_var_raw = raw.get(_INIT_VAR_KEY)
     extra_keys = sorted([str(k) for k in raw if k != _INIT_VAR_KEY])
     if extra_keys:
         msg = "only supports {{{}: <name>}}; unexpected keys: {}".format(_INIT_VAR_KEY, ", ".join(extra_keys))
         raise InitVarNodeValueError(msg, path=path)
 
-    if init_var_raw is None:
+    # 注意: `{ $init_var: null }` 与 `{}` 语义不同.
+    # - `{}`: 缺少 `$init_var` 键,属于“结构/形状”错误
+    # - `null`: 键存在但值非法,属于“值类型”错误
+    if _INIT_VAR_KEY not in raw:
         msg = "only supports {{{}: <name>}}; missing '{}'".format(_INIT_VAR_KEY, _INIT_VAR_KEY)
         raise InitVarNodeValueError(msg, path=path)
 
+    init_var_raw = raw.get(_INIT_VAR_KEY)
     if not isinstance(init_var_raw, str) or not init_var_raw.strip():
         reason = "must be a non-empty string"
         raise InitVarNodeTypeError(reason, path="{}.{}".format(path, _INIT_VAR_KEY))

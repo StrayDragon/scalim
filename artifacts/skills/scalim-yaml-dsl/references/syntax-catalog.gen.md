@@ -85,6 +85,7 @@
   - `outputs.*.fields` 支持 YAML alias 条目
   - alias identity 失败时允许唯一内容匹配
   - schema 允许 `outputs.*.fields` 包含 object 条目
+  - schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`
 - Purpose: 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
@@ -245,6 +246,8 @@
   - 无输出时避免构造返回列表
   - 允许 tee 同时写文件与显式 sink
   - total_rows 为稳定元数据
+  - 成功路径 sink.close 失败必须使 run 失败
+  - 异常路径 close 不得覆盖原异常
   - 异常路径 best-effort 关闭 sink
 
 ## Top-Level Field Details

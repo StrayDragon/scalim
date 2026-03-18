@@ -56,6 +56,7 @@
 - Requirements:
   - CLI validate 与 schema validate 职责边界(避免重复诊断)
   - CLI Schema-Only Validation
+  - JSONSchema 错误收集(完整 + 稳定 + 去噪)
   - CLI Schema Discovery
   - 严格未知字段校验
   - 运行时 validator 错误列表包含 issue path

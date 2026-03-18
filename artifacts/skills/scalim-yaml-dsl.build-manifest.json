@@ -6,6 +6,7 @@
         "requirements": [
           "CLI validate 与 schema validate 职责边界(避免重复诊断)",
           "CLI Schema-Only Validation",
+          "JSONSchema 错误收集(完整 + 稳定 + 去噪)",
           "CLI Schema Discovery",
           "严格未知字段校验",
           "运行时 validator 错误列表包含 issue path",
@@ -109,7 +110,8 @@
           "schema keeps `normalize` out of `main_source`",
           "`outputs.*.fields` 支持 YAML alias 条目",
           "alias identity 失败时允许唯一内容匹配",
-          "schema 允许 `outputs.*.fields` 包含 object 条目"
+          "schema 允许 `outputs.*.fields` 包含 object 条目",
+          "schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法"
         ],
         "slug": "yaml-dsl-schema"
       },
@@ -298,6 +300,8 @@
           "无输出时避免构造返回列表",
           "允许 tee 同时写文件与显式 sink",
           "total_rows 为稳定元数据",
+          "成功路径 sink.close 失败必须使 run 失败",
+          "异常路径 close 不得覆盖原异常",
           "异常路径 best-effort 关闭 sink"
         ],
         "slug": "output-mode-api"
@@ -357,7 +361,7 @@
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
-      "sha256": "ed6fdc357ca0edb43ecdd486dd1e9d45e80847fc0aa566b4dff41b5e745de4b7"
+      "sha256": "cebc67b677ec146a6a07c1328e2a9c462931083efd7a4e8f2428c77894d60f25"
     },
     {
       "path": "openspec/specs/loader-retry-policy/spec.md",
@@ -365,7 +369,7 @@
     },
     {
       "path": "openspec/specs/output-mode-api/spec.md",
-      "sha256": "33fb867d104692643dd652373ca8b9ca00a8e45befb3b2d58c3e0fba09ea7efb"
+      "sha256": "72be9d432b38fdf38ab42a2d50918d23fca27fe0a12eceafd66896de7618effa"
     },
     {
       "path": "openspec/specs/performance-observability/spec.md",
@@ -405,7 +409,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
-      "sha256": "0dbb2420e52a6e841cef053e39523b5a02d57a9accc108578437a662c5e82f67"
+      "sha256": "efbcf32635442f42ca3a36478e4cfdbb323cb665a703e6b5a790a050bbc83dcf"
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
@@ -413,7 +417,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "9e0c24d356756c9470c857d556263d2a97c119d272faf802cb16e078dd3cc394"
+      "sha256": "71e72a3dc79cd1c47084938660bd3b4b35d20627911f641f966198a60ccf94d1"
     },
     {
       "path": "openspec/specs/yaml-dsl-workflow/spec.md",
@@ -421,7 +425,7 @@
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "7affe309b3a0d78bd9e551823a91780fe4720258c21e91743fb0b98623db7608"
+      "sha256": "edcf0a1dcc35691c35ba3980eda804bf1dee5b489b395c205cb946ecb24d9502"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
@@ -435,7 +439,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "ee5f064eaaae561c442e3b330f6566c6c119445c51a698de90d30f44db37a76d"
+      "sha256": "04490f40576e579a3c026c1902d6589ca2314e50b32010ec7aa0afb96068c90d"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -451,7 +455,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "1bff5e4191737c253272e00c0586003d3c8ec43ac0dfc35876f0d65942ba33f2"
+      "sha256": "72b6d010cf9a772cf0f5227c9bade071c52c69856d26f6fca723e03ef62eb60d"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

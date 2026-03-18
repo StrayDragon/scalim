@@ -195,6 +195,12 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
             ValueError,
             r"only supports \{\$init_var: <name>\}; missing '\$init_var'",
         ),
+        (
+            {"type": "csv", "path": {"$init_var": None}},
+            "outputs.0.container",
+            TypeError,
+            r"path\.\$init_var must be a non-empty string",
+        ),
         ({"type": "csv", "path": {"$init_var": " "}}, "outputs.0.container", TypeError, r"path\.\$init_var must be a non-empty string"),
         ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a non-empty string or"),
         (
@@ -210,6 +216,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         "missing-path",
         "init-var-extra-keys",
         "init-var-missing-key",
+        "init-var-null-name",
         "init-var-empty-name",
         "path-bad-type",
         "bad-header-by",

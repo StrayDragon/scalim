@@ -192,6 +192,20 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
         outputs=(
             OutputTargetConfig(
                 name="detail",
+                container=OutputContainerConfig(type="workbook", path={"$init_var": None}, sheet="S"),
+                fields=("a",),
+            ),
+        )
+    )
+    with pytest.raises(TypeError, match=r"\$init_var must be a non-empty string"):
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
+        )
+
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
                 container=OutputContainerConfig(type="workbook", path={"$init_var": " "}, sheet="S"),
                 fields=("a",),
             ),
