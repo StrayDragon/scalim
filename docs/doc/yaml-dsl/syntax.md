@@ -219,13 +219,13 @@ outputs:
     container: {type: workbook, path: ./out.xlsx, sheet: 直客明细, write_lock: true}
     where: "channel == 'direct'"
 
-	  - name: by_channel
-	    container: {type: workbook, path: ./out.xlsx, sheet: 渠道汇总, write_lock: true}
-	    aggregate:
-	      group_by: [channel]
-	      fields:
-	        order_cnt: {count: {}}
-	        sum_amount: {sum: {field: amount_yuan}}
+  - name: by_channel
+    container: {type: workbook, path: ./out.xlsx, sheet: 渠道汇总, write_lock: true}
+    aggregate:
+      group_by: [channel]
+      fields:
+        order_cnt: {count: {}}
+        sum_amount: {sum: {field: amount_yuan}}
 ```
 
 ## 8. 校验与排错: 先用什么命令

@@ -1,6 +1,6 @@
 ---
 name: scalim-yaml-dsl
-description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,并为旧报表脚本规划渐进迁移到 YAML DSL 的方案。适用于 `scalim dsl`、`scalim yaml dsl`、YAML LSP/schema 配置、修复 `yaml-dsl validate` / `schema validate` 报错、以及判断哪些逻辑应留在 Python 与哪些应下沉到 YAML 的场景。"
+description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,并为旧报表脚本规划渐进迁移到 YAML DSL 的方案。适用于 `scalim-cli yaml-dsl`、YAML LSP/schema 配置、修复 `scalim-cli yaml-dsl validate` / `scalim-cli yaml-dsl schema validate` 报错、以及判断哪些逻辑应留在 Python 与哪些应下沉到 YAML 的场景。"
 ---
 
 # Scalim YAML DSL

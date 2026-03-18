@@ -82,6 +82,7 @@ workflow:
 - `resources` + `write_to`:
   - 共享输出资源必须先声明在 `workflow.resources.*`
   - `write_to` 是互斥 intent: 同一个 run 下最多一个 intent key
+  - `write_to` 目前只支持消费 CSV outputs: `write_to.*.output` 指向的 demand output 需要生成 `.csv` 文件(通常上游 demand 用 `outputs.*.container.type: csv`)
   - 写入顺序以 `workflow.runs` 声明顺序为准(不依赖并发完成时序),以保证确定性
 
 ## 常见模式

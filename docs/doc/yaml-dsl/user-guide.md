@@ -286,17 +286,17 @@ outputs:
       write_lock: true
     where: "channel == 'direct'"
 
-	  - name: by_channel
-	    container:
-	      type: workbook
-	      path: ./output/report.xlsx
-	      sheet: 渠道汇总
-	      write_lock: true
-	    aggregate:
-	      group_by: [channel]
-	      fields:
-	        order_cnt: {count: {}}
-	        sum_amount: {sum: {field: amount}}
+  - name: by_channel
+    container:
+      type: workbook
+      path: ./output/report.xlsx
+      sheet: 渠道汇总
+      write_lock: true
+    aggregate:
+      group_by: [channel]
+      fields:
+        order_cnt: {count: {}}
+        sum_amount: {sum: {field: amount}}
 ```
 
 ---

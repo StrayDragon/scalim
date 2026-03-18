@@ -143,10 +143,11 @@ workflow:
 - 生命周期 `cache_pool.release_policy`:
   - `dag_refcount`: 基于 workflow IR 推导 consumer set 上界,并在最后一个消费者完成后释放/可淘汰
   - `workflow_end`: 禁止按 refcount 自动释放,仅在 workflow 结束时统一清理
-  - `pin`: 可选 escape hatch,强制指定条目常驻到 workflow 结束
+- `cache_pool.pin`:
+  - 可选 escape hatch: 强制指定条目常驻到 workflow 结束(v0 仅支持 kind=preload_forever + source_id)
 - 预算 `cache_pool.budget`:
   - `max_entries`: entries 数量上限(v0)
-  - `over_budget_policy`: `fail_fast|evict_lru`(仅淘汰 refcount=0 且未 pin 的条目;否则 fail-fast)
+  - `over_budget_policy`: `fail_fast|evict_lru`(仅淘汰 refcount=0 且未被 `cache_pool.pin` 固定的条目;否则 fail-fast)
 - 可观测性: 系统会发出 `workflow_cache_acquire/release/evict` 事件,并复用 `workflow_exec_id/workflow_node_id` 归因字段
 
 迁移:
@@ -195,6 +196,7 @@ workflow:
 
 注意:
 
+- `write_to` 目前只支持消费 CSV outputs: `write_to.*.output` 指向的 demand output 需要生成 `.csv` 文件(通常在上游 demand 用 `outputs.*.container.type: csv`). workbook 输出暂不支持直接作为 write_to 输入.
 - 写入顺序以 `workflow.runs` 声明顺序为准(不依赖并发完成时序),以保证确定性
 - 当存在潜在的输出路径冲突(多个 nodes 写同一路径)时,系统会在写入发生前 fail-fast
 

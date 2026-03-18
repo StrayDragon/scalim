@@ -126,3 +126,14 @@ run_workflow(
 
 - 要么每个 demand 输出到唯一路径
 - 要么把共享输出收敛到 `workflow.resources.*` + `write_to` 的机制,避免多方直接写同一路径
+
+### 8) `write_to` 引用的 demand output 不是 CSV
+
+症状:
+
+- 运行期 fail-fast: `write_to currently only supports CSV outputs: output_path=...`
+
+修复:
+
+- 确保 `write_to.*.output` 指向的上游 demand output 生成的是 `.csv` 文件(通常上游 demand 用 `outputs.*.container.type: csv`)
+- 如果最终目标是 workbook/sheetbook,仍然让上游先产出 csv,再由 workflow 的 `write_to.workbook_*` / `write_to.sheetbook_*` 导入写入
