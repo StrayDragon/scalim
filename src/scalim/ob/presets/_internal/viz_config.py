@@ -35,8 +35,8 @@ class VizObserverConfig:
     run_id: Optional[str] = None
     """可选:运行标识(用于推导 `output_dir/<run_id>` 与写入事件 `run_id` 字段).
 
-    - 当未提供时, `VizObserver` 会在首次写入时生成一个时间戳 run_id.
-    - 该字段主要用于 workflow bundle 等需要稳定 run 目录名称的场景.
+    - 当未提供时, `VizObserver` 会在首次写入时生成一个时间戳 `run_id`.
+    - 该字段主要用于工作流 `bundle` 等需要稳定运行目录名称的场景.
     """
 
     output_path: Optional[str] = None

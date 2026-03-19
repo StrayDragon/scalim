@@ -40,6 +40,22 @@ from .._internal.viz_config import VizObserverConfig
 from .._internal.viz_nodes import VizObserverNodeMixin
 from .._internal.viz_output import VizObserverOutputMixin
 
+_WORKFLOW_DISPATCH_MAP = {
+    EVENT_WORKFLOW_NODE_START: "on_workflow_node_start",
+    EVENT_WORKFLOW_NODE_END: "on_workflow_node_end",
+    EVENT_WORKFLOW_NODE_CANCELLED: "on_workflow_node_cancelled",
+    EVENT_WORKFLOW_CACHE_ACQUIRE: "on_workflow_cache_acquire",
+    EVENT_WORKFLOW_CACHE_RELEASE: "on_workflow_cache_release",
+    EVENT_WORKFLOW_CACHE_EVICT: "on_workflow_cache_evict",
+    EVENT_WORKFLOW_RESOURCE_CREATE: "on_workflow_resource_create",
+    EVENT_WORKFLOW_RESOURCE_WRITE: "on_workflow_resource_write",
+    EVENT_WORKFLOW_RESOURCE_COMMIT: "on_workflow_resource_commit",
+    EVENT_WORKFLOW_RESOURCE_DISCARD: "on_workflow_resource_discard",
+    # 工作流运行时额外发出的事件类型(用于回放体验).
+    "workflow_started": "on_workflow_started",
+    "workflow_finished": "on_workflow_finished",
+}
+
 
 def _as_node_id(value: object) -> str:
     return str(value or "").strip()
@@ -71,7 +87,7 @@ def _derive_workflow_stage_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
         if cached is not None:
             return int(cached)
         if node_id in visiting:
-            # Cycle fallback: keep layout functional.
+            # 环检测回退: 保证布局计算可用.
             return 0
         visiting.add(node_id)
         node = node_by_id.get(node_id)
@@ -95,18 +111,17 @@ def _derive_workflow_stage_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
     return memo
 
 
-def build_workflow_viz_graph_snapshot(
+def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
     workflow_ir: WorkflowIr,
     *,
     demand_run_id_by_workflow_node_id: Optional[Mapping[str, str]] = None,
     workflow_yaml_path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Build a workflow-scope VizGraphSnapshot compatible with scalim-viz.
+    """构建与 `scalim-viz` 兼容的工作流级 `VizGraphSnapshot`.
 
-    Notes:
-    - workflow nodes are represented as `derived` nodes with stable ids: `workflow_node:{id}`
-    - workflow resources are represented as `output_target` nodes with stable ids:
-      `workflow_resource:{resource_type}:{resource_id}`
+    说明:
+    - 工作流节点以 `derived` 节点表示,标识固定为 `workflow_node:{id}`
+    - 工作流资源以 `output_target` 节点表示,标识固定为 `workflow_resource:{resource_type}:{resource_id}`
     """
 
     demand_run_id_by_workflow_node_id = dict(demand_run_id_by_workflow_node_id or {})
@@ -123,14 +138,14 @@ def build_workflow_viz_graph_snapshot(
         members = sorted(stage_nodes.get(level, []))
         for node_id in members:
             stage_id_by_node_id[str(node_id)] = stage_id
-        stages.append(
-            {
-                "stage_id": stage_id,
-                "level": int(level),
-                # `layoutSnapshot` expects these keys to match `node.data.field_key`.
-                "field_keys": members,
-            }
-        )
+            stages.append(
+                {
+                    "stage_id": stage_id,
+                    "level": int(level),
+                    # `layoutSnapshot` 要求这些字段名与 `node.data.field_key` 一致.
+                    "field_keys": members,
+                }
+            )
 
     nodes: List[Dict[str, Any]] = []
     known_node_ids: Set[str] = set()
@@ -144,7 +159,7 @@ def build_workflow_viz_graph_snapshot(
                 "id": node_id,
                 "type": node_type,
                 "data": data,
-                # `XYFlow` requires a position; layout will override.
+                # `XYFlow` 需要提供一个初始位置; 后续会被布局结果覆盖.
                 "position": {"x": 0, "y": 0},
             }
         )
@@ -217,7 +232,7 @@ def build_workflow_viz_graph_snapshot(
 
     def _add_edge(source: str, target: str, edge_type: str) -> None:
         if not source or not target or not edge_type:
-            return
+            return  # pragma: no cover
         if source not in known_node_ids or target not in known_node_ids:
             return
         key = (source, target, edge_type)
@@ -303,25 +318,11 @@ def _append_resource_node(res: WorkflowResourceIr, *, add_node: Any) -> None:
 
 
 class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDispatchObserver):
-    """Project workflow-scope events into vizevent/v1 and write a workflow-scope replay run."""
+    """将工作流作用域事件投影为 `vizevent/v1`,并写入工作流级回放运行."""
 
-    supports_unknown_event_types = True
+    supports_unknown_event_types: bool = True
 
-    dispatch_map = {
-        EVENT_WORKFLOW_NODE_START: "on_workflow_node_start",
-        EVENT_WORKFLOW_NODE_END: "on_workflow_node_end",
-        EVENT_WORKFLOW_NODE_CANCELLED: "on_workflow_node_cancelled",
-        EVENT_WORKFLOW_CACHE_ACQUIRE: "on_workflow_cache_acquire",
-        EVENT_WORKFLOW_CACHE_RELEASE: "on_workflow_cache_release",
-        EVENT_WORKFLOW_CACHE_EVICT: "on_workflow_cache_evict",
-        EVENT_WORKFLOW_RESOURCE_CREATE: "on_workflow_resource_create",
-        EVENT_WORKFLOW_RESOURCE_WRITE: "on_workflow_resource_write",
-        EVENT_WORKFLOW_RESOURCE_COMMIT: "on_workflow_resource_commit",
-        EVENT_WORKFLOW_RESOURCE_DISCARD: "on_workflow_resource_discard",
-        # Unknown event types emitted by workflow runtime for replay UX.
-        "workflow_started": "on_workflow_started",
-        "workflow_finished": "on_workflow_finished",
-    }
+    dispatch_map: Dict[str, str] = _WORKFLOW_DISPATCH_MAP
 
     config: VizObserverConfig
     snapshot: Optional[Dict[str, Any]]
@@ -383,20 +384,28 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
     def on_workflow_started(self, payload: Any) -> None:
         self._workflow_wall_start_ts = time.time()
         node_ref_id = self._entry_workflow_node_ref_id()
-        data = payload if isinstance(payload, dict) else {}
+        data: Dict[str, Any]
+        if isinstance(payload, dict):
+            data = cast("Dict[str, Any]", payload)
+        else:
+            data = {}
         self._emit_workflow_event(
             "workflow_started",
             {"type": "workflow_node", "id": node_ref_id},
-            cast("Dict[str, Any]", data),
+            data,
         )
 
     def on_workflow_finished(self, payload: Any) -> None:
         node_ref_id = self._entry_workflow_node_ref_id()
-        data = payload if isinstance(payload, dict) else {}
+        data: Dict[str, Any]
+        if isinstance(payload, dict):
+            data = cast("Dict[str, Any]", payload)
+        else:
+            data = {}
         self._emit_workflow_event(
             "workflow_finished",
             {"type": "workflow_node", "id": node_ref_id},
-            cast("Dict[str, Any]", data),
+            data,
         )
 
     def on_workflow_node_start(self, payload: WorkflowNodeStartEvent) -> None:

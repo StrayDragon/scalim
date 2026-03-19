@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scalim.dsl.by_yaml import RunOverrides, run_workflow
+from scalim.dsl.by_yaml.workflow import WorkflowConfigError
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -27,9 +30,34 @@ main_source:
   loader: "tests.fixtures.workflow_loaders:load_main_fast"
   fields:
     ref_id: {{extract: ref_id}}
-""".format(
-                name=str(name)
-            )
+""".format(name=str(name))
+        ).lstrip(),
+    )
+
+
+def _write_table_demand_yaml_with_csv_output(tmp_path: Path, *, file_name: str, name: str, output_path: Path) -> Path:
+    return _write_text(
+        tmp_path / file_name,
+        (
+            f"""
+name: {name}
+
+batch_size: 1
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id: {{extract: id}}
+    value: {{extract: value}}
+
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: "{str(output_path)}"
+    fields: ["id", "value"]
+"""
         ).lstrip(),
     )
 
@@ -49,9 +77,7 @@ main_source:
   loader: "tests.fixtures.workflow_loaders:no_such_function"
   fields:
     ref_id: {{extract: ref_id}}
-""".format(
-                name=str(name)
-            )
+""".format(name=str(name))
         ).lstrip(),
     )
 
@@ -118,3 +144,72 @@ def test_workflow_viz_bundle_exports_linked_runs(tmp_path: Path) -> None:
 
     assert bad_node.get("data", {}).get("kind") == "workflow_demand"
     assert "demand_run_id" not in (bad_node.get("data") or {})
+
+
+def test_workflow_viz_bundle_rejects_explicit_paths(tmp_path: Path) -> None:
+    _ = _write_minimal_demand_yaml(tmp_path, file_name="ok.yaml", name="ok")
+    wf = _write_workflow_yaml(tmp_path, file_name="wf.yaml", demand_ok="ok.yaml", demand_missing="ok.yaml")
+
+    with pytest.raises(WorkflowConfigError) as exc_info:
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(viz_config=VizObserverConfig(output_path=str(tmp_path / "viz_events.jsonl"))),
+        )
+
+    assert exc_info.value.path == "run_workflow.overrides.viz_config"
+
+
+def test_workflow_viz_bundle_requires_output_dir_or_default(tmp_path: Path) -> None:
+    _ = _write_minimal_demand_yaml(tmp_path, file_name="ok.yaml", name="ok")
+    wf = _write_workflow_yaml(tmp_path, file_name="wf.yaml", demand_ok="ok.yaml", demand_missing="ok.yaml")
+
+    with pytest.raises(WorkflowConfigError) as exc_info:
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(viz_config=VizObserverConfig()),
+        )
+
+    assert exc_info.value.path == "run_workflow.overrides.viz_config"
+
+
+def test_workflow_viz_bundle_uses_default_output_dir_and_skips_write_nodes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.ob.presets._internal import viz_config as viz_config_module
+
+    default_dir = tmp_path / "default"
+    monkeypatch.setattr(viz_config_module, "default_viz_dir", lambda: str(default_dir))
+
+    _ = _write_table_demand_yaml_with_csv_output(tmp_path, file_name="ok.yaml", name="ok", output_path=tmp_path / "ok_detail.csv")
+    wf = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            f"""
+workflow:
+  resources:
+    csvs:
+      merged:
+        path: "{str(tmp_path / "merged.csv")}"
+  runs:
+    - id: ok
+      demand: ok.yaml
+      writes:
+        - csv_append:
+            csv: merged
+            output: detail
+  options:
+    max_concurrency: 1
+    failure_policy: primary_only
+"""
+        ).lstrip(),
+    )
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        overrides=RunOverrides(viz_config=VizObserverConfig(use_default_output_dir=True)),
+    )
+    assert not result.errors()
+
+    workflow_snapshot_path = default_dir / "scalim-viz" / "workflow" / "viz_snapshot.json"
+    assert workflow_snapshot_path.exists()

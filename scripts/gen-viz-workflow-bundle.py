@@ -61,7 +61,7 @@ def main(argv: List[str]) -> int:
 
     allowed_modules = _normalize_allowed_modules(str(args.allowed_modules))
 
-    # Bundle export is opt-in via overrides.viz_config (output_dir only).
+    # `bundle` 导出仅在 `overrides.viz_config` 启用时生效(仅支持 `output_dir`).
     result = run_workflow(
         workflow_yaml_path,
         allowed_modules=allowed_modules,
@@ -79,7 +79,7 @@ def main(argv: List[str]) -> int:
         ),
     )
 
-    # Generate schedule plan for successful child runs (optional but useful for Adaptive view).
+    # 对成功的子运行补写 `viz_schedule_plan.json`(可选;用于可视化计划视角).
     for outcome in result.outcomes:
         if outcome.result is None:
             continue
@@ -91,13 +91,15 @@ def main(argv: List[str]) -> int:
                 encoding="utf-8",
             )
         except Exception as exc:  # pragma: no cover
-            print("[warn] write viz_schedule_plan.json failed for run {}: {}".format(outcome.run_id, exc))
+            print(
+                "告警: 写入 `viz_schedule_plan.json` 失败(run_id={}): {}".format(outcome.run_id, exc),
+                file=sys.stderr,
+            )
 
-    print("已生成 workflow bundle:", str(out_root))
-    print("包含 runs:", ", ".join(sorted([x.run_id for x in result.outcomes])))
+    print("已生成工作流回放包:", str(out_root))
+    print("包含子运行 run_id:", ", ".join(sorted([x.run_id for x in result.outcomes])))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-

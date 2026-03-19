@@ -54,4 +54,3 @@ class VizObserver(VizObserverNodeMixin, VizObserverOutputMixin, VizObserverHandl
 __all__ = [
     "VizObserver",
 ]
-
