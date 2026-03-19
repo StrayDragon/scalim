@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..._internal.loggingx import format_kv, get_logger, prefix
 from ...events.events import RelationLookupEvent
 from ...typedefs import RelationLookupResult, RelationReportFormat
 from ...vendor.compact.typing_extensionsx import override
@@ -16,7 +17,7 @@ from ..observer import EventDispatchObserver
 
 # endregion
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger("relations")
 
 
 @dataclass
@@ -161,12 +162,16 @@ class RelationObserver(EventDispatchObserver):
 
         if event.result == "type_error":
             if self.config.log_type_mismatch:
+                kv = format_kv(
+                    row_id=event.row_id,
+                    fk_raw=event.fk_raw,
+                    target_source=event.target_source,
+                    error=event.error_message,
+                )
                 self.config.logger.warning(
-                    "[RelationObserver] 类型不匹配: 行标识=%s, 外键原值=%s, 目标=%s, 错误=%s",
-                    event.row_id,
-                    event.fk_raw,
-                    event.target_source,
-                    event.error_message,
+                    "%s外键类型不匹配 %s",
+                    prefix("relations"),
+                    kv,
                 )
             if len(m.type_mismatch_samples) < self.config.max_samples:
                 m.type_mismatch_samples.append(sample)
@@ -268,9 +273,9 @@ class RelationObserver(EventDispatchObserver):
             if path.parent and not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
             _ = path.write_text(json.dumps(self._build_report_dict(), ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-            self.config.logger.info("[RelationObserver] 报告已写入: %s", output_path)
+            self.config.logger.info("%s报告已写入: %s", prefix("relations"), output_path)
         except OSError as e:
-            self.config.logger.warning("[RelationObserver] 写入报告失败: %s", e)
+            self.config.logger.warning("%s写入报告失败: %s", prefix("relations"), e)
 
     def _build_report_dict(self) -> Dict[str, Any]:
         return self.metrics.to_dict()

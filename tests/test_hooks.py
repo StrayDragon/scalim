@@ -327,7 +327,7 @@ def test_logging_hook_loader_call_len_error(caplog) -> None:
     with caplog.at_level(logging.INFO, logger=logger.name):
         hook.on_loader_call(event)
 
-    assert any("返回: 0" in record.getMessage() for record in caplog.records)
+    assert any("result_count=0" in record.getMessage() for record in caplog.records)
 
 
 def test_logging_hook_diagnostic_warning(caplog) -> None:

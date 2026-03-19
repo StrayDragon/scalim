@@ -7,6 +7,7 @@ from collections.abc import Sized
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from ..._internal.loggingx import format_kv, get_logger, prefix
 from ...events.catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
     EVENT_BATCH_END,
@@ -36,7 +37,7 @@ from .performance_presentation import PerformancePresentationLayer
 
 # endregion
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger("performance")
 
 PSUTIL_NOT_INSTALLED_WARNING_PREFIX = "未安装 `psutil`"
 PSUTIL_METRICS_DISABLED_WARNING = PSUTIL_NOT_INSTALLED_WARNING_PREFIX + ", 已禁用以下指标: `{}`"
@@ -199,9 +200,14 @@ class PerformanceObserver(EventDispatchObserver):
         if metric_name == "batch_duration" and thresholds.batch_duration_warn is not None:
             if isinstance(value, (int, float)) and value > thresholds.batch_duration_warn:
                 exceeded = True
-                msg = "Batch {} duration {:.2f}s exceeds threshold {:.2f}s".format(
-                    self._current_batch_num, value, thresholds.batch_duration_warn
+                kv = format_kv(
+                    batch_num=int(self._current_batch_num),
+                    duration_s="{:.2f}".format(float(value)),
+                    threshold_s="{:.2f}".format(float(thresholds.batch_duration_warn)),
                 )
+                msg = "批次耗时超阈值"
+                if kv:
+                    msg = "{} {}".format(msg, kv)
 
         elif (
             metric_name == "memory_increase"
@@ -210,10 +216,16 @@ class PerformanceObserver(EventDispatchObserver):
             and value > thresholds.memory_increase_warn
         ):
             exceeded = True
-            msg = "Memory increase {:.1f}MB exceeds threshold {:.1f}MB".format(value, thresholds.memory_increase_warn)
+            kv = format_kv(
+                memory_increase_mb="{:.1f}".format(float(value)),
+                threshold_mb="{:.1f}".format(float(thresholds.memory_increase_warn)),
+            )
+            msg = "内存增长超阈值"
+            if kv:
+                msg = "{} {}".format(msg, kv)
 
         if exceeded:
-            self.config.logger.warning("[PerformanceObserver] %s", msg)
+            self.config.logger.warning("%s%s", prefix("performance"), msg)
             if self._on_threshold_exceeded:
                 self._on_threshold_exceeded(metric_name, value)
 
@@ -290,7 +302,8 @@ class PerformanceObserver(EventDispatchObserver):
             if cpu_pct is not None:
                 parts.append("cpu={:.1f}%".format(cpu_pct))
             self.config.logger.info(
-                "[PerformanceObserver] 批次 %d | %s",
+                "%s批次 %d | %s",
+                prefix("performance"),
                 event.batch_num,
                 ", ".join(parts),
             )

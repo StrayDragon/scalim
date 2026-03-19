@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple, TypeVar
 
+from ..._internal.loggingx import format_kv, prefix
 from ...events.catalog import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
@@ -210,14 +211,14 @@ class HookManagerEventMixin(HookManagerBase):
             return
 
         if manager.fallback_logger_enabled:
-            _logger.warning(
-                "[诊断] %s | 源=%s 字段=%s 行标识=%s 查找键=%r",
-                message,
-                source_id,
-                field_id,
-                row_id,
-                lookup_key,
+            kv = format_kv(
+                message=message,
+                source_id=source_id,
+                field_id=field_id,
+                row_id=row_id,
+                lookup_key=lookup_key,
             )
+            _logger.warning("%s诊断警告 %s", prefix("pipeline"), kv)
 
     def trigger_field_slim(
         self,

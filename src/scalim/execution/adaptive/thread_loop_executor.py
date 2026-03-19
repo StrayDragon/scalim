@@ -7,6 +7,7 @@ import threading
 from concurrent.futures import Executor, Future
 from typing import Any, Callable, Optional, Set, cast
 
+from ..._internal.loggingx import prefix
 from ...vendor.compact.typing_extensionsx import override
 
 # endregion
@@ -35,7 +36,7 @@ def _best_effort_all_tasks(loop: "asyncio.AbstractEventLoop", asyncio_module: An
 _logger = logging.getLogger(__name__)
 
 THREAD_LOOP_EXECUTOR_NON_CORO_TASK_WARNING = (
-    "`ThreadLoopExecutor` 收到非协程任务; 将在事件循环线程执行,可能阻塞. 请将任务改为协程,或改用线程/进程执行."
+    prefix("adaptive") + "`ThreadLoopExecutor` 收到非协程任务; 将在事件循环线程执行,可能阻塞. 请将任务改为协程,或改用线程/进程执行."
 )
 
 

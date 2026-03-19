@@ -4,6 +4,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from ..._internal.loggingx import format_kv, get_logger, prefix
 from ...events.events import (
     BatchEndEvent,
     BatchStartEvent,
@@ -24,10 +25,10 @@ from ..observer import EventDispatchObserver
 
 # endregion
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger("pipeline")
 
-LOGGING_OBSERVER_LOADER_SLIM_LOG = "  [瘦身] 加载器 %s | 原始键数: %d"
-LOGGING_OBSERVER_COLUMN_WRITE_LOG = "  [写入] 列 %s | 行数: %d"
+LOGGING_OBSERVER_LOADER_SLIM_LOG = prefix("pipeline") + "加载器瘦身"
+LOGGING_OBSERVER_COLUMN_WRITE_LOG = prefix("pipeline") + "写入列"
 
 
 class LoggingObserver(EventDispatchObserver):
@@ -42,32 +43,20 @@ class LoggingObserver(EventDispatchObserver):
 
     def on_pipeline_start(self, event: PipelineStartEvent) -> None:
         batch_size_text = "all" if event.batch_size is None else str(event.batch_size)
-        self.logger.info(
-            "[管道] 启动 | 目标字段: %d 个, 批大小: %s",
-            len(event.targets),
-            batch_size_text,
-        )
+        kv = format_kv(target_fields=len(event.targets), batch_size=batch_size_text)
+        self.logger.info("%s管道启动 %s", prefix("pipeline"), kv)
 
     def on_pipeline_end(self, event: PipelineEndEvent) -> None:
-        self.logger.info(
-            "[管道] 完成 | 批次: %d, 耗时: %.2fs",
-            event.total_batches,
-            event.total_duration,
-        )
+        kv = format_kv(batches=event.total_batches, total_duration_s="{:.2f}".format(float(event.total_duration)))
+        self.logger.info("%s管道完成 %s", prefix("pipeline"), kv)
 
     def on_batch_start(self, event: BatchStartEvent) -> None:
-        self.logger.info(
-            "[批次 %d] 开始 | 记录数: %d",
-            event.batch_num,
-            len(event.row_ids),
-        )
+        kv = format_kv(batch_num=event.batch_num, row_count=len(event.row_ids))
+        self.logger.info("%s批次开始 %s", prefix("pipeline"), kv)
 
     def on_batch_end(self, event: BatchEndEvent) -> None:
-        self.logger.info(
-            "[批次 %d] 完成 | 耗时: %.2fs",
-            event.batch_num,
-            event.duration,
-        )
+        kv = format_kv(batch_num=event.batch_num, duration_s="{:.2f}".format(float(event.duration)))
+        self.logger.info("%s批次完成 %s", prefix("pipeline"), kv)
 
     def on_loader_call(self, event: LoaderCallEvent) -> None:
         loader_result: Any = event.result
@@ -75,62 +64,64 @@ class LoggingObserver(EventDispatchObserver):
             result_size = len(loader_result)
         except (TypeError, AttributeError):
             result_size = 0
-        cache_note = ""
+        cache_status = None
+        cache_fields = None
         if event.cache_status:
-            cache_note = " | cache: {}".format(event.cache_status)
             if event.field_keys:
-                cache_note += " fields: {}".format(",".join(event.field_keys))
-        self.logger.info(
-            "  [加载] %s | 返回: %d 条, 耗时: %.2fs%s",
-            event.loader_name,
-            result_size,
-            event.duration,
-            cache_note,
+                cache_fields = ",".join(event.field_keys)
+            cache_status = str(event.cache_status)
+        kv = format_kv(
+            loader_name=event.loader_name,
+            result_count=int(result_size),
+            duration_s="{:.2f}".format(float(event.duration)),
+            cache_status=cache_status,
+            cache_fields=cache_fields,
         )
+        self.logger.info("%s加载 %s", prefix("pipeline"), kv)
 
     def on_field_compute(self, event: FieldComputeEvent) -> None:
-        self.logger.debug(
-            "  [计算] %s | row_id=%s, 结果=%s",
-            event.field_key,
-            event.row_id,
-            event.result,
-        )
+        kv = format_kv(field_key=event.field_key, row_id=event.row_id, result=event.result)
+        self.logger.debug("%s计算 %s", prefix("pipeline"), kv)
 
     def on_error(self, event: ErrorEvent) -> None:
-        self.logger.error("[错误] %s", str(event.error))
+        self.logger.error("%s错误: %s", prefix("pipeline"), str(event.error))
         if event.context:
             for key, ctx_value in event.context.items():
-                self.logger.error("  %s: %s", key, ctx_value)
+                self.logger.error("%s  %s: %s", prefix("pipeline"), key, ctx_value)
 
     def on_diagnostic_warning(self, event: DiagnosticWarningEvent) -> None:
-        self.logger.warning(
-            "[诊断] %s | 源=%s 字段=%s 行标识=%s 查找键=%r",
-            event.message,
-            event.source_id,
-            event.field_id,
-            event.row_id,
-            event.lookup_key,
+        kv = format_kv(
+            message=event.message,
+            source_id=event.source_id,
+            field_id=event.field_id,
+            row_id=event.row_id,
+            lookup_key=event.lookup_key,
         )
+        self.logger.warning("%s诊断警告 %s", prefix("pipeline"), kv)
 
     def on_field_slim(self, event: FieldSlimEvent) -> None:
-        self.logger.debug("  [瘦身] 字段 %s | 原因: %s", event.field_key, event.reason)
+        kv = format_kv(field_key=event.field_key, reason=event.reason)
+        self.logger.debug("%s字段瘦身 %s", prefix("pipeline"), kv)
 
     def on_row_write(self, event: RowWriteEvent) -> None:
-        self.logger.debug("  [写入] 行 row_id=%s | 字段数: %d", event.row_id, event.field_count)
+        kv = format_kv(row_id=event.row_id, field_count=event.field_count)
+        self.logger.debug("%s写入行 %s", prefix("pipeline"), kv)
 
     def on_row_release(self, event: RowReleaseEvent) -> None:
-        self.logger.debug(
-            "  [释放] 行 row_id=%s | 释放: %d, 保留: %d",
-            event.row_id,
-            len(event.released_fields),
-            len(event.retained_fields),
+        kv = format_kv(
+            row_id=event.row_id,
+            released_count=len(event.released_fields),
+            retained_count=len(event.retained_fields),
         )
+        self.logger.debug("%s释放行 %s", prefix("pipeline"), kv)
 
     def on_loader_slim(self, event: LoaderSlimEvent) -> None:
-        self.logger.debug(LOGGING_OBSERVER_LOADER_SLIM_LOG, event.loader_name, event.original_keys)
+        kv = format_kv(loader_name=event.loader_name, original_keys=event.original_keys)
+        self.logger.debug("%s加载器瘦身 %s", prefix("pipeline"), kv)
 
     def on_column_write(self, event: ColumnWriteEvent) -> None:
-        self.logger.debug(LOGGING_OBSERVER_COLUMN_WRITE_LOG, event.field_key, event.row_count)
+        kv = format_kv(field_key=event.field_key, row_count=event.row_count)
+        self.logger.debug("%s写入列 %s", prefix("pipeline"), kv)
 
 
 class PrettyLoggingObserver(EventDispatchObserver):

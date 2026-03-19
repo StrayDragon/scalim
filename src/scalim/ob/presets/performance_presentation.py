@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+from ..._internal.loggingx import prefix
 from ...vendor.literich import Table
 from ..perf_metrics import PerformanceMetrics
 
@@ -46,9 +47,9 @@ class PerformancePresentationLayer:
             if path.parent and not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
             _ = path.write_text(metrics.to_json(), encoding="utf-8")
-            logger.info("[PerformanceObserver] 报告已写入: %s", output_path)
+            logger.info("%s报告已写入: %s", prefix("performance"), output_path)
         except OSError as e:
-            logger.warning("[PerformanceObserver] 写入报告失败: %s", e)
+            logger.warning("%s写入报告失败: %s", prefix("performance"), e)
 
     def write_csv_report(
         self,
@@ -58,7 +59,7 @@ class PerformancePresentationLayer:
         logger: logging.Logger,
     ) -> None:
         if not output_path:
-            logger.warning("[PerformanceObserver] `CSV` 输出需要提供 output_path")
+            logger.warning("%sCSV 输出需要提供 output_path", prefix("performance"))
             return
 
         try:
@@ -75,9 +76,9 @@ class PerformancePresentationLayer:
                 writer.writeheader()
                 writer.writerows(rows)
 
-            logger.info("[PerformanceObserver] 报告已写入: %s", output_path)
+            logger.info("%s报告已写入: %s", prefix("performance"), output_path)
         except OSError as e:
-            logger.warning("[PerformanceObserver] 写入报告失败: %s", e)
+            logger.warning("%s写入报告失败: %s", prefix("performance"), e)
 
     def render_summary(self, metrics: PerformanceMetrics, *, include_details: bool) -> str:
         summary_table = Table(title="Performance Summary", border_style="box")

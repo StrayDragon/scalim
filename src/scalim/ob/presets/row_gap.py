@@ -3,16 +3,17 @@
 import logging
 from typing import Any, Dict, Hashable, Iterable, List, Optional, Set, Sized, cast
 
+from ..._internal.loggingx import get_logger, prefix
 from ...events.events import LoaderCallEvent, PipelineEndEvent
 from ..observer import EventDispatchObserver
 
 # endregion
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger("row_gap")
 
-ROW_GAP_LOG_PRIMARY = "[RowGap] 主行数=%s 加载器=%s"
-ROW_GAP_LOG_DATA = "[RowGap] 加载器=%s 预期=%s 实际=%s 缺失=%s 缺失样本=%s"
-ROW_GAP_LOG_SUMMARY = "[RowGap] 总计: 预期=%s 实际=%s 缺失=%s 主行数=%s"
+ROW_GAP_LOG_PRIMARY = prefix("row_gap") + "主行数=%s 加载器=%s"
+ROW_GAP_LOG_DATA = prefix("row_gap") + "加载器=%s 预期=%s 实际=%s 缺失=%s 缺失样本=%s"
+ROW_GAP_LOG_SUMMARY = prefix("row_gap") + "总计: 预期=%s 实际=%s 缺失=%s 主行数=%s"
 
 
 class RowGapObserver(EventDispatchObserver):

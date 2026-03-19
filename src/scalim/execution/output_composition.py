@@ -1,12 +1,12 @@
 from __future__ import absolute_import
 
 import hashlib
-import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
+from .._internal.loggingx import format_kv, get_logger, prefix
 from .._project_constants import VERSION as SCALIM_VERSION
 from ..events.catalog import EVENT_OUTPUT_TARGET_END
 from ..events.events import OutputTargetEndEvent
@@ -32,7 +32,7 @@ from .output_contracts import ExportLayout, OutputSpec
 
 OutputRowPredicate = Callable[[RowData], bool]
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger("derived_outputs")
 
 if TYPE_CHECKING:
     from ..sinks.sink_excel import ExcelWorkbookSink
@@ -1021,25 +1021,28 @@ def _collect_specs_for_derived_warnings(derived: IDerivedAggregationSpec) -> Tup
 def _warn_derived_guardrails(*, target_id: str, group_specs: Sequence[DerivedGroupBySpec], dedup_specs: Sequence[DedupBySpec]) -> None:
     for g in group_specs:
         if not int(g.max_groups):
+            kv = format_kv(target_id=target_id, group_by=g.group_by)
             _logger.warning(
-                "派生输出 max_groups=0(不设上限);高基数分组可能耗尽内存: 目标=%s, 分组键=%s",
-                str(target_id),
-                ",".join(str(x) for x in g.group_by),
+                "%smax_groups=0(不设上限), 高基数分组可能耗尽内存; 建议设置 max_groups %s",
+                prefix("derived_outputs"),
+                kv,
             )
         has_count_distinct = any(str(m.op).lower() == "count_distinct" for m in g.metrics)
         if has_count_distinct and not int(g.max_distinct):
+            kv = format_kv(target_id=target_id, group_by=g.group_by)
             _logger.warning(
-                "派生输出 max_distinct=0(不设上限);count_distinct 高基数可能耗尽内存: 目标=%s, 分组键=%s",
-                str(target_id),
-                ",".join(str(x) for x in g.group_by),
+                "%smax_distinct=0(不设上限), count_distinct 高基数可能耗尽内存; 建议设置 max_distinct %s",
+                prefix("derived_outputs"),
+                kv,
             )
 
     for d in dedup_specs:
         if not int(d.max_distinct):
+            kv = format_kv(target_id=target_id, key_fields=d.key_fields)
             _logger.warning(
-                "派生输出 dedup_by.max_distinct=0(不设上限);高基数去重可能耗尽内存: 目标=%s, key_fields=%s",
-                str(target_id),
-                ",".join(str(x) for x in d.key_fields),
+                "%sdedup_by.max_distinct=0(不设上限), 高基数去重可能耗尽内存; 建议设置 dedup_by.max_distinct %s",
+                prefix("derived_outputs"),
+                kv,
             )
 
 

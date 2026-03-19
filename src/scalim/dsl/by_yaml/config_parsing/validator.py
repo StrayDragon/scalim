@@ -1,10 +1,10 @@
 import json
-import logging
 from dataclasses import asdict, dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
+from ...._internal.loggingx import format_kv, get_logger, prefix
 from ....vendor.compact.importlibx import import_module, require_optional_dependency
 
 if TYPE_CHECKING:
@@ -53,7 +53,7 @@ except Exception as exc:  # noqa: BLE001
 
 HAS_JSONSCHEMA: bool = _has_jsonschema
 
-_VALIDATOR_LOGGER = logging.getLogger("scalim.dsl.by_yaml.validator")
+_VALIDATOR_LOGGER = get_logger("schema")
 
 __all__ = [
     "HAS_JSONSCHEMA",
@@ -303,10 +303,17 @@ class ConfigValidator(ValidatorFieldsMixin):
     ) -> None:
         if not HAS_JSONSCHEMA or jsonschema is None:  # pragma: no cover
             # `JSONSchema` 校验是可选项. 某些旧运行时可能存在但因依赖版本不匹配(例如旧 `attrs`)而不可用,因此这里不能直接失败.
-            hint = ""
+            reason = None
+            detail = None
             if _jsonschema_import_error is not None:
-                hint = " ({}: {})".format(type(_jsonschema_import_error).__name__, _jsonschema_import_error)
-            msg = "JSONSchema is not available{}, skipping schema validation".format(hint)
+                reason = type(_jsonschema_import_error).__name__
+                detail = str(_jsonschema_import_error)
+
+            msg = "{}jsonschema 不可用, 已跳过 schema 校验".format(prefix("schema"))
+            kv = format_kv(reason=reason, detail=detail)
+            if kv:
+                msg = "{} {}".format(msg, kv)
+
             _VALIDATOR_LOGGER.warning(msg)
             errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
             return

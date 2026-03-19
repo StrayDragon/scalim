@@ -61,6 +61,7 @@
 - Purpose: 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 - Requirements:
   - schema 元数据生成与 hover 指引
+  - schema 为 `value_cast` 增加 `decimal` 枚举值
   - output 字段 hover 指引明确可选与 overrides 推荐写法
   - schema hover 提供常见错误与迁移提示
   - schema hover documents `$keys/$rows` directive nodes under `params`
@@ -86,6 +87,7 @@
   - alias identity 失败时允许唯一内容匹配
   - schema 允许 `outputs.*.fields` 包含 object 条目
   - schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法
+  - schema MAY allow pathless CSV outputs for workflow-managed temp outputs
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`
 - Purpose: 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
@@ -137,18 +139,21 @@
   - ref loader 依赖信号驱动稳定排序
   - 关联诊断基于样本值并支持复合键对比
   - 关联路径与比较输出可读且稳定
+  - relation `from` MAY reference pre-relation derived fields on main_source side
 ### `field-compute`
 - Source: `openspec/specs/field-compute/spec.md`
 - Purpose: 定义源字段 `value_cast` 转换与派生字段 `compute/call_by` 的解析、校验与执行行为,并规范派生字段依赖推导(拒绝显式 `depends_on`)与表达式安全策略.
 - Requirements:
   - 字段值 value_cast
   - compute 识别/校验/安全约束
+  - compute 表达式允许使用 `Decimal(...)` 构造器
   - 依赖推导规则与无依赖拒绝
   - 派生字段执行与错误处理
   - compute 表达式预编译并复用执行
   - compute 编译缓存有上限(有界 LRU)
   - call_by 派生字段函数调用
   - call_by 上下文引用
+  - compute sandbox rejection MUST include an actionable `call_by` migration hint
 ### `source-cache`
 - Source: `openspec/specs/source-cache/spec.md`
 - Purpose: 支持 cache_mode=preload_forever 的数据源在 pipeline 启动前预加载,结果写入 ExecutionRuntime.preloaded_cache 并在关联加载时复用;计划元数据记录已缓存的数据源.
@@ -460,7 +465,7 @@
   - `extract`: `string`
   - `relation`: `string` | `object`, oneOf(2)
   - `source`: `string`
-  - `value_cast`: `string`, enum `auto`, `int`, `str`
+  - `value_cast`: `string`, enum `auto`, `int`, `str`, `decimal`
 
 ### `guardrails`
 - Definition path: `definitions.guardrails`
@@ -587,13 +592,16 @@
 - `anyOf`:
   - 1. `object`
   - 2. `object`
+- `allOf`:
+  - 1. `object`
+  - 2. `object`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
   - `allow_formulas`: `boolean`
   - `encoding`: `string`
   - `header_fields_output_by`: `string`, enum `field_id`, `name`
   - `include_header`: `boolean`
-  - `path`: `string` | `object`, oneOf(2)
+  - `path`: `string` | `string` | `object`, oneOf(3)
   - `sheet`: `string`
   - `streaming`: `boolean`
   - `type`: `string`, enum `workbook`, `csv`
@@ -731,7 +739,7 @@
   - `extract`: `string`
   - `relation`: `string` | `object`, oneOf(2)
   - `source`: `string`
-  - `value_cast`: `string`, enum `auto`, `int`, `str`
+  - `value_cast`: `string`, enum `auto`, `int`, `str`, `decimal`
 
 ### `trace`
 - Definition path: `definitions.trace`
@@ -788,7 +796,7 @@
 - Properties:
   - `options`: `object`, properties `failure_policy`, `cache_pool`, `ctx`, `max_concurrency`
   - `resources`: `object`, properties `csvs`, `sheetbooks`, `workbooks`
-  - `runs` (required): `array`, items `object`, properties `demand`, `depends_on`, `id`, `init_vars`, `write_to`
+  - `runs` (required): `array`, items `object`, properties `demand`, `depends_on`, `id`, `init_vars`, `writes`
 
 ### `workflow.runs[*]`
 - Type: `object`
@@ -798,21 +806,7 @@
   - `depends_on`: `array`, items `string`
   - `id` (required): `string`
   - `init_vars`: `object` | `null`, oneOf(2)
-  - `write_to`: `null` | `object` | `object` | `object` | `object` | `object`, oneOf(6)
-
-### `workflow.runs[*].write_to`
-- Type: `null` | `object` | `object` | `object` | `object` | `object`
-- Description:
-  共享输出写入意图简写(可选).
-  
-  - MUST 恰好选择一个 write intent
-- `oneOf`:
-  - 1. `null`
-  - 2. `object`, properties `workbook_sheet`
-  - 3. `object`, properties `workbook_append`
-  - 4. `object`, properties `csv_append`
-  - 5. `object`, properties `sheetbook_sheet`
-  - 6. `object`, properties `sheetbook_append`
+  - `writes`: `array`, items `object` | `object` | `object` | `object` | `object`, oneOf(5)
 
 ### `workflow.options`
 - Type: `object`

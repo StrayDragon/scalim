@@ -3,6 +3,7 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
+from ..._internal.loggingx import format_kv, prefix
 from ...events.attribution import WORKFLOW_ATTRIBUTION_META_KEYS
 from ...events.catalog import (
     EVENT_BATCH_END,
@@ -319,14 +320,14 @@ class ObserverManagerEmitMixin(ABC):
             )
             _ = self.emit_event(EVENT_DIAGNOSTIC_WARNING, payload)
         elif self.fallback_logger_enabled:
-            _logger.warning(
-                "[诊断] %s | 源=%s 字段=%s 行标识=%s 查找键=%r",
-                message,
-                source_id,
-                field_id,
-                row_id,
-                lookup_key,
+            kv = format_kv(
+                message=message,
+                source_id=source_id,
+                field_id=field_id,
+                row_id=row_id,
+                lookup_key=lookup_key,
             )
+            _logger.warning("%s诊断警告 %s", prefix("pipeline"), kv)
 
     def emit_field_slim(
         self,

@@ -71,6 +71,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/flow-visualization/spec.md)
 - Summary: **状态: ✅ 已实现** - VizGraphSnapshot + VizEventStream 可视化机制已实现 提供执行过程的可视化输出:VizGraphSnapshot 从 ExecutionPlan 生成 XYFlow 兼容的 nodes/edges 结构用于依赖图展示;VizEventStream 将 Hook 事件映射为可视化事件流支持离线回放.
 
+### `framework-logging`
+- Title: framework-logging Specification
+- Source: [spec.md](#code=openspec/specs/framework-logging/spec.md)
+- Summary: **状态: ✅ 已实现** 为框架内部日志建立统一的 Python 标准库 `logging` 使用约定,以保证默认静默、命名空间稳定、输出前缀一致,并提供可扩展的诊断字段与 context 绑定机制。
+
 ### `hooks-events`
 - Title: hooks-events Specification
 - Source: [spec.md](#code=openspec/specs/hooks-events/spec.md)

@@ -1,6 +1,7 @@
 from collections.abc import Set as AbstractSet
 from typing import Any, Optional, Set, Tuple
 
+from ..._internal.loggingx import prefix
 from ...events.catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
     EVENT_BATCH_END,
@@ -32,8 +33,8 @@ from ...events.catalog import (
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
 
-OBSERVER_RAISED_EXCEPTION_WARNING = "观察者 %s.%s 抛出异常"
-OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = "观察者 %s 关闭时抛出异常"
+OBSERVER_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s.%s 抛出异常"
+OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s 关闭时抛出异常"
 
 CATALOG_EVENT_TYPES: Tuple[str, ...] = (
     EVENT_PIPELINE_START,

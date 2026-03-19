@@ -5,11 +5,12 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import IO, Any, Dict, Optional, cast
 
+from ...._internal.loggingx import get_logger, prefix
 from .viz_config import VizObserverConfig
 from .viz_config import default_viz_dir as _default_viz_dir
 from .viz_config import normalize_output_dir as _normalize_output_dir
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger("viz")
 
 
 class VizEventEmitter:
@@ -28,7 +29,7 @@ class VizEventEmitter:
             mode = "a" if append else "w"
             self._output_handle = resolved.open(mode, encoding="utf-8")
         except OSError as exc:
-            self._logger.warning("[VizObserver] 打开输出路径失败: %s", exc)
+            self._logger.warning("%s打开输出路径失败: %s", prefix("viz"), exc)
             self._output_handle = None
 
     def emit(self, event: Dict[str, Any]) -> None:
@@ -38,7 +39,7 @@ class VizEventEmitter:
                 _ = self._output_handle.write(line + "\n")
                 self._output_handle.flush()
             except OSError as exc:
-                self._logger.warning("[VizObserver] 写入事件失败: %s", exc)
+                self._logger.warning("%s写入事件失败: %s", prefix("viz"), exc)
 
     def close(self, timeout: float = 2.0) -> None:
         _ = timeout
@@ -143,7 +144,7 @@ class VizObserverOutputMixin(ABC):
                 json.dump(snapshot, handle, ensure_ascii=False, indent=2, default=str)
             self._snapshot_written = True
         except OSError as exc:
-            self.config.logger.warning("[VizObserver] 写入快照失败: %s", exc)
+            self.config.logger.warning("%s写入快照失败: %s", prefix("viz"), exc)
 
     def _select_payload(self, summary: Dict[str, Any], sample: Dict[str, Any], full: Dict[str, Any]) -> Dict[str, Any]:
         policy = (self.config.payload_policy or "summary").lower()

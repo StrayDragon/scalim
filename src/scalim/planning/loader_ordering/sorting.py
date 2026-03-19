@@ -2,13 +2,14 @@ import heapq
 import logging
 from typing import Dict, List, Set, Tuple, Union
 
+from ..._internal.loggingx import prefix
 from ...spec.ir.sources import SourceIr
 from ...utils import graph
 
 _logger = logging.getLogger(__name__)
 _UNMAPPED_DEPS_PREVIEW_LIMIT = 10
 
-REF_LOADER_ORDERING_DEGRADED_PREFIX = "引用加载器排序退化"
+REF_LOADER_ORDERING_DEGRADED_PREFIX = prefix("planning") + "引用加载器排序退化"
 REF_LOADER_ORDERING_DEGRADED_WARNING = (
     REF_LOADER_ORDERING_DEGRADED_PREFIX + ": 有 %d 个依赖键无法映射到对应的引用加载器; 将回退到稳定的并列裁决(`source_id`). 键=%s"
 )

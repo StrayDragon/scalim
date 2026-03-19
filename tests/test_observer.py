@@ -271,7 +271,7 @@ def test_performance_observer_threshold_warning(plan_builder, engine_factory, ca
     with caplog.at_level(logging.WARNING, logger=logger.name):
         engine.run(main_rows=main_rows)
 
-    assert any("exceeds threshold" in record.getMessage() for record in caplog.records)
+    assert any("批次耗时超阈值" in record.getMessage() for record in caplog.records)
 
 
 def test_performance_observer_threshold_callback(plan_builder, engine_factory) -> None:
@@ -390,7 +390,7 @@ def test_performance_observer_memory_threshold_warning(caplog) -> None:
     with caplog.at_level(logging.WARNING, logger=logger.name):
         observer._check_thresholds("memory_increase", 10.0)
 
-    assert any("Memory increase" in record.getMessage() for record in caplog.records)
+    assert any("[scalim] performance:" in record.getMessage() and "memory_increase_mb" in record.getMessage() for record in caplog.records)
 
 
 def test_performance_observer_details_and_events(caplog) -> None:

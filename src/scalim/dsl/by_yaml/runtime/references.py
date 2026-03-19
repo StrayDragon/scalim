@@ -5,6 +5,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, ClassVar, FrozenSet, List, Optional, Sequence, Tuple
 
+from ...._internal.loggingx import prefix
 from ....vendor.compact.typing_extensionsx import override
 from ..reference_syntax import ParsedReference, ReferenceSyntaxError, parse_python_reference
 from .errors import ResolverError
@@ -127,9 +128,9 @@ class PythonReferenceResolver:
         # - 通配符白名单(`\"*\"`)仅用于可信/内部场景与快速迭代.
         # - 它会实质上关闭白名单约束;不要用于不可信的 `YAML`/配置输入.
         if self._policy.allow_all_modules:
-            resolver_logger.warning(ALLOWLIST_WILDCARD_MODULES_WARNING)
+            resolver_logger.warning("%s%s", prefix("resolver"), ALLOWLIST_WILDCARD_MODULES_WARNING)
         if self._policy.allow_all_functions:
-            resolver_logger.warning(ALLOWLIST_WILDCARD_FUNCTIONS_WARNING)
+            resolver_logger.warning("%s%s", prefix("resolver"), ALLOWLIST_WILDCARD_FUNCTIONS_WARNING)
 
     def has_allowlist(self) -> bool:
         return self._policy.has_allowlist
@@ -370,17 +371,17 @@ def derive_base_module_path(
         raise ResolverError(msg)
 
     valid: List[Tuple[Tuple[str, ...], Path]] = []
-    for prefix in candidates:
-        rel_path = yaml_dir.relative_to(prefix)
+    for sys_prefix in candidates:
+        rel_path = yaml_dir.relative_to(sys_prefix)
         if rel_path == Path():
-            valid.append(((), prefix))
+            valid.append(((), sys_prefix))
             continue
         parts = tuple(p for p in rel_path.parts if p and p != ".")
         try:
-            _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=prefix)
+            _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=sys_prefix)
         except ResolverError:
             continue
-        valid.append((parts, prefix))
+        valid.append((parts, sys_prefix))
 
     if valid:
         # 选择“最长的模块路径”(更符合“YAML 文件所在目录对应模块路径”的直觉),
@@ -389,13 +390,13 @@ def derive_base_module_path(
         return ".".join(parts)
 
     # 若所有候选均非法(例如包含非标识符的目录段),沿用旧策略选择最长前缀并报错.
-    prefix = max(candidates, key=lambda p: len(p.parts))
-    rel_path = yaml_dir.relative_to(prefix)
+    sys_prefix = max(candidates, key=lambda p: len(p.parts))
+    rel_path = yaml_dir.relative_to(sys_prefix)
     if rel_path == Path():
         return ""  # pragma: no cover
 
     parts = [p for p in rel_path.parts if p and p != "."]
-    _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=prefix)
+    _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=sys_prefix)
 
     return ".".join(parts)  # pragma: no cover
 

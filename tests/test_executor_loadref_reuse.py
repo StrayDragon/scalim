@@ -272,8 +272,8 @@ def test_logging_hook_outputs_cache_status(caplog) -> None:
         hook.on_loader_call(event)
 
     messages = [record.getMessage() for record in caplog.records]
-    assert any("cache: hit" in message for message in messages)
-    assert any("fields: amount,extra" in message for message in messages)
+    assert any("cache_status=hit" in message for message in messages)
+    assert any("cache_fields=amount,extra" in message for message in messages)
 
 
 def test_rows_loadref_default_batch_reuse() -> None:

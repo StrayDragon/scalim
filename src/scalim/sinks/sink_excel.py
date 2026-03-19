@@ -7,6 +7,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Type
 
+from .._internal.loggingx import prefix
 from ..vendor.compact.importlibx import require_optional_dependency
 
 if TYPE_CHECKING:
@@ -37,22 +38,24 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-EXCEL_SINK_SAVE_FAILED = "ExcelSink 保存失败"
+_SINKS_PREFIX = prefix("sinks")
+
+EXCEL_SINK_SAVE_FAILED = _SINKS_PREFIX + "ExcelSink 保存失败"
 EXCEL_SINK_SAVE_FAILED_LOG = EXCEL_SINK_SAVE_FAILED + ": %s"
 
-EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = "ExcelSink 删除临时文件失败"
+EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ExcelSink 删除临时文件失败"
 EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG = EXCEL_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
-EXCEL_WORKBOOK_SINK_SAVE_FAILED = "ExcelWorkbookSink 保存失败"
+EXCEL_WORKBOOK_SINK_SAVE_FAILED = _SINKS_PREFIX + "ExcelWorkbookSink 保存失败"
 EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG = EXCEL_WORKBOOK_SINK_SAVE_FAILED + ": %s"
 
-EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED = "ExcelWorkbookSink 删除临时文件失败"
+EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ExcelWorkbookSink 删除临时文件失败"
 EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG = EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
-COLUMN_EXCEL_SINK_SAVE_FAILED = "ColumnExcelSink 保存失败"
+COLUMN_EXCEL_SINK_SAVE_FAILED = _SINKS_PREFIX + "ColumnExcelSink 保存失败"
 COLUMN_EXCEL_SINK_SAVE_FAILED_LOG = COLUMN_EXCEL_SINK_SAVE_FAILED + ": %s"
 
-COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = "ColumnExcelSink 删除临时文件失败"
+COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ColumnExcelSink 删除临时文件失败"
 COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -81,7 +84,7 @@ def _release_write_lock(lock_path: Path) -> None:
     except FileNotFoundError:
         return
     except OSError:
-        _LOGGER.warning("删除输出锁文件失败: %s", lock_path, exc_info=True)
+        _LOGGER.warning("%s删除输出锁文件失败: %s", _SINKS_PREFIX, lock_path, exc_info=True)
 
 
 def _best_effort_close_write_only_worksheet(worksheet: Any) -> None:

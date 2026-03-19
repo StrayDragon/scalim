@@ -183,7 +183,7 @@ main_source:
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert payload["errors"] == []
-    assert any("JSONSchema is not available" in item["message"] for item in payload["warnings"])
+    assert any("[scalim] schema:" in item["message"] and "jsonschema" in item["message"] for item in payload["warnings"])
 
 
 def test_yaml_dsl_validate_still_flags_outputs_container_path_init_var_shape_errors_without_jsonschema(

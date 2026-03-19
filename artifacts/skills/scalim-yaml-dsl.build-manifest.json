@@ -87,6 +87,7 @@
         "path": "openspec/specs/yaml-dsl-schema/spec.md",
         "requirements": [
           "schema 元数据生成与 hover 指引",
+          "schema 为 `value_cast` 增加 `decimal` 枚举值",
           "output 字段 hover 指引明确可选与 overrides 推荐写法",
           "schema hover 提供常见错误与迁移提示",
           "schema hover documents `$keys/$rows` directive nodes under `params`",
@@ -111,7 +112,8 @@
           "`outputs.*.fields` 支持 YAML alias 条目",
           "alias identity 失败时允许唯一内容匹配",
           "schema 允许 `outputs.*.fields` 包含 object 条目",
-          "schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法"
+          "schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法",
+          "schema MAY allow pathless CSV outputs for workflow-managed temp outputs"
         ],
         "slug": "yaml-dsl-schema"
       },
@@ -168,7 +170,8 @@
           "批次内 LoadRef 复用与分片语义",
           "ref loader 依赖信号驱动稳定排序",
           "关联诊断基于样本值并支持复合键对比",
-          "关联路径与比较输出可读且稳定"
+          "关联路径与比较输出可读且稳定",
+          "relation `from` MAY reference pre-relation derived fields on main_source side"
         ],
         "slug": "source-relations"
       },
@@ -177,12 +180,14 @@
         "requirements": [
           "字段值 value_cast",
           "compute 识别/校验/安全约束",
+          "compute 表达式允许使用 `Decimal(...)` 构造器",
           "依赖推导规则与无依赖拒绝",
           "派生字段执行与错误处理",
           "compute 表达式预编译并复用执行",
           "compute 编译缓存有上限(有界 LRU)",
           "call_by 派生字段函数调用",
-          "call_by 上下文引用"
+          "call_by 上下文引用",
+          "compute sandbox rejection MUST include an actionable `call_by` migration hint"
         ],
         "slug": "field-compute"
       },
@@ -336,7 +341,6 @@
       "workflow.runs[*].demand",
       "workflow.runs[*].depends_on",
       "workflow.runs[*].init_vars",
-      "workflow.runs[*].write_to",
       "workflow.options.max_concurrency",
       "workflow.options.failure_policy",
       "workflow.options.cache_pool",
@@ -361,7 +365,7 @@
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
-      "sha256": "cebc67b677ec146a6a07c1328e2a9c462931083efd7a4e8f2428c77894d60f25"
+      "sha256": "67c8e5dcd2de48cb2e88b3ade2a8453a19ed36bbbd9919ce9633c7610638eb24"
     },
     {
       "path": "openspec/specs/loader-retry-policy/spec.md",
@@ -389,7 +393,7 @@
     },
     {
       "path": "openspec/specs/source-relations/spec.md",
-      "sha256": "d5204d27c56ba975c420234ee3149c172d0e867b8ec26398ce3ae70008e5f04f"
+      "sha256": "33ed7a835dc7fefa654a770ac2975a0c47490df34a9168da688147dc20046727"
     },
     {
       "path": "openspec/specs/workflow-cache-pool/spec.md",
@@ -401,11 +405,11 @@
     },
     {
       "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "cb763467b924a7739859ad971aa071f0a331c9784169a6358b4caa90fed43254"
+      "sha256": "8e45b8c1b7c1ee96f3e28676250a83412494b8000ab11d0d8b3254b591bd01c2"
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-      "sha256": "7a1239c57a7660cfb8a2df5b0cd7029d73d4b0200a50d5deae5d772b188bbf5b"
+      "sha256": "91f3291adbc2b13ba64636b3c59d64e1c4558d8d11354b660f4a6c745828838a"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -417,7 +421,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "71e72a3dc79cd1c47084938660bd3b4b35d20627911f641f966198a60ccf94d1"
+      "sha256": "6d3a154b9e16abe888141fc1564775e937f6d8dff5d0e76ea7c129e87143d5d8"
     },
     {
       "path": "openspec/specs/yaml-dsl-workflow/spec.md",
@@ -429,17 +433,17 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "76bb80b563a7749793c38c7f204acc59e92e0f24ccd66911e463024a7c5d0434"
+      "sha256": "a2ee31ef08821a72923755e0655e3fdba4c33de8af8326f4ae882b26e0ee3024"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
-      "sha256": "86b5b601b31a0f4cd2ec40dcb4f82b9291766ab08c1f4bf775e76582cd6d2502"
+      "sha256": "bfb4c210315a3a2e2cbad92095c3bbfbafe093464a1a982918383f717deaafe1"
     }
   ],
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "163a835c1b05065ddb229c6136f12c322ede2623fa7c34aba3a7eb63c536b65d"
+      "sha256": "04490f40576e579a3c026c1902d6589ca2314e50b32010ec7aa0afb96068c90d"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -455,7 +459,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "72b6d010cf9a772cf0f5227c9bade071c52c69856d26f6fca723e03ef62eb60d"
+      "sha256": "3fa18d9c8bd6588bdde2af6a61b0155dd9b471eb951270f61bda944be90e08a8"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Type, Union
 
+from .._internal.loggingx import prefix
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import Self, override
 from .sink_base import (
@@ -29,13 +30,15 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-CSV_SINK_ATOMIC_REPLACE_FAILED = "`CSVSink` 原子替换失败"
+_SINKS_PREFIX = prefix("sinks")
+
+CSV_SINK_ATOMIC_REPLACE_FAILED = _SINKS_PREFIX + "`CSVSink` 原子替换失败"
 CSV_SINK_ATOMIC_REPLACE_FAILED_LOG = CSV_SINK_ATOMIC_REPLACE_FAILED + ": %s"
 
-CSV_SINK_REMOVE_TEMP_FILE_FAILED = "`CSVSink` 删除临时文件失败"
+CSV_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "`CSVSink` 删除临时文件失败"
 CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = CSV_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
-COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED = "ColumnCSVSink 删除临时文件失败"
+COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ColumnCSVSink 删除临时文件失败"
 COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
 
@@ -391,7 +394,7 @@ class BlockColumnCSVSink(IColumnSink):
         num_cols = len(field_names)
         self._row_length = num_cols * col_width + (num_cols - 1) + 1
         self._header_length = self._row_length
-        _LOGGER.warning("BlockColumnCSVSink 仅用于演示,生产环境请使用 ColumnCSVSink.")
+        _LOGGER.warning("%sBlockColumnCSVSink 仅用于演示,生产环境请使用 ColumnCSVSink.", _SINKS_PREFIX)
 
     def _init_file(self) -> None:
         if self._initialized:

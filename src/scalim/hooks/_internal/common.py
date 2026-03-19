@@ -2,6 +2,7 @@ import logging
 from collections.abc import Set as AbstractSet
 from typing import Any, Callable, Dict, Optional, Set, Tuple, cast
 
+from ..._internal.loggingx import prefix
 from ...events.catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
     EVENT_BATCH_END,
@@ -27,7 +28,7 @@ from ...events.catalog import (
 
 _logger = logging.getLogger(__name__)
 
-HOOK_RAISED_EXCEPTION_WARNING = "钩子 %s.%s 抛出异常"
+HOOK_RAISED_EXCEPTION_WARNING = prefix("hooks") + "钩子 %s.%s 抛出异常"
 
 _HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = {
     EVENT_PIPELINE_START: "on_pipeline_start",
