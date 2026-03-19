@@ -285,3 +285,8 @@ Sources:
 - Title: yaml-source-normalize Specification
 - Source: [spec.md](#code=openspec/specs/yaml-source-normalize/spec.md)
 - Summary: TBD - created by archiving change yaml-source-normalize. Update Purpose after archive.
+
+### `yaml-template-vars-precompile`
+- Title: yaml-template-vars-precompile Specification
+- Source: [spec.md](#code=openspec/specs/yaml-template-vars-precompile/spec.md)
+- Summary: TBD - created by archiving change c5-yaml-template-vars-precompile. Update Purpose after archive.

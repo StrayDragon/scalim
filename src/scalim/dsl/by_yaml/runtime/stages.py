@@ -8,7 +8,7 @@
 """
 
 from dataclasses import dataclass
-from typing import FrozenSet, Optional
+from typing import FrozenSet, Mapping, Optional
 
 from ....execution.run_ir import ExecutionRequest
 from ....spec.ir.demand import DemandIr
@@ -55,8 +55,8 @@ def stage_create_context(*, allowed_modules: FrozenSet[str], allowed_functions: 
     )
 
 
-def stage_load_yaml_config(yaml_path: str) -> DemandConfig:
-    return load_config(yaml_path)
+def stage_load_yaml_config(yaml_path: str, *, template_vars: Optional[Mapping[str, object]] = None) -> DemandConfig:
+    return load_config(yaml_path, template_vars=template_vars)
 
 
 def stage_compile_demand_ir(config: DemandConfig, *, context: YamlDslStageContext) -> DemandIr:

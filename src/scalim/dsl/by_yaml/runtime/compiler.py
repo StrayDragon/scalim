@@ -7,7 +7,7 @@
 """
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, cast
 
 from ....execution.guardrails import (
     GuardrailMode,
@@ -231,9 +231,9 @@ def _compile_loader_retry_policies(
     return LoaderRetryPolicies(default=global_policy, by_loader=by_loader)
 
 
-def load_config(yaml_path: str) -> DemandConfig:
+def load_config(yaml_path: str, *, template_vars: Optional[Mapping[str, object]] = None) -> DemandConfig:
     loader = YamlDemandLoader()
-    return loader.load(yaml_path)
+    return loader.load(yaml_path, template_vars=template_vars)
 
 
 def create_reference_resolver(
@@ -336,7 +336,7 @@ def compile(  # noqa: A001
     options: RunOptions,
 ) -> Compilation:
     validate_allowlist(allowed_modules=options.allowed_modules, allowed_functions=options.allowed_functions)
-    config = load_config(yaml_path)
+    config = load_config(yaml_path, template_vars=options.template_vars)
     base_module_path = None
     if _config_uses_relative_references(config):
         base_module_path = derive_base_module_path(yaml_path)

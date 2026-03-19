@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Optional, Union
+from typing import IO, TYPE_CHECKING, Mapping, Optional, Union
 
 from ....vendor.compact.importlibx import require_optional_dependency
 
@@ -24,6 +24,7 @@ from .parsers.output import ParserOutputMixin
 from .parsers.outputs import ParserOutputsMixin
 from .parsers.results import ParsedFieldsResult
 from .parsers.utils import mapping_or_none, str_or_none
+from .template_precompile import maybe_precompile_yaml_text
 
 __all__ = [
     "ParsedFieldsResult",
@@ -52,20 +53,31 @@ class YamlDemandLoader(
     def __init__(self) -> None:
         self._validator = None
 
-    def load(self, source: Union[str, Path, IO[str]]) -> DemandConfig:
+    def load(self, source: Union[str, Path, IO[str]], *, template_vars: Optional[Mapping[str, object]] = None) -> DemandConfig:
         yaml_path: Optional[Path] = None
         if isinstance(source, (str, Path)):
             yaml_path = Path(source)
-            with yaml_path.open("r", encoding=UTF8_ENCODING) as f:
-                raw = _safe_load_yaml(f)
+            text = yaml_path.read_text(encoding=UTF8_ENCODING)
+            text = maybe_precompile_yaml_text(
+                text,
+                template_vars=template_vars,
+                context_label="需求 `YAML` 文件 `{}`".format(str(yaml_path)),
+            )
+            raw = _safe_load_yaml(text)
         else:
-            raw = _safe_load_yaml(source)
+            text = source.read()
+            text = maybe_precompile_yaml_text(
+                text,
+                template_vars=template_vars,
+                context_label="需求 `YAML` 文本",
+            )
+            raw = _safe_load_yaml(text)
         raw_demand = RawDemand.from_raw(raw)
 
         if contains_import_syntax(raw_demand.data):
             if yaml_path is not None:
                 try:
-                    _ = expand_imports_inplace(raw_demand.data, yaml_path=yaml_path)
+                    _ = expand_imports_inplace(raw_demand.data, yaml_path=yaml_path, template_vars=template_vars)
                 except YamlImportExpansionError as exc:
                     raise ValueError(str(exc)) from exc
             else:
@@ -78,8 +90,13 @@ class YamlDemandLoader(
 
         return self._parse_config(raw_demand)
 
-    def load_string(self, yaml_string: str) -> DemandConfig:
-        raw = _safe_load_yaml(yaml_string)
+    def load_string(self, yaml_string: str, *, template_vars: Optional[Mapping[str, object]] = None) -> DemandConfig:
+        text = maybe_precompile_yaml_text(
+            yaml_string,
+            template_vars=template_vars,
+            context_label="需求 `YAML` 字符串",
+        )
+        raw = _safe_load_yaml(text)
         raw_demand = RawDemand.from_raw(raw)
 
         if contains_import_syntax(raw_demand.data):

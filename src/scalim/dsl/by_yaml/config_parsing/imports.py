@@ -2,9 +2,10 @@ import copy
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, cast
 
 from ....vendor.compact.importlibx import require_optional_dependency
+from .template_precompile import maybe_precompile_yaml_text
 
 if TYPE_CHECKING:
     import yaml
@@ -227,25 +228,36 @@ def expand_imports_inplace(
     *,
     yaml_path: Path,
     cache: Optional[Dict[Path, Dict[str, Any]]] = None,
+    template_vars: Optional[Mapping[str, object]] = None,
 ) -> Dict[str, Any]:
     resolved = yaml_path.resolve()
     if cache is None:
         cache = {}
     trace: List[ImportTraceItem] = [ImportTraceItem(yaml_path=resolved, via=None)]
-    return _expand_file_inplace(raw, yaml_path=resolved, cache=cache, trace=trace)
+    return _expand_file_inplace(raw, yaml_path=resolved, cache=cache, trace=trace, template_vars=template_vars)
 
 
-def load_and_expand_imports(yaml_path: Path, *, cache: Optional[Dict[Path, Dict[str, Any]]] = None) -> Dict[str, Any]:
+def load_and_expand_imports(
+    yaml_path: Path,
+    *,
+    cache: Optional[Dict[Path, Dict[str, Any]]] = None,
+    template_vars: Optional[Mapping[str, object]] = None,
+) -> Dict[str, Any]:
     resolved = yaml_path.resolve()
     if cache is None:
         cache = {}
     trace: List[ImportTraceItem] = [ImportTraceItem(yaml_path=resolved, via=None)]
-    return _load_and_expand_file(resolved, cache=cache, trace=trace)
+    return _load_and_expand_file(resolved, cache=cache, trace=trace, template_vars=template_vars)
 
 
-def _load_yaml_mapping(yaml_path: Path) -> Dict[str, Any]:
-    with yaml_path.open("r", encoding="utf-8") as handle:
-        loaded = yaml.safe_load(handle)
+def _load_yaml_mapping(yaml_path: Path, *, template_vars: Optional[Mapping[str, object]]) -> Dict[str, Any]:
+    text = yaml_path.read_text(encoding="utf-8")
+    text = maybe_precompile_yaml_text(
+        text,
+        template_vars=template_vars,
+        context_label="导入片段 `YAML` 文件 `{}`".format(str(yaml_path)),
+    )
+    loaded = yaml.safe_load(text)
     if not isinstance(loaded, dict):
         msg = "YAML config must be a mapping"
         raise TypeError(msg)
@@ -257,6 +269,7 @@ def _load_and_expand_file(
     *,
     cache: Dict[Path, Dict[str, Any]],
     trace: List[ImportTraceItem],
+    template_vars: Optional[Mapping[str, object]],
 ) -> Dict[str, Any]:
     if any(item.yaml_path == yaml_path for item in trace[:-1]):
         msg = "Import cycle detected"
@@ -268,11 +281,11 @@ def _load_and_expand_file(
         return cache[yaml_path]
 
     try:
-        data = _load_yaml_mapping(yaml_path)
+        data = _load_yaml_mapping(yaml_path, template_vars=template_vars)
     except Exception as exc:
         msg = "Failed to load fragment YAML: {}: {}".format(type(exc).__name__, exc)
         raise YamlImportExpansionError(msg, trace=trace, logical_path="") from exc
-    expanded = _expand_file_inplace(data, yaml_path=yaml_path, cache=cache, trace=trace)
+    expanded = _expand_file_inplace(data, yaml_path=yaml_path, cache=cache, trace=trace, template_vars=template_vars)
     cache[yaml_path] = expanded
     return expanded
 
@@ -283,6 +296,7 @@ def _expand_file_inplace(
     yaml_path: Path,
     cache: Dict[Path, Dict[str, Any]],
     trace: List[ImportTraceItem],
+    template_vars: Optional[Mapping[str, object]],
 ) -> Dict[str, Any]:
     base_dir = yaml_path.parent
     try:
@@ -299,6 +313,7 @@ def _expand_file_inplace(
         cache=cache,
         trace=trace,
         logical_path="",
+        template_vars=template_vars,
     )
     return raw
 
@@ -311,6 +326,7 @@ def _expand_node_inplace(
     cache: Dict[Path, Dict[str, Any]],
     trace: List[ImportTraceItem],
     logical_path: str,
+    template_vars: Optional[Mapping[str, object]],
 ) -> None:
     if isinstance(node, dict):
         _expand_mapping_inplace(
@@ -319,6 +335,7 @@ def _expand_node_inplace(
             cache=cache,
             trace=trace,
             logical_path=logical_path,
+            template_vars=template_vars,
         )
         for key, value in list(cast("Dict[str, Any]", node).items()):
             next_path = "{}.{}".format(logical_path, key) if logical_path else str(key)
@@ -329,6 +346,7 @@ def _expand_node_inplace(
                 cache=cache,
                 trace=trace,
                 logical_path=next_path,
+                template_vars=template_vars,
             )
         return
     if isinstance(node, list):
@@ -341,6 +359,7 @@ def _expand_node_inplace(
                 cache=cache,
                 trace=trace,
                 logical_path=next_path,
+                template_vars=template_vars,
             )
         return
 
@@ -352,6 +371,7 @@ def _expand_mapping_inplace(
     cache: Dict[Path, Dict[str, Any]],
     trace: List[ImportTraceItem],
     logical_path: str,
+    template_vars: Optional[Mapping[str, object]],
 ) -> None:
     if IMPORT_KEY not in mapping:
         return
@@ -382,7 +402,7 @@ def _expand_mapping_inplace(
             raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
         fragment_path = imports[alias]
         next_trace = [*trace, ImportTraceItem(yaml_path=fragment_path, via="$import {}".format(ref))]
-        imported_file = _load_and_expand_file(fragment_path, cache=cache, trace=next_trace)
+        imported_file = _load_and_expand_file(fragment_path, cache=cache, trace=next_trace, template_vars=template_vars)
         fragment = _select_mapping_fragment(
             imported_file,
             segments=segments,

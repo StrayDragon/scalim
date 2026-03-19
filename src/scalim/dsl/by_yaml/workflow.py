@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 
 from ...vendor.compact.importlibx import require_optional_dependency
+from .config_parsing.template_precompile import maybe_precompile_yaml_text
 
 if TYPE_CHECKING:
     import yaml
@@ -215,7 +216,7 @@ class WorkflowConfig:
     resources: WorkflowResources = dataclass_field(default_factory=WorkflowResources)
 
 
-def load_workflow_config(workflow_yaml_path: str) -> WorkflowConfig:
+def load_workflow_config(workflow_yaml_path: str, *, template_vars: Optional[Mapping[str, object]] = None) -> WorkflowConfig:
     msg: str
     yaml_path = Path(str(workflow_yaml_path or "")).expanduser()
     try:
@@ -223,6 +224,15 @@ def load_workflow_config(workflow_yaml_path: str) -> WorkflowConfig:
     except Exception as exc:
         msg = "Failed to read workflow YAML: {}: {}".format(type(exc).__name__, exc)
         raise WorkflowConfigError(msg, path="(file)") from exc
+
+    try:
+        text = maybe_precompile_yaml_text(
+            text,
+            template_vars=template_vars,
+            context_label="工作流 `YAML` 文件 `{}`".format(str(yaml_path)),
+        )
+    except ValueError as exc:
+        raise WorkflowConfigError(str(exc), path="(file)") from exc
 
     try:
         loaded = _safe_load_yaml_no_duplicates(text)

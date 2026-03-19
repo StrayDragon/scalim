@@ -421,6 +421,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
     parallel_mode: str = "seq",
     max_workers: int = 0,
     init_vars: Optional[Dict[str, object]] = None,
+    template_vars: Optional[Mapping[str, object]] = None,
     path_aliases: Optional[Mapping[str, str]] = None,
 ) -> WorkflowResult:
     workflow_path = str(workflow_yaml_path or "").strip()
@@ -428,13 +429,14 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         msg = "workflow_yaml_path is required"
         raise WorkflowConfigError(msg, path="(file)")
 
-    wf = load_workflow_config(workflow_path)
+    wf = load_workflow_config(workflow_path, template_vars=template_vars)
     workflow_exec_id = generate_run_id(prefix="wf")
 
     workflow_ir = _compile_workflow_ir(
         wf,
         workflow_yaml_path=workflow_path,
         path_aliases=path_aliases,
+        template_vars=template_vars,
     )
     artifacts_dir = _WorkflowArtifactsDirectory(workflow_ir)
     ctx_store = _WorkflowCtxStore(workflow_ir)
@@ -453,6 +455,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         parallel_mode=cast("Any", parallel_mode),
         max_workers=int(max_workers),
         init_vars=init_vars,
+        template_vars=template_vars,
     )
 
     outcomes: List[Optional[WorkflowRunOutcome]] = [None for _ in range(len(workflow_ir.nodes))]
@@ -521,7 +524,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
 
     workflow_cache_pool: Optional[WorkflowCachePool] = None
     if workflow_ir.options.cache_pool is not None:
-        logical_keys_by_node_id, consumers_by_logical_key = _derive_cache_pool_consumers(workflow_ir)
+        logical_keys_by_node_id, consumers_by_logical_key = _derive_cache_pool_consumers(workflow_ir, template_vars=template_vars)
         workflow_cache_pool = WorkflowCachePool(
             workflow_exec_id=workflow_exec_id,
             instrumentation=workflow_instrumentation,
@@ -1182,6 +1185,7 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
     *,
     workflow_yaml_path: str,
     path_aliases: Optional[Mapping[str, str]],
+    template_vars: Optional[Mapping[str, object]] = None,
 ) -> WorkflowIr:
     wf_obj = cast("Any", wf)
 
@@ -1299,7 +1303,7 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
     workbook_writers_by_abs_path: Dict[str, Set[str]] = {}
     for node_id, yaml_path in demand_yaml_paths_by_run_id.items():
         try:
-            cfg = loader.load(str(yaml_path))
+            cfg = loader.load(str(yaml_path), template_vars=template_vars)
         except Exception as exc:
             msg = "Failed to load demand YAML for workflow collision precheck: run_id={!r}, demand_path={!r}: {}".format(
                 str(node_id),
@@ -1587,6 +1591,8 @@ def _compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
 
 def _derive_cache_pool_consumers(
     workflow_ir: WorkflowIr,
+    *,
+    template_vars: Optional[Mapping[str, object]],
 ) -> Tuple[Dict[str, FrozenSet[Tuple[str, str]]], Dict[Tuple[str, str], FrozenSet[str]]]:
     """基于 `workflow IR` + `demand YAML` 推导缓存消费者集合上界.
 
@@ -1603,7 +1609,7 @@ def _derive_cache_pool_consumers(
         keys: Set[Tuple[str, str]] = set()
         demand_path = getattr(node, "demand_path", None)
         if demand_path is not None:
-            config = loader.load(str(demand_path))
+            config = loader.load(str(demand_path), template_vars=template_vars)
             for source_id, source in getattr(config, "sources", {}).items():
                 if str(getattr(source, "cache_mode", "") or "") != "preload_forever":
                     continue

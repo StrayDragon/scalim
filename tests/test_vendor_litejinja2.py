@@ -111,3 +111,14 @@ def test_litejinja2_environment_caching_and_clear_cache() -> None:
     env.clear_cache()
     t3 = env.from_string("{{ a }}")
     assert t3 is not t1
+
+
+def test_litejinja2_strict_undefined_and_default_filter_fallback() -> None:
+    tpl = from_string("{{ missing }}")
+    with pytest.raises(TemplateError) as exc_info:
+        _ = tpl.render({}, strict_undefined=True)
+    assert "未定义变量" in str(exc_info.value)
+    assert "missing" in str(exc_info.value)
+
+    tpl = from_string("{{ missing | default('x') }}")
+    assert tpl.render({}, strict_undefined=True) == "x"

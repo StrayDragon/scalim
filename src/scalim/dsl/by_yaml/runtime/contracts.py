@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union, cast
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
@@ -94,6 +94,9 @@ class RunOptions:
 
     init_vars: Optional[Dict[str, object]] = None
     """可选:初始化变量注入(编译期使用,用于解析 `params` 中的 `{$init_var: <name>}` 指令节点)."""
+
+    template_vars: Optional[Mapping[str, object]] = None
+    """可选:模板变量注入(编译期使用,用于在 `YAML` 解析前对 `YAML` 文本执行 `LiteJinja2` 预编译)."""
 
     output_container_path_overrides: Optional[Dict[str, str]] = None
     """可选:按 `output_id` 覆盖 `outputs.*.container.path`(用于工作流托管临时 `CSV` 输出路径注入)."""

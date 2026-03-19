@@ -1,4 +1,4 @@
-from typing import Dict, FrozenSet, List, Optional, Union
+from typing import Dict, FrozenSet, List, Mapping, Optional, Union
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
@@ -27,6 +27,7 @@ def run(
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     init_vars: Optional[Dict[str, object]] = None,
+    template_vars: Optional[Mapping[str, object]] = None,
 ) -> RunResult:
     """运行 `YAML DSL`,并支持显式覆盖项与输出 `sink`.
 
@@ -54,6 +55,7 @@ def run(
         parallel_mode=parallel_mode,
         max_workers=max_workers,
         init_vars=init_vars,
+        template_vars=template_vars,
     )
     compilation = _compile(yaml_path, options=options)
     core = run_ir(compilation.demand_ir, compilation.request)
@@ -75,6 +77,7 @@ def compile(  # noqa: A001
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     init_vars: Optional[Dict[str, object]] = None,
+    template_vars: Optional[Mapping[str, object]] = None,
 ) -> Compilation:
     options = RunOptions(
         allowed_modules=allowed_modules,
@@ -89,6 +92,7 @@ def compile(  # noqa: A001
         parallel_mode=parallel_mode,
         max_workers=max_workers,
         init_vars=init_vars,
+        template_vars=template_vars,
     )
     return _compile(yaml_path, options=options)
 
