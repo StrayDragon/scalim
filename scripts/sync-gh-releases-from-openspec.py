@@ -1,0 +1,765 @@
+# ruff: noqa: T201
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+
+_TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+
+@dataclass(frozen=True)
+class _Change:
+    change_id: str
+    proposal_text: str
+    keyword: str
+    is_yaml: bool
+    highlight: str
+    has_breaking: bool
+    breaking_instructions: Tuple[str, ...]
+    example_priority: int
+
+
+def _run_git(args: Sequence[str], *, cwd: Path) -> str:
+    return subprocess.check_output(["git", *args], cwd=str(cwd), text=True)
+
+
+def _try_run_git(args: Sequence[str], *, cwd: Path) -> Optional[str]:
+    try:
+        return _run_git(args, cwd=cwd)
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _parse_semver_tag(tag: str) -> Optional[Tuple[int, int, int]]:
+    match = _TAG_RE.fullmatch(tag.strip())
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+
+def _list_semver_tags(root: Path) -> List[str]:
+    out = _run_git(["tag", "--list", "v*.*.*"], cwd=root)
+    tags: List[Tuple[Tuple[int, int, int], str]] = []
+    for raw in out.splitlines():
+        tag = raw.strip()
+        if not tag:
+            continue
+        parsed = _parse_semver_tag(tag)
+        if parsed is None:
+            continue
+        tags.append((parsed, tag))
+    tags.sort(key=lambda x: x[0])
+    return [t for _v, t in tags]
+
+
+def _dirs_in_archive(tag: str, *, root: Path) -> Set[str]:
+    out = _try_run_git(["ls-tree", "-d", "--name-only", tag, "openspec/changes/archive/"], cwd=root)
+    if out is None:
+        return set()
+
+    dirs: Set[str] = set()
+    prefix = "openspec/changes/archive/"
+    for line in out.splitlines():
+        path = line.strip()
+        if not path:
+            continue
+        if path.startswith(prefix):
+            path = path[len(prefix) :]
+        dirs.add(path)
+    return dirs
+
+
+def _read_file_at_tag(tag: str, relpath: str, *, root: Path) -> Optional[str]:
+    # 只读取文件快照；不读取 `patch/diff`。
+    return _try_run_git(["show", "{}:{}".format(tag, relpath)], cwd=root)
+
+
+def _extract_section_lines(text: str, heading: str) -> List[str]:
+    lines = text.splitlines()
+    start = None
+    needle = "## {}".format(heading)
+    for i, line in enumerate(lines):
+        if line.strip() == needle:
+            start = i + 1
+            break
+    if start is None:
+        return []
+    end = len(lines)
+    for j in range(start, len(lines)):
+        if lines[j].startswith("## "):
+            end = j
+            break
+    return lines[start:end]
+
+
+def _parse_top_level_bullet_blocks(lines: Iterable[str]) -> List[List[str]]:
+    blocks: List[List[str]] = []
+    current: Optional[List[str]] = None
+    for raw in lines:
+        line = raw.rstrip("\n")
+        if line.startswith("- "):
+            if current:
+                blocks.append(current)
+            current = [line[2:].strip()]
+            continue
+        if current is None:
+            continue
+        if line.startswith("  ") or line.startswith("\t"):
+            stripped = line.strip()
+            if stripped:
+                current.append(stripped)
+            continue
+        # 把非空且非标题的行视为条目续行。
+        stripped = line.strip()
+        if stripped and not stripped.startswith("## "):
+            current.append(stripped)
+
+    if current:
+        blocks.append(current)
+    return blocks
+
+
+def _clean_inline_markers(s: str) -> str:
+    out = s.strip()
+    out = re.sub(r"\s+", " ", out)
+    out = re.sub(r"^\*\*BREAKING\*\*:\s*", "", out, flags=re.I)
+    out = re.sub(r"^\*\*NON-BREAKING\*\*:\s*", "", out, flags=re.I)
+    out = re.sub(r"^BREAKING:\s*", "", out, flags=re.I)
+    out = out.strip()
+    return out
+
+
+def _score_highlight(text: str) -> int:
+    s = text
+    lower = s.lower()
+    score = 0
+    if "新增" in s or "引入" in s or "支持" in s or "扩展" in s or "增加" in s or "new" in lower:
+        score += 3
+    if "BREAKING" in s or "breaking" in lower or "破坏性" in s:
+        score += 2
+    if "重构" in s or "refactor" in lower:
+        score += 2
+    if "工作流" in s or "workflow" in lower or "质量" in s or "qa" in lower:
+        score += 2
+    if "保持" in s or "不变" in s or "non-breaking" in lower:
+        score -= 1
+    if "schema" in lower or "hover" in lower or "description" in lower or "markdowndescription" in lower or "编辑器" in s:
+        score -= 2
+    if "non-breaking" in lower:
+        score -= 2
+    if "不在本变更范围" in s or "后续" in s:
+        score -= 1
+    if "文档" in s or "docs" in lower:
+        score += 1
+    return score
+
+
+def _choose_highlight(what_changes_lines: List[str]) -> str:
+    blocks = _parse_top_level_bullet_blocks(what_changes_lines)
+    if not blocks:
+        for line in what_changes_lines:
+            stripped = line.strip()
+            if stripped:
+                return _clean_inline_markers(stripped)
+        return "（无）"
+
+    def _score_block(block: List[str]) -> Tuple[int, int]:
+        blob = " ".join(block)
+        head = block[0].strip()
+        score = _score_highlight(blob)
+        if head.endswith(":") or head.endswith("："):
+            score -= 4
+        # 同分时偏向更靠前的条目。
+        return score, -blocks.index(block)
+
+    best = max(blocks, key=_score_block)
+    head = _clean_inline_markers(best[0])
+    if (head.endswith(":") or head.endswith("：")) and len(best) > 1:
+        head = head.rstrip(":：").rstrip()
+        tail = _clean_inline_markers(best[1])
+        tail = re.sub(r"^-\s+", "", tail)
+        if tail:
+            return "{}（{}）".format(head, tail.rstrip("。"))
+    return head
+
+
+def _extract_keyword(proposal_text: str, *, fallback_change_id: str) -> str:
+    cap_lines = _extract_section_lines(proposal_text, "Capabilities")
+    for line in cap_lines:
+        match = re.search(r"-\s+`([^`]+)`\s*:", line)
+        if match:
+            keyword = match.group(1).strip()
+            if keyword:
+                return keyword
+
+    # 兜底：取 `YYYY-MM-DD-` 后的 1~2 个片段。
+    rest = fallback_change_id
+    if re.match(r"^\d{4}-\d{2}-\d{2}-", rest):
+        rest = rest[11:]
+    tokens = [t for t in rest.split("-") if t]
+    if not tokens:
+        return fallback_change_id
+    if len(tokens) == 1:
+        return tokens[0]
+    return "{}-{}".format(tokens[0], tokens[1])
+
+
+def _example_priority(change_id: str) -> int:
+    cid = change_id.lower()
+    if "normalize" in cid:
+        return 1
+    if "extract" in cid:
+        return 2
+    if "inline-dynamic-params" in cid or "params-template" in cid or "init-vars" in cid or "init-var" in cid or "runtime-vars" in cid:
+        return 3
+    if "imports" in cid or "relative-import" in cid:
+        return 4
+    if "outputs" in cid or "aggregate" in cid or "derived-outputs" in cid:
+        return 5
+    if "output-fields-alias" in cid or "fields-alias" in cid:
+        return 6
+    if "comment-style" in cid:
+        return 7
+    return 99
+
+
+def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
+    cid = change_id.lower()
+    if priority == 1:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "sources:",
+            "  users:",
+            '    loader: {call_by: ".loaders:load_users"}',
+            "    normalize: {kind: index_by_key, key_field: user_id}",
+            "    fields:",
+            "      name: {extract: profile.name}",
+            "      age: {extract: profile.age}",
+            "outputs:",
+            "  - id: users_sheet",
+        ]
+    if priority == 2:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "main_source:",
+            "  fields:",
+            "    order_id: {extract: id}",
+            "    sku: {extract: items[1].sku}",
+            "    raw_key: {extract: '[\"a.b\"]'}",
+            "sources:",
+            "  ref:",
+            '    loader: {call_by: "..loaders:load_ref"}',
+            "    fields: {value: {extract: data.value}}",
+        ]
+    if priority == 3:
+        if "output" in cid and ("init-var" in cid or "init-vars" in cid):
+            return [
+                "# 示例为提案语义示意（不保证可直接运行）",
+                "main_source:",
+                '  loader: {call_by: ".loaders:main"}',
+                "  fields: {order_id: {extract: id}, amount: {extract: amt}}",
+                "outputs:",
+                "  - id: report",
+                "    container:",
+                "      path: {$init_var: out_dir}",
+                "    fields: [order_id, amount]",
+                "  # init_vars[out_dir] 由调用方在 run/compile 时传入",
+            ]
+        if "init-var" in cid or "init-vars" in cid or "runtime-vars" in cid:
+            return [
+                "# 示例为提案语义示意（不保证可直接运行）",
+                "sources:",
+                "  api:",
+                '    loader: {call_by: ".loaders:fetch"}',
+                "    params:",
+                "      token: {$init_var: api_token}",
+                "      query:",
+                "        ids: {$keys: {as: list}}",
+                "outputs:",
+                "  - id: api_sheet",
+            ]
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "sources:",
+            "  api:",
+            '    loader: {call_by: ".loaders:fetch"}',
+            "    params:",
+            "      query:",
+            "        ids: {$keys: {as: set}}",
+            "      rows_ctx: {$rows: {cache_mode: batch}}",
+            "outputs:",
+            "  - id: api_sheet",
+        ]
+    if priority == 4:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "sources:",
+            "  orders:",
+            '    loader: {call_by: ".loaders:load_orders"}',
+            "  ref:",
+            '    loader: {call_by: "..common.transforms:fixup"}',
+            "main_source:",
+            '  loader: {call_by: ".loaders:main"}',
+            "outputs:",
+            "  - id: orders_sheet",
+        ]
+    if priority == 5:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "outputs:",
+            "  - id: summary",
+            "    aggregate:",
+            "      group_by: [shop_id]",
+            "      fields:",
+            "        order_cnt: {count: {}}",
+            "        shop_rank:",
+            "          dense_rank: {order_by: [{field: order_cnt, desc: true}]}",
+            '      where: {eq: [status, "PAID"]}',
+        ]
+    if priority == 6:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "main_source:",
+            "  fields:",
+            "    quantity: &quantity {extract: qty}",
+            "outputs:",
+            "  - id: detail",
+            "    fields:",
+            "      - *quantity",
+            "      - price",
+            "      - amount",
+            "  - id: summary",
+        ]
+    if priority == 7:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "# 仅展示注释/文档风格变化，不代表完整配置",
+            "main_source:",
+            "  # 这里描述该 source 的意图，而不是写在字段旁边",
+            '  loader: {call_by: ".loaders:main"}',
+            "  fields:",
+            "    order_id: {extract: id}  # 只保留必要的行内注释",
+            "outputs:",
+            "  - id: sheet",
+            "    fields: [order_id]",
+        ]
+    return None
+
+
+def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[str]:
+    what_lines = _extract_section_lines(proposal_text, "What Changes")
+    impact_lines = _extract_section_lines(proposal_text, "Impact")
+
+    blocks = _parse_top_level_bullet_blocks(what_lines)
+    candidates: List[str] = []
+    for block in blocks:
+        blob = " ".join(block)
+        if re.search(r"\bBREAKING\b", blob, flags=re.I) or "破坏性" in blob or "不再支持" in blob or "移除" in blob:
+            candidates.append(blob)
+
+    for line in impact_lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if re.search(r"\bBREAKING\b", stripped, flags=re.I) or "破坏性" in stripped or "不再支持" in stripped:
+            candidates.append(stripped)
+
+    instructions: List[str] = []
+    for cand in candidates:
+        cleaned = _clean_inline_markers(cand)
+
+        # 重命名：`old` -> `new`
+        match = re.search(r"`([^`]+)`\s*(?:指令节点)?(?:更名为|重命名为)\s*`([^`]+)`", cleaned)
+        if match:
+            old, new = match.group(1), match.group(2)
+            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+            continue
+
+        match = re.search(r"将\s+.*?`([^`]+)`\s+.*?(?:更名为|重命名为)\s*`([^`]+)`", cleaned)
+        if match:
+            old, new = match.group(1), match.group(2)
+            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+            continue
+
+        match = re.search(r"`([^`]+)`.*(?:升级为|改为|改成|替换为)\s*`([^`]+)`", cleaned)
+        if match:
+            old, new = match.group(1), match.group(2)
+            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+            continue
+
+        if "--strict" in cleaned and "yaml-dsl validate" in cleaned:
+            instructions.append("不要再用 `yaml-dsl validate --strict`；直接用 `yaml-dsl validate`（默认严格）。")
+            continue
+
+        if "value_cast" in cleaned and "None" in cleaned and '"None"' in cleaned:
+            instructions.append('把下游依赖 `"None"` 字符串的逻辑改成处理 `None`（`value_cast: str/int` 不再把 None 变成 "None"）。')
+            continue
+
+        runtime_old = re.search(r"\$runtime\.([A-Za-z0-9_]+)", cleaned)
+        runtime_new = re.search(r"\{\$runtime:\s*([A-Za-z0-9_]+)\}", cleaned)
+        if runtime_old and runtime_new and runtime_old.group(1) == runtime_new.group(1):
+            name = runtime_old.group(1)
+            instructions.append("把 `$runtime.{}` 改成 `{{$runtime: {}}}`（旧写法会 fail-fast）。".format(name, name))
+            continue
+        if runtime_old and runtime_new:
+            instructions.append("把 `$runtime.<name>` 字符串占位符迁移为 `{$runtime: <name>}` 指令节点（旧写法会 fail-fast）。")
+            continue
+
+        if (
+            "fields.<field_id>.field" in cleaned
+            or "`field` 从稳定 YAML authoring surface 中移除" in cleaned
+            or "`field`" in cleaned
+            and "移除" in cleaned
+            and "`extract" in cleaned
+        ):
+            instructions.append("把 `fields.*.field` 迁移为 `extract`（`field` 会在校验阶段 fail-fast）。")
+            continue
+
+        if "bind/to_bind" in cleaned:
+            instructions.append("把 `bind/to_bind` 写法迁移到 `params` 模板内联指令（旧写法会 fail-fast）。")
+            continue
+
+        if "aggregate.metrics" in cleaned and "aggregate.fields" in cleaned:
+            instructions.append("把 `outputs[*].aggregate.metrics` 改为 `outputs[*].aggregate.fields`。")
+            continue
+
+        if "{op:" in cleaned and "函数当 key" in cleaned and "aggregate.fields" in cleaned:
+            instructions.append(
+                "把 `outputs[*].aggregate.fields.<field_id>` 从 `{op: ...}` 改成“函数当 key”的新写法（如 `order_cnt: {count: {}}`）。"
+            )
+            continue
+
+        # 兜底：保持短句且直接。
+        if cleaned.startswith("把 ") or cleaned.startswith("不要") or cleaned.startswith("将 ") or cleaned.startswith("按 "):
+            instructions.append(cleaned.rstrip("。") + "。")
+            continue
+        instructions.append("按提案升级：{}。".format(cleaned.rstrip("。")))
+
+    # 去重：保持原顺序。
+    seen: Set[str] = set()
+    uniq: List[str] = []
+    for ins in instructions:
+        if ins in seen:
+            continue
+        seen.add(ins)
+        uniq.append(ins)
+    return uniq
+
+
+def _score_change(change: _Change) -> int:
+    score = 0
+    cid = change.change_id.lower()
+    if change.is_yaml:
+        score += 100
+    if "normalize" in cid:
+        score += 70
+    if "extract" in cid:
+        score += 70
+    if "inline-dynamic-params" in cid or "params" in cid or "runtime-vars" in cid or "init-vars" in cid or "init-var" in cid:
+        score += 50
+    if "imports" in cid or "relative-import" in cid:
+        score += 40
+    if "outputs" in cid or "aggregate" in cid or "derived-outputs" in cid:
+        score += 30
+    if "workflow" in cid:
+        score += 80
+    if "qa" in cid or "hardening" in cid:
+        score += 60
+    if "refactor" in cid or "core" in cid:
+        score += 50
+    if "breaking" in change.proposal_text.lower() or change.has_breaking:
+        score += 40
+    if "skill" in cid:
+        score -= 30
+    if "preproposal" in cid:
+        score -= 50
+    if "frontend" in cid:
+        score += 30
+    if "doc" in cid:
+        score += 20
+    if "marimo" in cid:
+        score += 10
+    if "prompt-eval" in cid:
+        score += 10
+    return score
+
+
+def _build_change(tag: str, change_id: str, *, root: Path) -> Optional[_Change]:
+    proposal_relpath = "openspec/changes/archive/{}/proposal.md".format(change_id)
+    proposal_text = _read_file_at_tag(tag, proposal_relpath, root=root)
+    if proposal_text is None:
+        return None
+
+    keyword = _extract_keyword(proposal_text, fallback_change_id=change_id)
+    is_yaml = "yaml" in change_id.lower() or "yaml" in keyword.lower()
+    highlight = _choose_highlight(_extract_section_lines(proposal_text, "What Changes"))
+    breaking = _extract_breaking_instructions(proposal_text, change_id)
+    has_breaking = len(breaking) > 0 and any("按提案升级：" not in b for b in breaking)
+    prio = _example_priority(change_id) if is_yaml else 99
+    return _Change(
+        change_id=change_id,
+        proposal_text=proposal_text,
+        keyword=keyword,
+        is_yaml=is_yaml,
+        highlight=highlight,
+        has_breaking=has_breaking,
+        breaking_instructions=tuple(breaking),
+        example_priority=prio,
+    )
+
+
+def _git_log_oneline(prev_tag: str, tag: str, *, root: Path) -> List[str]:
+    out = _run_git(["log", "--oneline", "{}..{}".format(prev_tag, tag)], cwd=root)
+    lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
+    return lines
+
+
+def _render_notes(
+    tag: str,
+    prev_tag: str,
+    *,
+    new_changes: List[_Change],
+    commit_lines: List[str],
+    include_example: bool,
+    highlight_max: int,
+    breaking_max: int,
+) -> str:
+    lines: List[str] = []
+
+    lines.append("## Highlights")
+    if not new_changes:
+        lines.append("- 本版本没有新增 archived OpenSpec 提案，主要是实现/修整。")
+    else:
+        # 优先挑更关键的变更；若本版本有 YAML 变更，`Highlights` 至少保留 1 条 YAML。
+        sorted_changes = sorted(new_changes, key=_score_change, reverse=True)
+        chosen = sorted_changes[:highlight_max]
+        if any(c.is_yaml for c in new_changes) and not any(c.is_yaml for c in chosen):
+            yaml_first = next((c for c in sorted_changes if c.is_yaml), None)
+            if yaml_first is not None and chosen:
+                chosen[-1] = yaml_first
+            elif yaml_first is not None:
+                chosen = [yaml_first]
+
+        for ch in chosen:
+            highlight = ch.highlight.strip().rstrip("。").rstrip(".")
+            lines.append("- {}（{}）".format(highlight + "。", ch.keyword))
+
+    lines.append("## Breaking / Upgrade")
+    breaking_items: List[str] = []
+    for ch in new_changes:
+        breaking_items.extend(list(ch.breaking_instructions))
+    # 若存在更明确的迁移点，则丢弃“按提案升级：...”这类低信息量兜底项。
+    better = [b for b in breaking_items if not b.startswith("按提案升级：")]
+    if better:
+        breaking_items = better
+
+    # 去重：保持顺序。
+    seen: Set[str] = set()
+    breaking_uniq: List[str] = []
+    for item in breaking_items:
+        if item in seen:
+            continue
+        seen.add(item)
+        breaking_uniq.append(item)
+
+    if not breaking_uniq:
+        if new_changes:
+            breaking_uniq = ["无（本版本 archived 提案未声明不兼容/迁移点）。"]
+        else:
+            breaking_uniq = ["无（该 tag 未包含 archived OpenSpec 提案，无法从提案文本抽取迁移点）。"]
+
+    for item in breaking_uniq[:breaking_max]:
+        normalized = item.strip().rstrip("。").rstrip(".")
+        lines.append("- {}".format(normalized + "。"))
+
+    if include_example:
+        yaml_candidates = [c for c in new_changes if c.is_yaml and c.example_priority < 99]
+        yaml_candidates.sort(key=lambda c: (c.example_priority, c.change_id))
+        if yaml_candidates:
+            chosen = yaml_candidates[0]
+            snippet_lines = _render_example_snippet(chosen.change_id, chosen.example_priority)
+            if snippet_lines:
+                lines.append("## 新增/改动语法（示例）")
+                lines.append("```yaml")
+                lines.extend(snippet_lines)
+                lines.append("```")
+
+    lines.append("## Commits（节选）")
+    max_commits = 8
+    shown = commit_lines[:max_commits]
+    for ln in shown:
+        lines.append("- {}".format(ln))
+    if len(commit_lines) > max_commits:
+        lines.append("- ...略")
+
+    # 强制 <= 30 行：优先裁 `Commits`，再裁 `Highlights/Breaking`（不删除各节标题）。
+    while len(lines) > 30:
+        # 优先裁 `Commits` 段内容。
+        try:
+            commits_idx = lines.index("## Commits（节选）")
+        except ValueError:
+            break
+        if len(lines) > commits_idx + 2:
+            # 从末尾移除 1 行提交记录（保留标题）。
+            for k in range(len(lines) - 1, commits_idx, -1):
+                if lines[k].startswith("- "):
+                    del lines[k]
+                    break
+            continue
+        break
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="按 archived OpenSpec 提案+commit messages 批量 create/edit GitHub Releases。")
+    parser.add_argument("--start-tag", default="v0.2.1", help="起始 tag（包含）。默认: v0.2.1")
+    parser.add_argument("--prev-for-start", default="v0.1.0", help="start-tag 的 prev tag（用于 commits 区间）。默认: v0.1.0")
+    parser.add_argument("--end-tag", default="", help="结束 tag（包含）。为空则使用仓库中最新 semver tag。")
+    parser.add_argument("--notes-dir", default="", help="notes 输出目录。为空则写到 /tmp 下新目录。")
+    parser.add_argument("--apply", action="store_true", help="执行 gh release create/edit。默认仅生成 notes。")
+    parser.add_argument("--sleep-secs", type=int, default=5, help="每次 create/edit 后 sleep 秒数。默认: 5")
+    parser.add_argument("--root", default=".", help="仓库根目录（默认: 当前目录）。")
+    return parser.parse_args(list(argv or sys.argv[1:]))
+
+
+def _ensure_gh_available() -> None:
+    try:
+        subprocess.run(["gh", "--version"], check=True, stdout=subprocess.DEVNULL)
+    except Exception as exc:
+        raise RuntimeError("未找到 gh CLI 或不可用: {}".format(exc))
+
+
+def _gh_release_exists(tag: str) -> bool:
+    proc = subprocess.run(["gh", "release", "view", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return proc.returncode == 0
+
+
+def _gh_release_create(tag: str, notes_path: Path) -> None:
+    subprocess.run(["gh", "release", "create", tag, "--title", tag, "--notes-file", str(notes_path)], check=True)
+
+
+def _gh_release_edit(tag: str, notes_path: Path) -> None:
+    subprocess.run(["gh", "release", "edit", tag, "--title", tag, "--notes-file", str(notes_path)], check=True)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = _parse_args(argv)
+    root = Path(args.root).resolve()
+
+    tags = _list_semver_tags(root)
+    if not tags:
+        print("未找到符合 `vX.Y.Z` 的版本标签（语义化版本）", file=sys.stderr)
+        return 2
+
+    start = args.start_tag.strip()
+    if start not in tags:
+        print("起始标签不存在（`--start-tag`）：{}".format(start), file=sys.stderr)
+        return 2
+    end = args.end_tag.strip() or tags[-1]
+    if end not in tags:
+        print("结束标签不存在（`--end-tag`）：{}".format(end), file=sys.stderr)
+        return 2
+
+    start_idx = tags.index(start)
+    end_idx = tags.index(end)
+    if end_idx < start_idx:
+        print("结束标签早于起始标签：{} < {}".format(end, start), file=sys.stderr)
+        return 2
+
+    target_tags = tags[start_idx : end_idx + 1]
+    prev_for_start = args.prev_for_start.strip()
+    if prev_for_start not in tags:
+        print("起始版本的前序标签不存在（`--prev-for-start`）：{}".format(prev_for_start), file=sys.stderr)
+        return 2
+
+    notes_dir = args.notes_dir.strip()
+    if not notes_dir:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        notes_dir = os.path.join("/tmp", "scalim-gh-release-notes-{}".format(stamp))
+    out_dir = Path(notes_dir).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    print("仓库根目录：", root)
+    print("发布说明目录：", out_dir)
+    print("标签序列：", ", ".join(target_tags))
+
+    if args.apply:
+        _ensure_gh_available()
+
+    previous_tag = prev_for_start
+    notes_paths: Dict[str, Path] = {}
+    for tag in target_tags:
+        dirs_t = _dirs_in_archive(tag, root=root)
+        dirs_p = _dirs_in_archive(previous_tag, root=root)
+        new_dirs = sorted(dirs_t - dirs_p)
+
+        changes: List[_Change] = []
+        for change_id in new_dirs:
+            ch = _build_change(tag, change_id, root=root)
+            if ch is None:
+                continue
+            changes.append(ch)
+
+        has_yaml = any(c.is_yaml for c in changes)
+        include_example = has_yaml and any(c.example_priority < 99 for c in changes)
+        highlight_max = 2 if include_example else 3
+        breaking_max = 2 if include_example else 3
+
+        commits = _git_log_oneline(previous_tag, tag, root=root)
+        notes = _render_notes(
+            tag,
+            previous_tag,
+            new_changes=changes,
+            commit_lines=commits,
+            include_example=include_example,
+            highlight_max=highlight_max,
+            breaking_max=breaking_max,
+        )
+
+        path = out_dir / "{}.md".format(tag)
+        path.write_text(notes, encoding="utf-8")
+        notes_paths[tag] = path
+
+        line_count = notes.count("\n")
+        if line_count > 30:
+            print("警告：{} 的发布说明行数超限：{}".format(tag, line_count), file=sys.stderr)
+        else:
+            print("{} 发布说明行数：{}".format(tag, line_count))
+
+        previous_tag = tag
+
+    if not args.apply:
+        print("仅生成发布说明（`dry-run`）；加 `--apply` 才会创建/更新发布页。")
+        return 0
+
+    print("\n开始创建/更新发布页（每次操作后等待 {} 秒）...".format(args.sleep_secs))
+    for tag in target_tags:
+        notes_path = notes_paths[tag]
+        exists = _gh_release_exists(tag)
+        if exists:
+            print("更新：", tag)
+            _gh_release_edit(tag, notes_path)
+        else:
+            print("创建：", tag)
+            _gh_release_create(tag, notes_path)
+        time.sleep(max(0, int(args.sleep_secs)))
+
+    print("\n完成。建议复核：")
+    print("- `gh release list --limit 100`")
+    print("- `gh release view v0.2.3`")
+    print("- `gh release view v0.3.0`")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
