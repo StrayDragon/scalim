@@ -71,6 +71,7 @@ from scalim.ob import Observability
 from scalim.ob.presets.viz import VizObserverConfig, VizObserver
 
 config = VizObserverConfig(
+    run_id=None,               # (可选) 稳定 run_id(用于输出目录名与事件 run_id);workflow bundle 会自动设置
     output_dir="/path/to/run-root",
     trace_enabled=False,        # true => 额外输出 viz_trace.jsonl
     payload_policy="summary",   # 或 sample/full/none
@@ -118,6 +119,60 @@ observability:
   - `observability.viz.run_name`: 语义化且稳定的 run 标识(例如 workflow run id)
   - `observability.viz.env`: 环境标识(如 `dev`/`staging`/`prod`)
 - UI 展示优先级: `run_name` > `run_id`(fallback).
+
+### workflow replay bundle (MVP)
+
+当执行 workflow YAML(例如 `run_workflow(...)`)时,可以选择导出一个“单目录可携带”的 workflow replay bundle:
+
+- bundle 目录内包含一个 workflow scope run:`scalim-viz/workflow/`
+- bundle 目录内包含每个 workflow demand 节点的 child replay run:`scalim-viz/<demand_run_id>/`
+
+启用方式(建议只配置 `output_dir`,不要显式指定 `output_path`/`snapshot_path`/`trace_path`,因为 bundle 需要创建多个 run 子目录):
+
+```python
+from scalim.dsl.by_yaml import RunOverrides, run_workflow
+from scalim.ob.presets.viz import VizObserverConfig
+
+run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    overrides=RunOverrides(
+        viz_config=VizObserverConfig(
+            output_dir="/path/to/run-root",
+            trace_enabled=False,
+            payload_policy="summary",
+        ),
+    ),
+)
+```
+
+输出目录结构:
+
+```text
+/path/to/run-root/
+  scalim-viz/
+    workflow/
+      viz_snapshot.json
+      viz_events.jsonl
+    <demand_run_id>/
+      viz_snapshot.json
+      viz_events.jsonl
+      viz_trace.jsonl           # optional
+      viz_schedule_plan.json    # optional
+```
+
+workflow snapshot linking 规则:
+
+- workflow demand node 的 `node.data.kind` MUST 为 `"workflow_demand"`
+- 若可 drill-down,workflow demand node 的 `node.data.demand_run_id` MUST 指向同 bundle 内的子目录名(`<demand_run_id>`)
+- 若 child replay 缺失或不完整(至少缺 `viz_snapshot.json`/`viz_events.jsonl`),则 MUST 省略 `demand_run_id`(避免导出 broken link)
+
+workflow scope 的 node id / event node_ref 命名空间:
+
+- workflow node: `workflow_node:{workflow_node_id}`
+- workflow resource: `workflow_resource:{resource_type}:{resource_id}`
+
+前端加载到 bundle 时会默认进入 workflow scope(拓扑优先),并支持从 workflow demand 节点 drill-down 到 child demand replay,再返回 workflow scope 并恢复上下文.
 
 ### outputs(多输出组合)回放口径
 

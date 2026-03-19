@@ -213,6 +213,10 @@ gen-viz-data PARAM="":
     uv {{ UV_OPTIONS }} run python scripts/gen-viz-data.py --mode events-only {{ PARAM }}
     # uv {{ UV_OPTIONS }} run python scripts/gen-viz-data.py --mode events+trace {{ PARAM }}
 
+# 生成: workflow replay bundle (scalim-viz/workflow + child runs)
+gen-viz-workflow-bundle PARAM="":
+    uv {{ UV_OPTIONS }} run python scripts/gen-viz-workflow-bundle.py {{ PARAM }}
+
 # 生成: Viz schedule plan (基于已生成的 viz_events.jsonl; 用于补齐/修复缺失的 viz_schedule_plan.json)
 gen-viz-schedule-plan RUN_DIR="":
     #!/usr/bin/env bash

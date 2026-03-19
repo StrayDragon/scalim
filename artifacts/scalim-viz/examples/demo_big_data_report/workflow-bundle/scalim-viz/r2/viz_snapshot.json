@@ -1,0 +1,188 @@
+{
+  "nodes": [
+    {
+      "id": "field:customer_id",
+      "type": "field",
+      "data": {
+        "label": "客户ID",
+        "field_key": "customer_id",
+        "source_id": "orders",
+        "is_ref": false
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "field:order_id",
+      "type": "field",
+      "data": {
+        "label": "订单ID",
+        "field_key": "order_id",
+        "source_id": "orders",
+        "is_ref": false
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "field:payment_method_id",
+      "type": "field",
+      "data": {
+        "label": "支付方式ID",
+        "field_key": "payment_method_id",
+        "source_id": "orders",
+        "is_ref": false
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "loader:orders",
+      "type": "loader",
+      "data": {
+        "label": "orders",
+        "loader_name": "orders"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "source:orders",
+      "type": "source",
+      "data": {
+        "label": "orders",
+        "source_id": "orders",
+        "is_main": true
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "stage:stage_0",
+      "type": "stage",
+      "data": {
+        "label": "stage_0",
+        "stage_id": "stage_0",
+        "level": 0
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0:loader:orders:field:customer_id:loads_from",
+      "source": "loader:orders",
+      "target": "field:customer_id",
+      "type": "loads_from",
+      "data": {
+        "type": "loads_from"
+      }
+    },
+    {
+      "id": "e1:loader:orders:field:order_id:loads_from",
+      "source": "loader:orders",
+      "target": "field:order_id",
+      "type": "loads_from",
+      "data": {
+        "type": "loads_from"
+      }
+    },
+    {
+      "id": "e2:loader:orders:field:payment_method_id:loads_from",
+      "source": "loader:orders",
+      "target": "field:payment_method_id",
+      "type": "loads_from",
+      "data": {
+        "type": "loads_from"
+      }
+    },
+    {
+      "id": "e3:source:orders:loader:orders:loads_from",
+      "source": "source:orders",
+      "target": "loader:orders",
+      "type": "loads_from",
+      "data": {
+        "type": "loads_from"
+      }
+    },
+    {
+      "id": "e4:stage:stage_0:field:customer_id:in_stage",
+      "source": "stage:stage_0",
+      "target": "field:customer_id",
+      "type": "in_stage",
+      "data": {
+        "type": "in_stage"
+      }
+    },
+    {
+      "id": "e5:stage:stage_0:field:order_id:in_stage",
+      "source": "stage:stage_0",
+      "target": "field:order_id",
+      "type": "in_stage",
+      "data": {
+        "type": "in_stage"
+      }
+    },
+    {
+      "id": "e6:stage:stage_0:field:payment_method_id:in_stage",
+      "source": "stage:stage_0",
+      "target": "field:payment_method_id",
+      "type": "in_stage",
+      "data": {
+        "type": "in_stage"
+      }
+    }
+  ],
+  "meta": {
+    "schema_version": "vizgraph/v1",
+    "created_at": 1773916176.5998785,
+    "target_fields": [
+      "order_id",
+      "customer_id",
+      "payment_method_id"
+    ],
+    "metadata": {
+      "total_fields": 3,
+      "total_sources": 1,
+      "total_loaders": 0,
+      "pruned_fields": 0,
+      "max_depth": 0,
+      "has_derived_fields": false,
+      "has_ref_fields": false,
+      "cached_sources": [
+        "preload_counter"
+      ]
+    },
+    "viz": {
+      "payload_policy": "summary",
+      "sample_size": 5,
+      "trace_enabled": false,
+      "run_name": "demo_big_data_report/workflow_fixture",
+      "env": "demo"
+    }
+  },
+  "stages": [
+    {
+      "stage_id": "stage_0",
+      "level": 0,
+      "field_keys": [
+        "customer_id",
+        "order_id",
+        "payment_method_id"
+      ]
+    }
+  ]
+}

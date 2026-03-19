@@ -9,7 +9,9 @@
     getEventActionLabel,
     getEventSummaryItems,
     isExpandableValue,
+    openDemandFromWorkflow,
     openValueDialog,
+    returnToWorkflow,
     startPanelDrag,
     state,
     statusFromEvent,
@@ -34,6 +36,13 @@
   } from "$domain/state.svelte";
 
   let root: HTMLDivElement | null = null;
+
+  const workflowReturnLabel = () => {
+    const nav = state.workflowNav;
+    if (!nav) return "";
+    const run = state.runSources.find((item) => item.id === nav.returnRunId) ?? null;
+    return run?.label ?? nav.returnRunId;
+  };
 
   const clampIntoView = async () => {
     await tick();
@@ -97,6 +106,25 @@
 	      </div>
 	      <Button variant="outline" size="sm" on:click={() => (state.inspectorOpen = false)}>收起</Button>
 	    </div>
+
+      {#if state.workflowNav && state.activeRunId !== state.workflowNav.returnRunId}
+        <div class="rounded-xl border border-slate-200 bg-white/70 p-2 text-xs text-slate-600">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <div class="text-[11px] uppercase tracking-wide text-slate-400">导航</div>
+              <Badge variant="outline" className="font-mono">workflow</Badge>
+            </div>
+            <Button variant="outline" size="sm" on:click={returnToWorkflow}>
+              返回 {workflowReturnLabel() || "workflow"}
+            </Button>
+          </div>
+          {#if state.workflowNav.sourceWorkflowNodeId}
+            <div class="mt-1 text-[11px] text-slate-500">
+              来自节点: <span class="font-mono">{state.workflowNav.sourceWorkflowNodeId}</span>
+            </div>
+          {/if}
+        </div>
+      {/if}
 
     <div class="flex flex-col gap-2 text-xs text-slate-600">
       <div class="text-[11px] uppercase tracking-wide text-slate-400">概览</div>
@@ -300,10 +328,10 @@
       </div>
     {/if}
 
-    {#if nodeSummary()}
-      <div class="flex flex-col gap-2 text-xs text-slate-600">
-        <div class="text-[11px] uppercase tracking-wide text-slate-400">选中节点</div>
-        <div class="rounded-lg border border-slate-200 bg-white/70 px-2 py-2 flex flex-col gap-1">
+	    {#if nodeSummary()}
+	      <div class="flex flex-col gap-2 text-xs text-slate-600">
+	        <div class="text-[11px] uppercase tracking-wide text-slate-400">选中节点</div>
+	        <div class="rounded-lg border border-slate-200 bg-white/70 px-2 py-2 flex flex-col gap-1">
           <div class="flex items-center justify-between">
             <span class="text-[11px] text-slate-500">id</span>
             <span class="font-mono text-[11px] text-slate-700 max-w-[160px] truncate" title={nodeSummary()?.id}>
@@ -410,19 +438,36 @@
               </span>
             </div>
           {/if}
-          {#if nodeSummary()?.data?.last_event_type}
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] text-slate-500">last_event</span>
-              <Badge variant={badgeVariantFromStatus(String(nodeSummary()?.data?.status ?? ""))} className="font-mono">
-                {nodeSummary()?.data?.last_event_type}
-              </Badge>
+	          {#if nodeSummary()?.data?.last_event_type}
+	            <div class="flex items-center justify-between">
+	              <span class="text-[11px] text-slate-500">last_event</span>
+	              <Badge variant={badgeVariantFromStatus(String(nodeSummary()?.data?.status ?? ""))} className="font-mono">
+	                {nodeSummary()?.data?.last_event_type}
+	              </Badge>
+	            </div>
+	          {/if}
+	        </div>
+
+          {#if String(nodeSummary()?.data?.kind ?? "") === "workflow_demand"}
+            {@const demandRunId = String(nodeSummary()?.data?.demand_run_id ?? "").trim()}
+            <div class="flex flex-wrap gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                disabled={!demandRunId}
+                on:click={() => openDemandFromWorkflow({ demandRunId, sourceWorkflowNodeId: String(nodeSummary()?.id ?? "") })}
+              >
+                进入 demand 视图
+              </Button>
+              {#if !demandRunId}
+                <span class="text-[11px] text-slate-500">该 workflow 节点未提供 demand_run_id</span>
+              {/if}
             </div>
           {/if}
-        </div>
-      </div>
-    {:else if !selectedStageSummary()}
-      <div class="text-[11px] text-slate-500">点击节点查看详情</div>
-    {/if}
+	      </div>
+	    {:else if !selectedStageSummary()}
+	      <div class="text-[11px] text-slate-500">点击节点查看详情</div>
+	    {/if}
 
     {#if selectedNodeLastEvent()}
       {@const selectedIndex = selectedNodeLastEventIndex()}

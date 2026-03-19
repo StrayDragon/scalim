@@ -63,6 +63,10 @@ class VizObserverOutputMixin(ABC):
     def _ensure_run_id(self) -> None:
         if self.run_id is not None:
             return
+        configured = str(getattr(self.config, "run_id", "") or "").strip()
+        if configured:
+            self.run_id = configured
+            return
         self.run_id = "run_{}".format(int(time.time() * 1000))
 
     def _apply_run_output_dir(self) -> None:
@@ -86,8 +90,6 @@ class VizObserverOutputMixin(ABC):
         self._run_dir_applied = True
 
     def _open_append(self) -> bool:
-        if not self.config.has_explicit_paths():
-            return True
         return bool(self.config.append)
 
     def _ensure_emitters(self) -> None:

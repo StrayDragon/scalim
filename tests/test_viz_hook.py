@@ -408,7 +408,7 @@ def test_viz_observer_from_plan_augments_output_targets(tmp_path: Path) -> None:
 
 
 def test_viz_output_composition_snapshot_helpers_cover_branches() -> None:
-    import scalim.ob.presets.viz as viz_module
+    import scalim.ob.presets.viz.output_composition as viz_module
 
     assert viz_module._get_snapshot_node_ids({"nodes": {"id": "nope"}}) == set()
     assert viz_module._get_snapshot_node_ids({"nodes": [{"id": "a"}, {"id": 1}, {}]}) == {"a", "1"}

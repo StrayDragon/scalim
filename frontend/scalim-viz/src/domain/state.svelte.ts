@@ -25,6 +25,23 @@ import {
   readFileTail
 } from "$services/files";
 
+type WorkflowNavReturn = {
+  returnRunId: string;
+  returnViewMode: "graph" | "timeline";
+  returnPlaybackIndex: number;
+  returnViewport: { x: number; y: number; zoom: number } | null;
+  returnSelectedNodeId: string;
+  returnSelectedStageLevel: number | null;
+  returnSelectionSource: "none" | "user" | "playback";
+  returnStageFilterEnabled: boolean;
+  returnStageFilterMode: "auto" | "manual";
+  returnManualStageLevel: number | null;
+  returnFocusMode: "none" | "neighbors";
+  returnFocusNodeId: string;
+  sourceWorkflowNodeId: string;
+  demandRunId: string;
+};
+
 export const state = $state({
   nodes: [] as Node[],
   edges: [] as Edge[],
@@ -111,6 +128,7 @@ export const state = $state({
   inspectorOffset: { x: 0, y: 0 },
   planLensOffset: { x: 0, y: 0 },
   playbackOffset: { x: 0, y: 0 },
+  workflowNav: null as WorkflowNavReturn | null,
   planLensFollowTimeline: true,
   panelDrag: null as {
     panel: "inspector" | "planLens" | "playback";
@@ -143,6 +161,8 @@ const sanitizeInterval = (value: number, min: number, fallback: number) => {
 type FlowApi = {
   setCenter?: (x: number, y: number, options?: any) => Promise<unknown>;
   fitView?: (options?: any) => Promise<unknown>;
+  getViewport?: () => { x: number; y: number; zoom: number };
+  setViewport?: (viewport: { x: number; y: number; zoom: number }, options?: any) => Promise<unknown>;
 };
 
 let flowApi: FlowApi | null = null;
@@ -725,6 +745,39 @@ export const getEventMessage = (evt: VizEvent | null) => {
   if (evt.event_type === "error") {
     return String(payload.message || payload.error_type || "执行异常");
   }
+  if (evt.event_type === "workflow_started") {
+    const workflowId = String((payload as any)?.workflow_id ?? "").trim();
+    const maxConc = (payload as any)?.max_concurrency;
+    const parts: string[] = [];
+    if (workflowId) parts.push(workflowId);
+    if (maxConc !== undefined && maxConc !== null && maxConc !== "") parts.push(`max_concurrency=${maxConc}`);
+    return parts.length ? `workflow 开始 (${parts.join(", ")})` : "workflow 开始";
+  }
+  if (evt.event_type === "workflow_finished") {
+    const total = (payload as any)?.total_duration_ms;
+    const dur = total !== undefined && total !== null && total !== "" ? `${total}ms` : "";
+    return dur ? `workflow 完成 (dur=${dur})` : "workflow 完成";
+  }
+  if (evt.event_type === "workflow_node_started") {
+    const nodeId = String(evt.node_ref?.id ?? "").trim();
+    const attempt = (payload as any)?.attempt;
+    const windowId = (payload as any)?.parallel_window;
+    const parts: string[] = [];
+    if (attempt !== undefined && attempt !== null && attempt !== "") parts.push(`attempt=${attempt}`);
+    if (windowId !== undefined && windowId !== null && windowId !== "") parts.push(`window=${windowId}`);
+    const label = nodeId ? getNodeLabel(nodeId) : "workflow_node";
+    return parts.length ? `${label} 开始 (${parts.join(", ")})` : `${label} 开始`;
+  }
+  if (evt.event_type === "workflow_node_completed") {
+    const nodeId = String(evt.node_ref?.id ?? "").trim();
+    const durMs = (payload as any)?.duration_ms;
+    const attempt = (payload as any)?.attempt;
+    const parts: string[] = [];
+    if (durMs !== undefined && durMs !== null && durMs !== "") parts.push(`dur=${durMs}ms`);
+    if (attempt !== undefined && attempt !== null && attempt !== "") parts.push(`attempt=${attempt}`);
+    const label = nodeId ? getNodeLabel(nodeId) : "workflow_node";
+    return parts.length ? `${label} 完成 (${parts.join(", ")})` : `${label} 完成`;
+  }
   if (evt.event_type === "run_started") {
     const targets = Array.isArray(payload.targets) ? payload.targets.length : null;
     const batchSize = payload.batch_size ?? null;
@@ -869,6 +922,10 @@ export const getEventTone = (evt: VizEvent | null) => {
 
 export const getEventActionLabel = (eventType: string) => {
   const labels: Record<string, string> = {
+    workflow_started: "workflow 开始",
+    workflow_finished: "workflow 完成",
+    workflow_node_started: "workflow 节点开始",
+    workflow_node_completed: "workflow 节点完成",
     run_started: "开始执行",
     run_finished: "执行完成",
     batch_started: "开始批次",
@@ -1173,6 +1230,20 @@ export const getEventSummaryItems = (evt: VizEvent | null) => {
   } else if (evt.event_type === "run_finished") {
     push("批次", payload.total_batches);
     push("耗时", payload.total_duration_ms !== undefined ? `${payload.total_duration_ms}ms` : null);
+  } else if (evt.event_type === "workflow_started") {
+    push("workflow", (payload as any)?.workflow_id);
+    push("max_concurrency", (payload as any)?.max_concurrency);
+  } else if (evt.event_type === "workflow_finished") {
+    push("耗时", (payload as any)?.total_duration_ms !== undefined ? `${(payload as any)?.total_duration_ms}ms` : null);
+  } else if (evt.event_type === "workflow_node_started") {
+    push("attempt", (payload as any)?.attempt);
+    push("worker", (payload as any)?.worker);
+    push("parallel_window", (payload as any)?.parallel_window);
+    push("artifact", (payload as any)?.artifact);
+  } else if (evt.event_type === "workflow_node_completed") {
+    push("耗时", (payload as any)?.duration_ms !== undefined ? `${(payload as any)?.duration_ms}ms` : null);
+    push("attempt", (payload as any)?.attempt);
+    push("artifact", (payload as any)?.artifact);
   } else if (evt.event_type === "stage_span") {
     push("batch", resolveEventBatchNum(evt));
     push("stage", (payload as any)?.stage);
@@ -1264,6 +1335,13 @@ export const handleNodeDragStop = ({ targetNode, nodes: dragNodes }: { targetNod
   }
   state.nodes = updateStageBands(state.nodes, levels.size ? levels : undefined);
   state.nodes = updateIngestBands(state.nodes);
+  if (state.viewMode === "graph") {
+    for (const node of state.nodes) {
+      if (node.type !== "stage_band" && node.type !== "ingest_band") continue;
+      if (!node.position) continue;
+      state.baseNodePositions.set(node.id, { x: node.position.x, y: node.position.y });
+    }
+  }
 };
 
 const applySnapshot = (data: VizGraphSnapshot) => {
@@ -1279,9 +1357,25 @@ const applySnapshot = (data: VizGraphSnapshot) => {
   applyDecorations();
   state.nodes = updateStageBands(state.nodes);
   state.nodes = updateIngestBands(state.nodes);
+  if (state.viewMode === "graph") {
+    // Stage/ingest band nodes are auto-updated (size/position) based on member nodes.
+    // Keep their post-update positions as the base so later `applyDecorations()` does not snap them back.
+    for (const node of state.nodes) {
+      if (node.type !== "stage_band" && node.type !== "ingest_band") continue;
+      if (!node.position) continue;
+      state.baseNodePositions.set(node.id, { x: node.position.x, y: node.position.y });
+    }
+  }
   void tick().then(() => {
     state.nodes = updateStageBands(state.nodes);
     state.nodes = updateIngestBands(state.nodes);
+    if (state.viewMode === "graph") {
+      for (const node of state.nodes) {
+        if (node.type !== "stage_band" && node.type !== "ingest_band") continue;
+        if (!node.position) continue;
+        state.baseNodePositions.set(node.id, { x: node.position.x, y: node.position.y });
+      }
+    }
   });
 };
 
@@ -1406,7 +1500,18 @@ const applyEvents = (data: VizEvent[]) => {
   resetEventTypeStats(state.events);
   if (!state.jumpDefaultsApplied && state.jumpEventTokens.length === 0) {
     const available = new Set(state.eventTypeOrder ?? []);
-    const defaults = ["error", "diagnostic_warning", "batch_started", "batch_finished", "loader_called", "stage_span"];
+    const defaults = [
+      "error",
+      "diagnostic_warning",
+      "workflow_node_started",
+      "workflow_node_completed",
+      "workflow_started",
+      "workflow_finished",
+      "batch_started",
+      "batch_finished",
+      "loader_called",
+      "stage_span"
+    ];
     state.jumpEventTokens = defaults.filter((token) => available.has(token));
     state.jumpDefaultsApplied = true;
   }
@@ -1534,11 +1639,20 @@ export const autoloadReplayFromQuery = async () => {
 const setRunSources = async (label: string, runs: RunSource[]) => {
   state.runSources = runs;
   state.directoryLabel = label;
-  const latest = pickLatestRun(runs);
-  state.activeRunId = latest?.id ?? runs[0]?.id ?? "";
-  state.status = latest ? "已加载目录" : "目录为空";
-  if (latest) {
-    await activateRun(latest);
+  const pickWorkflowRun = () => {
+    for (const run of runs) {
+      const id = String(run?.id ?? "").toLowerCase();
+      const name = String(run?.label ?? "").toLowerCase();
+      if (id === "workflow" || name === "workflow") return run;
+      if (id.endsWith(":workflow") || name.endsWith(":workflow")) return run;
+    }
+    return null;
+  };
+  const selected = pickWorkflowRun() ?? pickLatestRun(runs);
+  state.activeRunId = selected?.id ?? runs[0]?.id ?? "";
+  state.status = selected ? "已加载目录" : "目录为空";
+  if (selected) {
+    await activateRun(selected);
   } else {
     resetGraphState();
   }
@@ -1774,6 +1888,112 @@ export const selectNodeById = (nodeId?: string | null) => {
     }
     selectNode(node);
   }
+};
+
+export const openDemandFromWorkflow = async (opts: { demandRunId: string; sourceWorkflowNodeId?: string }) => {
+  const demandRunId = String(opts?.demandRunId ?? "").trim();
+  if (!demandRunId) return;
+  const target = state.runSources.find((item) => item.id === demandRunId) ?? null;
+  if (!target) return;
+
+  const viewport = (() => {
+    try {
+      return flowApi?.getViewport ? flowApi.getViewport() : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  state.workflowNav = {
+    returnRunId: state.activeRunId,
+    returnViewMode: state.viewMode,
+    returnPlaybackIndex: state.playbackIndex,
+    returnViewport: viewport,
+    returnSelectedNodeId: state.selectedNodeId,
+    returnSelectedStageLevel: state.selectedStageLevel,
+    returnSelectionSource: state.selectionSource,
+    returnStageFilterEnabled: state.stageFilterEnabled,
+    returnStageFilterMode: state.stageFilterMode,
+    returnManualStageLevel: state.manualStageLevel,
+    returnFocusMode: state.focusMode,
+    returnFocusNodeId: state.focusNodeId,
+    sourceWorkflowNodeId: String(opts?.sourceWorkflowNodeId ?? state.selectedNodeId ?? ""),
+    demandRunId
+  };
+
+  stopPlayback();
+  // Entering a demand scope should not inherit workflow-only filters/focus.
+  state.stageFilterEnabled = false;
+  state.focusMode = "none";
+  state.focusNodeId = "";
+  state.viewMode = "graph";
+  state.activeRunId = demandRunId;
+  await onRunSelect();
+  clearSelection();
+  resetView();
+};
+
+export const returnToWorkflow = async () => {
+  const nav = state.workflowNav;
+  if (!nav) return;
+  const target = state.runSources.find((item) => item.id === nav.returnRunId) ?? null;
+  if (!target) {
+    state.workflowNav = null;
+    return;
+  }
+
+  stopPlayback();
+  state.activeRunId = nav.returnRunId;
+  state.viewMode = nav.returnViewMode;
+  state.stageFilterEnabled = nav.returnStageFilterEnabled;
+  state.stageFilterMode = nav.returnStageFilterMode;
+  state.manualStageLevel = nav.returnManualStageLevel;
+
+  await onRunSelect();
+
+  const focusPlayback = nav.returnViewMode === "timeline" && nav.returnSelectionSource === "playback";
+  setPlaybackIndex(nav.returnPlaybackIndex, focusPlayback, true);
+
+  if (!focusPlayback) {
+    if (nav.returnSelectionSource === "none") {
+      state.selectedNodeId = "";
+      state.selectedStageLevel = null;
+      state.selectionSource = "none";
+    } else if (nav.returnSelectedNodeId) {
+      selectNodeById(nav.returnSelectedNodeId);
+    } else if (nav.returnSelectedStageLevel !== null && nav.returnSelectedStageLevel !== undefined) {
+      const bandId = `stage-band:${nav.returnSelectedStageLevel}`;
+      if (state.nodes.some((node) => node.id === bandId)) {
+        selectNodeById(bandId);
+      } else {
+        state.selectedNodeId = "";
+        state.selectedStageLevel = nav.returnSelectedStageLevel;
+        state.selectionSource = nav.returnSelectionSource;
+        applyDecorations();
+      }
+    } else {
+      state.selectedNodeId = "";
+      state.selectedStageLevel = null;
+      state.selectionSource = nav.returnSelectionSource;
+      applyDecorations();
+    }
+
+    // Restore focus after selection (selectNodeById clears focus).
+    state.focusMode = nav.returnFocusMode;
+    state.focusNodeId = nav.returnFocusNodeId;
+    applyDecorations();
+  }
+
+  if (nav.returnViewMode === "graph" && nav.returnViewport && flowApi?.setViewport) {
+    try {
+      await tick();
+      await flowApi.setViewport(nav.returnViewport, { duration: 220 });
+    } catch {
+      // ignore viewport errors
+    }
+  }
+
+  state.workflowNav = null;
 };
 
 export const onNodeClick = (event: any) => {

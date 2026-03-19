@@ -3,7 +3,9 @@ import contextlib
 import json
 import math
 import shutil
+import sys
 import threading
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
@@ -26,6 +28,13 @@ from ....hooks.base import HookManager
 from ....ob.components import split_components
 from ....ob.hub import InstrumentationHub
 from ....ob.observability import Observability
+from ....ob.presets._internal.viz_config import default_viz_dir as _default_viz_dir
+from ....ob.presets._internal.viz_config import normalize_output_dir as _normalize_viz_output_dir
+from ....ob.presets.viz import (
+    VizObserverConfig,
+    WorkflowVizObserver,
+    build_workflow_viz_graph_snapshot,
+)
 from ....spec.ir.workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
@@ -55,7 +64,7 @@ from ..workflow import (
     resolve_workflow_demand_path,
 )
 from .compiler import compile as compile_demand
-from .contracts import RunOptions, RunOverrides, RunResult
+from .contracts import UNSET, RunOptions, RunOverrides, RunResult
 from .output_composition_yaml import PathlessCsvOutputError
 from .output_path_resolve import resolve_output_container_path
 from .workflow_loaders import workflow_loader_context
@@ -450,11 +459,58 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
     max_concurrency = int(workflow_ir.options.max_concurrency)
     failure_policy = str(workflow_ir.options.failure_policy or "all_fail")
 
+    workflow_wall_start_ts = time.time()
+
+    # Workflow bundle viz (MVP): opt-in via `run_workflow(..., overrides=RunOverrides(viz_config=...))`.
+    bundle_viz_base_config: Optional[VizObserverConfig] = None
+    if overrides is not None and overrides.viz_config is not UNSET:
+        viz_override = cast("Any", overrides.viz_config)
+        if viz_override is not None:
+            bundle_viz_base_config = cast("VizObserverConfig", viz_override)
+            if bundle_viz_base_config.has_explicit_paths():
+                msg = "workflow viz bundle requires viz_config.output_dir (do not set output_path/snapshot_path/trace_path)"
+                raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+            if not bundle_viz_base_config.output_dir and not bundle_viz_base_config.use_default_output_dir:
+                msg = "workflow viz bundle requires viz_config.output_dir or use_default_output_dir=True"
+                raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+
+    def _bundle_run_dir(run_id: str) -> Optional[Path]:
+        if bundle_viz_base_config is None:
+            return None
+        base_dir = bundle_viz_base_config.output_dir
+        if base_dir is None:
+            if bundle_viz_base_config.use_default_output_dir:
+                base_dir = _default_viz_dir()
+            else:
+                return None
+        output_dir = _normalize_viz_output_dir(str(base_dir))
+        return Path(output_dir) / str(run_id)
+
+    def _bundle_has_child_replay(run_id: str) -> bool:
+        if bundle_viz_base_config is None:
+            return False
+        run_dir = _bundle_run_dir(run_id)
+        if run_dir is None:
+            return False
+        snapshot_path = run_dir / str(bundle_viz_base_config.snapshot_filename)
+        events_path = run_dir / str(bundle_viz_base_config.events_filename)
+        return snapshot_path.exists() and events_path.exists()
+
     # 工作流层事件:复用 `hooks`/`observers` 分发通道,并以 `workflow_exec_id` 作为 `run_id` 分区.
     component_observers, component_hooks = split_components(components)
     workflow_observer_manager = Observability().build_manager(run_id=workflow_exec_id)
+    workflow_viz_observer: Optional[WorkflowVizObserver] = None
     for observer in component_observers:
         workflow_observer_manager.register(observer)
+    if bundle_viz_base_config is not None:
+        workflow_viz_config = replace(bundle_viz_base_config, run_id="workflow")
+        workflow_snapshot = build_workflow_viz_graph_snapshot(
+            workflow_ir,
+            demand_run_id_by_workflow_node_id={},
+            workflow_yaml_path=workflow_path,
+        )
+        workflow_viz_observer = WorkflowVizObserver(config=workflow_viz_config, snapshot=workflow_snapshot)
+        workflow_observer_manager.register(workflow_viz_observer)
     workflow_hook_manager = HookManager()
     for hook in component_hooks:
         workflow_hook_manager.register(hook)
@@ -462,6 +518,15 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         hook_manager=workflow_hook_manager,
         observer_manager=workflow_observer_manager,
     )
+    if workflow_viz_observer is not None:
+        _ = workflow_instrumentation.emit(
+            "workflow_started",
+            {
+                "workflow_id": str(Path(workflow_path).name),
+                "workflow_exec_id": str(workflow_exec_id),
+                "max_concurrency": int(max_concurrency),
+            },
+        )
 
     workflow_cache_pool: Optional[WorkflowCachePool] = None
     if workflow_ir.options.cache_pool is not None:
@@ -619,6 +684,15 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             managed_temp_dirs_by_run_id[node_id] = run_temp_dir
             overrides = {output_id: str(run_temp_dir / "{}.csv".format(output_id)) for output_id in sorted(managed_output_ids)}
             node_options = replace(node_options, output_container_path_overrides=overrides)
+
+        if bundle_viz_base_config is not None:
+            node_viz_config = replace(bundle_viz_base_config, run_id=str(node_id))
+            base_overrides = node_options.overrides
+            if base_overrides is None:
+                base_overrides = RunOverrides(viz_config=node_viz_config)
+            else:
+                base_overrides = replace(base_overrides, viz_config=node_viz_config)
+            node_options = replace(node_options, overrides=base_overrides)
 
         try:
             compilation = compile_demand(demand_path, options=node_options)
@@ -1057,6 +1131,44 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
 
         return result
     finally:
+        if workflow_viz_observer is not None and bundle_viz_base_config is not None:
+            total_duration_ms = int(max(0.0, time.time() - workflow_wall_start_ts) * 1000)
+            status = "error" if sys.exc_info()[1] is not None else "ok"
+            with contextlib.suppress(Exception):
+                _ = workflow_instrumentation.emit(
+                    "workflow_finished",
+                    {
+                        "workflow_id": str(Path(workflow_path).name),
+                        "workflow_exec_id": str(workflow_exec_id),
+                        "status": status,
+                        "total_duration_ms": total_duration_ms,
+                    },
+                )
+
+            # Rewrite the workflow snapshot after child runs complete, so we can omit broken drill-down links.
+            with contextlib.suppress(Exception):
+                demand_run_id_by_workflow_node_id: Dict[str, str] = {}
+                for node in workflow_ir.nodes:
+                    if getattr(node, "node_type", None) != WorkflowNodeType.DEMAND:
+                        continue
+                    node_id = str(getattr(node, "node_id", "") or "").strip()
+                    if not node_id:
+                        continue
+                    if _bundle_has_child_replay(node_id):
+                        demand_run_id_by_workflow_node_id[node_id] = node_id
+
+                workflow_run_dir = _bundle_run_dir("workflow")
+                if workflow_run_dir is not None:
+                    workflow_run_dir.mkdir(parents=True, exist_ok=True)
+                    workflow_snapshot = build_workflow_viz_graph_snapshot(
+                        workflow_ir,
+                        demand_run_id_by_workflow_node_id=demand_run_id_by_workflow_node_id,
+                        workflow_yaml_path=workflow_path,
+                    )
+                    snapshot_path = workflow_run_dir / str(bundle_viz_base_config.snapshot_filename)
+                    with snapshot_path.open("w", encoding="utf-8") as handle:
+                        json.dump(workflow_snapshot, handle, ensure_ascii=False, indent=2, default=str)
+
         if not resources_finalized:
             with contextlib.suppress(Exception):
                 resource_manager.discard_all(workflow_node_id="__wf__discard", reason="workflow_finally")

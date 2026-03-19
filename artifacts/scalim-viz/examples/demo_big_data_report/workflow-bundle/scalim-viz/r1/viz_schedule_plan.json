@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "created_at": 1773916177.315205,
+    "target_fields": [
+      "order_id",
+      "customer_id",
+      "payment_method_id"
+    ]
+  },
+  "targets": [
+    "order_id",
+    "customer_id",
+    "payment_method_id"
+  ],
+  "load_ref": {
+    "op_count": 0,
+    "layer_count": 0,
+    "layers": []
+  }
+}
