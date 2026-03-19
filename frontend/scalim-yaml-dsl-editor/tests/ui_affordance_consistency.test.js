@@ -11,7 +11,7 @@ const keyPanels = [
   "src/ui/panels/RelationsEditor.svelte",
   "src/ui/panels/SourcesEditor.svelte",
   "src/ui/panels/DerivedFieldsEditor.svelte",
-  "src/ui/panels/VisualPanel.svelte"
+  "src/ui/panels/schema_blocks/BlockView.svelte"
 ];
 
 const addButtonPanels = [
@@ -29,10 +29,10 @@ test("add actions use unified icon buttons with accessible labels", () => {
     assert.equal(plusOnly.test(src), false, `${panel} still contains a plus-only add button`);
 
     const addButtons = [...src.matchAll(/<Button[\s\S]*?variant="add"[\s\S]*?\/>/g)].map((m) => m[0]);
-    const addButtonsWithText = [...src.matchAll(/<Button[\s\S]*?variant="add"[\s\S]*?>[\s\S]*?<\/Button>/g)].map((m) => m[0]);
+    const variantAddCount = [...src.matchAll(/variant="add"/g)].length;
 
     assert.ok(addButtons.length > 0, `${panel} should render add buttons`);
-    assert.equal(addButtonsWithText.length, 0, `${panel} add buttons should be icon-only`);
+    assert.equal(variantAddCount, addButtons.length, `${panel} add buttons should be self-closing (icon-only)`);
     for (const btn of addButtons) {
       assert.ok(btn.includes('size="icon"'), `${panel} add button should use size=icon`);
       assert.ok(btn.includes("aria-label="), `${panel} add button should include aria-label`);

@@ -35,7 +35,8 @@ export default defineConfig({
       $services: resolve(__dirname, "src/services"),
       $ui: resolve(__dirname, "src/ui"),
       $utils: resolve(__dirname, "src/libs/utils"),
-      $components: resolve(__dirname, "src/libs/components")
+      $components: resolve(__dirname, "src/libs/components"),
+      $schema_blocks: resolve(__dirname, "src/libs/schema_blocks")
     }
   },
   server: {

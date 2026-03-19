@@ -94,7 +94,7 @@ def main(argv: List[str]) -> int:
     args = _parse_args(argv)
     ssot = Path(str(args.workflow_yaml_ssot)).expanduser().resolve(strict=False)
     if not ssot.exists():
-        print("[error] missing workflow YAML SSOT: {}".format(str(ssot)), file=sys.stderr)
+        print("[错误] 缺少工作流 YAML SSOT: {}".format(str(ssot)), file=sys.stderr)
         return 2
 
     out_root = Path(str(args.output_dir)).expanduser().resolve(strict=False)
@@ -153,15 +153,15 @@ def main(argv: List[str]) -> int:
             )
         except Exception as exc:  # pragma: no cover
             print(
-                "warning: write `viz_schedule_plan.json` failed(run_id={}): {}".format(outcome.run_id, exc),
+                "警告: 写入 `viz_schedule_plan.json` 失败(run_id={}): {}".format(outcome.run_id, exc),
                 file=sys.stderr,
             )
 
     manifest_path = scalim_viz_dir / str(args.manifest_filename)
     _write_bundle_manifest(scalim_viz_dir=scalim_viz_dir, manifest_path=manifest_path)
 
-    print("generated workflow demo bundle:", _to_posix_path(out_root))
-    print("bundle manifest:", _to_posix_path(manifest_path))
+    print("已生成工作流演示包:", _to_posix_path(out_root))
+    print("包清单:", _to_posix_path(manifest_path))
     return 0
 
 

@@ -6,6 +6,7 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "useDefineForClassFields": true,
     "allowJs": false,
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -19,10 +20,10 @@
       "$services/*": ["./src/services/*"],
       "$ui/*": ["./src/ui/*"],
       "$utils/*": ["./src/libs/utils/*"],
-      "$components/*": ["./src/libs/components/*"]
+      "$components/*": ["./src/libs/components/*"],
+      "$schema_blocks/*": ["./src/libs/schema_blocks/*"]
     }
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.svelte"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
-

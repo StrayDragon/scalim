@@ -1,11 +1,14 @@
-import type { PatchResult } from "$services/yaml_patch";
+import type { PatchResult } from "./yaml_patch.ts";
 import {
+  ensureEmptyMapAtPathDeep,
+  ensureEmptySeqAtPathDeep,
+  insertInlineItemAtPath,
   insertStringItemAtPath,
   moveSeqItemAtPath,
   removeKeyAtPath,
   removeSeqItemAtPath,
   setScalarAtPathDeep
-} from "$services/yaml_patch";
+} from "./yaml_patch.ts";
 
 export type YamlEditOp =
   | {
@@ -15,10 +18,21 @@ export type YamlEditOp =
       createMissing?: boolean;
     }
   | {
+      kind: "ensure_map";
+      path: string[];
+      createMissing?: boolean;
+    }
+  | {
+      kind: "ensure_seq";
+      path: string[];
+      createMissing?: boolean;
+    }
+  | {
       kind: "insert";
       path: string[];
       index: number;
       value: string;
+      valueKind?: "string" | "inline";
     }
   | {
       kind: "delete";
@@ -46,7 +60,19 @@ export const applyYamlEditOp = (yamlText: string, op: YamlEditOp): PatchResult =
     return setScalarAtPathDeep(yamlText, op.path, op.value, { createMissing });
   }
 
+  if (op.kind === "ensure_map") {
+    const createMissing = typeof op.createMissing === "boolean" ? op.createMissing : true;
+    return ensureEmptyMapAtPathDeep(yamlText, op.path, { createMissing });
+  }
+
+  if (op.kind === "ensure_seq") {
+    const createMissing = typeof op.createMissing === "boolean" ? op.createMissing : true;
+    return ensureEmptySeqAtPathDeep(yamlText, op.path, { createMissing });
+  }
+
   if (op.kind === "insert") {
+    const kind = op.valueKind || "string";
+    if (kind === "inline") return insertInlineItemAtPath(yamlText, op.path, op.index, op.value);
     return insertStringItemAtPath(yamlText, op.path, op.index, op.value);
   }
 

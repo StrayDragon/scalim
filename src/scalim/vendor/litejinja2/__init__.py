@@ -1,3 +1,5 @@
+# ruff: noqa: C901, EM101, EM103, FBT002, PLR0911, PLR0912, PLR0915, TRY003, TRY301
+
 """`LiteJinja2` - 简化的 `Jinja2` 兼容子集.
 
 支持的模板语法示例:
@@ -28,6 +30,7 @@
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
+from ..compact.typing_extensionsx import override
 from .typedefs import (
     ExpressionResult,
     FilterFunc,
@@ -59,6 +62,7 @@ class Undefined:
     def __init__(self, name: str) -> None:
         self.name = str(name or "")
 
+    @override
     def __str__(self) -> str:  # pragma: no cover
         return ""
 
@@ -71,6 +75,7 @@ class Undefined:
     def __len__(self) -> int:  # pragma: no cover
         return 0
 
+    @override
     def __repr__(self) -> str:  # pragma: no cover
         return "Undefined({})".format(self.name)
 
@@ -83,20 +88,24 @@ class StrictUndefined(Undefined):
     """
 
     def _raise(self) -> None:
-        raise TemplateError("Undefined variable: {}".format(self.name))
+        raise TemplateError("未定义变量: {}".format(self.name))
 
+    @override
     def __str__(self) -> str:  # pragma: no cover
         self._raise()
         return ""  # 不可达
 
+    @override
     def __bool__(self) -> bool:  # pragma: no cover
         self._raise()
         return False  # 不可达
 
+    @override
     def __iter__(self) -> Any:  # pragma: no cover
         self._raise()
         return iter(())  # 不可达
 
+    @override
     def __len__(self) -> int:  # pragma: no cover
         self._raise()
         return 0  # 不可达
@@ -201,9 +210,7 @@ class Template:
     macros: Dict[str, MacroDef]
     undefined: Any
 
-    def __init__(
-        self, template_string: str, filters: Optional[Dict[str, FilterFunc]] = None, *, undefined: Any = Undefined
-    ) -> None:
+    def __init__(self, template_string: str, filters: Optional[Dict[str, FilterFunc]] = None, *, undefined: Any = Undefined) -> None:
         """初始化模板.
 
         参数:
@@ -216,7 +223,7 @@ class Template:
         if filters:
             self.filters.update(filters)
         if not isinstance(undefined, type) or not issubclass(undefined, Undefined):
-            raise TypeError("undefined must be a subclass of Undefined")
+            raise TypeError("`undefined` 必须是 `Undefined` 的子类")
         self.undefined = undefined
         self.macros = {}
         self.nodes = self._parse()
@@ -287,9 +294,9 @@ class Template:
             渲染后的字符串.
         """
         if undefined_behavior not in {"error", "empty"}:
-            raise ValueError("undefined_behavior must be one of: error, empty")
+            raise ValueError("`undefined_behavior` 必须是以下值之一: `error`, `empty`")
         if empty_string_behavior not in {"keep", "error"}:
-            raise ValueError("empty_string_behavior must be one of: keep, error")
+            raise ValueError("`empty_string_behavior` 必须是以下值之一: `keep`, `error`")
 
         merged_context: RenderContext = {}
         if context:
@@ -341,9 +348,9 @@ class Template:
                     if undefined_behavior == "empty":
                         value = ""
                     else:
-                        raise TemplateError("Undefined variable: {}".format(value.name))
+                        raise TemplateError("未定义变量: {}".format(value.name))
                 if empty_string_behavior == "error" and isinstance(value, str) and value == "":
-                    raise TemplateError("Empty string value: {}".format(expr))
+                    raise TemplateError("空字符串值: {}".format(expr))
                 output.append(str(value))
             elif node["type"] == "control":
                 # 处理控制结构
@@ -482,7 +489,7 @@ class Template:
         strict_undefined: bool,
         undefined_behavior: str,
         empty_string_behavior: str,
-    ) -> Tuple[str, int]:  # noqa: C901, PLR0912
+    ) -> Tuple[str, int]:
         """处理 `for` 循环结构"""
         # 解析 `for` 循环
         for_content = nodes[pos]["content"][4:].strip()
@@ -503,7 +510,7 @@ class Template:
             if undefined_behavior == "empty":
                 iterable = []
             else:
-                raise TemplateError("Undefined variable: {}".format(iterable.name))
+                raise TemplateError("未定义变量: {}".format(iterable.name))
         # 检查是否可迭代
         if not isinstance(iterable, (list, tuple, dict, str)) and not hasattr(iterable, "__iter__"):
             msg = f"'{iter_expr}' 不可迭代"
@@ -540,7 +547,7 @@ class Template:
 
         # 渲染循环内容
         loop_nodes = nodes[pos + 1 : end_pos]
-        output_parts = []
+        output_parts: List[str] = []
 
         for index, item in enumerate(iterable):
             # 创建循环上下文
@@ -584,13 +591,11 @@ class Template:
                     undefined_behavior=undefined_behavior,
                     empty_string_behavior=empty_string_behavior,
                 )
-            )  # pyright: ignore[reportUnknownMemberType]
+            )
 
-        return "".join(output_parts), end_pos - pos + 1  # pyright: ignore[reportUnknownArgumentType]
+        return "".join(output_parts), end_pos - pos + 1
 
-    def _handle_set(
-        self, content: str, context: RenderContext, *, strict_undefined: bool, undefined_behavior: str
-    ) -> Tuple[None, int]:
+    def _handle_set(self, content: str, context: RenderContext, *, strict_undefined: bool, undefined_behavior: str) -> Tuple[None, int]:
         """处理 `set` 语句.
 
         支持语法示例:
@@ -618,7 +623,7 @@ class Template:
             if undefined_behavior == "empty":
                 value = ""
             else:
-                raise TemplateError("Undefined variable: {}".format(value.name))
+                raise TemplateError("未定义变量: {}".format(value.name))
 
         # 设置变量到上下文
         context[var_name] = value
@@ -674,7 +679,7 @@ class Template:
                     if undefined_behavior == "empty":
                         part_value = ""
                     else:
-                        raise TemplateError("Undefined variable: {}".format(part_value.name))
+                        raise TemplateError("未定义变量: {}".format(part_value.name))
                 result_parts.append(str(part_value))
             return "".join(result_parts)
 
@@ -746,7 +751,7 @@ class Template:
                                 if undefined_behavior == "empty":
                                     arg_value = ""
                                 else:
-                                    raise TemplateError("Undefined variable: {}".format(arg_value.name))
+                                    raise TemplateError("未定义变量: {}".format(arg_value.name))
                             args.append(arg_value)
             else:
                 # 无参数的过滤器
@@ -761,7 +766,7 @@ class Template:
                         if undefined_behavior == "empty":
                             value = ""
                         else:
-                            raise TemplateError("Undefined variable: {}".format(value.name))
+                            raise TemplateError("未定义变量: {}".format(value.name))
                     value = filter_func(value, *args)
                 except Exception as e:
                     error_msg = f"过滤器 '{filter_name}' 执行失败: {e}"
@@ -772,9 +777,7 @@ class Template:
 
         return value
 
-    def _get_variable(
-        self, var_expr: str, context: RenderContext, *, strict_undefined: bool
-    ) -> VariableValue:  # noqa: C901, PLR0911, PLR0912, PLR0915
+    def _get_variable(self, var_expr: str, context: RenderContext, *, strict_undefined: bool) -> VariableValue:
         """获取变量值,支持点号访问、方法调用和下标访问.
 
         参数:
@@ -884,7 +887,7 @@ class Template:
                 return self.undefined(var_expr)
 
         # 确保返回正确的类型
-        result = value if value is not None else ""  # pyright: ignore[reportUnknownVariableType]
+        result = value if value is not None else ""
         # 使用 `cast` 确保返回 `VariableValue` 类型
         return cast("VariableValue", result)
 
@@ -895,7 +898,7 @@ class Template:
         *,
         strict_undefined: bool,
         undefined_behavior: str,
-    ) -> bool:  # noqa: PLR0911
+    ) -> bool:
         """评估条件表达式.
 
         参数:
@@ -966,7 +969,7 @@ class Template:
         if strict_undefined and isinstance(value, Undefined):
             if undefined_behavior == "empty":
                 return False
-            raise TemplateError("Undefined variable: {}".format(value.name))
+            raise TemplateError("未定义变量: {}".format(value.name))
         if value != "":
             return bool(value)
 
@@ -984,7 +987,7 @@ class Environment:
     def __init__(self, *, undefined: Any = Undefined, filters: Optional[Dict[str, FilterFunc]] = None) -> None:
         self._cache = {}
         if not isinstance(undefined, type) or not issubclass(undefined, Undefined):
-            raise TypeError("undefined must be a subclass of Undefined")
+            raise TypeError("`undefined` 必须是 `Undefined` 的子类")
         self.undefined = undefined
         self.filters = {**DEFAULT_FILTERS}
         if filters:

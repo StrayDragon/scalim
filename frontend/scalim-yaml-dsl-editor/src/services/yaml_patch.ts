@@ -1048,6 +1048,107 @@ export const ensureEmptyMapAtPathDeep = (yamlText: string, path: string[], opts?
   };
 };
 
+const ensureEmptySeqAtPathDeepSafe = (yamlText: string, path: string[], opts?: { createMissing?: boolean }): PatchResult => {
+  const createMissing = opts && typeof opts.createMissing === "boolean" ? opts.createMissing : true;
+  if (!path.length) return { ok: false, error: "patch: empty path" };
+
+  let doc: any;
+  try {
+    doc = parseDocument(yamlText, { keepSourceTokens: true });
+  } catch (err: any) {
+    return { ok: false, error: "YAML parse failed: " + String(err?.message || err || "unknown") };
+  }
+  const root = (doc?.contents as Node | null) || null;
+  if (!root) return { ok: false, error: "YAML document is empty" };
+  if (!isMap(root)) return { ok: false, error: "patch: root is not a mapping", plan: { kind: "rewrite", reason: "non-mapping root" } };
+
+  const deepKey = path[path.length - 1] as string;
+  const parentSegments = path.slice(0, -1);
+
+  let current: Node = root as any;
+  let currentMap = current as YAMLMap;
+  let missingAt = parentSegments.length;
+
+  for (let i = 0; i < parentSegments.length; i += 1) {
+    const seg = parentSegments[i] as string;
+    if (!isMap(current)) return { ok: false, error: "patch: parent is not a mapping", plan: { kind: "rewrite", reason: "non-mapping parent" } };
+    currentMap = current as YAMLMap;
+    const pair = findPairInMap(currentMap, seg);
+    if (!pair || !pair.value) {
+      missingAt = i;
+      break;
+    }
+    const next = (pair.value as Node | null) || null;
+    if (!next || !isMap(next)) {
+      return { ok: false, error: "patch: existing node is not a mapping: " + seg, plan: { kind: "rewrite", reason: "non-mapping node" } };
+    }
+    current = next;
+  }
+
+  if (!createMissing && missingAt < parentSegments.length) {
+    return { ok: true, text: yamlText, plan: { kind: "safe" } };
+  }
+
+  if (isMap(current)) {
+    currentMap = current as YAMLMap;
+    const existing = findPairInMap(currentMap, deepKey);
+    if (existing && existing.value && isSeq(existing.value as any)) return { ok: true, text: yamlText, plan: { kind: "safe" } };
+    if (existing && existing.value && isAlias(existing.value as any)) {
+      return { ok: false, error: "patch: value is alias, requires detach or rewrite", plan: { kind: "rewrite", reason: "alias" } };
+    }
+    if (existing && existing.value && !isSeq(existing.value as any)) {
+      return { ok: false, error: "patch: existing value is not a list", plan: { kind: "rewrite", reason: "non-sequence" } };
+    }
+  }
+
+  const remaining = parentSegments.slice(missingAt);
+  const segmentsToCreate = remaining.concat([deepKey]);
+
+  const range = (currentMap as any).range;
+  if (!Array.isArray(range) || typeof range[1] !== "number") {
+    return { ok: false, error: "patch: missing parent range", plan: { kind: "rewrite", reason: "missing map range" } };
+  }
+  const insertAt = range[1] as number;
+  const baseIndent = indentForMapKeys(yamlText, currentMap);
+  const indentStep = 2;
+
+  let block = "";
+  let indent = baseIndent;
+  for (let i = 0; i < segmentsToCreate.length - 1; i += 1) {
+    block += " ".repeat(indent) + segmentsToCreate[i] + ":\n";
+    indent += indentStep;
+  }
+  block += " ".repeat(indent) + segmentsToCreate[segmentsToCreate.length - 1] + ": []\n";
+
+  const needsLeadingNewline = insertAt > 0 && yamlText.charCodeAt(insertAt - 1) !== 10;
+  const insertText = (needsLeadingNewline ? "\n" : "") + block;
+  return { ok: true, text: applyRangePatch(yamlText, insertAt, insertAt, insertText), plan: { kind: "safe" } };
+};
+
+export const ensureEmptySeqAtPathDeep = (yamlText: string, path: string[], opts?: { createMissing?: boolean }): PatchResult => {
+  const createMissing = opts && typeof opts.createMissing === "boolean" ? opts.createMissing : true;
+  const out = ensureEmptySeqAtPathDeepSafe(yamlText, path, { createMissing });
+  if (out.ok) return out;
+  if (!out.plan || out.plan.kind !== "rewrite") return out;
+
+  let root: any;
+  try {
+    root = parse(yamlText);
+  } catch (err: any) {
+    return { ok: false, error: "YAML parse failed: " + String(err?.message || err || "unknown"), plan: out.plan };
+  }
+  if (!isPlainObject(root) && !Array.isArray(root)) root = {};
+
+  const edit = deepSetInPlace(root, path, [], createMissing);
+  if (!edit.ok) return { ok: false, error: edit.error, plan: out.plan };
+
+  return {
+    ok: true,
+    text: stringifyWithLeadingCommentBlock(yamlText, edit.value),
+    plan: { kind: "rewrite", reason: out.plan.reason || "unsafe patch" }
+  };
+};
+
 type MapSpan = { start: number; end: number; key: string };
 
 const mapSpans = (yamlText: string, mapNode: YAMLMap): { ok: true; end: number; spans: MapSpan[] } | { ok: false; error: string } => {
