@@ -17,10 +17,11 @@ pnpm dev
 
 ### DevTools 快速打开(开发模式)
 
-开发模式支持通过 URL 参数自动加载回放目录(无需目录选择;路径相对仓库根目录,仅允许读取 `artifacts/scalim-viz/` 下的文件):
+开发模式支持通过 URL 参数自动加载回放目录/回放包(无需目录选择;路径相对仓库根目录,仅允许读取 `artifacts/scalim-viz/` 下的文件):
 
 - Seq/Adaptive:`/?replay=artifacts/scalim-viz/examples/demo_big_data_report/events-only/scalim-viz/run_demo_big_data_events`
   - 该样例目录内已包含 `viz_schedule_plan.json`,因此可直接在 UI 中切换到 Adaptive(计划视角)。
+- Workflow bundle(多 run;含下钻):`/?bundle=artifacts/scalim-viz/examples/demo_big_data_report/workflow-bundle-advanced/scalim-viz/bundle_manifest.json`
 
 ## Workflow Bundle (MVP)
 
@@ -49,9 +50,13 @@ workflow scope 的 demand 节点若携带:
 ```
 
 说明:
-- 当前 `/?replay=...` URL 仅能自动加载单个 run 目录;workflow bundle(多 run)请用“选择目录(回放)”导入整个目录。
+- 当前 `/?replay=...` URL 仅能自动加载单个 run 目录。
+- workflow bundle(多 run)可使用:
+  - `/?bundle=.../bundle_manifest.json` 自动加载整个 bundle
+  - 或用“选择目录(回放)”导入整个目录
 - 仓库内置 workflow bundle 样例目录:
   - `artifacts/scalim-viz/examples/demo_big_data_report/workflow-bundle/`(在 UI 中选择该目录或其下的 `scalim-viz/` 目录均可)
+  - `artifacts/scalim-viz/examples/demo_big_data_report/workflow-bundle-advanced/`(含 `bundle_manifest.json` + report.xlsx/detail.csv/metrics.csv)
 
 ## 目录结构(核心)
 - `src/domain/`: 纯逻辑/类型/选择器(无 IO/DOM).

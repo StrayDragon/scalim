@@ -217,6 +217,10 @@ gen-viz-data PARAM="":
 gen-viz-workflow-bundle PARAM="":
     uv {{ UV_OPTIONS }} run python scripts/gen-viz-workflow-bundle.py {{ PARAM }}
 
+# 生成: demo_big_data_report 的 workflow demo baseline(含 bundle_manifest.json + report.xlsx/detail.csv/metrics.csv)
+gen-viz-workflow-demo-big-data-report PARAM="":
+    uv {{ UV_OPTIONS }} run python scripts/gen-viz-workflow-demo-big-data-report.py {{ PARAM }}
+
 # 生成: Viz schedule plan (基于已生成的 viz_events.jsonl; 用于补齐/修复缺失的 viz_schedule_plan.json)
 gen-viz-schedule-plan RUN_DIR="":
     #!/usr/bin/env bash

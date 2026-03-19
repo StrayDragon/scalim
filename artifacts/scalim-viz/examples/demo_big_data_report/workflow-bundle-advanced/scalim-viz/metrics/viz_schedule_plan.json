@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "created_at": 1773934579.4882092,
+    "target_fields": [
+      "region_name_display",
+      "order_amount"
+    ]
+  },
+  "targets": [
+    "region_name_display",
+    "order_amount"
+  ],
+  "load_ref": {
+    "op_count": 0,
+    "layer_count": 0,
+    "layers": []
+  }
+}

@@ -22,6 +22,6 @@
 ## 4. Docs, Examples, Gates
 
 - [x] 4.1 更新 SSOT 文档 `docs/doc/viz/scalim-viz.md` 与 `frontend/scalim-viz/README.md`,说明 workflow bundle 目录结构(`scalim-viz/workflow/`)、workflow-first 入口与 drill-down 口径(`demand_run_id`)。
-- [ ] 4.2 如需同步生成页或 injected blocks，运行 `just gen-docs`；禁止手改 `.gen.*` 与 `BEGIN/END AUTOGEN:*` 区块。
+- [x] 4.2 如需同步生成页或 injected blocks，运行 `just gen-docs`；禁止手改 `.gen.*` 与 `BEGIN/END AUTOGEN:*` 区块。
 - [x] 4.3 补齐测试：bundle 目录布局、linking 规则(demand_run_id)、workflow node/resource 命名稳定性、workflow -> demand drill-down 状态保持。
-- [ ] 4.4 运行 `openspec validate --all --strict --no-interactive`、`just openspec-check` 与相关 `just qa` 门禁，确认工件与实现无漂移。
+- [x] 4.4 运行 `openspec validate --all --strict --no-interactive`、`just openspec-check` 与相关 `just qa` 门禁，确认工件与实现无漂移。

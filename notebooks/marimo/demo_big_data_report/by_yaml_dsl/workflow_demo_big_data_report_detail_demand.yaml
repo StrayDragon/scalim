@@ -1,0 +1,248 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: demo_big_data_report_workflow_detail_csv
+description: |
+  demo_big_data_report workflow demo: detail output (CSV, workflow-managed temp path).
+
+  目标:
+  - 产出与 `scalim_misc.demo_big_data_report.verification` 纯 Python 对照组一致的明细字段
+  - 作为 workflow `writes` 的上游输入(仅 CSV output)
+  - 同时携带一个 `preload_forever` source,用于 cache_pool 命中/释放/淘汰可观测验证
+
+batch_size: 30
+
+main_source:
+  source_id: orders
+  loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
+  params:
+    ids: {$init_var: order_ids}
+  order_by: [order_id]
+  fields:
+    order_id: {name: 订单ID}
+    order_date: {name: 订单日期}
+    quantity: {name: 数量}
+    unit_price: {name: 单价}
+    discount_rate: {name: 折扣率}
+
+    customer_id: {name: 客户ID}
+    product_id: {name: 产品ID}
+    warehouse_id: {name: 仓库ID}
+    promotion_id: {name: 促销ID}
+    payment_method_id: {name: 支付方式ID}
+    logistics_id: {name: 物流ID}
+    region_id: {name: 区域ID}
+    product_category_id: {name: 产品分类ID}
+
+relations:
+  orders_to_customers:
+    steps:
+      - from: orders.customer_id
+        to: customers.customer_id
+
+  orders_to_products:
+    steps:
+      - from: orders.product_id
+        to: products.product_id
+
+  orders_to_warehouses:
+    steps:
+      - from: orders.warehouse_id
+        to: warehouses.warehouse_id
+
+  orders_to_promotions:
+    steps:
+      - from: orders.promotion_id
+        to: promotions.promotion_id
+
+  orders_to_payment_methods:
+    steps:
+      - from: orders.payment_method_id
+        to: payment_methods.payment_method_id
+
+  orders_to_logistics:
+    steps:
+      - from: orders.logistics_id
+        to: logistics.logistics_id
+
+  orders_to_categories:
+    steps:
+      - from: orders.product_id
+        to: products.product_id
+      - from: products.category_id
+        to: categories.category_id
+
+  orders_to_regions:
+    steps:
+      - from: orders.warehouse_id
+        to: warehouses.warehouse_id
+      - from: warehouses.warehouse_region_id
+        to: regions.region_id
+
+  orders_to_region_pricing:
+    steps:
+      - from: [orders.region_id, orders.product_category_id]
+        to: [region_pricing.region_id, region_pricing.product_category_id]
+
+sources:
+  preload_counter:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_workflow_preload_counter_table"
+    key: id
+    cache_mode: preload_forever
+
+  customers:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_customers"
+    key: customer_id
+    lookup_chunk_size: 5
+    params:
+      ids: {$keys: {as: list}}
+    fields:
+      customer_name: {name: 客户姓名, relation: orders_to_customers}
+      customer_level: {name: 会员等级, relation: orders_to_customers}
+      customer_phone: {name: 客户电话, relation: orders_to_customers}
+
+  products:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_products"
+    key: product_id
+    lookup_chunk_size: 5
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      product_name: {name: 产品名称, relation: orders_to_products}
+      product_brand: {name: 产品品牌, relation: orders_to_products}
+      product_cost: {name: 产品成本, relation: orders_to_products}
+      category_id:
+        name: 产品分类ID(lookup)
+        extract: category_id
+        relation: orders_to_products
+
+  categories:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_categories"
+    key: category_id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      category_name: {name: 产品分类, relation: orders_to_categories}
+
+  warehouses:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_warehouses"
+    key: warehouse_id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      warehouse_region_id:
+        name: 区域ID(lookup)
+        extract: region_id
+        relation: orders_to_warehouses
+      warehouse_name: {name: 仓库名称, relation: orders_to_warehouses}
+
+  regions:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_regions"
+    key: region_id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      region_name_value:
+        name: 区域名称
+        extract: region_name
+        relation: orders_to_regions
+      region_manager: {name: 区域经理, relation: orders_to_regions}
+
+  region_pricing:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_region_pricing"
+    key: [region_id, product_category_id]
+    cache_mode: preload_forever
+    fields:
+      price_adjustment: {name: 价格调整系数, relation: orders_to_region_pricing}
+      shipping_fee: {name: 运费, relation: orders_to_region_pricing}
+      tax_rate: {name: 税率, relation: orders_to_region_pricing}
+
+  promotions:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_promotions"
+    key: promotion_id
+    cache_mode: preload_forever
+    fields:
+      promotion_name: {name: 促销名称, relation: orders_to_promotions}
+      promotion_discount: {name: 促销折扣, relation: orders_to_promotions}
+
+  payment_methods:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_payment_methods"
+    key: payment_method_id
+    cache_mode: preload_forever
+    normalize:
+      kind: index_by_key
+      key_field: payment_method_id
+      on_conflict: error
+    fields:
+      payment_method_name: {name: 支付方式, relation: orders_to_payment_methods}
+
+  logistics:
+    loader: "scalim_misc.demo_big_data_report.loaders:load_logistics"
+    key: logistics_id
+    cache_mode: preload_forever
+    fields:
+      logistics_name: {name: 物流公司, relation: orders_to_logistics}
+      logistics_speed: {name: 配送时效, relation: orders_to_logistics}
+
+fields:
+  region_name:
+    name: 区域名称
+    compute: "region_name_value"
+
+  region_name_display:
+    name: 区域名称(展示)
+    compute: "region_name_value"
+
+  order_amount:
+    name: 订单金额
+    call_by: "scalim_misc.demo_big_data_report.loaders:calc_order_amount(quantity=quantity, unit_price=unit_price, discount_rate=discount_rate)"
+
+  profit:
+    name: 利润
+    call_by: "scalim_misc.demo_big_data_report.loaders:calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)"
+
+  tax_amount:
+    name: 税费
+    call_by: "scalim_misc.demo_big_data_report.loaders:calc_tax_amount(order_amount=order_amount, tax_rate=tax_rate)"
+
+  final_price:
+    name: 最终价格
+    call_by: "scalim_misc.demo_big_data_report.loaders:calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)"
+
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: "" # workflow-managed temp output (writes consumer only)
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+    fields:
+      - order_id
+      - order_date
+      - quantity
+      - unit_price
+      - discount_rate
+      - customer_name
+      - customer_level
+      - customer_phone
+      - product_name
+      - product_brand
+      - product_cost
+      - product_category_id
+      - category_name
+      - warehouse_name
+      - region_name
+      - region_name_display
+      - region_manager
+      - promotion_name
+      - promotion_discount
+      - payment_method_name
+      - logistics_name
+      - logistics_speed
+      - price_adjustment
+      - shipping_fee
+      - tax_rate
+      - order_amount
+      - profit
+      - tax_amount
+      - final_price

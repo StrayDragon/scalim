@@ -321,10 +321,9 @@ export const applyDecorations = () => {
   const activeNode = rawNodes.find((node) => node.id === activeNodeId) ?? null;
   state.activeStageLevel = activeNode ? getStageLevel(activeNode) : null;
   const visible = visibleEvents();
-  const sequenceInfo =
-    state.viewMode === "timeline" ? buildSequenceVisibility(rawNodes, state.baseEdges, visible) : null;
-  const sequenceSet = sequenceInfo ? sequenceInfo.visible : null;
-  const sequenceStageLevels = sequenceInfo ? sequenceInfo.stageLevels : null;
+  const sequenceInfo = state.viewMode === "timeline" ? buildSequenceVisibility(rawNodes, state.baseEdges, visible) : null;
+  const sequenceSet = sequenceInfo && sequenceInfo.visible.size ? sequenceInfo.visible : null;
+  const sequenceStageLevels = sequenceInfo && sequenceInfo.visible.size ? sequenceInfo.stageLevels : null;
   const planHighlightSet = state.planHighlightNodeIds.length ? new Set(state.planHighlightNodeIds) : null;
   const stageFilterLevel =
     state.stageFilterEnabled
@@ -1590,6 +1589,75 @@ const fetchReplayFileText = async (path: string): Promise<string | null> => {
 export const autoloadReplayFromQuery = async () => {
   if (!import.meta.env.DEV) return;
   if (typeof window === "undefined") return;
+
+  const bundleMatch = (window.location.search || "").match(/(?:\?|&)bundle=([^&]*)/);
+  const bundleManifest = bundleMatch ? decodeURIComponent(bundleMatch[1]) : null;
+  if (bundleManifest) {
+    const manifestPath = String(bundleManifest).replace(/^\/+/, "");
+    const text = await fetchReplayFileText(manifestPath);
+    if (!text) {
+      state.status = "bundle manifest 未找到";
+      return;
+    }
+    let manifest: any = null;
+    try {
+      manifest = JSON.parse(text);
+    } catch (err) {
+      console.error("parse bundle manifest failed", err);
+      state.status = "bundle manifest 解析失败";
+      return;
+    }
+
+    const runsRaw = Array.isArray(manifest?.runs) ? manifest.runs : [];
+    const directoryLabel =
+      typeof manifest?.directoryLabel === "string" && manifest.directoryLabel.trim()
+        ? String(manifest.directoryLabel).trim()
+        : (() => {
+            const first = runsRaw[0]?.path;
+            const parts = typeof first === "string" ? String(first).replace(/^\/+/, "").split("/").filter(Boolean) : [];
+            return parts.length > 1 ? parts.slice(0, -1).join("/") : String(first || "");
+          })();
+
+    const now = Date.now();
+    const runSources: RunSource[] = [];
+    for (const item of runsRaw) {
+      const runId = typeof item?.id === "string" ? String(item.id).trim() : "";
+      const runDir = typeof item?.path === "string" ? String(item.path).replace(/^\/+/, "").trim() : "";
+      if (!runId || !runDir) continue;
+
+      const [snapshotText, eventsText, scheduleText, traceText] = await Promise.all([
+        fetchReplayFileText(`${runDir}/viz_snapshot.json`),
+        fetchReplayFileText(`${runDir}/viz_events.jsonl`),
+        fetchReplayFileText(`${runDir}/viz_schedule_plan.json`),
+        fetchReplayFileText(`${runDir}/viz_trace.jsonl`)
+      ]);
+
+      if (!snapshotText && !eventsText && !scheduleText) {
+        continue;
+      }
+
+      runSources.push({
+        id: runId,
+        label: runId,
+        snapshotFile: snapshotText ? new File([snapshotText], "viz_snapshot.json", { type: "application/json", lastModified: now }) : undefined,
+        eventsFile: eventsText ? new File([eventsText], "viz_events.jsonl", { type: "application/x-ndjson", lastModified: now }) : undefined,
+        schedulePlanFile: scheduleText
+          ? new File([scheduleText], "viz_schedule_plan.json", { type: "application/json", lastModified: now })
+          : undefined,
+        traceFile: traceText ? new File([traceText], "viz_trace.jsonl", { type: "application/x-ndjson", lastModified: now }) : undefined,
+        lastModified: now
+      });
+    }
+
+    if (!runSources.length) {
+      state.status = "bundle manifest 无有效 runs";
+      return;
+    }
+
+    await setRunSources(directoryLabel, runSources);
+    return;
+  }
+
   const match = (window.location.search || "").match(/(?:\?|&)replay=([^&]*)/);
   const dir = match ? decodeURIComponent(match[1]) : null;
   if (!dir) return;

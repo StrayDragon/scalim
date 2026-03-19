@@ -147,7 +147,7 @@ export const updateStageBands = (nodes: Node[], levels?: Set<number>) => {
   const bounds = new Map<number, { minX: number; minY: number; maxX: number; maxY: number }>();
 
   for (const node of nodes) {
-    if (node.type === "stage_band" || node.type === "stage" || node.type === "output_target") continue;
+    if (node.type === "stage_band" || node.type === "stage") continue;
     if ((node as any).hidden) continue;
     if ((node.data as any)?.sequence_hidden) continue;
     const level = getStageLevel(node);
@@ -309,6 +309,21 @@ export const buildSequenceVisibility = (nodes: Node[], baseEdges: Edge[], data: 
   for (const node of nodes) {
     nodeById.set(node.id, node);
   }
+
+  const isWorkflowNodeId = (nodeId: string) => {
+    return nodeId.startsWith("workflow_node:") || nodeId.startsWith("workflow_resource:");
+  };
+
+  // Workflow runs should keep their topology visible in timeline mode. Without this,
+  // the timeline "sequence visibility" filter would hide all workflow nodes because
+  // they don't match the source/loader/field prefixes.
+  const workflowNodes = nodes.filter((node) => isWorkflowNodeId(String(node.id)));
+  if (workflowNodes.length) {
+    for (const node of workflowNodes) {
+      visible.add(String(node.id));
+    }
+  }
+
   const mainSource = nodes.find((node) => node.type === "source" && (node.data as any)?.is_main);
   if (mainSource) {
     visible.add(mainSource.id);
@@ -348,6 +363,11 @@ export const buildSequenceVisibility = (nodes: Node[], baseEdges: Edge[], data: 
       continue;
     }
     if (nodeId.startsWith("field:")) {
+      visible.add(nodeId);
+      continue;
+    }
+
+    if (nodeById.has(nodeId)) {
       visible.add(nodeId);
     }
   }

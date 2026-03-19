@@ -23,8 +23,10 @@
 6. 小表关联: `orders` -> `promotions`、`payment_methods`、`logistics`
 """
 
+import csv
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # ============================================================================
@@ -111,6 +113,36 @@ def load_workflow_preload_counter_table() -> Dict[int, Dict[str, Any]]:
     """
     _WORKFLOW_PRELOAD_COUNTER["calls"] = int(_WORKFLOW_PRELOAD_COUNTER["calls"]) + 1
     return {0: {"id": 0, "name": "preload_counter"}}
+
+
+def load_rows_from_csv(path: str, *, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """从 workflow 上游的 CSV output 读取 rows.
+
+    说明:
+    - 该 loader 用于演示 workflow `depends_on` + `$ctx` 注入 output_path 的真实 glue 场景.
+    - CSV 列值默认保持为字符串;需要类型转换请在 YAML `fields.*.value_cast` 中声明.
+    """
+    p = Path(str(path))
+    if not p.exists():
+        msg = "CSV not found: {!r}".format(str(p))
+        raise FileNotFoundError(msg)
+
+    rows: List[Dict[str, Any]] = []
+    with p.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for idx, row in enumerate(reader):
+            if limit is not None and idx >= int(limit):
+                break
+            if not row:
+                continue
+            out: Dict[str, Any] = {}
+            for k, v in row.items():
+                key = str(k or "").strip()
+                if not key:
+                    continue
+                out[key] = str(v) if v is not None else ""
+            rows.append(out)
+    return rows
 
 
 def set_config(config: ECommerceConfig) -> None:

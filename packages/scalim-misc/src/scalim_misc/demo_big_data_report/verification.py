@@ -30,7 +30,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
@@ -394,6 +394,123 @@ def verify_scalim_output(
     return VerificationResult(
         passed=passed, total_rows=total_rows, checked_rows=checked, mismatches=mismatches, summary=summary, field_stats=field_stats
     )
+
+
+_DEFAULT_OUTPUT_CSV_INT_FIELDS: FrozenSet[str] = frozenset(
+    [
+        "order_id",
+        "quantity",
+        "product_category_id",
+        "logistics_speed",
+    ]
+)
+
+_DEFAULT_OUTPUT_CSV_FLOAT_FIELDS: FrozenSet[str] = frozenset(
+    [
+        "unit_price",
+        "discount_rate",
+        "promotion_discount",
+        "product_cost",
+        "price_adjustment",
+        "shipping_fee",
+        "tax_rate",
+        "order_amount",
+        "profit",
+        "tax_amount",
+        "final_price",
+    ]
+)
+
+
+def _coerce_output_csv_value(
+    field_id: str,
+    raw: object,
+    *,
+    int_fields: FrozenSet[str],
+    float_fields: FrozenSet[str],
+) -> Any:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+
+    value: Any = text
+    if field_id in int_fields:
+        try:
+            value = int(text)
+        except ValueError:
+            value = None
+    elif field_id in float_fields:
+        try:
+            value = float(text)
+        except ValueError:
+            value = None
+    return value
+
+
+def read_output_csv_rows(
+    path: object,
+    *,
+    int_fields: Optional[Sequence[str]] = None,
+    float_fields: Optional[Sequence[str]] = None,
+) -> List[RowData]:
+    """读取 scalim 输出的 CSV rows,并做最小类型还原.
+
+    说明:
+    - 输出 CSV 的值是字符串;纯 Python 对照组对拍需要把 `order_id` 等字段恢复成 int/float.
+    - 未声明类型的字段保持为字符串;空字符串 -> None.
+    """
+    int_fields_set = frozenset(int_fields) if int_fields is not None else _DEFAULT_OUTPUT_CSV_INT_FIELDS
+    float_fields_set = frozenset(float_fields) if float_fields is not None else _DEFAULT_OUTPUT_CSV_FLOAT_FIELDS
+
+    p = Path(str(path))
+    if not p.exists():
+        msg = "Missing output CSV: {!r}".format(str(p))
+        raise FileNotFoundError(msg)
+
+    rows: List[RowData] = []
+    with p.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            out: Dict[str, Any] = {}
+            for k, v in (row or {}).items():
+                key = str(k or "").strip()
+                if not key:
+                    continue
+                out[key] = _coerce_output_csv_value(
+                    key,
+                    v,
+                    int_fields=int_fields_set,
+                    float_fields=float_fields_set,
+                )
+            rows.append(out)
+    return rows
+
+
+def verify_scalim_output_csv(
+    output_csv_path: object,
+    *,
+    fields_to_check: Optional[Sequence[str]] = None,
+    tolerance: float = 0.01,
+) -> VerificationResult:
+    """对拍验证: 从 CSV 输出读取 rows 并用纯 Python 对照组验证."""
+    rows = read_output_csv_rows(output_csv_path)
+    result = verify_scalim_output(rows, fields_to_check=fields_to_check, tolerance=tolerance)
+    if rows and result.checked_rows != len(rows):
+        summary = "PK mismatch: checked_rows={} != total_rows={} (did you forget to coerce order_id to int?)".format(
+            result.checked_rows,
+            len(rows),
+        )
+        return VerificationResult(
+            passed=False,
+            total_rows=len(rows),
+            checked_rows=result.checked_rows,
+            mismatches=result.mismatches,
+            summary=summary,
+            field_stats=result.field_stats,
+        )
+    return result
 
 
 class DetailedVerification:
