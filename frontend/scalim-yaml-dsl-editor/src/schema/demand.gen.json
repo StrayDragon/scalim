@@ -1265,14 +1265,15 @@
         "value_cast": {
           "type": "string",
           "description": "字段值转换(仅源字段),用于写入上下文/输出前的类型调整",
-          "markdownDescription": "字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str",
+          "markdownDescription": "字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str\n- `decimal`: 转为 Decimal",
           "enum": [
             "auto",
             "int",
-            "str"
+            "str",
+            "decimal"
           ],
           "examples": [
-            "auto"
+            "decimal"
           ]
         },
         "$import": {
@@ -1472,14 +1473,15 @@
         "value_cast": {
           "type": "string",
           "description": "字段值转换(仅源字段),用于写入上下文/输出前的类型调整",
-          "markdownDescription": "字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str",
+          "markdownDescription": "字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str\n- `decimal`: 转为 Decimal",
           "enum": [
             "auto",
             "int",
-            "str"
+            "str",
+            "decimal"
           ],
           "examples": [
-            "auto"
+            "decimal"
           ]
         },
         "compute": {

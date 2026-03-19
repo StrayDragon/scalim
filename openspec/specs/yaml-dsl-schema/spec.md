@@ -60,6 +60,13 @@
 - **THEN** `output.format`/`output.header_fields_output_by`/`value_cast`/`lookup_cast.name`/`performance.report.format`/`relations.report.format`/`observability.viz.payload_policy` 的 `markdownDescription` 均包含选项语义说明且具备示例值
 - **AND** `output.path` 的 `markdownDescription` MUST 说明相对路径以进程 CWD 为基准、会自动创建父目录且可能覆盖同名文件(并提示不要对不可信 YAML 开启文件输出)
 
+### Requirement: schema 为 `value_cast` 增加 `decimal` 枚举值
+系统 MUST 在生成的 YAML DSL JSON Schema 中为源字段 `value_cast` 提供枚举值 `decimal`,并在 hover 文案中说明其语义为“转换为 `Decimal`”.
+
+#### Scenario: schema 生成结果包含 decimal
+- **WHEN** 运行 schema 生成脚本
+- **THEN** `demand.gen.json` 中 `value_cast` 的 enum MUST 包含 `decimal`
+
 ### Requirement: output 字段 hover 指引明确可选与 overrides 推荐写法
 系统 MUST 在生成的 YAML DSL JSON Schema 中,为顶层 `output` 字段提供清晰的 `markdownDescription`,并明确:
 - 顶层 `output` 为可选字段;
@@ -418,4 +425,3 @@ Schema MUST 为 retry policy 字段提供:
 #### Scenario: schema hover documents workflow-managed limitation
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
 - **THEN** `outputs.*.container.path` 的 `markdownDescription` MUST 明确说明“pathless 仅 workflow 托管可用”的限制
-

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
@@ -7,6 +9,7 @@ from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
 from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_str
+from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_decimal
 from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
 from tests.yaml_fixtures import make_yaml_config
@@ -131,10 +134,13 @@ fields:
     [
         ("int", "3", 3),
         ("str", 3, "3"),
+        ("decimal", "3.50", Decimal("3.50")),
+        ("decimal", 0.1, Decimal("0.1")),
         ("int", None, None),
         ("str", None, None),
+        ("decimal", None, None),
     ],
-    ids=["int-cast", "str-cast", "int-none", "str-none"],
+    ids=["int-cast", "str-cast", "decimal-str", "decimal-float", "int-none", "str-none", "decimal-none"],
 )
 def test_converter_value_cast_applies(value_cast: str, input_value, expected) -> None:
     yaml_content = make_yaml_config(
@@ -168,6 +174,27 @@ def test_value_cast_str_none_does_not_break_compute_if_falsy_guard() -> None:
         ("ratio",),
     )
     assert calc(cast_str(None)) == "0.0%"
+
+
+def test_cast_decimal_variants_and_errors() -> None:
+    assert cast_decimal(Decimal("1.23")) == Decimal("1.23")
+    assert cast_decimal(True) == Decimal(1)
+    assert cast_decimal(False) == Decimal(0)
+    assert cast_decimal(3) == Decimal(3)
+    assert cast_decimal("   ") is None
+
+    with pytest.raises(ValueError, match="Invalid decimal string literal"):
+        _ = cast_decimal("bad-decimal")
+
+    class _WeirdFloat(float):
+        def __str__(self) -> str:
+            return "not-a-number"
+
+    with pytest.raises(ValueError, match="Invalid decimal float literal"):
+        _ = cast_decimal(_WeirdFloat(1.0))
+
+    with pytest.raises(TypeError, match="Unsupported decimal cast value type"):
+        _ = cast_decimal([1])  # type: ignore[arg-type]
 
 
 def test_converter_private_value_cast_raises() -> None:

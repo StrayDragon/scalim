@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -125,6 +126,20 @@ class TestRelationMetrics:
         json_str = metrics.to_json()
         assert '"total_lookups": 50' in json_str
         assert '"hit_count": 40' in json_str
+
+    def test_to_json_supports_decimal_in_samples(self) -> None:
+        metrics = RelationMetrics()
+        metrics.samples.append(
+            RelationSample(
+                row_id=1,
+                fk_raw=Decimal("1.23"),
+                fk_normalized=Decimal("1.23"),
+                target_source="customers",
+                result="hit",
+            )
+        )
+        json_str = metrics.to_json()
+        assert "1.23" in json_str
 
     def test_get_source_stats(self) -> None:
         metrics = RelationMetrics()

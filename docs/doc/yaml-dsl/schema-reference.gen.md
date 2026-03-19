@@ -38,7 +38,7 @@ Sources:
 - `name`: type=string; 字段显示名称
 - `relation`: 关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)
 - `source`: type=string; 字段来源的 source_id (例: source: orders)
-- `value_cast`: type=string; enum=auto|int|str; 字段值转换(仅源字段),用于写入上下文/输出前的类型调整
+- `value_cast`: type=string; enum=auto|int|str|decimal; 字段值转换(仅源字段),用于写入上下文/输出前的类型调整
 
 ### `guardrails`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -201,7 +201,7 @@ Sources:
 - `name`: type=string; 字段显示名称
 - `relation`: 关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)
 - `source`: type=string; 字段来源的 source_id (例: source: orders)
-- `value_cast`: type=string; enum=auto|int|str; 字段值转换(仅源字段),用于写入上下文/输出前的类型调整
+- `value_cast`: type=string; enum=auto|int|str|decimal; 字段值转换(仅源字段),用于写入上下文/输出前的类型调整
 
 ### `trace`
 - `$import`: $import 引用(支持 string 或 string list)

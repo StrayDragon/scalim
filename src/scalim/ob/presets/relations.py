@@ -89,7 +89,9 @@ class RelationMetrics:
         }
 
     def to_json(self, indent: int = 2) -> str:
-        return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
+        # 注意: `samples` 可能包含非 `JSON` 原生类型(例如 `Decimal`/`datetime`/`tuple key` 等来自用户数据).
+        # 这里用 `default=str` 保证可观测性输出足够稳健.
+        return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent, default=str)
 
 
 @dataclass
@@ -258,14 +260,14 @@ class RelationObserver(EventDispatchObserver):
     def _write_json_report(self) -> None:
         output_path = self.config.output_path
         if not output_path:
-            self.config.logger.info("\n%s", json.dumps(self._build_report_dict(), ensure_ascii=False, indent=2))
+            self.config.logger.info("\n%s", json.dumps(self._build_report_dict(), ensure_ascii=False, indent=2, default=str))
             return
 
         try:
             path = Path(output_path)
             if path.parent and not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
-            _ = path.write_text(json.dumps(self._build_report_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+            _ = path.write_text(json.dumps(self._build_report_dict(), ensure_ascii=False, indent=2, default=str), encoding="utf-8")
             self.config.logger.info("[RelationObserver] 报告已写入: %s", output_path)
         except OSError as e:
             self.config.logger.warning("[RelationObserver] 写入报告失败: %s", e)

@@ -1833,7 +1833,7 @@ relations:
 main_source:
   fields:
     amount:
-      value_cast: int    # 确保 amount 输出为整数
+      value_cast: decimal    # 金融/金额类字段推荐: 用 Decimal 避免 float 精度问题
 ```
 
 ### Q5: 何时使用 preload_forever 缓存？

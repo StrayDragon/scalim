@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Callable, ClassVar, Dict, List, Optional, Sequence, cast
 
 from .....spec.ir.aliases import LookupKeyCast
@@ -29,10 +30,45 @@ def cast_str(value: object) -> Optional[str]:
     return str(value)
 
 
+def cast_decimal(value: object) -> Optional[Decimal]:
+    if value is None:
+        return None
+
+    dec: Optional[Decimal] = None
+    if isinstance(value, Decimal):
+        dec = value
+    elif isinstance(value, bool):
+        dec = Decimal(1) if value else Decimal(0)
+    elif isinstance(value, int):
+        dec = Decimal(value)
+    elif isinstance(value, float):
+        # 避免 `Decimal(float)` 的二进制精确展开带来“意外小数”;沿用仓库惯例: `Decimal(str(float))`.
+        try:
+            dec = Decimal(str(value))
+        except (InvalidOperation, ValueError) as exc:
+            msg = "Invalid decimal float literal: {!r}".format(value)
+            raise ValueError(msg) from exc
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            dec = Decimal(text)
+        except InvalidOperation as exc:
+            msg = "Invalid decimal string literal: {!r}".format(value)
+            raise ValueError(msg) from exc
+    else:
+        msg = "Unsupported decimal cast value type: {}".format(type(value).__name__)
+        raise TypeError(msg)
+
+    return dec
+
+
 VALUE_CASTS: Dict[str, Callable[[FieldValue], FieldValue]] = {
     "int": cast_int,
     "str": cast_str,
     "auto": auto_str_normalize,
+    "decimal": cast_decimal,
 }
 
 

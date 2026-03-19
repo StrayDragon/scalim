@@ -111,9 +111,9 @@ class SourceFieldConfig:
         default=None,
         metadata=schema_meta(
             desc="字段值转换(仅源字段),用于写入上下文/输出前的类型调整",
-            md=("字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str"),
+            md=("字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str\n- `decimal`: 转为 Decimal"),
             choices=VALUE_CAST_ENUM,
-            examples=["auto"],
+            examples=["decimal"],
         ),
     )
     """可选:字段值类型转换策略(仅源字段)."""

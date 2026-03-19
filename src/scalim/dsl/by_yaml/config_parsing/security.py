@@ -4,6 +4,7 @@ import operator
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Callable, ClassVar, Container, Dict, FrozenSet, List, Optional, Set, Tuple, Type, Union, cast
 
 from ....vendor.compact.typing_extensionsx import override
@@ -288,6 +289,8 @@ class SecureComputeEngine:
         "float": float,
         "str": str,
         "bool": bool,
+        # 金融场景常用: 允许在表达式中使用 `Decimal("0.1")`,避免 `float` 精度问题
+        "Decimal": Decimal,
         "list": list,
         "tuple": tuple,
         "set": set,

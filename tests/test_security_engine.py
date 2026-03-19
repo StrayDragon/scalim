@@ -1,5 +1,6 @@
 import ast
 import logging
+from decimal import Decimal
 
 import pytest
 
@@ -131,6 +132,14 @@ def test_compile_supports_bool_list_tuple_and_eval_error() -> None:
 
     calc_add = engine.compile("a + b", ("a", "b"))
     assert calc_add(a=1, b=2) == 3
+
+
+def test_secure_compute_supports_decimal_constructor() -> None:
+    engine = SecureComputeEngine()
+    calc = engine.compile("Decimal('0.1') + Decimal('0.2')", ())
+    result = calc()
+    assert isinstance(result, Decimal)
+    assert result == Decimal("0.3")
 
 
 def test_allowed_function_map_executes_custom_callable() -> None:
