@@ -146,6 +146,20 @@ const DEFAULT_PLAYBACK_INTERVAL = 800;
 const MAX_EVENTS_IN_MEMORY = 20000;
 const TRACE_TAIL_BYTES = 8 * 1024 * 1024;
 
+const prefersReducedMotion = () => {
+  try {
+    if (typeof window === "undefined") return false;
+    return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  } catch (err) {
+    return false;
+  }
+};
+
+const motionDuration = (durationMs: number) => {
+  if (durationMs <= 0) return 0;
+  return prefersReducedMotion() ? 0 : durationMs;
+};
+
 const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
@@ -403,7 +417,7 @@ const followNode = async (nodeId: string) => {
   const y = (node.position?.y ?? 0) + size.height / 2;
   try {
     if (flowApi?.setCenter) {
-      await flowApi.setCenter(x, y, { duration: 220 });
+      await flowApi.setCenter(x, y, { duration: motionDuration(220) });
     }
   } catch (err) {
     // ignore viewport errors
@@ -529,7 +543,7 @@ export const relayoutNodes = () => {
 export const resetView = () => {
   try {
     if (flowApi?.fitView) {
-      void flowApi.fitView({ padding: 0.2, duration: 260 });
+      void flowApi.fitView({ padding: 0.2, duration: motionDuration(260) });
     }
   } catch (err) {
     // ignore viewport errors
@@ -1132,12 +1146,12 @@ const fitTimelineView = () => {
   try {
     if (flowApi?.fitView) {
       // @ts-ignore fitView accepts nodes list in SvelteFlow.
-      void flowApi.fitView({ padding: 0.18, duration: 280, nodes: visibleNodes });
+      void flowApi.fitView({ padding: 0.18, duration: motionDuration(280), nodes: visibleNodes });
     }
   } catch (err) {
     try {
       if (flowApi?.fitView) {
-        void flowApi.fitView({ padding: 0.18, duration: 280 });
+        void flowApi.fitView({ padding: 0.18, duration: motionDuration(280) });
       }
     } catch {
       // ignore viewport errors
@@ -2055,7 +2069,7 @@ export const returnToWorkflow = async () => {
   if (nav.returnViewMode === "graph" && nav.returnViewport && flowApi?.setViewport) {
     try {
       await tick();
-      await flowApi.setViewport(nav.returnViewport, { duration: 220 });
+      await flowApi.setViewport(nav.returnViewport, { duration: motionDuration(220) });
     } catch {
       // ignore viewport errors
     }
