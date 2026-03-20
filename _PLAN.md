@@ -106,6 +106,13 @@ YAML → 执行的关键入口（用于定位“某字段影响哪里”）：
 - 能力边界/映射：`docs/doc/yaml-dsl/capability-matrix.md`
 - 升级指南：`docs/doc/yaml-dsl/upgrades/`（由 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 生成）
 
+### 2.3 示例 SSOT（Marimo notebooks / 对拍）
+
+- Canonical demo（YAML DSL SSOT）：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
+- Workflow demo：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml`（配套 demand YAML 在同目录）
+- 示例运行/对拍（集成冒烟）：`just examples`（调用 `notebooks/marimo/run_examples.py`）
+- 治理要求（从现在开始按 SSOT 对待）：任何 YAML DSL 变更都必须同步更新该示例套件，并保证 `just examples` 通过；示例不必强行塞进单一 YAML，可按“域/能力”拆分多个 YAML 来避免单文件爆炸
+
 ---
 
 ## 3. System Surface Map：我们拥有哪些 surface（按“意图域”分组）
@@ -241,6 +248,7 @@ workflow 只负责“编排多 demand + 共享资源 + DAG ctx”：
 - docs：`schema-reference` / `capability-matrix` / `upgrades` 同步
 - editor：schema 同步 +（如涉及）exact 语义校验对齐说明
 - 至少 1 个 fixture/测试覆盖该能力的典型路径（避免“文档写对了实现漂”）
+- marimo 示例 SSOT 同步更新，`just examples` 对拍通过（`notebooks/marimo/demo_big_data_report/by_yaml_dsl/`）
 
 > 说明：本文档不做这些实现，只把门禁固定下来。
 
@@ -248,6 +256,13 @@ workflow 只负责“编排多 demand + 共享资源 + DAG ctx”：
 
 - `compute` 继续保持“安全表达式”定位：不引入属性访问/下标/任意调用等会扩大攻击面的能力。
 - 复杂逻辑统一走 `call_by` + allowlist（且 allowlist 永远由环境提供，不写死在 YAML）。
+
+### 5.6 LSP-First（schema/补全优先，validator 兜底）
+
+- 设计目标是让“写 YAML”主要靠 JSON Schema（YAML LSP）即可完成：结构约束、枚举、默认值、示例、补全路径尽量在 schema 表达。
+- 尽量避免把“可结构表达”的约束留给 runtime/validator 特判；若必须 validator-only，必须在 hover/docs 明确，并保证错误信息可定位到具体节点。
+- `aggregate` 保持“聚合函数名作为 key”的 producer 形态（如 `{sum: {field: amount}}`），以获得定向补全与参数提示；避免退化为泛化 `kind: sum` 结构，除非证实对 LSP 更好。
+- 对于同名 key 在不同分支含义不同（例如 detail `fields: [..]` vs aggregate `fields: {..}`），短期优先通过 schema `oneOf` 分支/required keys 提升 LSP 判别；若仍不可控，再考虑显式 discriminator（但这属于结构性改造，见第 14 节停车场）。
 
 ---
 
@@ -264,10 +279,11 @@ workflow 只负责“编排多 demand + 共享资源 + DAG ctx”：
 
 **目标形状（统一认知）**
 
-- `enabled`：静态开关（替代“where=false”这类误用）
+- （可选）`enabled`：静态开关（避免把 `where` 当开关；若不引入，也必须在 schema/hover 中把误用写死）
 - `where`：只做行级路由谓词（永远不承担开关语义）
 - `container`：物理承载（workbook/csv），对 workflow-managed 临时输出的特殊形态要“明确标注为仅 workflow 可用”
 - `fields` vs `aggregate`：二选一且结构清晰（避免出现混合语义）
+- `aggregate.fields` 中每一列的 producer 继续采用“函数名作为 key”的形态（LSP 定向补全友好），并把 `call_by/compute` 明确为高级口子治理（不持续膨胀）
 - `from`：继承范围固定、禁止层层继承带来的隐式复杂度
 
 **禁止事项**
@@ -348,6 +364,7 @@ workflow 只负责“编排多 demand + 共享资源 + DAG ctx”：
 - docs：schema reference + capability matrix + upgrades（breaking 必须写迁移清单）
 - editor：schema 同步；若影响 exact，必须说明 exact 与 validate 的一致性边界
 - tests/fixtures：至少 1 个覆盖样例
+- marimo 示例 SSOT 同步更新，`just examples` 对拍通过（`notebooks/marimo/demo_big_data_report/by_yaml_dsl/`）
 
 ---
 
@@ -364,6 +381,8 @@ workflow 只负责“编排多 demand + 共享资源 + DAG ctx”：
   - `just check`（全量）
 - 前端编辑器门禁（若改到 schema blocks 或 schema 结构）：
   - `just frontend-yaml-dsl-editor-check`
+- 示例对拍（集成冒烟）：
+  - `just examples`
 
 ---
 
@@ -372,3 +391,415 @@ workflow 只负责“编排多 demand + 共享资源 + DAG ctx”：
 - ✅ 做：统一认知、确定原则、给出收敛路线图与治理门禁、列出未来验收清单。
 - ❌ 不做：任何代码修改、任何 schema 生成物更新、任何自动升级脚本、任何 OpenSpec 工件接入。
 
+---
+
+## 10. 预研快照（基于仓库现状的“事实证据”）
+
+> 本节把“我们直觉上觉得膨胀”的东西，用可验证的仓库事实固定下来：体量、结构复杂度、耦合面、近期 churn。
+> 这不是为了 KPI，而是为了后续做取舍时不靠拍脑袋。
+
+### 10.1 YAML surface 的客观规模（Schema 维度）
+
+**Demand schema（`src/scalim/dsl/by_yaml/schema/demand.gen.json`）**
+
+- 顶层 properties：18 个（`name/imports/$import/_templates/.../observability`）
+- definitions：25 个（`source/field/output_* /observability/* /guardrails/* /loader_retry/...`）
+- 结构复杂度（粗略统计）：`oneOf=53`、`anyOf=43`、`$ref=30`（union 与组合结构很多，强依赖 editor 的 union 推断与 hover 文案）
+- 全量 property-path（含 definitions）约：264 条
+
+**Workflow schema（`src/scalim/dsl/by_yaml/schema/workflow.gen.json`）**
+
+- 顶层 properties：1 个（`workflow`）
+- definitions：0 个（workflow schema 目前是“内联大对象”）
+- 全量 property-path 约：63 条（其中 `writes` 为 5-way `oneOf` union）
+
+**定义复杂度贡献（按 demand property-path 粗略计数，越大越可能是“认知/实现热点”）**
+
+- `definitions.output_aggregate`：62
+- `definitions.source`：36
+- `(root)`：21
+- `definitions.field`：14
+- `definitions.viz`：12
+- `definitions.output_container`：11
+
+结论（用于后续优先级裁决）：
+
+- 仅看 schema 结构复杂度：**output_aggregate**（聚合输出）是最大热点；其次是 **source/normalize**；然后才是顶层键数量。
+- workflow 的复杂度不在 keys 多，而在 union（writes）+ 资源/并发/ctx 等“编排控制面”的语义密度。
+
+### 10.2 实现热点（LOC + 责任分布）
+
+> 体量不是问题本身，但它是“哪里最容易继续膨胀、最容易引入漂移”的信号。
+
+**Schema SSOT（`src/scalim/dsl/by_yaml/schema_dsl/models/`）**
+
+- `outputs.py`：约 1092 行（聚合/排名/post fields/文案集中）
+- `observability.py`：约 486 行
+- `source.py`：约 397 行
+
+**Config parsing（`src/scalim/dsl/by_yaml/config_parsing/`）**
+
+- parsers：
+  - `parsers/outputs.py`：约 1141 行（outputs 的主要语义/校验/依赖提取都在这里）
+  - `parsers/sources.py`：约 304 行
+  - `parsers/fields.py`：约 283 行
+- validators：
+  - `validators/sources.py`：约 867 行（source 语义/约束非常密集）
+
+**Runtime（`src/scalim/dsl/by_yaml/runtime/`）**
+
+- `workflow_entrypoints.py`：约 1632 行
+- `workflow_resources.py`：约 1203 行
+- `output_composition_yaml.py`：约 592 行（YAML outputs → execution spec 的“第二语义层”）
+- `_internal/conversion_sources.py`：约 587 行
+
+**Workflow config（`src/scalim/dsl/by_yaml/workflow.py`）**
+
+- `workflow.py`：约 1148 行（workflow YAML 的加载/语义校验/错误定位也很重）
+
+结论：
+
+- “膨胀热点”不是抽象概念，**outputs / workflow / sources** 在 schema + parsing + runtime 三层都有明显的高体量与高耦合。
+
+### 10.3 关键耦合面（一个域的改动会波及哪些层）
+
+> 后续每个“收敛切片”必须显式列出这些触点，否则容易只改到 1-2 层导致漂移。
+
+**outputs（demand）**
+
+- schema SSOT：`src/scalim/dsl/by_yaml/schema_dsl/models/outputs.py`
+- parsing/语义：`src/scalim/dsl/by_yaml/config_parsing/parsers/outputs.py`
+- runtime 编译：`src/scalim/dsl/by_yaml/runtime/output_composition_yaml.py`
+- execution：`src/scalim/execution/output_composition.py` + sinks（workbook/csv）
+- docs：`docs/doc/yaml-dsl/syntax.md`、`docs/doc/yaml-dsl/user-guide.md`、`docs/doc/yaml-dsl/upgrades/*outputs*.gen.md`、`docs/doc/yaml-dsl/schema-reference.gen.md`
+- editor：schema 同步（`just gen-yaml-dsl-editor-schema`）+ schema blocks（union 推断依赖 `oneOf` 结构稳定）
+- tests：`tests/test_yaml_loader_outputs.py`、`tests/test_yaml_dsl_fields_and_output.py` 等（未来落地需补齐聚合/禁用/继承等组合覆盖）
+
+**workflow**
+
+- schema SSOT：`src/scalim/dsl/by_yaml/schema_dsl/builder.py::build_workflow_schema`（注意：**不是 dataclass 驱动**）
+- parsing/语义：`src/scalim/dsl/by_yaml/workflow.py`（包含大量语义校验）
+- runtime：`src/scalim/dsl/by_yaml/runtime/workflow_entrypoints.py`、`workflow_resources.py`
+- docs：`docs/doc/yaml-dsl/workflow.md`、`docs/doc/yaml-dsl/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.gen.md`
+- editor：同上（workflow schema 同步 + union blocks）
+- tests：`tests/test_yaml_dsl_workflow.py`、`tests/test_workflow_config_validation_coverage.py`
+
+**sources/normalize/params**
+
+- schema SSOT：`src/scalim/dsl/by_yaml/schema_dsl/models/source.py` + `schema_dsl/constants.py`（normalize/enum/hover）
+- parsing：`src/scalim/dsl/by_yaml/config_parsing/parsers/sources.py`
+- validator：`src/scalim/dsl/by_yaml/config_parsing/validators/sources.py`
+- runtime conversion：`src/scalim/dsl/by_yaml/runtime/_internal/conversion_sources.py`
+- docs/upgrades：`*normalize*`、`*params-template*`、`*field-extract*`
+
+### 10.4 近期 churn 信号（“我们为什么总在加字段”的证据）
+
+最近的 YAML DSL upgrades（`docs/doc/yaml-dsl/upgrades/*.gen.md`）在 2026-03-10 ~ 2026-03-18 期间共有 11 个条目，其中：
+
+- outputs：3
+- workflow：2
+- normalize：2
+- 其余（extract/params/breaking/derived-outputs…）：4
+
+结论：
+
+- outputs 与 workflow 是近期迭代最密集的域；这通常意味着“认知未收敛”，继续加法会进一步放大漂移成本。
+
+### 10.5 规范漂移风险（仅作为治理提示）
+
+仓库内 OpenSpec specs 作为“约束性描述”存在，但部分 spec 与当前实现/文档已经出现明显漂移迹象（例如历史上以 `output` 为中心的描述与现行 `outputs` surface 不一致，relation 引用规则也经历过收敛）。
+
+治理建议（不等于立即接入 OpenSpec 流程）：
+
+- 后续真正落地收敛时，要么同步更新相关 spec，要么明确“spec 仅作参考，不作为 SSOT”，避免团队在争议点上失去共同裁判。
+
+---
+
+## 11. 更可执行的“收敛推进路线图”（预研版）
+
+> 目标：把第 6 节的方向性路线图，收敛成“可切片、可验收、可并行”的推进顺序。
+> 注意：这里仍然只做规划，不落地实现。
+
+### 11.1 Phase 0：建立治理基线（先止血）
+
+产出/动作（仍是文档/流程层）：
+
+- 以 `demand.gen.json` / `workflow.gen.json` 为准，固化一份“域 → keys → 语义归属（DemandIr/ExecutionRequest/validator-only）→ 触点清单”的表（可直接内嵌在本文件或单独表格）。
+- 把 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/` 固化为“YAML DSL 能力展示 SSOT 套件”：维护 capability coverage matrix（schema key/definition → 覆盖 YAML/章节），并把 `just examples` 作为对拍门禁。
+- 明确“新增必须付复杂度税”的执行方式：PR 模板/Review Checklist（可复用第 7 节三问 + 交付物清单）。
+- 明确“什么不进 YAML”：allowlist/并发/组件注入/调参类控制面（第 3.3 与第 5.1 作为默认裁决）。
+
+验收标准：
+
+- 新增任何 YAML 能力前，评审能快速回答：它属于哪类、为什么不能用 anchors/imports、复杂度税怎么付。
+
+### 11.2 Phase 1：outputs 收敛（先解决最大误用与最大结构复杂度）
+
+优先目标（收敛语义）：
+
+- 先止损 `where` 误用：在 schema/hover/docs/upgrades 中明确 `where` 只能是行级谓词；必要时再引入显式静态开关（如 `enabled`），避免把开关语义塞进 `where`。
+- 明确 `from` 的继承边界（只继承哪些字段，不继承哪些字段），并减少隐式规则。
+- 对 `aggregate.fields` 的生产者 union 做分层（保持“聚合函数名作为 key”的 producer 形态）：
+  - **core stable**：最常用且可强补全的 producer（count/sum/min/max 等）
+  - **advanced/escape hatch**：`call_by/compute` 这类“强表达力但高漂移/高安全/高审计成本”的入口，明确为高级口子并限制其文档与 editor 展示层级
+
+预研结论（为何这么排）：
+
+- schema 结构复杂度最大的是 `output_aggregate`，而实现层面 outputs parsing/runtime 也都极重；先收敛 outputs 能最大化降低后续继续膨胀的边际成本。
+
+### 11.3 Phase 2：sources/normalize/params 收敛（减少“为了形状适配而加字段”的压力）
+
+优先目标：
+
+- 明确 “normalize 是 whole-result reshape，extract 是 field-level 取值” 的边界，避免两者语义重叠继续扩张。
+- 对 normalize kinds/steps 做“少而清晰”的收敛：宁可减少一种 fancy step，也不要保留多种等价形态。
+- 对 params 模板（`$keys/$rows/$init_var`）的语义边界写死：哪些场景允许、哪些场景必须 fail-fast、错误信息必须给出可复制替代片段。
+
+### 11.4 Phase 3：workflow 收敛（对齐 outputs 与资源/写入模型）
+
+优先目标：
+
+- 固化 demand outputs 与 workflow writes 的契约：哪个产物可被 writes 消费、何时允许 pathless 输出、错误信息如何引导。
+- 统一资源命名/冲突策略/写入确定性（避免“资源层再引入另一套 outputs 语义”）。
+- 评估 workflow schema 的 SSOT 形态：当前 workflow schema 在 `SchemaBuilder` 内联维护，未来是否需要迁移为 dataclass-driven（以降低 schema/实现重复成本）。
+
+### 11.5 Phase 4：observability 收敛（把控制面做薄）
+
+优先目标：
+
+- 子域结构同构化（enabled/report/thresholds），减少 special cases。
+- 明确哪些“调参/环境策略”迁回 Python overrides（YAML 只保留最小稳定子集）。
+
+---
+
+## 12. 下一步需要你拍板的 3 个高影响决策（建议默认值已给出）
+
+> 下面 3 个点不先对齐，后续很容易陷入“每个需求都能加字段”的无底洞。
+
+1) **outputs.aggregate 的定位**：它是长期 stable surface，还是明确为“高级/实验性面”？
+   - 建议默认：核心聚合能力 stable；`call_by/compute` 作为高级口子并限制展示与扩展（避免持续膨胀）。
+> 最新反馈：这个能力我们一定要有；`outputs` 里出现 `fields` 概念本身没问题，主要问题是当前 schema 设计整体不够一致。你希望尽可能靠 YAML LSP 的 schema 校验/补全来治理，并且 aggregate 继续保持“聚合函数名作为 key”的形态；当前阶段不推进大的 YAML 结构性重设计。
+
+2) **workflow schema 的 SSOT 形态**：是否要中期迁移为 dataclass-driven（对齐 demand 的 schema 生成治理），还是继续接受内联 schema？
+   - 建议默认：先不动 SSOT 形态，先收敛语义与契约；当 workflow 继续扩张时再迁移（避免一次性大工程）。
+> 你指的“并行池子/调度参数”主要是在 `workflow.options` 这块（如 `max_concurrency/failure_policy/ctx/cache_pool/...`），不是 demand 内部执行的 `parallel_mode/max_workers`。workflow 结构未来可能仍需重构，但你更希望先把 options 的语义/默认值/边界与 schema/LSP 体验梳理清楚。
+   
+3) **OpenSpec 的裁判地位**：未来落地收敛时，spec 是否必须同步（作为约束性 SSOT），还是允许“实现+docs”为先，spec 慢补？
+   - 建议默认：对关键边界（安全/执行确定性/输出契约）要求 spec 同步；其余允许滞后但必须明确标注，避免口径冲突。
+> 你的策略：不要求硬同步；必要时可以从具体实现反向重写 spec。
+
+---
+
+## 13. 决策记录与下一步预研方向（基于你的反馈）
+
+> 这节把你对第 12 节的反馈固化成“决策记录 + 可执行的预研拆解”，用于指导后续真正的重构切片。
+
+### 13.1 outputs.aggregate：能力必须有；短期以“schema 一致性 + LSP 友好”治理膨胀（不做大 YAML 改造）
+
+你最新反馈的关键点：
+
+- `outputs` 中出现 `fields` 概念本身可以接受；你更担心的是 **schema 设计整体不一致**（导致 LSP 校验/补全与认知边界不稳定）。
+- 希望尽可能靠 **YAML LSP + JSON Schema** 完成校验与补全（减少 internal validator 的“第二套规则”）。
+- `aggregate` 继续保持“聚合函数名作为 key”的 producer 形态（便于定向补全参数），不希望改成泛化 `kind:` 风格。
+- 当前阶段不推进大的 YAML 结构性重设计（先把现有 surface 收敛到可控、可维护）。
+
+基于仓库现状的佐证：
+
+- schema 复杂度贡献最大的是 `definitions.output_aggregate`（结构复杂度与膨胀风险最高的区域）。
+- outputs 相关 parsing/runtime 体量很高（`parsers/outputs.py`、`output_composition_yaml.py`），任何新增分支都会放大漂移成本。
+
+可执行的预研拆解（不改 YAML 结构的前提）：
+
+1) **把 `definitions.output_aggregate` 当作首要治理对象**：按 “core stable producers / advanced escape hatches” 分层（保持函数-key），并在 schema hover/docs/editor 层做展示分级（默认展示 core）。
+2) **统一 outputs 的 schema 一致性**（尽量让 LSP 自己能判别）：
+   - 对 union 的分支做“可预测判别”（required keys / oneOf 分层），避免同一位置出现多个近似形态导致补全噪声。
+   - 把 min/max/enum/required/default/examples 写进 schema；把 validator-only 约束标注清楚（语义层/运行时层）。
+3) **把 LSP 体验当作验收项**：对 `outputs[*].aggregate.fields.<out_field_id>` 等典型位置做补全回归，确保新增 producer 不会把补全打爆。
+4) **示例覆盖补齐**：在 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/` 补齐至少 1 个“高级口子”示例（`call_by/compute` 等），并确保 `just examples` 对拍通过。
+
+> 停车场：如果未来证实仅靠 schema 分层仍不足以治理（或 GUI 成为刚需），再考虑把聚合/派生能力从 outputs 中进一步解耦（见第 14 节候选）。
+
+### 13.2 workflow.options：你说的“并行池子”控制面在这里（优先梳理语义与 schema）
+
+你给出的关键信号：
+
+- 你主要指的是 `workflow.options` 里的调度/失败/ctx/cache_pool 这块控制面（`max_concurrency/failure_policy/ctx/cache_pool/...`），而不是 demand 内部执行的 `parallel_mode/max_workers`。
+- 你当前“不理解、无法掌控”的一部分来源，是 options 参数缺少统一语义说明与示例覆盖（尤其在 marimo demo 中未完整展示）。
+
+可执行的预研拆解（不改 YAML 结构的前提）：
+
+1) **为 `workflow.options` 做“参数字典”**：每个参数写清：默认值、取值边界、对调度/资源/失败的具体影响、以及与 demand 内部并发参数的关系与优先级。
+2) **workflow schema-only 的现实约束**：workflow YAML 目前没有 internal validator，因此能写进 schema 的约束要尽量写满（enum/min/max/default/examples），把“跑起来才炸”的概率降到最低。
+3) **把 options 变成可对拍的示例套件**：在 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/` 增加一个专门的 workflow options 示例 YAML（或扩展现有 demo），覆盖：
+   - `max_concurrency`
+   - `failure_policy`
+   - `ctx`（`max_value_bytes/max_bytes`）
+   - `cache_pool`（`conflict_policy/release_policy/budget/over_budget_policy`）
+4) **中长期候选（停车场）**：若未来 workflow 节点类型继续扩张或需要 GUI，再评估 `workflow.nodes + kind discriminator` 等 v2 结构（见第 14 节），但不纳入当前阶段的默认路线图。
+
+### 13.3 OpenSpec：不要求硬同步，必要时可从实现反向重写 spec
+
+你给出的策略：
+
+- spec 不作为硬门禁；当 spec 与实现冲突时，优先以实现/文档为准。
+- 需要时可以从实现反向重写 spec（把 spec 当作“总结/沉淀”，而非每次变更的强约束入口）。
+
+### 13.4 Marimo：把 notebooks/marimo 作为 YAML DSL 能力 SSOT 与对拍门禁
+
+你提出的新约束：
+
+- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/` 的示例目前没有覆盖全部 YAML DSL 能力点。
+- 你希望 `notebooks/marimo/` 永远保留一份“合适的交互式笔记 + YAML DSL 全能力展示 + 对拍验证（集成测试）”，以后任何 DSL 调整都必须同步维护这里。
+
+落到可执行的治理规则（本文件先定口径）：
+
+- SSOT 套件：以 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/` 为核心，但允许按域拆分多个 YAML（避免单文件爆炸）；由 `demo_main.py`/`run_examples.py` 负责把它们串起来跑通。
+- 对拍门禁：任何 YAML DSL 变更必须保证 `just examples` 通过，并在 capability coverage matrix 中标注“新增/变化能力”的覆盖位置。
+- 覆盖矩阵：以 `demand.gen.json`/`workflow.gen.json` 为基准，维护 “schema key/definition → 覆盖 YAML 文件/章节/断言” 的映射（先手工，后续可考虑半自动生成）。
+
+当前已发现的覆盖缺口（初步，来自对 `by_yaml_dsl/` 的快速扫查）：
+
+- demand 顶层能力：`retry`、`guardrails`、`failure_policy`、`include_full_error_message` 尚未在 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/` 出现。
+- observability 子域：`viz`、`trace`、`row_gap`、`memory_opt` 尚未在 canonical demo 中覆盖（目前覆盖了 `performance` 与 `relations`）。
+
+---
+
+## 14. 中长期候选（停车场）：结构性重构想法（明确：当前不推进）
+
+> 你已明确：当前阶段不建议推进大的 YAML 结构性设计/重构；因此本节只做“候选记账”，不进入第 11 节的近期路线图。
+> 触发条件建议：当仅靠 schema 分层/hover/validator 已无法保持 LSP 体验，或 GUI/图形化成为刚需时，再回到这里选型。
+
+### 14.1 术语与文案（先在 docs/hover 统一，不强制改 YAML key）
+
+- **field_id**：demand 行上下文字段（`main_source.fields` / `sources.*.fields` / 顶层派生 `fields`）。
+- **out_field_id / column**：输出层列（outputs/workflow 产物的“列”）。文档/hover 可以优先用 column 说法来降低歧义，但 YAML key 不必立即改名。
+- **metric**：聚合输出中的指标列（属于输出列的一种来源/角色）。
+
+短期目标：
+
+- 不强行消灭 `outputs.*.fields`；而是让 schema-reference/hover 明确区分 `field_id` vs `out_field_id`，并保证 LSP 补全与错误提示一致。
+- 如果未来确认“同名 key 类型重载”确实伤害 LSP，再进入 14.2 选择是否引入 discriminator 或更名。
+
+### 14.2 outputs 的结构性候选（仅在需要时考虑）
+
+#### 草案 A：引入显式 discriminator（最小结构性调整，优先为 LSP 判别服务）
+
+核心变化（概念层面）：
+
+- 增加 `outputs[*].kind: detail|aggregate|...` 作为显式 discriminator，降低 `oneOf` 分支靠“猜 required keys”的不确定性。
+- 不强制更名 `fields`：让不同 kind 下的 `fields` 形态固定（detail: list；aggregate: mapping），并继续保持 producer 为“聚合函数名作为 key”。
+
+示例（仅示意）：
+
+```yaml
+outputs:
+  - name: detail
+    kind: detail
+    container: {type: csv, path: ./out/detail.csv}
+    fields: [order_id, user_id, amount]
+
+  - name: summary
+    kind: aggregate
+    container: {type: csv, path: ./out/summary.csv}
+    where: "channel == 'direct'"
+    aggregate:
+      group_by: [channel]
+      fields:
+        order_cnt: {count: {}}
+        sum_amount: {sum: {field: amount}}
+    layout: [channel, order_cnt, sum_amount]
+```
+
+优点：
+
+- 对 YAML LSP/编辑器 union 判别最直接；对 schema 的可维护性也更好（分支更清晰）。
+- 不要求立即改名 `fields`，迁移成本更可控。
+
+缺点：
+
+- 仍是结构性变更（需要 upgrades + 示例套件全量升级 + `just examples` 对拍门禁保障）。
+
+#### 草案 B：把聚合/派生输出提升为顶层域（更清晰，但迁移更大）
+
+核心变化（概念层面）：
+
+- 新增顶层 `derived_outputs`（或 `aggregations`）映射：专门定义聚合/排名/后置派生产物（输出层字段/列定义）。
+- `outputs[*]` 只负责容器/路由/启用/布局，并通过 ref 引用某个 derived_output。
+
+示例（仅示意）：
+
+```yaml
+derived_outputs:
+  summary_direct:
+    kind: aggregate
+    where: "channel == 'direct'"
+    group_by: [channel]
+    fields:
+      order_cnt: {count: {}}
+      sum_amount: {sum: {field: amount}}
+
+outputs:
+  - name: detail
+    kind: detail
+    container: {type: csv, path: ./out/detail.csv}
+    fields: [order_id, user_id, amount]
+
+  - name: summary
+    kind: derived
+    ref: summary_direct
+    container: {type: csv, path: ./out/summary.csv}
+    layout: [channel, order_cnt, sum_amount]
+```
+
+优点：
+
+- outputs 域更“薄”，聚合能力作为第一类域更清晰，也更利于复用与 GUI/图形化。
+- derived_outputs 可承接更多派生能力，而不继续把 outputs 变成万能容器。
+
+缺点：
+
+- 引入跨引用（ref），错误定位与 LSP 提示必须更强，否则用户体验可能下降。
+- 迁移幅度更大，对示例套件与升级文档要求更高。
+
+### 14.3 workflow 的结构性候选（仅在需要 GUI/扩展时考虑）
+
+当前阻碍（总结）：
+
+- `writes` 采用“单键 intent object” + `oneOf`，扩展成本高、GUI 难表达。
+- 写入意图语义上是 DAG node，但语法上嵌套在 run 内。
+
+候选方向（概念层面）：
+
+1) 将 `runs` 与 `writes` 收敛为 **workflow.nodes**（DAG 第一类节点）
+2) 节点使用显式 `kind` discriminator（如 `demand` / `write_sheet` / `append_sheet` / ...）
+3) 将调度器/并行池（若确实要扩展）收敛成 `workflow.options.scheduler` 的可扩展结构，并允许 Python overrides 覆盖
+
+示例（仅示意）：
+
+```yaml
+workflow:
+  nodes:
+    - id: orders
+      kind: demand
+      demand: ./orders.yaml
+
+    - id: write_detail
+      kind: write_sheet
+      depends_on: [orders]
+      input: {node: orders, output: detail}
+      to: {resource_type: sheetbook, resource_id: report, sheet: Detail, on_conflict: error}
+
+  options:
+    scheduler: {kind: thread_pool, max_concurrency: 4}
+    failure_policy: primary_only
+    cache_pool: ...
+    ctx: ...
+
+  resources:
+    sheetbooks:
+      report: {budget: {max_sheets: 16, max_total_cells: 2000000}, export_xlsx: {path: ./out/report.xlsx}}
+```
+
+备注（与现状契约对齐点）：
+
+- 现状 writes 仅支持消费 CSV 输出（runtime 明确 fail-fast）；若做 v2，需要把这个限制写成明确的 schema hover + 语义错误提示，并为未来扩展（workbook/arrow/parquet）预留 kind 分支。
