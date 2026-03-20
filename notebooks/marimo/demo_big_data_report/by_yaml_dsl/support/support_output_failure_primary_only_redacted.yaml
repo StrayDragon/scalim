@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+imports:
+  frag: support_output_failure_fragments.yaml
+
+$import: [frag.base_main, frag.base_outputs]
+
+name: demo_big_data_report_support_output_failure_primary_only_redacted
+description: |
+  客服报表: “主输出必须成功,其它输出失败不阻断”(primary_only) + 错误信息默认脱敏.
+
+  场景:
+  - 主输出: detail CSV (给业务/运营同学看)
+  - 次输出: debug workbook (给工程同学排查)
+
+  诉求:
+  - debug workbook 偶尔写失败时,主输出依然要落盘
+  - 默认不要把完整错误信息写到产物中(可能包含敏感路径/参数)
+
+failure_policy: primary_only
+include_full_error_message: false

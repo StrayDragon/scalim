@@ -4,17 +4,16 @@ import importlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
-
 
 _CHAPTER_FILE_RE = re.compile(r"^(?:\d+_)?([a-z][a-z0-9_]+)\.py$")
 
 
 def _discover_chapter_modules() -> List[Tuple[str, str]]:
     chapters_dir = Path(__file__).resolve().parent
-    found: List[Tuple[str, str, str]] = []
+    found: List[Tuple[str, str]] = []
     for path in chapters_dir.iterdir():
         if not path.is_file():
             continue
@@ -24,30 +23,18 @@ def _discover_chapter_modules() -> List[Tuple[str, str]]:
         if not match:
             continue
         chapter_id = match.group(1)
-        module_name = "notebooks.marimo.demo_big_data_report.chapters.{}".format(path.stem)
-        found.append((path.name, chapter_id, module_name))
-    found.sort(key=lambda item: item[0])
-
-    chapters: List[Tuple[str, str]] = []
-    seen: Set[str] = set()
-    for _filename, chapter_id, module_name in found:
-        if chapter_id in seen:
-            msg = "Duplicate chapter_id discovered: {}".format(chapter_id)
-            raise ValueError(msg)
-        seen.add(chapter_id)
-        chapters.append((chapter_id, module_name))
-    return chapters
+        module_name = "notebooks.marimo.example_public_api_suite.chapters.{}".format(path.stem)
+        found.append((chapter_id, module_name))
+    return sorted(found, key=lambda item: item[0])
 
 
 _CHAPTERS = _discover_chapter_modules()
 _CHAPTER_MODULES_BY_ID: Dict[str, str] = dict(_CHAPTERS)
+_ALL_CHAPTER_IDS = [chapter_id for chapter_id, _module_name in _CHAPTERS]
 
 
 def all_chapter_ids() -> List[str]:
     return list(_ALL_CHAPTER_IDS)
-
-
-_ALL_CHAPTER_IDS = [chapter_id for chapter_id, _module_name in _CHAPTERS]
 
 
 @dataclass(frozen=True)
@@ -71,7 +58,7 @@ def _load_case(chapter_id: str) -> _Case:
 
 
 def _safe_run(case: _Case) -> ExampleResult:
-    example_id = f"demo_big_data_report/{case.chapter_id}"
+    example_id = "example_public_api_suite/{}".format(case.chapter_id)
     try:
         result = case.run()
     except Exception as exc:  # noqa: BLE001
@@ -110,13 +97,6 @@ def run_all_chapters(*, slow_ok: bool = False) -> List[ExampleResult]:
 
 def iter_chapters() -> Iterable[str]:
     return tuple(_ALL_CHAPTER_IDS)
-
-
-def get_chapter_module_name(chapter_id: str) -> str:
-    if chapter_id not in _ALL_CHAPTER_IDS:
-        msg = "unknown chapter_id: {}".format(chapter_id)
-        raise KeyError(msg)
-    return _CHAPTER_MODULES_BY_ID[chapter_id]
 
 
 def find_first_failure(results: Sequence[ExampleResult]) -> Optional[ExampleResult]:

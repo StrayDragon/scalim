@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: support_sla_report
+description: |
+  背景(假设): 客服负责人希望每天能回答两类问题：
+  1) 每个客服团队当天处理了多少工单？SLA（60 分钟内解决）超时有多少？
+  2) 明细里哪些工单没有正确分配到客服（agent_id 为空/缺失）——希望能在回归里稳定暴露出来。
+
+  方案: 用 Scalim YAML DSL 描述 “tickets 主表 + customers/agents 维表” 的关联与指标：
+  - guardrails: 开启运行期护栏（quiet 模式），让“缺字段/空 key”以可观测错误事件形式出现，但不阻断主流程
+  - observability.row_gap: 统计维表加载的缺口（预期 keys vs 实际返回）
+  - outputs: 明细 + 聚合指标（where 过滤掉 agent_team 为空的行参与聚合）
+
+  对拍(oracle):
+  - CSV 输出对拍：`scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:verify_support_outputs_csv_rows`
+  - row_gap 口径：`scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:expected_support_row_gap_totals`
+  - guardrail codes：`scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:expected_support_guardrail_codes`
+
+batch_size: null
+
+guardrails:
+  enabled: true
+  mode: quiet
+  loader:
+    validate_result: true
+    on_transform_error: quiet
+    required_fields:
+      - &ticket_id {name: Ticket ID}
+      - customer_id
+      - agent_id
+  relations:
+    null_key_max_rate: 0
+
+observability:
+  row_gap:
+    enabled: true
+    primary_loader_name: tickets
+    data_loader_names: [customers, agents]
+    sample_limit: 3
+
+_templates:
+  csv_container_detail: &csv_container_detail
+    type: csv
+    path: {$init_var: out_path_detail}
+    header_fields_output_by: field_id
+    include_header: true
+    streaming: true
+    encoding: utf-8
+
+main_source:
+  source_id: tickets
+  loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_tickets"
+  order_by: [ticket_id]
+  fields:
+    ticket_id: *ticket_id
+    customer_id: {name: Customer ID}
+    agent_id: {name: Agent ID}
+    category: {name: Category}
+    priority: {name: Priority}
+    first_response_minutes: {name: First Response Minutes, value_cast: int}
+    resolve_minutes: &resolve_minutes {name: Resolve Minutes, value_cast: int}
+    csat: {name: CSAT, value_cast: int}
+
+relations:
+  tickets_to_customers:
+    steps:
+      - from: tickets.customer_id
+        to: customers.customer_id
+
+  tickets_to_agents:
+    steps:
+      - from: tickets.agent_id
+        to: agents.agent_id
+
+sources:
+  customers:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_customers"
+    key: customer_id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      customer_segment: {name: Customer Segment, relation: tickets_to_customers}
+
+  agents:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_agents"
+    key: agent_id
+    params:
+      ids: {$keys: {as: list}}
+    fields:
+      agent_team: &agent_team {name: Agent Team, relation: tickets_to_agents}
+
+fields:
+  is_sla_breach:
+    name: SLA Breach (>= 60m)
+    compute: "resolve_minutes >= 60"
+
+outputs:
+  - name: detail
+    container: *csv_container_detail
+    fields:
+      - *ticket_id
+      - customer_id
+      - agent_id
+      - category
+      - priority
+      - first_response_minutes
+      - *resolve_minutes
+      - csat
+      - customer_segment
+      - *agent_team
+      - is_sla_breach
+
+  - name: metrics_by_team
+    where: "agent_team"
+    container:
+      type: csv
+      path: {$init_var: out_path_metrics}
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+      encoding: utf-8
+    aggregate:
+      group_by:
+        - *agent_team
+      fields:
+        ticket_cnt: {count: {}}
+        sla_breach_cnt: {count_true_gte: {field: *resolve_minutes, threshold: 60}}
+        sum_resolve_minutes: {sum: {field: *resolve_minutes}}
+        avg_resolve_minutes: {compute: "Decimal(sum_resolve_minutes) / Decimal(ticket_cnt) if ticket_cnt else Decimal('0')"}
+    fields:
+      - *agent_team
+      - ticket_cnt
+      - sla_breach_cnt
+      - avg_resolve_minutes
+

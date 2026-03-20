@@ -13,6 +13,7 @@ from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_i
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
+_EXAMPLE_ID = "example_public_api_suite/ch180_public_api_hooks_events"
 
 
 @dataclass
@@ -105,7 +106,7 @@ def run_public_api_hooks_events() -> ExampleResult:
         "rows": rows,
     }
     return ExampleResult(
-        example_id="demo_big_data_report/ch180_public_api_hooks_events",
+        example_id=_EXAMPLE_ID,
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -121,13 +122,13 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / ch180_public_api_hooks_events
+        # example_public_api_suite / ch180_public_api_hooks_events
 
         本章目标:
         - 演示扩展点: hook / observer / events / components 注入
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch180_public_api_hooks_events.py::run_public_api_hooks_events`
+        - `notebooks/marimo/example_public_api_suite/chapters/ch180_public_api_hooks_events.py::run_public_api_hooks_events`
 
         Gate:
         - `just examples`

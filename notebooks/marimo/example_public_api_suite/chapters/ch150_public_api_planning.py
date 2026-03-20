@@ -13,6 +13,7 @@ from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_i
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
+_EXAMPLE_ID = "example_public_api_suite/ch150_public_api_planning"
 
 _COVERED_PUBLIC_ALL = {
     "ComputeOperatorIr",
@@ -31,7 +32,7 @@ def run_public_api_planning() -> ExampleResult:
     coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
     if not coverage.ok:
         return ExampleResult(
-            example_id="demo_big_data_report/ch150_public_api_planning",
+            example_id=_EXAMPLE_ID,
             passed=False,
             kind=EXAMPLE_KIND_ORACLE,
             summary=coverage_failure_summary(coverage),
@@ -51,7 +52,7 @@ def run_public_api_planning() -> ExampleResult:
         "symbols_count": len(symbols),
     }
     return ExampleResult(
-        example_id="demo_big_data_report/ch150_public_api_planning",
+        example_id=_EXAMPLE_ID,
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
         summary=summary,
@@ -67,14 +68,14 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / ch150_public_api_planning
+        # example_public_api_suite / ch150_public_api_planning
 
         本章目标:
         - 覆盖 `scalim.planning.__all__` 的最小可运行示例
         - 演示 `PlanBuilder.build(...)` 的最小闭环
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch150_public_api_planning.py::run_public_api_planning`
+        - `notebooks/marimo/example_public_api_suite/chapters/ch150_public_api_planning.py::run_public_api_planning`
 
         Gate:
         - `just examples`

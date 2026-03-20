@@ -1,0 +1,35 @@
+# NOTE:
+# This file is intended to be imported by `support_output_failure_*.yaml` via `imports/$import`.
+# Keep it in the same directory to satisfy V1 path constraints (same-directory fragments only).
+
+base_main:
+  batch_size: 2
+
+  main_source:
+    source_id: tickets
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_tickets"
+    fields:
+      ticket_id: {extract: ticket_id, name: 工单ID}
+      priority: {extract: priority, name: 优先级}
+      resolve_minutes: {extract: resolve_minutes, name: 解决耗时(分钟)}
+
+base_outputs:
+  outputs:
+    - name: detail
+      container:
+        type: csv
+        path: {$init_var: out_path_detail}
+        header_fields_output_by: field_id
+        include_header: true
+        streaming: true
+      fields: [ticket_id, priority, resolve_minutes]
+
+    # 故意作为“非主输出”来演示 `failure_policy` + `include_full_error_message`.
+    # 运行时,我们会把 `out_path_secondary_workbook` 传成一个 *目录* 来触发可预期失败.
+    - name: secondary_debug_workbook
+      container:
+        type: workbook
+        path: {$init_var: out_path_secondary_workbook}
+        allow_formulas: false
+        write_lock: false
+      fields: [ticket_id, priority, resolve_minutes]

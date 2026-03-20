@@ -1,0 +1,95 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/workflow.gen.json
+
+workflow:
+  resources:
+    workbooks:
+      shared_report:
+        path: ./shared_report.xlsx
+
+    sheetbooks:
+      sheetbook_report:
+        budget:
+          max_sheets: 6
+          max_total_cells: 200000
+        export_xlsx:
+          path: ./sheetbook_report.xlsx
+          write_lock: true
+
+    csvs:
+      detail:
+        path: ./detail.csv
+
+  runs:
+    - id: detail_a
+      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_detail_demand.yaml"
+      writes:
+        - csv_append:
+            csv: detail
+            output: detail
+            header_policy: once
+            on_mismatch: error
+
+        - workbook_sheet:
+            workbook: shared_report
+            sheet: Detail
+            output: detail
+            on_conflict: error
+
+        - workbook_append:
+            workbook: shared_report
+            sheet: DetailAppend
+            output: detail
+            align_by: header
+            header_policy: once
+            on_mismatch: error
+
+        - sheetbook_sheet:
+            sheetbook: sheetbook_report
+            sheet: Detail
+            output: detail
+            on_conflict: error
+
+        - sheetbook_append:
+            sheetbook: sheetbook_report
+            sheet: DetailAppend
+            output: detail
+            align_by: header
+            header_policy: once
+            on_mismatch: error
+
+    - id: detail_b
+      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_detail_demand.yaml"
+      depends_on: [detail_a]
+      writes:
+        - csv_append:
+            csv: detail
+            output: detail
+            header_policy: once
+            on_mismatch: error
+
+        - workbook_append:
+            workbook: shared_report
+            sheet: DetailAppend
+            output: detail
+            align_by: header
+            header_policy: once
+            on_mismatch: error
+
+        - sheetbook_append:
+            sheetbook: sheetbook_report
+            sheet: DetailAppend
+            output: detail
+            align_by: header
+            header_policy: once
+            on_mismatch: error
+
+  options:
+    max_concurrency: 2
+    failure_policy: all_fail
+    cache_pool:
+      conflict_policy: error
+      release_policy: dag_refcount
+      budget:
+        max_entries: 16
+        over_budget_policy: fail_fast
+

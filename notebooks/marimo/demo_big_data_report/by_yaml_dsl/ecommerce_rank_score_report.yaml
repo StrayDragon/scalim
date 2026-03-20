@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: ecommerce_rank_score_report
+description: |
+  背景(假设): 运营负责人在做“大促复盘”时,经常会追问：
+  - 每个区域(仓库覆盖区域)里,成交额最高的分类是哪些？（Top2/Top5）
+  - 我不想只看排名,还想要一个“积分”方便做后续加权（例如: 第一名 100 分,第二名 97 分...）
+
+  约束:
+  - 我们没有现成数仓 SQL,工程同学希望“只改 YAML 就能回归口径”,并且在 CI 里确定性对拍。
+
+  方案: 用 `aggregate` + 排名字段 + `score_by_rank` 把口径写进 YAML:
+  - `dense_rank`: 并列同分并列名次(1,1,2...)
+  - `row_number`: 连续序号(1..N),常用于强制 “TopK 固定行数”(top_k_mode=rows)
+  - `score_by_rank`: 基于名次生成积分(score = base - (rank - 1) * step)
+
+  对拍(oracle):
+  - 纯 Python 真值: `scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle:build_expected_rows_top2_by_region`
+  - 断言: CSV 输出逐行对拍(稳定排序后比较)
+
+batch_size: 10
+
+main_source:
+  source_id: orders
+  loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
+  fields:
+    # 显式声明 `source` 的示例: 当字段被 fragments 复用时,可用来防止“拿错 source”的配置漂移。
+    region_id: {extract: region_id, name: 区域ID, source: orders}
+    product_category_id: {extract: product_category_id, name: 分类ID, source: orders}
+    quantity: {extract: quantity, name: 数量, value_cast: int, source: orders}
+    unit_price: {extract: unit_price, name: 单价, source: orders}
+    discount_rate: {extract: discount_rate, name: 折扣率, source: orders}
+
+fields:
+  final_amount:
+    name: 实付金额
+    compute: "quantity * unit_price * discount_rate"
+
+outputs:
+  - name: top2_by_region_category
+    container:
+      type: csv
+      path: {$init_var: out_path_rank}
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+      encoding: utf-8
+    aggregate:
+      group_by: [region_id, product_category_id]
+      fields:
+        order_cnt: {count: {}}
+        sum_final_amount: {sum: {field: final_amount}}
+
+        # 并列排名: (1,1,2...) —— 用于 `score_by_rank` 口径。
+        rank:
+          dense_rank:
+            by: sum_final_amount
+            partition_by: [region_id]
+            order: desc
+            # 注意: 当前实现对 `order_by` 使用统一方向(`order`),因此这里 product_category_id 也是 `desc`。
+            order_by: [sum_final_amount, product_category_id]
+
+        # 连续序号: (1..N) —— 用于“强制 Top2 固定两行”(top_k_mode=rows)。
+        row_no:
+          row_number:
+            by: sum_final_amount
+            partition_by: [region_id]
+            order: desc
+            order_by: [sum_final_amount, product_category_id]
+            top_k: 2
+            top_k_mode: rows
+
+        # 积分: 100,97,94... (按 rank 衰减)
+        score:
+          score_by_rank:
+            rank_field: rank
+            base: 100
+            step: 3

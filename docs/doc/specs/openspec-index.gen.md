@@ -216,6 +216,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-observability-bridge/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
 
+### `workflow-replay-bundle`
+- Title: workflow-replay-bundle Specification
+- Source: [spec.md](#code=openspec/specs/workflow-replay-bundle/spec.md)
+- Summary: TBD - created by archiving change c10-workflow-viz-linked-replay. Update Purpose after archive.
+
 ### `workflow-shared-output-containers`
 - Title: workflow-shared-output-containers Specification
 - Source: [spec.md](#code=openspec/specs/workflow-shared-output-containers/spec.md)

@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: support_guardrails_compute_on_error
+description: |
+  背景(假设): 客服负责人希望在报表里加一个“风险分(risky_score)”字段,用于快速筛出异常工单。
+
+  现实中,派生字段的 `compute` 经常会踩到两类坑：
+  - 上游字段偶发为 0 / 空 / 类型不对（例如: 分母为 0）
+  - 规则迭代中引入了新分支,遗漏了边界处理
+
+  需求方提问:
+  - 我能不能在不改 Python 的情况下,把 compute 的异常变成 **可回归信号**,同时主流程不中断？
+
+  方案:
+  - 开启 `guardrails.enabled`
+  - 全局 `guardrails.mode=fast_fail` 保持严格
+  - 单独把 `guardrails.compute.on_error=quiet` 放宽: compute 失败时写 `None` 并记录 guardrail 事件
+
+  对拍(oracle):
+  - 断言: 输出行数仍为 5; 且 ticket_id=1001 的 risky_score 为空(除零触发 compute_error)
+  - 断言: guardrail codes 包含 `compute_error`
+
+batch_size: 2
+
+guardrails:
+  enabled: true
+  mode: fast_fail
+  compute:
+    on_error: quiet
+
+main_source:
+  source_id: tickets
+  loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_tickets"
+  fields:
+    ticket_id: {extract: ticket_id, name: 工单ID, value_cast: int}
+
+fields:
+  risky_score:
+    name: 风险分(示例)
+    # ticket_id=1001 时分母为 0 -> 触发 compute_error; 由 `guardrails.compute.on_error=quiet` 兜底为 None
+    # 这里用 `call_by` 触发一个明确的 `ZeroDivisionError`,避免把异常包成难读的表达式错误。
+    call_by: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:calc_risky_score(ticket_id=ticket_id)"
+
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: {$init_var: out_path_detail}
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+      encoding: utf-8
+    fields: [ticket_id, risky_score]

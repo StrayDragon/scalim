@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+imports:
+  frag: support_output_failure_fragments.yaml
+
+$import: [frag.base_main, frag.base_outputs]
+
+name: demo_big_data_report_support_output_failure_primary_only_full
+description: |
+  客服报表: “主输出必须成功,其它输出失败不阻断”(primary_only) + 错误信息包含全文.
+
+  典型场景:
+  - 内部 CI/集成环境: 我们希望把完整错误信息留在 meta/audit/统计中,方便快速定位
+  - 生产环境: 通常保持默认脱敏,避免敏感信息落盘
+
+failure_policy: primary_only
+include_full_error_message: true

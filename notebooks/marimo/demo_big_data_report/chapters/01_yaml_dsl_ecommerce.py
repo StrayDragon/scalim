@@ -20,6 +20,7 @@ from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
+_EXAMPLE_ID = "demo_big_data_report/yaml_dsl_ecommerce"
 
 
 def _extract_verifiable_fields(rows: Sequence[RowData]) -> List[str]:
@@ -29,7 +30,7 @@ def _extract_verifiable_fields(rows: Sequence[RowData]) -> List[str]:
     return [field for field in TARGET_FIELDS_FULL if field in keys]
 
 
-def run_yaml_dsl(
+def run_yaml_dsl_ecommerce(
     cfg: Optional[ECommerceConfig] = None,
     *,
     yaml_path: Optional[Path] = None,
@@ -55,7 +56,7 @@ def run_yaml_dsl(
         except ConfigValidationError as exc:
             summary = "ConfigValidator failed: {}".format(exc)
             return ExampleResult(
-                example_id="demo_big_data_report/ch020_yaml_dsl",
+                example_id=_EXAMPLE_ID,
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary=summary,
@@ -64,7 +65,7 @@ def run_yaml_dsl(
 
         demand_config = YamlDemandLoader().load(str(yaml_path))
 
-        # 2) `compile`: 确保能生成 `IR`/`request`
+        # 2) `compile`: 生成编译产物(执行请求等),供下游运行入口复用
         compilation = compile_yaml(
             str(yaml_path),
             allowed_modules=allowed_modules,
@@ -85,7 +86,7 @@ def run_yaml_dsl(
         rows = sink.get_data()
         if not rows:
             return ExampleResult(
-                example_id="demo_big_data_report/ch020_yaml_dsl",
+                example_id=_EXAMPLE_ID,
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary="YAML run produced no rows",
@@ -123,7 +124,7 @@ def run_yaml_dsl(
             "rows_match_failures": mismatch,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/ch020_yaml_dsl",
+            example_id=_EXAMPLE_ID,
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -134,24 +135,37 @@ def run_yaml_dsl(
 
 
 def run_chapter() -> ExampleResult:
-    return run_yaml_dsl()
+    return run_yaml_dsl_ecommerce()
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / ch020_yaml_dsl
+        # demo_big_data_report / yaml_dsl_ecommerce
 
-        本章目标:
-        - 演示 canonical YAML 的加载/编译/执行闭环(含对拍)
-        - 作为 YAML DSL 语义回归的可交互入口
+        ## 背景
+
+        假设我们在做电商订单报表：订单主表 + 多张维表（客户/产品/促销/支付/物流/仓库/区域/区域定价）。
+
+        ## 需求方提问（自然语言）
+
+        运营同学：能不能每天给我一份 Excel，既有订单明细，也有按区域/品类的汇总 Top 榜？
+
+        ## 方案选择（取舍）
+
+        - 纯 Python 脚本：快，但复用/审计/编辑器提示差，容易 drift
+        - SQL：依赖数仓与口径治理，落地成本高
+        - **YAML DSL（本章）**：把“需求→配置→可回归对拍”收敛到一个可校验的需求文件
+
+        ## 对拍点（deterministic）
+
+        - YAML SSOT：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
+        - oracle：`scalim_misc.demo_big_data_report.verification.verify_scalim_output`
+        - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch020_yaml_dsl.py::run_yaml_dsl`
-
-        Gate:
-        - `just examples`（跑全量）
+        - `notebooks/marimo/demo_big_data_report/chapters/01_yaml_dsl_ecommerce.py::run_yaml_dsl_ecommerce`
         """
     )
     return
@@ -192,7 +206,7 @@ def _(mo, yaml_path):
 @app.cell
 def _(yaml_path):
     cfg = build_test_config_small()
-    result = run_yaml_dsl(cfg, yaml_path=yaml_path)
+    result = run_yaml_dsl_ecommerce(cfg, yaml_path=yaml_path)
     return cfg, result
 
 

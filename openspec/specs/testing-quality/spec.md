@@ -231,7 +231,7 @@
 - **THEN** `py36-typingext-check` MUST 失败
 
 ### Requirement: 稳定公开入口模块 `__all__` 必须被 examples gate 100% 覆盖
-系统 MUST 将以下稳定公开入口模块的 `__all__` 视为“面向框架用户的公开 API 覆盖清单”，并在 `notebooks/marimo/demo_big_data_report/chapters/` 的主线章节中提供 deterministic 的最小可运行示例以覆盖其全部导出符号：
+系统 MUST 将以下稳定公开入口模块的 `__all__` 视为“面向框架用户的公开 API 覆盖清单”，并在 `notebooks/marimo/` 下的 **独立 public API suite** 中提供 deterministic 的最小可运行示例以覆盖其全部导出符号：
 
 - `scalim.dsl.by_yaml`
 - `scalim.spec.ir`
@@ -264,12 +264,13 @@
 ### Requirement: `just examples` 入口收敛为 `notebooks/marimo/run_examples.py`
 系统 MUST 将 `just examples` 的执行入口收敛为单一脚本 `notebooks/marimo/run_examples.py`,并使其覆盖:
 
-- `demo_big_data_report` 的示例/对拍（包含其集成的公开入口覆盖章节与扩展点演示）
+- `demo_big_data_report` 的示例/对拍（YAML DSL 主线教程 + 场景化回归）
+- public API suite 的示例/对拍（`__all__` 覆盖断言 + 扩展点演示）
 
-#### Scenario: `just examples` 统一入口覆盖主线示例
+#### Scenario: `just examples` 统一入口覆盖示例套件
 - **WHEN** 开发者运行 `just examples`
 - **THEN** 系统 MUST 执行 `notebooks/marimo/run_examples.py`
-- **AND** 该 runner MUST 覆盖 `demo_big_data_report` 的全部回归点
+- **AND** 该 runner MUST 覆盖上述示例套件的全部回归点
 
 ### Requirement: `demo_big_data_report` 覆盖 workflow YAML 的可运行对拍
 系统 MUST 在 `demo_big_data_report` 主线中提供至少一个 deterministic 的 workflow YAML 示例,并将其纳入 `just examples` 的对拍回归范围。
@@ -311,3 +312,4 @@
 - **THEN** MUST 存在 `notebooks/marimo/marimo_coverage.gen.md`
 - **AND** 运行 `just gen-marimo-coverage` MUST 能稳定生成相同内容
 - **AND** 运行 `just marimo-coverage-drift-check` MUST 在无漂移时返回 0
+

@@ -55,9 +55,15 @@ def _(mo):
         - `demo_big_data_report/`
           - hub: `notebooks/marimo/demo_big_data_report/demo_main.py`
           - chapters: `notebooks/marimo/demo_big_data_report/chapters/*.py`
+          - yaml fixtures: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/*.yaml`
+
+        - `example_public_api_suite/`
+          - hub: `notebooks/marimo/example_public_api_suite/demo_main.py`
+          - chapters: `notebooks/marimo/example_public_api_suite/chapters/*.py`
+          - 目标: `scalim.*.__all__` 覆盖断言 + 扩展点(hook/observer/events/components) 最小闭环
 
         说明:
-        - public API 覆盖章节已并入 `demo_big_data_report/chapters/`（以 `scalim.*.__all__` 做 100% 覆盖断言）
+        - 主线教学只保留“工程使用方写 YAML 的路径”；public API 覆盖/扩展点演示迁出为独立 suite，但仍纳入 `just examples`。
         """
     )
     return

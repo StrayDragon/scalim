@@ -1,0 +1,204 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: ads_campaign_report
+description: |
+  背景(假设): 增长同学需要一份“投放日报”，用于回答：
+  1) 每个 Campaign 的曝光/点击/转化/花费/ROI 是多少？
+  2) 想把点击明细单独拉出来给排查同学看（只看点击行）。
+
+  方案: 用 Scalim YAML DSL 定义可回归的 demand：
+  - main_source: impressions（曝光日志）
+  - sources: adgroups/campaigns/creatives/clicks/conversions/pricing（维表/事件表）
+  - outputs: 多输出（明细 + 点击明细 + 聚合指标），并用 `where`/`from` 复用
+  - retry: 对瞬态 loader 错误做确定性重试（示例: creatives loader 首次调用抛 transient error）
+
+  对拍(oracle):
+  - `scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:verify_ads_outputs_csv_rows`
+
+batch_size: 10
+
+retry:
+  enabled: true
+  should_retry: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:should_retry_ads_transient"
+  max_attempts: 2
+  max_elapsed_seconds: 2
+  backoff: fixed
+  base_delay_seconds: 0
+  max_delay_seconds: 0
+  jitter: false
+
+_templates:
+  csv_container_detail_all: &csv_container_detail_all
+    type: csv
+    path: {$init_var: out_path_detail_all}
+    header_fields_output_by: field_id
+    include_header: true
+    streaming: true
+    encoding: utf-8
+
+main_source:
+  source_id: impressions
+  loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:load_ads_impressions"
+  order_by: [impression_id]
+  fields:
+    impression_id: &impression_id {extract: imp_id, name: Impression ID}
+    ts: {name: Timestamp}
+    user_id: {name: User ID}
+    adgroup_id: &adgroup_id {name: AdGroup ID}
+    creative_id: &creative_id {name: Creative ID}
+    placement: &placement {name: Placement}
+    country: &country {name: Country}
+    cost_micros: {name: Cost Micros, value_cast: int}
+
+relations:
+  impressions_to_adgroups:
+    steps:
+      - from: impressions.adgroup_id
+        to: adgroups.adgroup_id
+
+  impressions_to_campaigns:
+    steps:
+      - from: impressions.adgroup_id
+        to: adgroups.adgroup_id
+      - from: adgroups.campaign_id
+        to: campaigns.campaign_id
+
+  impressions_to_creatives:
+    steps:
+      - from: impressions.creative_id
+        to: creatives.creative_id
+        lookup_cast:
+          name: int
+
+  impressions_to_clicks:
+    steps:
+      - from: impressions.impression_id
+        to: clicks.impression_id
+
+  impressions_to_conversions:
+    steps:
+      - from: impressions.impression_id
+        to: conversions.impression_id
+
+  impressions_to_pricing:
+    steps:
+      - from: [impressions.placement, impressions.country]
+        to: [pricing.placement, pricing.country]
+
+sources:
+  adgroups:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:load_ads_adgroups"
+    key: adgroup_id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      adgroup_name: &adgroup_name {name: AdGroup Name, relation: impressions_to_adgroups}
+      campaign_id:
+        name: Campaign ID (lookup)
+        extract: campaign_id
+        relation: impressions_to_adgroups
+
+  campaigns:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:load_ads_campaigns"
+    key: campaign_id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      campaign_name: &campaign_name {name: Campaign, relation: impressions_to_campaigns}
+      objective: {name: Objective, relation: impressions_to_campaigns}
+
+  creatives:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:load_ads_creatives"
+    key: creative_id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      creative_format: &creative_format {name: Creative Format, relation: impressions_to_creatives}
+      creative_size: {name: Creative Size, relation: impressions_to_creatives}
+
+  clicks:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:load_ads_clicks"
+    key: impression_id
+    params:
+      ids: {$keys: {as: list}}
+    fields:
+      click_id: {name: Click ID, relation: impressions_to_clicks}
+
+  conversions:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:load_ads_conversions"
+    key: impression_id
+    params:
+      ids: {$keys: {as: list}}
+    fields:
+      conversion_id: {name: Conversion ID, relation: impressions_to_conversions}
+      conversion_value: {name: Conversion Value USD, relation: impressions_to_conversions}
+
+  pricing:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:load_ads_pricing"
+    key: [placement, country]
+    cache_mode: preload_forever
+    fields:
+      cpm_multiplier: {name: CPM Multiplier, relation: impressions_to_pricing}
+
+fields:
+  is_click:
+    name: Is Click
+    compute: "click_id is not None"
+
+  is_conversion:
+    name: Is Conversion
+    compute: "conversion_id is not None"
+
+  cost_usd:
+    name: Cost USD
+    call_by: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:micros_to_usd(cost_micros=cost_micros)"
+
+  cost_usd_adjusted:
+    name: Cost USD (Adjusted)
+    compute: "cost_usd * cpm_multiplier if cpm_multiplier is not None else cost_usd"
+
+outputs:
+  - name: detail_all
+    container: *csv_container_detail_all
+    fields:
+      - *impression_id
+      - user_id
+      - *campaign_name
+      - *adgroup_name
+      - *creative_format
+      - *placement
+      - *country
+      - is_click
+      - is_conversion
+      - conversion_value
+      - cost_usd
+      - cost_usd_adjusted
+
+  - name: detail_clicks
+    from: detail_all
+    where: "is_click"
+    container:
+      <<: *csv_container_detail_all
+      path: {$init_var: out_path_detail_clicks}
+
+  - name: metrics_by_campaign
+    container:
+      type: csv
+      path: {$init_var: out_path_metrics_by_campaign}
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+      encoding: utf-8
+    aggregate:
+      group_by:
+        - *campaign_name
+      fields:
+        impression_cnt: {count: {}}
+        click_cnt: {count_true: {field: is_click}}
+        conversion_cnt: {count_true: {field: is_conversion}}
+        spend_usd: {sum: {field: cost_usd}}
+        revenue_usd: {sum: {field: conversion_value}}
+        ctr: {compute: "Decimal(click_cnt) / Decimal(impression_cnt) if impression_cnt else Decimal('0')"}
+        cvr: {compute: "Decimal(conversion_cnt) / Decimal(click_cnt) if click_cnt else Decimal('0')"}
+        roas: {compute: "Decimal(revenue_usd) / Decimal(spend_usd) if spend_usd else Decimal('0')"}
+

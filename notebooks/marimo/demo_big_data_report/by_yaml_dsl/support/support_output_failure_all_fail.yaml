@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+imports:
+  frag: support_output_failure_fragments.yaml
+
+$import: [frag.base_main, frag.base_outputs]
+
+name: demo_big_data_report_support_output_failure_all_fail
+description: |
+  客服报表: “任一输出失败即整体失败”(all_fail).
+
+  用途:
+  - 在强一致场景(例如财务对账/监管报送)中,任何输出失败都必须阻断.
+
+failure_policy: all_fail
+include_full_error_message: false

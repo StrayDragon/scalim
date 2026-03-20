@@ -10,32 +10,21 @@
 - `notebooks/marimo/demo_big_data_report/chapters/*.py` (每章 notebook; 教学入口 + SSOT 执行入口)
 - `notebooks/marimo/demo_big_data_report/chapters/registry.py` (章节 registry + runner/pytest 复用入口)
 - `notebooks/marimo/run_examples.py` (`just examples` 统一入口)
-
 ## Requirements
 ### Requirement: `demo_big_data_report` 提供章节化 Marimo notebooks
 系统 MUST 在 `notebooks/marimo/demo_big_data_report/` 下提供 `chapters/` 目录,并为主线 demo 的每个 SSOT 章节提供一份对应的 Marimo notebook.
 
-初始章节集合 MUST 至少覆盖以下 `chapter_id`:
-- `basics`
-- `yaml_dsl`
-- `workflow_yaml`
-- `sinks`
-- `memory_opt`
-- `observability`
-- `parallel_mode`
-- `diagnostics`
-- `guardrails`
-- `loader_retry`
-- `output_composition`
-- `derived_set_aggregations`
+主线章节 MUST 以 **YAML DSL 场景化**为主（面向工程使用方），并避免以 IR/Plan 等底层视角作为主线教学内容。
 
-并额外覆盖稳定公开入口模块的教学/回归章节(以其 `__all__` 为覆盖清单来源):
-- `public_api_dsl_by_yaml`
-- `public_api_spec_ir`
-- `public_api_planning`
-- `public_api_execution`
-- `public_api_ob`
-- `public_api_hooks_events`
+初始章节集合 MUST 至少覆盖以下 `chapter_id`:
+- `yaml_dsl_ecommerce`
+- `yaml_dsl_ads`
+- `yaml_dsl_support`
+- `workflow_yaml`
+- `workflow_demo_big_data_report`
+- `yaml_dsl_debugging`
+
+public API 覆盖章节（`__all__` 覆盖断言 + hooks/ob 扩展点）不再属于该主线章节集合，迁移为独立 suite 并仍纳入 examples gate（见对应规范）。
 
 章节 notebook 文件名 MUST 以 `<chapter_id>.py` 结尾,且 MAY 额外包含有序前缀(例如 `01_`),用于稳定排序与导航.
 
@@ -86,3 +75,4 @@
 #### Scenario: helper 可被 headless runner 导入
 - **WHEN** 在不导入 marimo 的 Python 进程中导入这些 helper 模块
 - **THEN** 导入成功且不触发 marimo 依赖
+

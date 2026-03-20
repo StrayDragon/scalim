@@ -9,6 +9,7 @@
 ## 1) 关键入口(SSOT)
 
 - marimo 教程入口(交互式): [`notebooks/marimo/demo_big_data_report/demo_main.py`](#code=notebooks/marimo/demo_big_data_report/demo_main.py)
+- public API 覆盖套件入口(交互式): [`notebooks/marimo/example_public_api_suite/demo_main.py`](#code=notebooks/marimo/example_public_api_suite/demo_main.py)
 - `just examples` 集成对拍入口(headless/CI): [`notebooks/marimo/run_examples.py`](#code=notebooks/marimo/run_examples.py)
 - YAML DSL canonical example(SSOT): [`notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`](#code=notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml)
 
@@ -16,9 +17,15 @@
 
 章节集合包含:
 
-- 主线 demo 章节（例如 `basics/yaml_dsl/...`）
-- public API 覆盖章节（`public_api_*`；对 `scalim.*.__all__` 做 fail-fast 覆盖断言）
-- 扩展点演示（例如 `public_api_hooks_events`：hook/observer/events/components 注入）
+- 主线 demo 章节（面向工程使用方写 YAML 的主路径）
+- YAML DSL fixtures（`by_yaml_dsl/` 下的可校验示例）
+
+另外，本仓库维护一套 **独立** 的 public API 覆盖套件：`notebooks/marimo/example_public_api_suite/`，用于：
+
+- 对稳定公开入口模块 `scalim.*.__all__` 做 fail-fast 覆盖断言
+- 演示扩展点（hook/observer/events/components 注入）
+
+该 suite 同样纳入 `just examples` 回归范围。
 
 ## 2) 怎么跑(推荐命令)
 
@@ -28,7 +35,7 @@
 just examples
 ```
 
-该入口会执行 `demo_big_data_report` 的章节级对拍，并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。
+该入口会执行 `demo_big_data_report` + `example_public_api_suite` 的章节级对拍，并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。
 
 ### 2.2 跑整套门禁(改动后验收)
 

@@ -1,8 +1,10 @@
 import marimo
 
+import csv
 import tempfile
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from scalim.dsl.by_yaml import run_workflow
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -15,10 +17,47 @@ from scalim_misc.demo_big_data_report.loaders import (
 )
 from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL
 from scalim_misc.demo_big_data_report.verification import VerificationResult, verify_scalim_output_csv
+from scalim_misc.examples.oracle import diff_first_mismatch, stable_sort_rows
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
+_EXAMPLE_ID = "demo_big_data_report/workflow_demo_big_data_report"
+
+
+def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if not row:
+                continue
+            rows.append({str(k): str(v) if v is not None else "" for k, v in row.items()})
+    return rows
+
+
+def _build_expected_metrics_rows(*, detail_rows: Sequence[Mapping[str, str]]) -> List[Dict[str, str]]:
+    by_region: Dict[str, Dict[str, Any]] = {}
+    for row in detail_rows:
+        region = str(row.get("region_name_display") or "")
+        acc = by_region.setdefault(region, {"region_name_display": region, "order_cnt": 0, "sum_order_amount": Decimal("0")})
+        acc["order_cnt"] = int(acc["order_cnt"]) + 1
+        try:
+            amount = Decimal(str(row.get("order_amount") or "0"))
+        except Exception:  # noqa: BLE001
+            amount = Decimal("0")
+        acc["sum_order_amount"] = acc["sum_order_amount"] + amount
+
+    rows: List[Dict[str, str]] = []
+    for region, acc in by_region.items():
+        rows.append(
+            {
+                "region_name_display": region,
+                "order_cnt": str(acc["order_cnt"]),
+                "sum_order_amount": str(acc["sum_order_amount"]),
+            }
+        )
+    return rows
 
 
 def run_workflow_demo_big_data_report(
@@ -64,7 +103,7 @@ def run_workflow_demo_big_data_report(
             except Exception as exc:  # noqa: BLE001
                 summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)
                 return ExampleResult(
-                    example_id="demo_big_data_report/ch031_workflow_demo_big_data_report",
+                    example_id=_EXAMPLE_ID,
                     passed=False,
                     kind=EXAMPLE_KIND_ORACLE,
                     summary=summary,
@@ -90,8 +129,20 @@ def run_workflow_demo_big_data_report(
                     summary="Missing detail.csv",
                 )
 
+            metrics_ok = False
+            metrics_summary = "missing metrics.csv"
+            if detail_csv.exists() and metrics_csv.exists():
+                detail_rows = _read_csv_rows(detail_csv)
+                actual_metrics = stable_sort_rows(_read_csv_rows(metrics_csv), by=("region_name_display",))
+                expected_metrics = stable_sort_rows(_build_expected_metrics_rows(detail_rows=detail_rows), by=("region_name_display",))
+                metrics_ok, metrics_summary = diff_first_mismatch(
+                    actual_metrics,
+                    expected_metrics,
+                    fields=("region_name_display", "order_cnt", "sum_order_amount"),
+                )
+
             artifacts_ok = bool(detail_csv.exists() and metrics_csv.exists() and report_xlsx.exists())
-            passed = bool(not errors and preload_calls == 1 and artifacts_ok and verification.passed)
+            passed = bool(not errors and preload_calls == 1 and artifacts_ok and verification.passed and metrics_ok)
 
             summary = "errors={} preload_calls={} artifacts_ok={} verify={}".format(
                 len(errors),
@@ -103,6 +154,8 @@ def run_workflow_demo_big_data_report(
                 summary = summary + "\nfirst_error: {} {}".format(errors[0].exc_type, errors[0].message)
             if not verification.passed:
                 summary = summary + "\n" + verification.summary
+            if not metrics_ok:
+                summary = summary + "\nmetrics: " + metrics_summary
 
             details: Dict[str, Any] = {
                 "output_dir": str(out_dir),
@@ -110,11 +163,12 @@ def run_workflow_demo_big_data_report(
                 "metrics_csv": str(metrics_csv),
                 "report_xlsx": str(report_xlsx),
                 "verification": verification,
+                "metrics": {"passed": metrics_ok, "summary": metrics_summary},
                 "errors": errors,
                 "outcomes": result.outcomes,
             }
             return ExampleResult(
-                example_id="demo_big_data_report/ch031_workflow_demo_big_data_report",
+                example_id=_EXAMPLE_ID,
                 passed=passed,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary=summary,
@@ -141,18 +195,33 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / ch031_workflow_demo_big_data_report
+        # demo_big_data_report / workflow_demo_big_data_report
 
-        本章目标:
-        - 构造一个更贴近真实使用的 workflow YAML demo(资源 + writes + cache_pool)
-        - 覆盖 `depends_on` + `$ctx` 注入 + workflow-managed temp outputs
-        - 提供**纯 Python 对照组**对拍入口(作为 `just examples` 的 oracle)
+        ## 背景
+
+        workflow fixture 能证明“能跑”，但真实使用通常还会涉及：
+        - resources（sheetbook/csv 等资源托管）
+        - writes（把上游 output 写入到资源）
+        - depends_on（显式 DAG）
+        - `$ctx` 注入（把上游 output_path 传给下游 demand）
+        - cache_pool（workflow-scope cache，共享 `preload_forever`）
+
+        ## 需求方提问（自然语言）
+
+        业务方：能给一个更像生产的 workflow demo 吗？我想在 PR 里改 YAML 后能稳定对拍。
+
+        ## 对拍点（deterministic）
+
+        - workflow YAML：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml`
+        - 断言：
+          - `depends_on` + `$ctx` 注入链路可跑通（detail → metrics）
+          - 产物存在：`detail.csv` / `metrics.csv` / `report.xlsx`
+          - `cache_pool` 生效：`preload_forever` 共享 loader 仅调用 1 次
+          - 明细 CSV 与纯 Python 对照组一致：`verify_scalim_output_csv`
+        - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch031_workflow_demo_big_data_report.py::run_workflow_demo_big_data_report`
-
-        Gate:
-        - `just examples`
+        - `notebooks/marimo/demo_big_data_report/chapters/05_workflow_demo_big_data_report.py::run_workflow_demo_big_data_report`
         """
     )
     return

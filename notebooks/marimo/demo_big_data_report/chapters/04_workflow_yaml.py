@@ -16,6 +16,7 @@ from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
+_EXAMPLE_ID = "demo_big_data_report/workflow_yaml"
 
 
 def run_workflow_yaml(
@@ -43,7 +44,7 @@ def run_workflow_yaml(
         except Exception as exc:  # noqa: BLE001
             summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)
             return ExampleResult(
-                example_id="demo_big_data_report/ch030_workflow_yaml",
+                example_id=_EXAMPLE_ID,
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary=summary,
@@ -66,7 +67,7 @@ def run_workflow_yaml(
             "outcomes": result.outcomes,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/ch030_workflow_yaml",
+            example_id=_EXAMPLE_ID,
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -84,17 +85,32 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / ch030_workflow_yaml
+        # demo_big_data_report / workflow_yaml
 
-        本章目标:
-        - 演示 workflow YAML 的可运行对拍入口(含 `cache_pool`)
-        - 为 workflow 场景提供可交互排障入口
+        ## 背景
+
+        假设我们已经有若干份 demand YAML（单份需求配置）。工程上经常需要把它们“编排起来”：
+        - 串行/并行跑多份 demand
+        - 控制最大并发
+        - 共享/复用 cache（例如 `preload_forever` 小表）
+
+        ## 需求方提问（自然语言）
+
+        平台同学：能不能给一个最小的 workflow YAML，让我在 CI 里稳定回归 workflow 语义？
+
+        ## 方案选择（取舍）
+
+        - 手写 Python 编排：灵活，但复用/规范/校验差
+        - **workflow YAML（本章）**：把编排结构做成可 schema 校验的 YAML，且纳入 `just examples`
+
+        ## 对拍点（deterministic）
+
+        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_fixture.yaml`
+        - 断言：共享 cache_pool 下 `preload_forever` loader 仅调用 1 次
+        - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch030_workflow_yaml.py::run_workflow_yaml`
-
-        Gate:
-        - `just examples`（跑全量）
+        - `notebooks/marimo/demo_big_data_report/chapters/04_workflow_yaml.py::run_workflow_yaml`
         """
     )
     return

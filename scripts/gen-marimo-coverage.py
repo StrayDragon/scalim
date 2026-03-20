@@ -8,6 +8,7 @@
 该报告从以下来源推导并生成:
 - `notebooks/marimo/**` 的 `notebooks` 文件树(教学入口 + `SSOT` 执行入口)
 - `notebooks/marimo/demo_big_data_report/by_yaml_dsl/**` 的 `YAML` 固定示例(真值)
+- `notebooks/marimo/example_public_api_suite/**` 的 `public API` 覆盖套件
 """
 
 from __future__ import annotations
@@ -101,6 +102,12 @@ def _load_demo_chapter_ids() -> List[str]:
     return list(all_chapter_ids())
 
 
+def _load_public_api_chapter_ids() -> List[str]:
+    from notebooks.marimo.example_public_api_suite.chapters.registry import all_chapter_ids  # noqa: PLC0415
+
+    return list(all_chapter_ids())
+
+
 def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     warnings: List[str] = []
     rows: List[_Row] = []
@@ -108,6 +115,8 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     notebooks_root = root / "notebooks" / "marimo"
     demo_root = notebooks_root / "demo_big_data_report"
     demo_chapters_dir = demo_root / "chapters"
+    public_api_root = notebooks_root / "example_public_api_suite"
+    public_api_chapters_dir = public_api_root / "chapters"
 
     gate_runner = notebooks_root / "run_examples.py"
     pytest_demo_chapters = root / "tests" / "test_demo_big_data_report_chapters.py"
@@ -117,6 +126,7 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     hubs = [
         ("hub", "notebooks/marimo/index.py", notebooks_root / "index.py"),
         ("hub", "demo_big_data_report/demo_main.py", demo_root / "demo_main.py"),
+        ("hub", "example_public_api_suite/demo_main.py", public_api_root / "demo_main.py"),
     ]
     for kind, item_id, path in hubs:
         ok = path.exists()
@@ -169,7 +179,7 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     for chapter_id in chapter_ids:
         notebook = _find_demo_notebook_for_chapter(demo_chapters_dir, chapter_id) if demo_chapters_dir.exists() else None
         ssot = notebook
-        pytest_path = pytest_public_api if "public_api_" in chapter_id else pytest_demo_chapters
+        pytest_path = pytest_demo_chapters
         ok = bool(notebook and gate_runner.exists())
         note_parts: List[str] = []
         if not notebook:
@@ -178,8 +188,33 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
             note_parts.append("missing_gate")
         rows.append(
             _Row(
-                kind="demo_chapter",
+                kind="chapter",
                 item_id="demo_big_data_report/{}".format(chapter_id),
+                notebook=notebook,
+                ssot=ssot,
+                gate=gate_runner if gate_runner.exists() else None,
+                pytest=pytest_path if pytest_path.exists() else None,
+                ok=ok,
+                notes=",".join(note_parts),
+            )
+        )
+
+    # --- `public API` 套件章节 ---
+    chapter_ids = _load_public_api_chapter_ids()
+    for chapter_id in chapter_ids:
+        notebook = _find_demo_notebook_for_chapter(public_api_chapters_dir, chapter_id) if public_api_chapters_dir.exists() else None
+        ssot = notebook
+        pytest_path = pytest_public_api
+        ok = bool(notebook and gate_runner.exists())
+        note_parts = []
+        if not notebook:
+            note_parts.append("missing_notebook")
+        if not gate_runner.exists():
+            note_parts.append("missing_gate")
+        rows.append(
+            _Row(
+                kind="chapter",
+                item_id="example_public_api_suite/{}".format(chapter_id),
                 notebook=notebook,
                 ssot=ssot,
                 gate=gate_runner if gate_runner.exists() else None,

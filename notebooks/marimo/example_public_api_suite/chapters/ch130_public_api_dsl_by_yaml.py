@@ -31,6 +31,7 @@ _COVERED_PUBLIC_ALL = {
 
 _ALLOWED_MODULES: FrozenSet[str] = frozenset(["scalim_misc.examples.public_api._fixtures"])
 _EXPECTED_WORKFLOW_RUNS = 2
+_EXAMPLE_ID = "example_public_api_suite/ch130_public_api_dsl_by_yaml"
 
 
 def _write_text(path: Path, text: str) -> None:
@@ -41,7 +42,7 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
     coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
     if not coverage.ok:
         return ExampleResult(
-            example_id="demo_big_data_report/ch130_public_api_dsl_by_yaml",
+            example_id=_EXAMPLE_ID,
             passed=False,
             kind=EXAMPLE_KIND_ORACLE,
             summary=coverage_failure_summary(coverage),
@@ -98,7 +99,7 @@ workflow:
         compilation: api.Compilation = api.compile(str(demand_path), allowed_modules=_ALLOWED_MODULES, init_vars=init_vars)
         if not compilation.demand_ir.fields:
             return ExampleResult(
-                example_id="demo_big_data_report/ch130_public_api_dsl_by_yaml",
+                example_id=_EXAMPLE_ID,
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary="compile returned empty IR",
@@ -117,7 +118,7 @@ workflow:
         rows = sink.get_data()
         if not rows:
             return ExampleResult(
-                example_id="demo_big_data_report/ch130_public_api_dsl_by_yaml",
+                example_id=_EXAMPLE_ID,
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary="run produced no rows",
@@ -159,7 +160,7 @@ workflow:
             "errors": errors,
         }
         return ExampleResult(
-            example_id="demo_big_data_report/ch130_public_api_dsl_by_yaml",
+            example_id=_EXAMPLE_ID,
             passed=passed,
             kind=EXAMPLE_KIND_ORACLE,
             summary=summary,
@@ -175,14 +176,14 @@ def run_chapter() -> ExampleResult:
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / ch130_public_api_dsl_by_yaml
+        # example_public_api_suite / ch130_public_api_dsl_by_yaml
 
         本章目标:
         - 覆盖 `scalim.dsl.by_yaml.__all__` 的最小可运行示例
         - 演示 `compile/run/run_workflow` + overrides + allowlist
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch130_public_api_dsl_by_yaml.py::run_public_api_dsl_by_yaml`
+        - `notebooks/marimo/example_public_api_suite/chapters/ch130_public_api_dsl_by_yaml.py::run_public_api_dsl_by_yaml`
 
         Gate:
         - `just examples`

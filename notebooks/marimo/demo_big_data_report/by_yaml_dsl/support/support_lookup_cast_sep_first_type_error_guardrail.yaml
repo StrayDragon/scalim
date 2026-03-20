@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: support_lookup_cast_sep_first_type_error_guardrail
+description: |
+  背景(假设): 客服系统在做“工单导出”时,agent_id 经常被拼接成字符串:
+  - `"11,legacy"`: 旧系统为了兼容写了后缀
+  - `""`(空字符串): Excel/CSV 导出里常见的“看起来不是 null,但其实不可用”
+
+  需求方提问:
+  - 我能不能在 YAML 里声明 join key 的“清洗规则”,并且把清洗失败变成可回归的 guardrail 信号？
+
+  方案:
+  - relation step 上使用 `lookup_cast: {name: sep_first, sep: ','}`:
+    - 先按分隔符取第一段,再做 `auto_normalize_key`
+  - guardrails.relations.type_error_max_rate=0:
+    - 一旦出现 type_error(lookup_cast 返回 None 或抛异常)就立刻记录 guardrail(quiet 模式)
+
+  对拍(oracle):
+  - 断言: ticket_id=2001 能正确关联到 team-a; ticket_id=2002 为空字符串会触发 type_error 并让 agent_team 为空
+  - 断言: guardrail codes 包含 `relation_type_error_rate_exceeded`
+
+batch_size: 2
+
+guardrails:
+  enabled: true
+  mode: quiet
+  relations:
+    type_error_max_rate: 0
+
+main_source:
+  source_id: tickets
+  loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_tickets_dirty_agent_id"
+  fields:
+    ticket_id: {extract: ticket_id, name: 工单ID}
+    agent_id: {extract: agent_id, name: Agent ID(脏数据)}
+    category: {extract: category, name: Category}
+
+relations:
+  tickets_to_agents:
+    steps:
+      - from: tickets.agent_id
+        to: agents.agent_id
+        lookup_cast: {name: sep_first, sep: ","}
+
+sources:
+  agents:
+    loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_agents_str_keys"
+    key: agent_id
+    params:
+      ids: {$keys: {as: list}}
+    fields:
+      agent_team: {extract: agent_team, name: Agent Team, relation: tickets_to_agents}
+
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: {$init_var: out_path_detail}
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+      encoding: utf-8
+    fields: [ticket_id, agent_id, category, agent_team]
+
