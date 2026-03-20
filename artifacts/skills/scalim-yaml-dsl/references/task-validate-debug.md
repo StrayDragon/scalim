@@ -135,6 +135,23 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 - 未完成真实运行验证,因为缺少 `...`
 - 当前结论仅覆盖 YAML 结构与语义校验,不覆盖真实数据结果正确性
 
+## 模板预编译(可选): `template_vars`
+
+如果你的 YAML 里出现 `{{ ... }}` / `{% ... %}`:
+
+- 这是 **调用侧** 的编译期开关(例如 `run/compile/run_workflow(..., template_vars=...)`),不属于 YAML schema 字段。
+- `scalim-cli yaml-dsl schema validate/validate` 当前不暴露 `template_vars` 注入;直接对含模板语法的 YAML 跑 CLI 校验,通常会在 YAML parse 阶段失败。
+
+推荐做法:
+
+- 优先使用 schema 内的结构化注入: `init_vars` + `{$init_var: <name>}`(CLI 可直接校验;也更稳定/可维护)。
+- 只有确实需要模板语法时,才在 Python 入口启用 `template_vars`,并在该入口内完成渲染后的 parse + 校验/编译。
+
+排错提示:
+
+- strict-undefined: 缺失变量会 fail-fast;用 `| default(...)` 显式兜底。
+- imports 片段也会按同一份 `template_vars` 渲染;缺失变量/渲染失败时,错误信息通常会包含 fragment 路径(import trace)。
+
 需要完整 CLI 说明时再读:
 
 - [generated/cli-lsp-reference.gen.md](generated/cli-lsp-reference.gen.md)

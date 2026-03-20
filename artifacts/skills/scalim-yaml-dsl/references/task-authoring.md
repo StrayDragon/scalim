@@ -88,6 +88,39 @@ outputs:
 
 - `outputs.*.container.path: {$init_var: ...}` 会将“输出路径决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
 
+## YAML 模板预编译(可选): `template_vars`
+
+当你需要在 YAML **文本层**使用 `{{ ... }}` / `{% ... %}` 模板语法时(例如未加引号的占位符、条件/循环生成片段),可以让调用方在编译/运行入口传入 `template_vars`。系统会在 **YAML parse 前**用 LiteJinja2 先渲染文本,再进入正常的 parse + 校验/编译流程。
+
+注意事项:
+
+- 仅当调用方显式提供 `template_vars`(非 `None`)时才启用预编译;未提供时不会渲染,避免误把其它系统的 `{{ ... }}` 当模板语法。
+- strict-undefined: 模板引用缺失变量会 fail-fast;如需兜底,用 `| default(...)` 显式声明。
+- demand 的 `imports/$import` 片段会复用同一份 `template_vars` 做预编译(发生在 fragment YAML parse 前)。
+- 当前不提供 `tojson`/`toyaml` 等“安全序列化”过滤器;`template_vars` 渲染结果必须是合法 YAML 文本。
+
+示例(渲染后仍需能通过 schema/语义校验):
+
+```yaml
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: {{ output_path | default("./output/report.csv") }}
+```
+
+调用侧(Python):
+
+```py
+from scalim.dsl.by_yaml.runtime.entrypoints import run
+
+run(
+    "report.yaml",
+    allowed_modules=frozenset(["myapp"]),
+    template_vars={"output_path": "./out/report.csv"},
+)
+```
+
 ## 相对模块引用(可选)
 
 如果 YAML 文件与 loaders / `call_by` / retry 回调放在同一个 Python 包内,可以用以 `.` / `..` 开头的相对 module 引用来减少 `myapp.xxx` 这种前缀重复:
