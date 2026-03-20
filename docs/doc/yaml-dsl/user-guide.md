@@ -1955,6 +1955,23 @@ print(f"处理行数: {result.total_rows}")
 print(f"输出路径: {result.output_path}")
 ```
 
+#### (可选)YAML 模板预编译: `template_vars`
+
+当你需要在 YAML **文本层**使用 `{{ ... }}` / `{% ... %}` 模板语法时(例如未加引号的占位符、条件/循环生成片段),可以在 Python 入口传入 `template_vars`。系统会在 **YAML parse 前**先渲染文本,再进入正常的 parse + 校验/编译流程。
+
+注意:
+
+- `template_vars` 不是 YAML schema 字段;`scalim-cli yaml-dsl validate/schema validate` 当前也不支持注入 `template_vars`。
+- 能用结构化注入时,优先用 `init_vars` + `{$init_var: <name>}`(CLI 可直接校验;也更稳定/可维护)。
+
+```python
+result = run(
+    "path/to/config.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    template_vars={"output_path": "./out/report.csv"},
+)
+```
+
 ---
 
 ## 附录
