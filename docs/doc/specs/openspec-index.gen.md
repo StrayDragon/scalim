@@ -106,6 +106,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/marimo-demo-big-data-report-chapters/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `demo_big_data_report` 主线示例在 `notebooks/marimo/` 下的章节化组织要求:以 `demo_main.py` 作为 hub,每个 SSOT chapter 对应一本 Marimo notebook,并与 headless runner/pytest 同源对拍.
 
+### `marimo-example-public-api-suite`
+- Title: marimo-example-public-api-suite Specification
+- Source: [spec.md](#code=openspec/specs/marimo-example-public-api-suite/spec.md)
+- Summary: TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update Purpose after archive.
+
 ### `marimo-notebooks-examples-suite`
 - Title: marimo-notebooks-examples-suite Specification
 - Source: [spec.md](#code=openspec/specs/marimo-notebooks-examples-suite/spec.md)
@@ -240,6 +245,11 @@ Sources:
 - Title: yaml-dsl-cli-validation Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-validation/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `PROJECT_CLI_NAME yaml-dsl ...` 的校验分层、严格模式、JSON 输出与诊断输出格式(含源码位置),以确保 CLI 校验结果可用于 IDE 跳转、CI 报告与脚本化消费,并避免与 schema 生成规范耦合.
+
+### `yaml-dsl-demo-scenarios-suite`
+- Title: yaml-dsl-demo-scenarios-suite Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-demo-scenarios-suite/spec.md)
+- Summary: TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update Purpose after archive.
 
 ### `yaml-dsl-editor-core`
 - Title: yaml-dsl-editor-core Specification
