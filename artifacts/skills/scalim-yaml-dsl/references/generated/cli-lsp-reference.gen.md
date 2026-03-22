@@ -12,6 +12,7 @@
 ## Command Variants
 ### Repo
 - `uv run scalim-cli yaml-dsl validate <file.yaml>`
+- `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
 - `uv run scalim-cli yaml-dsl schema validate <file.yaml>`
 - `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
 - `uv run scalim-cli yaml-dsl schema show`
@@ -21,6 +22,7 @@
 
 ### External
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema show`
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
@@ -28,9 +30,10 @@
 - `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ## Validate Layering
-- `yaml-dsl validate`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.
+- `yaml-dsl validate --type demand`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.
+- `yaml-dsl validate --type workflow`: 静态/编译期 workflow 校验,递归校验 workflow 引用的 demands,并检查 `writes[*].output` 等跨文件一致性.
+- `yaml-dsl validate` 默认 `--type auto`: 根据 YAML 顶层结构推断 demand/workflow;CI/脚本建议显式传 `--type workflow`.
 - `yaml-dsl schema validate`: 使用 JSON Schema,更适合 schema-only 校验、编辑器/LSP 对齐与 unknown-field strict 收敛.
-- workflow YAML: 仅支持 `yaml-dsl schema validate --schema .../workflow.gen.json`(不得对 workflow YAML 运行 `yaml-dsl validate`).
 
 ## LSP / Schema Header
 - Repo schema path: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
@@ -97,12 +100,16 @@
 ## Command Details
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
-- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--json]
+- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA]
+                                    [--type {auto,demand,workflow}]
+                                    [--path-alias PATH_ALIASES] [--json]
                                     [--verbose]
                                     yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--json]
+usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA]
+                                    [--type {auto,demand,workflow}]
+                                    [--path-alias PATH_ALIASES] [--json]
                                     [--verbose]
                                     yaml_file
 
@@ -113,6 +120,10 @@ options:
   -h, --help            show this help message and exit
   --schema SCHEMA, -s SCHEMA
                         JSON Schema 文件路径
+  --type {auto,demand,workflow}
+                        校验类型: auto/demand/workflow
+  --path-alias PATH_ALIASES
+                        仅 workflow validate: 需求路径别名,格式 <alias>=<path> (可重复)
   --json                输出 JSON 结果
   --verbose, -v         显示详细错误信息
 ```

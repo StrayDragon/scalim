@@ -38,7 +38,7 @@ python3 scripts/scan-downstream-yaml-dsl.py
 
 它会:
 - 逐个扫描 `.tmp/known-outer-paths-using-this-package.txt` 的下游目录
-- 对候选 YAML 执行 `uv run scalim-cli yaml-dsl validate`(默认 strict unknown fields;workflow YAML 走 `schema validate`)
+- 对候选 YAML 执行 `uv run scalim-cli yaml-dsl validate --json`(`--type auto` 默认推断 demand/workflow;对 workflow 也可显式 `--type workflow`)
 - 仅在 stdout 输出统计与行号,并写入 `.tmp/output/downstream-yaml-dsl-scan/line-<N>.json`
 
 3) 把错误聚类为“可分配任务”(不做兼容层):
@@ -63,6 +63,13 @@ python3 scripts/scan-downstream-yaml-dsl.py
 ```bash
 uv run scalim-cli yaml-dsl schema validate <file.yaml>
 uv run scalim-cli yaml-dsl validate <file.yaml>
+```
+
+对 workflow YAML(建议显式指定类型与 schema):
+
+```bash
+uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>
 ```
 
 ## 交付(报告)建议格式

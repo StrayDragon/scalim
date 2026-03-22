@@ -20,8 +20,8 @@
 
 ## What Changes
 
-- 新增 CLI 子命令（提案目标形态）：
-  - `uv run scalim-cli yaml-dsl workflow validate <workflow.yaml>`
+- 扩展现有 `yaml-dsl validate`，新增 workflow 校验模式：
+  - `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
   - 支持 `--json/--verbose` 等与现有 demand validate 一致的输出风格（保持脚本化消费与 IDE 跳转体验）。
 - 校验内容（v1 聚焦“静态/编译期可确定”的检查，不执行 workflow）：
   1) 校验 workflow YAML 自身结构与语义：
@@ -58,7 +58,7 @@
   - workflow 解析与语义校验：`src/scalim/dsl/by_yaml/workflow.py`
   - demand 校验复用：`src/scalim/dsl/by_yaml/config_parsing/validator.py`、`src/scalim/dsl/by_yaml/config_parsing/imports.py`
   - workflow 运行期 `$ctx` 指令形态（用于复用/对齐校验规则）：`src/scalim/dsl/by_yaml/runtime/workflow_entrypoints.py`
-- Public surface：新增 CLI 命令（不影响现有运行入口）。
+- Public surface：扩展 `yaml-dsl validate`，新增 `--type workflow`（不影响现有运行入口）。
 - 文档治理：
   - specs SSOT：`openspec/specs/**`
   - schema SSOT：`src/scalim/dsl/by_yaml/schema_dsl/**`（生成物 `src/scalim/dsl/by_yaml/schema/*.gen.json` 不手改）

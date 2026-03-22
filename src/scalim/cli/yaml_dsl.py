@@ -3,7 +3,7 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from ..vendor.compact.importlibx import import_module, require_optional_dependency
 from . import yaml_dsl_lsp
@@ -22,6 +22,16 @@ from ..dsl.by_yaml.config_parsing.jsonschema_issues import JsonSchemaCollectorEr
 from ..dsl.by_yaml.config_parsing.unknown_fields import find_unknown_fields
 from ..dsl.by_yaml.config_parsing.validator import ConfigValidator, attach_locations, build_yaml_location_index
 from ..dsl.by_yaml.config_parsing.validator import YamlValidationIssue as Issue
+from ..dsl.by_yaml.workflow import (
+    WorkflowConfigError,
+    WorkflowWriteToCsvAppend,
+    WorkflowWriteToSheetbookAppend,
+    WorkflowWriteToSheetbookSheet,
+    WorkflowWriteToWorkbookAppend,
+    WorkflowWriteToWorkbookSheet,
+    load_workflow_config,
+    resolve_workflow_demand_path,
+)
 
 try:
     jsonschema = import_module("jsonschema")
@@ -64,6 +74,22 @@ class ValidationPayload:
         if self.schema_path is not None:
             payload["schema_path"] = self.schema_path
         return payload
+
+
+@dataclass
+class WorkflowValidationPayload:
+    mode: str
+    ok: bool
+    workflow_yaml_path: str
+    results: List[ValidationPayload] = field(default_factory=list)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "ok": self.ok,
+            "workflow_yaml_path": self.workflow_yaml_path,
+            "results": [item.as_dict() for item in self.results],
+        }
 
 
 LEGACY_FIELDS = {
@@ -124,6 +150,22 @@ def _set_help_default(parser: argparse.ArgumentParser) -> None:
 def _add_validate_args(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("yaml_file", type=Path, help="YAML 文件路径")
     _ = parser.add_argument("--schema", "-s", type=Path, default=None, help="JSON Schema 文件路径")
+    _ = parser.add_argument(
+        "--type",
+        dest="yaml_type",
+        type=str,
+        choices=["auto", "demand", "workflow"],
+        default="auto",
+        help="校验类型: auto/demand/workflow",
+    )
+    _ = parser.add_argument(
+        "--path-alias",
+        dest="path_aliases",
+        type=str,
+        action="append",
+        default=[],
+        help="仅 workflow validate: 需求路径别名,格式 <alias>=<path> (可重复)",
+    )
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     _ = parser.add_argument("--verbose", "-v", action="store_true", help="显示详细错误信息")
 
@@ -405,9 +447,235 @@ def _emit_error(
     _write_line_stderr("错误: {}".format(message))
 
 
-def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
+def _infer_yaml_type(yaml_text: str) -> str:
+    try:
+        yaml_data = yaml.safe_load(yaml_text)
+    except Exception:  # noqa: BLE001
+        return "demand"
+    if isinstance(yaml_data, dict) and "workflow" in yaml_data:
+        return "workflow"
+    return "demand"
+
+
+def _parse_path_aliases(raw_values: Iterable[str]) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
+    output: Dict[str, str] = {}
+    for raw in raw_values:
+        item = str(raw or "").strip()
+        if not item:
+            continue
+        if "=" not in item:
+            return None, "Invalid --path-alias value: {!r} (expected <alias>=<path>)".format(item)
+        alias, base = item.split("=", 1)
+        alias = str(alias or "").strip()
+        base = str(base or "").strip()
+        if not alias:
+            return None, "Invalid --path-alias value: {!r} (alias must be non-empty)".format(item)
+        if not base:
+            return None, "Invalid --path-alias value: {!r} (path must be non-empty)".format(item)
+        output[alias] = base
+    return output, None
+
+
+def _extract_demand_outputs(yaml_data: Optional[Dict[str, Any]]) -> Set[str]:
+    if not isinstance(yaml_data, dict):
+        return set()
+    outputs_raw = yaml_data.get("outputs")
+    if not isinstance(outputs_raw, list):
+        return set()
+    output_ids: Set[str] = set()
+    for item in cast("List[Any]", outputs_raw):
+        if not isinstance(item, dict):
+            continue
+        name_raw = cast("Dict[str, Any]", item).get("name")
+        if not isinstance(name_raw, str):
+            continue
+        name = str(name_raw or "").strip()
+        if not name:
+            continue
+        output_ids.add(name)
+    return output_ids
+
+
+def _intent_kind(value: object) -> str:
+    if isinstance(value, WorkflowWriteToWorkbookSheet):
+        return "workbook_sheet"
+    if isinstance(value, WorkflowWriteToWorkbookAppend):
+        return "workbook_append"
+    if isinstance(value, WorkflowWriteToCsvAppend):
+        return "csv_append"
+    if isinstance(value, WorkflowWriteToSheetbookSheet):
+        return "sheetbook_sheet"
+    if isinstance(value, WorkflowWriteToSheetbookAppend):
+        return "sheetbook_append"
+    return "unknown"
+
+
+def _validate_demand_yaml_text(
+    yaml_text: str,
+    *,
+    yaml_path: Path,
+    schema_path: Path,
+    validator: Optional[ConfigValidator] = None,
+) -> Tuple[ValidationPayload, Optional[Dict[str, Any]], Optional[List[str]]]:
+    source_lines: List[str] = yaml_text.splitlines()
+    try:
+        yaml_data = yaml.safe_load(yaml_text)
+    except yaml.YAMLError as exc:
+        loc = _extract_yaml_error_location(exc)
+        line = loc[0] if loc is not None else None
+        column = loc[1] if loc is not None else None
+        errors = [Issue(path="(root)", message="YAML parse error: {}".format(exc), line=line, column=column)]
+        return (
+            ValidationPayload(
+                mode="validate",
+                ok=False,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=[],
+            ),
+            None,
+            source_lines,
+        )
+
+    if yaml_data is None:
+        errors = [Issue(path="(root)", message="YAML document is empty", line=1, column=1)]
+        return (
+            ValidationPayload(
+                mode="validate",
+                ok=False,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=[],
+            ),
+            None,
+            source_lines,
+        )
+
+    if not isinstance(yaml_data, dict):
+        errors = [Issue(path="(root)", message="YAML root must be a mapping", line=1, column=1)]
+        return (
+            ValidationPayload(
+                mode="validate",
+                ok=False,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=[],
+            ),
+            None,
+            source_lines,
+        )
+
+    yaml_data_dict = cast("Dict[str, Any]", yaml_data)
+    locations = build_yaml_location_index(yaml_text)
+
+    try:
+        if contains_import_syntax(yaml_data_dict):
+            _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
+    except YamlImportExpansionError as exc:
+        errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
+        errors = attach_locations(errors, locations)
+        return (
+            ValidationPayload(
+                mode="validate",
+                ok=False,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=[],
+            ),
+            None,
+            source_lines,
+        )
+
+    demand_validator = validator or ConfigValidator(schema_path=str(schema_path))
+    report = demand_validator.validate_report(
+        yaml_data_dict,
+        strict_unknown_fields=True,
+        enable_jsonschema_validation=True,
+    )
+    errors = _issues_to_rows(report.errors())
+    warnings = _issues_to_rows(report.warnings())
+
+    errors = attach_locations(errors, locations)
+    warnings = attach_locations(warnings, locations)
+
+    ok = not errors
+    return (
+        ValidationPayload(
+            mode="validate",
+            ok=ok,
+            yaml_path=str(yaml_path),
+            schema_path=str(schema_path),
+            errors=errors,
+            warnings=warnings,
+        ),
+        yaml_data_dict,
+        source_lines,
+    )
+
+
+def _validate_demand_yaml_path(
+    yaml_path: Path,
+    *,
+    schema_path: Path,
+    validator: Optional[ConfigValidator] = None,
+) -> Tuple[ValidationPayload, Optional[Dict[str, Any]], Optional[List[str]]]:
+    if not yaml_path.exists():
+        errors = [Issue(path="(file)", message="YAML 文件不存在: {}".format(yaml_path))]
+        return (
+            ValidationPayload(
+                mode="validate",
+                ok=False,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=[],
+            ),
+            None,
+            None,
+        )
+    try:
+        yaml_text = yaml_path.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        errors = [Issue(path="(file)", message="YAML 文件读取失败: {}".format(yaml_path))]
+        return (
+            ValidationPayload(
+                mode="validate",
+                ok=False,
+                yaml_path=str(yaml_path),
+                schema_path=str(schema_path),
+                errors=errors,
+                warnings=[],
+            ),
+            None,
+            None,
+        )
+    return _validate_demand_yaml_text(
+        yaml_text,
+        yaml_path=yaml_path,
+        schema_path=schema_path,
+        validator=validator,
+    )
+
+
+def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0915
     yaml_path = args.yaml_file.resolve()
     schema_path = _resolve_schema_path(args.schema)
+    yaml_type = str(getattr(args, "yaml_type", "auto") or "auto").strip()
+    if yaml_type == "auto":
+        try:
+            yaml_text = yaml_path.read_text(encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            yaml_text = ""
+        yaml_type = _infer_yaml_type(yaml_text)
+    raw_aliases = cast("List[str]", list(getattr(args, "path_aliases", []) or []))
+    path_aliases, alias_error = _parse_path_aliases(raw_aliases)
+    if alias_error is not None:
+        _emit_error(alias_error, json_output=bool(args.json), yaml_path=yaml_path, schema_path=schema_path, mode="validate")
+        return 1
 
     if not schema_path.exists():
         _emit_error(
@@ -418,6 +686,152 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0
             mode="validate",
         )
         return 1
+
+    if yaml_type == "workflow":
+        try:
+            workflow_text = yaml_path.read_text(encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            _emit_error(
+                "YAML 文件读取失败: {}".format(yaml_path),
+                json_output=args.json,
+                yaml_path=yaml_path,
+                schema_path=schema_path,
+                mode="workflow-validate",
+            )
+            return 1
+
+        workflow_source_lines: List[str] = workflow_text.splitlines()
+        workflow_locations = build_yaml_location_index(workflow_text)
+        workflow_errors: List[Issue] = []
+        workflow_warnings: List[Issue] = []
+
+        wf_config = None
+        try:
+            wf_config = load_workflow_config(str(yaml_path))
+        except WorkflowConfigError as exc:
+            workflow_errors.append(Issue(path=str(exc.path or "(root)"), message=str(exc)))
+        except Exception as exc:  # noqa: BLE001
+            workflow_errors.append(Issue(path="(root)", message="Unexpected error: {}: {}".format(type(exc).__name__, exc)))
+
+        demand_results: List[ValidationPayload] = []
+        demand_source_lines: List[Optional[List[str]]] = []
+        demand_outputs: List[Optional[Set[str]]] = []
+
+        demand_validator = ConfigValidator(schema_path=str(schema_path))
+        if wf_config is not None:
+            for run_idx, run in enumerate(wf_config.runs):
+                demand_path: Optional[Path] = None
+                try:
+                    demand_path = resolve_workflow_demand_path(
+                        str(run.demand),
+                        workflow_yaml_path=str(yaml_path),
+                        path_aliases=path_aliases,
+                        run_id=str(run.id),
+                    )
+                except WorkflowConfigError as exc:
+                    workflow_errors.append(Issue(path="workflow.runs.{}.demand".format(int(run_idx)), message=str(exc)))
+                    demand_results.append(
+                        ValidationPayload(
+                            mode="validate",
+                            ok=False,
+                            yaml_path=str(run.demand),
+                            schema_path=str(schema_path),
+                            errors=[Issue(path="(file)", message="Demand path resolve failed: {}".format(str(exc)))],
+                            warnings=[],
+                        )
+                    )
+                    demand_outputs.append(None)
+                    demand_source_lines.append(None)
+                    continue
+
+                if not demand_path.exists():
+                    workflow_errors.append(
+                        Issue(
+                            path="workflow.runs.{}.demand".format(int(run_idx)),
+                            message="Demand YAML 文件不存在: {}".format(demand_path),
+                        )
+                    )
+                    payload, demand_data, lines = _validate_demand_yaml_path(
+                        demand_path,
+                        schema_path=schema_path,
+                        validator=demand_validator,
+                    )
+                    demand_results.append(payload)
+                    demand_outputs.append(_extract_demand_outputs(demand_data) if demand_data is not None else None)
+                    demand_source_lines.append(lines)
+                    continue
+
+                payload, demand_data, lines = _validate_demand_yaml_path(
+                    demand_path,
+                    schema_path=schema_path,
+                    validator=demand_validator,
+                )
+                demand_results.append(payload)
+                demand_outputs.append(_extract_demand_outputs(demand_data) if demand_data is not None else None)
+                demand_source_lines.append(lines)
+
+            for run_idx, run in enumerate(wf_config.runs):
+                outputs = demand_outputs[run_idx] if run_idx < len(demand_outputs) else None
+                if outputs is None:
+                    continue
+                for write_idx, intent in enumerate(run.writes):
+                    output_id = str(getattr(intent, "output", "") or "")
+                    if output_id in outputs:
+                        continue
+                    kind = _intent_kind(intent)
+                    workflow_errors.append(
+                        Issue(
+                            path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), kind),
+                            message="Unknown demand output id: {!r}".format(output_id),
+                            suggestions=sorted(outputs) if outputs else [],
+                        )
+                    )
+
+        workflow_errors = attach_locations(workflow_errors, workflow_locations)
+        workflow_warnings = attach_locations(workflow_warnings, workflow_locations)
+        workflow_ok = not workflow_errors
+
+        workflow_payload = ValidationPayload(
+            mode="workflow-validate",
+            ok=workflow_ok,
+            yaml_path=str(yaml_path),
+            errors=workflow_errors,
+            warnings=workflow_warnings,
+        )
+
+        results: List[ValidationPayload] = [workflow_payload]
+        results.extend(demand_results)
+
+        ok = workflow_ok and all(item.ok for item in demand_results)
+        payload = WorkflowValidationPayload(
+            mode="workflow-validate",
+            ok=ok,
+            workflow_yaml_path=str(yaml_path),
+            results=results,
+        )
+
+        if args.json:
+            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
+        else:
+            _render_result(
+                yaml_path,
+                errors=workflow_payload.errors,
+                warnings=workflow_payload.warnings,
+                verbose=args.verbose,
+                source_lines=workflow_source_lines,
+            )
+            for idx, item in enumerate(demand_results):
+                demand_path_str = item.yaml_path or ""
+                demand_path = Path(demand_path_str) if demand_path_str else Path("demand.yaml")
+                _render_result(
+                    demand_path,
+                    errors=item.errors,
+                    warnings=item.warnings,
+                    verbose=args.verbose,
+                    source_lines=demand_source_lines[idx] if idx < len(demand_source_lines) else None,
+                )
+
+        return 0 if ok else 1
 
     try:
         yaml_text = yaml_path.read_text(encoding="utf-8")
@@ -431,149 +845,24 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0
         )
         return 1
 
-    source_lines: List[str] = yaml_text.splitlines()
-
-    try:
-        yaml_data = yaml.safe_load(yaml_text)
-    except yaml.YAMLError as exc:
-        loc = _extract_yaml_error_location(exc)
-        line = loc[0] if loc is not None else None
-        column = loc[1] if loc is not None else None
-        errors = [Issue(path="(root)", message="YAML parse error: {}".format(exc), line=line, column=column)]
-        warnings: List[Issue] = []
-        ok = False
-        if args.json:
-            payload = ValidationPayload(
-                mode="validate",
-                ok=ok,
-                yaml_path=str(yaml_path),
-                schema_path=str(schema_path),
-                errors=errors,
-                warnings=warnings,
-            )
-            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
-        else:
-            _render_result(
-                yaml_path,
-                errors=errors,
-                warnings=warnings,
-                verbose=args.verbose,
-                source_lines=source_lines,
-            )
-        return 1
-
-    if yaml_data is None:
-        errors = [Issue(path="(root)", message="YAML document is empty", line=1, column=1)]
-        warnings = []
-        ok = False
-        if args.json:
-            payload = ValidationPayload(
-                mode="validate",
-                ok=ok,
-                yaml_path=str(yaml_path),
-                schema_path=str(schema_path),
-                errors=errors,
-                warnings=warnings,
-            )
-            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
-        else:
-            _render_result(
-                yaml_path,
-                errors=errors,
-                warnings=warnings,
-                verbose=args.verbose,
-                source_lines=source_lines,
-            )
-        return 1
-
-    if not isinstance(yaml_data, dict):
-        errors = [Issue(path="(root)", message="YAML root must be a mapping", line=1, column=1)]
-        warnings = []
-        ok = False
-        if args.json:
-            payload = ValidationPayload(
-                mode="validate",
-                ok=ok,
-                yaml_path=str(yaml_path),
-                schema_path=str(schema_path),
-                errors=errors,
-                warnings=warnings,
-            )
-            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
-        else:
-            _render_result(
-                yaml_path,
-                errors=errors,
-                warnings=warnings,
-                verbose=args.verbose,
-                source_lines=source_lines,
-            )
-        return 1
-
-    yaml_data_dict = cast("Dict[str, Any]", yaml_data)
-    locations = build_yaml_location_index(yaml_text)
-    try:
-        if contains_import_syntax(yaml_data_dict):
-            _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
-    except YamlImportExpansionError as exc:
-        errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
-        warnings = []
-        errors = attach_locations(errors, locations)
-        ok = False
-        if args.json:
-            payload = ValidationPayload(
-                mode="validate",
-                ok=ok,
-                yaml_path=str(yaml_path),
-                schema_path=str(schema_path),
-                errors=errors,
-                warnings=warnings,
-            )
-            _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
-        else:
-            _render_result(
-                yaml_path,
-                errors=errors,
-                warnings=warnings,
-                verbose=args.verbose,
-                source_lines=source_lines,
-            )
-        return 1
-
-    validator = ConfigValidator(schema_path=str(schema_path))
-    report = validator.validate_report(
-        yaml_data_dict,
-        strict_unknown_fields=True,
-        enable_jsonschema_validation=True,
+    payload, _yaml_data, source_lines = _validate_demand_yaml_text(
+        yaml_text,
+        yaml_path=yaml_path,
+        schema_path=schema_path,
     )
-    errors = _issues_to_rows(report.errors())
-    warnings = _issues_to_rows(report.warnings())
-
-    errors = attach_locations(errors, locations)
-    warnings = attach_locations(warnings, locations)
-
-    ok = not errors
 
     if args.json:
-        payload = ValidationPayload(
-            mode="validate",
-            ok=ok,
-            yaml_path=str(yaml_path),
-            schema_path=str(schema_path),
-            errors=errors,
-            warnings=warnings,
-        )
         _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
     else:
         _render_result(
             yaml_path,
-            errors=errors,
-            warnings=warnings,
+            errors=payload.errors,
+            warnings=payload.warnings,
             verbose=args.verbose,
             source_lines=source_lines,
         )
 
-    return 0 if ok else 1
+    return 0 if payload.ok else 1
 
 
 def _run_schema_validate(args: argparse.Namespace) -> int:

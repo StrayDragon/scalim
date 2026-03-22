@@ -452,6 +452,7 @@ def render_cli_lsp_reference(
         "## Command Variants",
         "### Repo",
         "- `uv run {cli} yaml-dsl validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+        "- `uv run {cli} yaml-dsl validate --type workflow <workflow.yaml>`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
         "- `uv run {cli} yaml-dsl schema validate --schema {workflow_schema} <workflow.yaml>`".format(
             cli=_project_constants.CLI_NAME,
@@ -466,6 +467,10 @@ def render_cli_lsp_reference(
         "",
         "### External",
         '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate <file.yaml>`'.format(
+            dist=_project_constants.DIST_NAME,
+            cli=_project_constants.CLI_NAME,
+        ),
+        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate --type workflow <workflow.yaml>`'.format(
             dist=_project_constants.DIST_NAME,
             cli=_project_constants.CLI_NAME,
         ),
@@ -491,9 +496,10 @@ def render_cli_lsp_reference(
         ),
         "",
         "## Validate Layering",
-        "- `yaml-dsl validate`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.",
+        "- `yaml-dsl validate --type demand`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.",
+        "- `yaml-dsl validate --type workflow`: 静态/编译期 workflow 校验,递归校验 workflow 引用的 demands,并检查 `writes[*].output` 等跨文件一致性.",
+        "- `yaml-dsl validate` 默认 `--type auto`: 根据 YAML 顶层结构推断 demand/workflow;CI/脚本建议显式传 `--type workflow`.",
         "- `yaml-dsl schema validate`: 使用 JSON Schema,更适合 schema-only 校验、编辑器/LSP 对齐与 unknown-field strict 收敛.",
-        "- workflow YAML: 仅支持 `yaml-dsl schema validate --schema .../workflow.gen.json`(不得对 workflow YAML 运行 `yaml-dsl validate`).",
         "",
         "## LSP / Schema Header",
         "- Repo schema path: `{}`".format(repo_schema_path),

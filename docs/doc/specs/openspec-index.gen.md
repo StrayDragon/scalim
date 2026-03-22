@@ -291,6 +291,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow/spec.md)
 - Summary: **状态: ✅ 已实现** 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).
 
+### `yaml-dsl-workflow-validate`
+- Title: yaml-dsl-workflow-validate Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow-validate/spec.md)
+- Summary: TBD - created by archiving change c12-yaml-dsl-workflow-validate-cli. Update Purpose after archive.
+
 ### `yaml-field-extract`
 - Title: yaml-field-extract Specification
 - Source: [spec.md](#code=openspec/specs/yaml-field-extract/spec.md)

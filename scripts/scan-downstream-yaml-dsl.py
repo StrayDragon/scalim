@@ -146,6 +146,13 @@ def _extract_json_payload(stdout: str) -> Optional[dict]:
 
 def _payload_to_issues(payload: dict) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
+    results = payload.get("results")
+    if isinstance(results, list):
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            out.extend(_payload_to_issues(item))
+        return out
     for k in ("errors", "warnings"):
         for it in payload.get(k, []) or []:
             # 重要: 不要向外透出文件系统路径(例如 `yaml_path`/`location`)
@@ -259,52 +266,67 @@ def _validate_yaml_file(
             issues=[{"level": "error", "path": "", "message": "读取 `YAML` 失败"}],
         )
 
+    cmds: List[List[str]] = []
     if _is_workflow_yaml(text):
         kind = "workflow"
-        cmd = [
-            *cli_prefix,
-            "yaml-dsl",
-            "schema",
-            "validate",
-            "--strict",
-            "--json",
-            "--schema",
-            str(workflow_schema),
-            str(yaml_path),
+        cmds = [
+            [
+                *cli_prefix,
+                "yaml-dsl",
+                "schema",
+                "validate",
+                "--json",
+                "--schema",
+                str(workflow_schema),
+                str(yaml_path),
+            ],
+            [
+                *cli_prefix,
+                "yaml-dsl",
+                "validate",
+                "--type",
+                "workflow",
+                "--json",
+                str(yaml_path),
+            ],
         ]
     else:
         kind = "demand"
-        cmd = [
-            *cli_prefix,
-            "yaml-dsl",
-            "validate",
-            "--strict",
-            "--json",
-            str(yaml_path),
+        cmds = [
+            [
+                *cli_prefix,
+                "yaml-dsl",
+                "validate",
+                "--type",
+                "demand",
+                "--json",
+                str(yaml_path),
+            ]
         ]
 
-    code, out, err = _run(cmd, cwd=repo_root, timeout_s=timeout_s)
-    payload = _extract_json_payload(out)
-    if payload is None:
-        # 兜底错误: 保持错误信息不包含路径
-        _ = code
-        _ = err
-        return _FileResult(
-            rel_path=rel_path,
-            kind=kind,
-            ok=False,
-            errors=1,
-            warnings=0,
-            issues=[{"level": "error", "path": "", "message": "校验输出未包含 `JSON` 载荷"}],
-        )
+    overall_ok = True
+    issues: List[Dict[str, Any]] = []
+    for cmd in cmds:
+        code, out, err = _run(cmd, cwd=repo_root, timeout_s=timeout_s)
+        payload = _extract_json_payload(out)
+        if payload is None:
+            # 兜底错误: 保持错误信息不包含路径
+            _ = code
+            _ = err
+            return _FileResult(
+                rel_path=rel_path,
+                kind=kind,
+                ok=False,
+                errors=1,
+                warnings=0,
+                issues=[{"level": "error", "path": "", "message": "校验输出未包含 `JSON` 载荷"}],
+            )
+        overall_ok = overall_ok and bool(payload.get("ok", False))
+        issues.extend(_payload_to_issues(payload))
 
-    ok = bool(payload.get("ok", False))
-    errors = len(payload.get("errors", []) or [])
-    warnings = len(payload.get("warnings", []) or [])
-    issues = _payload_to_issues(payload)
-    _ = code
-    _ = err
-    return _FileResult(rel_path=rel_path, kind=kind, ok=ok, errors=errors, warnings=warnings, issues=issues)
+    errors = sum(1 for it in issues if str(it.get("level", "") or "") == "error")
+    warnings = sum(1 for it in issues if str(it.get("level", "") or "") == "warning")
+    return _FileResult(rel_path=rel_path, kind=kind, ok=overall_ok, errors=errors, warnings=warnings, issues=issues)
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
