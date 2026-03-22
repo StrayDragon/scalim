@@ -9,7 +9,7 @@
 - 强化 `key_normalization` 的“实验性提示”可见性: 即使未配置任何 observer/hook/日志观察者,也能在一次运行内明确看到 `EXPERIMENTAL` 提示(一次去重).
 - 增补 `key_normalization` 的 loader/cached mapping 边界诊断:
   - 当 loader 返回的 mapping key 口径与当前匹配口径不一致时,提供可诊断的告警/错误(不泄露明细 key 值).
-  - 当 cached mapping 规范化发生 key collision 时,提供更明确的错误上下文(不泄露明细 key 值),并评估是否需要可选的 collision 策略(仍以 fail-fast 为默认).
+  - 当 mapping 规范化发生 key collision 时,提供更明确的错误上下文(不泄露明细 key 值),并将默认处理优化为: values 相等则合并继续+告警,values 不相等则 fail-fast.
 
 ## Capabilities
 
@@ -27,4 +27,3 @@
   - `src/scalim/execution/run_ir.py`(`EXPERIMENTAL` 提示策略)
   - `src/scalim/ob/hub.py`/`src/scalim/ob/observability.py`(fallback logger/告警落地口径,若选择复用)
   - `src/scalim/execution/executor/operators/load_ref/`(loader mapping 口径诊断/错误)
-
