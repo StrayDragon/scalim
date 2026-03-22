@@ -621,13 +621,17 @@ class SchemaBuilder:
                 "片段文件导入别名映射.\n\n"
                 "- key: alias\n"
                 "- value: 片段文件路径(字符串)\n"
-                "- V1 仅支持同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`\n"
-                "- 禁止: 绝对路径/父目录/子目录/alias 前缀"
+                "- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n"
+                "  - `./x.yaml` / `x.yaml`\n"
+                "  - `x/y.yaml`(子目录)\n"
+                "  - `../x.yaml`(父目录)\n"
+                "- 禁止: 绝对路径/任意 URI scheme(`*://...`)/预留 alias 前缀(例如 `@/x.yaml`, `COMMON:/x.yaml`)"
             ),
             "propertyNames": {"type": "string", "pattern": r"^[a-zA-Z_][a-zA-Z0-9_]*$"},
             "additionalProperties": {
                 "type": "string",
-                "pattern": r"^(\./)?[^/\\:]+\.ya?ml$",
+                # 说明: 更严格的边界与诊断以运行时实现为准(例如拒绝 `URI scheme`/绝对路径).
+                "pattern": r"^(?!@)(\./|\.\./)*([^/\\:]+/)*[^/\\:]+\.ya?ml$",
             },
         }
 

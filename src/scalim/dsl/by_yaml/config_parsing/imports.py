@@ -22,6 +22,9 @@ IMPORT_KEY = "$import"
 MAX_IMPORT_EXPANSION_DEPTH = 20
 
 _SEGMENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+_URI_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
+_WINDOWS_DRIVE_RE = re.compile(r"^[a-zA-Z]:")
+_RESERVED_ALIAS_PREFIX_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*:/")
 
 
 @dataclass(frozen=True)
@@ -70,22 +73,25 @@ def _normalize_import_path(raw: str) -> str:
     if not value:
         msg = "imports.* path cannot be empty"
         raise ValueError(msg)
-    if ":" in value or value.startswith("@"):
-        msg = "V1 only supports same-directory import paths: '{}'".format(value)
+    if _URI_SCHEME_RE.match(value):
+        msg = "Imports v2 only supports relative .yaml/.yml file paths; URI schemes are not allowed: '{}'".format(value)
         raise ValueError(msg)
     if value.startswith(("/", "\\")):
-        msg = "V1 only supports same-directory import paths: '{}'".format(value)
+        msg = "Imports v2 only supports relative .yaml/.yml file paths; absolute paths are not allowed: '{}'".format(value)
         raise ValueError(msg)
-    if value.startswith("./"):
+    if _WINDOWS_DRIVE_RE.match(value):
+        msg = "Imports v2 only supports relative .yaml/.yml file paths; Windows drive paths are not allowed: '{}'".format(value)
+        raise ValueError(msg)
+    if value.startswith("@") or _RESERVED_ALIAS_PREFIX_RE.match(value):
+        msg = "Imports v2 only supports relative .yaml/.yml file paths; reserved alias prefixes are not allowed: '{}'".format(value)
+        raise ValueError(msg)
+    if "\\" in value:
+        msg = "Imports v2 only supports '/' path separators: '{}'".format(value)
+        raise ValueError(msg)
+    while value.startswith("./"):
         value = value[2:]
-    if value.startswith("../"):
-        msg = "V1 only supports same-directory import paths: '{}'".format(raw)
-        raise ValueError(msg)
-    if "/" in value or "\\" in value:
-        msg = "V1 only supports same-directory import paths: '{}'".format(raw)
-        raise ValueError(msg)
     if not value.endswith((".yaml", ".yml")):
-        msg = "V1 only supports .yaml/.yml fragment paths: '{}'".format(raw)
+        msg = "Imports v2 only supports .yaml/.yml fragment paths: '{}'".format(raw)
         raise ValueError(msg)
     return value
 
@@ -105,7 +111,24 @@ def _parse_imports_mapping(raw: Any, *, base_dir: Path) -> Dict[str, Path]:
         if not isinstance(path_raw, str) or not str(path_raw).strip():
             msg = "imports.{} path must be a non-empty string".format(alias)
             raise TypeError(msg)
-        normalized = _normalize_import_path(str(path_raw))
+        raw_path = str(path_raw)
+        try:
+            normalized = _normalize_import_path(raw_path)
+        except Exception as exc:
+            resolved: Optional[Path] = None
+            try:
+                resolved = (base_dir / raw_path).resolve()
+            except Exception:  # noqa: BLE001
+                resolved = None
+            msg = "imports.{} invalid path: raw='{}' | base_dir='{}' | resolved='{}' | {}: {}".format(
+                alias,
+                raw_path,
+                str(base_dir),
+                str(resolved) if resolved is not None else "(unknown)",
+                type(exc).__name__,
+                exc,
+            )
+            raise ValueError(msg) from exc
         imports[str(alias)] = (base_dir / normalized).resolve()
     return imports
 

@@ -36,7 +36,7 @@
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`（imports + `$import`）
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`（顶层 `$import: [..]`）
-  - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_output_failure_fragments.yaml`
+  - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/_shared/support_output_failure_fragments.yaml`
 - `_templates`（用于 anchors/merge 复用；`_templates.retry.*` 受 schema 校验）
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ads/ads_campaign_report.yaml`

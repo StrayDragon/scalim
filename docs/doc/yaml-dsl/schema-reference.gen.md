@@ -10,7 +10,7 @@ Sources:
 
 ## Top-Level Fields
 - `name`: type=string; 需求配置名称. - 必填, 用于标识当前配置
-- `imports`: type=object; 片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V1 仅支持同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml` - 禁止: 绝对路径/父目录/子目录/alias 前缀
+- `imports`: type=object; 片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录): - `./x.yaml` / `x.yaml` - `x/y.yaml`(子目录) - `../x.yaml`(父目录) - 禁止: 绝对路径/任意 URI scheme(`*://...`)/预留 alias 前缀(例如 `@/x.yaml`, `COMMON:/x.yaml`)
 - `$import`: $import 引用. - string: `<alias>(.<segment>)*` - list: 按顺序合并,后者覆盖前者,最终再被本地覆盖 - 仅支持 mapping 片段 - V1 仅支持同级文件导入(见顶层 `imports`)
 - `_templates`: type=object; YAML anchor 模板集合. - 仅用于 YAML 复用(anchors) - 常用于 `fields` / `relations` / `retry`
 - `description`: type=string; 配置描述(可选).

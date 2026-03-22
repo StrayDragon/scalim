@@ -1,6 +1,6 @@
 # NOTE:
 # This file is intended to be imported by `ecommerce_report.yaml` via `imports/$import`.
-# Keep it in the same directory to satisfy V1 path constraints (same-directory fragments only).
+# Imports v2 resolves paths relative to the current YAML file's directory.
 
 main_source_params:
   ids: {$init_var: order_ids}

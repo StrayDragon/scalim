@@ -271,6 +271,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-micro-tunes/spec.md)
 - Summary: TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after archive.
 
+### `yaml-dsl-render-effective-yaml`
+- Title: yaml-dsl-render-effective-yaml Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-render-effective-yaml/spec.md)
+- Summary: **状态: ✅ 已实现** 提供用于 review/debug/对拍的**库侧 API**,将“作者写的 demand YAML”渲染为 effective YAML(展开后的单文件等价配置),避免 imports/template 复用在 review 时变成黑盒。
+
 ### `yaml-dsl-schema`
 - Title: yaml-dsl-schema Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-schema/spec.md)

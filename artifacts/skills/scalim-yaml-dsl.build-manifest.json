@@ -357,7 +357,7 @@
     },
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
-      "sha256": "c75ef15e1fa1638177bf3f5684da7f37d67beb78d0cc395ab85fbc0be8fc2324"
+      "sha256": "7ef9052d3cd8bffa8d413fdef23efb0ad7cbf47d79e11270c4a5c8eda309140b"
     },
     {
       "path": "openspec/specs/demand-dsl/spec.md",
@@ -433,7 +433,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "a2ee31ef08821a72923755e0655e3fdba4c33de8af8326f4ae882b26e0ee3024"
+      "sha256": "de37f55f955cf0eec9fe403c66d3cabec7bee3d83b94dadb724e2d8546de9bf3"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
@@ -451,7 +451,7 @@
     },
     {
       "path": "references/generated/example-full/ecommerce_report_fragments.yaml",
-      "sha256": "c75ef15e1fa1638177bf3f5684da7f37d67beb78d0cc395ab85fbc0be8fc2324"
+      "sha256": "7ef9052d3cd8bffa8d413fdef23efb0ad7cbf47d79e11270c4a5c8eda309140b"
     },
     {
       "path": "references/generated/yaml-dsl-upgrades.gen.md",
@@ -459,7 +459,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "3fa18d9c8bd6588bdde2af6a61b0155dd9b471eb951270f61bda944be90e08a8"
+      "sha256": "cfac4e751a24ecf54787e853873ed768f54272665882cfb745d948dfe726c265"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

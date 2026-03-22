@@ -22,6 +22,15 @@ Imports v2 放开 `../` 与子目录后，跨 demand 复用会更顺，但也会
   - 建议以“白名单/注册表”管理 presets（而不是任意包内路径），以便做版本治理
   - `render_explain`（可选）记录每个导入片段的来源（file path / scalim preset id），保证 review/debug 可审计
 
+（可选补充提案）
+
+- Windows 路径分隔符：
+  - 当前 imports v2 强制使用 `/` 分隔符并拒绝 `\\`，以保证路径语义可移植且避免 YAML 转义/UNC/盘符带来的歧义。
+  - 若后续确实需要提升 Windows 作者体验，可考虑“仅把 `\\` 作为分隔符归一化为 `/`”的策略，并继续拒绝盘符/UNC/URI scheme。
+- `render effective YAML` 的“作者友好输出”：
+  - 当前 `dump_effective_demand_yaml` 不保留注释/anchors/alias（`PyYAML safe_load/dump` 的天然限制），其定位是“审计产物”，不是“可逆的 authoring 形态”。
+  - 若后续需要更接近 roundtrip 的输出，可单独提案引入 `ruamel.yaml`（或等价 roundtrip dumper）作为**可选依赖**，在不影响 core runtime 的前提下提供“保留注释/anchors”的渲染工具链。
+
 ## Capabilities
 
 ### New Capabilities

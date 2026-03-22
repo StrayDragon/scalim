@@ -176,20 +176,23 @@ outputs: "oops"
 @pytest.mark.parametrize(
     "bad_path",
     [
-        "../common.yaml",
-        "fragments/common.yaml",
         "/abs/common.yaml",
+        "\\\\secrets.yaml",
+        "C:\\\\secrets.yaml",
+        "file:///tmp/x.yaml",
+        "scalim://yaml-dsl/presets/common.yaml",
+        "fragments\\\\common.yaml",
         "@/common.yaml",
         "COMMON:/common.yaml",
     ],
 )
-def test_imports_path_constraints_reject_non_sibling_paths(tmp_path, bad_path: str) -> None:
+def test_imports_path_constraints_reject_absolute_uri_and_reserved_alias_paths(tmp_path, bad_path: str) -> None:
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
 name: demo
 imports:
-  common: {bad_path}
+  common: '{bad_path}'
 main_source:
   source_id: orders
   loader: tests.conftest.mock_loader
@@ -197,8 +200,99 @@ sources: {{}}
 """.format(bad_path=bad_path).lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError):
+    with pytest.raises(YamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
+    assert excinfo.value.logical_path == "imports"
+    msg = str(excinfo.value)
+    assert "imports.common invalid path" in msg
+    assert "base_dir=" in msg
+    assert "resolved=" in msg
+
+
+def test_imports_mapping_resolve_hint_failures_are_handled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    demand = tmp_path / "demand.yaml"
+    demand.write_text(
+        """
+name: demo
+imports:
+  common: 'fragments\\\\common.yaml'
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+sources: {}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    original_resolve = Path.resolve
+
+    def _resolve(self: Path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if "\\" in str(self):
+            raise OSError("boom")
+        return original_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", _resolve)
+
+    with pytest.raises(YamlImportExpansionError) as excinfo:
+        _ = load_and_expand_imports(demand)
+    assert "resolved='(unknown)'" in str(excinfo.value)
+
+
+def test_imports_path_constraints_support_child_dir(tmp_path) -> None:
+    reports = tmp_path / "reports"
+    reports.mkdir(parents=True)
+    shared = reports / "_shared"
+    shared.mkdir(parents=True)
+    frag = shared / "common.yaml"
+    frag.write_text(
+        """
+demo:
+  x: 1
+""".lstrip(),
+        encoding="utf-8",
+    )
+    demand = reports / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: ./_shared/common.yaml
+demo:
+  $import: f.demo
+  y: 2
+""".lstrip(),
+        encoding="utf-8",
+    )
+    expanded = load_and_expand_imports(demand)
+    assert expanded["demo"]["x"] == 1
+    assert expanded["demo"]["y"] == 2
+
+
+def test_imports_path_constraints_support_parent_dir(tmp_path) -> None:
+    shared = tmp_path / "_shared"
+    shared.mkdir(parents=True)
+    frag = shared / "common.yaml"
+    frag.write_text(
+        """
+demo:
+  x: 1
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    reports = tmp_path / "reports"
+    reports.mkdir(parents=True)
+    demand = reports / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: ../_shared/common.yaml
+demo:
+  $import: f.demo
+""".lstrip(),
+        encoding="utf-8",
+    )
+    expanded = load_and_expand_imports(demand)
+    assert expanded["demo"]["x"] == 1
 
 
 def test_imports_cycle_detection(tmp_path) -> None:

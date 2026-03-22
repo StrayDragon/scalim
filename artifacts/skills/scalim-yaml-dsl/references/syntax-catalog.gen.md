@@ -271,8 +271,11 @@
   
   - key: alias
   - value: 片段文件路径(字符串)
-  - V1 仅支持同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`
-  - 禁止: 绝对路径/父目录/子目录/alias 前缀
+  - V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):
+    - `./x.yaml` / `x.yaml`
+    - `x/y.yaml`(子目录)
+    - `../x.yaml`(父目录)
+  - 禁止: 绝对路径/任意 URI scheme(`*://...`)/预留 alias 前缀(例如 `@/x.yaml`, `COMMON:/x.yaml`)
 - `additionalProperties`: `string`
 
 ### `$import`
