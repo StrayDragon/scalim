@@ -96,6 +96,9 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 - 确认 `from` / `to` 使用的是 `source.field_id`(或 list),不要写 loader 的 `data_key`
 - 确认 relation 链路连续
 - 确认 `sources.<id>.key` 与 step 右侧匹配
+- 若出现“本应命中但 miss / 分组拆分”,且确认是 key 类型不一致(例如 `1` vs `"1"`),优先按下面顺序处理:
+  - 显式口径: 在 step 上配置 `lookup_cast`,或在 `sources.<id>.key.cast` 统一 key 类型
+  - 全局口径(EXPERIMENTAL): 在调用侧启用 `key_normalization="auto_str"`(仅在无显式 cast 时生效)或 `key_normalization="force_str"`(最终匹配边界强制字符串口径)
 
 ### `normalize` 相关错误
 
