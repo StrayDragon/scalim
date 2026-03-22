@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 import scalim.execution.run_ir as run_ir_mod
+from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
+from scalim.events.event import Event
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.ob.observer import Observer
 from scalim.ob.presets.viz import VizObserverConfig
@@ -117,6 +119,55 @@ def test_run_ir_total_rows_counts_even_without_output_or_sink() -> None:
     result = run_ir(demand_ir, request)
     assert result.total_rows == 2
     assert result.output_path is None
+
+
+def test_run_ir_rejects_unknown_key_normalization() -> None:
+    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=InMemoryListSink(),
+        key_normalization="nope",  # type: ignore[arg-type]
+    )
+    with pytest.raises(ValueError, match="Invalid key_normalization"):
+        _ = run_ir(demand_ir, request)
+
+
+def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> None:
+    class _CaptureWarningObserver(Observer):
+        def __init__(self) -> None:
+            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.events = []
+
+        def on_event(self, event: Event) -> None:
+            self.events.append(event)
+
+    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+    observer = _CaptureWarningObserver()
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=InMemoryListSink(),
+        components=[observer],
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+
+    _ = run_ir(demand_ir, request)
+
+    assert len(observer.events) == 1
+    evt = observer.events[0]
+    assert evt.event_type == EVENT_DIAGNOSTIC_WARNING
+    assert "EXPERIMENTAL" in str(evt.payload.message)
+    assert "key_normalization='auto_str'" in str(evt.payload.message)
+    assert evt.payload.source_id == "(run)"
+    assert evt.payload.field_id == "(run)"
+    assert evt.payload.lookup_key is None
 
 
 def test_run_ir_closes_sink_on_exception() -> None:

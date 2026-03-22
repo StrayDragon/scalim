@@ -2,6 +2,18 @@
 
 本文用于沉淀该提案在 **IR 级别**推进前需要明确的开放问题、风险点与取舍项（避免实现时出现两套口径或隐性 breaking）。
 
+## ✅ 已确定(本 change 已在 design/spec 写死)
+
+- SSOT/threading: `ExecutionRequest.key_normalization`(默认 `raw`),RunOptions/workflow 入口 thread 到 execution core
+- 实验性标注: `key_normalization` 启用非 `raw` 模式(`auto_str/force_str`)时必须发出包含 `EXPERIMENTAL` 的运行期告警/诊断事件(一次运行去重)
+- relations 路线选择: 采用路线 A(`auto_str` 为缺省 fallback;`force_str` 为强制字符串规范化,显式 cast 先执行)
+- cached/preload sources: 当 step 实际使用字符串规范化口径匹配时(例如 `force_str`,或 `auto_str` 缺省 fallback),必须使用 mapping 的规范化视图命中;发生 key collision 必须 fail-fast
+- `None` 语义: raw `None` 为 `null_key`/允许分组;raw 非 `None` 但 normalize 失败为 `type_error`(relations)/fail-fast(derived)
+- float 语义: `key_normalization=auto_str/force_str` 按 `auto_str_normalize` 规则将 float 规范化为字符串(与 `lookup_cast:auto` 的“拒绝 float”不同,并在 spec 中明确)
+- derived outputs 输出表现: `group_by`/`dedup_by` 输出字段值使用规范化后的稳定字符串(仅在 opt-in 下)
+- 覆盖范围: 仅覆盖 relations lookup + derived group_by/dedup_by;`count_distinct` distinct key 等不在本变更 MVP
+- workflow YAML schema: 本变更不引入 `workflow.options.key_normalization` 字段(避免与 c12 unknown-fields 校验耦合)
+
 ## 1) SSOT 与 threading（开关放哪、怎么贯穿）
 
 - `key_normalization` 的 **SSOT** 建议落在 execution core（例如 IR 的 `ExecutionRequest` / runtime context）而不是散落在 relations/derived 内部；需要明确最终承载体、默认值与覆盖规则：
@@ -16,7 +28,7 @@
 1) 传给 loader（`$keys` / `$rows` 绑定），以及
 2) 作为索引命中 loader 返回 mapping 的 key（`intermediate_result[fk_value]`）。
 
-因此启用 `key_normalization=auto_str` 时需要明确采用哪条路线：
+因此启用 `key_normalization` 的字符串模式(`auto_str/force_str`)时需要明确采用哪条路线：
 
 - **路线 A（强一致 / 改 loader 入参）**：缺省情况下把 raw key 规范化为字符串后，再参与 loader 调用与 mapping lookup（等价于“默认 lookup_cast=auto_str”）。
   - 优点：实现最小；语义最统一；和既有 `lookup_cast` 心智模型一致。
@@ -31,7 +43,8 @@
 
 - 需要在 spec 中写死并验证：
   - step 级 `lookup_cast` 优先于 source 级 `key.cast`
-  - 两者都优先于 `key_normalization` 的缺省策略（`auto_str` 仅做 fallback）
+  - `auto_str`: 显式 cast 存在时不做字符串规范化(仅做 fallback)
+  - `force_str`: 显式 cast 先执行,但最终匹配边界仍强制做字符串规范化
 - 需要明确：多字段 key 时是逐字段 normalize 还是整体 stringify（建议逐字段并组成 `tuple[str, ...]`，但要写进 spec）。
 
 ## 4) `None` 语义：空值 vs “无法规范化”必须区分
@@ -46,7 +59,7 @@
 
 ## 5) key collision：允许/告警/拒绝的策略（必须显式）
 
-启用 `auto_str` 后潜在的语义合并：
+启用 `auto_str/force_str` 后潜在的语义合并：
 - `True` / `1` / `1.0` 可能都归一化到 `"1"`
 - `Decimal("1")` / `1` / `"1"` 合并到 `"1"`
 - datetime/date/time 的字符串口径可能造成意外合并或顺序问题
@@ -62,7 +75,7 @@
 - `auto_str_normalize` 会把 float 规范化为字符串（整数 float 变 `"123"`，非整数 float 用 `format(x, ".15g")`）
 
 需要明确：
-- `key_normalization=auto_str` 对 float 的行为是否真的符合业务预期（稳定性/对拍/跨版本一致性）
+- `key_normalization=auto_str/force_str` 对 float 的行为是否真的符合业务预期（稳定性/对拍/跨版本一致性）
 - 是否要对 float 做额外限制（例如保持与 relations 的 “float 需显式 cast” 一致，或者至少有 warn）
 
 ## 7) derived outputs：覆盖面边界（不仅是 group_by/dedup_by）
@@ -116,6 +129,10 @@
 
 ## 12) 性能/内存：开关开启后的开销与缓存策略
 
+## 🧩 后续可选提案(不作为本 change MVP 交付)
+
+- 将 key_normalization 扩展到 `count_distinct` distinct key(避免 `1` vs `"1"` 被当作不同 distinct)
+- 为 relations 的 key collision 增加脱敏诊断(计数/hash 摘要),帮助定位 upstream 数据质量问题
+- 若未来引入 node 级覆盖或跨 run 共享 cache,需将 `key_normalization` 纳入相关 signature/cache key
 - normalize 会引入额外 CPU；需要明确是否依赖批次级缓存（现有 `key_normalize_cache`）以及是否要扩展到 derived outputs 的 key normalization cache
 - 输出层（derived）若做 normalize，是否会在高基数下造成额外对象分配/内存膨胀；是否需要明确 guardrail/warn
-

@@ -20,24 +20,28 @@
   - by_yaml `run/compile`（`RunOptions`）
   - workflow `run_workflow`（workflow options 或入口参数）
   - 最终落到 execution core 的运行期上下文（确保 IR/Python-only 入口也可使用该能力）
-- 当 `key_normalization=auto_str` 时，框架内部“需要匹配”的 key 统一按 `auto_str_normalize` 规范化：
-  - relations lookup keys：在未显式配置 `lookup_cast`/`key.cast` 的情况下，将 `raw_key` 规范化为稳定字符串再参与 dict lookup / cache key；多字段 key 逐字段规范化并构造 `tuple[str, ...]`。
+- 支持两种字符串规范化模式（均基于 `auto_str_normalize`）：
+  - `key_normalization=auto_str`：仅作为缺省 fallback（未显式配置 `lookup_cast`/`key.cast` 时才生效）
+  - `key_normalization=force_str`：强制在最终匹配边界做字符串规范化（即使显式配置 cast 也会在最终做 `str` 化；显式 cast 仍先执行）
+- 当启用字符串模式时，框架内部“需要匹配”的 key 在进入匹配边界时按 `auto_str_normalize` 规范化：
+  - relations lookup keys：按模式语义决定是否/何时规范化；多字段 key 逐字段规范化并构造 `tuple[str, ...]`。
   - derived outputs 的 `group_by` / `dedup_by` keys：对 key_fields 逐字段规范化后再参与分组/去重；输出行中的 group_by 字段值也使用规范化后的字符串（避免“内部合并了但输出表现不一致/不稳定”）。
 - 失败/诊断语义（需要在 spec 中明确以便后续讨论与实现）：
   - `auto_str_normalize(...) -> None` 视为“无法规范化”，在 relations 路径中应计入 `type_error` 并提供可诊断 message；在 derived group_by/dedup 路径中推荐 fail-fast（避免 silent drop 造成报表少行且难排查）。
   - 该能力为 opt-in：默认 `key_normalization=raw`（完全保持现有行为与性能/缓存语义）。
+- 该能力为实验性：启用 `auto_str/force_str` 时应有明显提示（例如运行期 diagnostic warning 包含 `EXPERIMENTAL`，且去重避免刷屏）。
 - Non-Goals（本 change 明确不做）：
   - 不引入 sheetbook 行值类型 schema/casts；sheetbook/CSV 通道仍视为 string channel（类型由下游显式转换）。
-  - 不改变 `lookup_cast` 的既有 SSOT（用户显式配置的 cast 永远优先；仅在缺省时才由 key_normalization 提供 fallback 策略）。
+  - 不改变 `lookup_cast` 的既有 SSOT：显式 cast 仍决定 candidate key（优先级高于缺省路径）；但在 `force_str` 下最终匹配边界仍会强制 `str` 化（这是该模式的定义）。
 
 ## Capabilities
 
 ### New Capabilities
-- `key-normalization`: 提供 workflow/run 级别的 key 规范化策略（本 change 首先实现 `auto_str`），用于统一 relations + derived group_by/dedup 的匹配边界与诊断语义。
+- `key-normalization`: 提供 workflow/run 级别的 key 规范化策略（本 change 实现 `auto_str` 与 `force_str`），用于统一 relations + derived group_by/dedup 的匹配边界与诊断语义。
 
 ### Modified Capabilities
-- `source-relations`: 当启用 `key-normalization=auto_str` 时，缺省 lookup key 的规范化与 `type_error`/诊断语义需要补齐到规范。
-- `derived-outputs`: 当启用 `key-normalization=auto_str` 时，`group_by`/`dedup_by` 的 key 边界与输出表现需要定义（避免 `1` vs `"1"` 分裂）。
+- `source-relations`: 当启用 `key-normalization=auto_str/force_str` 时，lookup key 的规范化边界与 `type_error`/诊断语义需要补齐到规范（含 cached/preload mapping 的命中语义）。
+- `derived-outputs`: 当启用 `key-normalization=auto_str/force_str` 时，`group_by`/`dedup_by` 的 key 边界与输出表现需要定义（避免 `1` vs `"1"` 分裂）。
 - `dsl-runtime-structure`: by_yaml 与 workflow 对外入口需要新增 opt-in 参数，并定义其默认值/覆盖关系。
 
 ## Impact

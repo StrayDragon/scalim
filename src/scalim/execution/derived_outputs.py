@@ -7,9 +7,21 @@ from decimal import Decimal, InvalidOperation
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 
 from ..sinks.sink_base import BaseRowSink, IRowSink
-from ..typedefs import FieldValue, RowData
+from ..typedefs import FieldValue, KeyNormalizationMode, RowData
 from ..utils import graph as graph_utils
+from ..utils.converters import auto_str_normalize
 from ..vendor.compact.typing_extensionsx import override
+from .key_normalization import normalize_key_normalization
+
+
+def _auto_str_normalize_derived_key_part(*, value: object, field_id: str, context: str) -> FieldValue:
+    if value is None:
+        return None
+    normalized = auto_str_normalize(value)
+    if normalized is None:
+        msg = "key_normalization failed for {} key field {!r} (type={})".format(str(context), str(field_id), type(value).__name__)
+        raise ValueError(msg)
+    return normalized
 
 
 class AggregationKeyLimitExceededError(RuntimeError):
@@ -693,6 +705,7 @@ class GroupByAggregator(IRowAggregator):
     _max_groups: int
     _max_distinct: int
     _distinct_on_overflow: str
+    _key_normalization: KeyNormalizationMode
 
     def __init__(
         self,
@@ -702,6 +715,7 @@ class GroupByAggregator(IRowAggregator):
         max_groups: int = 0,
         max_distinct: int = 0,
         distinct_on_overflow: str = "error",
+        key_normalization: KeyNormalizationMode = "raw",
     ) -> None:
         if not group_by:
             msg = "group_by cannot be empty"
@@ -715,6 +729,7 @@ class GroupByAggregator(IRowAggregator):
         self._max_groups = int(max_groups) if max_groups else 0
         self._max_distinct = int(max_distinct) if max_distinct else 0
         self._distinct_on_overflow = str(distinct_on_overflow or "error").lower()
+        self._key_normalization = normalize_key_normalization(key_normalization)
 
     @override
     def required_fields(self) -> Tuple[str, ...]:
@@ -736,7 +751,12 @@ class GroupByAggregator(IRowAggregator):
 
     @override
     def accumulate(self, row: RowData) -> None:
-        key = tuple(row.get(fid) for fid in self._group_by)
+        if self._key_normalization == "raw":
+            key = tuple(row.get(fid) for fid in self._group_by)
+        else:
+            key = tuple(
+                _auto_str_normalize_derived_key_part(value=row.get(fid), field_id=fid, context="group_by") for fid in self._group_by
+            )
         state = self._states.get(key)
         if state is None:
             if self._max_groups and len(self._states) >= self._max_groups:
@@ -826,6 +846,7 @@ class RankedGroupByAggregator(IRowAggregator):
         max_groups: int = 0,
         max_distinct: int = 0,
         distinct_on_overflow: str = "error",
+        key_normalization: KeyNormalizationMode = "raw",
     ) -> None:
         self._group_by = tuple(str(item) for item in group_by)
         self._rank_fields = tuple(rank_fields)
@@ -837,6 +858,7 @@ class RankedGroupByAggregator(IRowAggregator):
             max_groups=max_groups,
             max_distinct=max_distinct,
             distinct_on_overflow=distinct_on_overflow,
+            key_normalization=key_normalization,
         )
 
     @override
@@ -1024,6 +1046,7 @@ class DedupByThenAggregator(IRowAggregator):
     _store_fields: Tuple[str, ...]
     _rows: Dict[Tuple[FieldValue, ...], Dict[str, FieldValue]]
     _conflict_count: int
+    _key_normalization: KeyNormalizationMode
 
     def __init__(
         self,
@@ -1033,6 +1056,7 @@ class DedupByThenAggregator(IRowAggregator):
         max_distinct: int,
         on_overflow: str,
         downstream: IRowAggregator,
+        key_normalization: KeyNormalizationMode = "raw",
     ) -> None:
         ids = [str(x) for x in key_fields if str(x)]
         if not ids:
@@ -1063,6 +1087,7 @@ class DedupByThenAggregator(IRowAggregator):
 
         self._rows = {}
         self._conflict_count = 0
+        self._key_normalization = normalize_key_normalization(key_normalization)
 
     @override
     def required_fields(self) -> Tuple[str, ...]:
@@ -1070,14 +1095,25 @@ class DedupByThenAggregator(IRowAggregator):
 
     @override
     def accumulate(self, row: RowData) -> None:
-        key = tuple(row.get(fid) for fid in self._key_fields)
+        if self._key_normalization == "raw":
+            key = tuple(row.get(fid) for fid in self._key_fields)
+            stored_row = {fid: row.get(fid) for fid in self._store_fields}
+        else:
+            normalized_by_fid: Dict[str, FieldValue] = {}
+            parts: List[FieldValue] = []
+            for fid in self._key_fields:
+                normalized_part = _auto_str_normalize_derived_key_part(value=row.get(fid), field_id=fid, context="dedup_by")
+                normalized_by_fid[fid] = normalized_part
+                parts.append(normalized_part)
+            key = tuple(parts)
+            stored_row = {fid: (normalized_by_fid[fid] if fid in normalized_by_fid else row.get(fid)) for fid in self._store_fields}
         existing = self._rows.get(key)
         if existing is not None:
             self._conflict_count += 1
             if self._on_conflict == "error":
                 raise DedupKeyConflictError(key_fields=self._key_fields, on_conflict=self._on_conflict)
             if self._on_conflict == "last":
-                self._rows[key] = {fid: row.get(fid) for fid in self._store_fields}
+                self._rows[key] = stored_row
             # `first`: 保留已有行
             return
 
@@ -1087,7 +1123,7 @@ class DedupByThenAggregator(IRowAggregator):
         if not retained:
             return
 
-        self._rows[key] = {fid: row.get(fid) for fid in self._store_fields}
+        self._rows[key] = stored_row
 
     @override
     def finalize_rows(self) -> List[RowData]:

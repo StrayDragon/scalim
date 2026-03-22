@@ -820,7 +820,8 @@ def test_collect_specs_for_derived_warnings_unknown_spec_returns_empty(tmp_path:
         def validate_parallel_mode(self, parallel_mode: str) -> None:
             return
 
-        def build_aggregator(self) -> IRowAggregator:
+        def build_aggregator(self, *, key_normalization: str = "raw") -> IRowAggregator:
+            _ = key_normalization
             return _PassThroughAgg()
 
     out = tmp_path / "report.xlsx"

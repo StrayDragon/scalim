@@ -270,7 +270,7 @@ def load_step_data(
     runtime = exec_ctx.runtime
 
     if runtime.is_source_cached(source.source_id):
-        return runtime.preloaded_cache[source.source_id]
+        return runtime.get_cached_source_mapping(step)
 
     to_key = step.get_to_key_or_source_key()
     binding_key = normalize_key_field(to_key)

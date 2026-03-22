@@ -1,6 +1,6 @@
 import contextlib
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -17,10 +17,11 @@ from ..sinks.sink_base import BaseRowSink, BaseSink, ColumnBatch, ColumnValues, 
 from ..sinks.sink_csv import ColumnCSVSink, CSVSink
 from ..spec.ir.demand import DemandIr
 from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
-from ..typedefs import ParallelMode, RowData, SinkRowKeySeq
+from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
 from .engine import ScalimEngine
 from .guardrails import GuardrailsPolicy
+from .key_normalization import normalize_key_normalization
 from .loader_retry import LoaderRetryPolicies
 from .output_contracts import ExportLayout, OutputSpec
 
@@ -65,6 +66,9 @@ class ExecutionRequest:
 
     max_workers: int = 0
     """最大并发工作数提示(`0` 表示自动)."""
+
+    key_normalization: KeyNormalizationMode = "raw"
+    """可选: `key` 规范化模式(实验性;默认 `raw`)."""
 
     guardrails: Optional[GuardrailsPolicy] = None
     """可选:运行时护栏策略."""
@@ -526,6 +530,7 @@ def _assemble_outputs(
         run_started_at_epoch=wall_start_time,
         run_parallel_mode=str(request.parallel_mode),
         run_batch_size=batch_size,
+        run_key_normalization=request.key_normalization,
         instrumentation=instrumentation,
     )
 
@@ -583,6 +588,7 @@ def _create_engine_with_cleanup(
             batch_size=batch_size,
             parallel_mode=request.parallel_mode,
             max_workers=request.max_workers,
+            key_normalization=request.key_normalization,
         )
     except Exception:
         with contextlib.suppress(Exception):
@@ -601,8 +607,23 @@ def run_ir(
     start_time = time.perf_counter()
     wall_start_time = time.time()
 
+    request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
+
     plan = _build_execution_plan(demand_ir, request)
     observer_manager, hook_manager = _build_observer_and_hook_managers(plan=plan, request=request, event_meta_defaults=event_meta_defaults)
+
+    if request.key_normalization != "raw":
+        instrumentation = InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)
+        instrumentation.emit_diagnostic_warning(
+            message="EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(
+                request.key_normalization
+            ),
+            source_id="(run)",
+            field_id="(run)",
+            lookup_key=None,
+            row_id="(run)",
+            sample_once=True,
+        )
 
     stats = InternalStatsCollector()
     batch_size = request.batch_size if request.batch_size is not None else demand_ir.batch_size_hint

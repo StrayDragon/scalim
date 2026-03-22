@@ -28,6 +28,14 @@ ParallelMode = Literal["seq", "adaptive"]
 - `adaptive`: 自动调度批次内 `LoadRef(keys)` 的并发 `fan-out`/`fan-in`,并在提交点稳定归并与回放事件
 """
 
+KeyNormalizationMode = Literal["raw", "auto_str", "force_str"]
+"""`key` 规范化模式
+
+- `raw`: 保持原始 `key` 口径(默认)
+- `auto_str`: 仅在未显式配置 `cast` 时,按稳定字符串口径匹配(缺省回退)
+- `force_str`: 强制按稳定字符串口径匹配(即使显式 `cast` 也在最终匹配边界做字符串规范化)
+"""
+
 PerformanceReportFormat = Literal["console", "json", "csv", "none"]
 """性能报告格式"""
 

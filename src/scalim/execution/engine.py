@@ -8,7 +8,7 @@ from ..ob.manager import ObserverManager
 from ..planning.plan import ExecutionPlan
 from ..sinks.sink_base import ISink
 from ..spec.ir.demand import DemandIr
-from ..typedefs import LoaderResultMapping, RowData
+from ..typedefs import KeyNormalizationMode, LoaderResultMapping, RowData
 from .executor.batch.executor import BatchExecutor
 from .executor.runtime.runtime import ExecutionRuntime
 from .guardrails import GuardrailsPolicy
@@ -47,6 +47,7 @@ class ScalimEngine:
         gc_interval: int = 10,
         parallel_mode: str = "seq",
         max_workers: int = 0,
+        key_normalization: KeyNormalizationMode = "raw",
         pipeline_overrides: Optional[PipelineOverrides] = None,
         guardrails: Optional[GuardrailsPolicy] = None,
         loader_retry: Optional[LoaderRetryPolicies] = None,
@@ -106,6 +107,7 @@ class ScalimEngine:
             loader_retry=loader_retry,
             parallel_mode=parallel_mode,
             max_workers=max_workers,
+            key_normalization=key_normalization,
             preloaded_cache=preloaded_cache,
             workflow_cache_pool=workflow_cache_pool,
             workflow_node_id=workflow_node_id,

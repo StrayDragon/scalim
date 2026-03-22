@@ -483,3 +483,89 @@ def test_two_stage_group_by_and_count_true_gte() -> None:
     diag = agg.diagnostics()
     assert diag.meta["stage1.group_count"] == 3
     assert diag.meta["stage2.group_count"] == 2
+
+
+def test_group_by_aggregator_key_normalization_merges_semantically_equal_keys() -> None:
+    agg = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    agg.accumulate({"g": 1})
+    agg.accumulate({"g": "1"})
+    agg.accumulate({"g": None})
+    assert agg.finalize_rows() == [{"g": None, "cnt": 1}, {"g": "1", "cnt": 2}]
+
+
+def test_group_by_aggregator_key_normalization_fail_fast_message_is_safe() -> None:
+    agg = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    raw = object()
+    with pytest.raises(ValueError) as excinfo:
+        agg.accumulate({"g": raw})
+    assert "key_normalization failed for group_by key field" in str(excinfo.value)
+    assert "type=object" in str(excinfo.value)
+    assert "0x" not in str(excinfo.value)
+
+
+def test_dedup_by_then_aggregator_key_normalization_merges_and_outputs_normalized_key() -> None:
+    downstream = mod.GroupByAggregator(
+        group_by=("k",),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    agg = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="first",
+        max_distinct=0,
+        on_overflow="error",
+        downstream=downstream,
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    agg.accumulate({"k": 1})
+    agg.accumulate({"k": "1"})
+    assert agg.finalize_rows() == [{"k": "1", "cnt": 1}]
+
+
+def test_dedup_by_then_aggregator_key_normalization_conflict_uses_normalized_key() -> None:
+    downstream = mod.GroupByAggregator(
+        group_by=("k",),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    agg = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="error",
+        max_distinct=0,
+        on_overflow="error",
+        downstream=downstream,
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    agg.accumulate({"k": 1})
+    with pytest.raises(mod.DedupKeyConflictError):
+        agg.accumulate({"k": "1"})
+
+
+def test_dedup_by_then_aggregator_key_normalization_fail_fast_message_is_safe() -> None:
+    downstream = mod.GroupByAggregator(
+        group_by=("k",),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    agg = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="first",
+        max_distinct=0,
+        on_overflow="error",
+        downstream=downstream,
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+    raw = object()
+    with pytest.raises(ValueError) as excinfo:
+        agg.accumulate({"k": raw})
+    assert "key_normalization failed for dedup_by key field" in str(excinfo.value)
+    assert "type=object" in str(excinfo.value)
+    assert "0x" not in str(excinfo.value)

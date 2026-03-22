@@ -14,8 +14,10 @@ from ....spec.ir.aliases import LookupKeyCast
 from ....spec.ir.fields import SupportedFieldIr
 from ....spec.ir.relations import LookupStepIr
 from ....spec.ir.sources import MainSourceIr
-from ....typedefs import LoaderResultMapping, LookupKey, ParallelMode, RowData
+from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LookupKey, ParallelMode, RowData
+from ....utils.converters import auto_str_normalize_key
 from ...guardrails import GuardrailsPolicy
+from ...key_normalization import normalize_key_normalization, should_apply_str_key_normalization
 from ...loader_retry import LoaderRetryPolicies
 from ...workflow_cache_pool import WorkflowCachePool
 from ..helpers.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
@@ -40,6 +42,7 @@ class ExecutionRuntime:
     workflow_cache_pool: Optional[WorkflowCachePool]
     workflow_node_id: Optional[str]
     _preload_source_ids: FrozenSet[str]
+    _preloaded_cache_str_views: Dict[str, LoaderResultMapping]
     load_ref_cache: Dict[LoadRefCacheKey, LoadRefCacheEntry]
     key_normalize_cache: Dict[RelationSignature, Dict[Tuple[Hashable, Tuple[str, ...]], Optional[LookupKey]]]
     load_ref_group_fields: Dict[RelationSignature, Tuple[str, ...]]
@@ -63,6 +66,7 @@ class ExecutionRuntime:
     batch_num: int
     parallel_mode: ParallelMode
     max_workers: int
+    key_normalization: KeyNormalizationMode
     adaptive_backend: Optional[str]
     adaptive_process_failure_mode: Optional[str]
 
@@ -77,11 +81,13 @@ class ExecutionRuntime:
         *,
         parallel_mode: ParallelMode = "seq",
         max_workers: int = 0,
+        key_normalization: KeyNormalizationMode = "raw",
         preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
         workflow_cache_pool: Optional[WorkflowCachePool] = None,
         workflow_node_id: Optional[str] = None,
     ) -> None:
         self.preloaded_cache = preloaded_cache if preloaded_cache is not None else {}
+        self._preloaded_cache_str_views = {}
         self.workflow_cache_pool = workflow_cache_pool
         self.workflow_node_id = str(workflow_node_id) if workflow_node_id is not None else None
         self.load_ref_cache = {}
@@ -100,6 +106,7 @@ class ExecutionRuntime:
         self.batch_num = 0
         self.parallel_mode = parallel_mode
         self.max_workers = max_workers
+        self.key_normalization = normalize_key_normalization(key_normalization)
         self.adaptive_backend = None
         self.adaptive_process_failure_mode = None
         self._preload_source_ids = frozenset(str(source.source_id) for source in plan.preload_sources if source.is_preload_forever())
@@ -111,6 +118,37 @@ class ExecutionRuntime:
         self.rows_cache_logged = set()
         self.guardrail_logged = set()
         self.relation_guardrail_stats = {}
+
+    def get_cached_source_mapping(self, step: LookupStepIr) -> LoaderResultMapping:
+        source_id = str(step.to_source.source_id)
+        mapping = self.preloaded_cache.get(source_id)
+        if mapping is None:
+            msg = "Unknown cached source '{}'".format(source_id)
+            raise KeyError(msg)
+
+        has_explicit_cast = step.lookup_cast is not None or step.to_source.key.cast is not None
+        if not should_apply_str_key_normalization(self.key_normalization, has_explicit_cast=has_explicit_cast):
+            return mapping
+
+        cached_view = self._preloaded_cache_str_views.get(source_id)
+        if cached_view is not None:
+            return cached_view
+
+        # 延迟构建规范化视图(稳定字符串 `key` 空间)用于匹配.
+        out: Dict[LookupKey, object] = {}
+        for raw_key, value in mapping.items():
+            normalized_key, status, _error_message = auto_str_normalize_key(raw_key)
+            if status != "ok" or normalized_key is None:
+                continue
+            if normalized_key in out:
+                msg = "key_normalization collision in cached source '{}' (multiple keys normalize to the same stable string key)".format(
+                    source_id
+                )
+                raise ValueError(msg)
+            out[normalized_key] = value
+
+        self._preloaded_cache_str_views[source_id] = out
+        return out
 
     def _compute_reverse_deps(self, plan: ExecutionPlan) -> Dict[str, Set[str]]:
         """计算反向依赖"""
@@ -184,13 +222,27 @@ class ExecutionRuntime:
         if raw_key is None:
             return None, "null_key", None
 
+        has_explicit_cast = step.lookup_cast is not None or step.to_source.key.cast is not None
+
         if step.lookup_cast is not None:
-            return self._apply_lookup_cast(step.lookup_cast, raw_key, none_message="lookup_cast returned None")
+            candidate, status, error_message = self._apply_lookup_cast(step.lookup_cast, raw_key, none_message="lookup_cast returned None")
+        elif step.to_source.key.cast is not None:
+            candidate, status, error_message = self._apply_lookup_cast(
+                step.to_source.key.cast, raw_key, none_message="key.cast returned None"
+            )
+        else:
+            candidate, status, error_message = raw_key, "ok", None
 
-        if step.to_source.key.cast is not None:
-            return self._apply_lookup_cast(step.to_source.key.cast, raw_key, none_message="key.cast returned None")
+        if status != "ok" or candidate is None:
+            return candidate, status, error_message
 
-        return raw_key, "ok", None
+        if not should_apply_str_key_normalization(self.key_normalization, has_explicit_cast=has_explicit_cast):
+            return candidate, "ok", None
+
+        normalized_key, norm_status, norm_error_message = auto_str_normalize_key(candidate)
+        if norm_status != "ok":
+            return None, norm_status, norm_error_message
+        return normalized_key, "ok", None
 
     def _apply_lookup_cast(
         self,

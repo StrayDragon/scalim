@@ -877,3 +877,177 @@ def test_load_ref_executor_ignores_non_load_ref_operator() -> None:
 
     LoadRefOperatorExecutor().execute(wrong_operator, context, [1], runtime)
     assert context.get_field_value("amount", 1) is None
+
+
+def test_load_ref_key_normalization_auto_str_unifies_key_types_for_matching() -> None:
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"target_ids": list(ctx.lookup_keys or [])}
+
+    def _loader(target_ids):  # type: ignore[no-untyped-def]
+        # Always return string-keyed mapping (regardless of input type).
+        return {str(key): {"name": "Name{}".format(key)} for key in target_ids}
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+    plan = ExecutionPlan(field_specs={"target_name": field_spec})
+
+    # raw: fk=1 -> lookup key is int(1), but mapping is str-keyed -> miss
+    runtime_raw = _make_runtime(plan, main_source, key_normalization="raw")
+    ctx_raw = BatchContext()
+    ctx_raw.set_field_value("fk_id", 1, 1)
+    LoadRefOperatorExecutor().execute(operator, ctx_raw, [1], runtime_raw)
+    assert ctx_raw.get_field_value("target_name", 1) is None
+
+    # auto_str: fk=1 -> lookup key is "1", mapping is str-keyed -> hit
+    runtime_norm = _make_runtime(plan, main_source, key_normalization="auto_str")
+    ctx_norm = BatchContext()
+    ctx_norm.set_field_value("fk_id", 1, 1)
+    LoadRefOperatorExecutor().execute(operator, ctx_norm, [1], runtime_norm)
+    assert ctx_norm.get_field_value("target_name", 1) == "Name1"
+
+
+def test_load_ref_key_normalization_force_str_normalizes_even_when_lookup_cast_is_set() -> None:
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"target_ids": list(ctx.lookup_keys_list or [])}
+
+    def _loader(target_ids):  # type: ignore[no-untyped-def]
+        # Return mapping keyed by whatever the loader received.
+        return {key: {"name": "Name{}".format(key)} for key in target_ids}
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=int),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+    plan = ExecutionPlan(field_specs={"target_name": field_spec})
+
+    # auto_str: explicit lookup_cast takes precedence -> loader sees int keys
+    runtime_auto = _make_runtime(plan, main_source, key_normalization="auto_str")
+    ctx_auto = BatchContext()
+    ctx_auto.set_field_value("fk_id", 1, "1")
+    LoadRefOperatorExecutor().execute(operator, ctx_auto, [1], runtime_auto)
+    assert ctx_auto.get_field_value("target_name", 1) == "Name1"
+
+    # force_str: normalize at the final match boundary -> loader sees str keys
+    runtime_force = _make_runtime(plan, main_source, key_normalization="force_str")
+    ctx_force = BatchContext()
+    ctx_force.set_field_value("fk_id", 1, "1")
+    LoadRefOperatorExecutor().execute(operator, ctx_force, [1], runtime_force)
+    assert ctx_force.get_field_value("target_name", 1) == "Name1"
+
+    # Verify the key space difference via cached loader results.
+    assert 1 in next(iter(runtime_auto.load_ref_cache.values())).result
+    assert "1" in next(iter(runtime_force.load_ref_cache.values())).result
+
+
+def test_load_ref_cached_mapping_key_normalization_hits_preloaded_int_key() -> None:
+    main_source = _make_main_source()
+    fail_loader = _FailLoader()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=fail_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source, key_normalization="auto_str")
+    runtime.preloaded_cache["targets"] = {1: {"name": "Alpha"}}
+    ctx = BatchContext()
+    ctx.set_field_value("fk_id", 1, "1")
+
+    LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)
+
+    assert fail_loader.calls == 0
+    assert ctx.get_field_value("target_name", 1) == "Alpha"
+
+
+def test_load_ref_cached_mapping_key_normalization_hits_preloaded_multi_field_key() -> None:
+    main_source = _make_main_source()
+    fail_loader = _FailLoader()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key=("a", "b")),
+        loader_spec=LoaderIr(callable=fail_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    steps = (LookupStepIr(from_field=["a", "b"], to_source=target_source),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source, key_normalization="auto_str")
+    runtime.preloaded_cache["targets"] = {(1, 2): {"name": "Alpha"}}
+    ctx = BatchContext()
+    ctx.set_field_value("a", 1, "1")
+    ctx.set_field_value("b", 1, 2)
+
+    LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)
+
+    assert fail_loader.calls == 0
+    assert ctx.get_field_value("target_name", 1) == "Alpha"
+
+
+def test_load_ref_cached_mapping_key_normalization_collision_fail_fast() -> None:
+    main_source = _make_main_source()
+    fail_loader = _FailLoader()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=fail_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source, key_normalization="auto_str")
+    runtime.preloaded_cache["targets"] = {1: {"name": "A"}, "1": {"name": "B"}}
+    ctx = BatchContext()
+    ctx.set_field_value("fk_id", 1, 1)
+
+    with pytest.raises(ValueError, match="collision"):
+        LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)

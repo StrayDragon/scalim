@@ -8,7 +8,7 @@ from ....execution.run_ir import ExecutionResult
 from ....hooks.base import IExecutionHook
 from ....ob.observer import Observer
 from ....sinks.sink_base import ISink
-from ....typedefs import ParallelMode
+from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
 from ..schema_dsl.models import DemandConfig
@@ -88,6 +88,9 @@ class RunOptions:
 
     max_workers: int = 0
     """最大并发工作数提示(`0` 表示自动)."""
+
+    key_normalization: KeyNormalizationMode = "raw"
+    """可选: `key` 规范化模式(实验性)."""
 
     overrides: Optional[RunOverrides] = None
     """可选:运行期覆盖项(例如输出与 `viz` 配置覆盖)."""

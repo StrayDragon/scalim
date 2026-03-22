@@ -82,10 +82,11 @@ def _make_runtime(
     hook_manager: Optional[HookManager] = None,
     observer_manager: Optional[ObserverManager] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
+    key_normalization: str = "raw",
 ) -> ExecutionRuntime:
     hook_manager = hook_manager or HookManager()
     observer_manager = observer_manager or ObserverManager()
-    return ExecutionRuntime(plan, hook_manager, observer_manager, main_source, guardrails=guardrails)
+    return ExecutionRuntime(plan, hook_manager, observer_manager, main_source, guardrails=guardrails, key_normalization=key_normalization)  # type: ignore[arg-type]
 
 
 class _WantsInstrumentation(object):

@@ -1,13 +1,14 @@
 from typing import Dict, FrozenSet, List, Mapping, Optional, Union
 
 from ....execution.guardrails import GuardrailsPolicy
+from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
 from ....execution.output_composition import OutputCompositionSpec
 from ....execution.run_ir import run_ir
 from ....hooks.base import IExecutionHook
 from ....ob.observer import Observer
 from ....sinks.sink_base import ISink
-from ....typedefs import ParallelMode
+from ....typedefs import KeyNormalizationMode, ParallelMode
 from .compiler import compile as _compile
 from .contracts import Compilation, RunOptions, RunOverrides, RunResult
 
@@ -26,6 +27,7 @@ def run(
     batch_size: Optional[int] = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
+    key_normalization: KeyNormalizationMode = "raw",
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
 ) -> RunResult:
@@ -54,6 +56,7 @@ def run(
         batch_size=batch_size,
         parallel_mode=parallel_mode,
         max_workers=max_workers,
+        key_normalization=normalize_key_normalization(key_normalization),
         init_vars=init_vars,
         template_vars=template_vars,
     )
@@ -76,6 +79,7 @@ def compile(  # noqa: A001
     batch_size: Optional[int] = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
+    key_normalization: KeyNormalizationMode = "raw",
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
 ) -> Compilation:
@@ -91,6 +95,7 @@ def compile(  # noqa: A001
         batch_size=batch_size,
         parallel_mode=parallel_mode,
         max_workers=max_workers,
+        key_normalization=normalize_key_normalization(key_normalization),
         init_vars=init_vars,
         template_vars=template_vars,
     )

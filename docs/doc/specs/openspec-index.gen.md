@@ -96,6 +96,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/ir-structure/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 IR 层的纯数据边界与依赖约束,确保 spec/ir 不依赖执行与规划层,便于稳定复用、演进与测试.
 
+### `key-normalization`
+- Title: key-normalization Specification
+- Source: [spec.md](#code=openspec/specs/key-normalization/spec.md)
+- Summary: `key_normalization` 提供一个运行期可控的“稳定字符串口径”键匹配策略,用于解决 relations/derived outputs 中 `1` 与 `"1"` 等跨来源类型不一致导致的 miss/分组拆分问题. 该能力为 `EXPERIMENTAL`,默认关闭(`raw`).
+
 ### `loader-retry-policy`
 - Title: loader-retry-policy Specification
 - Source: [spec.md](#code=openspec/specs/loader-retry-policy/spec.md)

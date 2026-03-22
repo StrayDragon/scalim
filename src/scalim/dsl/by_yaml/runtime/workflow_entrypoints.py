@@ -22,6 +22,7 @@ from ....events.catalog import (
 from ....events.event import generate_run_id
 from ....events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
 from ....execution.engine import ScalimEngine
+from ....execution.key_normalization import normalize_key_normalization
 from ....execution.run_ir import ExecutionResult, run_ir
 from ....execution.workflow_cache_pool import WorkflowCachePool, WorkflowCachePoolError
 from ....hooks.base import HookManager
@@ -420,6 +421,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
     batch_size: Optional[int] = None,
     parallel_mode: str = "seq",
     max_workers: int = 0,
+    key_normalization: str = "raw",
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     path_aliases: Optional[Mapping[str, str]] = None,
@@ -454,6 +456,7 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         batch_size=batch_size,
         parallel_mode=cast("Any", parallel_mode),
         max_workers=int(max_workers),
+        key_normalization=normalize_key_normalization(key_normalization),
         init_vars=init_vars,
         template_vars=template_vars,
     )

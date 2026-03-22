@@ -13,7 +13,7 @@ from ..events.events import OutputTargetEndEvent
 from ..ob.hub import InstrumentationHub
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..sinks.sink_csv import CSVSink
-from ..typedefs import RowData
+from ..typedefs import KeyNormalizationMode, RowData
 from ..vendor.compact.typing_extensionsx import override
 from .derived_outputs import (
     AggMetricSpec,
@@ -68,7 +68,7 @@ class IDerivedAggregationSpec(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_aggregator(self) -> IRowAggregator:
+    def build_aggregator(self, *, key_normalization: KeyNormalizationMode = "raw") -> IRowAggregator:
         raise NotImplementedError
 
 
@@ -158,7 +158,7 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
             raise ValueError(msg)
 
     @override
-    def build_aggregator(self) -> IRowAggregator:
+    def build_aggregator(self, *, key_normalization: KeyNormalizationMode = "raw") -> IRowAggregator:
         if self.rank_fields or self.post_fields:
             return RankedGroupByAggregator(
                 group_by=self.group_by,
@@ -168,6 +168,7 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
                 max_groups=int(self.max_groups),
                 max_distinct=int(self.max_distinct),
                 distinct_on_overflow=str(self.distinct_on_overflow),
+                key_normalization=key_normalization,
             )
         return GroupByAggregator(
             group_by=self.group_by,
@@ -175,6 +176,7 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
             max_groups=int(self.max_groups),
             max_distinct=int(self.max_distinct),
             distinct_on_overflow=str(self.distinct_on_overflow),
+            key_normalization=key_normalization,
         )
 
 
@@ -244,14 +246,15 @@ class DerivedDedupByGroupBySpec(IDerivedAggregationSpec):
         self.group_by.validate_parallel_mode(parallel_mode)
 
     @override
-    def build_aggregator(self) -> IRowAggregator:
-        base = self.group_by.build_aggregator()
+    def build_aggregator(self, *, key_normalization: KeyNormalizationMode = "raw") -> IRowAggregator:
+        base = self.group_by.build_aggregator(key_normalization=key_normalization)
         return DedupByThenAggregator(
             key_fields=self.dedup_by.key_fields,
             on_conflict=str(self.dedup_by.on_conflict),
             max_distinct=int(self.dedup_by.max_distinct),
             on_overflow=str(self.dedup_by.on_overflow),
             downstream=base,
+            key_normalization=key_normalization,
         )
 
 
@@ -288,13 +291,14 @@ class TwoStageGroupBySpec(IDerivedAggregationSpec):
             raise ValueError(msg)
 
     @override
-    def build_aggregator(self) -> IRowAggregator:
+    def build_aggregator(self, *, key_normalization: KeyNormalizationMode = "raw") -> IRowAggregator:
         agg1 = GroupByAggregator(
             group_by=self.stage1.group_by,
             metrics=self.stage1.metrics,
             max_groups=int(self.stage1.max_groups),
             max_distinct=int(self.stage1.max_distinct),
             distinct_on_overflow=str(self.stage1.distinct_on_overflow),
+            key_normalization=key_normalization,
         )
         agg2 = GroupByAggregator(
             group_by=self.stage2.group_by,
@@ -302,6 +306,7 @@ class TwoStageGroupBySpec(IDerivedAggregationSpec):
             max_groups=int(self.stage2.max_groups),
             max_distinct=int(self.stage2.max_distinct),
             distinct_on_overflow=str(self.stage2.distinct_on_overflow),
+            key_normalization=key_normalization,
         )
         return TwoStageGroupByAggregator(stage1=agg1, stage2=agg2)
 
@@ -1053,6 +1058,7 @@ def _append_derived_target_routes(
     targets: Sequence[DerivedOutputTargetSpec],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
     run_parallel_mode: str,
+    run_key_normalization: KeyNormalizationMode,
 ) -> None:
     for t in targets:
         # `adaptive` 下的确定性边界 `fail-fast` 校验
@@ -1067,7 +1073,7 @@ def _append_derived_target_routes(
             layout=t.output_layout,
             workbook_by_path=workbook_by_path,
         )
-        agg = t.derived.build_aggregator()
+        agg = t.derived.build_aggregator(key_normalization=run_key_normalization)
 
         sink = AggregatingRowSink(aggregator=agg, out_sink=out_sink)
         _append_route_state(
@@ -1191,6 +1197,7 @@ def build_output_composition(
     run_started_at_epoch: Optional[float] = None,
     run_parallel_mode: str = "",
     run_batch_size: Optional[int] = None,
+    run_key_normalization: KeyNormalizationMode = "raw",
     instrumentation: Optional[InstrumentationHub] = None,
 ) -> OutputCompositionPlan:
     """物化多输出组合为一个 `IRowSink`(`RouterRowSink`).
@@ -1218,6 +1225,7 @@ def build_output_composition(
         targets=spec.derived_targets,
         workbook_by_path=workbook_by_path,
         run_parallel_mode=str(run_parallel_mode or ""),
+        run_key_normalization=run_key_normalization,
     )
     _ensure_primary_route(routes)
 

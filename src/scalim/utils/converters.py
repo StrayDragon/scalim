@@ -237,3 +237,37 @@ def auto_normalize_key(value: object) -> Optional[LookupKey]:  # noqa: PLR0911
         return auto_str_normalize(value)
 
     return auto_str_normalize(value)
+
+
+def auto_str_normalize_key(value: object) -> Tuple[Optional[LookupKey], str, Optional[str]]:
+    """将 `key` 规范化为稳定字符串口径(单键或复合键).
+
+    语义:
+    - 输入值为 `None` 视为“空值”: 返回 `(None, "null_key", None)`
+    - 输入值非 `None` 但规范化失败: 返回 `(None, "type_error", <message>)`
+    - 复合键逐字段规范化并构造 `Tuple[str, ...]`
+
+    注意: 返回的 `message` 不得包含明细值(避免泄露敏感数据).
+    """
+    if value is None:
+        return None, "null_key", None
+
+    if isinstance(value, (tuple, list)):
+        items = cast("Sequence[object]", value)
+        out: List[str] = []
+        for idx, item in enumerate(items):
+            if item is None:
+                return None, "null_key", None
+            normalized = auto_str_normalize(item)
+            if normalized is None:
+                msg = "key_normalization failed for tuple element #{} (type={})".format(idx, type(item).__name__)
+                return None, "type_error", msg
+            out.append(normalized)
+        return tuple(out), "ok", None
+
+    normalized = auto_str_normalize(value)
+    if normalized is None:
+        msg = "key_normalization failed (type={})".format(type(value).__name__)
+        return None, "type_error", msg
+
+    return normalized, "ok", None

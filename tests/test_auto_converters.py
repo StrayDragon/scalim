@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.utils.converters import _format_decimal_no_exponent, auto_normalize_key, auto_str_normalize, must_to_int
+from scalim.utils.converters import _format_decimal_no_exponent, auto_normalize_key, auto_str_normalize, auto_str_normalize_key, must_to_int
 
 
 class TestAutoStrNormalize:
@@ -141,6 +141,40 @@ class TestAutoNormalizeKey:
 
     def test_dict_returns_none(self) -> None:
         assert auto_normalize_key({"a": 1}) is None
+
+
+class TestAutoStrNormalizeKey:
+    def test_none_returns_null_key(self) -> None:
+        assert auto_str_normalize_key(None) == (None, "null_key", None)
+
+    def test_scalar_normalizes_to_string(self) -> None:
+        assert auto_str_normalize_key(1) == ("1", "ok", None)
+        assert auto_str_normalize_key("1") == ("1", "ok", None)
+
+    def test_scalar_type_error_message_does_not_include_value(self) -> None:
+        raw = object()
+        normalized, status, message = auto_str_normalize_key(raw)
+        assert normalized is None
+        assert status == "type_error"
+        assert message is not None
+        assert "type=object" in message
+        assert "0x" not in message
+
+    def test_tuple_key_normalizes_each_part(self) -> None:
+        assert auto_str_normalize_key((1, "2")) == (("1", "2"), "ok", None)
+
+    def test_list_key_is_supported_and_normalized(self) -> None:
+        assert auto_str_normalize_key([1, 2]) == (("1", "2"), "ok", None)
+
+    def test_tuple_key_type_error_includes_index_and_not_value(self) -> None:
+        raw = object()
+        normalized, status, message = auto_str_normalize_key((1, raw))
+        assert normalized is None
+        assert status == "type_error"
+        assert message is not None
+        assert "element #1" in message
+        assert "type=object" in message
+        assert "0x" not in message
 
 
 class TestDecimalFormatting:

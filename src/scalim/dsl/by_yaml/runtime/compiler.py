@@ -327,6 +327,7 @@ def build_request(
         batch_size=batch_size,
         parallel_mode=options.parallel_mode,
         max_workers=options.max_workers,
+        key_normalization=options.key_normalization,
     )
 
 
