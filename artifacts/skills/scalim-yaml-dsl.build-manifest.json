@@ -341,6 +341,7 @@
       "workflow.runs[*].demand",
       "workflow.runs[*].depends_on",
       "workflow.runs[*].init_vars",
+      "workflow.runs[*].writes",
       "workflow.options.max_concurrency",
       "workflow.options.failure_policy",
       "workflow.options.cache_pool",
@@ -459,7 +460,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "cfac4e751a24ecf54787e853873ed768f54272665882cfb745d948dfe726c265"
+      "sha256": "26b399daeb54e25857a3c7a448bc37142bbffae1f852bc7156a755612bb29c83"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

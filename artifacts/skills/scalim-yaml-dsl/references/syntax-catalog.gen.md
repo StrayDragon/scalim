@@ -779,7 +779,7 @@
 - `workflow.runs[*].demand` (required)
 - `workflow.runs[*].depends_on` (optional)
 - `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)
-- `workflow.runs[*].write_to` (optional; oneOf intents)
+- `workflow.runs[*].writes` (optional; list of intents)
 - `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)
 - `workflow.options.ctx` (optional; ctx guardrails)
 - `workflow.options.cache_pool` (optional; workflow-scope cache pool)
@@ -810,6 +810,17 @@
   - `id` (required): `string`
   - `init_vars`: `object` | `null`, oneOf(2)
   - `writes`: `array`, items `object` | `object` | `object` | `object` | `object`, oneOf(5)
+
+### `workflow.runs[*].writes`
+- Type: `array`
+- Description:
+  共享输出写入意图列表(可选).
+  
+  - 缺省/空数组表示无写入意图
+  - 每个 item MUST 恰好选择一个 write intent
+  - 写入顺序 SSOT: run 顺序 + writes 顺序
+- Default: `[]`
+- `items`: `object` | `object` | `object` | `object` | `object`, oneOf(5)
 
 ### `workflow.options`
 - Type: `object`

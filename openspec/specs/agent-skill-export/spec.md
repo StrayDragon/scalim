@@ -154,7 +154,7 @@
 
 - 生成器 MUST 将 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 视为 workflow YAML 的 canonical schema 输入,并将其纳入构建清单输入哈希.
 - `references/syntax-catalog.gen.md` MUST 包含 workflow YAML 的语法索引,至少覆盖:
-  - `workflow.runs[*]` 的关键字段: `id`、`demand`、`depends_on`、`init_vars`、`write_to`
+  - `workflow.runs[*]` 的关键字段: `id`、`demand`、`depends_on`、`init_vars`、`writes`
   - `workflow.options` 的关键字段: `max_concurrency`、`failure_policy`、`cache_pool`、`ctx`
   - `workflow.resources` 的关键字段: `workbooks`、`csvs`、`sheetbooks`
 - `references/generated/cli-lsp-reference.gen.md` MUST 提供 workflow YAML 的可复制命令入口,至少包含:
@@ -164,10 +164,9 @@
 #### Scenario: generated syntax catalog 包含 workflow 语法索引
 - **WHEN** 维护者运行 `just gen-agent-skill`
 - **THEN** `references/syntax-catalog.gen.md` 中必须可检索到 workflow YAML 的字段索引
-- **THEN** 且其中必须包含 `depends_on/init_vars/resources/write_to/ctx` 等关键字段名
+- **THEN** 且其中必须包含 `depends_on/init_vars/resources/writes/ctx` 等关键字段名
 
 #### Scenario: generated CLI/LSP reference 包含 workflow 命令入口
 - **WHEN** 维护者运行 `just gen-agent-skill`
 - **THEN** `references/generated/cli-lsp-reference.gen.md` 必须包含 workflow schema-only 校验命令示例
 - **THEN** 且必须包含 `upsert-lsp-comment --type workflow` 的命令示例
-

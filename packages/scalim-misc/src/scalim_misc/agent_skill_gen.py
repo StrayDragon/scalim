@@ -378,7 +378,7 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
     runs_schema = workflow_props.get("runs", {}) if isinstance(workflow_props, dict) else {}
     run_item_schema = runs_schema.get("items", {}) if isinstance(runs_schema, dict) else {}
     run_props = run_item_schema.get("properties", {}) if isinstance(run_item_schema, dict) else {}
-    write_to_schema = run_props.get("write_to", {}) if isinstance(run_props, dict) else {}
+    writes_schema = run_props.get("writes", {}) if isinstance(run_props, dict) else {}
     options_schema = workflow_props.get("options", {}) if isinstance(workflow_props, dict) else {}
     resources_schema = workflow_props.get("resources", {}) if isinstance(workflow_props, dict) else {}
 
@@ -392,7 +392,7 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
         "- `workflow.runs[*].demand` (required)",
         "- `workflow.runs[*].depends_on` (optional)",
         "- `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)",
-        "- `workflow.runs[*].write_to` (optional; oneOf intents)",
+        "- `workflow.runs[*].writes` (optional; list of intents)",
         "- `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)",
         "- `workflow.options.ctx` (optional; ctx guardrails)",
         "- `workflow.options.cache_pool` (optional; workflow-scope cache pool)",
@@ -411,8 +411,8 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
         lines.extend(render_schema_entry("`workflow`", workflow_entry, required=workflow_required, level=3))
     if isinstance(run_item_schema, dict) and run_item_schema:
         lines.extend(render_schema_entry("`workflow.runs[*]`", run_item_schema, required=False, level=3))
-    if isinstance(write_to_schema, dict) and write_to_schema:
-        lines.extend(render_schema_entry("`workflow.runs[*].write_to`", write_to_schema, required=False, level=3))
+    if isinstance(writes_schema, dict) and writes_schema:
+        lines.extend(render_schema_entry("`workflow.runs[*].writes`", writes_schema, required=False, level=3))
     if isinstance(options_schema, dict) and options_schema:
         lines.extend(render_schema_entry("`workflow.options`", options_schema, required=False, level=3))
     if isinstance(resources_schema, dict) and resources_schema:
@@ -975,7 +975,7 @@ def build_workflow_field_paths(workflow_schema: Dict[str, Any]) -> List[str]:
         if isinstance(item, dict):
             item_props = item.get("properties", {})
             if isinstance(item_props, dict):
-                for key in ("id", "demand", "depends_on", "init_vars", "write_to"):
+                for key in ("id", "demand", "depends_on", "init_vars", "writes"):
                     if key in item_props:
                         paths.append("workflow.runs[*].{}".format(key))
 

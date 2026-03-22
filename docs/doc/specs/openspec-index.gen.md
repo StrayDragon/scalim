@@ -16,6 +16,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/agent-skill-export/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物与构建清单,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
 
+### `agent-skill-workflow-writes-docs`
+- Title: agent-skill-workflow-writes-docs Specification
+- Source: [spec.md](#code=openspec/specs/agent-skill-workflow-writes-docs/spec.md)
+- Summary: 定义并约束 `scalim-yaml-dsl` skill 的 workflow YAML 语法索引生成规则,确保生成物的关键 key paths 与 canonical workflow schema 一致（`writes` 是唯一写入字段）,避免文档漂移误导作者与工具链.
+
 ### `benchmarking`
 - Title: benchmarking Specification
 - Source: [spec.md](#code=openspec/specs/benchmarking/spec.md)

@@ -1,0 +1,6 @@
+- [x] 1. 更新 OpenSpec 主规范 `openspec/specs/agent-skill-export/spec.md`: `write_to` → `writes`
+- [x] 2. 修复 skill 生成器 `packages/scalim-misc/src/scalim_misc/agent_skill_gen.py`: workflow “Key Paths” 输出 `writes` 并移除 `write_to`
+- [x] 3. 修复 workflow coverage index 提取: `build_workflow_field_paths()` 使用 `writes`
+- [x] 4. 更新生成器回归测试 `tests/test_agent_skill_generator.py`: 断言 catalog 包含 `workflow.runs[*].writes` 且不包含 `write_to`
+- [x] 5. 运行 `just gen-agent-skill` 刷新生成物（不手改 `.gen.*` / injected blocks）
+- [x] 6. 验收: `pytest`、`just qa`、`just openspec-check`

@@ -10,9 +10,9 @@
 
 ## What Changes
 
-本变更是一个 **proposal 保留**，不作为当前 workflow validate / render 的 MVP 交付物；用于记录后续需要补齐的“文档/索引一致性修复”工作。
+本变更修复一个“生成文档与真实 schema 漂移”的问题,并通过测试把它收敛为可回归的门禁.
 
-计划修复点:
+修复点:
 
 - OpenSpec 文档:
   - `openspec/specs/agent-skill-export/spec.md` 中 workflow 关键字段索引由 `write_to` 更新为 `writes`
@@ -34,4 +34,3 @@
   - `packages/scalim-misc/src/scalim_misc/agent_skill_gen.py`
 - 受影响生成物(禁止手改;需通过 `just gen-agent-skill` 刷新):
   - `artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md`
-
