@@ -48,7 +48,10 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
    - 必须声明 `sheetbooks.<id>.budget.max_sheets/max_total_cells`
    - 需要导出为最终 xlsx 时,声明 `export_xlsx.path`(可选 `write_lock`)
 6) 校验与编辑器配置:
-   - workflow YAML 只支持 schema-only 校验(仓库内建议显式指定 schema):
+   - workflow YAML full validate(静态/编译期;递归校验引用的 demands;不执行 workflow):
+     - `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
+     - 若 `workflow.runs[*].demand` 使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析(可重复)
+   - workflow YAML schema-only 校验(结构/unknown-fields;仓库内建议显式指定 schema):
      - `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
    - 编辑器补全/hover:
      - `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`

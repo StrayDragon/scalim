@@ -19,6 +19,8 @@
 just type-check
 just test
 just lintfix
+just examples
+just qa
 just prompt-eval
 just prompt-eval-agent
 ```

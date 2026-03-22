@@ -98,6 +98,8 @@
 - YAML 示例(带 anchors): [`tests/fixtures/order_report.yaml`](#code=tests/fixtures/order_report.yaml)
 - 运行示例与 demo: [`notebooks/`](#code=notebooks/)(marimo)与 [`packages/scalim-misc/src/scalim_misc/`](#code=packages/scalim-misc/src/scalim_misc/)
   - 本地启动 marimo server(推荐): `uv run marimo edit notebooks/marimo/`
+  - headless 回归入口(与 CI 一致): `just examples`（实际入口: `notebooks/marimo/run_examples.py`）
+  - 覆盖报告(生成物): `notebooks/marimo/marimo_coverage.gen.md`（生成/漂移门禁: `just gen-marimo-coverage` / `just marimo-coverage-drift-check`）
 - 规划/执行相关 fixture: [`tests/fixtures/planning_fixtures.py`](#code=tests/fixtures/planning_fixtures.py), [`tests/fixtures/executor_operator_fixtures.py`](#code=tests/fixtures/executor_operator_fixtures.py)
 
 要改 DSL 行为或 schema,尽量先补一个能覆盖你场景的 fixture/测试,不然很难防止“文档写对了,实现悄悄漂”.

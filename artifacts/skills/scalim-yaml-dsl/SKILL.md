@@ -23,7 +23,8 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 
 - demand YAML 仓库内完整校验: `uv run scalim-cli yaml-dsl validate <demand.yaml>`
 - demand YAML 仓库内 schema 校验: `uv run scalim-cli yaml-dsl schema validate <demand.yaml>`
-- workflow YAML 仓库内 schema 校验(只支持 schema-only; 必须显式 schema 路径): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
+- workflow YAML 仓库内完整校验(静态/编译期;递归校验引用的 demands;不执行 workflow): `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
+- workflow YAML 仓库内 schema 校验(结构/unknown-fields; 必须显式 schema 路径): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
 - 仓库外完整校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`
 - 仓库外 schema 校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>`
 - 仓库内查询 schema 绝对路径: `uv run scalim-cli yaml-dsl schema path`
@@ -47,7 +48,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 不要硬记/猜语法: 以 schema / 生成文档为准(需要时看 `references/syntax-catalog.gen.md`、`references/generated/cli-lsp-reference.gen.md`、`references/generated/example-full/ecommerce_report.gen.yaml`)
 - 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
-- workflow YAML 没有 internal validator: 不要对 workflow YAML 运行 `yaml-dsl validate`,只用 `yaml-dsl schema validate --schema .../workflow.gen.json` 做 schema-only 校验
+- workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 `writes[*].output` 等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证
 
 只在需要时再读大 reference,不要默认把全量 catalog 和 playbook 一起塞进上下文。

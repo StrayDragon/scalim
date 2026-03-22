@@ -11,11 +11,24 @@
 
 ## 0) 校验与编辑器($schema)配置
 
-workflow YAML **只有 schema-only 校验**(没有 `yaml-dsl validate` 这层 internal validator). 仓库内校验建议显式指定 workflow schema:
+workflow YAML 支持两类校验入口:
+
+1) workflow-level full validate(静态/编译期;递归校验引用的 demands;不执行 workflow):
+
+```bash
+uv run scalim-cli yaml-dsl validate --type workflow path/to/workflow.yaml
+```
+
+2) schema-only 校验(结构/unknown-fields;依赖 `workflow.gen.json`):
 
 ```bash
 uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml
 ```
+
+说明:
+
+- `yaml-dsl validate` 默认 `--type auto`: 根据 YAML 顶层结构推断 demand/workflow;CI/脚本建议显式写 `--type workflow`
+- 若 `workflow.runs[*].demand` 使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析(可重复)
 
 本地编辑时,推荐直接批量写入 schema modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):
 
@@ -65,7 +78,7 @@ workflow:
 `run.demand` 路径解析规则:
 
 - 相对路径以 workflow 文件所在目录为基准
-- 支持通过 Python 入口注入 `path_aliases` 来解析:
+- 支持通过 CLI `--path-alias <alias>=<path>` 或 Python 入口注入 `path_aliases` 来解析:
   - `"@/x/y.yaml"` (alias 为 `"@"`)
   - `"ALIAS:/x/y.yaml"` (alias 为 `"ALIAS"`)
 

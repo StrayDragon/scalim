@@ -24,9 +24,20 @@
 
 ## Notebooks (marimo)
 
-notebooks 属于交互式 demo,不纳入 docs-site 的受控生成物与 drift gate. 推荐本地启动 marimo server:
+notebooks 本体是交互式 demo,但同时也是 **确定性回归入口** 的 SSOT(示例/对拍以 notebooks 的代码与 fixtures 为准):
 
-- `uv run marimo edit notebooks/marimo/`
+- 交互式入口(本地): `uv run marimo edit notebooks/marimo/`
+- 回归入口(headless/CI): `just examples`（`just qa` 会覆盖）
+  - 实际执行入口: `notebooks/marimo/run_examples.py`
+  - 覆盖报告(生成物): `notebooks/marimo/marimo_coverage.gen.md`
+    - 生成: `just gen-marimo-coverage`
+    - 漂移门禁: `just marimo-coverage-drift-check`（`just qa`/CI 会覆盖）
+
+如需把 marimo notebooks 导出为 docs-site 可直接浏览的 HTML(可选),运行:
+
+- `uv run python scripts/export-marimo-to-docs.py`
+
+说明: notebooks 的 HTML 导出不属于 `just gen-docs` 的受控生成物;以 `just examples` / `marimo-coverage-drift-check` 的回归口径为准。
 
 ## doc_texts 模式(推荐)
 
