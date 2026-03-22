@@ -410,7 +410,7 @@
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-      "sha256": "91f3291adbc2b13ba64636b3c59d64e1c4558d8d11354b660f4a6c745828838a"
+      "sha256": "848748f59a6aef29477d3ef70434a989f4be3214997a9347073d3e7ac4d1e8a8"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -456,11 +456,11 @@
     },
     {
       "path": "references/generated/yaml-dsl-upgrades.gen.md",
-      "sha256": "bf33b6f348d3ebdde6a633b87e42b241d66c2794b834ef7c0dbe3cbbab2aca96"
+      "sha256": "8cc163a920b681bd1b4af90acf421496e6ce9fdeda2fcdfef93d89ecb9bd81a3"
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "26b399daeb54e25857a3c7a448bc37142bbffae1f852bc7156a755612bb29c83"
+      "sha256": "f4dc40848ba5a42f09e8c2da8b56d9fd4baafc629678c850e404b30aa2423114"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

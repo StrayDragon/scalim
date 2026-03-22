@@ -10,7 +10,7 @@
 - **NEW**: `workflow.resources.*` 声明 workflow-scope 共享输出资源:
   - `resources.workbooks/csvs`: 共享输出路径
   - `resources.sheetbooks`: in-memory sheetbook + 预算护栏 + 可选导出 `export_xlsx`
-- **NEW**: `workflow.runs[*].write_to` 声明写入 intent(互斥): workbook/csv/sheetbook 的 sheet/append 写入
+- **NEW**: `workflow.runs[*].writes` 声明写入 intents(list): workbook/csv/sheetbook 的 sheet/append 写入（旧 `write_to` 已移除）
 - **NEW**: 内置 loader `scalim.dsl.by_yaml.runtime.workflow_loaders:sheetbook_sheet_rows` 支持下游 demand 读取上游 sheetbook sheet rows(受 deps 可见性约束)
 
 OpenSpec 归档变更（含 proposal/design/spec/tasks）:
@@ -38,7 +38,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
    - 必要时用 `workflow.options.ctx.max_value_bytes/max_bytes` 调整护栏
 4) 若存在共享输出或潜在输出路径冲突:
    - 将共享目标声明到 `workflow.resources.*`
-   - 用 `runs[*].write_to` 声明写入 intent(同一 run 只能有一个 intent key)
+   - 用 `runs[*].writes` 声明写入 intents(每个 run 可声明 0..N 条；每条 intent 恰好一个 intent key)
 5) 若使用 sheetbook:
    - 必须声明 `sheetbooks.<id>.budget.max_sheets/max_total_cells`
    - 需要导出为最终 xlsx 时,声明 `export_xlsx.path`(可选 `write_lock`)
@@ -47,4 +47,4 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
      - `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
    - 编辑器补全/hover:
      - `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
-7) 运行期验证: 用 Python 入口跑一次最小 workflow,验证 DAG/ctx/resources/write_to 的运行期 fail-fast 行为是否符合预期
+7) 运行期验证: 用 Python 入口跑一次最小 workflow,验证 DAG/ctx/resources/writes 的运行期 fail-fast 行为是否符合预期

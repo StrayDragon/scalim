@@ -1,0 +1,7 @@
+- [x] 1. 更新 OpenSpec `workflow-sheetbook-resources` Purpose 文案: `write_to.sheetbook_*` → `writes[*].sheetbook_*`
+- [x] 2. 更新 `artifacts/skills/scalim-yaml-dsl/SKILL.md` workflow 指引文案: `write_to` → `writes`
+- [x] 3. 更新 workflow upgrades 文档 `references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md`: `write_to` → `writes`（必要时保留迁移提示）
+- [x] 4. 强化生成器回归测试: `references/syntax-catalog.gen.md` 不包含 `write_to`
+- [x] 5. 运行 `just gen-agent-skill` 刷新 skill 生成物
+- [x] 6. 运行 `just gen-docs` 刷新 docs-site 生成物
+- [x] 7. 验收: `pytest`、`just qa`、`just openspec-check`

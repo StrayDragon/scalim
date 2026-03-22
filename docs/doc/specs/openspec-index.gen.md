@@ -191,6 +191,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/sinks-contracts/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 sink 接口稳定性与可选依赖提示规范,确保内建与外部 sink 的长期兼容、可诊断性与一致行为.
 
+### `skill-docs-write-to-cleanup`
+- Title: skill-docs-write-to-cleanup Specification
+- Source: [spec.md](#code=openspec/specs/skill-docs-write-to-cleanup/spec.md)
+- Summary: 定义并约束 `scalim-yaml-dsl` skill 与相关 OpenSpec 文档对 workflow 写入字段的表述口径,确保作者不会被已移除字段 `write_to` 误导,并以 `writes` 作为唯一可用的写入 authoring surface.
+
 ### `source-cache`
 - Title: source-cache Specification
 - Source: [spec.md](#code=openspec/specs/source-cache/spec.md)
@@ -244,7 +249,7 @@ Sources:
 ### `workflow-sheetbook-resources`
 - Title: workflow-sheetbook-resources Specification
 - Source: [spec.md](#code=openspec/specs/workflow-sheetbook-resources/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`write_to.sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
+- Summary: **状态: ✅ 已实现** 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`writes[*].sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
 
 ### `yaml-dsl-agent-guidance`
 - Title: yaml-dsl-agent-guidance Specification

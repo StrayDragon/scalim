@@ -10,12 +10,10 @@ workflow YAML 的写入 surface 已以 `workflow.runs[*].writes`（list of inten
 
 ## What Changes
 
-本变更为 **proposal 保留**（不作为当前交付物）,用于收敛一次“文档层 write_to 残留”清理的范围与验收口径.
-
-计划方向:
+本变更直接修复“文档层 write_to 残留”带来的作者误导,以 `writes` 为唯一真相进行统一.
 
 - OpenSpec 文档:
-  - 将 `workflow-sheetbook-resources` 等 spec 中关于 `write_to.sheetbook_*` 的旧表述更新为 `writes[*].sheetbook_*`（或等价的 canonical path）,并明确 `write_to` 已移除
+  - 将 `workflow-sheetbook-resources` spec 中关于 `write_to.sheetbook_*` 的旧表述更新为 `writes[*].sheetbook_*`（或等价的 canonical path）
 - skill 文档:
   - `artifacts/skills/scalim-yaml-dsl/SKILL.md`、workflow authoring/upgrades 文档中对 `write_to` 的表述更新为 `writes`
   - 若需要保留历史字段名,必须放在“迁移/历史”段落,并明确已移除与替代写法

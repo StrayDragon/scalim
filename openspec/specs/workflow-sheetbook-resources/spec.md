@@ -3,7 +3,7 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`write_to.sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
+定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`writes[*].sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
 ## Requirements
 ### Requirement: workflow YAML exposes a stable authoring surface for sheetbooks
 系统 MUST 为 sheetbook 资源提供可实现、可校验的 workflow YAML authoring surface:
@@ -139,4 +139,3 @@
 - **WHEN** observer 订阅 workflow-level 事件流
 - **THEN** observer MUST 能观测到 sheetbook export 事件
 - **AND** 该事件 MUST 携带 `workflow_exec_id` 以 join 回同一次 workflow 执行
-

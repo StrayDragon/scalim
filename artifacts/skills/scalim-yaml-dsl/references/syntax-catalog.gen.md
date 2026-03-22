@@ -186,7 +186,7 @@
   - shared resource lifecycle MUST be observable
 ### `workflow-sheetbook-resources`
 - Source: `openspec/specs/workflow-sheetbook-resources/spec.md`
-- Purpose: 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`write_to.sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
+- Purpose: 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`writes[*].sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
 - Requirements:
   - workflow YAML exposes a stable authoring surface for sheetbooks
   - workflow MUST support in-memory sheetbook resources

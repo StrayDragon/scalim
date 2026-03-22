@@ -8,7 +8,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 先识别任务类型,只读取最少的 reference:
 
 - 新写或改写 YAML: 读 [references/task-authoring.md](references/task-authoring.md)
-- 新写或改写 workflow YAML(编排多 demand / resources / write_to): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
+- 新写或改写 workflow YAML(编排多 demand / resources / writes): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
 - 校验、订正、排错 workflow YAML: 读 [references/task-workflow-validate-debug.md](references/task-workflow-validate-debug.md)
