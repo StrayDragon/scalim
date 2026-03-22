@@ -18,7 +18,7 @@
 
 ### Requirement: relations mapping collisions after normalization MUST be handled safely by default
 
-当 relations 在构建“规范化后的 mapping 视图”时,若多个不同 raw key 规范化到同一个稳定字符串 key(即发生 collision):
+当 relations 在构建“规范化后的 mapping 视图”时,若多个不同 raw key 规范化到同一个稳定字符串 key(即发生 collision),系统 MUST 按以下规则安全处理:
 
 - 若 collision 对应的 value 全部 `==`(深度相等),系统 MUST 保留任一值并继续(并发出一次 redacted 告警,便于用户后续清理 loader/data)
 - 若 collision 对应的 value 存在差异,系统 MUST fail-fast(避免 silent 选择导致隐性错误)
