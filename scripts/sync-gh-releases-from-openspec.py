@@ -142,6 +142,15 @@ def _score_highlight(text: str) -> int:
     s = text
     lower = s.lower()
     score = 0
+    if (
+        "non-goals" in lower
+        or "non goals" in lower
+        or "non-goal" in lower
+        or "非目标" in s
+        or "不做" in s
+        or "明确不做" in s
+    ):
+        score -= 50
     if "新增" in s or "引入" in s or "支持" in s or "扩展" in s or "增加" in s or "new" in lower:
         score += 3
     if "BREAKING" in s or "breaking" in lower or "破坏性" in s:
@@ -188,7 +197,7 @@ def _choose_highlight(what_changes_lines: List[str]) -> str:
         tail = _clean_inline_markers(best[1])
         tail = re.sub(r"^-\s+", "", tail)
         if tail:
-            return "{}（{}）".format(head, tail.rstrip("。"))
+            return "{}（例如：{}）".format(head, tail.rstrip("。"))
     return head
 
 
@@ -217,9 +226,20 @@ def _example_priority(change_id: str) -> int:
     cid = change_id.lower()
     if "normalize" in cid:
         return 1
+    # 字段级：`extract` / `value_cast` / 显式 decimal 等都归为同一档（field-level authoring surface）。
+    if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
+        return 2
     if "extract" in cid:
         return 2
-    if "inline-dynamic-params" in cid or "params-template" in cid or "init-vars" in cid or "init-var" in cid or "runtime-vars" in cid:
+    if (
+        "template-vars" in cid
+        or "template_vars" in cid
+        or "inline-dynamic-params" in cid
+        or "params-template" in cid
+        or "init-vars" in cid
+        or "init-var" in cid
+        or "runtime-vars" in cid
+    ):
         return 3
     if "imports" in cid or "relative-import" in cid:
         return 4
@@ -234,6 +254,19 @@ def _example_priority(change_id: str) -> int:
 
 def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
     cid = change_id.lower()
+    if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "# 重点：`value_cast: decimal` + compute 里可用 `Decimal(...)`",
+            "main_source:",
+            "  fields:",
+            "    amount: {extract: pay.amount, value_cast: decimal}",
+            "    fee: {extract: pay.fee, value_cast: decimal}",
+            "    total: {compute: 'amount - fee + Decimal(\"0.1\")'}",
+            "outputs:",
+            "  - id: settlement",
+            "    fields: [amount, fee, total]",
+        ]
     if priority == 1:
         return [
             "# 示例为提案语义示意（不保证可直接运行）",
@@ -261,6 +294,19 @@ def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]
             "    fields: {value: {extract: data.value}}",
         ]
     if priority == 3:
+        if "template-vars" in cid or "template_vars" in cid:
+            return [
+                "# 示例为提案语义示意（不保证可直接运行）",
+                "# 仅在调用方显式传入 template_vars 时启用预编译",
+                "main_source:",
+                '  loader: {call_by: ".loaders:main"}',
+                "  params:",
+                '    start_date: "{{ start_date }}"',
+                '    end_date: "{{ end_date }}"',
+                "outputs:",
+                "  - id: report",
+                '    name: "report_{{ biz }}"',
+            ]
         if "output" in cid and ("init-var" in cid or "init-vars" in cid):
             return [
                 "# 示例为提案语义示意（不保证可直接运行）",
@@ -300,6 +346,19 @@ def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]
             "  - id: api_sheet",
         ]
     if priority == 4:
+        if "yaml-import" in cid or ("yaml" in cid and "imports" in cid):
+            return [
+                "# 示例为提案语义示意（不保证可直接运行）",
+                "imports:",
+                "  shared: ./_shared/sources.yaml",
+                "  common: ../common/fragments.yaml",
+                "  local: x/y.yaml",
+                "# 解析基准：当前 YAML 文件所在目录",
+                "# 仍拒绝：绝对路径 / 任意 URI scheme / 预留 alias 前缀",
+                "main_source:",
+                "  $import: shared.main_source",
+                "outputs: []",
+            ]
         return [
             "# 示例为提案语义示意（不保证可直接运行）",
             "sources:",
@@ -356,26 +415,118 @@ def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]
 
 
 def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[str]:
-    what_lines = _extract_section_lines(proposal_text, "What Changes")
-    impact_lines = _extract_section_lines(proposal_text, "Impact")
+    all_lines = proposal_text.splitlines()
 
-    blocks = _parse_top_level_bullet_blocks(what_lines)
+    def _tok_is_surface(tok: str) -> bool:
+        t = tok.strip()
+        lower = t.lower()
+        if "[*]" in t or "$" in t:
+            return True
+        if any(
+            k in lower
+            for k in (
+                "yaml-dsl",
+                "write_to",
+                "writes",
+                "imports",
+                "$import",
+                "$ctx",
+                "$runtime",
+                "outputs",
+                "fields",
+                "aggregate",
+                "group_by",
+                "dedup_by",
+                "value_cast",
+                "value-cast",
+                "template_vars",
+                "template-vars",
+                "yaml-dsl validate",
+                "--",
+            )
+        ):
+            return True
+        if "." in t and any(k in lower for k in ("workflow", "demand", "outputs", "fields")):
+            return True
+        return False
+
+    def _is_breaking_candidate(s: str) -> bool:
+        text = s.strip()
+        if not text:
+            return False
+        lower = text.lower()
+        tokens = re.findall(r"`([^`]+)`", text)
+        has_surface_token = any(_tok_is_surface(tok) for tok in tokens) or "workflow." in text or "workflow " in lower or "yaml-dsl" in lower
+
+        # 明确不是 breaking 的常见表述：避免“为了避免 breaking”之类的句子误入。
+        if ("避免" in text or "保持" in text) and ("breaking" in lower or "不兼容" in text):
+            if "不再支持" not in text and "移除" not in text and "删除" not in text:
+                return False
+
+        # 没有任何 authoring surface token 的句子，通常不是“你要改 YAML”的点。
+        if not has_surface_token:
+            return False
+
+        # “输出约束：移除 ...” 这类描述是输出格式约束，不是 upgrade 点。
+        if "输出约束" in text and ("移除" in text or "删除" in text):
+            return False
+
+        # 触发词（严格依赖提案文本，不做代码推断）。
+        if re.search(r"\bbreaking\b", lower):
+            return True
+        if "破坏性" in text or "不兼容" in text or "不再支持" in text:
+            return True
+        if "删除旧写法" in text:
+            return True
+        if ("移除" in text or "删除" in text or "废弃" in text or "弃用" in text) and (
+            "旧写法" in text
+            or "旧语法" in text
+            or "旧字段" in text
+            or "不再支持" in text
+            or "不兼容" in text
+            or "已移除" in text
+            or "直接失败" in text
+            or "fail-fast" in lower
+            or "runtime" in lower
+            or "write_to" in lower
+        ):
+            return True
+        if "升级" in text or "迁移" in text:
+            return True
+        if "schema" in lower and ("变更" in text or "更名" in text or "移除" in text or "删除" in text):
+            return True
+        if "authoring surface" in lower and ("变更" in text or "更名" in text or "移除" in text or "删除" in text):
+            return True
+        if "旧写法" in text and ("失败" in text or "fail-fast" in lower):
+            return True
+        if "直接失败" in text:
+            return True
+        return False
+
     candidates: List[str] = []
-    for block in blocks:
+
+    # 1) 顶层 bullet blocks（跨全文），适合抓“迁移/不兼容/删除旧写法”这类条目。
+    for block in _parse_top_level_bullet_blocks(all_lines):
         blob = " ".join(block)
-        if re.search(r"\bBREAKING\b", blob, flags=re.I) or "破坏性" in blob or "不再支持" in blob or "移除" in blob:
+        if _is_breaking_candidate(blob):
             candidates.append(blob)
 
-    for line in impact_lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if re.search(r"\bBREAKING\b", stripped, flags=re.I) or "破坏性" in stripped or "不再支持" in stripped:
+    # 2) 行级扫描：补齐段落里提到的迁移点（例如 Why 中的 “旧写法会直接失败”）。
+    for raw in all_lines:
+        stripped = raw.strip()
+        if _is_breaking_candidate(stripped):
             candidates.append(stripped)
 
     instructions: List[str] = []
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
+
+        if "write_to" in cleaned and "writes" in cleaned:
+            if "`workflow.runs[*].write_to`" in cleaned and "`workflow.runs[*].writes`" in cleaned:
+                instructions.append("把 `workflow.runs[*].write_to` 改为 `workflow.runs[*].writes`。")
+                continue
+            instructions.append("workflow YAML：把 `write_to` 改为 `writes`（旧写法会 fail-fast）。")
+            continue
 
         # 重命名：`old` -> `new`
         match = re.search(r"`([^`]+)`\s*(?:指令节点)?(?:更名为|重命名为)\s*`([^`]+)`", cleaned)
@@ -391,6 +542,18 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             continue
 
         match = re.search(r"`([^`]+)`.*(?:升级为|改为|改成|替换为)\s*`([^`]+)`", cleaned)
+        if match:
+            old, new = match.group(1), match.group(2)
+            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+            continue
+
+        match = re.search(r"(?:由|从)\s*`([^`]+)`\s*(?:更新为|改为|改成|替换为|迁移为|升级为)\s*`([^`]+)`", cleaned)
+        if match:
+            old, new = match.group(1), match.group(2)
+            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+            continue
+
+        match = re.search(r"`([^`]+)`\s*(?:更新为|改为|改成|替换为|迁移为|升级为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
             instructions.append("把 `{}` 改为 `{}`。".format(old, new))
@@ -442,6 +605,25 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if cleaned.startswith("把 ") or cleaned.startswith("不要") or cleaned.startswith("将 ") or cleaned.startswith("按 "):
             instructions.append(cleaned.rstrip("。") + "。")
             continue
+        if ("移除" in cleaned or "删除" in cleaned) and "`" in cleaned:
+            if "输出约束" in cleaned or ("输出" in cleaned and "effective" in cleaned.lower()):
+                continue
+            toks = re.findall(r"`([^`]+)`", cleaned)
+            tok = next((t for t in toks if _tok_is_surface(t)), None)
+            if tok and (
+                "不兼容" in cleaned
+                or "不再支持" in cleaned
+                or "已移除" in cleaned
+                or "直接失败" in cleaned
+                or "fail-fast" in cleaned.lower()
+                or "runtime" in cleaned.lower()
+                or "旧写法" in cleaned
+                or "旧语法" in cleaned
+                or "旧字段" in cleaned
+                or "write_to" in tok.lower()
+            ):
+                instructions.append("不要再用 `{}`（已移除/不兼容）。".format(tok))
+                continue
         instructions.append("按提案升级：{}。".format(cleaned.rstrip("。")))
 
     # 去重：保持原顺序。
@@ -460,6 +642,10 @@ def _score_change(change: _Change) -> int:
     cid = change.change_id.lower()
     if change.is_yaml:
         score += 100
+    if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
+        score += 60
+    if "template-vars" in cid or "template_vars" in cid:
+        score += 50
     if "normalize" in cid:
         score += 70
     if "extract" in cid:
@@ -488,6 +674,8 @@ def _score_change(change: _Change) -> int:
         score += 20
     if "marimo" in cid:
         score += 10
+    if "demo" in cid or "example" in cid:
+        score -= 20
     if "prompt-eval" in cid:
         score += 10
     return score
@@ -497,10 +685,19 @@ def _build_change(tag: str, change_id: str, *, root: Path) -> Optional[_Change]:
     proposal_relpath = "openspec/changes/archive/{}/proposal.md".format(change_id)
     proposal_text = _read_file_at_tag(tag, proposal_relpath, root=root)
     if proposal_text is None:
-        return None
+        # 兼容极端情况：archive 中没有 proposal.md 时再尝试 design.md（仍只读快照，不读 patch）。
+        design_relpath = "openspec/changes/archive/{}/design.md".format(change_id)
+        proposal_text = _read_file_at_tag(tag, design_relpath, root=root)
+        if proposal_text is None:
+            return None
 
     keyword = _extract_keyword(proposal_text, fallback_change_id=change_id)
-    is_yaml = "yaml" in change_id.lower() or "yaml" in keyword.lower()
+    cap_names: List[str] = []
+    for line in _extract_section_lines(proposal_text, "Capabilities"):
+        match = re.search(r"-\s+`([^`]+)`\s*:", line)
+        if match:
+            cap_names.append(match.group(1).strip())
+    is_yaml = "yaml" in change_id.lower() or "yaml" in keyword.lower() or any("yaml" in name.lower() for name in cap_names)
     highlight = _choose_highlight(_extract_section_lines(proposal_text, "What Changes"))
     breaking = _extract_breaking_instructions(proposal_text, change_id)
     has_breaking = len(breaking) > 0 and any("按提案升级：" not in b for b in breaking)
@@ -556,7 +753,9 @@ def _render_notes(
     lines.append("## Breaking / Upgrade")
     breaking_items: List[str] = []
     for ch in new_changes:
-        breaking_items.extend(list(ch.breaking_instructions))
+        # 按你的约束：只放“需要改 YAML/旧写法跑不起来”的点；因此仅从 YAML 相关 archived changes 抽取。
+        if ch.is_yaml:
+            breaking_items.extend(list(ch.breaking_instructions))
     # 若存在更明确的迁移点，则丢弃“按提案升级：...”这类低信息量兜底项。
     better = [b for b in breaking_items if not b.startswith("按提案升级：")]
     if better:
@@ -594,12 +793,14 @@ def _render_notes(
                 lines.append("```")
 
     lines.append("## Commits（节选）")
-    max_commits = 8
-    shown = commit_lines[:max_commits]
+    max_commit_lines = 8
+    if len(commit_lines) <= max_commit_lines:
+        shown = commit_lines
+    else:
+        # 把 “...略” 也算进 8 行预算里：7 条 commit + 1 行省略。
+        shown = commit_lines[: max_commit_lines - 1] + ["...略"]
     for ln in shown:
         lines.append("- {}".format(ln))
-    if len(commit_lines) > max_commits:
-        lines.append("- ...略")
 
     # 强制 <= 30 行：优先裁 `Commits`，再裁 `Highlights/Breaking`（不删除各节标题）。
     while len(lines) > 30:
