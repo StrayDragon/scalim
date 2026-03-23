@@ -32,6 +32,21 @@
   - 构造一个会在 hook 回调里重入 cache_pool/resources 的 hook
   - 触发对应分支并断言不会卡死（使用 `join(timeout=...)` + fail-fast）
 
+## Scope / Non-Goals
+
+**Scope（本变更覆盖范围）**
+
+- 本变更只对以下两处组件提供“锁外回调”护栏与回归测试（其内部 `threading.Lock` 临界区不得触发用户回调）：
+  - `WorkflowCachePool`：`src/scalim/execution/workflow_cache_pool.py`
+  - `WorkflowResourceManager`：`src/scalim/dsl/by_yaml/runtime/workflow_resources.py`
+- 覆盖到上述组件内的所有事件发射路径（包括 diagnostic/acquire/release/evict/resource write/create 等），而不只局部 if 分支。
+
+**Non-Goals（本变更不做什么）**
+
+- 不做“全仓库锁内回调扫描/修复”；若后续需要，可单独建 change 扩大覆盖面。
+- 不改变事件字段的语义/含义（例如 `WorkflowCacheReleaseEvent.remaining_consumers` 的计算口径保持现状），以避免隐性行为变更导致下游观测回归。
+- 不将 `threading.Lock` 替换为 `threading.RLock` 作为主策略（仅靠 RLock 无法解决锁顺序反转）。
+
 ## Capabilities
 
 ### New Capabilities

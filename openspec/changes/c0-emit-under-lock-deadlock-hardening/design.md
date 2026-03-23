@@ -27,12 +27,14 @@
 - 在上述组件中建立并落实护栏：任何可能触发外部回调的 `instrumentation.emit(...)` 不得在内部互斥锁临界区内执行。
 - 将临界区收敛为“仅状态读写 + 必要字段采集/快照”，在解锁后再发射事件。
 - 增加回归测试：构造“emit 回调重入同一组件 API”的场景，确保不会卡死（fail-fast）。
+- 覆盖范围明确：仅聚焦 `WorkflowCachePool` 与 `WorkflowResourceManager`，但覆盖其内部所有事件发射路径（不只局部 if 分支）。
 
 **Non-Goals:**
 
 - 不将 `Lock` 替换为 `RLock` 作为主要方案（这只能缓解自死锁，且仍可能引入锁顺序反转/隐藏问题）。
 - 不改变事件类型定义与对外 API（除了事件发射从锁内移动到锁外的时机变化）。
 - 不在本次变更中全仓库扫清所有“锁内回调”模式（可作为后续工作）。
+- 不改变事件字段语义（尤其是 `WorkflowCacheReleaseEvent.remaining_consumers` 的计算口径保持现状），避免观测回归。
 
 ## Decisions
 
@@ -86,6 +88,33 @@
 - 伪造一个 `instrumentation.emit(...)`：在 `emit` 内同步调用一个会重入组件 API 的回调（只执行一次，避免无限递归）。
 - 如果 `emit` 仍在锁内执行，会在重入时自死锁；如果按本设计移到锁外，则不会卡死。
 
+### 5) 明确并发边界：保证“不死锁 + 快照一致”，不保证“回调可安全做任意写操作”
+
+本变更提供的并发契约：
+
+- **MUST**：`emit(...)`/外部回调不在内部互斥锁临界区内执行（避免死锁）。
+- **MUST**：事件 payload/meta 在锁内完成快照采集，解锁后发射，避免发射时读取到漂移的可变状态。
+- **MUST**：与事件相关的核心状态更新先于事件发射完成（例如资源写入计划、last node id 等）。
+- **NOT guaranteed**：回调重入后对同一组件执行“写操作 API”的时序与可见性（可能与原调用交错）。回调应尽量视事件为通知，不应依赖强一致的“回调内读取到完全静止的全局状态”。
+
+回归测试的目标也限定为：验证“重入会尝试获取同一把锁”时不会卡死，而不是验证回调重入的业务语义。
+
+### 6) `WorkflowResourceManager.plan.last_workflow_node_id` 更新顺序
+
+为匹配“事件在状态更新之后发射”的要求，本变更将把 `plan.last_workflow_node_id` 的更新移动到锁内、事件发射之前完成：
+
+- 锁内：更新 `plan/sheet_plan` 等状态 + 设置 `plan.last_workflow_node_id`
+- 锁外：发射 `EVENT_WORKFLOW_RESOURCE_WRITE`（以及可能的 diagnostic warning）
+
+这让回调在接收事件时能观察到最新的 `last_workflow_node_id`，同时仍满足“不在锁内回调”的护栏。
+
+### 7) `WorkflowCacheReleaseEvent.remaining_consumers` 语义保持现状
+
+当前实现的 `remaining_consumers` 是在 `on_workflow_node_done()` 的 refcount 递减（discard `node_id`）之前计算的。该口径可能不直觉，但本变更将其视为既有外部可观测语义的一部分：
+
+- **本变更不调整其计算时点**，仅将事件发射移到锁外并对 payload 做快照。
+- 若后续希望改为“释放后的 remaining”，建议单独开 change，避免与并发安全修复耦合。
+
 ## Risks / Trade-offs
 
 - **事件发射与并发交错**：解锁后发射事件期间，其他线程可能推进状态；但本设计保证事件发射发生在“对应状态更新之后”，且 payload 已在锁内完成快照，避免读到不一致的可变状态。
@@ -103,8 +132,7 @@
 - 回滚策略：
   - 直接 revert 该变更提交即可恢复原行为（注意 revert 会重新引入死锁风险）。
 
-## Open Questions
+## Future Work (Out of scope)
 
-- 是否需要在后续变更中对全仓库做一次“锁内外部回调”扫描并建立更强的静态/单元护栏（例如最小化的源码断言或 lint 规则）？
-- `WorkflowCacheReleaseEvent.remaining_consumers` 的含义是否应明确（当前实现的计算时点可能并非直觉的“释放后剩余”）；本变更是否保持原行为即可？
-
+- 可选：对全仓库做一次“锁内外部回调”扫描，并建立更强的护栏（例如更系统的并发回归测试或 lint 规则）。
+- 可选：单独澄清/调整 `WorkflowCacheReleaseEvent.remaining_consumers` 的语义与计算时点（若需要更直觉的“释放后剩余”定义）。
