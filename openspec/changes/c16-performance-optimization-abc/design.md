@@ -3,6 +3,7 @@
 Scalim 的核心执行链路为 `DemandIr` → `ExecutionPlan` → `Pipeline`/`BatchExecutor` → `Sink`。目前框架已具备 FR021/FR022/FR023（规划剪枝、运行时瘦身、流式写出）等能力，但在“关联 + 大批次 + 低观测”场景仍存在可避免的 CPU/内存开销：
 
 - **热路径 wants-gated 不彻底**：即使未订阅某些诊断/观测事件，执行侧仍可能做逐行/逐键的额外计算与对象构造，仅在最终 `emit` 处短路。
+  - 典型例子：`LoadRefOperatorExecutor` 在每个 lookup step 后逐行计算 `hit/miss` 并调用 `record_lookup`，即使 `InstrumentationHub.emit_relation_lookup` 会在 `wants(EVENT_RELATION_LOOKUP)=false` 时直接返回，调用点仍然做了 `O(row_count)` 的循环与 membership check（`src/scalim/execution/executor/operators/load_ref/executor.py` / `src/scalim/ob/hub.py`）。
 - **BatchContext 存储开销偏高**：当前以“字段 → {row_id → value}”的 dict-of-dict 形态存储（批次内 `row_id` 实际为连续整数），在字段多/批次大时哈希表开销与对象数量会放大 RSS。
 - **sink 写出需要中间 dict**：当前 `IColumnSink.write_column(field_key, Dict[row_id, value])`/`IRowSink.write_row(Dict[field_key, value])` 形态使 pipeline 在写出前必须构造 dict（对大批次/宽表会形成可见分配峰值）。
 
@@ -32,6 +33,7 @@ Scalim 的核心执行链路为 `DemandIr` → `ExecutionPlan` → `Pipeline`/`B
 
 **选择：**
 - 在执行热路径（典型：LoadRef 诊断、某些事件 payload 预处理）增加一次性门控：`if not wants(EVENT_X): skip expensive loop`。
+  - 对 `LoadRef` 的具体要求：当 `wants(EVENT_RELATION_LOOKUP)=false` 时，必须跳过逐行 `hit/miss` 分类循环（包括 `fk_value in intermediate_result` membership check 与 `fk_type` 等辅助字段构造），而不仅是 `emit_relation_lookup` 不产生事件。
 
 **备选：**
 - 仅在 `InstrumentationHub.emit_*` 内短路（现状）：仍会保留调用点的循环/对象构造成本。
@@ -93,7 +95,12 @@ Scalim 的核心执行链路为 `DemandIr` → `ExecutionPlan` → `Pipeline`/`B
 
 ## Open Questions
 
-1. 性能主场景优先级：以 `tests/bench` 的哪个 group 作为“主 KPI”（relations / full_column / yaml_dsl / workflow）？
-2. sink fastpath 的接口形态：选择 “(row_ids, values)” 还是 “MappingView/SequenceView” 等更抽象的载荷协议？
-3. 是否需要在 CI 增加“可选 perf job”（例如 nightly）来自动跑 `bench-compare-fail` 与 memray 采样？
+（以下问题不会阻塞实现，但需要提前给出默认推荐，避免后续反复摇摆。）
 
+1. 性能主场景优先级：以 `tests/bench` 的哪个 group 作为“主 KPI”（relations / full_column / yaml_dsl / workflow）？
+   - 推荐：把 **relations / LoadRef**（无观测场景）作为阶段 A 的主 KPI；B/C 再分别以 batch-context 与 write 的 micro-bench 作为主 KPI。
+2. sink fastpath 的接口形态：选择 “(row_ids, values)” 还是 “MappingView/SequenceView” 等更抽象的载荷协议？
+   - 推荐默认：最小协议优先——显式传 `(row_ids: Sequence[Hashable], values: Sequence[FieldValue])`（列式）与 `(field_keys: Sequence[str], values: Sequence[FieldValue])`（行式），避免引入过多抽象层导致协议复杂与难以实现/测试。
+   - 备选：引入只读 view 协议（MappingView/SequenceView）用于进一步减少拷贝，但应作为后续增强而非 MVP。
+3. 是否需要在 CI 增加“可选 perf job”（例如 nightly）来自动跑 `bench-compare-fail` 与 memray 采样？
+   - 推荐：PR 仅跑确定性语义护栏（wants-gated/等价性）；性能基准与 memray 作为可选或 nightly job，避免阈值抖动拖垮 CI 稳定性。

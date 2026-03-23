@@ -1,14 +1,14 @@
 ## 1. c0 基线与护栏（防回归优先）
 
 - [ ] 1.1 (c0) 修复现有 QA 门禁阻塞：让 `just quick-check-only-py` 可作为基线运行（例如 `ruff format --check` 失败的脚本文件）。
-- [ ] 1.2 (c0) 为 wants-gated 热路径新增确定性单测护栏：覆盖 `relation_lookup` 在未订阅时不得引入 `O(row_count)` 诊断开销（对应 `specs/hooks-observability-structure/spec.md`）。
+- [ ] 1.2 (c0) 为 wants-gated 热路径新增确定性单测护栏：覆盖 `LoadRefOperatorExecutor` 的 `relation_lookup` 在未订阅时不得引入 `O(row_count)` 诊断开销（调用点不应遍历 `current_mapping.items()` 做 hit/miss 分类；对应 `src/scalim/execution/executor/operators/load_ref/executor.py` + `specs/hooks-observability-structure/spec.md`）。
 - [ ] 1.3 (c0) 新增/补齐最小可运行的 micro-bench 场景：覆盖 `LoadRef` 热路径（无观测/有观测）并输出 JSON 结果用于对比（对应 `specs/perf-regression-guardrails/spec.md`）。
 - [ ] 1.4 (c0) 明确并固化 memray 采集与产物目录：确保 `just bench-memray*` 输出到 `.benchmarks/memray/` 且不影响默认 bench（对应 `specs/perf-regression-guardrails/spec.md`）。
 - [ ] 1.5 (c0) 为本变更建立验收口径：至少包含 `just quick-check-only-py`、`just bench-compare-fail`（本地基线）与 1 次 memray 对比记录。
 
 ## 2. A：Hotpath wants-gated + 减少无效分配
 
-- [ ] 2.1 (c0) 在 `LoadRef` 关联诊断路径引入调用点 wants-gate：未订阅 `relation_lookup` 时跳过逐行 hit/miss 分类与相关辅助构造（对应 `specs/hooks-observability-structure/spec.md`）。
+- [ ] 2.1 (c0) 在 `LoadRef` 关联诊断路径引入调用点 wants-gate：未订阅 `relation_lookup` 时跳过逐行 hit/miss 分类（`fk_value in intermediate_result` membership check）与 `fk_type` 等辅助字段构造（对应 `src/scalim/execution/executor/operators/load_ref/executor.py` + `specs/hooks-observability-structure/spec.md`）。
 - [ ] 2.2 (c1) 审计并修复其它“未订阅仍做规模线性工作”的热路径（优先 execution/ob/hub 周边），并为每个点补充单测或 micro-bench。
 - [ ] 2.3 (c1) 基准验证：对 `tests/bench` 相关 group 做 before/after 记录，确保趋势向好且无语义回归。
 
@@ -30,4 +30,3 @@
 
 - [ ] 5.1 (c1) 若需要更新文档：仅修改 SSOT（非 `.gen.` 文件、非 `BEGIN/END AUTOGEN` 区块内部），并通过 `just gen-docs` 生成站点受控产物。
 - [ ] 5.2 (c1) 验收：`just docs-drift-check`、`just doc-governance-check` 通过；OpenSpec 工件通过 `just openspec-check`。
-

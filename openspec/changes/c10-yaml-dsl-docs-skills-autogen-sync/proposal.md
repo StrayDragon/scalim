@@ -13,6 +13,27 @@ YAML DSL 的对外可用性很大程度依赖两类“可复制 reference”：
 
 本变更的目标是把上述两类 reference 收敛为 **代码/生成物单源**，并通过门禁把“手写片段漂移”变成可回归的失败信号。
 
+## As-Is 调研（当前漂移点与缺口）
+
+### 1) docs/skill 里仍有大量“手写可复制命令片段”
+
+- `docs/doc/yaml-dsl/workflow.md`：包含 workflow validate / schema validate / upsert-lsp-comment 等命令清单（目前无 injected block marker，属于手写片段）
+- `docs/doc/yaml-dsl/agent-skill.md`：包含一整段可复制命令清单（目前无 injected block marker）
+- `artifacts/skills/scalim-yaml-dsl/SKILL.md`：包含最小命令入口清单（目前无 injected block marker）
+
+目前仓库的 injected blocks 主要用于其它内容（例如 `docs/doc/yaml-dsl/user-guide.md` 的 `yaml-dsl-source-field-extract`、`docs/doc/yaml-dsl/upgrades/index.md` 的 `yaml-dsl-upgrades-index`），尚未覆盖 CLI/LSP reference 的“最小命令片段”。
+
+### 2) schema reference 生成页只覆盖 demand，缺 workflow
+
+- `docs/doc/yaml-dsl/schema-reference.gen.md` 当前只从 `src/scalim/dsl/by_yaml/schema/demand.gen.json` 渲染（`scripts/gen-docs.py::_render_yaml_schema_reference`）
+- `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 已存在，但字段参考未进入 docs-site（导致 workflow authoring 的“Top-Level fields/definitions”只能看 schema 源码或 editor）
+
+### 3) CLI docs 摘录与 renderer 已有基础，但覆盖不全
+
+- 录制入口已存在：`packages/scalim-misc/src/scalim_misc/cli_docs.py::build_yaml_dsl_command_docs()`
+  - 当前仅列出 `validate` / `schema validate|show|path`，导致 `upsert-lsp-comment` 的“Command Details/full help”缺失
+- skill 已生成 `references/generated/cli-lsp-reference.gen.md`，但 docs-site 尚无同源的 CLI reference 页面（且“最小命令入口”仍是多处手写）
+
 ## What Changes
 
 - CLI reference 单源化（以 CLI parser 为 SSOT）：
@@ -33,6 +54,7 @@ YAML DSL 的对外可用性很大程度依赖两类“可复制 reference”：
 
 - 治理门禁（强约束）：
   - 增加严格检查：若目标文件缺少 marker 或 marker 外出现手写命令片段，则 `just qa` 必须失败并给出修复指引（`just gen-docs` / `just gen-agent-skill`）
+  - 该门禁默认只覆盖少量目标文件（`workflow.md`、`agent-skill.md`、`SKILL.md`），避免误伤其它叙事性文档；并且只匹配高置信度命令前缀（例如 `uv run scalim-cli yaml-dsl`、`uvx --from "scalim[cli]" scalim-cli yaml-dsl`）。
 
 ## Capabilities
 
@@ -60,4 +82,3 @@ YAML DSL 的对外可用性很大程度依赖两类“可复制 reference”：
     - `docs/doc/yaml-dsl/workflow.md`
     - `docs/doc/yaml-dsl/agent-skill.md`
     - `artifacts/skills/scalim-yaml-dsl/SKILL.md`
-

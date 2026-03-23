@@ -12,6 +12,37 @@
 
 一旦新增/调整某个 producer key（例如新增一种 rank 或 metric），很容易出现“校验允许但运行时不识别”或“运行时支持但 introspection 默认字段缺失”的不一致问题，导致线上行为不可预测、回归难定位。
 
+## As-Is 调研（重复点与漂移样例）
+
+### 1) producer keys 在多个层重复维护（且粒度不一致）
+
+- parser：`src/scalim/dsl/by_yaml/config_parsing/parsers/outputs.py`
+  - `_AGG_FUNC_KEYS/_RANK_FUNC_KEYS/_POST_FUNC_KEYS`（包含 `compute` 等 post keys）
+- runtime：`src/scalim/dsl/by_yaml/runtime/output_composition_yaml.py`
+  - `_AGG_FUNC_KEYS/_RANK_FUNC_KEYS`（post keys 分散为硬编码字符串判断）
+- introspection：`src/scalim/dsl/by_yaml/runtime/introspection.py`
+  - `_AGG_FUNC_KEYS/_RANK_FUNC_KEYS` + post keys 以 `("score_by_rank", "call_by")` 硬编码（当前遗漏 `compute`）
+- schema/editor：
+  - schema SSOT 源码：`src/scalim/dsl/by_yaml/schema_dsl/models/outputs.py`（aggregate.fields 的 oneOf/required/description 分支显式枚举 `compute/score_by_rank/call_by/...`）
+  - 生成物与 bundle：`src/scalim/dsl/by_yaml/schema/demand.gen.json` + `frontend/.../schema/demand.gen.json`
+
+这意味着“新增/调整一个 key”会穿越至少 4 个层次的维护点，且其中两处（runtime/introspection）还存在“category 粒度不同/部分硬编码”的隐形漂移面。
+
+### 2) 可复现漂移：introspection 默认 output_fields 与 runtime 默认输出列不一致
+
+当前 `aggregate` + 未显式指定 `outputs.*.fields` 时：
+
+- runtime 默认输出列包含 `compute`（聚合后派生字段会参与 DAG 并被写出）
+- introspection 的 `_default_output_fields_from_primary_output()` 默认 `post_ids` 未包含 `compute`
+
+最小复现思路：
+
+1. 写一个包含 aggregate 且 fields 中存在 `compute` producer key 的 demand YAML。
+2. 调用 `src/scalim/dsl/by_yaml/runtime/introspection.py::load_output_config()`，观察返回的 `output_fields`（缺 `compute`）。
+3. 用同一 YAML 走 runtime compile/run，观察实际写出的列（包含 `compute`）。
+
+该差异会直接影响“工具/编辑器默认预览字段列表”与“实际输出列”的一致性，属于真实的跨层漂移。
+
 ## What Changes
 
 - 引入聚合相关枚举常量的 SSOT（单一事实来源）

@@ -4,6 +4,29 @@ Scalim 的核心卖点是“可控内存占用 + 高吞吐执行”。当前执�
 
 现在推进一次 A→B→C 的渐进式性能优化：先用 c0 级护栏锁住不回归，再逐步引入更激进的数据结构与接口优化。
 
+## As-Is 调研（热点与可复现问题）
+
+### 1) LoadRef 的 `relation_lookup`：wants-gated 不彻底（无订阅也做 O(rows) 工作）
+
+- 调用点仍有逐行循环：`src/scalim/execution/executor/operators/load_ref/executor.py`
+  - 每个 lookup step 都会对 `current_mapping.items()` 做逐行 `hit/miss` 分类，并调用 `exec_ctx.record_lookup(...)`
+  - 即使最终 `InstrumentationHub.emit_relation_lookup(...)` 会在 `wants(EVENT_RELATION_LOOKUP)=false` 时直接返回（`src/scalim/ob/hub.py`），调用点的循环与 membership check 仍然发生
+- 该开销在“默认无观测（无 observer/hook/fallback logger）+ 大批次关联”场景会变成纯 CPU 消耗，且会放大 Python 对象触达与方法调用次数
+
+**建议的可验证护栏**（c0）：新增确定性测试/基准，确保当 `wants(EVENT_RELATION_LOOKUP)=false` 时，上述逐行循环不会执行（不仅是 emit 不发生）。
+
+### 2) BatchContext：row_id 连续但存储为 dict-of-dict（对象与哈希开销偏高）
+
+- 批次 `row_id` 由 pipeline 用 `range(next_row_id, next_row_id + batch_size)` 生成，天然连续 int：`src/scalim/execution/pipeline/base/pipeline.py`
+- 当前 `BatchContext` 存储为 `Dict[field_key, Dict[row_id, value]]`：`src/scalim/execution/context.py`
+
+这为 Dense path（list/array-like）提供了稳定前置条件：只要批次 row_id 连续即可启用；否则回退到现有 dict path。
+
+### 3) sink 写出：需要中间 dict（分配峰值与拷贝不可避免）
+
+- 现有 sink API 以 row/column dict 作为入参（例如 `Dict[row_id, value]`/`Dict[field_key, value]`），pipeline 写出前必须构造 dict 载荷：`src/scalim/sinks/sink_base.py` + `src/scalim/execution/executor/operators/write.py`
+- 对“宽表 + 大批次”会造成可见的分配峰值；即使最终 sink 实现是列式写出，也无法避免这一步中间结构
+
 ## What Changes
 
 - A：Hotpath 级优化（更严格的 wants-gated + 更少临时分配）
@@ -17,6 +40,7 @@ Scalim 的核心卖点是“可控内存占用 + 高吞吐执行”。当前执�
   - 内建 sinks 升级使用 fastpath；外部 sinks 可继续使用现有接口（fastpath 为可选能力）。
 - c0 护栏：防回归与可观测
   - 建立可重复的性能/内存基线采集流程（bench + memray），并提供最小可运行的回归门禁入口（本地与 CI 皆可用/可选）。
+  - 优先用“确定性语义护栏”做 PR 级回归门禁：例如 wants-gated 不得触发规模线性循环、fastpath 与旧路径输出一致（避免用机器不稳定的耗时阈值做 hard gate）。
 
 ## Capabilities
 
@@ -35,4 +59,3 @@ Scalim 的核心卖点是“可控内存占用 + 高吞吐执行”。当前执�
 - 可观测性：`src/scalim/ob/` 的 wants-gated 语义将被强化并纳入回归测试/基准。
 - 输出层：`src/scalim/sinks/` 可能新增可选 fastpath 接口/实现以减少分配；内建 sinks 会同步升级。
 - 工程护栏：`tests/bench/`、`justfile`、CI（可选）将新增/强化性能回归门禁入口；OpenSpec 工件需通过 `just openspec-check` 校验。
-

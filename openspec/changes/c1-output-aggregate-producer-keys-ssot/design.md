@@ -55,6 +55,7 @@ producer keys 同时存在于：
 
 - `src/scalim/dsl/by_yaml/schema_dsl/models/outputs.py` MUST 基于 SSOT 组装 aggregate producer keys 的 schema 列表（anyOf/required）
 - schema 生成阶段 MUST 对齐 SSOT（缺 key 或多 key 都应失败或被测试捕获）
+  - 实现建议：schema 侧本质是 `oneOf` 分支列表（每个分支通过 `required: ["<producer_key>"]` 锚定 key）。可以从该 `oneOf` 中抽取所有 `required` key 集合，与 SSOT 的全集做集合一致性断言（避免“schema 多支持/少支持”）。
 - 使用既有生成命令同步 canonical schema 与 editor bundle（`just gen-yaml-dsl-editor-schema`）
 
 4) **对齐默认行为（修复已存在漂移）**

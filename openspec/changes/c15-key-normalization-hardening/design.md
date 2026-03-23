@@ -5,7 +5,9 @@
 本变更要补齐一类“上线后才会遇到”的边界风险:
 
 - **提示可见性**: 当前 `EXPERIMENTAL` 提示在默认配置下可能不可见(例如未挂载 observer/hook,也未显式开启 fallback logger)。
+  - As-Is: `run_ir` 会调用 `InstrumentationHub.emit_diagnostic_warning(..., sample_once=True)` 发出提示,但在“无订阅 + fallback logger 未开启”的情况下会直接返回(无 stderr/log 输出): `src/scalim/execution/run_ir.py` / `src/scalim/ob/hub.py`。
 - **loader/cached mapping 边界诊断**: loader 返回的 mapping key 口径与当前匹配口径交互复杂,在极端情况下容易踩坑(例如 key 口径不一致、cached mapping 规范化时发生 key collision)。需要补齐更可诊断的告警/错误上下文,同时保持“不泄露明细 key 值”的安全约束。
+  - As-Is: cached/preload mapping 的 str-view collision 目前一律 fail-fast(无法在 values 相等时“安全合并继续”): `src/scalim/execution/executor/runtime/runtime.py`。
 
 约束与工程规则:
 

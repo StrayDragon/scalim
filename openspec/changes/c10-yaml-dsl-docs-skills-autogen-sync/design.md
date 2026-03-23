@@ -11,6 +11,16 @@
 - workflow/demand 的校验策略迭代后，skill/docs 的最小命令入口不一致
 - schema 扩展后，字段参考页覆盖不全（例如 workflow schema 的字段参考缺失）
 
+As-Is 盘点（MVP 目标文件）：
+
+- docs（手写命令片段）：
+  - `docs/doc/yaml-dsl/workflow.md`
+  - `docs/doc/yaml-dsl/agent-skill.md`
+- skill（手写命令片段）：
+  - `artifacts/skills/scalim-yaml-dsl/SKILL.md`
+- docs schema reference（生成物，但当前仅覆盖 demand）：
+  - `docs/doc/yaml-dsl/schema-reference.gen.md`（来源：`scripts/gen-docs.py::_render_yaml_schema_reference`）
+
 这些漂移属于“作者体验与用户体验的硬坑”：一旦错了，用户会直接复制错误命令或错误 `$schema` 头部。
 
 约束：
@@ -42,6 +52,7 @@
    - 以 `src/scalim/cli/yaml_dsl.py` 的 argparse parser 为唯一命令真相
    - 使用/扩展现有的 `RecordingArgumentParser` 录制命令树（见 `packages/scalim-misc/src/scalim_misc/cli_docs.py`）
    - 录制覆盖面必须包含 `yaml-dsl upsert-lsp-comment`（避免最常漏的 authoring/LSP 指引）
+   - 注：当前 `build_yaml_dsl_command_docs()` 的 `command_tokens` 列表尚未包含该子命令，导致生成 reference 的 command details 缺失；本变更需要先补齐录制清单。
 
 2) **同源渲染：单一 renderer 输出 Markdown**
    - 直接生成 Markdown（不引入额外 JSON 中间层），但 renderer 必须单源复用，避免 docs 与 skill 重复实现渲染逻辑
@@ -66,6 +77,9 @@
      - 目标文件必须包含 marker（缺失即失败）
      - marker 外出现匹配的“可复制命令片段”即失败
    - 检查范围默认只覆盖少量文件（`workflow.md`、`agent-skill.md`、`SKILL.md`），避免误杀其它页面的叙事性引用
+   - 匹配模式推荐收敛为高置信度前缀（避免误杀）：
+     - `uv run scalim-cli yaml-dsl ...`
+     - `uvx --from "scalim[cli]" scalim-cli yaml-dsl ...`
    - 失败信息必须包含修复命令：`just gen-docs` / `just gen-agent-skill`
    - 该检查必须进入 `quick-check-only-py`，因此 `just qa` 会 fail-fast
 
@@ -74,4 +88,3 @@
 - [风险] 过度严格的文本扫描会误杀合法叙事引用 → 缓解：仅扫描少量目标文件；仅匹配高置信的命令模式；忽略 injected blocks 内部
 - [风险] CLI usage/help 输出格式随 argparse 变化而变动，可能导致生成页频繁更新 → 缓解：将其视为 SSOT 变化；用生成物与 drift gate 捕获并显式 review
 - [风险] `SKILL.md` 引入 injected blocks 可能影响手工维护体验 → 缓解：只注入“最小命令清单”一段；marker 外结构不变；在区块上方明确禁止手改区块内部
-
