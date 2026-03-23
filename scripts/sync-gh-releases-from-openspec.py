@@ -142,14 +142,7 @@ def _score_highlight(text: str) -> int:
     s = text
     lower = s.lower()
     score = 0
-    if (
-        "non-goals" in lower
-        or "non goals" in lower
-        or "non-goal" in lower
-        or "非目标" in s
-        or "不做" in s
-        or "明确不做" in s
-    ):
+    if "non-goals" in lower or "non goals" in lower or "non-goal" in lower or "非目标" in s or "不做" in s or "明确不做" in s:
         score -= 50
     if "新增" in s or "引入" in s or "支持" in s or "扩展" in s or "增加" in s or "new" in lower:
         score += 3
@@ -456,7 +449,9 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             return False
         lower = text.lower()
         tokens = re.findall(r"`([^`]+)`", text)
-        has_surface_token = any(_tok_is_surface(tok) for tok in tokens) or "workflow." in text or "workflow " in lower or "yaml-dsl" in lower
+        has_surface_token = (
+            any(_tok_is_surface(tok) for tok in tokens) or "workflow." in text or "workflow " in lower or "yaml-dsl" in lower
+        )
 
         # 明确不是 breaking 的常见表述：避免“为了避免 breaking”之类的句子误入。
         if ("避免" in text or "保持" in text) and ("breaking" in lower or "不兼容" in text):
