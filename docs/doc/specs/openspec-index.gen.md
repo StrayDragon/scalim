@@ -136,6 +136,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/module-organization/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `src/IMPL_ROOT/` 的模块边界、入口最小化与兼容约束,避免将内部实现路径误用为公共 API,并保持 Python 3.6 运行时可用性.
 
+### `no-external-callback-under-lock`
+- Title: no-external-callback-under-lock Specification
+- Source: [spec.md](#code=openspec/specs/no-external-callback-under-lock/spec.md)
+- Summary: 为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。
+
 ### `output-composition`
 - Title: output-composition Specification
 - Source: [spec.md](#code=openspec/specs/output-composition/spec.md)
