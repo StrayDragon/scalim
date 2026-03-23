@@ -425,7 +425,7 @@ class WorkflowResourceManager:
         msg = "Sheetbook budget exceeded: sheetbook={!r}".format(str(plan.resource_id))
         raise WorkflowWriteError(msg, diff=diff)
 
-    def apply_sheetbook_sheet(
+    def apply_sheetbook_sheet(  # noqa: C901
         self,
         *,
         workflow_node_id: str,
@@ -442,25 +442,14 @@ class WorkflowResourceManager:
 
         input_header = _read_csv_header(input_csv_path)
 
+        pending_skip = False
         with self._lock:
             existing = plan.sheets.get(sheet_name)
             if existing is not None:
                 if on_conflict == "skip":
                     action = "skip"
-                    display_path = plan.export_path if plan.export_path is not None else "<memory>"
-                    self._emit_resource_write(
-                        workflow_node_id=str(workflow_node_id),
-                        resource_type="sheetbook",
-                        resource_id=str(sheetbook_id),
-                        path=str(display_path),
-                        write_kind="sheetbook_sheet",
-                        action=action,
-                        input_node_id=str(input_node_id),
-                        input_output_id=str(input_output_id),
-                        sheet=sheet_name,
-                    )
                     plan.last_workflow_node_id = str(workflow_node_id)
-                    return
+                    pending_skip = True
                 if on_conflict == "error":
                     msg = "Sheet conflict (sheetbook_sheet): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
                     raise WorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
@@ -474,6 +463,21 @@ class WorkflowResourceManager:
                     "new_sheet={!r}".format(sheet_name),
                 ]
                 raise WorkflowWriteError(msg, diff=diff)
+
+        if pending_skip:
+            display_path = plan.export_path if plan.export_path is not None else "<memory>"
+            self._emit_resource_write(
+                workflow_node_id=str(workflow_node_id),
+                resource_type="sheetbook",
+                resource_id=str(sheetbook_id),
+                path=str(display_path),
+                write_kind="sheetbook_sheet",
+                action=action,
+                input_node_id=str(input_node_id),
+                input_output_id=str(input_output_id),
+                sheet=sheet_name,
+            )
+            return
 
         expected = list(input_header)
         mapping = _build_alignment_mapping(expected, input_header)
@@ -517,6 +521,7 @@ class WorkflowResourceManager:
             )
             plan.sheets[sheet_name] = sheet_plan
             plan.total_cells = int(new_total)
+            plan.last_workflow_node_id = str(workflow_node_id)
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._emit_resource_write(
@@ -530,7 +535,6 @@ class WorkflowResourceManager:
             input_output_id=str(input_output_id),
             sheet=sheet_name,
         )
-        plan.last_workflow_node_id = str(workflow_node_id)
 
     def apply_sheetbook_append(  # noqa: C901, PLR0912, PLR0915
         self,
@@ -548,6 +552,11 @@ class WorkflowResourceManager:
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
         input_header = _read_csv_header(input_csv_path)
+
+        pending_warning: Optional[DiagnosticWarningEvent] = None
+        pending_warning_meta: Optional[Dict[str, object]] = None
+        pending_skip = False
+        start_row = 0
 
         with self._lock:
             sheet_plan = plan.sheets.get(sheet_name)
@@ -583,44 +592,48 @@ class WorkflowResourceManager:
                     msg = "Field alignment mismatch (sheetbook_append): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
                     raise WorkflowWriteError(msg, diff=diff)
                 if on_mismatch == "warn":
-                    _ = self._instrumentation.emit(
-                        EVENT_DIAGNOSTIC_WARNING,
-                        DiagnosticWarningEvent(
-                            message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
-                            source_id=None,
-                            field_id=None,
-                            lookup_key={"expected": expected, "actual": list(input_header)},
-                            row_id=None,
-                        ),
-                        meta={"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)},
+                    pending_warning = DiagnosticWarningEvent(
+                        message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
+                        source_id=None,
+                        field_id=None,
+                        lookup_key={"expected": expected, "actual": list(input_header)},
+                        row_id=None,
                     )
+                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
                 if on_mismatch == "skip":
-                    display_path = plan.export_path if plan.export_path is not None else "<memory>"
-                    self._emit_resource_write(
-                        workflow_node_id=str(workflow_node_id),
-                        resource_type="sheetbook",
-                        resource_id=str(sheetbook_id),
-                        path=str(display_path),
-                        write_kind="sheetbook_append",
-                        action="skip",
-                        input_node_id=str(input_node_id),
-                        input_output_id=str(input_output_id),
-                        sheet=sheet_name,
-                    )
                     plan.last_workflow_node_id = str(workflow_node_id)
-                    return
+                    pending_skip = True
 
-            # 重复写入检测: 同一生产者不应写入同一工作表多次.
-            for seg in sheet_plan.segments:
-                if str(seg.producer_node_id) == str(input_node_id):
-                    msg = "Duplicate sheetbook write for the same producer: sheetbook={!r}, sheet={!r}, producer={!r}".format(
-                        str(sheetbook_id),
-                        sheet_name,
-                        str(input_node_id),
-                    )
-                    raise WorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
+            if not pending_skip:
+                # 重复写入检测: 同一生产者不应写入同一工作表多次.
+                for seg in sheet_plan.segments:
+                    if str(seg.producer_node_id) == str(input_node_id):
+                        msg = "Duplicate sheetbook write for the same producer: sheetbook={!r}, sheet={!r}, producer={!r}".format(
+                            str(sheetbook_id),
+                            sheet_name,
+                            str(input_node_id),
+                        )
+                        raise WorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
 
-            start_row = int(sheet_plan.row_count)
+                start_row = int(sheet_plan.row_count)
+
+        if pending_warning is not None:
+            _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)
+
+        if pending_skip:
+            display_path = plan.export_path if plan.export_path is not None else "<memory>"
+            self._emit_resource_write(
+                workflow_node_id=str(workflow_node_id),
+                resource_type="sheetbook",
+                resource_id=str(sheetbook_id),
+                path=str(display_path),
+                write_kind="sheetbook_append",
+                action="skip",
+                input_node_id=str(input_node_id),
+                input_output_id=str(input_output_id),
+                sheet=sheet_name,
+            )
+            return
 
         # 读取并对齐到基线表头(列式追加).
         col_lists: List[List[str]] = [[] for _ in expected]
@@ -657,6 +670,7 @@ class WorkflowResourceManager:
                 )
             )
             plan.total_cells = int(new_total)
+            plan.last_workflow_node_id = str(workflow_node_id)
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._emit_resource_write(
@@ -670,7 +684,6 @@ class WorkflowResourceManager:
             input_output_id=str(input_output_id),
             sheet=sheet_name,
         )
-        plan.last_workflow_node_id = str(workflow_node_id)
 
     def iter_sheetbook_sheet_rows(  # noqa: C901
         self,
@@ -750,43 +763,49 @@ class WorkflowResourceManager:
 
         input_header = _read_csv_header(input_csv_path)
 
+        pending_skip = False
         with self._lock:
             existing = plan.sheets.get(sheet_name)
             if existing is not None:
                 if on_conflict == "skip":
                     action = "skip"
-                    self._emit_resource_write(
-                        workflow_node_id=str(workflow_node_id),
-                        resource_type="workbook",
-                        resource_id=str(workbook_id),
-                        path=str(plan.path),
-                        write_kind="workbook_sheet",
-                        action=action,
-                        input_node_id=str(input_node_id),
-                        input_output_id=str(input_output_id),
-                        sheet=sheet_name,
-                    )
                     plan.last_workflow_node_id = str(workflow_node_id)
-                    return
+                    pending_skip = True
                 if on_conflict == "error":
                     msg = "Sheet conflict (workbook_sheet): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
                     raise WorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
                 if on_conflict == "overwrite":
                     action = "overwrite"
 
-            if existing is None:
-                plan.sheet_order.append(sheet_name)
+            if not pending_skip:
+                if existing is None:
+                    plan.sheet_order.append(sheet_name)
 
-            mapping = _build_alignment_mapping(input_header, input_header)
-            segment = _AppendSegment(
-                input_csv_path=str(input_csv_path),
-                header_policy="once",
-                mapping=mapping,
-                on_mismatch="error",
-                align_by="header",
-                input_header=input_header,
+                mapping = _build_alignment_mapping(input_header, input_header)
+                segment = _AppendSegment(
+                    input_csv_path=str(input_csv_path),
+                    header_policy="once",
+                    mapping=mapping,
+                    on_mismatch="error",
+                    align_by="header",
+                    input_header=input_header,
+                )
+                plan.sheets[sheet_name] = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[segment])
+                plan.last_workflow_node_id = str(workflow_node_id)
+
+        if pending_skip:
+            self._emit_resource_write(
+                workflow_node_id=str(workflow_node_id),
+                resource_type="workbook",
+                resource_id=str(workbook_id),
+                path=str(plan.path),
+                write_kind="workbook_sheet",
+                action=action,
+                input_node_id=str(input_node_id),
+                input_output_id=str(input_output_id),
+                sheet=sheet_name,
             )
-            plan.sheets[sheet_name] = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[segment])
+            return
 
         self._emit_resource_write(
             workflow_node_id=str(workflow_node_id),
@@ -799,7 +818,6 @@ class WorkflowResourceManager:
             input_output_id=str(input_output_id),
             sheet=sheet_name,
         )
-        plan.last_workflow_node_id = str(workflow_node_id)
 
     def apply_workbook_append(
         self,
@@ -818,6 +836,10 @@ class WorkflowResourceManager:
         sheet_name = str(sheet)
         input_header = _read_csv_header(input_csv_path)
 
+        pending_warning: Optional[DiagnosticWarningEvent] = None
+        pending_warning_meta: Optional[Dict[str, object]] = None
+        pending_skip = False
+
         with self._lock:
             sheet_plan = plan.sheets.get(sheet_name)
             if sheet_plan is None:
@@ -834,42 +856,48 @@ class WorkflowResourceManager:
                     msg = "Field alignment mismatch (workbook_append): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
                     raise WorkflowWriteError(msg, diff=diff)
                 if on_mismatch == "warn":
-                    _ = self._instrumentation.emit(
-                        EVENT_DIAGNOSTIC_WARNING,
-                        DiagnosticWarningEvent(
-                            message="Field alignment mismatch (warn): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name),
-                            source_id=None,
-                            field_id=None,
-                            lookup_key={"expected": expected, "actual": list(input_header)},
-                            row_id=None,
-                        ),
-                        meta={"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)},
+                    pending_warning = DiagnosticWarningEvent(
+                        message="Field alignment mismatch (warn): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name),
+                        source_id=None,
+                        field_id=None,
+                        lookup_key={"expected": expected, "actual": list(input_header)},
+                        row_id=None,
                     )
+                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
                 if on_mismatch == "skip":
-                    self._emit_resource_write(
-                        workflow_node_id=str(workflow_node_id),
-                        resource_type="workbook",
-                        resource_id=str(workbook_id),
-                        path=str(plan.path),
-                        write_kind="workbook_append",
-                        action="skip",
-                        input_node_id=str(input_node_id),
-                        input_output_id=str(input_output_id),
-                        sheet=sheet_name,
-                    )
                     plan.last_workflow_node_id = str(workflow_node_id)
-                    return
+                    pending_skip = True
 
-            sheet_plan.segments.append(
-                _AppendSegment(
-                    input_csv_path=str(input_csv_path),
-                    header_policy=str(header_policy),
-                    mapping=mapping,
-                    on_mismatch=str(on_mismatch),
-                    align_by=str(align_by),
-                    input_header=list(input_header),
+            if not pending_skip:
+                sheet_plan.segments.append(
+                    _AppendSegment(
+                        input_csv_path=str(input_csv_path),
+                        header_policy=str(header_policy),
+                        mapping=mapping,
+                        on_mismatch=str(on_mismatch),
+                        align_by=str(align_by),
+                        input_header=list(input_header),
+                    )
                 )
+                plan.last_workflow_node_id = str(workflow_node_id)
+
+        if pending_warning is not None:
+            _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)
+
+        if pending_skip:
+            self._emit_resource_write(
+                workflow_node_id=str(workflow_node_id),
+                resource_type="workbook",
+                resource_id=str(workbook_id),
+                path=str(plan.path),
+                write_kind="workbook_append",
+                action="skip",
+                input_node_id=str(input_node_id),
+                input_output_id=str(input_output_id),
+                sheet=sheet_name,
             )
+            return
+
         self._emit_resource_write(
             workflow_node_id=str(workflow_node_id),
             resource_type="workbook",
@@ -881,7 +909,6 @@ class WorkflowResourceManager:
             input_output_id=str(input_output_id),
             sheet=sheet_name,
         )
-        plan.last_workflow_node_id = str(workflow_node_id)
 
     def apply_csv_append(
         self,
@@ -897,6 +924,10 @@ class WorkflowResourceManager:
         plan = self._get_or_create_csv(csv_id, workflow_node_id=str(workflow_node_id))
         input_header = _read_csv_header(input_csv_path)
 
+        pending_warning: Optional[DiagnosticWarningEvent] = None
+        pending_warning_meta: Optional[Dict[str, object]] = None
+        pending_skip = False
+
         with self._lock:
             if plan.baseline_header is None:
                 plan.baseline_header = list(input_header)
@@ -911,41 +942,47 @@ class WorkflowResourceManager:
                     msg = "Field alignment mismatch (csv_append): csv={!r}".format(str(csv_id))
                     raise WorkflowWriteError(msg, diff=diff)
                 if on_mismatch == "warn":
-                    _ = self._instrumentation.emit(
-                        EVENT_DIAGNOSTIC_WARNING,
-                        DiagnosticWarningEvent(
-                            message="Field alignment mismatch (warn): csv={!r}".format(str(csv_id)),
-                            source_id=None,
-                            field_id=None,
-                            lookup_key={"expected": expected, "actual": list(input_header)},
-                            row_id=None,
-                        ),
-                        meta={"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)},
+                    pending_warning = DiagnosticWarningEvent(
+                        message="Field alignment mismatch (warn): csv={!r}".format(str(csv_id)),
+                        source_id=None,
+                        field_id=None,
+                        lookup_key={"expected": expected, "actual": list(input_header)},
+                        row_id=None,
                     )
+                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
                 if on_mismatch == "skip":
-                    self._emit_resource_write(
-                        workflow_node_id=str(workflow_node_id),
-                        resource_type="csv",
-                        resource_id=str(csv_id),
-                        path=str(plan.path),
-                        write_kind="csv_append",
-                        action="skip",
-                        input_node_id=str(input_node_id),
-                        input_output_id=str(input_output_id),
-                    )
                     plan.last_workflow_node_id = str(workflow_node_id)
-                    return
+                    pending_skip = True
 
-            cast("List[_AppendSegment]", plan.segments).append(
-                _AppendSegment(
-                    input_csv_path=str(input_csv_path),
-                    header_policy=str(header_policy),
-                    mapping=mapping,
-                    on_mismatch=str(on_mismatch),
-                    align_by="header",
-                    input_header=list(input_header),
+            if not pending_skip:
+                cast("List[_AppendSegment]", plan.segments).append(
+                    _AppendSegment(
+                        input_csv_path=str(input_csv_path),
+                        header_policy=str(header_policy),
+                        mapping=mapping,
+                        on_mismatch=str(on_mismatch),
+                        align_by="header",
+                        input_header=list(input_header),
+                    )
                 )
+                plan.last_workflow_node_id = str(workflow_node_id)
+
+        if pending_warning is not None:
+            _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)
+
+        if pending_skip:
+            self._emit_resource_write(
+                workflow_node_id=str(workflow_node_id),
+                resource_type="csv",
+                resource_id=str(csv_id),
+                path=str(plan.path),
+                write_kind="csv_append",
+                action="skip",
+                input_node_id=str(input_node_id),
+                input_output_id=str(input_output_id),
             )
+            return
+
         self._emit_resource_write(
             workflow_node_id=str(workflow_node_id),
             resource_type="csv",
@@ -956,7 +993,6 @@ class WorkflowResourceManager:
             input_node_id=str(input_node_id),
             input_output_id=str(input_output_id),
         )
-        plan.last_workflow_node_id = str(workflow_node_id)
 
     def commit_all(self) -> None:
         for plan in list(self._workbooks.values()):

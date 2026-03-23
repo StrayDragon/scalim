@@ -269,6 +269,8 @@ class WorkflowCachePool:
         conflict_diff: Optional[List[str]] = None
         conflict_target_digest: Optional[str] = None
 
+        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
+
         with self._lock:
             existing_keys = self._signature_keys_by_logical_key.get(logical_key, set())
             if existing_keys and signature_key not in existing_keys:
@@ -293,25 +295,27 @@ class WorkflowCachePool:
                     self._conflict_policy,
                     ",".join(conflict_diff or []),
                 )
-                _ = self._instrumentation.emit(
-                    EVENT_DIAGNOSTIC_WARNING,
-                    DiagnosticWarningEvent(
-                        message=warn_msg,
-                        source_id=str(logical_key[1]),
-                        field_id=None,
-                        lookup_key=None,
-                        row_id=None,
-                    ),
-                    meta={
-                        "workflow_exec_id": self._workflow_exec_id,
-                        "workflow_node_id": node_id,
-                    },
+                pending_emits.append(
+                    (
+                        EVENT_DIAGNOSTIC_WARNING,
+                        DiagnosticWarningEvent(
+                            message=warn_msg,
+                            source_id=str(logical_key[1]),
+                            field_id=None,
+                            lookup_key=None,
+                            row_id=None,
+                        ),
+                        {
+                            "workflow_exec_id": self._workflow_exec_id,
+                            "workflow_node_id": node_id,
+                        },
+                    )
                 )
 
             entry = self._entries.get(signature_key)
             cache_status = "hit" if entry is not None and entry.value is not None else "miss"
             if entry is None:
-                self._ensure_budget_for_new_entry(workflow_node_id=node_id)
+                self._ensure_budget_for_new_entry(workflow_node_id=node_id, pending_emits=pending_emits)
                 entry = _CacheEntry(signature=signature)
                 self._entries[signature_key] = entry
                 self._signature_keys_by_logical_key.setdefault(logical_key, set()).add(signature_key)
@@ -319,25 +323,30 @@ class WorkflowCachePool:
             self._acquired_by_node_id.setdefault(node_id, set()).add(signature_key)
             self._entries.move_to_end(signature_key)
 
-            _ = self._instrumentation.emit(
-                EVENT_WORKFLOW_CACHE_ACQUIRE,
-                WorkflowCacheAcquireEvent(
-                    workflow_exec_id=self._workflow_exec_id,
-                    workflow_node_id=node_id,
-                    cache_kind=str(logical_key[0]),
-                    source_id=str(logical_key[1]),
-                    signature_digest=signature_digest,
-                    cache_status=cache_status,
-                    conflict_policy=str(self._conflict_policy),
-                    conflict_detected=bool(conflict_diff),
-                    conflict_diff_fields=tuple(conflict_diff or ()),
-                    conflict_target_signature_digest=conflict_target_digest,
-                ),
-                meta={
-                    "workflow_exec_id": self._workflow_exec_id,
-                    "workflow_node_id": node_id,
-                },
+            pending_emits.append(
+                (
+                    EVENT_WORKFLOW_CACHE_ACQUIRE,
+                    WorkflowCacheAcquireEvent(
+                        workflow_exec_id=self._workflow_exec_id,
+                        workflow_node_id=node_id,
+                        cache_kind=str(logical_key[0]),
+                        source_id=str(logical_key[1]),
+                        signature_digest=signature_digest,
+                        cache_status=cache_status,
+                        conflict_policy=str(self._conflict_policy),
+                        conflict_detected=bool(conflict_diff),
+                        conflict_diff_fields=tuple(conflict_diff or ()),
+                        conflict_target_signature_digest=conflict_target_digest,
+                    ),
+                    {
+                        "workflow_exec_id": self._workflow_exec_id,
+                        "workflow_node_id": node_id,
+                    },
+                )
             )
+
+        for event_type, payload, meta in pending_emits:
+            _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
 
         # 加载过程由每条目锁(`per-entry lock`)保护.
         with entry.lock:
@@ -354,41 +363,52 @@ class WorkflowCachePool:
     def on_workflow_node_done(self, workflow_node_id: str) -> None:
         node_id = str(workflow_node_id)
 
+        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
+
         with self._lock:
             if node_id in self._done_node_ids:
                 return
             self._done_node_ids.add(node_id)
 
             acquired = self._acquired_by_node_id.pop(node_id, set())
-            self._emit_release_events(node_id=node_id, acquired_signature_keys=acquired)
+            pending_emits.extend(self._collect_release_events(node_id=node_id, acquired_signature_keys=acquired))
             evict_reasons = self._collect_refcount_evictions(node_id=node_id)
             for signature_key, reason in evict_reasons.items():
-                self._evict_entry(signature_key, workflow_node_id=node_id, reason=reason)
+                pending = self._evict_entry(signature_key, workflow_node_id=node_id, reason=reason)
+                if pending is not None:
+                    pending_emits.append(pending)
 
-    def _emit_release_events(self, *, node_id: str, acquired_signature_keys: Set[str]) -> None:
+        for event_type, payload, meta in pending_emits:
+            _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
+
+    def _collect_release_events(self, *, node_id: str, acquired_signature_keys: Set[str]) -> List[Tuple[str, object, Dict[str, object]]]:
+        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
         for signature_key in acquired_signature_keys:
             entry = self._entries.get(signature_key)
             if entry is None:
                 continue
             logical_key = entry.signature.logical_key()
             remaining = len(self._remaining_consumers_by_logical_key.get(logical_key, set()))
-            _ = self._instrumentation.emit(
-                EVENT_WORKFLOW_CACHE_RELEASE,
-                WorkflowCacheReleaseEvent(
-                    workflow_exec_id=self._workflow_exec_id,
-                    workflow_node_id=node_id,
-                    cache_kind=str(logical_key[0]),
-                    source_id=str(logical_key[1]),
-                    signature_digest=entry.signature.digest(),
-                    remaining_consumers=remaining,
-                    release_policy=str(self._release_policy),
-                    is_pinned=logical_key in self._pinned_logical_keys,
-                ),
-                meta={
-                    "workflow_exec_id": self._workflow_exec_id,
-                    "workflow_node_id": node_id,
-                },
+            pending_emits.append(
+                (
+                    EVENT_WORKFLOW_CACHE_RELEASE,
+                    WorkflowCacheReleaseEvent(
+                        workflow_exec_id=self._workflow_exec_id,
+                        workflow_node_id=node_id,
+                        cache_kind=str(logical_key[0]),
+                        source_id=str(logical_key[1]),
+                        signature_digest=entry.signature.digest(),
+                        remaining_consumers=remaining,
+                        release_policy=str(self._release_policy),
+                        is_pinned=logical_key in self._pinned_logical_keys,
+                    ),
+                    {
+                        "workflow_exec_id": self._workflow_exec_id,
+                        "workflow_node_id": node_id,
+                    },
+                )
             )
+        return pending_emits
 
     def _collect_refcount_evictions(self, *, node_id: str) -> Dict[str, str]:
         evict_reasons: Dict[str, str] = {}
@@ -408,11 +428,17 @@ class WorkflowCachePool:
         return evict_reasons
 
     def close(self) -> None:
+        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
         with self._lock:
             for signature_key in list(self._entries.keys()):
-                self._evict_entry(signature_key, workflow_node_id="workflow_end", reason="workflow_end")
+                pending = self._evict_entry(signature_key, workflow_node_id="workflow_end", reason="workflow_end")
+                if pending is not None:
+                    pending_emits.append(pending)
 
-    def _ensure_budget_for_new_entry(self, *, workflow_node_id: str) -> None:
+        for event_type, payload, meta in pending_emits:
+            _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
+
+    def _ensure_budget_for_new_entry(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> None:
         if self._max_entries < 1:  # pragma: no cover
             msg = "cache_pool budget.max_entries must be >= 1"
             raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.max_entries")
@@ -427,12 +453,12 @@ class WorkflowCachePool:
             msg = "cache_pool over_budget_policy '{}' is not supported".format(self._over_budget_policy)
             raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
 
-        evicted = self._evict_lru_idle(workflow_node_id=workflow_node_id)
+        evicted = self._evict_lru_idle(workflow_node_id=workflow_node_id, pending_emits=pending_emits)
         if not evicted:
             msg = "cache_pool over budget: max_entries={} (no evictable refcount=0 entries)".format(self._max_entries)
             raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
 
-    def _evict_lru_idle(self, *, workflow_node_id: str) -> bool:
+    def _evict_lru_idle(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> bool:
         for signature_key, entry in list(self._entries.items()):
             logical_key = entry.signature.logical_key()
             if logical_key in self._pinned_logical_keys:
@@ -442,14 +468,22 @@ class WorkflowCachePool:
             remaining = self._remaining_consumers_by_logical_key.get(logical_key, set())
             if remaining:
                 continue
-            self._evict_entry(signature_key, workflow_node_id=workflow_node_id, reason="budget_lru")
+            pending = self._evict_entry(signature_key, workflow_node_id=workflow_node_id, reason="budget_lru")
+            if pending is not None:
+                pending_emits.append(pending)
             return True
         return False
 
-    def _evict_entry(self, signature_key: str, *, workflow_node_id: str, reason: str) -> None:
+    def _evict_entry(
+        self,
+        signature_key: str,
+        *,
+        workflow_node_id: str,
+        reason: str,
+    ) -> Optional[Tuple[str, object, Dict[str, object]]]:
         entry = self._entries.pop(signature_key, None)
         if entry is None:
-            return
+            return None
         logical_key = entry.signature.logical_key()
         keys = self._signature_keys_by_logical_key.get(logical_key)
         if keys is not None:
@@ -458,7 +492,7 @@ class WorkflowCachePool:
                 _ = self._signature_keys_by_logical_key.pop(logical_key, None)
                 _ = self._remaining_consumers_by_logical_key.pop(logical_key, None)
 
-        _ = self._instrumentation.emit(
+        return (
             EVENT_WORKFLOW_CACHE_EVICT,
             WorkflowCacheEvictEvent(
                 workflow_exec_id=self._workflow_exec_id,
@@ -468,7 +502,7 @@ class WorkflowCachePool:
                 signature_digest=entry.signature.digest(),
                 reason=str(reason),
             ),
-            meta={
+            {
                 "workflow_exec_id": self._workflow_exec_id,
                 "workflow_node_id": str(workflow_node_id),
             },

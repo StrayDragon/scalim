@@ -1,4 +1,5 @@
 import csv
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -561,6 +562,74 @@ def test_resource_manager_sheetbook_append_duplicate_producer_is_rejected(tmp_pa
             header_policy="once",
             on_mismatch="error",
         )
+
+
+def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: Path) -> None:
+    class _ReentrantInstrumentation:
+        def __init__(self) -> None:
+            self._reentered = False
+            self.manager = None
+            self.csv_input_path = None
+
+        def emit(self, event_type: str, payload: Any, meta: Optional[Dict[str, Any]] = None) -> None:
+            _ = event_type, meta
+            if self._reentered:
+                return
+            if str(event_type) != EVENT_WORKFLOW_RESOURCE_WRITE:
+                return
+            if getattr(payload, "action", None) != "skip":
+                return
+            self._reentered = True
+            self.manager.apply_csv_append(  # type: ignore[union-attr]
+                workflow_node_id="reentry",
+                csv_id="merged",
+                input_node_id="r",
+                input_output_id="out",
+                input_csv_path=str(self.csv_input_path),  # type: ignore[arg-type]
+                header_policy="once",
+                on_mismatch="error",
+            )
+
+    instrumentation = _ReentrantInstrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(tmp_path / "report.xlsx")},
+        csv_defs={"merged": str(tmp_path / "merged.csv")},
+        sheetbook_defs={},
+    )
+    instrumentation.manager = manager
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    instrumentation.csv_input_path = str(first)
+
+    manager.apply_workbook_sheet(
+        workflow_node_id="n0",
+        workbook_id="report",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv_path=str(first),
+        on_conflict="error",
+    )
+
+    runner = threading.Thread(
+        target=lambda: manager.apply_workbook_sheet(
+            workflow_node_id="n1",
+            workbook_id="report",
+            sheet="S",
+            input_node_id="b",
+            input_output_id="detail",
+            input_csv_path=str(first),
+            on_conflict="skip",
+        ),
+        daemon=True,
+    )
+    runner.start()
+    runner.join(timeout=1.0)
+    if runner.is_alive():
+        pytest.fail("WorkflowResourceManager.emit appears to be called under internal locks (reentry deadlock)")
+    assert instrumentation._reentered is True
 
 
 def test_resource_manager_sheetbook_iter_rows_visibility_and_errors(tmp_path: Path) -> None:

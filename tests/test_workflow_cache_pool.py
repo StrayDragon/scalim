@@ -1,4 +1,5 @@
 import math
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -74,7 +75,7 @@ def test_workflow_cache_pool_release_and_refcount_edge_cases() -> None:
     pool.on_workflow_node_done("n1")
     pool.on_workflow_node_done("n1")
 
-    pool._emit_release_events(node_id="n2", acquired_signature_keys=set(["missing"]))  # type: ignore[attr-defined]
+    _ = pool._collect_release_events(node_id="n2", acquired_signature_keys=set(["missing"]))  # type: ignore[attr-defined]
 
 
 def test_workflow_cache_pool_budget_rejects_unknown_policy() -> None:
@@ -119,11 +120,11 @@ def test_workflow_cache_pool_evict_lru_skips_loading_and_remaining_consumers() -
 
     entry = pool._entries[signature.canonical_key()]  # type: ignore[attr-defined]
     entry.loading = True
-    assert pool._evict_lru_idle(workflow_node_id="n2") is False  # type: ignore[attr-defined]
+    assert pool._evict_lru_idle(workflow_node_id="n2", pending_emits=[]) is False  # type: ignore[attr-defined]
     entry.loading = False
 
     pool._remaining_consumers_by_logical_key[signature.logical_key()] = set(["n1"])  # type: ignore[attr-defined]
-    assert pool._evict_lru_idle(workflow_node_id="n2") is False  # type: ignore[attr-defined]
+    assert pool._evict_lru_idle(workflow_node_id="n2", pending_emits=[]) is False  # type: ignore[attr-defined]
 
     pool._evict_entry("missing", workflow_node_id="n3", reason="x")  # type: ignore[attr-defined]
 
@@ -224,3 +225,41 @@ def _sig(source_id: str) -> WorkflowCacheEntrySignature:
         key=None,
         lookup_cast=None,
     )
+
+
+def test_workflow_cache_pool_emit_does_not_deadlock_on_reentry() -> None:
+    class _ReentrantInstrumentation:
+        def __init__(self) -> None:
+            self._reentered = False
+            self.pool = None
+
+        def emit(self, event_type: str, payload, meta=None):  # type: ignore[no-untyped-def]
+            _ = event_type, payload, meta
+            if self._reentered:
+                return None
+            self._reentered = True
+            _ = self.pool.get_or_load(_sig("inner"), workflow_node_id="n_inner", load_fn=lambda: {1: {"id": 1}})  # type: ignore[union-attr]
+            return None
+
+    instrumentation = _ReentrantInstrumentation()
+    pool = WorkflowCachePool(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,  # type: ignore[arg-type]
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+        logical_keys_by_node_id={},
+        consumers_by_logical_key={},
+    )
+    instrumentation.pool = pool
+
+    runner = threading.Thread(
+        target=lambda: pool.get_or_load(_sig("outer"), workflow_node_id="n_outer", load_fn=lambda: {1: {"id": 1}}),
+        daemon=True,
+    )
+    runner.start()
+    runner.join(timeout=1.0)
+    if runner.is_alive():
+        pytest.fail("WorkflowCachePool.emit appears to be called under internal locks (reentry deadlock)")
