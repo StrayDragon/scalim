@@ -9,6 +9,8 @@ from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.sources import MainSourceIr
 
+_TIMEOUT_S = 5.0
+
 
 def test_scalim_engine_run_is_serialized_per_instance() -> None:
     demand = DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader=lambda: []))
@@ -18,10 +20,11 @@ def test_scalim_engine_run_is_serialized_per_instance() -> None:
     run1_started = threading.Event()
     run1_can_continue = threading.Event()
     run2_started = threading.Event()
+    run2_thread_started = threading.Event()
 
     def _rows1():  # type: ignore[no-untyped-def]
         run1_started.set()
-        if not run1_can_continue.wait(timeout=1.0):
+        if not run1_can_continue.wait(timeout=_TIMEOUT_S):
             raise RuntimeError("timeout waiting for run1_can_continue")
         yield {"x": 1}
 
@@ -39,16 +42,21 @@ def test_scalim_engine_run_is_serialized_per_instance() -> None:
 
     t1 = threading.Thread(target=lambda: _run_rows(_rows1()), daemon=True)
     t1.start()
-    assert run1_started.wait(timeout=1.0)
+    assert run1_started.wait(timeout=_TIMEOUT_S)
 
-    t2 = threading.Thread(target=lambda: _run_rows(_rows2()), daemon=True)
+    def _run_rows2() -> None:
+        run2_thread_started.set()
+        _run_rows(_rows2())
+
+    t2 = threading.Thread(target=_run_rows2, daemon=True)
     t2.start()
 
-    assert run2_started.wait(timeout=0.2) is False
+    assert run2_thread_started.wait(timeout=_TIMEOUT_S)
+    assert run2_started.wait(timeout=0.5) is False
 
     run1_can_continue.set()
-    t1.join(timeout=1.0)
-    t2.join(timeout=1.0)
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
     assert not t1.is_alive()
     assert not t2.is_alive()
     assert not errors

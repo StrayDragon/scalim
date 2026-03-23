@@ -259,14 +259,14 @@ def test_adaptive_scheduler_enforces_pool_limits() -> None:
 
         assert started["a"].wait(timeout=1.0)
         assert started["b"].wait(timeout=1.0)
-        assert started["c"].wait(timeout=0.05) is False
+        assert started["c"].wait(timeout=0.3) is False
 
         finish["a"].set()
         assert started["c"].wait(timeout=1.0)
 
         finish["b"].set()
         finish["c"].set()
-        t.join(timeout=1.0)
+        t.join(timeout=5.0)
         assert not t.is_alive()
 
     assert current["max"] == 2

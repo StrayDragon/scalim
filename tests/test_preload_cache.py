@@ -4,6 +4,8 @@ import time
 
 from scalim.execution.preload_cache import PreloadCache
 
+_TIMEOUT_S = 5.0
+
 
 def test_preload_cache_supports_basic_mapping_protocol_and_pickle_roundtrip() -> None:
     cache = PreloadCache()
@@ -50,15 +52,20 @@ def test_preload_cache_get_or_load_returns_cached_value_inside_lock() -> None:
     results = []
 
     def _worker() -> None:
-        barrier.wait()
+        try:
+            barrier.wait(timeout=_TIMEOUT_S)
+        except threading.BrokenBarrierError as exc:
+            raise RuntimeError("timeout waiting for barrier") from exc
         results.append(cache.get_or_load("src", _load))
 
     t1 = threading.Thread(target=_worker)
     t2 = threading.Thread(target=_worker)
     t1.start()
     t2.start()
-    t1.join()
-    t2.join()
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
 
     assert results == [{1: {"value": "z"}}, {1: {"value": "z"}}]
     assert len(calls) == 1

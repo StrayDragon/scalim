@@ -10,6 +10,8 @@ from scalim.execution.adaptive.thread_loop_executor import (
     _best_effort_all_tasks,
 )
 
+_TIMEOUT_S = 5.0
+
 
 def test_thread_loop_executor_runs_sync_and_coroutine_and_shutdown(caplog) -> None:  # type: ignore[no-untyped-def]
     caplog.set_level(logging.WARNING, logger="scalim.execution.adaptive.thread_loop_executor")
@@ -17,13 +19,13 @@ def test_thread_loop_executor_runs_sync_and_coroutine_and_shutdown(caplog) -> No
     executor = ThreadLoopExecutor(max_workers=2)
     try:
         fut = executor.submit(lambda: 1)  # noqa: E731
-        assert fut.result(timeout=1.0) == 1
+        assert fut.result(timeout=_TIMEOUT_S) == 1
 
         async def _coro() -> int:
             return 2
 
         fut = executor.submit(lambda: _coro())  # noqa: E731
-        assert fut.result(timeout=1.0) == 2
+        assert fut.result(timeout=_TIMEOUT_S) == 2
     finally:
         executor.shutdown(wait=True)
 
@@ -45,7 +47,7 @@ def test_thread_loop_executor_shutdown_cancels_pending_tasks_and_is_idempotent()
             await asyncio.Event().wait()
 
         fut = executor.submit(lambda: _block())  # noqa: E731
-        assert started.wait(timeout=1.0)
+        assert started.wait(timeout=_TIMEOUT_S)
     finally:
         executor.shutdown(wait=True)
 
@@ -53,7 +55,7 @@ def test_thread_loop_executor_shutdown_cancels_pending_tasks_and_is_idempotent()
 
     assert fut is not None
     with pytest.raises(Exception):  # noqa: BLE001
-        _ = fut.result(timeout=1.0)
+        _ = fut.result(timeout=_TIMEOUT_S)
 
 
 def test_best_effort_all_tasks_falls_back_to_legacy_task_all_tasks() -> None:
