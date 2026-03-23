@@ -219,7 +219,7 @@ def _example_priority(change_id: str) -> int:
     cid = change_id.lower()
     if "normalize" in cid:
         return 1
-    # 字段级：`extract` / `value_cast` / 显式 decimal 等都归为同一档（field-level authoring surface）。
+    # 字段级：`extract` / `value_cast` / 显式 `decimal` 等都归为同一档（`field-level authoring surface`）。
     if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
         return 2
     if "extract" in cid:
@@ -453,16 +453,16 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             any(_tok_is_surface(tok) for tok in tokens) or "workflow." in text or "workflow " in lower or "yaml-dsl" in lower
         )
 
-        # 明确不是 breaking 的常见表述：避免“为了避免 breaking”之类的句子误入。
+        # 明确不是 `breaking` 的常见表述：避免“为了避免 `breaking`”之类的句子误入。
         if ("避免" in text or "保持" in text) and ("breaking" in lower or "不兼容" in text):
             if "不再支持" not in text and "移除" not in text and "删除" not in text:
                 return False
 
-        # 没有任何 authoring surface token 的句子，通常不是“你要改 YAML”的点。
+        # 没有任何 `authoring surface token` 的句子，通常不是“你要改 `YAML`”的点。
         if not has_surface_token:
             return False
 
-        # “输出约束：移除 ...” 这类描述是输出格式约束，不是 upgrade 点。
+        # “输出约束：移除 ...” 这类描述是输出格式约束，不是 `upgrade` 点。
         if "输出约束" in text and ("移除" in text or "删除" in text):
             return False
 
@@ -500,13 +500,13 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
 
     candidates: List[str] = []
 
-    # 1) 顶层 bullet blocks（跨全文），适合抓“迁移/不兼容/删除旧写法”这类条目。
+    # 1) 顶层 `bullet blocks`（跨全文），适合抓“迁移/不兼容/删除旧写法”这类条目。
     for block in _parse_top_level_bullet_blocks(all_lines):
         blob = " ".join(block)
         if _is_breaking_candidate(blob):
             candidates.append(blob)
 
-    # 2) 行级扫描：补齐段落里提到的迁移点（例如 Why 中的 “旧写法会直接失败”）。
+    # 2) 行级扫描：补齐段落里提到的迁移点（例如 `Why` 中的 “旧写法会直接失败”）。
     for raw in all_lines:
         stripped = raw.strip()
         if _is_breaking_candidate(stripped):
@@ -680,7 +680,7 @@ def _build_change(tag: str, change_id: str, *, root: Path) -> Optional[_Change]:
     proposal_relpath = "openspec/changes/archive/{}/proposal.md".format(change_id)
     proposal_text = _read_file_at_tag(tag, proposal_relpath, root=root)
     if proposal_text is None:
-        # 兼容极端情况：archive 中没有 proposal.md 时再尝试 design.md（仍只读快照，不读 patch）。
+        # 兼容极端情况：`archive` 中没有 `proposal.md` 时再尝试 `design.md`（仍只读快照，不读 `patch`）。
         design_relpath = "openspec/changes/archive/{}/design.md".format(change_id)
         proposal_text = _read_file_at_tag(tag, design_relpath, root=root)
         if proposal_text is None:
@@ -748,7 +748,7 @@ def _render_notes(
     lines.append("## Breaking / Upgrade")
     breaking_items: List[str] = []
     for ch in new_changes:
-        # 按你的约束：只放“需要改 YAML/旧写法跑不起来”的点；因此仅从 YAML 相关 archived changes 抽取。
+        # 按你的约束：只放“需要改 `YAML`/旧写法跑不起来”的点；因此仅从 `YAML` 相关 `archived changes` 抽取。
         if ch.is_yaml:
             breaking_items.extend(list(ch.breaking_instructions))
     # 若存在更明确的迁移点，则丢弃“按提案升级：...”这类低信息量兜底项。
@@ -792,7 +792,7 @@ def _render_notes(
     if len(commit_lines) <= max_commit_lines:
         shown = commit_lines
     else:
-        # 把 “...略” 也算进 8 行预算里：7 条 commit + 1 行省略。
+        # 把 “...略” 也算进 8 行预算里：7 条 `commit` + 1 行省略。
         shown = commit_lines[: max_commit_lines - 1] + ["...略"]
     for ln in shown:
         lines.append("- {}".format(ln))
