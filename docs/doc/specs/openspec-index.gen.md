@@ -171,6 +171,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/performance-observability/spec.md)
 - Summary: **状态: ✅ 已实现** PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断.
 
+### `preload-cache-inflight-dedupe`
+- Title: preload-cache-inflight-dedupe Specification
+- Source: [spec.md](#code=openspec/specs/preload-cache-inflight-dedupe/spec.md)
+- Summary: TBD - created by archiving change c0-preload-cache-inflight-dedupe. Update Purpose after archive.
+
 ### `prompt-eval-fixture-cli`
 - Title: prompt-eval-fixture-cli Specification
 - Source: [spec.md](#code=openspec/specs/prompt-eval-fixture-cli/spec.md)
