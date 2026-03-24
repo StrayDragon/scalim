@@ -14,7 +14,7 @@ def _repo_root() -> Path:
 def _require_safe_dest(dest: Path) -> None:
     resolved = dest.resolve()
     if resolved == Path("/"):
-        raise ValueError("拒绝危险目标路径: --dest=/")
+        raise ValueError("拒绝危险目标路径: `--dest=/`")
     if not resolved.exists():
         raise ValueError("目标目录不存在: {!r}".format(str(resolved)))
     if not resolved.is_dir():
@@ -23,10 +23,10 @@ def _require_safe_dest(dest: Path) -> None:
 
 def _run_rsync(args: Sequence[str]) -> None:
     if shutil.which("rsync") is None:
-        raise RuntimeError("rsync not found (required). Please install rsync and retry.")
+        raise RuntimeError("未找到 `rsync`（必需）。请先安装 `rsync` 后重试。")
     completed = subprocess.run(list(args), check=False)
     if completed.returncode in (0, 141):
-        # 141 = 128 + SIGPIPE. 常见于用户将输出管道到 `head`/`less` 后提前退出。
+        # `141 = 128 + SIGPIPE`。常见于用户将输出管道到 `head`/`less` 后提前退出。
         return
     raise subprocess.CalledProcessError(completed.returncode, list(args))
 
@@ -92,12 +92,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("repo_root:", str(root))
     print("dest_root:", str(dest_root.resolve()))
     print("dest_pkg:", str(target_pkg_dir))
-    print("mode:", "dry-run" if dry_run else "apply")
+    print("模式:", "预览(`dry-run`)" if dry_run else "执行(`apply`)")
     print("")
 
     src_pkg = root / "src" / "scalim"
     if not src_pkg.exists():
-        print("错误: src/scalim 不存在: {!r}".format(str(src_pkg)), file=sys.stderr)
+        print("错误: `src/scalim` 不存在: {!r}".format(str(src_pkg)), file=sys.stderr)
         return 2
     _rsync_mirror_dir(src_dir=src_pkg, dest_dir=target_pkg_dir, dry_run=dry_run)
 
@@ -105,7 +105,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if readme.exists():
         _rsync_copy_file(src_path=readme, dest_dir=target_pkg_dir, dry_run=dry_run)
     else:
-        print("[warn] README.md not found; skipping", file=sys.stderr)
+        print("警告: 未找到 `README.md`，已跳过同步。", file=sys.stderr)
     return 0
 
 
