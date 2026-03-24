@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from typing import Any, ClassVar, Dict, Optional, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, cast
 
 from ..constants import (
     DEFAULT_OUTPUT_ENCODING,
@@ -10,6 +10,11 @@ from ..constants import (
     FIELD_ID_STRING_SCHEMA,
     schema_meta,
     schema_omit,
+)
+from ..output_enums import (
+    AGG_METRIC_PRODUCER_KEYS,
+    AGG_POST_PRODUCER_KEYS,
+    AGG_RANK_PRODUCER_KEYS,
 )
 
 _OUTPUT_NAME_SCHEMA = {
@@ -1090,3 +1095,30 @@ class OutputExtraSheetConfig:
         ),
     )
     """可选:写锁."""
+
+
+def _validate_output_aggregate_producer_keys_schema() -> None:
+    expected: Set[str] = set(AGG_METRIC_PRODUCER_KEYS + AGG_RANK_PRODUCER_KEYS + AGG_POST_PRODUCER_KEYS)
+
+    meta = cast("Dict[str, Any]", OutputAggregateConfig.__dataclass_fields__["fields"].metadata.get("schema") or {})
+    schema = cast("Dict[str, Any]", meta.get("schema") or {})
+    additional_props = cast("Dict[str, Any]", schema.get("additionalProperties") or {})
+    one_of: List[Dict[str, Any]] = cast("List[Dict[str, Any]]", additional_props.get("oneOf") or [])
+
+    actual: Set[str] = set()
+    for item in one_of:
+        required = cast("List[object]", item.get("required") or [])
+        if len(required) != 1:
+            continue
+        key = required[0]
+        if isinstance(key, str):
+            actual.add(key)
+
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        msg = "聚合 `producer_key` 的 schema 覆盖不一致: 缺失={}, 多余={}".format(",".join(missing), ",".join(extra))
+        raise ValueError(msg)
+
+
+_validate_output_aggregate_producer_keys_schema()

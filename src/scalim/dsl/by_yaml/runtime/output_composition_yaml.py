@@ -26,11 +26,17 @@ from ..schema_dsl.models import (
     OutputContainerConfig,
     OutputExtraSheetConfig,
 )
+from ..schema_dsl.output_enums import (
+    AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,
+)
+from ..schema_dsl.output_enums import (
+    AGG_POST_PRODUCER_KEYS as _POST_FUNC_KEYS,
+)
+from ..schema_dsl.output_enums import (
+    AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
+)
 from .output_path_resolve import resolve_output_container_path
 from .references import SecurePythonReferenceResolver
-
-_AGG_FUNC_KEYS: Tuple[str, ...] = ("count", "sum", "min", "max", "count_true", "count_true_gte", "count_distinct")
-_RANK_FUNC_KEYS: Tuple[str, ...] = ("row_number", "rank", "dense_rank")
 
 
 class PathlessCsvOutputError(ValueError):
@@ -416,7 +422,7 @@ def _derived_group_by_spec_from_yaml(
 def _derived_output_layout_fields(cfg: OutputAggregateConfig) -> Tuple[str, ...]:
     metric_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _AGG_FUNC_KEYS])
     rank_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _RANK_FUNC_KEYS])
-    post_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in ("score_by_rank", "call_by", "compute")])
+    post_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _POST_FUNC_KEYS])
     fields: List[str] = list(cfg.group_by) + metric_ids + rank_ids + post_ids
     return tuple(str(x) for x in fields)
 

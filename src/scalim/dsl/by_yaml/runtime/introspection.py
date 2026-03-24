@@ -5,11 +5,17 @@ from ....planning.builder import PlanBuilder
 from ..config_parsing.errors import ConfigValidationError
 from ..config_parsing.loader import YamlDemandLoader
 from ..schema_dsl.models import DemandConfig
+from ..schema_dsl.output_enums import (
+    AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,
+)
+from ..schema_dsl.output_enums import (
+    AGG_POST_PRODUCER_KEYS as _POST_FUNC_KEYS,
+)
+from ..schema_dsl.output_enums import (
+    AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
+)
 from .compiler import compile  # noqa: A004
 from .contracts import RunOptions
-
-_AGG_FUNC_KEYS = ("count", "sum", "min", "max", "count_true", "count_true_gte", "count_distinct")
-_RANK_FUNC_KEYS = ("row_number", "rank", "dense_rank")
 
 
 def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str]:
@@ -26,7 +32,7 @@ def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str
 
     metric_ids = sorted([fid for fid, cfg in aggregate.fields.items() if str(cfg.producer_key) in _AGG_FUNC_KEYS])
     rank_ids = sorted([fid for fid, cfg in aggregate.fields.items() if str(cfg.producer_key) in _RANK_FUNC_KEYS])
-    post_ids = sorted([fid for fid, cfg in aggregate.fields.items() if str(cfg.producer_key) in ("score_by_rank", "call_by")])
+    post_ids = sorted([fid for fid, cfg in aggregate.fields.items() if str(cfg.producer_key) in _POST_FUNC_KEYS])
     return list(aggregate.group_by) + metric_ids + rank_ids + post_ids
 
 
@@ -147,7 +153,7 @@ def load_output_config(yaml_path: str) -> Dict[str, Any]:
                             [fid for fid, cfg in t.aggregate.fields.items() if str(cfg.producer_key) in _RANK_FUNC_KEYS]
                         ),
                         "post_field_ids": sorted(
-                            [fid for fid, cfg in t.aggregate.fields.items() if str(cfg.producer_key) in ("score_by_rank", "call_by")]
+                            [fid for fid, cfg in t.aggregate.fields.items() if str(cfg.producer_key) in _POST_FUNC_KEYS]
                         ),
                     }
                 ),

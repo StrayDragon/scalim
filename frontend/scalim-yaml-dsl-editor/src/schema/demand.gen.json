@@ -30,14 +30,14 @@
     "imports": {
       "type": "object",
       "description": "片段文件导入别名映射(编译期展开)",
-      "markdownDescription": "片段文件导入别名映射.\n\n- key: alias\n- value: 片段文件路径(字符串)\n- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n  - `./x.yaml` / `x.yaml`\n  - `x/y.yaml`(子目录)\n  - `../x.yaml`(父目录)\n- 禁止: 绝对路径/任意 URI scheme(`*://...`)/预留 alias 前缀(例如 `@/x.yaml`, `COMMON:/x.yaml`)",
+      "markdownDescription": "片段文件导入别名映射.\n\n- key: alias\n- value: 片段文件路径(字符串)\n- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n  - `./x.yaml` / `x.yaml`\n  - `x/y.yaml`(子目录)\n  - `../x.yaml`(父目录)\n- 支持(编辑器侧放宽,运行时校验为准):\n  - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)\n  - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)\n- 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等",
       "propertyNames": {
         "type": "string",
         "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
       },
       "additionalProperties": {
         "type": "string",
-        "pattern": "^(?!@)(\\./|\\.\\./)*([^/\\\\:]+/)*[^/\\\\:]+\\.ya?ml$"
+        "pattern": "^((\\./|\\.\\./)*([^/\\\\:]+/)*[^/\\\\:]+\\.ya?ml|@/([^/\\\\:]+/)*[^/\\\\:]+\\.ya?ml|[a-zA-Z_][a-zA-Z0-9_]*:/([^/\\\\:]+/)*[^/\\\\:]+\\.ya?ml|scalim://[^\\\\s\\\\\\\\]+\\.ya?ml)$"
       }
     },
     "$import": {

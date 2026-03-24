@@ -21,6 +21,11 @@ from ...schema_dsl.models import (
     OutputContainerConfig,
     OutputTargetConfig,
 )
+from ...schema_dsl.output_enums import (
+    AGG_METRIC_PRODUCER_KEYS,
+    AGG_POST_PRODUCER_KEYS,
+    AGG_RANK_PRODUCER_KEYS,
+)
 from ..call_by import CallByParseError, extract_call_by_dependencies, parse_call_by
 from ..models import FieldDefIndex, RawDemand
 from ..security import ComputeExpressionError, SecureComputeEngine, SecurityError, extract_compute_dependencies
@@ -29,9 +34,9 @@ from .utils import list_or_none, mapping_or_none, str_or_none
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _OUTPUT_CONTAINER_TYPES = ("workbook", "csv")
 _OUTPUT_HEADER_BY_ENUM = ("field_id", "name")
-_AGG_FUNC_KEYS = ("count", "sum", "min", "max", "count_true", "count_true_gte", "count_distinct")
-_RANK_FUNC_KEYS = ("row_number", "rank", "dense_rank")
-_POST_FUNC_KEYS = ("score_by_rank", "call_by", "compute")
+_AGG_FUNC_KEYS = AGG_METRIC_PRODUCER_KEYS
+_RANK_FUNC_KEYS = AGG_RANK_PRODUCER_KEYS
+_POST_FUNC_KEYS = AGG_POST_PRODUCER_KEYS
 _AGG_DISTINCT_ON_OVERFLOW_ENUM = ("error", "truncate")
 _AGG_RANK_ORDER_ENUM = ("asc", "desc")
 _AGG_RANK_TOP_K_MODE_ENUM = ("rank", "rows")

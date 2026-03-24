@@ -1,0 +1,42 @@
+"""`by_yaml` 输出/聚合相关的枚举 `SSOT`.
+
+约束:
+- 运行时需兼容 `Python 3.6`
+- 该模块必须保持“向下依赖”(允许被解析层、运行时、自省层(`introspection`)以及 `schema` 生成层依赖),禁止反向依赖运行时实现
+"""
+
+from typing import Tuple
+
+AGG_METRIC_PRODUCER_KEYS: Tuple[str, ...] = (
+    "count",
+    "sum",
+    "min",
+    "max",
+    "count_true",
+    "count_true_gte",
+    "count_distinct",
+)
+"""`aggregate` 指标 `producer_key` 枚举(聚合指标)."""
+
+
+AGG_RANK_PRODUCER_KEYS: Tuple[str, ...] = (
+    "row_number",
+    "rank",
+    "dense_rank",
+)
+"""`aggregate` 排名 `producer_key` 枚举(排名字段)."""
+
+
+AGG_POST_PRODUCER_KEYS: Tuple[str, ...] = (
+    "score_by_rank",
+    "call_by",
+    "compute",
+)
+"""`aggregate` 聚合后派生字段 `producer_key` 枚举(后置派生字段)."""
+
+
+__all__ = [
+    "AGG_METRIC_PRODUCER_KEYS",
+    "AGG_POST_PRODUCER_KEYS",
+    "AGG_RANK_PRODUCER_KEYS",
+]
