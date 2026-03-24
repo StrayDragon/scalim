@@ -13,4 +13,6 @@
 - `scalim.ob`: 可观测性入口
 """
 
-__all__ = ()
+from ._project_constants import VERSION as __version__
+
+__all__ = ("__version__",)

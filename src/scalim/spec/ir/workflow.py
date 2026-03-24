@@ -30,6 +30,12 @@ class WorkflowNodeIr:
 
 
 @dataclass(frozen=True)
+class WorkflowDemandNodeDerivedIr:
+    workbook_output_paths_abs: Tuple[str, ...] = ()
+    workflow_managed_csv_output_ids: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class WriteSheetNodeIr:
     node_id: str
     node_type: WorkflowNodeType

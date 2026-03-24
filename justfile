@@ -335,6 +335,31 @@ bump-versions VERSION="" CONFIRM="":
         uv {{ UV_OPTIONS }} lock
     fi
 
+# 工具: 将 src/scalim + README.md 镜像同步到目标 vendors 目录(默认 dry-run; 需要 YES 才执行)
+sync-project-vendors PATH="" CONFIRM="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dest="{{ PATH }}"
+    confirm="{{ CONFIRM }}"
+    apply=""
+    if [ -z "$dest" ]; then
+        echo "[error] PATH is required (dest vendors root). Example:" >&2
+        echo "  just sync-project-vendors /path/to/vendors/libs" >&2
+        exit 2
+    fi
+    if [ "$confirm" = "YES" ] || [ "$confirm" = "CONFIRM=YES" ]; then
+        apply="YES"
+    elif [ -n "$confirm" ]; then
+        echo "[warn] confirm token ignored (expected 'YES'):" "$confirm" >&2
+    fi
+    args=( --dest "$dest" )
+    if [ -z "$apply" ]; then
+        :
+    else
+        args+=( --apply )
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/vendor_sync.py "${args[@]}"
+
 # 生成: Agent Skill 数据
 gen-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py
