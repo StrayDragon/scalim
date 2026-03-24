@@ -14,7 +14,6 @@ from .references import PythonReferenceResolver, SecurePythonReferenceResolver
 
 
 class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
-    _allow_unsafe_resolver: bool
     _resolver: Optional[PythonReferenceResolver]
     _compute_engine: Optional[SecureComputeEngine]
     _lookup_casts: Optional[LookupCastRegistry]
@@ -47,19 +46,11 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
         resolver: Optional[PythonReferenceResolver] = None,
         compute_engine: Optional[SecureComputeEngine] = None,
         init_vars: Optional[Mapping[str, object]] = None,
-        *,
-        allow_unsafe_resolver: bool = False,
     ) -> None:
         resolved = resolver
-        allow_unsafe = bool(allow_unsafe_resolver)
-        if resolved is None:
-            if not allow_unsafe:
-                raise AllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
-            resolved = SecurePythonReferenceResolver()
-        elif not resolved.has_allowlist() and not allow_unsafe:
+        if resolved is None or not resolved.has_allowlist():
             raise AllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
 
-        self._allow_unsafe_resolver = allow_unsafe
         self._resolver = resolved
         self._compute_engine = compute_engine or SecureComputeEngine()
         self._init_vars = init_vars

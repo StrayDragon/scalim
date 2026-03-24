@@ -10,14 +10,15 @@ from ....ob.observer import Observer
 from ....sinks.sink_base import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from .compiler import compile as _compile
-from .contracts import Compilation, RunOptions, RunOverrides, RunResult
+from .contracts import Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult
 
 
-def run(
+def run(  # noqa: PLR0913
     yaml_path: str,
     *,
     allowed_modules: FrozenSet[str],
     allowed_functions: Optional[FrozenSet[str]] = None,
+    resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
     output_composition: Optional[OutputCompositionSpec] = None,
@@ -47,6 +48,7 @@ def run(
     options = RunOptions(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
+        resolver_trusted_mode=resolver_trusted_mode,
         components=components,
         sink=sink,
         output_composition=output_composition,
@@ -65,11 +67,12 @@ def run(
     return RunResult(core, config=compilation.config, yaml_path=yaml_path, sink=sink)
 
 
-def compile(  # noqa: A001
+def compile(  # noqa: A001, PLR0913
     yaml_path: str,
     *,
     allowed_modules: FrozenSet[str],
     allowed_functions: Optional[FrozenSet[str]] = None,
+    resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
     output_composition: Optional[OutputCompositionSpec] = None,
@@ -86,6 +89,7 @@ def compile(  # noqa: A001
     options = RunOptions(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
+        resolver_trusted_mode=resolver_trusted_mode,
         components=components,
         sink=sink,
         output_composition=output_composition,

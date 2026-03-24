@@ -12,6 +12,7 @@ from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
 from ..schema_dsl.models import DemandConfig
+from .allowlist_policy import ResolverTrustedMode
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -64,6 +65,13 @@ class RunOptions:
 
     allowed_functions: Optional[FrozenSet[str]] = None
     """可选:允许被引用/导入的函数白名单(用于更细粒度的安全控制)."""
+
+    resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST
+    """`Python` 引用 `resolver` 的安全模式.
+
+    - `strict_allowlist`(默认): 禁止 `wildcard`,并要求显式 `allowlist`.
+    - `trusted_allow_all_modules`: 仅用于可信输入/内部测试;显式放宽为允许任意模块,并产生强告警.
+    """
 
     components: Optional[List[Union[Observer, IExecutionHook]]] = None
     """可选:要挂载的 `Observer`/`Hook` 组件列表."""
@@ -168,6 +176,7 @@ __all__ = [
     "UNSET",
     "Compilation",
     "OutputOverrides",
+    "ResolverTrustedMode",
     "RunOptions",
     "RunOverrides",
     "RunResult",

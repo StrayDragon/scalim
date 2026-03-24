@@ -21,7 +21,7 @@ from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec
 from ....spec.ir.demand import DemandIr
 from ..config_parsing.loader import YamlDemandLoader
 from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfig
-from .contracts import UNSET, Compilation, OutputOverrides, RunOptions
+from .contracts import UNSET, Compilation, OutputOverrides, ResolverTrustedMode, RunOptions
 from .conversion import ConfigToIRConverter
 from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError
 from .observability import compile_observability_spec
@@ -240,11 +240,13 @@ def create_reference_resolver(
     *,
     allowed_modules: FrozenSet[str],
     allowed_functions: Optional[FrozenSet[str]],
+    resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     base_module_path: Optional[str] = None,
 ) -> SecurePythonReferenceResolver:
     return SecurePythonReferenceResolver(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
+        resolver_trusted_mode=resolver_trusted_mode,
         base_module_path=base_module_path,
     )
 
@@ -344,6 +346,7 @@ def compile(  # noqa: A001
     resolver = create_reference_resolver(
         allowed_modules=options.allowed_modules,
         allowed_functions=options.allowed_functions,
+        resolver_trusted_mode=options.resolver_trusted_mode,
         base_module_path=base_module_path,
     )
     demand_ir = compile_ir(config, resolver=resolver, init_vars=options.init_vars)

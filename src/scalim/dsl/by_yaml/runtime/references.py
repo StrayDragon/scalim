@@ -5,17 +5,43 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, ClassVar, FrozenSet, List, Optional, Sequence, Tuple
 
-from ...._internal.loggingx import prefix
+from ...._internal.loggingx import format_kv, prefix
 from ....vendor.compact.typing_extensionsx import override
 from ..reference_syntax import ParsedReference, ReferenceSyntaxError, parse_python_reference
+from .allowlist_policy import ResolverTrustedMode
 from .errors import ResolverError
 
 resolver_logger = logging.getLogger("scalim.dsl.by_yaml.resolver")
 
 _ALLOWLIST_WILDCARD = "*"
 
-ALLOWLIST_WILDCARD_MODULES_WARNING = "在 `allowed_modules` 中使用允许列表通配符 `*`: 将允许所有模块. 生产环境请使用严格允许列表."
-ALLOWLIST_WILDCARD_FUNCTIONS_WARNING = "在 `allowed_functions` 中使用允许列表通配符 `*`: 将允许所有函数. 生产环境请使用严格允许列表."
+_TRUSTED_MODE_ALLOW_ALL_MODULES_WARNING = (
+    "已启用 resolver_trusted_mode=trusted_allow_all_modules: resolver allowlist 已放宽为允许任意模块. 仅用于可信输入/内部测试."
+)
+
+_WILDCARD_MODULES_REJECTED_BY_DEFAULT_MSG = (
+    "不允许在 `allowed_modules` 中使用通配符 `*` (默认 resolver_trusted_mode=strict_allowlist 会 fail-fast). "
+    "迁移: 若仅做模块约束,请改为显式模块前缀 allowlist (例如 allowed_modules=frozenset(['myapp.loaders'])); "
+    "若确需在可信输入场景放宽为允许任意模块,请显式设置 "
+    "resolver_trusted_mode=trusted_allow_all_modules 且 allowed_modules=frozenset(['*'])."
+)
+
+_WILDCARD_FUNCTIONS_REJECTED_MSG = (
+    "不允许 `allowed_functions={'*'}`: 该配置无法表达“仍受模块 allowlist 约束”,且容易造成误用脚枪. "
+    "迁移: 若希望仅做模块约束,请移除 allowed_functions 并仅设置 allowed_modules; "
+    "若希望放宽为允许任意模块,请使用 resolver_trusted_mode=trusted_allow_all_modules."
+)
+
+_TRUSTED_MODE_MIXED_ALLOWLIST_REJECTED_MSG = (
+    "当 resolver_trusted_mode=trusted_allow_all_modules 时,仅允许以下配置组合: "
+    "allowed_modules=frozenset(['*']), allowed_functions=None. "
+    "请勿与显式 allowlist 混用(避免制造“部分约束仍生效”的错觉)."
+)
+
+
+def _has_wildcard(values: Optional[FrozenSet[str]]) -> bool:
+    return values is not None and _ALLOWLIST_WILDCARD in values
+
 
 RELATIVE_REFERENCE_BASE_REQUIRED = (
     "相对模块引用 '{}' 需要先根据 `yaml_path` + `sys.path` 推导 `base_module_path`. "
@@ -36,7 +62,6 @@ class ResolverPolicy:
     _allowed_modules: Optional[FrozenSet[str]]
     _allowed_functions: Optional[FrozenSet[str]]
     _allow_all_modules: bool
-    _allow_all_functions: bool
 
     def __init__(
         self,
@@ -46,15 +71,6 @@ class ResolverPolicy:
         self._allowed_modules = allowed_modules
         self._allowed_functions = allowed_functions
         self._allow_all_modules = self._has_wildcard(self._allowed_modules)
-        self._allow_all_functions = self._has_wildcard(self._allowed_functions)
-
-    @property
-    def allow_all_modules(self) -> bool:
-        return self._allow_all_modules
-
-    @property
-    def allow_all_functions(self) -> bool:
-        return self._allow_all_functions
 
     @property
     def has_allowlist(self) -> bool:
@@ -90,8 +106,6 @@ class ResolverPolicy:
     def _is_allowed_function(self, module_path: str, func_name: str) -> bool:
         if self._allowed_functions is None:
             return False
-        if self._allow_all_functions:
-            return True
 
         full_path = "{}:{}".format(module_path, func_name)
         dotted_path = "{}.{}".format(module_path, func_name)
@@ -114,23 +128,33 @@ class PythonReferenceResolver:
         self,
         allowed_modules: Optional[FrozenSet[str]] = None,
         allowed_functions: Optional[FrozenSet[str]] = None,
+        resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
         max_cache_size: int = DEFAULT_CACHE_MAX_SIZE,
     ) -> None:
         if int(max_cache_size) < 1:
             msg = "`max_cache_size` 必须 >= 1"
             raise ValueError(msg)
+        if _has_wildcard(allowed_functions):
+            raise ValueError(_WILDCARD_FUNCTIONS_REJECTED_MSG)
+        if resolver_trusted_mode == ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES:
+            if allowed_functions is not None or allowed_modules != frozenset([_ALLOWLIST_WILDCARD]):
+                raise ValueError(_TRUSTED_MODE_MIXED_ALLOWLIST_REJECTED_MSG)
+            resolver_logger.warning(
+                "%s%s (%s)",
+                prefix("resolver"),
+                _TRUSTED_MODE_ALLOW_ALL_MODULES_WARNING,
+                format_kv(
+                    resolver_trusted_mode=str(resolver_trusted_mode),
+                    allowed_modules=_ALLOWLIST_WILDCARD,
+                ),
+            )
+        elif _has_wildcard(allowed_modules):
+            raise ValueError(_WILDCARD_MODULES_REJECTED_BY_DEFAULT_MSG)
         # 推荐: 仅允许统一的加载模块或明确的函数列表.
         self._policy = ResolverPolicy(allowed_modules=allowed_modules, allowed_functions=allowed_functions)
         self._parser = ReferenceParser()
         self._cache = OrderedDict()
         self._max_cache_size = int(max_cache_size)
-        # 注意:
-        # - 通配符白名单(`\"*\"`)仅用于可信/内部场景与快速迭代.
-        # - 它会实质上关闭白名单约束;不要用于不可信的 `YAML`/配置输入.
-        if self._policy.allow_all_modules:
-            resolver_logger.warning("%s%s", prefix("resolver"), ALLOWLIST_WILDCARD_MODULES_WARNING)
-        if self._policy.allow_all_functions:
-            resolver_logger.warning("%s%s", prefix("resolver"), ALLOWLIST_WILDCARD_FUNCTIONS_WARNING)
 
     def has_allowlist(self) -> bool:
         return self._policy.has_allowlist
@@ -261,12 +285,14 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         self,
         allowed_modules: Optional[FrozenSet[str]] = None,
         allowed_functions: Optional[FrozenSet[str]] = None,
+        resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
         max_cache_size: int = PythonReferenceResolver.DEFAULT_CACHE_MAX_SIZE,
         base_module_path: Optional[str] = None,
     ) -> None:
         super(SecurePythonReferenceResolver, self).__init__(
             allowed_modules=allowed_modules,
             allowed_functions=allowed_functions,
+            resolver_trusted_mode=resolver_trusted_mode,
             max_cache_size=max_cache_size,
         )
         self._base_module_path = base_module_path

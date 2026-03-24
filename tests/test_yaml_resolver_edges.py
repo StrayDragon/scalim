@@ -4,11 +4,8 @@ import math
 import pytest
 
 from scalim.dsl.by_yaml.runtime.errors import ResolverError
+from scalim.dsl.by_yaml.runtime.allowlist_policy import ResolverTrustedMode
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
-from scalim.dsl.by_yaml.runtime.references import (
-    ALLOWLIST_WILDCARD_FUNCTIONS_WARNING,
-    ALLOWLIST_WILDCARD_MODULES_WARNING,
-)
 
 
 def test_resolver_rejects_invalid_dotted_reference() -> None:
@@ -50,23 +47,41 @@ def test_resolver_allows_explicit_function_over_module_allowlist() -> None:
     assert resolved is math.sqrt
 
 
-def test_resolver_allows_wildcard_modules_and_warns(caplog) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.dsl.by_yaml.runtime")
-    resolver = PythonReferenceResolver(allowed_modules=frozenset(["*"]))
+def test_resolver_rejects_wildcard_modules_by_default() -> None:
+    with pytest.raises(ValueError, match=r"resolver_trusted_mode=.*strict_allowlist.*trusted_allow_all_modules"):
+        _ = PythonReferenceResolver(allowed_modules=frozenset(["*"]))
+
+
+def test_resolver_trusted_mode_allows_wildcard_modules_and_warns(caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="scalim.dsl.by_yaml.resolver")
+    resolver = PythonReferenceResolver(
+        allowed_modules=frozenset(["*"]),
+        resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
+    )
 
     resolved = resolver.resolve("math.sqrt")
     assert resolved is math.sqrt
-    assert any(ALLOWLIST_WILDCARD_MODULES_WARNING in record.getMessage() for record in caplog.records)
+    assert any("resolver_trusted_mode=trusted_allow_all_modules" in record.getMessage() for record in caplog.records)
 
 
-def test_resolver_allows_wildcard_functions_and_warns(caplog) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.dsl.by_yaml.runtime")
-    caplog.clear()
-    resolver = PythonReferenceResolver(allowed_functions=frozenset(["*"]))
+def test_resolver_rejects_wildcard_functions() -> None:
+    with pytest.raises(ValueError, match=r"allowed_functions.*\*"):
+        _ = PythonReferenceResolver(allowed_functions=frozenset(["*"]))
 
-    resolved = resolver.resolve("math.sqrt")
-    assert resolved is math.sqrt
-    assert any(ALLOWLIST_WILDCARD_FUNCTIONS_WARNING in record.getMessage() for record in caplog.records)
+    with pytest.raises(ValueError, match=r"allowed_functions.*\*"):
+        _ = PythonReferenceResolver(
+            allowed_modules=frozenset(["*"]),
+            allowed_functions=frozenset(["*"]),
+            resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
+        )
+
+
+def test_resolver_rejects_trusted_mode_with_explicit_allowlist() -> None:
+    with pytest.raises(ValueError, match=r"trusted_allow_all_modules"):
+        _ = PythonReferenceResolver(
+            allowed_modules=frozenset(["math"]),
+            resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
+        )
 
 
 @pytest.mark.parametrize(
