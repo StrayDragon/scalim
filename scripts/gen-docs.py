@@ -11,7 +11,17 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
 from scalim.dsl.by_yaml.schema_dsl.doc_texts import SOURCE_FIELD_EXTRACT_MD
+from scalim_misc.cli_docs import build_yaml_dsl_command_docs
 from scalim_misc.markdown_inject import InjectBlockSpec, replace_markdown_injected_block
+from scalim_misc.yaml_dsl_cli_reference_md import (
+    DOCS_CLI_MIN_COMMANDS_BEGIN,
+    DOCS_CLI_MIN_COMMANDS_END,
+    WORKFLOW_CLI_MIN_COMMANDS_BEGIN,
+    WORKFLOW_CLI_MIN_COMMANDS_END,
+    render_yaml_dsl_cli_min_commands_markdown,
+    render_yaml_dsl_cli_reference_markdown,
+    render_yaml_dsl_workflow_cli_min_commands_markdown,
+)
 
 
 USER_GUIDE_SOURCE_FIELD_EXTRACT_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-source-field-extract -->"
@@ -176,6 +186,9 @@ def _render_yaml_schema_reference(repo_root: Path) -> str:
     schema_rel = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
     schema_path = repo_root / schema_rel
     schema = _load_json(schema_path)
+    workflow_schema_rel = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
+    workflow_schema_path = repo_root / workflow_schema_rel
+    workflow_schema = _load_json(workflow_schema_path)
 
     properties = schema.get("properties") or {}
     required = set(schema.get("required") or [])
@@ -191,6 +204,7 @@ def _render_yaml_schema_reference(repo_root: Path) -> str:
         _autogen_md_header(
             sources=[
                 "`{}`".format(str(schema_rel).replace("\\", "/")),
+                "`{}`".format(str(workflow_schema_rel).replace("\\", "/")),
                 "Schema generator: `just gen-yaml-dsl-schema`",
             ]
         ).rstrip("\n"),
@@ -227,6 +241,68 @@ def _render_yaml_schema_reference(repo_root: Path) -> str:
             def_required = set(def_schema.get("required") or [])
 
             lines.extend(["", "### `{}`".format(name)])
+            if def_desc:
+                lines.extend(["", def_desc])
+
+            if def_required:
+                lines.append("")
+                lines.append("- Required: {}".format(", ".join("`{}`".format(item) for item in sorted(def_required))))
+
+            for prop_name in sorted(def_props.keys()):
+                prop_schema = def_props.get(prop_name) or {}
+                prop_desc = _collapse_text(prop_schema.get("description") or prop_schema.get("markdownDescription") or "")
+                prop_kind = _schema_kind(prop_schema)
+
+                suffix_parts = []
+                if prop_kind:
+                    if prop_kind.startswith("ref="):
+                        suffix_parts.append(prop_kind)
+                    else:
+                        suffix_parts.append("type={}".format(prop_kind))
+                if "default" in prop_schema:
+                    suffix_parts.append("default={}".format(_format_scalar(prop_schema.get("default"))))
+                enum_values = prop_schema.get("enum")
+                if isinstance(enum_values, list) and enum_values:
+                    suffix_parts.append("enum={}".format("|".join(_format_scalar(item) for item in enum_values)))
+                if prop_desc:
+                    suffix_parts.append(prop_desc)
+
+                suffix = ": " + "; ".join(suffix_parts) if suffix_parts else ""
+                req = " (required)" if prop_name in def_required else ""
+                lines.append("- `{}`{}{}".format(prop_name, req, suffix))
+
+    workflow_properties = workflow_schema.get("properties") or {}
+    workflow_required = set(workflow_schema.get("required") or [])
+    workflow_ordered: List[str] = sorted(workflow_properties.keys())
+
+    lines.extend(["", "## Workflow Schema", "", "### Top-Level Fields"])
+    for field_name in workflow_ordered:
+        field_schema = workflow_properties.get(field_name) or {}
+        desc = _collapse_text(field_schema.get("markdownDescription") or field_schema.get("description") or "")
+        kind = _schema_kind(field_schema)
+
+        suffix_parts = []
+        if kind:
+            if kind.startswith("ref="):
+                suffix_parts.append(kind)
+            else:
+                suffix_parts.append("type={}".format(kind))
+        if desc:
+            suffix_parts.append(desc)
+        suffix = ": " + "; ".join(suffix_parts) if suffix_parts else ""
+        req = " (required)" if field_name in workflow_required else ""
+        lines.append("- `{}`{}{}".format(field_name, req, suffix))
+
+    workflow_definitions = workflow_schema.get("definitions") or {}
+    if workflow_definitions:
+        lines.extend(["", "### Definitions"])
+        for name in sorted(workflow_definitions.keys()):
+            def_schema = workflow_definitions.get(name) or {}
+            def_desc = _collapse_text(def_schema.get("markdownDescription") or def_schema.get("description") or "")
+            def_props = def_schema.get("properties") or {}
+            def_required = set(def_schema.get("required") or [])
+
+            lines.extend(["", "#### `{}`".format(name)])
             if def_desc:
                 lines.extend(["", def_desc])
 
@@ -386,8 +462,24 @@ def _cleanup_yaml_dsl_upgrades_dir(docs_dir: Path) -> List[Path]:
 
 
 def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, str]:
+    cli_reference = docs_dir / "yaml-dsl" / "cli-reference.gen.md"
+    command_docs = build_yaml_dsl_command_docs()
+    cli_reference_content = _autogen_md_header(
+        sources=[
+            "`src/scalim/cli/yaml_dsl.py`",
+            "`packages/scalim-misc/src/scalim_misc/cli_docs.py`",
+            "`packages/scalim-misc/src/scalim_misc/yaml_dsl_cli_reference_md.py`",
+        ]
+    ) + render_yaml_dsl_cli_reference_markdown(
+        repo_root,
+        command_docs,
+        generated_by="just gen-docs",
+        canonical_example_path="artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml",
+    )
+
     expected: Dict[Path, str] = {
         docs_dir / "yaml-dsl" / "schema-reference.gen.md": _render_yaml_schema_reference(repo_root),
+        cli_reference: cli_reference_content,
         docs_dir / "specs" / "openspec-index.gen.md": _render_openspec_index(repo_root),
     }
     expected.update(_render_yaml_dsl_upgrade_pages(repo_root, docs_dir))
@@ -451,6 +543,33 @@ def _expected_injected_docs(repo_root: Path, docs_dir: Path) -> Dict[Path, str]:
         content=_render_yaml_dsl_upgrades_index(repo_root),
     )
     expected[upgrades_index] = updated
+
+    workflow_doc = docs_dir / "yaml-dsl" / "workflow.md"
+    original = _read_text(workflow_doc)
+    updated = replace_markdown_injected_block(
+        original,
+        spec=InjectBlockSpec(
+            begin_marker=WORKFLOW_CLI_MIN_COMMANDS_BEGIN,
+            end_marker=WORKFLOW_CLI_MIN_COMMANDS_END,
+            label=str(workflow_doc),
+        ),
+        content=render_yaml_dsl_workflow_cli_min_commands_markdown(),
+    )
+    expected[workflow_doc] = updated
+
+    agent_skill_doc = docs_dir / "yaml-dsl" / "agent-skill.md"
+    original = _read_text(agent_skill_doc)
+    updated = replace_markdown_injected_block(
+        original,
+        spec=InjectBlockSpec(
+            begin_marker=DOCS_CLI_MIN_COMMANDS_BEGIN,
+            end_marker=DOCS_CLI_MIN_COMMANDS_END,
+            label=str(agent_skill_doc),
+        ),
+        content=render_yaml_dsl_cli_min_commands_markdown(),
+    )
+    expected[agent_skill_doc] = updated
+
     return expected
 
 

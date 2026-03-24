@@ -53,7 +53,8 @@
       "yaml-dsl validate",
       "yaml-dsl schema validate",
       "yaml-dsl schema show",
-      "yaml-dsl schema path"
+      "yaml-dsl schema path",
+      "yaml-dsl upsert-lsp-comment"
     ],
     "definitions": [
       "field",
@@ -197,7 +198,10 @@
           "预加载缓存模式",
           "关联加载优先命中缓存",
           "计划元数据记录缓存源",
-          "preload cache stores normalized source results"
+          "preload cache stores normalized source results",
+          "`preloaded_cache` concurrency boundary and key space MUST be explicit",
+          "`PreloadCache` signature guardrail MUST be available (opt-in)",
+          "loader SHOULD be idempotent when concurrent / repeated loads are possible"
         ],
         "slug": "source-cache"
       },
@@ -390,7 +394,7 @@
     },
     {
       "path": "openspec/specs/source-cache/spec.md",
-      "sha256": "e6af6f71b200bad154a5bae759fbe3941df8f207d9715431b6db3fa3d5e802e8"
+      "sha256": "63db82ef3b9d12d60439b24492a7b2ab5dee77294d3c72eedf0ad8113f65aee1"
     },
     {
       "path": "openspec/specs/source-relations/spec.md",
@@ -398,7 +402,7 @@
     },
     {
       "path": "openspec/specs/workflow-cache-pool/spec.md",
-      "sha256": "f9db5d3e4bb9e3de386577821566634d0dd273e5f28a032f077223406de08e3f"
+      "sha256": "a4e529cbdad2f067acec636a0d04fa8b574d6da36ccd8c890336ac76f918a18f"
     },
     {
       "path": "openspec/specs/workflow-observability-bridge/spec.md",
@@ -430,11 +434,11 @@
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "b403008811c5b8f1e1875add2255ee007b44e7f6b4e09b738d834dcf80ced1c3"
+      "sha256": "0ac7f56e5725de27b2490aa0995edf62f4e595ba4ea077073e3e6006625017c2"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "de37f55f955cf0eec9fe403c66d3cabec7bee3d83b94dadb724e2d8546de9bf3"
+      "sha256": "774b7e124a6f711cc47bf07f7bc5fd7e431c47e0a88d55742b4d1a7a12eb740d"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
@@ -444,7 +448,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "0950167ae61d30ddae0925052aa7eb5cbc1dc0705d9f49e46442d4bab02b3e09"
+      "sha256": "9dec517bf455665d2f236d04e9f2ca4d869d15f9073a49e0b60af70577922087"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -460,7 +464,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "f4dc40848ba5a42f09e8c2da8b56d9fd4baafc629678c850e404b30aa2423114"
+      "sha256": "e52c1c97106c1beb6ab7f6ced4e34b76f362672446b22cc22796a6432075b5b3"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

@@ -13,6 +13,7 @@
 
 workflow YAML 支持两类校验入口:
 
+<!-- BEGIN AUTOGEN:yaml-dsl-workflow-cli-min-commands -->
 1) workflow-level full validate(静态/编译期;递归校验引用的 demands;不执行 workflow):
 
 ```bash
@@ -25,11 +26,6 @@ uv run scalim-cli yaml-dsl validate --type workflow path/to/workflow.yaml
 uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml
 ```
 
-说明:
-
-- `yaml-dsl validate` 默认 `--type auto`: 根据 YAML 顶层结构推断 demand/workflow;CI/脚本建议显式写 `--type workflow`
-- 若 `workflow.runs[*].demand` 使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析(可重复)
-
 本地编辑时,推荐直接批量写入 schema modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):
 
 - 批量写入/更新 `$schema` 头部(默认同时写 Red Hat + JetBrains 两种 modeline; 用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
@@ -38,6 +34,12 @@ uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schem
 # yaml-language-server: $schema=.../workflow.gen.json
 # $schema: .../workflow.gen.json
 ```
+<!-- END AUTOGEN:yaml-dsl-workflow-cli-min-commands -->
+
+说明:
+
+- `yaml-dsl validate` 默认 `--type auto`: 根据 YAML 顶层结构推断 demand/workflow;CI/脚本建议显式写 `--type workflow`
+- 若 `workflow.runs[*].demand` 使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析(可重复)
 
 ## 1) 最小结构
 

@@ -31,6 +31,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/demand-dsl/spec.md)
 - Summary: **状态: ✅ 已实现** 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
 
+### `dense-batch-context`
+- Title: dense-batch-context Specification
+- Source: [spec.md](#code=openspec/specs/dense-batch-context/spec.md)
+- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
+
 ### `derived-outputs`
 - Title: derived-outputs Specification
 - Source: [spec.md](#code=openspec/specs/derived-outputs/spec.md)
@@ -141,6 +146,16 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/no-external-callback-under-lock/spec.md)
 - Summary: 为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。
 
+### `ordered-unique-ssot`
+- Title: ordered-unique-ssot Specification
+- Source: [spec.md](#code=openspec/specs/ordered-unique-ssot/spec.md)
+- Summary: TBD - created by archiving change c40-ordered-unique-ssot. Update Purpose after archive.
+
+### `output-aggregate-producer-keys-ssot`
+- Title: output-aggregate-producer-keys-ssot Specification
+- Source: [spec.md](#code=openspec/specs/output-aggregate-producer-keys-ssot/spec.md)
+- Summary: TBD - created by archiving change c45-output-aggregate-producer-keys-ssot. Update Purpose after archive.
+
 ### `output-composition`
 - Title: output-composition Specification
 - Source: [spec.md](#code=openspec/specs/output-composition/spec.md)
@@ -150,6 +165,11 @@ Sources:
 - Title: output-mode-api Specification
 - Source: [spec.md](#code=openspec/specs/output-mode-api/spec.md)
 - Summary: **状态: ✅ 已实现** 定义运行时输出语义为“显式 sink 驱动”: 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配. 同时要求稳定的执行元数据(例如 `ExecutionResult.total_rows`)以及异常路径的 best-effort 资源清理.
+
+### `outputs-parser-staged-design`
+- Title: outputs-parser-staged-design Specification
+- Source: [spec.md](#code=openspec/specs/outputs-parser-staged-design/spec.md)
+- Summary: TBD - created by archiving change c50-outputs-parser-split. Update Purpose after archive.
 
 ### `overlap-optimization`
 - Title: overlap-optimization Specification
@@ -166,15 +186,35 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/parallel-execution/spec.md)
 - Summary: **状态: ⚠️ 实验性** 定义执行层对外并发语义 `seq|adaptive`,以及 `adaptive` 下的调度边界、后端选择、结果提交与事件回放契约.
 
+### `perf-regression-guardrails`
+- Title: perf-regression-guardrails Specification
+- Source: [spec.md](#code=openspec/specs/perf-regression-guardrails/spec.md)
+- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
+
 ### `performance-observability`
 - Title: performance-observability Specification
 - Source: [spec.md](#code=openspec/specs/performance-observability/spec.md)
 - Summary: **状态: ✅ 已实现** PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断.
 
+### `preload-cache-concurrent-load-scenarios`
+- Title: preload-cache-concurrent-load-scenarios Specification
+- Source: [spec.md](#code=openspec/specs/preload-cache-concurrent-load-scenarios/spec.md)
+- Summary: TBD - created by archiving change c70-preload-cache-concurrent-load-scenarios. Update Purpose after archive.
+
 ### `preload-cache-inflight-dedupe`
 - Title: preload-cache-inflight-dedupe Specification
 - Source: [spec.md](#code=openspec/specs/preload-cache-inflight-dedupe/spec.md)
 - Summary: TBD - created by archiving change c0-preload-cache-inflight-dedupe. Update Purpose after archive.
+
+### `preload-cache-inflight-wait-diagnostics`
+- Title: preload-cache-inflight-wait-diagnostics Specification
+- Source: [spec.md](#code=openspec/specs/preload-cache-inflight-wait-diagnostics/spec.md)
+- Summary: TBD - created by archiving change c75-preload-cache-inflight-wait-diagnostics. Update Purpose after archive.
+
+### `preload-cache-signature-guardrail`
+- Title: preload-cache-signature-guardrail Specification
+- Source: [spec.md](#code=openspec/specs/preload-cache-signature-guardrail/spec.md)
+- Summary: TBD - created by archiving change c700-preload-cache-signature-guardrail. Update Purpose after archive.
 
 ### `prompt-eval-fixture-cli`
 - Title: prompt-eval-fixture-cli Specification
@@ -195,6 +235,11 @@ Sources:
 - Title: runtime-pruning Specification
 - Source: [spec.md](#code=openspec/specs/runtime-pruning/spec.md)
 - Summary: **状态: ✅ 已实现** PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用.
+
+### `sink-fastpath`
+- Title: sink-fastpath Specification
+- Source: [spec.md](#code=openspec/specs/sink-fastpath/spec.md)
+- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
 
 ### `sinks-contracts`
 - Title: sinks-contracts Specification
@@ -251,6 +296,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-replay-bundle/spec.md)
 - Summary: TBD - created by archiving change c10-workflow-viz-linked-replay. Update Purpose after archive.
 
+### `workflow-runtime-module-organization`
+- Title: workflow-runtime-module-organization Specification
+- Source: [spec.md](#code=openspec/specs/workflow-runtime-module-organization/spec.md)
+- Summary: TBD - created by archiving change c55-workflow-runtime-modularization. Update Purpose after archive.
+
 ### `workflow-shared-output-containers`
 - Title: workflow-shared-output-containers Specification
 - Source: [spec.md](#code=openspec/specs/workflow-shared-output-containers/spec.md)
@@ -266,6 +316,16 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-agent-guidance/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `scalim-yaml-dsl` 手工维护 skill 的任务驱动组织方式,确保 agent 能基于最小入口、明确命令和按需 references 一次完成 YAML 编写、升级、校验、订正与渐进迁移方案设计.
 
+### `yaml-dsl-allowed-paths-policy`
+- Title: yaml-dsl-allowed-paths-policy Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-allowed-paths-policy/spec.md)
+- Summary: TBD - created by archiving change c25-yaml-path-escape-hardening. Update Purpose after archive.
+
+### `yaml-dsl-allowlist-policy`
+- Title: yaml-dsl-allowlist-policy Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-allowlist-policy/spec.md)
+- Summary: TBD - created by archiving change c2-allowlist-footgun-hardening. Update Purpose after archive.
+
 ### `yaml-dsl-cli-validation`
 - Title: yaml-dsl-cli-validation Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-validation/spec.md)
@@ -276,6 +336,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-demo-scenarios-suite/spec.md)
 - Summary: TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update Purpose after archive.
 
+### `yaml-dsl-docs-skills-autogen-sync`
+- Title: yaml-dsl-docs-skills-autogen-sync Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-docs-skills-autogen-sync/spec.md)
+- Summary: TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update Purpose after archive.
+
 ### `yaml-dsl-editor-core`
 - Title: yaml-dsl-editor-core Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-core/spec.md)
@@ -285,6 +350,11 @@ Sources:
 - Title: yaml-dsl-editor-schema-blocks Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-schema-blocks/spec.md)
 - Summary: TBD - created by archiving change c1-yaml-dsl-editor-schema-blocks. Update Purpose after archive.
+
+### `yaml-dsl-import-aliases-and-presets`
+- Title: yaml-dsl-import-aliases-and-presets Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-import-aliases-and-presets/spec.md)
+- Summary: TBD - created by archiving change c80-yaml-dsl-import-aliases-and-presets. Update Purpose after archive.
 
 ### `yaml-dsl-imports`
 - Title: yaml-dsl-imports Specification
@@ -340,3 +410,8 @@ Sources:
 - Title: yaml-template-vars-precompile Specification
 - Source: [spec.md](#code=openspec/specs/yaml-template-vars-precompile/spec.md)
 - Summary: TBD - created by archiving change c5-yaml-template-vars-precompile. Update Purpose after archive.
+
+### `yaml-template-vars-sandbox`
+- Title: yaml-template-vars-sandbox Specification
+- Source: [spec.md](#code=openspec/specs/yaml-template-vars-sandbox/spec.md)
+- Summary: TBD - created by archiving change c20-yaml-template-vars-sandbox. Update Purpose after archive.

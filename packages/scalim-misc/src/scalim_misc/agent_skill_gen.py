@@ -27,6 +27,12 @@ import yaml
 
 from scalim_misc.cli_docs import build_yaml_dsl_command_docs
 from scalim_misc.markdown_inject import InjectBlockError, InjectBlockSpec, replace_markdown_injected_block
+from scalim_misc.yaml_dsl_cli_reference_md import (
+    SKILL_CLI_MIN_COMMANDS_BEGIN,
+    SKILL_CLI_MIN_COMMANDS_END,
+    render_yaml_dsl_cli_reference_markdown,
+    render_yaml_dsl_skill_cli_min_commands_markdown,
+)
 
 from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
@@ -132,7 +138,13 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     upgrades_root = repo_root / UPGRADES_SSOT_ROOT_REL
     generated_files = {
         SYNTAX_CATALOG_REL: render_syntax_catalog(schema, workflow_schema, syntax_specs),
-        CLI_LSP_REFERENCE_REL: render_cli_lsp_reference(repo_root, command_docs, cli_specs),
+        CLI_LSP_REFERENCE_REL: render_yaml_dsl_cli_reference_markdown(
+            repo_root,
+            command_docs,
+            generated_by="scripts/gen-agent-skill.py",
+            spec_summaries=cli_specs,
+            canonical_example_path=path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL),
+        ),
         CANONICAL_EXAMPLE_OUTPUT_REL: canonical_example_text,
         UPGRADES_NOTES_REL: render_yaml_dsl_upgrades_notes(repo_root, upgrades_root),
     }
@@ -141,6 +153,7 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
         generated_files[fragment_rel] = fragment_text
     sync_generated_files(skill_dir, generated_files)
     sync_upgrade_legacy_reference(repo_root, skill_dir)
+    sync_skill_cli_min_commands(skill_dir)
 
     outputs = [skill_dir / rel_path for rel_path in sorted(generated_files.keys(), key=lambda item: str(item))]
     fragment_inputs = [canonical_example_source.parent / name for name in sorted(canonical_example_fragments)]
@@ -421,129 +434,29 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
     return lines
 
 
-def render_cli_lsp_reference(
-    repo_root: Path,
-    command_docs: Sequence[Dict[str, Any]],
-    spec_summaries: Sequence[Dict[str, Any]],
-) -> str:
-    repo_schema_path = path_to_posix(SCHEMA_REL)
-    workflow_repo_schema_path = path_to_posix(WORKFLOW_SCHEMA_REL)
-    default_schema_path = yaml_dsl_cli._default_schema_path().resolve()
+def sync_skill_cli_min_commands(skill_dir: Path) -> None:
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.exists():
+        return
+
+    original = read_text(skill_md)
+    if SKILL_CLI_MIN_COMMANDS_BEGIN not in original and SKILL_CLI_MIN_COMMANDS_END not in original:
+        return
     try:
-        default_schema_repo_rel = path_to_posix(default_schema_path.relative_to(repo_root))
-    except ValueError as exc:
-        raise GenerationError("CLI 默认 `schema` 路径不在仓库内: {}".format(default_schema_path)) from exc
-
-    if default_schema_repo_rel != repo_schema_path:
-        raise GenerationError("CLI 默认 `schema` 路径与规范 `schema` 文件不一致: {}".format(default_schema_repo_rel))
-
-    lines = [
-        "# Scalim YAML DSL CLI and LSP Reference",
-        "",
-        "此文档由 `scripts/gen-agent-skill.py` 自动生成.",
-        "",
-        "## Canonical Sources",
-        "- CLI implementation: `{}`".format(path_to_posix(CLI_SOURCE_REL)),
-        "- Project identity constants: `src/scalim/_project_constants.py`",
-        "- Demand schema file: `{}`".format(repo_schema_path),
-        "- Workflow schema file: `{}`".format(workflow_repo_schema_path),
-        "- Canonical example: `{}`".format(path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL)),
-        "",
-        "## Command Variants",
-        "### Repo",
-        "- `uv run {cli} yaml-dsl validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
-        "- `uv run {cli} yaml-dsl validate --type workflow <workflow.yaml>`".format(cli=_project_constants.CLI_NAME),
-        "- `uv run {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
-        "- `uv run {cli} yaml-dsl schema validate --schema {workflow_schema} <workflow.yaml>`".format(
-            cli=_project_constants.CLI_NAME,
-            workflow_schema=workflow_repo_schema_path,
-        ),
-        "- `uv run {cli} yaml-dsl schema show`".format(cli=_project_constants.CLI_NAME),
-        "- `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
-        "- `uv run {cli} yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`".format(cli=_project_constants.CLI_NAME),
-        "- `uv run {cli} yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`".format(
-            cli=_project_constants.CLI_NAME
-        ),
-        "",
-        "### External",
-        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate <file.yaml>`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate --type workflow <workflow.yaml>`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema validate <file.yaml>`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema show`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        '- `uvx --from "{dist}[cli]" {cli} yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        "",
-        "## Validate Layering",
-        "- `yaml-dsl validate --type demand`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.",
-        "- `yaml-dsl validate --type workflow`: 静态/编译期 workflow 校验,递归校验 workflow 引用的 demands,并检查 `writes[*].output` 等跨文件一致性.",
-        "- `yaml-dsl validate` 默认 `--type auto`: 根据 YAML 顶层结构推断 demand/workflow;CI/脚本建议显式传 `--type workflow`.",
-        "- `yaml-dsl schema validate`: 使用 JSON Schema,更适合 schema-only 校验、编辑器/LSP 对齐与 unknown-field strict 收敛.",
-        "",
-        "## LSP / Schema Header",
-        "- Repo schema path: `{}`".format(repo_schema_path),
-        "- Workflow schema path: `{}`".format(workflow_repo_schema_path),
-        "- Canonical example: 故意不写 schema 头(`# $schema: ...`),避免把本机路径固化进共享 YAML.",
-        "- 批量写入/更新头部(默认同时写 Red Hat + JetBrains modeline; 可用 `--comment-style` 控制): `uv run {cli} yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`".format(
-            cli=_project_constants.CLI_NAME
-        ),
-        "- Workflow modeline: `uv run {cli} yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`".format(
-            cli=_project_constants.CLI_NAME
-        ),
-        "- Repo query: `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
-        '- External query: `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
-            dist=_project_constants.DIST_NAME,
-            cli=_project_constants.CLI_NAME,
-        ),
-        "- Python fallback: `python -c \"import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/by_yaml/schema/demand.gen.json'))\"`",
-        "- 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.",
-        "```yaml",
-        "# yaml-language-server: $schema=.../demand.gen.json",
-        "# $schema: .../demand.gen.json",
-        "# yaml-language-server: $schema=.../workflow.gen.json",
-        "# $schema: .../workflow.gen.json",
-        "```",
-    ]
-
-    lines.extend(render_spec_requirement_map("## OpenSpec Requirement Map", spec_summaries))
-
-    lines.extend(["", "## Command Details"])
-    for command_doc in command_docs:
-        command_name = " ".join(command_doc["tokens"])
-        lines.extend(
-            [
-                "### `{}`".format(command_name),
-                "- Help: {}".format(command_doc["help"]),
-                "- Usage: `{}`".format(command_doc["usage"]),
-            ]
+        injected = replace_markdown_injected_block(
+            original,
+            spec=InjectBlockSpec(
+                begin_marker=SKILL_CLI_MIN_COMMANDS_BEGIN,
+                end_marker=SKILL_CLI_MIN_COMMANDS_END,
+                label=str(skill_md),
+            ),
+            content=render_yaml_dsl_skill_cli_min_commands_markdown(),
         )
-        help_full = str(command_doc.get("help_full") or "").rstrip()
-        if help_full:
-            lines.extend(["- Full help:", "```text", help_full.rstrip(), "```"])
-        lines.append("")
+    except InjectBlockError as exc:
+        raise GenerationError(str(exc)) from exc
 
-    return "\n".join(lines).rstrip() + "\n"
+    if injected != original:
+        write_text(skill_md, injected)
 
 
 def sync_upgrade_legacy_reference(repo_root: Path, skill_dir: Path) -> None:

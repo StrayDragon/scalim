@@ -21,6 +21,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 
 先给出最小可执行命令,再开始分析或改 YAML:
 
+<!-- BEGIN AUTOGEN:yaml-dsl-skill-cli-min-commands -->
 - demand YAML 仓库内完整校验: `uv run scalim-cli yaml-dsl validate <demand.yaml>`
 - demand YAML 仓库内 schema 校验: `uv run scalim-cli yaml-dsl schema validate <demand.yaml>`
 - workflow YAML 仓库内完整校验(静态/编译期;递归校验引用的 demands;不执行 workflow): `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
@@ -39,6 +40,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 # yaml-language-server: $schema=.../demand.gen.json
 # $schema: .../demand.gen.json
 ```
+<!-- END AUTOGEN:yaml-dsl-skill-cli-min-commands -->
 
 工作时遵守这些硬规则:
 

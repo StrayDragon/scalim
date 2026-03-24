@@ -4,6 +4,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from scalim_misc.yaml_dsl_cli_snippet_governance import check_yaml_dsl_cli_snippet_governance
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -116,6 +118,7 @@ def main() -> int:
     errors.extend(_check_claude_symlink(root))
     errors.extend(_check_repo_guide_single_link(root))
     errors.extend(_check_yaml_dsl_upgrades_ssot(root))
+    errors.extend(check_yaml_dsl_cli_snippet_governance(root))
 
     if errors:
         sys.stderr.write("文档治理一致性检查失败:\n")

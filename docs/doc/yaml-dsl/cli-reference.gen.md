@@ -1,13 +1,20 @@
+<!--
+本文件由 `just gen-docs` (scripts/gen-docs.py) 自动生成,请勿手动修改.
+Sources:
+- `src/scalim/cli/yaml_dsl.py`
+- `packages/scalim-misc/src/scalim_misc/cli_docs.py`
+- `packages/scalim-misc/src/scalim_misc/yaml_dsl_cli_reference_md.py`
+-->
 # Scalim YAML DSL CLI and LSP Reference
 
-此文档由 `scripts/gen-agent-skill.py` 自动生成.
+此文档由 `just gen-docs` 自动生成.
 
 ## Canonical Sources
 - CLI implementation: `src/scalim/cli/yaml_dsl.py`
 - Project identity constants: `src/scalim/_project_constants.py`
 - Demand schema file: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
 - Workflow schema file: `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
-- Canonical example: `references/generated/example-full/ecommerce_report.gen.yaml`
+- Canonical example: `artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`
 
 ## Command Variants
 ### Repo
@@ -51,51 +58,6 @@
 # yaml-language-server: $schema=.../workflow.gen.json
 # $schema: .../workflow.gen.json
 ```
-
-## OpenSpec Requirement Map
-### `yaml-dsl-cli-validation`
-- Source: `openspec/specs/yaml-dsl-cli-validation/spec.md`
-- Purpose: 定义 `PROJECT_CLI_NAME yaml-dsl ...` 的校验分层、严格模式、JSON 输出与诊断输出格式(含源码位置),以确保 CLI 校验结果可用于 IDE 跳转、CI 报告与脚本化消费,并避免与 schema 生成规范耦合.
-- Requirements:
-  - CLI validate 与 schema validate 职责边界(避免重复诊断)
-  - CLI Schema-Only Validation
-  - JSONSchema 错误收集(完整 + 稳定 + 去噪)
-  - CLI Schema Discovery
-  - 严格未知字段校验
-  - 运行时 validator 错误列表包含 issue path
-  - 校验命令输出与 schema 一致性
-  - CLI 校验输出包含源码位置
-  - Linter/编译器风格输出
-  - validate 对 `outputs.*.fields` object 条目给出可行动诊断
-  - CLI can upsert schema modeline in YAML files (IntelliJ compatible)
-  - upsert-lsp-comment resolves schema reference from type + schema-path
-### `yaml-dsl-editor-core`
-- Source: `openspec/specs/yaml-dsl-editor-core/spec.md`
-- Purpose: 定义 YAML DSL 编辑器的核心能力:文本优先编辑、Visual 双向同步、统一校验模型、roundtrip 稳定性与可选 exact(Pyodide)语义校验.
-- Requirements:
-  - 作为纯前端应用运行
-  - 文本编辑为主路径(Text-first)
-  - 可视化与 YAML 双向编辑(Split)
-  - 使用 canonical JSON Schema 提供补全与 hover
-  - 编辑器对相对模块引用提供一致提示
-  - 编辑器暴露与 canonical schema 语义一致的 `extract`
-  - 导入/导出与模板新建
-  - Outline 与快速导航
-  - 可选多 schema 选择(demand vs workflow)
-  - 可视化辅助视图(关系与依赖)
-  - 统一 issue 数据模型与定位能力
-  - 默认提供 schema-only 校验并支持 strict
-  - 支持 local semantic 与 exact semantic 并合并展示
-  - exact semantic 基于 Worker + Pyodide 且默认关闭
-  - exact 初始化失败自动降级
-  - exact 依赖最小化
-  - roundtrip 优先补丁并尽量保留格式
-  - 重写前必须 diff 预览并显式确认
-  - alias 编辑提供共享与拆分策略
-  - 可视化编辑块必须提供稳定可发现的新增入口
-  - 同一编辑器中的可操作项必须采用一致的交互视觉体系
-  - 关键操作的可见性不得依赖 hover-only
-  - 编辑器暴露源代码级 `normalize` 并提供与 canonical schema 一致的指引
 
 ## Command Details
 ### `yaml-dsl validate`

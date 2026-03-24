@@ -162,6 +162,9 @@
   - 关联加载优先命中缓存
   - 计划元数据记录缓存源
   - preload cache stores normalized source results
+  - `preloaded_cache` concurrency boundary and key space MUST be explicit
+  - `PreloadCache` signature guardrail MUST be available (opt-in)
+  - loader SHOULD be idempotent when concurrent / repeated loads are possible
 ### `workflow-cache-pool`
 - Source: `openspec/specs/workflow-cache-pool/spec.md`
 - Purpose: 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
@@ -275,7 +278,10 @@
     - `./x.yaml` / `x.yaml`
     - `x/y.yaml`(子目录)
     - `../x.yaml`(父目录)
-  - 禁止: 绝对路径/任意 URI scheme(`*://...`)/预留 alias 前缀(例如 `@/x.yaml`, `COMMON:/x.yaml`)
+  - 支持(编辑器侧放宽,运行时校验为准):
+    - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)
+    - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)
+  - 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等
 - `additionalProperties`: `string`
 
 ### `$import`

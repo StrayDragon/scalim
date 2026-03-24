@@ -67,6 +67,7 @@ def build_yaml_dsl_command_docs() -> List[Dict[str, Any]]:
         ("yaml-dsl", "schema", "validate"),
         ("yaml-dsl", "schema", "show"),
         ("yaml-dsl", "schema", "path"),
+        ("yaml-dsl", "upsert-lsp-comment"),
     ]
     docs = []
     for tokens in command_tokens:

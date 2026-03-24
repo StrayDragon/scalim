@@ -2,6 +2,7 @@
 本文件由 `just gen-docs` (scripts/gen-docs.py) 自动生成,请勿手动修改.
 Sources:
 - `src/scalim/dsl/by_yaml/schema/demand.gen.json`
+- `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
 - Schema generator: `just gen-yaml-dsl-schema`
 -->
 # YAML Schema 参考(生成)
@@ -10,7 +11,7 @@ Sources:
 
 ## Top-Level Fields
 - `name`: type=string; 需求配置名称. - 必填, 用于标识当前配置
-- `imports`: type=object; 片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录): - `./x.yaml` / `x.yaml` - `x/y.yaml`(子目录) - `../x.yaml`(父目录) - 禁止: 绝对路径/任意 URI scheme(`*://...`)/预留 alias 前缀(例如 `@/x.yaml`, `COMMON:/x.yaml`)
+- `imports`: type=object; 片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录): - `./x.yaml` / `x.yaml` - `x/y.yaml`(子目录) - `../x.yaml`(父目录) - 支持(编辑器侧放宽,运行时校验为准): - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置) - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单) - 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等
 - `$import`: $import 引用. - string: `<alias>(.<segment>)*` - list: 按顺序合并,后者覆盖前者,最终再被本地覆盖 - 仅支持 mapping 片段 - V1 仅支持同级文件导入(见顶层 `imports`)
 - `_templates`: type=object; YAML anchor 模板集合. - 仅用于 YAML 复用(anchors) - 常用于 `fields` / `relations` / `retry`
 - `description`: type=string; 配置描述(可选).
@@ -220,6 +221,11 @@ Sources:
 - `snapshot_path`: type=string; 快照输出文件路径(可选)
 - `trace_enabled`: type=boolean; default=false; 启用高频 trace 输出
 - `use_default_output_dir`: type=boolean; default=false; 使用默认输出目录
+
+## Workflow Schema
+
+### Top-Level Fields
+- `workflow` (required): type=object
 
 ## Notes
 - 完整字段语义以 `scalim-cli yaml-dsl validate` 的运行时行为为准.

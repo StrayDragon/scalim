@@ -1681,7 +1681,7 @@ run(
 
 - `allowed_modules`: 粗粒度,适合把 loader 统一收敛到单一模块(如 `myapp.loaders`)
 - `allowed_functions`: 细粒度,推荐在生产使用;支持 `module:function` 与 `module.function` 两种写法
-- 避免在生产使用 wildcard `*`(等价全部放开)
+- wildcard `*` 默认被禁止(避免误用导致 allowlist 形同虚设);仅在 `resolver_trusted_mode=trusted_allow_all_modules` 下允许显式放宽
 
 **reference 形式与注意事项**:
 
@@ -1707,14 +1707,20 @@ main_source:
 ```python
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
+from scalim.dsl.by_yaml import ResolverTrustedMode
 
 # 推荐:显式 allowlist(安全默认)
 converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["myapp.loaders"]))
 # 或等价:传入带 allowlist 的 resolver
 converter = ConfigToIRConverter(resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["myapp.loaders"])))
 
-# 仅用于可信环境/测试:显式 opt-in 不安全解析(不推荐生产使用)
-converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+# 仅用于可信环境/测试:显式启用 trusted-mode 放宽为允许任意模块(不推荐生产使用)
+converter = ConfigToIRConverter(
+    resolver=SecurePythonReferenceResolver(
+        allowed_modules=frozenset(["*"]),
+        resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
+    )
+)
 ```
 
 **3. compute / call_by 的边界**:

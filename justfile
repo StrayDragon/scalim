@@ -478,7 +478,7 @@ prompt-eval-agent-tmp OUTPUT_DIR="/tmp/scalim-prompt-eval-agent":
     python scripts/prompt-eval.py --llm-agent --output-dir "{{ OUTPUT_DIR }}"
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

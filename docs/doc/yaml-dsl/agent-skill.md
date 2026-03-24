@@ -43,6 +43,7 @@
 
 写完/改完 YAML 后,建议跑一遍校验:
 
+<!-- BEGIN AUTOGEN:yaml-dsl-cli-min-commands -->
 - demand YAML 仓库内语义校验(内置 validator): `uv run scalim-cli yaml-dsl validate path/to/demand.yaml`
 - workflow YAML 仓库内 full validate(静态/编译期;递归校验引用的 demands;不执行 workflow): `uv run scalim-cli yaml-dsl validate --type workflow path/to/workflow.yaml`
   - 若 workflow demand 路径使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析
@@ -70,6 +71,7 @@ workflow YAML 同理,只是 `--type` 与 schema 文件名不同:
 # yaml-language-server: $schema=.../workflow.gen.json
 # $schema: .../workflow.gen.json
 ```
+<!-- END AUTOGEN:yaml-dsl-cli-min-commands -->
 
 不要把 `.venv/...` 或 `site-packages/...` 这类机器相关路径固化进共享示例文件.
 

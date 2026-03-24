@@ -65,6 +65,7 @@ def run_workflow_shared_workbooks(
                     allowed_modules=allowed_modules,
                     init_vars={"order_ids": []},
                     path_aliases={"@": str(repo_root)},
+                    allowed_yaml_roots=(str(repo_root),),
                 )
             except Exception as exc:  # noqa: BLE001
                 summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)

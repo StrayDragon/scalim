@@ -167,6 +167,7 @@ def test_generated_cli_reference_has_required_commands_and_paths(tmp_path: Path)
     assert "uv run scalim-cli yaml-dsl schema path" in cli_ref
     assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path' in cli_ref
     assert "uv run scalim-cli yaml-dsl upsert-lsp-comment" in cli_ref
+    assert "### `yaml-dsl upsert-lsp-comment`" in cli_ref
     assert "--comment-style all" in cli_ref
     assert "--type workflow" in cli_ref
     assert "Canonical example: 故意不写 schema 头" in cli_ref

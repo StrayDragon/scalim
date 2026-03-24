@@ -21,6 +21,7 @@ _COVERED_PUBLIC_ALL = {
     "UNSET",
     "Compilation",
     "OutputOverrides",
+    "ResolverTrustedMode",
     "RunOptions",
     "RunOverrides",
     "RunResult",
