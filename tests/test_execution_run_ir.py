@@ -13,6 +13,7 @@ from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryListSink, InMem
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import FieldIr
 from scalim.spec.ir.sources import MainSourceIr
+from scalim.warningsx import ScalimExperimentalWarning
 from scalim.vendor.compact.typing_extensionsx import override
 
 
@@ -168,6 +169,27 @@ def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> N
     assert evt.payload.source_id == "(run)"
     assert evt.payload.field_id == "(run)"
     assert evt.payload.lookup_key is None
+
+
+def test_run_ir_experimental_warning_is_visible_by_default_when_key_normalization_enabled() -> None:
+    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=InMemoryListSink(),
+        key_normalization="auto_str",  # type: ignore[arg-type]
+    )
+
+    with pytest.warns(ScalimExperimentalWarning) as record:
+        _ = run_ir(demand_ir, request)
+
+    assert len(record) == 1
+    msg = str(record[0].message)
+    assert "EXPERIMENTAL" in msg
+    assert "key_normalization='auto_str'" in msg
 
 
 def test_run_ir_closes_sink_on_exception() -> None:

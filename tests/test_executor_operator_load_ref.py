@@ -4,13 +4,14 @@ from typing import Dict, List
 
 import pytest
 
-from scalim.events.catalog import EVENT_LOADER_CALL
+from scalim.events.catalog import EVENT_LOADER_CALL, EVENT_RELATION_LOOKUP
 from scalim.execution.context import BatchContext
+from scalim.execution.executor.operators.load_ref.context import LoadRefExecutionContext
 from scalim.execution.executor.operators.load_ref import loader as load_ref_loader
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import LoadRefCacheEntry
 from scalim.ob.manager import ObserverManager
-from scalim.ob.observer import Observer
+from scalim.ob.observer import EventDispatchObserver, Observer
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
@@ -67,6 +68,106 @@ def test_load_ref_returns_early_variants(main_source, lookup_steps) -> None:  # 
     LoadRefOperatorExecutor().execute(operator, context, [1], runtime)
 
     assert context.get_field_value("customer_name", 1) is None
+
+
+def test_load_ref_relation_lookup_diagnostics_are_wants_gated(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"target_ids": list(ctx.lookup_keys or [])}
+
+    def _loader(target_ids):  # type: ignore[no-untyped-def]
+        return {key: {"name": "Name{}".format(key)} for key in target_ids}
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+
+    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    context = BatchContext()
+    batch_row_nth = list(range(10))
+    for row_id in batch_row_nth:
+        context.set_field_value("fk_id", row_id, row_id)
+
+    def _forbid_record_lookup(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("relation_lookup diagnostics should be wants-gated at the callsite")
+
+    monkeypatch.setattr(LoadRefExecutionContext, "record_lookup", _forbid_record_lookup)
+
+    LoadRefOperatorExecutor().execute(operator, context, batch_row_nth, runtime)
+
+    assert context.get_field_value("target_name", 0) == "Name0"
+
+
+def test_load_ref_relation_lookup_diagnostics_still_work_when_wanted(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _RelationLookupObserver(EventDispatchObserver):
+        event_types = {EVENT_RELATION_LOOKUP}
+
+        def __init__(self) -> None:
+            self.events: List[object] = []
+
+        def on_relation_lookup(self, payload) -> None:  # type: ignore[no-untyped-def]
+            self.events.append(payload)
+
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"target_ids": list(ctx.lookup_keys or [])}
+
+    def _loader(target_ids):  # type: ignore[no-untyped-def]
+        return {key: {"name": "Name{}".format(key)} for key in target_ids}
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+
+    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    observer = _RelationLookupObserver()
+    runtime.observer_manager.register(observer)
+
+    context = BatchContext()
+    batch_row_nth = [0, 1, 2]
+    for row_id in batch_row_nth:
+        context.set_field_value("fk_id", row_id, row_id)
+
+    record_calls: List[object] = []
+    original_record_lookup = LoadRefExecutionContext.record_lookup
+
+    def _spy_record_lookup(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        record_calls.append((args, kwargs))
+        return original_record_lookup(self, *args, **kwargs)
+
+    monkeypatch.setattr(LoadRefExecutionContext, "record_lookup", _spy_record_lookup)
+
+    LoadRefOperatorExecutor().execute(operator, context, batch_row_nth, runtime)
+
+    assert record_calls
+    assert observer.events
+    assert context.get_field_value("target_name", 0) == "Name0"
 
 
 def test_load_ref_builds_batch_rows_with_row_binding() -> None:
@@ -1045,9 +1146,193 @@ def test_load_ref_cached_mapping_key_normalization_collision_fail_fast() -> None
         lookup_steps=steps,
     )
     runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source, key_normalization="auto_str")
-    runtime.preloaded_cache["targets"] = {1: {"name": "A"}, "1": {"name": "B"}}
+    runtime.preloaded_cache["targets"] = {123: {"name": "A"}, "123": {"name": "B"}}
     ctx = BatchContext()
-    ctx.set_field_value("fk_id", 1, 1)
+    ctx.set_field_value("fk_id", 1, 123)
 
-    with pytest.raises(ValueError, match="collision"):
+    with pytest.raises(ValueError, match="collision") as excinfo:
         LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)
+
+    assert "123" not in str(excinfo.value)
+
+
+def test_load_ref_cached_mapping_key_normalization_collision_merges_when_values_equal_and_warns_redacted() -> None:
+    from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
+    from scalim.events.event import Event
+    from scalim.ob.manager import ObserverManager
+    from scalim.ob.observer import Observer
+
+    class _CaptureWarningObserver(Observer):
+        def __init__(self) -> None:
+            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.events = []
+
+        def on_event(self, event: Event) -> None:
+            self.events.append(event)
+
+    main_source = _make_main_source()
+    fail_loader = _FailLoader()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=fail_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+
+    observer = _CaptureWarningObserver()
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}),
+        main_source,
+        observer_manager=ObserverManager([observer]),
+        key_normalization="auto_str",
+    )
+    runtime.preloaded_cache["targets"] = {123: {"name": "A"}, "123": {"name": "A"}}
+    ctx = BatchContext()
+    ctx.set_field_value("fk_id", 1, 123)
+
+    LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)
+
+    assert fail_loader.calls == 0
+    assert ctx.get_field_value("target_name", 1) == "A"
+
+    assert len(observer.events) == 1
+    evt = observer.events[0]
+    assert "collision" in str(evt.payload.message)
+    assert "redacted" in str(evt.payload.message)
+    assert "123" not in str(evt.payload.message)
+    assert evt.payload.lookup_key is None
+
+
+def test_load_ref_key_normalization_auto_str_with_explicit_cast_mismatch_warns_redacted() -> None:
+    from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
+    from scalim.events.event import Event
+    from scalim.ob.manager import ObserverManager
+    from scalim.ob.observer import Observer
+
+    class _CaptureWarningObserver(Observer):
+        def __init__(self) -> None:
+            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.events = []
+
+        def on_event(self, event: Event) -> None:
+            self.events.append(event)
+
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"target_ids": list(ctx.lookup_keys_list or [])}
+
+    def _loader(target_ids):  # type: ignore[no-untyped-def]
+        # Always return string-keyed mapping (regardless of input type).
+        return {str(key): {"name": "Name{}".format(key)} for key in target_ids}
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    binding = BindingIr(key_field="target_id", params_builder=_params_builder, mode="rows", cache_mode="none")
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=int),)
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+
+    observer = _CaptureWarningObserver()
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}),
+        main_source,
+        observer_manager=ObserverManager([observer]),
+        key_normalization="auto_str",
+    )
+    ctx = BatchContext()
+    ctx.set_field_value("fk_id", 1, "123")
+
+    LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)
+    LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)
+
+    assert ctx.get_field_value("target_name", 1) is None
+    assert len(observer.events) == 1
+    msg = str(observer.events[0].payload.message)
+    assert "mismatch" in msg
+    assert "redacted" in msg
+    assert "123" not in msg
+
+
+def test_load_ref_key_normalization_auto_str_with_explicit_cast_unnormalizable_key_probe_is_skipped() -> None:
+    from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
+    from scalim.events.event import Event
+    from scalim.ob.manager import ObserverManager
+    from scalim.ob.observer import Observer
+
+    class _CaptureWarningObserver(Observer):
+        def __init__(self) -> None:
+            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.events = []
+
+        def on_event(self, event: Event) -> None:
+            self.events.append(event)
+
+    class _WeirdKey(object):
+        def __repr__(self) -> str:
+            return "WeirdKey()"
+
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"target_ids": list(ctx.lookup_keys_list or [])}
+
+    def _loader(target_ids):  # type: ignore[no-untyped-def]
+        _ = target_ids
+        return {}
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable=_loader),
+    )
+    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    binding = BindingIr(key_field="target_id", params_builder=_params_builder, mode="rows", cache_mode="none")
+    steps = (
+        LookupStepIr(
+            from_field="fk_id",
+            to_source=target_source,
+            bind=binding,
+            lookup_cast=lambda _value: _WeirdKey(),  # type: ignore[arg-type]
+        ),
+    )
+    operator = LoadRefOperatorIr(
+        operator_id="load_ref",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=target_source,
+        field_key="target_name",
+        field_spec=field_spec,
+        lookup_steps=steps,
+    )
+
+    observer = _CaptureWarningObserver()
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}),
+        main_source,
+        observer_manager=ObserverManager([observer]),
+        key_normalization="auto_str",
+    )
+    ctx = BatchContext()
+    ctx.set_field_value("fk_id", 1, "any")
+
+    LoadRefOperatorExecutor().execute(operator, ctx, [1], runtime)
+
+    assert ctx.get_field_value("target_name", 1) is None
+    assert observer.events == []

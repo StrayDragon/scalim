@@ -75,3 +75,18 @@ def test_execution_runtime_get_cached_source_mapping_branches() -> None:
     runtime_missing = _make_runtime(key_normalization="auto_str")
     with pytest.raises(KeyError, match="Unknown cached source"):
         _ = runtime_missing.get_cached_source_mapping(step)
+
+
+def test_execution_runtime_get_cached_source_mapping_collision_fails_fast_when_value_equality_raises() -> None:
+    class _ExplodingEq(object):
+        def __eq__(self, _other) -> bool:  # type: ignore[override]
+            raise RuntimeError("boom")
+
+    runtime = _make_runtime(key_normalization="auto_str")
+    step = _make_step()
+    runtime.preloaded_cache["targets"] = {123: _ExplodingEq(), "123": _ExplodingEq()}
+
+    with pytest.raises(ValueError, match="collision") as excinfo:
+        _ = runtime.get_cached_source_mapping(step)
+
+    assert "123" not in str(excinfo.value)

@@ -1,10 +1,12 @@
 import contextlib
 import time
+import warnings as py_warnings
 from dataclasses import dataclass, replace
 from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
 from ..hooks.base import HookManager, IExecutionHook
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
@@ -19,6 +21,7 @@ from ..spec.ir.demand import DemandIr
 from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
+from ..warningsx import ScalimExperimentalWarning
 from .engine import ScalimEngine
 from .guardrails import GuardrailsPolicy
 from .key_normalization import normalize_key_normalization
@@ -613,17 +616,28 @@ def run_ir(
     observer_manager, hook_manager = _build_observer_and_hook_managers(plan=plan, request=request, event_meta_defaults=event_meta_defaults)
 
     if request.key_normalization != "raw":
-        instrumentation = InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)
-        instrumentation.emit_diagnostic_warning(
-            message="EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(
-                request.key_normalization
-            ),
-            source_id="(run)",
-            field_id="(run)",
-            lookup_key=None,
-            row_id="(run)",
-            sample_once=True,
-        )
+        msg = "EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(request.key_normalization)
+
+        hooks_want = hook_manager.wants_typed(EVENT_DIAGNOSTIC_WARNING)
+        event_want = observer_manager.wants(EVENT_DIAGNOSTIC_WARNING) or hook_manager.wants_on_event(EVENT_DIAGNOSTIC_WARNING)
+        has_visible_channel = hooks_want or event_want or hook_manager.fallback_logger_enabled or observer_manager.fallback_logger_enabled
+
+        if has_visible_channel:
+            instrumentation = InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)
+            instrumentation.emit_diagnostic_warning(
+                message=msg,
+                source_id="(run)",
+                field_id="(run)",
+                lookup_key=None,
+                row_id="(run)",
+                sample_once=True,
+            )
+        else:
+            py_warnings.warn(
+                msg,
+                category=ScalimExperimentalWarning,
+                stacklevel=2,
+            )
 
     stats = InternalStatsCollector()
     batch_size = request.batch_size if request.batch_size is not None else demand_ir.batch_size_hint

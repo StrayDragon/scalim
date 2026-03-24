@@ -49,6 +49,7 @@ class ExecutionRuntime:
     load_ref_group_executed: Set[RelationSignature]
     rows_cache_logged: Set[RelationSignature]
     guardrail_logged: Set[Tuple[str, ...]]
+    key_space_mismatch_logged: Set[Tuple[RelationSignature, str]]
     relation_guardrail_stats: Dict[int, Any]
     hook_manager: HookManager
     observer_manager: ObserverManager
@@ -117,6 +118,7 @@ class ExecutionRuntime:
         self.load_ref_group_executed = set()
         self.rows_cache_logged = set()
         self.guardrail_logged = set()
+        self.key_space_mismatch_logged = set()
         self.relation_guardrail_stats = {}
 
     def get_cached_source_mapping(self, step: LookupStepIr) -> LoaderResultMapping:
@@ -136,16 +138,45 @@ class ExecutionRuntime:
 
         # 延迟构建规范化视图(稳定字符串 `key` 空间)用于匹配.
         out: Dict[LookupKey, object] = {}
+        merged_collision_count = 0
         for raw_key, value in mapping.items():
             normalized_key, status, _error_message = auto_str_normalize_key(raw_key)
             if status != "ok" or normalized_key is None:
                 continue
             if normalized_key in out:
-                msg = "key_normalization collision in cached source '{}' (multiple keys normalize to the same stable string key)".format(
-                    source_id
-                )
+                existing_value = out[normalized_key]
+                same_value = False
+                try:
+                    same_value = existing_value == value
+                except Exception:  # noqa: BLE001
+                    same_value = False
+
+                if same_value:
+                    merged_collision_count += 1
+                    continue
+
+                msg = (
+                    "key_normalization collision in cached source '{}' (mode='{}'): "
+                    "multiple keys normalize to the same stable string key but values differ; fail-fast. "
+                    "(redacted: raw keys omitted)"
+                ).format(source_id, self.key_normalization)
                 raise ValueError(msg)
+
             out[normalized_key] = value
+
+        if merged_collision_count:
+            self.instrumentation.emit_diagnostic_warning(
+                message=(
+                    "key_normalization collision in cached source '{}' (mode='{}'): "
+                    "merged {} duplicate keys because values are equal. "
+                    "Consider normalizing loader/cached mapping keys into a single key space. "
+                    "(redacted: raw keys omitted)"
+                ).format(source_id, self.key_normalization, merged_collision_count),
+                source_id=source_id,
+                field_id="(cache)",
+                lookup_key=None,
+                row_id="(cache)",
+            )
 
         self._preloaded_cache_str_views[source_id] = out
         return out
