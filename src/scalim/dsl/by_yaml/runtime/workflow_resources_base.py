@@ -6,11 +6,13 @@
 - 运行时需兼容 `Python 3.6`
 """
 
+import copy
 import os
 import threading
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from ....events.catalog import (
     EVENT_WORKFLOW_RESOURCE_COMMIT,
@@ -34,6 +36,27 @@ class WorkflowWriteError(RuntimeError):
     def __init__(self, message: str, *, diff: Optional[List[str]] = None) -> None:
         super(WorkflowWriteError, self).__init__(message)
         self.diff = list(diff) if diff is not None else None
+
+
+def _clone_exception_for_reraise(exc: BaseException) -> BaseException:
+    try:
+        cloned = copy.copy(exc)
+    except Exception:  # noqa: BLE001
+        cloned = None
+    if isinstance(cloned, BaseException):
+        return cloned
+
+    try:
+        args = getattr(exc, "args", ())
+        return exc.__class__(*args)
+    except Exception:  # noqa: BLE001
+        return exc
+
+
+class _InFlightCreate:
+    def __init__(self) -> None:
+        self.done: threading.Event = threading.Event()
+        self.error: Optional[BaseException] = None
 
 
 def _acquire_write_lock(output_path: str) -> Path:
@@ -71,6 +94,8 @@ class _WorkflowResourceManagerBase(ABC):
     _workbooks: Dict[str, object]
     _csvs: Dict[str, object]
     _sheetbooks: Dict[str, object]
+    _inflight_workbooks: Dict[str, _InFlightCreate]
+    _inflight_csvs: Dict[str, _InFlightCreate]
     _lock: threading.Lock
 
     def __init__(
@@ -90,7 +115,70 @@ class _WorkflowResourceManagerBase(ABC):
         self._workbooks = {}
         self._csvs = {}
         self._sheetbooks = {}
+        self._inflight_workbooks = {}
+        self._inflight_csvs = {}
         self._lock = threading.Lock()
+
+    def _get_or_create_joinable_plan(
+        self,
+        *,
+        resource_id: str,
+        plans: Dict[str, object],
+        inflight: Dict[str, _InFlightCreate],
+        create_fn: Callable[[], object],
+        on_create: Callable[[object], None],
+    ) -> object:
+        key = str(resource_id)
+        with self._lock:
+            existing = plans.get(key)
+            if existing is not None:
+                return existing
+            inflight_state = inflight.get(key)
+            if inflight_state is None:
+                inflight_state = _InFlightCreate()
+                inflight[key] = inflight_state
+                is_owner = True
+            else:
+                is_owner = False
+
+        if not is_owner:
+            _ = inflight_state.done.wait()
+            with self._lock:
+                existing = plans.get(key)
+                if existing is not None:
+                    return existing
+                error = inflight_state.error
+            if error is not None:
+                raise _clone_exception_for_reraise(error)
+            msg = "WorkflowResourceManager internal error: inflight done but missing plan/error for resource_id: {!r}".format(
+                key
+            )  # pragma: no cover
+            raise RuntimeError(msg)  # pragma: no cover
+
+        try:
+            plan = create_fn()
+        except BaseException as exc:
+            stored_error = _clone_exception_for_reraise(exc)
+            with suppress(Exception):
+                stored_error = stored_error.with_traceback(None)
+            with self._lock:
+                inflight_state.error = stored_error
+                if inflight.get(key) is inflight_state:
+                    _ = inflight.pop(key, None)
+            inflight_state.done.set()
+            raise
+
+        with self._lock:
+            plans[key] = plan
+            if inflight.get(key) is inflight_state:
+                _ = inflight.pop(key, None)
+            inflight_state.error = None
+
+        try:
+            on_create(plan)
+        finally:
+            inflight_state.done.set()
+        return plan
 
     def _emit_resource_create(self, *, workflow_node_id: str, resource_type: str, resource_id: str, path: str) -> None:
         _ = self._instrumentation.emit(

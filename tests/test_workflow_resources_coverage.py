@@ -1,11 +1,14 @@
 import csv
 import threading
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pytest
 
 from scalim.dsl.by_yaml.runtime import workflow_resources as resources_mod
+from scalim.dsl.by_yaml.runtime import workflow_resources_base as resources_base_mod
+from scalim.dsl.by_yaml.runtime import workflow_resources_csv as resources_csv_mod
 from scalim.dsl.by_yaml.runtime import workflow_resources_sheetbook as resources_sheetbook_mod
 from scalim.dsl.by_yaml.runtime import workflow_resources_workbook as resources_workbook_mod
 from scalim.events.catalog import (
@@ -37,6 +40,37 @@ def test_release_write_lock_is_best_effort(tmp_path: Path) -> None:
     bad_dir = tmp_path / "lockdir"
     bad_dir.mkdir()
     resources_mod._release_write_lock(bad_dir)
+
+
+def test_clone_exception_for_reraise_handles_fallbacks() -> None:
+    clone = resources_base_mod._clone_exception_for_reraise
+
+    first = clone(resources_mod.WorkflowWriteError("boom"))
+    assert isinstance(first, BaseException)
+
+    class _CopyFails(Exception):
+        def __reduce_ex__(self, _protocol: int) -> object:
+            raise RuntimeError("no copy")
+
+    exc2 = _CopyFails("x")
+    second = clone(exc2)
+    assert isinstance(second, _CopyFails)
+    assert second is not exc2
+    assert second.args == exc2.args
+
+    class _CopyAndCtorFail(Exception):
+        def __reduce_ex__(self, _protocol: int) -> object:
+            raise RuntimeError("no copy")
+
+        def __init__(self, code: int) -> None:
+            if not isinstance(code, int):
+                raise TypeError("code must be int")
+            super(_CopyAndCtorFail, self).__init__(code)
+
+    exc3 = _CopyAndCtorFail(1)
+    exc3.args = ("bad",)  # type: ignore[assignment]
+    third = clone(exc3)
+    assert third is exc3
 
 
 def test_best_effort_close_write_only_workbook_worksheets_handles_variants() -> None:
@@ -632,6 +666,284 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
     if runner.is_alive():
         pytest.fail("WorkflowResourceManager.emit appears to be called under internal locks (reentry deadlock)")
     assert instrumentation._reentered is True
+
+
+def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_acquires_lock_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from openpyxl import load_workbook
+
+    lock_started = threading.Event()
+    lock_continue = threading.Event()
+    lock_calls: List[str] = []
+    orig_acquire_write_lock = resources_workbook_mod.acquire_write_lock
+
+    def _delayed_acquire_write_lock(output_path: str) -> Path:
+        lock_calls.append(str(output_path))
+        lock_started.set()
+        if not lock_continue.wait(timeout=5.0):
+            raise RuntimeError("test timeout waiting to continue acquire_write_lock")
+        return orig_acquire_write_lock(output_path)
+
+    monkeypatch.setattr(resources_workbook_mod, "acquire_write_lock", _delayed_acquire_write_lock)
+
+    instrumentation = _Instrumentation()
+    workbook_path = tmp_path / "report.xlsx"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(workbook_path)},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id", "value"], ["b1", "B1"]])
+
+    errors: List[BaseException] = []
+
+    def _worker(*, workflow_node_id: str, sheet: str, csv_path: Path) -> None:
+        try:
+            manager.apply_workbook_sheet(
+                workflow_node_id=str(workflow_node_id),
+                workbook_id="report",
+                sheet=str(sheet),
+                input_node_id=str(workflow_node_id),
+                input_output_id="detail",
+                input_csv_path=str(csv_path),
+                on_conflict="error",
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=lambda: _worker(workflow_node_id="n1", sheet="S1", csv_path=first))
+    t1.start()
+    assert lock_started.wait(timeout=5.0)
+
+    t2 = threading.Thread(target=lambda: _worker(workflow_node_id="n2", sheet="S2", csv_path=second))
+    t2.start()
+    lock_continue.set()
+
+    t1.join(timeout=5.0)
+    t2.join(timeout=5.0)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert errors == []
+    assert len(lock_calls) == 1
+
+    manager.commit_all()
+
+    wb = load_workbook(str(workbook_path), read_only=True, data_only=True)
+    try:
+        assert "S1" in wb.sheetnames
+        assert "S2" in wb.sheetnames
+        assert list(wb["S1"].iter_rows(values_only=True)) == [("id", "value"), ("a1", "A1")]
+        assert list(wb["S2"].iter_rows(values_only=True)) == [("id", "value"), ("b1", "B1")]
+    finally:
+        with suppress(Exception):
+            wb.close()
+
+
+def test_resource_manager_concurrent_first_csv_write_joins_single_plan_and_acquires_lock_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lock_started = threading.Event()
+    lock_continue = threading.Event()
+    lock_calls: List[str] = []
+    orig_acquire_write_lock = resources_csv_mod.acquire_write_lock
+
+    def _delayed_acquire_write_lock(output_path: str) -> Path:
+        lock_calls.append(str(output_path))
+        lock_started.set()
+        if not lock_continue.wait(timeout=5.0):
+            raise RuntimeError("test timeout waiting to continue acquire_write_lock")
+        return orig_acquire_write_lock(output_path)
+
+    monkeypatch.setattr(resources_csv_mod, "acquire_write_lock", _delayed_acquire_write_lock)
+
+    instrumentation = _Instrumentation()
+    output_path = tmp_path / "merged.csv"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={"merged": str(output_path)},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id", "value"], ["b1", "B1"]])
+
+    errors: List[BaseException] = []
+
+    def _worker(*, workflow_node_id: str, csv_path: Path) -> None:
+        try:
+            manager.apply_csv_append(
+                workflow_node_id=str(workflow_node_id),
+                csv_id="merged",
+                input_node_id=str(workflow_node_id),
+                input_output_id="detail",
+                input_csv_path=str(csv_path),
+                header_policy="once",
+                on_mismatch="error",
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=lambda: _worker(workflow_node_id="n1", csv_path=first))
+    t1.start()
+    assert lock_started.wait(timeout=5.0)
+
+    t2 = threading.Thread(target=lambda: _worker(workflow_node_id="n2", csv_path=second))
+    t2.start()
+    lock_continue.set()
+
+    t1.join(timeout=5.0)
+    t2.join(timeout=5.0)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert errors == []
+    assert len(lock_calls) == 1
+
+    manager.commit_all()
+
+    with output_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle)
+        rows = list(reader)
+    assert rows[0] == ["id", "value"]
+    assert {tuple(row) for row in rows[1:]} == {("a1", "A1"), ("b1", "B1")}
+
+
+def test_resource_manager_concurrent_first_csv_write_lock_failure_wakes_waiters_and_acquires_lock_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lock_started = threading.Event()
+    lock_continue = threading.Event()
+    lock_calls: List[str] = []
+
+    def _fail_acquire_write_lock(output_path: str) -> Path:
+        lock_calls.append(str(output_path))
+        lock_started.set()
+        if not lock_continue.wait(timeout=5.0):
+            raise RuntimeError("test timeout waiting to continue acquire_write_lock")
+        raise resources_mod.WorkflowWriteError("boom")
+
+    monkeypatch.setattr(resources_csv_mod, "acquire_write_lock", _fail_acquire_write_lock)
+
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={"merged": str(tmp_path / "merged.csv")},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id", "value"], ["b1", "B1"]])
+
+    errors: List[BaseException] = []
+
+    def _worker(*, workflow_node_id: str, csv_path: Path) -> None:
+        try:
+            manager.apply_csv_append(
+                workflow_node_id=str(workflow_node_id),
+                csv_id="merged",
+                input_node_id=str(workflow_node_id),
+                input_output_id="detail",
+                input_csv_path=str(csv_path),
+                header_policy="once",
+                on_mismatch="error",
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=lambda: _worker(workflow_node_id="n1", csv_path=first))
+    t1.start()
+    assert lock_started.wait(timeout=5.0)
+
+    t2 = threading.Thread(target=lambda: _worker(workflow_node_id="n2", csv_path=second))
+    t2.start()
+    lock_continue.set()
+
+    t1.join(timeout=5.0)
+    t2.join(timeout=5.0)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert len(lock_calls) == 1
+    assert len(errors) == 2
+    assert all(isinstance(err, resources_mod.WorkflowWriteError) for err in errors)
+    assert all("boom" in str(err) for err in errors)
+
+
+def test_resource_manager_concurrent_first_sheetbook_write_creates_single_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    init_started = threading.Event()
+    init_continue = threading.Event()
+    plan_calls: List[int] = []
+    orig_plan_cls = resources_sheetbook_mod.SheetBookPlan
+
+    def _delayed_plan(*args: object, **kwargs: object) -> Any:  # noqa: ANN401
+        plan_calls.append(1)
+        init_started.set()
+        if not init_continue.wait(timeout=5.0):
+            raise RuntimeError("test timeout waiting to continue SheetBookPlan init")
+        return orig_plan_cls(*args, **kwargs)
+
+    monkeypatch.setattr(resources_sheetbook_mod, "SheetBookPlan", _delayed_plan)
+
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=None,
+                export_write_lock=False,
+            )
+        },
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id", "value"], ["b1", "B1"]])
+
+    errors: List[BaseException] = []
+
+    def _worker(*, workflow_node_id: str, sheet: str, csv_path: Path) -> None:
+        try:
+            manager.apply_sheetbook_sheet(
+                workflow_node_id=str(workflow_node_id),
+                sheetbook_id="sb",
+                sheet=str(sheet),
+                input_node_id=str(workflow_node_id),
+                input_output_id="detail",
+                input_csv_path=str(csv_path),
+                on_conflict="error",
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=lambda: _worker(workflow_node_id="n1", sheet="S1", csv_path=first))
+    t1.start()
+    assert init_started.wait(timeout=5.0)
+
+    t2 = threading.Thread(target=lambda: _worker(workflow_node_id="n2", sheet="S2", csv_path=second))
+    t2.start()
+    init_continue.set()
+
+    t1.join(timeout=5.0)
+    t2.join(timeout=5.0)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert errors == []
+    assert len(plan_calls) == 1
+
+    plan = manager._sheetbooks["sb"]
+    assert set(getattr(plan, "sheets", {}).keys()) == {"S1", "S2"}
 
 
 def test_resource_manager_sheetbook_iter_rows_visibility_and_errors(tmp_path: Path) -> None:

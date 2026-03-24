@@ -227,7 +227,8 @@
           "writes to shared resources are deterministic and serialized",
           "append/merge semantics are explicit and verifiable",
           "shared resources commit atomically at workflow end",
-          "shared resource lifecycle MUST be observable"
+          "shared resource lifecycle MUST be observable",
+          "shared resource plan creation MUST be atomic and joinable within a workflow exec"
         ],
         "slug": "workflow-shared-output-containers"
       },
@@ -240,7 +241,8 @@
           "workflow MUST support exporting a sheetbook to an Excel workbook atomically",
           "demand nodes MUST be able to consume sheetbook sheet rows via a built-in loader",
           "workflow MUST precheck Excel output-path collisions across nodes",
-          "sheetbook lifecycle MUST be observable and joinable"
+          "sheetbook lifecycle MUST be observable and joinable",
+          "sheetbook plan creation MUST be atomic within a workflow exec"
         ],
         "slug": "workflow-sheetbook-resources"
       },
@@ -410,11 +412,11 @@
     },
     {
       "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "8e45b8c1b7c1ee96f3e28676250a83412494b8000ab11d0d8b3254b591bd01c2"
+      "sha256": "c16de5aa93ecc3f2ffb82366c2d5d73e1a7176c1da8d0446550ca9800abc424d"
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-      "sha256": "848748f59a6aef29477d3ef70434a989f4be3214997a9347073d3e7ac4d1e8a8"
+      "sha256": "b802a2a0919121622be07b266b2c29d1edf0239c8ab22a1349dc123042e44699"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -464,7 +466,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "e52c1c97106c1beb6ab7f6ced4e34b76f362672446b22cc22796a6432075b5b3"
+      "sha256": "6b211aa6ab477acc3f6c0b2a7421fc145d253cb57cda7d83d6aefdcaabc3aca9"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

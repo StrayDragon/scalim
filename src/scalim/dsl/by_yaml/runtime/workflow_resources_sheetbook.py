@@ -76,22 +76,21 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             if existing is not None:
                 return existing
 
-        raw_def = self._sheetbook_defs.get(key)
-        if raw_def is None:
-            msg = "Unknown sheetbook resource id: {!r}".format(key)
-            raise WorkflowWriteError(msg)
+            raw_def = self._sheetbook_defs.get(key)
+            if raw_def is None:
+                msg = "Unknown sheetbook resource id: {!r}".format(key)
+                raise WorkflowWriteError(msg)
 
-        raw_def = cast("SheetBookDef", raw_def)
-        plan = _SheetBookPlan(
-            resource_id=str(raw_def.resource_id),
-            budget_max_sheets=int(raw_def.budget_max_sheets),
-            budget_max_total_cells=int(raw_def.budget_max_total_cells),
-            export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
-            export_write_lock=bool(raw_def.export_write_lock),
-            sheet_order=[],
-            sheets={},
-        )
-        with self._lock:
+            raw_def = cast("SheetBookDef", raw_def)
+            plan = SheetBookPlan(
+                resource_id=str(raw_def.resource_id),
+                budget_max_sheets=int(raw_def.budget_max_sheets),
+                budget_max_total_cells=int(raw_def.budget_max_total_cells),
+                export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
+                export_write_lock=bool(raw_def.export_write_lock),
+                sheet_order=[],
+                sheets={},
+            )
             self._sheetbooks[key] = plan
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"

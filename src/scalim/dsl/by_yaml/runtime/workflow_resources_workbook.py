@@ -74,27 +74,38 @@ class _WorkbookPlan:
 class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
     def _get_or_create_workbook(self, workbook_id: str, *, workflow_node_id: str) -> _WorkbookPlan:
         key = str(workbook_id)
-        with self._lock:
-            existing = cast("Optional[_WorkbookPlan]", self._workbooks.get(key))
-            if existing is not None:
-                return existing
 
-        raw_path = self._workbook_defs.get(key)
-        if raw_path is None:
-            msg = "Unknown workbook resource id: {!r}".format(key)
-            raise WorkflowWriteError(msg)
-        lock_path = acquire_write_lock(raw_path)
-        plan = _WorkbookPlan(
+        def _create() -> object:
+            raw_path = self._workbook_defs.get(key)
+            if raw_path is None:
+                msg = "Unknown workbook resource id: {!r}".format(key)
+                raise WorkflowWriteError(msg)
+            lock_path = acquire_write_lock(raw_path)
+            return _WorkbookPlan(
+                resource_id=key,
+                path=str(raw_path),
+                lock_path=lock_path,
+                sheet_order=[],
+                sheets={},
+            )
+
+        def _on_create(plan: object) -> None:
+            p = cast("_WorkbookPlan", plan)
+            self._emit_resource_create(
+                workflow_node_id=str(workflow_node_id),
+                resource_type="workbook",
+                resource_id=key,
+                path=str(p.path),
+            )
+
+        plan = self._get_or_create_joinable_plan(
             resource_id=key,
-            path=str(raw_path),
-            lock_path=lock_path,
-            sheet_order=[],
-            sheets={},
+            plans=self._workbooks,
+            inflight=self._inflight_workbooks,
+            create_fn=_create,
+            on_create=_on_create,
         )
-        with self._lock:
-            self._workbooks[key] = plan
-        self._emit_resource_create(workflow_node_id=str(workflow_node_id), resource_type="workbook", resource_id=key, path=str(raw_path))
-        return plan
+        return cast("_WorkbookPlan", plan)
 
     def apply_workbook_sheet(
         self,

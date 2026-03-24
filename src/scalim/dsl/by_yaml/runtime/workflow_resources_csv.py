@@ -96,21 +96,32 @@ class _CsvPlan:
 class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
     def _get_or_create_csv(self, csv_id: str, *, workflow_node_id: str) -> _CsvPlan:
         key = str(csv_id)
-        with self._lock:
-            existing = cast("Optional[_CsvPlan]", self._csvs.get(key))
-            if existing is not None:
-                return existing
 
-        raw_path = self._csv_defs.get(key)
-        if raw_path is None:
-            msg = "Unknown csv resource id: {!r}".format(key)
-            raise WorkflowWriteError(msg)
-        lock_path = acquire_write_lock(raw_path)
-        plan = _CsvPlan(resource_id=key, path=str(raw_path), lock_path=lock_path)
-        with self._lock:
-            self._csvs[key] = plan
-        self._emit_resource_create(workflow_node_id=str(workflow_node_id), resource_type="csv", resource_id=key, path=str(raw_path))
-        return plan
+        def _create() -> object:
+            raw_path = self._csv_defs.get(key)
+            if raw_path is None:
+                msg = "Unknown csv resource id: {!r}".format(key)
+                raise WorkflowWriteError(msg)
+            lock_path = acquire_write_lock(raw_path)
+            return _CsvPlan(resource_id=key, path=str(raw_path), lock_path=lock_path)
+
+        def _on_create(plan: object) -> None:
+            p = cast("_CsvPlan", plan)
+            self._emit_resource_create(
+                workflow_node_id=str(workflow_node_id),
+                resource_type="csv",
+                resource_id=key,
+                path=str(p.path),
+            )
+
+        plan = self._get_or_create_joinable_plan(
+            resource_id=key,
+            plans=self._csvs,
+            inflight=self._inflight_csvs,
+            create_fn=_create,
+            on_create=_on_create,
+        )
+        return cast("_CsvPlan", plan)
 
     def apply_csv_append(
         self,
