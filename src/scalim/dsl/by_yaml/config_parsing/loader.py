@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Mapping, Optional, Union
+from typing import IO, TYPE_CHECKING, Mapping, Optional, Sequence, Union
 
 from ....vendor.compact.importlibx import require_optional_dependency
 
@@ -59,6 +59,7 @@ class YamlDemandLoader(
         *,
         template_vars: Optional[Mapping[str, object]] = None,
         template_sandbox: str = "safe",
+        allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
     ) -> DemandConfig:
         yaml_path: Optional[Path] = None
         if isinstance(source, (str, Path)):
@@ -85,7 +86,12 @@ class YamlDemandLoader(
         if contains_import_syntax(raw_demand.data):
             if yaml_path is not None:
                 try:
-                    _ = expand_imports_inplace(raw_demand.data, yaml_path=yaml_path, template_vars=template_vars)
+                    _ = expand_imports_inplace(
+                        raw_demand.data,
+                        yaml_path=yaml_path,
+                        template_vars=template_vars,
+                        allowed_yaml_roots=allowed_yaml_roots,
+                    )
                 except YamlImportExpansionError as exc:
                     raise ValueError(str(exc)) from exc
             else:

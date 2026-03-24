@@ -180,7 +180,6 @@ outputs: "oops"
         "\\\\secrets.yaml",
         "C:\\\\secrets.yaml",
         "file:///tmp/x.yaml",
-        "scalim://yaml-dsl/presets/common.yaml",
         "fragments\\\\common.yaml",
         "@/common.yaml",
         "COMMON:/common.yaml",
@@ -207,6 +206,159 @@ sources: {{}}
     assert "imports.common invalid path" in msg
     assert "base_dir=" in msg
     assert "resolved=" in msg
+
+
+def test_imports_scalim_preset_can_be_imported_and_expanded(tmp_path: Path) -> None:
+    demand = tmp_path / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  std: "scalim://yaml-dsl/presets/common.yaml"
+demo:
+  $import: std.demo
+  y: 2
+""".lstrip(),
+        encoding="utf-8",
+    )
+    expanded = load_and_expand_imports(demand)
+    assert expanded["demo"]["x"] == 1
+    assert expanded["demo"]["y"] == 2
+
+
+def test_imports_scalim_yaml_alias_allows_reserved_prefix(tmp_path: Path) -> None:
+    scalim_yaml = tmp_path / "scalim.yaml"
+    scalim_yaml.write_text(
+        """
+yaml_dsl:
+  import_aliases:
+    "@": "./"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    fragments = tmp_path / "fragments"
+    fragments.mkdir(parents=True)
+    common = fragments / "common.yaml"
+    common.write_text(
+        """
+demo:
+  x: 1
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    reports = tmp_path / "reports"
+    reports.mkdir(parents=True)
+    demand = reports / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: "@/fragments/common.yaml"
+demo:
+  $import: f.demo
+  y: 2
+""".lstrip(),
+        encoding="utf-8",
+    )
+    expanded = load_and_expand_imports(demand)
+    assert expanded["demo"]["x"] == 1
+    assert expanded["demo"]["y"] == 2
+
+
+def test_imports_scalim_yaml_import_allowed_roots_rejects_outside(tmp_path: Path) -> None:
+    allowed = tmp_path / "allowed"
+    allowed.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir(parents=True)
+    common = outside / "common.yaml"
+    common.write_text(
+        """
+demo:
+  x: 1
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    scalim_yaml = tmp_path / "scalim.yaml"
+    scalim_yaml.write_text(
+        """
+yaml_dsl:
+  import_allowed_roots:
+    - ./allowed
+""".lstrip(),
+        encoding="utf-8",
+    )
+    demand = tmp_path / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: ./outside/common.yaml
+demo:
+  $import: f.demo
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(YamlImportExpansionError) as excinfo:
+        _ = load_and_expand_imports(demand)
+    msg = str(excinfo.value)
+    assert "YAML path escapes allowed roots" in msg
+    assert "import_allowed_roots" in msg
+    assert str(common.resolve(strict=False)) in msg
+
+
+def test_imports_scalim_yaml_override_disables_upward_search(tmp_path: Path) -> None:
+    outer_scalim_yaml = tmp_path / "scalim.yaml"
+    outer_root = tmp_path / "outer"
+    outer_root.mkdir(parents=True)
+    outer_frag = outer_root / "fragments"
+    outer_frag.mkdir(parents=True)
+    (outer_frag / "common.yaml").write_text("demo:\n  x: 1\n", encoding="utf-8")
+    outer_scalim_yaml.write_text(
+        """
+yaml_dsl:
+  import_aliases:
+    "@": "./outer"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    project_root = tmp_path / "proj"
+    project_root.mkdir(parents=True)
+    inner_root = project_root / "inner"
+    inner_root.mkdir(parents=True)
+    inner_frag = inner_root / "fragments"
+    inner_frag.mkdir(parents=True)
+    (inner_frag / "common.yaml").write_text("demo:\n  x: 2\n", encoding="utf-8")
+    (project_root / "scalim.yaml").write_text(
+        """
+yaml_dsl:
+  import_aliases:
+    "@": "./inner"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    reports = project_root / "reports"
+    reports.mkdir(parents=True)
+    demand = reports / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: "@/fragments/common.yaml"
+demo:
+  $import: f.demo
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    expanded = load_and_expand_imports(demand)
+    assert expanded["demo"]["x"] == 2
+
+    expanded = load_and_expand_imports(demand, scalim_yaml_override=outer_scalim_yaml)
+    assert expanded["demo"]["x"] == 1
+
+    expanded = load_and_expand_imports(demand, project_root_override=tmp_path)
+    assert expanded["demo"]["x"] == 1
 
 
 def test_imports_mapping_resolve_hint_failures_are_handled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -291,8 +443,59 @@ demo:
 """.lstrip(),
         encoding="utf-8",
     )
-    expanded = load_and_expand_imports(demand)
+    with pytest.raises(YamlImportExpansionError) as excinfo:
+        _ = load_and_expand_imports(demand)
+    assert "YAML path escapes allowed roots" in str(excinfo.value)
+    assert "allowed_yaml_roots" in str(excinfo.value)
+
+    expanded = load_and_expand_imports(demand, allowed_yaml_roots=[tmp_path])
     assert expanded["demo"]["x"] == 1
+
+
+def test_imports_symlink_escape_is_rejected_by_default(tmp_path: Path) -> None:
+    reports = tmp_path / "reports"
+    reports.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir(parents=True)
+    secret = outside / "secret.yaml"
+    secret.write_text(
+        """
+demo:
+  x: 1
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    link = reports / "link.yaml"
+    try:
+        link.symlink_to(secret)
+    except OSError:
+        pytest.skip("symlink not supported in current environment")
+
+    demand = reports / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: ./link.yaml
+demo:
+  $import: f.demo
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(YamlImportExpansionError) as excinfo:
+        _ = load_and_expand_imports(demand)
+    assert "YAML path escapes allowed roots" in str(excinfo.value)
+    assert str(secret.resolve(strict=False)) in str(excinfo.value)
+
+
+def test_imports_allowed_yaml_roots_must_exist_and_be_dir(tmp_path: Path) -> None:
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    missing_root = tmp_path / "missing_root"
+    with pytest.raises(ValueError) as excinfo:
+        _ = load_and_expand_imports(demand, allowed_yaml_roots=[missing_root])
+    assert "allowed_yaml_roots must be existing directories" in str(excinfo.value)
 
 
 def test_imports_cycle_detection(tmp_path) -> None:
@@ -767,3 +970,48 @@ sources:
     with pytest.raises(ValueError) as excinfo:
         _ = loader.load(demand)
     assert "Unknown $import alias" in str(excinfo.value)
+
+
+def test_imports_default_allowed_yaml_roots_rejects_path_escape(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    root.mkdir(parents=True)
+
+    frag = tmp_path / "outside.yaml"
+    frag.write_text("x: {a: 1}\n", encoding="utf-8")
+
+    demand = root / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: ../outside.yaml
+demo:
+  $import: f.x
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(YamlImportExpansionError) as excinfo:
+        _ = load_and_expand_imports(demand)
+    assert "allowed_yaml_roots" in str(excinfo.value) or "allowed roots" in str(excinfo.value)
+
+
+def test_imports_allowed_yaml_roots_allows_explicit_parent(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    root.mkdir(parents=True)
+
+    frag = tmp_path / "outside.yaml"
+    frag.write_text("x: {a: 1}\n", encoding="utf-8")
+
+    demand = root / "demand.yaml"
+    demand.write_text(
+        """
+imports:
+  f: ../outside.yaml
+demo:
+  $import: f.x
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    expanded = load_and_expand_imports(demand, allowed_yaml_roots=[tmp_path])
+    assert expanded["demo"]["a"] == 1

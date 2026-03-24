@@ -116,6 +116,13 @@ class RunOptions:
     - `legacy`: 显式放宽(不安全);仅用于可信输入/内部测试.
     """
 
+    allowed_yaml_roots: Optional[Tuple[str, ...]] = None
+    """可选:允许读取 `YAML` 文件的根目录集合.
+
+    - 若为 `None`(默认),仅允许读取入口 `YAML` 所在目录树内的文件.
+    - 若显式提供,仍会自动包含入口 `YAML` 所在目录;用于“受控跨目录复用”(例如 `imports` 或工作流需求引用上层共享目录).
+    """
+
     output_container_path_overrides: Optional[Dict[str, str]] = None
     """可选:按 `output_id` 覆盖 `outputs.*.container.path`(用于工作流托管临时 `CSV` 输出路径注入)."""
 

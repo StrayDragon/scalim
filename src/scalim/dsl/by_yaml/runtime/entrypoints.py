@@ -1,4 +1,4 @@
-from typing import Dict, FrozenSet, List, Mapping, Optional, Union
+from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
@@ -32,6 +32,7 @@ def run(  # noqa: PLR0913
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> RunResult:
     """运行 `YAML DSL`,并支持显式覆盖项与输出 `sink`.
 
@@ -63,6 +64,7 @@ def run(  # noqa: PLR0913
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        allowed_yaml_roots=allowed_yaml_roots,
     )
     compilation = _compile(yaml_path, options=options)
     core = run_ir(compilation.demand_ir, compilation.request)
@@ -88,6 +90,7 @@ def compile(  # noqa: A001, PLR0913
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> Compilation:
     options = RunOptions(
         allowed_modules=allowed_modules,
@@ -106,6 +109,7 @@ def compile(  # noqa: A001, PLR0913
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        allowed_yaml_roots=allowed_yaml_roots,
     )
     return _compile(yaml_path, options=options)
 

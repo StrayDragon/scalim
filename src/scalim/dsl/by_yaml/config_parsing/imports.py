@@ -2,9 +2,10 @@ import copy
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from ....vendor.compact.importlibx import require_optional_dependency
+from .allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
 from .template_precompile import maybe_precompile_yaml_text
 
 if TYPE_CHECKING:
@@ -96,7 +97,12 @@ def _normalize_import_path(raw: str) -> str:
     return value
 
 
-def _parse_imports_mapping(raw: Any, *, base_dir: Path) -> Dict[str, Path]:
+def _parse_imports_mapping(
+    raw: Any,
+    *,
+    base_dir: Path,
+    allowed_yaml_roots: Sequence[Path],
+) -> Dict[str, Path]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
@@ -129,7 +135,15 @@ def _parse_imports_mapping(raw: Any, *, base_dir: Path) -> Dict[str, Path]:
                 exc,
             )
             raise ValueError(msg) from exc
-        imports[str(alias)] = (base_dir / normalized).resolve()
+        resolved_path = (base_dir / normalized).resolve()
+        validate_resolved_yaml_path_within_roots(
+            raw_path=raw_path,
+            base_dir=base_dir,
+            resolved_path=resolved_path,
+            allowed_yaml_roots=allowed_yaml_roots,
+            context_label="imports.{}".format(str(alias)),
+        )
+        imports[str(alias)] = resolved_path
     return imports
 
 
@@ -252,12 +266,21 @@ def expand_imports_inplace(
     yaml_path: Path,
     cache: Optional[Dict[Path, Dict[str, Any]]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
+    allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
 ) -> Dict[str, Any]:
     resolved = yaml_path.resolve()
     if cache is None:
         cache = {}
+    roots = normalize_allowed_yaml_roots(allowed_yaml_roots, default_root=resolved.parent)
     trace: List[ImportTraceItem] = [ImportTraceItem(yaml_path=resolved, via=None)]
-    return _expand_file_inplace(raw, yaml_path=resolved, cache=cache, trace=trace, template_vars=template_vars)
+    return _expand_file_inplace(
+        raw,
+        yaml_path=resolved,
+        cache=cache,
+        trace=trace,
+        template_vars=template_vars,
+        allowed_yaml_roots=roots,
+    )
 
 
 def load_and_expand_imports(
@@ -265,12 +288,14 @@ def load_and_expand_imports(
     *,
     cache: Optional[Dict[Path, Dict[str, Any]]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
+    allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
 ) -> Dict[str, Any]:
     resolved = yaml_path.resolve()
     if cache is None:
         cache = {}
+    roots = normalize_allowed_yaml_roots(allowed_yaml_roots, default_root=resolved.parent)
     trace: List[ImportTraceItem] = [ImportTraceItem(yaml_path=resolved, via=None)]
-    return _load_and_expand_file(resolved, cache=cache, trace=trace, template_vars=template_vars)
+    return _load_and_expand_file(resolved, cache=cache, trace=trace, template_vars=template_vars, allowed_yaml_roots=roots)
 
 
 def _load_yaml_mapping(yaml_path: Path, *, template_vars: Optional[Mapping[str, object]]) -> Dict[str, Any]:
@@ -293,6 +318,7 @@ def _load_and_expand_file(
     cache: Dict[Path, Dict[str, Any]],
     trace: List[ImportTraceItem],
     template_vars: Optional[Mapping[str, object]],
+    allowed_yaml_roots: Sequence[Path],
 ) -> Dict[str, Any]:
     if any(item.yaml_path == yaml_path for item in trace[:-1]):
         msg = "Import cycle detected"
@@ -308,7 +334,14 @@ def _load_and_expand_file(
     except Exception as exc:
         msg = "Failed to load fragment YAML: {}: {}".format(type(exc).__name__, exc)
         raise YamlImportExpansionError(msg, trace=trace, logical_path="") from exc
-    expanded = _expand_file_inplace(data, yaml_path=yaml_path, cache=cache, trace=trace, template_vars=template_vars)
+    expanded = _expand_file_inplace(
+        data,
+        yaml_path=yaml_path,
+        cache=cache,
+        trace=trace,
+        template_vars=template_vars,
+        allowed_yaml_roots=allowed_yaml_roots,
+    )
     cache[yaml_path] = expanded
     return expanded
 
@@ -320,10 +353,11 @@ def _expand_file_inplace(
     cache: Dict[Path, Dict[str, Any]],
     trace: List[ImportTraceItem],
     template_vars: Optional[Mapping[str, object]],
+    allowed_yaml_roots: Sequence[Path],
 ) -> Dict[str, Any]:
     base_dir = yaml_path.parent
     try:
-        imports = _parse_imports_mapping(raw.get(IMPORTS_KEY), base_dir=base_dir)
+        imports = _parse_imports_mapping(raw.get(IMPORTS_KEY), base_dir=base_dir, allowed_yaml_roots=allowed_yaml_roots)
     except Exception as exc:
         msg = "Invalid imports mapping: {}: {}".format(type(exc).__name__, exc)
         raise YamlImportExpansionError(msg, trace=trace, logical_path=IMPORTS_KEY) from exc
@@ -337,6 +371,7 @@ def _expand_file_inplace(
         trace=trace,
         logical_path="",
         template_vars=template_vars,
+        allowed_yaml_roots=allowed_yaml_roots,
     )
     return raw
 
@@ -350,6 +385,7 @@ def _expand_node_inplace(
     trace: List[ImportTraceItem],
     logical_path: str,
     template_vars: Optional[Mapping[str, object]],
+    allowed_yaml_roots: Sequence[Path],
 ) -> None:
     if isinstance(node, dict):
         _expand_mapping_inplace(
@@ -359,6 +395,7 @@ def _expand_node_inplace(
             trace=trace,
             logical_path=logical_path,
             template_vars=template_vars,
+            allowed_yaml_roots=allowed_yaml_roots,
         )
         for key, value in list(cast("Dict[str, Any]", node).items()):
             next_path = "{}.{}".format(logical_path, key) if logical_path else str(key)
@@ -370,6 +407,7 @@ def _expand_node_inplace(
                 trace=trace,
                 logical_path=next_path,
                 template_vars=template_vars,
+                allowed_yaml_roots=allowed_yaml_roots,
             )
         return
     if isinstance(node, list):
@@ -383,6 +421,7 @@ def _expand_node_inplace(
                 trace=trace,
                 logical_path=next_path,
                 template_vars=template_vars,
+                allowed_yaml_roots=allowed_yaml_roots,
             )
         return
 
@@ -395,6 +434,7 @@ def _expand_mapping_inplace(
     trace: List[ImportTraceItem],
     logical_path: str,
     template_vars: Optional[Mapping[str, object]],
+    allowed_yaml_roots: Sequence[Path],
 ) -> None:
     if IMPORT_KEY not in mapping:
         return
@@ -425,7 +465,13 @@ def _expand_mapping_inplace(
             raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
         fragment_path = imports[alias]
         next_trace = [*trace, ImportTraceItem(yaml_path=fragment_path, via="$import {}".format(ref))]
-        imported_file = _load_and_expand_file(fragment_path, cache=cache, trace=next_trace, template_vars=template_vars)
+        imported_file = _load_and_expand_file(
+            fragment_path,
+            cache=cache,
+            trace=next_trace,
+            template_vars=template_vars,
+            allowed_yaml_roots=allowed_yaml_roots,
+        )
         fragment = _select_mapping_fragment(
             imported_file,
             segments=segments,
