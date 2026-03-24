@@ -1,0 +1,38 @@
+# sink-fastpath Specification
+
+## Purpose
+TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
+## Requirements
+### Requirement: Optional aligned-write fastpath interfaces
+系统 MUST 为 sinks 提供可选的 aligned-write fastpath，以减少执行层在写出前构造中间 `dict` 的分配开销。
+
+系统 MUST 定义以下可选接口（方法名为稳定契约）：
+- 对 `IColumnSink`：`write_column_aligned(field_key, row_ids, values)`
+  - `row_ids` 与 `values` MUST 为等长序列
+  - `values[i]` 对应 `row_ids[i]` 的值
+- 对 `IRowSink`：`write_row_aligned(field_keys, values)`
+  - `field_keys` 与 `values` MUST 为等长序列
+  - `values[i]` 对应 `field_keys[i]` 的值
+
+#### Scenario: aligned column write validates lengths
+- **WHEN** `write_column_aligned` 收到长度不一致的 `row_ids` 与 `values`
+- **THEN** sink 实现 MUST fail-fast 抛出错误并指出不一致
+
+### Requirement: Pipeline prefers fastpath when available
+当 sink 支持 aligned-write fastpath 时，pipeline MUST 优先使用 fastpath，并且 MUST 避免构造等价的 `{row_id: value}` / `{field_key: value}` 中间 `dict`。
+
+#### Scenario: column mode uses aligned-write when supported
+- **WHEN** pipeline 运行在列式 sink 且 sink 支持 `write_column_aligned`
+- **THEN** pipeline MUST 通过 aligned-write 写出列数据
+
+#### Scenario: streaming row mode uses aligned-write when supported
+- **WHEN** pipeline 运行在行式流式 sink 且 sink 支持 `write_row_aligned`
+- **THEN** pipeline MUST 通过 aligned-write 写出行数据
+
+### Requirement: Backwards compatible fallback behavior
+当 sink 未实现 aligned-write fastpath 时，pipeline MUST 回退使用现有接口（`write_column`/`write_row` 等），并保持输出语义一致。
+
+#### Scenario: existing sinks still work without fastpath
+- **WHEN** 用户提供的 sink 仅实现现有接口且不包含 aligned-write 方法
+- **THEN** pipeline MUST 仍可运行并产出与 fastpath 语义一致的结果
+

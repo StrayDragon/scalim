@@ -37,6 +37,12 @@ class PandasRowSink(IRowSink):
                 if key not in self.field_names:
                     self.field_names.append(key)
 
+    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
+        if len(field_keys) != len(values):
+            msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
+            raise ValueError(msg)
+        self.write_row(dict(zip(field_keys, values)))
+
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
         for row in rows:
@@ -89,6 +95,18 @@ class PandasColumnSink(IColumnSink):
         if field_key not in self._columns:
             self._columns[field_key] = {}
         self._columns[field_key].update(values)
+        if self._auto_field_names and field_key not in self.field_names:
+            self.field_names.append(field_key)
+
+    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
+        if len(row_ids) != len(values):
+            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            raise ValueError(msg)
+        if field_key not in self._columns:
+            self._columns[field_key] = {}
+        col = self._columns[field_key]
+        for row_id, value in zip(row_ids, values):
+            col[row_id] = value
         if self._auto_field_names and field_key not in self.field_names:
             self.field_names.append(field_key)
 

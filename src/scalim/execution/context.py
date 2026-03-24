@@ -1,10 +1,29 @@
 # region imports
 
-from typing import Callable, Dict, Hashable, List, Optional, Set
+from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 
 from ..typedefs import FieldValue
+from ..vendor.compact.typing_extensionsx import override
 
 # endregion
+
+
+class _DenseFieldStorage:
+    """批次字段的 `Dense` 存储表示: `values` + `present` 掩码.
+
+    说明:
+    - `present[i]==1` 表示该行有值(即使值为 `None`),`present[i]==0` 表示缺失.
+    - 用 `bytearray` 避免缺失哨兵带来的 `pickle` 兼容性问题.
+    """
+
+    values: List[FieldValue]
+    present: bytearray
+    present_count: int
+
+    def __init__(self, row_count: int) -> None:
+        self.values = [None] * int(row_count)
+        self.present = bytearray(int(row_count))
+        self.present_count = 0
 
 
 class BatchContext:
@@ -108,3 +127,182 @@ class BatchContext:
 
     def get_field_count(self) -> int:
         return len(self._data)
+
+
+class DenseBatchContext(BatchContext):
+    """针对连续整数 `row_id` 批次的 `BatchContext` `Dense` 优化实现.
+
+    仅用于批次内 `row_id` 为连续 `int` 的场景(例如 `pipeline` 生成的 `range` 行号)。
+    若需要通用 `row_id`,请使用 `BatchContext`.
+    """
+
+    _base_row_id: int
+    _row_count: int
+    _dense_data: Dict[str, _DenseFieldStorage]
+
+    def __init__(
+        self,
+        *,
+        base_row_id: int,
+        row_count: int,
+        required_fields: Optional[Set[str]] = None,
+        on_field_set: Optional[Callable[[str, Hashable], None]] = None,
+    ) -> None:
+        super(DenseBatchContext, self).__init__(required_fields=required_fields, on_field_set=on_field_set)
+        self._base_row_id = int(base_row_id)
+        self._row_count = int(max(0, row_count))
+        self._dense_data = {}
+
+    def _idx_of(self, row_id: Hashable) -> Optional[int]:
+        if not isinstance(row_id, int):
+            return None
+        idx = int(row_id) - int(self._base_row_id)
+        if idx < 0 or idx >= int(self._row_count):
+            return None
+        return idx
+
+    def _ensure_storage(self, field_key: str) -> _DenseFieldStorage:
+        storage = self._dense_data.get(field_key)
+        if storage is None:
+            storage = _DenseFieldStorage(self._row_count)
+            self._dense_data[field_key] = storage
+        return storage
+
+    @override
+    def set_field_value(self, field_key: str, row_id: Hashable, value: FieldValue) -> None:
+        if self._disabled_rows is not None and row_id in self._disabled_rows:
+            return
+        if self._required_fields is not None and field_key not in self._required_fields:
+            return
+
+        idx = self._idx_of(row_id)
+        if idx is None:
+            # 该实现仅用于连续 `int row_id`;若不满足条件,让调用方回退到通用实现.
+            msg = "`DenseBatchContext` row_id 不在范围内或不是 `int`: {!r}".format(row_id)
+            raise ValueError(msg)
+
+        storage = self._ensure_storage(field_key)
+        if storage.present[idx] == 0:
+            storage.present[idx] = 1
+            storage.present_count += 1
+        storage.values[idx] = value
+
+        if self._on_field_set is not None:
+            self._on_field_set(field_key, row_id)
+
+    @override
+    def get_field_value(self, field_key: str, row_id: Hashable, default: Optional[FieldValue] = None) -> FieldValue:
+        storage = self._dense_data.get(field_key)
+        if storage is None:
+            return default
+        idx = self._idx_of(row_id)
+        if idx is None:
+            return default
+        if storage.present[idx] == 0:
+            return default
+        return storage.values[idx]
+
+    @override
+    def has_field(self, field_key: str) -> bool:
+        return field_key in self._dense_data
+
+    @override
+    def delete_field(self, field_key: str) -> None:
+        if field_key in self._dense_data:
+            del self._dense_data[field_key]
+
+    @override
+    def delete_row_from_field(self, field_key: str, row_id: Hashable) -> None:
+        storage = self._dense_data.get(field_key)
+        if storage is None:
+            return
+        idx = self._idx_of(row_id)
+        if idx is None:
+            return
+        if storage.present[idx] == 0:
+            return
+        storage.present[idx] = 0
+        storage.values[idx] = None
+        storage.present_count -= 1
+        if storage.present_count <= 0:
+            _ = self._dense_data.pop(field_key, None)
+
+    @override
+    def delete_row_from_all_fields(self, row_id: Hashable, exclude_fields: Optional[Set[str]] = None) -> List[str]:
+        exclude = exclude_fields or set()
+        idx = self._idx_of(row_id)
+        if idx is None:
+            return []
+
+        released_fields: List[str] = []
+        for field_key in list(self._dense_data.keys()):
+            if field_key in exclude:
+                continue
+            storage = self._dense_data[field_key]
+            if storage.present[idx] == 0:
+                continue
+            storage.present[idx] = 0
+            storage.values[idx] = None
+            storage.present_count -= 1
+            released_fields.append(field_key)
+            if storage.present_count <= 0:
+                _ = self._dense_data.pop(field_key, None)
+        return released_fields
+
+    @override
+    def get_field_values_for_row(self, row_id: Hashable, field_keys: List[str]) -> Dict[str, FieldValue]:
+        return {key: self.get_field_value(key, row_id) for key in field_keys}
+
+    @override
+    def clear(self) -> None:
+        self._dense_data.clear()
+        if self._disabled_rows:
+            self._disabled_rows.clear()
+
+    @override
+    def get_all_rows_for_field(self, field_key: str) -> Set[Hashable]:
+        storage = self._dense_data.get(field_key)
+        if storage is None:
+            return set()
+        out: Set[Hashable] = set()
+        base = int(self._base_row_id)
+        for idx, present in enumerate(storage.present):
+            if present:
+                out.add(base + idx)
+        return out
+
+    @override
+    def get_field_keys(self) -> Set[str]:
+        return set(self._dense_data.keys())
+
+    @override
+    def get_field_count(self) -> int:
+        return len(self._dense_data)
+
+
+def _try_resolve_dense_range(row_ids: Sequence[Hashable]) -> Optional[Tuple[int, int]]:
+    if not row_ids:
+        return None
+    first = row_ids[0]
+    if not isinstance(first, int):
+        return None
+    base = int(first)
+    for idx, row_id in enumerate(row_ids):
+        if not isinstance(row_id, int):
+            return None
+        if int(row_id) != base + int(idx):
+            return None
+    return base, len(row_ids)
+
+
+def create_batch_context_for_rows(
+    row_ids: Sequence[Hashable],
+    *,
+    required_fields: Optional[Set[str]] = None,
+    on_field_set: Optional[Callable[[str, Hashable], None]] = None,
+) -> BatchContext:
+    resolved = _try_resolve_dense_range(row_ids)
+    if resolved is None:
+        return BatchContext(required_fields=required_fields, on_field_set=on_field_set)
+    base, row_count = resolved
+    return DenseBatchContext(base_row_id=base, row_count=row_count, required_fields=required_fields, on_field_set=on_field_set)

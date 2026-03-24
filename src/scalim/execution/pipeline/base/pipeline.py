@@ -25,9 +25,10 @@ from ....spec.ir.binding import LoaderCallContextIr
 from ....spec.ir.demand import DemandIr
 from ....spec.ir.fields import FieldIr
 from ....spec.ir.helpers import coerce_loader_result_mapping
+from ....spec.ir.sources import SourceIr
 from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, RowData, SinkRowKeySeq
 from ....vendor.compact.typing_extensionsx import override
-from ...context import BatchContext
+from ...context import BatchContext, create_batch_context_for_rows
 from ...executor.batch.executor import BatchExecutor
 from ...executor.helpers.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
 from ...executor.runtime.runtime import ExecutionRuntime
@@ -172,6 +173,24 @@ class Pipeline(ABC):
     ) -> Sequence[RowData]:
         """执行管线."""
 
+    def _preload_cache_get_or_load_or_none(
+        self,
+        *,
+        cache: object,
+        source: SourceIr,
+        source_id: str,
+        rendered_params: LoaderCallKwargs,
+        load_fn: Callable[[], LoaderResultMapping],
+    ) -> Optional[LoaderResultMapping]:
+        """通过 `preloaded_cache.get_or_load` 扩展点加载/复用结果(若不存在则返回 `None`)."""
+        get_or_load = getattr(cache, "get_or_load", None)
+        if not callable(get_or_load):
+            return None
+        if bool(getattr(cache, "signature_guardrail_enabled", False)):
+            digest = build_preload_forever_signature(source, rendered_params=rendered_params).digest()
+            return cast("LoaderResultMapping", get_or_load(source_id, load_fn, signature_digest=digest))
+        return cast("LoaderResultMapping", get_or_load(source_id, load_fn))
+
     def _preload_cached_sources(self) -> None:
         """预加载缓存数据源"""
         for source in self.plan.preload_sources:
@@ -239,9 +258,14 @@ class Pipeline(ABC):
                     cache[source_id] = result_mapping
                     continue
 
-                get_or_load = getattr(cache, "get_or_load", None)
-                if callable(get_or_load):
-                    result_mapping = cast("LoaderResultMapping", get_or_load(source_id, _load_preload_forever_source))
+                result_mapping = self._preload_cache_get_or_load_or_none(
+                    cache=cache,
+                    source=source,
+                    source_id=source_id,
+                    rendered_params=call_kwargs,
+                    load_fn=_load_preload_forever_source,
+                )
+                if result_mapping is not None:
                     cache[source_id] = result_mapping
                     continue
 
@@ -448,7 +472,7 @@ class SeqPipeline(Pipeline):
         - 批次1 (5行): 写入 `col1`(5行) → 释放 → 写入 `col2`(5行) → 释放 → ...
         - 批次2 (5行): 写入 `col1`(5行) → 释放 → 写入 `col2`(5行) → 释放 → ...
         """
-        context = BatchContext(required_fields=self._required_fields)
+        context = create_batch_context_for_rows(row_ids, required_fields=self._required_fields)
         self.runtime.sink = column_sink
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()
@@ -516,16 +540,24 @@ class SeqPipeline(Pipeline):
         if field_key not in self.plan.target_fields:
             return
 
-        col_data: Dict[Hashable, FieldValue] = {}
-        for row_id in row_ids:
-            value = context.get_field_value(field_key, row_id)
-            col_data[row_id] = value
+        write_column_aligned = getattr(column_sink, "write_column_aligned", None)
+        if callable(write_column_aligned):
+            values: List[FieldValue] = [context.get_field_value(field_key, row_id) for row_id in row_ids]
+            aligned_row_ids = cast("SinkRowKeySeq", row_ids)
+            _ = cast("Callable[[str, SinkRowKeySeq, Sequence[FieldValue]], None]", write_column_aligned)(field_key, aligned_row_ids, values)
+            row_count = len(values)
+        else:
+            col_data: Dict[Hashable, FieldValue] = {}
+            for row_id in row_ids:
+                value = context.get_field_value(field_key, row_id)
+                col_data[row_id] = value
 
-        column_sink.write_column(field_key, col_data)
+            column_sink.write_column(field_key, col_data)
+            row_count = len(col_data)
 
         self.runtime.instrumentation.emit_column_write(
             field_key=field_key,
-            row_count=len(col_data),
+            row_count=row_count,
             batch_num=batch_num,
         )
 
@@ -596,7 +628,11 @@ class SeqPipeline(Pipeline):
             allow_release=allow_release,
         )
 
-        context = BatchContext(required_fields=self._required_fields, on_field_set=coordinator.on_field_set)
+        context = create_batch_context_for_rows(
+            row_ids,
+            required_fields=self._required_fields,
+            on_field_set=coordinator.on_field_set,
+        )
         coordinator.attach_context(context)
 
         self.executor.prefill_main_source_fields(context, batch_rows, required_fields=self._required_fields)

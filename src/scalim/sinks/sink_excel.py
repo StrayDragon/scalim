@@ -16,7 +16,7 @@ else:
     _openpyxl = require_optional_dependency("openpyxl", context="scalim.sinks.sink_excel")
     Workbook = _openpyxl.Workbook
 
-from ..typedefs import RowData, SinkRowKeySeq
+from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import Self, override
 from .sink_base import (
     BaseRowSink,
@@ -201,6 +201,12 @@ class ExcelSink(BaseRowSink):
     @override
     def write_row(self, row: RowData) -> None:
         _ = self._worksheet.append(self._format_row(row))
+
+    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
+        if len(field_keys) != len(values):
+            msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
+            raise ValueError(msg)
+        self.write_row(dict(zip(field_keys, values)))
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
@@ -482,6 +488,12 @@ class ColumnExcelSink(IColumnSink):
     @override
     def write_column(self, field_key: str, values: ColumnValues) -> None:
         update_column(self._columns, field_key, values)
+
+    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
+        if len(row_ids) != len(values):
+            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            raise ValueError(msg)
+        self.write_column(field_key, dict(zip(row_ids, values)))
 
     @override
     def write_columns(self, columns: ColumnBatch) -> None:

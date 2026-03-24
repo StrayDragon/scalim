@@ -1,11 +1,13 @@
-from typing import TYPE_CHECKING, Dict, Hashable, List, Sequence, Set
+from typing import TYPE_CHECKING, Dict, Hashable, List, Sequence, Set, cast
 
 from ....sinks.sink_base import IRowSink
 from ...context import BatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
 
 if TYPE_CHECKING:
-    from ....typedefs import RowData
+    from typing import Callable
+
+    from ....typedefs import FieldValue, RowData
 
 
 class RowEmissionCoordinator:
@@ -102,11 +104,18 @@ class RowEmissionCoordinator:
         return int(self._ready_counts.get(row_id, 0)) >= int(self._required_non_global_targets)
 
     def _write_row(self, *, row_id: Hashable, row_index: int) -> None:
-        row: "RowData" = self._context.get_field_values_for_row(row_id, self._target_fields)
-        self._sink.write_row(row)
+        write_row_aligned = getattr(self._sink, "write_row_aligned", None)
+        if callable(write_row_aligned):
+            values: List["FieldValue"] = [self._context.get_field_value(field_key, row_id) for field_key in self._target_fields]
+            _ = cast("Callable[[Sequence[str], Sequence[FieldValue]], None]", write_row_aligned)(self._target_fields, values)
+            field_count = len(self._target_fields)
+        else:
+            row: "RowData" = self._context.get_field_values_for_row(row_id, self._target_fields)
+            self._sink.write_row(row)
+            field_count = len(row)
         self._runtime.instrumentation.emit_row_write(
             row_id=row_id,
-            field_count=len(row),
+            field_count=field_count,
             batch_num=self._runtime.batch_num,
             row_index=int(row_index),
         )

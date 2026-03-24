@@ -5,7 +5,7 @@ import io
 import logging
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 from .._internal.loggingx import prefix
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
@@ -90,6 +90,8 @@ class CSVSink(BaseRowSink):
     _writer: Any
     _temp_path: str
     _open_fn: Callable[..., io.TextIOWrapper]
+    _aligned_cache_field_keys: Optional[Tuple[str, ...]]
+    _aligned_cache_indexes: Optional[List[Optional[int]]]
 
     def __init__(
         self,
@@ -134,6 +136,8 @@ class CSVSink(BaseRowSink):
         self._writer = csv.writer(self._file, delimiter=self.delimiter)
         if self.include_header:
             self._write_header()
+        self._aligned_cache_field_keys = None
+        self._aligned_cache_indexes = None
 
     def _write_header(self) -> None:
         self._writer.writerow(self.header_names)
@@ -154,6 +158,28 @@ class CSVSink(BaseRowSink):
     @override
     def write_row(self, row: RowData) -> None:
         self._writer.writerow(self._format_row(row))
+        self._maybe_flush(1)
+
+    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
+        if len(field_keys) != len(values):
+            msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
+            raise ValueError(msg)
+
+        cache_keys = self._aligned_cache_field_keys
+        field_keys_tuple = tuple(field_keys)
+        if cache_keys != field_keys_tuple:
+            index_by_key: Dict[str, int] = {key: i for i, key in enumerate(field_keys_tuple)}
+            self._aligned_cache_field_keys = field_keys_tuple
+            self._aligned_cache_indexes = [index_by_key.get(name) for name in self.field_names]
+
+        indexes = self._aligned_cache_indexes or []
+        row_values: List[str] = []
+        for idx in indexes:
+            if idx is None:
+                row_values.append("")
+            else:
+                row_values.append(_normalize_csv_value(values[idx]))
+        self._writer.writerow(row_values)
         self._maybe_flush(1)
 
     @override
@@ -255,6 +281,16 @@ class ColumnCSVSink(IColumnSink):
     @override
     def write_column(self, field_key: str, values: ColumnValues) -> None:
         update_column(self._columns, field_key, values)
+
+    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
+        if len(row_ids) != len(values):
+            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            raise ValueError(msg)
+        if field_key not in self._columns:
+            self._columns[field_key] = {}
+        col = self._columns[field_key]
+        for row_id, value in zip(row_ids, values):
+            col[row_id] = value
 
     @override
     def write_columns(self, columns: ColumnBatch) -> None:
@@ -474,6 +510,28 @@ class BlockColumnCSVSink(IColumnSink):
         if self._file is None:
             return
         for pk, value in values.items():
+            row_index = self._pk_to_index.get(pk)
+            if row_index is not None:
+                self._write_cell(row_index, col_index, value)
+
+        self._file.flush()
+
+        if self._write_delay > 0:
+            time.sleep(self._write_delay)
+
+    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
+        if len(row_ids) != len(values):
+            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            raise ValueError(msg)
+        if not self._initialized:
+            msg = "必须先调用 set_row_ids"
+            raise RuntimeError(msg)
+
+        col_index = self._field_to_col_index.get(field_key)
+        if col_index is None or self._file is None:
+            return
+
+        for pk, value in zip(row_ids, values):
             row_index = self._pk_to_index.get(pk)
             if row_index is not None:
                 self._write_cell(row_index, col_index, value)

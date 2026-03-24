@@ -16,7 +16,7 @@ from ....sinks.sink_base import ISink
 from ....typedefs import FieldValue, RowData
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
 from ...adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
-from ...context import BatchContext
+from ...context import BatchContext, create_batch_context_for_rows
 from ...pipeline.overrides import PipelineOverrides
 from ..operators.base import OperatorExecutor
 from ..operators.compute.executor import ComputeOperatorExecutor
@@ -87,7 +87,7 @@ class BatchExecutor:
         *,
         adaptive_pool: Optional[Executor] = None,
     ) -> List[RowData]:
-        context = BatchContext(required_fields=required_fields)
+        context = create_batch_context_for_rows(batch_row_nth, required_fields=required_fields)
         self.runtime.sink = sink
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()
