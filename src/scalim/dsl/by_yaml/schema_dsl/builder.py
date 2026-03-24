@@ -625,13 +625,23 @@ class SchemaBuilder:
                 "  - `./x.yaml` / `x.yaml`\n"
                 "  - `x/y.yaml`(子目录)\n"
                 "  - `../x.yaml`(父目录)\n"
-                "- 禁止: 绝对路径/任意 URI scheme(`*://...`)/预留 alias 前缀(例如 `@/x.yaml`, `COMMON:/x.yaml`)"
+                "- 支持(编辑器侧放宽,运行时校验为准):\n"
+                "  - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)\n"
+                "  - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)\n"
+                "- 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等"
             ),
             "propertyNames": {"type": "string", "pattern": r"^[a-zA-Z_][a-zA-Z0-9_]*$"},
             "additionalProperties": {
                 "type": "string",
                 # 说明: 更严格的边界与诊断以运行时实现为准(例如拒绝 `URI scheme`/绝对路径).
-                "pattern": r"^(?!@)(\./|\.\./)*([^/\\:]+/)*[^/\\:]+\.ya?ml$",
+                "pattern": (
+                    r"^("
+                    r"(\./|\.\./)*([^/\\:]+/)*[^/\\:]+\.ya?ml"
+                    r"|@/([^/\\:]+/)*[^/\\:]+\.ya?ml"
+                    r"|[a-zA-Z_][a-zA-Z0-9_]*:/([^/\\:]+/)*[^/\\:]+\.ya?ml"
+                    r"|scalim://[^\\s\\\\]+\.ya?ml"
+                    r")$"
+                ),
             },
         }
 

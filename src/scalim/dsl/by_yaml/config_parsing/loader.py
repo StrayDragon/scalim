@@ -60,6 +60,8 @@ class YamlDemandLoader(
         template_vars: Optional[Mapping[str, object]] = None,
         template_sandbox: str = "safe",
         allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
+        scalim_yaml_override: Optional[Union[str, Path]] = None,
+        project_root_override: Optional[Union[str, Path]] = None,
     ) -> DemandConfig:
         yaml_path: Optional[Path] = None
         if isinstance(source, (str, Path)):
@@ -90,7 +92,10 @@ class YamlDemandLoader(
                         raw_demand.data,
                         yaml_path=yaml_path,
                         template_vars=template_vars,
+                        template_sandbox=template_sandbox,
                         allowed_yaml_roots=allowed_yaml_roots,
+                        scalim_yaml_override=scalim_yaml_override,
+                        project_root_override=project_root_override,
                     )
                 except YamlImportExpansionError as exc:
                     raise ValueError(str(exc)) from exc

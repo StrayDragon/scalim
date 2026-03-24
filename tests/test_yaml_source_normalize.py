@@ -308,7 +308,7 @@ def test_converter_rejects_unknown_normalize_kind() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -324,7 +324,7 @@ def test_converter_rejects_missing_normalize_key_field() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -340,7 +340,7 @@ def test_converter_rejects_invalid_normalize_on_conflict() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -356,7 +356,7 @@ def test_converter_rejects_normalize_for_composite_key() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -372,7 +372,7 @@ def test_converter_rejects_normalize_key_field_mismatch() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -499,7 +499,7 @@ def test_converter_converts_take_first_normalize() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -517,7 +517,7 @@ def test_converter_rejects_take_first_invalid_on_empty() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -533,7 +533,7 @@ def test_converter_rejects_normalize_call_by_empty() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -548,7 +548,7 @@ def test_converter_converts_project_fields_normalize() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeProjectFieldRuleConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -574,7 +574,7 @@ def test_converter_rejects_project_fields_invalid_on_missing() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -590,7 +590,7 @@ def test_converter_rejects_project_fields_empty_rules() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -606,7 +606,7 @@ def test_converter_rejects_project_fields_invalid_rule_shapes() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeProjectFieldRuleConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
 
     source_config = SourceConfig(
         source_id="s1",
@@ -650,7 +650,7 @@ def test_converter_rejects_map_values_empty_steps() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     source_config = SourceConfig(
         source_id="s1",
         loader="tests.conftest.mock_loader",
@@ -666,7 +666,7 @@ def test_converter_rejects_map_values_step_invalid_configs() -> None:
     from scalim.dsl.by_yaml.runtime.errors import ConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeStepConfig, SourceConfig
 
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
 
     source_config = SourceConfig(
         source_id="s1",

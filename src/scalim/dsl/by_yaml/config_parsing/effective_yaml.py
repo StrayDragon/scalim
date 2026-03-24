@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Union
 
 from ....vendor.compact.importlibx import require_optional_dependency
 from ....vendor.compact.typing_extensionsx import override
@@ -25,6 +25,10 @@ def load_effective_demand_yaml(
     yaml_path: Union[str, Path],
     *,
     template_vars: Optional[Mapping[str, object]] = None,
+    template_sandbox: str = "safe",
+    allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Any]:
     """把需求 `YAML` 渲染为 `effective YAML`(展开 `template_vars` + `imports/$import`).
 
@@ -34,7 +38,14 @@ def load_effective_demand_yaml(
     - 输出映射不再包含 `imports`/`$import`(已展开).
     """
     path = Path(yaml_path).resolve()
-    return load_and_expand_imports(path, template_vars=template_vars)
+    return load_and_expand_imports(
+        path,
+        template_vars=template_vars,
+        template_sandbox=template_sandbox,
+        allowed_yaml_roots=allowed_yaml_roots,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+    )
 
 
 class _NoAliasSafeDumper(yaml.SafeDumper):  # type: ignore[name-defined]

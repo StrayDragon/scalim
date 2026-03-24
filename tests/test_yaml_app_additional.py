@@ -66,6 +66,43 @@ outputs:
     assert result["field_name_mapping"]["profit"] == "Profit"
 
 
+def test_load_output_config_default_aggregate_output_fields_includes_compute_and_matches_runtime_default(tmp_path: Path) -> None:
+    from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.by_yaml.runtime import output_composition_yaml as oc_yaml
+
+    yaml_path = _write_yaml(
+        tmp_path,
+        "export_agg.yaml",
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    customer_id: {extract: customer_id}
+    amount: {extract: amount}
+sources: {}
+outputs:
+  - name: summary
+    container: {type: csv, path: ./out.csv}
+    aggregate:
+      group_by: [customer_id]
+      fields:
+        order_cnt: {count: {}}
+        sum_amount: {sum: {field: amount}}
+        avg_amount: {compute: "sum_amount / order_cnt"}
+""",
+    )
+
+    result = load_output_config(str(yaml_path))
+    assert result["output_fields"] == ["customer_id", "order_cnt", "sum_amount", "avg_amount"]
+
+    config = YamlDemandLoader().load(str(yaml_path))
+    assert config.outputs is not None
+    assert config.outputs[0].aggregate is not None
+    assert result["output_fields"] == list(oc_yaml._derived_output_layout_fields(config.outputs[0].aggregate))  # noqa: SLF001
+
+
 @pytest.mark.parametrize(
     "filename,content,error_match",
     [

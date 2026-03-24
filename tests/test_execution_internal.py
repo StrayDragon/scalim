@@ -15,6 +15,7 @@ from scalim.ob.manager import ObserverManager
 from scalim.planning import PlanBuilder
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
+from scalim.sinks.sink_base import IColumnSink
 from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir.demand import DemandIr
@@ -644,6 +645,73 @@ def test_row_emission_coordinator_finalize_writes_rows_even_when_not_ready() -> 
     assert sink.get_data() == [{"a": 1}]
 
 
+def test_row_emission_coordinator_falls_back_when_write_row_aligned_missing() -> None:
+    class _NoAlignedRowSink:  # noqa: D401
+        def __init__(self) -> None:
+            self.rows = []
+
+        def write_row(self, row) -> None:  # type: ignore[no-untyped-def]
+            self.rows.append(dict(row))
+
+        def close(self) -> None:
+            return
+
+    plan = _make_plan({}, ["a"])
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
+    sink = _NoAlignedRowSink()
+    coordinator = RowEmissionCoordinator(
+        runtime=runtime,
+        sink=sink,  # type: ignore[arg-type]
+        target_fields=["a"],
+        retained_fields=set(),
+        global_ready_fields=set(),
+        allow_release=True,
+    )
+    ctx = BatchContext()
+    ctx.set_field_value("a", 0, 1)
+    coordinator.attach_context(ctx)
+    coordinator.set_write_order([0])
+
+    coordinator.on_field_set("a", 0)
+
+    assert sink.rows == [{"a": 1}]
+
+
+def test_row_emission_coordinator_prefers_write_row_aligned_when_supported() -> None:
+    class _AlignedOnlyRowSink:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def write_row(self, _row) -> None:  # type: ignore[no-untyped-def]
+            raise AssertionError("should prefer write_row_aligned")
+
+        def write_row_aligned(self, field_keys, values) -> None:  # type: ignore[no-untyped-def]
+            self.calls.append((list(field_keys), list(values)))
+
+        def close(self) -> None:
+            return
+
+    plan = _make_plan({}, ["a"])
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
+    sink = _AlignedOnlyRowSink()
+    coordinator = RowEmissionCoordinator(
+        runtime=runtime,
+        sink=sink,  # type: ignore[arg-type]
+        target_fields=["a"],
+        retained_fields=set(),
+        global_ready_fields=set(),
+        allow_release=True,
+    )
+    ctx = BatchContext()
+    ctx.set_field_value("a", 0, 1)
+    coordinator.attach_context(ctx)
+    coordinator.set_write_order([0])
+
+    coordinator.on_field_set("a", 0)
+
+    assert sink.calls == [(["a"], [1])]
+
+
 def test_pipeline_streaming_order_by_sorts_rows_and_stable() -> None:
     main_source = MainSourceIr(
         source_id="main",
@@ -752,3 +820,73 @@ def test_pipeline_column_mode_emits_column_events() -> None:
 
     assert len(hook.column_writes) == 1
     assert len(hook.field_slims) == 1
+
+
+def test_pipeline_column_write_falls_back_when_aligned_missing() -> None:
+    class _NoAlignedColumnSink(IColumnSink):
+        def __init__(self) -> None:
+            self.row_ids = []
+            self.columns = {}
+
+        def set_row_ids(self, row_ids):  # type: ignore[no-untyped-def]
+            self.row_ids.extend(row_ids)
+
+        def write_column(self, field_key, values) -> None:  # type: ignore[no-untyped-def]
+            self.columns[field_key] = dict(values)
+
+        def write_columns(self, columns) -> None:  # type: ignore[no-untyped-def]
+            for field_key, values in columns.items():
+                self.write_column(field_key, values)
+
+        def close(self) -> None:
+            return
+
+    main_source = _make_main_source()
+    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
+    plan = _make_plan({"id": field_spec}, ["id"])
+    pipeline = _make_pipeline(plan, demand, main_source)
+
+    ctx = BatchContext()
+    ctx.set_field_value("id", 0, 1)
+
+    sink = _NoAlignedColumnSink()
+    pipeline._write_column_if_target("id", [0], ctx, sink, batch_num=1)
+
+    assert sink.columns == {"id": {0: 1}}
+
+
+def test_pipeline_column_write_prefers_aligned_when_supported() -> None:
+    class _AlignedOnlyColumnSink(IColumnSink):
+        def __init__(self) -> None:
+            self.calls = []
+
+        def set_row_ids(self, _row_ids):  # type: ignore[no-untyped-def]
+            return
+
+        def write_column(self, _field_key, _values) -> None:  # type: ignore[no-untyped-def]
+            raise AssertionError("should prefer write_column_aligned")
+
+        def write_column_aligned(self, field_key, row_ids, values) -> None:  # type: ignore[no-untyped-def]
+            self.calls.append((field_key, list(row_ids), list(values)))
+
+        def write_columns(self, columns) -> None:  # type: ignore[no-untyped-def]
+            for field_key, values in columns.items():
+                self.write_column(field_key, values)
+
+        def close(self) -> None:
+            return
+
+    main_source = _make_main_source()
+    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
+    plan = _make_plan({"id": field_spec}, ["id"])
+    pipeline = _make_pipeline(plan, demand, main_source)
+
+    ctx = BatchContext()
+    ctx.set_field_value("id", 0, 1)
+
+    sink = _AlignedOnlyColumnSink()
+    pipeline._write_column_if_target("id", [0], ctx, sink, batch_num=1)
+
+    assert sink.calls == [("id", [0], [1])]

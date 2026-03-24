@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, 
 
 from ....vendor.compact.importlibx import require_optional_dependency
 from .allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
+from .presets import load_scalim_preset_yaml_text
+from .project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
 from .template_precompile import maybe_precompile_yaml_text
 
 if TYPE_CHECKING:
@@ -26,11 +28,20 @@ _SEGMENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _URI_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 _WINDOWS_DRIVE_RE = re.compile(r"^[a-zA-Z]:")
 _RESERVED_ALIAS_PREFIX_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*:/")
+_SCALIM_SCHEME_PREFIX = "scalim://"
+
+
+@dataclass(frozen=True)
+class ImportSource:
+    kind: str
+    key: str
+    path: Optional[Path] = None
+    preset_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class ImportTraceItem:
-    yaml_path: Path
+    source: str
     via: Optional[str] = None
 
 
@@ -62,10 +73,10 @@ class YamlImportExpansionError(ValueError):
 def _format_trace(trace: Tuple[ImportTraceItem, ...]) -> str:
     if not trace:
         return ""
-    parts: List[str] = [str(trace[0].yaml_path)]
+    parts: List[str] = [str(trace[0].source)]
     for item in trace[1:]:
         via = str(item.via) if item.via else "import"
-        parts.append("--{}--> {}".format(via, item.yaml_path))
+        parts.append("--{}--> {}".format(via, item.source))
     return " ".join(parts)
 
 
@@ -97,19 +108,118 @@ def _normalize_import_path(raw: str) -> str:
     return value
 
 
+def _parse_scalim_preset_uri(raw: str) -> str:
+    uri = str(raw or "").strip()
+    if not uri.startswith(_SCALIM_SCHEME_PREFIX):
+        msg = "Expected scalim:// preset URI, got: '{}'".format(uri)
+        raise ValueError(msg)
+    preset_id = uri[len(_SCALIM_SCHEME_PREFIX) :].lstrip("/")
+    if not preset_id:
+        msg = "scalim:// preset id cannot be empty"
+        raise ValueError(msg)
+    return preset_id
+
+
+def _apply_import_aliases(raw_path: str, *, project_config: Optional[YamlDslProjectConfig]) -> Optional[Tuple[str, Path]]:
+    if project_config is None:
+        return None
+    aliases = dict(getattr(project_config, "import_aliases", {}) or {})
+    if not aliases:
+        return None
+
+    value = str(raw_path or "")
+    matches: List[Tuple[int, str, Path]] = []
+    for alias, dir_path in aliases.items():
+        alias_text = str(alias or "").strip()
+        if not alias_text:
+            continue
+        if alias_text.startswith("@"):
+            token = "{}{}".format(alias_text, "/")
+        else:
+            token = "{}{}".format(alias_text, ":/")
+        if value.startswith(token):
+            matches.append((len(token), token, dir_path))
+    if not matches:
+        return None
+    matches.sort(key=lambda item: (-item[0], item[1]))
+    _, token, dir_path = matches[0]
+    remainder = value[len(token) :].lstrip("/")
+    return remainder, dir_path
+
+
+def _parse_import_source(
+    alias: str,
+    raw_path: str,
+    *,
+    base_dir: Optional[Path],
+    project_config: Optional[YamlDslProjectConfig],
+    allowed_yaml_roots: Sequence[Path],
+) -> ImportSource:
+    if raw_path.startswith(_SCALIM_SCHEME_PREFIX):
+        preset_id = _parse_scalim_preset_uri(raw_path)
+        return ImportSource(kind="preset", key=str(raw_path), preset_id=preset_id)
+
+    if base_dir is None:
+        msg = "imports file paths require base_dir"
+        raise ValueError(msg)
+
+    path_for_normalize = raw_path
+    resolve_base_dir = base_dir
+    rewrite = _apply_import_aliases(raw_path, project_config=project_config)
+    if rewrite is not None:
+        path_for_normalize, resolve_base_dir = rewrite
+
+    try:
+        normalized = _normalize_import_path(path_for_normalize)
+    except Exception as exc:
+        resolved: Optional[Path] = None
+        try:
+            resolved = (resolve_base_dir / path_for_normalize).resolve()
+        except Exception:  # noqa: BLE001
+            resolved = None
+        msg = "imports.{} invalid path: raw='{}' | base_dir='{}' | resolved='{}' | {}: {}".format(
+            alias,
+            raw_path,
+            str(resolve_base_dir),
+            str(resolved) if resolved is not None else "(unknown)",
+            type(exc).__name__,
+            exc,
+        )
+        raise ValueError(msg) from exc
+
+    resolved = (resolve_base_dir / normalized).resolve()
+    validate_resolved_yaml_path_within_roots(
+        raw_path=raw_path,
+        base_dir=resolve_base_dir,
+        resolved_path=resolved,
+        allowed_yaml_roots=allowed_yaml_roots,
+        context_label="imports.{}".format(str(alias)),
+    )
+    if project_config is not None and project_config.import_allowed_roots:
+        validate_resolved_yaml_path_within_roots(
+            raw_path=raw_path,
+            base_dir=project_config.project_root,
+            resolved_path=resolved,
+            allowed_yaml_roots=project_config.import_allowed_roots,
+            context_label="imports.{}(import_allowed_roots)".format(str(alias)),
+        )
+    return ImportSource(kind="file", key=str(resolved), path=resolved)
+
+
 def _parse_imports_mapping(
     raw: Any,
     *,
-    base_dir: Path,
+    base_dir: Optional[Path],
+    project_config: Optional[YamlDslProjectConfig],
     allowed_yaml_roots: Sequence[Path],
-) -> Dict[str, Path]:
+) -> Dict[str, ImportSource]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
         msg = "imports must be a mapping"
         raise TypeError(msg)
     raw_dict = cast("Dict[str, Any]", raw)
-    imports: Dict[str, Path] = {}
+    imports: Dict[str, ImportSource] = {}
     for alias, path_raw in raw_dict.items():
         if not isinstance(alias, str) or not alias.strip():
             msg = "imports alias must be a non-empty string"
@@ -117,33 +227,14 @@ def _parse_imports_mapping(
         if not isinstance(path_raw, str) or not str(path_raw).strip():
             msg = "imports.{} path must be a non-empty string".format(alias)
             raise TypeError(msg)
-        raw_path = str(path_raw)
-        try:
-            normalized = _normalize_import_path(raw_path)
-        except Exception as exc:
-            resolved: Optional[Path] = None
-            try:
-                resolved = (base_dir / raw_path).resolve()
-            except Exception:  # noqa: BLE001
-                resolved = None
-            msg = "imports.{} invalid path: raw='{}' | base_dir='{}' | resolved='{}' | {}: {}".format(
-                alias,
-                raw_path,
-                str(base_dir),
-                str(resolved) if resolved is not None else "(unknown)",
-                type(exc).__name__,
-                exc,
-            )
-            raise ValueError(msg) from exc
-        resolved_path = (base_dir / normalized).resolve()
-        validate_resolved_yaml_path_within_roots(
-            raw_path=raw_path,
+        raw_path = str(path_raw).strip()
+        imports[str(alias)] = _parse_import_source(
+            str(alias),
+            raw_path,
             base_dir=base_dir,
-            resolved_path=resolved_path,
+            project_config=project_config,
             allowed_yaml_roots=allowed_yaml_roots,
-            context_label="imports.{}".format(str(alias)),
         )
-        imports[str(alias)] = resolved_path
     return imports
 
 
@@ -264,46 +355,112 @@ def expand_imports_inplace(
     raw: Dict[str, Any],
     *,
     yaml_path: Path,
-    cache: Optional[Dict[Path, Dict[str, Any]]] = None,
+    cache: Optional[Dict[str, Dict[str, Any]]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
+    template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Any]:
     resolved = yaml_path.resolve()
     if cache is None:
         cache = {}
-    roots = normalize_allowed_yaml_roots(allowed_yaml_roots, default_root=resolved.parent)
-    trace: List[ImportTraceItem] = [ImportTraceItem(yaml_path=resolved, via=None)]
+    project_config = load_yaml_dsl_project_config(
+        resolved,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+    )
+    roots = _compute_allowed_yaml_roots(
+        entry_yaml_path=resolved,
+        project_config=project_config,
+        allowed_yaml_roots=allowed_yaml_roots,
+    )
+    trace: List[ImportTraceItem] = [ImportTraceItem(source=str(resolved), via=None)]
+    source = ImportSource(kind="file", key=str(resolved), path=resolved)
     return _expand_file_inplace(
         raw,
-        yaml_path=resolved,
+        source=source,
         cache=cache,
         trace=trace,
+        logical_path="",
         template_vars=template_vars,
+        template_sandbox=template_sandbox,
         allowed_yaml_roots=roots,
+        project_config=project_config,
     )
 
 
 def load_and_expand_imports(
     yaml_path: Path,
     *,
-    cache: Optional[Dict[Path, Dict[str, Any]]] = None,
+    cache: Optional[Dict[str, Dict[str, Any]]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
+    template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Any]:
     resolved = yaml_path.resolve()
     if cache is None:
         cache = {}
-    roots = normalize_allowed_yaml_roots(allowed_yaml_roots, default_root=resolved.parent)
-    trace: List[ImportTraceItem] = [ImportTraceItem(yaml_path=resolved, via=None)]
-    return _load_and_expand_file(resolved, cache=cache, trace=trace, template_vars=template_vars, allowed_yaml_roots=roots)
+    project_config = load_yaml_dsl_project_config(
+        resolved,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+    )
+    roots = _compute_allowed_yaml_roots(
+        entry_yaml_path=resolved,
+        project_config=project_config,
+        allowed_yaml_roots=allowed_yaml_roots,
+    )
+    trace: List[ImportTraceItem] = [ImportTraceItem(source=str(resolved), via=None)]
+    source = ImportSource(kind="file", key=str(resolved), path=resolved)
+    return _load_and_expand_source(
+        source,
+        cache=cache,
+        trace=trace,
+        template_vars=template_vars,
+        template_sandbox=template_sandbox,
+        allowed_yaml_roots=roots,
+        project_config=project_config,
+    )
 
 
-def _load_yaml_mapping(yaml_path: Path, *, template_vars: Optional[Mapping[str, object]]) -> Dict[str, Any]:
+def _compute_allowed_yaml_roots(
+    *,
+    entry_yaml_path: Path,
+    project_config: Optional[YamlDslProjectConfig],
+    allowed_yaml_roots: Optional[Sequence[Union[str, Path]]],
+) -> Tuple[Path, ...]:
+    """计算 `imports` 展开所使用的 `allowed_yaml_roots`.
+
+    规则:
+    - 若调用方显式提供 `allowed_yaml_roots`,则以调用方为准(并强制包含入口 `YAML` 的目录).
+    - 若未显式提供,则允许 `scalim.yaml` 通过 `import_aliases`/`import_allowed_roots` 显式扩展允许范围.
+    """
+    base_dir = entry_yaml_path.resolve(strict=False).parent
+    if allowed_yaml_roots is not None:
+        return normalize_allowed_yaml_roots(allowed_yaml_roots, default_root=base_dir)
+
+    extras: List[Path] = []
+    if project_config is not None:
+        extras = list(project_config.import_aliases.values())
+        extras.extend(project_config.import_allowed_roots)
+    return normalize_allowed_yaml_roots(extras, default_root=base_dir)
+
+
+def _load_yaml_mapping(
+    yaml_path: Path,
+    *,
+    template_vars: Optional[Mapping[str, object]],
+    template_sandbox: str,
+) -> Dict[str, Any]:
     text = yaml_path.read_text(encoding="utf-8")
     text = maybe_precompile_yaml_text(
         text,
         template_vars=template_vars,
         context_label="导入片段 `YAML` 文件 `{}`".format(str(yaml_path)),
+        template_sandbox=template_sandbox,
     )
     loaded = yaml.safe_load(text)
     if not isinstance(loaded, dict):
@@ -312,52 +469,100 @@ def _load_yaml_mapping(yaml_path: Path, *, template_vars: Optional[Mapping[str, 
     return cast("Dict[str, Any]", loaded)
 
 
-def _load_and_expand_file(
-    yaml_path: Path,
+def _load_and_expand_source(
+    source: ImportSource,
     *,
-    cache: Dict[Path, Dict[str, Any]],
+    cache: Dict[str, Dict[str, Any]],
     trace: List[ImportTraceItem],
     template_vars: Optional[Mapping[str, object]],
+    template_sandbox: str,
     allowed_yaml_roots: Sequence[Path],
+    project_config: Optional[YamlDslProjectConfig],
 ) -> Dict[str, Any]:
-    if any(item.yaml_path == yaml_path for item in trace[:-1]):
+    if any(item.source == source.key for item in trace[:-1]):
         msg = "Import cycle detected"
         raise YamlImportExpansionError(msg, trace=trace, logical_path="")
     if len(trace) > MAX_IMPORT_EXPANSION_DEPTH:
         msg = "Import expansion exceeded max depth {}".format(MAX_IMPORT_EXPANSION_DEPTH)
         raise YamlImportExpansionError(msg, trace=trace, logical_path="")
-    if yaml_path in cache:
-        return cache[yaml_path]
+    if source.key in cache:
+        return cache[source.key]
 
     try:
-        data = _load_yaml_mapping(yaml_path, template_vars=template_vars)
+        data = _load_yaml_mapping_from_source(
+            source,
+            template_vars=template_vars,
+            template_sandbox=template_sandbox,
+        )
     except Exception as exc:
         msg = "Failed to load fragment YAML: {}: {}".format(type(exc).__name__, exc)
         raise YamlImportExpansionError(msg, trace=trace, logical_path="") from exc
     expanded = _expand_file_inplace(
         data,
-        yaml_path=yaml_path,
+        source=source,
         cache=cache,
         trace=trace,
+        logical_path="",
         template_vars=template_vars,
+        template_sandbox=template_sandbox,
         allowed_yaml_roots=allowed_yaml_roots,
+        project_config=project_config,
     )
-    cache[yaml_path] = expanded
+    cache[source.key] = expanded
     return expanded
+
+
+def _load_yaml_mapping_from_source(
+    source: ImportSource,
+    *,
+    template_vars: Optional[Mapping[str, object]],
+    template_sandbox: str,
+) -> Dict[str, Any]:
+    if source.kind == "file":
+        if source.path is None:
+            msg = "ImportSource(kind='file') requires path"
+            raise ValueError(msg)
+        return _load_yaml_mapping(source.path, template_vars=template_vars, template_sandbox=template_sandbox)
+    if source.kind == "preset":
+        if source.preset_id is None:
+            msg = "ImportSource(kind='preset') requires preset_id"
+            raise ValueError(msg)
+        text = load_scalim_preset_yaml_text(source.preset_id)
+        text = maybe_precompile_yaml_text(
+            text,
+            template_vars=template_vars,
+            context_label="导入片段 `YAML` preset `{}`".format(source.key),
+            template_sandbox=template_sandbox,
+        )
+        loaded = yaml.safe_load(text)
+        if not isinstance(loaded, dict):
+            msg = "YAML config must be a mapping"
+            raise TypeError(msg)
+        return cast("Dict[str, Any]", loaded)
+    msg = "Unknown ImportSource.kind: '{}'".format(source.kind)
+    raise ValueError(msg)
 
 
 def _expand_file_inplace(
     raw: Dict[str, Any],
     *,
-    yaml_path: Path,
-    cache: Dict[Path, Dict[str, Any]],
+    source: ImportSource,
+    cache: Dict[str, Dict[str, Any]],
     trace: List[ImportTraceItem],
+    logical_path: str,
     template_vars: Optional[Mapping[str, object]],
+    template_sandbox: str,
     allowed_yaml_roots: Sequence[Path],
+    project_config: Optional[YamlDslProjectConfig],
 ) -> Dict[str, Any]:
-    base_dir = yaml_path.parent
+    base_dir = source.path.parent if source.path is not None else None
     try:
-        imports = _parse_imports_mapping(raw.get(IMPORTS_KEY), base_dir=base_dir, allowed_yaml_roots=allowed_yaml_roots)
+        imports = _parse_imports_mapping(
+            raw.get(IMPORTS_KEY),
+            base_dir=base_dir,
+            project_config=project_config,
+            allowed_yaml_roots=allowed_yaml_roots,
+        )
     except Exception as exc:
         msg = "Invalid imports mapping: {}: {}".format(type(exc).__name__, exc)
         raise YamlImportExpansionError(msg, trace=trace, logical_path=IMPORTS_KEY) from exc
@@ -365,13 +570,14 @@ def _expand_file_inplace(
 
     _expand_node_inplace(
         raw,
-        yaml_path=yaml_path,
         imports=imports,
         cache=cache,
         trace=trace,
-        logical_path="",
+        logical_path=logical_path,
         template_vars=template_vars,
+        template_sandbox=template_sandbox,
         allowed_yaml_roots=allowed_yaml_roots,
+        project_config=project_config,
     )
     return raw
 
@@ -379,13 +585,14 @@ def _expand_file_inplace(
 def _expand_node_inplace(
     node: Any,
     *,
-    yaml_path: Path,
-    imports: Dict[str, Path],
-    cache: Dict[Path, Dict[str, Any]],
+    imports: Dict[str, ImportSource],
+    cache: Dict[str, Dict[str, Any]],
     trace: List[ImportTraceItem],
     logical_path: str,
     template_vars: Optional[Mapping[str, object]],
+    template_sandbox: str,
     allowed_yaml_roots: Sequence[Path],
+    project_config: Optional[YamlDslProjectConfig],
 ) -> None:
     if isinstance(node, dict):
         _expand_mapping_inplace(
@@ -395,19 +602,22 @@ def _expand_node_inplace(
             trace=trace,
             logical_path=logical_path,
             template_vars=template_vars,
+            template_sandbox=template_sandbox,
             allowed_yaml_roots=allowed_yaml_roots,
+            project_config=project_config,
         )
         for key, value in list(cast("Dict[str, Any]", node).items()):
             next_path = "{}.{}".format(logical_path, key) if logical_path else str(key)
             _expand_node_inplace(
                 value,
-                yaml_path=yaml_path,
                 imports=imports,
                 cache=cache,
                 trace=trace,
                 logical_path=next_path,
                 template_vars=template_vars,
+                template_sandbox=template_sandbox,
                 allowed_yaml_roots=allowed_yaml_roots,
+                project_config=project_config,
             )
         return
     if isinstance(node, list):
@@ -415,13 +625,14 @@ def _expand_node_inplace(
             next_path = "{}.{}".format(logical_path, idx) if logical_path else str(idx)
             _expand_node_inplace(
                 item,
-                yaml_path=yaml_path,
                 imports=imports,
                 cache=cache,
                 trace=trace,
                 logical_path=next_path,
                 template_vars=template_vars,
+                template_sandbox=template_sandbox,
                 allowed_yaml_roots=allowed_yaml_roots,
+                project_config=project_config,
             )
         return
 
@@ -429,12 +640,14 @@ def _expand_node_inplace(
 def _expand_mapping_inplace(
     mapping: Dict[str, Any],
     *,
-    imports: Dict[str, Path],
-    cache: Dict[Path, Dict[str, Any]],
+    imports: Dict[str, ImportSource],
+    cache: Dict[str, Dict[str, Any]],
     trace: List[ImportTraceItem],
     logical_path: str,
     template_vars: Optional[Mapping[str, object]],
+    template_sandbox: str,
     allowed_yaml_roots: Sequence[Path],
+    project_config: Optional[YamlDslProjectConfig],
 ) -> None:
     if IMPORT_KEY not in mapping:
         return
@@ -463,14 +676,16 @@ def _expand_mapping_inplace(
         if alias not in imports:
             msg = "Unknown $import alias '{}'".format(alias)
             raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
-        fragment_path = imports[alias]
-        next_trace = [*trace, ImportTraceItem(yaml_path=fragment_path, via="$import {}".format(ref))]
-        imported_file = _load_and_expand_file(
-            fragment_path,
+        fragment_source = imports[alias]
+        next_trace = [*trace, ImportTraceItem(source=fragment_source.key, via="$import {}".format(ref))]
+        imported_file = _load_and_expand_source(
+            fragment_source,
             cache=cache,
             trace=next_trace,
             template_vars=template_vars,
+            template_sandbox=template_sandbox,
             allowed_yaml_roots=allowed_yaml_roots,
+            project_config=project_config,
         )
         fragment = _select_mapping_fragment(
             imported_file,

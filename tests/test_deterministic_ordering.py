@@ -165,7 +165,7 @@ def test_restore_bindings_rejects_invalid_state_entries() -> None:
 
 
 def test_lookup_cast_requires_initialized_registry() -> None:
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     converter._lookup_casts = None
 
     try:

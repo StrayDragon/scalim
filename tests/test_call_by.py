@@ -268,7 +268,7 @@ def _make_call_by_config(call_by: str, *, depends_on: tuple) -> DemandConfig:
 
 def test_converter_requires_allowlist_for_call_by() -> None:
     config = _make_call_by_config("tests.call_by_fns:echo(status)", depends_on=("status",))
-    converter = ConfigToIRConverter(allow_unsafe_resolver=True)
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.call_by_fns"]))
     demand_ir = converter.convert(config)
 
     derived = demand_ir.fields["text"]
