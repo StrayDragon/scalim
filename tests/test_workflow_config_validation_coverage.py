@@ -132,6 +132,7 @@ def test_load_workflow_config_from_mapping_writes_errors(writes_raw: Any, match:
         ({"workbooks": {1: {"path": "a.xlsx"}}}, "workbooks keys must be non-empty strings"),
         ({"workbooks": {"report": "nope"}}, "workbooks.<id> must be a mapping"),
         ({"workbooks": {"report": {}}}, "workbooks.<id>.path must be a non-empty string"),
+        ({"workbooks": {"report": {"path": "a.xlsx", "allow_formulas": "nope"}}}, "allow_formulas must be a bool"),
         ({"csvs": {1: {"path": "a.csv"}}}, "csvs keys must be non-empty strings"),
         ({"csvs": {"merged": "nope"}}, "csvs.<id> must be a mapping"),
         ({"csvs": {"merged": {}}}, "csvs.<id>.path must be a non-empty string"),
@@ -159,6 +160,14 @@ def test_load_workflow_config_from_mapping_writes_errors(writes_raw: Any, match:
                 }
             },
             "write_lock must be a bool",
+        ),
+        (
+            {
+                "sheetbooks": {
+                    "sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "allow_formulas": "nope"}}
+                }
+            },
+            "export_xlsx.allow_formulas must be a bool",
         ),
         (
             {"workbooks": {"same": {"path": "a.xlsx"}}, "csvs": {"same": {"path": "a.csv"}}},

@@ -270,7 +270,14 @@ class SchemaBuilder:
                     "description": "workbook 输出路径(非空字符串)",
                     "markdownDescription": "workbook 输出路径(非空字符串).",
                     "examples": ["./out/report.xlsx"],
-                }
+                },
+                "allow_formulas": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "允许公式(可信输入显式放宽,将禁用公式前缀转义)",
+                    "markdownDescription": "允许公式(可信输入显式放宽,将禁用公式前缀转义).",
+                    "examples": [True],
+                },
             },
             "additionalProperties": False,
         }
@@ -390,6 +397,13 @@ class SchemaBuilder:
                     "default": False,
                     "description": "导出阶段启用写锁(可选)",
                     "markdownDescription": "导出阶段启用写锁(可选).",
+                    "examples": [True],
+                },
+                "allow_formulas": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "允许公式(可信输入显式放宽,将禁用公式前缀转义)",
+                    "markdownDescription": "允许公式(可信输入显式放宽,将禁用公式前缀转义).",
                     "examples": [True],
                 },
             },

@@ -65,12 +65,13 @@ def compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
                 if raw_path and not Path(raw_path).is_absolute()
                 else Path(raw_path).resolve(strict=False)
             )
+            allow_formulas = bool(getattr(wb, "allow_formulas", False))
             resources.append(
                 WorkflowResourceIr(
                     resource_id=str(workbook_id),
                     resource_type="workbook",
                     path=str(resolved),
-                    options=None,
+                    options={"allow_formulas": bool(allow_formulas)},
                 )
             )
         for csv_id, csv_cfg in getattr(raw_resources, "csvs", {}).items():
@@ -106,7 +107,10 @@ def compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
                 "budget": {"max_sheets": int(max_sheets), "max_total_cells": int(max_total_cells)},
             }
             if export_cfg is not None and raw_path:
-                resource_options["export_xlsx"] = {"write_lock": bool(getattr(export_cfg, "write_lock", False))}
+                resource_options["export_xlsx"] = {
+                    "write_lock": bool(getattr(export_cfg, "write_lock", False)),
+                    "allow_formulas": bool(getattr(export_cfg, "allow_formulas", False)),
+                }
 
             resources.append(
                 WorkflowResourceIr(

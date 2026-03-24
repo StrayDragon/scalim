@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
 from ....events.catalog import EVENT_DIAGNOSTIC_WARNING
 from ....events.events import DiagnosticWarningEvent
 from ....sinks.sink_base import create_temp_path
+from ....utils.excel import escape_excel_formula
 from ....vendor.compact.importlibx import require_optional_dependency
 from ....vendor.compact.typing_extensionsx import override
 from .workflow_resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
@@ -66,6 +67,7 @@ class _WorkbookPlan:
     resource_id: str
     path: str
     lock_path: Optional[Path]
+    allow_formulas: bool
     sheet_order: List[str]
     sheets: Dict[str, _SheetPlan]
     last_workflow_node_id: Optional[str] = None
@@ -85,6 +87,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 resource_id=key,
                 path=str(raw_path),
                 lock_path=lock_path,
+                allow_formulas=bool(self._workbook_allow_formulas.get(key, False)),
                 sheet_order=[],
                 sheets={},
             )
@@ -302,14 +305,16 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 header_written = False
                 for seg in sheet_plan.segments:
                     if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
-                        _ = ws.append(list(sheet_plan.baseline_header))
+                        header = [escape_excel_formula(x, allow_formulas=bool(p.allow_formulas)) for x in list(sheet_plan.baseline_header)]
+                        _ = ws.append(header)
                         header_written = True
                     # `never`: 不输出 `header`
 
                     for row in _iter_csv_rows(seg.input_csv_path):
                         out_row: List[object] = []
                         for idx in seg.mapping:
-                            out_row.append(row[idx] if idx >= 0 and idx < len(row) else "")
+                            value = row[idx] if idx >= 0 and idx < len(row) else ""
+                            out_row.append(escape_excel_formula(value, allow_formulas=bool(p.allow_formulas)))
                         _ = ws.append(out_row)
 
             temp_path = create_temp_path(output_path, ".xlsx.tmp")

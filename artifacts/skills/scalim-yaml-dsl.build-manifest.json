@@ -444,7 +444,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
-      "sha256": "bfb4c210315a3a2e2cbad92095c3bbfbafe093464a1a982918383f717deaafe1"
+      "sha256": "086dec296c38e3031c81f893535222a9d285a2303265535f9e73b27db0e10c93"
     }
   ],
   "outputs": [

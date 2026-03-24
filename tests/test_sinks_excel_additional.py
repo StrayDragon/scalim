@@ -448,7 +448,7 @@ def test_excel_write_lock_release_logs_warning_on_oserror(tmp_path: Path, monkey
 
 
 def test_excel_formula_escape_skips_already_escaped_value() -> None:
-    assert excel_mod._escape_excel_formula("'=1+1", allow_formulas=False) == "'=1+1"
+    assert excel_mod.escape_excel_formula("'=1+1", allow_formulas=False) == "'=1+1"
 
 
 def test_excel_best_effort_close_write_only_workbook_worksheets_ignores_typeerror() -> None:

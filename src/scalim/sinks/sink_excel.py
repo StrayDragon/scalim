@@ -17,6 +17,7 @@ else:
     Workbook = _openpyxl.Workbook
 
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
+from ..utils.excel import escape_excel_formula
 from ..vendor.compact.typing_extensionsx import Self, override
 from .sink_base import (
     BaseRowSink,
@@ -58,7 +59,6 @@ COLUMN_EXCEL_SINK_SAVE_FAILED_LOG = COLUMN_EXCEL_SINK_SAVE_FAILED + ": %s"
 COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ColumnExcelSink 删除临时文件失败"
 COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
-_FORMULA_PREFIXES = ("=", "+", "-", "@")
 _WRITE_LOCK_SUFFIX = ".scalim.lock"
 
 
@@ -119,20 +119,6 @@ def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
         _best_effort_close_write_only_worksheet(ws)
 
 
-def _escape_excel_formula(value: Any, *, allow_formulas: bool) -> Any:
-    if allow_formulas:
-        return value
-    if not isinstance(value, str) or not value:
-        return value
-    if value.startswith("'"):
-        return value
-    stripped = value.lstrip()
-    if stripped and stripped[0] in _FORMULA_PREFIXES:
-        # 前缀转义,避免 `Excel` 将其解析为公式.
-        return "'" + value
-    return value
-
-
 class ExcelSink(BaseRowSink):
     """`Excel` 行写入器:支持流式行写入.
 
@@ -190,12 +176,12 @@ class ExcelSink(BaseRowSink):
         self._workbook = Workbook(write_only=True)
         self._worksheet = self._workbook.create_sheet(self.sheet_name)
         if self.include_header:
-            _ = self._worksheet.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
+            _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
     def _format_row(self, row: RowData) -> List[Any]:
         values: List[Any] = []
         for field_name in self.field_names:
-            values.append(_escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
+            values.append(escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
         return values
 
     @override
@@ -291,12 +277,12 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
         self._closed = False
         if self.include_header:
             # 关键护栏: `header` 与 `rows` 分离,避免 `header` `list` 被复用污染.
-            _ = self._worksheet.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(self.header_names)])
+            _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(self.header_names)])
 
     def _format_row(self, row: RowData) -> List[Any]:
         values: List[Any] = []
         for field_name in self.field_names:
-            values.append(_escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
+            values.append(escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
         return values
 
     @override
@@ -535,10 +521,10 @@ class ColumnExcelSink(IColumnSink):
                     ws.title = self.sheet_name
 
                 if self.include_header:
-                    _ = ws.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
+                    _ = ws.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
                 for row_values in iter_row_values(self._row_ids, self.field_names, self._columns):
-                    _ = ws.append([_escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(row_values)])
+                    _ = ws.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(row_values)])
 
                 wb.save(temp_path_obj)
                 # 原子重命名临时文件到目标路径

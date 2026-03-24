@@ -89,6 +89,7 @@ class _WorkflowResourceManagerBase(ABC):
     _workflow_exec_id: str
     _instrumentation: Any
     _workbook_defs: Dict[str, str]
+    _workbook_allow_formulas: Dict[str, bool]
     _csv_defs: Dict[str, str]
     _sheetbook_defs: Dict[str, object]
     _workbooks: Dict[str, object]
@@ -104,12 +105,14 @@ class _WorkflowResourceManagerBase(ABC):
         workflow_exec_id: str,
         instrumentation: Any,
         workbook_defs: Mapping[str, str],
+        workbook_allow_formulas: Optional[Mapping[str, bool]] = None,
         csv_defs: Mapping[str, str],
         sheetbook_defs: Mapping[str, object],
     ) -> None:
         self._workflow_exec_id = str(workflow_exec_id)
         self._instrumentation = instrumentation
         self._workbook_defs = dict(workbook_defs)
+        self._workbook_allow_formulas = dict(workbook_allow_formulas or {})
         self._csv_defs = dict(csv_defs)
         self._sheetbook_defs = dict(sheetbook_defs)
         self._workbooks = {}

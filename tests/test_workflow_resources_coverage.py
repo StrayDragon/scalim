@@ -1205,6 +1205,220 @@ def test_resource_manager_commit_all_releases_locks_when_no_segments(tmp_path: P
     assert not csv_output_path.exists()
 
 
+def test_resource_manager_commit_workbook_escapes_excel_formulas_by_default(tmp_path: Path) -> None:
+    from openpyxl import load_workbook
+
+    instrumentation = _Instrumentation()
+    workbook_path = tmp_path / "report.xlsx"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(workbook_path)},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    csv_path = _write_csv(
+        tmp_path / "input.csv",
+        [
+            ["=h", "eq", "plus", "minus", "at"],
+            ["ok", "=1+1", "  +SUM(A1:A2)", "-1+2", "@X"],
+        ],
+    )
+    manager.apply_workbook_sheet(
+        workflow_node_id="n0",
+        workbook_id="report",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv_path=str(csv_path),
+        on_conflict="error",
+    )
+    manager.commit_all()
+
+    wb = load_workbook(str(workbook_path), data_only=False)
+    try:
+        ws = wb["S"]
+        assert ws["A1"].value == "'=h"
+        assert ws["A2"].value == "ok"
+
+        eq_value = ws["B2"].value
+        eq_type = ws["B2"].data_type
+        assert eq_type != "f"
+        assert eq_value == "'=1+1"
+
+        assert ws["C2"].value == "'  +SUM(A1:A2)"
+        assert ws["D2"].value == "'-1+2"
+        assert ws["E2"].value == "'@X"
+    finally:
+        wb.close()
+
+
+def test_resource_manager_commit_workbook_allow_formulas_preserves_raw_strings(tmp_path: Path) -> None:
+    from openpyxl import load_workbook
+
+    instrumentation = _Instrumentation()
+    workbook_path = tmp_path / "report.xlsx"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(workbook_path)},
+        workbook_allow_formulas={"report": True},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    csv_path = _write_csv(
+        tmp_path / "input.csv",
+        [
+            ["=h", "eq", "plus", "minus", "at"],
+            ["ok", "=1+1", "  +SUM(A1:A2)", "-1+2", "@X"],
+        ],
+    )
+    manager.apply_workbook_sheet(
+        workflow_node_id="n0",
+        workbook_id="report",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv_path=str(csv_path),
+        on_conflict="error",
+    )
+    manager.commit_all()
+
+    wb = load_workbook(str(workbook_path), data_only=False)
+    try:
+        ws = wb["S"]
+        assert ws["A1"].value == "=h"
+        assert ws["A2"].value == "ok"
+
+        eq_value = ws["B2"].value
+        eq_type = ws["B2"].data_type
+        assert eq_type == "f"
+        assert eq_value == "=1+1"
+
+        assert ws["C2"].value == "  +SUM(A1:A2)"
+        assert ws["D2"].value == "-1+2"
+        assert ws["E2"].value == "@X"
+    finally:
+        wb.close()
+
+
+def test_resource_manager_commit_sheetbook_escapes_excel_formulas_by_default(tmp_path: Path) -> None:
+    from openpyxl import load_workbook
+
+    instrumentation = _Instrumentation()
+    export_path = tmp_path / "sheetbook.xlsx"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=str(export_path),
+                export_write_lock=False,
+            )
+        },
+    )
+
+    csv_path = _write_csv(
+        tmp_path / "input.csv",
+        [
+            ["=h", "eq", "plus", "minus", "at"],
+            ["ok", "=1+1", "  +SUM(A1:A2)", "-1+2", "@X"],
+        ],
+    )
+    manager.apply_sheetbook_sheet(
+        workflow_node_id="n0",
+        sheetbook_id="sb",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv_path=str(csv_path),
+        on_conflict="error",
+    )
+    manager.commit_all()
+
+    wb = load_workbook(str(export_path), data_only=False)
+    try:
+        ws = wb["S"]
+        assert ws["A1"].value == "'=h"
+        assert ws["A2"].value == "ok"
+
+        eq_value = ws["B2"].value
+        eq_type = ws["B2"].data_type
+        assert eq_type != "f"
+        assert eq_value == "'=1+1"
+
+        assert ws["C2"].value == "'  +SUM(A1:A2)"
+        assert ws["D2"].value == "'-1+2"
+        assert ws["E2"].value == "'@X"
+    finally:
+        wb.close()
+
+
+def test_resource_manager_commit_sheetbook_allow_formulas_preserves_raw_strings(tmp_path: Path) -> None:
+    from openpyxl import load_workbook
+
+    instrumentation = _Instrumentation()
+    export_path = tmp_path / "sheetbook.xlsx"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=str(export_path),
+                export_write_lock=False,
+                export_allow_formulas=True,
+            )
+        },
+    )
+
+    csv_path = _write_csv(
+        tmp_path / "input.csv",
+        [
+            ["=h", "eq", "plus", "minus", "at"],
+            ["ok", "=1+1", "  +SUM(A1:A2)", "-1+2", "@X"],
+        ],
+    )
+    manager.apply_sheetbook_sheet(
+        workflow_node_id="n0",
+        sheetbook_id="sb",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv_path=str(csv_path),
+        on_conflict="error",
+    )
+    manager.commit_all()
+
+    wb = load_workbook(str(export_path), data_only=False)
+    try:
+        ws = wb["S"]
+        assert ws["A1"].value == "=h"
+        assert ws["A2"].value == "ok"
+
+        eq_value = ws["B2"].value
+        eq_type = ws["B2"].data_type
+        assert eq_type == "f"
+        assert eq_value == "=1+1"
+
+        assert ws["C2"].value == "  +SUM(A1:A2)"
+        assert ws["D2"].value == "-1+2"
+        assert ws["E2"].value == "@X"
+    finally:
+        wb.close()
+
+
 def test_resource_manager_commit_workbook_handles_missing_sheet_plan(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
     workbook_path = tmp_path / "report.xlsx"

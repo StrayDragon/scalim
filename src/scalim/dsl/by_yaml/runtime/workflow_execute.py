@@ -503,11 +503,17 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
         )
 
     workbook_defs: Dict[str, str] = {}
+    workbook_allow_formulas_by_id: Dict[str, bool] = {}
     csv_defs: Dict[str, str] = {}
     sheetbook_defs: Dict[str, SheetBookDef] = {}
     for res in workflow_ir.resources:
         if str(res.resource_type) == "workbook":
             workbook_defs[str(res.resource_id)] = str(res.path)
+            opts = res.options or {}
+            allow_formulas = False
+            if isinstance(opts, dict):
+                allow_formulas = bool(cast("Any", opts).get("allow_formulas", False))
+            workbook_allow_formulas_by_id[str(res.resource_id)] = bool(allow_formulas)
         elif str(res.resource_type) == "csv":
             csv_defs[str(res.resource_id)] = str(res.path)
         elif str(res.resource_type) == "sheetbook":
@@ -516,9 +522,11 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
             max_sheets = int(cast("Any", budget.get("max_sheets") or 0))
             max_total_cells = int(cast("Any", budget.get("max_total_cells") or 0))
             export_write_lock = False
+            export_allow_formulas = False
             export_cfg = opts.get("export_xlsx")
             if isinstance(export_cfg, dict):
                 export_write_lock = bool(cast("Any", export_cfg).get("write_lock", False))
+                export_allow_formulas = bool(cast("Any", export_cfg).get("allow_formulas", False))
             export_path = str(res.path or "").strip() or None
             sheetbook_defs[str(res.resource_id)] = SheetBookDef(
                 resource_id=str(res.resource_id),
@@ -526,12 +534,14 @@ def run_workflow(  # noqa: C901, PLR0912, PLR0915
                 budget_max_total_cells=int(max_total_cells),
                 export_path=str(export_path) if export_path is not None else None,
                 export_write_lock=bool(export_write_lock),
+                export_allow_formulas=bool(export_allow_formulas),
             )
 
     resource_manager = WorkflowResourceManager(
         workflow_exec_id=workflow_exec_id,
         instrumentation=workflow_instrumentation,
         workbook_defs=workbook_defs,
+        workbook_allow_formulas=workbook_allow_formulas_by_id,
         csv_defs=csv_defs,
         sheetbook_defs=sheetbook_defs,
     )

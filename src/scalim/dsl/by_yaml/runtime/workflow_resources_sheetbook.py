@@ -14,6 +14,7 @@ from typing import Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
 from ....events.catalog import EVENT_DIAGNOSTIC_WARNING
 from ....events.events import DiagnosticWarningEvent
 from ....sinks.sink_base import create_temp_path
+from ....utils.excel import escape_excel_formula
 from ....vendor.compact.typing_extensionsx import override
 from .workflow_resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
 from .workflow_resources_csv import build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
@@ -35,6 +36,7 @@ class SheetBookDef:
     budget_max_total_cells: int
     export_path: Optional[str]
     export_write_lock: bool
+    export_allow_formulas: bool = False
 
 
 @dataclass
@@ -61,6 +63,7 @@ class _SheetBookPlan:
     budget_max_total_cells: int
     export_path: Optional[str]
     export_write_lock: bool
+    export_allow_formulas: bool
     sheet_order: List[str]
     sheets: Dict[str, _SheetBookSheetPlan]
     lock_path: Optional[Path] = None
@@ -88,6 +91,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 budget_max_total_cells=int(raw_def.budget_max_total_cells),
                 export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
                 export_write_lock=bool(raw_def.export_write_lock),
+                export_allow_formulas=bool(raw_def.export_allow_formulas),
                 sheet_order=[],
                 sheets={},
             )
@@ -480,9 +484,10 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 ws = wb.create_sheet(str(sheet_name))
                 header_written = False
                 fields = list(sheet_plan.baseline_header)
+                escaped_fields = [escape_excel_formula(x, allow_formulas=bool(p.export_allow_formulas)) for x in fields]
                 for seg in sheet_plan.segments:
                     if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
-                        _ = ws.append(list(fields))
+                        _ = ws.append(list(escaped_fields))
                         header_written = True
                     # `never`: 不输出表头
 
@@ -490,7 +495,8 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                         out_row: List[object] = []
                         for field_key in fields:
                             col = sheet_plan.columns.get(str(field_key))
-                            out_row.append(col[row_idx] if col is not None and row_idx >= 0 and row_idx < len(col) else "")
+                            value = col[row_idx] if col is not None and row_idx >= 0 and row_idx < len(col) else ""
+                            out_row.append(escape_excel_formula(value, allow_formulas=bool(p.export_allow_formulas)))
                         _ = ws.append(out_row)
 
             temp_path = create_temp_path(output_path, ".xlsx.tmp")

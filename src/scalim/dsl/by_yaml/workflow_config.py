@@ -82,6 +82,7 @@ def _safe_load_yaml_no_duplicates(text: str) -> object:
 @dataclass(frozen=True)
 class WorkflowWorkbookResource:
     path: str
+    allow_formulas: bool = False
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class WorkflowSheetbookBudget:
 class WorkflowSheetbookExportXlsx:
     path: str
     write_lock: bool = False
+    allow_formulas: bool = False
 
 
 @dataclass(frozen=True)
@@ -785,7 +787,11 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
         if not path_text:
             msg = "workflow.resources.workbooks.<id>.path must be a non-empty string"
             raise WorkflowConfigError(msg, path="{}.path".format(item_path))
-        workbooks[resource_id] = WorkflowWorkbookResource(path=path_text)
+        allow_formulas_raw = cfg.get("allow_formulas", False)
+        if not isinstance(allow_formulas_raw, bool):
+            msg = "workflow.resources.workbooks.<id>.allow_formulas must be a bool"
+            raise WorkflowConfigError(msg, path="{}.allow_formulas".format(item_path))
+        workbooks[resource_id] = WorkflowWorkbookResource(path=path_text, allow_formulas=bool(allow_formulas_raw))
 
     csvs: Dict[str, WorkflowCsvResource] = {}
     for raw_id, raw_cfg in cast("Dict[Any, Any]", csvs_raw).items():
@@ -866,7 +872,15 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:  
             if not isinstance(write_lock_raw, bool):
                 msg = "workflow.resources.sheetbooks.<id>.export_xlsx.write_lock must be a bool"
                 raise WorkflowConfigError(msg, path="{}.export_xlsx.write_lock".format(item_path))
-            export_xlsx = WorkflowSheetbookExportXlsx(path=path_text, write_lock=bool(write_lock_raw))
+            allow_formulas_raw = export_dict.get("allow_formulas", False)
+            if not isinstance(allow_formulas_raw, bool):
+                msg = "workflow.resources.sheetbooks.<id>.export_xlsx.allow_formulas must be a bool"
+                raise WorkflowConfigError(msg, path="{}.export_xlsx.allow_formulas".format(item_path))
+            export_xlsx = WorkflowSheetbookExportXlsx(
+                path=path_text,
+                write_lock=bool(write_lock_raw),
+                allow_formulas=bool(allow_formulas_raw),
+            )
 
         sheetbooks[resource_id] = WorkflowSheetbookResource(budget=budget, export_xlsx=export_xlsx)
 
