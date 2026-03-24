@@ -14,6 +14,7 @@ from ..ob.hub import InstrumentationHub
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..sinks.sink_csv import CSVSink
 from ..typedefs import KeyNormalizationMode, RowData
+from ..utils.iterables import ordered_unique_str
 from ..vendor.compact.typing_extensionsx import override
 from .derived_outputs import (
     AggMetricSpec,
@@ -382,17 +383,6 @@ class OutputTargetWriteError(RuntimeError):
         self.target_id = str(target_id)
 
 
-def _ordered_unique(items: Sequence[str]) -> Tuple[str, ...]:
-    seen: Set[str] = set()
-    out: List[str] = []
-    for item in items:
-        if item in seen:
-            continue
-        seen.add(item)
-        out.append(item)
-    return tuple(out)
-
-
 def _sha256_text(value: str) -> str:
     digest = hashlib.sha256()
     digest.update(value.encode("utf-8", errors="replace"))
@@ -430,7 +420,7 @@ def required_demand_fields(spec: OutputCompositionSpec) -> Tuple[str, ...]:
         fields.extend([str(x) for x in target.derived.required_fields()])
         if target.requires:
             fields.extend([str(x) for x in target.requires])
-    return _ordered_unique(fields)
+    return ordered_unique_str(fields)
 
 
 def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:

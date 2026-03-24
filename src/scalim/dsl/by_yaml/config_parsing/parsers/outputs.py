@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 from .....utils import graph as graph_utils
+from .....utils.iterables import ordered_unique_str
 from ...init_var_nodes import parse_init_var_mapping_node
 from ...schema_dsl.constants import (
     DEFAULT_OUTPUT_ENCODING,
@@ -34,17 +35,6 @@ _POST_FUNC_KEYS = ("score_by_rank", "call_by", "compute")
 _AGG_DISTINCT_ON_OVERFLOW_ENUM = ("error", "truncate")
 _AGG_RANK_ORDER_ENUM = ("asc", "desc")
 _AGG_RANK_TOP_K_MODE_ENUM = ("rank", "rows")
-
-
-def _ordered_unique(items: List[str]) -> List[str]:
-    seen: Set[str] = set()
-    ordered: List[str] = []
-    for item in items:
-        if item in seen:
-            continue
-        seen.add(item)
-        ordered.append(item)
-    return ordered
 
 
 def _non_empty_str(raw: object) -> str:
@@ -1061,7 +1051,7 @@ class ParserOutputsMixin:
                             if order_by:
                                 deps_list.extend([str(x) for x in order_by])
                             # `order_by` 缺省时,语义等价于 `[by]`.
-                            derived_deps = tuple(_ordered_unique([str(x) for x in deps_list if str(x)]))
+                            derived_deps = ordered_unique_str([str(x) for x in deps_list if str(x)])
 
                         elif producer_key == "score_by_rank":
                             score_cfg = cast("Dict[str, Any]", cfg.config)
@@ -1138,4 +1128,4 @@ class ParserOutputsMixin:
                 required.extend(self._collect_required_field_ids_from_aggregate(agg))
             if t.requires:
                 required.extend([str(x) for x in t.requires])
-        return _ordered_unique(required)
+        return list(ordered_unique_str(required))

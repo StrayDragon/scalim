@@ -10,6 +10,7 @@ from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..typedefs import FieldValue, KeyNormalizationMode, RowData
 from ..utils import graph as graph_utils
 from ..utils.converters import auto_str_normalize
+from ..utils.iterables import ordered_unique_str
 from ..vendor.compact.typing_extensionsx import override
 from .key_normalization import normalize_key_normalization
 
@@ -178,18 +179,6 @@ class FinalizeDagPlan:
         return tuple(item.out_field_id for item in self.items if str(item.phase) == "post_top_k")
 
 
-def _ordered_unique(items: Sequence[str]) -> Tuple[str, ...]:
-    seen: Set[str] = set()
-    ordered: List[str] = []
-    for item in items:
-        key = str(item)
-        if key in seen:
-            continue
-        seen.add(key)
-        ordered.append(key)
-    return tuple(ordered)
-
-
 def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields: Sequence[PostFieldSpec]) -> FinalizeDagPlan:
     """构建 `finalize` `DAG` 计划(稳定拓扑序 + 依赖列表).
 
@@ -209,7 +198,7 @@ def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields
         rank_spec = rank_by_id.get(node_id)
         if rank_spec is not None:
             order_fields = tuple(str(x) for x in (rank_spec.order_by or ())) or (str(rank_spec.by),)
-            deps = _ordered_unique((str(rank_spec.by), *tuple(order_fields)))
+            deps = ordered_unique_str((str(rank_spec.by), *tuple(order_fields)))
             deps_by_id[node_id] = deps
             producer_by_id[node_id] = str(rank_spec.kind)
             continue
