@@ -15,6 +15,8 @@ from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
 from scalim.spec.ir.workflow import WorkflowCachePoolBudgetIr, WorkflowCachePoolIr, WorkflowCachePoolPinIr
 from scalim.typedefs import SourceSpecIrCacheMode
 
+_TIMEOUT_S = 5.0
+
 
 def test_json_like_helpers_reject_invalid_values() -> None:
     from scalim.execution import workflow_cache_pool as mod
@@ -281,6 +283,7 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
     allow_finish = threading.Event()
     thread2_started = threading.Event()
     thread2_done = threading.Event()
+    thread1_done = threading.Event()
 
     calls = []
 
@@ -290,7 +293,7 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
     def load_fn():  # type: ignore[no-untyped-def]
         calls.append("load")
         load_started.set()
-        if not allow_finish.wait(timeout=1.0):
+        if not allow_finish.wait(timeout=_TIMEOUT_S):
             pytest.fail("test fixture deadlock: allow_finish not set")
         return {1: {"id": 1}}
 
@@ -299,6 +302,8 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
             results.append(pool.get_or_load(signature, workflow_node_id="n1", load_fn=load_fn))
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
+        finally:
+            thread1_done.set()
 
     def _worker2() -> None:
         thread2_started.set()
@@ -311,7 +316,7 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
 
     t1 = threading.Thread(target=_worker1, daemon=True)
     t1.start()
-    if not load_started.wait(timeout=1.0):
+    if not load_started.wait(timeout=_TIMEOUT_S):
         pytest.fail("load_fn did not start")
 
     t2 = threading.Thread(
@@ -319,15 +324,20 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
         daemon=True,
     )
     t2.start()
-    if not thread2_started.wait(timeout=1.0):
+    if not thread2_started.wait(timeout=_TIMEOUT_S):
         pytest.fail("thread2 did not start")
     if thread2_done.wait(timeout=0.1):
         pytest.fail("thread2 finished before load finished; expected in-flight wait")
 
     allow_finish.set()
 
-    t1.join(timeout=1.0)
-    t2.join(timeout=1.0)
+    if not thread1_done.wait(timeout=_TIMEOUT_S):
+        pytest.fail("thread1 did not finish")
+    if not thread2_done.wait(timeout=_TIMEOUT_S):
+        pytest.fail("thread2 did not finish")
+
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
     if t1.is_alive() or t2.is_alive():
         pytest.fail("threads did not finish")
 
@@ -366,11 +376,18 @@ def test_workflow_cache_pool_emit_does_not_deadlock_on_reentry() -> None:
     )
     instrumentation.pool = pool
 
+    runner_done = threading.Event()
+
+    def _run() -> None:
+        try:
+            _ = pool.get_or_load(_sig("outer"), workflow_node_id="n_outer", load_fn=lambda: {1: {"id": 1}})
+        finally:
+            runner_done.set()
+
     runner = threading.Thread(
-        target=lambda: pool.get_or_load(_sig("outer"), workflow_node_id="n_outer", load_fn=lambda: {1: {"id": 1}}),
+        target=_run,
         daemon=True,
     )
     runner.start()
-    runner.join(timeout=1.0)
-    if runner.is_alive():
+    if not runner_done.wait(timeout=_TIMEOUT_S):
         pytest.fail("WorkflowCachePool.emit appears to be called under internal locks (reentry deadlock)")

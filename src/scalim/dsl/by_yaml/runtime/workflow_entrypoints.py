@@ -27,8 +27,10 @@ def run_ir(*args: Any, **kwargs: Any) -> Any:
 
 
 def run_workflow(*args: Any, **kwargs: Any) -> Any:
-    # 单测可通过 `monkeypatch.setattr(workflow_entrypoints, "run_ir", ...)` 劫持执行器.
-    _workflow_execute.run_ir = run_ir  # type: ignore[assignment]
+    # 单测可通过 `monkeypatch.setattr(workflow_entrypoints, "run_ir", ...)` 劫持执行器;
+    # 并可通过 `run_workflow(..., run_ir_fn=...)` 做每次调用级别的显式注入(避免并发串扰).
+    if "run_ir_fn" not in kwargs:
+        kwargs["run_ir_fn"] = run_ir
     return _workflow_execute.run_workflow(*args, **kwargs)
 
 

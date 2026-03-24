@@ -9,7 +9,7 @@ from abc import ABC
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
+from typing import Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
 
 from ....events.catalog import EVENT_DIAGNOSTIC_WARNING
 from ....events.events import DiagnosticWarningEvent
@@ -27,6 +27,54 @@ _iter_csv_rows = iter_csv_rows
 _read_csv_header = read_csv_header
 _best_effort_close_write_only_workbook_worksheets = best_effort_close_write_only_workbook_worksheets
 _get_openpyxl_workbook_class = get_openpyxl_workbook_class
+
+
+def _materialize_aligned_csv_columns(expected: List[str], mapping: List[int], *, input_csv_path: str) -> List[List[str]]:
+    col_lists: List[List[str]] = [[] for _ in expected]
+    for row in _iter_csv_rows(input_csv_path):
+        for col_idx, src_idx in enumerate(mapping):
+            col_lists[col_idx].append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
+    return col_lists
+
+
+def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBookPlan") -> None:
+    wb = cast("Any", workbook)
+    for sheet_name in plan.sheet_order:
+        sheet_plan = plan.sheets.get(sheet_name)
+        if sheet_plan is None:
+            continue  # pragma: no cover
+        ws = wb.create_sheet(str(sheet_name))
+        header_written = False
+        fields = list(sheet_plan.baseline_header)
+        escaped_fields = [escape_excel_formula(x, allow_formulas=bool(plan.export_allow_formulas)) for x in fields]
+        for seg in sheet_plan.segments:
+            if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
+                _ = ws.append(list(escaped_fields))
+                header_written = True
+            # `never`: 不输出表头
+
+            for row_idx in range(int(seg.start_row), int(seg.end_row)):
+                out_row: List[object] = []
+                for field_key in fields:
+                    col = sheet_plan.columns.get(str(field_key))
+                    value = col[row_idx] if col is not None and row_idx >= 0 and row_idx < len(col) else ""
+                    out_row.append(escape_excel_formula(value, allow_formulas=bool(plan.export_allow_formulas)))
+                _ = ws.append(out_row)
+
+
+def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
+    wb = cast("Any", workbook)
+    temp_path = create_temp_path(output_path, ".xlsx.tmp")
+    temp_obj = Path(temp_path)
+    try:
+        wb.save(temp_obj)
+        _ = temp_obj.replace(output_path)
+    except Exception as exc:
+        with suppress(Exception):
+            if temp_obj.exists():
+                temp_obj.unlink()
+        msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
+        raise WorkflowWriteError(msg) from exc
 
 
 @dataclass(frozen=True)
@@ -72,6 +120,228 @@ class _SheetBookPlan:
 
 
 class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
+    @staticmethod
+    def _sheetbook_has_alignment_mismatch(expected: List[str], input_header: List[str], *, align_by: str) -> bool:
+        if str(align_by) == "field_id":
+            exp_set = {str(x) for x in expected}
+            act_set = {str(x) for x in input_header}
+            missing = exp_set.difference(act_set)
+            extra = act_set.difference(exp_set)
+            return bool(missing or extra)
+        return list(input_header) != list(expected)
+
+    def _emit_sheetbook_commit(self, plan: _SheetBookPlan, *, display_path: str) -> None:
+        node_id = plan.last_workflow_node_id or "__wf__commit"
+        self._emit_resource_commit(
+            workflow_node_id=node_id, resource_type="sheetbook", resource_id=plan.resource_id, path=str(display_path)
+        )
+
+    def _maybe_acquire_sheetbook_write_lock(self, plan: _SheetBookPlan, *, output_path: str) -> None:
+        if not bool(plan.export_write_lock):
+            return
+        lock_path = acquire_write_lock(output_path)
+        plan.lock_path = lock_path
+
+    def _release_sheetbook_write_lock(self, plan: _SheetBookPlan) -> None:
+        if plan.lock_path is None:
+            return
+        release_write_lock(plan.lock_path)
+        plan.lock_path = None
+
+    def _sheetbook_sheet_prepare_action(
+        self,
+        plan: _SheetBookPlan,
+        *,
+        workflow_node_id: str,
+        sheetbook_id: str,
+        sheet_name: str,
+        on_conflict: str,
+    ) -> Tuple[str, bool]:
+        action = "write"
+        pending_skip = False
+        with self._lock:
+            existing = plan.sheets.get(sheet_name)
+            if existing is not None:
+                if on_conflict == "skip":
+                    action = "skip"
+                    plan.last_workflow_node_id = str(workflow_node_id)
+                    pending_skip = True
+                if on_conflict == "error":
+                    msg = "Sheet conflict (sheetbook_sheet): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+                    raise WorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
+                if on_conflict == "overwrite":
+                    action = "overwrite"
+            elif len(plan.sheets) >= int(plan.budget_max_sheets):
+                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
+                diff = [
+                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
+                    "current_sheets={}".format(len(plan.sheets)),
+                    "new_sheet={!r}".format(sheet_name),
+                ]
+                raise WorkflowWriteError(msg, diff=diff)
+        return action, pending_skip
+
+    def _sheetbook_sheet_store(
+        self,
+        plan: _SheetBookPlan,
+        *,
+        workflow_node_id: str,
+        sheet_name: str,
+        input_node_id: str,
+        expected: List[str],
+        columns: Dict[str, List[str]],
+        row_count: int,
+        new_sheet_cells: int,
+    ) -> None:
+        with self._lock:
+            existing = plan.sheets.get(sheet_name)
+            old_cells = 0
+            if existing is not None:
+                old_cells = int(existing.row_count) * len(existing.baseline_header)
+
+            new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
+            self._check_sheetbook_budget(plan, new_total_cells=new_total)
+
+            if existing is None:
+                plan.sheet_order.append(sheet_name)
+
+            sheet_plan = _SheetBookSheetPlan(
+                sheet=sheet_name,
+                baseline_header=list(expected),
+                columns=columns,
+                segments=[],
+                row_count=int(row_count),
+            )
+            sheet_plan.segments.append(
+                _SheetBookSegment(
+                    producer_node_id=str(input_node_id),
+                    start_row=0,
+                    end_row=int(row_count),
+                    header_policy="once",
+                )
+            )
+            plan.sheets[sheet_name] = sheet_plan
+            plan.total_cells = int(new_total)
+            plan.last_workflow_node_id = str(workflow_node_id)
+
+    def _sheetbook_append_prepare(
+        self,
+        plan: _SheetBookPlan,
+        *,
+        workflow_node_id: str,
+        sheetbook_id: str,
+        sheet_name: str,
+        input_node_id: str,
+        input_header: List[str],
+        align_by: str,
+        on_mismatch: str,
+    ) -> Tuple[List[str], List[int], int, Optional[DiagnosticWarningEvent], Optional[Dict[str, object]], bool]:
+        msg: str
+        pending_warning: Optional[DiagnosticWarningEvent] = None
+        pending_warning_meta: Optional[Dict[str, object]] = None
+        pending_skip = False
+        start_row = 0
+
+        with self._lock:
+            sheet_plan = plan.sheets.get(sheet_name)
+            if sheet_plan is None:
+                if len(plan.sheets) >= int(plan.budget_max_sheets):
+                    msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
+                    diff = [
+                        "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
+                        "current_sheets={}".format(len(plan.sheets)),
+                        "new_sheet={!r}".format(sheet_name),
+                    ]
+                    raise WorkflowWriteError(msg, diff=diff)
+                plan.sheet_order.append(sheet_name)
+                sheet_plan = _SheetBookSheetPlan(
+                    sheet=sheet_name,
+                    baseline_header=list(input_header),
+                    columns={},
+                    segments=[],
+                    row_count=0,
+                )
+                plan.sheets[sheet_name] = sheet_plan
+
+            expected = list(sheet_plan.baseline_header)
+            mapping = _build_alignment_mapping(expected, input_header)
+
+            if self._sheetbook_has_alignment_mismatch(expected, input_header, align_by=str(align_by)):
+                diff = _describe_header_diff(expected, input_header)
+                if on_mismatch == "error":
+                    msg = "Field alignment mismatch (sheetbook_append): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+                    raise WorkflowWriteError(msg, diff=diff)
+                if on_mismatch == "warn":
+                    pending_warning = DiagnosticWarningEvent(
+                        message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
+                        source_id=None,
+                        field_id=None,
+                        lookup_key={"expected": expected, "actual": list(input_header)},
+                        row_id=None,
+                    )
+                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
+                if on_mismatch == "skip":
+                    plan.last_workflow_node_id = str(workflow_node_id)
+                    pending_skip = True
+
+            if not pending_skip:
+                # 重复写入检测: 同一生产者不应写入同一工作表多次.
+                for seg in sheet_plan.segments:
+                    if str(seg.producer_node_id) == str(input_node_id):
+                        msg = "Duplicate sheetbook write for the same producer: sheetbook={!r}, sheet={!r}, producer={!r}".format(
+                            str(sheetbook_id),
+                            sheet_name,
+                            str(input_node_id),
+                        )
+                        raise WorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
+
+                start_row = int(sheet_plan.row_count)
+
+        return expected, mapping, start_row, pending_warning, pending_warning_meta, pending_skip
+
+    def _sheetbook_append_apply(
+        self,
+        plan: _SheetBookPlan,
+        *,
+        sheetbook_id: str,
+        sheet_name: str,
+        expected: List[str],
+        col_lists: List[List[str]],
+        append_rows: int,
+        append_cells: int,
+        start_row: int,
+        workflow_node_id: str,
+        input_node_id: str,
+        header_policy: str,
+    ) -> None:
+        with self._lock:
+            sheet_plan = plan.sheets.get(sheet_name)
+            if sheet_plan is None:  # pragma: no cover
+                msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+                raise WorkflowWriteError(msg)
+
+            new_total = int(plan.total_cells) + int(append_cells)
+            self._check_sheetbook_budget(plan, new_total_cells=new_total)
+
+            for idx, field_key in enumerate(expected):
+                col = sheet_plan.columns.get(field_key)
+                if col is None:
+                    col = []
+                    sheet_plan.columns[str(field_key)] = col
+                col.extend(col_lists[idx])
+
+            sheet_plan.row_count = int(sheet_plan.row_count) + int(append_rows)
+            sheet_plan.segments.append(
+                _SheetBookSegment(
+                    producer_node_id=str(input_node_id),
+                    start_row=int(start_row),
+                    end_row=int(start_row) + int(append_rows),
+                    header_policy=str(header_policy),
+                )
+            )
+            plan.total_cells = int(new_total)
+            plan.last_workflow_node_id = str(workflow_node_id)
+
     def _get_or_create_sheetbook(self, sheetbook_id: str, *, workflow_node_id: str) -> _SheetBookPlan:
         key = str(sheetbook_id)
         with self._lock:
@@ -125,7 +395,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         msg = "Sheetbook budget exceeded: sheetbook={!r}".format(str(plan.resource_id))
         raise WorkflowWriteError(msg, diff=diff)
 
-    def apply_sheetbook_sheet(  # noqa: C901
+    def apply_sheetbook_sheet(
         self,
         *,
         workflow_node_id: str,
@@ -138,31 +408,14 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
     ) -> None:
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
-        action = "write"
-
         input_header = _read_csv_header(input_csv_path)
-
-        pending_skip = False
-        with self._lock:
-            existing = plan.sheets.get(sheet_name)
-            if existing is not None:
-                if on_conflict == "skip":
-                    action = "skip"
-                    plan.last_workflow_node_id = str(workflow_node_id)
-                    pending_skip = True
-                if on_conflict == "error":
-                    msg = "Sheet conflict (sheetbook_sheet): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                    raise WorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
-                if on_conflict == "overwrite":
-                    action = "overwrite"
-            elif len(plan.sheets) >= int(plan.budget_max_sheets):
-                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                diff = [
-                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                    "current_sheets={}".format(len(plan.sheets)),
-                    "new_sheet={!r}".format(sheet_name),
-                ]
-                raise WorkflowWriteError(msg, diff=diff)
+        action, pending_skip = self._sheetbook_sheet_prepare_action(
+            plan,
+            workflow_node_id=str(workflow_node_id),
+            sheetbook_id=str(sheetbook_id),
+            sheet_name=sheet_name,
+            on_conflict=str(on_conflict),
+        )
 
         if pending_skip:
             display_path = plan.export_path if plan.export_path is not None else "<memory>"
@@ -183,45 +436,21 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         mapping = _build_alignment_mapping(expected, input_header)
 
         # 读取并物化到内存(列式),用于下游读取与导出.
-        col_lists: List[List[str]] = [[] for _ in expected]
-        for row in _iter_csv_rows(input_csv_path):
-            for col_idx, src_idx in enumerate(mapping):
-                col_lists[col_idx].append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
-
+        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv_path=input_csv_path)
         columns: Dict[str, List[str]] = {str(key): col_lists[idx] for idx, key in enumerate(expected)}
         row_count = len(col_lists[0]) if col_lists else 0
         new_sheet_cells = int(row_count) * len(expected)
 
-        with self._lock:
-            existing = plan.sheets.get(sheet_name)
-            old_cells = 0
-            if existing is not None:
-                old_cells = int(existing.row_count) * len(existing.baseline_header)
-
-            new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
-            self._check_sheetbook_budget(plan, new_total_cells=new_total)
-
-            if existing is None:
-                plan.sheet_order.append(sheet_name)
-
-            sheet_plan = _SheetBookSheetPlan(
-                sheet=sheet_name,
-                baseline_header=list(expected),
-                columns=columns,
-                segments=[],
-                row_count=int(row_count),
-            )
-            sheet_plan.segments.append(
-                _SheetBookSegment(
-                    producer_node_id=str(input_node_id),
-                    start_row=0,
-                    end_row=int(row_count),
-                    header_policy="once",
-                )
-            )
-            plan.sheets[sheet_name] = sheet_plan
-            plan.total_cells = int(new_total)
-            plan.last_workflow_node_id = str(workflow_node_id)
+        self._sheetbook_sheet_store(
+            plan,
+            workflow_node_id=str(workflow_node_id),
+            sheet_name=sheet_name,
+            input_node_id=str(input_node_id),
+            expected=expected,
+            columns=columns,
+            row_count=int(row_count),
+            new_sheet_cells=int(new_sheet_cells),
+        )
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._emit_resource_write(
@@ -236,7 +465,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             sheet=sheet_name,
         )
 
-    def apply_sheetbook_append(  # noqa: C901, PLR0912, PLR0915
+    def apply_sheetbook_append(
         self,
         *,
         workflow_node_id: str,
@@ -252,70 +481,16 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
         input_header = _read_csv_header(input_csv_path)
-
-        pending_warning: Optional[DiagnosticWarningEvent] = None
-        pending_warning_meta: Optional[Dict[str, object]] = None
-        pending_skip = False
-        start_row = 0
-
-        with self._lock:
-            sheet_plan = plan.sheets.get(sheet_name)
-            if sheet_plan is None:
-                if len(plan.sheets) >= int(plan.budget_max_sheets):
-                    msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                    diff = [
-                        "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                        "current_sheets={}".format(len(plan.sheets)),
-                        "new_sheet={!r}".format(sheet_name),
-                    ]
-                    raise WorkflowWriteError(msg, diff=diff)
-                plan.sheet_order.append(sheet_name)
-                sheet_plan = _SheetBookSheetPlan(sheet=sheet_name, baseline_header=list(input_header), columns={}, segments=[], row_count=0)
-                plan.sheets[sheet_name] = sheet_plan
-
-            expected = list(sheet_plan.baseline_header)
-            mapping = _build_alignment_mapping(expected, input_header)
-
-            mismatch = False
-            if str(align_by) == "field_id":
-                exp_set = {str(x) for x in expected}
-                act_set = {str(x) for x in input_header}
-                missing = exp_set.difference(act_set)
-                extra = act_set.difference(exp_set)
-                mismatch = bool(missing or extra)
-            else:
-                mismatch = list(input_header) != expected
-
-            if mismatch:
-                diff = _describe_header_diff(expected, input_header)
-                if on_mismatch == "error":
-                    msg = "Field alignment mismatch (sheetbook_append): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                    raise WorkflowWriteError(msg, diff=diff)
-                if on_mismatch == "warn":
-                    pending_warning = DiagnosticWarningEvent(
-                        message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
-                        source_id=None,
-                        field_id=None,
-                        lookup_key={"expected": expected, "actual": list(input_header)},
-                        row_id=None,
-                    )
-                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
-                if on_mismatch == "skip":
-                    plan.last_workflow_node_id = str(workflow_node_id)
-                    pending_skip = True
-
-            if not pending_skip:
-                # 重复写入检测: 同一生产者不应写入同一工作表多次.
-                for seg in sheet_plan.segments:
-                    if str(seg.producer_node_id) == str(input_node_id):
-                        msg = "Duplicate sheetbook write for the same producer: sheetbook={!r}, sheet={!r}, producer={!r}".format(
-                            str(sheetbook_id),
-                            sheet_name,
-                            str(input_node_id),
-                        )
-                        raise WorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
-
-                start_row = int(sheet_plan.row_count)
+        expected, mapping, start_row, pending_warning, pending_warning_meta, pending_skip = self._sheetbook_append_prepare(
+            plan,
+            workflow_node_id=str(workflow_node_id),
+            sheetbook_id=str(sheetbook_id),
+            sheet_name=sheet_name,
+            input_node_id=str(input_node_id),
+            input_header=list(input_header),
+            align_by=str(align_by),
+            on_mismatch=str(on_mismatch),
+        )
 
         if pending_warning is not None:
             _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)
@@ -336,41 +511,24 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             return
 
         # 读取并对齐到基线表头(列式追加).
-        col_lists: List[List[str]] = [[] for _ in expected]
-        for row in _iter_csv_rows(input_csv_path):
-            for col_idx, src_idx in enumerate(mapping):
-                col_lists[col_idx].append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
+        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv_path=input_csv_path)
 
         append_rows = len(col_lists[0]) if col_lists else 0
         append_cells = int(append_rows) * len(expected)
 
-        with self._lock:
-            sheet_plan = plan.sheets.get(sheet_name)
-            if sheet_plan is None:  # pragma: no cover
-                msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                raise WorkflowWriteError(msg)
-
-            new_total = int(plan.total_cells) + int(append_cells)
-            self._check_sheetbook_budget(plan, new_total_cells=new_total)
-
-            for idx, field_key in enumerate(expected):
-                col = sheet_plan.columns.get(field_key)
-                if col is None:
-                    col = []
-                    sheet_plan.columns[str(field_key)] = col
-                col.extend(col_lists[idx])
-
-            sheet_plan.row_count = int(sheet_plan.row_count) + int(append_rows)
-            sheet_plan.segments.append(
-                _SheetBookSegment(
-                    producer_node_id=str(input_node_id),
-                    start_row=int(start_row),
-                    end_row=int(start_row) + int(append_rows),
-                    header_policy=str(header_policy),
-                )
-            )
-            plan.total_cells = int(new_total)
-            plan.last_workflow_node_id = str(workflow_node_id)
+        self._sheetbook_append_apply(
+            plan,
+            sheetbook_id=str(sheetbook_id),
+            sheet_name=sheet_name,
+            expected=expected,
+            col_lists=col_lists,
+            append_rows=int(append_rows),
+            append_cells=int(append_cells),
+            start_row=int(start_row),
+            workflow_node_id=str(workflow_node_id),
+            input_node_id=str(input_node_id),
+            header_policy=str(header_policy),
+        )
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._emit_resource_write(
@@ -447,88 +605,47 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         return _iter()
 
     @override
-    def _commit_sheetbook(self, plan: object) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _commit_sheetbook(self, plan: object) -> None:
         p = cast("_SheetBookPlan", plan)
         export_path = p.export_path
         display_path = export_path if export_path is not None else "<memory>"
         if export_path is None:
-            node_id = p.last_workflow_node_id or "__wf__commit"
-            self._emit_resource_commit(
-                workflow_node_id=node_id, resource_type="sheetbook", resource_id=p.resource_id, path=str(display_path)
-            )
+            self._emit_sheetbook_commit(p, display_path=str(display_path))
             return
 
         output_path = str(export_path)
         output_dir = Path(output_path).parent
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        lock_path = None
-        if bool(p.export_write_lock):
-            lock_path = acquire_write_lock(output_path)
-            p.lock_path = lock_path
+        self._maybe_acquire_sheetbook_write_lock(p, output_path=output_path)
 
         try:
             workbook_cls = _get_openpyxl_workbook_class()
         except ImportError as exc:
-            if lock_path is not None:
-                release_write_lock(lock_path)
-                p.lock_path = None
+            with suppress(Exception):
+                self._release_sheetbook_write_lock(p)
             raise WorkflowWriteError(str(exc)) from exc
 
         wb = workbook_cls(write_only=True)
         try:
-            for sheet_name in p.sheet_order:
-                sheet_plan = p.sheets.get(sheet_name)
-                if sheet_plan is None:
-                    continue  # pragma: no cover
-                ws = wb.create_sheet(str(sheet_name))
-                header_written = False
-                fields = list(sheet_plan.baseline_header)
-                escaped_fields = [escape_excel_formula(x, allow_formulas=bool(p.export_allow_formulas)) for x in fields]
-                for seg in sheet_plan.segments:
-                    if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
-                        _ = ws.append(list(escaped_fields))
-                        header_written = True
-                    # `never`: 不输出表头
-
-                    for row_idx in range(int(seg.start_row), int(seg.end_row)):
-                        out_row: List[object] = []
-                        for field_key in fields:
-                            col = sheet_plan.columns.get(str(field_key))
-                            value = col[row_idx] if col is not None and row_idx >= 0 and row_idx < len(col) else ""
-                            out_row.append(escape_excel_formula(value, allow_formulas=bool(p.export_allow_formulas)))
-                        _ = ws.append(out_row)
-
-            temp_path = create_temp_path(output_path, ".xlsx.tmp")
-            temp_obj = Path(temp_path)
-            try:
-                wb.save(temp_obj)
-                _ = temp_obj.replace(output_path)
-            except Exception as exc:
-                with suppress(Exception):
-                    if temp_obj.exists():
-                        temp_obj.unlink()
-                msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
-                raise WorkflowWriteError(msg) from exc
+            _write_sheetbook_plan_to_openpyxl_workbook(wb, p)
+            _save_openpyxl_workbook_atomic(wb, output_path=output_path)
         except Exception:
             _best_effort_close_write_only_workbook_worksheets(wb)
             raise
         finally:
             with suppress(Exception):
                 wb.close()
-            if p.lock_path is not None:
-                release_write_lock(p.lock_path)
-                p.lock_path = None
+            with suppress(Exception):
+                self._release_sheetbook_write_lock(p)
 
-        node_id = p.last_workflow_node_id or "__wf__commit"
-        self._emit_resource_commit(workflow_node_id=node_id, resource_type="sheetbook", resource_id=p.resource_id, path=str(display_path))
+        self._emit_sheetbook_commit(p, display_path=str(display_path))
 
     @override
     def _discard_sheetbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
         p = cast("_SheetBookPlan", plan)
-        if p.lock_path is not None:
-            release_write_lock(p.lock_path)
-            p.lock_path = None
+        with suppress(Exception):
+            self._release_sheetbook_write_lock(p)
         node_id = p.last_workflow_node_id or str(workflow_node_id)
         display_path = p.export_path if p.export_path is not None else "<memory>"
         self._emit_resource_discard(

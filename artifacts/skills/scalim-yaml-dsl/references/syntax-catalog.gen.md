@@ -188,6 +188,8 @@
   - shared resources commit atomically at workflow end
   - shared resource lifecycle MUST be observable
   - shared resource plan creation MUST be atomic and joinable within a workflow exec
+  - workflow workbook exports MUST escape Excel formulas by default
+  - workflow workbook resource authoring surface MUST support allow_formulas
 ### `workflow-sheetbook-resources`
 - Source: `openspec/specs/workflow-sheetbook-resources/spec.md`
 - Purpose: 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`writes[*].sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
@@ -200,6 +202,8 @@
   - workflow MUST precheck Excel output-path collisions across nodes
   - sheetbook lifecycle MUST be observable and joinable
   - sheetbook plan creation MUST be atomic within a workflow exec
+  - sheetbook xlsx export MUST escape Excel formulas by default
+  - sheetbook export_xlsx authoring surface MUST support allow_formulas
 ### `workflow-observability-bridge`
 - Source: `openspec/specs/workflow-observability-bridge/spec.md`
 - Purpose: 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.

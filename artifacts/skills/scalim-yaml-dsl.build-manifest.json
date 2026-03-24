@@ -228,7 +228,9 @@
           "append/merge semantics are explicit and verifiable",
           "shared resources commit atomically at workflow end",
           "shared resource lifecycle MUST be observable",
-          "shared resource plan creation MUST be atomic and joinable within a workflow exec"
+          "shared resource plan creation MUST be atomic and joinable within a workflow exec",
+          "workflow workbook exports MUST escape Excel formulas by default",
+          "workflow workbook resource authoring surface MUST support allow_formulas"
         ],
         "slug": "workflow-shared-output-containers"
       },
@@ -242,7 +244,9 @@
           "demand nodes MUST be able to consume sheetbook sheet rows via a built-in loader",
           "workflow MUST precheck Excel output-path collisions across nodes",
           "sheetbook lifecycle MUST be observable and joinable",
-          "sheetbook plan creation MUST be atomic within a workflow exec"
+          "sheetbook plan creation MUST be atomic within a workflow exec",
+          "sheetbook xlsx export MUST escape Excel formulas by default",
+          "sheetbook export_xlsx authoring surface MUST support allow_formulas"
         ],
         "slug": "workflow-sheetbook-resources"
       },
@@ -412,11 +416,11 @@
     },
     {
       "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "c16de5aa93ecc3f2ffb82366c2d5d73e1a7176c1da8d0446550ca9800abc424d"
+      "sha256": "a2d496edba1e43f10d27ccfd1d14e3fa34bfb388bd566c708f3f247169735e60"
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-      "sha256": "b802a2a0919121622be07b266b2c29d1edf0239c8ab22a1349dc123042e44699"
+      "sha256": "ad11cfbbfecbbe9eeb277d0bc8d27f94e85738206317bcaa8e551c0311cc864d"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -466,7 +470,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "6b211aa6ab477acc3f6c0b2a7421fc145d253cb57cda7d83d6aefdcaabc3aca9"
+      "sha256": "998c4056630be1dd6a5b83c970177610a00d38ae7f085531e6293a0a3696702f"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

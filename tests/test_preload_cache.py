@@ -1,7 +1,6 @@
 import logging
 import pickle
 import threading
-import time
 
 import pytest
 
@@ -49,7 +48,6 @@ def test_preload_cache_get_or_load_returns_cached_value_inside_lock() -> None:
 
     def _load():  # type: ignore[no-untyped-def]
         calls.append(1)
-        time.sleep(0.05)
         return {1: {"value": "z"}}
 
     results = []
@@ -76,73 +74,123 @@ def test_preload_cache_get_or_load_returns_cached_value_inside_lock() -> None:
 
 def test_preload_cache_wait_diagnostics_default_disabled_emits_no_warning(caplog) -> None:
     cache = PreloadCache()
-    barrier = threading.Barrier(2)
     calls = []
+    owner_entered = threading.Event()
+    allow_finish = threading.Event()
+    results = []
+    errors = []
 
-    def _load():  # type: ignore[no-untyped-def]
+    def _load_owner():  # type: ignore[no-untyped-def]
         calls.append(1)
-        time.sleep(0.05)
+        owner_entered.set()
+        if not allow_finish.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("timeout waiting for allow_finish")
         return {1: {"value": "z"}}
 
-    results = []
+    def _load_waiter():  # type: ignore[no-untyped-def]
+        raise AssertionError("load_fn should not be called for waiter")
 
-    def _worker() -> None:
+    def _owner() -> None:
         try:
-            barrier.wait(timeout=_TIMEOUT_S)
-        except threading.BrokenBarrierError as exc:
-            raise RuntimeError("timeout waiting for barrier") from exc
-        results.append(cache.get_or_load("src", _load))
+            results.append(cache.get_or_load("src", _load_owner))
+        except BaseException as exc:
+            errors.append(exc)
+
+    def _waiter() -> None:
+        try:
+            if not owner_entered.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("timeout waiting for owner_entered")
+            results.append(cache.get_or_load("src", _load_waiter))
+        except BaseException as exc:
+            errors.append(exc)
 
     caplog.set_level(logging.WARNING, logger="scalim.preload-cache")
-    t1 = threading.Thread(target=_worker)
-    t2 = threading.Thread(target=_worker)
+    t1 = threading.Thread(target=_owner)
+    t2 = threading.Thread(target=_waiter)
     t1.start()
     t2.start()
+    if not owner_entered.wait(timeout=_TIMEOUT_S):
+        raise RuntimeError("timeout waiting for owner_entered")
+    allow_finish.set()
     t1.join(timeout=_TIMEOUT_S)
     t2.join(timeout=_TIMEOUT_S)
     assert not t1.is_alive()
     assert not t2.is_alive()
 
+    if errors:
+        raise AssertionError(errors)
     assert results == [{1: {"value": "z"}}, {1: {"value": "z"}}]
     assert len(calls) == 1
     assert [rec for rec in caplog.records if rec.name == "scalim.preload-cache"] == []
 
 
 def test_preload_cache_wait_diagnostics_emits_warning_with_stable_fields(caplog) -> None:
+    warning_emitted = threading.Event()
     cache = PreloadCache(
         wait_diagnostics=PreloadCacheWaitDiagnostics(
             enabled=True,
-            warn_after_s=0.01,
+            warn_after_s=0.0,
             repeat_every_s=None,
         ),
     )
-    barrier = threading.Barrier(2)
     calls = []
-
-    def _load():  # type: ignore[no-untyped-def]
-        calls.append(1)
-        time.sleep(0.05)
-        return {1: {"value": "z"}}
-
+    owner_entered = threading.Event()
+    allow_finish = threading.Event()
     results = []
+    errors = []
 
-    def _worker() -> None:
-        try:
-            barrier.wait(timeout=_TIMEOUT_S)
-        except threading.BrokenBarrierError as exc:
-            raise RuntimeError("timeout waiting for barrier") from exc
-        results.append(cache.get_or_load("src", _load))
+    logger = logging.getLogger("scalim.preload-cache")
 
-    caplog.set_level(logging.WARNING, logger="scalim.preload-cache")
-    t1 = threading.Thread(target=_worker)
-    t2 = threading.Thread(target=_worker)
-    t1.start()
-    t2.start()
-    t1.join(timeout=_TIMEOUT_S)
-    t2.join(timeout=_TIMEOUT_S)
-    assert not t1.is_alive()
-    assert not t2.is_alive()
+    class _WarningHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            if "inflight wait slow:" in record.getMessage():
+                warning_emitted.set()
 
+    handler = _WarningHandler()
+    logger.addHandler(handler)
+    try:
+
+        def _load_owner():  # type: ignore[no-untyped-def]
+            calls.append(1)
+            owner_entered.set()
+            if not allow_finish.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("timeout waiting for allow_finish")
+            return {1: {"value": "z"}}
+
+        def _load_waiter():  # type: ignore[no-untyped-def]
+            raise AssertionError("load_fn should not be called for waiter")
+
+        def _owner() -> None:
+            try:
+                results.append(cache.get_or_load("src", _load_owner))
+            except BaseException as exc:
+                errors.append(exc)
+
+        def _waiter() -> None:
+            try:
+                if not owner_entered.wait(timeout=_TIMEOUT_S):
+                    raise RuntimeError("timeout waiting for owner_entered")
+                results.append(cache.get_or_load("src", _load_waiter))
+            except BaseException as exc:
+                errors.append(exc)
+
+        caplog.set_level(logging.WARNING, logger="scalim.preload-cache")
+        t1 = threading.Thread(target=_owner)
+        t2 = threading.Thread(target=_waiter)
+        t1.start()
+        t2.start()
+        if not warning_emitted.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("timeout waiting for warning emission")
+        allow_finish.set()
+        t1.join(timeout=_TIMEOUT_S)
+        t2.join(timeout=_TIMEOUT_S)
+        assert not t1.is_alive()
+        assert not t2.is_alive()
+    finally:
+        logger.removeHandler(handler)
+
+    if errors:
+        raise AssertionError(errors)
     assert results == [{1: {"value": "z"}}, {1: {"value": "z"}}]
     assert len(calls) == 1
 
@@ -264,6 +312,7 @@ def test_preload_cache_signature_guardrail_inflight_accepts_first_digest_when_in
     owner_started = threading.Event()
     allow_finish = threading.Event()
     waiter_called = threading.Event()
+    waiter_entered = threading.Event()
     waiter_result = []
 
     def _load_owner():  # type: ignore[no-untyped-def]
@@ -295,15 +344,17 @@ def test_preload_cache_signature_guardrail_inflight_accepts_first_digest_when_in
 
     cache._signature_guardrail = PreloadCacheSignatureGuardrail(enabled=True, policy="error")  # type: ignore[attr-defined]
 
+    original_waiter = cache._get_or_load_waiter  # type: ignore[attr-defined]
+
+    def _wrapped_waiter(*args, **kwargs):  # type: ignore[no-untyped-def]
+        waiter_entered.set()
+        return original_waiter(*args, **kwargs)
+
+    cache._get_or_load_waiter = _wrapped_waiter  # type: ignore[assignment]
+
     t2.start()
 
-    deadline = time.monotonic() + _TIMEOUT_S
-    while time.monotonic() < deadline:
-        inflight = cache._inflight.get("s1")  # type: ignore[attr-defined]
-        if inflight is not None and inflight.ref_count > 1:
-            break
-        time.sleep(0.001)
-    else:
+    if not waiter_entered.wait(timeout=_TIMEOUT_S):
         raise RuntimeError("timeout waiting for waiter to join inflight")
 
     allow_finish.set()
@@ -345,73 +396,144 @@ def test_preload_cache_signature_guardrail_enabled_requires_signature_digest() -
 
 
 def test_preload_cache_wait_diagnostics_repeat_emits_multiple_warnings(caplog) -> None:
+    warnings_emitted = threading.Event()
+    warning_count = {"n": 0}
     cache = PreloadCache(
         wait_diagnostics=PreloadCacheWaitDiagnostics(
             enabled=True,
-            warn_after_s=0.01,
-            repeat_every_s=0.01,
+            warn_after_s=0.0,
+            repeat_every_s=0.05,
         ),
     )
-    barrier = threading.Barrier(2)
+    owner_entered = threading.Event()
+    allow_finish = threading.Event()
+    errors = []
 
-    def _load():  # type: ignore[no-untyped-def]
-        time.sleep(0.05)
-        return {1: {"value": "z"}}
+    logger = logging.getLogger("scalim.preload-cache")
 
-    def _worker() -> None:
-        try:
-            barrier.wait(timeout=_TIMEOUT_S)
-        except threading.BrokenBarrierError as exc:
-            raise RuntimeError("timeout waiting for barrier") from exc
-        _ = cache.get_or_load("src", _load)
+    class _WarningHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            if "inflight wait slow:" not in record.getMessage():
+                return
+            warning_count["n"] += 1
+            if warning_count["n"] >= 2:
+                warnings_emitted.set()
 
-    caplog.set_level(logging.WARNING, logger="scalim.preload-cache")
-    t1 = threading.Thread(target=_worker)
-    t2 = threading.Thread(target=_worker)
-    t1.start()
-    t2.start()
-    t1.join(timeout=_TIMEOUT_S)
-    t2.join(timeout=_TIMEOUT_S)
-    assert not t1.is_alive()
-    assert not t2.is_alive()
+    handler = _WarningHandler()
+    logger.addHandler(handler)
+    try:
 
+        def _load_owner():  # type: ignore[no-untyped-def]
+            owner_entered.set()
+            if not allow_finish.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("timeout waiting for allow_finish")
+            return {1: {"value": "z"}}
+
+        def _load_waiter():  # type: ignore[no-untyped-def]
+            raise AssertionError("load_fn should not be called for waiter")
+
+        def _owner() -> None:
+            try:
+                _ = cache.get_or_load("src", _load_owner)
+            except BaseException as exc:
+                errors.append(exc)
+
+        def _waiter() -> None:
+            try:
+                if not owner_entered.wait(timeout=_TIMEOUT_S):
+                    raise RuntimeError("timeout waiting for owner_entered")
+                _ = cache.get_or_load("src", _load_waiter)
+            except BaseException as exc:
+                errors.append(exc)
+
+        caplog.set_level(logging.WARNING, logger="scalim.preload-cache")
+        t1 = threading.Thread(target=_owner)
+        t2 = threading.Thread(target=_waiter)
+        t1.start()
+        t2.start()
+        if not warnings_emitted.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("timeout waiting for multiple warning emissions")
+        allow_finish.set()
+        t1.join(timeout=_TIMEOUT_S)
+        t2.join(timeout=_TIMEOUT_S)
+        assert not t1.is_alive()
+        assert not t2.is_alive()
+    finally:
+        logger.removeHandler(handler)
+
+    if errors:
+        raise AssertionError(errors)
+    assert warning_count["n"] >= 2
     messages = [rec.getMessage() for rec in caplog.records if rec.name == "scalim.preload-cache"]
     slow_warnings = [msg for msg in messages if "inflight wait slow:" in msg]
     assert len(slow_warnings) >= 2
 
 
 def test_preload_cache_wait_diagnostics_capture_owner_callsite_includes_callsite(caplog) -> None:
+    warning_emitted = threading.Event()
     cache = PreloadCache(
         wait_diagnostics=PreloadCacheWaitDiagnostics(
             enabled=True,
-            warn_after_s=0.01,
+            warn_after_s=0.0,
             repeat_every_s=None,
             capture_owner_callsite=True,
         ),
     )
-    barrier = threading.Barrier(2)
+    owner_entered = threading.Event()
+    allow_finish = threading.Event()
+    errors = []
 
-    def _load():  # type: ignore[no-untyped-def]
-        time.sleep(0.05)
-        return {1: {"value": "z"}}
+    logger = logging.getLogger("scalim.preload-cache")
 
-    def _worker() -> None:
-        try:
-            barrier.wait(timeout=_TIMEOUT_S)
-        except threading.BrokenBarrierError as exc:
-            raise RuntimeError("timeout waiting for barrier") from exc
-        _ = cache.get_or_load("src", _load)
+    class _WarningHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            if "owner_callsite=" in record.getMessage():
+                warning_emitted.set()
 
-    caplog.set_level(logging.WARNING, logger="scalim.preload-cache")
-    t1 = threading.Thread(target=_worker)
-    t2 = threading.Thread(target=_worker)
-    t1.start()
-    t2.start()
-    t1.join(timeout=_TIMEOUT_S)
-    t2.join(timeout=_TIMEOUT_S)
-    assert not t1.is_alive()
-    assert not t2.is_alive()
+    handler = _WarningHandler()
+    logger.addHandler(handler)
+    try:
 
+        def _load_owner():  # type: ignore[no-untyped-def]
+            owner_entered.set()
+            if not allow_finish.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("timeout waiting for allow_finish")
+            return {1: {"value": "z"}}
+
+        def _load_waiter():  # type: ignore[no-untyped-def]
+            raise AssertionError("load_fn should not be called for waiter")
+
+        def _owner() -> None:
+            try:
+                _ = cache.get_or_load("src", _load_owner)
+            except BaseException as exc:
+                errors.append(exc)
+
+        def _waiter() -> None:
+            try:
+                if not owner_entered.wait(timeout=_TIMEOUT_S):
+                    raise RuntimeError("timeout waiting for owner_entered")
+                _ = cache.get_or_load("src", _load_waiter)
+            except BaseException as exc:
+                errors.append(exc)
+
+        caplog.set_level(logging.WARNING, logger="scalim.preload-cache")
+        t1 = threading.Thread(target=_owner)
+        t2 = threading.Thread(target=_waiter)
+        t1.start()
+        t2.start()
+        if not warning_emitted.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("timeout waiting for warning emission")
+        allow_finish.set()
+        t1.join(timeout=_TIMEOUT_S)
+        t2.join(timeout=_TIMEOUT_S)
+        assert not t1.is_alive()
+        assert not t2.is_alive()
+    finally:
+        logger.removeHandler(handler)
+
+    if errors:
+        raise AssertionError(errors)
     messages = [rec.getMessage() for rec in caplog.records if rec.name == "scalim.preload-cache"]
     assert any("owner_callsite=" in msg for msg in messages)
 
@@ -453,32 +575,46 @@ def test_preload_cache_get_or_load_does_not_call_load_fn_if_cached_before_acquir
 
 def test_preload_cache_get_or_load_propagates_exceptions_to_waiters_and_allows_retry() -> None:
     cache = PreloadCache()
-    barrier = threading.Barrier(2)
     calls = []
     errors = []
+    owner_entered = threading.Event()
+    allow_raise = threading.Event()
 
     class _LoadError(RuntimeError):
         pass
 
-    def _load():  # type: ignore[no-untyped-def]
+    def _load_owner():  # type: ignore[no-untyped-def]
         calls.append(1)
-        time.sleep(0.05)
+        owner_entered.set()
+        if not allow_raise.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("timeout waiting for allow_raise")
         raise _LoadError("boom")
 
-    def _worker() -> None:
+    def _load_waiter():  # type: ignore[no-untyped-def]
+        raise AssertionError("load_fn should not be called for waiter")
+
+    def _owner() -> None:
         try:
-            barrier.wait(timeout=_TIMEOUT_S)
-        except threading.BrokenBarrierError as exc:
-            raise RuntimeError("timeout waiting for barrier") from exc
-        try:
-            cache.get_or_load("src", _load)
+            cache.get_or_load("src", _load_owner)
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
 
-    t1 = threading.Thread(target=_worker)
-    t2 = threading.Thread(target=_worker)
+    def _waiter() -> None:
+        if not owner_entered.wait(timeout=_TIMEOUT_S):
+            errors.append(RuntimeError("timeout waiting for owner_entered"))
+            return
+        try:
+            cache.get_or_load("src", _load_waiter)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    t1 = threading.Thread(target=_owner)
+    t2 = threading.Thread(target=_waiter)
     t1.start()
+    if not owner_entered.wait(timeout=_TIMEOUT_S):
+        raise RuntimeError("timeout waiting for owner_entered")
     t2.start()
+    allow_raise.set()
     t1.join(timeout=_TIMEOUT_S)
     t2.join(timeout=_TIMEOUT_S)
     assert not t1.is_alive()

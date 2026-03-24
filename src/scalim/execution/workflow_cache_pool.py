@@ -1,10 +1,9 @@
 import hashlib
 import json
-import math
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
+from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from ..events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
@@ -17,6 +16,7 @@ from ..ob.hub import InstrumentationHub
 from ..spec.ir.sources import SourceIr
 from ..spec.ir.workflow import WorkflowCachePoolIr
 from ..typedefs import LoaderCallKwargs, LoaderResultMapping
+from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
 
 
 class WorkflowCachePoolError(RuntimeError):
@@ -28,25 +28,15 @@ class WorkflowCachePoolError(RuntimeError):
 
 
 def _ensure_json_like(value: object, *, path: str) -> object:
-    if value is None or isinstance(value, (bool, int, str)):
-        return value
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            msg = "Signature value must be JSON-like (float must be finite)"
-            raise WorkflowCachePoolError(msg, path=path)
-        return value
-    if isinstance(value, (list, tuple)):
-        return [_ensure_json_like(v, path=path) for v in cast("Sequence[object]", value)]
-    if isinstance(value, dict):
-        out: Dict[str, object] = {}
-        for k, v in cast("Dict[object, object]", value).items():
-            if not isinstance(k, str):
-                msg = "Signature value must be JSON-like (dict key must be str)"
-                raise WorkflowCachePoolError(msg, path=path)
-            out[str(k)] = _ensure_json_like(v, path=path)
-        return out
-    msg = "Signature value must be JSON-like (None/bool/int/float/str/list/tuple/dict[str, ...]), got {}".format(type(value).__name__)
-    raise WorkflowCachePoolError(msg, path=path)
+    return _ensure_json_like_ssot(
+        value,
+        path=path,
+        value_name="Signature value",
+        allowed_types_desc="None/bool/int/float/str/list/tuple/dict[str, ...]",
+        dict_key_desc="str",
+        require_nonempty_dict_key=False,
+        error_cls=WorkflowCachePoolError,
+    )
 
 
 def _normalize_json_like(value: object) -> object:

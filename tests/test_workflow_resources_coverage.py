@@ -17,6 +17,8 @@ from scalim.events.catalog import (
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
 
+_TIMEOUT_S = 5.0
+
 
 class _Instrumentation:
     def __init__(self) -> None:
@@ -649,22 +651,31 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
         on_conflict="error",
     )
 
-    runner = threading.Thread(
-        target=lambda: manager.apply_workbook_sheet(
-            workflow_node_id="n1",
-            workbook_id="report",
-            sheet="S",
-            input_node_id="b",
-            input_output_id="detail",
-            input_csv_path=str(first),
-            on_conflict="skip",
-        ),
-        daemon=True,
-    )
+    runner_done = threading.Event()
+    runner_errors: List[BaseException] = []
+
+    def _run() -> None:
+        try:
+            manager.apply_workbook_sheet(
+                workflow_node_id="n1",
+                workbook_id="report",
+                sheet="S",
+                input_node_id="b",
+                input_output_id="detail",
+                input_csv_path=str(first),
+                on_conflict="skip",
+            )
+        except BaseException as exc:
+            runner_errors.append(exc)
+        finally:
+            runner_done.set()
+
+    runner = threading.Thread(target=_run, daemon=True)
     runner.start()
-    runner.join(timeout=1.0)
-    if runner.is_alive():
+    if not runner_done.wait(timeout=_TIMEOUT_S):
         pytest.fail("WorkflowResourceManager.emit appears to be called under internal locks (reentry deadlock)")
+    runner.join(timeout=_TIMEOUT_S)
+    assert not runner_errors
     assert instrumentation._reentered is True
 
 

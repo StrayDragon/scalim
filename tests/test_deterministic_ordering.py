@@ -88,7 +88,13 @@ def _run_hashseed_snippet(seed: str, snippet: str) -> Any:
     env["PYTHONHASHSEED"] = str(seed)
     env["PYTHONPATH"] = str(root)
     dedented = textwrap.dedent(snippet).strip()
-    out = subprocess.check_output([sys.executable, "-c", dedented], env=env, cwd=str(root), text=True)
+    out = subprocess.check_output(
+        [sys.executable, "-c", dedented],
+        env=env,
+        cwd=str(root),
+        text=True,
+        timeout=20.0,
+    )
     return json.loads(out)
 
 
