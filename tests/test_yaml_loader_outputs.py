@@ -104,8 +104,11 @@ outputs:
     container: {type: csv, path: ./out.csv}
     fields: [order_id]
 """
-    with pytest.raises(ValueError, match=r"points to unknown output"):
+    with pytest.raises(ValueError) as exc:
         _ = _load(yaml_content)
+
+    msg = str(exc.value)
+    assert "outputs.child.from points to unknown output: missing" in msg
 
 
 def test_loader_rejects_outputs_from_cycle() -> None:
@@ -128,7 +131,32 @@ outputs:
     container: {type: csv, path: ./out.csv}
     fields: [order_id]
 """
-    with pytest.raises(ValueError, match="cycle"):
+    with pytest.raises(ValueError, match=r"cycle at 'a'"):
+        _ = _load(yaml_content)
+
+
+def test_loader_rejects_outputs_from_inherits_fields_from_base_without_fields() -> None:
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs:
+  - name: base_agg
+    container: {type: csv, path: ./out.csv}
+    aggregate:
+      group_by: [order_id]
+      fields:
+        order_cnt: {count: {field: order_id}}
+  - name: child_detail
+    from: base_agg
+    container: {type: csv, path: ./child.csv}
+"""
+    with pytest.raises(ValueError, match=r"inherits fields from 'base_agg'"):
         _ = _load(yaml_content)
 
 

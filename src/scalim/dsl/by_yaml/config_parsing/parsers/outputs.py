@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, replace
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
 
 from .....utils import graph as graph_utils
 from .....utils.iterables import ordered_unique_str
@@ -22,9 +22,13 @@ from ...schema_dsl.models import (
     OutputTargetConfig,
 )
 from ...schema_dsl.output_enums import (
-    AGG_METRIC_PRODUCER_KEYS,
-    AGG_POST_PRODUCER_KEYS,
-    AGG_RANK_PRODUCER_KEYS,
+    AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,
+)
+from ...schema_dsl.output_enums import (
+    AGG_POST_PRODUCER_KEYS as _POST_FUNC_KEYS,
+)
+from ...schema_dsl.output_enums import (
+    AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
 )
 from ..call_by import CallByParseError, extract_call_by_dependencies, parse_call_by
 from ..models import FieldDefIndex, RawDemand
@@ -34,9 +38,6 @@ from .utils import list_or_none, mapping_or_none, str_or_none
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _OUTPUT_CONTAINER_TYPES = ("workbook", "csv")
 _OUTPUT_HEADER_BY_ENUM = ("field_id", "name")
-_AGG_FUNC_KEYS = AGG_METRIC_PRODUCER_KEYS
-_RANK_FUNC_KEYS = AGG_RANK_PRODUCER_KEYS
-_POST_FUNC_KEYS = AGG_POST_PRODUCER_KEYS
 _AGG_DISTINCT_ON_OVERFLOW_ENUM = ("error", "truncate")
 _AGG_RANK_ORDER_ENUM = ("asc", "desc")
 _AGG_RANK_TOP_K_MODE_ENUM = ("rank", "rows")
@@ -69,6 +70,72 @@ class _AggregateAliasIndex:
 class _AggregateFieldIndex:
     field_defs: List[_AggregateFieldDef]
     alias_index: _AggregateAliasIndex
+
+
+def _resolve_output_targets_from_inheritance(
+    base_outputs: List[OutputTargetConfig],
+    *,
+    validate_output_name: Callable[[str], None],
+) -> List[OutputTargetConfig]:
+    """阶段 2: 解析 `outputs` 的 `from` 继承(含环检测)."""
+
+    resolver = _OutputFromResolver(base_outputs, validate_output_name=validate_output_name)
+    return resolver.resolve_all()
+
+
+class _OutputFromResolver:
+    def __init__(self, base_outputs: List[OutputTargetConfig], *, validate_output_name: Callable[[str], None]) -> None:
+        self._by_name: Dict[str, OutputTargetConfig] = {}
+        self._ordered_names: List[str] = []
+        for t in base_outputs:
+            name = str(t.name or "").strip()
+            validate_output_name(name)
+            if name in self._by_name:
+                msg = "Duplicate output name: {}".format(name)
+                raise ValueError(msg)
+            self._by_name[name] = t
+            self._ordered_names.append(name)
+
+        self._resolved: Dict[str, OutputTargetConfig] = {}
+        self._visiting: Set[str] = set()
+
+    def resolve_all(self) -> List[OutputTargetConfig]:
+        return [self._resolve_one(name) for name in self._ordered_names]
+
+    def _resolve_one(self, name: str) -> OutputTargetConfig:
+        existing = self._resolved.get(name)
+        if existing is not None:
+            return existing
+        if name in self._visiting:
+            msg = "outputs.*.from has a cycle at '{}'".format(name)
+            raise ValueError(msg)
+        self._visiting.add(name)
+        current = self._by_name[name]
+
+        merged = self._merge_one(current, name=name)
+        self._resolved[name] = merged
+        self._visiting.remove(name)
+        return merged
+
+    def _merge_one(self, current: OutputTargetConfig, *, name: str) -> OutputTargetConfig:
+        container = current.container
+        fields = current.fields
+
+        from_name = str(current.from_ or "").strip() or None
+        if from_name:
+            if from_name not in self._by_name:
+                msg = "outputs.{}.from points to unknown output: {}".format(name, from_name)
+                raise ValueError(msg)
+            base_resolved = self._resolve_one(from_name)
+            if container is None:
+                container = base_resolved.container
+            if current.aggregate is None and fields is None:
+                fields = base_resolved.fields
+                if fields is None:
+                    msg = "outputs.{} inherits fields from '{}', but base output has no fields".format(name, from_name)
+                    raise ValueError(msg)
+
+        return replace(current, container=container, fields=fields)
 
 
 class ParserOutputsMixin:
@@ -160,7 +227,7 @@ class ParserOutputsMixin:
             out.extend(self._walk_output_field_items(sub, field_path=sub_path))
         return out
 
-    def _parse_outputs(  # noqa: C901, PLR0915
+    def _parse_outputs(
         self,
         raw: RawDemand,
         *,
@@ -196,52 +263,10 @@ class ParserOutputsMixin:
                 )
             )
 
-        by_name: Dict[str, OutputTargetConfig] = {}
-        for t in base_outputs:
-            name = str(t.name or "").strip()
-            self._validate_output_name(name, path="outputs.*.name")
-            if name in by_name:
-                msg = "Duplicate output name: {}".format(name)
-                raise ValueError(msg)
-            by_name[name] = t
-
-        resolved: Dict[str, OutputTargetConfig] = {}
-        visiting: Set[str] = set()
-
-        def _resolve(name: str) -> OutputTargetConfig:
-            existing = resolved.get(name)
-            if existing is not None:
-                return existing
-            if name in visiting:
-                msg = "outputs.*.from has a cycle at '{}'".format(name)
-                raise ValueError(msg)
-            visiting.add(name)
-            current = by_name[name]
-
-            container = current.container
-            fields = current.fields
-
-            from_name = str(current.from_ or "").strip() or None
-            if from_name:
-                base = by_name.get(from_name)
-                if base is None:
-                    msg = "outputs.{}.from points to unknown output: {}".format(name, from_name)
-                    raise ValueError(msg)
-                base_resolved = _resolve(from_name)
-                if container is None:
-                    container = base_resolved.container
-                if current.aggregate is None and fields is None:
-                    fields = base_resolved.fields
-                    if fields is None:
-                        msg = "outputs.{} inherits fields from '{}', but base output has no fields".format(name, from_name)
-                        raise ValueError(msg)
-
-            merged = replace(current, container=container, fields=fields)
-            resolved[name] = merged
-            visiting.remove(name)
-            return merged
-
-        resolved_outputs: List[OutputTargetConfig] = [_resolve(str(t.name)) for t in base_outputs]
+        resolved_outputs = _resolve_output_targets_from_inheritance(
+            base_outputs,
+            validate_output_name=lambda x: self._validate_output_name(x, path="outputs.*.name"),
+        )
         self._validate_outputs_semantics(resolved_outputs, known_field_ids=known_field_ids)
 
         required_field_ids = self._collect_required_field_ids_from_outputs(resolved_outputs)
@@ -1056,7 +1081,7 @@ class ParserOutputsMixin:
                             if order_by:
                                 deps_list.extend([str(x) for x in order_by])
                             # `order_by` 缺省时,语义等价于 `[by]`.
-                            derived_deps = ordered_unique_str([str(x) for x in deps_list if str(x)])
+                            derived_deps = ordered_unique_str([x for x in deps_list if x])
 
                         elif producer_key == "score_by_rank":
                             score_cfg = cast("Dict[str, Any]", cfg.config)

@@ -2,6 +2,7 @@ import pytest
 
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.models import AliasIndex, FieldDef, FieldDefIndex, RawDemand
+from scalim.dsl.by_yaml.config_parsing.parsers.outputs import _resolve_output_targets_from_inheritance
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
 from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputAggregateConfig,
@@ -35,6 +36,32 @@ def test_parse_outputs_rejects_non_list_and_non_object_items() -> None:
     raw = RawDemand.from_raw({"outputs": [1]})
     with pytest.raises(TypeError, match=r"outputs\.0 must be an object"):
         loader._parse_outputs(raw, field_def_index=field_index)
+
+
+def test_resolve_output_targets_from_inheritance_cycle_is_deterministic_and_has_name() -> None:
+    base_outputs = [
+        OutputTargetConfig(name="a", from_="b"),
+        OutputTargetConfig(name="b", from_="a"),
+    ]
+    with pytest.raises(ValueError, match=r"cycle at 'a'"):
+        _ = _resolve_output_targets_from_inheritance(base_outputs, validate_output_name=lambda _x: None)  # noqa: SLF001
+
+
+def test_resolve_output_targets_from_inheritance_rejects_unknown_from_with_names() -> None:
+    base_outputs = [
+        OutputTargetConfig(name="child", from_="missing"),
+    ]
+    with pytest.raises(ValueError, match=r"outputs\.child\.from points to unknown output: missing"):
+        _ = _resolve_output_targets_from_inheritance(base_outputs, validate_output_name=lambda _x: None)  # noqa: SLF001
+
+
+def test_resolve_output_targets_from_inheritance_rejects_inherit_fields_when_base_has_none() -> None:
+    base_outputs = [
+        OutputTargetConfig(name="base_agg", aggregate=OutputAggregateConfig()),
+        OutputTargetConfig(name="child_detail", from_="base_agg"),
+    ]
+    with pytest.raises(ValueError, match=r"inherits fields from 'base_agg'"):
+        _ = _resolve_output_targets_from_inheritance(base_outputs, validate_output_name=lambda _x: None)  # noqa: SLF001
 
 
 def test_parse_output_target_rejects_fields_non_list() -> None:
