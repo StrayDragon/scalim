@@ -1,7 +1,8 @@
-"""`workflow` 配置(稳定导入路径).
+"""`workflow` 配置类型(内部模块).
 
 说明:
-- 本文件对外保持稳定导入路径;实现已拆分/迁移到 `workflow_config.py` 等内部模块
+- 该模块提供更稳定、更明确的类型导入路径
+- 当前实现仍位于 `workflow_config.py`,此处仅做 `re-export`
 - 运行时需兼容 `Python 3.6`
 """
 
@@ -20,10 +21,6 @@ from .workflow_config import (
     WorkflowWriteToSheetbookSheet,
     WorkflowWriteToWorkbookAppend,
     WorkflowWriteToWorkbookSheet,
-    load_workflow_config,
-    load_workflow_config_from_mapping,
-    resolve_workflow_demand_path,
-    validate_workflow_yaml_text_json,
 )
 
 __all__ = [
@@ -41,8 +38,4 @@ __all__ = [
     "WorkflowWriteToSheetbookSheet",
     "WorkflowWriteToWorkbookAppend",
     "WorkflowWriteToWorkbookSheet",
-    "load_workflow_config",
-    "load_workflow_config_from_mapping",
-    "resolve_workflow_demand_path",
-    "validate_workflow_yaml_text_json",
 ]

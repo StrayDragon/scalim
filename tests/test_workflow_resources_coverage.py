@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 from scalim.dsl.by_yaml.runtime import workflow_resources as resources_mod
+from scalim.dsl.by_yaml.runtime import workflow_resources_sheetbook as resources_sheetbook_mod
+from scalim.dsl.by_yaml.runtime import workflow_resources_workbook as resources_workbook_mod
 from scalim.events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
@@ -755,7 +757,7 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
     def _raise_import(*_args: object, **_kwargs: object) -> Any:  # noqa: ANN401
         raise ImportError("no openpyxl")
 
-    monkeypatch.setattr(resources_mod, "require_optional_dependency", _raise_import)
+    monkeypatch.setattr(resources_workbook_mod, "require_optional_dependency", _raise_import)
     with pytest.raises(resources_mod.WorkflowWriteError, match="openpyxl"):
         manager.commit_all()
     assert not Path(str(export_path) + resources_mod._WRITE_LOCK_SUFFIX).exists()
@@ -808,8 +810,12 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
     )
 
     temp_path = tmp_path / "temp.xlsx.tmp"
-    monkeypatch.setattr(resources_mod, "require_optional_dependency", lambda *_args, **_kwargs: type("_M", (), {"Workbook": _FakeWB})())
-    monkeypatch.setattr(resources_mod, "create_temp_path", lambda _path, _suffix: str(temp_path))
+    monkeypatch.setattr(
+        resources_workbook_mod,
+        "require_optional_dependency",
+        lambda *_args, **_kwargs: type("_M", (), {"Workbook": _FakeWB})(),
+    )
+    monkeypatch.setattr(resources_sheetbook_mod, "create_temp_path", lambda _path, _suffix: str(temp_path))
     with pytest.raises(resources_mod.WorkflowWriteError, match="Sheetbook export failed"):
         manager.commit_all()
     assert not temp_path.exists()
@@ -999,7 +1005,7 @@ def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_pat
     def _raise_import_error(*args: object, **kwargs: object) -> object:
         raise ImportError("missing openpyxl")
 
-    monkeypatch.setattr(resources_mod, "require_optional_dependency", _raise_import_error)
+    monkeypatch.setattr(resources_workbook_mod, "require_optional_dependency", _raise_import_error)
     with pytest.raises(resources_mod.WorkflowWriteError, match="missing openpyxl"):
         manager.commit_all()
     assert not Path(str(workbook_path) + resources_mod._WRITE_LOCK_SUFFIX).exists()

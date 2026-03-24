@@ -1801,6 +1801,84 @@ def test_resolve_workflow_demand_path_supports_paths_relative_to_workflow(tmp_pa
     assert demand == (tmp_path / "rel.yaml").resolve(strict=False)
 
 
+def test_resolve_workflow_demand_path_rejects_relative_escape_by_default(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path("../escape.yaml", workflow_yaml_path=str(wf))
+    assert "YAML path escapes allowed roots" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_escape_error_includes_run_id(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path("../escape.yaml", workflow_yaml_path=str(wf), run_id="r1")
+    assert "YAML path escapes allowed roots" in str(excinfo.value)
+    assert "run_id=r1" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_rejects_absolute_escape_by_default(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    outside = (tmp_path.parent / "escape.yaml").resolve(strict=False)
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(str(outside), workflow_yaml_path=str(wf))
+    assert "YAML path escapes allowed roots" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_rejects_alias_escape_by_default(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "DATA:/escape.yaml",
+            workflow_yaml_path=str(wf),
+            path_aliases={"DATA": str(tmp_path.parent)},
+            run_id="r1",
+        )
+    assert "YAML path escapes allowed roots" in str(excinfo.value)
+    assert "alias=DATA" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_allows_escape_with_explicit_allowed_roots(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    allowed_yaml_roots = [tmp_path.parent]
+    demand = resolve_workflow_demand_path(
+        "../escape.yaml",
+        workflow_yaml_path=str(wf),
+        allowed_yaml_roots=allowed_yaml_roots,
+    )
+    assert demand == (tmp_path.parent / "escape.yaml").resolve(strict=False)
+
+    outside = (tmp_path.parent / "abs.yaml").resolve(strict=False)
+    demand = resolve_workflow_demand_path(
+        str(outside),
+        workflow_yaml_path=str(wf),
+        allowed_yaml_roots=allowed_yaml_roots,
+    )
+    assert demand == outside
+
+    demand = resolve_workflow_demand_path(
+        "DATA:/alias.yaml",
+        workflow_yaml_path=str(wf),
+        path_aliases={"DATA": str(tmp_path.parent)},
+        run_id="r1",
+        allowed_yaml_roots=allowed_yaml_roots,
+    )
+    assert demand == (tmp_path.parent / "alias.yaml").resolve(strict=False)
+
+
+def test_resolve_workflow_demand_path_invalid_allowed_yaml_roots_is_wrapped(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    missing_root = tmp_path / "missing_root"
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "rel.yaml",
+            workflow_yaml_path=str(wf),
+            allowed_yaml_roots=[missing_root],
+            run_id="r1",
+        )
+    assert "Invalid allowed_yaml_roots" in str(excinfo.value)
+    assert "run_id=r1" in str(excinfo.value)
+
+
 def test_validate_workflow_yaml_text_json_variants() -> None:
     bad_parse = json.loads(validate_workflow_yaml_text_json("workflow: [\n"))
     assert bad_parse["ok"] is False

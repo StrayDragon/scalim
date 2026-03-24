@@ -3,7 +3,7 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
 from ..vendor.compact.importlibx import import_module, require_optional_dependency
 from . import yaml_dsl_lsp
@@ -22,15 +22,15 @@ from ..dsl.by_yaml.config_parsing.jsonschema_issues import JsonSchemaCollectorEr
 from ..dsl.by_yaml.config_parsing.unknown_fields import find_unknown_fields
 from ..dsl.by_yaml.config_parsing.validator import ConfigValidator, attach_locations, build_yaml_location_index
 from ..dsl.by_yaml.config_parsing.validator import YamlValidationIssue as Issue
-from ..dsl.by_yaml.workflow import (
+from ..dsl.by_yaml.workflow_config import load_workflow_config
+from ..dsl.by_yaml.workflow_paths import resolve_workflow_demand_path
+from ..dsl.by_yaml.workflow_types import (
     WorkflowConfigError,
     WorkflowWriteToCsvAppend,
     WorkflowWriteToSheetbookAppend,
     WorkflowWriteToSheetbookSheet,
     WorkflowWriteToWorkbookAppend,
     WorkflowWriteToWorkbookSheet,
-    load_workflow_config,
-    resolve_workflow_demand_path,
 )
 
 try:
@@ -165,6 +165,14 @@ def _add_validate_args(parser: argparse.ArgumentParser) -> None:
         action="append",
         default=[],
         help="仅 workflow validate: 需求路径别名,格式 <alias>=<path> (可重复)",
+    )
+    _ = parser.add_argument(
+        "--allowed-yaml-root",
+        dest="allowed_yaml_roots",
+        type=Path,
+        action="append",
+        default=[],
+        help="允许读取 YAML 的根目录(可重复);默认仅允许入口 YAML 所在目录",
     )
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     _ = parser.add_argument("--verbose", "-v", action="store_true", help="显示详细错误信息")
@@ -516,6 +524,7 @@ def _validate_demand_yaml_text(
     yaml_path: Path,
     schema_path: Path,
     validator: Optional[ConfigValidator] = None,
+    allowed_yaml_roots: Optional[Sequence[Path]] = None,
 ) -> Tuple[ValidationPayload, Optional[Dict[str, Any]], Optional[List[str]]]:
     source_lines: List[str] = yaml_text.splitlines()
     try:
@@ -573,7 +582,7 @@ def _validate_demand_yaml_text(
 
     try:
         if contains_import_syntax(yaml_data_dict):
-            _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
+            _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path, allowed_yaml_roots=allowed_yaml_roots)
     except YamlImportExpansionError as exc:
         errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
         errors = attach_locations(errors, locations)
@@ -622,6 +631,7 @@ def _validate_demand_yaml_path(
     *,
     schema_path: Path,
     validator: Optional[ConfigValidator] = None,
+    allowed_yaml_roots: Optional[Sequence[Path]] = None,
 ) -> Tuple[ValidationPayload, Optional[Dict[str, Any]], Optional[List[str]]]:
     if not yaml_path.exists():
         errors = [Issue(path="(file)", message="YAML 文件不存在: {}".format(yaml_path))]
@@ -658,6 +668,7 @@ def _validate_demand_yaml_path(
         yaml_path=yaml_path,
         schema_path=schema_path,
         validator=validator,
+        allowed_yaml_roots=allowed_yaml_roots,
     )
 
 
@@ -676,6 +687,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
     if alias_error is not None:
         _emit_error(alias_error, json_output=bool(args.json), yaml_path=yaml_path, schema_path=schema_path, mode="validate")
         return 1
+    allowed_yaml_roots = cast("List[Path]", list(getattr(args, "allowed_yaml_roots", []) or []))
 
     if not schema_path.exists():
         _emit_error(
@@ -727,6 +739,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                         workflow_yaml_path=str(yaml_path),
                         path_aliases=path_aliases,
                         run_id=str(run.id),
+                        allowed_yaml_roots=allowed_yaml_roots,
                     )
                 except WorkflowConfigError as exc:
                     workflow_errors.append(Issue(path="workflow.runs.{}.demand".format(int(run_idx)), message=str(exc)))
@@ -755,6 +768,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                         demand_path,
                         schema_path=schema_path,
                         validator=demand_validator,
+                        allowed_yaml_roots=allowed_yaml_roots,
                     )
                     demand_results.append(payload)
                     demand_outputs.append(_extract_demand_outputs(demand_data) if demand_data is not None else None)
@@ -765,6 +779,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                     demand_path,
                     schema_path=schema_path,
                     validator=demand_validator,
+                    allowed_yaml_roots=allowed_yaml_roots,
                 )
                 demand_results.append(payload)
                 demand_outputs.append(_extract_demand_outputs(demand_data) if demand_data is not None else None)
@@ -849,6 +864,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
         yaml_text,
         yaml_path=yaml_path,
         schema_path=schema_path,
+        allowed_yaml_roots=allowed_yaml_roots,
     )
 
     if args.json:
