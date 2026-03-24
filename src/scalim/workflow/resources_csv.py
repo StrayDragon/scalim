@@ -11,36 +11,52 @@ from abc import ABC
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Sequence, cast
+from typing import Dict, Iterator, List, Optional, Sequence, Union, cast
 
-from ....events.catalog import EVENT_DIAGNOSTIC_WARNING
-from ....events.events import DiagnosticWarningEvent
-from ....sinks.sink_base import create_temp_path
-from ....vendor.compact.typing_extensionsx import override
-from .workflow_resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
+from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
+from ..events.events import DiagnosticWarningEvent
+from ..sinks.sink_base import create_temp_path
+from ..sinks.sink_csv import InMemoryCsv
+from ..vendor.compact.typing_extensionsx import override
+from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
+
+WorkflowCsvInput = Union[str, InMemoryCsv]
 
 
-def _read_csv_header(path: str) -> List[str]:
-    p = Path(str(path))
+def _read_csv_header(input_csv: WorkflowCsvInput) -> List[str]:
+    if isinstance(input_csv, InMemoryCsv):
+        header = [str(x or "").strip() for x in input_csv.header]
+        if not header or any(not x for x in header):
+            msg = "Input CSV has invalid header (empty field): <in_memory>"
+            raise WorkflowWriteError(msg)
+        return header
+
+    path = str(input_csv)
+    p = Path(path)
     if not p.exists():
-        msg = "Missing input CSV: {!r}".format(str(path))
+        msg = "Missing input CSV: {!r}".format(path)
         raise WorkflowWriteError(msg)
     with p.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.reader(handle)
         try:
             header = next(reader)
         except StopIteration:
-            msg = "Input CSV is empty (missing header): {!r}".format(str(path))
+            msg = "Input CSV is empty (missing header): {!r}".format(path)
             raise WorkflowWriteError(msg) from None
     header = [str(x or "").strip() for x in header]
     if not header or any(not x for x in header):
-        msg = "Input CSV has invalid header (empty field): {!r}".format(str(path))
+        msg = "Input CSV has invalid header (empty field): {!r}".format(path)
         raise WorkflowWriteError(msg)
     return header
 
 
-def _iter_csv_rows(path: str) -> Iterator[List[str]]:
-    p = Path(str(path))
+def _iter_csv_rows(input_csv: WorkflowCsvInput) -> Iterator[List[str]]:
+    if isinstance(input_csv, InMemoryCsv):
+        for row in input_csv.rows:
+            yield [str(v) for v in row]
+        return
+
+    p = Path(str(input_csv))
     with p.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.reader(handle)
         _header = next(reader, None)
@@ -75,7 +91,7 @@ def _build_alignment_mapping(expected: Sequence[str], actual: Sequence[str]) -> 
 
 @dataclass
 class _AppendSegment:
-    input_csv_path: str
+    input_csv: WorkflowCsvInput
     header_policy: str
     mapping: List[int]
     on_mismatch: str
@@ -130,12 +146,12 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         csv_id: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv_path: str,
+        input_csv: WorkflowCsvInput,
         header_policy: str,
         on_mismatch: str,
     ) -> None:
         plan = self._get_or_create_csv(csv_id, workflow_node_id=str(workflow_node_id))
-        input_header = _read_csv_header(input_csv_path)
+        input_header = _read_csv_header(input_csv)
 
         pending_warning: Optional[DiagnosticWarningEvent] = None
         pending_warning_meta: Optional[Dict[str, object]] = None
@@ -170,7 +186,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             if not pending_skip:
                 cast("List[_AppendSegment]", plan.segments).append(
                     _AppendSegment(
-                        input_csv_path=str(input_csv_path),
+                        input_csv=input_csv,
                         header_policy=str(header_policy),
                         mapping=mapping,
                         on_mismatch=str(on_mismatch),
@@ -232,7 +248,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                         writer.writerow(list(p.baseline_header))
                         header_written = True
 
-                    for row in _iter_csv_rows(seg.input_csv_path):
+                    for row in _iter_csv_rows(seg.input_csv):
                         out_row: List[str] = []
                         for idx in seg.mapping:
                             out_row.append(row[idx] if idx >= 0 and idx < len(row) else "")

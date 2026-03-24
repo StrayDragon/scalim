@@ -73,7 +73,7 @@
 - **THEN** 系统 MUST 不生成不完整的 `./out/report.xlsx`(默认 discard)
 
 ### Requirement: demand nodes MUST be able to consume sheetbook sheet rows via a built-in loader
-系统 MUST 提供内置 loader `scalim.dsl.by_yaml.runtime.workflow_loaders:sheetbook_sheet_rows`,允许下游 demand 将上游 sheetbook 的某个 sheet 作为 rows 输入使用:
+系统 MUST 提供内置 loader `scalim.workflow.loaders:sheetbook_sheet_rows`,允许下游 demand 将上游 sheetbook 的某个 sheet 作为 rows 输入使用:
 
 - loader MUST 接收 `params.ref` 映射对象,并满足以下结构:
   - `ref.node`（上游 node id）
@@ -185,4 +185,3 @@
 #### Scenario: sheetbook export_xlsx allow_formulas passes schema validation
 - **WHEN** workflow YAML 声明 `workflow.resources.sheetbooks.report.export_xlsx.allow_formulas=false`
 - **THEN** schema-only 校验 MUST 通过
-

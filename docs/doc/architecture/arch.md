@@ -120,6 +120,29 @@ flowchart TD
   end
 ```
 
+### 2.3 Workflow YAML 的边界与分层
+
+除单次 demand YAML 的运行入口外,Scalim 还支持 workflow YAML 用于编排多个 demand run 与 workflow shared resources 写出.
+
+分层约束(以 `openspec/specs/` 为准):
+
+- `scalim.dsl.by_yaml.run_workflow` / `scalim.dsl.by_yaml.workflow*` 是 workflow 的稳定入口:负责 workflow YAML 的加载/校验/编译,并通过 per-call callbacks 注入执行依赖.
+- `scalim.workflow.*` 是 workflow runtime 的 framework/SSOT:负责调度执行、ctx/artifacts/resources 管理与 workflow-level events.
+- workflow runtime MUST NOT 反向依赖 `scalim.dsl.*`(由 pytest gate 守护).
+
+```mermaid
+flowchart TD
+  WF_YAML[workflow.yaml] --> WF_ENTRY[scalim.dsl.by_yaml.run_workflow]
+  WF_ENTRY --> WF_IR[WorkflowIr]
+  WF_IR --> WF_RUN[scalim.workflow.*]
+
+  WF_RUN -->|compile_demand_fn| D_YAML[demand.yaml]
+  D_YAML --> D_ADAPTER[scalim.dsl.by_yaml.compile]
+  D_ADAPTER --> D_IR[DemandIr + ExecutionRequest]
+  D_IR --> RUN_IR[scalim.execution.run_ir]
+  RUN_IR --> RESULT[ExecutionResult]
+```
+
 ## 3. 规范层(spec): IR 的角色
 
 IR(Intermediate Representation) 是框架内部统一的“需求描述”.

@@ -1,15 +1,14 @@
 import concurrent.futures
 import contextlib
 import json
-import shutil
 import sys
 import threading
 import time
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
 
-from ....events.catalog import (
+from ..events.catalog import (
     EVENT_WORKFLOW_NODE_CANCELLED,
     EVENT_WORKFLOW_NODE_END,
     EVENT_WORKFLOW_NODE_START,
@@ -18,25 +17,24 @@ from ....events.catalog import (
     WORKFLOW_NODE_END_STATUS_ERROR,
     WORKFLOW_NODE_END_STATUS_OK,
 )
-from ....events.event import generate_run_id
-from ....events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
-from ....execution.engine import ScalimEngine
-from ....execution.key_normalization import normalize_key_normalization
-from ....execution.run_ir import ExecutionResult, run_ir
-from ....execution.workflow_cache_pool import WorkflowCachePool, WorkflowCachePoolError
-from ....hooks.base import HookManager
-from ....ob.components import split_components
-from ....ob.hub import InstrumentationHub
-from ....ob.manager import ObserverManager
-from ....ob.observability import Observability
-from ....ob.presets._internal import viz_config as viz_config_module
-from ....ob.presets._internal.viz_config import normalize_output_dir as _normalize_viz_output_dir
-from ....ob.presets.viz import (
+from ..events.event import generate_run_id
+from ..events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
+from ..execution.engine import ScalimEngine
+from ..execution.run_ir import ExecutionResult, run_ir
+from ..execution.workflow_cache_pool import WorkflowCachePool, WorkflowCachePoolError
+from ..hooks.base import HookManager
+from ..ob.components import split_components
+from ..ob.hub import InstrumentationHub
+from ..ob.manager import ObserverManager
+from ..ob.observability import Observability
+from ..ob.presets._internal import viz_config as viz_config_module
+from ..ob.presets._internal.viz_config import normalize_output_dir as _normalize_viz_output_dir
+from ..ob.presets.viz import (
     VizObserverConfig,
     WorkflowVizObserver,
     build_workflow_viz_graph_snapshot,
 )
-from ....spec.ir.workflow import (
+from ..spec.ir.workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
     WorkflowCtxOptionsIr,
@@ -45,19 +43,15 @@ from ....spec.ir.workflow import (
     WorkflowNodeType,
     WriteSheetNodeIr,
 )
-from ....utils.json_like import ensure_json_like as _ensure_json_like_ssot
-from ..workflow import (
-    WorkflowConfigError,
-)
-from .compiler import compile as compile_demand
-from .contracts import UNSET, RunOptions, RunOverrides, RunResult
-from .output_composition_yaml import PathlessCsvOutputError
-from .output_path_resolve import resolve_output_container_path
-from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
-from .workflow_load import load_workflow_config_from_path
-from .workflow_loaders import workflow_loader_context
-from .workflow_report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
-from .workflow_resources import SheetBookDef, WorkflowResourceManager, WorkflowWriteError
+from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from .errors import WorkflowConfigError
+from .loaders import workflow_loader_context
+from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
+from .resources import SheetBookDef, WorkflowResourceManager, WorkflowWriteError
+from .resources_csv import WorkflowCsvInput
+
+if TYPE_CHECKING:
+    from ..sinks.sink_csv import InMemoryCsv
 
 
 class WorkflowArtifactsDirectory:
@@ -111,6 +105,41 @@ class WorkflowArtifactsDirectory:
                 msg = "Unknown artifact '{}' for node '{}'".format(artifact_key, producer)
                 raise KeyError(msg)
             return by_artifact[artifact_key]
+
+    def discard(self, producer_node_id: str, artifact_id: str) -> None:
+        producer = str(producer_node_id)
+        artifact_key = str(artifact_id)
+        with self._lock:
+            by_artifact = self._values_by_producer_node_id.get(producer)
+            if not by_artifact:
+                return
+            _ = by_artifact.pop(artifact_key, None)
+            if not by_artifact:
+                _ = self._values_by_producer_node_id.pop(producer, None)
+
+    def discard_in_memory_csv_output(self, producer_node_id: str, output_id: str) -> None:
+        producer = str(producer_node_id)
+        out_id = str(output_id)
+        with self._lock:
+            by_artifact = self._values_by_producer_node_id.get(producer)
+            if not by_artifact:
+                return
+            mem = by_artifact.get("in_memory_csv_outputs")
+            if not isinstance(mem, dict):
+                return
+            mem_outputs = cast("Dict[str, InMemoryCsv]", mem)
+            _ = mem_outputs.pop(out_id, None)
+            if not mem_outputs:
+                _ = by_artifact.pop("in_memory_csv_outputs", None)
+            if not by_artifact:
+                _ = self._values_by_producer_node_id.pop(producer, None)
+
+    def discard_all_in_memory_csv_outputs(self) -> None:
+        with self._lock:
+            for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
+                _ = by_artifact.pop("in_memory_csv_outputs", None)
+                if not by_artifact:
+                    _ = self._values_by_producer_node_id.pop(producer_node_id, None)
 
 
 def ensure_json_like(value: object, *, path: str) -> object:
@@ -355,27 +384,61 @@ class WorkflowRunFailedError(RuntimeError):
         self.demand_path = str(demand_path)
 
 
+def _resolve_workflow_input_csv(
+    *,
+    artifacts_dir: WorkflowArtifactsDirectory,
+    consumer_node_id: str,
+    input_node_id: str,
+    input_output_id: str,
+    error_prefix: str,
+) -> WorkflowCsvInput:
+    outputs_obj = artifacts_dir.get(str(consumer_node_id), str(input_node_id), "outputs")
+    outputs = cast("Optional[Dict[str, str]]", outputs_obj)
+    if outputs_obj is None:
+        msg = "{} requires demand outputs mapping: input_node_id={!r}".format(str(error_prefix), str(input_node_id))
+        raise WorkflowWriteError(msg)
+
+    output_id = str(input_output_id)
+    output_in_mapping = False
+    output_path = ""
+    if outputs is not None and output_id in outputs:
+        output_in_mapping = True
+        output_path = str(outputs.get(output_id) or "")
+    if output_path:
+        if not str(output_path).lower().endswith(".csv"):
+            msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
+            raise WorkflowWriteError(msg)
+        return output_path
+
+    mem_map_obj = None
+    try:
+        mem_map_obj = artifacts_dir.get(str(consumer_node_id), str(input_node_id), "in_memory_csv_outputs")
+    except KeyError:
+        mem_map_obj = None
+    mem_map = cast("Optional[Dict[str, InMemoryCsv]]", mem_map_obj)
+    csv_artifact = mem_map.get(output_id) if mem_map is not None else None
+    if csv_artifact is not None:
+        return csv_artifact
+    if output_in_mapping:
+        msg = "Missing workflow-managed in-memory CSV artifact: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
+        raise WorkflowWriteError(msg)
+    msg = "Unknown demand output id: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
+    raise WorkflowWriteError(msg)
+
+
 def _run_workflow_write_sheet_node(
     node: WriteSheetNodeIr,
     *,
     artifacts_dir: WorkflowArtifactsDirectory,
     resource_manager: WorkflowResourceManager,
 ) -> None:
-    outputs_obj = artifacts_dir.get(str(node.node_id), str(node.input_node_id), "outputs")
-    outputs = cast("Optional[Dict[str, str]]", outputs_obj)
-    if not outputs:
-        msg = "write node requires demand outputs mapping: input_node_id={!r}".format(str(node.input_node_id))
-        raise WorkflowWriteError(msg)
-    output_path = outputs.get(str(node.input_output_id))
-    if not output_path:
-        msg = "Unknown demand output id: input_node_id={!r}, output_id={!r}".format(
-            str(node.input_node_id),
-            str(node.input_output_id),
-        )
-        raise WorkflowWriteError(msg)
-    if not str(output_path).lower().endswith(".csv"):
-        msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
-        raise WorkflowWriteError(msg)
+    input_csv = _resolve_workflow_input_csv(
+        artifacts_dir=artifacts_dir,
+        consumer_node_id=str(node.node_id),
+        input_node_id=str(node.input_node_id),
+        input_output_id=str(node.input_output_id),
+        error_prefix="write node",
+    )
 
     if str(node.resource_type) == "workbook":
         resource_manager.apply_workbook_sheet(
@@ -384,7 +447,7 @@ def _run_workflow_write_sheet_node(
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
-            input_csv_path=str(output_path),
+            input_csv=input_csv,
             on_conflict=str(node.on_conflict or "error"),
         )
         return
@@ -396,7 +459,7 @@ def _run_workflow_write_sheet_node(
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
-            input_csv_path=str(output_path),
+            input_csv=input_csv,
             on_conflict=str(node.on_conflict or "error"),
         )
         return
@@ -411,21 +474,13 @@ def _run_workflow_append_sheet_node(
     artifacts_dir: WorkflowArtifactsDirectory,
     resource_manager: WorkflowResourceManager,
 ) -> None:
-    outputs_obj = artifacts_dir.get(str(node.node_id), str(node.input_node_id), "outputs")
-    outputs = cast("Optional[Dict[str, str]]", outputs_obj)
-    if not outputs:
-        msg = "append node requires demand outputs mapping: input_node_id={!r}".format(str(node.input_node_id))
-        raise WorkflowWriteError(msg)
-    output_path = outputs.get(str(node.input_output_id))
-    if not output_path:
-        msg = "Unknown demand output id: input_node_id={!r}, output_id={!r}".format(
-            str(node.input_node_id),
-            str(node.input_output_id),
-        )
-        raise WorkflowWriteError(msg)
-    if not str(output_path).lower().endswith(".csv"):
-        msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
-        raise WorkflowWriteError(msg)
+    input_csv = _resolve_workflow_input_csv(
+        artifacts_dir=artifacts_dir,
+        consumer_node_id=str(node.node_id),
+        input_node_id=str(node.input_node_id),
+        input_output_id=str(node.input_output_id),
+        error_prefix="append node",
+    )
 
     if str(node.resource_type) == "workbook":
         if not node.sheet:  # pragma: no cover
@@ -437,7 +492,7 @@ def _run_workflow_append_sheet_node(
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
-            input_csv_path=str(output_path),
+            input_csv=input_csv,
             align_by=str(node.align_by or "field_id"),
             header_policy=str(node.header_policy or "once"),
             on_mismatch=str(node.on_mismatch or "error"),
@@ -450,7 +505,7 @@ def _run_workflow_append_sheet_node(
             csv_id=str(node.resource_id),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
-            input_csv_path=str(output_path),
+            input_csv=input_csv,
             header_policy=str(node.header_policy or "once"),
             on_mismatch=str(node.on_mismatch or "error"),
         )
@@ -466,7 +521,7 @@ def _run_workflow_append_sheet_node(
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
-            input_csv_path=str(output_path),
+            input_csv=input_csv,
             align_by=str(node.align_by or "field_id"),
             header_policy=str(node.header_policy or "once"),
             on_mismatch=str(node.on_mismatch or "error"),
@@ -525,7 +580,6 @@ class _PreparedWorkflowRun:
     workflow_ir: WorkflowIr
     artifacts_dir: WorkflowArtifactsDirectory
     ctx_store: WorkflowCtxStore
-    options: RunOptions
     max_concurrency: int
     failure_policy: str
     workflow_wall_start_ts: float
@@ -535,27 +589,8 @@ class _PreparedWorkflowRun:
     workflow_instrumentation: InstrumentationHub
     workflow_cache_pool: Optional[WorkflowCachePool]
     resource_manager: WorkflowResourceManager
-    reserved_xlsx_paths: Set[str]
-    workbook_writers_by_abs_path: Dict[str, List[str]]
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]]
-    managed_temp_dirs_by_run_id: Dict[str, Path]
-    managed_temp_root: Path
-
-
-def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Optional[VizObserverConfig]:
-    # 工作流 `bundle` 可视化: 通过 `run_workflow(..., overrides=RunOverrides(viz_config=...))` 显式启用.
-    bundle_viz_base_config: Optional[VizObserverConfig] = None
-    if overrides is not None and overrides.viz_config is not UNSET:
-        viz_override = cast("Any", overrides.viz_config)
-        if viz_override is not None:
-            bundle_viz_base_config = cast("VizObserverConfig", viz_override)
-            if bundle_viz_base_config.has_explicit_paths():
-                msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`(请勿设置 `output_path`/`snapshot_path`/`trace_path`)."
-                raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
-            if not bundle_viz_base_config.output_dir and not bundle_viz_base_config.use_default_output_dir:
-                msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`, 或设置 `use_default_output_dir=True`."
-                raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
-    return bundle_viz_base_config
+    write_consumers_remaining_by_output_key: Dict[Tuple[str, str], int]
 
 
 def _build_workflow_instrumentation(
@@ -615,18 +650,16 @@ def _maybe_build_workflow_cache_pool(
     workflow_exec_id: str,
     workflow_ir: WorkflowIr,
     workflow_instrumentation: InstrumentationHub,
-    template_vars: Optional[Mapping[str, object]],
-    allowed_yaml_roots: Optional[Tuple[str, ...]],
+    logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]],
+    consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]],
 ) -> Optional[WorkflowCachePool]:
     cache_pool_ir = workflow_ir.options.cache_pool
     if cache_pool_ir is None:
         return None
 
-    logical_keys_by_node_id, consumers_by_logical_key = derive_cache_pool_consumers(
-        workflow_ir,
-        template_vars=template_vars,
-        allowed_yaml_roots=allowed_yaml_roots,
-    )
+    if logical_keys_by_node_id is None or consumers_by_logical_key is None:
+        msg = "workflow cache_pool requires derived consumers mapping"
+        raise WorkflowConfigError(msg, path="workflow.options.cache_pool")
     return WorkflowCachePool(
         workflow_exec_id=workflow_exec_id,
         instrumentation=workflow_instrumentation,
@@ -684,18 +717,6 @@ def _build_workflow_resource_defs(
     return workbook_defs, workbook_allow_formulas_by_id, csv_defs, sheetbook_defs
 
 
-def _build_reserved_xlsx_paths(workflow_ir: WorkflowIr) -> Set[str]:
-    reserved_xlsx_paths: Set[str] = set()
-    for res in workflow_ir.resources:
-        if str(res.resource_type) not in {"workbook", "sheetbook"}:
-            continue
-        res_path = str(res.path or "").strip()
-        if not res_path:
-            continue
-        reserved_xlsx_paths.add(str(Path(res_path).expanduser().resolve(strict=False)))
-    return reserved_xlsx_paths
-
-
 def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, FrozenSet[str]]:
     tmp_write_output_ids: Dict[str, Set[str]] = {}
     for node in workflow_ir.nodes:
@@ -704,71 +725,32 @@ def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, Froz
     return {run_id: frozenset(sorted(ids)) for run_id, ids in tmp_write_output_ids.items()}
 
 
-def _build_managed_temp_root(workflow_path: str, *, workflow_exec_id: str) -> Path:
-    wf_config_path = Path(str(workflow_path)).expanduser().resolve(strict=False)
-    return wf_config_path.parent / ".scalim" / "workflow" / str(workflow_exec_id) / "managed_temp_outputs"
+def _build_write_consumers_remaining_by_output_key(workflow_ir: WorkflowIr) -> Dict[Tuple[str, str], int]:
+    counts: Dict[Tuple[str, str], int] = {}
+    for node in workflow_ir.nodes:
+        if isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
+            key = (str(node.input_node_id), str(node.input_output_id))
+            counts[key] = int(counts.get(key, 0)) + 1
+    return counts
 
 
-def _prepare_workflow_run(
-    workflow_yaml_path: str,
+def _prepare_workflow_run_ir(
+    workflow_path: str,
+    workflow_ir: WorkflowIr,
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]],
     components: Optional[List[object]],
-    overrides: Optional[RunOverrides],
-    guardrails: Optional[object],
-    loader_retry: Optional[object],
-    batch_size: Optional[int],
-    parallel_mode: str,
-    max_workers: int,
-    key_normalization: str,
-    init_vars: Optional[Dict[str, object]],
-    template_vars: Optional[Mapping[str, object]],
-    template_sandbox: str,
-    allowed_yaml_roots: Optional[Tuple[str, ...]],
-    path_aliases: Optional[Mapping[str, str]],
+    bundle_viz_base_config: Optional[VizObserverConfig],
+    cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]],
+    cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]],
 ) -> _PreparedWorkflowRun:
-    workflow_path, wf = load_workflow_config_from_path(
-        workflow_yaml_path,
-        template_vars=template_vars,
-        template_sandbox=template_sandbox,
-    )
     workflow_exec_id = generate_run_id(prefix="wf")
-
-    workflow_ir = compile_workflow_ir(
-        wf,
-        workflow_yaml_path=workflow_path,
-        path_aliases=path_aliases,
-        template_vars=template_vars,
-        allowed_yaml_roots=allowed_yaml_roots,
-    )
     artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
     ctx_store = WorkflowCtxStore(workflow_ir)
     _validate_workflow_ctx_refs(workflow_ir, ctx_store=ctx_store)
 
-    options = RunOptions(
-        allowed_modules=allowed_modules,
-        allowed_functions=allowed_functions,
-        components=cast("Any", components),
-        sink=None,
-        output_composition=None,
-        overrides=overrides,
-        guardrails=cast("Any", guardrails),
-        loader_retry=cast("Any", loader_retry),
-        batch_size=batch_size,
-        parallel_mode=cast("Any", parallel_mode),
-        max_workers=int(max_workers),
-        key_normalization=normalize_key_normalization(key_normalization),
-        init_vars=init_vars,
-        template_vars=template_vars,
-        template_sandbox=template_sandbox,
-        allowed_yaml_roots=allowed_yaml_roots,
-    )
-
     max_concurrency = int(workflow_ir.options.max_concurrency)
     failure_policy = str(workflow_ir.options.failure_policy or "all_fail")
     workflow_wall_start_ts = time.time()
-    bundle_viz_base_config = _extract_bundle_viz_base_config(overrides)
 
     workflow_observer_manager: Optional[ObserverManager] = None
     workflow_cache_pool: Optional[WorkflowCachePool] = None
@@ -785,8 +767,8 @@ def _prepare_workflow_run(
             workflow_exec_id=workflow_exec_id,
             workflow_ir=workflow_ir,
             workflow_instrumentation=workflow_instrumentation,
-            template_vars=template_vars,
-            allowed_yaml_roots=allowed_yaml_roots,
+            logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
+            consumers_by_logical_key=cache_pool_consumers_by_logical_key,
         )
 
         workbook_defs, workbook_allow_formulas_by_id, csv_defs, sheetbook_defs = _build_workflow_resource_defs(workflow_ir)
@@ -799,13 +781,8 @@ def _prepare_workflow_run(
             sheetbook_defs=sheetbook_defs,
         )
 
-        reserved_xlsx_paths = _build_reserved_xlsx_paths(workflow_ir)
-        workbook_writers_by_abs_path: Dict[str, List[str]] = {}
-
         write_output_ids_by_run_id = _build_write_output_ids_by_run_id(workflow_ir)
-
-        managed_temp_dirs_by_run_id: Dict[str, Path] = {}
-        managed_temp_root = _build_managed_temp_root(workflow_path, workflow_exec_id=workflow_exec_id)
+        write_consumers_remaining_by_output_key = _build_write_consumers_remaining_by_output_key(workflow_ir)
 
         return _PreparedWorkflowRun(
             workflow_path=workflow_path,
@@ -813,7 +790,6 @@ def _prepare_workflow_run(
             workflow_ir=workflow_ir,
             artifacts_dir=artifacts_dir,
             ctx_store=ctx_store,
-            options=options,
             max_concurrency=int(max_concurrency),
             failure_policy=str(failure_policy),
             workflow_wall_start_ts=float(workflow_wall_start_ts),
@@ -823,11 +799,8 @@ def _prepare_workflow_run(
             workflow_instrumentation=workflow_instrumentation,
             workflow_cache_pool=workflow_cache_pool,
             resource_manager=resource_manager,
-            reserved_xlsx_paths=reserved_xlsx_paths,
-            workbook_writers_by_abs_path=workbook_writers_by_abs_path,
             write_output_ids_by_run_id=write_output_ids_by_run_id,
-            managed_temp_dirs_by_run_id=managed_temp_dirs_by_run_id,
-            managed_temp_root=managed_temp_root,
+            write_consumers_remaining_by_output_key=write_consumers_remaining_by_output_key,
         )
     except Exception:
         if workflow_cache_pool is not None:
@@ -842,134 +815,73 @@ def _prepare_workflow_run(
 def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
     prepared: _PreparedWorkflowRun,
     *,
+    compile_demand_fn: Callable[..., object],
+    build_demand_run_result_fn: Optional[Callable[..., object]],
     run_ir_fn: Callable[..., ExecutionResult],
 ) -> Tuple[List[WorkflowRunOutcome], Optional[WorkflowRunOutcome], Optional[BaseException]]:
     workflow_exec_id = prepared.workflow_exec_id
     workflow_ir = prepared.workflow_ir
     artifacts_dir = prepared.artifacts_dir
     ctx_store = prepared.ctx_store
-    options = prepared.options
     max_concurrency = int(prepared.max_concurrency)
     failure_policy = str(prepared.failure_policy or "all_fail")
     bundle_viz_base_config = prepared.bundle_viz_base_config
     workflow_instrumentation = prepared.workflow_instrumentation
     workflow_cache_pool = prepared.workflow_cache_pool
     resource_manager = prepared.resource_manager
-    reserved_xlsx_paths = prepared.reserved_xlsx_paths
-    workbook_writers_by_abs_path = prepared.workbook_writers_by_abs_path
     write_output_ids_by_run_id = prepared.write_output_ids_by_run_id
-    managed_temp_dirs_by_run_id = prepared.managed_temp_dirs_by_run_id
-    managed_temp_root = prepared.managed_temp_root
+    write_consumers_remaining_by_output_key = prepared.write_consumers_remaining_by_output_key
 
     outcomes: List[Optional[WorkflowRunOutcome]] = [None for _ in range(len(workflow_ir.nodes))]
 
-    def _as_abs_path(raw_path: str) -> str:
-        return str(Path(str(raw_path)).expanduser().resolve(strict=False))
-
-    def _collect_workbook_output_paths(cfg: object, *, init_vars: Optional[Dict[str, object]]) -> Set[str]:
-        raw_paths: Set[str] = set()
-
-        default_workbook_path: Optional[str] = None
-        for idx, out_cfg in enumerate(getattr(cfg, "outputs", ()) or ()):
-            container = getattr(out_cfg, "container", None)
-            if container is None:
-                continue  # pragma: no cover
-            if str(getattr(container, "type", "") or "").lower() != "workbook":
-                continue
-            path_str = resolve_output_container_path(
-                getattr(container, "path", None),
-                init_vars=init_vars,
-                path="outputs.{}.container.path".format(int(idx)),
+    def _maybe_release_workflow_managed_in_memory_output(node: WorkflowAnyNodeIr) -> None:
+        if not isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
+            return  # pragma: no cover
+        producer_node_id = str(node.input_node_id)
+        output_id = str(node.input_output_id)
+        key = (producer_node_id, output_id)
+        remaining = write_consumers_remaining_by_output_key.get(key)
+        if remaining is None:
+            return
+        next_remaining = int(remaining) - 1
+        if next_remaining < 0:
+            msg = "workflow internal error: negative write consumer count: producer_node_id={!r}, output_id={!r}".format(
+                producer_node_id,
+                output_id,
             )
-            raw_paths.add(path_str)
-            if default_workbook_path is None:
-                default_workbook_path = path_str
-
-        for extra in (getattr(cfg, "meta", None), getattr(cfg, "audit", None)):
-            if extra is None:
-                continue
-            p = str(getattr(extra, "path", "") or "").strip()
-            if p:
-                raw_paths.add(p)
-            elif default_workbook_path:
-                raw_paths.add(default_workbook_path)
-
-        abs_paths: Set[str] = set()
-        for raw_path in raw_paths:
-            abs_paths.add(_as_abs_path(str(raw_path)))
-        return abs_paths
-
-    def _precheck_and_register_workbook_output_paths(
-        *,
-        run_id: str,
-        demand_config: object,
-        init_vars: Optional[Dict[str, object]],
-    ) -> None:
-        abs_paths = _collect_workbook_output_paths(demand_config, init_vars=init_vars)
-        for abs_path in sorted(abs_paths):
-            if abs_path in reserved_xlsx_paths:
-                msg = (
-                    "Excel output path is reserved by workflow shared resources (use resources + write nodes): "
-                    + "run_id={!r}, path={!r}".format(str(run_id), str(abs_path))
-                )
-                raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
-
-            existing = workbook_writers_by_abs_path.get(abs_path)
-            if existing is not None and str(run_id) not in existing:
-                nodes = list(existing)
-                nodes.append(str(run_id))
-                msg = "Excel output path collision across workflow nodes: run_id={!r}, path={!r}, nodes={}".format(
-                    str(run_id),
-                    str(abs_path),
-                    ",".join(nodes),
-                )
-                raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
-
-            if existing is None:
-                workbook_writers_by_abs_path[abs_path] = [str(run_id)]
+            raise RuntimeError(msg)
+        if next_remaining == 0:
+            _ = write_consumers_remaining_by_output_key.pop(key, None)
+            artifacts_dir.discard_in_memory_csv_output(producer_node_id, output_id)
+        else:
+            write_consumers_remaining_by_output_key[key] = int(next_remaining)
 
     def _compile_demand_node(node: WorkflowNodeIr) -> object:
         node_id = str(node.node_id)
         demand_path = str(getattr(node, "demand_path", "") or "")
 
-        node_options = options
         node_init_vars = _render_workflow_init_vars(
             getattr(node, "init_vars", None),
             consumer_node_id=node_id,
             ctx_store=ctx_store,
             path_prefix="workflow.runs.{}.init_vars".format(int(node.decl_order)),
         )
-        if node_init_vars:
-            merged = dict(options.init_vars or {})
-            merged.update(node_init_vars)
-            node_options = replace(node_options, init_vars=merged)
 
         managed_output_ids = write_output_ids_by_run_id.get(node_id)
-        if managed_output_ids:
-            run_temp_dir = managed_temp_root / node_id
-            run_temp_dir.mkdir(parents=True, exist_ok=True)
-            managed_temp_dirs_by_run_id[node_id] = run_temp_dir
-            overrides = {output_id: str(run_temp_dir / "{}.csv".format(output_id)) for output_id in sorted(managed_output_ids)}
-            node_options = replace(node_options, output_container_path_overrides=overrides)
 
+        node_viz_config = None
         if bundle_viz_base_config is not None:
             node_viz_config = replace(bundle_viz_base_config, run_id=str(node_id))
-            base_overrides = cast("RunOverrides", node_options.overrides)
-            base_overrides = replace(base_overrides, viz_config=node_viz_config)
-            node_options = replace(node_options, overrides=base_overrides)
 
-        try:
-            compilation = compile_demand(demand_path, options=node_options)
-        except PathlessCsvOutputError as exc:
-            msg = "run_id={!r}: {}".format(node_id, str(exc))
-            raise WorkflowConfigError(msg, path=str(exc.config_path)) from exc
-
-        _precheck_and_register_workbook_output_paths(
-            run_id=node_id,
-            demand_config=getattr(compilation, "config", None),
-            init_vars=getattr(node_options, "init_vars", None),
+        return compile_demand_fn(
+            demand_path,
+            workflow_exec_id=str(workflow_exec_id),
+            workflow_node_id=str(node_id),
+            workflow_node_decl_order=int(node.decl_order),
+            node_init_vars=node_init_vars,
+            managed_output_ids=managed_output_ids,
+            viz_config=node_viz_config,
         )
-        return compilation
 
     def _node_type_str(node: WorkflowAnyNodeIr) -> str:
         raw = getattr(node, "node_type", "")
@@ -1200,18 +1112,29 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
 
                     if getattr(node, "node_type", None) == WorkflowNodeType.DEMAND:
                         core = cast("ExecutionResult", result_obj)
-                        comp = cast("Any", compilation)
                         demand_yaml_path = str(demand_path or "")
                         artifacts_dir.publish(str(node_id), "output_path", core.output_path)
                         artifacts_dir.publish(str(node_id), "outputs", core.outputs)
+                        artifacts_dir.publish(str(node_id), "in_memory_csv_outputs", core.in_memory_csv_outputs or {})
                         ctx_store.publish_default_summary(str(node_id), core)
+                        if build_demand_run_result_fn is None:
+                            node_result: object = core
+                        else:
+                            node_result = build_demand_run_result_fn(
+                                core,
+                                compilation=compilation,
+                                demand_yaml_path=demand_yaml_path,
+                                workflow_exec_id=str(workflow_exec_id),
+                                workflow_node_id=str(node_id),
+                            )
                         outcomes[idx] = WorkflowRunOutcome(
                             run_id=str(node_id),
                             demand_path=demand_yaml_path,
-                            result=RunResult(core, config=comp.config, yaml_path=demand_yaml_path, sink=None),
+                            result=node_result,
                             error=None,
                         )
                     else:
+                        _maybe_release_workflow_managed_in_memory_output(node)
                         outcomes[idx] = WorkflowRunOutcome(run_id=str(node_id), demand_path="", result=None, error=None)
 
                     node_state[str(node_id)] = "done"
@@ -1325,17 +1248,8 @@ def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_final
     if not resources_finalized:
         with contextlib.suppress(Exception):
             prepared.resource_manager.discard_all(workflow_node_id="__wf__discard", reason="workflow_finally")
-    if prepared.managed_temp_dirs_by_run_id:
-        for temp_dir in prepared.managed_temp_dirs_by_run_id.values():
-            shutil.rmtree(str(temp_dir), ignore_errors=True)
-        with contextlib.suppress(Exception):
-            prepared.managed_temp_root.rmdir()
-        with contextlib.suppress(Exception):
-            prepared.managed_temp_root.parent.rmdir()
-        with contextlib.suppress(Exception):
-            prepared.managed_temp_root.parent.parent.rmdir()
-        with contextlib.suppress(Exception):
-            prepared.managed_temp_root.parent.parent.parent.rmdir()
+    with contextlib.suppress(Exception):
+        prepared.artifacts_dir.discard_all_in_memory_csv_outputs()
     if prepared.workflow_cache_pool is not None:
         with contextlib.suppress(Exception):
             prepared.workflow_cache_pool.close()
@@ -1343,48 +1257,35 @@ def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_final
         cast("Any", prepared.workflow_observer_manager).close()
 
 
-def run_workflow(  # noqa: PLR0913
-    workflow_yaml_path: str,
+def run_workflow_ir(
+    workflow_path: str,
+    workflow_ir: WorkflowIr,
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]] = None,
-    components: Optional[List[object]] = None,
-    overrides: Optional[RunOverrides] = None,
-    guardrails: Optional[object] = None,
-    loader_retry: Optional[object] = None,
-    batch_size: Optional[int] = None,
-    parallel_mode: str = "seq",
-    max_workers: int = 0,
-    key_normalization: str = "raw",
-    init_vars: Optional[Dict[str, object]] = None,
-    template_vars: Optional[Mapping[str, object]] = None,
-    template_sandbox: str = "safe",
-    allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
-    path_aliases: Optional[Mapping[str, str]] = None,
+    compile_demand_fn: Callable[..., object],
+    build_demand_run_result_fn: Optional[Callable[..., object]] = None,
     run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
+    components: Optional[List[object]] = None,
+    bundle_viz_base_config: Optional[VizObserverConfig] = None,
+    cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]] = None,
+    cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]] = None,
 ) -> WorkflowResult:
     prepared: Optional[_PreparedWorkflowRun] = None
     resources_finalized = False
     try:
-        prepared = _prepare_workflow_run(
-            workflow_yaml_path,
-            allowed_modules=allowed_modules,
-            allowed_functions=allowed_functions,
+        prepared = _prepare_workflow_run_ir(
+            workflow_path,
+            workflow_ir,
             components=components,
-            overrides=overrides,
-            guardrails=guardrails,
-            loader_retry=loader_retry,
-            batch_size=batch_size,
-            parallel_mode=parallel_mode,
-            max_workers=max_workers,
-            key_normalization=key_normalization,
-            init_vars=init_vars,
-            template_vars=template_vars,
-            template_sandbox=template_sandbox,
-            allowed_yaml_roots=allowed_yaml_roots,
-            path_aliases=path_aliases,
+            bundle_viz_base_config=bundle_viz_base_config,
+            cache_pool_logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
+            cache_pool_consumers_by_logical_key=cache_pool_consumers_by_logical_key,
         )
-        final_outcomes, failed, failed_exc = _execute_workflow_run(prepared, run_ir_fn=run_ir_fn or run_ir)
+        final_outcomes, failed, failed_exc = _execute_workflow_run(
+            prepared,
+            compile_demand_fn=compile_demand_fn,
+            build_demand_run_result_fn=build_demand_run_result_fn,
+            run_ir_fn=run_ir_fn or run_ir,
+        )
         try:
             _commit_workflow_resources(
                 resource_manager=prepared.resource_manager,
@@ -1415,5 +1316,5 @@ __all__ = [
     "WorkflowRunError",
     "WorkflowRunFailedError",
     "WorkflowRunOutcome",
-    "run_workflow",
+    "run_workflow_ir",
 ]

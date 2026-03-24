@@ -1,14 +1,13 @@
 """`workflow` 运行结果与错误结构.
 
 说明:
-- 该模块不承载执行逻辑,仅承载结果/错误数据结构,便于在重构中保持稳定边界
-- 运行时需兼容 `Python 3.6`
+- 本模块不承载执行逻辑,仅承载结果/错误数据结构,便于在重构中保持稳定边界.
+- 为保持 `scalim.workflow` 不依赖 `scalim.dsl`,`WorkflowRunOutcome.result` 使用 `object` 承载由上层适配层组装的结果对象.
+- 运行时需兼容 `Python 3.6`.
 """
 
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
-
-from .contracts import RunResult
 
 
 @dataclass(frozen=True)
@@ -24,7 +23,7 @@ class WorkflowRunError:
 class WorkflowRunOutcome:
     run_id: str
     demand_path: str
-    result: Optional[RunResult] = None
+    result: Optional[object] = None
     error: Optional[WorkflowRunError] = None
 
 

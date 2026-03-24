@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 
 from scalim.dsl.by_yaml import run_workflow as run_workflow_public
-from scalim.dsl.by_yaml.runtime.workflow_entrypoints import run_workflow as run_workflow_runtime
+from scalim.dsl.by_yaml.workflow_entrypoints import run_workflow as run_workflow_stable
 
 
 def _write_demand_yaml(tmp_path: Path, *, file_name: str, name: str, output_path: Path) -> Path:
@@ -71,13 +71,13 @@ def test_stable_workflow_entrypoints_are_importable_and_runnable(tmp_path: Path)
         output_path=wf2_dir / "b.csv",
     )
     wf2 = _write_workflow_yaml(wf2_dir, file_name="wf.yaml", run_id="b", demand_file="b.yaml")
-    result2 = run_workflow_runtime(str(wf2), allowed_modules=frozenset(["tests"]))
+    result2 = run_workflow_stable(str(wf2), allowed_modules=frozenset(["tests"]))
     assert not result2.errors()
 
 
 def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurrent_runs(tmp_path: Path) -> None:
-    from scalim.dsl.by_yaml.runtime import workflow_execute as execute_mod  # noqa: PLC0415
     from scalim.execution.run_ir import run_ir as real_run_ir  # noqa: PLC0415
+    from scalim.workflow import execute as execute_mod  # noqa: PLC0415
 
     original_run_ir = execute_mod.run_ir
 
@@ -124,7 +124,7 @@ def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurre
 
     def _run(tag: str, wf: Path, fake):  # type: ignore[no-untyped-def]
         try:
-            results[tag] = run_workflow_runtime(str(wf), allowed_modules=frozenset(["tests"]), run_ir_fn=fake)
+            results[tag] = run_workflow_stable(str(wf), allowed_modules=frozenset(["tests"]), run_ir_fn=fake)
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
 

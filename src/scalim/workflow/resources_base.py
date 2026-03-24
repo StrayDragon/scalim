@@ -2,7 +2,7 @@
 
 说明:
 - 该模块仅承载通用的错误/写锁/事件发射与资源管理器基类
-- 具体资源类型实现位于同目录的 `workflow_resources_*` 子模块
+- 具体资源类型实现位于同目录的 `resources_*` 子模块
 - 运行时需兼容 `Python 3.6`
 """
 
@@ -14,13 +14,13 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from ....events.catalog import (
+from ..events.catalog import (
     EVENT_WORKFLOW_RESOURCE_COMMIT,
     EVENT_WORKFLOW_RESOURCE_CREATE,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
-from ....events.events import (
+from ..events.events import (
     WorkflowResourceCommitEvent,
     WorkflowResourceCreateEvent,
     WorkflowResourceDiscardEvent,

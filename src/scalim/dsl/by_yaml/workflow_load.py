@@ -7,7 +7,7 @@
 
 from typing import Mapping, Optional, Tuple
 
-from ..workflow import WorkflowConfig, WorkflowConfigError, load_workflow_config
+from .workflow import WorkflowConfig, WorkflowConfigError, load_workflow_config
 
 
 def load_workflow_config_from_path(

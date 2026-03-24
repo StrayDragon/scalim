@@ -9,7 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
-from ....spec.ir.workflow import (
+from ...spec.ir.workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
     WorkflowArtifactsIr,
@@ -25,8 +25,8 @@ from ....spec.ir.workflow import (
     WorkflowResourceIr,
     WriteSheetNodeIr,
 )
-from ..config_parsing.loader import YamlDemandLoader
-from ..workflow import (
+from .config_parsing.loader import YamlDemandLoader
+from .workflow import (
     WorkflowConfigError,
     WorkflowWriteTo,
     WorkflowWriteToCsvAppend,

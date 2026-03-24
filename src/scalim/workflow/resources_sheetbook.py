@@ -11,14 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
 
-from ....events.catalog import EVENT_DIAGNOSTIC_WARNING
-from ....events.events import DiagnosticWarningEvent
-from ....sinks.sink_base import create_temp_path
-from ....utils.excel import escape_excel_formula
-from ....vendor.compact.typing_extensionsx import override
-from .workflow_resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
-from .workflow_resources_csv import build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
-from .workflow_resources_workbook import best_effort_close_write_only_workbook_worksheets, get_openpyxl_workbook_class
+from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
+from ..events.events import DiagnosticWarningEvent
+from ..sinks.sink_base import create_temp_path
+from ..utils.excel import escape_excel_formula
+from ..vendor.compact.typing_extensionsx import override
+from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_csv import WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
+from .resources_workbook import best_effort_close_write_only_workbook_worksheets, get_openpyxl_workbook_class
 
 # 内部实现仍沿用原有局部命名,减少重构噪音.
 _build_alignment_mapping = build_alignment_mapping
@@ -29,9 +29,9 @@ _best_effort_close_write_only_workbook_worksheets = best_effort_close_write_only
 _get_openpyxl_workbook_class = get_openpyxl_workbook_class
 
 
-def _materialize_aligned_csv_columns(expected: List[str], mapping: List[int], *, input_csv_path: str) -> List[List[str]]:
+def _materialize_aligned_csv_columns(expected: List[str], mapping: List[int], *, input_csv: WorkflowCsvInput) -> List[List[str]]:
     col_lists: List[List[str]] = [[] for _ in expected]
-    for row in _iter_csv_rows(input_csv_path):
+    for row in _iter_csv_rows(input_csv):
         for col_idx, src_idx in enumerate(mapping):
             col_lists[col_idx].append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
     return col_lists
@@ -403,12 +403,12 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv_path: str,
+        input_csv: WorkflowCsvInput,
         on_conflict: str,
     ) -> None:
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
-        input_header = _read_csv_header(input_csv_path)
+        input_header = _read_csv_header(input_csv)
         action, pending_skip = self._sheetbook_sheet_prepare_action(
             plan,
             workflow_node_id=str(workflow_node_id),
@@ -436,7 +436,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         mapping = _build_alignment_mapping(expected, input_header)
 
         # 读取并物化到内存(列式),用于下游读取与导出.
-        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv_path=input_csv_path)
+        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv=input_csv)
         columns: Dict[str, List[str]] = {str(key): col_lists[idx] for idx, key in enumerate(expected)}
         row_count = len(col_lists[0]) if col_lists else 0
         new_sheet_cells = int(row_count) * len(expected)
@@ -473,14 +473,14 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv_path: str,
+        input_csv: WorkflowCsvInput,
         align_by: str,
         header_policy: str,
         on_mismatch: str,
     ) -> None:
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
-        input_header = _read_csv_header(input_csv_path)
+        input_header = _read_csv_header(input_csv)
         expected, mapping, start_row, pending_warning, pending_warning_meta, pending_skip = self._sheetbook_append_prepare(
             plan,
             workflow_node_id=str(workflow_node_id),
@@ -511,7 +511,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             return
 
         # 读取并对齐到基线表头(列式追加).
-        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv_path=input_csv_path)
+        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv=input_csv)
 
         append_rows = len(col_lists[0]) if col_lists else 0
         append_cells = int(append_rows) * len(expected)

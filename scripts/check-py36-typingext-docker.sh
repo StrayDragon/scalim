@@ -56,7 +56,7 @@ PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python - <<'PY
 # - compileall 仅能发现语法问题; import smoke test 才能覆盖注解求值差异等问题(Python 3.6 典型坑).
 
 from scalim.dsl.by_yaml import *  # noqa: F401,F403
-from scalim.dsl.by_yaml.runtime import workflow_entrypoints  # noqa: F401
+from scalim.dsl.by_yaml import workflow_entrypoints  # noqa: F401
 from scalim.execution import ScalimEngine  # noqa: F401
 from scalim.execution import output_composition  # noqa: F401
 from scalim.execution.preload_cache import PreloadCache  # noqa: F401

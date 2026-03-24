@@ -11,14 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
 
-from ....events.catalog import EVENT_DIAGNOSTIC_WARNING
-from ....events.events import DiagnosticWarningEvent
-from ....sinks.sink_base import create_temp_path
-from ....utils.excel import escape_excel_formula
-from ....vendor.compact.importlibx import require_optional_dependency
-from ....vendor.compact.typing_extensionsx import override
-from .workflow_resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
-from .workflow_resources_csv import AppendSegment, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
+from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
+from ..events.events import DiagnosticWarningEvent
+from ..sinks.sink_base import create_temp_path
+from ..utils.excel import escape_excel_formula
+from ..vendor.compact.importlibx import require_optional_dependency
+from ..vendor.compact.typing_extensionsx import override
+from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_csv import AppendSegment, WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 
 # 内部实现仍沿用原有局部命名,减少重构噪音.
 _AppendSegment = AppendSegment
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 def _get_openpyxl_workbook_class() -> "Type[Workbook]":
-    openpyxl_mod = require_optional_dependency("openpyxl", context="scalim.dsl.by_yaml.runtime.workflow_resources")
+    openpyxl_mod = require_optional_dependency("openpyxl", context="scalim.workflow.resources")
     return cast("Any", openpyxl_mod).Workbook
 
 
@@ -118,14 +118,14 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv_path: str,
+        input_csv: WorkflowCsvInput,
         on_conflict: str,
     ) -> None:
         plan = self._get_or_create_workbook(workbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
         action = "write"
 
-        input_header = _read_csv_header(input_csv_path)
+        input_header = _read_csv_header(input_csv)
 
         pending_skip = False
         with self._lock:
@@ -147,7 +147,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
 
                 mapping = _build_alignment_mapping(input_header, input_header)
                 segment = _AppendSegment(
-                    input_csv_path=str(input_csv_path),
+                    input_csv=input_csv,
                     header_policy="once",
                     mapping=mapping,
                     on_mismatch="error",
@@ -191,14 +191,14 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv_path: str,
+        input_csv: WorkflowCsvInput,
         align_by: str,
         header_policy: str,
         on_mismatch: str,
     ) -> None:
         plan = self._get_or_create_workbook(workbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
-        input_header = _read_csv_header(input_csv_path)
+        input_header = _read_csv_header(input_csv)
 
         pending_warning: Optional[DiagnosticWarningEvent] = None
         pending_warning_meta: Optional[Dict[str, object]] = None
@@ -235,7 +235,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             if not pending_skip:
                 sheet_plan.segments.append(
                     _AppendSegment(
-                        input_csv_path=str(input_csv_path),
+                        input_csv=input_csv,
                         header_policy=str(header_policy),
                         mapping=mapping,
                         on_mismatch=str(on_mismatch),
@@ -310,7 +310,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                         header_written = True
                     # `never`: 不输出 `header`
 
-                    for row in _iter_csv_rows(seg.input_csv_path):
+                    for row in _iter_csv_rows(seg.input_csv):
                         out_row: List[object] = []
                         for idx in seg.mapping:
                             value = row[idx] if idx >= 0 and idx < len(row) else ""

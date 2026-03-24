@@ -3,7 +3,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any, FrozenSet, Iterator, Mapping, cast
 
-from .workflow_resources import WorkflowResourceManager
+from .resources import WorkflowResourceManager
 
 
 @dataclass(frozen=True)

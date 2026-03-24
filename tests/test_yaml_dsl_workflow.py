@@ -6,8 +6,10 @@ from typing import Any, Dict, List, Optional, cast
 import pytest
 
 from scalim.dsl.by_yaml import run_workflow
-from scalim.dsl.by_yaml.runtime import workflow_entrypoints as entrypoints_mod
-from scalim.dsl.by_yaml.runtime import workflow_loaders as workflow_loaders_mod
+from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+from scalim.workflow import execute as workflow_execute_mod
+from scalim.workflow import loaders as workflow_loaders_mod
+from scalim.workflow.errors import WorkflowConfigError as WorkflowRuntimeConfigError
 from scalim.events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_PIPELINE_START,
@@ -36,7 +38,7 @@ from tests.fixtures import workflow_loaders
 
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])
-_ALLOWED_MODULES_WITH_SHEETBOOK = frozenset(["tests.fixtures.workflow_loaders", "scalim.dsl.by_yaml.runtime.workflow_loaders"])
+_ALLOWED_MODULES_WITH_SHEETBOOK = frozenset(["tests.fixtures.workflow_loaders", "scalim.workflow.loaders"])
 
 
 class _WorkflowEventRecorder(Observer):
@@ -325,7 +327,7 @@ name: {name}
 
 main_source:
   source_id: main
-  loader: "scalim.dsl.by_yaml.runtime.workflow_loaders:sheetbook_sheet_rows"
+  loader: "scalim.workflow.loaders:sheetbook_sheet_rows"
   params:
     ref:
       $init_var: {init_var_name}
@@ -2333,38 +2335,38 @@ def test_workflow_entrypoints_artifacts_directory_enforces_visibility() -> None:
             }
         ),
     )
-    artifacts_dir = entrypoints_mod._WorkflowArtifactsDirectory(ir)  # noqa: SLF001
-    artifacts_dir.publish("a", "x", 1)  # noqa: SLF001
-    assert artifacts_dir.get("b", "a", "x") == 1  # noqa: SLF001
+    artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(ir)
+    artifacts_dir.publish("a", "x", 1)
+    assert artifacts_dir.get("b", "a", "x") == 1
 
-    artifacts_dir.publish("b", "y", 2)  # noqa: SLF001
-    assert artifacts_dir.get("b", "b", "y") == 2  # noqa: SLF001
+    artifacts_dir.publish("b", "y", 2)
+    assert artifacts_dir.get("b", "b", "y") == 2
 
     with pytest.raises(ValueError, match="not visible"):
-        _ = artifacts_dir.get("a", "b", "y")  # noqa: SLF001
+        _ = artifacts_dir.get("a", "b", "y")
 
     with pytest.raises(KeyError, match="Unknown artifact"):
-        _ = artifacts_dir.get("b", "a", "missing")  # noqa: SLF001
+        _ = artifacts_dir.get("b", "a", "missing")
 
 
 def test_workflow_entrypoints_ensure_json_like_variants() -> None:
-    assert entrypoints_mod._ensure_json_like(None, path="x") is None  # noqa: SLF001
-    assert entrypoints_mod._ensure_json_like(True, path="x") is True  # noqa: SLF001
-    assert entrypoints_mod._ensure_json_like(1, path="x") == 1  # noqa: SLF001
-    assert entrypoints_mod._ensure_json_like("s", path="x") == "s"  # noqa: SLF001
-    assert entrypoints_mod._ensure_json_like(1.5, path="x") == 1.5  # noqa: SLF001
+    assert workflow_execute_mod.ensure_json_like(None, path="x") is None
+    assert workflow_execute_mod.ensure_json_like(True, path="x") is True
+    assert workflow_execute_mod.ensure_json_like(1, path="x") == 1
+    assert workflow_execute_mod.ensure_json_like("s", path="x") == "s"
+    assert workflow_execute_mod.ensure_json_like(1.5, path="x") == 1.5
 
-    assert entrypoints_mod._ensure_json_like([1, {"k": 2}], path="x") == [1, {"k": 2}]  # noqa: SLF001
-    assert entrypoints_mod._ensure_json_like((1, 2), path="x") == [1, 2]  # noqa: SLF001
+    assert workflow_execute_mod.ensure_json_like([1, {"k": 2}], path="x") == [1, {"k": 2}]
+    assert workflow_execute_mod.ensure_json_like((1, 2), path="x") == [1, 2]
 
-    with pytest.raises(WorkflowConfigError, match="finite"):
-        _ = entrypoints_mod._ensure_json_like(float("inf"), path="x")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="finite"):
+        _ = workflow_execute_mod.ensure_json_like(float("inf"), path="x")
 
-    with pytest.raises(WorkflowConfigError, match="dict key"):
-        _ = entrypoints_mod._ensure_json_like({1: "x"}, path="x")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="dict key"):
+        _ = workflow_execute_mod.ensure_json_like({1: "x"}, path="x")
 
-    with pytest.raises(WorkflowConfigError, match="JSON-like"):
-        _ = entrypoints_mod._ensure_json_like(object(), path="x")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="JSON-like"):
+        _ = workflow_execute_mod.ensure_json_like(object(), path="x")
 
 
 def test_workflow_entrypoints_ctx_store_total_bytes_guardrail() -> None:
@@ -2385,10 +2387,10 @@ def test_workflow_entrypoints_ctx_store_total_bytes_guardrail() -> None:
         resources=(),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": ()}),
     )
-    ctx_store = entrypoints_mod._WorkflowCtxStore(ir)  # noqa: SLF001
-    ctx_store.publish("a", "k1", "x", path="x")  # noqa: SLF001
-    with pytest.raises(WorkflowConfigError) as excinfo:
-        ctx_store.publish("a", "k2", "y", path="x")  # noqa: SLF001
+    ctx_store = workflow_execute_mod.WorkflowCtxStore(ir)
+    ctx_store.publish("a", "k1", "x", path="x")
+    with pytest.raises(WorkflowRuntimeConfigError) as excinfo:
+        ctx_store.publish("a", "k2", "y", path="x")
     assert excinfo.value.path == "workflow.options.ctx.max_bytes"
 
 
@@ -2405,32 +2407,32 @@ def test_workflow_entrypoints_ctx_store_resolve_errors() -> None:
         resources=(),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "b": ()}),
     )
-    ctx_store = entrypoints_mod._WorkflowCtxStore(ir)  # noqa: SLF001
+    ctx_store = workflow_execute_mod.WorkflowCtxStore(ir)
 
-    with pytest.raises(WorkflowConfigError, match="node=self"):
-        _ = ctx_store.resolve("a", node="a", key="k", path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="node=self"):
+        _ = ctx_store.resolve("a", node="a", key="k", path="p")
 
-    with pytest.raises(WorkflowConfigError, match="not visible"):
-        _ = ctx_store.resolve("a", node="b", key="k", path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="not visible"):
+        _ = ctx_store.resolve("a", node="b", key="k", path="p")
 
-    with pytest.raises(WorkflowConfigError, match="Unknown ctx key"):
-        _ = ctx_store.resolve("b", node="a", key="missing", path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="Unknown ctx key"):
+        _ = ctx_store.resolve("b", node="a", key="missing", path="p")
 
 
 def test_workflow_entrypoints_iter_ctx_directives_variants() -> None:
-    with pytest.raises(WorkflowConfigError, match="directive must be a mapping"):
-        _ = entrypoints_mod._iter_ctx_directives({"$ctx": "nope"}, path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="directive must be a mapping"):
+        _ = workflow_execute_mod.iter_ctx_directives({"$ctx": "nope"}, path="p")
 
-    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.node"):
-        _ = entrypoints_mod._iter_ctx_directives({"$ctx": {"node": "", "key": "k"}}, path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="\\$ctx\\.node"):
+        _ = workflow_execute_mod.iter_ctx_directives({"$ctx": {"node": "", "key": "k"}}, path="p")
 
-    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.key"):
-        _ = entrypoints_mod._iter_ctx_directives({"$ctx": {"node": "a", "key": ""}}, path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="\\$ctx\\.key"):
+        _ = workflow_execute_mod.iter_ctx_directives({"$ctx": {"node": "a", "key": ""}}, path="p")
 
-    assert entrypoints_mod._iter_ctx_directives({"outer": {"$ctx": {"node": "a", "key": "k"}}}, path="p") == [  # noqa: SLF001
+    assert workflow_execute_mod.iter_ctx_directives({"outer": {"$ctx": {"node": "a", "key": "k"}}}, path="p") == [
         ("a", "k"),
     ]
-    assert entrypoints_mod._iter_ctx_directives([{"$ctx": {"node": "a", "key": "k"}}], path="p") == [  # noqa: SLF001
+    assert workflow_execute_mod.iter_ctx_directives([{"$ctx": {"node": "a", "key": "k"}}], path="p") == [
         ("a", "k"),
     ]
 
@@ -2448,29 +2450,29 @@ def test_workflow_entrypoints_render_ctx_directives_variants() -> None:
         resources=(),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "b": ()}),
     )
-    ctx_store = entrypoints_mod._WorkflowCtxStore(ir)  # noqa: SLF001
-    ctx_store.publish("a", "k", 1, path="p")  # noqa: SLF001
+    ctx_store = workflow_execute_mod.WorkflowCtxStore(ir)
+    ctx_store.publish("a", "k", 1, path="p")
 
-    with pytest.raises(WorkflowConfigError, match="directive must be a mapping"):
-        _ = entrypoints_mod._render_ctx_directives({"$ctx": "nope"}, consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="directive must be a mapping"):
+        _ = workflow_execute_mod.render_ctx_directives({"$ctx": "nope"}, consumer_node_id="b", ctx_store=ctx_store, path="p")
 
-    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.node"):
-        _ = entrypoints_mod._render_ctx_directives({"$ctx": {"node": "", "key": "k"}}, consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="\\$ctx\\.node"):
+        _ = workflow_execute_mod.render_ctx_directives(
+            {"$ctx": {"node": "", "key": "k"}}, consumer_node_id="b", ctx_store=ctx_store, path="p"
+        )
 
-    with pytest.raises(WorkflowConfigError, match="\\$ctx\\.key"):
-        _ = entrypoints_mod._render_ctx_directives({"$ctx": {"node": "a", "key": ""}}, consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
+    with pytest.raises(WorkflowRuntimeConfigError, match="\\$ctx\\.key"):
+        _ = workflow_execute_mod.render_ctx_directives(
+            {"$ctx": {"node": "a", "key": ""}}, consumer_node_id="b", ctx_store=ctx_store, path="p"
+        )
 
-    assert (
-        entrypoints_mod._render_ctx_directives(
-            {"outer": {"$ctx": {"node": "a", "key": "k"}}}, consumer_node_id="b", ctx_store=ctx_store, path="p"
-        )  # noqa: SLF001
-        == {"outer": 1}
-    )
-    assert (
-        entrypoints_mod._render_ctx_directives([{"$ctx": {"node": "a", "key": "k"}}], consumer_node_id="b", ctx_store=ctx_store, path="p")  # noqa: SLF001
-        == [1]
-    )
-    assert entrypoints_mod._render_ctx_directives(1, consumer_node_id="b", ctx_store=ctx_store, path="p") == 1  # noqa: SLF001
+    assert workflow_execute_mod.render_ctx_directives(
+        {"outer": {"$ctx": {"node": "a", "key": "k"}}}, consumer_node_id="b", ctx_store=ctx_store, path="p"
+    ) == {"outer": 1}
+    assert workflow_execute_mod.render_ctx_directives(
+        [{"$ctx": {"node": "a", "key": "k"}}], consumer_node_id="b", ctx_store=ctx_store, path="p"
+    ) == [1]
+    assert workflow_execute_mod.render_ctx_directives(1, consumer_node_id="b", ctx_store=ctx_store, path="p") == 1
 
 
 def test_cache_pool_single_run_accepts_lookup_cast_and_normalize(tmp_path: Path) -> None:
@@ -3202,7 +3204,7 @@ def test_workflow_excel_output_collision_precheck_reports_demand_yaml_load_failu
     )
     cfg = load_workflow_config(str(wf))
     with pytest.raises(WorkflowConfigError, match="Failed to load demand YAML for workflow collision precheck"):
-        _ = entrypoints_mod._compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+        _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
 
 
 @pytest.mark.parametrize("extra_key", ("meta", "audit"))
@@ -3269,7 +3271,7 @@ outputs:
     )
     cfg = load_workflow_config(str(wf))
     with pytest.raises(WorkflowConfigError) as excinfo:
-        _ = entrypoints_mod._compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+        _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
     msg = str(excinfo.value)
     assert "collision" in msg
     assert str(extra_path.expanduser().resolve(strict=False)) in msg
@@ -3310,7 +3312,7 @@ outputs:
         failure_policy="primary_only",
     )
     cfg = load_workflow_config(str(wf))
-    ir = entrypoints_mod._compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+    ir = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
     assert ir is not None
 
 
@@ -3866,6 +3868,9 @@ outputs:
 
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert not result.errors()
+    demand_outcome = next(o for o in result.outcomes if o.run_id == "a")
+    assert demand_outcome.result is not None
+    assert demand_outcome.result.core.in_memory_csv_outputs == {}
     assert workbook_path.exists()
     assert _read_xlsx_rows(workbook_path, "S")[-1] == ["a2", "A2"]
     assert not (tmp_path / ".scalim").exists()
@@ -4049,7 +4054,6 @@ def test_workflow_shared_write_node_rejects_non_csv_output_paths(tmp_path: Path)
 )
 def test_workflow_write_nodes_validate_outputs_mapping_runtime(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     outputs_override: Optional[Dict[str, str]],
     expected_substrings: tuple,
 ) -> None:
@@ -4105,9 +4109,7 @@ def test_workflow_write_nodes_validate_outputs_mapping_runtime(
             output_target_stats=real.output_target_stats,
         )
 
-    monkeypatch.setattr(entrypoints_mod, "run_ir", fake_run_ir)
-
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, run_ir_fn=fake_run_ir)
     errors = result.errors()
     assert len(errors) == 2
     messages = sorted(str(e.message) for e in errors)
