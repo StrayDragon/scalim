@@ -14,6 +14,7 @@
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/planning/builder.py` (`ExecutionPlan.preload_sources`)
 - `src/IMPL_ROOT/execution/pipeline/base/pipeline.py` (`Pipeline._preload_cached_sources`)
+- `src/IMPL_ROOT/execution/preload_cache.py` (`PreloadCache.get_or_load`)
 - `src/IMPL_ROOT/execution/executor/operators/load_ref/loader.py` (cache hit path)
 ## Requirements
 ### Requirement: 预加载缓存模式
@@ -65,5 +66,64 @@
 - **THEN** 关联读取 MUST 直接消费 normalized mapping
 - **AND** MUST NOT 再暴露原始 `list[row]` 形状给字段读取逻辑
 
+### Requirement: `preloaded_cache` concurrency boundary and key space MUST be explicit
+系统 MUST 明确 `ExecutionRuntime.preloaded_cache` 的 key 空间与并发边界（避免将其误解为“天然不会并发的全局缓存”）：
+
+- `preloaded_cache` 为可注入容器,生命周期由调用方决定;系统默认仅承诺 per-key `in-flight` 去重与结果复用（不承诺跨进程/跨不同 signature 的全局去重）。
+- 当多个并发执行单元共享同一个 `preloaded_cache`（例如多 `ScalimEngine.run()` 并发共享容器,或 workflow 多 node 并发共享容器）时,容器 MUST 是线程安全的（推荐使用 `PreloadCache`）；普通 `dict` 在并发下行为未定义。
+- `PreloadCache.get_or_load(source_id, ...)` 的 key 为 `source_id`（不包含 loader/params/normalize signature）。跨不同 signature 复用同一 `source_id` 可能产生**错误复用**,其风险与责任边界 MUST 在文档中明确（调用方需避免此类复用或使用更强 guardrail）。
+
+#### Scenario: concurrent callers dedupe at most one in-flight load per `source_id`
+- **GIVEN** 两个线程并发对同一 `source_id` 调用 `PreloadCache.get_or_load(...)`
+- **WHEN** 该 `source_id` 当前为 miss
+- **THEN** 系统 MUST 保证同一时刻最多一个实际 `load_fn` 被执行
+- **AND** 其余请求 MUST 等待并复用该次 load 的结果或异常
+- Repro: `tests/test_preload_cache.py::test_preload_cache_get_or_load_returns_cached_value_inside_lock`
+
+### Requirement: `PreloadCache` signature guardrail MUST be available (opt-in)
+系统 MUST 为共享 `PreloadCache` 场景提供可选的 signature guardrail（默认关闭）,用于检测同一 `source_id` 被不同 signature 复用的风险,并在开发/测试阶段尽早暴露问题。
+
+开启后系统 MUST:
+
+- 支持至少两种策略: `error|warn`
+- 当同一 `source_id` 的 signature digest 不一致时:
+  - `error`: MUST fail-fast
+  - `warn`: MUST 产生强告警,且继续执行
+- 诊断信息 MUST 可用于定位与迁移（至少包含 `source_id`、两次 signature digest、以及迁移提示）
+
+signature digest 的 SSOT MUST 与 `WorkflowCacheEntrySignature` 对齐（复用 canonicalization/digest 口径）,并至少覆盖:
+
+- `loader_ref`
+- 渲染后的 `params`（含 `$runtime` 解析结果）
+- `normalize`
+- `key`
+- `lookup_cast`
+
+#### Scenario: signature mismatch fails fast in `error` mode
+- **GIVEN** 共享同一个 `PreloadCache` 且该 cache 已记录 `source_id="s1"` 的 signature digest 为 A
+- **WHEN** 再次请求 `source_id="s1"` 且本次 signature digest 为 B（A!=B）
+- **AND** 策略为 `error`
+- **THEN** 系统 MUST fail-fast
+- Repro: `tests/test_preload_cache.py::test_preload_cache_signature_guardrail_error_mode_fails_fast_on_mismatch`
+
+#### Scenario: signature mismatch warns in `warn` mode
+- **GIVEN** 共享同一个 `PreloadCache` 且该 cache 已记录 `source_id="s1"` 的 signature digest 为 A
+- **WHEN** 再次请求 `source_id="s1"` 且本次 signature digest 为 B（A!=B）
+- **AND** 策略为 `warn`
+- **THEN** 系统 MUST 产生强告警且继续执行
+- Repro: `tests/test_preload_cache.py::test_preload_cache_signature_guardrail_warn_mode_emits_warning_and_continues`
+
+### Requirement: loader SHOULD be idempotent when concurrent / repeated loads are possible
+当系统允许出现并发或重复触发 preload load 的现实路径时（例如多 engine 共享同一 `PreloadCache`,或 workflow 多 node 并发请求同一条目）,系统 MUST 明确 loader 的幂等性期望与风险边界：
+
+- loader 实现 SHOULD 尽量满足幂等性（重复调用产生等价结果,或在可接受范围内一致）
+- 系统 MUST 明确: 不应依赖“永不并发/永不重复调用”的隐式假设来保证正确性
+- 若 loader 不可幂等（例如包含外部副作用）,系统 MUST 明确提示风险,并建议调用方避免跨不同配置/不同 signature 复用同一 `PreloadCache`（或在后续启用更强 guardrail 若提供）
+
+#### Scenario: preload_forever docs mention idempotency expectations
+- **WHEN** 系统文档描述 `preload_forever` / `PreloadCache` 的并发边界与 per-key `in-flight` 去重语义
+- **THEN** 文档 MUST 同时包含关于 loader 幂等性（SHOULD）与非幂等风险的明确说明
+
 ## Notes
-- 当前仅支持 preload_forever;缓存生命周期限定在单次 pipeline 运行中.
+- 当前仅支持 preload_forever;默认语义仅承诺 per-key `in-flight` 去重.
+- `preloaded_cache` 为可注入容器,可能被共享并跨多次运行复用;调用方需自行管理其生命周期与线程安全边界.

@@ -165,6 +165,46 @@ def test_pipeline_preload_uses_preloaded_cache_get_or_load() -> None:
     assert "preload" in cache
 
 
+def test_pipeline_preload_passes_signature_digest_when_guardrail_enabled() -> None:
+    class _PreloadedCache(dict):
+        signature_guardrail_enabled = True
+
+        def __init__(self) -> None:
+            super(_PreloadedCache, self).__init__()
+            self.calls = []
+
+        def get_or_load(self, source_id, load_fn, *, signature_digest=None):  # type: ignore[no-untyped-def]
+            assert signature_digest
+            self.calls.append((source_id, str(signature_digest)))
+            return load_fn()
+
+    cache = _PreloadedCache()
+    source = SourceIr(
+        source_id="preload",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable=lambda: {1: {"id": 1, "value": "ok"}}),
+        cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
+    )
+    plan = ExecutionPlan(preload_sources=(source,))
+    hook_manager = HookManager()
+    observer_manager = ObserverManager()
+    runtime = _make_runtime(plan, hook_manager=hook_manager, observer_manager=observer_manager, cache=cache)
+    executor = _make_executor(plan, runtime)
+    pipeline = _TestPipeline(
+        plan,
+        executor,
+        runtime,
+        hook_manager,
+        observer_manager,
+        DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader=lambda: [])),
+    )
+
+    pipeline._preload_cached_sources()  # type: ignore[attr-defined]
+    assert [item[0] for item in cache.calls] == ["preload"]
+    assert cache.calls[0][1]
+    assert "preload" in cache
+
+
 class _TestPipeline(Pipeline):
     def run(self, main_rows=None, sink=None):  # type: ignore[no-untyped-def]
         _ = main_rows, sink
@@ -225,6 +265,77 @@ def _sig(source_id: str) -> WorkflowCacheEntrySignature:
         key=None,
         lookup_cast=None,
     )
+
+
+def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature() -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+    )
+    signature = _sig("s1")
+
+    load_started = threading.Event()
+    allow_finish = threading.Event()
+    thread2_started = threading.Event()
+    thread2_done = threading.Event()
+
+    calls = []
+
+    results = []
+    errors = []
+
+    def load_fn():  # type: ignore[no-untyped-def]
+        calls.append("load")
+        load_started.set()
+        if not allow_finish.wait(timeout=1.0):
+            pytest.fail("test fixture deadlock: allow_finish not set")
+        return {1: {"id": 1}}
+
+    def _worker1() -> None:
+        try:
+            results.append(pool.get_or_load(signature, workflow_node_id="n1", load_fn=load_fn))
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    def _worker2() -> None:
+        thread2_started.set()
+        try:
+            results.append(pool.get_or_load(signature, workflow_node_id="n2", load_fn=load_fn))
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            thread2_done.set()
+
+    t1 = threading.Thread(target=_worker1, daemon=True)
+    t1.start()
+    if not load_started.wait(timeout=1.0):
+        pytest.fail("load_fn did not start")
+
+    t2 = threading.Thread(
+        target=_worker2,
+        daemon=True,
+    )
+    t2.start()
+    if not thread2_started.wait(timeout=1.0):
+        pytest.fail("thread2 did not start")
+    if thread2_done.wait(timeout=0.1):
+        pytest.fail("thread2 finished before load finished; expected in-flight wait")
+
+    allow_finish.set()
+
+    t1.join(timeout=1.0)
+    t2.join(timeout=1.0)
+    if t1.is_alive() or t2.is_alive():
+        pytest.fail("threads did not finish")
+
+    assert not errors
+    assert len(calls) == 1
+    assert len(results) == 2
+    assert results[0] == {1: {"id": 1}}
+    assert results[1] == {1: {"id": 1}}
 
 
 def test_workflow_cache_pool_emit_does_not_deadlock_on_reentry() -> None:

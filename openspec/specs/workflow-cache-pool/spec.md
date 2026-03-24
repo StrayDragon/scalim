@@ -47,6 +47,13 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **WHEN** cache pool 已存在该条目
 - **THEN** 系统 MUST 复用该缓存结果(不得重复加载/构造)
 
+#### Scenario: concurrent same signature triggers at most one in-flight load
+- **GIVEN** workflow node A 与 node B 并发请求同一条目且 signature 完全一致
+- **WHEN** 该 signature 当前为 miss
+- **THEN** 系统 MUST 保证同一时刻最多一个实际 `load_fn` 被执行
+- **AND** 其余请求 MUST 等待并复用该次 load 的结果或异常
+- Repro: `tests/test_workflow_cache_pool.py::test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature`
+
 #### Scenario: different signature does not reuse cache entry
 - **GIVEN** 两个 workflow node 请求同一个 `source_id` 但 loader/params/normalize 不同导致 signature 不一致
 - **WHEN** 两个请求先后发生
@@ -109,4 +116,3 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **GIVEN** workflow node A acquire 一个 preload_forever cache entry
 - **WHEN** observer 订阅 workflow-level 事件流
 - **THEN** observer MUST 能观测到该 acquire 事件,且其 `workflow_node_id` MUST 等于 `"A"`
-
