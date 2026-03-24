@@ -1,6 +1,7 @@
 import pytest
 
 from scalim.dsl.by_yaml import compile, run_workflow
+from scalim.dsl.by_yaml.config_parsing.template_precompile import maybe_precompile_yaml_text
 from scalim.dsl.by_yaml.workflow import WorkflowConfigError, load_workflow_config
 
 
@@ -222,3 +223,143 @@ workflow:
     with pytest.raises(WorkflowConfigError) as exc_info:
         _ = load_workflow_config(str(wf), template_vars={})
     assert "missing" in str(exc_info.value)
+
+
+def test_template_sandbox_safe_rejects_method_calls() -> None:
+    from pathlib import Path
+
+    yaml_text = "x: {{ p.open().read() }}\n"
+    with pytest.raises(ValueError, match=r"禁止无参方法调用"):
+        _ = maybe_precompile_yaml_text(
+            yaml_text,
+            template_vars={"p": Path("/etc/hosts")},
+            context_label="repro",
+        )
+
+
+@pytest.mark.parametrize("template_sandbox", ["safe", "legacy"], ids=["safe", "legacy"])
+def test_template_sandbox_rejects_underscore_attributes_in_both_modes(template_sandbox: str) -> None:
+    yaml_text = "x: {{ obj.__class__ }}\n"
+    with pytest.raises(ValueError, match=r"禁止访问以下划线开头属性"):
+        _ = maybe_precompile_yaml_text(
+            yaml_text,
+            template_vars={"obj": "x"},
+            context_label="repro",
+            template_sandbox=template_sandbox,
+        )
+
+
+def test_template_sandbox_rejects_unknown_value() -> None:
+    yaml_text = "x: {{ a }}\n"
+    with pytest.raises(ValueError, match=r"`template_sandbox` 必须是以下值之一"):
+        _ = maybe_precompile_yaml_text(
+            yaml_text,
+            template_vars={"a": 1},
+            context_label="repro",
+            template_sandbox="nope",
+        )
+
+
+def test_template_sandbox_common_substitutions_still_work() -> None:
+    yaml_text = "\n".join(
+        [
+            "a: {{ a }}",
+            "b: {{ m.key }}",
+            "c: {{ items[0] }}",
+            "",
+        ]
+    )
+    rendered = maybe_precompile_yaml_text(
+        yaml_text,
+        template_vars={"a": 1, "m": {"key": "v"}, "items": ["x"]},
+        context_label="repro",
+    )
+    assert "a: 1" in rendered
+    assert "b: v" in rendered
+    assert "c: x" in rendered
+
+
+def test_template_sandbox_legacy_allows_method_calls_and_warns(caplog) -> None:
+    caplog.set_level("WARNING", logger="scalim.dsl.by_yaml.template_vars")
+    yaml_text = "x: {{ s.strip() }}\n"
+
+    rendered = maybe_precompile_yaml_text(
+        yaml_text,
+        template_vars={"s": "  hi  "},
+        context_label="repro",
+        template_sandbox="legacy",
+    )
+    assert "x: hi" in rendered
+    assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
+
+
+def test_template_sandbox_legacy_is_exposed_by_public_compile_api(tmp_path, caplog) -> None:
+    caplog.set_level("WARNING", logger="scalim.dsl.by_yaml.template_vars")
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: {{ output_path.strip() }}
+    fields:
+      - order_id
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    compilation = compile(
+        str(yaml_path),
+        allowed_modules=frozenset(["tests"]),
+        template_vars={"output_path": "  ./out.csv  "},
+        template_sandbox="legacy",
+    )
+    assert compilation.config.outputs[0].container.path == "./out.csv"
+    assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
+
+
+def test_template_vars_rejects_non_json_like_types_and_does_not_leak_value() -> None:
+    from pathlib import Path
+
+    yaml_text = "x: {{ p }}\n"
+    with pytest.raises(ValueError) as exc_info:
+        _ = maybe_precompile_yaml_text(
+            yaml_text,
+            template_vars={"p": Path("/etc/hosts")},
+            context_label="repro",
+        )
+    assert "路径=`template_vars['p']`" in str(exc_info.value)
+    assert "/etc/hosts" not in str(exc_info.value)
+
+
+def test_template_vars_rejects_dict_key_not_str() -> None:
+    yaml_text = "x: {{ m }}\n"
+    with pytest.raises(ValueError) as exc_info:
+        _ = maybe_precompile_yaml_text(
+            yaml_text,
+            template_vars={"m": {1: "x"}},  # type: ignore[dict-item]
+            context_label="repro",
+        )
+    assert "路径=`template_vars['m']`" in str(exc_info.value)
+    assert "键类型=int" in str(exc_info.value)
+
+
+def test_template_vars_rejects_top_level_key_not_str_even_without_template_markers() -> None:
+    yaml_text = "x: 1\n"
+    with pytest.raises(ValueError) as exc_info:
+        _ = maybe_precompile_yaml_text(
+            yaml_text,
+            template_vars={1: "x"},  # type: ignore[dict-item]
+            context_label="repro",
+        )
+    assert "路径=`template_vars`" in str(exc_info.value)
+    assert "键类型=int" in str(exc_info.value)

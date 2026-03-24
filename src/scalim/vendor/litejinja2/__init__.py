@@ -208,6 +208,7 @@ class Template:
     nodes: List[TemplateNode]
     filters: Dict[str, FilterFunc]
     macros: Dict[str, MacroDef]
+    _template_sandbox: str
     undefined: Any
 
     def __init__(self, template_string: str, filters: Optional[Dict[str, FilterFunc]] = None, *, undefined: Any = Undefined) -> None:
@@ -225,6 +226,7 @@ class Template:
         if not isinstance(undefined, type) or not issubclass(undefined, Undefined):
             raise TypeError("`undefined` 必须是 `Undefined` 的子类")
         self.undefined = undefined
+        self._template_sandbox = "legacy"
         self.macros = {}
         self.nodes = self._parse()
 
@@ -280,6 +282,7 @@ class Template:
         self,
         context: Optional[RenderContext] = None,
         *,
+        template_sandbox: str = "legacy",
         strict_undefined: bool = False,
         undefined_behavior: str = "error",
         empty_string_behavior: str = "keep",
@@ -293,6 +296,8 @@ class Template:
         返回:
             渲染后的字符串.
         """
+        if template_sandbox not in {"safe", "legacy"}:
+            raise ValueError("`template_sandbox` 必须是以下值之一: `safe`, `legacy`")
         if undefined_behavior not in {"error", "empty"}:
             raise ValueError("`undefined_behavior` 必须是以下值之一: `error`, `empty`")
         if empty_string_behavior not in {"keep", "error"}:
@@ -304,6 +309,8 @@ class Template:
         if kwargs:
             merged_context.update(kwargs)
 
+        previous_sandbox = self._template_sandbox
+        self._template_sandbox = str(template_sandbox)
         try:
             return self._render_nodes(
                 self.nodes,
@@ -317,6 +324,8 @@ class Template:
         except Exception as e:
             error_msg = "模板渲染失败: {}".format(e)
             raise TemplateError(error_msg) from e
+        finally:
+            self._template_sandbox = previous_sandbox
 
     def _render_nodes(
         self,
@@ -804,7 +813,7 @@ class Template:
             bracket_end = var_expr.rindex("]")
 
             base_expr = var_expr[:bracket_start]
-            key_expr = var_expr[bracket_start + 1 : bracket_end]
+            key_expr = var_expr[bracket_start + 1 : bracket_end].strip()
 
             # 获取基础对象
             base_value = self._get_variable(base_expr, context, strict_undefined=strict_undefined) if base_expr else context
@@ -813,6 +822,8 @@ class Template:
             # 移除引号(如果有)
             if (key_expr.startswith('"') and key_expr.endswith('"')) or (key_expr.startswith("'") and key_expr.endswith("'")):
                 key = key_expr[1:-1]
+            elif key_expr.isdigit() or (key_expr.startswith("-") and key_expr[1:].isdigit()):
+                key = int(key_expr)
             else:
                 # 作为变量解析
                 key = self._get_variable(key_expr, context, strict_undefined=strict_undefined)
@@ -851,11 +862,16 @@ class Template:
         # 处理带点号的属性访问和方法调用
         parts = var_expr.split(".")
         value = context
+        template_sandbox = str(getattr(self, "_template_sandbox", "legacy"))
 
         for part in parts:
             # 检查是否是方法调用 (以 () 结尾)
             if part.endswith("()"):
                 method_name = part[:-2]
+                if method_name.startswith("_"):
+                    raise TemplateError("`template_sandbox` 禁止访问以下划线开头属性: `{}`".format(method_name))
+                if template_sandbox == "safe":
+                    raise TemplateError("`template_sandbox=safe` 禁止无参方法调用: `{}()`".format(method_name))
                 if isinstance(value, dict):
                     if method_name in value:
                         value = value[method_name]
@@ -876,6 +892,8 @@ class Template:
                 else:
                     return self.undefined(var_expr)
             # 普通属性访问
+            elif part.startswith("_"):
+                raise TemplateError("`template_sandbox` 禁止访问以下划线开头属性: `{}`".format(part))
             elif isinstance(value, dict):
                 if part in value:
                     value = value[part]

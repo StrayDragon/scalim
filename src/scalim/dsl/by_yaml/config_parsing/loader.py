@@ -53,7 +53,13 @@ class YamlDemandLoader(
     def __init__(self) -> None:
         self._validator = None
 
-    def load(self, source: Union[str, Path, IO[str]], *, template_vars: Optional[Mapping[str, object]] = None) -> DemandConfig:
+    def load(
+        self,
+        source: Union[str, Path, IO[str]],
+        *,
+        template_vars: Optional[Mapping[str, object]] = None,
+        template_sandbox: str = "safe",
+    ) -> DemandConfig:
         yaml_path: Optional[Path] = None
         if isinstance(source, (str, Path)):
             yaml_path = Path(source)
@@ -62,6 +68,7 @@ class YamlDemandLoader(
                 text,
                 template_vars=template_vars,
                 context_label="需求 `YAML` 文件 `{}`".format(str(yaml_path)),
+                template_sandbox=template_sandbox,
             )
             raw = _safe_load_yaml(text)
         else:
@@ -70,6 +77,7 @@ class YamlDemandLoader(
                 text,
                 template_vars=template_vars,
                 context_label="需求 `YAML` 文本",
+                template_sandbox=template_sandbox,
             )
             raw = _safe_load_yaml(text)
         raw_demand = RawDemand.from_raw(raw)
@@ -90,11 +98,18 @@ class YamlDemandLoader(
 
         return self._parse_config(raw_demand)
 
-    def load_string(self, yaml_string: str, *, template_vars: Optional[Mapping[str, object]] = None) -> DemandConfig:
+    def load_string(
+        self,
+        yaml_string: str,
+        *,
+        template_vars: Optional[Mapping[str, object]] = None,
+        template_sandbox: str = "safe",
+    ) -> DemandConfig:
         text = maybe_precompile_yaml_text(
             yaml_string,
             template_vars=template_vars,
             context_label="需求 `YAML` 字符串",
+            template_sandbox=template_sandbox,
         )
         raw = _safe_load_yaml(text)
         raw_demand = RawDemand.from_raw(raw)

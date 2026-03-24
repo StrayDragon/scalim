@@ -109,6 +109,13 @@ class RunOptions:
     template_vars: Optional[Mapping[str, object]] = None
     """可选:模板变量注入(编译期使用,用于在 `YAML` 解析前对 `YAML` 文本执行 `LiteJinja2` 预编译)."""
 
+    template_sandbox: str = "safe"
+    """模板预编译的 `template_sandbox` 模式.
+
+    - `safe`(默认): 禁止无参 `method call`,并禁止访问以下划线开头属性(含 `__dunder__`).
+    - `legacy`: 显式放宽(不安全);仅用于可信输入/内部测试.
+    """
+
     output_container_path_overrides: Optional[Dict[str, str]] = None
     """可选:按 `output_id` 覆盖 `outputs.*.container.path`(用于工作流托管临时 `CSV` 输出路径注入)."""
 
