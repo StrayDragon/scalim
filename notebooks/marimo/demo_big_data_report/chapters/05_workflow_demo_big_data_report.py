@@ -76,7 +76,7 @@ def run_workflow_demo_big_data_report(
     prev = get_config()
     set_config(cfg)
     try:
-        allowed_modules = frozenset(["scalim_misc.demo_big_data_report.loaders"])
+        allowed_modules = frozenset(["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"])
         repo_root = Path(__file__).resolve().parents[4]
         reset_workflow_preload_counter_calls()
 
@@ -204,7 +204,7 @@ def _(mo):
         - resources（sheetbook/csv 等资源托管）
         - writes（把上游 output 写入到资源）
         - depends_on（显式 DAG）
-        - `$ctx` 注入（把上游 output_path 传给下游 demand）
+        - workflow 内置 `loader`（从共享 `sheetbook` 读取上游 rows）
         - cache_pool（workflow-scope cache，共享 `preload_forever`）
 
         ## 需求方提问（自然语言）
@@ -215,7 +215,7 @@ def _(mo):
 
         - workflow YAML：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml`
         - 断言：
-          - `depends_on` + `$ctx` 注入链路可跑通（detail → metrics）
+          - `depends_on` + `scalim.workflow.loaders.sheetbook_sheet_rows` 链路可跑通（detail → metrics）
           - 产物存在：`detail.csv` / `metrics.csv` / `report.xlsx`
           - `cache_pool` 生效：`preload_forever` 共享 loader 仅调用 1 次
           - 明细 CSV 与纯 Python 对照组一致：`verify_scalim_output_csv`

@@ -12,7 +12,7 @@ from ..events.catalog import EVENT_OUTPUT_TARGET_END
 from ..events.events import OutputTargetEndEvent
 from ..ob.hub import InstrumentationHub
 from ..sinks.sink_base import BaseRowSink, IRowSink
-from ..sinks.sink_csv import CSVSink
+from ..sinks.sink_csv import CSVSink, InMemoryCsvSink
 from ..typedefs import KeyNormalizationMode, RowData
 from ..utils.iterables import ordered_unique_str
 from ..vendor.compact.typing_extensionsx import override
@@ -50,6 +50,7 @@ class OutputTargetSpec:
     target_id: str
     layout: ExportLayout
     output: OutputSpec
+    in_memory: bool = False
     predicate: Optional[OutputRowPredicate] = None
     is_primary: bool = False
     requires: Optional[Tuple[str, ...]] = None
@@ -320,6 +321,7 @@ class DerivedOutputTargetSpec:
     derived: IDerivedAggregationSpec
     output_layout: ExportLayout
     output: OutputSpec
+    in_memory: bool = False
     predicate: Optional[OutputRowPredicate] = None
     is_primary: bool = False
     requires: Optional[Tuple[str, ...]] = None
@@ -434,6 +436,12 @@ def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
         include_header=bool(output.include_header),
         flush_policy="every_n_rows",
     )
+
+
+def _create_in_memory_csv_sink(layout: ExportLayout) -> InMemoryCsvSink:
+    field_names = list(layout.field_ids)
+    header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
+    return InMemoryCsvSink(field_names=field_names, header_names=header_names)
 
 
 def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink:
@@ -847,6 +855,7 @@ class RouterRowSink(BaseRowSink):
 class OutputCompositionPlan:
     sink: RouterRowSink
     output_paths: Dict[str, str]
+    in_memory_csv_sinks: Dict[str, InMemoryCsvSink]
 
 
 def _normalize_failure_policy(failure_policy: str) -> str:
@@ -886,17 +895,47 @@ def _validate_excel_workbook_sheet_names(spec: OutputCompositionSpec) -> None:
             raise ValueError(msg)
 
 
+def _get_or_create_excel_workbook_sink(
+    output: OutputSpec,
+    *,
+    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
+) -> "ExcelWorkbookSink":
+    from ..sinks.sink_excel import ExcelWorkbookSink  # noqa: PLC0415
+
+    path = str(output.path)
+    wb = workbook_by_path.get(path)
+    if wb is None:
+        wb = ExcelWorkbookSink(path, write_lock=bool(output.write_lock))
+        workbook_by_path[path] = wb
+    else:
+        wb.write_lock = bool(wb.write_lock or output.write_lock)
+    return wb
+
+
 def _create_row_sink_for_composed_output(
     *,
     target_id: str,
     output: OutputSpec,
     layout: ExportLayout,
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
-) -> Tuple[IRowSink, _RowCounter]:
+    in_memory: bool = False,
+) -> Tuple[IRowSink, _RowCounter, Optional[InMemoryCsvSink]]:
     fmt = (output.format or "csv").lower()
-    if not output.path:
+    if not output.path and not in_memory:
         msg = "OutputSpec.path is required for composed outputs (target_id={}, format={})".format(target_id, fmt)
         raise ValueError(msg)
+
+    if in_memory:
+        if fmt != "csv":
+            msg = "In-memory composed output only supports format=csv (target_id={}, format={})".format(target_id, fmt)
+            raise ValueError(msg)
+        if not output.streaming:
+            msg = "Composed outputs only support streaming row sinks for csv (streaming=true)"
+            raise ValueError(msg)
+        counter = _RowCounter()
+        mem_sink = _create_in_memory_csv_sink(layout)
+        sink = _CountingOutputRowSink(mem_sink, counter)
+        return sink, counter, mem_sink
 
     if fmt == "csv":
         if not output.streaming:
@@ -904,7 +943,7 @@ def _create_row_sink_for_composed_output(
             raise ValueError(msg)
         counter = _RowCounter()
         sink = _CountingOutputRowSink(_create_csv_sink(output, layout), counter)
-        return sink, counter
+        return sink, counter, None
 
     if fmt == "excel":
         if not output.streaming:
@@ -913,15 +952,7 @@ def _create_row_sink_for_composed_output(
 
         counter = _RowCounter()
         if output.sheet_name:
-            from ..sinks.sink_excel import ExcelWorkbookSink  # noqa: PLC0415
-
-            path = str(output.path)
-            wb = workbook_by_path.get(path)
-            if wb is None:
-                wb = ExcelWorkbookSink(path, write_lock=bool(output.write_lock))
-                workbook_by_path[path] = wb
-            else:
-                wb.write_lock = bool(wb.write_lock or output.write_lock)
+            wb = _get_or_create_excel_workbook_sink(output, workbook_by_path=workbook_by_path)
             field_names = list(layout.field_ids)
             header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
             sheet_sink = wb.create_sheet_row_sink(
@@ -932,11 +963,11 @@ def _create_row_sink_for_composed_output(
                 allow_formulas=bool(output.excel_allow_formulas),
             )
             sink = _CountingOutputRowSink(sheet_sink, counter)
-            return sink, counter
+            return sink, counter, None
 
         # 单工作表 `Excel` 输出(独立文件)
         sink = _CountingOutputRowSink(_create_excel_row_sink(output, layout), counter)
-        return sink, counter
+        return sink, counter, None
 
     msg = "Unsupported output format for composed outputs: {!r}".format(output.format)
     raise ValueError(msg)
@@ -973,16 +1004,20 @@ def _append_direct_target_routes(
     *,
     routes: List[_RouteState],
     output_paths: Dict[str, str],
+    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
     targets: Sequence[OutputTargetSpec],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> None:
     for t in targets:
-        sink, counter = _create_row_sink_for_composed_output(
+        sink, counter, mem_sink = _create_row_sink_for_composed_output(
             target_id=str(t.target_id),
             output=t.output,
             layout=t.layout,
             workbook_by_path=workbook_by_path,
+            in_memory=bool(t.in_memory),
         )
+        if mem_sink is not None:
+            in_memory_csv_sinks[str(t.target_id)] = mem_sink
         _append_route_state(
             routes=routes,
             output_paths=output_paths,
@@ -1045,6 +1080,7 @@ def _append_derived_target_routes(
     *,
     routes: List[_RouteState],
     output_paths: Dict[str, str],
+    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
     targets: Sequence[DerivedOutputTargetSpec],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
     run_parallel_mode: str,
@@ -1057,12 +1093,15 @@ def _append_derived_target_routes(
         group_specs, dedup_specs = _collect_specs_for_derived_warnings(t.derived)
         _warn_derived_guardrails(target_id=str(t.target_id), group_specs=group_specs, dedup_specs=dedup_specs)
 
-        out_sink, out_counter = _create_row_sink_for_composed_output(
+        out_sink, out_counter, mem_sink = _create_row_sink_for_composed_output(
             target_id=str(t.target_id),
             output=t.output,
             layout=t.output_layout,
             workbook_by_path=workbook_by_path,
+            in_memory=bool(t.in_memory),
         )
+        if mem_sink is not None:
+            in_memory_csv_sinks[str(t.target_id)] = mem_sink
         agg = t.derived.build_aggregator(key_normalization=run_key_normalization)
 
         sink = AggregatingRowSink(aggregator=agg, out_sink=out_sink)
@@ -1104,7 +1143,7 @@ def _maybe_create_meta_target(
         excel_allow_formulas=bool(meta_sheet.output.excel_allow_formulas),
         write_lock=bool(meta_sheet.output.write_lock),
     )
-    sink, counter = _create_row_sink_for_composed_output(
+    sink, counter, _ = _create_row_sink_for_composed_output(
         target_id=str(meta_sheet.target_id),
         output=meta_output,
         layout=layout,
@@ -1161,7 +1200,7 @@ def _maybe_create_audit_target(
         excel_allow_formulas=bool(audit_sheet.output.excel_allow_formulas),
         write_lock=bool(audit_sheet.output.write_lock),
     )
-    sink, counter = _create_row_sink_for_composed_output(
+    sink, counter, _ = _create_row_sink_for_composed_output(
         target_id=str(audit_sheet.target_id),
         output=audit_output,
         layout=layout,
@@ -1200,18 +1239,21 @@ def build_output_composition(
 
     workbook_by_path: Dict[str, "ExcelWorkbookSink"] = {}
     output_paths: Dict[str, str] = {}
+    in_memory_csv_sinks: Dict[str, InMemoryCsvSink] = {}
 
     routes: List[_RouteState] = []
 
     _append_direct_target_routes(
         routes=routes,
         output_paths=output_paths,
+        in_memory_csv_sinks=in_memory_csv_sinks,
         targets=spec.targets,
         workbook_by_path=workbook_by_path,
     )
     _append_derived_target_routes(
         routes=routes,
         output_paths=output_paths,
+        in_memory_csv_sinks=in_memory_csv_sinks,
         targets=spec.derived_targets,
         workbook_by_path=workbook_by_path,
         run_parallel_mode=str(run_parallel_mode or ""),
@@ -1254,6 +1296,7 @@ def build_output_composition(
     return OutputCompositionPlan(
         sink=router,
         output_paths={k: v for k, v in output_paths.items() if v},
+        in_memory_csv_sinks=in_memory_csv_sinks,
     )
 
 

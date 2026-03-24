@@ -33,7 +33,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--allowed-modules",
-        default="scalim_misc.demo_big_data_report.loaders",
+        default="scalim_misc.demo_big_data_report.loaders,scalim.workflow.loaders",
         help="Comma-separated allowed modules for YAML compilation/runtime.",
     )
     parser.add_argument(

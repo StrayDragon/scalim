@@ -16,7 +16,7 @@ from ..ob.presets.viz import VizObserver, VizObserverConfig
 from ..planning.builder import PlanBuilder
 from ..planning.plan import ExecutionPlan
 from ..sinks.sink_base import BaseRowSink, BaseSink, ColumnBatch, ColumnValues, IColumnSink, IRowSink, ISink
-from ..sinks.sink_csv import ColumnCSVSink, CSVSink
+from ..sinks.sink_csv import ColumnCSVSink, CSVSink, InMemoryCsv, InMemoryCsvSink
 from ..spec.ir.demand import DemandIr
 from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
@@ -108,6 +108,9 @@ class ExecutionResult:
 
     output_target_stats: Optional[List["OutputTargetStats"]] = None
     """可选:每个输出目标的统计(行数/耗时/错误/禁用)(多输出组合时提供)."""
+
+    in_memory_csv_outputs: Optional[Dict[str, InMemoryCsv]] = None
+    """可选: `workflow-managed` 无路径 CSV 输出的内存中间态(多输出组合时提供)."""
 
 
 class _TeeRowSink(BaseRowSink):
@@ -421,6 +424,7 @@ class _OutputAssembly:
     counting_sink: ISink
     output_path: Optional[str]
     outputs: Optional[Dict[str, str]]
+    in_memory_csv_sinks: Optional[Dict[str, InMemoryCsvSink]]
     composition_router: Optional["RouterRowSink"]
 
 
@@ -516,6 +520,7 @@ def _assemble_outputs(
             counting_sink=counting_sink,
             output_path=output_plan.output_path,
             outputs=None,
+            in_memory_csv_sinks=None,
             composition_router=None,
         )
 
@@ -564,6 +569,7 @@ def _assemble_outputs(
         counting_sink=counting_sink,
         output_path=output_path,
         outputs=outputs,
+        in_memory_csv_sinks=composition_plan.in_memory_csv_sinks or None,
         composition_router=router_sink,
     )
 
@@ -691,6 +697,10 @@ def run_ir(
         # 注意: `counting_sink.close()` 在 `finally` 中执行;此处读取的是关闭后的最终统计快照.
         output_target_stats = output_assembly.composition_router.get_target_stats()
 
+    in_memory_csv_outputs: Optional[Dict[str, InMemoryCsv]] = None
+    if output_assembly.in_memory_csv_sinks is not None:
+        in_memory_csv_outputs = {target_id: sink.to_artifact() for target_id, sink in output_assembly.in_memory_csv_sinks.items()}
+
     return ExecutionResult(
         output_path=output_assembly.output_path,
         total_rows=stats.total_rows,
@@ -699,6 +709,7 @@ def run_ir(
         plan=plan,
         outputs=output_assembly.outputs,
         output_target_stats=output_target_stats,
+        in_memory_csv_outputs=in_memory_csv_outputs,
     )
 
 

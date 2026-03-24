@@ -287,7 +287,7 @@ def build_request(
             demand_ir,
             resolver=resolver,
             init_vars=options.init_vars,
-            output_container_path_overrides=options.output_container_path_overrides,
+            workflow_managed_output_ids=options.workflow_managed_output_ids,
         )
     output_composition = options.output_composition or yaml_output_composition
 

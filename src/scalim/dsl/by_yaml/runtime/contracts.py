@@ -123,8 +123,8 @@ class RunOptions:
     - 若显式提供,仍会自动包含入口 `YAML` 所在目录;用于“受控跨目录复用”(例如 `imports` 或工作流需求引用上层共享目录).
     """
 
-    output_container_path_overrides: Optional[Dict[str, str]] = None
-    """可选:按 `output_id` 覆盖 `outputs.*.container.path`(用于工作流托管临时 `CSV` 输出路径注入)."""
+    workflow_managed_output_ids: Optional[FrozenSet[str]] = None
+    """可选: `workflow` 托管的 `output_id` 白名单(用于 `workflow-managed` 的无路径 `CSV` 输出的内存物化)."""
 
 
 @dataclass(frozen=True)

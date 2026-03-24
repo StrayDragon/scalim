@@ -3,7 +3,7 @@ import csv
 import pytest
 
 from scalim.sinks.sink_base import IColumnSink
-from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink
+from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink, InMemoryCsvSink
 
 
 def _write_rows_to_csv(output_path, sink_cls, rows, header_names=None):
@@ -77,6 +77,37 @@ def test_csv_sink_write_row_and_batch(tmp_path):
         "1,Alice",
         "2,Bob",
     ]
+
+
+def test_in_memory_csv_sink_normalizes_values_like_csv_sink(tmp_path):
+    rows = [
+        {"id": 1, "name": None},
+        {"id": None, "name": "Alice"},
+        {"id": True, "name": 3.14},
+    ]
+
+    mem_sink = InMemoryCsvSink(field_names=["id", "name"])
+    mem_sink.write_batch(rows)
+    mem_sink.close()
+    artifact = mem_sink.to_artifact()
+    assert artifact.header == ["id", "name"]
+
+    output_path = tmp_path / "rows.csv"
+    with CSVSink(str(output_path), field_names=["id", "name"]) as sink:
+        sink.write_batch(rows)
+
+    with output_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle)
+        file_header = next(reader)
+        file_rows = [list(r) for r in reader]
+
+    assert list(file_header) == artifact.header
+    assert file_rows == artifact.rows
+
+
+def test_in_memory_csv_sink_requires_field_names() -> None:
+    with pytest.raises(ValueError, match="field_names"):
+        _ = InMemoryCsvSink()
 
 
 def test_csv_sink_requires_field_names(tmp_path):

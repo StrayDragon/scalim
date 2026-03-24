@@ -4,6 +4,7 @@ import csv
 import io
 import logging
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
@@ -44,6 +45,65 @@ COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_CSV_SINK_REMOVE_TEMP_FILE_F
 
 def _normalize_csv_value(value: Any) -> str:
     return "" if value is None else str(value)
+
+
+@dataclass(frozen=True)
+class InMemoryCsv:
+    """`CSV` 的内存中间态(用于 `workflow-managed` 的无路径 `CSV` 输出).
+
+    - `header`: 表头字段序列(顺序 `SSOT`;通常等于 `header_names`)
+    - `rows`: 已对齐的字符串化行数据(每行长度 `MUST` 与 `header` 等长)
+    """
+
+    header: List[str]
+    rows: List[List[str]]
+
+
+class InMemoryCsvSink(BaseRowSink):
+    """将行流写入 `InMemoryCsv` 的内存 `sink`.
+
+    说明:
+    - 值规范化语义与 `CSVSink` 保持一致(`None` -> "", 其它 -> `str(value)`).
+    - 该 `sink` 不做 `IO`,仅用于 `workflow-managed` 中间态.
+    """
+
+    field_names: List[str]
+    header_names: List[str]
+    _artifact: InMemoryCsv
+    _closed: bool
+
+    def __init__(
+        self,
+        *,
+        field_names: Union[List[str], None] = None,
+        header_names: Union[List[str], None] = None,
+    ) -> None:
+        if field_names is None:
+            msg = "必须提供 field_names 参数"
+            raise ValueError(msg)
+        self.field_names = list(field_names)
+        self.header_names = list(header_names) if header_names is not None else list(self.field_names)
+        self._artifact = InMemoryCsv(header=list(self.header_names), rows=[])
+        self._closed = False
+
+    def to_artifact(self) -> InMemoryCsv:
+        return self._artifact
+
+    def _format_row(self, row: RowData) -> List[str]:
+        return [_normalize_csv_value(row.get(field_name)) for field_name in self.field_names]
+
+    @override
+    def write_row(self, row: RowData) -> None:
+        self._artifact.rows.append(self._format_row(row))
+
+    @override
+    def write_batch(self, rows: Sequence[RowData]) -> None:
+        for row in rows:
+            self._artifact.rows.append(self._format_row(row))
+
+    @override
+    def close(self) -> None:
+        self._closed = True
 
 
 class CSVSink(BaseRowSink):
@@ -588,4 +648,6 @@ __all__ = [
     "BlockColumnCSVSink",
     "CSVSink",
     "ColumnCSVSink",
+    "InMemoryCsv",
+    "InMemoryCsvSink",
 ]

@@ -34,8 +34,6 @@ workflow:
     - id: metrics
       demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_metrics_demand.yaml"
       depends_on: [detail]
-      init_vars:
-        detail_csv_path: {$ctx: {node: detail, key: output_path}}
       writes:
         - sheetbook_sheet:
             sheetbook: report
@@ -60,4 +58,3 @@ workflow:
       budget:
         max_entries: 16
         over_budget_policy: fail_fast
-

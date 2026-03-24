@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
 from ....execution.output_composition import (
     AggMetricSpec,
@@ -63,19 +63,18 @@ def _resolve_output_container_path_with_overrides(
     output_id: str,
     config_path: str,
     init_vars: Optional[Dict[str, object]],
-    output_container_path_overrides: Optional[Dict[str, str]],
-) -> str:
+    workflow_managed_output_ids: Optional[FrozenSet[str]],
+) -> Tuple[Optional[str], bool]:
     if str(container.type).lower() == "csv" and _is_pathless_container_path(container.path):
-        override = output_container_path_overrides.get(output_id) if output_container_path_overrides else None
-        resolved_override = str(override or "").strip()
-        if not resolved_override:
+        managed = workflow_managed_output_ids or frozenset()
+        if str(output_id) not in managed:
             msg = (
                 "Pathless CSV output is only allowed when workflow manages temp outputs for writes "
-                "(set outputs.*.container.path or run via workflow writes): output_id={!r}, path={}"
+                "(set outputs.*.container.path or reference via workflow writes): output_id={!r}, path={}"
             ).format(output_id, config_path)
             raise PathlessCsvOutputError(msg, output_id=output_id, config_path=config_path)
-        return resolved_override
-    return resolve_output_container_path(container.path, init_vars=init_vars, path=config_path)
+        return None, True
+    return resolve_output_container_path(container.path, init_vars=init_vars, path=config_path), False
 
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
@@ -300,7 +299,7 @@ def _export_layout_for_derived(
     return ExportLayout(field_ids=normalized, header_names=tuple(names))
 
 
-def _output_spec_from_container(container: OutputContainerConfig, *, path: str) -> OutputSpec:
+def _output_spec_from_container(container: OutputContainerConfig, *, path: Optional[str]) -> OutputSpec:
     fmt = "excel" if str(container.type).lower() == "workbook" else "csv"
     sheet_name = str(container.sheet) if container.sheet else None
     if fmt != "excel":
@@ -472,7 +471,7 @@ def compile_output_composition_from_yaml(
     *,
     resolver: SecurePythonReferenceResolver,
     init_vars: Optional[Dict[str, object]] = None,
-    output_container_path_overrides: Optional[Dict[str, str]] = None,
+    workflow_managed_output_ids: Optional[FrozenSet[str]] = None,
 ) -> Optional[OutputCompositionSpec]:
     outputs = config.outputs
     if not outputs:
@@ -501,16 +500,16 @@ def compile_output_composition_from_yaml(
             raise ValueError(msg)
 
         container_path_key = "outputs.{}.container.path".format(idx)
-        container_path = _resolve_output_container_path_with_overrides(
+        container_path, in_memory = _resolve_output_container_path_with_overrides(
             container,
             output_id=str(out_cfg.name),
             config_path=container_path_key,
             init_vars=init_vars,
-            output_container_path_overrides=output_container_path_overrides,
+            workflow_managed_output_ids=workflow_managed_output_ids,
         )
         output_spec = _output_spec_from_container(container, path=container_path)
         if workbook_default_path is None and str(output_spec.format) == "excel":
-            workbook_default_path = container_path
+            workbook_default_path = str(container_path)
             workbook_default_allow_formulas = bool(container.allow_formulas)
             workbook_default_write_lock = bool(container.write_lock)
 
@@ -530,6 +529,7 @@ def compile_output_composition_from_yaml(
                     target_id=str(out_cfg.name),
                     layout=layout,
                     output=output_spec,
+                    in_memory=bool(in_memory),
                     predicate=predicate,
                     is_primary=bool(is_primary),
                     requires=requires_opt,
@@ -552,6 +552,7 @@ def compile_output_composition_from_yaml(
                 derived=derived,
                 output_layout=out_layout,
                 output=output_spec,
+                in_memory=bool(in_memory),
                 predicate=predicate,
                 is_primary=bool(is_primary),
                 requires=requires_opt,

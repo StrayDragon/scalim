@@ -99,10 +99,28 @@ def test_create_row_sink_for_composed_output_validations(tmp_path: Path) -> None
             workbook_by_path={},
         )
 
+    with pytest.raises(ValueError, match="In-memory composed output only supports format=csv"):
+        _ = mod._create_row_sink_for_composed_output(  # noqa: SLF001
+            target_id="t",
+            output=OutputSpec(format="excel", path=None, streaming=True),
+            layout=layout,
+            workbook_by_path={},
+            in_memory=True,
+        )
+
+    with pytest.raises(ValueError, match="streaming=true"):
+        _ = mod._create_row_sink_for_composed_output(  # noqa: SLF001
+            target_id="t",
+            output=OutputSpec(format="csv", path=None, streaming=False),
+            layout=layout,
+            workbook_by_path={},
+            in_memory=True,
+        )
+
 
 def test_create_row_sink_for_composed_output_csv_success_counts_and_writes(tmp_path: Path) -> None:
     out = tmp_path / "out.csv"
-    sink, counter = mod._create_row_sink_for_composed_output(  # noqa: SLF001
+    sink, counter, _ = mod._create_row_sink_for_composed_output(  # noqa: SLF001
         target_id="t",
         output=OutputSpec(format="csv", path=str(out), streaming=True, include_header=True),
         layout=ExportLayout(field_ids=("a",), header_names=None),
@@ -118,7 +136,7 @@ def test_create_row_sink_for_composed_output_csv_success_counts_and_writes(tmp_p
 
 def test_create_row_sink_for_composed_output_excel_single_sheet_defaults_sheet_name(tmp_path: Path) -> None:
     out = tmp_path / "out.xlsx"
-    sink, counter = mod._create_row_sink_for_composed_output(  # noqa: SLF001
+    sink, counter, _ = mod._create_row_sink_for_composed_output(  # noqa: SLF001
         target_id="t",
         output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name=None),
         layout=ExportLayout(field_ids=("a",), header_names=None),
