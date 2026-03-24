@@ -293,7 +293,45 @@ def test_template_sandbox_legacy_allows_method_calls_and_warns(caplog) -> None:
     assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
 
 
-def test_template_sandbox_legacy_is_exposed_by_public_compile_api(tmp_path, caplog) -> None:
+def test_template_sandbox_legacy_is_rejected_by_public_compile_api(tmp_path) -> None:
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: {{ output_path.strip() }}
+    fields:
+      - order_id
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        _ = compile(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests"]),
+            template_vars={"output_path": "  ./out.csv  "},
+            template_sandbox="legacy",
+        )
+    msg = str(exc_info.value)
+    assert "仅允许" in msg and "safe" in msg
+    assert "迁移" in msg
+    assert "unsafe" in msg
+
+
+def test_template_sandbox_legacy_is_available_via_unsafe_compile_entrypoint(tmp_path, caplog) -> None:
+    from scalim.dsl.by_yaml.runtime.unsafe_entrypoints import unsafe_compile
+
     caplog.set_level("WARNING", logger="scalim.dsl.by_yaml.template_vars")
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(
@@ -317,13 +355,78 @@ outputs:
         encoding="utf-8",
     )
 
-    compilation = compile(
+    compilation = unsafe_compile(
         str(yaml_path),
         allowed_modules=frozenset(["tests"]),
         template_vars={"output_path": "  ./out.csv  "},
         template_sandbox="legacy",
     )
     assert compilation.config.outputs[0].container.path == "./out.csv"
+    assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
+
+
+def test_template_sandbox_invalid_value_is_rejected_by_unsafe_entrypoints(tmp_path) -> None:
+    from scalim.dsl.by_yaml.runtime.unsafe_entrypoints import unsafe_compile
+
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="template_sandbox"):
+        _ = unsafe_compile(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests"]),
+            template_sandbox="nope",
+        )
+
+
+def test_template_sandbox_legacy_is_available_via_unsafe_run_entrypoint(tmp_path, caplog) -> None:
+    from scalim.dsl.by_yaml.runtime.unsafe_entrypoints import unsafe_run
+
+    caplog.set_level("WARNING", logger="scalim.dsl.by_yaml.template_vars")
+    yaml_path = tmp_path / "demand.yaml"
+    out = tmp_path / "out.csv"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs:
+  - name: detail
+    container:
+      type: csv
+      path: {{ output_path.strip() }}
+    fields:
+      - order_id
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = unsafe_run(
+        str(yaml_path),
+        allowed_modules=frozenset(["tests"]),
+        template_vars={"output_path": "  {}  ".format(str(out))},
+        template_sandbox="legacy",
+    )
+    assert result is not None
+    assert out.exists()
     assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
 
 

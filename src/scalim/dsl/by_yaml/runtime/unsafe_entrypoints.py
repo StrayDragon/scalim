@@ -1,3 +1,10 @@
+"""YAML DSL 非公共入口: `unsafe` 扩展点.
+
+注意:
+- 该模块属于内部/不稳定路径,不应在 `docs`/`examples`/`skills` 中作为官方导入路径推广.
+- 该模块允许显式启用不安全能力(例如 `legacy` 模板沙箱),仅用于可信输入/内部测试.
+"""
+
 from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 from ....execution.guardrails import GuardrailsPolicy
@@ -9,12 +16,19 @@ from ....hooks.base import IExecutionHook
 from ....ob.observer import Observer
 from ....sinks.sink_base import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
-from .._public_template_sandbox import validate_public_template_sandbox
 from .compiler import compile as _compile
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult
 
 
-def run(  # noqa: PLR0913
+def _validate_unsafe_template_sandbox(template_sandbox: str) -> str:
+    value = str(template_sandbox or "").strip() or "safe"
+    if value not in {"safe", "legacy"}:
+        msg = "`template_sandbox` 必须是以下值之一: `safe`, `legacy`"
+        raise ValueError(msg)
+    return value
+
+
+def unsafe_run(  # noqa: PLR0913
     yaml_path: str,
     *,
     allowed_modules: FrozenSet[str],
@@ -35,20 +49,11 @@ def run(  # noqa: PLR0913
     template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> RunResult:
-    """运行 `YAML DSL`,并支持显式覆盖项与输出 `sink`.
+    """不安全入口: 允许显式启用 `legacy` 模板沙箱等能力.
 
-    优先级(高 -> 低):
-    - `output_composition=...`(完全覆盖 `YAML` 的 `outputs`)
-    - `overrides.*`(仅对未设为 `UNSET` 的字段生效;主要用于单输出模式)
-    - 执行默认值
-
-    注意:
-    - 当 `YAML` 声明 `outputs` 时,会自动装配 `composed outputs`;此时 `overrides.output.*` 不影响 `outputs.*.container.*`.
-    - `overrides.output.path=None` 会禁用单输出模式的文件输出.
-    - `overrides.viz_config` 可启用/禁用 `viz`,不受 `YAML` 的 `observability.viz.*` 影响.
-    - 输出数据的保留完全由 `sink=...`(例如 `InMemoryRowSink`)决定,而不是由布尔开关控制.
+    仅用于可信输入/内部测试;普通用户请使用 `scalim.dsl.by_yaml.run`.
     """
-    template_sandbox = validate_public_template_sandbox(template_sandbox)
+    sandbox = _validate_unsafe_template_sandbox(template_sandbox)
     options = RunOptions(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
@@ -65,7 +70,7 @@ def run(  # noqa: PLR0913
         key_normalization=normalize_key_normalization(key_normalization),
         init_vars=init_vars,
         template_vars=template_vars,
-        template_sandbox=template_sandbox,
+        template_sandbox=sandbox,
         allowed_yaml_roots=allowed_yaml_roots,
     )
     compilation = _compile(yaml_path, options=options)
@@ -73,7 +78,7 @@ def run(  # noqa: PLR0913
     return RunResult(core, config=compilation.config, yaml_path=yaml_path, sink=sink)
 
 
-def compile(  # noqa: A001, PLR0913
+def unsafe_compile(  # noqa: PLR0913
     yaml_path: str,
     *,
     allowed_modules: FrozenSet[str],
@@ -94,7 +99,11 @@ def compile(  # noqa: A001, PLR0913
     template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> Compilation:
-    template_sandbox = validate_public_template_sandbox(template_sandbox)
+    """不安全入口: 允许显式启用 `legacy` 模板沙箱等能力.
+
+    仅用于可信输入/内部测试;普通用户请使用 `scalim.dsl.by_yaml.compile`.
+    """
+    sandbox = _validate_unsafe_template_sandbox(template_sandbox)
     options = RunOptions(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
@@ -111,13 +120,13 @@ def compile(  # noqa: A001, PLR0913
         key_normalization=normalize_key_normalization(key_normalization),
         init_vars=init_vars,
         template_vars=template_vars,
-        template_sandbox=template_sandbox,
+        template_sandbox=sandbox,
         allowed_yaml_roots=allowed_yaml_roots,
     )
     return _compile(yaml_path, options=options)
 
 
 __all__ = [
-    "compile",
-    "run",
+    "unsafe_compile",
+    "unsafe_run",
 ]

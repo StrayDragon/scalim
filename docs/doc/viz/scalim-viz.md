@@ -183,20 +183,14 @@ workflow scope 的 node id / event node_ref 命名空间:
 ## 5. 从 YAML 构建 VizObserver(便捷方式)
 
 ```python
-from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
-from scalim.execution import ScalimEngine
-from scalim.ob import Observability
+from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.ob.presets.viz import VizObserverConfig
 
-observer = build_viz_observer(
-    yaml_path="path/to/report.yaml",
+_ = run(
+    "path/to/report.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    config=VizObserverConfig(output_dir="/path/to/scalim-viz"),
+    overrides=RunOverrides(viz_config=VizObserverConfig(output_dir="/path/to/scalim-viz")),
 )
-
-observability = Observability(observers=[observer])
-observer_manager = observability.build_manager()
-engine = ScalimEngine(demand=demand_ir, plan=plan, observer_manager=observer_manager)
-engine.run()
 ```
 
 ## 6. UI 端接入(本地目录)

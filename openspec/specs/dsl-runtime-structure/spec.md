@@ -22,9 +22,43 @@
 
 by_yaml runtime MUST NOT 直接承担执行编排主流程(如 plan 构建、engine 实例化/调用、sink finalize、observer manager 生命周期),这些 MUST 由 execution 的统一 IR 编排入口负责.
 
+by_yaml runtime 同时 MUST NOT 承载 workflow 的执行编排；workflow runtime MUST 位于 framework 层(例如 `scalim.workflow.*`),YAML workflow 入口仅做前端编译与依赖注入.
+
 #### Scenario: runtime 仅作为适配层
 - **WHEN** 审阅 YAML DSL 的运行路径
 - **THEN** 运行编排应委托 execution 层统一入口,而非在 by_yaml/runtime 内部自行拼装完整执行链
+
+#### Scenario: workflow orchestration is not implemented in by_yaml runtime
+- **WHEN** 调用方通过 workflow 的稳定入口运行 workflow YAML
+- **THEN** workflow 的调度执行与资源/ctx/事件桥接 MUST 由 framework 层实现,而不是 by_yaml/runtime
+
+### Requirement: `IMPL_ROOT.dsl.by_yaml` MUST be the preferred public facade
+
+系统 MUST 将 `IMPL_ROOT.dsl.by_yaml` 作为 YAML DSL 的首选公开 facade，用于承载用户最常见且受支持的运行入口与运行期契约。
+
+系统可以保留 `runtime` 子模块作为实现分层和内部组合边界，但这些路径 MUST NOT 再作为面向普通用户的首选公开入口被文档、skills 或 examples 推荐。
+
+#### Scenario: public guidance prefers facade over runtime internals
+- **WHEN** 用户查阅 YAML DSL 的官方导入示例
+- **THEN** 示例 MUST 优先使用 `IMPL_ROOT.dsl.by_yaml`
+- **AND** 不得把 `IMPL_ROOT.dsl.by_yaml.runtime.entrypoints`、`runtime.contracts` 或 `runtime.introspection` 作为默认推荐入口
+
+### Requirement: official facade MUST preserve current extension seams
+
+在公共表面收敛过程中，系统 MUST 保持当前已确认的受控扩展点继续可经由官方 facade 使用，而不是通过删减能力来完成“收敛”。
+
+本轮至少包括：
+
+- `sink`
+- `components`
+- `output_composition`
+- `allowed_modules` / `allowed_functions`
+- `allowed_yaml_roots`
+
+#### Scenario: public facade remains behavior-complete for supported extension seams
+- **WHEN** 调用方通过 `IMPL_ROOT.dsl.by_yaml.run(...)` 或 `compile(...)` 使用上述受控扩展点
+- **THEN** 系统 MUST 继续支持这些能力
+- **AND** 公共表面收敛 MUST 体现为“入口与契约明确”,而不是静默删除这些受支持能力
 
 ### Requirement: by_yaml runtime compiles `runtime_vars` into loader params templates
 系统 SHALL 扩展 by_yaml runtime 的对外入口 `run/compile` 与 `RunOptions`,允许调用方提供可选的 `init_vars` 用于 loader 参数模板注入.
@@ -311,4 +345,3 @@ by_yaml runtime compiler MUST 将 YAML/RunOptions 的 `batch_size` 编译为 `Ex
 - **WHEN** 调用方执行 `compile(..., template_vars={...})`
 - **THEN** adapter MUST 在 YAML parse 前完成预编译
 - **AND** 后续编译链路(validator/`DemandConfig -> DemandIr`) MUST 基于预编译后的配置继续执行
-

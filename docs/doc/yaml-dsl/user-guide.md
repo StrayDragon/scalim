@@ -1147,7 +1147,7 @@ sources:
 ```python
 from dataclasses import replace
 
-from scalim.dsl.by_yaml import RunOptions, compile
+from scalim.dsl.by_yaml import compile
 from scalim.execution.output_composition import (
     AggMetricSpec,
     AuditSheetSpec,
@@ -1160,8 +1160,7 @@ from scalim.execution.output_composition import (
 from scalim.execution.run_ir import ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 
 # 1) 编译 YAML 得到 demand_ir/request (安全:需要 allowlist)
-options = RunOptions(allowed_modules=frozenset(["myapp.loaders"]))
-comp = compile("path/to/config.yaml", options=options)
+comp = compile("path/to/config.yaml", allowed_modules=frozenset(["myapp.loaders"]))
 
 # 2) 为每个 sheet 定义自己的字段顺序/表头
 detail_layout = export_layout_from_demand_ir(
@@ -1702,24 +1701,22 @@ main_source:
 
 **高级用法(迁移提示)**:
 
-- 如果你在旧代码中直接使用 `ConfigToIRConverter()`(绕过 `run/compile`),现在必须改为显式 allowlist 或显式 opt-in:
+- 旧代码如果绕过官方 facade 直接调用内部编译器/转换器,建议迁移到 `scalim.dsl.by_yaml.compile/run`,并显式配置 allowlist:
 
 ```python
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
-from scalim.dsl.by_yaml import ResolverTrustedMode
+from scalim.dsl.by_yaml import ResolverTrustedMode, compile
 
 # 推荐:显式 allowlist(安全默认)
-converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["myapp.loaders"]))
-# 或等价:传入带 allowlist 的 resolver
-converter = ConfigToIRConverter(resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["myapp.loaders"])))
+_ = compile(
+    "path/to/config.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+)
 
 # 仅用于可信环境/测试:显式启用 trusted-mode 放宽为允许任意模块(不推荐生产使用)
-converter = ConfigToIRConverter(
-    resolver=SecurePythonReferenceResolver(
-        allowed_modules=frozenset(["*"]),
-        resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
-    )
+_ = compile(
+    "path/to/config.yaml",
+    allowed_modules=frozenset(["*"]),
+    resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
 )
 ```
 
@@ -1742,18 +1739,9 @@ fields:
 
 **compute limits(可选覆盖)**:
 
-```python
-from scalim.dsl.by_yaml.config_parsing.security import ComputeLimits, SecureComputeEngine
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
+compute limits 等更细粒度安全配置属于内部实现细节;如确需自定义,请以 OpenSpec 与源码为准:
 
-limits = ComputeLimits(max_expression_len=4096, max_range_len=20000)
-engine = SecureComputeEngine(limits=limits)
-converter = ConfigToIRConverter(
-    resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["myapp.loaders"])),
-    compute_engine=engine,
-)
-```
+- `src/scalim/dsl/by_yaml/config_parsing/security.py`
 
 常见报错关键字(触发上限时会出现在错误信息中):
 `max_expression_len` / `max_ast_nodes` / `max_ast_depth` / `max_literal_string_len` / `max_collection_literal_len` / `max_repeat` / `max_range_len`
@@ -1916,9 +1904,9 @@ scalim-cli yaml-dsl validate config.yaml
 ```
 
 ```python
-# 或在代码中(加载时会自动验证)
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-_ = YamlDemandLoader().load("config.yaml")
+# 或在代码中(编译时会自动校验;需配置 allowlist)
+from scalim.dsl.by_yaml import compile
+_ = compile("config.yaml", allowed_modules=frozenset(["myapp.loaders"]))
 ```
 
 ### Q9: 支持哪些输出格式？

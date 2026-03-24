@@ -6,10 +6,6 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from scalim.dsl.by_yaml import compile as compile_yaml
 from scalim.dsl.by_yaml import run as run_yaml
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
-from scalim.dsl.by_yaml.config_parsing.imports import load_and_expand_imports
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.sinks.sink_memory import InMemoryRowSink
 from scalim.typedefs import RowData
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -48,31 +44,26 @@ def run_yaml_dsl_ecommerce(
         allowed_modules = frozenset([loader_module])
         init_vars = init_vars or {"order_ids": []}
 
-        # 1) 语义校验: ConfigValidator + YamlDemandLoader
-        validator = ConfigValidator()
-        yaml_config = load_and_expand_imports(yaml_path)
+        # 1) `compile`: 语义校验 + 生成编译产物(执行请求等),供下游运行入口复用
         try:
-            validator.validate(yaml_config)
-        except ConfigValidationError as exc:
-            summary = "ConfigValidator failed: {}".format(exc)
+            compilation = compile_yaml(
+                str(yaml_path),
+                allowed_modules=allowed_modules,
+                init_vars=init_vars,
+            )
+        except Exception as exc:
+            summary = "compile failed: {}".format(exc)
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
                 summary=summary,
-                details={"errors": getattr(exc, "errors", None)},
+                details={"error": str(exc)},
             )
 
-        demand_config = YamlDemandLoader().load(str(yaml_path))
+        demand_config = compilation.config
 
-        # 2) `compile`: 生成编译产物(执行请求等),供下游运行入口复用
-        compilation = compile_yaml(
-            str(yaml_path),
-            allowed_modules=allowed_modules,
-            init_vars=init_vars,
-        )
-
-        # 3) `run`: 用内存 `sink` 获取行数据
+        # 2) `run`: 用内存 `sink` 获取行数据
         sink = InMemoryRowSink()
         start = time.time()
         result = run_yaml(
@@ -93,7 +84,7 @@ def run_yaml_dsl_ecommerce(
                 details={"duration_seconds": elapsed, "result": result},
             )
 
-        # 4) `rows-binding` 对拍字段校验(来自唯一完整 YAML 示例)
+        # 3) `rows-binding` 对拍字段校验(来自唯一完整 YAML 示例)
         match_fields = ["rows_name_match", "rows_level_match"]
         mismatch = 0
         for row in rows:
@@ -102,7 +93,7 @@ def run_yaml_dsl_ecommerce(
                     mismatch += 1
                     break
 
-        # 5) 基于纯 Python 对照组对拍(只检查可验证字段子集)
+        # 4) 基于纯 Python 对照组对拍(只检查可验证字段子集)
         fields_to_check = _extract_verifiable_fields(rows)
         verification: VerificationResult = verify_scalim_output(rows, fields_to_check=fields_to_check)
 

@@ -111,6 +111,7 @@
 - Source: `openspec/specs/yaml-dsl-workflow/spec.md`
 - Purpose: 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).
 - Requirements:
+  - workflow public guidance MUST use curated stable entrypoints
   - Workflow YAML declares runs and options
   - Runs execute demand YAML via existing compilation pipeline
   - Workflow enforces failure_policy

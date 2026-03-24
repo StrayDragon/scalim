@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions
+from scalim.dsl.by_yaml.runtime.contracts import RunOptions
 from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.stages import (
     stage_create_context,

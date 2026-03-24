@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 
 from ...vendor.compact.importlibx import require_optional_dependency
+from ._public_template_sandbox import validate_public_template_sandbox
 from .config_parsing.allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
 from .config_parsing.template_precompile import maybe_precompile_yaml_text
 
@@ -225,6 +226,7 @@ def load_workflow_config(
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
 ) -> WorkflowConfig:
+    template_sandbox = validate_public_template_sandbox(template_sandbox)
     msg: str
     yaml_path = Path(str(workflow_yaml_path or "")).expanduser()
     try:

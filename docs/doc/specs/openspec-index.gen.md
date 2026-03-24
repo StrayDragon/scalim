@@ -111,6 +111,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/key-normalization/spec.md)
 - Summary: `key_normalization` 提供一个运行期可控的“稳定字符串口径”键匹配策略,用于解决 relations/derived outputs 中 `1` 与 `"1"` 等跨来源类型不一致导致的 miss/分组拆分问题. 该能力为 `EXPERIMENTAL`,默认关闭(`raw`).
 
+### `legacy-vendors-sync`
+- Title: legacy-vendors-sync Specification
+- Source: [spec.md](#code=openspec/specs/legacy-vendors-sync/spec.md)
+- Summary: **状态: ✅ 已实现** 为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。
+
 ### `loader-retry-policy`
 - Title: loader-retry-policy Specification
 - Source: [spec.md](#code=openspec/specs/loader-retry-policy/spec.md)
@@ -181,6 +186,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/package-identity/spec.md)
 - Summary: TBD - created by archiving change projectlib-rename-uv-lib-migration. Update Purpose after archive.
 
+### `package-metadata`
+- Title: package-metadata Specification
+- Source: [spec.md](#code=openspec/specs/package-metadata/spec.md)
+- Summary: **状态: ✅ 已实现** 为 `scalim` 提供一套轻量、稳定、Python 3.6 兼容的运行时版本号入口（`__version__`），用于排查与集成，并与 `pyproject.toml` 的 `project.version` 保持一致.
+
 ### `parallel-execution`
 - Title: parallel-execution Specification
 - Source: [spec.md](#code=openspec/specs/parallel-execution/spec.md)
@@ -225,6 +235,11 @@ Sources:
 - Title: prompt-eval-workflow Specification
 - Source: [spec.md](#code=openspec/specs/prompt-eval-workflow/spec.md)
 - Summary: **状态: ✅ 已实现** 定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。
+
+### `public-api-surface-governance`
+- Title: public-api-surface-governance Specification
+- Source: [spec.md](#code=openspec/specs/public-api-surface-governance/spec.md)
+- Summary: **状态: ✅ 已实现** 定义稳定公开入口的编目规则与回归门禁,避免内部实现路径在文档/skills/examples/tests 中被误固化为事实公共 API.
 
 ### `runtime-guardrails`
 - Title: runtime-guardrails Specification
@@ -299,7 +314,12 @@ Sources:
 ### `workflow-runtime-module-organization`
 - Title: workflow-runtime-module-organization Specification
 - Source: [spec.md](#code=openspec/specs/workflow-runtime-module-organization/spec.md)
-- Summary: TBD - created by archiving change c55-workflow-runtime-modularization. Update Purpose after archive.
+- Summary: 定义 workflow runtime 的包位置、子模块职责划分与稳定入口策略,确保其作为 framework 层能力与 DSL 层保持清晰边界.
+
+### `workflow-runtime-quality-and-test-stability`
+- Title: workflow-runtime-quality-and-test-stability Specification
+- Source: [spec.md](#code=openspec/specs/workflow-runtime-quality-and-test-stability/spec.md)
+- Summary: 定义 workflow runtime 的质量与测试稳定性要求,包括依赖注入契约、规则 SSOT 复用与并发测试的确定性护栏.
 
 ### `workflow-shared-output-containers`
 - Title: workflow-shared-output-containers Specification

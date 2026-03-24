@@ -13,6 +13,29 @@
 - `src/IMPL_ROOT/vendor/compact/typing_extensionsx.py`
 
 ## Requirements
+### Requirement: internal implementation paths MUST remain non-contract
+
+系统 MUST 将“可导入”与“可承诺”为两个不同层级：
+
+- 稳定公开入口由显式白名单定义
+- 其余实现路径即使暂时可导入,也 MUST 视为内部实现细节
+
+系统 MUST 不允许测试、示例、skills 或文档把内部实现路径反向固化为事实上的公共 API。
+
+#### Scenario: implementation paths are not promoted to public contract
+- **WHEN** 某个内部实现模块仍然可以被 import
+- **THEN** 系统 MUST NOT 因此自动将其视为稳定公开入口
+- **AND** 面向用户的回归门禁 MUST 仍以显式公共白名单为准
+
+### Requirement: curated facade modules MUST use explicit export whitelists
+
+系统 MUST 要求被认定为稳定公开入口的 facade 模块使用显式 `__all__` 或等价白名单控制导出面，避免内部符号随着重构被无意带出。
+
+#### Scenario: facade export growth is deliberate
+- **WHEN** 维护者调整某个稳定 facade 模块中的导出符号
+- **THEN** 变更 MUST 通过显式白名单体现
+- **AND** 公共表面 gate MUST 能对新增或删除导出做出确定性回归提示
+
 ### Requirement: by_yaml 解析与 runtime 模块保持子包化
 系统 MUST 保持 by_yaml 的解析与 runtime 为显式子包结构:
 - `config_parsing` 采用 package 形态,并保留 `loader.py`/`validator.py` 作为稳定入口;
@@ -88,6 +111,18 @@
 - **WHEN** 执行模块依赖方向检查
 - **THEN** 结果 MUST 不出现 `planning -> execution` 的反向依赖
 - **AND** MUST 不出现 `hooks/ob -> dsl 专有配置` 的直接依赖
+
+### Requirement: workflow framework MUST NOT import DSL modules
+系统 MUST 保持核心层级依赖方向可审计且单向；workflow runtime/framework 层 MUST NOT 反向依赖 DSL 层实现符号（例如 `IMPL_ROOT.dsl.by_yaml` 及其子模块）。
+
+该约束 MUST 由自动化门禁守护（例如 pytest 的 AST 扫描 + 文本扫描等价工具）,并在回归时 fail-fast。
+
+补充约束: workflow 层 MUST NOT 通过动态导入绕开该限制（例如 `importlib.import_module("...dsl...")` 或等价字符串导入）。
+
+#### Scenario: workflow does not import dsl
+- **WHEN** 运行模块依赖方向检查
+- **THEN** 结果 MUST 不出现 `workflow -> dsl` 的反向依赖
+- **AND** 结果 MUST 不出现通过动态导入引入 `dsl` 的行为
 
 ### Requirement: 不新增顶层公共 facade
 系统 MUST NOT 新增 `src/IMPL_ROOT/api.py` 或在顶层 `src/IMPL_ROOT/__init__.py` 做公共 re-export 聚合;公共入口继续采用显式模块路径.

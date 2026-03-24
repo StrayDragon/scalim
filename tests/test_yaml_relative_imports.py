@@ -3,10 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
+from scalim.dsl.by_yaml import compile as compile_yaml
 from scalim.dsl.by_yaml.config_parsing.call_by import CallByParseError, parse_call_by
 from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml.runtime.contracts import RunOptions
 from scalim.dsl.by_yaml.runtime.errors import ResolverError
 from scalim.dsl.by_yaml.runtime import compiler as compiler_module
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver, derive_base_module_path

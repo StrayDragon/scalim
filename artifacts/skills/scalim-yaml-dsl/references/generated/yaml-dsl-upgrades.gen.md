@@ -233,7 +233,7 @@
   - `resources.workbooks/csvs`: 共享输出路径
   - `resources.sheetbooks`: in-memory sheetbook + 预算护栏 + 可选导出 `export_xlsx`
   - **NEW**: `workflow.runs[*].writes` 声明写入 intents(list): workbook/csv/sheetbook 的 sheet/append 写入（旧 `write_to` 已移除）
-  - **NEW**: 内置 loader `scalim.dsl.by_yaml.runtime.workflow_loaders:sheetbook_sheet_rows` 支持下游 demand 读取上游 sheetbook sheet rows(受 deps 可见性约束)
+  - **NEW**: 内置 loader `scalim.workflow.loaders:sheetbook_sheet_rows` 支持下游 demand 读取上游 sheetbook sheet rows(受 deps 可见性约束)
   OpenSpec 归档变更（含 proposal/design/spec/tasks）:
   - `openspec/changes/archive/2026-03-18-c20-workflow-dag-context-passing/`
   - `openspec/changes/archive/2026-03-17-c30-workflow-shared-output-containers/`

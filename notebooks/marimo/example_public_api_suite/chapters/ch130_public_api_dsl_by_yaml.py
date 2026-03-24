@@ -22,12 +22,92 @@ _COVERED_PUBLIC_ALL = {
     "Compilation",
     "OutputOverrides",
     "ResolverTrustedMode",
-    "RunOptions",
     "RunOverrides",
     "RunResult",
     "compile",
     "run",
     "run_workflow",
+}
+
+_COVERED_WORKFLOW_ALL = {
+    "WorkflowCachePoolBudget",
+    "WorkflowCachePoolOptions",
+    "WorkflowCachePoolPin",
+    "WorkflowConfig",
+    "WorkflowConfigError",
+    "WorkflowOptions",
+    "WorkflowResources",
+    "WorkflowRun",
+    "WorkflowWriteTo",
+    "WorkflowWriteToCsvAppend",
+    "WorkflowWriteToSheetbookAppend",
+    "WorkflowWriteToSheetbookSheet",
+    "WorkflowWriteToWorkbookAppend",
+    "WorkflowWriteToWorkbookSheet",
+    "load_workflow_config",
+    "load_workflow_config_from_mapping",
+    "resolve_workflow_demand_path",
+    "validate_workflow_yaml_text_json",
+}
+
+_COVERED_WORKFLOW_TYPES_ALL = {
+    "WorkflowCachePoolBudget",
+    "WorkflowCachePoolOptions",
+    "WorkflowCachePoolPin",
+    "WorkflowConfig",
+    "WorkflowConfigError",
+    "WorkflowOptions",
+    "WorkflowResources",
+    "WorkflowRun",
+    "WorkflowWriteTo",
+    "WorkflowWriteToCsvAppend",
+    "WorkflowWriteToSheetbookAppend",
+    "WorkflowWriteToSheetbookSheet",
+    "WorkflowWriteToWorkbookAppend",
+    "WorkflowWriteToWorkbookSheet",
+}
+
+_COVERED_WORKFLOW_PATHS_ALL = {
+    "resolve_workflow_demand_path",
+}
+
+_COVERED_SPEC_IR_ALL = {
+    "BindingIr",
+    "ComputeCallContextIr",
+    "CsvFieldPresentationIr",
+    "DemandIr",
+    "DerivedFieldIr",
+    "ExportProfileIr",
+    "FieldIr",
+    "FieldPresentationIr",
+    "FieldRefIr",
+    "JoinConditionIr",
+    "KeyIr",
+    "LoaderCallContextIr",
+    "LoaderExtractor",
+    "LoaderIr",
+    "LoaderParamsBuilder",
+    "LoaderResultMapCallable",
+    "LookupKeyCast",
+    "LookupKeySpec",
+    "LookupStepIr",
+    "MainSourceIr",
+    "MainSourceRowIterableCallable",
+    "NormalizedLookupKeySpec",
+    "OrderByKeyIr",
+    "PandasFieldPresentationIr",
+    "RelationIr",
+    "SourceIr",
+    "SourceNormalizeIr",
+    "SourceRefIr",
+    "SpreadsheetFieldPresentationIr",
+    "SupportedFieldIr",
+    "build_stable_lookup_key_list",
+}
+
+_COVERED_WORKFLOW_LOADERS_ALL = {
+    "sheetbook_sheet_rows",
+    "workflow_loader_context",
 }
 
 _ALLOWED_MODULES: FrozenSet[str] = frozenset(["scalim_misc.examples.public_api._fixtures"])
@@ -49,6 +129,29 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
             summary=coverage_failure_summary(coverage),
             details=coverage_to_details(coverage),
         )
+
+    from scalim.dsl.by_yaml import workflow as workflow_api
+    from scalim.dsl.by_yaml import workflow_paths as workflow_paths_api
+    from scalim.dsl.by_yaml import workflow_types as workflow_types_api
+    from scalim.spec import ir as spec_ir_api
+    from scalim.workflow import loaders as workflow_loaders_api
+
+    for mod, covered in (
+        (workflow_api, _COVERED_WORKFLOW_ALL),
+        (workflow_types_api, _COVERED_WORKFLOW_TYPES_ALL),
+        (workflow_paths_api, _COVERED_WORKFLOW_PATHS_ALL),
+        (spec_ir_api, _COVERED_SPEC_IR_ALL),
+        (workflow_loaders_api, _COVERED_WORKFLOW_LOADERS_ALL),
+    ):
+        mod_coverage = check_public_all_coverage(mod, covered=covered)
+        if not mod_coverage.ok:
+            return ExampleResult(
+                example_id=_EXAMPLE_ID,
+                passed=False,
+                kind=EXAMPLE_KIND_ORACLE,
+                summary=coverage_failure_summary(mod_coverage),
+                details=coverage_to_details(mod_coverage),
+            )
 
     symbols = {name: getattr(api, name) for name in api.__all__}
     _ = symbols.get("UNSET")
@@ -126,13 +229,6 @@ workflow:
                 details={"run_result": run_result},
             )
 
-        options = api.RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            init_vars=init_vars,
-            overrides=overrides,
-        )
-        _ = options.parallel_mode
-
         reset_preload_counter_calls()
         wf = api.run_workflow(
             str(workflow_path),
@@ -182,6 +278,7 @@ def _(mo):
         本章目标:
         - 覆盖 `scalim.dsl.by_yaml.__all__` 的最小可运行示例
         - 演示 `compile/run/run_workflow` + overrides + allowlist
+        - 覆盖 curated public entrypoints: workflow helpers / `scalim.spec.ir` / `scalim.workflow.loaders`
 
         SSOT:
         - `notebooks/marimo/example_public_api_suite/chapters/ch130_public_api_dsl_by_yaml.py::run_public_api_dsl_by_yaml`

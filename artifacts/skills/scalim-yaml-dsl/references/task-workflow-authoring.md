@@ -93,7 +93,7 @@ workflow 的 sheetbook 是 workflow scope 的共享资源. 若下游 demand 需�
 
 ```yaml
 main_source:
-  loader: "scalim.dsl.by_yaml.runtime.workflow_loaders:sheetbook_sheet_rows"
+  loader: "scalim.workflow.loaders:sheetbook_sheet_rows"
   params:
     ref:
       node: export

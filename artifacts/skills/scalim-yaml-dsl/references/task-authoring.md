@@ -112,7 +112,7 @@ outputs:
 调用侧(Python):
 
 ```py
-from scalim.dsl.by_yaml.runtime.entrypoints import run
+from scalim.dsl.by_yaml import run
 
 run(
     "report.yaml",

@@ -142,6 +142,7 @@
       {
         "path": "openspec/specs/yaml-dsl-workflow/spec.md",
         "requirements": [
+          "workflow public guidance MUST use curated stable entrypoints",
           "Workflow YAML declares runs and options",
           "Runs execute demand YAML via existing compilation pipeline",
           "Workflow enforces failure_policy",
@@ -416,11 +417,11 @@
     },
     {
       "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "a2d496edba1e43f10d27ccfd1d14e3fa34bfb388bd566c708f3f247169735e60"
+      "sha256": "f018ccd463f5cacabd27494e0e68abf483b941ab4c8fa18dba5c45bd5be7b342"
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-      "sha256": "ad11cfbbfecbbe9eeb277d0bc8d27f94e85738206317bcaa8e551c0311cc864d"
+      "sha256": "c0bfcf7fd5432430cf28bce0d1d9d26ff088a274ea98ce949ac71e0067f950f5"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -436,7 +437,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-workflow/spec.md",
-      "sha256": "7112969f1ab54f05492648b46c92c8937cd55e8a013c4a7970581d1bb2854998"
+      "sha256": "06c3dd2bd8d4cf22687982d2d798e8ad6a5615cbe8065a002fb827b3a8c4c237"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
@@ -466,11 +467,11 @@
     },
     {
       "path": "references/generated/yaml-dsl-upgrades.gen.md",
-      "sha256": "198b467dd0f06b777b8d8893985f8e7716b087036cc4a841f49dc5be7ee24182"
+      "sha256": "ac5f553cd07389afc94c3f2f32c27c2ecae7b49a72965005121cce2e756f0918"
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "998c4056630be1dd6a5b83c970177610a00d38ae7f085531e6293a0a3696702f"
+      "sha256": "d27331b54d50d9e62f0400e2413a4af3ad10926d8adbefe3304929267d596dd2"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

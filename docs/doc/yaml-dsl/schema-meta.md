@@ -86,7 +86,9 @@
 
 ```py
 from dataclasses import dataclass, field
-from scalim.dsl.by_yaml.schema_dsl.constants import _schema_meta
+
+# `_schema_meta` 是内部 helper,见:
+# - `src/scalim/dsl/by_yaml/schema_dsl/constants.py::_schema_meta`
 
 
 @dataclass(frozen=True)
@@ -105,7 +107,9 @@ class Demo:
 
 ```py
 from dataclasses import dataclass, field
-from scalim.dsl.by_yaml.schema_dsl.constants import _schema_meta
+
+# `_schema_meta` 是内部 helper,见:
+# - `src/scalim/dsl/by_yaml/schema_dsl/constants.py::_schema_meta`
 
 
 @dataclass(frozen=True)
@@ -120,7 +124,8 @@ class BindConfig:
 from dataclasses import dataclass, field
 from typing import List
 
-from scalim.dsl.by_yaml.schema_dsl.constants import _schema_meta
+# `_schema_meta` 是内部 helper,见:
+# - `src/scalim/dsl/by_yaml/schema_dsl/constants.py::_schema_meta`
 
 
 @dataclass(frozen=True)

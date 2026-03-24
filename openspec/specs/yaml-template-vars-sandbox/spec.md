@@ -18,20 +18,32 @@ TBD - created by archiving change c20-yaml-template-vars-sandbox. Update Purpose
 - **THEN** 模板渲染 MUST fail-fast
 - **AND** 错误信息 MUST 可诊断地指出“method call 在 sandbox 下被禁止”（或等价表述）
 
-### Requirement: legacy behavior MUST require explicit opt-in
-系统 MUST 提供显式的“信任模式/legacy 模式”开关（例如 `template_sandbox="legacy"`），仅当调用方显式 opt-in 时才允许：
+### Requirement: legacy behavior MUST require explicit non-public opt-in
+系统 MUST NOT 在默认公共 API 上继续暴露 legacy/信任模式模板沙箱开关。
 
-- 属性访问（含非 `_` 属性）
-- 无参方法调用
+当且仅当调用方进入显式的非公共、不安全语义入口时，系统才允许 legacy 行为放宽；默认公共入口 MUST 只允许 safe sandbox。
 
 并且：
 
 - `_`/`__dunder__` 属性访问 MUST 仍然被禁止（不提供放宽开关）
+- 公共入口收到 `template_sandbox="legacy"`（或等价 legacy opt-in）时 MUST fail-fast，并给出迁移提示
+- 若后续保留 legacy 能力，系统 MUST 通过显式 `unsafe` 语义的专用入口承载，而不是继续挂在默认 facade 上
 
-当启用 legacy 模式时，系统 MUST 以强提示告知风险（至少 warning 级日志；可选诊断事件）。
+#### Scenario: public run API rejects legacy sandbox
+- **WHEN** 调用方通过官方公开入口启用 `template_sandbox="legacy"`
+- **THEN** 系统 MUST fail-fast
+- **AND** 错误信息 MUST 同时满足:
+  - 指出默认公共入口仅允许 safe sandbox（legacy 已不再支持）
+  - 给出明确迁移动作（例如“移除 `template_sandbox` 参数或显式改为 safe 模式”）
+  - 若仍需 legacy 能力,提示其必须转入显式 `unsafe` 语义的非公共入口（而非继续使用默认 facade）
 
-#### Scenario: legacy mode allows method calls with warnings
-- **WHEN** 调用方显式启用 legacy 模式
+#### Scenario: safe sandbox remains the only public template mode
+- **WHEN** 调用方通过官方公开入口提供 `template_vars`
+- **THEN** 系统 MUST 继续在 YAML parse 前执行 safe sandbox 预编译
+- **AND** 不得再通过公共入口放宽为 legacy 模式
+
+#### Scenario: legacy mode allows method calls with warnings (unsafe entrypoint)
+- **WHEN** 调用方通过显式 `unsafe` 语义的非公共入口启用 legacy 模式
 - **AND** YAML 文本包含 `x: {{ p.open().read() }}`
 - **THEN** 模板渲染 MUST 成功并产生渲染后的 YAML 文本
 - **AND** 系统 MUST 发出明确的风险告警（warning）
@@ -50,4 +62,3 @@ TBD - created by archiving change c20-yaml-template-vars-sandbox. Update Purpose
 - **THEN** 系统 MUST fail-fast
 - **AND** 错误信息 MUST 指出不允许的类型与变量路径
 - **AND** 错误信息 MUST NOT 泄露该对象的具体值内容（例如实际文件路径文本）
-

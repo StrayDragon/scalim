@@ -94,31 +94,22 @@ def _(mo, yaml_path):
 @app.cell
 def _(yaml_path):
     # region SCALIM-SKILL:example-full:constraints
-    import yaml
+    from scalim.dsl.by_yaml import compile
 
-    from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
-    from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-    from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+    _loaders_module = "scalim_misc.demo_big_data_report.loaders"
 
-    # 先加载 YAML 内容
-    with open(yaml_path, "r", encoding="utf-8") as _f:
-        yaml_config = yaml.safe_load(_f)
-
-    # 使用 ConfigValidator 验证配置
-    validator = ConfigValidator()
     try:
-        validator.validate(yaml_config)
-        print("✅ ConfigValidator 验证通过!")
+        compilation = compile(
+            str(yaml_path),
+            allowed_modules=frozenset([_loaders_module]),
+        )
+        print("✅ `compile()` 校验/加载通过!")
         validation_passed = True
-    except ConfigValidationError as e:
-        print("❌ ConfigValidator 验证失败:", e)
-        for _err in e.errors[:5]:
-            print("   -", _err)
+        demand_config = compilation.config
+    except Exception as e:
+        print("❌ `compile()` 校验/加载失败:", e)
         validation_passed = False
-
-    # 然后使用 YamlDemandLoader 加载
-    loader = YamlDemandLoader()
-    demand_config = loader.load(str(yaml_path))
+        demand_config = None
     # endregion
 
     _ = validation_passed
