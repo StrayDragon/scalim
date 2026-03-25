@@ -4,8 +4,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml.runtime.contracts import OutputOverrides, RunOverrides
-from scalim.dsl.by_yaml.runtime.entrypoints import run
+from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -233,9 +232,6 @@ def main(argv: List[str]) -> int:
         output_dir = output_base / run_dir if multi else (output_base if args.output_dir else (profile_root / run_dir))
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        output_fields = _output_fields_override_for_scenario(scenario)
-        output_overrides = OutputOverrides(path=None, fields=output_fields) if output_fields is not None else OutputOverrides(path=None)
-
         viz_config = VizObserverConfig(
             output_path=str(output_dir / "viz_events.jsonl"),
             snapshot_path=str(output_dir / "viz_snapshot.json"),
@@ -251,7 +247,6 @@ def main(argv: List[str]) -> int:
             yaml_path,
             allowed_modules=allowed_modules,
             overrides=RunOverrides(
-                output=output_overrides,
                 viz_config=viz_config,
             ),
             parallel_mode=parallel_mode,

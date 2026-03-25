@@ -301,7 +301,7 @@ sources:
         name: 产品成本
         relation: orders_to_products
       category_id: &category_id
-        name: 产品分类ID
+        name: 产品分类ID(lookup)
         relation: orders_to_products
 
   categories:
@@ -322,7 +322,7 @@ sources:
       ids: {$keys: {as: set}}
     fields:
       warehouse_region_id:
-        name: 区域ID
+        name: 区域ID(lookup)
         extract: region_id
         relation: orders_to_warehouses
 

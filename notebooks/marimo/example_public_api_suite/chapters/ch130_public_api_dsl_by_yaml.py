@@ -20,7 +20,6 @@ app = marimo.App(width="full")
 _COVERED_PUBLIC_ALL = {
     "UNSET",
     "Compilation",
-    "OutputOverrides",
     "ResolverTrustedMode",
     "RunOverrides",
     "RunResult",
@@ -211,7 +210,21 @@ workflow:
             )
 
         sink = InMemoryRowSink()
-        overrides = api.RunOverrides(output=api.OutputOverrides(path=None, include_header=api.UNSET))
+        overrides = api.RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {
+                        "type": "csv",
+                        "path": str(tmp / "out.csv"),
+                        "include_header": True,
+                        "header_fields_output_by": "name",
+                        "streaming": True,
+                    },
+                    "fields": ["item_id", "dim_id"],
+                }
+            ]
+        )
         run_result: api.RunResult = api.run(
             str(demand_path),
             allowed_modules=_ALLOWED_MODULES,

@@ -51,15 +51,23 @@ main_source:
       name: 订单ID
 ```
 
-如果希望写文件输出,推荐在 Python 调用侧使用 `overrides.output.path` 覆盖输出路径(而不是把路径写死在 YAML 里):
+如果希望写文件输出,推荐在 Python 调用侧使用与 YAML `outputs` 同形的 `overrides.outputs` 指定输出编排(字段/路径/sheet/表头策略等),而不是把路径写死在 YAML 里:
 
 ```python
-from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, run
+from scalim.dsl.by_yaml import RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(output=OutputOverrides(path="./output/minimal_order_report.csv")),
+    overrides=RunOverrides(
+        outputs=[
+            {
+                "name": "detail",
+                "container": {"type": "workbook", "path": "./output/minimal_order_report.xlsx", "sheet": "明细"},
+                "fields": ["order_id"],
+            }
+        ]
+    ),
 )
 ```
 
@@ -68,7 +76,7 @@ result = run(
 ```yaml
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/minimal_order_report.csv}
+    container: {type: workbook, path: ./output/minimal_order_report.xlsx, sheet: 明细}
     fields: [order_id]
 ```
 
@@ -137,7 +145,7 @@ scalim-cli yaml-dsl validate config.yaml
 **Python 代码调用**:
 
 ```python
-from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, run
+from scalim.dsl.by_yaml import RunOverrides, run
 
 # 加载并执行 YAML 配置(安全:需要 allowlist)
 result = run(
@@ -145,11 +153,19 @@ result = run(
     allowed_modules=frozenset(["myapp.loaders"]),
 )
 
-# 常见用法: YAML 不声明 outputs,由 Python overrides/sink 决定单输出策略
+# 常见用法: YAML 不声明 outputs,由 Python overrides.outputs 指定单输出编排(推荐)
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(output=OutputOverrides(path="./output/order_report.csv")),
+    overrides=RunOverrides(
+        outputs=[
+            {
+                "name": "detail",
+                "container": {"type": "csv", "path": "./output/order_report.csv"},
+                "fields": ["order_id"],
+            }
+        ]
+    ),
 )
 ```
 
@@ -1133,114 +1149,51 @@ sources:
 
 ### 4.5 多输出编排与派生汇总 (outputs / output_composition)
 
-`YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 workbook 多 sheet / where 分发 / aggregate 派生汇总 / meta/audit).
-运行时会自动将 `outputs` 装配为等价的执行层 `OutputCompositionSpec`.
+`YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 workbook 多 sheet / where 分发 / aggregate 派生汇总 / meta/audit),
+运行时会将其编译为执行层的 `ExecutionRequest.output_composition`.
 
 关键点:
 
 - `outputs` 是有序列表;顺序决定 primary 输出
 - 当多个 outputs 共享同一 Excel `path` 时,每个 output 必须显式设置 `sheet`(否则会覆盖同一个 sheet)
-- 如需在 Python 调用侧完全覆盖 YAML 的 outputs,可以传入 `output_composition=...`(driver override)
+- Python 调用侧可通过 `overrides.outputs` **整体替换** YAML 的 `outputs`(replace).优先级: `overrides.outputs` > YAML `outputs` > 默认(不写文件;仅 sink 保留数据)
+- `overrides.outputs` 必须为非空 list;本版本仅承诺明细输出(detail)最小子集: `name/container/fields`(不支持 `where/from/aggregate`)
 
-#### 4.5.1 示例: 单次运行写入同一 workbook 的多 sheet(明细 + 汇总 + meta + audit)
+#### 4.5.1 示例: YAML 声明多 sheet(明细 + 汇总 + meta + audit)
 
-```python
-from dataclasses import replace
-
-from scalim.dsl.by_yaml import compile
-from scalim.execution.output_composition import (
-    AggMetricSpec,
-    AuditSheetSpec,
-    DerivedGroupBySpec,
-    DerivedOutputTargetSpec,
-    MetaSheetSpec,
-    OutputCompositionSpec,
-    OutputTargetSpec,
-)
-from scalim.execution.run_ir import ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
-
-# 1) 编译 YAML 得到 demand_ir/request (安全:需要 allowlist)
-comp = compile("path/to/config.yaml", allowed_modules=frozenset(["myapp.loaders"]))
-
-# 2) 为每个 sheet 定义自己的字段顺序/表头
-detail_layout = export_layout_from_demand_ir(
-    comp.demand_ir,
-    ["order_id", "order_source", "amount", "cost", "profit"],
-    header_fields_output_by="name",
-)
-
-summary_layout = ExportLayout(
-    field_ids=("order_source", "order_cnt", "sum_amount", "sum_profit", "rank"),
-    header_names=None,
-)
-
-workbook_path = "./output/report.xlsx"
-
-# 3) 组合输出: 同一次 run 写 4 张 sheet
-spec = OutputCompositionSpec(
-    targets=(
-        OutputTargetSpec(
-            target_id="detail",
-            layout=detail_layout,
-            output=OutputSpec(format="excel", path=workbook_path, streaming=True, include_header=True, sheet_name="Detail"),
-            is_primary=True,
-        ),
-    ),
-    derived_targets=(
-        DerivedOutputTargetSpec(
-            target_id="summary_by_source",
-            derived=DerivedGroupBySpec(
-                group_by=("order_source",),
-                metrics=(
-                    AggMetricSpec(out_field_id="order_cnt", op="count", field_id="order_id"),
-                    AggMetricSpec(out_field_id="sum_amount", op="sum", field_id="amount"),
-                    AggMetricSpec(out_field_id="sum_profit", op="sum", field_id="profit"),
-                ),
-                rank_by="sum_profit",
-                rank_order="desc",
-                max_groups=10000,
-            ),
-            output_layout=summary_layout,
-            output=OutputSpec(format="excel", path=workbook_path, streaming=True, include_header=True, sheet_name="Summary"),
-        ),
-    ),
-    meta_sheet=MetaSheetSpec(
-        target_id="meta",
-        output=OutputSpec(format="excel", path=workbook_path),
-        sheet_name="Meta",
-    ),
-    audit_sheet=AuditSheetSpec(
-        target_id="audit",
-        output=OutputSpec(format="excel", path=workbook_path),
-        sheet_name="Audit",
-    ),
-    failure_policy="all_fail",
-)
-
-request = replace(
-    comp.request,
-    output=OutputSpec(path=None),  # 禁用默认单输出输出(由 output_composition 接管)
-    sink=None,
-    output_composition=spec,
-)
-
-result = run_ir(comp.demand_ir, request)
-print(result.outputs)  # 例如: {"detail": "./output/report.xlsx", "summary_by_source": "./output/report.xlsx", ...}
+```yaml
+outputs:
+  - name: detail
+    container: {type: workbook, path: ./output/report.xlsx, sheet: 明细}
+    fields: [order_id, order_source, amount, cost, profit]
+  - name: summary
+    container: {type: workbook, path: ./output/report.xlsx, sheet: 汇总}
+    aggregate:
+      group_by: [order_source]
+      fields:
+        order_cnt: {count: {field: order_id}}
+        sum_amount: {sum: {field: amount}}
+        sum_profit: {sum: {field: profit}}
+meta: true
+audit: true
 ```
 
-#### 4.5.2 示例: multi-root workbook(每张 sheet 绑定独立 demand)
-
-当 workbook 的每张 sheet 来自独立数据源/独立 demand 时,可以把 workbook 当作容器顺序执行多个 demand 并写入不同 sheet:
+#### 4.5.2 示例: Python 运行期覆盖 outputs(动态选字段/路径/sheet)
 
 ```python
-from scalim.execution.workbook_multi_root import run_multi_root_workbook
+from scalim.dsl.by_yaml import RunOverrides, run
 
-results = run_multi_root_workbook(
-    output_path="./output/report.xlsx",
-    runs=(
-        ("Total", demand_ir_total, request_total),
-        ("Channel", demand_ir_channel, request_channel),
-        ("Service", demand_ir_service, request_service),
+result = run(
+    "path/to/config.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    overrides=RunOverrides(
+        outputs=[
+            {
+                "name": "detail",
+                "container": {"type": "workbook", "path": "./output/report.xlsx", "sheet": "明细"},
+                "fields": ["order_id", "amount", "profit"],
+            }
+        ]
     ),
 )
 ```

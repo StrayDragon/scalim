@@ -206,7 +206,7 @@ class OutputContainerConfig:
             md=("表头字段名来源.\n\n- `field_id`: 使用字段 ID\n- `name`: 使用字段的 `name`(为空或等于 field_id 时回退为 field_id)"),
             choices=["field_id", "name"],
             default=DEFAULT_OUTPUT_HEADER_BY,
-            examples=["field_id"],
+            examples=["name"],
         ),
     )
     """表头字段名来源."""

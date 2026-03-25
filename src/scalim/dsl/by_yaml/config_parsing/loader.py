@@ -163,6 +163,15 @@ class YamlDemandLoader(
         main_source = self._with_main_source_fields(main_source, parsed_fields.main_source_fields)
         sources = self._with_source_fields(sources, parsed_fields.source_fields_by_source)
 
+        validate_unique_raw = raw.data.get(DEMAND_KEYS["validate_unique_field_names"])
+        if validate_unique_raw is None:
+            validate_unique_field_names = True
+        elif isinstance(validate_unique_raw, bool):
+            validate_unique_field_names = bool(validate_unique_raw)
+        else:
+            msg = "validate_unique_field_names must be a boolean"
+            raise TypeError(msg)
+
         failure_policy = str(raw.data.get(DEMAND_KEYS["failure_policy"], "all_fail") or "all_fail")
         if failure_policy not in ("all_fail", "primary_only"):
             msg = "failure_policy must be 'all_fail' or 'primary_only'"
@@ -188,6 +197,7 @@ class YamlDemandLoader(
             relations=relations,
             guardrails=guardrails,
             outputs=outputs,
+            validate_unique_field_names=validate_unique_field_names,
             failure_policy=failure_policy,
             include_full_error_message=include_full_error_message,
             meta=meta,

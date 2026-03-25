@@ -51,9 +51,14 @@ by_yaml runtime 同时 MUST NOT 承载 workflow 的执行编排；workflow runti
 
 - `sink`
 - `components`
-- `output_composition`
 - `allowed_modules` / `allowed_functions`
 - `allowed_yaml_roots`
+
+系统 MUST 破坏性移除 by_yaml facade 的 Python-only 输出注入扩展点:
+- `run/compile` 不再接受 `output_composition=...`
+- `RunOptions` 不再暴露 `output_composition` 字段
+
+execution 层内部仍会使用编译产物 `OutputCompositionSpec` 表达 composed outputs,但该对象不再作为 by_yaml facade 的可注入扩展点。
 
 #### Scenario: public facade remains behavior-complete for supported extension seams
 - **WHEN** 调用方通过 `IMPL_ROOT.dsl.by_yaml.run(...)` 或 `compile(...)` 使用上述受控扩展点
@@ -72,54 +77,43 @@ adapter MUST 在 `DemandConfig -> DemandIr` 转换前完成 `{$init_var: <name>}
 - **THEN** adapter 返回的 `Compilation.demand_ir` MUST 已反映占位符解析后的 params 值
 - **AND** execution 层不需要再做二次解析
 
-### Requirement: `output.fields` 的双重语义必须在编译期拆解
-系统 MUST 将 YAML `output.fields` 在 adapter 编译期拆解为:
-1) 有序 targets(导出字段与顺序)
-2) 字段 override(如覆盖 `name`),其效果 MUST 体现在 effective Field IR 上
+### Requirement: YAML `outputs` MUST compile into an output composition request
+系统 MUST 将 YAML `outputs`(以及 `overrides.outputs`)编译为 execution 层的输出编排请求对象,并确保 execution/engine 不需要读取 YAML config 即可完成写出。
 
-#### Scenario: output.fields 同时决定顺序与覆盖
-- **WHEN** `output.fields` 中包含 `{field_id: order_id, name: 订单ID}` 之类条目
-- **THEN** 执行 targets 的顺序与 IR 字段的 `name` 都应反映该编译结果
+#### Scenario: execution does not read YAML config for outputs
+- **WHEN** 调用方通过 by_yaml adapter 编译得到 execution request 并执行
+- **THEN** execution/engine MUST 仅依赖编译产物中的输出编排对象完成写出
 
-### Requirement: YAML `output` 编译为 `OutputSpec + ExportLayout`
-系统 MUST 将 `output` 的 I/O 策略与布局策略编译为两个 DSL-agnostic 对象并随请求下传:
-- `OutputSpec`: format/path/encoding/streaming/include_header 等 I/O 策略
-- `ExportLayout`: targets(field_ids) + header_names(若需要)
+### Requirement: runtime 支持 overrides 覆盖 YAML `outputs`
+系统 SHALL 允许调用方在不修改 YAML 文件的情况下以**显式 overrides** 覆盖输出编排,以适配不同运行环境(例如临时输出路径、不同导出字段顺序、不同 sheet 名)。
 
-execution/engine MUST NOT 直接读取 `DemandConfig` 来决定输出格式/路径/表头等策略.
+系统 MUST 使用 `overrides.outputs` 作为输出覆盖的唯一形态,并破坏性移除历史 `overrides.output.*`。
 
-#### Scenario: header_fields_output_by 不穿透到 execution
-- **WHEN** YAML 配置 `output.header_fields_output_by: name`
-- **THEN** adapter 应产出对齐的 `ExportLayout.header_names`,execution 无需读取 YAML config 即可完成导出
+`overrides.outputs` 的结构 MUST 与 YAML 顶层 `outputs` 的元素结构一致(YAML-shaped `list[dict]`),但本 change 仅承诺明细输出的最小子集: `name/container/fields`。
 
-### Requirement: runtime 支持 overrides 覆盖 YAML `output`
-系统 SHALL 允许调用方在不修改 YAML 文件的情况下以**显式 overrides** 覆盖 YAML `output` 的部分行为,以适配不同运行环境(例如临时输出路径、不同导出字段顺序).
-overrides MUST 是 mask 语义: 未显式设置的字段不覆盖 YAML.
+`overrides.outputs` 的语义 MUST 为“整体替换”(replace): 当其提供且非空时,系统 MUST 仅使用 `overrides.outputs` 作为 effective outputs,而不是对 YAML `outputs` 做 deep-merge。
+当调用方显式提供 `overrides.outputs=[]` 时,系统 MUST fail-fast(避免静默“不导出任何东西”)。
 
-建议 overrides 形态接近 YAML 结构(例如 `overrides.output.path` / `overrides.output.fields`),并允许:
-- `overrides.output.path=None` 显式禁用文件输出(即使 YAML 中配置了 `output.path`)
-- `overrides.output.fields=[...]` 覆盖 targets/顺序(不改变 YAML 语法)
+#### Scenario: overrides 覆盖 outputs
+- **GIVEN** YAML 配置包含 `outputs`
+- **WHEN** 调用方提供 `overrides.outputs`
+- **THEN** adapter 编译产出的输出编排 MUST 反映 `overrides.outputs` 的覆盖结果
 
-#### Scenario: overrides 覆盖 output.path 与 fields
-- **WHEN** YAML 配置包含 `output.path`/`output.fields`
-- **AND** 调用方提供 `overrides.output.path` 或 `overrides.output.fields`
-- **THEN** adapter 编译产出的 `OutputSpec.path` 与 `ExportLayout.field_ids` MUST 反映 overrides 的覆盖结果
+### Requirement: YAML 缺省 outputs 时使用默认输出策略且 overrides 仍生效
+系统 MUST 允许 YAML DSL 配置缺省顶层 `outputs` 节点。
 
-### Requirement: YAML 缺省 output 时使用默认输出策略且 overrides 仍生效
-系统 MUST 允许 YAML DSL 配置缺省顶层 `output` 节点.
-当 `output` 缺省时,by_yaml runtime adapter MUST 以 execution 层的默认 `OutputSpec` 作为基线(例如默认 `format: csv`,默认不写文件),并在调用方提供 `overrides.output.*` 时仍然正确应用覆盖.
+当 `outputs` 缺省时,by_yaml runtime adapter MUST 以 execution 层的默认输出策略作为基线(例如默认不写文件),并在调用方提供 `overrides.outputs` 时正确应用覆盖。
 
-#### Scenario: 缺省 output 但覆盖 output.path
-- **WHEN** YAML 配置未声明顶层 `output`
-- **AND** 调用方在 `compile/run` 中提供 `overrides.output.path="..."`
-- **THEN** adapter 编译产出的 `ExecutionRequest.output.path` MUST 等于 overrides 指定的路径
-- **AND** 其它未覆盖字段(例如 `format`) MUST 保持默认值或来自 YAML 的值(若 YAML 声明了对应字段)
+#### Scenario: 缺省 outputs 但提供 overrides.outputs
+- **WHEN** YAML 配置未声明顶层 `outputs`
+- **AND** 调用方在 `compile/run` 中提供 `overrides.outputs`
+- **THEN** adapter 编译产出的 effective outputs MUST 等于 `overrides.outputs`
 
-#### Scenario: 缺省 output 且无 overrides
-- **WHEN** YAML 配置未声明顶层 `output`
-- **AND** 调用方未提供 `overrides.output.*`
-- **THEN** adapter 编译产出的 `ExecutionRequest.output` MUST 仍为合法默认值(例如默认 `format: csv`)
-- **AND** `ExecutionRequest.output.path` MUST 为空值(不写文件输出)
+#### Scenario: 缺省 outputs 且无 overrides
+- **WHEN** YAML 配置未声明顶层 `outputs`
+- **AND** 调用方未提供 `overrides.outputs`
+- **THEN** adapter 编译产出的请求 MUST 仍为合法默认值
+- **AND** 不应产生文件写出(除非调用方通过显式 sink/容器配置启用)
 
 ### Requirement: run 移除 return_data 并支持显式 sink
 系统 MUST 破坏性移除对外运行入口中的 `return_data: Optional[bool]`(及其隐式推断/tee 逻辑),
@@ -144,8 +138,8 @@ overrides MUST 是 mask 语义: 未显式设置的字段不覆盖 YAML.
 系统 MUST 提供 `IMPL_ROOT.dsl.by_yaml` 作为 YAML DSL 的官方入口(导入路径),用于承载调用方最常用的稳定接口.
 
 该官方入口 MUST 以“受控 re-export”方式提供最小 facade,并 MUST 导出以下符号:
-- 运行入口: `run` 与 `compile`
-- 运行期契约: `UNSET`、`OutputOverrides`、`RunOverrides`、`RunOptions`、`Compilation`、`RunResult`
+- 运行入口: `run` / `compile` / `run_workflow`
+- 运行期契约: `UNSET`、`ResolverTrustedMode`、`RunOverrides`、`Compilation`、`RunResult`
 
 该官方入口 MUST 保持精简:
 - MUST NOT 通过包根 re-export `schema_dsl`、`config_parsing` 等大域对象或内部实现细节.
@@ -153,7 +147,7 @@ overrides MUST 是 mask 语义: 未显式设置的字段不覆盖 YAML.
 
 #### Scenario: 调用方可通过 IMPL_ROOT.dsl.by_yaml 导入运行入口与 overrides 契约
 - **WHEN** 调用方执行 `from IMPL_ROOT.dsl.by_yaml import run, compile`
-- **AND** 调用方执行 `from IMPL_ROOT.dsl.by_yaml import RunOverrides, OutputOverrides`
+- **AND** 调用方执行 `from IMPL_ROOT.dsl.by_yaml import RunOverrides, ResolverTrustedMode`
 - **THEN** 导入 MUST 成功且行为与现有实现一致
 
 ### Requirement: runtime 子包化且入口明确
@@ -164,7 +158,7 @@ overrides MUST 是 mask 语义: 未显式设置的字段不覆盖 YAML.
 调用方 SHOULD 从显式子模块导入所需符号:
 - 运行/编译入口:`from IMPL_ROOT.dsl.by_yaml.runtime.entrypoints import run, compile`
 - introspection 入口:`from IMPL_ROOT.dsl.by_yaml.runtime.introspection import resolve_required_field_ids, build_viz_observer, load_output_config`
-- overrides/结果契约类型:`from IMPL_ROOT.dsl.by_yaml.runtime.contracts import RunOverrides, OutputOverrides, RunResult`
+- overrides/结果契约类型:`from IMPL_ROOT.dsl.by_yaml.runtime.contracts import RunOverrides, RunResult`
 
 公开编译链路 API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.compiler`)MUST 为:
 - `load_config`

@@ -89,7 +89,9 @@
         "requirements": [
           "schema 元数据生成与 hover 指引",
           "schema 为 `value_cast` 增加 `decimal` 枚举值",
-          "output 字段 hover 指引明确可选与 overrides 推荐写法",
+          "outputs 字段 hover 指引明确可选与 overrides 推荐写法",
+          "`header_fields_output_by` default is `name`",
+          "schema exposes a switch for unique effective field display names",
           "schema hover 提供常见错误与迁移提示",
           "schema hover documents `$keys/$rows` directive nodes under `params`",
           "`params` hover documents `{$runtime: <name>}` and preload params behavior",
@@ -337,6 +339,7 @@
       "relations",
       "guardrails",
       "outputs",
+      "validate_unique_field_names",
       "failure_policy",
       "include_full_error_message",
       "meta",
@@ -365,7 +368,7 @@
   "inputs": [
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "2e285c21024a4649bd11c8abba8a6fbe3a130a33c8220e4f7d8e398815797e39"
+      "sha256": "ab9d641d170bd1f7550ce7129a88f4d969b65f4d678f9f511007e22c7a3e7961"
     },
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
@@ -433,7 +436,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "6d3a154b9e16abe888141fc1564775e937f6d8dff5d0e76ea7c129e87143d5d8"
+      "sha256": "6b5a9d498d97da0ae211a329d08a2b82672cecd4df4c95a320a1d0d83f2a674f"
     },
     {
       "path": "openspec/specs/yaml-dsl-workflow/spec.md",
@@ -445,7 +448,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "596418872544ed31bbccf4474e2f4068b74d7b4cd2633ee25f62068e0718156a"
+      "sha256": "2fcce8882ab9707539d59940d577e47fc046c2e54cc2ebf7be0fbbc99827fb3f"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
@@ -459,7 +462,7 @@
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "ae000fe30330a530b1def77f01846ec42809bee645dbc0508054e7a614d55eeb"
+      "sha256": "fd41c346ecf83c68f2d0d2eab593a7167369eb459d532df581810acdd06429d5"
     },
     {
       "path": "references/generated/example-full/ecommerce_report_fragments.yaml",
@@ -471,7 +474,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "800337e4badf72c694a15b3a0c6a543fdf8cb5efd1138dbc9ba4fd35cdabd19b"
+      "sha256": "208d6db8ed0417a1a7f6b1a335247475ad85082da41530b82fcceb9bf77fbdbd"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

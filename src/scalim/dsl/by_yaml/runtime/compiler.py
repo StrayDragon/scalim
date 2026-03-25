@@ -6,7 +6,9 @@
 - 运行时请求(`ExecutionRequest`)
 """
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple, cast
+import os
+import re
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
 from ....execution.guardrails import (
     GuardrailMode,
@@ -20,10 +22,17 @@ from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec
 from ....spec.ir.demand import DemandIr
 from ....vendor.dataclassesx import replace
 from ..config_parsing.loader import YamlDemandLoader
+from ..init_var_nodes import parse_init_var_mapping_node
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
-from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfig
+from ..schema_dsl.constants import (
+    DEFAULT_OUTPUT_ENCODING,
+    DEFAULT_OUTPUT_HEADER_BY,
+    DEFAULT_OUTPUT_INCLUDE_HEADER,
+    DEFAULT_OUTPUT_STREAMING,
+)
+from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfig, OutputContainerConfig, OutputTargetConfig
 from .builtin_callables import parse_builtin_callable_id
-from .contracts import UNSET, Compilation, OutputOverrides, ResolverTrustedMode, RunOptions
+from .contracts import UNSET, Compilation, ResolverTrustedMode, RunOptions
 from .conversion import ConfigToIRConverter
 from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError, ResolverError
 from .observability import compile_observability_spec
@@ -31,6 +40,7 @@ from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
 
 if TYPE_CHECKING:
+    from ....execution.output_composition import OutputCompositionSpec
     from ....ob.presets.viz import VizObserverConfig
 
 
@@ -51,40 +61,262 @@ def validate_allowlist(
     _ensure_allowlist(allowed_modules, allowed_functions)
 
 
-def _resolve_target_field_ids(
-    demand_ir: DemandIr,
-    overrides: Optional[OutputOverrides],
-) -> List[str]:
-    if overrides is not None and overrides.fields is not UNSET:
-        raw_fields = cast("Optional[List[str]]", overrides.fields)
-        if raw_fields is None:
-            return list(demand_ir.fields.keys())
-        if not raw_fields:
-            msg = "overrides.output.fields cannot be empty (use None to select all fields)"
+_OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+_OVERRIDES_OUTPUT_ALLOWED_KEYS: FrozenSet[str] = frozenset(["name", "container", "fields"])
+_OVERRIDES_OUTPUT_FORBIDDEN_KEYS: FrozenSet[str] = frozenset(["where", "from", "aggregate"])
+_OUTPUT_CONTAINER_TYPES: Tuple[str, ...] = ("workbook", "csv")
+_OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
+
+
+def _require_dict(raw: object, *, path: str) -> Dict[str, Any]:
+    if not isinstance(raw, dict):
+        msg = "{} must be an object".format(path)
+        raise TypeError(msg)
+    return cast("Dict[str, Any]", raw)
+
+
+def _parse_overrides_outputs_container_type(container: Dict[str, Any], *, path: str) -> str:
+    typ_raw = container.get("type")
+    typ = str(typ_raw or "").strip().lower()
+    if not typ:
+        msg = "{}.type is required".format(path)
+        raise ValueError(msg)
+    if typ not in _OUTPUT_CONTAINER_TYPES:
+        msg = "{}.type={!r} is invalid; expected one of: {}".format(path, typ, ", ".join(_OUTPUT_CONTAINER_TYPES))
+        raise ValueError(msg)
+    return typ
+
+
+def _parse_overrides_outputs_container_path(path_raw: Any, *, container_type: str, path: str) -> Any:
+    if isinstance(path_raw, dict):
+        path_value: Any = {"$init_var": parse_init_var_mapping_node(cast("Dict[str, Any]", path_raw), path="{}.path".format(path))}
+    elif path_raw is None:
+        path_value = ""
+    elif isinstance(path_raw, os.PathLike):
+        path_value = str(os.fspath(path_raw)).strip()
+    elif isinstance(path_raw, str):
+        path_value = path_raw.strip()
+    else:
+        msg = "{}.path must be a string (empty allowed for workflow-managed CSV) or {{$init_var: <name>}}".format(path)
+        raise TypeError(msg)
+
+    if container_type == "workbook" and not path_value:
+        msg = "{}.path is required for workbook outputs".format(path)
+        raise ValueError(msg)
+    return path_value
+
+
+def _parse_overrides_outputs_container_header_by(header_by_raw: Any, *, path: str) -> str:
+    header_by = str(header_by_raw).strip() if isinstance(header_by_raw, str) else ""
+    header_by = (header_by or DEFAULT_OUTPUT_HEADER_BY).strip()
+    if header_by not in _OUTPUT_HEADER_BY_ENUM:
+        msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(path, header_by, ", ".join(_OUTPUT_HEADER_BY_ENUM))
+        raise ValueError(msg)
+    return header_by
+
+
+def _validate_overrides_outputs_container_semantics(
+    container_type: str,
+    *,
+    path: str,
+    sheet: Optional[str],
+    streaming: bool,
+    allow_formulas: bool,
+    write_lock: bool,
+) -> None:
+    if not streaming:
+        msg = "{}.streaming must be true (composed outputs only support streaming=true)".format(path)
+        raise ValueError(msg)
+
+    if container_type != "csv":
+        return
+    if sheet:
+        msg = "{}.sheet is only allowed for type=workbook".format(path)
+        raise ValueError(msg)
+    if allow_formulas:
+        msg = "{}.allow_formulas is only allowed for type=workbook".format(path)
+        raise ValueError(msg)
+    if write_lock:
+        msg = "{}.write_lock is only allowed for type=workbook".format(path)
+        raise ValueError(msg)
+
+
+def _parse_overrides_outputs_container(raw: object, *, path: str) -> OutputContainerConfig:
+    typed = _require_dict(raw, path=path)
+    typ = _parse_overrides_outputs_container_type(typed, path=path)
+    path_value: Any = _parse_overrides_outputs_container_path(typed.get("path"), container_type=typ, path=path)
+
+    sheet_raw = typed.get("sheet")
+    sheet = str(sheet_raw).strip() if isinstance(sheet_raw, str) else ""
+    sheet = sheet or None
+
+    encoding_raw = typed.get("encoding")
+    encoding = str(encoding_raw).strip() if isinstance(encoding_raw, str) else ""
+    encoding = encoding or DEFAULT_OUTPUT_ENCODING
+
+    streaming = bool(typed.get("streaming", DEFAULT_OUTPUT_STREAMING))
+    include_header = bool(typed.get("include_header", DEFAULT_OUTPUT_INCLUDE_HEADER))
+
+    header_by = _parse_overrides_outputs_container_header_by(typed.get("header_fields_output_by"), path=path)
+
+    allow_formulas = bool(typed.get("allow_formulas", False))
+    write_lock = bool(typed.get("write_lock", False))
+
+    _validate_overrides_outputs_container_semantics(
+        typ,
+        path=path,
+        sheet=sheet,
+        streaming=streaming,
+        allow_formulas=allow_formulas,
+        write_lock=write_lock,
+    )
+
+    return OutputContainerConfig(
+        type=typ,
+        path=path_value,
+        sheet=sheet,
+        encoding=encoding,
+        streaming=streaming,
+        include_header=include_header,
+        header_fields_output_by=header_by,
+        allow_formulas=allow_formulas,
+        write_lock=write_lock,
+    )
+
+
+def _validate_overrides_output_keys(typed: Dict[str, Any], *, idx: int, path: str) -> None:
+    extra_keys = sorted([str(k) for k in typed if str(k) not in _OVERRIDES_OUTPUT_ALLOWED_KEYS])
+    if not extra_keys:
+        return
+    forbidden = sorted([k for k in extra_keys if k in _OVERRIDES_OUTPUT_FORBIDDEN_KEYS])
+    unsupported = forbidden or extra_keys
+    msg = "{}.{} has unsupported keys: {} (only supports: name/container/fields)".format(path, idx, ", ".join(unsupported))
+    raise ValueError(msg)
+
+
+def _parse_overrides_output_name(typed: Dict[str, Any], *, idx: int, path: str, seen_names: Set[str]) -> str:
+    name = str(typed.get("name") or "").strip()
+    if not name:
+        msg = "{}.{}.name is required".format(path, idx)
+        raise ValueError(msg)
+    if not _OUTPUT_NAME_PATTERN.match(name):
+        msg = "{}.{}.name={!r} is invalid; expected identifier like [a-zA-Z_][a-zA-Z0-9_]*".format(path, idx, name)
+        raise ValueError(msg)
+    if name in seen_names:
+        msg = "{} has duplicate output name: {}".format(path, name)
+        raise ValueError(msg)
+    seen_names.add(name)
+    return name
+
+
+def _parse_overrides_output_fields(typed: Dict[str, Any], *, idx: int, path: str, known_field_ids: Set[str]) -> Tuple[str, ...]:
+    fields_raw = typed.get("fields")
+    if not isinstance(fields_raw, list):
+        msg = "{}.{}.fields must be a list".format(path, idx)
+        raise TypeError(msg)
+    fields_list = cast("List[object]", fields_raw)
+    if not fields_list:
+        msg = "{}.{}.fields must not be empty".format(path, idx)
+        raise ValueError(msg)
+
+    field_ids: List[str] = []
+    for field_idx, field_id_raw in enumerate(fields_list):
+        if not isinstance(field_id_raw, str):
+            msg = "{}.{}.fields.{} must be a field_id string".format(path, idx, field_idx)
+            raise TypeError(msg)
+        field_id = field_id_raw.strip()
+        if not field_id:
+            msg = "{}.{}.fields.{} must not be empty".format(path, idx, field_idx)
             raise ValueError(msg)
-        return [str(fid) for fid in raw_fields]
-    return list(demand_ir.fields.keys())
+        field_ids.append(field_id)
+
+    unknown_fields = [fid for fid in field_ids if fid not in known_field_ids]
+    if unknown_fields:
+        msg = "{}.{}.fields reference unknown fields: {}".format(path, idx, ", ".join(sorted(set(unknown_fields))))
+        raise ValueError(msg)
+
+    return tuple(field_ids)
 
 
-def _compile_output_spec(options: RunOptions) -> OutputSpec:
-    spec = OutputSpec()
+def _parse_overrides_outputs_targets(
+    raw: object,
+    demand_ir: DemandIr,
+    *,
+    path: str,
+) -> Tuple[OutputTargetConfig, ...]:
+    if not isinstance(raw, list):
+        msg = "{} must be a list".format(path)
+        raise TypeError(msg)
+    outputs = cast("List[object]", raw)
+    if not outputs:
+        msg = "{} cannot be empty".format(path)
+        raise ValueError(msg)
 
-    overrides = options.overrides.output if options.overrides is not None else None
-    if overrides is None:
-        return spec
+    known_field_ids: Set[str] = {str(fid) for fid in demand_ir.fields}
+    seen_names: Set[str] = set()
+    parsed: List[OutputTargetConfig] = []
 
-    if overrides.format is not UNSET:
-        spec = replace(spec, format=str(overrides.format))
-    if overrides.path is not UNSET:
-        spec = replace(spec, path=overrides.path)
-    if overrides.encoding is not UNSET:
-        spec = replace(spec, encoding=str(overrides.encoding))
-    if overrides.streaming is not UNSET:
-        spec = replace(spec, streaming=bool(overrides.streaming))
-    if overrides.include_header is not UNSET:
-        spec = replace(spec, include_header=bool(overrides.include_header))
+    for idx, item in enumerate(outputs):
+        if not isinstance(item, dict):
+            msg = "{}.{} must be an object".format(path, idx)
+            raise TypeError(msg)
+        typed = cast("Dict[str, Any]", item)
 
-    return spec
+        _validate_overrides_output_keys(typed, idx=idx, path=path)
+        name = _parse_overrides_output_name(typed, idx=idx, path=path, seen_names=seen_names)
+        container = _parse_overrides_outputs_container(typed.get("container"), path="{}.{}.container".format(path, idx))
+        field_ids = _parse_overrides_output_fields(typed, idx=idx, path=path, known_field_ids=known_field_ids)
+
+        parsed.append(
+            OutputTargetConfig(
+                name=name,
+                from_=None,
+                container=container,
+                fields=field_ids,
+                where=None,
+                aggregate=None,
+                requires=(),
+            )
+        )
+
+    return tuple(parsed)
+
+
+def _should_validate_unique_effective_field_display_names(config: DemandConfig, outputs: Tuple[OutputTargetConfig, ...]) -> bool:
+    if not bool(config.validate_unique_field_names):
+        return False
+    for t in outputs:
+        container = t.container
+        if container is None:
+            continue
+        if container.include_header and str(container.header_fields_output_by) == "name":
+            return True
+    return False
+
+
+def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
+    conflicts: Dict[str, List[str]] = {}
+    for field_id, field_ir in demand_ir.fields.items():
+        name = str(getattr(field_ir, "name", "") or "").strip()
+        effective = name or str(field_id)
+        conflicts.setdefault(effective, []).append(str(field_id))
+
+    duplicates = {name: ids for name, ids in conflicts.items() if len(ids) > 1}
+    if not duplicates:
+        return
+
+    parts: List[str] = []
+    for name in sorted(duplicates.keys()):
+        parts.append("{!r}: {}".format(name, ", ".join(sorted(duplicates[name]))))
+    conflicts_str = "; ".join(parts)
+    msg = "".join(
+        [
+            "Duplicate effective field display names detected (validate_unique_field_names=true). ",
+            "This is not allowed when outputs include header_fields_output_by=name and include_header=true. ",
+            "Conflicts: {}".format(conflicts_str),
+        ]
+    )
+    raise ValueError(msg)
 
 
 def _as_guardrail_mode(value: str) -> GuardrailMode:
@@ -355,6 +587,49 @@ def compile_ir(
     return converter.convert(config)
 
 
+def _resolve_effective_outputs_and_path(
+    config: DemandConfig,
+    demand_ir: DemandIr,
+    *,
+    options: RunOptions,
+) -> Tuple[Tuple[OutputTargetConfig, ...], str]:
+    overrides_outputs = options.overrides.outputs if options.overrides is not None else None
+    if overrides_outputs is not None:
+        return _parse_overrides_outputs_targets(overrides_outputs, demand_ir, path="overrides.outputs"), "overrides.outputs"
+    if config.outputs:
+        return tuple(config.outputs), "outputs"
+    return (), "outputs"
+
+
+def _compile_output_composition_for_outputs(
+    config: DemandConfig,
+    demand_ir: DemandIr,
+    *,
+    effective_outputs: Tuple[OutputTargetConfig, ...],
+    outputs_path: str,
+    options: RunOptions,
+    resolver: SecurePythonReferenceResolver,
+) -> Optional["OutputCompositionSpec"]:
+    if not effective_outputs:
+        return None
+
+    if _should_validate_unique_effective_field_display_names(config, effective_outputs):
+        _validate_unique_effective_field_display_names(demand_ir)
+
+    config_for_outputs = config if effective_outputs == tuple(config.outputs) else replace(config, outputs=effective_outputs)
+    return cast(
+        "OutputCompositionSpec",
+        compile_output_composition_from_yaml(
+            config_for_outputs,
+            demand_ir,
+            resolver=resolver,
+            init_vars=options.init_vars,
+            workflow_managed_output_ids=options.workflow_managed_output_ids,
+            outputs_path=outputs_path,
+        ),
+    )
+
+
 def build_request(
     config: DemandConfig,
     demand_ir: DemandIr,
@@ -362,32 +637,26 @@ def build_request(
     options: RunOptions,
     resolver: SecurePythonReferenceResolver,
 ) -> ExecutionRequest:
-    output_overrides = options.overrides.output if options.overrides is not None else None
-    yaml_output_composition = None
-    if options.output_composition is None and config.outputs:
-        yaml_output_composition = compile_output_composition_from_yaml(
-            config,
-            demand_ir,
-            resolver=resolver,
-            init_vars=options.init_vars,
-            workflow_managed_output_ids=options.workflow_managed_output_ids,
-        )
-    output_composition = options.output_composition or yaml_output_composition
+    effective_outputs, outputs_path = _resolve_effective_outputs_and_path(config, demand_ir, options=options)
+    output_composition = _compile_output_composition_for_outputs(
+        config,
+        demand_ir,
+        effective_outputs=effective_outputs,
+        outputs_path=outputs_path,
+        options=options,
+        resolver=resolver,
+    )
 
-    # 单输出模式: 仍可通过 `overrides.output.*` 控制输出. 当启用 `outputs`/`output_composition` 时, `export_layout`/`output` 会被忽略.
+    # 无 `outputs` 时走默认策略: 不写文件,但 `sink` 仍可捕获数据.
     export_layout = export_layout_from_demand_ir(demand_ir, (), header_fields_output_by="field_id")
     output_spec = OutputSpec(path=None)
     if output_composition is None:
-        target_field_ids = _resolve_target_field_ids(demand_ir, output_overrides)
-        header_by = "field_id"
-        if output_overrides is not None and output_overrides.header_fields_output_by is not UNSET:
-            header_by = str(output_overrides.header_fields_output_by)
+        target_field_ids = list(demand_ir.fields.keys())
         export_layout = export_layout_from_demand_ir(
             demand_ir,
             target_field_ids,
-            header_fields_output_by=header_by,
+            header_fields_output_by="field_id",
         )
-        output_spec = _compile_output_spec(options)
 
     observability: Optional[ObservabilitySpec] = None
     components = list(options.components or [])

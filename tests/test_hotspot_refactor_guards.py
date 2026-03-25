@@ -1,4 +1,4 @@
-from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, run
+from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config
@@ -9,7 +9,6 @@ from scalim.ob.presets.viz import VizObserver, VizObserverConfig
 
 
 def test_hotspot_public_imports_remain_available() -> None:
-    assert OutputOverrides is not None
     assert RunOverrides is not None
     assert run is not None
     assert YamlDemandLoader is not None

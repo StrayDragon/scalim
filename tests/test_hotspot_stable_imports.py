@@ -1,6 +1,6 @@
 import pickle
 
-from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, run
+from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
@@ -13,7 +13,6 @@ from scalim.ob.presets.viz import VizEventEmitter, VizObserver, VizObserverConfi
 
 def test_hotspot_stable_imports_expose_public_types() -> None:
     assert callable(run)
-    assert OutputOverrides is not None
     assert RunOverrides is not None
     assert YamlDemandLoader is not None
     assert ConfigValidator is not None

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, run
+from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config, resolve_required_field_ids
 from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
@@ -186,7 +186,15 @@ def test_run_writes_output(tmp_path: Path) -> None:
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": str(output_path)},
+                    "fields": ["order_id"],
+                }
+            ]
+        ),
         sink=sink,
     )
 
@@ -212,7 +220,15 @@ def test_run_with_performance_observability(tmp_path: Path) -> None:
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": str(output_path)},
+                    "fields": ["order_id"],
+                }
+            ]
+        ),
     )
 
     assert output_path.exists()

@@ -3,7 +3,6 @@ from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
-from ....execution.output_composition import OutputCompositionSpec
 from ....execution.run_ir import run_ir
 from ....hooks.base import IExecutionHook
 from ....ob.observer import Observer
@@ -22,7 +21,6 @@ def run(  # noqa: PLR0913
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
-    output_composition: Optional[OutputCompositionSpec] = None,
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
@@ -40,13 +38,11 @@ def run(  # noqa: PLR0913
     """运行 `YAML DSL`,并支持显式覆盖项与输出 `sink`.
 
     优先级(高 -> 低):
-    - `output_composition=...`(完全覆盖 `YAML` 的 `outputs`)
-    - `overrides.*`(仅对未设为 `UNSET` 的字段生效;主要用于单输出模式)
+    - `overrides.outputs`(完全覆盖 `YAML` 的 `outputs`; 整体替换,即 `replace`; 非空)
+    - `YAML` 的 `outputs`(若声明)
     - 执行默认值
 
     注意:
-    - 当 `YAML` 声明 `outputs` 时,会自动装配 `composed outputs`;此时 `overrides.output.*` 不影响 `outputs.*.container.*`.
-    - `overrides.output.path=None` 会禁用单输出模式的文件输出.
     - `overrides.viz_config` 可启用/禁用 `viz`,不受 `YAML` 的 `observability.viz.*` 影响.
     - 输出数据的保留完全由 `sink=...`(例如 `InMemoryRowSink`)决定,而不是由布尔开关控制.
     """
@@ -57,7 +53,6 @@ def run(  # noqa: PLR0913
         resolver_trusted_mode=resolver_trusted_mode,
         components=components,
         sink=sink,
-        output_composition=output_composition,
         overrides=overrides,
         guardrails=guardrails,
         loader_retry=loader_retry,
@@ -85,7 +80,6 @@ def compile(  # noqa: A001, PLR0913
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
-    output_composition: Optional[OutputCompositionSpec] = None,
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
@@ -107,7 +101,6 @@ def compile(  # noqa: A001, PLR0913
         resolver_trusted_mode=resolver_trusted_mode,
         components=components,
         sink=sink,
-        output_composition=output_composition,
         overrides=overrides,
         guardrails=guardrails,
         loader_retry=loader_retry,

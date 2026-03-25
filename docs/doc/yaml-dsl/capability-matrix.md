@@ -67,7 +67,7 @@
 
 | YAML key | 编译到(主要影响) | 限制/边界 | 替代方案 |
 |---|---|---|---|
-| `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | 启用后会忽略单输出的 `overrides.output.*` | 用 `run(..., output_composition=...)` 完全覆盖 YAML outputs |
+| `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | `overrides.outputs` 可整体替换(仅承诺 `name/container/fields` 最小子集;不支持 `where/from/aggregate`) | 运行期动态输出: `run(..., overrides=RunOverrides(outputs=[...]))` |
 | `outputs.*.container` | `OutputTargetSpec.output` (`OutputSpec`) | 目前仅 `workbook/csv` 两类容器 | 其它 sink 用 `run(..., sink=...)` |
 | `outputs.*.container.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast | 用 Python 侧 `init_vars` 注入或改用固定路径 |
 | `outputs.*.fields` | `ExportLayout.field_ids` | 支持 `field_id` string + YAML alias(object/list)并 flatten | 若 alias identity 丢失且内容匹配歧义,改用 string `field_id` |
@@ -93,7 +93,7 @@
 | `init_vars` | `RunOptions.init_vars` | 运行时输入,不应写死在共享 YAML | `run(..., init_vars={...})` |
 | 并行模式/并发数 | `ExecutionRequest.parallel_mode/max_workers` | 与环境/资源相关,容易导致不可复现 | `run(..., parallel_mode=\"seq|adaptive\", max_workers=...)` |
 | 自定义 sink | `ExecutionRequest.sink` | sink 往往是运行环境能力(文件系统/内存/对象存储) | `run(..., sink=InMemoryRowSink())` 等 |
-| 完全自定义 outputs | `ExecutionRequest.output_composition` | 组合输出属于执行装配层,复杂度高 | `run(..., output_composition=...)` |
+| 完全自定义 outputs | `ExecutionRequest.output_composition` | 组合输出属于执行装配层,复杂度高 | 使用 execution 层入口 `scalim.execution.run_ir(...)` 自行构造 `ExecutionRequest(output_composition=...)` |
 | 自定义 hooks/observers | `ExecutionRequest.components` | 运行期组件需要 Python 对象 | `run(..., components=[Observer(), Hook()])` |
 
 ## 7) IR 已存在但 YAML 未暴露的典型缺口(候选清单)

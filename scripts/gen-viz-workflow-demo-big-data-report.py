@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict, FrozenSet, List
 
 from scalim.dsl.by_yaml import RunOverrides, run_workflow
-from scalim.dsl.by_yaml.runtime.contracts import OutputOverrides
 from scalim.ob.presets._internal.viz_config import normalize_output_dir
 from scalim.ob.presets.viz import VizObserverConfig
 
@@ -127,7 +126,6 @@ def main(argv: List[str]) -> int:
         init_vars={"order_ids": []},
         path_aliases={"@": str(REPO_ROOT)},
         overrides=RunOverrides(
-            output=OutputOverrides(path=None),
             viz_config=VizObserverConfig(
                 output_dir=str(out_root),
                 trace_enabled=False,

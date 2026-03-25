@@ -10,7 +10,6 @@ from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
-from ....execution.output_composition import OutputCompositionSpec
 from ....execution.run_ir import run_ir
 from ....hooks.base import IExecutionHook
 from ....ob.observer import Observer
@@ -36,7 +35,6 @@ def unsafe_run(  # noqa: PLR0913
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
-    output_composition: Optional[OutputCompositionSpec] = None,
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
@@ -60,7 +58,6 @@ def unsafe_run(  # noqa: PLR0913
         resolver_trusted_mode=resolver_trusted_mode,
         components=components,
         sink=sink,
-        output_composition=output_composition,
         overrides=overrides,
         guardrails=guardrails,
         loader_retry=loader_retry,
@@ -86,7 +83,6 @@ def unsafe_compile(  # noqa: PLR0913
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
     sink: Optional[ISink] = None,
-    output_composition: Optional[OutputCompositionSpec] = None,
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
@@ -110,7 +106,6 @@ def unsafe_compile(  # noqa: PLR0913
         resolver_trusted_mode=resolver_trusted_mode,
         components=components,
         sink=sink,
-        output_composition=output_composition,
         overrides=overrides,
         guardrails=guardrails,
         loader_retry=loader_retry,

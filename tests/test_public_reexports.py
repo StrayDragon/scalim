@@ -9,7 +9,7 @@ import pytest
 
 def test_public_reexports_importable() -> None:
     from scalim.dsl import by_yaml
-    from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, compile, run
+    from scalim.dsl.by_yaml import RunOverrides, compile, run
     from scalim.execution import ScalimEngine
     from scalim.ob import Observability
     from scalim.planning import PlanBuilder
@@ -17,7 +17,6 @@ def test_public_reexports_importable() -> None:
 
     _ = by_yaml
     _ = DemandIr
-    _ = OutputOverrides
     _ = PlanBuilder
     _ = RunOverrides
     _ = ScalimEngine

@@ -14,7 +14,7 @@ from scalim_misc.demo_big_data_report.shared import (
     build_ecommerce_model,
 )
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, run
+from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.execution import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.memory import MemoryOptimizationObserver
@@ -269,7 +269,15 @@ def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
         run(
             str(yaml_path),
             allowed_modules=allowed_modules,
-            overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
+            overrides=RunOverrides(
+                outputs=[
+                    {
+                        "name": "detail",
+                        "container": {"type": "csv", "path": str(output_path)},
+                        "fields": list(TARGET_FIELDS_BASIC),
+                    }
+                ]
+            ),
             init_vars={"order_ids": []},
         )
 

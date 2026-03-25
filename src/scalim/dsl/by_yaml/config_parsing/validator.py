@@ -25,11 +25,12 @@ else:
     SequenceNode = _yaml_nodes.SequenceNode
 
 from ..init_var_nodes import InitVarNodeTypeError, InitVarNodeValueError, parse_init_var_mapping_node
+from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
 from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_CONTAINER_KEYS, OUTPUT_TARGET_KEYS
 from .errors import ConfigValidationError
 from .imports import contains_import_syntax
 from .jsonschema_issues import JsonSchemaCollectorError, collect_jsonschema_validation_issues
-from .models import FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
+from .models import FieldDef, FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
 from .validators.fields import ValidatorFieldsMixin
@@ -72,6 +73,65 @@ __all__ = [
     "validate_yaml_text",
     "validate_yaml_text_json",
 ]
+
+
+def _field_def_path(field_def: FieldDef, *, main_source_id: str) -> str:
+    if str(field_def.kind) == FIELD_KIND_DERIVED:
+        return "{}.{}".format(DEMAND_FIELDS_KEY, field_def.field_id)
+    if field_def.source_id and str(field_def.source_id) != str(main_source_id):
+        return "sources.{}.fields.{}".format(field_def.source_id, field_def.field_id)
+    return "main_source.fields.{}".format(field_def.field_id)
+
+
+def _output_item_requires_unique_effective_display_names(output_item: object) -> bool:
+    if not isinstance(output_item, dict):
+        return False
+    out_dict = cast("Dict[str, Any]", output_item)
+    container_raw: Any = out_dict.get(OUTPUT_TARGET_KEYS["container"])
+    if not isinstance(container_raw, dict):
+        return False
+
+    container_dict = cast("Dict[str, Any]", container_raw)
+    include_header_raw: Any = container_dict.get(OUTPUT_CONTAINER_KEYS["include_header"])
+    include_header = include_header_raw if isinstance(include_header_raw, bool) else DEFAULT_OUTPUT_INCLUDE_HEADER
+
+    header_by_raw: Any = container_dict.get(OUTPUT_CONTAINER_KEYS["header_fields_output_by"])
+    if isinstance(header_by_raw, str):
+        header_by = header_by_raw.strip().lower()
+    else:
+        header_by = str(DEFAULT_OUTPUT_HEADER_BY).strip().lower()
+
+    return bool(include_header) and header_by == "name"
+
+
+def _outputs_require_unique_effective_display_names(outputs: List[object]) -> bool:
+    return any(_output_item_requires_unique_effective_display_names(item) for item in outputs)
+
+
+def _collect_duplicate_effective_display_names(field_def_index: FieldDefIndex, *, main_source_id: str) -> Dict[str, List[str]]:
+    by_effective: Dict[str, List[str]] = {}
+
+    for fd in field_def_index.field_defs:
+        name_raw = fd.data.get("name")
+        name = name_raw.strip() if isinstance(name_raw, str) else ""
+        effective = name or str(fd.field_id)
+        by_effective.setdefault(effective, []).append(_field_def_path(fd, main_source_id=main_source_id))
+
+    return {name: paths for name, paths in by_effective.items() if len(paths) > 1}
+
+
+def _format_duplicate_effective_display_names_message(duplicates: Dict[str, List[str]]) -> str:
+    parts: List[str] = []
+    for name in sorted(duplicates.keys()):
+        parts.append("{!r}: {}".format(name, ", ".join(sorted(duplicates[name]))))
+
+    conflicts = "; ".join(parts)
+    return "".join(
+        [
+            "Duplicate effective field display names detected while outputs include include_header=true and header_fields_output_by=name. ",
+            "Conflicts: {}. Set validate_unique_field_names: false to disable.".format(conflicts),
+        ]
+    )
 
 
 class ConfigValidator(ValidatorFieldsMixin):
@@ -157,12 +217,39 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._validate_fields(raw, errors, sources_info, main_source_id, relation_paths)
         self._validate_outputs_fields_object_refs(raw, errors, main_source_id=main_source_id)
         self._validate_outputs_container_paths(raw.data, errors)
+        self._validate_unique_effective_field_display_names(raw, errors, main_source_id=main_source_id)
 
         if enable_jsonschema_validation:
             self._validate_with_jsonschema(raw.data, errors, filter_additional_properties=strict_unknown_fields)
         self._validate_unknown_fields(raw.data, errors, strict=strict_unknown_fields)
 
         return ValidationReport(issues=errors)
+
+    def _validate_unique_effective_field_display_names(
+        self,
+        raw: RawDemand,
+        errors: List[ValidationIssue],
+        *,
+        main_source_id: str,
+    ) -> None:
+        validate_raw = raw.data.get(DEMAND_KEYS["validate_unique_field_names"])
+        if validate_raw is False:
+            return
+
+        outputs_raw: Any = raw.data.get(DEMAND_KEYS["outputs"])
+        if not isinstance(outputs_raw, list):
+            return
+        outputs = cast("List[object]", outputs_raw)
+        if not _outputs_require_unique_effective_display_names(outputs):
+            return
+
+        field_def_index = collect_field_defs(raw, main_source_id=main_source_id)
+        duplicates = _collect_duplicate_effective_display_names(field_def_index, main_source_id=main_source_id)
+        if not duplicates:
+            return
+
+        msg = _format_duplicate_effective_display_names_message(duplicates)
+        self._add_error(errors, msg, path=DEMAND_KEYS["validate_unique_field_names"])
 
     def _build_aggregate_field_index(self, aggregate: Dict[str, Any]) -> Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]:
         fields_raw = aggregate.get("fields")

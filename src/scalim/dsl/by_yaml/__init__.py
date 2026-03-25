@@ -9,7 +9,6 @@ from ...vendor.compact.importlibx import import_module
 from .runtime.contracts import (
     UNSET,
     Compilation,
-    OutputOverrides,
     ResolverTrustedMode,
     RunOverrides,
     RunResult,
@@ -37,7 +36,6 @@ else:
 __all__ = (
     "UNSET",
     "Compilation",
-    "OutputOverrides",
     "ResolverTrustedMode",
     "RunOverrides",
     "RunResult",

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import OutputOverrides, RunOverrides, RunResult, run
+from scalim.dsl.by_yaml import RunOverrides, RunResult, run
 from scalim.dsl.by_yaml.runtime.observability import (
     _create_performance_observer_from_config,
     _create_relation_observer_from_config,
@@ -108,14 +108,8 @@ class _CaptureHook(BaseHook):
             InMemoryRowSink,
             True,
         ),
-        (
-            _build_column_yaml,
-            "order_report_column.csv",
-            None,
-            False,
-        ),
     ],
-    ids=["default-streaming", "column-default-return"],
+    ids=["default-streaming"],
 )
 def test_run_outputs_and_returns_data(
     example_model,
@@ -132,7 +126,15 @@ def test_run_outputs_and_returns_data(
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path), streaming=output_name != "order_report_column.csv")),
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": str(output_path)},
+                    "fields": ["order_id"],
+                }
+            ]
+        ),
         sink=sink,
     )
 
@@ -144,17 +146,26 @@ def test_run_outputs_and_returns_data(
 
     if check_header:
         header = output_path.read_text(encoding="utf-8").splitlines()[0]
-        assert "order_id" in header
+        assert "订单ID" in header
 
 
 def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_path: Path) -> None:
     output_path = tmp_path / "order_report_named.csv"
     yaml_path = _write_yaml_with_named_headers(tmp_path, _demo_yaml_path(), output_path)
 
+    fields = ["order_id"]
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path), header_fields_output_by="name")),
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": str(output_path), "header_fields_output_by": "name"},
+                    "fields": fields,
+                }
+            ]
+        ),
     )
 
     with output_path.open("r", encoding="utf-8", newline="") as handle:
@@ -162,8 +173,7 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
         header = next(reader)
         first_row = next(reader)
 
-    target_fields = list(result.demand_ir.fields.keys())
-    export_layout = export_layout_from_demand_ir(result.demand_ir, target_fields, header_fields_output_by="name")
+    export_layout = export_layout_from_demand_ir(result.demand_ir, fields, header_fields_output_by="name")
     expected_headers = list(export_layout.header_names or export_layout.field_ids)
     assert header == expected_headers
     assert first_row[0] != ""
@@ -192,7 +202,15 @@ def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": str(output_path)},
+                    "fields": ["order_id"],
+                }
+            ]
+        ),
         components=[hook],
     )
 
@@ -219,7 +237,15 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
         components=[observer],
-        overrides=RunOverrides(output=OutputOverrides(path=str(output_path))),
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": str(output_path)},
+                    "fields": ["order_id"],
+                }
+            ]
+        ),
     )
 
     assert observer.events

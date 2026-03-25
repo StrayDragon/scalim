@@ -10,14 +10,12 @@ from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
 from ....vendor.dataclassesx import dataclass
-from ....vendor.dataclassesx import field as dataclass_field
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
 
 if TYPE_CHECKING:
     import pandas as pd
 
-    from ....execution.output_composition import OutputCompositionSpec
     from ....execution.run_ir import ExecutionRequest
     from ....ob.presets.viz import VizObserverConfig
     from ....planning.plan import ExecutionPlan
@@ -36,25 +34,17 @@ UNSET = _UnsetType()
 
 
 @dataclass(frozen=True)
-class OutputOverrides:
-    """`YAML` 的 `output` 配置段覆盖项.
+class RunOverrides:
+    """运行期覆盖项.
 
-    - 任意字段设为 `UNSET` 表示“不覆盖 `YAML` 配置”.
-    - 某些字段(例如 `path`/`fields`)允许显式使用 `None` 表示“禁用/清空”.
+    `outputs` 为与 `YAML` 顶层 `outputs` 同形的输出覆盖片段:
+
+    - `outputs: list[dict]` (非空)
+    - 本变更仅承诺明细输出(`detail`)最小子集: `name` / `container` / `fields`
+    - 语义为整体替换(`replace`): 提供则整体替换 `YAML` 的 `outputs`(不做 `deep-merge`)
     """
 
-    format: Union[str, _UnsetType] = UNSET
-    path: Union[Optional[str], _UnsetType] = UNSET
-    encoding: Union[str, _UnsetType] = UNSET
-    streaming: Union[bool, _UnsetType] = UNSET
-    include_header: Union[bool, _UnsetType] = UNSET
-    header_fields_output_by: Union[str, _UnsetType] = UNSET
-    fields: Union[Optional[List[str]], _UnsetType] = UNSET
-
-
-@dataclass(frozen=True)
-class RunOverrides:
-    output: OutputOverrides = dataclass_field(default_factory=OutputOverrides)
+    outputs: Optional[List[Dict[str, Any]]] = None
     viz_config: Union[Optional["VizObserverConfig"], _UnsetType] = UNSET
 
 
@@ -78,9 +68,6 @@ class RunOptions:
 
     sink: Optional[ISink] = None
     """可选:显式指定输出端;若为 `None` 则按配置创建."""
-
-    output_composition: Optional["OutputCompositionSpec"] = None
-    """可选:多输出组合请求(`IR/Python-only`).当提供该字段时,运行期会忽略 YAML 的单输出装配."""
 
     guardrails: Optional[GuardrailsPolicy] = None
     """可选:运行时护栏策略."""
@@ -200,7 +187,6 @@ class RunResult:
 __all__ = [
     "UNSET",
     "Compilation",
-    "OutputOverrides",
     "ResolverTrustedMode",
     "RunOptions",
     "RunOverrides",

@@ -9,6 +9,7 @@ from scalim.execution.run_ir import ExecutionRequest, ExportLayout, Observabilit
 from scalim.ob.observer import Observer
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim.sinks.sink_base import BaseRowSink, BaseSink, IColumnSink, IRowSink
+from scalim.sinks.sink_csv import ColumnCSVSink
 from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryListSink, InMemoryRowSink
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import FieldIr
@@ -421,11 +422,43 @@ def test_wrap_sink_for_row_count_column_sink_counts_set_row_ids_and_write_column
     assert isinstance(wrapped, IColumnSink)
 
     wrapped.set_row_ids([1, 2])
+    wrapped.write_column("id", {1: 1, 2: 2})  # type: ignore[attr-defined]
     wrapped.write_columns({"id": {1: 1, 2: 2}})
     wrapped.write_batch([{"id": 3}, {"id": 4}])
     wrapped.close()
 
     assert tracker.total_rows == 4
+
+
+def test_create_output_plan_uses_column_csv_sink_when_streaming_false_and_sink_none(tmp_path: Path) -> None:
+    output_path = tmp_path / "out.csv"
+    layout = ExportLayout(field_ids=("id",), header_names=None)
+
+    plan = run_ir_mod._create_output_plan(  # noqa: SLF001
+        OutputSpec(format="csv", path=str(output_path), streaming=False),
+        layout,
+        sink=None,
+    )
+
+    assert isinstance(plan.sink, ColumnCSVSink)
+    assert plan.output_path == str(output_path)
+    plan.sink.close()
+
+
+def test_create_output_plan_returns_tee_sink_for_compatible_row_sinks(tmp_path: Path) -> None:
+    output_path = tmp_path / "out.csv"
+    layout = ExportLayout(field_ids=("id",), header_names=None)
+
+    plan = run_ir_mod._create_output_plan(  # noqa: SLF001
+        OutputSpec(format="csv", path=str(output_path), streaming=True),
+        layout,
+        sink=InMemoryRowSink(),
+    )
+
+    assert plan.output_path == str(output_path)
+    plan.sink.write_batch([{"id": 1}])
+    plan.sink.close()
+    assert output_path.exists()
 
 
 def test_wrap_sink_for_row_count_batch_sink_counts_write_batch_and_close() -> None:

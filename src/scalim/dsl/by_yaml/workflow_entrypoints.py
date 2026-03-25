@@ -98,7 +98,6 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         allowed_functions=allowed_functions,
         components=cast("Any", components),
         sink=None,
-        output_composition=None,
         overrides=overrides,
         guardrails=cast("Any", guardrails),
         loader_retry=cast("Any", loader_retry),

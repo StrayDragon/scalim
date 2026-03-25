@@ -126,9 +126,11 @@ class DemandConfig:
     outputs: Tuple[OutputTargetConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
-            desc="输出目标列表(多 sheet 分发 + 派生汇总)",
+            desc="输出目标列表(多 sheet 分发 + 派生汇总; 可选)",
             md=(
-                "输出目标列表(有序).\n\n"
+                "输出目标列表(有序; 可选).\n\n"
+                "- 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体)\n"
+                "- 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs`\n"
                 "- 通过 `where` 分发到不同 sheet\n"
                 "- 通过 `aggregate` 声明派生汇总输出\n"
                 "- 通过 `from` 复用字段集合与容器配置\n"
@@ -147,6 +149,26 @@ class DemandConfig:
         ),
     )
     """输出目标列表(有序)."""
+
+    validate_unique_field_names: bool = dataclass_field(
+        default=True,
+        metadata=schema_meta(
+            desc="预检查: 字段有效展示名全局唯一(默认 true)",
+            md=(
+                "预检查: 字段有效展示名(`effective display name`)全局唯一.\n\n"
+                "- 默认启用: 未声明时等价 `true`\n"
+                "- 有效展示名定义:\n"
+                "  - 若 `field.name` 非空: 使用 `name`\n"
+                "  - 否则回退为 `field_id`\n"
+                "- 仅当 `effective outputs` 使用 `container.include_header: true`(显式或默认)\n"
+                "  且 `container.header_fields_output_by: name` 时触发\n"
+                "- 显式设置为 `false` 可关闭该检查(不推荐长期使用)"
+            ),
+            default=True,
+            examples=[True, False],
+        ),
+    )
+    """预检查:字段有效展示名(`effective display name`)全局唯一."""
 
     failure_policy: str = dataclass_field(
         default="all_fail",

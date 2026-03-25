@@ -243,6 +243,7 @@ def test_csv_sink_atomic_write(tmp_path):
     assert output_path.exists()
     lines = output_path.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2  # header + 1 row
+    sink.close()
 
 
 def test_column_csv_sink_atomic_write_on_error(tmp_path):

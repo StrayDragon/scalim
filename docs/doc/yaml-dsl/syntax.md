@@ -60,7 +60,7 @@ observability: {}       # 可选
 提示:
 
 - 顶层已不再支持旧写法 `output:`(会 fail-fast).请使用 `outputs:`(有序列表)描述输出编排.
-- `outputs` 可省略.省略时运行在“单输出模式”: 由 Python 调用侧提供 `sink=...` 或通过 `overrides.output.*` 控制输出策略.
+- `outputs` 可省略.省略时默认不写文件;如需写文件,请在 YAML 中声明 `outputs` 或在 Python 调用侧使用 `overrides.outputs` 显式指定(整体替换,replace).
 - `field_id` 必须全局唯一(不再支持 `source.field_id` 消歧).
 
 ## 3. YAML 复用: anchors、alias、`_templates`

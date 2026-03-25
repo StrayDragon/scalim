@@ -21,7 +21,6 @@ _EXPECTED_PUBLIC_ALL: Mapping[str, FrozenSet[str]] = {
         [
             "UNSET",
             "Compilation",
-            "OutputOverrides",
             "ResolverTrustedMode",
             "RunOverrides",
             "RunResult",

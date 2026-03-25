@@ -69,14 +69,11 @@ sources:
 """
         _write_text(demand_path, demand_yaml)
 
-        overrides = api.RunOverrides(output=api.OutputOverrides(path=None, include_header=api.UNSET))
-
         sink_raw = InMemoryRowSink()
         _ = api.run(
             str(demand_path),
             allowed_modules=_ALLOWED_MODULES,
             sink=sink_raw,
-            overrides=overrides,
             key_normalization="raw",
         )
         raw_rows = sink_raw.get_data()
@@ -86,7 +83,6 @@ sources:
             str(demand_path),
             allowed_modules=_ALLOWED_MODULES,
             sink=sink_norm,
-            overrides=overrides,
             key_normalization="auto_str",
         )
         norm_rows = sink_norm.get_data()

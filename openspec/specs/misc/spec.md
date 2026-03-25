@@ -47,7 +47,7 @@ by_yaml 的 loader 与 validator SHALL 使用同一 Raw 适配层归一化 YAML 
 对于本类变更,迁移完成后旧命名 MUST NOT 继续可用.
 
 为减少“同一件事多种方式”的团队协作成本,对外执行入口 SHOULD 收敛为 `run`,
-并通过显式 `overrides.output.path=...`/`sink=...` 表达输出策略,而不是提供多个 `run_yaml_to_*` 便捷函数.
+并通过显式 `outputs/overrides.outputs` 与 `sink=...` 表达输出策略,而不是提供多个 `run_yaml_to_*` 便捷函数.
 notebooks 示例允许随内部接口调整,不要求向后兼容.
 
 #### Scenario: 归一化结果一致

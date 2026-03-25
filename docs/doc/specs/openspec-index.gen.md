@@ -396,6 +396,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-micro-tunes/spec.md)
 - Summary: TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after archive.
 
+### `yaml-dsl-output-overrides`
+- Title: yaml-dsl-output-overrides Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-output-overrides/spec.md)
+- Summary: **状态: ✅ 已实现** 为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过与 YAML 同形的 `overrides.outputs` 显式指定输出。
+
 ### `yaml-dsl-public-tools`
 - Title: yaml-dsl-public-tools Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-public-tools/spec.md)

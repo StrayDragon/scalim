@@ -22,7 +22,8 @@ Sources:
 - `fields`: type=object; 字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用
 - `relations`: type=object; 命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`
 - `guardrails`: ref=guardrails; 运行时护栏配置. - 默认关闭 - 用于控制 loader/relations/compute 等运行期护栏策略
-- `outputs`: type=array[ref=output_target]; 输出目标列表(有序). - 通过 `where` 分发到不同 sheet - 通过 `aggregate` 声明派生汇总输出 - 通过 `from` 复用字段集合与容器配置 - 不再支持旧写法: 顶层 `output:`
+- `outputs`: type=array[ref=output_target]; 输出目标列表(有序; 可选). - 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体) - 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs` - 通过 `where` 分发到不同 sheet - 通过 `aggregate` 声明派生汇总输出 - 通过 `from` 复用字段集合与容器配置 - 不再支持旧写法: 顶层 `output:`
+- `validate_unique_field_names`: type=boolean; 预检查: 字段有效展示名(`effective display name`)全局唯一. - 默认启用: 未声明时等价 `true` - 有效展示名定义: - 若 `field.name` 非空: 使用 `name` - 否则回退为 `field_id` - 仅当 `effective outputs` 使用 `container.include_header: true`(显式或默认) 且 `container.header_fields_output_by: name` 时触发 - 显式设置为 `false` 可关闭该检查(不推荐长期使用)
 - `failure_policy`: type=string; 多输出失败策略. - `all_fail`: 任一目标失败即失败 - `primary_only`: 非主输出失败将被禁用但不阻断主输出
 - `include_full_error_message`: type=boolean; 包含完整错误信息(可能包含敏感信息;默认 false).
 - `meta`: ref=output_extra_sheet; 可选:启用 meta sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径
@@ -117,7 +118,7 @@ Sources:
 - `$import`: $import 引用(支持 string 或 string list)
 - `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(仅 workbook)
 - `encoding`: type=string; default=utf-8; 文件编码(CSV 输出使用)
-- `header_fields_output_by`: type=string; default=field_id; enum=field_id|name; 表头字段名来源: field_id/name
+- `header_fields_output_by`: type=string; default=name; enum=field_id|name; 表头字段名来源: field_id/name
 - `include_header`: type=boolean; default=true; 包含表头行
 - `path`: 输出文件路径(支持静态字符串/空字符串 或 {$init_var: <name>} 动态注入)
 - `sheet`: type=string; Excel sheet 名称(仅 workbook)

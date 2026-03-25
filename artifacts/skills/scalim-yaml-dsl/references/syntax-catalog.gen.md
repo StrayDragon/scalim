@@ -27,6 +27,7 @@
 - `relations`
 - `guardrails`
 - `outputs`
+- `validate_unique_field_names`
 - `failure_policy`
 - `include_full_error_message`
 - `meta`
@@ -67,7 +68,9 @@
 - Requirements:
   - schema 元数据生成与 hover 指引
   - schema 为 `value_cast` 增加 `decimal` 枚举值
-  - output 字段 hover 指引明确可选与 overrides 推荐写法
+  - outputs 字段 hover 指引明确可选与 overrides 推荐写法
+  - `header_fields_output_by` default is `name`
+  - schema exposes a switch for unique effective field display names
   - schema hover 提供常见错误与迁移提示
   - schema hover documents `$keys/$rows` directive nodes under `params`
   - `params` hover documents `{$runtime: <name>}` and preload params behavior
@@ -410,8 +413,10 @@
 ### `outputs`
 - Type: `array`
 - Description:
-  输出目标列表(有序).
+  输出目标列表(有序; 可选).
   
+  - 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体)
+  - 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs`
   - 通过 `where` 分发到不同 sheet
   - 通过 `aggregate` 声明派生汇总输出
   - 通过 `from` 复用字段集合与容器配置
@@ -419,6 +424,21 @@
 - Examples: `[{"container": {"path": "./output/report.xlsx", "sheet": "明细", "type": "workbook"}, "fields": ["order_id", "user_id"], "name": "detail"}]`
 - `minItems`: `0`
 - `items`: ref `#/definitions/output_target`
+
+### `validate_unique_field_names`
+- Type: `boolean`
+- Description:
+  预检查: 字段有效展示名(`effective display name`)全局唯一.
+  
+  - 默认启用: 未声明时等价 `true`
+  - 有效展示名定义:
+    - 若 `field.name` 非空: 使用 `name`
+    - 否则回退为 `field_id`
+  - 仅当 `effective outputs` 使用 `container.include_header: true`(显式或默认)
+    且 `container.header_fields_output_by: name` 时触发
+  - 显式设置为 `false` 可关闭该检查(不推荐长期使用)
+- Default: `True`
+- Examples: `true`, `false`
 
 ### `failure_policy`
 - Type: `string`

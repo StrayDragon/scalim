@@ -454,14 +454,14 @@ def _compile_extra_sheet(
     )
 
 
-def _validate_extra_sheet_target_names(config: DemandConfig) -> None:
+def _validate_extra_sheet_target_names(config: DemandConfig, *, outputs_path: str) -> None:
     outputs = config.outputs or ()
     reserved = {str(t.name) for t in outputs}
     if config.meta is not None and "meta" in reserved:
-        msg = "outputs.*.name cannot be 'meta' when meta sheet is enabled"
+        msg = "{}.*.name cannot be 'meta' when meta sheet is enabled".format(outputs_path)
         raise ValueError(msg)
     if config.audit is not None and "audit" in reserved:
-        msg = "outputs.*.name cannot be 'audit' when audit sheet is enabled"
+        msg = "{}.*.name cannot be 'audit' when audit sheet is enabled".format(outputs_path)
         raise ValueError(msg)
 
 
@@ -472,6 +472,7 @@ def compile_output_composition_from_yaml(
     resolver: SecurePythonReferenceResolver,
     init_vars: Optional[Dict[str, object]] = None,
     workflow_managed_output_ids: Optional[FrozenSet[str]] = None,
+    outputs_path: str = "outputs",
 ) -> Optional[OutputCompositionSpec]:
     outputs = config.outputs
     if not outputs:
@@ -480,7 +481,7 @@ def compile_output_composition_from_yaml(
             raise ValueError(msg)
         return None
 
-    _validate_extra_sheet_target_names(config)
+    _validate_extra_sheet_target_names(config, outputs_path=outputs_path)
 
     engine = SecureComputeEngine()
 
@@ -496,10 +497,10 @@ def compile_output_composition_from_yaml(
 
         container = out_cfg.container
         if container is None:
-            msg = "outputs.{} missing container".format(out_cfg.name)
+            msg = "{}.{} missing container".format(outputs_path, out_cfg.name)
             raise ValueError(msg)
 
-        container_path_key = "outputs.{}.container.path".format(idx)
+        container_path_key = "{}.{}.container.path".format(outputs_path, idx)
         container_path, in_memory = _resolve_output_container_path_with_overrides(
             container,
             output_id=str(out_cfg.name),

@@ -34,7 +34,7 @@ DEFAULT_PERF_SAMPLING_INTERVAL = 1
 DEFAULT_OUTPUT_FORMAT = "csv"
 DEFAULT_OUTPUT_ENCODING = UTF8_ENCODING
 DEFAULT_OUTPUT_INCLUDE_HEADER = True
-DEFAULT_OUTPUT_HEADER_BY = "field_id"
+DEFAULT_OUTPUT_HEADER_BY = "name"
 DEFAULT_OUTPUT_STREAMING = True
 DEFAULT_CACHE_MODE = "none"
 DEFAULT_BIND_AS = "set"
@@ -645,6 +645,7 @@ DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "relations",
     "guardrails",
     "outputs",
+    "validate_unique_field_names",
     "failure_policy",
     "include_full_error_message",
     "meta",
