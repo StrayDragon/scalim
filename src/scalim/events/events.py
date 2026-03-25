@@ -1,9 +1,9 @@
 # region imports
 
-from dataclasses import dataclass
 from typing import Any, Dict, Hashable, List, Optional, Tuple
 
 from ..typedefs import RelationLookupResult
+from ..vendor.dataclassesx import dataclass
 
 # endregion
 

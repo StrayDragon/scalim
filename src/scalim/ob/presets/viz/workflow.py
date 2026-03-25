@@ -1,5 +1,4 @@
 import time
-from dataclasses import asdict
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, cast
 
 from ....events.catalog import (
@@ -35,6 +34,7 @@ from ....spec.ir.workflow import (
     WorkflowResourceIr,
     WriteSheetNodeIr,
 )
+from ....vendor.dataclassesx import asdict
 from ...observer import EventDispatchObserver as _EventDispatchObserver
 from .._internal.viz_config import VizObserverConfig
 from .._internal.viz_nodes import VizObserverNodeMixin

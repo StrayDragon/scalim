@@ -2,7 +2,6 @@ import hashlib
 import json
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass, field
 from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from ..events.catalog import (
@@ -17,6 +16,7 @@ from ..spec.ir.sources import SourceIr
 from ..spec.ir.workflow import WorkflowCachePoolIr
 from ..typedefs import LoaderCallKwargs, LoaderResultMapping
 from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from ..vendor.dataclassesx import dataclass, field
 
 
 class WorkflowCachePoolError(RuntimeError):

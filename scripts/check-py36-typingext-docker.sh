@@ -43,7 +43,7 @@ PY
 
 if [ "$py_is_legacy" = "1" ]; then
     install_with_retry --upgrade "pip<22" "setuptools<60" "wheel<0.38"
-    install_with_retry dataclasses "typing-extensions==4.1.1" "pyyaml>=5.4.1,<6.0.2"
+    install_with_retry "typing-extensions==4.1.1" "pyyaml>=5.4.1,<6.0.2"
 else
     install_with_retry --upgrade pip setuptools wheel
     install_with_retry "typing-extensions==4.1.1" "pyyaml>=5.4.1,<6.0.2"
@@ -63,6 +63,7 @@ from scalim.execution.preload_cache import PreloadCache  # noqa: F401
 from scalim.ob import Observability  # noqa: F401
 from scalim.planning import PlanBuilder  # noqa: F401
 from scalim.spec.ir import DemandIr  # noqa: F401
+from scalim.vendor.dataclassesx import dataclass as dataclassesx_dataclass  # noqa: F401
 from scalim.vendor.compact.typing_extensionsx import Self, override  # noqa: F401
 
 _ = (
@@ -71,6 +72,7 @@ _ = (
     PlanBuilder,
     PreloadCache,
     ScalimEngine,
+    dataclassesx_dataclass,
     Self,
     output_composition,
     override,

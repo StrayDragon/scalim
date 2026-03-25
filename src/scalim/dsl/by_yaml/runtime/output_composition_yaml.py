@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
@@ -18,6 +17,7 @@ from ....execution.output_contracts import ExportLayout, OutputSpec
 from ....execution.run_ir import export_layout_from_demand_ir
 from ....spec.ir.demand import DemandIr
 from ....typedefs import FieldValue, RowData
+from ....vendor.dataclassesx import dataclass
 from ..config_parsing.call_by import CallByParseError, CallByValue, ParsedCallBy, parse_call_by
 from ..config_parsing.security import ComputeExpressionError, SecureComputeEngine, SecurityError
 from ..schema_dsl.models import (

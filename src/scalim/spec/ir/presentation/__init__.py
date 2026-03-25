@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 from ....typedefs import FieldPresentationKind
+from ....vendor.dataclassesx import dataclass, field
 
 
 @dataclass(frozen=True)

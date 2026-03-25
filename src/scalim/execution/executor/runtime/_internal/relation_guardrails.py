@@ -1,7 +1,7 @@
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 from .....spec.ir.relations import LookupStepIr
+from .....vendor.dataclassesx import dataclass
 from ...guardrails import build_guardrail_once_key, fail_guardrail, record_guardrail
 
 

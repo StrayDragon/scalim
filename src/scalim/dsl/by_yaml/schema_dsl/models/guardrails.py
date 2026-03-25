@@ -1,7 +1,7 @@
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from typing import Any, ClassVar, Optional, Tuple
 
+from .....vendor.dataclassesx import dataclass
+from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import DEFAULT_GUARDRAILS_MODE, GUARDRAILS_MODE_ENUM, schema_meta
 
 

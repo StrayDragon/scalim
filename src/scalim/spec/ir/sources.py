@@ -1,10 +1,10 @@
 import inspect
 from collections.abc import Hashable, Mapping
-from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, FrozenSet, Optional, Sequence, Tuple, Union, cast
 
 from ...typedefs import LoaderResultMap, LoaderResultMapping, SourceSpecIrCacheMode, StaticParams
 from ...vendor.compact.typing_extensionsx import override
+from ...vendor.dataclassesx import dataclass, field
 from .aliases import LookupKeyCast, MainSourceRowIterableCallable, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
 from .relations import FieldRefIr

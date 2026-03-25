@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union, cast
 
 from ....execution.guardrails import GuardrailsPolicy
@@ -11,6 +9,8 @@ from ....sinks.sink_base import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
+from ....vendor.dataclassesx import dataclass
+from ....vendor.dataclassesx import field as dataclass_field
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
 

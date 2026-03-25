@@ -1,10 +1,10 @@
 from __future__ import absolute_import
 
-from dataclasses import replace
 from typing import List, Optional, Sequence, Tuple
 
 from ..sinks.sink_excel import ExcelWorkbookSink
 from ..spec.ir.demand import DemandIr
+from ..vendor.dataclassesx import replace
 from .run_ir import ExecutionRequest, ExecutionResult, OutputSpec, run_ir
 
 

@@ -1,7 +1,8 @@
 from __future__ import absolute_import
 
-from dataclasses import dataclass
 from typing import Optional, Tuple
+
+from ..vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)

@@ -1,10 +1,10 @@
 import copy
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from ....vendor.compact.importlibx import require_optional_dependency
+from ....vendor.dataclassesx import dataclass
 from .allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
 from .presets import load_scalim_preset_yaml_text
 from .project_config import YamlDslProjectConfig, load_yaml_dsl_project_config

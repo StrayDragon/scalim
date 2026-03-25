@@ -4,7 +4,6 @@ import json
 import sys
 import threading
 import time
-from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
 
@@ -44,6 +43,7 @@ from ..spec.ir.workflow import (
     WriteSheetNodeIr,
 )
 from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from ..vendor.dataclassesx import dataclass, replace
 from .errors import WorkflowConfigError
 from .loaders import workflow_loader_context
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome

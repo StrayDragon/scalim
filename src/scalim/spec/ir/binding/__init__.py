@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Dict, List, Mapping, Optional, Tuple, cast
 
 from ....typedefs import LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData
+from ....vendor.dataclassesx import dataclass, field
 from ..aliases import LoaderExtractor, LoaderParamsBuilder, LoaderResultMapCallable, NormalizedLookupKeySpec
 
 

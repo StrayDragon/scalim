@@ -1,10 +1,10 @@
 import re
-from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 
 from ...spec.ir.binding import LoaderCallContextIr, build_stable_lookup_key_list
 from ...typedefs import LoaderCallKwargs, RuntimeValue
 from ...vendor.compact.typing_extensionsx import override
+from ...vendor.dataclassesx import dataclass
 
 _RUNTIME_PREFIX = "$runtime."
 _RUNTIME_VAR_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")

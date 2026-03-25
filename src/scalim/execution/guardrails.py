@@ -1,8 +1,8 @@
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from typing import Any, Dict, Optional, Tuple
 
 from ..vendor.compact.typing_extensionsx import Literal
+from ..vendor.dataclassesx import dataclass
+from ..vendor.dataclassesx import field as dataclass_field
 
 GuardrailMode = Literal["quiet", "fast_fail"]
 

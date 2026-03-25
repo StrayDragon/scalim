@@ -9,7 +9,6 @@ import csv
 import io
 from abc import ABC
 from contextlib import suppress
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, Union, cast
 
@@ -18,6 +17,7 @@ from ..events.events import DiagnosticWarningEvent
 from ..sinks.sink_base import create_temp_path
 from ..sinks.sink_csv import InMemoryCsv
 from ..vendor.compact.typing_extensionsx import override
+from ..vendor.dataclassesx import dataclass
 from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
 
 WorkflowCsvInput = Union[str, InMemoryCsv]

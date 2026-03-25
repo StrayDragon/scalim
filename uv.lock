@@ -3152,7 +3152,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dataclasses", marker = "python_full_version < '3.7'" },
     { name = "jsonschema", marker = "python_full_version >= '3.7' and extra == 'cli'", specifier = ">=4.0.0" },
     { name = "jsonschema", marker = "python_full_version < '3.7' and extra == 'cli'", specifier = ">=3.2,<4" },
     { name = "numpy", marker = "python_full_version >= '3.7' and extra == 'pandas'", specifier = ">=1.24.4" },

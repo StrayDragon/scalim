@@ -1,6 +1,6 @@
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
 
+from ...vendor.dataclassesx import dataclass
 from .fields import FieldIr, SupportedFieldIr
 from .presentation import ExportProfileIr
 from .sources import MainSourceIr, SourceIr

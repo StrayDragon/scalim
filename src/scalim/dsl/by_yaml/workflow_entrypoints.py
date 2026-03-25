@@ -6,11 +6,11 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from ...execution.run_ir import ExecutionResult
+from ...vendor.dataclassesx import replace
 from ...workflow.errors import WorkflowConfigError as WorkflowRuntimeConfigError
 from ...workflow.execute import WorkflowRunFailedError
 from ...workflow.execute import run_workflow_ir as _run_workflow_ir

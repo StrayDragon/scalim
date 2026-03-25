@@ -6,7 +6,6 @@
 - 运行时请求(`ExecutionRequest`)
 """
 
-from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, cast
 
 from ....execution.guardrails import (
@@ -19,6 +18,7 @@ from ....execution.guardrails import (
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
 from ....spec.ir.demand import DemandIr
+from ....vendor.dataclassesx import replace
 from ..config_parsing.loader import YamlDemandLoader
 from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfig
 from .contracts import UNSET, Compilation, OutputOverrides, ResolverTrustedMode, RunOptions

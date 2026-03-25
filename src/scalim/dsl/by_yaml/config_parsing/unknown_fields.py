@@ -1,6 +1,7 @@
-from dataclasses import dataclass
 from difflib import get_close_matches
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple, cast
+
+from ....vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)

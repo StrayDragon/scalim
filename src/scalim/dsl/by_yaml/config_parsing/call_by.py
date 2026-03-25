@@ -1,8 +1,8 @@
 import ast
 import sys
-from dataclasses import dataclass
 from typing import Any, FrozenSet, List, Optional, Set, Tuple
 
+from ....vendor.dataclassesx import dataclass
 from ..reference_syntax import is_valid_python_reference
 
 _PY38_PLUS = sys.version_info >= (3, 8)

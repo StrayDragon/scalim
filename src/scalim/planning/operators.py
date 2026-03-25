@@ -1,9 +1,9 @@
 # region imports
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Tuple, Union
 
 from ..vendor.compact import StrEnum
+from ..vendor.dataclassesx import dataclass, field
 
 if TYPE_CHECKING:
     from ..spec.ir.fields import DerivedFieldIr, FieldIr

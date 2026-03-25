@@ -1,8 +1,8 @@
 from collections import deque
-from dataclasses import dataclass
 from typing import Dict, FrozenSet, List, Optional, Set, Tuple, cast, overload
 
 from ...vendor.compact.typing_extensionsx import override
+from ...vendor.dataclassesx import dataclass
 from .aliases import LookupKeyCast, LookupKeySpec
 from .binding import BindingIr
 from .source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase

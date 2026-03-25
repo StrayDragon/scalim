@@ -1,10 +1,10 @@
 # region imports
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
 
 from ..planning.operators import PlanOperatorIr
 from ..spec.ir.fields import SupportedFieldIr
+from ..vendor.dataclassesx import dataclass, field
 from .viz import build_viz_graph_snapshot
 from .viz_schedule import build_viz_schedule_plan
 

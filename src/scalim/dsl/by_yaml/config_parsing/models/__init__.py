@@ -1,6 +1,6 @@
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, cast
 
+from .....vendor.dataclassesx import dataclass
 from ...schema_dsl.constants import DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED, FIELD_KIND_SOURCE
 from ...schema_dsl.models import DEMAND_KEYS, DERIVED_FIELD_KEYS, MAIN_SOURCE_KEYS, SOURCE_KEYS
 

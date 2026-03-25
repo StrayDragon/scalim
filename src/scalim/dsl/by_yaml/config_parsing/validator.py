@@ -1,11 +1,11 @@
 import json
-from dataclasses import asdict, dataclass
-from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from ...._internal.loggingx import format_kv, get_logger, prefix
 from ....vendor.compact.importlibx import import_module, require_optional_dependency
+from ....vendor.dataclassesx import asdict, dataclass
+from ....vendor.dataclassesx import field as dataclass_field
 
 if TYPE_CHECKING:
     import yaml

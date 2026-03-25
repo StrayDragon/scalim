@@ -1,7 +1,7 @@
-from dataclasses import Field
-from dataclasses import fields as dataclass_fields
 from typing import Any, Dict, List, Optional, Tuple
 
+from .....vendor.dataclassesx import Field
+from .....vendor.dataclassesx import fields as dataclass_fields
 from ..constants import SCHEMA_META_KEY, SCHEMA_OMIT_KEY
 from .demand import DemandConfig
 from .field import DerivedFieldConfig, SourceFieldConfig

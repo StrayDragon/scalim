@@ -1,8 +1,8 @@
 import contextlib
 import threading
-from dataclasses import dataclass
 from typing import Any, FrozenSet, Iterator, Mapping, cast
 
+from ..vendor.dataclassesx import dataclass
 from .resources import WorkflowResourceManager
 
 

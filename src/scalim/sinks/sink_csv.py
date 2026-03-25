@@ -4,13 +4,13 @@ import csv
 import io
 import logging
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 from .._internal.loggingx import prefix
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import Self, override
+from ..vendor.dataclassesx import dataclass
 from .sink_base import (
     BaseRowSink,
     ColumnBatch,

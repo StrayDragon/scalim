@@ -1,6 +1,7 @@
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from typing import Any, List, Optional, Tuple
+
+from .....vendor.dataclassesx import dataclass
+from .....vendor.dataclassesx import field as dataclass_field
 
 VALIDATION_SEVERITY_ERROR = "error"
 VALIDATION_SEVERITY_WARNING = "warning"

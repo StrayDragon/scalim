@@ -1,11 +1,11 @@
 import json
 import re
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 
 from ...vendor.compact.importlibx import require_optional_dependency
+from ...vendor.dataclassesx import dataclass
+from ...vendor.dataclassesx import field as dataclass_field
 from ._public_template_sandbox import validate_public_template_sandbox
 from .config_parsing.allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
 from .config_parsing.template_precompile import maybe_precompile_yaml_text

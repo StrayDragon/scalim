@@ -1,9 +1,9 @@
 import threading
 import time
 from concurrent.futures import Future, as_completed
-from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
+from ...vendor.dataclassesx import dataclass
 from .strategy_unit import TaskSpec
 
 

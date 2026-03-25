@@ -1,7 +1,6 @@
 # region imports
 
 import logging
-from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, Hashable, List, MutableMapping, Optional, Set, Tuple
 
 from ....hooks.base import HookManager
@@ -16,6 +15,7 @@ from ....spec.ir.relations import LookupStepIr
 from ....spec.ir.sources import MainSourceIr
 from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LookupKey, ParallelMode, RowData
 from ....utils.converters import auto_str_normalize_key
+from ....vendor.dataclassesx import dataclass
 from ...guardrails import GuardrailsPolicy
 from ...key_normalization import normalize_key_normalization, should_apply_str_key_normalization
 from ...loader_retry import LoaderRetryPolicies

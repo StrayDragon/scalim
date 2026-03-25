@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 import hashlib
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 
@@ -12,6 +11,7 @@ from ..utils import graph as graph_utils
 from ..utils.converters import auto_str_normalize
 from ..utils.iterables import ordered_unique_str
 from ..vendor.compact.typing_extensionsx import override
+from ..vendor.dataclassesx import dataclass, field
 from .key_normalization import normalize_key_normalization
 
 

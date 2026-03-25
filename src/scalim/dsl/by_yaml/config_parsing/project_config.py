@@ -1,8 +1,8 @@
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from ....vendor.compact.importlibx import require_optional_dependency
+from ....vendor.dataclassesx import dataclass
 
 if TYPE_CHECKING:
     import yaml

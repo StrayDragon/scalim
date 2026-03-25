@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 from typing import Callable, Dict, Hashable, List, MutableMapping, Optional, Sequence, Set, Tuple
 
 from ....events.event import Event
@@ -9,6 +8,7 @@ from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....spec.ir.sources import MainSourceIr
 from ....typedefs import FieldValue, LoaderResultMapping
+from ....vendor.dataclassesx import dataclass
 from ...context import BatchContext
 from ...executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from ...executor.runtime.runtime import ExecutionRuntime

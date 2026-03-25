@@ -7,11 +7,11 @@
 4)执行请求映射
 """
 
-from dataclasses import dataclass
 from typing import FrozenSet, Mapping, Optional
 
 from ....execution.run_ir import ExecutionRequest
 from ....spec.ir.demand import DemandIr
+from ....vendor.dataclassesx import dataclass
 from ..schema_dsl.models import DemandConfig
 from .compiler import (
     build_request,

@@ -4,7 +4,6 @@ import logging
 import time
 import warnings
 from collections.abc import Sized
-from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
@@ -31,6 +30,7 @@ from ...events.events import (
 )
 from ...typedefs import PerformanceReportFormat
 from ...vendor.compact.importlibx import import_module
+from ...vendor.dataclassesx import dataclass, field
 from ..observer import EventDispatchObserver
 from ..perf_metrics import AdaptiveSchedulerMetrics, CpuSample, MemorySample, PerformanceMetrics
 from .performance_presentation import PerformancePresentationLayer

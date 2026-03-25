@@ -1,9 +1,9 @@
 import secrets
 import time
-from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
 
 from ..events.catalog import EVENT_LOADER_RETRY
+from ..vendor.dataclassesx import dataclass, field
 
 CALLSITE_LOAD = "load"
 CALLSITE_LOAD_REF = "load_ref"

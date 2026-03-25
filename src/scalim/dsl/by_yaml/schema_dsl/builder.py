@@ -1,11 +1,11 @@
 import copy
 import json
-from dataclasses import Field, dataclass
-from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
+from ....vendor.dataclassesx import Field, dataclass
+from ....vendor.dataclassesx import fields as dataclass_fields
 from . import constants as schema_constants
 from . import models as schema_models
 from .constants import SCHEMA_META_KEY

@@ -1,6 +1,6 @@
-from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from .....vendor.dataclassesx import dataclass
 from ...schema_dsl.models import DerivedFieldConfig, SourceFieldConfig
 from ..models import FieldDefIndex
 

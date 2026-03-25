@@ -2,9 +2,9 @@
 
 import itertools
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Iterator, List, Optional, Type
 
+from ...vendor.dataclassesx import dataclass
 from ..adaptive.policy import AdaptivePolicy
 from ..adaptive.tuning import AdaptiveTuning
 

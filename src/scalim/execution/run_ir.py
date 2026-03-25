@@ -1,8 +1,6 @@
 import contextlib
 import time
 import warnings as py_warnings
-from dataclasses import dataclass, replace
-from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -21,6 +19,8 @@ from ..spec.ir.demand import DemandIr
 from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
+from ..vendor.dataclassesx import dataclass, replace
+from ..vendor.dataclassesx import field as dataclass_field
 from ..warningsx import ScalimExperimentalWarning
 from .engine import ScalimEngine
 from .guardrails import GuardrailsPolicy

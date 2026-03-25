@@ -1,8 +1,8 @@
-from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Callable, Hashable, Mapping, Optional, Set, Tuple, Union
 
 from ...typedefs import FieldValue
+from ...vendor.dataclassesx import dataclass
 from .helpers import extract_from_fields
 from .presentation import FieldPresentationIr
 from .relations import JoinConditionIr, LookupStepIr, RelationIr

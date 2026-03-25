@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Optional, Tuple, Union
+
+from ...vendor.dataclassesx import dataclass, field
 
 
 class WorkflowNodeType(str, Enum):

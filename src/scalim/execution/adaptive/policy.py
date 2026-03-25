@@ -1,10 +1,10 @@
 # region imports
 
-from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, Set
 
 from ...planning.operators import LoadRefOperatorIr
 from ...planning.plan import ExecutionPlan
+from ...vendor.dataclassesx import dataclass
 from ..executor.runtime.runtime import ExecutionRuntime
 from .tuning import DEFAULT_ADAPTIVE_POOL, AdaptiveTuning
 

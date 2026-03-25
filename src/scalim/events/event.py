@@ -1,8 +1,9 @@
 # region imports
 
 import time
-from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Dict
+
+from ..vendor.dataclassesx import asdict, dataclass, field, is_dataclass
 
 # endregion
 

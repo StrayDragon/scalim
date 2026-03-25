@@ -1,11 +1,11 @@
 # region imports
 
 import time
-from dataclasses import asdict
 from typing import Any, Dict, List, Set, Tuple, Union
 
 from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..spec.ir.sources import MainSourceIr, SourceIr
+from ..vendor.dataclassesx import asdict
 
 # endregion
 

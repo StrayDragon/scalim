@@ -5,7 +5,6 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
@@ -25,6 +24,7 @@ from ...spec.ir.workflow import (
     WorkflowResourceIr,
     WriteSheetNodeIr,
 )
+from ...vendor.dataclassesx import replace
 from .config_parsing.loader import YamlDemandLoader
 from .workflow import (
     WorkflowConfigError,

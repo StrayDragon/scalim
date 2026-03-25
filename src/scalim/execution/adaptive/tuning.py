@@ -1,7 +1,8 @@
 # region imports
 
-from dataclasses import dataclass, field
 from typing import Dict
+
+from ...vendor.dataclassesx import dataclass, field
 
 # endregion
 

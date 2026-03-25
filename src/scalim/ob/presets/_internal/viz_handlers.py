@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import asdict
 from typing import Any, Dict, Optional, Sequence, Set, cast
 
 from ....events.events import (
@@ -21,6 +20,7 @@ from ....events.events import (
     RowWriteEvent,
     StageSpanEvent,
 )
+from ....vendor.dataclassesx import asdict
 from .viz_config import VizObserverConfig
 from .viz_output import VizEventEmitter
 

@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import hashlib
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from .._internal.loggingx import format_kv, get_logger, prefix
@@ -16,6 +15,7 @@ from ..sinks.sink_csv import CSVSink, InMemoryCsvSink
 from ..typedefs import KeyNormalizationMode, RowData
 from ..utils.iterables import ordered_unique_str
 from ..vendor.compact.typing_extensionsx import override
+from ..vendor.dataclassesx import dataclass
 from .derived_outputs import (
     AggMetricSpec,
     AggregatingRowSink,

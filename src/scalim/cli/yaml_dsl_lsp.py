@@ -1,7 +1,8 @@
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
+
+from ..vendor.dataclassesx import dataclass
 
 DEFAULT_SCHEMA_TYPE = "demand"
 DEFAULT_MAX_SCAN_LINES = 10

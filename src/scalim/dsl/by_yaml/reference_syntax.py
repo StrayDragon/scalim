@@ -1,6 +1,7 @@
 import re
-from dataclasses import dataclass
 from typing import Tuple
+
+from ...vendor.dataclassesx import dataclass
 
 _MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
 _REFERENCE_PARTS_COUNT = 2

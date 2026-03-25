@@ -7,7 +7,6 @@
 
 from abc import ABC
 from contextlib import suppress
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
 
@@ -17,6 +16,7 @@ from ..sinks.sink_base import create_temp_path
 from ..utils.excel import escape_excel_formula
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
+from ..vendor.dataclassesx import dataclass
 from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
 from .resources_csv import AppendSegment, WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 

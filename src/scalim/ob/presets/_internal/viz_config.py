@@ -1,11 +1,11 @@
 import logging
 import os
 import platform
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
 from ...._project_constants import VIZ_DIR_NAME
+from ....vendor.dataclassesx import dataclass, field
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -1,10 +1,10 @@
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from ...events.catalog import EVENT_LOADER_CALL
 from ...events.events import LoaderCallEvent
 from ...hooks.base import HookManager, IExecutionHook
 from ...vendor.compact.typing_extensionsx import override
+from ...vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)

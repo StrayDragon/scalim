@@ -6,8 +6,9 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from dataclasses import dataclass
 from typing import List, Optional, Tuple
+
+from ..vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)

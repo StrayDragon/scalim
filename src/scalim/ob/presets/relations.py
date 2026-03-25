@@ -4,7 +4,6 @@ import json
 import logging
 import random
 import time
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -12,6 +11,7 @@ from ..._internal.loggingx import format_kv, get_logger, prefix
 from ...events.events import RelationLookupEvent
 from ...typedefs import RelationLookupResult, RelationReportFormat
 from ...vendor.compact.typing_extensionsx import override
+from ...vendor.dataclassesx import asdict, dataclass, field
 from ...vendor.literich import Table
 from ..observer import EventDispatchObserver
 

@@ -1,7 +1,7 @@
-from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from ...planning.operators import LoadRefOperatorIr
+from ...vendor.dataclassesx import dataclass
 from ..executor.helpers.relation_signature import build_relation_signature, can_group_by_relation
 from ..executor.runtime.runtime import ExecutionRuntime
 

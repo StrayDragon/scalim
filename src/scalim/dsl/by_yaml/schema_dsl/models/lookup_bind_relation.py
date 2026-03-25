@@ -1,7 +1,7 @@
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from typing import ClassVar, Optional, Tuple, Union
 
+from .....vendor.dataclassesx import dataclass
+from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     BIND_AS_ENUM,
     BIND_CACHE_MODE_ENUM,

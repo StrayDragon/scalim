@@ -1,9 +1,9 @@
 # region imports
 
 import logging
-from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
+from ..vendor.dataclassesx import dataclass, field
 from ..vendor.literich import Table
 
 # endregion

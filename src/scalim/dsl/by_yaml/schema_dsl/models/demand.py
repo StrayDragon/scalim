@@ -1,7 +1,7 @@
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from typing import ClassVar, Dict, Optional, Tuple
 
+from .....vendor.dataclassesx import dataclass
+from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     DEFAULT_BATCH_SIZE,
     DESC_LOADER_RETRY,

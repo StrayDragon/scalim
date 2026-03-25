@@ -3,11 +3,11 @@ import logging
 import operator
 import sys
 from collections import OrderedDict
-from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Callable, ClassVar, Container, Dict, FrozenSet, List, Optional, Set, Tuple, Type, Union, cast
 
 from ....vendor.compact.typing_extensionsx import override
+from ....vendor.dataclassesx import dataclass
 
 _PY38_PLUS = sys.version_info >= (3, 8)
 

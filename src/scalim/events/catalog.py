@@ -1,8 +1,8 @@
 # region imports
 
-from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
+from ..vendor.dataclassesx import dataclass
 from .events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,

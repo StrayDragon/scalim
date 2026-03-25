@@ -3,7 +3,6 @@ import json
 import logging
 import time
 from collections.abc import Sized
-from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Hashable, Iterable, List, Optional, Union, cast
 
 from ...events.events import (
@@ -16,6 +15,7 @@ from ...events.events import (
     RowReleaseEvent,
     RowWriteEvent,
 )
+from ...vendor.dataclassesx import asdict, dataclass, field
 from ...vendor.literich import Panel, Table
 from ..observer import EventDispatchObserver
 

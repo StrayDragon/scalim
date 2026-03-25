@@ -1,10 +1,10 @@
 # region imports
 
 import json
-from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ..events.events import AdaptiveSchedulerDecisionEvent
+from ..vendor.dataclassesx import asdict, dataclass, field
 
 # endregion
 

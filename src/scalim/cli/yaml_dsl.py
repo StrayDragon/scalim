@@ -1,11 +1,11 @@
 import argparse
 import json
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
 from ..vendor.compact.importlibx import import_module, require_optional_dependency
+from ..vendor.dataclassesx import dataclass, field
 from . import yaml_dsl_lsp
 
 if TYPE_CHECKING:

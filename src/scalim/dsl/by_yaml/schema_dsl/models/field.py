@@ -1,7 +1,7 @@
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
+from .....vendor.dataclassesx import dataclass
+from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     DESC_FIELD_NAME,
     DESC_FIELD_NAME_MD,
