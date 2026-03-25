@@ -56,7 +56,6 @@
 - workflow 模块路径已从 `src/scalim/dsl/by_yaml/runtime/` 迁移到 `src/scalim/workflow/`，已校正 `workflow_execute.py` → `execute.py`
 - `workflow-cache-pool`、`source-cache` 规范已存在于 `openspec/specs/`
 - 本提案仍为纯路线规划文档,不涉及实现
-<<<<<<<< HEAD:openspec/notplan-changes/c15-workflow-intermediate-store-optimizations/proposal.md
 - c15 归档时的 delta specs 落入 `workflow-managed-temp-outputs`/`workflow-shared-output-containers`/`output-composition`,而非独立的 `workflow-intermediate-store` spec;如后续推进本提案,需决定是创建独立 spec 还是继续扩展已有 specs
 
 ## Implementation Pitfalls (代码探索 2026-03-25)
@@ -80,5 +79,3 @@
 ### P5: `workflow/artifacts.py` 和 `workflow/ctx.py` 是薄封装
 
 实际 artifact/ctx 行为逻辑在 `workflow/execute.py` 中。修改 intermediate store 需直接改动 execute.py 的编排逻辑,而非仅在 artifacts/ctx 模块中扩展。
-========
->>>>>>>> f169a62 (Squash commits from feat-yaml-dsl-public-tools):openspec/notplan-changes/c80-workflow-intermediate-store-optimizations/proposal.md

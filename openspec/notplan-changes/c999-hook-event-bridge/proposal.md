@@ -35,7 +35,4 @@
 - `get_event_catalog()` / `get_event_catalog_map()` API 已可用,proposal 中的"事件目录"目标已部分实现(仅缺对外投递能力)
 - hooks 系统(`src/scalim/hooks/`)包含 dispatch/manager_registry/manager_events/manager_subscriptions 等,结构已稳定
 - 如果启动此提案,建议从"最小异步投递 + 事件目录标准化 CLI 导出"切片开始,不需要一次性实现完整的 outbox/backpressure/reliable mode
-<<<<<<<< HEAD:openspec/notplan-changes/c999-hook-event-bridge/proposal.md
 - SSOT 归属注意: delta spec `hooks-events/spec.md` 中的"事件目录与元数据"requirement 与 `hooks-observability-structure` spec 存在 SSOT 重叠——后者已管辖 `EventDescriptor`/`InstrumentationHub`/事件分发路径。如启动此提案,事件目录/元数据应继续归属 `hooks-observability-structure`,本提案的新增 requirement 应仅聚焦在"event-bridge 异步投递"能力本身（已有独立 delta spec `event-bridge/spec.md`）
-========
->>>>>>>> f169a62 (Squash commits from feat-yaml-dsl-public-tools):openspec/notplan-changes/c60-hook-event-bridge/proposal.md
