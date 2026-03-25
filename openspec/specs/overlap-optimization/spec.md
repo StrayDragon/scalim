@@ -12,9 +12,9 @@
 
 当前方案:暂时不处理.当前实现未引入跨批次复用缓存.
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/execution/executor/runtime/runtime.py` (`preloaded_cache` vs per-batch `load_ref_cache`)
-- `src/IMPL_ROOT/execution/pipeline/base/pipeline.py` (`preload_forever` preloading + per-batch cache reset)
-- `src/IMPL_ROOT/execution/executor/operators/load_ref/loader.py` (preloaded cache fast-path)
+- `src/scalim/execution/executor/runtime/runtime.py` (`preloaded_cache` vs per-batch `load_ref_cache`)
+- `src/scalim/execution/pipeline/base/pipeline.py` (`preload_forever` preloading + per-batch cache reset)
+- `src/scalim/execution/executor/operators/load_ref/loader.py` (preloaded cache fast-path)
 
 ## Requirements
 ### Requirement: 批次间不复用关联结果
