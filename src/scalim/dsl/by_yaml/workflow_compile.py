@@ -142,6 +142,9 @@ def compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
         )
         node_id = str(run.id)
         run_deps = tuple(str(d) for d in (getattr(run, "depends_on", ()) or ()))
+        main_rows_from_run_id = getattr(run, "main_rows_from_run_id", None)
+        if main_rows_from_run_id is not None:
+            main_rows_from_run_id = str(main_rows_from_run_id or "").strip() or None
         init_vars = cast("Optional[Dict[str, object]]", getattr(run, "init_vars", None))
         if init_vars is not None:
             init_vars = dict(init_vars)
@@ -154,6 +157,7 @@ def compile_workflow_ir(  # noqa: C901, PLR0912, PLR0915
                 deps=run_deps,
                 demand_path=str(demand_path),
                 init_vars=init_vars,
+                main_rows_from_run_id=main_rows_from_run_id,
             )
         )
         demand_node_pos_by_run_id[node_id] = int(len(nodes) - 1)

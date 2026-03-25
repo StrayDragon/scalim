@@ -840,7 +840,7 @@
 - Properties:
   - `options`: `object`, properties `failure_policy`, `cache_pool`, `ctx`, `max_concurrency`
   - `resources`: `object`, properties `csvs`, `sheetbooks`, `workbooks`
-  - `runs` (required): `array`, items `object`, properties `demand`, `depends_on`, `id`, `init_vars`, `writes`
+  - `runs` (required): `array`, items `object`, properties `demand`, `depends_on`, `id`, `init_vars`, `main_rows_from`, `writes`
 
 ### `workflow.runs[*]`
 - Type: `object`
@@ -850,6 +850,7 @@
   - `depends_on`: `array`, items `string`
   - `id` (required): `string`
   - `init_vars`: `object` | `null`, oneOf(2)
+  - `main_rows_from`: `object` | `null`, oneOf(2)
   - `writes`: `array`, items `object` | `object` | `object` | `object` | `object`, oneOf(5)
 
 ### `workflow.runs[*].writes`

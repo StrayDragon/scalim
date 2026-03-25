@@ -455,7 +455,7 @@
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
-      "sha256": "086dec296c38e3031c81f893535222a9d285a2303265535f9e73b27db0e10c93"
+      "sha256": "b35bb8c37a0c9f6b040dab5bfd656fadf006d2e20427c693a4792f4a496da36a"
     }
   ],
   "outputs": [
@@ -477,7 +477,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "66baec13fe06874b35ae325d028619b9c2aa943a01c513af823d65ae15c82b66"
+      "sha256": "c0e26412d4aa12048268fce1f641692425bc0efeab67d5f985ac3290868c9093"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

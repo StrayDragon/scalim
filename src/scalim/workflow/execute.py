@@ -33,6 +33,7 @@ from ..ob.presets.viz import (
     WorkflowVizObserver,
     build_workflow_viz_graph_snapshot,
 )
+from ..sinks.sink_rows import InMemoryRows, iter_in_memory_rows_as_main_rows
 from ..spec.ir.workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
@@ -138,6 +139,13 @@ class WorkflowArtifactsDirectory:
         with self._lock:
             for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
                 _ = by_artifact.pop("in_memory_csv_outputs", None)
+                if not by_artifact:
+                    _ = self._values_by_producer_node_id.pop(producer_node_id, None)
+
+    def discard_all_in_memory_rows(self) -> None:
+        with self._lock:
+            for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
+                _ = by_artifact.pop("in_memory_rows", None)
                 if not by_artifact:
                     _ = self._values_by_producer_node_id.pop(producer_node_id, None)
 
@@ -591,6 +599,7 @@ class _PreparedWorkflowRun:
     resource_manager: WorkflowResourceManager
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]]
     write_consumers_remaining_by_output_key: Dict[Tuple[str, str], int]
+    main_rows_consumers_remaining_by_run_id: Dict[str, int]
 
 
 def _build_workflow_instrumentation(
@@ -734,6 +743,18 @@ def _build_write_consumers_remaining_by_output_key(workflow_ir: WorkflowIr) -> D
     return counts
 
 
+def _build_main_rows_consumers_remaining_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for node in workflow_ir.nodes:
+        if not isinstance(node, WorkflowNodeIr):
+            continue
+        producer_run_id = str(getattr(node, "main_rows_from_run_id", "") or "").strip()
+        if not producer_run_id:
+            continue
+        counts[producer_run_id] = int(counts.get(producer_run_id, 0)) + 1
+    return counts
+
+
 def _prepare_workflow_run_ir(
     workflow_path: str,
     workflow_ir: WorkflowIr,
@@ -783,6 +804,7 @@ def _prepare_workflow_run_ir(
 
         write_output_ids_by_run_id = _build_write_output_ids_by_run_id(workflow_ir)
         write_consumers_remaining_by_output_key = _build_write_consumers_remaining_by_output_key(workflow_ir)
+        main_rows_consumers_remaining_by_run_id = _build_main_rows_consumers_remaining_by_run_id(workflow_ir)
 
         return _PreparedWorkflowRun(
             workflow_path=workflow_path,
@@ -801,6 +823,7 @@ def _prepare_workflow_run_ir(
             resource_manager=resource_manager,
             write_output_ids_by_run_id=write_output_ids_by_run_id,
             write_consumers_remaining_by_output_key=write_consumers_remaining_by_output_key,
+            main_rows_consumers_remaining_by_run_id=main_rows_consumers_remaining_by_run_id,
         )
     except Exception:
         if workflow_cache_pool is not None:
@@ -831,6 +854,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
     resource_manager = prepared.resource_manager
     write_output_ids_by_run_id = prepared.write_output_ids_by_run_id
     write_consumers_remaining_by_output_key = prepared.write_consumers_remaining_by_output_key
+    main_rows_consumers_remaining_by_run_id = prepared.main_rows_consumers_remaining_by_run_id
 
     outcomes: List[Optional[WorkflowRunOutcome]] = [None for _ in range(len(workflow_ir.nodes))]
 
@@ -856,6 +880,25 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
         else:
             write_consumers_remaining_by_output_key[key] = int(next_remaining)
 
+    def _maybe_release_workflow_main_rows_artifact(node: WorkflowAnyNodeIr) -> None:
+        if not isinstance(node, WorkflowNodeIr):
+            return
+        producer_node_id = str(getattr(node, "main_rows_from_run_id", "") or "").strip()
+        if not producer_node_id:
+            return
+        remaining = main_rows_consumers_remaining_by_run_id.get(producer_node_id)
+        if remaining is None:
+            return
+        next_remaining = int(remaining) - 1
+        if next_remaining < 0:
+            msg = "workflow internal error: negative main_rows consumer count: producer_node_id={!r}".format(producer_node_id)
+            raise RuntimeError(msg)
+        if next_remaining == 0:
+            _ = main_rows_consumers_remaining_by_run_id.pop(producer_node_id, None)
+            artifacts_dir.discard(producer_node_id, "in_memory_rows")
+        else:
+            main_rows_consumers_remaining_by_run_id[producer_node_id] = int(next_remaining)
+
     def _compile_demand_node(node: WorkflowNodeIr) -> object:
         node_id = str(node.node_id)
         demand_path = str(getattr(node, "demand_path", "") or "")
@@ -873,7 +916,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
         if bundle_viz_base_config is not None:
             node_viz_config = replace(bundle_viz_base_config, run_id=str(node_id))
 
-        return compile_demand_fn(
+        compilation = compile_demand_fn(
             demand_path,
             workflow_exec_id=str(workflow_exec_id),
             workflow_node_id=str(node_id),
@@ -882,6 +925,26 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
             managed_output_ids=managed_output_ids,
             viz_config=node_viz_config,
         )
+        comp = cast("Any", compilation)
+        request = getattr(comp, "request", None)
+        if request is None:
+            return compilation  # pragma: no cover
+
+        next_request = request
+        if node_id in main_rows_consumers_remaining_by_run_id:
+            next_request = replace(next_request, capture_in_memory_rows=True)
+
+        producer_run_id = str(getattr(node, "main_rows_from_run_id", "") or "").strip()
+        if producer_run_id:
+            typed_rows_obj = artifacts_dir.get(str(node_id), producer_run_id, "in_memory_rows")
+            if not isinstance(typed_rows_obj, InMemoryRows):
+                msg = "Missing workflow-managed typed rows artifact: producer_node_id={!r}".format(producer_run_id)
+                raise WorkflowWriteError(msg)
+            next_request = replace(next_request, main_rows=iter_in_memory_rows_as_main_rows(typed_rows_obj))
+
+        if next_request is request:
+            return compilation
+        return replace(compilation, request=next_request)
 
     def _node_type_str(node: WorkflowAnyNodeIr) -> str:
         raw = getattr(node, "node_type", "")
@@ -1017,6 +1080,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
         )
         node_state[str(node_id)] = "cancelled"
         _emit_workflow_node_cancelled(node, reason=reason, message=message)
+        _maybe_release_workflow_main_rows_artifact(node)
         if workflow_cache_pool is not None:
             workflow_cache_pool.on_workflow_node_done(str(node_id))
 
@@ -1079,6 +1143,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
                         outcomes[index_by_node_id[str(node_id)]] = outcome
                         node_state[str(node_id)] = "failed"
                         _emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+                        _maybe_release_workflow_main_rows_artifact(node)
                         if workflow_cache_pool is not None:
                             workflow_cache_pool.on_workflow_node_done(str(node_id))
                         _on_terminal(str(node_id), ok=False)
@@ -1116,6 +1181,8 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
                         artifacts_dir.publish(str(node_id), "output_path", core.output_path)
                         artifacts_dir.publish(str(node_id), "outputs", core.outputs)
                         artifacts_dir.publish(str(node_id), "in_memory_csv_outputs", core.in_memory_csv_outputs or {})
+                        if core.in_memory_rows is not None:
+                            artifacts_dir.publish(str(node_id), "in_memory_rows", core.in_memory_rows)
                         ctx_store.publish_default_summary(str(node_id), core)
                         if build_demand_run_result_fn is None:
                             node_result: object = core
@@ -1137,6 +1204,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
                         _maybe_release_workflow_managed_in_memory_output(node)
                         outcomes[idx] = WorkflowRunOutcome(run_id=str(node_id), demand_path="", result=None, error=None)
 
+                    _maybe_release_workflow_main_rows_artifact(node)
                     node_state[str(node_id)] = "done"
                     _emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
                     if workflow_cache_pool is not None:
@@ -1156,6 +1224,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0912, PLR0915
                     outcomes[idx] = outcome
                     node_state[str(node_id)] = "failed"
                     _emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+                    _maybe_release_workflow_main_rows_artifact(node)
                     if workflow_cache_pool is not None:
                         workflow_cache_pool.on_workflow_node_done(str(node_id))
                     _on_terminal(str(node_id), ok=False)
@@ -1250,6 +1319,8 @@ def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_final
             prepared.resource_manager.discard_all(workflow_node_id="__wf__discard", reason="workflow_finally")
     with contextlib.suppress(Exception):
         prepared.artifacts_dir.discard_all_in_memory_csv_outputs()
+    with contextlib.suppress(Exception):
+        prepared.artifacts_dir.discard_all_in_memory_rows()
     if prepared.workflow_cache_pool is not None:
         with contextlib.suppress(Exception):
             prepared.workflow_cache_pool.close()

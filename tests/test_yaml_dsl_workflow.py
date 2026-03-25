@@ -371,6 +371,17 @@ def _write_workflow_yaml(
         if depends_on:
             depends_on_lines = "\n      depends_on:\n{}".format("\n".join(["        - {}".format(d) for d in depends_on]))
 
+        main_rows_from_lines = ""
+        if "main_rows_from" in item:
+            main_rows_from = cast("Any", item.get("main_rows_from"))
+            if main_rows_from is None:
+                main_rows_from_lines = "\n      main_rows_from: null"
+            else:
+                if not isinstance(main_rows_from, dict):
+                    raise ValueError("main_rows_from must be a mapping")
+                producer = main_rows_from.get("run")
+                main_rows_from_lines = "\n      main_rows_from:\n        run: {}".format(json.dumps(producer))
+
         init_vars = cast("Optional[Dict[str, object]]", item.get("init_vars"))
         init_vars_lines = ""
         if init_vars:
@@ -418,10 +429,11 @@ def _write_workflow_yaml(
             write_to_lines = "\n      write_to:\n        {}:\n{}".format(str(kind), "\n".join(cfg_lines))
 
         run_lines.append(
-            "    - id: {}\n      demand: {}{}{}{}{}".format(
+            "    - id: {}\n      demand: {}{}{}{}{}{}".format(
                 item["id"],
                 item["demand"],
                 depends_on_lines,
+                main_rows_from_lines,
                 init_vars_lines,
                 writes_lines,
                 write_to_lines,
@@ -565,6 +577,142 @@ workflow:
         _ = load_workflow_config(str(workflow_path))
     assert "cycle_path" in str(excinfo.value)
     assert '["a", "b", "a"]' in str(excinfo.value)
+
+
+def test_load_workflow_config_rejects_unknown_main_rows_from_run(tmp_path: Path) -> None:
+    workflow_path = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: b
+      demand: b.yaml
+      main_rows_from:
+        run: nope
+"""
+        ).lstrip(),
+    )
+
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "Unknown run.main_rows_from.run id" in str(excinfo.value)
+    assert "path=workflow.runs.1.main_rows_from.run" in str(excinfo.value)
+
+
+def test_load_workflow_config_requires_depends_on_for_main_rows_from(tmp_path: Path) -> None:
+    workflow_path = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: b
+      demand: b.yaml
+      main_rows_from:
+        run: a
+"""
+        ).lstrip(),
+    )
+
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "run.main_rows_from requires explicit depends_on" in str(excinfo.value)
+    assert "path=workflow.runs.1.depends_on" in str(excinfo.value)
+
+
+def test_load_workflow_config_rejects_main_rows_from_when_not_mapping(tmp_path: Path) -> None:
+    workflow_path = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: b
+      demand: b.yaml
+      main_rows_from: a
+"""
+        ).lstrip(),
+    )
+
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "run.main_rows_from must be a mapping" in str(excinfo.value)
+    assert "path=workflow.runs.1.main_rows_from" in str(excinfo.value)
+
+
+def test_load_workflow_config_rejects_main_rows_from_unknown_keys(tmp_path: Path) -> None:
+    workflow_path = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: b
+      demand: b.yaml
+      main_rows_from:
+        run: a
+        extra: 1
+"""
+        ).lstrip(),
+    )
+
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "run.main_rows_from contains unknown keys" in str(excinfo.value)
+    assert "path=workflow.runs.1.main_rows_from" in str(excinfo.value)
+
+
+def test_load_workflow_config_rejects_main_rows_from_run_when_not_string(tmp_path: Path) -> None:
+    workflow_path = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: b
+      demand: b.yaml
+      main_rows_from:
+        run: 123
+"""
+        ).lstrip(),
+    )
+
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "run.main_rows_from.run must be a non-empty string" in str(excinfo.value)
+    assert "path=workflow.runs.1.main_rows_from.run" in str(excinfo.value)
+
+
+def test_load_workflow_config_rejects_main_rows_from_self_reference(tmp_path: Path) -> None:
+    workflow_path = _write_text(
+        tmp_path / "wf.yaml",
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+      main_rows_from:
+        run: a
+"""
+        ).lstrip(),
+    )
+
+    with pytest.raises(WorkflowConfigError) as excinfo:
+        _ = load_workflow_config(str(workflow_path))
+    assert "run.main_rows_from.run must not reference self" in str(excinfo.value)
+    assert "path=workflow.runs.0.main_rows_from.run" in str(excinfo.value)
 
 
 def test_load_workflow_config_parses_multiple_writes(tmp_path: Path) -> None:
@@ -3874,6 +4022,359 @@ outputs:
     assert workbook_path.exists()
     assert _read_xlsx_rows(workbook_path, "S")[-1] == ["a2", "A2"]
     assert not (tmp_path / ".scalim").exists()
+
+
+def test_workflow_main_rows_from_wires_upstream_typed_rows_into_downstream_main_rows(tmp_path: Path) -> None:
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=a_out,
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
+        output_name="detail",
+        output_path=b_out,
+        field_ids=["id", "value"],
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml", "depends_on": ["a"], "main_rows_from": {"run": "a"}},
+        ],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert not result.errors()
+    assert _read_csv_rows(b_out) == [
+        ["id", "value"],
+        ["a1", "A1"],
+        ["a2", "A2"],
+    ]
+
+
+def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_path: Path, monkeypatch) -> None:
+    publish_calls = []
+    discard_calls = []
+
+    class _RecordingArtifactsDirectory(workflow_execute_mod.WorkflowArtifactsDirectory):  # type: ignore[misc]
+        def publish(self, producer_node_id: str, artifact_id: str, value: object) -> None:
+            publish_calls.append((str(producer_node_id), str(artifact_id)))
+            super(_RecordingArtifactsDirectory, self).publish(producer_node_id, artifact_id, value)
+
+        def discard(self, producer_node_id: str, artifact_id: str) -> None:
+            discard_calls.append((str(producer_node_id), str(artifact_id)))
+            super(_RecordingArtifactsDirectory, self).discard(producer_node_id, artifact_id)
+
+    monkeypatch.setattr(workflow_execute_mod, "WorkflowArtifactsDirectory", _RecordingArtifactsDirectory)
+
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    c_out = tmp_path / "c_detail.csv"
+    d_out = tmp_path / "d_detail.csv"
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=a_out,
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
+        output_name="detail",
+        output_path=b_out,
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="c.yaml",
+        name="c",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
+        output_name="detail",
+        output_path=c_out,
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="d.yaml",
+        name="d",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
+        output_name="detail",
+        output_path=d_out,
+        field_ids=["id", "value"],
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml", "depends_on": ["a"], "main_rows_from": {"run": "a"}},
+            {"id": "c", "demand": "c.yaml", "depends_on": ["a"], "main_rows_from": {"run": "a"}},
+            {"id": "d", "demand": "d.yaml", "depends_on": ["b", "c"]},
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert not result.errors()
+    assert _read_csv_rows(b_out) == [
+        ["id", "value"],
+        ["a1", "A1"],
+        ["a2", "A2"],
+    ]
+    assert _read_csv_rows(c_out) == [
+        ["id", "value"],
+        ["a1", "A1"],
+        ["a2", "A2"],
+    ]
+
+    typed_rows_publishes = [c for c in publish_calls if c[1] == "in_memory_rows"]
+    assert typed_rows_publishes == [("a", "in_memory_rows")]
+
+    typed_rows_discards = [c for c in discard_calls if c[1] == "in_memory_rows"]
+    assert typed_rows_discards == [("a", "in_memory_rows")]
+
+
+def test_workflow_artifacts_directory_discard_all_in_memory_rows_removes_empty_producer_entry() -> None:
+    from scalim.sinks.sink_rows import InMemoryRows
+    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+
+    workflow_ir = WorkflowIr(
+        nodes=(WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=()),),
+        edges=(),
+        options=WorkflowOptionsIr(),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
+    artifacts_dir.publish("a", "in_memory_rows", InMemoryRows(header=["id"], rows=[[1]]))
+    artifacts_dir.discard_all_in_memory_rows()
+
+    with pytest.raises(KeyError, match=r"Unknown artifact"):
+        _ = artifacts_dir.get("a", "a", "in_memory_rows")
+
+
+def test_workflow_main_rows_from_rejects_non_in_memory_rows_artifact(tmp_path: Path, monkeypatch) -> None:
+    class _CorruptArtifactsDirectory(workflow_execute_mod.WorkflowArtifactsDirectory):  # type: ignore[misc]
+        def publish(self, producer_node_id: str, artifact_id: str, value: object) -> None:
+            if str(producer_node_id) == "a" and str(artifact_id) == "in_memory_rows":
+                value = "not_in_memory_rows"
+            super(_CorruptArtifactsDirectory, self).publish(producer_node_id, artifact_id, value)
+
+    monkeypatch.setattr(workflow_execute_mod, "WorkflowArtifactsDirectory", _CorruptArtifactsDirectory)
+
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=a_out,
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
+        output_name="detail",
+        output_path=b_out,
+        field_ids=["id", "value"],
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml", "depends_on": ["a"], "main_rows_from": {"run": "a"}},
+        ],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    assert result.errors()
+    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
+    assert b_outcome.error is not None
+    assert b_outcome.error.exc_type == "WorkflowWriteError"
+
+
+def test_workflow_execute_release_main_rows_artifact_returns_when_missing_count_entry(tmp_path: Path) -> None:
+    from typing import Any
+
+    from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec
+    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.vendor.dataclassesx import dataclass
+
+    @dataclass(frozen=True)
+    class _Compilation:
+        demand_ir: object
+        request: ExecutionRequest
+
+    class _Core:
+        output_path = None
+        total_rows = 0
+        duration = 0.0
+        outputs = None
+        in_memory_csv_outputs = {}
+        in_memory_rows = None
+
+    def _compile_demand_node(demand_path: str, **kwargs: Any) -> object:
+        _ = demand_path, kwargs
+        request = ExecutionRequest(
+            export_layout=ExportLayout(field_ids=(), header_names=None),
+            output=OutputSpec(path=None),
+            sink=None,
+        )
+        return _Compilation(demand_ir=object(), request=request)
+
+    def _run_ir_fn(demand_ir: object, request: ExecutionRequest, **kwargs: Any) -> object:
+        _ = demand_ir, request, kwargs
+        return _Core()
+
+    workflow_ir = WorkflowIr(
+        nodes=(
+            WorkflowNodeIr(
+                node_id="a",
+                node_type=WorkflowNodeType.DEMAND,
+                decl_order=0,
+                deps=(),
+                demand_path="a.yaml",
+            ),
+            WorkflowNodeIr(
+                node_id="b",
+                node_type=WorkflowNodeType.DEMAND,
+                decl_order=1,
+                deps=("a",),
+                demand_path="b.yaml",
+                main_rows_from_run_id="a",
+            ),
+        ),
+        edges=(WorkflowEdgeIr(from_node_id="a", to_node_id="b"),),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="primary_only"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+
+    prepared = workflow_execute_mod._prepare_workflow_run_ir(  # type: ignore[attr-defined]
+        str(tmp_path / "workflow.yaml"),
+        workflow_ir,
+        components=None,
+        bundle_viz_base_config=None,
+        cache_pool_logical_keys_by_node_id=None,
+        cache_pool_consumers_by_logical_key=None,
+    )
+    prepared.main_rows_consumers_remaining_by_run_id = {}
+    try:
+        outcomes, _failed, _exc = workflow_execute_mod._execute_workflow_run(  # type: ignore[attr-defined]
+            prepared,
+            compile_demand_fn=_compile_demand_node,
+            build_demand_run_result_fn=None,
+            run_ir_fn=_run_ir_fn,
+        )
+    finally:
+        workflow_execute_mod._cleanup_workflow_finally(prepared, resources_finalized=False)  # type: ignore[attr-defined]
+
+    b_outcome = next(o for o in outcomes if o.run_id == "b")
+    assert b_outcome.error is not None
+    assert b_outcome.error.exc_type == "KeyError"
+
+
+def test_workflow_execute_release_main_rows_artifact_raises_on_negative_count(tmp_path: Path) -> None:
+    from typing import Any
+
+    from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec
+    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.vendor.dataclassesx import dataclass
+
+    @dataclass(frozen=True)
+    class _Compilation:
+        demand_ir: object
+        request: ExecutionRequest
+
+    class _Core:
+        output_path = None
+        total_rows = 0
+        duration = 0.0
+        outputs = None
+        in_memory_csv_outputs = {}
+        in_memory_rows = None
+
+    def _compile_demand_node(demand_path: str, **kwargs: Any) -> object:
+        _ = demand_path, kwargs
+        request = ExecutionRequest(
+            export_layout=ExportLayout(field_ids=(), header_names=None),
+            output=OutputSpec(path=None),
+            sink=None,
+        )
+        return _Compilation(demand_ir=object(), request=request)
+
+    def _run_ir_fn(demand_ir: object, request: ExecutionRequest, **kwargs: Any) -> object:
+        _ = demand_ir, request, kwargs
+        return _Core()
+
+    workflow_ir = WorkflowIr(
+        nodes=(
+            WorkflowNodeIr(
+                node_id="a",
+                node_type=WorkflowNodeType.DEMAND,
+                decl_order=0,
+                deps=(),
+                demand_path="a.yaml",
+            ),
+            WorkflowNodeIr(
+                node_id="b",
+                node_type=WorkflowNodeType.DEMAND,
+                decl_order=1,
+                deps=("a",),
+                demand_path="b.yaml",
+                main_rows_from_run_id="a",
+            ),
+        ),
+        edges=(WorkflowEdgeIr(from_node_id="a", to_node_id="b"),),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="primary_only"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+
+    prepared = workflow_execute_mod._prepare_workflow_run_ir(  # type: ignore[attr-defined]
+        str(tmp_path / "workflow.yaml"),
+        workflow_ir,
+        components=None,
+        bundle_viz_base_config=None,
+        cache_pool_logical_keys_by_node_id=None,
+        cache_pool_consumers_by_logical_key=None,
+    )
+    prepared.main_rows_consumers_remaining_by_run_id = {"a": 0}
+    try:
+        with pytest.raises(RuntimeError, match=r"negative main_rows consumer count"):
+            _ = workflow_execute_mod._execute_workflow_run(  # type: ignore[attr-defined]
+                prepared,
+                compile_demand_fn=_compile_demand_node,
+                build_demand_run_result_fn=None,
+                run_ir_fn=_run_ir_fn,
+            )
+    finally:
+        workflow_execute_mod._cleanup_workflow_finally(prepared, resources_finalized=False)  # type: ignore[attr-defined]
 
 
 def test_workflow_shared_write_node_validates_demand_outputs_mapping_and_output_id(tmp_path: Path) -> None:

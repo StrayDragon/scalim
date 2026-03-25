@@ -2,7 +2,7 @@ import contextlib
 import time
 import warnings as py_warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
 from ..hooks.base import HookManager, IExecutionHook
@@ -15,6 +15,7 @@ from ..planning.builder import PlanBuilder
 from ..planning.plan import ExecutionPlan
 from ..sinks.sink_base import BaseRowSink, BaseSink, ColumnBatch, ColumnValues, IColumnSink, IRowSink, ISink
 from ..sinks.sink_csv import ColumnCSVSink, CSVSink, InMemoryCsv, InMemoryCsvSink
+from ..sinks.sink_rows import InMemoryRows, InMemoryRowsSink
 from ..spec.ir.demand import DemandIr
 from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
@@ -87,6 +88,12 @@ class ExecutionRequest:
     - 运行计划的目标字段将由组合请求的 `required_demand_fields` 计算得出
     """
 
+    main_rows: Optional[Iterable[RowData]] = None
+    """可选:显式注入 `main_rows`(当提供时绕过主数据源 `loader`)."""
+
+    capture_in_memory_rows: bool = False
+    """可选:捕获本次运行输出的 `InMemoryRows`(保留 `FieldValue` 类型域;默认关闭)."""
+
 
 @dataclass(frozen=True)
 class ExecutionResult:
@@ -111,6 +118,9 @@ class ExecutionResult:
 
     in_memory_csv_outputs: Optional[Dict[str, InMemoryCsv]] = None
     """可选: `workflow-managed` 无路径 CSV 输出的内存中间态(多输出组合时提供)."""
+
+    in_memory_rows: Optional[InMemoryRows] = None
+    """可选: `workflow-intermediate-store` 的 `InMemoryRows` 中间态(显式启用时提供)."""
 
 
 class _TeeRowSink(BaseRowSink):
@@ -267,6 +277,61 @@ class _CountingBatchSink(ISink):
     @override
     def close(self) -> None:
         self._sink.close()
+
+
+class _TeeBatchSink(BaseSink):
+    _primary: ISink
+    _secondary: ISink
+
+    def __init__(self, primary: ISink, secondary: ISink) -> None:
+        self._primary = primary
+        self._secondary = secondary
+
+    @override
+    def write_batch(self, rows: Sequence[RowData]) -> None:
+        self._primary.write_batch(rows)
+        self._secondary.write_batch(rows)
+
+    @override
+    def close(self) -> None:
+        self._primary.close()
+        self._secondary.close()
+
+
+def _create_engine_sink_for_in_memory_rows_capture(
+    *,
+    sink: ISink,
+    field_ids: Sequence[str],
+) -> Tuple[ISink, InMemoryRowsSink]:
+    rows_sink = InMemoryRowsSink(field_ids=field_ids)
+    if isinstance(sink, IColumnSink):
+        msg = "capture_in_memory_rows currently requires an IRowSink/ISink output (got IColumnSink)"
+        raise TypeError(msg)
+    if isinstance(sink, IRowSink):
+        return _TeeRowSink(sink, rows_sink), rows_sink
+    return _TeeBatchSink(sink, rows_sink), rows_sink
+
+
+def _prepare_engine_sink(
+    *,
+    sink: ISink,
+    field_ids: Sequence[str],
+    capture_in_memory_rows: bool,
+    observer_manager: object,
+) -> Tuple[ISink, Optional[InMemoryRowsSink]]:
+    if not capture_in_memory_rows:
+        return sink, None
+    try:
+        return _create_engine_sink_for_in_memory_rows_capture(
+            sink=sink,
+            field_ids=field_ids,
+        )
+    except Exception:
+        with contextlib.suppress(Exception):
+            sink.close()
+        with contextlib.suppress(Exception):
+            cast("Any", observer_manager).close()
+        raise
 
 
 def _wrap_sink_for_row_count(sink: ISink, tracker: InternalStatsCollector) -> ISink:
@@ -670,9 +735,16 @@ def run_ir(
         engine_factory=engine_factory,
     )
 
+    engine_sink, in_memory_rows_sink = _prepare_engine_sink(
+        sink=output_assembly.counting_sink,
+        field_ids=list(plan.target_fields),
+        capture_in_memory_rows=bool(request.capture_in_memory_rows),
+        observer_manager=observer_manager,
+    )
+
     run_ok = False
     try:
-        _ = engine.run(sink=output_assembly.counting_sink)
+        _ = engine.run(main_rows=request.main_rows, sink=engine_sink)
         run_ok = True
     finally:
         # 尽力清理: 即使 `engine`/`pipeline` 在关闭前失败也要执行.
@@ -682,13 +754,13 @@ def run_ir(
         # - `engine.run(...)` 失败: `sink.close()` 尽力而为,不得覆盖原异常.
         if run_ok:
             try:
-                output_assembly.counting_sink.close()
+                engine_sink.close()
             finally:
                 with contextlib.suppress(Exception):
                     observer_manager.close()
         else:
             with contextlib.suppress(Exception):
-                output_assembly.counting_sink.close()
+                engine_sink.close()
             with contextlib.suppress(Exception):
                 observer_manager.close()
 
@@ -701,6 +773,10 @@ def run_ir(
     if output_assembly.in_memory_csv_sinks is not None:
         in_memory_csv_outputs = {target_id: sink.to_artifact() for target_id, sink in output_assembly.in_memory_csv_sinks.items()}
 
+    in_memory_rows: Optional[InMemoryRows] = None
+    if in_memory_rows_sink is not None:
+        in_memory_rows = in_memory_rows_sink.to_artifact()
+
     return ExecutionResult(
         output_path=output_assembly.output_path,
         total_rows=stats.total_rows,
@@ -710,6 +786,7 @@ def run_ir(
         outputs=output_assembly.outputs,
         output_target_stats=output_target_stats,
         in_memory_csv_outputs=in_memory_csv_outputs,
+        in_memory_rows=in_memory_rows,
     )
 
 

@@ -118,6 +118,30 @@ workflow:
         a_output_path: {$ctx: {node: a, key: output_path}}
 ```
 
+## 3.1) `main_rows_from`: 上游 `InMemoryRows` → 下游 `main_rows`
+
+当 workflow 内部需要把上游 run 的结果作为下游 run 的主行流输入(不落盘/不字符串化)时,可以使用:
+
+- `workflow.runs[*].main_rows_from: {run: <producer_run_id>}`
+
+语义:
+
+- consumer MUST 显式 `depends_on` producer(否则启动前 fail-fast)
+- producer 仅在被引用时才会启用 typed rows 捕获(避免无意间常驻大对象)
+- 下游 demand 执行时会注入 `main_rows` 并绕过 main source loader
+
+```yaml
+workflow:
+  runs:
+    - id: a
+      demand: ./a.yaml
+    - id: b
+      demand: ./b.yaml
+      depends_on: [a]
+      main_rows_from:
+        run: a
+```
+
 ## 4) `ctx`: workflow-level ctx store（跨节点小体量数据）
 
 workflow 在一次执行中维护 workflow-level ctx store,用于在依赖边上传递小体量 JSON-like 数据.

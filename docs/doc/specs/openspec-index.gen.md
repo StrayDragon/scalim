@@ -296,6 +296,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-cache-pool/spec.md)
 - Summary: **状态: ✅ 已实现** 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
 
+### `workflow-intermediate-store`
+- Title: workflow-intermediate-store Specification
+- Source: [spec.md](#code=openspec/specs/workflow-intermediate-store/spec.md)
+- Summary: TBD - created by archiving change c15-workflow-intermediate-store-optimizations. Update Purpose after archive.
+
 ### `workflow-ir`
 - Title: workflow-ir Specification
 - Source: [spec.md](#code=openspec/specs/workflow-ir/spec.md)

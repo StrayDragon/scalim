@@ -28,6 +28,7 @@ class WorkflowNodeIr:
     deps: Tuple[str, ...] = ()
     demand_path: Optional[str] = None
     init_vars: Optional[Dict[str, object]] = None
+    main_rows_from_run_id: Optional[str] = None
 
 
 @dataclass(frozen=True)

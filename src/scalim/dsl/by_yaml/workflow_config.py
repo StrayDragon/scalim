@@ -175,6 +175,7 @@ class WorkflowRun:
     id: str
     demand: str
     depends_on: Tuple[str, ...] = ()
+    main_rows_from_run_id: Optional[str] = None
     init_vars: Optional[Dict[str, object]] = None
     writes: Tuple[WorkflowWriteTo, ...] = ()
 
@@ -488,6 +489,28 @@ def _parse_run_init_vars(init_vars_raw: object, *, item_path: str) -> Optional[D
     return init_vars
 
 
+def _parse_run_main_rows_from(main_rows_from_raw: object, *, item_path: str) -> Optional[str]:
+    msg: str
+    if main_rows_from_raw is None:
+        return None
+    if not isinstance(main_rows_from_raw, dict):
+        msg = "run.main_rows_from must be a mapping"
+        raise WorkflowConfigError(msg, path="{}.main_rows_from".format(item_path))
+    main_rows_from = cast("Dict[str, Any]", main_rows_from_raw)
+
+    unknown_keys = sorted(k for k in main_rows_from if str(k) != "run")
+    if unknown_keys:
+        msg = "run.main_rows_from contains unknown keys: {}".format(",".join(str(k) for k in unknown_keys))
+        raise WorkflowConfigError(msg, path="{}.main_rows_from".format(item_path))
+
+    producer_raw = main_rows_from.get("run")
+    producer_run_id = str(producer_raw or "").strip() if isinstance(producer_raw, str) else ""
+    if not producer_run_id:
+        msg = "run.main_rows_from.run must be a non-empty string"
+        raise WorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
+    return producer_run_id
+
+
 def _normalize_write_intent_mapping(write_raw: object, *, write_path: str) -> Dict[str, object]:
     msg: str
     if not isinstance(write_raw, dict):
@@ -754,9 +777,19 @@ def _load_workflow_runs(wf: Mapping[str, Any]) -> Tuple[List[WorkflowRun], Dict[
             raise WorkflowConfigError(msg, path="{}.demand".format(item_path))
 
         depends_on = _parse_run_depends_on(run_dict.get("depends_on"), item_path=item_path)
+        main_rows_from_run_id = _parse_run_main_rows_from(run_dict.get("main_rows_from"), item_path=item_path)
         init_vars = _parse_run_init_vars(run_dict.get("init_vars"), item_path=item_path)
         writes = _parse_run_writes(run_dict.get("writes"), item_path=item_path)
-        runs.append(WorkflowRun(id=run_id, demand=demand, depends_on=depends_on, init_vars=init_vars, writes=writes))
+        runs.append(
+            WorkflowRun(
+                id=run_id,
+                demand=demand,
+                depends_on=depends_on,
+                main_rows_from_run_id=main_rows_from_run_id,
+                init_vars=init_vars,
+                writes=writes,
+            )
+        )
 
     return runs, seen_ids
 
@@ -1193,6 +1226,7 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:
 
     runs, seen_ids = _load_workflow_runs(wf)
     _validate_workflow_deps(runs, seen_ids=seen_ids)
+    _validate_workflow_main_rows_from(runs, seen_ids=seen_ids)
     resources = _load_workflow_resources(wf)
     _validate_workflow_run_writes_reference_resources(runs, resources=resources)
     options = _load_workflow_options(wf)
@@ -1211,6 +1245,35 @@ def _validate_workflow_deps(
 ) -> None:
     _validate_workflow_deps_references(runs, seen_ids=seen_ids)
     _validate_workflow_deps_no_cycles(runs, seen_ids=seen_ids)
+
+
+def _validate_workflow_main_rows_from(
+    runs: Sequence[WorkflowRun],
+    *,
+    seen_ids: Mapping[str, int],
+) -> None:
+    msg: str
+    run_ids = set(seen_ids.keys())
+    for idx, run in enumerate(runs):
+        producer_run_id = str(getattr(run, "main_rows_from_run_id", "") or "").strip()
+        if not producer_run_id:
+            continue
+        item_path = "workflow.runs.{}".format(idx)
+
+        if producer_run_id not in run_ids:
+            msg = "Unknown run.main_rows_from.run id '{}'".format(producer_run_id)
+            raise WorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
+
+        if producer_run_id == run.id:
+            msg = "run.main_rows_from.run must not reference self: '{}'".format(producer_run_id)
+            raise WorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
+
+        if producer_run_id not in run.depends_on:
+            msg = "run.main_rows_from requires explicit depends_on: consumer={!r}, producer={!r}".format(
+                str(run.id),
+                str(producer_run_id),
+            )
+            raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
 
 
 def _validate_workflow_deps_references(
