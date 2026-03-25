@@ -16,14 +16,14 @@
 **Goals:**
 - 提供一个稳定、可审计、可回归的公开工具面,让下游无需依赖 `runtime.*` 内部路径即可使用 `load_output_config` 与 `derive_base_module_path`。
 - 固化 `load_output_config()` 的返回结构契约(对下游字段对齐非常关键),同时保持运行期返回仍为普通 `dict`。
-- 为 loader/call_by/... 等 callable 引用点提供 `scalim://py/<id>` 的内置 callable 快捷方式,让下游能稳定引用框架内置能力且不扩大 allowlist。
+- 为 loader/call_by/... 等 callable 引用点提供 `^<id>` 的内置 callable 快捷方式,让下游能稳定引用框架内置能力且不扩大 allowlist。
 - 保持 `scalim.dsl.by_yaml` 顶层 facade 的最小化: 不把工具面混入默认运行入口,而是放入独立公共模块。
 - 保持 Python 3.6 运行时兼容(类型工具使用 `vendor/compact/typing_extensionsx.py`)。
 
 **Non-Goals:**
 - 不修改 YAML DSL 的解析/校验/运行语义,仅提供公开稳定入口与契约化文档/类型。
-- 本 change 不引入 YAML tag 语法(例如 `!scalim`)或其它需要自定义 YAML parser 的机制;统一采用 plain string 的 `scalim://py/<id>`。
-- 本 change 不改变“缺少 allowlist fail-fast”的安全语义: allowlist 仍为必需,仅对 `scalim://py/<id>` 这类内置引用做 allowlist bypass(不要求在 allowlist 中声明 `scalim.*`)。
+- 本 change 不引入 YAML tag 语法(例如 `!scalim`)或其它需要自定义 YAML parser 的机制;统一采用 plain string 的 `^<id>`。
+- 本 change 不改变“缺少 allowlist fail-fast”的安全语义: allowlist 仍为必需,仅对 `^<id>` 这类内置引用做 allowlist bypass(不要求在 allowlist 中声明 `scalim.*`)。
 - 不把 `runtime.*` 现有模块移除或标记为公共;内部实现仍可重构,公共承诺仅通过 curated surface 生效。
 
 ## Decisions
@@ -52,15 +52,17 @@
   - 新增 key: 允许(向后兼容)
   - 修改/删除/改语义: 需要 major
 
-### Decision: 内置 callable 语法固定为 `scalim://py/<id>`(plain string)
+### Decision: 内置 callable 语法固定为 `^<id>`(plain string)
 
-- 采用 plain string `scalim://py/<id>` 作为唯一内置 callable 引用语法,避免 YAML tag 语义与额外 parser 复杂度。
-- `<id>` 采用稳定的 `/` 分段命名,由 Scalim 内置 registry 显式映射到具体 callable;该 registry 是 SSOT,可随内部重构调整映射而不影响下游 YAML。
+- 采用 plain string `^<id>` 作为唯一内置 callable 引用语法,避免 YAML tag 语义与额外 parser 复杂度。
+- `<id>` 采用稳定的 `/` 分段命名,通过一份显式“builtin callable 词表”(vocabulary)映射到具体 callable。
+  - 词表支持调用方自定义(可扩展/覆盖默认词表),以满足下游集成的受控扩展点需求
+  - 默认词表仅提供少量 Scalim 内置 id(保守暴露;可审计)
 - 该语法在所有“期待 Python callable 引用”的位置均可使用(例如 `main_source.loader`、`sources.*.loader`、`fields.*.call_by`、`sources.*.normalize.call_by`、`retry.should_retry` 等)。
 
-### Decision: `scalim://py/<id>` 解析绕过 allowlist,但不改变 allowlist 必需性
+### Decision: `^<id>` 解析绕过 allowlist,但不改变 allowlist 必需性
 
-- `scalim://py/<id>` 的解析与执行 MUST 不依赖 `allowed_modules/allowed_functions`(避免迫使下游把 `scalim.*` 加入 allowlist)。
+- `^<id>` 的解析与执行 MUST 不依赖 `allowed_modules/allowed_functions`(避免迫使下游把 `scalim.*` 加入 allowlist)。
 - `run/compile` 与 `ConfigToIRConverter` 等入口对 allowlist 的必需性保持不变(缺失 allowlist MUST fail-fast),以符合既有安全规范(`yaml-dsl-allowlist-policy`)。
 
 ### Decision: 不遗留 Open Questions
@@ -78,8 +80,8 @@
 - 仓库内:
   - public-surface gate 增加 `scalim.dsl.by_yaml.tools` 的导入 smoke 与 `__all__` 断言。
   - 文档/示例中涉及“输出字段配置/相对引用基准推导”的推荐用法,统一迁移为 `scalim.dsl.by_yaml.tools`。
-  - 文档/示例中涉及 Scalim 内置 callable 的推荐用法统一迁移为 `scalim://py/<id>`(避免写内部模块路径)。
+  - 文档/示例中涉及 Scalim 内置 callable 的推荐用法统一迁移为 `^<id>`(避免写内部模块路径)。
 - 下游:
   - `scalim.dsl.by_yaml.runtime.introspection.load_output_config` → `scalim.dsl.by_yaml.tools.load_output_config`
   - `scalim.dsl.by_yaml.runtime.references.derive_base_module_path` → `scalim.dsl.by_yaml.tools.derive_base_module_path`
-  - `scalim.workflow.loaders:sheetbook_sheet_rows`(或其它内置 callable) → `scalim://py/workflow/sheetbook_sheet_rows`
+  - `scalim.workflow.loaders:sheetbook_sheet_rows`(或其它内置 callable) → `^workflow/sheetbook_sheet_rows`

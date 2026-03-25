@@ -7,6 +7,7 @@ import pytest
 
 _CURATED_PUBLIC_MODULES: Tuple[str, ...] = (
     "scalim.dsl.by_yaml",
+    "scalim.dsl.by_yaml.tools",
     "scalim.dsl.by_yaml.workflow",
     "scalim.dsl.by_yaml.workflow_types",
     "scalim.dsl.by_yaml.workflow_paths",
@@ -29,6 +30,7 @@ _EXPECTED_PUBLIC_ALL: Mapping[str, FrozenSet[str]] = {
             "run_workflow",
         ]
     ),
+    "scalim.dsl.by_yaml.tools": frozenset(["OutputConfigDict", "derive_base_module_path", "load_output_config"]),
     "scalim.dsl.by_yaml.workflow": frozenset(
         [
             "WorkflowCachePoolBudget",
@@ -131,6 +133,21 @@ def test_curated_public_modules_use_explicit_all_whitelists() -> None:
 
     assert not missing, "curated module __all__ missing names:\n{}".format(missing)
     assert not stale, "curated module __all__ contains stale names:\n{}".format(stale)
+
+
+def test_by_yaml_tools_smoke() -> None:
+    from scalim.dsl.by_yaml.tools import derive_base_module_path, load_output_config
+
+    repo_root = _repo_root()
+    yaml_path = str(repo_root / "tests" / "fixtures" / "order_report.yaml")
+
+    cfg = load_output_config(yaml_path)
+    assert isinstance(cfg, dict)
+    for required_key in ("params", "field_name_mapping", "output_fields", "outputs"):
+        assert required_key in cfg
+
+    base_module_path = derive_base_module_path(yaml_path, sys_path=[str(repo_root)], cwd=str(repo_root))
+    assert base_module_path == "tests.fixtures"
 
 
 def test_public_template_sandbox_rejects_unknown_values() -> None:

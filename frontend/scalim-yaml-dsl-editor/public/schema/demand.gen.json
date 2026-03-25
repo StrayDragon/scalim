@@ -308,10 +308,11 @@
         },
         "loader": {
           "type": "string",
-          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)",
-          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做白名单校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`",
+          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
+          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/sheetbook_sheet_rows`",
           "examples": [
-            "myapp.loaders:load_orders"
+            "myapp.loaders:load_orders",
+            "^workflow/sheetbook_sheet_rows"
           ]
         },
         "fields": {
@@ -440,10 +441,11 @@
       "properties": {
         "loader": {
           "type": "string",
-          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)",
-          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做白名单校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`",
+          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
+          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/sheetbook_sheet_rows`",
           "examples": [
-            "myapp.loaders:load_orders"
+            "myapp.loaders:load_orders",
+            "^workflow/sheetbook_sheet_rows"
           ]
         },
         "key": {
@@ -814,7 +816,7 @@
             "call_by": {
               "type": "string",
               "description": "Normalize 受控扩展点(安全引用,由 allowlist 约束)",
-              "markdownDescription": "Normalize 受控扩展点(可选).\n\n- 形式与 `loader` 引用一致(支持绝对/相对引用)\n- 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n- 固定 contract: 输入与输出均为 `Mapping`\n\n建议签名:\n- `fn(result, ctx) -> Mapping`\n  - `ctx.source_id`\n  - `ctx.kind`\n  - `ctx.config_path`",
+              "markdownDescription": "Normalize 受控扩展点(可选).\n\n- 形式与 `loader` 引用一致,支持:\n  - Python 引用(绝对/相对)\n  - 内置引用: `^<id>`\n- Python 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n- `^<id>` 为内置白名单,无需把 `scalim.*` 加入 allowlist\n- 固定 contract: 输入与输出均为 `Mapping`\n\n建议签名:\n- `fn(result, ctx) -> Mapping`\n  - `ctx.source_id`\n  - `ctx.kind`\n  - `ctx.config_path`",
               "examples": [
                 "myapp.normalizes:normalize_source_x"
               ]
@@ -1495,11 +1497,12 @@
         "call_by": {
           "type": "string",
           "description": "派生字段函数调用(函数引用 + 参数列表),与 compute 互斥",
-          "markdownDescription": "派生字段函数调用(与 `compute` 互斥).\n\n- 语法: `reference(args...)`\n- `reference` 形式与 `loader` 引用一致,支持:\n  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- 支持位置参数与 kwargs\n- Python 字面量: `1`/`1.5`/`'ok'`/`True`/`False`/`None`\n- 上下文引用: `$ctx` 或 `$ctx.<attr>`\n- 可用 ctx 属性: `row_id`/`batch_num`/`field_id`/`deps`/`values`",
+          "markdownDescription": "派生字段函数调用(与 `compute` 互斥).\n\n- 语法: `reference(args...)`\n- `reference` 形式与 `loader` 引用一致,支持:\n  - Python 引用(绝对/相对)\n  - 内置引用: `^<id>`\n- Python 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- `^<id>` 为受控词表(vocabulary)中的 builtin callable 引用,无需把目标模块加入 allowlist\n- 支持位置参数与 kwargs\n- Python 字面量: `1`/`1.5`/`'ok'`/`True`/`False`/`None`\n- 上下文引用: `$ctx` 或 `$ctx.<attr>`\n- 可用 ctx 属性: `row_id`/`batch_num`/`field_id`/`deps`/`values`",
           "examples": [
             "myapp.enums:get_status_text(status)",
             "myapp.enums:get_status_text(status=status, ctx=$ctx)",
-            ".helpers:to_text(status)"
+            ".helpers:to_text(status)",
+            "^workflow/sheetbook_sheet_rows(ref)"
           ]
         },
         "$import": {
@@ -3015,8 +3018,8 @@
                   "call_by": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "call_by: 聚合后派生字段的 hotfix 口子(安全引用,受 allowlist 约束)",
-                    "markdownDescription": "聚合后派生字段的 hotfix 口子(受 allowlist 约束).\n\n- 与 `compute` 一样属于聚合后派生字段,会与 rank/其它派生字段一起组成 DAG\n- 只可引用聚合输出行内字段: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 不可引用明细行字段(聚合前状态不可用)\n- 若存在循环依赖,编译期会报错并给出依赖链路\n\n示例:\n```yaml\nscore: {call_by: \"pkg.mod:fn(rank=rank, base=100, step=3)\"}\n```",
+                    "description": "call_by: 聚合后派生字段的 hotfix 口子(安全引用;支持 ^<id>)",
+                    "markdownDescription": "聚合后派生字段的 hotfix 口子.\n\n- Python 引用仍受 allowlist 约束; `^<id>` 为受控词表(vocabulary)中的 builtin callable 引用,无需把目标模块加入 allowlist\n\n- 与 `compute` 一样属于聚合后派生字段,会与 rank/其它派生字段一起组成 DAG\n- 只可引用聚合输出行内字段: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 不可引用明细行字段(聚合前状态不可用)\n- 若存在循环依赖,编译期会报错并给出依赖链路\n\n示例:\n```yaml\nscore: {call_by: \"pkg.mod:fn(rank=rank, base=100, step=3)\"}\n```",
                     "examples": [
                       "pkg.mod:fn(rank=rank, base=100, step=3)"
                     ]

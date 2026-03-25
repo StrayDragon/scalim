@@ -26,6 +26,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/benchmarking/spec.md)
 - Summary: **状态: ✅ 已实现** 定义基准测试入口与依赖约束,覆盖 pytest-benchmark 执行、JSON 导出、baseline 对比、benchlib 复用与可选 memray 剖析.
 
+### `dataclassesx-vendor`
+- Title: dataclassesx-vendor Specification
+- Source: [spec.md](#code=openspec/specs/dataclassesx-vendor/spec.md)
+- Summary: **状态: ✅ 已实现** 为 `src/scalim/` 提供一个可 vendors 化、可审计的 dataclasses 能力入口,在保持 Python 3.6 运行时兼容的同时避免依赖外部 `dataclasses` backport,并避免包内绝对导入在多份包共存时混入错误实现。
+
 ### `demand-dsl`
 - Title: demand-dsl Specification
 - Source: [spec.md](#code=openspec/specs/demand-dsl/spec.md)
@@ -346,6 +351,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-allowlist-policy/spec.md)
 - Summary: TBD - created by archiving change c2-allowlist-footgun-hardening. Update Purpose after archive.
 
+### `yaml-dsl-builtin-callables`
+- Title: yaml-dsl-builtin-callables Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-builtin-callables/spec.md)
+- Summary: 为 `YAML DSL` 中的 loader/call_by/... 等 Python 可调用对象引用点提供一套 **稳定、受控、无需扩大 allowlist** 的内置 callable 引用语法,避免下游依赖 `scalim.*` 内部模块路径。
+
 ### `yaml-dsl-cli-validation`
 - Title: yaml-dsl-cli-validation Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-validation/spec.md)
@@ -385,6 +395,11 @@ Sources:
 - Title: yaml-dsl-micro-tunes Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-micro-tunes/spec.md)
 - Summary: TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after archive.
+
+### `yaml-dsl-public-tools`
+- Title: yaml-dsl-public-tools Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-public-tools/spec.md)
+- Summary: 为 `YAML DSL` 的下游集成提供稳定“工具/自省”公开入口,避免下游依赖 `scalim.dsl.by_yaml.runtime.*` 等内部实现路径。
 
 ### `yaml-dsl-render-effective-yaml`
 - Title: yaml-dsl-render-effective-yaml Specification

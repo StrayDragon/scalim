@@ -8,6 +8,11 @@
 - Canonical example: `references/generated/example-full/ecommerce_report.gen.yaml`
 - Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`
 
+## Builtin Callable IDs (Public)
+- `^workflow/sheetbook_sheet_rows`
+
+> 注: `^<id>` 由运行入口参数 `builtin_callables` 提供词表;此处仅列出默认公开子集(保守暴露).
+
 ## Top-Level Fields
 - `name`
 - `imports`

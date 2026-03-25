@@ -23,17 +23,19 @@
   - `OutputConfigDict`(TypedDict): 固化 `load_output_config()` 的返回结构契约,同时保持运行期返回值仍为 `dict`。
 - 将 `scalim.dsl.by_yaml.tools` 纳入 curated public modules 的回归门禁(导入 smoke + `__all__` 断言),确保这是“明确承诺”的公共表面,而不是偶然可导入的实现路径。
 - 文档与示例(用户可见材料)补充推荐导入方式,将“从 runtime.* 导入”统一迁移为 `scalim.dsl.by_yaml.tools`。
-- 新增一套内置 callable 引用语法: `scalim://py/<id>`(plain string,无需 YAML tag),用于在 loader/call_by/... 等位置引用 Scalim 内置、受控白名单的 callable:
+- 新增一套内置 callable 引用语法: `^<id>`(plain string,无需 YAML tag),用于在 loader/call_by/... 等位置引用 Scalim 内置、受控白名单的 callable:
   - 解析阶段将其视为合法 callable 引用(与 `module.path:function` 并列)
-  - 运行期通过内置 registry 将 `<id>` 映射为具体 callable(不依赖内部模块路径)
-  - 该语法的解析与执行 **不扩大 allowlist**: 内置 callable 可在不将 `scalim.*` 加入 allowlist 的情况下被安全使用
+  - 运行期通过一份显式“builtin callable 词表”(vocabulary)将 `<id>` 映射为具体 callable(不依赖内部模块路径)
+    - 词表支持调用方自定义(可扩展/覆盖默认词表),以满足下游集成的受控扩展点需求
+    - 默认词表仅提供少量 Scalim 内置 id(保守暴露;可审计)
+  - 该语法的解析与执行 **不扩大 allowlist**: 词表中的 callable 可在不将其模块加入 allowlist 的情况下被安全使用
   - unknown `<id>` MUST fail-fast 并给出可操作的错误信息(例如提示可用 id 列表或指向文档)
 
 ## Capabilities
 
 ### New Capabilities
 - `yaml-dsl-public-tools`: 为 `YAML DSL` 提供稳定的工具/自省公开入口,避免下游依赖 `runtime.*` 内部实现路径。
-- `yaml-dsl-builtin-callables`: 为 loader/call_by 等 Python 引用扩展点提供 `scalim://py/<id>` 的内置 callable 快捷方式,避免下游依赖内部模块路径或扩大 allowlist。
+- `yaml-dsl-builtin-callables`: 为 loader/call_by 等 Python 引用扩展点提供 `^<id>` 的内置 callable 快捷方式,避免下游依赖内部模块路径或扩大 allowlist。
 
 ### Modified Capabilities
 - （无）

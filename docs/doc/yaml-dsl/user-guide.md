@@ -1245,6 +1245,28 @@ results = run_multi_root_workbook(
 )
 ```
 
+### 4.6 下游集成工具(稳定入口): `scalim.dsl.by_yaml.tools`
+
+下游在做集成时,常见还需要一些“工具/自省”能力(例如读取输出字段配置、推导相对引用的基准模块路径).这类能力请优先使用稳定工具面:
+
+- `scalim.dsl.by_yaml.tools.load_output_config(yaml_path)`
+  - 返回 `dict`(运行期)且至少包含 keys: `params` / `field_name_mapping` / `output_fields` / `outputs`
+- `scalim.dsl.by_yaml.tools.derive_base_module_path(yaml_path, sys_path=..., cwd=...)`
+  - 根据 `yaml_path + sys.path` 推导相对引用的 `base_module_path`
+
+迁移提示:
+
+- 若你之前直接从 YAML DSL 的内部实现子包(例如 `runtime` 子包)导入这些 helper,请统一迁移到 `scalim.dsl.by_yaml.tools`
+
+最小示例:
+
+```python
+from scalim.dsl.by_yaml.tools import derive_base_module_path, load_output_config
+
+cfg = load_output_config("path/to/config.yaml")
+base_module_path = derive_base_module_path("path/to/config.yaml")
+```
+
 ---
 
 ## 5. 完整示例 (Complete Examples)

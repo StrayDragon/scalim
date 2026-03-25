@@ -816,9 +816,11 @@ class OutputAggregateConfig:
                                 "call_by": {
                                     "type": "string",
                                     "minLength": 1,
-                                    "description": "call_by: 聚合后派生字段的 hotfix 口子(安全引用,受 allowlist 约束)",
+                                    "description": "call_by: 聚合后派生字段的 hotfix 口子(安全引用;支持 ^<id>)",
                                     "markdownDescription": (
-                                        "聚合后派生字段的 hotfix 口子(受 allowlist 约束).\n\n"
+                                        "聚合后派生字段的 hotfix 口子.\n\n"
+                                        "- Python 引用仍受 allowlist 约束; `^<id>` 为受控词表(vocabulary)中的 builtin callable 引用,"
+                                        "无需把目标模块加入 allowlist\n\n"
                                         "- 与 `compute` 一样属于聚合后派生字段,会与 rank/其它派生字段一起组成 DAG\n"
                                         "- 只可引用聚合输出行内字段: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n"
                                         "- 不可引用明细行字段(聚合前状态不可用)\n"

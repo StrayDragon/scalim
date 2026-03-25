@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Set
 
 from ...params_template import ParamsTemplateCompileError, compile_params_template
-from ...reference_syntax import REFERENCE_FORMAT_EXAMPLES, is_valid_python_reference
+from ...reference_syntax import REFERENCE_FORMAT_EXAMPLES, is_valid_callable_reference
 from ...schema_dsl.constants import (
     DEFAULT_CACHE_MODE,
     LOOKUP_CAST_NAME_ENUM,
@@ -864,4 +864,4 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             self._add_error(errors, "Invalid extract path: {}".format(str(exc)), path="{}.extract".format(rule_path))
 
     def _is_valid_loader_ref(self, loader_ref: str) -> bool:
-        return is_valid_python_reference(loader_ref)
+        return is_valid_callable_reference(loader_ref)

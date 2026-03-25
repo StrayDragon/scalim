@@ -135,6 +135,23 @@ def test_validate_yaml_text_minimal_valid_config_ok() -> None:
     assert result.errors == []
 
 
+@pytest.mark.parametrize("enable_jsonschema_validation", [False, True])
+def test_validate_yaml_text_allows_builtin_callable_reference(enable_jsonschema_validation: bool) -> None:
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: ^workflow/sheetbook_sheet_rows",
+            "sources: {}",
+            "",
+        ]
+    )
+    result = validate_yaml_text(yaml_text, enable_jsonschema_validation=enable_jsonschema_validation)
+    assert result.ok is True
+    assert result.errors == []
+
+
 def test_validate_yaml_text_rejects_invalid_batch_size() -> None:
     yaml_text = "\n".join(
         [

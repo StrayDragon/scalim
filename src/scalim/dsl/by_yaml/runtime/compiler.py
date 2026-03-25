@@ -6,7 +6,7 @@
 - 运行时请求(`ExecutionRequest`)
 """
 
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple, cast
 
 from ....execution.guardrails import (
     GuardrailMode,
@@ -20,10 +20,12 @@ from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec
 from ....spec.ir.demand import DemandIr
 from ....vendor.dataclassesx import replace
 from ..config_parsing.loader import YamlDemandLoader
+from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfig
+from .builtin_callables import parse_builtin_callable_id
 from .contracts import UNSET, Compilation, OutputOverrides, ResolverTrustedMode, RunOptions
 from .conversion import ConfigToIRConverter
-from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError
+from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError, ResolverError
 from .observability import compile_observability_spec
 from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
@@ -247,18 +249,99 @@ def load_config(
     )
 
 
+def _normalize_builtin_callable_id(id_raw: object, *, label: str) -> str:
+    builtin_id = str(id_raw or "").strip()
+    if not builtin_id:
+        msg = "{}: <id> must not be empty".format(label)
+        raise ValueError(msg)
+    if builtin_id.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
+        msg = "{}: <id> must not include prefix '{}': {!r}".format(label, BUILTIN_CALLABLE_REFERENCE_PREFIX, builtin_id)
+        raise ValueError(msg)
+    try:
+        _ = parse_builtin_callable_id(BUILTIN_CALLABLE_REFERENCE_PREFIX + builtin_id)
+    except ResolverError as exc:
+        msg = "{}: invalid <id> {!r}: {}".format(label, builtin_id, exc)
+        raise ValueError(msg) from exc
+    return builtin_id
+
+
+def _compile_builtin_callable_vocab_value(
+    builtin_id: str,
+    value_raw: object,
+    *,
+    trusted_resolver: SecurePythonReferenceResolver,
+) -> Callable[..., Any]:
+    if callable(value_raw):
+        return cast("Callable[..., Any]", value_raw)
+
+    if isinstance(value_raw, str):
+        reference = value_raw.strip()
+        if not reference:
+            msg = "builtin_callables[{!r}]: value must not be empty".format(builtin_id)
+            raise ValueError(msg)
+        if reference.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
+            msg = "builtin_callables[{!r}]: value must be a Python reference, not builtin '^<id>': {!r}".format(builtin_id, value_raw)
+            raise ValueError(msg)
+        try:
+            return trusted_resolver.resolve(reference)
+        except ResolverError as exc:
+            msg = "builtin_callables[{!r}]: failed to resolve Python reference {!r}: {}".format(builtin_id, reference, exc)
+            raise ValueError(msg) from exc
+
+    msg = "builtin_callables[{!r}]: expected a callable or Python reference string, got: {}".format(builtin_id, type(value_raw).__name__)
+    raise TypeError(msg)
+
+
+def _compile_builtin_callables_vocab(builtin_callables: Optional[Mapping[str, object]]) -> Optional[Dict[str, Callable[..., Any]]]:
+    if builtin_callables is None:
+        return None
+
+    compiled: Dict[str, Callable[..., Any]] = {}
+    trusted_resolver = SecurePythonReferenceResolver(
+        allowed_modules=None,
+        allowed_functions=None,
+        base_module_path=None,
+    )
+
+    for builtin_id_raw, value_raw in builtin_callables.items():
+        builtin_id = _normalize_builtin_callable_id(builtin_id_raw, label="builtin_callables")
+        compiled[builtin_id] = _compile_builtin_callable_vocab_value(
+            builtin_id,
+            value_raw,
+            trusted_resolver=trusted_resolver,
+        )
+
+    return compiled
+
+
+def _validate_public_builtin_callable_ids(public_ids: Optional[Sequence[str]]) -> Optional[Tuple[str, ...]]:
+    if public_ids is None:
+        return None
+
+    validated: List[str] = []
+    for raw in public_ids:
+        validated.append(_normalize_builtin_callable_id(raw, label="public_builtin_callable_ids"))
+    return tuple(validated)
+
+
 def create_reference_resolver(
     *,
     allowed_modules: FrozenSet[str],
     allowed_functions: Optional[FrozenSet[str]],
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     base_module_path: Optional[str] = None,
+    builtin_callables: Optional[Mapping[str, object]] = None,
+    public_builtin_callable_ids: Optional[Sequence[str]] = None,
 ) -> SecurePythonReferenceResolver:
+    compiled_builtin_callables = _compile_builtin_callables_vocab(builtin_callables)
+    validated_public_ids = _validate_public_builtin_callable_ids(public_builtin_callable_ids)
     return SecurePythonReferenceResolver(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
         resolver_trusted_mode=resolver_trusted_mode,
         base_module_path=base_module_path,
+        builtin_callables_by_id=compiled_builtin_callables,
+        public_builtin_callable_ids=validated_public_ids,
     )
 
 
@@ -364,6 +447,8 @@ def compile(  # noqa: A001
         allowed_functions=options.allowed_functions,
         resolver_trusted_mode=options.resolver_trusted_mode,
         base_module_path=base_module_path,
+        builtin_callables=options.builtin_callables,
+        public_builtin_callable_ids=options.public_builtin_callable_ids,
     )
     demand_ir = compile_ir(config, resolver=resolver, init_vars=options.init_vars)
     request = build_request(config, demand_ir, options=options, resolver=resolver)

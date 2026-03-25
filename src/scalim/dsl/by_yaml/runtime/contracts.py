@@ -126,6 +126,17 @@ class RunOptions:
     workflow_managed_output_ids: Optional[FrozenSet[str]] = None
     """可选: `workflow` 托管的 `output_id` 白名单(用于 `workflow-managed` 的无路径 `CSV` 输出的内存物化)."""
 
+    builtin_callables: Optional[Mapping[str, object]] = None
+    """可选:内置可调用对象词表(用于 `^<id>` 引用).
+
+    - 键: `<id>` (不包含前缀 `^`)
+    - 值: `callable` 或 `Python` 引用字符串(例如 `pkg.mod:fn`)
+    - 该词表作为“显式受控白名单”: `^<id>` 的解析与执行不要求把其目标模块加入 `allowlist`
+    """
+
+    public_builtin_callable_ids: Optional[Tuple[str, ...]] = None
+    """可选:用户可见的内置 `<id>` 列表(用于错误信息/文档提示;应为保守子集)."""
+
 
 @dataclass(frozen=True)
 class Compilation:

@@ -6,7 +6,10 @@ from ...vendor.dataclassesx import dataclass
 _MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
 _REFERENCE_PARTS_COUNT = 2
 
-REFERENCE_FORMAT_EXAMPLES = "`module.path:function` / `module.path:obj.method` / `module.path.function`"
+BUILTIN_CALLABLE_REFERENCE_PREFIX = "^"
+_BUILTIN_CALLABLE_ID_RE = re.compile(r"^[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*$")
+
+REFERENCE_FORMAT_EXAMPLES = "`module.path:function` / `module.path:obj.method` / `module.path.function` / `^<id>`"
 
 
 class ReferenceSyntaxError(ValueError):
@@ -41,6 +44,18 @@ def is_valid_python_reference(reference: str) -> bool:
     except ReferenceSyntaxError:
         return False
     return True
+
+
+def is_valid_builtin_callable_reference(reference: str) -> bool:
+    raw = str(reference or "").strip()
+    if not raw.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
+        return False
+    builtin_id = raw[len(BUILTIN_CALLABLE_REFERENCE_PREFIX) :]
+    return bool(builtin_id) and _BUILTIN_CALLABLE_ID_RE.fullmatch(builtin_id) is not None
+
+
+def is_valid_callable_reference(reference: str) -> bool:
+    return is_valid_python_reference(reference) or is_valid_builtin_callable_reference(reference)
 
 
 def _parse_class_style(reference: str) -> ParsedReference:
@@ -90,9 +105,12 @@ def _parse_dotted_style(reference: str) -> ParsedReference:
 
 
 __all__ = [
+    "BUILTIN_CALLABLE_REFERENCE_PREFIX",
     "REFERENCE_FORMAT_EXAMPLES",
     "ParsedReference",
     "ReferenceSyntaxError",
+    "is_valid_builtin_callable_reference",
+    "is_valid_callable_reference",
     "is_valid_python_reference",
     "parse_python_reference",
 ]

@@ -124,12 +124,47 @@ sources:
 
 ## 4. 引用 Python: loader / call_by
 
-YAML 里引用 Python 的地方主要有两类:
+YAML 里引用 Python 可调用对象的地方主要有两类:
 
 - `main_source.loader` / `sources.<id>.loader`: loader 引用
 - `fields.<id>.call_by`: 派生字段函数调用
 
-注意: `allowed_modules`/`allowed_functions` 是运行时参数,不是 YAML 字段.
+### 4.1 Python 引用格式(absolute/relative)
+
+- 绝对引用:
+  - 点式引用: `module.path.function`
+  - 类式引用: `module.path:ClassName` / `module.path:obj.method`
+- 相对引用:
+  - 以 `.` / `..` 开头的 module path,相对 YAML 文件所在目录对应的模块路径
+  - 运行期会先归一化为绝对引用,再做 allowlist 校验
+
+### 4.2 内置 callable 快捷方式: `^<id>`
+
+`^<id>` 是一类 **plain string** 的内置引用,用于在 `loader` / `call_by` 等位置通过“受控词表”(vocabulary)稳定引用一批可调用对象:
+
+- Python 引用仍受 allowlist 约束
+- `^<id>` 的解析与执行 **不要求**把其目标模块加入 allowlist(unknown id 会 fail-fast 并提示一份保守的可用 id 列表)
+- `<id>` 为可定制的词表 key,推荐使用 `/` 分段表示命名空间(例如 `workflow/sheetbook_sheet_rows`)
+- 默认词表仅提供少量 Scalim 内置 id(保守暴露);下游可在 `run/compile(..., builtin_callables=...)` 中注入/扩展词表
+
+示例(loader):
+
+```yaml
+main_source:
+  loader: ^workflow/sheetbook_sheet_rows
+```
+
+示例(call_by):
+
+```yaml
+fields:
+  rows:
+    call_by: "^workflow/sheetbook_sheet_rows(ref)"
+```
+
+### 4.3 allowlist 是运行时参数
+
+注意: `allowed_modules`/`allowed_functions` 是 Python 运行入口参数,不是 YAML 字段.
 
 ## 5. relations 与 relation 引用方式
 

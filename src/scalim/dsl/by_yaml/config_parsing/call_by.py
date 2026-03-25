@@ -3,7 +3,7 @@ import sys
 from typing import Any, FrozenSet, List, Optional, Set, Tuple
 
 from ....vendor.dataclassesx import dataclass
-from ..reference_syntax import is_valid_python_reference
+from ..reference_syntax import REFERENCE_FORMAT_EXAMPLES, is_valid_callable_reference
 
 _PY38_PLUS = sys.version_info >= (3, 8)
 
@@ -61,9 +61,7 @@ def _normalize_call_by(call_by: Any) -> str:
 def _parse_call_by_call(raw: str) -> Tuple[str, ast.Call]:
     reference, args_src = _split_reference_and_args(raw)
     if not _is_valid_loader_ref(reference):
-        msg = ("`call_by` 引用 '{}' 非法. 期望格式: `module.path:function` / `module.path:obj.method` / `module.path.function`").format(
-            reference
-        )
+        msg = "`call_by` 引用 '{}' 非法. 期望格式: {}".format(reference, REFERENCE_FORMAT_EXAMPLES)
         raise CallByParseError(msg)
 
     rewritten_args = _rewrite_ctx_tokens(args_src)
@@ -335,7 +333,7 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
 
 
 def _is_valid_loader_ref(loader_ref: str) -> bool:
-    return is_valid_python_reference(loader_ref)
+    return is_valid_callable_reference(loader_ref)
 
 
 __all__ = [

@@ -3,12 +3,13 @@ import logging
 import sys
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Callable, ClassVar, FrozenSet, List, Optional, Sequence, Tuple
+from typing import Any, Callable, ClassVar, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
 from ...._internal.loggingx import format_kv, prefix
 from ....vendor.compact.typing_extensionsx import override
-from ..reference_syntax import ParsedReference, ReferenceSyntaxError, parse_python_reference
+from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX, ParsedReference, ReferenceSyntaxError, parse_python_reference
 from .allowlist_policy import ResolverTrustedMode
+from .builtin_callables import resolve_builtin_callable_reference
 from .errors import ResolverError
 
 resolver_logger = logging.getLogger("scalim.dsl.by_yaml.resolver")
@@ -123,6 +124,8 @@ class PythonReferenceResolver:
     _parser: ReferenceParser
     _cache: "OrderedDict[str, Callable[..., Any]]"
     _max_cache_size: int
+    _builtin_callables_by_id: Optional[Mapping[str, Callable[..., Any]]]
+    _public_builtin_callable_ids: Optional[Tuple[str, ...]]
 
     def __init__(
         self,
@@ -130,6 +133,8 @@ class PythonReferenceResolver:
         allowed_functions: Optional[FrozenSet[str]] = None,
         resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
         max_cache_size: int = DEFAULT_CACHE_MAX_SIZE,
+        builtin_callables_by_id: Optional[Mapping[str, Callable[..., Any]]] = None,
+        public_builtin_callable_ids: Optional[Sequence[str]] = None,
     ) -> None:
         if int(max_cache_size) < 1:
             msg = "`max_cache_size` 必须 >= 1"
@@ -155,6 +160,8 @@ class PythonReferenceResolver:
         self._parser = ReferenceParser()
         self._cache = OrderedDict()
         self._max_cache_size = int(max_cache_size)
+        self._builtin_callables_by_id = builtin_callables_by_id
+        self._public_builtin_callable_ids = tuple(public_builtin_callable_ids) if public_builtin_callable_ids is not None else None
 
     def has_allowlist(self) -> bool:
         return self._policy.has_allowlist
@@ -164,6 +171,18 @@ class PythonReferenceResolver:
         if cached is not None:
             self._cache.move_to_end(reference)
             return cached
+
+        raw = str(reference or "").strip()
+        if raw.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
+            result = resolve_builtin_callable_reference(
+                reference,
+                callables_by_id=self._builtin_callables_by_id,
+                public_ids=self._public_builtin_callable_ids,
+            )
+            self._cache[reference] = result
+            if len(self._cache) > self._max_cache_size:
+                _ = self._cache.popitem(last=False)
+            return result
 
         parsed = self._parser.parse(reference)
         if parsed.style == "class":
@@ -288,17 +307,25 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
         max_cache_size: int = PythonReferenceResolver.DEFAULT_CACHE_MAX_SIZE,
         base_module_path: Optional[str] = None,
+        builtin_callables_by_id: Optional[Mapping[str, Callable[..., Any]]] = None,
+        public_builtin_callable_ids: Optional[Sequence[str]] = None,
     ) -> None:
         super(SecurePythonReferenceResolver, self).__init__(
             allowed_modules=allowed_modules,
             allowed_functions=allowed_functions,
             resolver_trusted_mode=resolver_trusted_mode,
             max_cache_size=max_cache_size,
+            builtin_callables_by_id=builtin_callables_by_id,
+            public_builtin_callable_ids=public_builtin_callable_ids,
         )
         self._base_module_path = base_module_path
 
     @override
     def resolve(self, reference: str) -> Callable[..., Any]:
+        raw = str(reference or "").strip()
+        if raw.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
+            return super(SecurePythonReferenceResolver, self).resolve(reference)
+
         if reference.startswith("."):
             normalized = self._normalize_reference(reference)
             self._security_check(normalized)

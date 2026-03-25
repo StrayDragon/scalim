@@ -38,6 +38,7 @@ from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
 from scalim.dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml.runtime.builtin_callables import list_public_builtin_callable_ids
 from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
 
 try:
@@ -351,8 +352,23 @@ def render_syntax_catalog(
         "- Canonical example: `{}`".format(path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL)),
         "- Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`",
         "",
-        "## Top-Level Fields",
+        "## Builtin Callable IDs (Public)",
     ]
+    public_builtin_ids = list_public_builtin_callable_ids()
+    if public_builtin_ids:
+        for builtin_id in public_builtin_ids:
+            lines.append("- `^{}`".format(builtin_id))
+    else:
+        lines.append("- (none)")
+
+    lines.extend(
+        [
+            "",
+            "> 注: `^<id>` 由运行入口参数 `builtin_callables` 提供词表;此处仅列出默认公开子集(保守暴露).",
+            "",
+            "## Top-Level Fields",
+        ]
+    )
     for field_name in top_level_fields:
         is_required = field_name in schema.get("required", [])
         lines.append("- `{}`{}".format(field_name, " (required)" if is_required else ""))

@@ -73,18 +73,21 @@ DESC_MAIN_SOURCE_ORDER_BY = "主数据源批次内排序字段列表(仅主数�
 DESC_MAIN_SOURCE_ORDER_BY_MD = (
     "主数据源批次内排序字段列表.\n\n- 每项为字段 id, 前缀 `-` 表示 desc\n- 未配置时保持 loader 原始顺序\n- 仅允许主数据源字段"
 )
-DESC_LOADER = "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式)"
+DESC_LOADER = "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)"
 DESC_LOADER_MD = (
     "Python 可调用对象引用.\n\n"
     "绝对引用:\n"
     "- 点式引用: `module.path.function`\n"
     "- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n"
+    "内置引用:\n"
+    "- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n"
     "相对引用:\n"
     "- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n"
-    "- 运行期会先归一化为绝对引用,再做白名单校验\n\n"
+    "- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n"
     "示例:\n"
     "- `.loaders:load_orders`\n"
-    "- `.loaders.load_orders`"
+    "- `.loaders.load_orders`\n"
+    "- `^workflow/sheetbook_sheet_rows`"
 )
 DESC_LOOKUP_CAST = "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}"
 DESC_LOOKUP_CAST_MD = (
@@ -299,8 +302,11 @@ _DESC_SOURCE_NORMALIZE_KIND_MD = (
 
 _DESC_SOURCE_NORMALIZE_CALL_BY_MD = (
     "Normalize 受控扩展点(可选).\n\n"
-    "- 形式与 `loader` 引用一致(支持绝对/相对引用)\n"
-    "- 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n"
+    "- 形式与 `loader` 引用一致,支持:\n"
+    "  - Python 引用(绝对/相对)\n"
+    "  - 内置引用: `^<id>`\n"
+    "- Python 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n"
+    "- `^<id>` 为内置白名单,无需把 `scalim.*` 加入 allowlist\n"
     "- 固定 contract: 输入与输出均为 `Mapping`\n\n"
     "建议签名:\n"
     "- `fn(result, ctx) -> Mapping`\n"

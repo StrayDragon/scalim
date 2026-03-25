@@ -34,6 +34,8 @@ def run(  # noqa: PLR0913
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
+    builtin_callables: Optional[Mapping[str, object]] = None,
+    public_builtin_callable_ids: Optional[Tuple[str, ...]] = None,
 ) -> RunResult:
     """运行 `YAML DSL`,并支持显式覆盖项与输出 `sink`.
 
@@ -67,6 +69,8 @@ def run(  # noqa: PLR0913
         template_vars=template_vars,
         template_sandbox=template_sandbox,
         allowed_yaml_roots=allowed_yaml_roots,
+        builtin_callables=builtin_callables,
+        public_builtin_callable_ids=public_builtin_callable_ids,
     )
     compilation = _compile(yaml_path, options=options)
     core = run_ir(compilation.demand_ir, compilation.request)
@@ -93,6 +97,8 @@ def compile(  # noqa: A001, PLR0913
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
+    builtin_callables: Optional[Mapping[str, object]] = None,
+    public_builtin_callable_ids: Optional[Tuple[str, ...]] = None,
 ) -> Compilation:
     template_sandbox = validate_public_template_sandbox(template_sandbox)
     options = RunOptions(
@@ -113,6 +119,8 @@ def compile(  # noqa: A001, PLR0913
         template_vars=template_vars,
         template_sandbox=template_sandbox,
         allowed_yaml_roots=allowed_yaml_roots,
+        builtin_callables=builtin_callables,
+        public_builtin_callable_ids=public_builtin_callable_ids,
     )
     return _compile(yaml_path, options=options)
 
