@@ -1,7 +1,7 @@
 # yaml-dsl-public-tools Specification
 
 ## Purpose
-为 `YAML DSL` 的下游集成提供稳定“工具/自省”公开入口,避免下游依赖 `scalim.dsl.by_yaml.runtime.*` 等内部实现路径。
+为 `YAML DSL` 的下游集成提供稳定“工具/自省”公开入口,避免下游依赖 by_yaml runtime 的内部实现模块路径。
 
 ## Requirements
 
@@ -41,4 +41,3 @@
 - **GIVEN** `yaml_path` 位于某个 `sys.path` 前缀目录下
 - **WHEN** 调用方执行 `scalim.dsl.by_yaml.tools.derive_base_module_path(yaml_path, sys_path=[...], cwd=...)`
 - **THEN** 返回值 MUST 为字符串模块路径(允许为空字符串表示根包)
-

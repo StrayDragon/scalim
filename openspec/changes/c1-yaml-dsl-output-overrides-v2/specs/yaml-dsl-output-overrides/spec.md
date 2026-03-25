@@ -8,7 +8,7 @@
 ### Requirement: by_yaml runtime MUST accept YAML-shaped `overrides.outputs`
 系统 MUST 在 by_yaml runtime 的 `RunOverrides` 中提供 `outputs` 覆盖字段,用于在不修改 demand YAML 的前提下运行期指定输出编排。
 
-`overrides.outputs` 的结构 MUST 与 YAML 顶层 `outputs` 的元素结构一致(plain dict/list),但本 change **仅承诺明细输出(detail)**的最小子集,至少包含:
+`overrides.outputs` 的结构 MUST 与 YAML 顶层 `outputs` 的元素结构一致(YAML-shaped `list[dict]`),但本 change **仅承诺明细输出(detail)**的最小子集,至少包含:
 - `name`
 - `container`(例如 `type/path/sheet/encoding/include_header/header_fields_output_by/...`)
 - `fields`(有序 field_id list)

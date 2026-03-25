@@ -37,7 +37,7 @@
 - 名称为 `validate_unique_field_names`(boolean);
 - 默认语义为启用(未声明时等价 `true`);
 - hover 文案 MUST 解释“有效展示名”的定义: `field.name` 非空则取 `name`,否则回退为 `field_id`。
-- hover 文案 MUST 说明该预检查仅在 effective outputs 使用 `container.header_fields_output_by: name` 时触发。
+- hover 文案 MUST 说明该预检查仅在 effective outputs 使用 `container.include_header: true`(显式或默认) 且 `container.header_fields_output_by: name` 时触发。
 
 #### Scenario: schema 生成结果包含顶层校验开关
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`

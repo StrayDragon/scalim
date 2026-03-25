@@ -32,7 +32,7 @@ execution 层内部仍会使用编译产物 `OutputCompositionSpec` 表达 compo
 
 系统 MUST 使用 `overrides.outputs` 作为输出覆盖的唯一形态,并破坏性移除历史 `overrides.output.*`。
 
-`overrides.outputs` 的结构 MUST 与 YAML 顶层 `outputs` 的元素结构一致(plain dict/list),但本 change 仅承诺明细输出的最小子集: `name/container/fields`。
+`overrides.outputs` 的结构 MUST 与 YAML 顶层 `outputs` 的元素结构一致(YAML-shaped `list[dict]`),但本 change 仅承诺明细输出的最小子集: `name/container/fields`。
 
 `overrides.outputs` 的语义 MUST 为“整体替换”(replace): 当其提供且非空时,系统 MUST 仅使用 `overrides.outputs` 作为 effective outputs,而不是对 YAML `outputs` 做 deep-merge。
 当调用方显式提供 `overrides.outputs=[]` 时,系统 MUST fail-fast(避免静默“不导出任何东西”)。

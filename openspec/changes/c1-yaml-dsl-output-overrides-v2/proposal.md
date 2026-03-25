@@ -32,7 +32,7 @@
 
 ## What Changes
 
-- **BREAKING**: 重设计 `RunOverrides` 的“输出覆盖”形态,引入 `overrides.outputs`(plain dict/list),用于在不修改 demand YAML 的前提下运行时指定输出。
+- **BREAKING**: 重设计 `RunOverrides` 的“输出覆盖”形态,引入 `overrides.outputs`(YAML-shaped `list[dict]`),用于在不修改 demand YAML 的前提下运行时指定输出。
   - 统一推荐: demand YAML 默认不声明 `outputs`,由调用侧提供 overrides 输出片段驱动导出。
   - 本轮仅承诺明细输出(detail)的最小子集: `name/container/fields`(顺序敏感),未来按需扩展到 `where/from/aggregate/...`。
 - **BREAKING**: 移除历史 `overrides.output.*`(单输出模式覆盖)以避免“传参但被忽略”的误用陷阱;单输出导出统一通过 `outputs/overrides.outputs` 表达。
@@ -40,7 +40,7 @@
 - **BREAKING**: 将 `outputs[*].container.header_fields_output_by` 默认值从 `field_id` 调整为 `name`(更符合人读报表默认预期)。
 - 新增一个 YAML 顶层校验开关 `validate_unique_field_names: bool`,用于默认启用“字段展示名(name)不得重复”的预检查,并允许显式关闭(仅对不需要该约束的场景开放)。
   - 该校验以“有效展示名”为准: `name` 为空时回退为 `field_id`。
-  - 该校验仅在 effective outputs 使用 `container.header_fields_output_by: name` 时触发;当开关显式为 false 时无条件跳过。
+  - 该校验仅在 effective outputs 使用 `container.include_header: true`(显式或默认) 且 `container.header_fields_output_by: name` 时触发;当开关显式为 false 时无条件跳过。
 - `template_vars` 仍保留为高级 workaround,但不作为“动态选字段/动态输出”的标准推荐路径。
 
 ## Requirements
@@ -57,7 +57,7 @@
 - 字段展示名唯一性校验默认启用,并提供显式关闭开关:
   - 校验对象为“有效展示名”: `field.name` 为空时回退到 `field_id`
   - 失败时错误信息应可诊断(至少包含冲突的展示名与相关字段定位信息)
-  - 触发条件: 仅当 effective outputs 使用 `header_fields_output_by: name`
+  - 触发条件: 仅当 effective outputs 使用 `include_header: true`(显式或默认) 且 `header_fields_output_by: name`
   - 开关: `validate_unique_field_names: false` 可显式关闭
 
 ### Nice to Have (Follow-ups)

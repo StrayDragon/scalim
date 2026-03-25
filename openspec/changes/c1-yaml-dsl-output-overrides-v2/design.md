@@ -36,10 +36,10 @@
 
 ### Decision: `RunOverrides` 输出覆盖对齐 YAML `outputs` 结构
 
-- 将历史 `overrides.output.*` 迁移为 `overrides.outputs`(list/mapping),其元素结构与 YAML `outputs[*]` 对齐,但本轮**仅承诺明细输出(detail)**的最小子集:
+- 将历史 `overrides.output.*` 迁移为 `overrides.outputs`(YAML-shaped `list[dict]`),其元素结构与 YAML `outputs[*]` 对齐,但本轮**仅承诺明细输出(detail)**的最小子集:
   - 仅允许 keys: `name` / `container` / `fields`
   - 不支持 `where` / `from` / `aggregate` 等扩展能力(未来按需增量扩展)
-- 调用侧以 plain dict/list 传入(不暴露/不要求用户导入 Python-only `OutputCompositionSpec`)。
+- 调用侧以 plain `list[dict]` 传入(不暴露/不要求用户导入 Python-only `OutputCompositionSpec`)。
 
 **优先级(高 → 低):**
 1) `overrides.outputs`(若提供且非空): 作为本次运行的 effective outputs,并编译为 execution 层的 `OutputCompositionSpec`
@@ -56,7 +56,7 @@
   - 若 `field.name` 非空: 使用 `field.name`
   - 否则回退为 `field_id`
 - 新增顶层开关 `validate_unique_field_names: bool`(默认启用;未声明视为 `true`)。
-- 该校验仅在“本次运行的 effective outputs 中存在 `container.header_fields_output_by: name`”时触发(避免在不输出 name header 的场景下引入不必要的破坏性)；当开关显式为 `false` 时无条件跳过。
+- 该校验仅在“本次运行的 effective outputs 中存在 `container.include_header: true`(显式或默认) 且 `container.header_fields_output_by: name`”时触发(避免在不输出 header 的场景下引入不必要的破坏性)；当开关显式为 `false` 时无条件跳过。
 - 允许 YAML 侧显式关闭该校验(用于存量重复表头或过渡期配置)。
 
 **校验范围:**

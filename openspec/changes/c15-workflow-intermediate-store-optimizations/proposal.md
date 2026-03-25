@@ -1,32 +1,34 @@
 ## Why
 
-`workflow-intermediate-store` 先解决最急迫的 pathless CSV 临时落盘问题，但 workflow 与 demand 之间仍存在更大的优化空间：内存预算治理、spill 策略、跨 demand 的 source 复用，以及非 CSV 中间态的统一承载。这些方向值得单独建模，否则很容易把 v1 简化方案膨胀成一轮高风险大改。
+`workflow-intermediate-store` 的 v1 先解决最急迫的 workflow-managed pathless CSV 临时落盘问题，但 workflow 与 demand 之间仍有两个关键缺口未闭合：
 
-因此需要一个低优先级、仅做 proposal 的后续提案，收敛这些优化目标与边界，避免它们在当前变更中以“顺手加入”的形式失控扩张。
+- 缺少稳定的 typed 中间态契约：当前仅有字符串化的 `InMemoryCsv`，无法承载 `FieldValue` 类型域，typed 数据流只能靠下游自行 parse。
+- workflow 无法把上游节点的数据作为下游 demand 的 main source：尽管 engine 层支持 `main_rows` 注入，但 workflow 层缺少显式声明与稳定 wiring。
+
+这两点会逼迫用户回退到“落盘 + 重新加载/解析”或“ctx/临时对象塞进隐式通道”的非理想路径，既慢也不稳。
+
+因此需要把 “typed 中间态 + workflow 纯 Python dataflow” 作为一个独立切片落地实现，并明确边界（不做预算/spill 等更大议题），避免 v1 在后续迭代中以“顺手加入”的形式失控扩张。
 
 ## What Changes
 
-- 规划一套更通用的 workflow intermediate store，覆盖：
-  - 内存预算与观测
-  - 超限后的 fail-fast / spill 策略
-  - 跨 demand 节点的 source / preload 结果复用
-  - 非 CSV 中间态（例如更适合 columnar 或自定义结构的中间格式）
-- 在 `workflow-intermediate-store` 已引入的 `InMemoryCsv`（字符串化 CSV 语义）之外，新增一个独立的 typed artifact：`InMemoryRows`（保留 Python `FieldValue` 类型域），用于：
-  - workflow 内部的纯 Python 数据流（source）传递
-  - 需要保留数值/布尔/Decimal 等类型语义的后续消费（例如 workbook 写入、进一步计算）
-  - 与 `InMemoryCsv` 并存但互不干扰：两者面向不同场景，不互相倒逼对方的契约扩张
-- 评估这套能力与现有 `workflow-cache-pool`、`source-cache`、output composition、workflow artifacts/ctx 的职责边界，避免能力重叠。
-- 该 change 当前只建立 proposal（可选补充最小 specs 作为契约草案），不开始实现。
+- 在 `workflow-intermediate-store` 已引入的 `InMemoryCsv`（字符串化 CSV 语义）之外，新增一个独立的 typed artifact：`InMemoryRows`（保留 `FieldValue` 类型域），用于 workflow 内部的纯 Python 数据流（source）传递与后续 typed 消费。
+- 扩展 execution 编排：`run_ir` 透传 `main_rows` 到 engine，并提供可选的 typed rows 捕获通道（按需启用）。
+- 扩展 workflow YAML/IR：通过显式声明 `main_rows_from` 将上游 `InMemoryRows` wiring 到下游 demand 的 `main_rows`（显式依赖/显式授权）。
+- workflow runtime 增加 typed artifact 的发布/可见性检查/最终 consumer 释放语义（与 workflow-managed CSV 的生命周期模式对齐）。
+
+**Non-Goals（本 change 不做）**
+- 不引入内存预算、spill-to-disk/tmpfs、LRU、OOM 防护等“预算治理”机制（另开 change 单独建模）。
+- 不引入非 rows 的 columnar/自定义格式（parquet/arrow/sqlite 等）。
+- 不改变 demand YAML 的既有 authoring surface（仅扩展 workflow YAML；standalone demand 规则不放宽）。
 
 ## Capabilities
 
 ### New Capabilities
-- `workflow-intermediate-store`: 规划 workflow 级中间态存储抽象，支持内存对象、预算治理与可选 spill。
-- `workflow-source-reuse`: 规划多个 demand 节点之间对相同 source / preload 结果的复用与生命周期管理。
-- `workflow-intermediate-artifacts`: 规划 workflow 中间态产物的“稳定数据契约”，至少包括：
+- `workflow-intermediate-store`: 提供 workflow 级 typed 中间态 `InMemoryRows`，以及发布/可见性/生命周期（最终 consumer 释放）语义。
+- `workflow-intermediate-artifacts`: 提供 workflow 中间态产物的“稳定数据契约”，至少包括：
   - `InMemoryCsv`：与 CSV 文件输出等价的字符串化表结构
   - `InMemoryRows`：保留 `FieldValue` 类型域的行式/表式结构（用于纯 Python 数据流）
-- `workflow-dataflow-main-rows`: 规划将上游节点的 `InMemoryRows` 作为下游节点的 `main_rows` 输入（显式声明、显式授权），形成 workflow 内纯 Python 数据流（source）传递。
+- `workflow-dataflow-main-rows`: 支持将上游节点的 `InMemoryRows` 作为下游节点的 `main_rows` 输入（显式声明、显式授权），形成 workflow 内纯 Python 数据流（source）传递。
 
 ### Modified Capabilities
 - `workflow-cache-pool`: 明确它与更通用 intermediate store 的边界，避免 cache_pool 被继续扩展成“万能中间态容器”。
@@ -35,8 +37,8 @@
 
 ## Impact
 
-- 该 proposal 面向后续路线，不改变当前实现，也不修改现有 YAML authoring surface。
-- 后续若继续推进，影响面预计会覆盖：
+- 该 change 将落地实现（不止 proposal），但 **不会** 修改 demand YAML authoring surface；会扩展 workflow YAML authoring surface。
+- 影响面预计覆盖：
   - `src/scalim/execution/**`
   - `src/scalim/workflow/**`
   - `src/scalim/workflow/execute.py`（workflow 侧数据流编排/生命周期）
@@ -45,17 +47,16 @@
   - `openspec/specs/source-cache/spec.md`
   - 可能新增的 `openspec/specs/workflow-intermediate-store/spec.md`
 - SSOT / 生成物边界：
-  - 当前位于 `openspec/notplan-changes/c80-workflow-intermediate-store-optimizations/`，仅维护 proposal 与契约草案：
-    - `openspec/notplan-changes/c80-workflow-intermediate-store-optimizations/proposal.md`
-    - `openspec/notplan-changes/c80-workflow-intermediate-store-optimizations/specs/workflow-intermediate-store/spec.md`
-  - 不涉及 `.gen.*` 文件或 `AUTOGEN` 注入区块；共享前仍通过 `just openspec-check` 校验
+  - 本 change 工件位于 `openspec/changes/c15-workflow-intermediate-store-optimizations/`。
+  - 不手改任何 `.gen.*` 文件或 `AUTOGEN` 注入区块；需要生成物更新时按 SSOT 流程通过 `just gen-docs`/`just qa` 完成。
+  - 共享前通过 `just openspec-check` 与 `just qa` 作为门禁。
 
 ## Calibration Notes (2026-03-25)
 
 - `c15-workflow-intermediate-store` 已完成归档（`openspec/changes/archive/2026-03-25-c15-workflow-intermediate-store/`），pathless CSV 临时落盘的基础能力已落地
 - workflow 模块路径已从 `src/scalim/dsl/by_yaml/runtime/` 迁移到 `src/scalim/workflow/`，已校正 `workflow_execute.py` → `execute.py`
 - `workflow-cache-pool`、`source-cache` 规范已存在于 `openspec/specs/`
-- 本提案仍为纯路线规划文档,不涉及实现
+- 本 change 将推进实现（typed artifact + workflow dataflow），并以 `just qa` 为兜底门禁
 - c15 归档时的 delta specs 落入 `workflow-managed-temp-outputs`/`workflow-shared-output-containers`/`output-composition`,而非独立的 `workflow-intermediate-store` spec;如后续推进本提案,需决定是创建独立 spec 还是继续扩展已有 specs
 
 ## Implementation Pitfalls (代码探索 2026-03-25)

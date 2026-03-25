@@ -399,7 +399,7 @@ Sources:
 ### `yaml-dsl-public-tools`
 - Title: yaml-dsl-public-tools Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-public-tools/spec.md)
-- Summary: 为 `YAML DSL` 的下游集成提供稳定“工具/自省”公开入口,避免下游依赖 `scalim.dsl.by_yaml.runtime.*` 等内部实现路径。
+- Summary: 为 `YAML DSL` 的下游集成提供稳定“工具/自省”公开入口,避免下游依赖 by_yaml runtime 的内部实现模块路径。
 
 ### `yaml-dsl-render-effective-yaml`
 - Title: yaml-dsl-render-effective-yaml Specification
