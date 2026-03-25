@@ -102,6 +102,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             )
 
         plan = self._get_or_create_joinable_plan(
+            resource_type="workbook",
             resource_id=key,
             plans=self._workbooks,
             inflight=self._inflight_workbooks,

@@ -131,6 +131,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             )
 
         plan = self._get_or_create_joinable_plan(
+            resource_type="csv",
             resource_id=key,
             plans=self._csvs,
             inflight=self._inflight_csvs,

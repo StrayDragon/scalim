@@ -232,6 +232,9 @@
           "shared resources commit atomically at workflow end",
           "shared resource lifecycle MUST be observable",
           "shared resource plan creation MUST be atomic and joinable within a workflow exec",
+          "joinable get-or-create 的等待诊断",
+          "joinable get-or-create 的可选超时",
+          "commit_all/discard_all 与 inflight 并发交错语义",
           "workflow workbook exports MUST escape Excel formulas by default",
           "workflow workbook resource authoring surface MUST support allow_formulas"
         ],
@@ -420,7 +423,7 @@
     },
     {
       "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "f018ccd463f5cacabd27494e0e68abf483b941ab4c8fa18dba5c45bd5be7b342"
+      "sha256": "ca8c2f9b01c8b80fc3476c8f115fd62ad5c33fc033633f3fc949677daf84f9ce"
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
@@ -474,7 +477,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "208d6db8ed0417a1a7f6b1a335247475ad85082da41530b82fcceb9bf77fbdbd"
+      "sha256": "66baec13fe06874b35ae325d028619b9c2aa943a01c513af823d65ae15c82b66"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

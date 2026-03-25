@@ -197,6 +197,9 @@
   - shared resources commit atomically at workflow end
   - shared resource lifecycle MUST be observable
   - shared resource plan creation MUST be atomic and joinable within a workflow exec
+  - joinable get-or-create 的等待诊断
+  - joinable get-or-create 的可选超时
+  - commit_all/discard_all 与 inflight 并发交错语义
   - workflow workbook exports MUST escape Excel formulas by default
   - workflow workbook resource authoring surface MUST support allow_formulas
 ### `workflow-sheetbook-resources`

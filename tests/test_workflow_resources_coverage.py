@@ -1,5 +1,6 @@
 import csv
 import threading
+import time
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -26,6 +27,58 @@ class _Instrumentation:
 
     def emit(self, event_type: str, payload: Any, meta: Optional[Dict[str, Any]] = None) -> None:
         self.events.append({"event_type": str(event_type), "payload": payload, "meta": dict(meta or {})})
+
+
+class _RaiseOnDiagnosticWarningInstrumentation(_Instrumentation):
+    def emit(self, event_type: str, payload: Any, meta: Optional[Dict[str, Any]] = None) -> None:
+        if str(event_type) == EVENT_DIAGNOSTIC_WARNING:
+            raise RuntimeError("emit boom")
+        return super(_RaiseOnDiagnosticWarningInstrumentation, self).emit(event_type, payload, meta=meta)
+
+
+class _JoinableTestManager(resources_base_mod.WorkflowResourceManagerBase):
+    def __init__(
+        self,
+        *,
+        instrumentation: Any,
+        wait_diagnostics: Optional[resources_base_mod.WorkflowResourceWaitDiagnostics] = None,
+        max_wait_s: Optional[float] = None,
+    ) -> None:
+        super(_JoinableTestManager, self).__init__(
+            workflow_exec_id="wf",
+            instrumentation=instrumentation,
+            workbook_defs={},
+            csv_defs={},
+            sheetbook_defs={},
+            wait_diagnostics=wait_diagnostics,
+            max_wait_s=max_wait_s,
+        )
+        self.commits: List[str] = []
+        self.discards: List[str] = []
+
+    def _commit_workbook(self, plan: object) -> None:  # type: ignore[override]
+        _ = plan
+        self.commits.append("workbook")
+
+    def _commit_csv(self, plan: object) -> None:  # type: ignore[override]
+        _ = plan
+        self.commits.append("csv")
+
+    def _commit_sheetbook(self, plan: object) -> None:  # type: ignore[override]
+        _ = plan
+        self.commits.append("sheetbook")
+
+    def _discard_workbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:  # type: ignore[override]
+        _ = plan, workflow_node_id, reason
+        self.discards.append("workbook")
+
+    def _discard_csv(self, plan: object, *, workflow_node_id: str, reason: str) -> None:  # type: ignore[override]
+        _ = plan, workflow_node_id, reason
+        self.discards.append("csv")
+
+    def _discard_sheetbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:  # type: ignore[override]
+        _ = plan, workflow_node_id, reason
+        self.discards.append("sheetbook")
 
 
 def _write_csv(path: Path, rows: List[List[str]]) -> Path:
@@ -685,6 +738,492 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
     runner.join(timeout=_TIMEOUT_S)
     assert not runner_errors
     assert instrumentation._reentered is True
+
+
+def test_workflow_resource_wait_diagnostics_rejects_invalid_values() -> None:
+    with pytest.raises(ValueError, match=r"warn_after_s"):
+        _ = resources_base_mod.WorkflowResourceWaitDiagnostics(enabled=True, warn_after_s=-1.0)
+    with pytest.raises(ValueError, match=r"repeat_every_s"):
+        _ = resources_base_mod.WorkflowResourceWaitDiagnostics(enabled=True, repeat_every_s=0.0)
+
+    diagnostics = resources_base_mod.WorkflowResourceWaitDiagnostics(
+        enabled=True,
+        warn_after_s=0.0,
+        repeat_every_s=0.01,
+        capture_owner_callsite=True,
+    )
+    assert diagnostics.enabled is True
+    assert diagnostics.warn_after_s == 0.0
+    assert diagnostics.repeat_every_s == 0.01
+    assert diagnostics.capture_owner_callsite is True
+
+
+def test_workflow_resource_manager_rejects_invalid_max_wait_s() -> None:
+    with pytest.raises(ValueError, match=r"max_wait_s"):
+        _ = _JoinableTestManager(instrumentation=_Instrumentation(), max_wait_s=-1.0)
+
+
+def test_capture_owner_callsite_returns_unknown_when_stack_has_no_frames(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(resources_base_mod.traceback, "extract_stack", lambda limit=12: [object()])
+    assert resources_base_mod._capture_owner_callsite() == "(unknown)"  # noqa: SLF001
+
+
+def test_wait_for_inflight_done_does_not_emit_warning_before_warn_after() -> None:
+    instrumentation = _Instrumentation()
+    diagnostics = resources_base_mod.WorkflowResourceWaitDiagnostics(
+        enabled=True,
+        warn_after_s=0.3,
+        repeat_every_s=0.01,
+        capture_owner_callsite=False,
+    )
+    manager = _JoinableTestManager(instrumentation=instrumentation, wait_diagnostics=diagnostics)
+
+    inflight_state = resources_base_mod._InFlightCreate(owner_thread_ident=123, owner_callsite=None)  # noqa: SLF001
+
+    def _set_done() -> None:
+        time.sleep(0.05)
+        inflight_state.done.set()
+
+    t1 = threading.Thread(target=_set_done, daemon=True)
+    t1.start()
+    manager._wait_for_inflight_done(  # noqa: SLF001
+        inflight_state=inflight_state,
+        resource_type="workbook",
+        resource_id="report",
+        wait_kind="join",
+    )
+    t1.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+
+
+def test_joinable_wait_diagnostics_emits_warning_and_includes_required_fields() -> None:
+    instrumentation = _Instrumentation()
+    diagnostics = resources_base_mod.WorkflowResourceWaitDiagnostics(
+        enabled=True,
+        warn_after_s=0.01,
+        repeat_every_s=None,
+        capture_owner_callsite=True,
+    )
+    manager = _JoinableTestManager(instrumentation=instrumentation, wait_diagnostics=diagnostics)
+
+    plans: Dict[str, object] = {}
+    inflight: Dict[str, object] = {}
+    owner_in_create = threading.Event()
+    continue_create = threading.Event()
+    errors: List[BaseException] = []
+
+    def _create() -> object:
+        owner_in_create.set()
+        if not continue_create.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("test timeout waiting to continue create")
+        return object()
+
+    def _owner() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    def _waiter() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=_owner)
+    t1.start()
+    assert owner_in_create.wait(timeout=_TIMEOUT_S)
+
+    t2 = threading.Thread(target=_waiter)
+    t2.start()
+
+    deadline = time.monotonic() + 2.0
+    warnings: List[Dict[str, Any]] = []
+    while time.monotonic() < deadline:
+        warnings = [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+        if warnings:
+            break
+        time.sleep(0.01)
+    assert warnings
+
+    continue_create.set()
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert errors == []
+
+    payload = warnings[0]["payload"]
+    lookup = getattr(payload, "lookup_key", None)
+    assert isinstance(lookup, dict)
+    assert lookup.get("resource_id") == "report"
+    assert lookup.get("resource_type") == "workbook"
+    assert isinstance(lookup.get("owner_thread_ident"), int)
+    assert isinstance(lookup.get("waiter_thread_ident"), int)
+    assert isinstance(lookup.get("wait_s"), float)
+    assert lookup.get("owner_callsite")
+
+
+def test_joinable_on_create_failure_propagates_error_to_waiters() -> None:
+    manager = _JoinableTestManager(instrumentation=_Instrumentation())
+
+    plans: Dict[str, object] = {}
+    inflight: Dict[str, object] = {}
+    owner_in_create = threading.Event()
+    continue_create = threading.Event()
+    owner_errors: List[BaseException] = []
+    waiter_errors: List[BaseException] = []
+
+    def _create() -> object:
+        owner_in_create.set()
+        if not continue_create.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("test timeout waiting to continue create")
+        return object()
+
+    def _on_create(_plan: object) -> None:
+        raise RuntimeError("on_create boom")
+
+    def _owner() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=_on_create,
+            )
+        except BaseException as exc:
+            owner_errors.append(exc)
+
+    def _waiter() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=_on_create,
+            )
+        except BaseException as exc:
+            waiter_errors.append(exc)
+
+    t1 = threading.Thread(target=_owner)
+    t1.start()
+    assert owner_in_create.wait(timeout=_TIMEOUT_S)
+
+    t2 = threading.Thread(target=_waiter)
+    t2.start()
+
+    continue_create.set()
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert len(owner_errors) == 1
+    assert len(waiter_errors) == 1
+    assert isinstance(owner_errors[0], RuntimeError)
+    assert isinstance(waiter_errors[0], RuntimeError)
+    assert "on_create boom" in str(owner_errors[0])
+    assert "on_create boom" in str(waiter_errors[0])
+    assert plans == {}
+
+
+def test_joinable_wait_diagnostics_repeats_warning() -> None:
+    instrumentation = _Instrumentation()
+    diagnostics = resources_base_mod.WorkflowResourceWaitDiagnostics(
+        enabled=True,
+        warn_after_s=0.01,
+        repeat_every_s=0.01,
+    )
+    manager = _JoinableTestManager(instrumentation=instrumentation, wait_diagnostics=diagnostics)
+
+    plans: Dict[str, object] = {}
+    inflight: Dict[str, object] = {}
+    owner_in_create = threading.Event()
+    continue_create = threading.Event()
+    errors: List[BaseException] = []
+
+    def _create() -> object:
+        owner_in_create.set()
+        if not continue_create.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("test timeout waiting to continue create")
+        return object()
+
+    def _owner() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="csv",
+                resource_id="merged",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    def _waiter() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="csv",
+                resource_id="merged",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=_owner)
+    t1.start()
+    assert owner_in_create.wait(timeout=_TIMEOUT_S)
+
+    t2 = threading.Thread(target=_waiter)
+    t2.start()
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        warnings = [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+        if len(warnings) >= 2:
+            break
+        time.sleep(0.01)
+
+    warnings = [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+    assert len(warnings) >= 2
+
+    continue_create.set()
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert errors == []
+
+
+def test_wait_diagnostics_warning_falls_back_to_logger_on_emit_failure(caplog: pytest.LogCaptureFixture) -> None:
+    instrumentation = _RaiseOnDiagnosticWarningInstrumentation()
+    diagnostics = resources_base_mod.WorkflowResourceWaitDiagnostics(enabled=True, warn_after_s=0.01)
+    manager = _JoinableTestManager(instrumentation=instrumentation, wait_diagnostics=diagnostics)
+
+    caplog.set_level("WARNING", logger="scalim.workflow-resources")
+
+    plans: Dict[str, object] = {}
+    inflight: Dict[str, object] = {}
+    owner_in_create = threading.Event()
+    continue_create = threading.Event()
+    errors: List[BaseException] = []
+
+    def _create() -> object:
+        owner_in_create.set()
+        if not continue_create.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("test timeout waiting to continue create")
+        return object()
+
+    def _owner() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    def _waiter() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=_owner)
+    t1.start()
+    assert owner_in_create.wait(timeout=_TIMEOUT_S)
+
+    t2 = threading.Thread(target=_waiter)
+    t2.start()
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        if any("inflight wait slow" in r.message for r in caplog.records):
+            break
+        time.sleep(0.01)
+
+    continue_create.set()
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+    assert errors == []
+    assert any("inflight wait slow" in r.message for r in caplog.records)
+
+
+def test_joinable_wait_timeout_raises_workflow_write_error_for_waiter_only() -> None:
+    instrumentation = _Instrumentation()
+    manager = _JoinableTestManager(
+        instrumentation=instrumentation,
+        max_wait_s=0.05,
+    )
+
+    plans: Dict[str, object] = {}
+    inflight: Dict[str, object] = {}
+    owner_in_create = threading.Event()
+    continue_create = threading.Event()
+    owner_errors: List[BaseException] = []
+    waiter_errors: List[BaseException] = []
+
+    def _create() -> object:
+        owner_in_create.set()
+        if not continue_create.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("test timeout waiting to continue create")
+        return object()
+
+    def _owner() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            owner_errors.append(exc)
+
+    def _waiter() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=plans,
+                inflight=inflight,  # type: ignore[arg-type]
+                create_fn=_create,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            waiter_errors.append(exc)
+
+    t1 = threading.Thread(target=_owner)
+    t1.start()
+    assert owner_in_create.wait(timeout=_TIMEOUT_S)
+
+    t2 = threading.Thread(target=_waiter)
+    t2.start()
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t2.is_alive()
+
+    continue_create.set()
+    t1.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert owner_errors == []
+    assert len(waiter_errors) == 1
+    assert isinstance(waiter_errors[0], resources_mod.WorkflowWriteError)
+    assert "resource_id=report" in str(waiter_errors[0])
+    assert "owner_thread_ident" in str(waiter_errors[0])
+
+
+def test_commit_all_and_discard_all_drain_inflight_workbook_and_csv() -> None:
+    manager = _JoinableTestManager(instrumentation=_Instrumentation())
+
+    wb_started = threading.Event()
+    wb_continue = threading.Event()
+    csv_started = threading.Event()
+    csv_continue = threading.Event()
+    errors: List[BaseException] = []
+
+    def _create_wb() -> object:
+        wb_started.set()
+        if not wb_continue.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("test timeout waiting to continue workbook create")
+        return object()
+
+    def _create_csv() -> object:
+        csv_started.set()
+        if not csv_continue.wait(timeout=_TIMEOUT_S):
+            raise RuntimeError("test timeout waiting to continue csv create")
+        return object()
+
+    def _owner_wb() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="workbook",
+                resource_id="report",
+                plans=manager._workbooks,  # noqa: SLF001
+                inflight=manager._inflight_workbooks,  # noqa: SLF001
+                create_fn=_create_wb,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    def _owner_csv() -> None:
+        try:
+            _ = manager._get_or_create_joinable_plan(  # noqa: SLF001
+                resource_type="csv",
+                resource_id="merged",
+                plans=manager._csvs,  # noqa: SLF001
+                inflight=manager._inflight_csvs,  # noqa: SLF001
+                create_fn=_create_csv,
+                on_create=lambda _p: None,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    owner1 = threading.Thread(target=_owner_wb)
+    owner2 = threading.Thread(target=_owner_csv)
+    owner1.start()
+    owner2.start()
+    assert wb_started.wait(timeout=_TIMEOUT_S)
+    assert csv_started.wait(timeout=_TIMEOUT_S)
+
+    committer = threading.Thread(target=manager.commit_all)
+    committer.start()
+    time.sleep(0.05)
+    assert committer.is_alive()
+
+    wb_continue.set()
+    csv_continue.set()
+
+    owner1.join(timeout=_TIMEOUT_S)
+    owner2.join(timeout=_TIMEOUT_S)
+    committer.join(timeout=_TIMEOUT_S)
+    assert not owner1.is_alive()
+    assert not owner2.is_alive()
+    assert not committer.is_alive()
+    assert errors == []
+    assert manager.commits[:2] == ["workbook", "csv"]
+
+    # discard_all should also drain (no inflight now, but cover path).
+    manager.discard_all(workflow_node_id="n_discard", reason="test")
+    assert "workbook" in manager.discards
+    assert "csv" in manager.discards
 
 
 def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_acquires_lock_once(

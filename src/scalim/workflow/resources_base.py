@@ -7,27 +7,70 @@
 """
 
 import copy
+import math
 import os
 import threading
+import time
+import traceback
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
+from .._internal import loggingx
 from ..events.catalog import (
+    EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_RESOURCE_COMMIT,
     EVENT_WORKFLOW_RESOURCE_CREATE,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
 from ..events.events import (
+    DiagnosticWarningEvent,
     WorkflowResourceCommitEvent,
     WorkflowResourceCreateEvent,
     WorkflowResourceDiscardEvent,
     WorkflowResourceWriteEvent,
 )
+from ..vendor.dataclassesx import dataclass
 
 _WRITE_LOCK_SUFFIX = ".scalim.lock"
+
+
+@dataclass
+class WorkflowResourceWaitDiagnostics:
+    """共享资源 `joinable get-or-create` 的 `waiter` 等待诊断配置(默认关闭).
+
+    说明:
+    - 当 `enabled=False` 且 `max_wait_s` 未配置时,`waiter` 路径保持单次 `Event.wait()` (不引入循环/时间计算开销)。
+    - 仅在显式开启后,当等待超过阈值才输出告警 (便于定位卡住的资源创建)。
+    """
+
+    enabled: bool
+    warn_after_s: float = 30.0
+    repeat_every_s: Optional[float] = None
+    capture_owner_callsite: bool = False
+
+    def __post_init__(self) -> None:
+        self.enabled = bool(self.enabled)
+
+        warn_after = float(self.warn_after_s)
+        if not math.isfinite(warn_after) or warn_after < 0:
+            msg = "warn_after_s must be a finite non-negative float"
+            raise ValueError(msg)
+        self.warn_after_s = warn_after
+
+        repeat_every = None if self.repeat_every_s is None else float(self.repeat_every_s)
+        if repeat_every is not None and (not math.isfinite(repeat_every) or repeat_every <= 0):
+            msg = "repeat_every_s must be a finite positive float"
+            raise ValueError(msg)
+        self.repeat_every_s = repeat_every
+
+        self.capture_owner_callsite = bool(self.capture_owner_callsite)
+
+    @classmethod
+    def disabled(cls) -> "WorkflowResourceWaitDiagnostics":
+        return cls(enabled=False)
 
 
 class WorkflowWriteError(RuntimeError):
@@ -54,9 +97,40 @@ def _clone_exception_for_reraise(exc: BaseException) -> BaseException:
 
 
 class _InFlightCreate:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        owner_thread_ident: int,
+        owner_callsite: Optional[str] = None,
+    ) -> None:
+        self.owner_thread_ident: int = int(owner_thread_ident)
+        self.owner_callsite: Optional[str] = owner_callsite
         self.done: threading.Event = threading.Event()
         self.error: Optional[BaseException] = None
+
+
+def _capture_owner_callsite() -> str:
+    # 仅用于诊断模式: 尽量保持简短、稳定、且不包含不必要的栈深信息.
+    stack = traceback.extract_stack(limit=12)
+    for frame in reversed(stack[:-1]):
+        filename = str(getattr(frame, "filename", "") or "")
+        if filename.endswith("resources_base.py"):
+            continue
+        func = str(getattr(frame, "name", "") or "")
+        lineno = int(getattr(frame, "lineno", 0) or 0)
+        return "{}:{}:{}".format(filename, lineno, func)
+    return "(unknown)"
+
+
+def _compute_poll_interval_s(diagnostics: WorkflowResourceWaitDiagnostics, *, max_wait_s: Optional[float]) -> float:
+    # 默认: 1s 轮询;当阈值很小(例如测试场景)时,用更小的轮询避免错过告警/超时.
+    candidates: List[float] = [1.0, float(diagnostics.warn_after_s)]
+    if diagnostics.repeat_every_s is not None:
+        candidates.append(float(diagnostics.repeat_every_s))
+    if max_wait_s is not None:
+        candidates.append(float(max_wait_s))
+    poll_s = min(candidates)
+    return max(0.01, float(poll_s))
 
 
 def _acquire_write_lock(output_path: str) -> Path:
@@ -98,6 +172,8 @@ class _WorkflowResourceManagerBase(ABC):
     _inflight_workbooks: Dict[str, _InFlightCreate]
     _inflight_csvs: Dict[str, _InFlightCreate]
     _lock: threading.Lock
+    _wait_diagnostics: WorkflowResourceWaitDiagnostics
+    _max_wait_s: Optional[float]
 
     def __init__(
         self,
@@ -108,6 +184,8 @@ class _WorkflowResourceManagerBase(ABC):
         workbook_allow_formulas: Optional[Mapping[str, bool]] = None,
         csv_defs: Mapping[str, str],
         sheetbook_defs: Mapping[str, object],
+        wait_diagnostics: Optional[WorkflowResourceWaitDiagnostics] = None,
+        max_wait_s: Optional[float] = None,
     ) -> None:
         self._workflow_exec_id = str(workflow_exec_id)
         self._instrumentation = instrumentation
@@ -121,10 +199,217 @@ class _WorkflowResourceManagerBase(ABC):
         self._inflight_workbooks = {}
         self._inflight_csvs = {}
         self._lock = threading.Lock()
+        self._wait_diagnostics = wait_diagnostics or WorkflowResourceWaitDiagnostics.disabled()
+        self._max_wait_s = self._normalize_max_wait_s(max_wait_s)
+
+    def _normalize_max_wait_s(self, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        max_wait = float(value)
+        if not math.isfinite(max_wait) or max_wait < 0:
+            msg = "max_wait_s must be a finite non-negative float"
+            raise ValueError(msg)
+        return float(max_wait)
+
+    def _emit_inflight_wait_slow_warning(
+        self,
+        *,
+        resource_type: str,
+        resource_id: str,
+        wait_kind: str,
+        wait_s: float,
+        inflight_state: _InFlightCreate,
+    ) -> None:
+        diagnostics = self._wait_diagnostics
+        lookup_key = {
+            "resource_type": str(resource_type),
+            "resource_id": str(resource_id),
+            "wait_kind": str(wait_kind),
+            "wait_s": round(float(wait_s), 3),
+            "warn_after_s": float(diagnostics.warn_after_s),
+            "repeat_every_s": diagnostics.repeat_every_s,
+            "max_wait_s": self._max_wait_s,
+            "owner_thread_ident": inflight_state.owner_thread_ident,
+            "waiter_thread_ident": threading.get_ident(),
+            "owner_callsite": inflight_state.owner_callsite,
+        }
+        event = DiagnosticWarningEvent(
+            message="Workflow resource inflight wait slow",
+            source_id=None,
+            field_id=None,
+            lookup_key=lookup_key,
+            row_id=None,
+        )
+        meta = {
+            "workflow_exec_id": self._workflow_exec_id,
+            "resource_type": str(resource_type),
+            "resource_id": str(resource_id),
+        }
+
+        try:
+            _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, event, meta=meta)
+        except Exception:  # noqa: BLE001
+            logger = loggingx.get_logger("workflow-resources")
+            msg = "{}inflight wait slow: {}".format(loggingx.prefix("workflow-resources"), loggingx.format_kv(lookup_key))
+            logger.warning(msg)
+
+    def _wait_for_inflight_done(
+        self,
+        *,
+        inflight_state: _InFlightCreate,
+        resource_type: str,
+        resource_id: str,
+        wait_kind: str,
+    ) -> None:
+        diagnostics = self._wait_diagnostics
+        max_wait_s = self._max_wait_s
+        if not diagnostics.enabled and max_wait_s is None:
+            _ = inflight_state.done.wait()
+            return
+
+        wait_start = time.monotonic()
+        next_warn_after_s = diagnostics.warn_after_s
+        poll_s = _compute_poll_interval_s(diagnostics, max_wait_s=max_wait_s)
+        while True:
+            if inflight_state.done.wait(timeout=poll_s):
+                return
+            wait_s = time.monotonic() - wait_start
+
+            if max_wait_s is not None and wait_s >= max_wait_s:
+                msg = "Workflow resource inflight wait timeout: {}".format(
+                    loggingx.format_kv(
+                        resource_type=str(resource_type),
+                        resource_id=str(resource_id),
+                        wait_kind=str(wait_kind),
+                        wait_s=round(float(wait_s), 3),
+                        max_wait_s=float(max_wait_s),
+                        owner_thread_ident=inflight_state.owner_thread_ident,
+                        waiter_thread_ident=threading.get_ident(),
+                        owner_callsite=inflight_state.owner_callsite,
+                    )
+                )
+                raise WorkflowWriteError(msg)
+
+            if not diagnostics.enabled or wait_s < next_warn_after_s:
+                continue
+
+            self._emit_inflight_wait_slow_warning(
+                resource_type=str(resource_type),
+                resource_id=str(resource_id),
+                wait_kind=str(wait_kind),
+                wait_s=wait_s,
+                inflight_state=inflight_state,
+            )
+            if diagnostics.repeat_every_s is None:
+                next_warn_after_s = float("inf")
+            else:
+                next_warn_after_s += diagnostics.repeat_every_s
+
+    def _drain_inflight(self, *, wait_kind: str) -> None:
+        while True:
+            with self._lock:
+                workbook_items = list(self._inflight_workbooks.items())
+                csv_items = list(self._inflight_csvs.items())
+            if not workbook_items and not csv_items:
+                return
+            for inflight_id, inflight_state in workbook_items:
+                self._wait_for_inflight_done(
+                    inflight_state=inflight_state,
+                    resource_type="workbook",
+                    resource_id=str(inflight_id),
+                    wait_kind=str(wait_kind),
+                )
+            for inflight_id, inflight_state in csv_items:
+                self._wait_for_inflight_done(
+                    inflight_state=inflight_state,
+                    resource_type="csv",
+                    resource_id=str(inflight_id),
+                    wait_kind=str(wait_kind),
+                )
+
+    def _new_inflight_state(self) -> _InFlightCreate:
+        owner_callsite = None
+        diagnostics = self._wait_diagnostics
+        if diagnostics.enabled and diagnostics.capture_owner_callsite:
+            owner_callsite = _capture_owner_callsite()
+        return _InFlightCreate(
+            owner_thread_ident=threading.get_ident(),
+            owner_callsite=owner_callsite,
+        )
+
+    def _store_inflight_error_and_cleanup(
+        self,
+        *,
+        key: str,
+        inflight: Dict[str, _InFlightCreate],
+        inflight_state: _InFlightCreate,
+        exc: BaseException,
+    ) -> None:
+        stored_error = _clone_exception_for_reraise(exc)
+        with suppress(Exception):
+            stored_error = stored_error.with_traceback(None)
+        with self._lock:
+            inflight_state.error = stored_error
+            if inflight.get(key) is inflight_state:
+                _ = inflight.pop(key, None)
+
+    def _get_joinable_plan_waiter(
+        self,
+        *,
+        resource_type: str,
+        resource_id: str,
+        key: str,
+        plans: Dict[str, object],
+        inflight_state: _InFlightCreate,
+    ) -> object:
+        self._wait_for_inflight_done(
+            inflight_state=inflight_state,
+            resource_type=str(resource_type),
+            resource_id=str(resource_id),
+            wait_kind="join",
+        )
+        with self._lock:
+            existing = plans.get(key)
+            error = inflight_state.error
+        if existing is not None:
+            return existing
+        if error is not None:
+            raise _clone_exception_for_reraise(error)
+        msg = (  # pragma: no cover
+            "WorkflowResourceManager internal error: inflight done but missing plan/error for resource_id: {!r}".format(key)
+        )
+        raise RuntimeError(msg)  # pragma: no cover
+
+    def _get_joinable_plan_owner(
+        self,
+        *,
+        key: str,
+        plans: Dict[str, object],
+        inflight: Dict[str, _InFlightCreate],
+        inflight_state: _InFlightCreate,
+        create_fn: Callable[[], object],
+        on_create: Callable[[object], None],
+    ) -> object:
+        try:
+            plan = create_fn()
+            on_create(plan)
+        except BaseException as exc:
+            self._store_inflight_error_and_cleanup(key=key, inflight=inflight, inflight_state=inflight_state, exc=exc)
+            raise
+        else:
+            with self._lock:
+                plans[key] = plan
+                if inflight.get(key) is inflight_state:
+                    _ = inflight.pop(key, None)
+                inflight_state.error = None
+            return plan
+        finally:
+            inflight_state.done.set()
 
     def _get_or_create_joinable_plan(
         self,
         *,
+        resource_type: str,
         resource_id: str,
         plans: Dict[str, object],
         inflight: Dict[str, _InFlightCreate],
@@ -138,50 +423,29 @@ class _WorkflowResourceManagerBase(ABC):
                 return existing
             inflight_state = inflight.get(key)
             if inflight_state is None:
-                inflight_state = _InFlightCreate()
+                inflight_state = self._new_inflight_state()
                 inflight[key] = inflight_state
                 is_owner = True
             else:
                 is_owner = False
 
         if not is_owner:
-            _ = inflight_state.done.wait()
-            with self._lock:
-                existing = plans.get(key)
-                if existing is not None:
-                    return existing
-                error = inflight_state.error
-            if error is not None:
-                raise _clone_exception_for_reraise(error)
-            msg = "WorkflowResourceManager internal error: inflight done but missing plan/error for resource_id: {!r}".format(
-                key
-            )  # pragma: no cover
-            raise RuntimeError(msg)  # pragma: no cover
+            return self._get_joinable_plan_waiter(
+                resource_type=str(resource_type),
+                resource_id=str(resource_id),
+                key=key,
+                plans=plans,
+                inflight_state=inflight_state,
+            )
 
-        try:
-            plan = create_fn()
-        except BaseException as exc:
-            stored_error = _clone_exception_for_reraise(exc)
-            with suppress(Exception):
-                stored_error = stored_error.with_traceback(None)
-            with self._lock:
-                inflight_state.error = stored_error
-                if inflight.get(key) is inflight_state:
-                    _ = inflight.pop(key, None)
-            inflight_state.done.set()
-            raise
-
-        with self._lock:
-            plans[key] = plan
-            if inflight.get(key) is inflight_state:
-                _ = inflight.pop(key, None)
-            inflight_state.error = None
-
-        try:
-            on_create(plan)
-        finally:
-            inflight_state.done.set()
-        return plan
+        return self._get_joinable_plan_owner(
+            key=key,
+            plans=plans,
+            inflight=inflight,
+            inflight_state=inflight_state,
+            create_fn=create_fn,
+            on_create=on_create,
+        )
 
     def _emit_resource_create(self, *, workflow_node_id: str, resource_type: str, resource_id: str, path: str) -> None:
         _ = self._instrumentation.emit(
@@ -266,6 +530,7 @@ class _WorkflowResourceManagerBase(ABC):
         )
 
     def commit_all(self) -> None:
+        self._drain_inflight(wait_kind="commit_all")
         for plan in list(self._workbooks.values()):
             self._commit_workbook(plan)
         for plan in list(self._csvs.values()):
@@ -274,6 +539,7 @@ class _WorkflowResourceManagerBase(ABC):
             self._commit_sheetbook(plan)
 
     def discard_all(self, *, workflow_node_id: str, reason: str) -> None:
+        self._drain_inflight(wait_kind="discard_all")
         for plan in list(self._workbooks.values()):
             self._discard_workbook(plan, workflow_node_id=str(workflow_node_id), reason=str(reason))
         for plan in list(self._csvs.values()):
@@ -309,6 +575,7 @@ class _WorkflowResourceManagerBase(ABC):
 __all__ = [
     "WRITE_LOCK_SUFFIX",
     "WorkflowResourceManagerBase",
+    "WorkflowResourceWaitDiagnostics",
     "WorkflowWriteError",
     "_WorkflowResourceManagerBase",
     "_acquire_write_lock",
