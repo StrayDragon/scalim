@@ -502,6 +502,22 @@ prompt-eval-agent:
 prompt-eval-agent-tmp OUTPUT_DIR="/tmp/scalim-prompt-eval-agent":
     python scripts/prompt-eval.py --llm-agent --output-dir "{{ OUTPUT_DIR }}"
 
+# 报告: cast 使用基线
+report-cast-usage:
+    uv {{ UV_OPTIONS }} run python scripts/check-cast-usage.py
+
+# 检查: cast 使用必须显式 allow
+check-cast-usage:
+    uv {{ UV_OPTIONS }} run python scripts/check-cast-usage.py --check
+
+# 报告: pragma no cover 基线
+report-no-cover:
+    uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py
+
+# 检查: pragma no cover 必须显式 allow
+check-no-cover:
+    uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check
+
 # QA: 仅py轻量的检查
 quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 

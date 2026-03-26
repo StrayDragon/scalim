@@ -104,6 +104,15 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **WHEN** 新条目写入将导致超限
 - **THEN** 系统 MUST 按该策略执行(报错或淘汰),且错误信息/事件 MUST 可用于排障
 
+### Requirement: cache pool eviction MUST NOT evict in-flight (loading) entries
+当 cache pool 条目处于 in-flight load(`loading=True`)时,系统 MUST NOT 将其作为 refcount/LRU 的淘汰候选;否则可能导致条目被逐出后成为“孤儿”,从而触发重复加载与缓存不一致.
+
+#### Scenario: refcount eviction skips loading entries
+- **GIVEN** 某个 signature 的缓存条目处于 `loading=True`
+- **WHEN** workflow node done 触发 refcount=0 的逐出逻辑
+- **THEN** 逐出逻辑 MUST 跳过该条目
+- **AND** 后续请求 MUST 复用该次 in-flight load 的结果(不得重复加载)
+
 ### Requirement: cache pool MUST be observable via workflow-level events
 系统 MUST 为 cache pool 的关键生命周期动作提供可观测事件/钩子点,以便 hooks/observers/scalim-viz 能解释“复用/释放/淘汰”导致的行为变化:
 - 系统 MUST 发出以下事件类型:

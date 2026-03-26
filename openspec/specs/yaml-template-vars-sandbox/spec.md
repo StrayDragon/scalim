@@ -48,6 +48,19 @@ TBD - created by archiving change c20-yaml-template-vars-sandbox. Update Purpose
 - **THEN** 模板渲染 MUST 成功并产生渲染后的 YAML 文本
 - **AND** 系统 MUST 发出明确的风险告警（warning）
 
+### Requirement: unsafe entrypoints MUST be auditable and MUST warn about legacy sandbox deprecation
+当调用方通过显式 `unsafe` 语义入口启用不安全能力时,系统 MUST 产生可观测的 warning 级审计输出.
+
+当 `template_sandbox="legacy"` 被使用时,系统 SHOULD 额外输出弃用警告,提示迁移到 `safe`.
+
+#### Scenario: unsafe entrypoint emits audit warning
+- **WHEN** 调用方调用 `unsafe_run/unsafe_compile`
+- **THEN** 系统 MUST 产生 warning 级告警/审计输出
+
+#### Scenario: legacy sandbox emits deprecation warning
+- **WHEN** 调用方通过 `unsafe` 入口启用 `template_sandbox="legacy"`
+- **THEN** 系统 SHOULD 产生弃用警告(deprecation)
+
 ### Requirement: template_vars MUST be JSON/YAML-like by default
 系统 MUST 对 `template_vars` 提供输入护栏（默认策略），以降低误把“带副作用能力对象”注入模板的风险。
 

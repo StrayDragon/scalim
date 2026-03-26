@@ -23,6 +23,23 @@ TBD - created by archiving change c2-allowlist-footgun-hardening. Update Purpose
 - **THEN** 系统 MUST 允许继续执行
 - **AND** 系统 MUST 发出明确的风险告警（warning）
 
+### Requirement: trusted_allow_all_modules MUST be gated by an explicit env var
+当调用方显式启用 `resolver_trusted_mode=trusted_allow_all_modules` 时,系统 MUST 要求环境变量 `SCALIM_ALLOW_TRUSTED_ALL_MODULES=1`,否则 MUST fail-fast.
+
+该门控用于防止误在生产环境中启用“等效代码执行权限”的模式.
+
+#### Scenario: trusted_allow_all_modules fails without env gate
+- **WHEN** 调用方启用 `resolver_trusted_mode=trusted_allow_all_modules`
+- **AND** 未设置 `SCALIM_ALLOW_TRUSTED_ALL_MODULES=1`
+- **THEN** 系统 MUST fail-fast
+- **AND** 错误信息 MUST 明确指出需要设置环境变量才能启用
+
+#### Scenario: trusted_allow_all_modules allowed with env gate
+- **WHEN** 调用方启用 `resolver_trusted_mode=trusted_allow_all_modules`
+- **AND** 设置 `SCALIM_ALLOW_TRUSTED_ALL_MODULES=1`
+- **THEN** 系统 MAY 继续执行
+- **AND** 系统 MUST 发出明确的风险告警(warning)
+
 ### Requirement: allowed_functions wildcard MUST be rejected
 系统 MUST 拒绝 `allowed_functions={"*"}`（无论是否同时提供 `allowed_modules` 或是否处于 trusted-mode），并给出可操作的替代方案：
 - 若希望“对模块做约束”，则应移除 `allowed_functions={"*"}` 并仅使用 `allowed_modules`
@@ -48,4 +65,3 @@ TBD - created by archiving change c2-allowlist-footgun-hardening. Update Purpose
 - **WHEN** 调用方未提供 `allowed_modules` 且未提供 `allowed_functions`
 - **THEN** 系统 MUST fail-fast
 - **AND** 错误信息 MUST 提供可复制的 allowlist 配置示例
-

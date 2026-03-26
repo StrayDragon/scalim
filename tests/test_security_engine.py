@@ -1,6 +1,7 @@
 import ast
 import logging
 from decimal import Decimal
+from typing import Any, Dict, List, Tuple
 
 import pytest
 
@@ -8,9 +9,11 @@ import scalim.dsl.by_yaml.config_parsing.security as security
 from scalim.dsl.by_yaml.config_parsing.security import (
     ComputeExpressionError,
     SecureComputeEngine,
+    SecureComputeCalculator,
     SecurityAuditLogger,
     SecurityError,
     default_audit_callback,
+    redacted_audit_callback,
     extract_dependencies_from_compute,
 )
 
@@ -28,8 +31,8 @@ def test_compiled_calculator_supports_positional_and_kwargs() -> None:
 
     assert calc(a=1, b=2) == 3
     assert calc(1, 2) == 3
-    assert getattr(calc, "_scalim_secure_compute", False) is True
-    assert getattr(calc, "_scalim_secure_compute_dependencies") == ("a", "b")
+    assert isinstance(calc, SecureComputeCalculator)
+    assert calc.dependencies == ("a", "b")
 
     with pytest.raises(TypeError, match="mixed args and kwargs"):
         _ = calc(1, b=2)
@@ -248,9 +251,9 @@ def test_security_audit_logger_emits_messages(caplog) -> None:
 
 
 def test_audit_callback_called_on_eval() -> None:
-    calls = []
+    calls: List[Tuple[str, Dict[str, Any], object]] = []
 
-    def my_audit(expression: str, field_values: dict, result: object) -> None:
+    def my_audit(expression: str, field_values: Dict[str, Any], result: object) -> None:
         calls.append((expression, field_values.copy(), result))
 
     engine = SecureComputeEngine(audit_callback=my_audit)
@@ -285,6 +288,18 @@ def test_default_audit_callback_logs(caplog) -> None:
         calc(a=10)
 
     assert any(security.EVAL_AUDIT_LOG_PREFIX in record.getMessage() for record in caplog.records)
+
+
+def test_redacted_audit_callback_logs_only_hash_and_field_names(caplog) -> None:
+    engine = SecureComputeEngine(audit_callback=redacted_audit_callback)
+    calc = engine.compile("a * 2", ("a",))
+
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.by_yaml.security"):
+        calc(a=10)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("`expr_hash`=" in message for message in messages)
+    assert any("`fields`=" in message for message in messages)
 
 
 def test_compute_limits_rejects_negative_values() -> None:

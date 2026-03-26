@@ -1,10 +1,17 @@
+import os
 from concurrent.futures import Future
 from contextlib import contextmanager
 import sys
+from typing import cast
 
+from scalim.planning.operators import LoadRefOperatorIr
 from scalim.vendor.compact import importlibx
 from scalim.sinks.sink_base import IColumnSink, IRowSink, ISink
 from scalim.typedefs import FieldValue, RowData
+
+CI_TIMEOUT_S = float(os.environ.get("SCALIM_TEST_TIMEOUT", "10.0"))
+NEGATIVE_TIMEOUT_S = float(os.environ.get("SCALIM_TEST_NEGATIVE_TIMEOUT", "2.0"))
+POLL_DEADLINE_S = float(os.environ.get("SCALIM_TEST_POLL_DEADLINE", "5.0"))
 
 
 class InlineExecutor:
@@ -27,8 +34,8 @@ class RecordingLoadRefExecutor:
         self._calls = calls
 
     def execute(self, operator, context, batch_row_nth, runtime) -> None:  # type: ignore[no-untyped-def]
-        field_key = getattr(operator, "field_key", None)
-        self._calls.append(field_key if field_key is not None else str(operator))
+        load_ref_operator = cast("LoadRefOperatorIr", operator)
+        self._calls.append(load_ref_operator.field_key)
         _ = context
         _ = batch_row_nth
         _ = runtime
@@ -115,10 +122,13 @@ class ColumnListSink(IColumnSink):
 
 
 __all__ = [
+    "CI_TIMEOUT_S",
     "ColumnListSink",
     "InlineExecutor",
     "ListSink",
+    "NEGATIVE_TIMEOUT_S",
     "NoOpLoadRefExecutor",
+    "POLL_DEADLINE_S",
     "RecordingLoadRefExecutor",
     "StreamingListSink",
     "missing_optional_dependency",

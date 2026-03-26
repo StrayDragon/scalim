@@ -258,7 +258,7 @@ class CSVSink(BaseRowSink):
         try:
             # 原子重命名临时文件到目标路径
             _ = temp_path_obj.replace(self.output_path)
-        except Exception as exc:
+        except OSError as exc:
             _LOGGER.exception(CSV_SINK_ATOMIC_REPLACE_FAILED_LOG, self.output_path)
             if temp_path_obj.exists():
                 try:
@@ -385,7 +385,7 @@ class ColumnCSVSink(IColumnSink):
 
             # 原子重命名临时文件到目标路径
             _ = temp_path_obj.replace(self.output_path)
-        except Exception:
+        except (OSError, csv.Error):
             # 清理临时文件
             if temp_path_obj.exists():
                 try:

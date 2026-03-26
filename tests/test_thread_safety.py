@@ -9,7 +9,9 @@ from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.sources import MainSourceIr
 
-_TIMEOUT_S = 5.0
+from tests.testing_utils import CI_TIMEOUT_S, NEGATIVE_TIMEOUT_S
+
+_TIMEOUT_S = CI_TIMEOUT_S
 
 
 def test_scalim_engine_run_is_serialized_per_instance() -> None:
@@ -52,7 +54,7 @@ def test_scalim_engine_run_is_serialized_per_instance() -> None:
     t2.start()
 
     assert run2_thread_started.wait(timeout=_TIMEOUT_S)
-    assert run2_started.wait(timeout=0.5) is False
+    assert run2_started.wait(timeout=NEGATIVE_TIMEOUT_S) is False
 
     run1_can_continue.set()
     t1.join(timeout=_TIMEOUT_S)
@@ -93,8 +95,8 @@ def test_observer_manager_capture_drain_and_emit_are_thread_safe() -> None:
     t2 = threading.Thread(target=_drain, daemon=True)
     t1.start()
     t2.start()
-    t1.join(timeout=2.0)
-    t2.join(timeout=2.0)
+    t1.join(timeout=CI_TIMEOUT_S)
+    t2.join(timeout=CI_TIMEOUT_S)
     assert not t1.is_alive()
     assert not t2.is_alive()
     assert not errors
@@ -140,8 +142,8 @@ def test_hook_manager_register_unreg_while_emitting_is_thread_safe() -> None:
     t2 = threading.Thread(target=_mutate, daemon=True)
     t1.start()
     t2.start()
-    t1.join(timeout=2.0)
-    t2.join(timeout=2.0)
+    t1.join(timeout=CI_TIMEOUT_S)
+    t2.join(timeout=CI_TIMEOUT_S)
     assert not t1.is_alive()
     assert not t2.is_alive()
     assert not errors

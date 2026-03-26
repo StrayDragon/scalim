@@ -189,6 +189,9 @@
           "派生字段执行与错误处理",
           "compute 表达式预编译并复用执行",
           "compute 编译缓存有上限(有界 LRU)",
+          "compute failures MUST NOT log raw expressions by default",
+          "compute audit callback MUST support redaction",
+          "compile cache operations MUST be safe under concurrent access",
           "call_by 派生字段函数调用",
           "call_by 上下文引用",
           "compute sandbox rejection MUST include an actionable `call_by` migration hint"
@@ -217,6 +220,7 @@
           "cache pool supports lifecycle management and auto-release",
           "cache pool refcount MUST be derived from Workflow IR when available",
           "cache pool enforces budgets with a clear policy",
+          "cache pool eviction MUST NOT evict in-flight (loading) entries",
           "cache pool MUST be observable via workflow-level events"
         ],
         "slug": "workflow-cache-pool"
@@ -383,7 +387,7 @@
     },
     {
       "path": "openspec/specs/field-compute/spec.md",
-      "sha256": "67c8e5dcd2de48cb2e88b3ade2a8453a19ed36bbbd9919ce9633c7610638eb24"
+      "sha256": "e90d8474dcb6fce32f82017a74ec6924048f65ecaafee0702961201d6ddf1504"
     },
     {
       "path": "openspec/specs/loader-retry-policy/spec.md",
@@ -415,7 +419,7 @@
     },
     {
       "path": "openspec/specs/workflow-cache-pool/spec.md",
-      "sha256": "a4e529cbdad2f067acec636a0d04fa8b574d6da36ccd8c890336ac76f918a18f"
+      "sha256": "43f5a93bfaf7152c4180d06312238d4de9bbd6a444f752a8d38f50181db58942"
     },
     {
       "path": "openspec/specs/workflow-observability-bridge/spec.md",
@@ -477,7 +481,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "c0e26412d4aa12048268fce1f641692425bc0efeab67d5f985ac3290868c9093"
+      "sha256": "e9bdf35d33681bff6a73ea5285756f63fbb6c9bee8bef64bf0236ae3e8d493b7"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

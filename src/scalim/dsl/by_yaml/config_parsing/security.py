@@ -1,9 +1,12 @@
 import ast
+import hashlib
 import logging
 import operator
 import sys
+import threading
 from collections import OrderedDict
 from decimal import Decimal
+from types import CodeType
 from typing import Any, Callable, ClassVar, Container, Dict, FrozenSet, List, Optional, Set, Tuple, Type, Union, cast
 
 from ....vendor.compact.typing_extensionsx import override
@@ -12,9 +15,6 @@ from ....vendor.dataclassesx import dataclass
 _PY38_PLUS = sys.version_info >= (3, 8)
 
 security_logger = logging.getLogger("scalim.dsl.by_yaml.security")
-
-_SECURE_COMPUTE_MARKER_ATTR = "_scalim_secure_compute"
-_SECURE_COMPUTE_DEPS_ATTR = "_scalim_secure_compute_dependencies"
 
 EVAL_AUDIT_LOG_PREFIX = "求值审计"
 EVAL_AUDIT_LOG = EVAL_AUDIT_LOG_PREFIX + ": 表达式=%r, 字段=%r, 结果=%r"
@@ -109,10 +109,44 @@ class ComputeLimits:
     max_range_len: int = 10000
 
 
+@dataclass(frozen=True)
+class SecureComputeCalculator:
+    engine: "SecureComputeEngine"
+    expression: str
+    dependencies: Tuple[str, ...]
+    code: CodeType
+
+    def __call__(self, *args: Any, **field_values: Any) -> Any:
+        return self.engine.evaluate_compiled(
+            expression=self.expression,
+            code=self.code,
+            dependencies=self.dependencies,
+            args=args,
+            field_values=field_values,
+        )
+
+
+def is_secure_compute_calculator(value: object) -> bool:
+    return isinstance(value, SecureComputeCalculator)
+
+
 def default_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
     # 注意: 这里会记录原始字段值与计算结果;根据输入数据集不同,可能包含 `PII` 或其他敏感信息.
     # 在生产环境中,除非你完全信任数据,否则建议使用脱敏回调(或直接禁用审计日志).
     security_logger.debug(EVAL_AUDIT_LOG, expression, field_values, result)
+
+
+def redacted_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
+    """脱敏审计回调: 仅记录表达式和字段名,不记录字段值与结果."""
+    expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
+    field_names = sorted(field_values.keys()) if field_values else []
+    security_logger.debug(
+        "%s: `expr_hash`=%s, `fields`=%r, `result_type`=%s",
+        EVAL_AUDIT_LOG_PREFIX,
+        expr_id,
+        field_names,
+        type(result).__name__,
+    )
 
 
 class ExpressionValidator:
@@ -235,7 +269,7 @@ class ExpressionValidator:
         msg = (
             "Attribute access is not allowed in compute expressions (got attribute={!r}); "
             'move this logic to call_by (allowlisted), e.g. call_by: "myapp.module:fn(value=value, ctx=$ctx)"'
-        ).format(str(getattr(typed, "attr", "")))
+        ).format(str(typed.attr))
         raise SecurityError(msg)
 
     def _validate_boolop_node(self, node: ast.AST) -> None:
@@ -355,8 +389,9 @@ class SecureComputeEngine:
     _allowed_functions: FrozenSet[str]
     _custom_functions: Dict[str, Callable[..., Any]]
     _audit_callback: Optional["AuditCallback"]
-    _compiled_cache: "OrderedDict[str, Callable[..., Any]]"
+    _compiled_cache: "OrderedDict[str, SecureComputeCalculator]"
     _compiled_cache_max_size: int
+    _compiled_cache_lock: threading.Lock
     _limits: ComputeLimits
 
     def __init__(
@@ -380,53 +415,46 @@ class SecureComputeEngine:
         self._allowed_functions = frozenset(allowed)
         self._compiled_cache_max_size = max_compiled_cache_size
         self._compiled_cache = OrderedDict()
+        self._compiled_cache_lock = threading.Lock()
         self._audit_callback = audit_callback
 
     def _validate_limits(self) -> None:
         limits = self._limits
-        for name in (
-            "max_expression_len",
-            "max_ast_nodes",
-            "max_ast_depth",
-            "max_literal_string_len",
-            "max_collection_literal_len",
-            "max_repeat",
-            "max_range_len",
+        for name, value in (
+            ("max_expression_len", limits.max_expression_len),
+            ("max_ast_nodes", limits.max_ast_nodes),
+            ("max_ast_depth", limits.max_ast_depth),
+            ("max_literal_string_len", limits.max_literal_string_len),
+            ("max_collection_literal_len", limits.max_collection_literal_len),
+            ("max_repeat", limits.max_repeat),
+            ("max_range_len", limits.max_range_len),
         ):
-            value = int(getattr(limits, name))
-            if value < 0:
+            numeric_value = int(value)
+            if numeric_value < 0:
                 msg = "ComputeLimits.{} must be >= 0".format(name)
                 raise ValueError(msg)
 
-    def compile(self, expression: str, dependencies: Tuple[str, ...]) -> Callable[..., Any]:
+    def compile(self, expression: str, dependencies: Tuple[str, ...]) -> SecureComputeCalculator:
         cache_key = "{}:{}".format(expression, ",".join(dependencies))
-        cached = self._compiled_cache.get(cache_key)
-        if cached is not None:
-            self._compiled_cache.move_to_end(cache_key)
-            return cached
+        with self._compiled_cache_lock:
+            cached = self._compiled_cache.get(cache_key)
+            if cached is not None:
+                self._compiled_cache.move_to_end(cache_key)
+                return cached
 
         tree = self._validate_expression(expression, dependencies)
         code = compile(tree, "<scalim-compute>", "eval")
-        expr_copy = expression
-        dep_keys = dependencies
+        calculator = SecureComputeCalculator(
+            engine=self,
+            expression=expression,
+            dependencies=dependencies,
+            code=code,
+        )
 
-        def calculator(*args: Any, **field_values: Any) -> Any:
-            if args:
-                if field_values:
-                    msg = "Secure compute calculator does not accept mixed args and kwargs"
-                    raise TypeError(msg)
-                if len(args) != len(dep_keys):
-                    msg = "Secure compute calculator expected {} positional args, got {}".format(len(dep_keys), len(args))
-                    raise TypeError(msg)
-                return self._evaluate_positional(expr_copy, code, dep_keys, args)
-            return self._evaluate(expr_copy, code, field_values)
-
-        setattr(calculator, _SECURE_COMPUTE_MARKER_ATTR, True)
-        setattr(calculator, _SECURE_COMPUTE_DEPS_ATTR, dep_keys)
-
-        self._compiled_cache[cache_key] = calculator
-        if len(self._compiled_cache) > self._compiled_cache_max_size:
-            _ = self._compiled_cache.popitem(last=False)
+        with self._compiled_cache_lock:
+            self._compiled_cache[cache_key] = calculator
+            if len(self._compiled_cache) > self._compiled_cache_max_size:
+                _ = self._compiled_cache.popitem(last=False)
         return calculator
 
     def _validate_expression(self, expression: str, dependencies: Tuple[str, ...]) -> ast.Expression:
@@ -455,6 +483,25 @@ class SecureComputeEngine:
         )
         validator.validate(tree.body)
         return tree
+
+    def evaluate_compiled(
+        self,
+        *,
+        expression: str,
+        code: CodeType,
+        dependencies: Tuple[str, ...],
+        args: Tuple[Any, ...],
+        field_values: Dict[str, Any],
+    ) -> Any:
+        if args:
+            if field_values:
+                msg = "Secure compute calculator does not accept mixed args and kwargs"
+                raise TypeError(msg)
+            if len(args) != len(dependencies):
+                msg = "Secure compute calculator expected {} positional args, got {}".format(len(dependencies), len(args))
+                raise TypeError(msg)
+            return self._evaluate_positional(expression, code, dependencies, args)
+        return self._evaluate(expression, code, field_values)
 
     @staticmethod
     def _as_int_literal(node: ast.AST) -> Optional[int]:
@@ -605,8 +652,9 @@ class SecureComputeEngine:
         except ComputeExpressionError:
             raise
         except Exception as e:
-            security_logger.exception("表达式求值失败: %s", expression)
-            msg = "表达式求值失败 '{}': {}".format(expression, e)
+            expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
+            security_logger.exception("表达式求值失败: expr_hash=%s", expr_id)
+            msg = "表达式求值失败 [expr:{}]: {}".format(expr_id, type(e).__name__)
             raise ComputeExpressionError(msg) from e
         else:
             return result
@@ -645,8 +693,9 @@ class SecureComputeEngine:
         except ComputeExpressionError:
             raise
         except Exception as e:
-            security_logger.exception("表达式求值失败: %s", expression)
-            msg = "表达式求值失败 '{}': {}".format(expression, e)
+            expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
+            security_logger.exception("表达式求值失败: expr_hash=%s", expr_id)
+            msg = "表达式求值失败 [expr:{}]: {}".format(expr_id, type(e).__name__)
             raise ComputeExpressionError(msg) from e
         else:
             return result

@@ -10,11 +10,14 @@ from scalim.execution.adaptive.capture import HookCaptureManager
 from scalim.execution import ScalimEngine
 from scalim.hooks.base import BaseHook, HookManager
 from scalim.planning import PlanBuilder
+from scalim.planning.operators import LoadRefOperatorIr
 from scalim.sinks.sink_memory import InMemoryRowSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import FieldIr
 from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+
+from tests.testing_utils import CI_TIMEOUT_S
 
 
 class _BatchStartHook(BaseHook):
@@ -100,12 +103,12 @@ def test_adaptive_loadref_parallelism_replays_in_plan_order_on_main_thread() -> 
     def _barrier(name: str) -> None:
         started[name].set()
         other = "products" if name == "customers" else "customers"
-        if not started[other].wait(timeout=0.5):
+        if not started[other].wait(timeout=CI_TIMEOUT_S):
             raise RuntimeError("expected concurrent start for {}".format(other))
 
     def _order_completion(name: str) -> None:
         _barrier(name)
-        if name == slow_name and not fast_done.wait(timeout=1.0):
+        if name == slow_name and not fast_done.wait(timeout=CI_TIMEOUT_S):
             raise RuntimeError("expected {} to complete first".format(fast_name))
         with completion_lock:
             completion_order.append(name)
@@ -183,7 +186,7 @@ def test_adaptive_loadref_parallelism_replays_in_plan_order_on_main_thread() -> 
 
     expected = []
     for op in plan.operators:
-        if getattr(op, "operator_type", None) != "load_ref":
+        if not isinstance(op, LoadRefOperatorIr):
             continue
         expected.append(op.lookup_steps[0].to_source.source_id)
     assert len(expected) == 2
@@ -222,12 +225,12 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
     def _barrier(name: str) -> None:
         started[name].set()
         other = "products" if name == "customers" else "customers"
-        if not started[other].wait(timeout=0.5):
+        if not started[other].wait(timeout=CI_TIMEOUT_S):
             raise RuntimeError("expected concurrent start for {}".format(other))
 
     def _order_completion(name: str) -> None:
         _barrier(name)
-        if name == slow_name and not fast_done.wait(timeout=1.0):
+        if name == slow_name and not fast_done.wait(timeout=CI_TIMEOUT_S):
             raise RuntimeError("expected {} to complete first".format(fast_name))
         with completion_lock:
             completion_order.append(name)
@@ -305,7 +308,7 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
 
     expected = []
     for op in plan.operators:
-        if getattr(op, "operator_type", None) != "load_ref":
+        if not isinstance(op, LoadRefOperatorIr):
             continue
         expected.append(op.lookup_steps[0].to_source.source_id)
     assert len(expected) == 2

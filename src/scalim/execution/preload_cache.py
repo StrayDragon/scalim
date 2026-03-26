@@ -102,7 +102,7 @@ def _clone_exception_for_reraise(exc: BaseException) -> BaseException:
         return cloned
 
     try:
-        args = getattr(exc, "args", ())
+        args = exc.args
         return exc.__class__(*args)
     except Exception:  # noqa: BLE001
         return exc
@@ -157,15 +157,19 @@ class PreloadCache(_PreloadCacheBase):
 
     @override
     def __getitem__(self, key: str) -> LoaderResultMapping:
-        return self._data[key]
+        with self._lock_for(key):
+            return self._data[key]
 
     @override
     def __setitem__(self, key: str, value: LoaderResultMapping) -> None:
-        self._data[key] = value
+        # 并发加载请优先使用 `get_or_load()`; 该方法仅直接写入缓存数据.
+        with self._lock_for(key):
+            self._data[key] = value
 
     @override
     def __delitem__(self, key: str) -> None:
-        del self._data[key]
+        with self._lock_for(key):
+            del self._data[key]
 
     @override
     def __iter__(self) -> Iterator[str]:
@@ -327,8 +331,11 @@ class PreloadCache(_PreloadCacheBase):
         signature_digest: Optional[str] = None,
     ) -> LoaderResultMapping:
         digest = self._guardrail_digest_or_none(signature_digest, source_id=source_id)
-        if digest is None and source_id in self._data:
-            return self._data[source_id]
+        if digest is None:
+            try:
+                return self._data[source_id]
+            except KeyError:
+                pass
 
         lock = self._lock_for(source_id)
         current_ident = threading.get_ident()
@@ -374,11 +381,11 @@ def _capture_owner_callsite() -> str:
     # 仅用于诊断模式: 尽量保持简短、稳定、且不包含不必要的栈深信息.
     stack = traceback.extract_stack(limit=12)
     for frame in reversed(stack[:-1]):
-        filename = str(getattr(frame, "filename", "") or "")
+        filename = str(frame.filename or "")
         if filename.endswith("preload_cache.py"):
             continue
-        func = str(getattr(frame, "name", "") or "")
-        lineno = int(getattr(frame, "lineno", 0) or 0)
+        func = str(frame.name or "")
+        lineno = int(frame.lineno or 0)
         return "{}:{}:{}".format(filename, lineno, func)
     return "(unknown)"
 

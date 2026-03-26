@@ -12,6 +12,7 @@ def validate_public_template_sandbox(template_sandbox: str) -> str:
     - `legacy` 属于不安全行为,必须转入显式 `unsafe` 语义的非公共入口
     """
     value = str(template_sandbox or "").strip() or _SAFE
+
     if value == _SAFE:
         return _SAFE
     if value == _LEGACY:

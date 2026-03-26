@@ -258,8 +258,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             _ = temp_obj.replace(output_path)
         except Exception as exc:
             with suppress(Exception):
-                if temp_obj.exists():
-                    temp_obj.unlink()
+                temp_obj.unlink()
             msg = "CSV commit failed: {}: {}".format(type(exc).__name__, exc)
             raise WorkflowWriteError(msg) from exc
         finally:

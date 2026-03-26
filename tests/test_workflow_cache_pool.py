@@ -128,6 +128,25 @@ def test_workflow_cache_pool_evict_lru_skips_loading_and_remaining_consumers() -
     pool._remaining_consumers_by_logical_key[signature.logical_key()] = set(["n1"])  # type: ignore[attr-defined]
     assert pool._evict_lru_idle(workflow_node_id="n2", pending_emits=[]) is False  # type: ignore[attr-defined]
 
+
+def test_workflow_cache_pool_collect_refcount_evictions_skips_loading_entries() -> None:
+    signature = _sig("s1")
+    logical_key = signature.logical_key()
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="dag_refcount",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+        logical_keys_by_node_id={"n1": frozenset([logical_key])},
+        consumers_by_logical_key={logical_key: set(["n1"])},
+    )
+    _ = pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
+
+    entry = pool._entries[signature.canonical_key()]  # type: ignore[attr-defined]
+    entry.loading = True
+    assert pool._collect_refcount_evictions(node_id="n1") == {}  # type: ignore[attr-defined]
+
     pool._evict_entry("missing", workflow_node_id="n3", reason="x")  # type: ignore[attr-defined]
 
 

@@ -52,8 +52,9 @@ def test_resolver_rejects_wildcard_modules_by_default() -> None:
         _ = PythonReferenceResolver(allowed_modules=frozenset(["*"]))
 
 
-def test_resolver_trusted_mode_allows_wildcard_modules_and_warns(caplog) -> None:
+def test_resolver_trusted_mode_allows_wildcard_modules_and_warns(caplog, monkeypatch) -> None:
     caplog.set_level(logging.WARNING, logger="scalim.dsl.by_yaml.resolver")
+    monkeypatch.setenv("SCALIM_ALLOW_TRUSTED_ALL_MODULES", "1")
     resolver = PythonReferenceResolver(
         allowed_modules=frozenset(["*"]),
         resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
@@ -77,6 +78,15 @@ def test_resolver_rejects_wildcard_functions() -> None:
 
 
 def test_resolver_rejects_trusted_mode_with_explicit_allowlist() -> None:
+    with pytest.raises(ValueError, match=r"trusted_allow_all_modules"):
+        _ = PythonReferenceResolver(
+            allowed_modules=frozenset(["math"]),
+            resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
+        )
+
+
+def test_resolver_trusted_mode_rejects_mixed_allowlist_even_with_env_gate(monkeypatch) -> None:
+    monkeypatch.setenv("SCALIM_ALLOW_TRUSTED_ALL_MODULES", "1")
     with pytest.raises(ValueError, match=r"trusted_allow_all_modules"):
         _ = PythonReferenceResolver(
             allowed_modules=frozenset(["math"]),

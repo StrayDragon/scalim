@@ -37,11 +37,12 @@ def _get_openpyxl_workbook_class() -> "Type[Workbook]":
 
 
 def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
-    worksheets = getattr(workbook, "worksheets", None)
-    if worksheets is None:
+    try:
+        worksheets_obj = workbook.worksheets
+    except AttributeError:
         return
     try:
-        worksheets = list(worksheets)
+        worksheets = list(worksheets_obj)
     except TypeError:
         return
     for ws in worksheets:
@@ -325,8 +326,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 _ = temp_obj.replace(output_path)
             except Exception as exc:
                 with suppress(Exception):
-                    if temp_obj.exists():
-                        temp_obj.unlink()
+                    temp_obj.unlink()
                 msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
                 raise WorkflowWriteError(msg) from exc
         except Exception:

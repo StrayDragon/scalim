@@ -17,6 +17,7 @@ from scalim.events.catalog import (
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
+from scalim.events.events import DiagnosticWarningEvent, WorkflowResourceWriteEvent
 
 _TIMEOUT_S = 5.0
 
@@ -676,7 +677,10 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
                 return
             if str(event_type) != EVENT_WORKFLOW_RESOURCE_WRITE:
                 return
-            if getattr(payload, "action", None) != "skip":
+            write_payload = payload
+            if not isinstance(write_payload, WorkflowResourceWriteEvent):
+                return
+            if write_payload.action != "skip":
                 return
             self._reentered = True
             self.manager.apply_csv_append(  # type: ignore[union-attr]
@@ -852,7 +856,7 @@ def test_joinable_wait_diagnostics_emits_warning_and_includes_required_fields() 
     t2 = threading.Thread(target=_waiter)
     t2.start()
 
-    deadline = time.monotonic() + 2.0
+    deadline = time.monotonic() + _TIMEOUT_S
     warnings: List[Dict[str, Any]] = []
     while time.monotonic() < deadline:
         warnings = [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
@@ -869,7 +873,8 @@ def test_joinable_wait_diagnostics_emits_warning_and_includes_required_fields() 
     assert errors == []
 
     payload = warnings[0]["payload"]
-    lookup = getattr(payload, "lookup_key", None)
+    assert isinstance(payload, DiagnosticWarningEvent)
+    lookup = payload.lookup_key
     assert isinstance(lookup, dict)
     assert lookup.get("resource_id") == "report"
     assert lookup.get("resource_type") == "workbook"
@@ -999,7 +1004,7 @@ def test_joinable_wait_diagnostics_repeats_warning() -> None:
     t2 = threading.Thread(target=_waiter)
     t2.start()
 
-    deadline = time.monotonic() + 2.0
+    deadline = time.monotonic() + _TIMEOUT_S
     while time.monotonic() < deadline:
         warnings = [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
         if len(warnings) >= 2:
@@ -1069,7 +1074,7 @@ def test_wait_diagnostics_warning_falls_back_to_logger_on_emit_failure(caplog: p
     t2 = threading.Thread(target=_waiter)
     t2.start()
 
-    deadline = time.monotonic() + 2.0
+    deadline = time.monotonic() + _TIMEOUT_S
     while time.monotonic() < deadline:
         if any("inflight wait slow" in r.message for r in caplog.records):
             break
@@ -1501,7 +1506,7 @@ def test_resource_manager_concurrent_first_sheetbook_write_creates_single_plan(t
     assert len(plan_calls) == 1
 
     plan = manager._sheetbooks["sb"]
-    assert set(getattr(plan, "sheets", {}).keys()) == {"S1", "S2"}
+    assert set(plan.sheets.keys()) == {"S1", "S2"}
 
 
 def test_resource_manager_sheetbook_iter_rows_visibility_and_errors(tmp_path: Path) -> None:

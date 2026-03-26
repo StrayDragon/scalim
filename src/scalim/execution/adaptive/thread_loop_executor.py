@@ -14,17 +14,26 @@ from ...vendor.compact.typing_extensionsx import override
 
 
 def _best_effort_all_tasks(loop: "asyncio.AbstractEventLoop", asyncio_module: Any = asyncio) -> "Set[Any]":
-    all_tasks = getattr(asyncio_module, "all_tasks", None)
+    try:
+        all_tasks = asyncio_module.all_tasks
+    except AttributeError:  # pragma: no cover
+        all_tasks = None
     if all_tasks is not None:
         try:
             return all_tasks(loop=loop)  # type: ignore[call-arg]
         except TypeError:  # pragma: no cover
             return all_tasks(loop)  # type: ignore[call-arg]
 
-    task_cls = getattr(asyncio_module, "Task", None)
+    try:
+        task_cls = asyncio_module.Task
+    except AttributeError:  # pragma: no cover
+        task_cls = None
     if task_cls is None:  # pragma: no cover
         return set()
-    legacy_all_tasks = getattr(task_cls, "all_tasks", None)
+    try:
+        legacy_all_tasks = task_cls.all_tasks
+    except AttributeError:  # pragma: no cover
+        legacy_all_tasks = None
     if legacy_all_tasks is None:  # pragma: no cover
         return set()
     try:
@@ -57,6 +66,7 @@ class ThreadLoopExecutor(Executor):
     _shutdown: bool
     _sem: Optional["asyncio.Semaphore"]
     _warned_sync_submit: bool
+    _submit_lock: threading.Lock
 
     def __init__(self, max_workers: int = 1) -> None:
         super().__init__()
@@ -65,6 +75,7 @@ class ThreadLoopExecutor(Executor):
         self._shutdown = False
         self._sem = None
         self._warned_sync_submit = False
+        self._submit_lock = threading.Lock()
         self._thread = threading.Thread(target=self._run_loop, name="scalim-adaptive-async", daemon=True)
         self._thread.start()
 
@@ -83,31 +94,33 @@ class ThreadLoopExecutor(Executor):
 
     @override
     def submit(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> "Future[Any]":  # type: ignore[override]
-        if self._shutdown:
-            msg = "ThreadLoopExecutor is shutdown"
-            raise RuntimeError(msg)
+        with self._submit_lock:
+            if self._shutdown:
+                msg = "ThreadLoopExecutor is shutdown"
+                raise RuntimeError(msg)
 
-        async def _call() -> Any:
-            sem = self._sem
-            if sem is None:  # pragma: no cover
-                sem = asyncio.Semaphore(self._max_workers)
-                self._sem = sem
-            async with sem:
-                result = fn(*args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    return await result
-                if not self._warned_sync_submit:
-                    self._warned_sync_submit = True
-                    _logger.warning(THREAD_LOOP_EXECUTOR_NON_CORO_TASK_WARNING)
-                return result
+            async def _call() -> Any:
+                sem = self._sem
+                if sem is None:  # pragma: no cover
+                    sem = asyncio.Semaphore(self._max_workers)
+                    self._sem = sem
+                async with sem:
+                    result = fn(*args, **kwargs)
+                    if asyncio.iscoroutine(result):
+                        return await result
+                    if not self._warned_sync_submit:
+                        self._warned_sync_submit = True
+                        _logger.warning(THREAD_LOOP_EXECUTOR_NON_CORO_TASK_WARNING)
+                    return result
 
-        return asyncio.run_coroutine_threadsafe(_call(), self._loop)
+            return asyncio.run_coroutine_threadsafe(_call(), self._loop)
 
     @override
     def shutdown(self, wait: bool = True, **_kwargs: Any) -> None:  # type: ignore[override]  # noqa: FBT001, FBT002
-        if self._shutdown:
-            return
-        self._shutdown = True
+        with self._submit_lock:
+            if self._shutdown:
+                return
+            self._shutdown = True
         _ = cast("Any", self._loop).call_soon_threadsafe(self._loop.stop)
         if wait:
             self._thread.join(timeout=5.0)

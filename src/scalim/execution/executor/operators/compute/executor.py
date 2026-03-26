@@ -19,6 +19,12 @@ _EXPECTED_COMPUTE_ERRORS = (
 )
 
 
+def _is_secure_compute_calculator(value: object) -> bool:
+    from .....dsl.by_yaml.config_parsing.security import is_secure_compute_calculator  # noqa: PLC0415
+
+    return is_secure_compute_calculator(value)
+
+
 def _execute_constant_compute(
     field_spec: "DerivedFieldIr",
     context: BatchContext,
@@ -234,11 +240,7 @@ class ComputeOperatorExecutor(OperatorExecutor):
             )
             return
 
-        if (
-            isinstance(field_spec, DerivedFieldIr)
-            and not field_spec.call_ctx_key
-            and bool(getattr(field_spec.calculator, "_scalim_secure_compute", False))
-        ):
+        if isinstance(field_spec, DerivedFieldIr) and not field_spec.call_ctx_key and _is_secure_compute_calculator(field_spec.calculator):
             _execute_secure_compute(
                 field_spec,
                 context,

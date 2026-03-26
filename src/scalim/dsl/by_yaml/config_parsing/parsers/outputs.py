@@ -874,247 +874,287 @@ class ParserOutputsMixin:
             raise ValueError(msg) from exc
         return deps
 
-    def _validate_outputs_semantics(  # noqa: C901, PLR0912, PLR0915
+    def _validate_output_container_semantics(
         self,
-        outputs: List[OutputTargetConfig],
-        *,
-        known_field_ids: Set[str],
+        t: OutputTargetConfig,
+        name: str,
+        workbook_targets_by_path: Dict[str, List[str]],
     ) -> None:
-        workbook_targets_by_path: Dict[str, List[str]] = {}
+        container = t.container
+        if container is None:
+            msg = "outputs.{} missing required container (or inherit via from)".format(name)
+            raise ValueError(msg)
 
-        for t in outputs:
-            name = str(t.name or "").strip()
-            container = t.container
-            if container is None:
-                msg = "outputs.{} missing required container (or inherit via from)".format(name)
+        if not container.streaming:
+            msg = "outputs.{}.container.streaming must be true (composed outputs only support streaming=true)".format(name)
+            raise ValueError(msg)
+
+        if container.type == "workbook":
+            if container.path:
+                workbook_targets_by_path.setdefault(str(container.path), []).append(name)
+        elif container.type == "csv":
+            if container.sheet:
+                msg = "outputs.{}.container.sheet is only allowed for type=workbook".format(name)
+                raise ValueError(msg)
+            if container.allow_formulas:
+                msg = "outputs.{}.container.allow_formulas is only allowed for type=workbook".format(name)
+                raise ValueError(msg)
+            if container.write_lock:
+                msg = "outputs.{}.container.write_lock is only allowed for type=workbook".format(name)
                 raise ValueError(msg)
 
-            if not container.streaming:
-                msg = "outputs.{}.container.streaming must be true (composed outputs only support streaming=true)".format(name)
+    def _validate_detail_output_semantics(self, t: OutputTargetConfig, name: str, known_field_ids: Set[str]) -> None:
+        if t.fields is None or not t.fields:
+            msg = "outputs.{} requires fields for detail output".format(name)
+            raise ValueError(msg)
+        unknown_fields = [fid for fid in t.fields if fid not in known_field_ids]
+        if unknown_fields:
+            msg = "outputs.{}.fields reference unknown fields: {}".format(name, ", ".join(sorted(set(unknown_fields))))
+            raise ValueError(msg)
+
+    def _validate_aggregate_group_and_metrics(
+        self,
+        t: OutputTargetConfig,
+        name: str,
+        known_field_ids: Set[str],
+        agg: OutputAggregateConfig,
+    ) -> Tuple[List[str], List[str], Set[str]]:
+        if not agg.group_by:
+            msg = "outputs.{}.aggregate.group_by cannot be empty".format(name)
+            raise ValueError(msg)
+        if not agg.fields:
+            msg = "outputs.{}.aggregate.fields cannot be empty".format(name)
+            raise ValueError(msg)
+
+        agg_field_ids = set(agg.fields.keys())
+        overlap = [fid for fid in agg.group_by if fid in agg_field_ids]
+        if overlap:
+            msg = "outputs.{}.aggregate.fields ids conflict with group_by fields: {}".format(name, ", ".join(sorted(set(overlap))))
+            raise ValueError(msg)
+        missing = [fid for fid in agg.group_by if fid not in known_field_ids]
+        if missing:
+            msg = "outputs.{}.aggregate.group_by reference unknown fields: {}".format(name, ", ".join(sorted(set(missing))))
+            raise ValueError(msg)
+
+        metric_field_ids = sorted([fid for fid, cfg in agg.fields.items() if cfg.producer_key in _AGG_FUNC_KEYS])
+        if not metric_field_ids:
+            msg = "outputs.{}.aggregate.fields must include at least one aggregation function field".format(name)
+            raise ValueError(msg)
+
+        rank_field_ids = sorted([fid for fid, cfg in agg.fields.items() if cfg.producer_key in _RANK_FUNC_KEYS])
+        post_field_ids = sorted([fid for fid, cfg in agg.fields.items() if cfg.producer_key in _POST_FUNC_KEYS])
+
+        metric_required = self._collect_required_field_ids_from_aggregate(agg)
+        missing = [fid for fid in metric_required if fid not in known_field_ids]
+        if missing:
+            msg = "outputs.{}.aggregate.fields reference unknown input fields: {}".format(name, ", ".join(sorted(set(missing))))
+            raise ValueError(msg)
+
+        # 排名/派生字段允许引用 `aggregate.group_by` + `aggregate.fields` 任意字段(含派生字段).
+        allowed_agg_out_fields = set(agg.group_by) | set(agg_field_ids)
+
+        if t.fields is not None:
+            if not t.fields:
+                msg = "outputs.{}.fields must not be empty".format(name)
+                raise ValueError(msg)
+            allowed_layout_fields = set(agg.group_by) | set(agg_field_ids)
+            unknown_layout_fields = [fid for fid in t.fields if fid not in allowed_layout_fields]
+            if unknown_layout_fields:
+                msg = "outputs.{}.fields reference unknown aggregate output fields: {}".format(
+                    name, ", ".join(sorted(set(unknown_layout_fields)))
+                )
                 raise ValueError(msg)
 
-            if container.type == "workbook":
-                if container.path:
-                    workbook_targets_by_path.setdefault(str(container.path), []).append(name)
-            elif container.type == "csv":
-                if container.sheet:
-                    msg = "outputs.{}.container.sheet is only allowed for type=workbook".format(name)
-                    raise ValueError(msg)
-                if container.allow_formulas:
-                    msg = "outputs.{}.container.allow_formulas is only allowed for type=workbook".format(name)
-                    raise ValueError(msg)
-                if container.write_lock:
-                    msg = "outputs.{}.container.write_lock is only allowed for type=workbook".format(name)
-                    raise ValueError(msg)
+        return rank_field_ids, post_field_ids, allowed_agg_out_fields
 
-            if t.aggregate is None:
-                if t.fields is None or not t.fields:
-                    msg = "outputs.{} requires fields for detail output".format(name)
-                    raise ValueError(msg)
-                unknown_fields = [fid for fid in t.fields if fid not in known_field_ids]
-                if unknown_fields:
-                    msg = "outputs.{}.fields reference unknown fields: {}".format(name, ", ".join(sorted(set(unknown_fields))))
-                    raise ValueError(msg)
-            else:
-                agg = t.aggregate
-                if not agg.group_by:
-                    msg = "outputs.{}.aggregate.group_by cannot be empty".format(name)
-                    raise ValueError(msg)
-                if not agg.fields:
-                    msg = "outputs.{}.aggregate.fields cannot be empty".format(name)
-                    raise ValueError(msg)
+    def _validate_rank_semantics(
+        self,
+        name: str,
+        agg: OutputAggregateConfig,
+        rank_field_ids: List[str],
+        allowed_agg_out_fields: Set[str],
+    ) -> None:
+        rank_with_top_k: List[str] = []
+        for fid in rank_field_ids:
+            cfg = agg.fields[fid]
+            rank_cfg = cast("Dict[str, Any]", cfg.config)
+            by = str(rank_cfg.get("by") or "").strip()
+            if by not in allowed_agg_out_fields:
+                msg = "outputs.{}.aggregate.fields.{}.{} by={!r} must reference group_by fields or aggregate.fields ids: {}".format(
+                    name,
+                    fid,
+                    cfg.producer_key,
+                    by,
+                    ", ".join(sorted(allowed_agg_out_fields)),
+                )
+                raise ValueError(msg)
 
-                agg_field_ids = set(agg.fields.keys())
-                overlap = [fid for fid in agg.group_by if fid in agg_field_ids]
-                if overlap:
-                    msg = "outputs.{}.aggregate.fields ids conflict with group_by fields: {}".format(name, ", ".join(sorted(set(overlap))))
-                    raise ValueError(msg)
-                missing = [fid for fid in agg.group_by if fid not in known_field_ids]
-                if missing:
-                    msg = "outputs.{}.aggregate.group_by reference unknown fields: {}".format(name, ", ".join(sorted(set(missing))))
-                    raise ValueError(msg)
+            partition_by = cast("Tuple[str, ...]", rank_cfg.get("partition_by") or ())
+            missing = [x for x in partition_by if x not in agg.group_by]
+            if missing:
+                msg = "outputs.{}.aggregate.fields.{}.{} partition_by must be a subset of group_by: {}".format(
+                    name,
+                    fid,
+                    cfg.producer_key,
+                    ", ".join(sorted(set(missing))),
+                )
+                raise ValueError(msg)
 
-                metric_field_ids = sorted([fid for fid, cfg in agg.fields.items() if cfg.producer_key in _AGG_FUNC_KEYS])
-                if not metric_field_ids:
-                    msg = "outputs.{}.aggregate.fields must include at least one aggregation function field".format(name)
-                    raise ValueError(msg)
+            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())
+            missing = [x for x in order_by if x not in allowed_agg_out_fields]
+            if missing:
+                msg = "outputs.{}.aggregate.fields.{}.{} order_by reference unknown agg output fields: {}".format(
+                    name,
+                    fid,
+                    cfg.producer_key,
+                    ", ".join(sorted(set(missing))),
+                )
+                raise ValueError(msg)
 
-                rank_field_ids = sorted([fid for fid, cfg in agg.fields.items() if cfg.producer_key in _RANK_FUNC_KEYS])
-                post_field_ids = sorted([fid for fid, cfg in agg.fields.items() if cfg.producer_key in _POST_FUNC_KEYS])
+            top_k = int(rank_cfg.get("top_k") or 0)
+            if top_k and str(rank_cfg.get("top_k_mode") or "rank").lower() == "rows" and not order_by:
+                msg = "outputs.{}.aggregate.fields.{}.{} top_k_mode='rows' requires order_by".format(
+                    name,
+                    fid,
+                    cfg.producer_key,
+                )
+                raise ValueError(msg)
 
-                metric_required = self._collect_required_field_ids_from_aggregate(agg)
-                missing = [fid for fid in metric_required if fid not in known_field_ids]
-                if missing:
-                    msg = "outputs.{}.aggregate.fields reference unknown input fields: {}".format(name, ", ".join(sorted(set(missing))))
-                    raise ValueError(msg)
+            if top_k:
+                rank_with_top_k.append(fid)
 
-                # 排名/派生字段允许引用 `aggregate.group_by` + `aggregate.fields` 任意字段(含派生字段).
-                allowed_agg_out_fields = set(agg.group_by) | set(agg_field_ids)
+        if len(rank_with_top_k) > 1:
+            msg = "outputs.{}.aggregate supports top_k on at most one rank field; got: {}".format(
+                name,
+                ", ".join(sorted(rank_with_top_k)),
+            )
+            raise ValueError(msg)
 
-                if t.fields is not None:
-                    if not t.fields:
-                        msg = "outputs.{}.fields must not be empty".format(name)
-                        raise ValueError(msg)
-                    allowed_layout_fields = set(agg.group_by) | set(agg_field_ids)
-                    unknown_layout_fields = [fid for fid in t.fields if fid not in allowed_layout_fields]
-                    if unknown_layout_fields:
-                        msg = "outputs.{}.fields reference unknown aggregate output fields: {}".format(
-                            name, ", ".join(sorted(set(unknown_layout_fields)))
-                        )
-                        raise ValueError(msg)
-
-                rank_with_top_k: List[str] = []
-                for fid in rank_field_ids:
-                    cfg = agg.fields[fid]
-                    rank_cfg = cast("Dict[str, Any]", cfg.config)
-                    by = str(rank_cfg.get("by") or "").strip()
-                    if by not in allowed_agg_out_fields:
-                        msg = "outputs.{}.aggregate.fields.{}.{} by={!r} must reference group_by fields or aggregate.fields ids: {}".format(
-                            name,
-                            fid,
-                            cfg.producer_key,
-                            by,
-                            ", ".join(sorted(allowed_agg_out_fields)),
-                        )
-                        raise ValueError(msg)
-
-                    partition_by = cast("Tuple[str, ...]", rank_cfg.get("partition_by") or ())
-                    missing = [x for x in partition_by if x not in agg.group_by]
-                    if missing:
-                        msg = "outputs.{}.aggregate.fields.{}.{} partition_by must be a subset of group_by: {}".format(
-                            name,
-                            fid,
-                            cfg.producer_key,
-                            ", ".join(sorted(set(missing))),
-                        )
-                        raise ValueError(msg)
-
-                    order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())
-                    missing = [x for x in order_by if x not in allowed_agg_out_fields]
-                    if missing:
-                        msg = "outputs.{}.aggregate.fields.{}.{} order_by reference unknown agg output fields: {}".format(
-                            name,
-                            fid,
-                            cfg.producer_key,
-                            ", ".join(sorted(set(missing))),
-                        )
-                        raise ValueError(msg)
-
-                    top_k = int(rank_cfg.get("top_k") or 0)
-                    if top_k and str(rank_cfg.get("top_k_mode") or "rank").lower() == "rows" and not order_by:
-                        msg = "outputs.{}.aggregate.fields.{}.{} top_k_mode='rows' requires order_by".format(
-                            name,
-                            fid,
-                            cfg.producer_key,
-                        )
-                        raise ValueError(msg)
-
-                    if top_k:
-                        rank_with_top_k.append(fid)
-
-                if len(rank_with_top_k) > 1:
-                    msg = "outputs.{}.aggregate supports top_k on at most one rank field; got: {}".format(
+    def _validate_aggregate_post_semantics(
+        self,
+        name: str,
+        agg: OutputAggregateConfig,
+        agg_field_ids: Set[str],
+        rank_field_ids: List[str],
+        post_field_ids: List[str],
+    ) -> None:
+        allowed = set(agg.group_by) | set(agg_field_ids)
+        for fid in post_field_ids:
+            cfg = agg.fields[fid]
+            if cfg.producer_key == "score_by_rank":
+                score_cfg = cast("Dict[str, Any]", cfg.config)
+                rank_field = str(score_cfg.get("rank_field") or "rank").strip()
+                if rank_field not in rank_field_ids:
+                    msg = "outputs.{}.aggregate.fields.{}.score_by_rank rank_field={!r} must reference a rank field id: {}".format(
                         name,
-                        ", ".join(sorted(rank_with_top_k)),
+                        fid,
+                        rank_field,
+                        ", ".join(sorted(rank_field_ids)),
                     )
                     raise ValueError(msg)
+                continue
 
-                for fid in post_field_ids:
-                    cfg = agg.fields[fid]
-                    if cfg.producer_key == "score_by_rank":
-                        score_cfg = cast("Dict[str, Any]", cfg.config)
-                        rank_field = str(score_cfg.get("rank_field") or "rank").strip()
-                        if rank_field not in rank_field_ids:
-                            msg = "outputs.{}.aggregate.fields.{}.score_by_rank rank_field={!r} must reference a rank field id: {}".format(
-                                name,
-                                fid,
-                                rank_field,
-                                ", ".join(sorted(rank_field_ids)),
-                            )
-                            raise ValueError(msg)
-                        continue
+            if cfg.producer_key == "call_by":
+                call_by = str(cfg.config or "").strip()
+                deps = extract_call_by_dependencies(call_by)
+                missing = [d for d in deps if d not in allowed]
+                if missing:
+                    msg = "outputs.{}.aggregate.fields.{}.call_by reference unknown fields: {}".format(
+                        name,
+                        fid,
+                        ", ".join(sorted(set(missing))),
+                    )
+                    raise ValueError(msg)
+                continue
 
-                    if cfg.producer_key == "call_by":
-                        call_by = str(cfg.config or "").strip()
-                        deps = extract_call_by_dependencies(call_by)
-                        allowed = set(agg.group_by) | set(agg_field_ids)
-                        missing = [d for d in deps if d not in allowed]
-                        if missing:
-                            msg = "outputs.{}.aggregate.fields.{}.call_by reference unknown fields: {}".format(
-                                name,
-                                fid,
-                                ", ".join(sorted(set(missing))),
-                            )
-                            raise ValueError(msg)
-                        continue
+            if cfg.producer_key == "compute":
+                compute_cfg = cast("Dict[str, Any]", cfg.config)
+                compute_deps = cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
+                missing = [d for d in compute_deps if d not in allowed]
+                if missing:
+                    msg = "outputs.{}.aggregate.fields.{}.compute reference unknown fields: {}".format(
+                        name,
+                        fid,
+                        ", ".join(sorted(set(missing))),
+                    )
+                    raise ValueError(msg)
+                continue
 
-                    if cfg.producer_key == "compute":
-                        compute_cfg = cast("Dict[str, Any]", cfg.config)
-                        compute_deps = cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
-                        allowed = set(agg.group_by) | set(agg_field_ids)
-                        missing = [d for d in compute_deps if d not in allowed]
-                        if missing:
-                            msg = "outputs.{}.aggregate.fields.{}.compute reference unknown fields: {}".format(
-                                name,
-                                fid,
-                                ", ".join(sorted(set(missing))),
-                            )
-                            raise ValueError(msg)
-                        continue
+    def _derived_deps_for_aggregate_derived_field(self, cfg: OutputAggregateFieldConfig) -> Tuple[str, ...]:
+        producer_key = str(cfg.producer_key)
+        if producer_key in _RANK_FUNC_KEYS:
+            rank_cfg = cast("Dict[str, Any]", cfg.config)
+            by = str(rank_cfg.get("by") or "").strip()
+            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())
+            deps_list: List[str] = []
+            if by:
+                deps_list.append(by)
+            if order_by:
+                deps_list.extend([str(x) for x in order_by])
+            # `order_by` 缺省时,语义等价于 `[by]`.
+            return ordered_unique_str([x for x in deps_list if x])
 
-                # 依赖 `DAG`: 检测循环依赖并给出可操作错误.
-                derived_ids = set(rank_field_ids) | set(post_field_ids)
-                if derived_ids:
-                    deps_by_id: Dict[str, Tuple[str, ...]] = {}
-                    for fid in derived_ids:
-                        cfg = agg.fields[fid]
-                        producer_key = str(cfg.producer_key)
-                        derived_deps: Tuple[str, ...] = ()
+        if producer_key == "score_by_rank":
+            score_cfg = cast("Dict[str, Any]", cfg.config)
+            rf = str(score_cfg.get("rank_field") or "rank").strip() or "rank"
+            return (rf,)
 
-                        if producer_key in _RANK_FUNC_KEYS:
-                            rank_cfg = cast("Dict[str, Any]", cfg.config)
-                            by = str(rank_cfg.get("by") or "").strip()
-                            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())
-                            deps_list: List[str] = []
-                            if by:
-                                deps_list.append(by)
-                            if order_by:
-                                deps_list.extend([str(x) for x in order_by])
-                            # `order_by` 缺省时,语义等价于 `[by]`.
-                            derived_deps = ordered_unique_str([x for x in deps_list if x])
+        if producer_key == "call_by":
+            call_by = str(cfg.config or "").strip()
+            return tuple(str(x) for x in extract_call_by_dependencies(call_by))
 
-                        elif producer_key == "score_by_rank":
-                            score_cfg = cast("Dict[str, Any]", cfg.config)
-                            rf = str(score_cfg.get("rank_field") or "rank").strip() or "rank"
-                            derived_deps = (rf,)
+        if producer_key == "compute":
+            compute_cfg = cast("Dict[str, Any]", cfg.config)
+            return cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
 
-                        elif producer_key == "call_by":
-                            call_by = str(cfg.config or "").strip()
-                            derived_deps = tuple(str(x) for x in extract_call_by_dependencies(call_by))
+        return ()
 
-                        elif producer_key == "compute":
-                            compute_cfg = cast("Dict[str, Any]", cfg.config)
-                            derived_deps = cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
+    def _validate_aggregate_derived_dag(
+        self,
+        name: str,
+        agg: OutputAggregateConfig,
+        rank_field_ids: List[str],
+        post_field_ids: List[str],
+    ) -> None:
+        # 依赖 `DAG`: 检测循环依赖并给出可操作错误.
+        derived_ids = set(rank_field_ids) | set(post_field_ids)
+        if not derived_ids:
+            return
+        deps_by_id: Dict[str, Tuple[str, ...]] = {}
+        for fid in derived_ids:
+            cfg = agg.fields[fid]
+            deps_by_id[fid] = self._derived_deps_for_aggregate_derived_field(cfg)
 
-                        deps_by_id[fid] = derived_deps
+        def _get_derived_deps(
+            node_id: str,
+            deps_map: Dict[str, Tuple[str, ...]] = deps_by_id,
+            node_set: Set[str] = derived_ids,
+        ) -> Tuple[str, ...]:
+            raw_deps = deps_map.get(node_id, ())
+            return tuple(d for d in raw_deps if d in node_set)
 
-                    def _get_derived_deps(
-                        node_id: str,
-                        deps_map: Dict[str, Tuple[str, ...]] = deps_by_id,
-                        node_set: Set[str] = derived_ids,
-                    ) -> Tuple[str, ...]:
-                        raw_deps = deps_map.get(node_id, ())
-                        return tuple(d for d in raw_deps if d in node_set)
+        try:
+            _ = graph_utils.topological_sort(derived_ids, _get_derived_deps)
+        except graph_utils.CyclicDependencyError as exc:
+            cycles = exc.cycles or ()
+            cycle = cycles[0] if cycles else ()
+            chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"
+            msg = "outputs.{}.aggregate.fields has cyclic dependency: {}".format(name, chain)
+            raise ValueError(msg) from exc
 
-                    try:
-                        _ = graph_utils.topological_sort(derived_ids, _get_derived_deps)
-                    except graph_utils.CyclicDependencyError as exc:
-                        cycles = getattr(exc, "cycles", None) or ()
-                        cycle = cycles[0] if cycles else ()
-                        chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"
-                        msg = "outputs.{}.aggregate.fields has cyclic dependency: {}".format(name, chain)
-                        raise ValueError(msg) from exc
+    def _validate_aggregate_semantics(self, t: OutputTargetConfig, name: str, known_field_ids: Set[str]) -> None:
+        agg = cast("OutputAggregateConfig", t.aggregate)
+        rank_field_ids, post_field_ids, allowed_agg_out_fields = self._validate_aggregate_group_and_metrics(t, name, known_field_ids, agg)
+        agg_field_ids = set(agg.fields.keys())
+        self._validate_rank_semantics(name, agg, rank_field_ids, allowed_agg_out_fields)
+        self._validate_aggregate_post_semantics(name, agg, agg_field_ids, rank_field_ids, post_field_ids)
+        self._validate_aggregate_derived_dag(name, agg, rank_field_ids, post_field_ids)
 
+    def _validate_shared_workbook_path_semantics(
+        self,
+        outputs: List[OutputTargetConfig],
+        workbook_targets_by_path: Dict[str, List[str]],
+    ) -> None:
         for path, names in workbook_targets_by_path.items():
             if len(names) <= 1:
                 continue
@@ -1131,6 +1171,24 @@ class ParserOutputsMixin:
                     ", ".join(sorted(missing_sheet)),
                 )
                 raise ValueError(msg)
+
+    def _validate_outputs_semantics(
+        self,
+        outputs: List[OutputTargetConfig],
+        *,
+        known_field_ids: Set[str],
+    ) -> None:
+        workbook_targets_by_path: Dict[str, List[str]] = {}
+
+        for t in outputs:
+            name = str(t.name or "").strip()
+            self._validate_output_container_semantics(t, name, workbook_targets_by_path)
+            if t.aggregate is None:
+                self._validate_detail_output_semantics(t, name, known_field_ids)
+            else:
+                self._validate_aggregate_semantics(t, name, known_field_ids)
+
+        self._validate_shared_workbook_path_semantics(outputs, workbook_targets_by_path)
 
     def _collect_required_field_ids_from_aggregate(self, agg: OutputAggregateConfig) -> List[str]:
         required: List[str] = []

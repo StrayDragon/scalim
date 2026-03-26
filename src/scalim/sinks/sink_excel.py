@@ -3,18 +3,21 @@
 import logging
 import os
 import time
+import zipfile
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple, Type
 
 from .._internal.loggingx import prefix
 from ..vendor.compact.importlibx import require_optional_dependency
 
 if TYPE_CHECKING:
     from openpyxl import Workbook
+    from openpyxl.utils import exceptions as _openpyxl_utils_exceptions
 else:
     _openpyxl = require_optional_dependency("openpyxl", context="scalim.sinks.sink_excel")
     Workbook = _openpyxl.Workbook
+    from openpyxl.utils import exceptions as _openpyxl_utils_exceptions
 
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..utils.excel import escape_excel_formula
@@ -36,6 +39,20 @@ if TYPE_CHECKING:
     import types
 
 # endregion
+
+_EXCEL_ATOMIC_SAVE_ERRORS: Tuple[Type[BaseException], ...] = (
+    OSError,
+    TypeError,
+    zipfile.BadZipFile,
+    _openpyxl_utils_exceptions.CellCoordinatesException,
+    _openpyxl_utils_exceptions.IllegalCharacterError,
+    _openpyxl_utils_exceptions.InvalidFileException,
+    _openpyxl_utils_exceptions.NamedRangeException,
+    _openpyxl_utils_exceptions.ReadOnlyWorkbookException,
+    _openpyxl_utils_exceptions.SheetTitleException,
+    _openpyxl_utils_exceptions.WorkbookAlreadySaved,
+)
+_EXCEL_SINK_OUTER_CLOSE_ERRORS: Tuple[Type[BaseException], ...] = (RuntimeError, *_EXCEL_ATOMIC_SAVE_ERRORS)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,11 +125,12 @@ def _best_effort_close_write_only_worksheet(worksheet: Any) -> None:
 def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
     """尽力关闭 `write_only workbook` 下所有 `worksheet`(仅在异常路径使用)."""
 
-    worksheets = getattr(workbook, "worksheets", None)
-    if worksheets is None:
+    try:
+        worksheets_obj = workbook.worksheets
+    except AttributeError:
         return
     try:
-        worksheets = list(worksheets)
+        worksheets = list(worksheets_obj)
     except TypeError:
         return
     for ws in worksheets:
@@ -221,16 +239,17 @@ class ExcelSink(BaseRowSink):
                     self._workbook.save(temp_path_obj)
                     # 原子重命名临时文件到目标路径
                     _ = temp_path_obj.replace(self.output_path)
-                except Exception:
+                except _EXCEL_ATOMIC_SAVE_ERRORS:
                     _LOGGER.exception(EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
                     # 清理临时文件
-                    if temp_path_obj.exists():
-                        try:
-                            temp_path_obj.unlink()
-                        except OSError:
-                            _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                    try:
+                        temp_path_obj.unlink()
+                    except FileNotFoundError:  # pragma: no cover
+                        pass
+                    except OSError:
+                        _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
                     raise
-            except Exception:
+            except _EXCEL_SINK_OUTER_CLOSE_ERRORS:
                 # 尽力清理: 在写锁冲突/保存失败等异常路径,避免出现只写生成器告警.
                 _best_effort_close_write_only_worksheet(self._worksheet)
                 raise
@@ -382,15 +401,16 @@ class ExcelWorkbookSink:
                 try:
                     self._workbook.save(temp_path_obj)
                     _ = temp_path_obj.replace(self.output_path)
-                except Exception:
+                except _EXCEL_ATOMIC_SAVE_ERRORS:
                     _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
-                    if temp_path_obj.exists():
-                        try:
-                            temp_path_obj.unlink()
-                        except OSError:
-                            _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                    try:
+                        temp_path_obj.unlink()
+                    except FileNotFoundError:  # pragma: no cover
+                        pass
+                    except OSError:
+                        _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
                     raise
-            except Exception:
+            except _EXCEL_SINK_OUTER_CLOSE_ERRORS:
                 # 尽力清理: 在写锁冲突/保存失败等异常路径,避免出现只写生成器告警.
                 _best_effort_close_write_only_workbook_worksheets(self._workbook)
                 raise
@@ -529,14 +549,15 @@ class ColumnExcelSink(IColumnSink):
                 wb.save(temp_path_obj)
                 # 原子重命名临时文件到目标路径
                 _ = temp_path_obj.replace(self.output_path)
-            except Exception:
+            except _EXCEL_ATOMIC_SAVE_ERRORS:
                 _LOGGER.exception(COLUMN_EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
                 # 清理临时文件
-                if temp_path_obj.exists():
-                    try:
-                        temp_path_obj.unlink()
-                    except OSError:
-                        _LOGGER.warning(COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                try:
+                    temp_path_obj.unlink()
+                except FileNotFoundError:  # pragma: no cover
+                    pass
+                except OSError:
+                    _LOGGER.warning(COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
                 raise
             finally:
                 if wb is not None:

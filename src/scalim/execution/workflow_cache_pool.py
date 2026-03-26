@@ -64,9 +64,9 @@ def _canonical_json_dumps(value: object) -> str:
 
 
 def _format_callable_reference(fn: object) -> str:
-    module = str(getattr(fn, "__module__", "") or "").strip()
-    qualname = str(getattr(fn, "__qualname__", "") or "").strip()
-    name = str(getattr(fn, "__name__", "") or "").strip()
+    module = str(getattr(fn, "__module__", "") or "").strip()  # pragma: allow-dynattr callable metadata fallback
+    qualname = str(getattr(fn, "__qualname__", "") or "").strip()  # pragma: allow-dynattr callable metadata fallback
+    name = str(getattr(fn, "__name__", "") or "").strip()  # pragma: allow-dynattr callable metadata fallback
 
     if not module or module == "builtins":
         return qualname or name or repr(fn)
@@ -81,10 +81,10 @@ def _format_callable_reference(fn: object) -> str:
 def _lookup_cast_signature(cast_fn: object) -> Optional[Dict[str, object]]:
     if cast_fn is None:
         return None
-    name = getattr(cast_fn, "scalim_lookup_cast_name", None)
+    name = getattr(cast_fn, "scalim_lookup_cast_name", None)  # pragma: allow-dynattr plugin cast metadata
     if isinstance(name, str) and name.strip():
         payload: Dict[str, object] = {"name": str(name)}
-        meta = getattr(cast_fn, "scalim_lookup_cast_meta", None)
+        meta = getattr(cast_fn, "scalim_lookup_cast_meta", None)  # pragma: allow-dynattr plugin cast metadata
         if isinstance(meta, dict):
             meta_dict = cast("Dict[object, object]", meta)
             for k, v in meta_dict.items():
@@ -144,19 +144,19 @@ def build_preload_forever_signature(source: SourceIr, *, rendered_params: Loader
             "Dict[str, object]",
             _ensure_json_like(
                 {
-                    "kind": getattr(norm, "kind", None),
-                    "key_field": getattr(norm, "key_field", None),
-                    "on_conflict": getattr(norm, "on_conflict", None),
-                    "on_empty": getattr(norm, "on_empty", None),
-                    "on_missing": getattr(norm, "on_missing", None),
+                    "kind": norm.kind,
+                    "key_field": norm.key_field,
+                    "on_conflict": norm.on_conflict,
+                    "on_empty": norm.on_empty,
+                    "on_missing": norm.on_missing,
                     "fields": [
                         {
-                            "name": getattr(rule, "name", None),
-                            "from_key": getattr(rule, "from_key", None),
-                            "extract_expr": getattr(rule, "extract_expr", None),
-                            "extract_segments": list(getattr(rule, "extract_segments", ()) or ()),
+                            "name": rule.name,
+                            "from_key": rule.from_key,
+                            "extract_expr": rule.extract_expr,
+                            "extract_segments": list(rule.extract_segments or ()),
                         }
-                        for rule in getattr(norm, "fields", ()) or ()
+                        for rule in norm.fields
                     ],
                 },
                 path="sources.{}.normalize".format(source.source_id),
@@ -171,7 +171,7 @@ def build_preload_forever_signature(source: SourceIr, *, rendered_params: Loader
         rendered_params=params,
         normalize=normalize_dict,
         key=_normalize_json_like(_ensure_json_like(source.key.key, path="sources.{}.key".format(source.source_id))),
-        lookup_cast=_lookup_cast_signature(getattr(source.key, "cast", None)),
+        lookup_cast=_lookup_cast_signature(source.key.cast),
     )
     # 校验顶层 `JSON-like` 结构.
     _ = _ensure_json_like(signature.as_dict(), path="(signature)")
@@ -306,7 +306,7 @@ class WorkflowCachePool:
             cache_status = "hit" if entry is not None and entry.value is not None else "miss"
             if entry is None:
                 self._ensure_budget_for_new_entry(workflow_node_id=node_id, pending_emits=pending_emits)
-                entry = _CacheEntry(signature=signature)
+                entry = _CacheEntry(signature=signature, loading=True)
                 self._entries[signature_key] = entry
                 self._signature_keys_by_logical_key.setdefault(logical_key, set()).add(signature_key)
 
@@ -414,6 +414,9 @@ class WorkflowCachePool:
             if logical_key in self._pinned_logical_keys:
                 continue
             for signature_key in list(self._signature_keys_by_logical_key.get(logical_key, set())):
+                entry = self._entries.get(signature_key)
+                if entry is not None and entry.loading:
+                    continue
                 evict_reasons[signature_key] = "refcount_zero"
         return evict_reasons
 

@@ -297,7 +297,7 @@ def _should_validate_unique_effective_field_display_names(config: DemandConfig, 
 def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
     conflicts: Dict[str, List[str]] = {}
     for field_id, field_ir in demand_ir.fields.items():
-        name = str(getattr(field_ir, "name", "") or "").strip()
+        name = str(field_ir.name or "").strip()
         effective = name or str(field_id)
         conflicts.setdefault(effective, []).append(str(field_id))
 
@@ -524,14 +524,19 @@ def _compile_builtin_callable_vocab_value(
     raise TypeError(msg)
 
 
-def _compile_builtin_callables_vocab(builtin_callables: Optional[Mapping[str, object]]) -> Optional[Dict[str, Callable[..., Any]]]:
+def _compile_builtin_callables_vocab(
+    builtin_callables: Optional[Mapping[str, object]],
+    *,
+    allowed_modules: Optional[FrozenSet[str]] = None,
+    allowed_functions: Optional[FrozenSet[str]] = None,
+) -> Optional[Dict[str, Callable[..., Any]]]:
     if builtin_callables is None:
         return None
 
     compiled: Dict[str, Callable[..., Any]] = {}
     trusted_resolver = SecurePythonReferenceResolver(
-        allowed_modules=None,
-        allowed_functions=None,
+        allowed_modules=allowed_modules,
+        allowed_functions=allowed_functions,
         base_module_path=None,
     )
 
@@ -565,7 +570,11 @@ def create_reference_resolver(
     builtin_callables: Optional[Mapping[str, object]] = None,
     public_builtin_callable_ids: Optional[Sequence[str]] = None,
 ) -> SecurePythonReferenceResolver:
-    compiled_builtin_callables = _compile_builtin_callables_vocab(builtin_callables)
+    compiled_builtin_callables = _compile_builtin_callables_vocab(
+        builtin_callables,
+        allowed_modules=allowed_modules,
+        allowed_functions=allowed_functions,
+    )
     validated_public_ids = _validate_public_builtin_callable_ids(public_builtin_callable_ids)
     return SecurePythonReferenceResolver(
         allowed_modules=allowed_modules,

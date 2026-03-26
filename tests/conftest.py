@@ -9,8 +9,12 @@ def mock_loader(*_args, **_kwargs):
 def example_report_ir_module():
     from scalim_misc import example_report_ir
 
+    original = example_report_ir.data_loader.random_delay
     example_report_ir.data_loader.random_delay = 0.0
-    return example_report_ir
+    try:
+        yield example_report_ir
+    finally:
+        example_report_ir.data_loader.random_delay = original
 
 
 @pytest.fixture(scope="module")

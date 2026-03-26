@@ -1,5 +1,6 @@
 import importlib
 import logging
+import os
 import sys
 from collections import OrderedDict
 from pathlib import Path
@@ -17,8 +18,15 @@ resolver_logger = logging.getLogger("scalim.dsl.by_yaml.resolver")
 _ALLOWLIST_WILDCARD = "*"
 
 _TRUSTED_MODE_ALLOW_ALL_MODULES_WARNING = (
-    "已启用 resolver_trusted_mode=trusted_allow_all_modules: resolver allowlist 已放宽为允许任意模块. 仅用于可信输入/内部测试."
+    "已启用 resolver_trusted_mode=trusted_allow_all_modules: resolver allowlist 已放宽为允许任意模块. "
+    "此模式等效于授予 YAML 配置代码执行权限,仅用于可信输入/内部测试."
 )
+
+_TRUSTED_MODE_ENV_GATE = "SCALIM_ALLOW_TRUSTED_ALL_MODULES"
+
+_TRUSTED_MODE_ENV_GATE_REJECTED_MSG = (
+    "trusted_allow_all_modules 需要显式设置环境变量 {}=1 方可启用. 此模式等效于代码执行权限,仅用于完全可信的输入."
+).format(_TRUSTED_MODE_ENV_GATE)
 
 _WILDCARD_MODULES_REJECTED_BY_DEFAULT_MSG = (
     "不允许在 `allowed_modules` 中使用通配符 `*` (默认 resolver_trusted_mode=strict_allowlist 会 fail-fast). "
@@ -142,6 +150,8 @@ class PythonReferenceResolver:
         if _has_wildcard(allowed_functions):
             raise ValueError(_WILDCARD_FUNCTIONS_REJECTED_MSG)
         if resolver_trusted_mode == ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES:
+            if os.environ.get(_TRUSTED_MODE_ENV_GATE) != "1":
+                raise ValueError(_TRUSTED_MODE_ENV_GATE_REJECTED_MSG)
             if allowed_functions is not None or allowed_modules != frozenset([_ALLOWLIST_WILDCARD]):
                 raise ValueError(_TRUSTED_MODE_MIXED_ALLOWLIST_REJECTED_MSG)
             resolver_logger.warning(
@@ -208,10 +218,10 @@ class PythonReferenceResolver:
             if attr_name.startswith("__"):
                 msg = "引用 '{}' 禁止访问双下划线属性 '{}'".format(parsed.reference, attr_name)
                 raise ResolverError(msg)
-            if not hasattr(obj, attr_name):
+            if not hasattr(obj, attr_name):  # pragma: allow-dynattr resolver attribute traversal
                 msg = "对象 '{}' 不存在属性 '{}'".format(obj, attr_name)
                 raise ResolverError(msg)
-            obj = getattr(obj, attr_name)
+            obj = getattr(obj, attr_name)  # pragma: allow-dynattr resolver attribute traversal
 
         if not callable(obj):
             msg = "'{}:{}' 不是可调用对象".format(parsed.module_path, ".".join(parsed.attr_path))
@@ -230,11 +240,11 @@ class PythonReferenceResolver:
 
         module = self._import_module(parsed.module_path)
 
-        if not hasattr(module, func_name):
+        if not hasattr(module, func_name):  # pragma: allow-dynattr module callable resolution
             msg = "模块 '{}' 不存在属性 '{}'".format(parsed.module_path, func_name)
             raise ResolverError(msg)
 
-        obj = getattr(module, func_name)
+        obj = getattr(module, func_name)  # pragma: allow-dynattr module callable resolution
         if not callable(obj):
             msg = "'{}' 不是可调用对象".format(parsed.reference)
             raise ResolverError(msg)

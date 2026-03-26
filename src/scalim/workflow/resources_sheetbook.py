@@ -71,8 +71,7 @@ def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> Non
         _ = temp_obj.replace(output_path)
     except Exception as exc:
         with suppress(Exception):
-            if temp_obj.exists():
-                temp_obj.unlink()
+            temp_obj.unlink()
         msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
         raise WorkflowWriteError(msg) from exc
 

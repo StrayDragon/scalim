@@ -135,6 +135,12 @@ def test_resolve_output_field_ref_rejects_ambiguous_content_match() -> None:
         )
 
 
+def test_aggregate_derived_deps_unknown_producer_key_falls_back_to_empty_tuple() -> None:
+    loader = YamlDemandLoader()
+    cfg = OutputAggregateFieldConfig(producer_key="unknown", config={})
+    assert loader._derived_deps_for_aggregate_derived_field(cfg) == ()  # type: ignore[attr-defined]
+
+
 def test_build_aggregate_field_index_skips_non_dict_values() -> None:
     loader = YamlDemandLoader()
 

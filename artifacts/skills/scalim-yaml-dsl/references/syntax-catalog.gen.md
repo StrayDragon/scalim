@@ -160,6 +160,9 @@
   - 派生字段执行与错误处理
   - compute 表达式预编译并复用执行
   - compute 编译缓存有上限(有界 LRU)
+  - compute failures MUST NOT log raw expressions by default
+  - compute audit callback MUST support redaction
+  - compile cache operations MUST be safe under concurrent access
   - call_by 派生字段函数调用
   - call_by 上下文引用
   - compute sandbox rejection MUST include an actionable `call_by` migration hint
@@ -184,6 +187,7 @@
   - cache pool supports lifecycle management and auto-release
   - cache pool refcount MUST be derived from Workflow IR when available
   - cache pool enforces budgets with a clear policy
+  - cache pool eviction MUST NOT evict in-flight (loading) entries
   - cache pool MUST be observable via workflow-level events
 ### `workflow-shared-output-containers`
 - Source: `openspec/specs/workflow-shared-output-containers/spec.md`
