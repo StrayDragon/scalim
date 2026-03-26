@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 import pytest
 
 import scalim.dsl.by_yaml.config_parsing.security as security
+from scalim.secure_compute_contracts import is_secure_compute_calculator
 from scalim.dsl.by_yaml.config_parsing.security import (
     ComputeExpressionError,
     SecureComputeEngine,
@@ -32,6 +33,8 @@ def test_compiled_calculator_supports_positional_and_kwargs() -> None:
     assert calc(a=1, b=2) == 3
     assert calc(1, 2) == 3
     assert isinstance(calc, SecureComputeCalculator)
+    assert is_secure_compute_calculator(calc)
+    assert security.is_secure_compute_calculator(calc)
     assert calc.dependencies == ("a", "b")
 
     with pytest.raises(TypeError, match="mixed args and kwargs"):

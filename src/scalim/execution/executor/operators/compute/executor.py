@@ -3,6 +3,7 @@ from typing import Any, Dict, Hashable, List, Tuple, cast
 
 from .....events.catalog import EVENT_FIELD_COMPUTE
 from .....planning.operators import ComputeOperatorIr, SupportedOperatorIr
+from .....secure_compute_contracts import is_secure_compute_calculator
 from .....spec.ir.fields import ComputeCallContextIr, DerivedFieldIr
 from .....vendor.compact.typing_extensionsx import override
 from ....context import BatchContext
@@ -17,12 +18,6 @@ _EXPECTED_COMPUTE_ERRORS = (
     ZeroDivisionError,
     ArithmeticError,
 )
-
-
-def _is_secure_compute_calculator(value: object) -> bool:
-    from .....dsl.by_yaml.config_parsing.security import is_secure_compute_calculator  # noqa: PLC0415
-
-    return is_secure_compute_calculator(value)
 
 
 def _execute_constant_compute(
@@ -240,7 +235,7 @@ class ComputeOperatorExecutor(OperatorExecutor):
             )
             return
 
-        if isinstance(field_spec, DerivedFieldIr) and not field_spec.call_ctx_key and _is_secure_compute_calculator(field_spec.calculator):
+        if isinstance(field_spec, DerivedFieldIr) and not field_spec.call_ctx_key and is_secure_compute_calculator(field_spec.calculator):
             _execute_secure_compute(
                 field_spec,
                 context,

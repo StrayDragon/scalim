@@ -9,6 +9,12 @@ from decimal import Decimal
 from types import CodeType
 from typing import Any, Callable, ClassVar, Container, Dict, FrozenSet, List, Optional, Set, Tuple, Type, Union, cast
 
+from ....secure_compute_contracts import (
+    SecureComputeCalculatorContract,
+)
+from ....secure_compute_contracts import (
+    is_secure_compute_calculator as _is_secure_compute_calculator,
+)
 from ....vendor.compact.typing_extensionsx import override
 from ....vendor.dataclassesx import dataclass
 
@@ -110,12 +116,13 @@ class ComputeLimits:
 
 
 @dataclass(frozen=True)
-class SecureComputeCalculator:
+class SecureComputeCalculator(SecureComputeCalculatorContract):
     engine: "SecureComputeEngine"
     expression: str
     dependencies: Tuple[str, ...]
     code: CodeType
 
+    @override
     def __call__(self, *args: Any, **field_values: Any) -> Any:
         return self.engine.evaluate_compiled(
             expression=self.expression,
@@ -127,7 +134,7 @@ class SecureComputeCalculator:
 
 
 def is_secure_compute_calculator(value: object) -> bool:
-    return isinstance(value, SecureComputeCalculator)
+    return _is_secure_compute_calculator(value)
 
 
 def default_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
