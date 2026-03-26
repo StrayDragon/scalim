@@ -1,9 +1,0 @@
-## ADDED Requirements
-
-### Requirement: Skill docs MUST not present removed workflow field `write_to` as an authoring surface
-系统 MUST 保证作者面对的 skill references / OpenSpec 文档不再把 `write_to` 作为当前 workflow 写入 surface；`write_to` 仅允许出现在“迁移/历史”说明中,并必须明确其已被移除以及替代写法为 `writes`.
-
-#### Scenario: skill docs no longer advertise write_to
-- **WHEN** 维护者运行 `just gen-agent-skill`
-- **THEN** `artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md` 不得将 `write_to` 作为当前字段/路径进行描述
-
