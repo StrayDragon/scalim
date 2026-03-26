@@ -52,5 +52,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
 - workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 `writes[*].output` 等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证
+- 若 Python 侧使用 `overrides.outputs` 把 workbook outputs 整体替换为非 workbook 输出,未显式 `path` 的 `meta/audit`
+  会被运行时跳过;仍需保留时请显式配置 `meta.path` / `audit.path`
 
 只在需要时再读大 reference,不要默认把全量 catalog 和 playbook 一起塞进上下文。

@@ -237,6 +237,8 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 
 - 顶层 `failure_policy` / `include_full_error_message` 控制 composed outputs 的失败策略与错误信息脱敏
 - 顶层 `meta` / `audit` 可开启额外 sheet(默认写入 primary workbook)
+- 若 Python 侧用 `overrides.outputs` 把 workbook outputs 整体替换为纯 `csv` 等非 workbook 输出,且 `meta/audit`
+  未显式提供 `path`,则运行时会跳过这些隐式 extra sheets;如需保留,请显式设置 `meta.path` / `audit.path`
 
 一个最小示例:
 

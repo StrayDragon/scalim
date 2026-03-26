@@ -74,7 +74,7 @@
 | `outputs.*.where` | `OutputTargetSpec.predicate` | 安全表达式;依赖字段静态提取注入 required fields | 复杂分发逻辑放到 loader/derived field 里生成路由字段 |
 | `outputs.*.aggregate` | `DerivedOutputTargetSpec.derived`(group_by) | 当前 YAML 只暴露 `group_by+metrics` 这一类派生汇总 | 更复杂派生输出装配走 Python-only `OutputCompositionSpec` |
 | `outputs.*.from` | 输出继承(字段/容器) | 不继承 where/aggregate | - |
-| `meta` / `audit` | `OutputCompositionSpec.meta_sheet/audit_sheet` | 需要至少一个 workbook 输出(或显式提供 path) | 需要非 Excel 审计输出时走 observers/hooks |
+| `meta` / `audit` | `OutputCompositionSpec.meta_sheet/audit_sheet` | 需要至少一个 workbook 输出(或显式提供 path);若 `overrides.outputs` 整体替换为非 workbook 输出,未显式 `path` 时会被跳过 | 需要非 Excel 审计输出时走 observers/hooks |
 | `failure_policy` | `OutputCompositionSpec.failure_policy` | `all_fail/primary_only` | - |
 | `include_full_error_message` | `OutputCompositionSpec.include_full_error_message` | 可能包含敏感信息;默认 false | 在 CI/公开环境保持 false |
 

@@ -1158,6 +1158,9 @@ sources:
 - 当多个 outputs 共享同一 Excel `path` 时,每个 output 必须显式设置 `sheet`(否则会覆盖同一个 sheet)
 - Python 调用侧可通过 `overrides.outputs` **整体替换** YAML 的 `outputs`(replace).优先级: `overrides.outputs` > YAML `outputs` > 默认(不写文件;仅 sink 保留数据)
 - `overrides.outputs` 必须为非空 list;本版本仅承诺明细输出(detail)最小子集: `name/container/fields`(不支持 `where/from/aggregate`)
+- 若 `overrides.outputs` 把原本的 workbook outputs 替换成纯 `csv` 等非 workbook 输出,则未显式设置 `path` 的
+  `meta/audit` 不再继承原 YAML 的 workbook,而是会被跳过;若仍需输出这些 extra sheets,请显式配置 `meta.path`
+  / `audit.path`
 
 #### 4.5.1 示例: YAML 声明多 sheet(明细 + 汇总 + meta + audit)
 

@@ -44,6 +44,8 @@ def run(  # noqa: PLR0913
 
     注意:
     - `overrides.viz_config` 可启用/禁用 `viz`,不受 `YAML` 的 `observability.viz.*` 影响.
+    - 当 `overrides.outputs` 把 `YAML` 中的 workbook 输出整体替换为非 workbook 输出时,未显式设置 `path` 的 `meta/audit`
+      会被跳过;若仍需保留,请为 `meta.path` / `audit.path` 提供独立 workbook 路径.
     - 输出数据的保留完全由 `sink=...`(例如 `InMemoryRowSink`)决定,而不是由布尔开关控制.
     """
     template_sandbox = validate_public_template_sandbox(template_sandbox)
