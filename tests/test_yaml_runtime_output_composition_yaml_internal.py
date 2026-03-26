@@ -123,6 +123,51 @@ def test_compile_output_composition_returns_none_when_no_outputs() -> None:
     assert oc_yaml.compile_output_composition_from_yaml(DemandConfig(), _make_demand_ir(), resolver=_resolver()) is None
 
 
+def test_compile_output_composition_can_skip_extra_sheet_without_workbook() -> None:
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="csv", path="./out.csv"),
+                fields=("a",),
+            ),
+        ),
+        meta=OutputExtraSheetConfig(),
+    )
+
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(),
+        resolver=_resolver(),
+        skip_extra_sheets_without_workbook=True,
+    )
+    assert spec is not None
+    assert spec.meta_sheet is None
+
+
+def test_compile_output_composition_skip_flag_keeps_explicit_extra_sheet_path() -> None:
+    config = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                container=OutputContainerConfig(type="csv", path="./out.csv"),
+                fields=("a",),
+            ),
+        ),
+        meta=OutputExtraSheetConfig(path="./meta.xlsx"),
+    )
+
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(),
+        resolver=_resolver(),
+        skip_extra_sheets_without_workbook=True,
+    )
+    assert spec is not None
+    assert spec.meta_sheet is not None
+    assert spec.meta_sheet.output.path == "./meta.xlsx"
+
+
 def test_compile_output_composition_resolves_output_container_path_init_var() -> None:
     config = DemandConfig(
         outputs=(

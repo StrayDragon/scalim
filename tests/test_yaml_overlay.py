@@ -339,6 +339,43 @@ sources: {}
     assert compilation.request.output_composition.targets[0].output.path == str(output_path)
 
 
+def test_compile_overrides_outputs_disables_implicit_meta_without_workbook(tmp_path: Path) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: overlay_overrides_outputs_meta
+main_source:
+  source_id: orders
+  loader: tests.conftest.mock_loader
+  fields:
+    order_id: {extract: order_id}
+outputs:
+  - name: detail
+    container: {type: workbook, path: ./report.xlsx, sheet: Detail}
+    fields: [order_id]
+meta: true
+sources: {}
+""",
+    )
+
+    compilation = compile(
+        str(yaml_path),
+        allowed_modules=frozenset(["tests.conftest"]),
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": "./out.csv"},
+                    "fields": ["order_id"],
+                }
+            ]
+        ),
+    )
+
+    assert compilation.request.output_composition is not None
+    assert compilation.request.output_composition.meta_sheet is None
+
+
 def test_validate_unique_field_names_runtime_rejects_duplicates_triggered_by_overrides(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,

@@ -454,6 +454,30 @@ def _compile_extra_sheet(
     )
 
 
+def _maybe_compile_extra_sheet(
+    *,
+    target_id: str,
+    cfg: Optional[OutputExtraSheetConfig],
+    default_sheet: str,
+    default_workbook_path: Optional[str],
+    default_allow_formulas: bool,
+    default_write_lock: bool,
+    skip_without_workbook: bool,
+) -> Optional[Tuple[OutputSpec, str]]:
+    if cfg is None or (skip_without_workbook and cfg.path is None and default_workbook_path is None):
+        return None
+
+    out, sheet_name = _compile_extra_sheet(
+        target_id=target_id,
+        cfg=cfg,
+        default_sheet=default_sheet,
+        default_workbook_path=default_workbook_path,
+        default_allow_formulas=default_allow_formulas,
+        default_write_lock=default_write_lock,
+    )
+    return out, sheet_name
+
+
 def _validate_extra_sheet_target_names(config: DemandConfig, *, outputs_path: str) -> None:
     outputs = config.outputs or ()
     reserved = {str(t.name) for t in outputs}
@@ -473,6 +497,7 @@ def compile_output_composition_from_yaml(
     init_vars: Optional[Dict[str, object]] = None,
     workflow_managed_output_ids: Optional[FrozenSet[str]] = None,
     outputs_path: str = "outputs",
+    skip_extra_sheets_without_workbook: bool = False,
 ) -> Optional[OutputCompositionSpec]:
     outputs = config.outputs
     if not outputs:
@@ -561,27 +586,31 @@ def compile_output_composition_from_yaml(
         )
 
     meta_sheet_spec = None
-    if config.meta is not None:
-        meta_out, meta_sheet_name = _compile_extra_sheet(
-            target_id="meta",
-            cfg=config.meta,
-            default_sheet="__meta__",
-            default_workbook_path=workbook_default_path,
-            default_allow_formulas=workbook_default_allow_formulas,
-            default_write_lock=workbook_default_write_lock,
-        )
+    meta_sheet_compiled = _maybe_compile_extra_sheet(
+        target_id="meta",
+        cfg=config.meta,
+        default_sheet="__meta__",
+        default_workbook_path=workbook_default_path,
+        default_allow_formulas=workbook_default_allow_formulas,
+        default_write_lock=workbook_default_write_lock,
+        skip_without_workbook=skip_extra_sheets_without_workbook,
+    )
+    if meta_sheet_compiled is not None:
+        meta_out, meta_sheet_name = meta_sheet_compiled
         meta_sheet_spec = MetaSheetSpec(target_id="meta", output=meta_out, sheet_name=meta_sheet_name)
 
     audit_sheet_spec = None
-    if config.audit is not None:
-        audit_out, audit_sheet_name = _compile_extra_sheet(
-            target_id="audit",
-            cfg=config.audit,
-            default_sheet="__audit__",
-            default_workbook_path=workbook_default_path,
-            default_allow_formulas=workbook_default_allow_formulas,
-            default_write_lock=workbook_default_write_lock,
-        )
+    audit_sheet_compiled = _maybe_compile_extra_sheet(
+        target_id="audit",
+        cfg=config.audit,
+        default_sheet="__audit__",
+        default_workbook_path=workbook_default_path,
+        default_allow_formulas=workbook_default_allow_formulas,
+        default_write_lock=workbook_default_write_lock,
+        skip_without_workbook=skip_extra_sheets_without_workbook,
+    )
+    if audit_sheet_compiled is not None:
+        audit_out, audit_sheet_name = audit_sheet_compiled
         audit_sheet_spec = AuditSheetSpec(target_id="audit", output=audit_out, sheet_name=audit_sheet_name)
 
     return OutputCompositionSpec(

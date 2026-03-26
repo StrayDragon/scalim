@@ -635,6 +635,7 @@ def _compile_output_composition_for_outputs(
             init_vars=options.init_vars,
             workflow_managed_output_ids=options.workflow_managed_output_ids,
             outputs_path=outputs_path,
+            skip_extra_sheets_without_workbook=options.overrides is not None and options.overrides.outputs is not None,
         ),
     )
 
