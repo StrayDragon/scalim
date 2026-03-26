@@ -12,7 +12,16 @@ class CliDocsError(RuntimeError):
     pass
 
 
+_CLI_DOCS_HELP_WIDTH = 100
+_CLI_DOCS_HELP_MAX_POSITION = 28
+
+
 TokenPath = Tuple[str, ...]
+
+
+class StableCliHelpFormatter(argparse.HelpFormatter):
+    def __init__(self, prog: str) -> None:
+        super().__init__(prog, width=_CLI_DOCS_HELP_WIDTH, max_help_position=_CLI_DOCS_HELP_MAX_POSITION)
 
 
 @dataclass
@@ -45,6 +54,7 @@ class RecordingSubparsers:
 
 class RecordingArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("formatter_class", StableCliHelpFormatter)
         super().__init__(*args, **kwargs)
         self.recording = CommandRecording()
         self.recording_prefix: TokenPath = ()

@@ -465,7 +465,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "9dec517bf455665d2f236d04e9f2ca4d869d15f9073a49e0b60af70577922087"
+      "sha256": "bc79053b9dd4ccfaf5b379f3b370ddd038238f110c7392a595b1478613cb00f8"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",

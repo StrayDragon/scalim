@@ -17,3 +17,13 @@ def test_yaml_dsl_cli_reference_renderer_is_deterministic() -> None:
     a = render_yaml_dsl_cli_reference_markdown(repo_root, command_docs, generated_by="test")
     b = render_yaml_dsl_cli_reference_markdown(repo_root, command_docs, generated_by="test")
     assert a == b
+
+
+def test_build_yaml_dsl_command_docs_is_independent_of_terminal_width(monkeypatch) -> None:
+    monkeypatch.setenv("COLUMNS", "60")
+    narrow = build_yaml_dsl_command_docs()
+
+    monkeypatch.setenv("COLUMNS", "140")
+    wide = build_yaml_dsl_command_docs()
+
+    assert narrow == wide

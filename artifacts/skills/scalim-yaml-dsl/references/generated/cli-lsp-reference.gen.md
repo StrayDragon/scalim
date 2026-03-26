@@ -100,58 +100,50 @@
 ## Command Details
 ### `yaml-dsl validate`
 - Help: Validate YAML DSL via internal validator
-- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA]
-                                    [--type {auto,demand,workflow}]
+- Usage: `scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--type {auto,demand,workflow}]
                                     [--path-alias PATH_ALIASES]
-                                    [--allowed-yaml-root ALLOWED_YAML_ROOTS]
-                                    [--json] [--verbose]
+                                    [--allowed-yaml-root ALLOWED_YAML_ROOTS] [--json] [--verbose]
                                     yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA]
-                                    [--type {auto,demand,workflow}]
+usage: scalim-cli yaml-dsl validate [-h] [--schema SCHEMA] [--type {auto,demand,workflow}]
                                     [--path-alias PATH_ALIASES]
-                                    [--allowed-yaml-root ALLOWED_YAML_ROOTS]
-                                    [--json] [--verbose]
+                                    [--allowed-yaml-root ALLOWED_YAML_ROOTS] [--json] [--verbose]
                                     yaml_file
 
 positional arguments:
-  yaml_file             YAML 文件路径
+  yaml_file                 YAML 文件路径
 
 options:
-  -h, --help            show this help message and exit
+  -h, --help                show this help message and exit
   --schema SCHEMA, -s SCHEMA
-                        JSON Schema 文件路径
+                            JSON Schema 文件路径
   --type {auto,demand,workflow}
-                        校验类型: auto/demand/workflow
+                            校验类型: auto/demand/workflow
   --path-alias PATH_ALIASES
-                        仅 workflow validate: 需求路径别名,格式 <alias>=<path> (可重复)
+                            仅 workflow validate: 需求路径别名,格式 <alias>=<path> (可重复)
   --allowed-yaml-root ALLOWED_YAML_ROOTS
-                        允许读取 YAML 的根目录(可重复);默认仅允许入口 YAML 所在目录
-  --json                输出 JSON 结果
-  --verbose, -v         显示详细错误信息
+                            允许读取 YAML 的根目录(可重复);默认仅允许入口 YAML 所在目录
+  --json                    输出 JSON 结果
+  --verbose, -v             显示详细错误信息
 ```
 
 ### `yaml-dsl schema validate`
 - Help: Validate YAML DSL via JSON Schema
-- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--json]
-                                           [--verbose]
-                                           yaml_file`
+- Usage: `scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--json] [--verbose] yaml_file`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--json]
-                                           [--verbose]
-                                           yaml_file
+usage: scalim-cli yaml-dsl schema validate [-h] [--schema SCHEMA] [--json] [--verbose] yaml_file
 
 positional arguments:
-  yaml_file             YAML 文件路径
+  yaml_file                 YAML 文件路径
 
 options:
-  -h, --help            show this help message and exit
+  -h, --help                show this help message and exit
   --schema SCHEMA, -s SCHEMA
-                        JSON Schema 文件路径
-  --json                输出 JSON 结果
-  --verbose, -v         显示详细错误信息
+                            JSON Schema 文件路径
+  --json                    输出 JSON 结果
+  --verbose, -v             显示详细错误信息
 ```
 
 ### `yaml-dsl schema show`
@@ -178,26 +170,23 @@ options:
 
 ### `yaml-dsl upsert-lsp-comment`
 - Help: Upsert YAML $schema modeline comment (JetBrains/RedHat)
-- Usage: `scalim-cli yaml-dsl upsert-lsp-comment [-h] [--type SCHEMA_TYPE]
-                                              [--schema-path SCHEMA_PATH]
+- Usage: `scalim-cli yaml-dsl upsert-lsp-comment [-h] [--type SCHEMA_TYPE] [--schema-path SCHEMA_PATH]
                                               [--comment-style {all,jetbrains,redhat}]
                                               paths [paths ...]`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl upsert-lsp-comment [-h] [--type SCHEMA_TYPE]
-                                              [--schema-path SCHEMA_PATH]
+usage: scalim-cli yaml-dsl upsert-lsp-comment [-h] [--type SCHEMA_TYPE] [--schema-path SCHEMA_PATH]
                                               [--comment-style {all,jetbrains,redhat}]
                                               paths [paths ...]
 
 positional arguments:
-  paths                 一个或多个 YAML 文件路径
+  paths                     一个或多个 YAML 文件路径
 
 options:
-  -h, --help            show this help message and exit
-  --type SCHEMA_TYPE    Schema 类型(例如 demand/workflow)
+  -h, --help                show this help message and exit
+  --type SCHEMA_TYPE        Schema 类型(例如 demand/workflow)
   --schema-path SCHEMA_PATH
-                        Schema base URL/dir 或完整 .json URL/path(默认使用内置 schema
-                        目录)
+                            Schema base URL/dir 或完整 .json URL/path(默认使用内置 schema 目录)
   --comment-style {all,jetbrains,redhat}
-                        Schema modeline 风格: all/jetbrains/redhat
+                            Schema modeline 风格: all/jetbrains/redhat
 ```
