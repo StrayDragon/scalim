@@ -39,11 +39,13 @@ def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
     assert excinfo.value.path == "workflow.options.cache_pool"
 
 
-def test_run_workflow_ir_works_without_build_demand_run_result_fn(tmp_path: Path) -> None:
+def test_run_workflow_ir_works_without_build_demand_run_result_fn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.by_yaml.runtime.contracts import RunOptions
     from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
+
+    monkeypatch.chdir(tmp_path)
 
     demand_yaml = tmp_path / "demand.yaml"
     demand_yaml.write_text(
