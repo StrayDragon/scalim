@@ -36,6 +36,38 @@ def test_json_like_helpers_reject_invalid_values() -> None:
     assert payload == (1, 2)
 
 
+def test_ensure_json_like_rejects_empty_dict_key_when_required() -> None:
+    from scalim.utils.json_like import ensure_json_like
+
+    with pytest.raises(WorkflowCachePoolError, match="dict key must be str"):
+        _ = ensure_json_like(
+            {"": 1},
+            path="x",
+            value_name="value",
+            allowed_types_desc="dict[str, ...]",
+            dict_key_desc="str",
+            require_nonempty_dict_key=True,
+            error_cls=WorkflowCachePoolError,
+        )
+
+
+def test_build_preload_forever_signature_rejects_unexpected_normalize_payload_shape(monkeypatch) -> None:
+    from scalim.execution import workflow_cache_pool as mod
+    from scalim.spec.ir.sources import SourceNormalizeIr
+
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable=lambda: {}),
+        normalize=SourceNormalizeIr(kind="index_by_key", key_field="id"),
+    )
+
+    monkeypatch.setattr(mod, "_normalize_json_like", lambda _value: 1)
+
+    with pytest.raises(WorkflowCachePoolError, match="expected dict"):
+        _ = mod.build_preload_forever_signature(source, rendered_params={})  # type: ignore[arg-type]
+
+
 def test_format_callable_reference_and_lookup_cast_signature_variants() -> None:
     from scalim.execution import workflow_cache_pool as mod
 

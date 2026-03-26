@@ -1,5 +1,18 @@
 import math
-from typing import Callable, Dict, Sequence, cast
+from typing import Callable, Dict, List, Sequence, Union
+
+from ..vendor.compact.typing_extensionsx import TypeGuard
+
+JsonScalar = Union[None, bool, int, float, str]
+JsonLike = Union[JsonScalar, List["JsonLike"], Dict[str, "JsonLike"]]
+
+
+def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+    return isinstance(value, (list, tuple))
+
+
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
 
 
 def ensure_json_like(
@@ -11,7 +24,7 @@ def ensure_json_like(
     dict_key_desc: str,
     require_nonempty_dict_key: bool,
     error_cls: Callable[..., Exception],
-) -> object:
+) -> JsonLike:
     """校验并归一化 `JSON-like` 值.
 
     - `list`/`tuple` 会归一化为 `list`.
@@ -25,8 +38,7 @@ def ensure_json_like(
             msg = "{} must be JSON-like (float must be finite)".format(str(value_name))
             raise error_cls(msg, path=str(path))
         return value
-    if isinstance(value, (list, tuple)):
-        items = cast("Sequence[object]", value)
+    if _is_sequence(value):
         return [
             ensure_json_like(
                 item,
@@ -37,19 +49,18 @@ def ensure_json_like(
                 require_nonempty_dict_key=require_nonempty_dict_key,
                 error_cls=error_cls,
             )
-            for item in items
+            for item in value
         ]
-    if isinstance(value, dict):
-        mapping = cast("Dict[object, object]", value)
-        out: Dict[str, object] = {}
-        for raw_key, raw_value in mapping.items():
-            ok_key = isinstance(raw_key, str)
-            if ok_key and require_nonempty_dict_key:
-                ok_key = bool(str(raw_key).strip())
-            if not ok_key:
+    if _is_dict(value):
+        out: Dict[str, JsonLike] = {}
+        for raw_key, raw_value in value.items():
+            if not isinstance(raw_key, str):
                 msg = "{} must be JSON-like (dict key must be {})".format(str(value_name), str(dict_key_desc))
                 raise error_cls(msg, path=str(path))
-            out[str(raw_key)] = ensure_json_like(
+            if require_nonempty_dict_key and not raw_key.strip():
+                msg = "{} must be JSON-like (dict key must be {})".format(str(value_name), str(dict_key_desc))
+                raise error_cls(msg, path=str(path))
+            out[raw_key] = ensure_json_like(
                 raw_value,
                 path=str(path),
                 value_name=value_name,

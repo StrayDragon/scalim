@@ -3554,6 +3554,15 @@ def test_sheetbook_sheet_rows_loader_validates_ref_and_context_cleanup() -> None
         delattr(workflow_loaders_mod._TLS, "ctx")
 
 
+def test_sheetbook_sheet_rows_loader_rejects_corrupted_context() -> None:
+    workflow_loaders_mod._TLS.ctx = object()
+    try:
+        with pytest.raises(TypeError, match="context is corrupted"):
+            _ = workflow_loaders_mod.sheetbook_sheet_rows(ref={"node": "a", "sheetbook": "sb", "sheet": "S"})
+    finally:
+        delattr(workflow_loaders_mod._TLS, "ctx")
+
+
 def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path: Path) -> None:
     slow_out = tmp_path / "slow_detail.csv"
     fast_out = tmp_path / "fast_detail.csv"

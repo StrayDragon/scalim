@@ -12,6 +12,22 @@ except ImportError:
 # endregion
 
 
+# region TypeGuard compat
+try:
+    from typing_extensions import TypeGuard  # pyright: ignore[reportUnusedImport]
+except ImportError:
+    if TYPE_CHECKING:
+        from typing_extensions import TypeGuard  # pyright: ignore[reportUnusedImport]
+    else:
+        # 最小化兜底: 仅用于 `Python 3.6` 上注解求值通过; 类型收窄由类型检查器处理.
+        class _TypeGuard:
+            def __getitem__(self, item: Any) -> Any:
+                return bool
+
+        TypeGuard = _TypeGuard()
+# endregion
+
+
 # region Literal compat
 try:
     from typing_extensions import Literal  # pyright: ignore[reportUnusedImport]

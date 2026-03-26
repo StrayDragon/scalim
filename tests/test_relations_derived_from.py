@@ -180,6 +180,16 @@ def test_derive_pre_ref_available_field_keys_excludes_main_source_ref_fields() -
     assert "ref_like" not in available
 
 
+def test_derive_pre_ref_available_field_keys_returns_empty_when_main_source_id_empty() -> None:
+    orders_source = MainSourceIr(source_id="", loader=lambda: [])
+    demand = DemandIr.from_irs(
+        sources=[],
+        fields=[FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True)],
+        main_source=orders_source,
+    )
+    assert derive_pre_ref_available_field_keys(demand=demand) == set()
+
+
 def test_plan_builder_find_pre_ref_blocking_chain_branches() -> None:
     class _WeirdField:
         def __init__(self, field_id: str) -> None:

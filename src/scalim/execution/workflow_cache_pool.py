@@ -2,7 +2,7 @@ import hashlib
 import json
 import threading
 from collections import OrderedDict
-from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple
 
 from ..events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
@@ -16,6 +16,7 @@ from ..spec.ir.sources import SourceIr
 from ..spec.ir.workflow import WorkflowCachePoolIr
 from ..typedefs import LoaderCallKwargs, LoaderResultMapping
 from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, field
 
 
@@ -25,6 +26,14 @@ class WorkflowCachePoolError(RuntimeError):
     def __init__(self, message: str, *, path: str) -> None:
         super(WorkflowCachePoolError, self).__init__(str(message))
         self.path = str(path or "")
+
+
+def _is_list(value: object) -> TypeGuard[List[object]]:
+    return isinstance(value, list)
+
+
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
 
 
 def _ensure_json_like(value: object, *, path: str) -> object:
@@ -42,14 +51,12 @@ def _ensure_json_like(value: object, *, path: str) -> object:
 def _normalize_json_like(value: object) -> object:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
-    if isinstance(value, list):
-        items = cast("List[object]", value)
-        return [_normalize_json_like(item) for item in items]
-    if isinstance(value, dict):
-        mapping = cast("Dict[object, object]", value)
+    if _is_list(value):
+        return [_normalize_json_like(item) for item in value]
+    if _is_dict(value):
         out: Dict[str, object] = {}
-        for raw_key in sorted(mapping.keys(), key=str):
-            out[str(raw_key)] = _normalize_json_like(mapping[raw_key])
+        for raw_key in sorted(value.keys(), key=str):
+            out[str(raw_key)] = _normalize_json_like(value[raw_key])
         return out
     return value
 
@@ -85,9 +92,8 @@ def _lookup_cast_signature(cast_fn: object) -> Optional[Dict[str, object]]:
     if isinstance(name, str) and name.strip():
         payload: Dict[str, object] = {"name": str(name)}
         meta = getattr(cast_fn, "scalim_lookup_cast_meta", None)  # pragma: allow-dynattr plugin cast metadata
-        if isinstance(meta, dict):
-            meta_dict = cast("Dict[object, object]", meta)
-            for k, v in meta_dict.items():
+        if _is_dict(meta):
+            for k, v in meta.items():
                 if k == "name":
                     continue
                 if isinstance(k, str) and k.strip():
@@ -140,29 +146,30 @@ def build_preload_forever_signature(source: SourceIr, *, rendered_params: Loader
     normalize_dict: Optional[Dict[str, object]] = None
     if source.normalize is not None:
         norm = source.normalize
-        normalize_payload = cast(
-            "Dict[str, object]",
-            _ensure_json_like(
-                {
-                    "kind": norm.kind,
-                    "key_field": norm.key_field,
-                    "on_conflict": norm.on_conflict,
-                    "on_empty": norm.on_empty,
-                    "on_missing": norm.on_missing,
-                    "fields": [
-                        {
-                            "name": rule.name,
-                            "from_key": rule.from_key,
-                            "extract_expr": rule.extract_expr,
-                            "extract_segments": list(rule.extract_segments or ()),
-                        }
-                        for rule in norm.fields
-                    ],
-                },
-                path="sources.{}.normalize".format(source.source_id),
-            ),
+        normalize_payload = _ensure_json_like(
+            {
+                "kind": norm.kind,
+                "key_field": norm.key_field,
+                "on_conflict": norm.on_conflict,
+                "on_empty": norm.on_empty,
+                "on_missing": norm.on_missing,
+                "fields": [
+                    {
+                        "name": rule.name,
+                        "from_key": rule.from_key,
+                        "extract_expr": rule.extract_expr,
+                        "extract_segments": list(rule.extract_segments or ()),
+                    }
+                    for rule in norm.fields
+                ],
+            },
+            path="sources.{}.normalize".format(source.source_id),
         )
-        normalize_dict = cast("Dict[str, object]", _normalize_json_like(normalize_payload))
+        normalized = _normalize_json_like(normalize_payload)
+        if not _is_dict(normalized):
+            msg = "Signature value must be JSON-like (expected dict)"
+            raise WorkflowCachePoolError(msg, path="sources.{}.normalize".format(source.source_id))
+        normalize_dict = {str(k): v for k, v in normalized.items()}
 
     signature = WorkflowCacheEntrySignature(
         kind="preload_forever",

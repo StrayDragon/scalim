@@ -3,10 +3,11 @@
 import math
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from ..spec.ir.aliases import LookupKeyCast
 from ..typedefs import LookupKey
+from ..vendor.compact.typing_extensionsx import TypeGuard
 
 # endregion
 
@@ -21,6 +22,10 @@ ConvertibleToIntTuple = Union[Tuple[ConvertibleToInt, ...], List[ConvertibleToIn
 
 SeparatedValues = Union[str, int, float]
 """CSV 字符串或已转换的值"""
+
+
+def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+    return isinstance(value, (tuple, list))
 
 
 class NamedLookupCast:
@@ -91,11 +96,10 @@ def must_to_int_tuple(value: object) -> Optional[Tuple[int, ...]]:
     """强制将序列的每个元素转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
-    if not isinstance(value, (tuple, list)):
+    if not _is_sequence(value):
         return None
     converted_items: List[int] = []
-    items = cast("Sequence[object]", value)
-    for item in items:
+    for item in value:
         converted = must_to_int(item)
         if converted is None:
             return None
@@ -252,10 +256,9 @@ def auto_str_normalize_key(value: object) -> Tuple[Optional[LookupKey], str, Opt
     if value is None:
         return None, "null_key", None
 
-    if isinstance(value, (tuple, list)):
-        items = cast("Sequence[object]", value)
+    if _is_sequence(value):
         out: List[str] = []
-        for idx, item in enumerate(items):
+        for idx, item in enumerate(value):
             if item is None:
                 return None, "null_key", None
             normalized = auto_str_normalize(item)

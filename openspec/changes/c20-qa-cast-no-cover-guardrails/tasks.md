@@ -2,7 +2,8 @@
 
 - [x] 0.1 运行 `uv run scripts/check-cast-usage.py --report .tmp/artifacts/cast-usage.report.txt` 建立 `cast` 基线
 - [x] 0.2 运行 `uv run scripts/check-no-cover.py --report .tmp/artifacts/no-cover.report.txt` 建立 `no cover` 基线
-- [ ] 0.3 按目录/职责分类命中,区分“应补类型/应补测试”与“必须 allow”的场景
+- [x] 0.3 按目录/职责分类命中,区分“应补类型/应补测试”与“必须 allow”的场景（见 `classification.md`）
+- [x] 0.4 运行 `uv run scripts/check-object-type.py --report .tmp/artifacts/object-type.report.txt` 建立 `object` 基线
 
 ## 1. Tooling
 
@@ -10,6 +11,9 @@
 - [x] 1.2 实现 `scripts/check-no-cover.py`,支持文本/JSON 报告与 `--check`
 - [x] 1.3 为两类检查定义显式 allow 约定与理由校验,并明确这些注释属于治理标记
 - [x] 1.4 在 `justfile` 增加 SSOT 入口: `report-*` / `check-*` 命令
+- [x] 1.5 实现 `scripts/check-object-type.py`,支持文本/JSON 报告与 `--check`
+- [x] 1.6 支持行级 `# pragma: allow-object <reason>` 与文件级 `# pragma: allow-object-file <reason>`,并将 `scripts/` 与 `vendor/` 视为白名单边界
+- [x] 1.7 在 `justfile` 增加 SSOT 入口: `report-object-type` / `check-object-type`
 
 ## 2. Rollout
 

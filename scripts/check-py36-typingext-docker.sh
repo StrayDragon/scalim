@@ -55,29 +55,52 @@ PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python - <<'PY
 # - 该检查刻意不安装 openpyxl/pandas 等可选依赖,用于捕获“import 时炸”的回归.
 # - compileall 仅能发现语法问题; import smoke test 才能覆盖注解求值差异等问题(Python 3.6 典型坑).
 
-from scalim.dsl.by_yaml import *  # noqa: F401,F403
-from scalim.dsl.by_yaml import workflow_entrypoints  # noqa: F401
-from scalim.execution import ScalimEngine  # noqa: F401
-from scalim.execution import output_composition  # noqa: F401
-from scalim.execution.preload_cache import PreloadCache  # noqa: F401
-from scalim.ob import Observability  # noqa: F401
-from scalim.planning import PlanBuilder  # noqa: F401
-from scalim.spec.ir import DemandIr  # noqa: F401
-from scalim.vendor.dataclassesx import dataclass as dataclassesx_dataclass  # noqa: F401
-from scalim.vendor.compact.typing_extensionsx import Self, override  # noqa: F401
+import traceback
+from pathlib import Path
 
-_ = (
-    DemandIr,
-    Observability,
-    PlanBuilder,
-    PreloadCache,
-    ScalimEngine,
-    dataclassesx_dataclass,
-    Self,
-    output_composition,
-    override,
-    workflow_entrypoints,
-)
+import scalim
 
-print("检查通过: py36 + typing-extensions 4.1.1 + workflow import smoke")
+
+def iter_scalim_modules():
+    pkg_root = Path(scalim.__file__).resolve().parent
+    src_root = pkg_root.parent
+    modules = set()
+    for path in pkg_root.rglob("*.py"):
+        rel = path.relative_to(src_root).with_suffix("")
+        parts = rel.parts
+        if not parts or parts[0] != "scalim":
+            continue
+        if parts[-1] == "__init__":
+            modules.add(".".join(parts[:-1]))
+        else:
+            modules.add(".".join(parts))
+    return sorted(modules)
+
+
+def star_import(module_name: str) -> None:
+    # `import *` 会触发 `__all__`/注解求值等路径,更贴近“真实 import 边界”.
+    ns = {}
+    exec("from {} import *".format(module_name), ns)
+
+
+failures = []
+modules = iter_scalim_modules()
+
+for module_name in modules:
+    try:
+        star_import(module_name)
+    except BaseException as exc:
+        failures.append((module_name, exc))
+        print("")
+        print("[fail] from {} import *".format(module_name))
+        traceback.print_exc()
+
+if failures:
+    print("")
+    print("[error] py36 import smoke failures: {}".format(len(failures)))
+    for module_name, exc in failures:
+        print("  - {}: {}: {}".format(module_name, type(exc).__name__, exc))
+    raise SystemExit(1)
+
+print("检查通过: py36 + typing-extensions 4.1.1 + import* smoke (modules={})".format(len(modules)))
 PY

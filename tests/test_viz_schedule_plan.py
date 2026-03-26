@@ -2,7 +2,7 @@ from pathlib import Path
 
 from scalim.dsl.by_yaml import compile
 from scalim.planning import PlanBuilder
-from scalim.planning.viz_schedule import _build_layers
+from scalim.planning.viz_schedule import _build_layers, _build_ref_deps
 
 
 def _write_yaml(tmp_path: Path, text: str) -> Path:
@@ -88,3 +88,10 @@ sources:
 def test_viz_schedule_layers_fallback_for_cycles() -> None:
     layers = _build_layers(["a", "b"], deps={"a": ("b",), "b": ("a",)})
     assert layers == [["a", "b"]]
+
+
+def test_viz_schedule_ref_deps_accepts_nonempty_str_dep() -> None:
+    from types import SimpleNamespace
+
+    plan = SimpleNamespace(ref_loader_sequence=[(None, [("ref_a", "ref_b")])])
+    assert _build_ref_deps(plan) == {"ref_a": ("ref_b",)}

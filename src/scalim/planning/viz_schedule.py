@@ -1,15 +1,39 @@
 import time
-from typing import Any, Dict, List, Sequence, Set, Tuple, cast
+from typing import Any, Dict, List, Sequence, Set, Tuple, Union
 
-from ..utils.relation_signature import build_relation_signature, has_rows_binding
-from .operators import LoadRefOperatorIr, OperatorType
+from ..spec.ir.sources import SourceIr
+from ..utils.relation_signature import RelationSignature, build_relation_signature, has_rows_binding
+from ..vendor.compact.typing_extensionsx import Protocol, TypedDict
+from .operators import LoadRefOperatorIr, PlanOperatorIr
+
+_RefLoaderOrderingDep = Union[str, Tuple[str, ...]]
+_RefLoaderField = Tuple[str, _RefLoaderOrderingDep]
+_RefLoaderSequenceItem = Tuple[SourceIr, List[_RefLoaderField]]
 
 
-def _build_ref_deps(plan: Any) -> Dict[str, Tuple[str, ...]]:
+class _ExecutionPlanLike(Protocol):
+    operators: Tuple[PlanOperatorIr, ...]
+    ref_loader_sequence: List[_RefLoaderSequenceItem]
+    target_fields: List[str]
+
+
+class _VizTask(TypedDict):
+    task_id: str
+    chain: List[str]
+    fields: List[str]
+    rows_binding: bool
+
+
+def _build_ref_deps(plan: _ExecutionPlanLike) -> Dict[str, Tuple[str, ...]]:
     deps: Dict[str, Tuple[str, ...]] = {}
     for _source, items in plan.ref_loader_sequence:
         for field_key, dep_ref_field_keys in items:
-            deps[str(field_key)] = tuple(str(dep) for dep in (dep_ref_field_keys or ()))
+            if not dep_ref_field_keys:
+                deps[str(field_key)] = ()
+            elif isinstance(dep_ref_field_keys, tuple):
+                deps[str(field_key)] = tuple(str(dep) for dep in dep_ref_field_keys)
+            else:
+                deps[str(field_key)] = (str(dep_ref_field_keys),)
     return deps
 
 
@@ -42,7 +66,7 @@ def _build_layers(field_keys: Sequence[str], *, deps: Dict[str, Tuple[str, ...]]
 
 
 def build_viz_schedule_plan(
-    plan: Any,
+    plan: _ExecutionPlanLike,
 ) -> Dict[str, Any]:
     """生成 `viz_schedule_plan.json` (用于 `adaptive` 计划视角的可视化).
 
@@ -51,9 +75,7 @@ def build_viz_schedule_plan(
     - 当前仅包含 `load_ref` 维度 (与 `adaptive scheduler` 的分层/分组逻辑对齐).
     """
 
-    loadref_ops: List[LoadRefOperatorIr] = [
-        cast("LoadRefOperatorIr", op) for op in plan.operators if getattr(op, "operator_type", None) == OperatorType.LOAD_REF
-    ]
+    loadref_ops = [op for op in plan.operators if isinstance(op, LoadRefOperatorIr)]
     op_by_field_key: Dict[str, LoadRefOperatorIr] = {op.field_key: op for op in loadref_ops}
     field_keys: List[str] = [op.field_key for op in loadref_ops]
 
@@ -70,23 +92,24 @@ def build_viz_schedule_plan(
 
         rows_barrier = any(has_rows_binding(op.lookup_steps) for op in layer_ops)
 
-        groups: Dict[Tuple[Tuple[Any, ...], ...], Dict[str, Any]] = {}
-        group_order: List[Tuple[Tuple[Any, ...], ...]] = []
+        groups: Dict[RelationSignature, _VizTask] = {}
+        group_order: List[RelationSignature] = []
 
         for op in layer_ops:
             sig = build_relation_signature(op.lookup_steps)
             item = groups.get(sig)
             if item is None:
                 chain = [step[0] for step in sig]
-                item = {
+                new_item: _VizTask = {
                     "task_id": "t{}".format(len(group_order)),
                     "chain": chain,
                     "fields": [],
                     "rows_binding": bool(has_rows_binding(op.lookup_steps)),
                 }
-                groups[sig] = item
+                groups[sig] = new_item
                 group_order.append(sig)
-            cast("List[str]", item["fields"]).append(str(op.field_key))
+                item = new_item
+            item["fields"].append(str(op.field_key))
 
         tasks = [groups[key] for key in group_order]
         layer_items.append(

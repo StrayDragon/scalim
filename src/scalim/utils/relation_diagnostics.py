@@ -1,9 +1,17 @@
 from collections.abc import Mapping as MappingABC
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from ..spec.ir.relations import FieldRefIr, JoinConditionIr, RelationIr
 from ..spec.ir.sources import SourceIr
-from ..vendor.compact.typing_extensionsx import override
+from ..vendor.compact.typing_extensionsx import TypeGuard, override
+
+
+def _is_mapping(value: object) -> TypeGuard[Mapping[str, Any]]:
+    return isinstance(value, MappingABC)
+
+
+def _is_tuple(value: object) -> TypeGuard[Tuple[Any, ...]]:
+    return isinstance(value, tuple)
 
 
 class TypeMismatchWarning:
@@ -35,9 +43,8 @@ class TypeMismatchWarning:
 class RelationDiagnostics:
     @staticmethod
     def _extract_field_value(data: Any, field_name: str) -> Any:
-        if isinstance(data, MappingABC):
-            mapping = cast("Mapping[str, Any]", data)
-            return mapping.get(field_name)
+        if _is_mapping(data):
+            return data.get(field_name)
         return getattr(data, field_name, None)
 
     @staticmethod
@@ -53,9 +60,8 @@ class RelationDiagnostics:
 
     @staticmethod
     def _format_value_type(value: Any) -> Union[str, Tuple[str, ...]]:
-        if isinstance(value, tuple):
-            items = cast("Iterable[Any]", value)
-            return tuple(type(item).__name__ if item is not None else "None" for item in items)
+        if _is_tuple(value):
+            return tuple(type(item).__name__ if item is not None else "None" for item in value)
         return type(value).__name__ if value is not None else "None"
 
     @staticmethod
@@ -98,8 +104,8 @@ class RelationDiagnostics:
 
     @staticmethod
     def _as_tuple(value: Union[Any, Tuple[Any, ...]]) -> Tuple[Any, ...]:
-        if isinstance(value, tuple):
-            return tuple(cast("Iterable[Any]", value))
+        if _is_tuple(value):
+            return value
         return (value,)
 
     @staticmethod
@@ -242,9 +248,9 @@ class RelationDiagnostics:
                 normalized_fk = fk_raw
                 if isinstance(right_source, SourceIr) and right_source.key.cast:
                     try:
-                        if isinstance(fk_raw, tuple):
+                        if _is_tuple(fk_raw):
                             casted: List[Any] = []
-                            for item in cast("Iterable[Any]", fk_raw):
+                            for item in fk_raw:
                                 converted = right_source.key.cast(item)
                                 if converted is None:
                                     casted = []

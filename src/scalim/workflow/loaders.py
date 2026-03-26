@@ -1,7 +1,8 @@
 import contextlib
 import threading
-from typing import Any, FrozenSet, Iterator, Mapping, cast
+from typing import Any, FrozenSet, Iterator, Mapping
 
+from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass
 from .resources import WorkflowResourceManager
 
@@ -17,6 +18,10 @@ class _WorkflowLoaderContext:
 _TLS = threading.local()
 
 
+def _is_mapping(value: object) -> TypeGuard[Mapping[str, Any]]:
+    return isinstance(value, dict)
+
+
 @contextlib.contextmanager
 def workflow_loader_context(
     *,
@@ -26,7 +31,10 @@ def workflow_loader_context(
     resource_manager: WorkflowResourceManager,
 ) -> Iterator[None]:
     """在执行一个 `workflow` 的 `demand` 节点时,注入内置 `workflow loader` 所需上下文(`thread-local`)."""
-    prev = getattr(_TLS, "ctx", None)
+    try:
+        prev = _TLS.ctx
+    except AttributeError:
+        prev = None
     _TLS.ctx = _WorkflowLoaderContext(
         workflow_exec_id=str(workflow_exec_id),
         workflow_node_id=str(workflow_node_id),
@@ -38,7 +46,7 @@ def workflow_loader_context(
     finally:
         if prev is None:
             try:
-                delattr(_TLS, "ctx")
+                del _TLS.ctx
             except AttributeError:
                 return
         else:
@@ -46,11 +54,17 @@ def workflow_loader_context(
 
 
 def _require_context() -> _WorkflowLoaderContext:
-    ctx = getattr(_TLS, "ctx", None)
+    try:
+        ctx = _TLS.ctx
+    except AttributeError:
+        ctx = None
     if ctx is None:
         msg = "workflow loader requires workflow context (only valid inside run_workflow execution)"
         raise ValueError(msg)
-    return cast("_WorkflowLoaderContext", ctx)
+    if not isinstance(ctx, _WorkflowLoaderContext):
+        msg = "workflow loader context is corrupted (expected _WorkflowLoaderContext, got {})".format(type(ctx).__name__)
+        raise TypeError(msg)
+    return ctx
 
 
 def sheetbook_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
@@ -61,10 +75,10 @@ def sheetbook_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
     """
     ctx = _require_context()
 
-    if not isinstance(ref, dict):
+    if not _is_mapping(ref):
         msg = "sheetbook_sheet_rows requires params.ref as a mapping"
         raise TypeError(msg)
-    ref_dict = cast("Mapping[str, Any]", ref)
+    ref_dict = ref
 
     producer_node_id = str(ref_dict.get("node", "") or "").strip()
     sheetbook_id = str(ref_dict.get("sheetbook", "") or "").strip()

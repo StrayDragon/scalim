@@ -2,7 +2,7 @@ from typing import List, Optional, Sequence, Set, Tuple, Union
 
 from ...spec.ir.demand import DemandIr
 from ...spec.ir.fields import DerivedFieldIr, FieldIr
-from ...spec.ir.sources import SourceIr
+from ...spec.ir.sources import MainSourceIr, SourceIr
 from ..operators import (
     ComputeOperatorIr,
     LoadOperatorIr,
@@ -19,6 +19,11 @@ RefLoaderOrderingDep = Union[str, Tuple[str, ...]]
 RefLoaderField = Tuple[str, RefLoaderOrderingDep]
 RefLoaderSequenceItem = Tuple[SourceIr, List[RefLoaderField]]
 RefLoaderSequence = List[RefLoaderSequenceItem]
+
+
+def _get_main_source(demand: DemandIr) -> Optional[MainSourceIr]:
+    # `DemandIr.main_source` 在规范语义中是必填字段;但测试/不完整 IR 可能会临时设为 `None`.
+    return demand.main_source
 
 
 def build_plan_operators(
@@ -74,8 +79,10 @@ def derive_pre_ref_available_field_keys(*, demand: DemandIr) -> Set[str]:
     - 用途: 约束当 `relation` 的连接键引用派生字段时,其依赖必须全部可在 `LoadRef` 前获得.
     """
 
-    main_source = getattr(demand, "main_source", None)
-    main_source_id = str(getattr(main_source, "source_id", "") or "")
+    main_source = _get_main_source(demand)
+    if main_source is None:
+        return set()
+    main_source_id = str(main_source.source_id or "")
     if not main_source_id:
         return set()
 
@@ -83,8 +90,7 @@ def derive_pre_ref_available_field_keys(*, demand: DemandIr) -> Set[str]:
     for field_key, field_spec in demand.fields.items():
         if not isinstance(field_spec, FieldIr):
             continue
-        source = getattr(field_spec, "source", None)
-        source_id = str(getattr(source, "source_id", "") or "")
+        source_id = str(field_spec.source.source_id or "")
         if source_id != main_source_id:
             continue
         if field_spec.lookup_steps or field_spec.relation:

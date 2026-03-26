@@ -518,6 +518,14 @@ report-no-cover:
 check-no-cover:
     uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check
 
+# 报告: `object` 类型标注基线
+report-object-type:
+    uv {{ UV_OPTIONS }} run python scripts/check-object-type.py
+
+# 检查: `object` 类型标注必须显式 allow (scripts/vendor 白名单除外)
+check-object-type:
+    uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
+
 # QA: 仅py轻量的检查
 quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 

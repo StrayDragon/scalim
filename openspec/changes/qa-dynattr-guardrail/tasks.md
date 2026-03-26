@@ -1,13 +1,13 @@
 ## 0. Baseline / Verification
 
-- [ ] 0.1 运行 `uv run scripts/check-dynattr.py --report .tmp/artifacts/dynattr.report.txt` 生成基线报告
-- [ ] 0.2 按目录/职责分类报告结果,识别“可静态化”与“必须 allow”的命中
+- [x] 0.1 运行 `uv run scripts/check-dynattr.py --report .tmp/artifacts/dynattr.report.txt` 生成基线报告
+- [x] 0.2 按目录/职责分类报告结果,识别“可静态化”与“必须 allow”的命中（见 `classification.md`）
 
 ## 1. Tooling
 
-- [ ] 1.1 实现 `scripts/check-dynattr.py`
-- [ ] 1.2 支持行级 `# pragma: allow-dynattr <reason>` 与文件级 `# pragma: allow-dynattr-file <reason>`
-- [ ] 1.3 支持文本报告、JSON 报告与 `--check` 非零退出码
+- [x] 1.1 实现 `scripts/check-dynattr.py`
+- [x] 1.2 支持行级 `# pragma: allow-dynattr <reason>` 与文件级 `# pragma: allow-dynattr-file <reason>`
+- [x] 1.3 支持文本报告、JSON 报告与 `--check` 非零退出码
 
 ## 2. Rollout
 
