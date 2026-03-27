@@ -8,6 +8,13 @@
 - **WHEN** 用户希望兜底处理 scalim 抛出的全部自定义异常
 - **THEN** `except ScalimException:` MUST 捕获到这些异常
 
+### Requirement: scalim 自定义异常类名 MUST 以 `Scalim` 前缀开头
+系统 MUST 为所有 scalim 自定义异常统一使用 `Scalim*` 的类名命名约定(包括分类基类与叶子异常),以避免跨模块命名冲突并提升可搜索性/可治理性.
+
+#### Scenario: exception class name has Scalim prefix
+- **WHEN** 任意 scalim 自定义异常对外暴露
+- **THEN** 其异常类名 MUST 以 `Scalim` 开头(例如 `ScalimYamlException`)
+
 ### Requirement: 用户可感知错误 MUST 以异常类型作为稳定契约
 系统 MUST 为常见用户可感知错误提供清晰的异常类型层级(例如 YAML/Execution/Workflow 维度的基类与叶子类)。
 用户/测试 SHOULD 优先使用 `isinstance`/`except` 进行分支判断，而不是依赖 message 文本或额外的错误码映射。

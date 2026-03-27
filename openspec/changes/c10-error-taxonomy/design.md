@@ -28,6 +28,7 @@ scalim 当前存在大量分散的错误/异常类型与抛错风格:
 **Decision:** 定义 `ScalimException(Exception)` 作为 scalim 所有自定义异常的根.仓库内新增的 scalim 自定义异常 MUST 直接或间接继承该根,并保持单继承以保证严格树形结构。
 
 异常命名约定:
+- 异常类名 MUST 以 `Scalim` 前缀开头(例如 `ScalimYamlException`),以避免跨模块命名冲突并提升可搜索性/可治理性。
 - 异常类名 SHOULD 以 `Error`/`Exception` 结尾,或以明确的“可恢复”后缀结尾(例如 `*Recoverable*`/`*Retryable*`,按落地阶段统一)。
 - 子类分层用于表达分类边界(例如 YAML/Execution/Workflow 等),用于治理与 `isinstance` 判断。
 
