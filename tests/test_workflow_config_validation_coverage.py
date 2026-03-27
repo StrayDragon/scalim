@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import pytest
 
-from scalim.dsl.by_yaml.workflow import WorkflowConfigError, load_workflow_config, load_workflow_config_from_mapping
+from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config, load_workflow_config_from_mapping
 
 
 def _base_root() -> Dict[str, Any]:
@@ -40,7 +40,7 @@ workflow:
         encoding="utf-8",
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "Duplicate key" in str(excinfo.value)
 
@@ -48,7 +48,7 @@ workflow:
 def test_workflow_run_id_rejects_internal_prefix() -> None:
     root = _base_root()
     root["workflow"]["runs"][0]["id"] = "__wf__bad"
-    with pytest.raises(WorkflowConfigError, match="reserved prefix"):
+    with pytest.raises(ScalimWorkflowConfigError, match="reserved prefix"):
         _ = load_workflow_config_from_mapping(root)
 
 
@@ -118,7 +118,7 @@ def test_workflow_run_id_rejects_internal_prefix() -> None:
 def test_load_workflow_config_from_mapping_writes_errors(writes_raw: Any, match: str) -> None:
     root = _base_root()
     root["workflow"]["runs"][0]["writes"] = writes_raw
-    with pytest.raises(WorkflowConfigError, match=match):
+    with pytest.raises(ScalimWorkflowConfigError, match=match):
         _ = load_workflow_config_from_mapping(root)
 
 
@@ -182,7 +182,7 @@ def test_load_workflow_config_from_mapping_writes_errors(writes_raw: Any, match:
 def test_load_workflow_config_from_mapping_resources_errors(resources_raw: Any, match: str) -> None:
     root = _base_root()
     root["workflow"]["resources"] = resources_raw
-    with pytest.raises(WorkflowConfigError, match=match):
+    with pytest.raises(ScalimWorkflowConfigError, match=match):
         _ = load_workflow_config_from_mapping(root)
 
 
@@ -199,7 +199,7 @@ def test_load_workflow_config_from_mapping_validates_unknown_workbook_reference(
     root = _base_root()
     root["workflow"]["resources"] = {"workbooks": {"ok": {"path": "a.xlsx"}}}
     root["workflow"]["runs"][0]["writes"] = [{"workbook_sheet": {"workbook": "nope", "sheet": "S", "output": "detail"}}]
-    with pytest.raises(WorkflowConfigError, match="Unknown workbook resource id"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown workbook resource id"):
         _ = load_workflow_config_from_mapping(root)
 
 
@@ -207,7 +207,7 @@ def test_load_workflow_config_from_mapping_validates_unknown_csv_reference() -> 
     root = _base_root()
     root["workflow"]["resources"] = {"csvs": {"ok": {"path": "a.csv"}}}
     root["workflow"]["runs"][0]["writes"] = [{"csv_append": {"csv": "nope", "output": "detail"}}]
-    with pytest.raises(WorkflowConfigError, match="Unknown csv resource id"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown csv resource id"):
         _ = load_workflow_config_from_mapping(root)
 
 
@@ -215,7 +215,7 @@ def test_load_workflow_config_from_mapping_validates_unknown_sheetbook_reference
     root = _base_root()
     root["workflow"]["resources"] = {"sheetbooks": {"ok": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}
     root["workflow"]["runs"][0]["writes"] = [{"sheetbook_sheet": {"sheetbook": "nope", "sheet": "S", "output": "detail"}}]
-    with pytest.raises(WorkflowConfigError, match="Unknown sheetbook resource id"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown sheetbook resource id"):
         _ = load_workflow_config_from_mapping(root)
 
 

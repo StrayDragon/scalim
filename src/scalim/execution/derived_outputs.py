@@ -26,19 +26,19 @@ def _auto_str_normalize_derived_key_part(*, value: object, field_id: str, contex
     return normalized
 
 
-class AggregationKeyLimitExceededError(ScalimExecutionException):
+class ScalimAggregationKeyLimitExceededError(ScalimExecutionException):
     group_count: int
     max_groups: int
 
     def __init__(self, *, group_count: int, max_groups: int) -> None:
-        super(AggregationKeyLimitExceededError, self).__init__(
+        super(ScalimAggregationKeyLimitExceededError, self).__init__(
             "Group-by key cardinality exceeded: group_count={} > max_groups={}".format(int(group_count), int(max_groups))
         )
         self.group_count = int(group_count)
         self.max_groups = int(max_groups)
 
 
-class DistinctKeyLimitExceededError(ScalimExecutionException):
+class ScalimDistinctKeyLimitExceededError(ScalimExecutionException):
     distinct_count: int
     max_distinct: int
     on_overflow: str
@@ -52,7 +52,7 @@ class DistinctKeyLimitExceededError(ScalimExecutionException):
         on_overflow: str,
         key_fields: Sequence[str],
     ) -> None:
-        super(DistinctKeyLimitExceededError, self).__init__(
+        super(ScalimDistinctKeyLimitExceededError, self).__init__(
             "Distinct key cardinality exceeded: distinct_count={} > max_distinct={} (on_overflow={}, key_fields={})".format(
                 int(distinct_count),
                 int(max_distinct),
@@ -66,12 +66,12 @@ class DistinctKeyLimitExceededError(ScalimExecutionException):
         self.key_fields = tuple(str(x) for x in key_fields)
 
 
-class DedupKeyConflictError(ScalimExecutionException):
+class ScalimDedupKeyConflictError(ScalimExecutionException):
     key_fields: Tuple[str, ...]
     on_conflict: str
 
     def __init__(self, *, key_fields: Sequence[str], on_conflict: str) -> None:
-        super(DedupKeyConflictError, self).__init__(
+        super(ScalimDedupKeyConflictError, self).__init__(
             "dedup_by key conflict: on_conflict={!r} requires deterministic resolution; duplicate keys encountered (key_fields={})".format(
                 str(on_conflict), ",".join(str(x) for x in key_fields)
             )
@@ -213,7 +213,7 @@ def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields
 
     try:
         topo_order = graph_utils.topological_sort(node_ids, _get_derived_deps)
-    except graph_utils.CyclicDependencyError as exc:
+    except graph_utils.ScalimCyclicDependencyError as exc:
         cycles = exc.cycles or ()
         cycle = cycles[0] if cycles else ()
         chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"
@@ -356,7 +356,7 @@ class _BoundedDistinctKeySet:
             return True, None
 
         if self._on_overflow == "error":
-            raise DistinctKeyLimitExceededError(
+            raise ScalimDistinctKeyLimitExceededError(
                 distinct_count=len(self._keys) + 1,
                 max_distinct=self._max_distinct,
                 on_overflow=self._on_overflow,
@@ -750,7 +750,7 @@ class GroupByAggregator(IRowAggregator):
         state = self._states.get(key)
         if state is None:
             if self._max_groups and len(self._states) >= self._max_groups:
-                raise AggregationKeyLimitExceededError(group_count=len(self._states) + 1, max_groups=self._max_groups)
+                raise ScalimAggregationKeyLimitExceededError(group_count=len(self._states) + 1, max_groups=self._max_groups)
             state = tuple(
                 _metric_state_from_spec(m, max_distinct=self._max_distinct, on_overflow=self._distinct_on_overflow) for m in self._metrics
             )
@@ -1109,7 +1109,7 @@ class DedupByThenAggregator(IRowAggregator):
         if existing is not None:
             self._conflict_count += 1
             if self._on_conflict == "error":
-                raise DedupKeyConflictError(key_fields=self._key_fields, on_conflict=self._on_conflict)
+                raise ScalimDedupKeyConflictError(key_fields=self._key_fields, on_conflict=self._on_conflict)
             if self._on_conflict == "last":
                 self._rows[key] = stored_row
             # `first`: 保留已有行

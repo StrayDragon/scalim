@@ -87,7 +87,7 @@ def test_run_multi_root_workbook_all_fail_wraps_sheet_error(monkeypatch, tmp_pat
     case = build_minimal_ir_case()
     req = ExecutionRequest(export_layout=ExportLayout(field_ids=("order_id",), header_names=None), output=OutputSpec(path=None), sink=None)
 
-    with pytest.raises(wm_mod.MultiRootWorkbookRunError, match="Workbook sheet run failed"):
+    with pytest.raises(wm_mod.ScalimMultiRootWorkbookRunError, match="Workbook sheet run failed"):
         _ = run_multi_root_workbook(output_path=str(tmp_path / "x.xlsx"), runs=(("SheetA", case.demand, req),), failure_policy="all_fail")
 
     assert _FakeWorkbookSink.instances[-1].closed is True

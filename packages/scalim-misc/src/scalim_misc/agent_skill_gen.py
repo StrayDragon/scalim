@@ -36,7 +36,11 @@ from scalim_misc.yaml_dsl_cli_reference_md import (
 
 from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
+from scalim.dsl.by_yaml.config_parsing.imports import (
+    ScalimYamlImportExpansionError,
+    contains_import_syntax,
+    expand_imports_inplace,
+)
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.builtin_callables import list_public_builtin_callable_ids
 from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
@@ -301,7 +305,7 @@ def validate_canonical_example(repo_root: Path, yaml_text: str, *, fragments: Di
         try:
             if contains_import_syntax(payload_dict):
                 _ = expand_imports_inplace(payload_dict, yaml_path=yaml_path)
-        except YamlImportExpansionError as exc:
+        except ScalimYamlImportExpansionError as exc:
             raise GenerationError("唯一完整示例 `imports` 展开失败: {}".format(exc))
 
         validator = ConfigValidator(schema_path=str(schema_path))

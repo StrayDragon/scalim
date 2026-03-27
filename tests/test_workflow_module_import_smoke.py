@@ -8,6 +8,6 @@ def test_workflow_ctx_and_artifacts_modules_are_importable() -> None:
 
 
 def test_workflow_runtime_config_error_str_formatting_without_path() -> None:
-    from scalim.workflow.errors import WorkflowConfigError
+    from scalim.workflow.errors import ScalimWorkflowConfigError
 
-    assert str(WorkflowConfigError("msg")) == "msg"
+    assert str(ScalimWorkflowConfigError("msg")) == "msg"

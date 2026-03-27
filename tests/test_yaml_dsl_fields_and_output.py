@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 
@@ -239,7 +239,7 @@ outputs:
       - {extract: id}
 """
     loader = YamlDemandLoader()
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         loader.load_string(yaml_content)
 
     assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
@@ -264,7 +264,7 @@ outputs:
       - {extract: missing}
 """
     loader = YamlDemandLoader()
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         loader.load_string(yaml_content)
 
     assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
@@ -288,7 +288,7 @@ outputs:
       - 1
 """
     loader = YamlDemandLoader()
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         loader.load_string(yaml_content)
 
     assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
@@ -304,7 +304,7 @@ def test_validator_outputs_object_ref_check_skips_non_object_outputs_items() -> 
         "outputs": [1],
     }
 
-    with pytest.raises(ConfigValidationError):
+    with pytest.raises(ScalimConfigValidationError):
         validator.validate(config)
 
 
@@ -328,7 +328,7 @@ def test_validator_rejects_top_level_source_fields() -> None:
         "fields": {"order_id": {"extract": "order_id"}},
     }
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("Derived field 'order_id' must declare compute/call_by" in msg for msg in exc.value.errors)
@@ -359,7 +359,7 @@ def test_validator_rejects_duplicate_field_ids_across_sources() -> None:
         },
     }
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("Field 'name' is defined multiple times" in msg for msg in exc.value.errors)

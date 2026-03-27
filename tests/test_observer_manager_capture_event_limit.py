@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Set
 import pytest
 
 from scalim.events.catalog import EVENT_LOADER_CALL
-from scalim.ob.manager import ObserverCaptureOverflowError, ObserverManager
+from scalim.ob.manager import ScalimObserverCaptureOverflowError, ObserverManager
 from scalim.ob.observer import Observer
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import BindingIr, LoaderIr
@@ -28,7 +28,7 @@ class _LoaderCallObserver(Observer):
 def test_observer_manager_capture_overflow_default_policy_raises() -> None:
     manager = ObserverManager(mode="capture", max_recorded_events=1)
     manager.emit_event("x", 1)
-    with pytest.raises(ObserverCaptureOverflowError, match="capture recorded events overflow"):
+    with pytest.raises(ScalimObserverCaptureOverflowError, match="capture recorded events overflow"):
         manager.emit_event("x", 2)
 
     drained = manager.drain_events()
@@ -208,7 +208,7 @@ def test_adaptive_capture_overflow_is_diagnosable() -> None:
     manager = ObserverManager(observers=[observer], max_recorded_events=0, capture_overflow_policy="raise")
     engine = ScalimEngine(demand=demand, plan=plan, batch_size=10, parallel_mode="adaptive", max_workers=2, observer_manager=manager)
 
-    with pytest.raises(ObserverCaptureOverflowError, match="capture recorded events overflow"):
+    with pytest.raises(ScalimObserverCaptureOverflowError, match="capture recorded events overflow"):
         _ = engine.run(
             main_rows=[
                 {"order_id": 0, "customer_id": 100, "product_id": 200},

@@ -35,7 +35,7 @@ from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfi
 from .builtin_callables import parse_builtin_callable_id
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, UnsetType
 from .conversion import ConfigToIRConverter
-from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError, ResolverError
+from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimResolverError
 from .observability import compile_observability_spec
 from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
@@ -50,7 +50,7 @@ def _ensure_allowlist(
 ) -> None:
     if not allowed_modules and not allowed_functions:
         # 安全审计:仅允许从 `allowlist` 中指定的模块/函数加载,避免 `YAML` 触发任意导入执行.
-        raise AllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
+        raise ScalimAllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
 
 
 def validate_allowlist(
@@ -500,7 +500,7 @@ def _normalize_builtin_callable_id(id_raw: object, *, label: str) -> str:
         raise ValueError(msg)
     try:
         _ = parse_builtin_callable_id(BUILTIN_CALLABLE_REFERENCE_PREFIX + builtin_id)
-    except ResolverError as exc:
+    except ScalimResolverError as exc:
         msg = "{}: invalid <id> {!r}: {}".format(label, builtin_id, exc)
         raise ValueError(msg) from exc
     return builtin_id
@@ -525,7 +525,7 @@ def _compile_builtin_callable_vocab_value(
             raise ValueError(msg)
         try:
             return trusted_resolver.resolve(reference)
-        except ResolverError as exc:
+        except ScalimResolverError as exc:
             msg = "builtin_callables[{!r}]: failed to resolve Python reference {!r}: {}".format(builtin_id, reference, exc)
             raise ValueError(msg) from exc
 

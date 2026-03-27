@@ -17,7 +17,7 @@ from ..utils.excel import escape_excel_formula
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_base import WorkflowResourceManagerBase, ScalimWorkflowWriteError, acquire_write_lock, release_write_lock
 from .resources_csv import AppendSegment, WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 
 # 内部实现仍沿用原有局部命名,减少重构噪音.
@@ -82,7 +82,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             raw_path = self._workbook_defs.get(key)
             if raw_path is None:
                 msg = "Unknown workbook resource id: {!r}".format(key)
-                raise WorkflowWriteError(msg)
+                raise ScalimWorkflowWriteError(msg)
             lock_path = acquire_write_lock(raw_path)
             return _WorkbookPlan(
                 resource_id=key,
@@ -139,7 +139,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                     pending_skip = True
                 if on_conflict == "error":
                     msg = "Sheet conflict (workbook_sheet): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
-                    raise WorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
+                    raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
                 if on_conflict == "overwrite":
                     action = "overwrite"
 
@@ -220,7 +220,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 diff = _describe_header_diff(expected, input_header)
                 if on_mismatch == "error":
                     msg = "Field alignment mismatch (workbook_append): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
-                    raise WorkflowWriteError(msg, diff=diff)
+                    raise ScalimWorkflowWriteError(msg, diff=diff)
                 if on_mismatch == "warn":
                     pending_warning = DiagnosticWarningEvent(
                         message="Field alignment mismatch (warn): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name),
@@ -295,7 +295,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             if p.lock_path is not None:
                 release_write_lock(p.lock_path)
                 p.lock_path = None
-            raise WorkflowWriteError(str(exc)) from exc
+            raise ScalimWorkflowWriteError(str(exc)) from exc
 
         wb = workbook_cls(write_only=True)
         try:
@@ -328,7 +328,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 with suppress(Exception):
                     temp_obj.unlink()
                 msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
-                raise WorkflowWriteError(msg) from exc
+                raise ScalimWorkflowWriteError(msg) from exc
         except Exception:
             _best_effort_close_write_only_workbook_worksheets(wb)
             raise

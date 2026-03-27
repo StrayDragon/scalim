@@ -5,7 +5,7 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from .resources_base import WorkflowWriteError
+from .resources_base import ScalimWorkflowWriteError
 from .resources_csv import WorkflowCsvResourceMixin
 from .resources_sheetbook import SheetBookDef, WorkflowSheetBookResourceMixin
 from .resources_workbook import WorkflowWorkbookResourceMixin
@@ -22,5 +22,5 @@ class WorkflowResourceManager(
 __all__ = [
     "SheetBookDef",
     "WorkflowResourceManager",
-    "WorkflowWriteError",
+    "ScalimWorkflowWriteError",
 ]

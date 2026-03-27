@@ -2,7 +2,7 @@ import importlib
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from tests.testing_utils import missing_optional_dependency
 
@@ -42,7 +42,7 @@ def _base_config() -> dict:
 
 def _assert_validation_errors(config: dict, expected_substrings: list) -> None:
     validator = ConfigValidator()
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
     errors = exc.value.errors
     for substring in expected_substrings:
@@ -210,14 +210,14 @@ def test_validator_reports_errors(config_factory, expected_substrings) -> None:
 
 def test_validator_errors_include_paths() -> None:
     validator = ConfigValidator()
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(_config_main_source_invalid_loader_reference())
     assert any(msg.startswith("main_source.loader: ") for msg in exc.value.errors)
 
 
 def test_validator_errors_are_truncated_but_issues_are_preserved() -> None:
     validator = ConfigValidator(max_validation_error_lines=1)
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(_config_source_errors())
 
     error_issues = [issue for issue in exc.value.issues if getattr(issue, "severity", None) == "error"]

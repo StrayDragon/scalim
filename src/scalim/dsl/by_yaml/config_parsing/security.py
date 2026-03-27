@@ -94,11 +94,11 @@ def _not_in(a: Container[Any], b: Any) -> bool:
     return not operator.contains(a, b)
 
 
-class SecurityError(ScalimYamlException):
+class ScalimSecurityError(ScalimYamlException):
     pass
 
 
-class ComputeExpressionError(ScalimYamlException):
+class ScalimComputeExpressionError(ScalimYamlException):
     pass
 
 
@@ -214,7 +214,7 @@ class ExpressionValidator:
         handler = self._handlers.get(type(node))
         if handler is None:
             msg = "Unsupported AST node type: {}".format(type(node).__name__)
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
         handler(node)
 
     def _validate_name_node(self, node: ast.AST) -> None:
@@ -222,16 +222,16 @@ class ExpressionValidator:
         name = typed.id
         if name in self._forbidden_names:
             msg = "Forbidden name '{}' in expression".format(name)
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
         if name not in self._allowed_names and name not in self._allowed_functions:
             msg = "Unknown name '{}' in expression. Allowed: {}".format(name, ", ".join(sorted(self._allowed_names)))
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
 
     def _validate_binop_node(self, node: ast.AST) -> None:
         typed = cast("ast.BinOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         if type(typed.op) not in self._safe_operators:
             msg = "Unsupported operator: {}".format(type(typed.op).__name__)
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
         self._visit(typed.left)
         self._visit(typed.right)
 
@@ -241,7 +241,7 @@ class ExpressionValidator:
             msg = "Unsupported unary operator: {}".format(
                 type(typed.op).__name__
             )  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
-            raise SecurityError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
+            raise ScalimSecurityError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
         self._visit(typed.operand)
 
     def _validate_compare_node(self, node: ast.AST) -> None:
@@ -252,7 +252,7 @@ class ExpressionValidator:
         for op in typed.ops:
             if type(op) not in self._safe_comparators:
                 msg = "Unsupported comparator: {}".format(type(op).__name__)
-                raise SecurityError(msg)
+                raise ScalimSecurityError(msg)
 
     def _validate_ifexp_node(self, node: ast.AST) -> None:
         typed = cast("ast.IfExp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
@@ -268,19 +268,19 @@ class ExpressionValidator:
                 "(e.g. obj.get(...), s.strip(...)); move this logic to call_by "
                 '(allowlisted), e.g. call_by: "myapp.module:fn(value=value, ctx=$ctx)"'
             )
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
         if not isinstance(typed.func, ast.Name):
             msg = "Only simple function calls are allowed (use call_by for complex logic)"
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
         func_name = typed.func.id
         if func_name not in self._allowed_functions:
             msg = "Function '{}' is not in the allowed list".format(func_name)
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
         for arg in typed.args:
             self._visit(arg)
         if typed.keywords:
             msg = "Keyword arguments are not allowed in expressions"
-            raise SecurityError(msg)
+            raise ScalimSecurityError(msg)
 
     def _validate_attribute_node(self, node: ast.AST) -> None:
         typed = cast("ast.Attribute", node)  # pragma: allow-cast ast handler dispatch typed narrowing
@@ -288,7 +288,7 @@ class ExpressionValidator:
             "Attribute access is not allowed in compute expressions (got attribute={!r}); "
             'move this logic to call_by (allowlisted), e.g. call_by: "myapp.module:fn(value=value, ctx=$ctx)"'
         ).format(str(typed.attr))
-        raise SecurityError(msg)
+        raise ScalimSecurityError(msg)
 
     def _validate_boolop_node(self, node: ast.AST) -> None:
         typed = cast("ast.BoolOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
@@ -481,13 +481,13 @@ class SecureComputeEngine:
                 len(expression),
                 int(self._limits.max_expression_len),
             )
-            raise ComputeExpressionError(msg)
+            raise ScalimComputeExpressionError(msg)
 
         try:
             tree = ast.parse(expression, mode="eval")
         except SyntaxError as e:
             msg = "Invalid expression syntax: {}".format(e)
-            raise ComputeExpressionError(msg) from e
+            raise ScalimComputeExpressionError(msg) from e
 
         self._enforce_ast_limits(tree)
 
@@ -564,7 +564,7 @@ class SecureComputeEngine:
                 len(node.elts),
                 max_collection_literal_len,
             )
-            raise ComputeExpressionError(msg)
+            raise ScalimComputeExpressionError(msg)
 
     @classmethod
     def _check_repeat_limit(cls, node: ast.AST, max_repeat: int) -> None:
@@ -574,10 +574,10 @@ class SecureComputeEngine:
         right_repeat = cls._as_int_literal(node.right)
         if left_repeat is not None and cls._is_repeatable_literal(node.right) and left_repeat > max_repeat:
             msg = "Compute expression exceeds max_repeat (repeat={}, limit={})".format(left_repeat, max_repeat)
-            raise ComputeExpressionError(msg)
+            raise ScalimComputeExpressionError(msg)
         if right_repeat is not None and cls._is_repeatable_literal(node.left) and right_repeat > max_repeat:
             msg = "Compute expression exceeds max_repeat (repeat={}, limit={})".format(right_repeat, max_repeat)
-            raise ComputeExpressionError(msg)
+            raise ScalimComputeExpressionError(msg)
 
     @classmethod
     def _check_static_range_limit(cls, node: ast.AST, max_range_len: int) -> None:
@@ -601,7 +601,7 @@ class SecureComputeEngine:
 
         if range_len > max_range_len:
             msg = "Compute expression exceeds max_range_len (len={}, limit={})".format(range_len, max_range_len)
-            raise ComputeExpressionError(msg)
+            raise ScalimComputeExpressionError(msg)
 
     def _enforce_ast_limits(self, tree: ast.Expression) -> None:
         limits = self._limits
@@ -619,10 +619,10 @@ class SecureComputeEngine:
             node_count += 1
             if node_count > max_nodes:
                 msg = "Compute expression exceeds max_ast_nodes (nodes={}, limit={})".format(node_count, max_nodes)
-                raise ComputeExpressionError(msg)
+                raise ScalimComputeExpressionError(msg)
             if depth > max_depth:
                 msg = "Compute expression exceeds max_ast_depth (depth={}, limit={})".format(depth, max_depth)
-                raise ComputeExpressionError(msg)
+                raise ScalimComputeExpressionError(msg)
 
             literal_len = self._string_literal_len(node)
             if literal_len is not None and literal_len > max_literal_string_len:
@@ -630,7 +630,7 @@ class SecureComputeEngine:
                     literal_len,
                     max_literal_string_len,
                 )
-                raise ComputeExpressionError(msg)
+                raise ScalimComputeExpressionError(msg)
 
             self._check_collection_literal_limit(node, max_collection_literal_len)
             self._check_repeat_limit(node, max_repeat)
@@ -645,7 +645,7 @@ class SecureComputeEngine:
         rng_len = len(rng)
         if rng_len > max_range_len:
             msg = "`range` 长度 {} 超过 max_range_len={}".format(rng_len, max_range_len)
-            raise ComputeExpressionError(msg)
+            raise ScalimComputeExpressionError(msg)
         return rng
 
     def _evaluate(self, expression: str, code: Any, field_values: Dict[str, Any]) -> Any:
@@ -671,13 +671,13 @@ class SecureComputeEngine:
             result = eval(code, safe_globals, {})  # noqa: S307
             if self._audit_callback is not None:
                 self._audit_callback(expression, field_values, result)
-        except ComputeExpressionError:
+        except ScalimComputeExpressionError:
             raise
         except Exception as e:
             expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
             security_logger.exception("表达式求值失败: expr_hash=%s", expr_id)
             msg = "表达式求值失败 [expr:{}]: {}".format(expr_id, type(e).__name__)
-            raise ComputeExpressionError(msg) from e
+            raise ScalimComputeExpressionError(msg) from e
         else:
             return result
 
@@ -713,13 +713,13 @@ class SecureComputeEngine:
             result = eval(code, safe_globals, {})  # noqa: S307
             if audit_callback is not None:
                 audit_callback(expression, audit_field_values, result)
-        except ComputeExpressionError:
+        except ScalimComputeExpressionError:
             raise
         except Exception as e:
             expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
             security_logger.exception("表达式求值失败: expr_hash=%s", expr_id)
             msg = "表达式求值失败 [expr:{}]: {}".format(expr_id, type(e).__name__)
-            raise ComputeExpressionError(msg) from e
+            raise ScalimComputeExpressionError(msg) from e
         else:
             return result
 

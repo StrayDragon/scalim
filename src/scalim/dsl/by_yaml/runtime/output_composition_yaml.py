@@ -19,8 +19,8 @@ from ....execution.run_ir import export_layout_from_demand_ir
 from ....spec.ir.demand import DemandIr
 from ....typedefs import FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
-from ..config_parsing.call_by import CallByParseError, CallByValue, ParsedCallBy, parse_call_by
-from ..config_parsing.security import ComputeExpressionError, SecureComputeEngine, SecurityError
+from ..config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
+from ..config_parsing.security import ScalimComputeExpressionError, SecureComputeEngine, ScalimSecurityError
 from ..schema_dsl.models import (
     DemandConfig,
     OutputAggregateConfig,
@@ -43,12 +43,12 @@ from .references import SecurePythonReferenceResolver
 PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT = "workflow manages temp outputs for writes"
 
 
-class PathlessCsvOutputError(ScalimYamlException):
+class ScalimPathlessCsvOutputError(ScalimYamlException):
     output_id: str
     config_path: str
 
     def __init__(self, message: str, *, output_id: str, config_path: str) -> None:
-        super(PathlessCsvOutputError, self).__init__(message)
+        super(ScalimPathlessCsvOutputError, self).__init__(message)
         self.output_id = str(output_id)
         self.config_path = str(config_path)
 
@@ -76,7 +76,7 @@ def _resolve_output_container_path_with_overrides(
                 "Pathless CSV output is only allowed when {} "
                 "(set outputs.*.container.path or reference via workflow writes): output_id={!r}, path={}"
             ).format(PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT, output_id, config_path)
-            raise PathlessCsvOutputError(msg, output_id=output_id, config_path=config_path)
+            raise ScalimPathlessCsvOutputError(msg, output_id=output_id, config_path=config_path)
         return None, True
     return resolve_output_container_path(container.path, init_vars=init_vars, path=config_path), False
 
@@ -153,7 +153,7 @@ def _compile_call_by_post_field(
 ) -> PostFieldSpec:
     try:
         parsed = parse_call_by(call_by)
-    except CallByParseError as exc:
+    except ScalimCallByParseError as exc:
         msg = "aggregate.fields.{} has invalid call_by: {}".format(out_field_id, exc)
         raise ValueError(msg) from exc
 
@@ -243,7 +243,7 @@ def _compile_compute_post_field(
         raw_calculator = cast(
             "Callable[..., object]", engine.compile(expr, deps)
         )  # pragma: allow-cast compute engine compile typed narrowing
-    except (ComputeExpressionError, SecurityError) as exc:
+    except (ScalimComputeExpressionError, ScalimSecurityError) as exc:
         msg = "aggregate.fields.{} has invalid compute expression: {}".format(out_field_id, exc)
         raise ValueError(msg) from exc
 
@@ -634,6 +634,6 @@ def compile_output_composition_from_yaml(
 
 
 __all__ = [
-    "PathlessCsvOutputError",
+    "ScalimPathlessCsvOutputError",
     "compile_output_composition_from_yaml",
 ]

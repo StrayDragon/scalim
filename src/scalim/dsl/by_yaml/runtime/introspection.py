@@ -3,7 +3,7 @@ from typing import Any, Dict, FrozenSet, List, Optional, Set
 from ....ob.presets.viz import VizObserver, VizObserverConfig
 from ....planning.builder import PlanBuilder
 from ....vendor.compact.typing_extensionsx import TypedDict
-from ..config_parsing.errors import ConfigValidationError
+from ..config_parsing.errors import ScalimConfigValidationError
 from ..config_parsing.loader import YamlDemandLoader
 from ..schema_dsl.models import DemandConfig
 from ..schema_dsl.output_enums import (
@@ -123,11 +123,11 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
     loader = YamlDemandLoader()
     try:
         config = loader.load(yaml_path)
-    except ConfigValidationError:
+    except ScalimConfigValidationError:
         raise
     except ValueError as exc:
         msg = str(exc)
-        raise ConfigValidationError(msg, errors=[msg]) from exc
+        raise ScalimConfigValidationError(msg, errors=[msg]) from exc
 
     params = config.main_source.params
     output_fields = _default_output_fields_from_primary_output(config)

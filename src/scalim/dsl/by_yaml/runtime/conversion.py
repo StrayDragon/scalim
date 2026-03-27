@@ -9,7 +9,7 @@ from ._internal.conversion_lookup import LookupCastRegistry
 from ._internal.conversion_lookup import validate_source_id as _validate_source_id
 from ._internal.conversion_relations import StepInfo
 from ._internal.conversion_sources import ConfigToIRConversionSourceMixin
-from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError, ConversionError
+from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimConversionError
 from .references import PythonReferenceResolver, SecurePythonReferenceResolver
 
 
@@ -34,7 +34,7 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
         compute_engine: Optional[SecureComputeEngine] = None,
     ) -> "ConfigToIRConverter":
         if not allowed_modules and not allowed_functions:
-            raise AllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
+            raise ScalimAllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
         resolver = SecurePythonReferenceResolver(
             allowed_modules=allowed_modules,
             allowed_functions=allowed_functions,
@@ -49,7 +49,7 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
     ) -> None:
         resolved = resolver
         if resolved is None or not resolved.has_allowlist():
-            raise AllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
+            raise ScalimAllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
 
         self._resolver = resolved
         self._compute_engine = compute_engine or SecureComputeEngine()
@@ -81,7 +81,7 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
 
         if main_source_ir.source_id in sources_ir:
             msg = "Main source '{}' conflicts with sources".format(main_source_ir.source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         relation_steps = self._convert_relations(config)
         self._relation_steps = relation_steps

@@ -1,5 +1,5 @@
 from scalim.dsl.by_yaml.config_parsing.effective_yaml import dump_effective_demand_yaml, load_effective_demand_yaml
-from scalim.dsl.by_yaml.config_parsing.imports import YamlImportExpansionError
+from scalim.dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError
 
 
 def test_effective_yaml_renders_and_dumps_without_import_syntax(tmp_path) -> None:
@@ -59,13 +59,13 @@ demo: "oops"
 
     try:
         _ = load_effective_demand_yaml(demand)
-    except YamlImportExpansionError as exc:
+    except ScalimYamlImportExpansionError as exc:
         msg = str(exc)
         assert "import trace:" in msg
         assert "logical path:" in msg
         assert exc.logical_path == "demo"
     else:
-        raise AssertionError("Expected YamlImportExpansionError")
+        raise AssertionError("Expected ScalimYamlImportExpansionError")
 
 
 def test_effective_yaml_dump_rejects_non_effective_mapping() -> None:

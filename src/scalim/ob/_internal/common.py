@@ -73,7 +73,7 @@ DEFAULT_MAX_RECORDED_EVENTS = 10_000
 CAPTURE_OVERFLOW_POLICIES = ("raise", "drop-oldest", "drop-newest")
 
 
-class ObserverCaptureOverflowError(ScalimObserverException):
+class ScalimObserverCaptureOverflowError(ScalimObserverException):
     pass
 
 

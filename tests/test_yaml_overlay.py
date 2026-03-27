@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import UNSET, RunOverrides, compile
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -472,7 +472,7 @@ outputs:
 """,
     )
 
-    with pytest.raises(ConfigValidationError) as excinfo:
+    with pytest.raises(ScalimConfigValidationError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.conftest"]))
     assert any("Duplicate effective field display names" in msg for msg in excinfo.value.errors)
     assert any("'ID'" in msg for msg in excinfo.value.errors)

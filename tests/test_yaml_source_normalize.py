@@ -19,7 +19,7 @@ def _write_yaml(tmp_path: Path, text: str) -> Path:
 
 def _assert_validation_errors(config: dict, *expected_messages: str) -> None:
     validator = validator_module.ConfigValidator()
-    with pytest.raises(validator_module.ConfigValidationError) as exc:
+    with pytest.raises(validator_module.ScalimConfigValidationError) as exc:
         validator.validate(config)
     errors = exc.value.errors
     for message in expected_messages:
@@ -228,7 +228,7 @@ sources:
 
 
 def test_run_rejects_normalize_call_by_not_in_allowlist(tmp_path: Path) -> None:
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 
     yaml_path = _write_yaml(
         tmp_path,
@@ -260,7 +260,7 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    with pytest.raises(ConversionError, match=r"normalize\.call_by.*allowed_modules"):
+    with pytest.raises(ScalimConversionError, match=r"normalize\.call_by.*allowed_modules"):
         _ = run(str(yaml_path), allowed_modules=frozenset(["tests.source_normalize_loaders"]), sink=sink)
 
 
@@ -305,7 +305,7 @@ sources:
 
 def test_converter_rejects_unknown_normalize_kind() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -315,13 +315,13 @@ def test_converter_rejects_unknown_normalize_kind() -> None:
         key="id",
         normalize=NormalizeConfig(kind="bad", key_field="id"),
     )
-    with pytest.raises(ConversionError, match="normalize\\.kind must be one of: index_by_key/take_first/project_fields/map_values"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.kind must be one of: index_by_key/take_first/project_fields/map_values"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_missing_normalize_key_field() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -331,13 +331,13 @@ def test_converter_rejects_missing_normalize_key_field() -> None:
         key="id",
         normalize=NormalizeConfig(kind="index_by_key", key_field=""),
     )
-    with pytest.raises(ConversionError, match="normalize\\.key_field is required"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.key_field is required"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_invalid_normalize_on_conflict() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -347,13 +347,13 @@ def test_converter_rejects_invalid_normalize_on_conflict() -> None:
         key="id",
         normalize=NormalizeConfig(kind="index_by_key", key_field="id", on_conflict="bad"),
     )
-    with pytest.raises(ConversionError, match="normalize\\.on_conflict must be one of"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.on_conflict must be one of"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_normalize_for_composite_key() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -363,13 +363,13 @@ def test_converter_rejects_normalize_for_composite_key() -> None:
         key=("a", "b"),
         normalize=NormalizeConfig(kind="index_by_key", key_field="a"),
     )
-    with pytest.raises(ConversionError, match="does not support composite key yet"):
+    with pytest.raises(ScalimConversionError, match="does not support composite key yet"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_normalize_key_field_mismatch() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -379,7 +379,7 @@ def test_converter_rejects_normalize_key_field_mismatch() -> None:
         key="id",
         normalize=NormalizeConfig(kind="index_by_key", key_field="other"),
     )
-    with pytest.raises(ConversionError, match="normalize\\.key_field must equal sources\\.s1\\.key"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.key_field must equal sources\\.s1\\.key"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
@@ -514,7 +514,7 @@ def test_converter_converts_take_first_normalize() -> None:
 
 def test_converter_rejects_take_first_invalid_on_empty() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -524,13 +524,13 @@ def test_converter_rejects_take_first_invalid_on_empty() -> None:
         key="id",
         normalize=NormalizeConfig(kind="take_first", on_empty="bad"),
     )
-    with pytest.raises(ConversionError, match="normalize\\.on_empty must be one of: miss/null/error"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.on_empty must be one of: miss/null/error"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_normalize_call_by_empty() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -540,7 +540,7 @@ def test_converter_rejects_normalize_call_by_empty() -> None:
         key="id",
         normalize=NormalizeConfig(kind="index_by_key", key_field="id", call_by=" "),
     )
-    with pytest.raises(ConversionError, match="normalize\\.call_by must not be empty"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.call_by must not be empty"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
@@ -571,7 +571,7 @@ def test_converter_converts_project_fields_normalize() -> None:
 
 def test_converter_rejects_project_fields_invalid_on_missing() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -581,13 +581,13 @@ def test_converter_rejects_project_fields_invalid_on_missing() -> None:
         key="id",
         normalize=NormalizeConfig(kind="project_fields", on_missing="bad", fields={"id": {"from_key": True}}),
     )
-    with pytest.raises(ConversionError, match="normalize\\.on_missing must be one of: error/null"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.on_missing must be one of: error/null"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_project_fields_empty_rules() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -597,13 +597,13 @@ def test_converter_rejects_project_fields_empty_rules() -> None:
         key="id",
         normalize=NormalizeConfig(kind="project_fields", fields={}),
     )
-    with pytest.raises(ConversionError, match="normalize\\.fields.*must not be empty"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.fields.*must not be empty"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_project_fields_invalid_rule_shapes() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeProjectFieldRuleConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -614,7 +614,7 @@ def test_converter_rejects_project_fields_invalid_rule_shapes() -> None:
         key="id",
         normalize=NormalizeConfig(kind="project_fields", fields={"x": object()}),
     )
-    with pytest.raises(ConversionError, match="must be a normalize project_fields rule"):
+    with pytest.raises(ScalimConversionError, match="must be a normalize project_fields rule"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
     source_config = SourceConfig(
@@ -623,7 +623,7 @@ def test_converter_rejects_project_fields_invalid_rule_shapes() -> None:
         key="id",
         normalize=NormalizeConfig(kind="project_fields", fields={"x": NormalizeProjectFieldRuleConfig(from_key=True, extract="id")}),
     )
-    with pytest.raises(ConversionError, match="must not declare both"):
+    with pytest.raises(ScalimConversionError, match="must not declare both"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
     source_config = SourceConfig(
@@ -632,7 +632,7 @@ def test_converter_rejects_project_fields_invalid_rule_shapes() -> None:
         key="id",
         normalize=NormalizeConfig(kind="project_fields", fields={"x": NormalizeProjectFieldRuleConfig()}),
     )
-    with pytest.raises(ConversionError, match="must declare from_key or extract"):
+    with pytest.raises(ScalimConversionError, match="must declare from_key or extract"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
     source_config = SourceConfig(
@@ -641,13 +641,13 @@ def test_converter_rejects_project_fields_invalid_rule_shapes() -> None:
         key="id",
         normalize=NormalizeConfig(kind="project_fields", fields={"x": NormalizeProjectFieldRuleConfig(extract="[x")}),
     )
-    with pytest.raises(ConversionError, match="has invalid extract"):
+    with pytest.raises(ScalimConversionError, match="has invalid extract"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_map_values_empty_steps() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -657,13 +657,13 @@ def test_converter_rejects_map_values_empty_steps() -> None:
         key="id",
         normalize=NormalizeConfig(kind="map_values"),
     )
-    with pytest.raises(ConversionError, match="normalize\\.steps must not be empty"):
+    with pytest.raises(ScalimConversionError, match="normalize\\.steps must not be empty"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
 def test_converter_rejects_map_values_step_invalid_configs() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ConversionError
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, NormalizeStepConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
@@ -674,7 +674,7 @@ def test_converter_rejects_map_values_step_invalid_configs() -> None:
         key="id",
         normalize=NormalizeConfig(kind="map_values", steps=(NormalizeStepConfig(kind="take_first", on_empty="bad"),)),
     )
-    with pytest.raises(ConversionError, match="on_empty must be one of: miss/null/error"):
+    with pytest.raises(ScalimConversionError, match="on_empty must be one of: miss/null/error"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
     source_config = SourceConfig(
@@ -683,7 +683,7 @@ def test_converter_rejects_map_values_step_invalid_configs() -> None:
         key="id",
         normalize=NormalizeConfig(kind="map_values", steps=(NormalizeStepConfig(kind="project_fields", on_missing="bad"),)),
     )
-    with pytest.raises(ConversionError, match="on_missing must be one of: error/null"):
+    with pytest.raises(ScalimConversionError, match="on_missing must be one of: error/null"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
     source_config = SourceConfig(
@@ -692,5 +692,5 @@ def test_converter_rejects_map_values_step_invalid_configs() -> None:
         key="id",
         normalize=NormalizeConfig(kind="map_values", steps=(NormalizeStepConfig(kind="bad"),)),
     )
-    with pytest.raises(ConversionError, match="kind must be one of: take_first/project_fields"):
+    with pytest.raises(ScalimConversionError, match="kind must be one of: take_first/project_fields"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]

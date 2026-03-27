@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import run
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
-from scalim.dsl.by_yaml.config_parsing.field_extract import FieldExtractCompileError, compile_field_extract, derive_source_field_data_key
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.execution.executor.helpers.field_access import extract_field_segments
 from scalim.sinks.sink_memory import InMemoryRowSink
@@ -60,7 +60,7 @@ def test_compile_field_extract_does_not_cast_between_str_and_int_keys() -> None:
     ],
 )
 def test_compile_field_extract_rejects_invalid_expressions(expr: str) -> None:
-    with pytest.raises(FieldExtractCompileError):
+    with pytest.raises(ScalimFieldExtractCompileError):
         compile_field_extract(expr)
 
 
@@ -76,10 +76,10 @@ def test_derive_source_field_data_key_only_for_flat_single_string_segment() -> N
 def test_internal_extract_parsers_guard_out_of_bounds_inputs() -> None:
     from scalim.dsl.by_yaml.config_parsing import field_extract as field_extract_module
 
-    with pytest.raises(FieldExtractCompileError):
+    with pytest.raises(ScalimFieldExtractCompileError):
         field_extract_module._parse_identifier("a", 1)
 
-    with pytest.raises(FieldExtractCompileError):
+    with pytest.raises(ScalimFieldExtractCompileError):
         field_extract_module._parse_bracket_int("]", 0)
 
 
@@ -96,7 +96,7 @@ main_source:
       extract: "a..b"
 """.lstrip()
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         loader.load_string(yaml_text)
 
     assert any("invalid extract" in msg for msg in exc.value.errors)

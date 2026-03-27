@@ -2,7 +2,7 @@ import pytest
 
 from scalim.dsl.by_yaml import compile, run_workflow
 from scalim.dsl.by_yaml.config_parsing.template_precompile import maybe_precompile_yaml_text
-from scalim.dsl.by_yaml.workflow import WorkflowConfigError, load_workflow_config
+from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config
 
 
 def test_template_vars_precompile_supports_unquoted_placeholders_in_demand_yaml(tmp_path) -> None:
@@ -220,7 +220,7 @@ workflow:
         encoding="utf-8",
     )
 
-    with pytest.raises(WorkflowConfigError) as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = load_workflow_config(str(wf), template_vars={})
     assert "missing" in str(exc_info.value)
 

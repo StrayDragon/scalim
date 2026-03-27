@@ -16,7 +16,7 @@ else:
 
 from ..schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_EXTRA_SHEET_KEYS, DemandConfig, OutputExtraSheetConfig
-from .imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
+from .imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
 from .parsers.guardrails import ParserGuardrailsMixin
@@ -97,7 +97,7 @@ class YamlDemandLoader(
                         scalim_yaml_override=scalim_yaml_override,
                         project_root_override=project_root_override,
                     )
-                except YamlImportExpansionError as exc:
+                except ScalimYamlImportExpansionError as exc:
                     raise ValueError(str(exc)) from exc
             else:
                 msg = "imports/$import is only supported for file path entrypoints; use YamlDemandLoader.load(<yaml_path>)"

@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 from ....workflow.loaders import sheetbook_sheet_rows
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
-from .errors import ResolverError
+from .errors import ScalimResolverError
 
 _BUILTIN_ID_RE = re.compile(r"^[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*$")
 
@@ -26,14 +26,14 @@ def parse_builtin_callable_id(reference: str) -> str:
     raw = str(reference or "").strip()
     if not raw.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
         msg = "Not a builtin callable reference: {!r}".format(reference)
-        raise ResolverError(msg)
+        raise ScalimResolverError(msg)
     builtin_id = raw[len(BUILTIN_CALLABLE_REFERENCE_PREFIX) :]
     if not builtin_id:
         msg = "Invalid builtin callable reference {!r}: missing <id> after '{}'".format(reference, BUILTIN_CALLABLE_REFERENCE_PREFIX)
-        raise ResolverError(msg)
+        raise ScalimResolverError(msg)
     if _BUILTIN_ID_RE.fullmatch(builtin_id) is None:
         msg = "Invalid builtin callable id {!r} in reference {!r}".format(builtin_id, reference)
-        raise ResolverError(msg)
+        raise ScalimResolverError(msg)
     return builtin_id
 
 
@@ -67,7 +67,7 @@ def resolve_builtin_callable_reference(
         reference,
         available or "<none>",
     )
-    raise ResolverError(msg)
+    raise ScalimResolverError(msg)
 
 
 __all__ = [

@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ....schema_dsl.constants import FIELD_KIND_SOURCE, VALUE_CAST_ENUM
-from ...field_extract import FieldExtractCompileError, compile_field_extract, derive_source_field_data_key
+from ...field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
 from ...models import AliasIndex, FieldDef, RawDemand
 from ...parsers.utils import mapping_or_none
 from ..base import ValidatorFieldBaseMixin
@@ -328,7 +328,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         extract_expr = field_id if extract_val is None else str(extract_val)
         try:
             _ = compile_field_extract(extract_expr)
-        except FieldExtractCompileError as exc:
+        except ScalimFieldExtractCompileError as exc:
             msg = "Field '{}' has invalid extract '{}': {}".format(field_id, extract_expr, str(exc))
             self._add_error(
                 errors,

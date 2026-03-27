@@ -262,7 +262,7 @@ def test_router_row_sink_raises_output_target_write_error_on_write_exception() -
         failure_policy="all_fail",
         workbook_resources=(),
     )
-    with pytest.raises(mod.OutputTargetWriteError, match="t_fail"):
+    with pytest.raises(mod.ScalimOutputTargetWriteError, match="t_fail"):
         router.write_row({"a": 1})
 
 
@@ -308,10 +308,10 @@ def test_router_row_sink_close_raises_on_close_error_all_fail() -> None:
         output_counter=mod._RowCounter(),  # noqa: SLF001
     )
     router = mod.RouterRowSink(routes=(route,), failure_policy="all_fail", workbook_resources=())
-    with pytest.raises(mod.OutputTargetWriteError, match="t"):
+    with pytest.raises(mod.ScalimOutputTargetWriteError, match="t"):
         router.close()
 
 
 def test_output_target_write_error_str_includes_target_id() -> None:
-    err = mod.OutputTargetWriteError("t", Exception("x"))
+    err = mod.ScalimOutputTargetWriteError("t", Exception("x"))
     assert "t" in str(err)

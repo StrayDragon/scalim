@@ -11,7 +11,7 @@ from ...schema_dsl.models import (
     RelationStepConfig,
     SourceFieldConfig,
 )
-from ..errors import ConversionError
+from ..errors import ScalimConversionError
 
 StepInfo = Tuple[str, str, LookupStepIr]
 
@@ -41,35 +41,35 @@ class ConfigToIRConversionRelationMixin:
         sources_ir = self._sources_ir
         if sources_ir is None:
             msg = "Source IR map is not initialized"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return sources_ir
 
     def _require_relation_steps(self) -> Dict[str, List[StepInfo]]:
         relation_steps = self._relation_steps
         if relation_steps is None:
             msg = "Relation steps are not initialized"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return relation_steps
 
     def _require_relation_adjacency(self) -> Dict[str, List[StepInfo]]:
         relation_adjacency = self._relation_adjacency
         if relation_adjacency is None:
             msg = "Relation adjacency is not initialized"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return relation_adjacency
 
     def _require_source_field_id_map(self) -> Dict[str, Dict[str, str]]:
         source_field_id_map = self._source_field_id_map
         if source_field_id_map is None:
             msg = "Source field id map is not initialized"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return source_field_id_map
 
     def _require_source_data_key_map(self) -> Dict[str, Dict[str, List[str]]]:
         source_data_key_map = self._source_data_key_map
         if source_data_key_map is None:
             msg = "Source data key map is not initialized"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return source_data_key_map
 
     def _convert_relations(self, config: DemandConfig) -> Dict[str, List[StepInfo]]:
@@ -115,7 +115,7 @@ class ConfigToIRConversionRelationMixin:
         source = self._require_sources_ir().get(source_id)
         if source is None:
             msg = "Step references unknown source '{}'".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return source
 
     def _resolve_to_field(self, to_fields: List[str], to_source: SourceIr) -> Optional["NormalizedLookupKeySpec"]:
@@ -164,7 +164,7 @@ class ConfigToIRConversionRelationMixin:
             relation_config = config.relations.get(relation)
             if relation_config is None:
                 msg = "Unsupported relation reference: '{}'".format(relation)
-                raise ConversionError(msg)
+                raise ScalimConversionError(msg)
             relation_steps = relation_config.steps
         else:
             relation_steps = relation.steps
@@ -204,19 +204,19 @@ class ConfigToIRConversionRelationMixin:
 
         if not found_paths:
             msg = "No relation path found from '{}' to '{}'".format(start_id, target_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         msg = "Ambiguous relation paths from '{}' to '{}'".format(start_id, target_id)
-        raise ConversionError(msg)
+        raise ScalimConversionError(msg)
 
     def _parse_source_field_expr(self, expr: str) -> Tuple[str, str]:
         if "." not in expr:
             msg = "Invalid field reference: '{}'".format(expr)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         source_id, field_name = expr.split(".", 1)
         if not source_id or not field_name:
             msg = "Invalid field reference: '{}'".format(expr)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         field_name = self._resolve_source_field_name(source_id, field_name)
         return source_id, field_name
 
@@ -230,11 +230,11 @@ class ConfigToIRConversionRelationMixin:
                     source_id = src
                 elif source_id != src:
                     msg = "Step fields must reference the same source, got '{}' and '{}'".format(source_id, src)
-                    raise ConversionError(msg)
+                    raise ScalimConversionError(msg)
                 fields.append(field_name)
             if source_id is None:
                 msg = "Empty step field list"
-                raise ConversionError(msg)
+                raise ScalimConversionError(msg)
             return source_id, fields
 
         src, field_name = self._parse_source_field_expr(value)
@@ -272,5 +272,5 @@ class ConfigToIRConversionRelationMixin:
                     field_name,
                     ", ".join(sorted(unique)),
                 )
-                raise ConversionError(msg)
+                raise ScalimConversionError(msg)
         return mapped

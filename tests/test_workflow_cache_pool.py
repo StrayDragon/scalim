@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from scalim.execution.pipeline.base.pipeline import Pipeline
-from scalim.execution.workflow_cache_pool import WorkflowCacheEntrySignature, WorkflowCachePool, WorkflowCachePoolError
+from scalim.execution.workflow_cache_pool import WorkflowCacheEntrySignature, WorkflowCachePool, ScalimWorkflowCachePoolError
 from scalim.hooks.base import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
@@ -23,13 +23,13 @@ def test_json_like_helpers_reject_invalid_values() -> None:
 
     assert mod._ensure_json_like(1.5, path="x") == 1.5  # type: ignore[attr-defined]
 
-    with pytest.raises(WorkflowCachePoolError, match="float must be finite"):
+    with pytest.raises(ScalimWorkflowCachePoolError, match="float must be finite"):
         _ = mod._ensure_json_like(math.nan, path="x")  # type: ignore[attr-defined]
 
-    with pytest.raises(WorkflowCachePoolError, match="dict key must be str"):
+    with pytest.raises(ScalimWorkflowCachePoolError, match="dict key must be str"):
         _ = mod._ensure_json_like({1: "x"}, path="x")  # type: ignore[attr-defined]
 
-    with pytest.raises(WorkflowCachePoolError, match="must be JSON-like"):
+    with pytest.raises(ScalimWorkflowCachePoolError, match="must be JSON-like"):
         _ = mod._ensure_json_like(set([1]), path="x")  # type: ignore[attr-defined]
 
     payload = mod._normalize_json_like((1, 2))  # type: ignore[attr-defined]
@@ -39,7 +39,7 @@ def test_json_like_helpers_reject_invalid_values() -> None:
 def test_ensure_json_like_rejects_empty_dict_key_when_required() -> None:
     from scalim.utils.json_like import ensure_json_like
 
-    with pytest.raises(WorkflowCachePoolError, match="dict key must be str"):
+    with pytest.raises(ScalimWorkflowCachePoolError, match="dict key must be str"):
         _ = ensure_json_like(
             {"": 1},
             path="x",
@@ -47,7 +47,7 @@ def test_ensure_json_like_rejects_empty_dict_key_when_required() -> None:
             allowed_types_desc="dict[str, ...]",
             dict_key_desc="str",
             require_nonempty_dict_key=True,
-            error_cls=WorkflowCachePoolError,
+            error_cls=ScalimWorkflowCachePoolError,
         )
 
 
@@ -122,7 +122,7 @@ def test_workflow_cache_pool_budget_rejects_unknown_policy() -> None:
     )
     _ = pool.get_or_load(_sig("s1"), workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
 
-    with pytest.raises(WorkflowCachePoolError, match="over_budget_policy"):
+    with pytest.raises(ScalimWorkflowCachePoolError, match="over_budget_policy"):
         _ = pool.get_or_load(_sig("s2"), workflow_node_id="n2", load_fn=lambda: {1: {"id": 1}})
 
 
@@ -137,7 +137,7 @@ def test_workflow_cache_pool_budget_evict_lru_fails_when_pinned_and_no_evictable
     )
     _ = pool.get_or_load(_sig("s1"), workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
 
-    with pytest.raises(WorkflowCachePoolError, match="no evictable"):
+    with pytest.raises(ScalimWorkflowCachePoolError, match="no evictable"):
         _ = pool.get_or_load(_sig("s2"), workflow_node_id="n2", load_fn=lambda: {1: {"id": 1}})
 
 

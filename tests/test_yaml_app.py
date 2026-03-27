@@ -4,9 +4,9 @@ import pytest
 import yaml
 
 from scalim.dsl.by_yaml import RunOverrides, run
-from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
+from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config, resolve_required_field_ids
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.sinks.sink_memory import InMemoryRowSink
 
 _ALLOWED_MODULES = frozenset(["scalim_misc.example_report_ir"])
@@ -107,7 +107,7 @@ sources: {}
         encoding="utf-8",
     )
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         load_output_config(str(yaml_path))
 
     assert any("Field 'bad_field' must be a dictionary" in msg for msg in exc.value.errors)
@@ -173,7 +173,7 @@ outputs:
 def test_resolve_required_field_ids_requires_allowlist() -> None:
     yaml_path = _demo_yaml_path()
 
-    with pytest.raises(AllowlistRequiredError):
+    with pytest.raises(ScalimAllowlistRequiredError):
         resolve_required_field_ids(str(yaml_path), allowed_modules=frozenset())
 
 

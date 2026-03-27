@@ -8,7 +8,7 @@ from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 from ..events.event import Event, generate_run_id
 from ._internal.common import (
     DEFAULT_MAX_RECORDED_EVENTS,
-    ObserverCaptureOverflowError,
+    ScalimObserverCaptureOverflowError,
 )
 from ._internal.common import (
     OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING as _OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING,
@@ -102,6 +102,6 @@ class ObserverManager(
 
 
 __all__ = [
-    "ObserverCaptureOverflowError",
+    "ScalimObserverCaptureOverflowError",
     "ObserverManager",
 ]

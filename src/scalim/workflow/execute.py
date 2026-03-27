@@ -22,7 +22,7 @@ from ..events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, Wo
 from ..exceptions import ScalimWorkflowException
 from ..execution.engine import ScalimEngine
 from ..execution.run_ir import ExecutionResult, run_ir
-from ..execution.workflow_cache_pool import WorkflowCachePool, WorkflowCachePoolError
+from ..execution.workflow_cache_pool import WorkflowCachePool, ScalimWorkflowCachePoolError
 from ..hooks.base import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
@@ -48,10 +48,10 @@ from ..spec.ir.workflow import (
 from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
-from .errors import WorkflowConfigError
+from .errors import ScalimWorkflowConfigError
 from .loaders import workflow_loader_context
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
-from .resources import SheetBookDef, WorkflowResourceManager, WorkflowWriteError
+from .resources import SheetBookDef, WorkflowResourceManager, ScalimWorkflowWriteError
 from .resources_csv import WorkflowCsvInput
 
 
@@ -158,7 +158,7 @@ class WorkflowArtifactsDirectory:
 
 
 def _workflow_error_diff(exc: BaseException) -> Optional[List[str]]:
-    if isinstance(exc, WorkflowWriteError):
+    if isinstance(exc, ScalimWorkflowWriteError):
         return exc.diff
     return None
 
@@ -171,7 +171,7 @@ def ensure_json_like(value: object, *, path: str) -> object:
         allowed_types_desc="None/bool/int/float/str/list/dict[str, ...]",
         dict_key_desc="non-empty str",
         require_nonempty_dict_key=True,
-        error_cls=WorkflowConfigError,
+        error_cls=ScalimWorkflowConfigError,
     )
 
 
@@ -239,7 +239,7 @@ class WorkflowCtxStore:
             msg = "ctx value too large: node={}, key={}, bytes={} > max_value_bytes={}".format(
                 node_id, ctx_key, value_bytes, max_value_bytes
             )
-            raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
+            raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
 
         with self._lock:
             by_key = self._values_by_producer_node_id.setdefault(node_id, {})
@@ -255,7 +255,7 @@ class WorkflowCtxStore:
                     next_total,
                     max_bytes,
                 )
-                raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
+                raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
 
             by_key[ctx_key] = ctx_value
             by_key_bytes[ctx_key] = int(value_bytes)
@@ -268,18 +268,18 @@ class WorkflowCtxStore:
 
         if producer == consumer:
             msg = "$ctx does not allow node=self (node_id={})".format(consumer)
-            raise WorkflowConfigError(msg, path=path)
+            raise ScalimWorkflowConfigError(msg, path=path)
 
         visible = self.visible_producer_node_ids(consumer)
         if producer not in visible:
             msg = "ctx key '{}' from node '{}' is not visible to node '{}' (declare depends_on)".format(ctx_key, producer, consumer)
-            raise WorkflowConfigError(msg, path=path)
+            raise ScalimWorkflowConfigError(msg, path=path)
 
         with self._lock:
             by_key = self._values_by_producer_node_id.get(producer) or {}
             if ctx_key not in by_key:
                 msg = "Unknown ctx key '{}' for node '{}'".format(ctx_key, producer)
-                raise WorkflowConfigError(msg, path=path)
+                raise ScalimWorkflowConfigError(msg, path=path)
             return by_key[ctx_key]
 
 
@@ -303,17 +303,17 @@ def iter_ctx_directives(value: object, *, path: str) -> List[Tuple[str, str]]:
             directive = mapping.get("$ctx")
             if not _is_dict(directive):
                 msg = "$ctx directive must be a mapping"
-                raise WorkflowConfigError(msg, path=path)
+                raise ScalimWorkflowConfigError(msg, path=path)
             node_raw = directive.get("node")
             key_raw = directive.get("key")
             node_id = str(node_raw or "").strip() if isinstance(node_raw, str) else ""
             ctx_key = str(key_raw or "").strip() if isinstance(key_raw, str) else ""
             if not node_id:
                 msg = "$ctx.node must be a non-empty string"
-                raise WorkflowConfigError(msg, path=path)
+                raise ScalimWorkflowConfigError(msg, path=path)
             if not ctx_key:
                 msg = "$ctx.key must be a non-empty string"
-                raise WorkflowConfigError(msg, path=path)
+                raise ScalimWorkflowConfigError(msg, path=path)
             out.append((node_id, ctx_key))
             return out
         for raw_key, raw_value in mapping.items():
@@ -335,17 +335,17 @@ def render_ctx_directives(value: object, *, consumer_node_id: str, ctx_store: Wo
             directive = mapping.get("$ctx")
             if not _is_dict(directive):
                 msg = "$ctx directive must be a mapping"
-                raise WorkflowConfigError(msg, path=path)
+                raise ScalimWorkflowConfigError(msg, path=path)
             node_raw = directive.get("node")
             key_raw = directive.get("key")
             node_id = str(node_raw or "").strip() if isinstance(node_raw, str) else ""
             ctx_key = str(key_raw or "").strip() if isinstance(key_raw, str) else ""
             if not node_id:
                 msg = "$ctx.node must be a non-empty string"
-                raise WorkflowConfigError(msg, path=path)
+                raise ScalimWorkflowConfigError(msg, path=path)
             if not ctx_key:
                 msg = "$ctx.key must be a non-empty string"
-                raise WorkflowConfigError(msg, path=path)
+                raise ScalimWorkflowConfigError(msg, path=path)
             value = ctx_store.resolve(str(consumer_node_id), node=node_id, key=ctx_key, path=path)
             return ensure_json_like(value, path=path)
 
@@ -397,21 +397,21 @@ def _validate_workflow_ctx_refs(workflow_ir: WorkflowIr, *, ctx_store: WorkflowC
             for ref_node_id, _ref_key in iter_ctx_directives(value, path=item_path):
                 if ref_node_id == node_id:
                     msg = "$ctx does not allow node=self (node_id={})".format(node_id)
-                    raise WorkflowConfigError(msg, path=item_path)
+                    raise ScalimWorkflowConfigError(msg, path=item_path)
                 if ref_node_id not in node_ids:
                     msg = "Unknown ctx node '{}'".format(ref_node_id)
-                    raise WorkflowConfigError(msg, path=item_path)
+                    raise ScalimWorkflowConfigError(msg, path=item_path)
                 if ref_node_id not in visible:
                     msg = "ctx reference to node '{}' is not visible to node '{}' (declare depends_on)".format(ref_node_id, node_id)
-                    raise WorkflowConfigError(msg, path=item_path)
+                    raise ScalimWorkflowConfigError(msg, path=item_path)
 
 
-class WorkflowRunFailedError(ScalimWorkflowException):
+class ScalimWorkflowRunFailedError(ScalimWorkflowException):
     run_id: str
     demand_path: str
 
     def __init__(self, message: str, *, run_id: str, demand_path: str) -> None:
-        super(WorkflowRunFailedError, self).__init__(message)
+        super(ScalimWorkflowRunFailedError, self).__init__(message)
         self.run_id = str(run_id)
         self.demand_path = str(demand_path)
 
@@ -428,7 +428,7 @@ def _resolve_workflow_input_csv(
     outputs = cast("Optional[Dict[str, str]]", outputs_obj)  # pragma: allow-cast workflow output mapping typed narrowing
     if outputs_obj is None:
         msg = "{} requires demand outputs mapping: input_node_id={!r}".format(str(error_prefix), str(input_node_id))
-        raise WorkflowWriteError(msg)
+        raise ScalimWorkflowWriteError(msg)
 
     output_id = str(input_output_id)
     output_in_mapping = False
@@ -439,7 +439,7 @@ def _resolve_workflow_input_csv(
     if output_path:
         if not str(output_path).lower().endswith(".csv"):
             msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
-            raise WorkflowWriteError(msg)
+            raise ScalimWorkflowWriteError(msg)
         return output_path
 
     mem_map_obj = None
@@ -453,9 +453,9 @@ def _resolve_workflow_input_csv(
         return csv_artifact
     if output_in_mapping:
         msg = "Missing workflow-managed in-memory CSV artifact: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
-        raise WorkflowWriteError(msg)
+        raise ScalimWorkflowWriteError(msg)
     msg = "Unknown demand output id: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
-    raise WorkflowWriteError(msg)
+    raise ScalimWorkflowWriteError(msg)
 
 
 def _run_workflow_write_sheet_node(
@@ -499,7 +499,7 @@ def _run_workflow_write_sheet_node(
     msg = "Unsupported write_sheet resource_type: {!r}".format(
         str(node.resource_type)
     )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-    raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
 def _run_workflow_append_sheet_node(
@@ -521,7 +521,7 @@ def _run_workflow_append_sheet_node(
             msg = "append_sheet requires sheet for workbook resource (resource_id={!r})".format(
                 str(node.resource_id)
             )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_workbook_append(
             workflow_node_id=str(node.node_id),
             workbook_id=str(node.resource_id),
@@ -552,7 +552,7 @@ def _run_workflow_append_sheet_node(
             msg = "append_sheet requires sheet for sheetbook resource (resource_id={!r})".format(
                 str(node.resource_id)
             )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_sheetbook_append(
             workflow_node_id=str(node.node_id),
             sheetbook_id=str(node.resource_id),
@@ -569,7 +569,7 @@ def _run_workflow_append_sheet_node(
     msg = "Unsupported append_sheet resource_type: {!r}".format(
         str(node.resource_type)
     )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-    raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
 def _run_workflow_write_node(
@@ -597,7 +597,7 @@ def _run_workflow_write_node(
     msg = "Unsupported workflow node type: {}".format(
         type(node).__name__
     )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-    raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
 def _bundle_run_dir(config: VizObserverConfig, run_id: str) -> Path:
@@ -702,7 +702,7 @@ def _maybe_build_workflow_cache_pool(
 
     if logical_keys_by_node_id is None or consumers_by_logical_key is None:
         msg = "workflow cache_pool requires derived consumers mapping"
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool")
     return WorkflowCachePool(
         workflow_exec_id=workflow_exec_id,
         instrumentation=workflow_instrumentation,
@@ -916,7 +916,7 @@ def _compile_demand_node(
         typed_rows_obj = artifacts_dir.get(str(node_id), producer_run_id, "in_memory_rows")
         if not isinstance(typed_rows_obj, InMemoryRows):
             msg = "Missing workflow-managed typed rows artifact: producer_node_id={!r}".format(producer_run_id)
-            raise WorkflowWriteError(msg)
+            raise ScalimWorkflowWriteError(msg)
         next_request = replace(next_request, main_rows=iter_in_memory_rows_as_main_rows(typed_rows_obj))
 
     if next_request is request:
@@ -972,7 +972,7 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
                     main_rows_consumers_remaining_by_run_id=main_rows_consumers_remaining_by_run_id,
                     artifacts_dir=artifacts_dir,
                 )
-            except WorkflowConfigError:
+            except ScalimWorkflowConfigError:
                 raise
             except Exception as exc:  # noqa: BLE001
                 err = WorkflowRunError(
@@ -1072,8 +1072,8 @@ def _workflow_process_completed_future(  # noqa: PLR0913
             workflow_cache_pool.on_workflow_node_done(str(node_id))
         on_terminal(str(node_id), ok=True)
     except Exception as exc:
-        if isinstance(exc, WorkflowCachePoolError):
-            raise WorkflowConfigError(str(exc), path=exc.path) from exc
+        if isinstance(exc, ScalimWorkflowCachePoolError):
+            raise ScalimWorkflowConfigError(str(exc), path=exc.path) from exc
         err = WorkflowRunError(
             run_id=str(node_id),
             demand_path=str(demand_path or ""),
@@ -1432,10 +1432,10 @@ def _commit_workflow_resources(
             resource_manager.discard_all(workflow_node_id=str(discard_node_id), reason="workflow_failed")
         else:
             resource_manager.commit_all()
-    except WorkflowWriteError as exc:
+    except ScalimWorkflowWriteError as exc:
         with contextlib.suppress(Exception):
             resource_manager.discard_all(workflow_node_id="__wf__discard", reason="resource_commit_failed")
-        raise WorkflowConfigError(str(exc), path="workflow.resources") from exc
+        raise ScalimWorkflowConfigError(str(exc), path="workflow.resources") from exc
 
 
 def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
@@ -1530,14 +1530,14 @@ def run_workflow_ir(
                 failed=failed,
             )
             resources_finalized = True
-        except WorkflowConfigError:
+        except ScalimWorkflowConfigError:
             resources_finalized = True
             raise
 
         result = WorkflowResult(outcomes=tuple(final_outcomes))
         if failed is not None and prepared.failure_policy == "all_fail":
             msg = "工作流运行失败(run_id={}, demand_path={})".format(failed.run_id, failed.demand_path)
-            exc = WorkflowRunFailedError(msg, run_id=failed.run_id, demand_path=failed.demand_path)
+            exc = ScalimWorkflowRunFailedError(msg, run_id=failed.run_id, demand_path=failed.demand_path)
             if failed_exc is not None:
                 exc.__cause__ = failed_exc
             raise exc
@@ -1551,7 +1551,7 @@ def run_workflow_ir(
 __all__ = [
     "WorkflowResult",
     "WorkflowRunError",
-    "WorkflowRunFailedError",
+    "ScalimWorkflowRunFailedError",
     "WorkflowRunOutcome",
     "run_workflow_ir",
 ]

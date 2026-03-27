@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 
 
@@ -19,7 +19,7 @@ sources: {}
 output:
   format: csv
 """
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         _ = _load(yaml_content)
 
     assert any("Legacy YAML syntax is not supported: top-level 'output'" in msg for msg in exc.value.errors)

@@ -46,7 +46,7 @@ class ImportTraceItem:
     via: Optional[str] = None
 
 
-class YamlImportExpansionError(ScalimYamlException):
+class ScalimYamlImportExpansionError(ScalimYamlException):
     trace: Tuple[ImportTraceItem, ...]
     logical_path: str
 
@@ -59,7 +59,7 @@ class YamlImportExpansionError(ScalimYamlException):
     ) -> None:
         self.trace = tuple(trace)
         self.logical_path = str(logical_path or "")
-        super(YamlImportExpansionError, self).__init__(self._format_message(message))
+        super(ScalimYamlImportExpansionError, self).__init__(self._format_message(message))
 
     def _format_message(self, message: str) -> str:
         parts: List[str] = []
@@ -271,16 +271,16 @@ def _select_mapping_fragment(
     for seg in segments:
         if not isinstance(current, dict):
             msg = "$import ref '{}' points to a non-mapping value".format(ref)
-            raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
+            raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
         current_dict = cast("Dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
         if seg not in current_dict:
             msg = "$import ref '{}' missing key '{}'".format(ref, seg)
-            raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
+            raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
         drill_path.append(seg)
         current = current_dict[seg]
     if not isinstance(current, dict):
         msg = "$import ref '{}' points to a non-mapping value".format(ref)
-        raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
+        raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
     return cast("Dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
 
 
@@ -317,7 +317,7 @@ def _deep_merge_override_inplace(
                 left_name,
                 right_name,
             )
-            raise YamlImportExpansionError(msg, trace=trace, logical_path=conflict_path)
+            raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=conflict_path)
         target[key] = right
 
 
@@ -360,7 +360,7 @@ def _deep_merge_fill_inplace(
                 local_name,
                 imported_name,
             )
-            raise YamlImportExpansionError(msg, trace=trace, logical_path=conflict_path)
+            raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=conflict_path)
         continue
 
 
@@ -494,10 +494,10 @@ def _load_and_expand_source(
 ) -> Dict[str, Any]:
     if any(item.source == source.key for item in trace[:-1]):
         msg = "Import cycle detected"
-        raise YamlImportExpansionError(msg, trace=trace, logical_path="")
+        raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path="")
     if len(trace) > MAX_IMPORT_EXPANSION_DEPTH:
         msg = "Import expansion exceeded max depth {}".format(MAX_IMPORT_EXPANSION_DEPTH)
-        raise YamlImportExpansionError(msg, trace=trace, logical_path="")
+        raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path="")
     if source.key in cache:
         return cache[source.key]
 
@@ -509,7 +509,7 @@ def _load_and_expand_source(
         )
     except Exception as exc:
         msg = "Failed to load fragment YAML: {}: {}".format(type(exc).__name__, exc)
-        raise YamlImportExpansionError(msg, trace=trace, logical_path="") from exc
+        raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path="") from exc
     expanded = _expand_file_inplace(
         data,
         source=source,
@@ -578,7 +578,7 @@ def _expand_file_inplace(
         )
     except Exception as exc:
         msg = "Invalid imports mapping: {}: {}".format(type(exc).__name__, exc)
-        raise YamlImportExpansionError(msg, trace=trace, logical_path=IMPORTS_KEY) from exc
+        raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=IMPORTS_KEY) from exc
     _ = raw.pop(IMPORTS_KEY, None)
 
     _expand_node_inplace(
@@ -673,11 +673,11 @@ def _expand_mapping_inplace(
         for item in cast("List[Any]", import_raw):  # pragma: allow-cast yaml $import list typed narrowing
             if not isinstance(item, str):
                 msg = "$import list entries must be strings"
-                raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
+                raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
             import_refs.append(item)
     else:
         msg = "$import must be a string or list of strings"
-        raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
+        raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
 
     merged: Dict[str, Any] = {}
     for ref in import_refs:
@@ -685,10 +685,10 @@ def _expand_mapping_inplace(
             alias, segments = _parse_import_ref(ref)
         except Exception as exc:
             msg = "Invalid $import ref '{}': {}: {}".format(ref, type(exc).__name__, exc)
-            raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path) from exc
+            raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=logical_path) from exc
         if alias not in imports:
             msg = "Unknown $import alias '{}'".format(alias)
-            raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
+            raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
         fragment_source = imports[alias]
         next_trace = [*trace, ImportTraceItem(source=fragment_source.key, via="$import {}".format(ref))]
         imported_file = _load_and_expand_source(

@@ -16,7 +16,7 @@ from ..sinks.sink_base import create_temp_path
 from ..utils.excel import escape_excel_formula
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_base import WorkflowResourceManagerBase, ScalimWorkflowWriteError, acquire_write_lock, release_write_lock
 from .resources_csv import WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 from .resources_workbook import best_effort_close_write_only_workbook_worksheets, get_openpyxl_workbook_class
 
@@ -73,7 +73,7 @@ def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> Non
         with suppress(Exception):
             temp_obj.unlink()
         msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
-        raise WorkflowWriteError(msg) from exc
+        raise ScalimWorkflowWriteError(msg) from exc
 
 
 @dataclass(frozen=True)
@@ -167,7 +167,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                     pending_skip = True
                 if on_conflict == "error":
                     msg = "Sheet conflict (sheetbook_sheet): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                    raise WorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
+                    raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
                 if on_conflict == "overwrite":
                     action = "overwrite"
             elif len(plan.sheets) >= int(plan.budget_max_sheets):
@@ -177,7 +177,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                     "current_sheets={}".format(len(plan.sheets)),
                     "new_sheet={!r}".format(sheet_name),
                 ]
-                raise WorkflowWriteError(msg, diff=diff)
+                raise ScalimWorkflowWriteError(msg, diff=diff)
         return action, pending_skip
 
     def _sheetbook_sheet_store(
@@ -251,7 +251,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                         "current_sheets={}".format(len(plan.sheets)),
                         "new_sheet={!r}".format(sheet_name),
                     ]
-                    raise WorkflowWriteError(msg, diff=diff)
+                    raise ScalimWorkflowWriteError(msg, diff=diff)
                 plan.sheet_order.append(sheet_name)
                 sheet_plan = _SheetBookSheetPlan(
                     sheet=sheet_name,
@@ -269,7 +269,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 diff = _describe_header_diff(expected, input_header)
                 if on_mismatch == "error":
                     msg = "Field alignment mismatch (sheetbook_append): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                    raise WorkflowWriteError(msg, diff=diff)
+                    raise ScalimWorkflowWriteError(msg, diff=diff)
                 if on_mismatch == "warn":
                     pending_warning = DiagnosticWarningEvent(
                         message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
@@ -292,7 +292,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                             sheet_name,
                             str(input_node_id),
                         )
-                        raise WorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
+                        raise ScalimWorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
 
                 start_row = int(sheet_plan.row_count)
 
@@ -317,7 +317,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             sheet_plan = plan.sheets.get(sheet_name)
             if sheet_plan is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
                 msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                raise WorkflowWriteError(msg)
+                raise ScalimWorkflowWriteError(msg)
 
             new_total = int(plan.total_cells) + int(append_cells)
             self._check_sheetbook_budget(plan, new_total_cells=new_total)
@@ -351,7 +351,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             raw_def = self._sheetbook_defs.get(key)
             if raw_def is None:
                 msg = "Unknown sheetbook resource id: {!r}".format(key)
-                raise WorkflowWriteError(msg)
+                raise ScalimWorkflowWriteError(msg)
 
             raw_def = cast("SheetBookDef", raw_def)  # pragma: allow-cast sheetbook def typed narrowing
             plan = SheetBookPlan(
@@ -392,7 +392,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             "new_total_cells={}".format(int(new_total_cells)),
         ]
         msg = "Sheetbook budget exceeded: sheetbook={!r}".format(str(plan.resource_id))
-        raise WorkflowWriteError(msg, diff=diff)
+        raise ScalimWorkflowWriteError(msg, diff=diff)
 
     def apply_sheetbook_sheet(
         self,
@@ -625,7 +625,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         except ImportError as exc:
             with suppress(Exception):
                 self._release_sheetbook_write_lock(p)
-            raise WorkflowWriteError(str(exc)) from exc
+            raise ScalimWorkflowWriteError(str(exc)) from exc
 
         wb = workbook_cls(write_only=True)
         try:

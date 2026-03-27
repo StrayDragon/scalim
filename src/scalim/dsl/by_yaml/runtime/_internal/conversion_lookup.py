@@ -7,7 +7,7 @@ from .....typedefs import FieldValue, LookupKey
 from .....utils.converters import NamedLookupCast, auto_normalize_key, auto_str_normalize, must_to_int, must_to_str
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from ...schema_dsl.models import LookupCastConfig
-from ..errors import ConversionError
+from ..errors import ScalimConversionError
 
 _SOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 CALL_BY_CTX_KEY = "$ctx"
@@ -99,7 +99,7 @@ class LookupCastRegistry:
         base = self._BASE_CASTS.get(lookup_cast.name)
         if base is None:
             msg = "Unknown lookup_cast: '{}'".format(lookup_cast.name)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return base
 
     def _build_sep_first(self, sep: Optional[str]) -> LookupKeyCast:
@@ -134,4 +134,4 @@ class LookupCastRegistry:
 def validate_source_id(source_id: str, context: str) -> None:
     if not _SOURCE_ID_PATTERN.match(source_id):
         msg = "{}: source_id '{}' must match pattern [a-zA-Z_][a-zA-Z0-9_]*".format(context, source_id)
-        raise ConversionError(msg)
+        raise ScalimConversionError(msg)

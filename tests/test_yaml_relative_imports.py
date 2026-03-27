@@ -4,11 +4,11 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import compile as compile_yaml
-from scalim.dsl.by_yaml.config_parsing.call_by import CallByParseError, parse_call_by
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.call_by import ScalimCallByParseError, parse_call_by
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-from scalim.dsl.by_yaml.runtime.errors import ResolverError
+from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.dsl.by_yaml.runtime import compiler as compiler_module
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver, derive_base_module_path
 from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, DerivedFieldConfig, LoaderRetryConfig, MainSourceConfig, SourceConfig
@@ -115,7 +115,7 @@ def test_derive_base_module_path_reads_sys_path_when_not_provided(monkeypatch: p
 
 
 def test_derive_base_module_path_errors_on_missing_yaml_path() -> None:
-    with pytest.raises(ResolverError, match="必须提供 `yaml_path`"):
+    with pytest.raises(ScalimResolverError, match="必须提供 `yaml_path`"):
         derive_base_module_path("")
 
 
@@ -123,7 +123,7 @@ def test_derive_base_module_path_errors_when_no_candidate_sys_path_prefix(tmp_pa
     yaml_path = tmp_path / "relpkg/sub/config.yaml"
     _write_text(yaml_path, "name: demo\nmain_source: {source_id: a, loader: x.y:z}\n")
 
-    with pytest.raises(ResolverError, match="不在任何 `sys\\.path` 条目下"):
+    with pytest.raises(ScalimResolverError, match="不在任何 `sys\\.path` 条目下"):
         derive_base_module_path(str(yaml_path), sys_path=[], cwd=str(tmp_path))
 
 
@@ -131,7 +131,7 @@ def test_derive_base_module_path_errors_on_non_identifier_segment(tmp_path: Path
     yaml_path = tmp_path / "bad-name/sub/config.yaml"
     _write_text(yaml_path, "name: demo\nmain_source: {source_id: a, loader: x.y:z}\n")
 
-    with pytest.raises(ResolverError, match="不是合法的 Python 标识符"):
+    with pytest.raises(ScalimResolverError, match="不是合法的 Python 标识符"):
         derive_base_module_path(str(yaml_path), sys_path=[str(tmp_path)], cwd=str(tmp_path))
 
 
@@ -149,7 +149,7 @@ def test_secure_resolver_normalizes_relative_reference_and_enforces_allowlist(mo
     assert resolver.resolve(".loaders.ping")() == "sub"
     assert resolver.resolve("..common:ping")() == "common"
 
-    with pytest.raises(ResolverError, match="不在 `allowed_modules` 允许列表中"):
+    with pytest.raises(ScalimResolverError, match="不在 `allowed_modules` 允许列表中"):
         SecurePythonReferenceResolver(allowed_modules=frozenset(["relpkg.sub"]), base_module_path=base).resolve("..common:ping")
 
 
@@ -159,7 +159,7 @@ def test_secure_resolver_errors_when_base_module_is_missing(monkeypatch: pytest.
     _purge_modules("relpkg")
 
     resolver = SecurePythonReferenceResolver(allowed_modules=frozenset(["relpkg"]))
-    with pytest.raises(ResolverError, match="需要先根据 `yaml_path` \\+ `sys\\.path` 推导 `base_module_path`"):
+    with pytest.raises(ScalimResolverError, match="需要先根据 `yaml_path` \\+ `sys\\.path` 推导 `base_module_path`"):
         resolver.resolve(".loaders:ping")
 
 
@@ -171,15 +171,15 @@ def test_secure_resolver_errors_for_relative_syntax_edges(monkeypatch: pytest.Mo
     base = derive_base_module_path(str(yaml_path))
     resolver = SecurePythonReferenceResolver(allowed_modules=frozenset(["relpkg"]), base_module_path=base)
 
-    with pytest.raises(ResolverError, match="前导点后缺少模块路径"):
+    with pytest.raises(ScalimResolverError, match="前导点后缺少模块路径"):
         resolver.resolve(".:ping")
-    with pytest.raises(ResolverError, match="类式引用 .* 非法"):
+    with pytest.raises(ScalimResolverError, match="类式引用 .* 非法"):
         resolver.resolve(".loaders:ping:extra")
-    with pytest.raises(ResolverError, match="相对点号引用 .* 非法"):
+    with pytest.raises(ScalimResolverError, match="相对点号引用 .* 非法"):
         SecurePythonReferenceResolver().resolve(".ping")
-    with pytest.raises(ResolverError, match="超出了根包范围"):
+    with pytest.raises(ScalimResolverError, match="超出了根包范围"):
         resolver.resolve("....loaders:ping")
-    with pytest.raises(ResolverError, match="模块路径 .* 非法"):
+    with pytest.raises(ScalimResolverError, match="模块路径 .* 非法"):
         resolver.resolve(".bad-name:ping")
 
 
@@ -187,7 +187,7 @@ def test_compile_raises_clear_error_when_relative_reference_cannot_derive_base_m
     yaml_path = _prepare_pkg(tmp_path)
     _purge_modules("relpkg")
 
-    with pytest.raises(ResolverError, match="无法根据 `yaml_path="):
+    with pytest.raises(ScalimResolverError, match="无法根据 `yaml_path="):
         compile_yaml(
             str(yaml_path),
             allowed_modules=frozenset(["relpkg"]),
@@ -255,7 +255,7 @@ def test_config_validator_and_call_by_parser_reject_invalid_relative_references(
         "fields": {},
     }
 
-    with pytest.raises(ConfigValidationError):
+    with pytest.raises(ScalimConfigValidationError):
         validator.validate(bad)
 
     bad_dotted = {
@@ -267,7 +267,7 @@ def test_config_validator_and_call_by_parser_reject_invalid_relative_references(
         "sources": {},
         "fields": {},
     }
-    with pytest.raises(ConfigValidationError):
+    with pytest.raises(ScalimConfigValidationError):
         validator.validate(bad_dotted)
 
     bad_retry = {
@@ -277,10 +277,10 @@ def test_config_validator_and_call_by_parser_reject_invalid_relative_references(
         "fields": {},
         "retry": {"should_retry": ".:should_retry"},
     }
-    with pytest.raises(ConfigValidationError):
+    with pytest.raises(ScalimConfigValidationError):
         validator.validate(bad_retry)
 
-    with pytest.raises(CallByParseError, match="`call_by` 引用 .* 非法"):
+    with pytest.raises(ScalimCallByParseError, match="`call_by` 引用 .* 非法"):
         parse_call_by(".:echo(status)")
 
 
@@ -298,7 +298,7 @@ def test_validator_retry_block_must_be_mapping() -> None:
         "fields": {},
     }
 
-    with pytest.raises(ConfigValidationError) as excinfo:
+    with pytest.raises(ScalimConfigValidationError) as excinfo:
         validator.validate(config)
     assert any("retry: 'retry' must be a dictionary" in item for item in excinfo.value.errors)
 
@@ -334,7 +334,7 @@ def test_validator_retry_should_retry_must_be_string() -> None:
         "fields": {},
     }
 
-    with pytest.raises(ConfigValidationError) as excinfo:
+    with pytest.raises(ScalimConfigValidationError) as excinfo:
         validator.validate(config)
     assert any("retry.should_retry" in item and "must be a string" in item for item in excinfo.value.errors)
 

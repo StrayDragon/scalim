@@ -14,10 +14,10 @@ from .....spec.ir.sources import (
     SourceRefIr,
 )
 from .....typedefs import FieldValue, LoaderCallKwargs, RuntimeValue, SourceSpecIrCacheMode
-from ...config_parsing.call_by import CallByParseError, CallByValue, parse_call_by
-from ...config_parsing.field_extract import FieldExtractCompileError, compile_field_extract
+from ...config_parsing.call_by import ScalimCallByParseError, CallByValue, parse_call_by
+from ...config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
 from ...config_parsing.security import SecureComputeEngine, is_constant_compute_expression
-from ...params_template import CompiledParamsTemplate, ParamsTemplateCompileError, compile_params_template
+from ...params_template import CompiledParamsTemplate, ScalimParamsTemplateCompileError, compile_params_template
 from ...schema_dsl.models import (
     DemandConfig,
     DerivedFieldConfig,
@@ -28,7 +28,7 @@ from ...schema_dsl.models import (
     SourceConfig,
     SourceFieldConfig,
 )
-from ..errors import ConversionError
+from ..errors import ScalimConversionError
 from ..references import PythonReferenceResolver
 from .conversion_bindings import ConfigToIRConversionBindingMixin
 from .conversion_lookup import CALL_BY_CTX_KEY, validate_source_id
@@ -92,14 +92,14 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         resolver = self._resolver
         if resolver is None:
             msg = "Reference resolver is not initialized"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return resolver
 
     def _require_compute_engine(self) -> SecureComputeEngine:
         compute_engine = self._compute_engine
         if compute_engine is None:
             msg = "Compute engine is not initialized"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return compute_engine
 
     def _resolve_required_field_ids(self, config: DemandConfig) -> Optional[Set[str]]:
@@ -111,11 +111,11 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
     def _convert_main_source(self, config: MainSourceConfig) -> MainSourceIr:
         if not config.source_id:
             msg = "Main source 'source_id' is required"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         validate_source_id(config.source_id, "Main source")
         if not config.loader:
             msg = "Main source 'loader' is required"
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         loader_fn = cast(  # pragma: allow-cast resolver callable typed narrowing
             "MainSourceRowIterableCallable",
@@ -132,8 +132,8 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
                 allow_keys=False,
                 allow_rows=False,
             )
-        except ParamsTemplateCompileError as exc:
-            raise ConversionError(str(exc)) from exc
+        except ScalimParamsTemplateCompileError as exc:
+            raise ScalimConversionError(str(exc)) from exc
 
         params: LoaderCallKwargs = {}
         if not template.is_empty_mapping():
@@ -154,7 +154,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             raw = str(item).strip()
             if not raw or raw == "-":
                 msg = "Main source order_by contains invalid field"
-                raise ConversionError(msg)
+                raise ScalimConversionError(msg)
             direction = "desc" if raw.startswith("-") else "asc"
             field_id = raw[1:] if raw.startswith("-") else raw
             converted.append(OrderByKeyIr(field_key=field_id, direction=direction))
@@ -210,7 +210,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         kind = str(norm.kind or "").strip()
         if kind not in {"index_by_key", "take_first", "project_fields", "map_values"}:
             msg = "sources.{}.normalize.kind must be one of: index_by_key/take_first/project_fields/map_values".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         call_by_fn = self._convert_source_normalize_call_by_fn(norm, source_id=source_id)
 
@@ -226,7 +226,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         msg = "sources.{}.normalize.kind must be one of: index_by_key/take_first/project_fields/map_values".format(
             source_id
         )  # pragma: no cover  # pragma: allow-no-cover invariant: normalize kind validated above
-        raise ConversionError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: normalize kind validated above
+        raise ScalimConversionError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: normalize kind validated above
 
     def _convert_source_normalize_call_by_fn(
         self,
@@ -240,7 +240,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         call_by_ref = str(norm.call_by or "").strip()
         if not call_by_ref:
             msg = "sources.{}.normalize.call_by must not be empty".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         try:
             return cast(  # pragma: allow-cast resolver callable typed narrowing
                 "Callable[..., object]",
@@ -248,7 +248,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             )
         except Exception as exc:
             msg = "sources.{}.normalize.call_by failed to resolve reference '{}': {}".format(source_id, call_by_ref, str(exc))
-            raise ConversionError(msg) from exc
+            raise ScalimConversionError(msg) from exc
 
     def _convert_source_normalize_index_by_key(
         self,
@@ -262,21 +262,21 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         key_field = str(norm.key_field or "").strip()
         if not key_field:
             msg = "sources.{}.normalize.key_field is required".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         on_conflict = str(norm.on_conflict or "error").strip() or "error"
         if on_conflict not in {"error", "first", "last"}:
             msg = "sources.{}.normalize.on_conflict must be one of: error/first/last".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         if isinstance(source_config.key, tuple):
             msg = "sources.{}.normalize.kind=index_by_key does not support composite key yet".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         declared_key = str(source_config.key or "").strip()
         if declared_key and declared_key != key_field:
             msg = "sources.{}.normalize.key_field must equal sources.{}.key".format(source_id, source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         return SourceNormalizeIr(kind="index_by_key", key_field=key_field, on_conflict=on_conflict, call_by=call_by_fn)
 
@@ -290,7 +290,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         on_empty = str(norm.on_empty or "miss").strip() or "miss"
         if on_empty not in {"miss", "null", "error"}:
             msg = "sources.{}.normalize.on_empty must be one of: miss/null/error".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return SourceNormalizeIr(kind="take_first", on_empty=on_empty, call_by=call_by_fn)
 
     def _convert_source_normalize_project_fields(
@@ -303,7 +303,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         on_missing = str(norm.on_missing or "error").strip() or "error"
         if on_missing not in {"error", "null"}:
             msg = "sources.{}.normalize.on_missing must be one of: error/null".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         fields = self._convert_source_normalize_project_fields_rules(
             norm.fields,
@@ -321,7 +321,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         steps = norm.steps
         if not steps:
             msg = "sources.{}.normalize.steps must not be empty".format(source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         converted_steps: List[SourceNormalizeStepIr] = []
         for idx, step in enumerate(steps):
@@ -343,14 +343,14 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             step_on_empty = str(step.on_empty or "miss").strip() or "miss"
             if step_on_empty not in {"miss", "null", "error"}:
                 msg = "{}.on_empty must be one of: miss/null/error".format(step_path)
-                raise ConversionError(msg)
+                raise ScalimConversionError(msg)
             return SourceNormalizeStepIr(kind="take_first", on_empty=step_on_empty)
 
         if step_kind == "project_fields":
             step_on_missing = str(step.on_missing or "error").strip() or "error"
             if step_on_missing not in {"error", "null"}:
                 msg = "{}.on_missing must be one of: error/null".format(step_path)
-                raise ConversionError(msg)
+                raise ScalimConversionError(msg)
             step_fields = self._convert_source_normalize_project_fields_rules(
                 step.fields,
                 config_path="{}.fields".format(step_path),
@@ -358,7 +358,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             return SourceNormalizeStepIr(kind="project_fields", on_missing=step_on_missing, fields=step_fields)
 
         msg = "{}.kind must be one of: take_first/project_fields".format(step_path)
-        raise ConversionError(msg)
+        raise ScalimConversionError(msg)
 
     def _convert_source_normalize_project_fields_rules(
         self,
@@ -368,7 +368,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
     ) -> Tuple[SourceNormalizeProjectFieldRuleIr, ...]:
         if not rules:
             msg = "{} must not be empty".format(config_path)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         converted: List[SourceNormalizeProjectFieldRuleIr] = []
         for name, rule_obj in rules.items():
@@ -384,25 +384,25 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
     ) -> SourceNormalizeProjectFieldRuleIr:
         if not isinstance(rule_obj, NormalizeProjectFieldRuleConfig):
             msg = "{}.{} must be a normalize project_fields rule".format(config_path, name)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         from_key = bool(rule_obj.from_key)
         extract_expr = str(rule_obj.extract or "").strip()
         if from_key and extract_expr:
             msg = "{}.{} must not declare both from_key and extract".format(config_path, name)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         if not from_key and not extract_expr:
             msg = "{}.{} must declare from_key or extract".format(config_path, name)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         if from_key:
             return SourceNormalizeProjectFieldRuleIr(name=name, from_key=True)
 
         try:
             segments = compile_field_extract(extract_expr)
-        except FieldExtractCompileError as exc:
+        except ScalimFieldExtractCompileError as exc:
             msg = "{}.{} has invalid extract '{}': {}".format(config_path, name, extract_expr, str(exc))
-            raise ConversionError(msg) from exc
+            raise ScalimConversionError(msg) from exc
         return SourceNormalizeProjectFieldRuleIr(
             name=name,
             from_key=False,
@@ -426,8 +426,8 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
                 allow_keys=allow_directives,
                 allow_rows=allow_directives,
             )
-        except ParamsTemplateCompileError as exc:
-            raise ConversionError(str(exc)) from exc
+        except ScalimParamsTemplateCompileError as exc:
+            raise ScalimConversionError(str(exc)) from exc
 
         if template.is_empty_mapping():
             return None
@@ -448,7 +448,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         source_ir = self._require_sources_ir().get(from_source_id)
         if source_ir is None:
             msg = "Field '{}' references unknown source '{}'".format(field_id, from_source_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         return source_ir
 
     def _convert_source_field(self, field_config: SourceFieldConfig, config: DemandConfig) -> FieldIr:
@@ -456,16 +456,16 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         extract_expr = field_config.field_id if field_config.extract is None else str(field_config.extract)
         if not from_source_id:
             msg = "Field '{}' missing source".format(field_config.field_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
         if not extract_expr:
             msg = "Field '{}' missing extract".format(field_config.field_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         try:
             extract_segments = compile_field_extract(extract_expr)
-        except FieldExtractCompileError as exc:
+        except ScalimFieldExtractCompileError as exc:
             msg = "Field '{}' has invalid extract '{}': {}".format(field_config.field_id, extract_expr, str(exc))
-            raise ConversionError(msg) from exc
+            raise ScalimConversionError(msg) from exc
 
         data_key = field_config.field_id
         if len(extract_segments) == 1 and isinstance(extract_segments[0], str):
@@ -523,7 +523,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             call_ctx_key = CALL_BY_CTX_KEY
         else:
             msg = "Derived field '{}' must declare 'compute' or 'call_by'".format(derived_config.field_id)
-            raise ConversionError(msg)
+            raise ScalimConversionError(msg)
 
         return DerivedFieldIr(
             field_id=derived_config.field_id,
@@ -537,9 +537,9 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
     def _compile_call_by(self, *, field_id: str, call_by: str) -> Callable[..., FieldValue]:
         try:
             parsed = parse_call_by(call_by)
-        except CallByParseError as exc:
+        except ScalimCallByParseError as exc:
             msg = "Derived field '{}' has invalid call_by: {}".format(field_id, exc)
-            raise ConversionError(msg) from exc
+            raise ScalimConversionError(msg) from exc
 
         try:
             fn = cast(  # pragma: allow-cast resolver callable typed narrowing
@@ -548,7 +548,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             )
         except Exception as exc:
             msg = "Derived field '{}' failed to resolve call_by reference '{}': {}".format(field_id, parsed.reference, exc)
-            raise ConversionError(msg) from exc
+            raise ScalimConversionError(msg) from exc
 
         def calculator(**field_values: RuntimeValue) -> FieldValue:
             args: List[RuntimeValue] = []

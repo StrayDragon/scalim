@@ -74,11 +74,11 @@ class WorkflowResourceWaitDiagnostics:
         return cls(enabled=False)
 
 
-class WorkflowWriteError(ScalimWorkflowException):
+class ScalimWorkflowWriteError(ScalimWorkflowException):
     diff: Optional[List[str]]
 
     def __init__(self, message: str, *, diff: Optional[List[str]] = None) -> None:
-        super(WorkflowWriteError, self).__init__(message)
+        super(ScalimWorkflowWriteError, self).__init__(message)
         self.diff = list(diff) if diff is not None else None
 
 
@@ -142,7 +142,7 @@ def _acquire_write_lock(output_path: str) -> Path:
             str(output_path),
             str(lock_path),
         )
-        raise WorkflowWriteError(msg) from None
+        raise ScalimWorkflowWriteError(msg) from None
     with os.fdopen(fd, "w") as f:
         _ = f.write("pid={}\n".format(os.getpid()))
     return lock_path
@@ -288,7 +288,7 @@ class _WorkflowResourceManagerBase(ABC):
                         owner_callsite=inflight_state.owner_callsite,
                     )
                 )
-                raise WorkflowWriteError(msg)
+                raise ScalimWorkflowWriteError(msg)
 
             if not diagnostics.enabled or wait_s < next_warn_after_s:
                 continue
@@ -582,7 +582,7 @@ __all__ = [
     "WRITE_LOCK_SUFFIX",
     "WorkflowResourceManagerBase",
     "WorkflowResourceWaitDiagnostics",
-    "WorkflowWriteError",
+    "ScalimWorkflowWriteError",
     "_WorkflowResourceManagerBase",
     "_acquire_write_lock",
     "_release_write_lock",

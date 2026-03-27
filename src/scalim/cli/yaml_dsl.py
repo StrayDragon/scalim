@@ -17,8 +17,8 @@ else:
         install_name="pyyaml",
     )
 
-from ..dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
-from ..dsl.by_yaml.config_parsing.jsonschema_issues import JsonSchemaCollectorError, collect_jsonschema_validation_issues
+from ..dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
+from ..dsl.by_yaml.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
 from ..dsl.by_yaml.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
 from ..dsl.by_yaml.config_parsing.validator import ConfigValidator, attach_locations, build_yaml_location_index
 from ..dsl.by_yaml.config_parsing.validator import YamlValidationIssue as Issue
@@ -26,7 +26,7 @@ from ..dsl.by_yaml.config_parsing.validators.issues import ValidationIssue
 from ..dsl.by_yaml.workflow_config import load_workflow_config
 from ..dsl.by_yaml.workflow_paths import resolve_workflow_demand_path
 from ..dsl.by_yaml.workflow_types import (
-    WorkflowConfigError,
+    ScalimWorkflowConfigError,
     WorkflowWriteToCsvAppend,
     WorkflowWriteToSheetbookAppend,
     WorkflowWriteToSheetbookSheet,
@@ -606,7 +606,7 @@ def _validate_demand_yaml_text(
     try:
         if contains_import_syntax(yaml_data_dict):
             _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path, allowed_yaml_roots=allowed_yaml_roots)
-    except YamlImportExpansionError as exc:
+    except ScalimYamlImportExpansionError as exc:
         errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
         errors = attach_locations(errors, locations)
         return (
@@ -744,7 +744,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
         wf_config = None
         try:
             wf_config = load_workflow_config(str(yaml_path))
-        except WorkflowConfigError as exc:
+        except ScalimWorkflowConfigError as exc:
             workflow_errors.append(Issue(path=str(exc.path or "(root)"), message=str(exc)))
         except Exception as exc:  # noqa: BLE001
             workflow_errors.append(Issue(path="(root)", message="Unexpected error: {}: {}".format(type(exc).__name__, exc)))
@@ -765,7 +765,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                         run_id=str(run.id),
                         allowed_yaml_roots=allowed_yaml_roots,
                     )
-                except WorkflowConfigError as exc:
+                except ScalimWorkflowConfigError as exc:
                     workflow_errors.append(Issue(path="workflow.runs.{}.demand".format(int(run_idx)), message=str(exc)))
                     demand_results.append(
                         ValidationPayload(
@@ -933,7 +933,7 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
     try:
         if contains_import_syntax(yaml_data_dict):
             _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
-    except YamlImportExpansionError as exc:
+    except ScalimYamlImportExpansionError as exc:
         errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
         return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=None)
     errors, warnings = _collect_schema_issues(yaml_data_dict, schema, args, jsonschema_module)
@@ -1023,7 +1023,7 @@ def _collect_schema_issues(
             include_context=bool(args.verbose),
             filter_additional_properties=True,
         )
-    except JsonSchemaCollectorError as exc:
+    except ScalimJsonSchemaCollectorError as exc:
         errors = [Issue(path="(root)", message=str(exc))]
         return errors, []
 

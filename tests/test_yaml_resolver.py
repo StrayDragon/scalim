@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml.runtime.errors import ResolverError
+from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 
 
@@ -26,5 +26,5 @@ from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 def test_resolver_rejects_invalid_refs(ref: str, match: str) -> None:
     resolver = PythonReferenceResolver()
 
-    with pytest.raises(ResolverError, match=match):
+    with pytest.raises(ScalimResolverError, match=match):
         resolver.resolve(ref)

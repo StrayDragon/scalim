@@ -18,7 +18,7 @@ from ..sinks.sink_base import create_temp_path
 from ..sinks.sink_csv import InMemoryCsv
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import WorkflowResourceManagerBase, WorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_base import WorkflowResourceManagerBase, ScalimWorkflowWriteError, acquire_write_lock, release_write_lock
 
 WorkflowCsvInput = Union[str, InMemoryCsv]
 
@@ -28,25 +28,25 @@ def _read_csv_header(input_csv: WorkflowCsvInput) -> List[str]:
         header = [str(x or "").strip() for x in input_csv.header]
         if not header or any(not x for x in header):
             msg = "Input CSV has invalid header (empty field): <in_memory>"
-            raise WorkflowWriteError(msg)
+            raise ScalimWorkflowWriteError(msg)
         return header
 
     path = str(input_csv)
     p = Path(path)
     if not p.exists():
         msg = "Missing input CSV: {!r}".format(path)
-        raise WorkflowWriteError(msg)
+        raise ScalimWorkflowWriteError(msg)
     with p.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.reader(handle)
         try:
             header = next(reader)
         except StopIteration:
             msg = "Input CSV is empty (missing header): {!r}".format(path)
-            raise WorkflowWriteError(msg) from None
+            raise ScalimWorkflowWriteError(msg) from None
     header = [str(x or "").strip() for x in header]
     if not header or any(not x for x in header):
         msg = "Input CSV has invalid header (empty field): {!r}".format(path)
-        raise WorkflowWriteError(msg)
+        raise ScalimWorkflowWriteError(msg)
     return header
 
 
@@ -117,7 +117,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             raw_path = self._csv_defs.get(key)
             if raw_path is None:
                 msg = "Unknown csv resource id: {!r}".format(key)
-                raise WorkflowWriteError(msg)
+                raise ScalimWorkflowWriteError(msg)
             lock_path = acquire_write_lock(raw_path)
             return _CsvPlan(resource_id=key, path=str(raw_path), lock_path=lock_path)
 
@@ -170,7 +170,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                 diff = _describe_header_diff(expected, input_header)
                 if on_mismatch == "error":
                     msg = "Field alignment mismatch (csv_append): csv={!r}".format(str(csv_id))
-                    raise WorkflowWriteError(msg, diff=diff)
+                    raise ScalimWorkflowWriteError(msg, diff=diff)
                 if on_mismatch == "warn":
                     pending_warning = DiagnosticWarningEvent(
                         message="Field alignment mismatch (warn): csv={!r}".format(str(csv_id)),
@@ -260,7 +260,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             with suppress(Exception):
                 temp_obj.unlink()
             msg = "CSV commit failed: {}: {}".format(type(exc).__name__, exc)
-            raise WorkflowWriteError(msg) from exc
+            raise ScalimWorkflowWriteError(msg) from exc
         finally:
             if p.lock_path is not None:
                 release_write_lock(p.lock_path)

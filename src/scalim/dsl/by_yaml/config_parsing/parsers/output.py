@@ -39,9 +39,9 @@ from .utils import list_or_none, mapping_or_none, str_or_none
 _VIZ_EVENT_MODE_REMOVED_MESSAGE = "observability.viz.event_mode has been removed; use observability.viz.trace_enabled"
 
 
-class VizEventModeRemovedError(ScalimYamlException):
+class ScalimVizEventModeRemovedError(ScalimYamlException):
     def __init__(self) -> None:
-        super(VizEventModeRemovedError, self).__init__(_VIZ_EVENT_MODE_REMOVED_MESSAGE)
+        super(ScalimVizEventModeRemovedError, self).__init__(_VIZ_EVENT_MODE_REMOVED_MESSAGE)
 
 
 class ParserOutputMixin:
@@ -153,7 +153,7 @@ class ParserOutputMixin:
         snapshot_path = str_or_none(viz_raw.get(VIZ_KEYS["snapshot_path"]))
         append = bool(viz_raw.get(VIZ_KEYS["append"], False))
         if "event_mode" in viz_raw:
-            raise VizEventModeRemovedError
+            raise ScalimVizEventModeRemovedError
         trace_enabled = bool(viz_raw.get(VIZ_KEYS["trace_enabled"], False))
         payload_policy = str(viz_raw.get(VIZ_KEYS["payload_policy"], "summary"))
         sample_size_raw = viz_raw.get(VIZ_KEYS["sample_size"], 5)

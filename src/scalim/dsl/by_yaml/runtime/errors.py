@@ -1,15 +1,15 @@
 from ....exceptions import ScalimYamlException
 
 
-class ResolverError(ScalimYamlException):
+class ScalimResolverError(ScalimYamlException):
     pass
 
 
-class ConversionError(ScalimYamlException):
+class ScalimConversionError(ScalimYamlException):
     pass
 
 
-class AllowlistRequiredError(ScalimYamlException):
+class ScalimAllowlistRequiredError(ScalimYamlException):
     pass
 
 
@@ -21,7 +21,7 @@ ALLOWLIST_REQUIRED_MSG = (
 
 __all__ = [
     "ALLOWLIST_REQUIRED_MSG",
-    "AllowlistRequiredError",
-    "ConversionError",
-    "ResolverError",
+    "ScalimAllowlistRequiredError",
+    "ScalimConversionError",
+    "ScalimResolverError",
 ]

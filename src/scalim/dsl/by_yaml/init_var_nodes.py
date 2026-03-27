@@ -4,7 +4,7 @@ from ...exceptions import ScalimYamlException
 from ...vendor.compact.typing_extensionsx import override
 
 
-class InitVarNodeValueError(ScalimYamlException):
+class ScalimInitVarNodeValueError(ScalimYamlException):
     path: str
     reason: str
 
@@ -18,7 +18,7 @@ class InitVarNodeValueError(ScalimYamlException):
         return "{} {}".format(self.path, self.reason)
 
 
-class InitVarNodeTypeError(ScalimYamlException):
+class ScalimInitVarNodeTypeError(ScalimYamlException):
     path: str
     reason: str
 
@@ -46,25 +46,25 @@ def parse_init_var_mapping_node(raw: Dict[str, Any], *, path: str) -> str:
     extra_keys = sorted([str(k) for k in raw if k != _INIT_VAR_KEY])
     if extra_keys:
         msg = "only supports {{{}: <name>}}; unexpected keys: {}".format(_INIT_VAR_KEY, ", ".join(extra_keys))
-        raise InitVarNodeValueError(msg, path=path)
+        raise ScalimInitVarNodeValueError(msg, path=path)
 
     # 注意: `{ $init_var: null }` 与 `{}` 语义不同.
     # - `{}`: 缺少 `$init_var` 键,属于“结构/形状”错误
     # - `null`: 键存在但值非法,属于“值类型”错误
     if _INIT_VAR_KEY not in raw:
         msg = "only supports {{{}: <name>}}; missing '{}'".format(_INIT_VAR_KEY, _INIT_VAR_KEY)
-        raise InitVarNodeValueError(msg, path=path)
+        raise ScalimInitVarNodeValueError(msg, path=path)
 
     init_var_raw = raw.get(_INIT_VAR_KEY)
     if not isinstance(init_var_raw, str) or not init_var_raw.strip():
         reason = "must be a non-empty string"
-        raise InitVarNodeTypeError(reason, path="{}.{}".format(path, _INIT_VAR_KEY))
+        raise ScalimInitVarNodeTypeError(reason, path="{}.{}".format(path, _INIT_VAR_KEY))
 
     return init_var_raw.strip()
 
 
 __all__ = [
-    "InitVarNodeTypeError",
-    "InitVarNodeValueError",
+    "ScalimInitVarNodeTypeError",
+    "ScalimInitVarNodeValueError",
     "parse_init_var_mapping_node",
 ]

@@ -4,7 +4,7 @@ from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.models import AliasIndex, FieldDef, FieldDefIndex, RawDemand
 from scalim.dsl.by_yaml.config_parsing.parsers.outputs import _resolve_output_targets_from_inheritance
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
-from scalim.dsl.by_yaml.init_var_nodes import InitVarNodeTypeError, InitVarNodeValueError
+from scalim.dsl.by_yaml.init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError
 from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputAggregateConfig,
     OutputAggregateFieldConfig,
@@ -220,7 +220,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         (
             {"type": "csv", "path": {"$init_var": "out_path", "other": 1}},
             "outputs.0.container",
-            InitVarNodeValueError,
+            ScalimInitVarNodeValueError,
             None,
             "outputs.0.container.path",
             "only supports {$init_var: <name>}; unexpected keys: other",
@@ -228,7 +228,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         (
             {"type": "csv", "path": {}},
             "outputs.0.container",
-            InitVarNodeValueError,
+            ScalimInitVarNodeValueError,
             None,
             "outputs.0.container.path",
             "only supports {$init_var: <name>}; missing '$init_var'",
@@ -236,7 +236,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         (
             {"type": "csv", "path": {"$init_var": None}},
             "outputs.0.container",
-            InitVarNodeTypeError,
+            ScalimInitVarNodeTypeError,
             None,
             "outputs.0.container.path.$init_var",
             "must be a non-empty string",
@@ -244,7 +244,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         (
             {"type": "csv", "path": {"$init_var": " "}},
             "outputs.0.container",
-            InitVarNodeTypeError,
+            ScalimInitVarNodeTypeError,
             None,
             "outputs.0.container.path.$init_var",
             "must be a non-empty string",

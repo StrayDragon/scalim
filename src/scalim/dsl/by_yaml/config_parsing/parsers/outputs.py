@@ -30,9 +30,9 @@ from ...schema_dsl.output_enums import (
 from ...schema_dsl.output_enums import (
     AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
 )
-from ..call_by import CallByParseError, extract_call_by_dependencies, parse_call_by
+from ..call_by import ScalimCallByParseError, extract_call_by_dependencies, parse_call_by
 from ..models import FieldDefIndex, RawDemand
-from ..security import ComputeExpressionError, SecureComputeEngine, SecurityError, extract_compute_dependencies
+from ..security import ScalimComputeExpressionError, SecureComputeEngine, ScalimSecurityError, extract_compute_dependencies
 from .utils import list_or_none, mapping_or_none, str_or_none
 
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -788,7 +788,7 @@ class ParserOutputsMixin:
             raise ValueError(msg)
         try:
             _ = parse_call_by(call_by)
-        except CallByParseError as exc:
+        except ScalimCallByParseError as exc:
             msg = "{}.call_by is invalid: {}".format(base_path, exc)
             raise ValueError(msg) from exc
         return call_by
@@ -805,7 +805,7 @@ class ParserOutputsMixin:
         deps = tuple(str(x) for x in extract_compute_dependencies(expr))
         try:
             _ = engine.compile(expr, deps)
-        except (ComputeExpressionError, SecurityError) as exc:
+        except (ScalimComputeExpressionError, ScalimSecurityError) as exc:
             msg = "{}.compute is invalid: {}".format(base_path, exc)
             raise ValueError(msg) from exc
 
@@ -869,7 +869,7 @@ class ParserOutputsMixin:
 
         try:
             _ = engine.compile(expr, deps)
-        except (ComputeExpressionError, SecurityError) as exc:
+        except (ScalimComputeExpressionError, ScalimSecurityError) as exc:
             msg = "Invalid where expression at {}: {}".format(path, exc)
             raise ValueError(msg) from exc
         return deps
@@ -1141,7 +1141,7 @@ class ParserOutputsMixin:
 
         try:
             _ = graph_utils.topological_sort(derived_ids, _get_derived_deps)
-        except graph_utils.CyclicDependencyError as exc:
+        except graph_utils.ScalimCyclicDependencyError as exc:
             cycles = exc.cycles or ()
             cycle = cycles[0] if cycles else ()
             chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"

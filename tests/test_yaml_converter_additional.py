@@ -3,7 +3,7 @@ import pytest
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
 
 
@@ -166,7 +166,7 @@ fields:
 def test_converter_rejects_invalid_order_by_entry() -> None:
     converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests"])))
 
-    with pytest.raises(ConversionError, match="order_by contains invalid field"):
+    with pytest.raises(ScalimConversionError, match="order_by contains invalid field"):
         converter._convert_main_source_order_by(("-",))
 
 
@@ -183,5 +183,5 @@ def test_source_id_format_validation_invalid() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import _validate_source_id
 
     for source_id in ("123-invalid", "order-id", ""):
-        with pytest.raises(ConversionError, match="source_id.*must match pattern"):
+        with pytest.raises(ScalimConversionError, match="source_id.*must match pattern"):
             _validate_source_id(source_id, "test")

@@ -10,7 +10,7 @@ from scalim.dsl.by_yaml import run_workflow
 from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.workflow import loaders as workflow_loaders_mod
-from scalim.workflow.errors import WorkflowConfigError as WorkflowRuntimeConfigError
+from scalim.workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
 from scalim.events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_PIPELINE_START,
@@ -29,7 +29,7 @@ from scalim.hooks.base import BaseHook
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
 from scalim.dsl.by_yaml.workflow import (
-    WorkflowConfigError,
+    ScalimWorkflowConfigError,
     load_workflow_config,
     load_workflow_config_from_mapping,
     resolve_workflow_demand_path,
@@ -532,7 +532,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError):
+    with pytest.raises(ScalimWorkflowConfigError):
         _ = load_workflow_config(str(workflow_path))
 
 
@@ -552,7 +552,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "Unknown run.depends_on id" in str(excinfo.value)
 
@@ -574,7 +574,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "cycle_path" in str(excinfo.value)
     assert '["a", "b", "a"]' in str(excinfo.value)
@@ -597,7 +597,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "Unknown run.main_rows_from.run id" in str(excinfo.value)
     assert "path=workflow.runs.1.main_rows_from.run" in str(excinfo.value)
@@ -620,7 +620,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "run.main_rows_from requires explicit depends_on" in str(excinfo.value)
     assert "path=workflow.runs.1.depends_on" in str(excinfo.value)
@@ -642,7 +642,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "run.main_rows_from must be a mapping" in str(excinfo.value)
     assert "path=workflow.runs.1.main_rows_from" in str(excinfo.value)
@@ -666,7 +666,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "run.main_rows_from contains unknown keys" in str(excinfo.value)
     assert "path=workflow.runs.1.main_rows_from" in str(excinfo.value)
@@ -689,7 +689,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "run.main_rows_from.run must be a non-empty string" in str(excinfo.value)
     assert "path=workflow.runs.1.main_rows_from.run" in str(excinfo.value)
@@ -710,7 +710,7 @@ workflow:
         ).lstrip(),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "run.main_rows_from.run must not reference self" in str(excinfo.value)
     assert "path=workflow.runs.0.main_rows_from.run" in str(excinfo.value)
@@ -742,7 +742,7 @@ def test_load_workflow_config_parses_multiple_writes(tmp_path: Path) -> None:
 
 
 def test_load_workflow_config_rejects_write_to_with_migration_hint(tmp_path: Path) -> None:
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -756,7 +756,7 @@ def test_load_workflow_config_rejects_write_to_with_migration_hint(tmp_path: Pat
 
 
 def test_load_workflow_config_rejects_writes_items_with_multiple_intent_keys(tmp_path: Path) -> None:
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -812,7 +812,7 @@ def test_run_workflow_primary_only_collects_errors(tmp_path: Path) -> None:
     assert result.outcomes[0].error is None
     assert result.outcomes[1].result is None
     assert result.outcomes[1].error is not None
-    assert result.outcomes[1].error.exc_type in {"ValueError", "WorkflowRunFailedError", "RuntimeError"}
+    assert result.outcomes[1].error.exc_type in {"ValueError", "ScalimWorkflowRunFailedError", "RuntimeError"}
     assert result.errors()
 
 
@@ -1008,7 +1008,7 @@ def test_workflow_ctx_ref_outside_depends_on_closure_fails_fast(tmp_path: Path) 
         failure_policy="primary_only",
     )
 
-    with pytest.raises(WorkflowConfigError, match="declare depends_on"):
+    with pytest.raises(ScalimWorkflowConfigError, match="declare depends_on"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -1035,7 +1035,7 @@ def test_workflow_ctx_ref_node_self_fails_fast(tmp_path: Path) -> None:
         failure_policy="primary_only",
     )
 
-    with pytest.raises(WorkflowConfigError, match="node=self"):
+    with pytest.raises(ScalimWorkflowConfigError, match="node=self"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -1071,7 +1071,7 @@ def test_workflow_ctx_ref_unknown_node_fails_fast(tmp_path: Path) -> None:
         failure_policy="primary_only",
     )
 
-    with pytest.raises(WorkflowConfigError, match="Unknown ctx node"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown ctx node"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -1096,7 +1096,7 @@ def test_workflow_ctx_guardrails_fail_fast(tmp_path: Path) -> None:
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert result.errors()
     assert result.outcomes[0].error is not None
-    assert result.outcomes[0].error.exc_type == "WorkflowConfigError"
+    assert result.outcomes[0].error.exc_type == "ScalimWorkflowConfigError"
     assert "max_value_bytes" in result.outcomes[0].error.message
 
 
@@ -1441,7 +1441,7 @@ def test_cache_pool_conflict_policy_error_fails_fast(tmp_path: Path) -> None:
         cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
     msg = str(excinfo.value)
@@ -1580,7 +1580,7 @@ relations:
         cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert "lookup_cast" in str(excinfo.value)
 
@@ -1657,7 +1657,7 @@ def test_cache_pool_budget_fail_fast_raises(tmp_path: Path) -> None:
         ),
     )
 
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert "over budget" in str(excinfo.value).lower()
     assert workflow_loaders.preload_calls() == 1
@@ -1880,32 +1880,32 @@ workflow:
 
 
 def test_workflow_config_error_formats_without_path() -> None:
-    assert str(WorkflowConfigError("msg")) == "msg"
+    assert str(ScalimWorkflowConfigError("msg")) == "msg"
 
 
 def test_load_workflow_config_wraps_read_errors(tmp_path: Path) -> None:
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(tmp_path))
     assert "Failed to read workflow YAML" in str(excinfo.value)
 
 
 def test_load_workflow_config_wraps_yaml_parse_errors(tmp_path: Path) -> None:
     workflow_path = _write_text(tmp_path / "wf.yaml", "workflow: [\n")
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "YAML parse error" in str(excinfo.value)
 
 
 def test_load_workflow_config_root_must_be_mapping(tmp_path: Path) -> None:
     workflow_path = _write_text(tmp_path / "wf.yaml", "- 1\n")
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
     assert "root must be a mapping" in str(excinfo.value)
 
 
 def test_resolve_workflow_demand_path_requires_non_empty_string(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path("", workflow_yaml_path=str(wf))
     assert "run.demand must be a non-empty string" in str(excinfo.value)
 
@@ -1934,7 +1934,7 @@ def test_resolve_workflow_demand_path_supports_named_alias(tmp_path: Path) -> No
 
 def test_resolve_workflow_demand_path_rejects_unknown_alias(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path(
             "DATA:/b.yaml",
             workflow_yaml_path=str(wf),
@@ -1947,7 +1947,7 @@ def test_resolve_workflow_demand_path_rejects_unknown_alias(tmp_path: Path) -> N
 
 def test_resolve_workflow_demand_path_rejects_empty_at_alias_path(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path(
             "@/",
             workflow_yaml_path=str(wf),
@@ -1973,14 +1973,14 @@ def test_resolve_workflow_demand_path_supports_paths_relative_to_workflow(tmp_pa
 
 def test_resolve_workflow_demand_path_rejects_relative_escape_by_default(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path("../escape.yaml", workflow_yaml_path=str(wf))
     assert "YAML path escapes allowed roots" in str(excinfo.value)
 
 
 def test_resolve_workflow_demand_path_escape_error_includes_run_id(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path("../escape.yaml", workflow_yaml_path=str(wf), run_id="r1")
     assert "YAML path escapes allowed roots" in str(excinfo.value)
     assert "run_id=r1" in str(excinfo.value)
@@ -1989,14 +1989,14 @@ def test_resolve_workflow_demand_path_escape_error_includes_run_id(tmp_path: Pat
 def test_resolve_workflow_demand_path_rejects_absolute_escape_by_default(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
     outside = (tmp_path.parent / "escape.yaml").resolve(strict=False)
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path(str(outside), workflow_yaml_path=str(wf))
     assert "YAML path escapes allowed roots" in str(excinfo.value)
 
 
 def test_resolve_workflow_demand_path_rejects_alias_escape_by_default(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path(
             "DATA:/escape.yaml",
             workflow_yaml_path=str(wf),
@@ -2038,7 +2038,7 @@ def test_resolve_workflow_demand_path_allows_escape_with_explicit_allowed_roots(
 def test_resolve_workflow_demand_path_invalid_allowed_yaml_roots_is_wrapped(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
     missing_root = tmp_path / "missing_root"
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = resolve_workflow_demand_path(
             "rel.yaml",
             workflow_yaml_path=str(wf),
@@ -2096,7 +2096,7 @@ workflow:
     ],
 )
 def test_load_workflow_config_from_mapping_rejects_invalid_structures(bad_mapping: dict) -> None:
-    with pytest.raises(WorkflowConfigError):
+    with pytest.raises(ScalimWorkflowConfigError):
         _ = load_workflow_config_from_mapping(bad_mapping)
 
 
@@ -2222,7 +2222,7 @@ def test_load_workflow_config_from_mapping_rejects_invalid_structures(bad_mappin
     ],
 )
 def test_load_workflow_config_from_mapping_rejects_invalid_cache_pool_options(options: Dict[str, Any], path: str) -> None:
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": options}})
     assert excinfo.value.path == path
 
@@ -2263,7 +2263,7 @@ def test_load_workflow_config_from_mapping_accepts_ctx_options() -> None:
     ],
 )
 def test_load_workflow_config_from_mapping_rejects_invalid_ctx_options(ctx: object, path: str) -> None:
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -2278,7 +2278,7 @@ def test_load_workflow_config_from_mapping_rejects_invalid_ctx_options(ctx: obje
 
 
 def test_load_workflow_config_from_mapping_rejects_legacy_deps_field() -> None:
-    with pytest.raises(WorkflowConfigError, match="run\\.deps was removed; use run\\.depends_on") as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError, match="run\\.deps was removed; use run\\.depends_on") as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -2292,7 +2292,7 @@ def test_load_workflow_config_from_mapping_rejects_legacy_deps_field() -> None:
 
 
 def test_load_workflow_config_from_mapping_rejects_depends_on_not_list() -> None:
-    with pytest.raises(WorkflowConfigError, match="run\\.depends_on must be a list"):
+    with pytest.raises(ScalimWorkflowConfigError, match="run\\.depends_on must be a list"):
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -2305,7 +2305,7 @@ def test_load_workflow_config_from_mapping_rejects_depends_on_not_list() -> None
 
 
 def test_load_workflow_config_from_mapping_rejects_depends_on_empty_item() -> None:
-    with pytest.raises(WorkflowConfigError, match="depends_on items must be non-empty"):
+    with pytest.raises(ScalimWorkflowConfigError, match="depends_on items must be non-empty"):
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -2347,7 +2347,7 @@ def test_load_workflow_config_from_mapping_accepts_forward_depends_on() -> None:
 
 
 def test_load_workflow_config_from_mapping_rejects_init_vars_not_mapping() -> None:
-    with pytest.raises(WorkflowConfigError, match="run\\.init_vars must be a mapping") as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError, match="run\\.init_vars must be a mapping") as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -2361,7 +2361,7 @@ def test_load_workflow_config_from_mapping_rejects_init_vars_not_mapping() -> No
 
 
 def test_load_workflow_config_from_mapping_rejects_init_vars_key_invalid() -> None:
-    with pytest.raises(WorkflowConfigError, match="run\\.init_vars keys must be non-empty strings") as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError, match="run\\.init_vars keys must be non-empty strings") as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
@@ -2397,23 +2397,23 @@ def test_load_workflow_config_from_mapping_accepts_resources_mapping() -> None:
 
 
 def test_load_workflow_config_from_mapping_rejects_resources_not_mapping() -> None:
-    with pytest.raises(WorkflowConfigError, match="workflow.resources must be a mapping"):
+    with pytest.raises(ScalimWorkflowConfigError, match="workflow.resources must be a mapping"):
         _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "resources": []}})
 
 
 def test_load_workflow_config_from_mapping_rejects_resources_key_invalid() -> None:
-    with pytest.raises(WorkflowConfigError, match="workflow\\.resources keys must be non-empty"):
+    with pytest.raises(ScalimWorkflowConfigError, match="workflow\\.resources keys must be non-empty"):
         _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "resources": {"": {"kind": "x"}}}})
 
 
 def test_load_workflow_config_from_mapping_rejects_self_depends_on() -> None:
-    with pytest.raises(WorkflowConfigError, match="self dependency"):
+    with pytest.raises(ScalimWorkflowConfigError, match="self dependency"):
         _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml", "depends_on": ["a"]}]}})
 
 
 def test_run_workflow_requires_workflow_path(tmp_path: Path) -> None:
     _ = tmp_path
-    with pytest.raises(WorkflowConfigError):
+    with pytest.raises(ScalimWorkflowConfigError):
         _ = run_workflow("", allowed_modules=_ALLOWED_MODULES)
 
 
@@ -3149,7 +3149,7 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match="collision"):
+    with pytest.raises(ScalimWorkflowConfigError, match="collision"):
         _ = run_workflow(str(wf_collision), allowed_modules=_ALLOWED_MODULES)
 
     reserved_export = tmp_path / "reserved.xlsx"
@@ -3177,7 +3177,7 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match="reserved"):
+    with pytest.raises(ScalimWorkflowConfigError, match="reserved"):
         _ = run_workflow(str(wf_reserved), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -3260,7 +3260,7 @@ outputs:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     msg = str(excinfo.value)
     assert "collision" in msg
@@ -3310,7 +3310,7 @@ outputs:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     msg = str(excinfo.value)
     assert "reserved" in msg
@@ -3371,7 +3371,7 @@ def test_workflow_excel_output_collision_precheck_reports_demand_yaml_load_failu
         failure_policy="primary_only",
     )
     cfg = load_workflow_config(str(wf))
-    with pytest.raises(WorkflowConfigError, match="Failed to load demand YAML for workflow collision precheck"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Failed to load demand YAML for workflow collision precheck"):
         _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
 
 
@@ -3438,7 +3438,7 @@ outputs:
         failure_policy="primary_only",
     )
     cfg = load_workflow_config(str(wf))
-    with pytest.raises(WorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
     msg = str(excinfo.value)
     assert "collision" in msg
@@ -4009,7 +4009,7 @@ outputs:
         failure_policy="primary_only",
     )
 
-    with pytest.raises(WorkflowConfigError, match="Pathless CSV output"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Pathless CSV output"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -4244,7 +4244,7 @@ def test_workflow_main_rows_from_rejects_non_in_memory_rows_artifact(tmp_path: P
     assert result.errors()
     b_outcome = next(o for o in result.outcomes if o.run_id == "b")
     assert b_outcome.error is not None
-    assert b_outcome.error.exc_type == "WorkflowWriteError"
+    assert b_outcome.error.exc_type == "ScalimWorkflowWriteError"
 
 
 def test_workflow_execute_release_main_rows_artifact_returns_when_missing_count_entry(tmp_path: Path) -> None:
@@ -4443,7 +4443,7 @@ main_source:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
         _ = run_workflow(str(wf_missing_outputs), allowed_modules=_ALLOWED_MODULES)
 
     wf_unknown_output_id = _write_workflow_yaml(
@@ -4453,7 +4453,7 @@ main_source:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
         _ = run_workflow(str(wf_unknown_output_id), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -4498,7 +4498,7 @@ main_source:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
         _ = run_workflow(str(wf_missing_outputs), allowed_modules=_ALLOWED_MODULES)
 
     wf_unknown_output_id = _write_workflow_yaml(
@@ -4514,7 +4514,7 @@ main_source:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
         _ = run_workflow(str(wf_unknown_output_id), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -4674,7 +4674,7 @@ def test_workflow_writes_rejects_non_csv_output_types(tmp_path: Path) -> None:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match=r"only supports CSV outputs"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"only supports CSV outputs"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -4707,7 +4707,7 @@ def test_workflow_shared_resource_commit_failure_raises_workflow_config_error(tm
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowConfigError, match="workflow.resources"):
+    with pytest.raises(ScalimWorkflowConfigError, match="workflow.resources"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert workbook_dir.exists()
     assert not lock_path.exists()

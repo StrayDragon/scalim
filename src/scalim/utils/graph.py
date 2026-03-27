@@ -32,7 +32,7 @@ def _stable_tie_break_key(node: Hashable) -> str:
     return "{}:{}".format(type(node).__name__, repr(node))
 
 
-class CyclicDependencyError(ScalimExecutionException):
+class ScalimCyclicDependencyError(ScalimExecutionException):
     """循环依赖异常"""
 
     cycles: Sequence[Sequence[Hashable]]
@@ -137,7 +137,7 @@ def topological_sort(
         当多个节点在同一层级同时就绪时,会按稳定的“平局规则”输出(默认使用节点的稳定字符串表示).
 
     异常:
-        `CyclicDependencyError`: 检测到循环依赖
+        `ScalimCyclicDependencyError`: 检测到循环依赖
 
     示例:
         - `deps = {"a": ["b", "c"], "b": ["d"], "c": [], "d": []}`
@@ -181,7 +181,7 @@ def topological_sort(
     if len(result) != len(node_set):
         cycles = detect_cycles(node_set, get_deps)
         msg = "检测到循环依赖"
-        raise CyclicDependencyError(msg, cycles)
+        raise ScalimCyclicDependencyError(msg, cycles)
 
     return result
 

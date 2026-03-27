@@ -25,12 +25,12 @@ else:
     MappingNode = _yaml_nodes.MappingNode
     SequenceNode = _yaml_nodes.SequenceNode
 
-from ..init_var_nodes import InitVarNodeTypeError, InitVarNodeValueError, parse_init_var_mapping_node
+from ..init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
 from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_CONTAINER_KEYS, OUTPUT_TARGET_KEYS
-from .errors import ConfigValidationError
+from .errors import ScalimConfigValidationError
 from .imports import contains_import_syntax
-from .jsonschema_issues import JsonSchemaCollectorError, collect_jsonschema_validation_issues
+from .jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
 from .models import FieldDef, FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
@@ -201,7 +201,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         msg = "Configuration validation failed with {} error(s)".format(len(issues))
         if len(issues) > self._max_validation_error_lines:
             msg = "{} (showing first {} errors)".format(msg, self._max_validation_error_lines)
-        raise ConfigValidationError(msg, errors=errors, issues=report.issues)
+        raise ScalimConfigValidationError(msg, errors=errors, issues=report.issues)
 
     def validate_report(
         self,
@@ -437,7 +437,7 @@ class ConfigValidator(ValidatorFieldsMixin):
             absolute_path = getattr(e, "absolute_path", None)  # pragma: allow-dynattr third-party: jsonschema ValidationError
             path = ".".join(str(p) for p in absolute_path) if absolute_path else ""
             self._add_error(errors, "Schema validation error: {}".format(e.message), path=path)
-        except JsonSchemaCollectorError as exc:
+        except ScalimJsonSchemaCollectorError as exc:
             msg = "JSONSchema validation failed unexpectedly: {}: {}".format(type(exc).__name__, exc)
             errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
         except Exception as exc:  # noqa: BLE001
@@ -496,7 +496,7 @@ class ConfigValidator(ValidatorFieldsMixin):
                     cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
                     path=base_path,
                 )
-            except (InitVarNodeValueError, InitVarNodeTypeError) as exc:
+            except (ScalimInitVarNodeValueError, ScalimInitVarNodeTypeError) as exc:
                 self._add_error(errors, exc.reason, path=exc.path)
 
 

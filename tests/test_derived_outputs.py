@@ -286,7 +286,7 @@ def test_count_distinct_guardrails_error_and_truncate_is_deterministic() -> None
     )
     err.accumulate({"g": "x", "user_id": "u1"})
     err.accumulate({"g": "x", "user_id": "u2"})
-    with pytest.raises(mod.DistinctKeyLimitExceededError, match="distinct_count=3"):
+    with pytest.raises(mod.ScalimDistinctKeyLimitExceededError, match="distinct_count=3"):
         err.accumulate({"g": "x", "user_id": "u3"})
 
     # truncate keeps stable-smallest keys, regardless of row order
@@ -354,7 +354,7 @@ def test_dedup_by_on_conflict_variants_and_truncate() -> None:
         ),
     )
     err.accumulate({"k": "a", "g": "x", "v": 1})
-    with pytest.raises(mod.DedupKeyConflictError):
+    with pytest.raises(mod.ScalimDedupKeyConflictError):
         err.accumulate({"k": "a", "g": "x", "v": 9})
 
     # truncate: keeps stable-smallest keys (a,b) and drops c
@@ -545,7 +545,7 @@ def test_dedup_by_then_aggregator_key_normalization_conflict_uses_normalized_key
         key_normalization="auto_str",  # type: ignore[arg-type]
     )
     agg.accumulate({"k": 1})
-    with pytest.raises(mod.DedupKeyConflictError):
+    with pytest.raises(mod.ScalimDedupKeyConflictError):
         agg.accumulate({"k": "1"})
 
 

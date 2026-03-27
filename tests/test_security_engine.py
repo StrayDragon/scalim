@@ -8,11 +8,11 @@ import pytest
 import scalim.dsl.by_yaml.config_parsing.security as security
 from scalim.secure_compute_contracts import is_secure_compute_calculator
 from scalim.dsl.by_yaml.config_parsing.security import (
-    ComputeExpressionError,
+    ScalimComputeExpressionError,
     SecureComputeEngine,
     SecureComputeCalculator,
     SecurityAuditLogger,
-    SecurityError,
+    ScalimSecurityError,
     default_audit_callback,
     redacted_audit_callback,
     extract_dependencies_from_compute,
@@ -61,35 +61,35 @@ def test_compiled_cache_is_bounded_and_evicts_oldest() -> None:
 
 def test_invalid_expression_syntax() -> None:
     engine = SecureComputeEngine()
-    with pytest.raises(ComputeExpressionError):
+    with pytest.raises(ScalimComputeExpressionError):
         engine.compile("a +", ("a",))
 
 
 def test_forbidden_call_patterns() -> None:
     engine = SecureComputeEngine()
 
-    with pytest.raises(SecurityError):
+    with pytest.raises(ScalimSecurityError):
         engine.compile("max(a=1)", ())
 
-    with pytest.raises(SecurityError, match="call_by"):
+    with pytest.raises(ScalimSecurityError, match="call_by"):
         engine.compile("obj.method()", ("obj",))
 
-    with pytest.raises(SecurityError):
+    with pytest.raises(ScalimSecurityError):
         engine.compile("a & b", ("a", "b"))
 
-    with pytest.raises(SecurityError):
+    with pytest.raises(ScalimSecurityError):
         engine.compile("data[0]", ("data",))
 
 
 def test_method_calls_are_rejected_with_call_by_migration_hint() -> None:
     engine = SecureComputeEngine()
 
-    with pytest.raises(SecurityError) as excinfo:
+    with pytest.raises(ScalimSecurityError) as excinfo:
         engine.compile("mapping.get('k', None)", ("mapping",))
     assert "method call" in str(excinfo.value).lower() or "method calls" in str(excinfo.value).lower()
     assert "call_by" in str(excinfo.value)
 
-    with pytest.raises(SecurityError) as excinfo2:
+    with pytest.raises(ScalimSecurityError) as excinfo2:
         engine.compile("s.strip()", ("s",))
     assert "method call" in str(excinfo2.value).lower() or "method calls" in str(excinfo2.value).lower()
     assert "call_by" in str(excinfo2.value)
@@ -98,7 +98,7 @@ def test_method_calls_are_rejected_with_call_by_migration_hint() -> None:
 def test_non_name_calls_are_rejected_with_call_by_guidance() -> None:
     engine = SecureComputeEngine()
 
-    with pytest.raises(SecurityError, match=r"Only simple function calls are allowed.*call_by"):
+    with pytest.raises(ScalimSecurityError, match=r"Only simple function calls are allowed.*call_by"):
         engine.compile("(a + b)()", ("a", "b"))
 
 
@@ -116,7 +116,7 @@ def test_non_name_calls_are_rejected_with_call_by_guidance() -> None:
 )
 def test_rejects_unsupported_ast_nodes(expression: str, deps) -> None:  # type: ignore[no-untyped-def]
     engine = SecureComputeEngine()
-    with pytest.raises(SecurityError):
+    with pytest.raises(ScalimSecurityError):
         engine.compile(expression, deps)
 
 
@@ -133,7 +133,7 @@ def test_compile_supports_bool_list_tuple_and_eval_error() -> None:
     assert calc_tuple(a=1, b=2) == 2
 
     calc_div = engine.compile("a / b", ("a", "b"))
-    with pytest.raises(ComputeExpressionError):
+    with pytest.raises(ScalimComputeExpressionError):
         calc_div(a=1, b=0)
 
     calc_add = engine.compile("a + b", ("a", "b"))
@@ -186,7 +186,7 @@ def test_supports_not_unary_operator() -> None:
 def test_forbidden_name_rejected() -> None:
     engine = SecureComputeEngine()
 
-    with pytest.raises(SecurityError):
+    with pytest.raises(ScalimSecurityError):
         engine.compile("__import__", ())
 
 
@@ -200,7 +200,7 @@ def test_unsupported_comparator_rejected() -> None:
         forbidden_names=SecureComputeEngine.FORBIDDEN_NAMES,
     )
     expression = ast.parse("a == b", mode="eval")
-    with pytest.raises(SecurityError):
+    with pytest.raises(ScalimSecurityError):
         validator.validate(expression.body)
 
 
@@ -272,7 +272,7 @@ def test_audit_callback_called_on_eval() -> None:
 def test_positional_eval_error_is_wrapped_as_compute_expression_error() -> None:
     engine = SecureComputeEngine()
     calc = engine.compile("a / b", ("a", "b"))
-    with pytest.raises(ComputeExpressionError):
+    with pytest.raises(ScalimComputeExpressionError):
         _ = calc(1, 0)
 
 
@@ -312,63 +312,63 @@ def test_compute_limits_rejects_negative_values() -> None:
 
 def test_compute_limits_rejects_long_expression() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_expression_len=3))
-    with pytest.raises(ComputeExpressionError, match="max_expression_len"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_expression_len"):
         engine.compile("a + b", ("a", "b"))
 
 
 def test_compute_limits_rejects_excess_ast_nodes() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_ast_nodes=1))
-    with pytest.raises(ComputeExpressionError, match="max_ast_nodes"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_ast_nodes"):
         engine.compile("a", ("a",))
 
 
 def test_compute_limits_rejects_excess_ast_depth() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_ast_depth=1))
-    with pytest.raises(ComputeExpressionError, match="max_ast_depth"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_ast_depth"):
         engine.compile("a", ("a",))
 
 
 def test_compute_limits_rejects_literal_string_len() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_literal_string_len=3))
-    with pytest.raises(ComputeExpressionError, match="max_literal_string_len"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_literal_string_len"):
         engine.compile("'abcd'", ())
 
 
 def test_compute_limits_rejects_collection_literal_len() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_collection_literal_len=3))
-    with pytest.raises(ComputeExpressionError, match="max_collection_literal_len"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_collection_literal_len"):
         engine.compile("sum([1, 2, 3, 4])", ())
 
 
 def test_compute_limits_rejects_repeat_int_on_left() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_repeat=3))
-    with pytest.raises(ComputeExpressionError, match="max_repeat"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_repeat"):
         engine.compile("4 * 'a'", ())
 
 
 def test_compute_limits_rejects_repeat_int_on_right() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_repeat=3))
-    with pytest.raises(ComputeExpressionError, match="max_repeat"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_repeat"):
         engine.compile("'a' * 4", ())
 
 
 def test_compute_limits_rejects_static_range_len() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_range_len=3))
-    with pytest.raises(ComputeExpressionError, match="max_range_len"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_range_len"):
         engine.compile("sum(range(4))", ())
 
 
 def test_compute_limits_enforces_runtime_range_len() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_range_len=3))
     calc = engine.compile("sum(range(n))", ("n",))
-    with pytest.raises(ComputeExpressionError, match="max_range_len"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_range_len"):
         calc(n=4)
 
 
 def test_compute_limits_enforces_runtime_range_len_positional() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_range_len=3))
     calc = engine.compile("sum(range(n))", ("n",))
-    with pytest.raises(ComputeExpressionError, match="max_range_len"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_range_len"):
         _ = calc(4)
 
 
@@ -386,7 +386,7 @@ def test_compute_limits_repeat_does_not_treat_bool_as_int() -> None:
 
 def test_compute_limits_rejects_repeat_list_literal() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_repeat=3))
-    with pytest.raises(ComputeExpressionError, match="max_repeat"):
+    with pytest.raises(ScalimComputeExpressionError, match="max_repeat"):
         engine.compile("[1] * 4", ())
 
 

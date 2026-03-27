@@ -1,6 +1,6 @@
 from typing import Any, Dict, Hashable, Optional, Sequence, Tuple
 
-from ..guardrails import GuardrailMode, GuardrailViolationError
+from ..guardrails import GuardrailMode, ScalimGuardrailViolationError
 
 
 def build_guardrail_once_key(code: str, *parts: Any) -> Tuple[str, ...]:
@@ -118,7 +118,7 @@ def record_guardrail(
         if once_key in runtime.guardrail_logged:
             return
         runtime.guardrail_logged.add(once_key)
-    runtime.instrumentation.emit_error(GuardrailViolationError(message, code=code, context=payload), payload)
+    runtime.instrumentation.emit_error(ScalimGuardrailViolationError(message, code=code, context=payload), payload)
 
 
 def fail_guardrail(
@@ -134,6 +134,6 @@ def fail_guardrail(
     if cause is not None:
         payload["cause_type"] = type(cause).__name__
         payload["cause"] = str(cause)
-    violation = GuardrailViolationError(message, code=code, context=payload)
+    violation = ScalimGuardrailViolationError(message, code=code, context=payload)
     runtime.instrumentation.emit_error(violation, payload)
     raise violation

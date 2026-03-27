@@ -1,7 +1,7 @@
 import pytest
 
 from scalim.planning import PlanBuilder
-from scalim.utils.graph import CyclicDependencyError
+from scalim.utils.graph import ScalimCyclicDependencyError
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
 
@@ -62,7 +62,7 @@ def test_cyclic_dependency_raises() -> None:
 
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=source)
 
-    with pytest.raises(CyclicDependencyError):
+    with pytest.raises(ScalimCyclicDependencyError):
         PlanBuilder(demand).build(targets=["a"])
 
 

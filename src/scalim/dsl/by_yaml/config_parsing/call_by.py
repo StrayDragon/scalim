@@ -23,7 +23,7 @@ ALLOWED_CTX_ATTRS: Tuple[str, ...] = (
 _NON_PY_LITERAL_NAMES: FrozenSet[str] = frozenset(["true", "false", "null"])
 
 
-class CallByParseError(ScalimYamlException):
+class ScalimCallByParseError(ScalimYamlException):
     pass
 
 
@@ -51,11 +51,11 @@ def parse_call_by(call_by: Any) -> ParsedCallBy:
 def _normalize_call_by(call_by: Any) -> str:
     if not isinstance(call_by, str):
         msg = "call_by must be a string"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
     raw = call_by.strip()
     if not raw:
         msg = "call_by must not be empty"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
     return raw
 
 
@@ -63,7 +63,7 @@ def _parse_call_by_call(raw: str) -> Tuple[str, ast.Call]:
     reference, args_src = _split_reference_and_args(raw)
     if not _is_valid_loader_ref(reference):
         msg = "`call_by` 引用 '{}' 非法. 期望格式: {}".format(reference, REFERENCE_FORMAT_EXAMPLES)
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     rewritten_args = _rewrite_ctx_tokens(args_src)
     call_src = "{}({})".format(_CALL_PLACEHOLDER, rewritten_args)
@@ -72,19 +72,19 @@ def _parse_call_by_call(raw: str) -> Tuple[str, ast.Call]:
         tree = ast.parse(call_src, mode="eval")
     except SyntaxError as e:
         msg = "Invalid call_by arguments syntax: {}".format(e)
-        raise CallByParseError(msg) from e
+        raise ScalimCallByParseError(msg) from e
 
     node = tree.body
     if not isinstance(
         node, ast.Call
     ):  # pragma: no cover  # pragma: allow-no-cover ast.parse(eval) with placeholder call should always yield ast.Call
         msg = "Invalid call_by syntax: expected a function call"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
     if (
         not isinstance(node.func, ast.Name) or node.func.id != _CALL_PLACEHOLDER
     ):  # pragma: no cover  # pragma: allow-no-cover ast.parse(eval) placeholder call should always use ast.Name
         msg = "Invalid call_by syntax: expected a simple function call"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     return reference, node
 
@@ -99,7 +99,7 @@ def _parse_call_by_call_args(node: ast.Call) -> Tuple[Tuple[CallByValue, ...], T
     for arg in node.args:
         if isinstance(arg, ast.Starred):
             msg = "call_by does not allow '*' argument unpacking"
-            raise CallByParseError(msg)
+            raise ScalimCallByParseError(msg)
         parsed = _parse_value(arg)
         args.append(parsed)
         _collect_dep(parsed, deps, seen)
@@ -107,10 +107,10 @@ def _parse_call_by_call_args(node: ast.Call) -> Tuple[Tuple[CallByValue, ...], T
     for kw in node.keywords:
         if kw.arg is None:
             msg = "call_by does not allow '**' keyword unpacking"
-            raise CallByParseError(msg)
+            raise ScalimCallByParseError(msg)
         if kw.arg in kw_names:
             msg = "call_by has duplicate keyword argument '{}'".format(kw.arg)
-            raise CallByParseError(msg)
+            raise ScalimCallByParseError(msg)
         kw_names.add(kw.arg)
         parsed = _parse_value(kw.value)
         kwargs.append((kw.arg, parsed))
@@ -132,7 +132,7 @@ def _collect_dep(value: CallByValue, deps: List[str], seen: Set[str]) -> None:
 def extract_call_by_dependencies(call_by: str) -> List[str]:
     try:
         parsed = parse_call_by(call_by)
-    except CallByParseError:
+    except ScalimCallByParseError:
         return []
     return list(parsed.field_names)
 
@@ -141,19 +141,19 @@ def _split_reference_and_args(raw: str) -> Tuple[str, str]:
     open_idx = raw.find("(")
     if open_idx < 0:
         msg = "Invalid call_by syntax: expected '<reference>(...)'"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
     reference = raw[:open_idx].strip()
     if not reference:
         msg = "Invalid call_by syntax: missing reference before '('"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     close_idx = _find_matching_paren(raw, open_idx)
     if close_idx is None:
         msg = "Invalid call_by syntax: missing closing ')'"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
     if raw[close_idx + 1 :].strip():
         msg = "Invalid call_by syntax: unexpected trailing content after ')'"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     args_src = raw[open_idx + 1 : close_idx].strip()
     return reference, args_src
@@ -196,7 +196,7 @@ def _rewrite_ctx_tokens(src: str) -> str:
 
     if _has_placeholder_token(src):
         msg = "Illegal token '{}' in call_by arguments; use '$ctx' instead".format(_CTX_PLACEHOLDER)
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     out: List[str] = []
     i = 0
@@ -275,7 +275,7 @@ def _parse_value(node: ast.AST) -> CallByValue:
             return CallByValue(kind="ctx", value=None)
         if name in _NON_PY_LITERAL_NAMES:
             msg = "Invalid literal '{}': use True/False/None".format(name)
-            raise CallByParseError(msg)
+            raise ScalimCallByParseError(msg)
         return CallByValue(kind="field", value=name)
 
     if isinstance(node, ast.Attribute):
@@ -283,17 +283,17 @@ def _parse_value(node: ast.AST) -> CallByValue:
             attr = node.attr
             if attr not in ALLOWED_CTX_ATTRS:
                 msg = "Invalid ctx attribute '{}'. Allowed: {}".format(attr, ", ".join(ALLOWED_CTX_ATTRS))
-                raise CallByParseError(msg)
+                raise ScalimCallByParseError(msg)
             return CallByValue(kind="ctx_attr", value=attr)
         msg = "Only '$ctx' or '$ctx.<attr>' is allowed for attribute access"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     literal = _parse_literal(node)
     if literal is not _MISSING:
         return CallByValue(kind="literal", value=literal)
 
     msg = "Unsupported call_by argument type: {}".format(type(node).__name__)
-    raise CallByParseError(msg)
+    raise ScalimCallByParseError(msg)
 
 
 _MISSING = object()
@@ -305,7 +305,7 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
         if isinstance(value, (int, float, str, bool)) or value is None:
             return value
         msg = "Unsupported literal type in call_by: {}".format(type(value).__name__)
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     if isinstance(
         node, ast.Num
@@ -316,7 +316,7 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
         ):  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
             return value  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
         msg = "Unsupported numeric literal in call_by"  # pragma: no cover  # pragma: allow-no-cover py<3.8 compat
-        raise CallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        raise ScalimCallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
 
     if isinstance(
         node, ast.Str
@@ -329,18 +329,18 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
         if node.value in (True, False, None):  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
             return node.value  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
         msg = "Unsupported literal in call_by"  # pragma: no cover  # pragma: allow-no-cover py<3.8 compat
-        raise CallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        raise ScalimCallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
 
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
         operand = _parse_literal(node.operand)
         if isinstance(operand, bool) or not isinstance(operand, (int, float)):
             msg = "Unary +/- in call_by only supports numeric literals"
-            raise CallByParseError(msg)
+            raise ScalimCallByParseError(msg)
         return operand if isinstance(node.op, ast.UAdd) else -operand
 
     if isinstance(node, (ast.List, ast.Tuple, ast.Dict, ast.Set)):
         msg = "Only simple Python literals are allowed in call_by (int/float/str/True/False/None)"
-        raise CallByParseError(msg)
+        raise ScalimCallByParseError(msg)
 
     return _MISSING
 
@@ -351,7 +351,7 @@ def _is_valid_loader_ref(loader_ref: str) -> bool:
 
 __all__ = [
     "ALLOWED_CTX_ATTRS",
-    "CallByParseError",
+    "ScalimCallByParseError",
     "CallByValue",
     "ParsedCallBy",
     "extract_call_by_dependencies",

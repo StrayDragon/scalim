@@ -53,7 +53,7 @@ def test_collect_jsonschema_validation_issues_error_cases_and_context_collection
     assert issues_mod._is_additional_properties_error(_DummyError(validator=None)) is False  # noqa: SLF001
 
     # Draft7Validator 不可用/不可调用
-    with pytest.raises(issues_mod.JsonSchemaCollectorError):  # noqa: SLF001
+    with pytest.raises(issues_mod.ScalimJsonSchemaCollectorError):  # noqa: SLF001
         _ = issues_mod.collect_jsonschema_validation_issues(
             {},
             {},
@@ -68,7 +68,7 @@ def test_collect_jsonschema_validation_issues_error_cases_and_context_collection
             def __init__(self, _schema: object) -> None:
                 raise RuntimeError("boom")
 
-    with pytest.raises(issues_mod.JsonSchemaCollectorError, match=r"init failed"):  # noqa: SLF001
+    with pytest.raises(issues_mod.ScalimJsonSchemaCollectorError, match=r"init failed"):  # noqa: SLF001
         _ = issues_mod.collect_jsonschema_validation_issues(
             {},
             {},
@@ -83,7 +83,7 @@ def test_collect_jsonschema_validation_issues_error_cases_and_context_collection
             def __init__(self, _schema: object) -> None:
                 self._ = _schema
 
-    with pytest.raises(issues_mod.JsonSchemaCollectorError, match=r"missing iter_errors"):  # noqa: SLF001
+    with pytest.raises(issues_mod.ScalimJsonSchemaCollectorError, match=r"missing iter_errors"):  # noqa: SLF001
         _ = issues_mod.collect_jsonschema_validation_issues(
             {},
             {},

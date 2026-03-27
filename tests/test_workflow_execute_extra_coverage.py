@@ -28,7 +28,7 @@ def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
 
-    with pytest.raises(workflow_execute_mod.WorkflowConfigError, match="requires derived consumers mapping") as excinfo:
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match="requires derived consumers mapping") as excinfo:
         _ = workflow_execute_mod._maybe_build_workflow_cache_pool(
             workflow_exec_id="wf_test",
             workflow_ir=workflow_ir,
@@ -144,7 +144,7 @@ def test_resolve_workflow_input_csv_missing_in_memory_artifact_raises() -> None:
     artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
     artifacts_dir.publish("a", "outputs", {"detail": ""})
 
-    with pytest.raises(workflow_execute_mod.WorkflowWriteError, match="Missing workflow-managed in-memory CSV artifact"):
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowWriteError, match="Missing workflow-managed in-memory CSV artifact"):
         _ = workflow_execute_mod._resolve_workflow_input_csv(
             artifacts_dir=artifacts_dir,
             consumer_node_id="a",

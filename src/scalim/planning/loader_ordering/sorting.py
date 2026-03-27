@@ -79,7 +79,7 @@ def sort_ref_loaders(  # noqa: C901, PLR0912
         cycles = graph.detect_cycles(loader_ids, lambda name: sorted(loader_deps.get(name, set())))
         cycle_str = "; ".join(" -> ".join(cycle) for cycle in cycles) if cycles else "<unknown>"
         msg = "检测到 ref loader 循环依赖: {}".format(cycle_str)
-        raise graph.CyclicDependencyError(msg, cycles)
+        raise graph.ScalimCyclicDependencyError(msg, cycles)
 
     loader_map = {source.source_id: (source, fields) for source, fields in ref_loaders}
     return [loader_map[name] for name in sorted_loaders if name in loader_map]

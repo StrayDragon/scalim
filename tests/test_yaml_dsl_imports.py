@@ -6,7 +6,7 @@ import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
 from scalim.dsl.by_yaml.config_parsing import imports as imports_mod
-from scalim.dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, load_and_expand_imports
+from scalim.dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError, load_and_expand_imports
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import validate_yaml_text
 
@@ -167,7 +167,7 @@ outputs: "oops"
         encoding="utf-8",
     )
 
-    with pytest.raises(YamlImportExpansionError) as exc:
+    with pytest.raises(ScalimYamlImportExpansionError) as exc:
         _ = load_and_expand_imports(demand)
     assert "Type mismatch" in str(exc.value)
     assert exc.value.logical_path == "outputs"
@@ -199,7 +199,7 @@ sources: {{}}
 """.format(bad_path=bad_path).lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert excinfo.value.logical_path == "imports"
     msg = str(excinfo.value)
@@ -298,7 +298,7 @@ demo:
         encoding="utf-8",
     )
 
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     msg = str(excinfo.value)
     assert "YAML path escapes allowed roots" in msg
@@ -385,7 +385,7 @@ sources: {}
 
     monkeypatch.setattr(Path, "resolve", _resolve)
 
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "resolved='(unknown)'" in str(excinfo.value)
 
@@ -443,7 +443,7 @@ demo:
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "YAML path escapes allowed roots" in str(excinfo.value)
     assert "allowed_yaml_roots" in str(excinfo.value)
@@ -483,7 +483,7 @@ demo:
         encoding="utf-8",
     )
 
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "YAML path escapes allowed roots" in str(excinfo.value)
     assert str(secret.resolve(strict=False)) in str(excinfo.value)
@@ -523,7 +523,7 @@ $import: a
         encoding="utf-8",
     )
 
-    with pytest.raises(YamlImportExpansionError) as exc:
+    with pytest.raises(ScalimYamlImportExpansionError) as exc:
         _ = load_and_expand_imports(a)
     assert "cycle" in str(exc.value).lower()
 
@@ -545,7 +545,7 @@ $import: n
                 encoding="utf-8",
             )
 
-    with pytest.raises(YamlImportExpansionError) as exc:
+    with pytest.raises(ScalimYamlImportExpansionError) as exc:
         _ = load_and_expand_imports(tmp_path / "f0.yaml")
     assert "max depth" in str(exc.value).lower()
 
@@ -634,7 +634,7 @@ imports: []
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert excinfo.value.logical_path == "imports"
     assert "imports must be a mapping" in str(excinfo.value)
@@ -649,7 +649,7 @@ imports:
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert excinfo.value.logical_path == "imports"
     assert "imports alias must be a non-empty string" in str(excinfo.value)
@@ -664,7 +664,7 @@ imports:
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert excinfo.value.logical_path == "imports"
     assert "imports.common path must be a non-empty string" in str(excinfo.value)
@@ -679,7 +679,7 @@ imports:
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert excinfo.value.logical_path == "imports"
     assert ".yaml/.yml" in str(excinfo.value)
@@ -717,7 +717,7 @@ $import: "{bad_ref}"
 """.format(bad_ref=bad_ref).lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "Invalid $import ref" in str(excinfo.value)
 
@@ -731,7 +731,7 @@ $import: missing
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "Unknown $import alias" in str(excinfo.value)
 
@@ -748,7 +748,7 @@ $import: f.a.b
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "non-mapping" in str(excinfo.value)
 
@@ -765,7 +765,7 @@ $import: f.a.b
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "missing key" in str(excinfo.value)
 
@@ -782,7 +782,7 @@ $import: f.a
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "non-mapping" in str(excinfo.value)
 
@@ -836,7 +836,7 @@ $import: [a, b]
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "Type mismatch during import merge" in str(excinfo.value)
 
@@ -870,7 +870,7 @@ $import: f
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "YAML config must be a mapping" in str(excinfo.value)
 
@@ -904,7 +904,7 @@ demo:
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "$import must be a string or list of strings" in str(excinfo.value)
 
@@ -922,7 +922,7 @@ demo:
 """.lstrip(),
         encoding="utf-8",
     )
-    with pytest.raises(YamlImportExpansionError) as excinfo:
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
     assert "$import list entries must be strings" in str(excinfo.value)
 

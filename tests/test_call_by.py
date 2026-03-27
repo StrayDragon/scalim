@@ -1,11 +1,11 @@
 import pytest
 
 import scalim.dsl.by_yaml.config_parsing.call_by as call_by_module
-from scalim.dsl.by_yaml.config_parsing.call_by import CallByParseError, parse_call_by
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.call_by import ScalimCallByParseError, parse_call_by
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
 from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceFieldConfig
 from scalim.execution.context import BatchContext
@@ -33,39 +33,39 @@ def test_parse_call_by_dedupes_dependencies() -> None:
 
 
 def test_parse_call_by_rejects_illegal_ctx_attr() -> None:
-    with pytest.raises(CallByParseError, match="Invalid ctx attribute"):
+    with pytest.raises(ScalimCallByParseError, match="Invalid ctx attribute"):
         parse_call_by("tests.call_by_fns:echo($ctx.unknown)")
 
 
 def test_parse_call_by_rejects_non_string_and_empty() -> None:
-    with pytest.raises(CallByParseError, match="must be a string"):
+    with pytest.raises(ScalimCallByParseError, match="must be a string"):
         parse_call_by(None)  # type: ignore[arg-type]
-    with pytest.raises(CallByParseError, match="must not be empty"):
+    with pytest.raises(ScalimCallByParseError, match="must not be empty"):
         parse_call_by("   ")
 
 
 def test_parse_call_by_rejects_invalid_reference_and_split_errors() -> None:
-    with pytest.raises(CallByParseError, match="expected '<reference>\\(\\.\\.\\.\\)'"):
+    with pytest.raises(ScalimCallByParseError, match="expected '<reference>\\(\\.\\.\\.\\)'"):
         parse_call_by("tests.call_by_fns:echo")
-    with pytest.raises(CallByParseError, match="missing reference"):
+    with pytest.raises(ScalimCallByParseError, match="missing reference"):
         parse_call_by("(1)")
-    with pytest.raises(CallByParseError, match="unexpected trailing"):
+    with pytest.raises(ScalimCallByParseError, match="unexpected trailing"):
         parse_call_by("tests.call_by_fns:echo(1) trailing")
-    with pytest.raises(CallByParseError, match="`call_by` 引用 .* 非法"):
+    with pytest.raises(ScalimCallByParseError, match="`call_by` 引用 .* 非法"):
         parse_call_by("module:attr:extra(1)")
 
 
 def test_parse_call_by_rejects_invalid_args_syntax() -> None:
-    with pytest.raises(CallByParseError, match="arguments syntax"):
+    with pytest.raises(ScalimCallByParseError, match="arguments syntax"):
         parse_call_by("tests.call_by_fns:echo(a=)")
 
 
 def test_parse_call_by_rejects_unpacking_and_duplicate_kwargs() -> None:
-    with pytest.raises(CallByParseError, match="\\*' argument unpacking"):
+    with pytest.raises(ScalimCallByParseError, match="\\*' argument unpacking"):
         parse_call_by("tests.call_by_fns:echo(*a)")
-    with pytest.raises(CallByParseError, match="\\*\\*' keyword unpacking"):
+    with pytest.raises(ScalimCallByParseError, match="\\*\\*' keyword unpacking"):
         parse_call_by("tests.call_by_fns:echo(**a)")
-    with pytest.raises(CallByParseError, match="duplicate keyword argument"):
+    with pytest.raises(ScalimCallByParseError, match="duplicate keyword argument"):
         parse_call_by("tests.call_by_fns:echo(a=1, a=2)")
 
 
@@ -87,25 +87,25 @@ def test_parse_call_by_handles_strings_and_does_not_rewrite_inside_string() -> N
 
 
 def test_parse_call_by_rejects_placeholder_token() -> None:
-    with pytest.raises(CallByParseError, match="Illegal token"):
+    with pytest.raises(ScalimCallByParseError, match="Illegal token"):
         parse_call_by("tests.call_by_fns:echo(__scalim_ctx__)")
 
 
 def test_parse_call_by_rejects_attribute_access_and_unsupported_exprs_and_literals() -> None:
-    with pytest.raises(CallByParseError, match="attribute access"):
+    with pytest.raises(ScalimCallByParseError, match="attribute access"):
         parse_call_by("tests.call_by_fns:echo(a.b)")
-    with pytest.raises(CallByParseError, match="Unsupported call_by argument type"):
+    with pytest.raises(ScalimCallByParseError, match="Unsupported call_by argument type"):
         parse_call_by("tests.call_by_fns:echo(a + b)")
-    with pytest.raises(CallByParseError, match="Unsupported literal type"):
+    with pytest.raises(ScalimCallByParseError, match="Unsupported literal type"):
         parse_call_by("tests.call_by_fns:echo(b'hi')")
     parsed = parse_call_by("tests.call_by_fns:echo(-1)")
     assert parsed.args[0].kind == "literal"
     assert parsed.args[0].value == -1
     parsed = parse_call_by("tests.call_by_fns:echo(+1)")
     assert parsed.args[0].value == 1
-    with pytest.raises(CallByParseError, match="Unary \\+/-"):
+    with pytest.raises(ScalimCallByParseError, match="Unary \\+/-"):
         parse_call_by("tests.call_by_fns:echo(-True)")
-    with pytest.raises(CallByParseError, match="Only simple Python literals"):
+    with pytest.raises(ScalimCallByParseError, match="Only simple Python literals"):
         parse_call_by("tests.call_by_fns:echo([1])")
 
 
@@ -148,7 +148,7 @@ def test_validator_rejects_call_by_in_source_fields() -> None:
     config = _base_validator_config()
     config["main_source"]["fields"]["bad"] = {"extract": "x", "call_by": "tests.call_by_fns:echo(a)"}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("must not declare call_by" in msg for msg in exc.value.errors)
@@ -165,7 +165,7 @@ def test_validator_rejects_call_by_in_sources_fields() -> None:
         }
     }
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("must not declare call_by" in msg for msg in exc.value.errors)
@@ -176,7 +176,7 @@ def test_validator_rejects_call_by_syntax_error() -> None:
     config = _base_validator_config()
     config["fields"]["text"] = {"call_by": "tests.call_by_fns:echo("}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("invalid call_by" in msg for msg in exc.value.errors)
@@ -187,7 +187,7 @@ def test_validator_rejects_call_by_non_python_literal() -> None:
     config = _base_validator_config()
     config["fields"]["text"] = {"call_by": "tests.call_by_fns:echo(true)"}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("Invalid literal 'true'" in msg for msg in exc.value.errors)
@@ -198,7 +198,7 @@ def test_validator_rejects_call_by_depends_on_mismatch() -> None:
     config = _base_validator_config()
     config["fields"]["sum"] = {"call_by": "tests.call_by_fns:add(a, b=b)", "depends_on": ["a"]}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("does not allow 'depends_on'" in msg for msg in exc.value.errors)
@@ -209,7 +209,7 @@ def test_validator_rejects_constant_call_by_without_depends_on() -> None:
     config = _base_validator_config()
     config["fields"]["const"] = {"call_by": "tests.call_by_fns:echo(1, $ctx.row_id)"}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("call_by has no field dependencies" in msg for msg in exc.value.errors)
@@ -220,7 +220,7 @@ def test_validator_rejects_call_by_and_compute_both_present() -> None:
     config = _base_validator_config()
     config["fields"]["bad"] = {"compute": "a", "call_by": "tests.call_by_fns:echo(a)"}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("must not declare both" in msg for msg in exc.value.errors)
@@ -232,7 +232,7 @@ def test_validator_rejects_call_by_type_and_empty() -> None:
     config["fields"]["bad_type"] = {"call_by": 1}
     config["fields"]["bad_empty"] = {"call_by": ""}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("call_by must be a string" in msg for msg in exc.value.errors)
@@ -244,7 +244,7 @@ def test_validator_rejects_call_by_depends_on_empty_list() -> None:
     config = _base_validator_config()
     config["fields"]["bad"] = {"call_by": "tests.call_by_fns:echo(a)", "depends_on": []}
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     assert any("does not allow 'depends_on'" in msg for msg in exc.value.errors)
@@ -283,7 +283,7 @@ def test_converter_rejects_unknown_call_by_reference() -> None:
         resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.call_by_fns"])),
     )
 
-    with pytest.raises(ConversionError, match="failed to resolve call_by reference"):
+    with pytest.raises(ScalimConversionError, match="failed to resolve call_by reference"):
         converter.convert(config)
 
 
@@ -322,7 +322,7 @@ def test_converter_rejects_missing_compute_and_call_by() -> None:
         resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.call_by_fns"])),
     )
 
-    with pytest.raises(ConversionError, match="must declare"):
+    with pytest.raises(ScalimConversionError, match="must declare"):
         converter.convert(config)
 
 
@@ -346,7 +346,7 @@ def test_converter_call_by_parse_error_and_literal_and_ctx_attr_and_missing_ctx(
             },
         }
     )
-    with pytest.raises(ConversionError, match="invalid call_by"):
+    with pytest.raises(ScalimConversionError, match="invalid call_by"):
         converter.convert(bad)
 
     literal_cfg = DemandConfig(

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import RunOverrides, run_workflow
-from scalim.dsl.by_yaml.workflow import WorkflowConfigError
+from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -150,7 +150,7 @@ def test_workflow_viz_bundle_rejects_explicit_paths(tmp_path: Path) -> None:
     _ = _write_minimal_demand_yaml(tmp_path, file_name="ok.yaml", name="ok")
     wf = _write_workflow_yaml(tmp_path, file_name="wf.yaml", demand_ok="ok.yaml", demand_missing="ok.yaml")
 
-    with pytest.raises(WorkflowConfigError) as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = run_workflow(
             str(wf),
             allowed_modules=_ALLOWED_MODULES,
@@ -164,7 +164,7 @@ def test_workflow_viz_bundle_requires_output_dir_or_default(tmp_path: Path) -> N
     _ = _write_minimal_demand_yaml(tmp_path, file_name="ok.yaml", name="ok")
     wf = _write_workflow_yaml(tmp_path, file_name="wf.yaml", demand_ok="ok.yaml", demand_missing="ok.yaml")
 
-    with pytest.raises(WorkflowConfigError) as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = run_workflow(
             str(wf),
             allowed_modules=_ALLOWED_MODULES,

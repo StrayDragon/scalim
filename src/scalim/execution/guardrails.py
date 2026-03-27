@@ -8,7 +8,7 @@ from ..vendor.dataclassesx import field as dataclass_field
 GuardrailMode = Literal["quiet", "fast_fail"]
 
 
-class GuardrailViolationError(ScalimExecutionException):
+class ScalimGuardrailViolationError(ScalimExecutionException):
     """当运行时防护触发时抛出(或记录)的异常."""
 
     code: str

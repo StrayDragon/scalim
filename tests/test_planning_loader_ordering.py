@@ -7,7 +7,7 @@ from scalim.planning.loader_ordering.sorting import REF_LOADER_ORDERING_DEGRADED
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import FieldIr
 from scalim.spec.ir.relations import LookupStepIr
-from scalim.utils.graph import CyclicDependencyError
+from scalim.utils.graph import ScalimCyclicDependencyError
 
 from .fixtures.planning_fixtures import make_main_source, make_source
 
@@ -21,7 +21,7 @@ def test_sort_ref_loaders_cycle_detected() -> None:
         (source_b, [("field_b", "field_a")]),
     ]
 
-    with pytest.raises(CyclicDependencyError):
+    with pytest.raises(ScalimCyclicDependencyError):
         sort_ref_loaders(ref_loaders)
 
 

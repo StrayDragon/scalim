@@ -1,10 +1,10 @@
 from typing import Any, Dict, List, Tuple
 
 from ....schema_dsl.constants import FIELD_KIND_DERIVED, FIELD_KIND_SOURCE
-from ...call_by import CallByParseError, extract_call_by_dependencies, parse_call_by
+from ...call_by import ScalimCallByParseError, extract_call_by_dependencies, parse_call_by
 from ...models import AliasIndex, FieldDef, RawDemand
 from ...parsers.utils import mapping_or_none
-from ...security import ComputeExpressionError, SecurityError, extract_compute_dependencies, is_constant_compute_expression
+from ...security import ScalimComputeExpressionError, ScalimSecurityError, extract_compute_dependencies, is_constant_compute_expression
 from ..base import ValidatorFieldBaseMixin
 from ..constants import F
 from ..issues import ValidationIssue
@@ -142,7 +142,7 @@ class ValidatorFieldDerivedMixin(ValidatorFieldBaseMixin):
 
         try:
             parsed = parse_call_by(call_by_val)
-        except CallByParseError as exc:
+        except ScalimCallByParseError as exc:
             self._add_error(
                 errors,
                 "Derived field '{}' has invalid call_by: {}".format(field_id, exc),
@@ -174,7 +174,7 @@ class ValidatorFieldDerivedMixin(ValidatorFieldBaseMixin):
         dependencies = tuple(extract_compute_dependencies(compute_expr))
         try:
             _ = self._require_compute_engine().compile(compute_expr, dependencies)
-        except (SecurityError, ComputeExpressionError) as exc:
+        except (ScalimSecurityError, ScalimComputeExpressionError) as exc:
             self._add_error(
                 errors,
                 "Derived field '{}' has invalid compute expression: {}".format(field_id, exc),

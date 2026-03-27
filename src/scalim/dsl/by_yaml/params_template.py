@@ -16,11 +16,11 @@ _DIRECTIVE_KEYS = "$keys"
 _DIRECTIVE_ROWS = "$rows"
 
 
-class ParamsTemplateError(ScalimYamlException):
+class ScalimParamsTemplateError(ScalimYamlException):
     """`params` 模板编译/渲染相关异常基类."""
 
 
-class ParamsTemplateCompileError(ParamsTemplateError):
+class ScalimParamsTemplateCompileError(ScalimParamsTemplateError):
     message: str
     path: str
 
@@ -34,7 +34,7 @@ class ParamsTemplateCompileError(ParamsTemplateError):
         return "{} (path={})".format(self.message, self.path)
 
 
-class ParamsTemplateRenderError(ParamsTemplateError):
+class ScalimParamsTemplateRenderError(ScalimParamsTemplateError):
     message: str
     path: str
 
@@ -146,7 +146,7 @@ class KeysDirectiveNode(_NodeBase):
     def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
         if not ctx.is_ref_loader or ctx.lookup_keys is None:
             msg = "`$keys` is only valid in ref loader call contexts"
-            raise ParamsTemplateRenderError(msg, path=path)
+            raise ScalimParamsTemplateRenderError(msg, path=path)
 
         if self.as_ == "list":
             if ctx.lookup_keys_list is not None:
@@ -165,7 +165,7 @@ class RowsDirectiveNode(_NodeBase):
     def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
         if not ctx.is_ref_loader or ctx.batch_rows is None:
             msg = "`$rows` is only valid in ref loader call contexts"
-            raise ParamsTemplateRenderError(msg, path=path)
+            raise ScalimParamsTemplateRenderError(msg, path=path)
         return ctx.batch_rows
 
 
@@ -177,7 +177,7 @@ class RuntimeDirectiveNode(_NodeBase):
     def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
         _ = (ctx, path)
         msg = "`$init_var` directive must be resolved at compile time; provide init_vars when compiling the params template"
-        raise ParamsTemplateRenderError(msg, path=path)
+        raise ScalimParamsTemplateRenderError(msg, path=path)
 
 
 Node = Union[LiteralNode, MappingNode, ListNode, RuntimeDirectiveNode, KeysDirectiveNode, RowsDirectiveNode]
@@ -201,13 +201,13 @@ class CompiledParamsTemplate:
             return {}
         if not _is_dict(rendered):
             msg = "params template must render to a mapping"
-            raise ParamsTemplateRenderError(msg, path=path)
+            raise ScalimParamsTemplateRenderError(msg, path=path)
 
         typed: LoaderCallKwargs = {}
         for key, value in rendered.items():
             if not isinstance(key, str):
                 msg = "params template mapping keys must be strings"
-                raise ParamsTemplateRenderError(msg, path=_path_child(path, key))
+                raise ScalimParamsTemplateRenderError(msg, path=_path_child(path, key))
             typed[key] = value
         return typed
 
@@ -231,26 +231,26 @@ class _CompileState:
     def seen_keys(self, as_: str, *, path: str) -> None:
         if self.directive_mode == "rows":
             msg = "`$keys` and `$rows` are mutually exclusive"
-            raise ParamsTemplateCompileError(msg, path=path)
+            raise ScalimParamsTemplateCompileError(msg, path=path)
         if self.directive_mode == "none":
             self.directive_mode = "keys"
             self.keys_as = as_
             return
         if self.keys_as != as_:
             msg = "Conflicting `$keys.as` options in the same template"
-            raise ParamsTemplateCompileError(msg, path=path)
+            raise ScalimParamsTemplateCompileError(msg, path=path)
 
     def seen_rows(self, cache_mode: str, *, path: str) -> None:
         if self.directive_mode == "keys":
             msg = "`$keys` and `$rows` are mutually exclusive"
-            raise ParamsTemplateCompileError(msg, path=path)
+            raise ScalimParamsTemplateCompileError(msg, path=path)
         if self.directive_mode == "none":
             self.directive_mode = "rows"
             self.rows_cache_mode = cache_mode
             return
         if self.rows_cache_mode != cache_mode:
             msg = "Conflicting `$rows.cache_mode` options in the same template"
-            raise ParamsTemplateCompileError(msg, path=path)
+            raise ScalimParamsTemplateCompileError(msg, path=path)
 
 
 def _maybe_compile_runtime_literal(
@@ -266,15 +266,15 @@ def _maybe_compile_runtime_literal(
     var_name = node_value[len(_RUNTIME_PREFIX) :]
     if not var_name:
         msg = "Legacy `$runtime.<name>` placeholder is not supported; use `{$init_var: <name>}`"
-        raise ParamsTemplateCompileError(msg, path=node_path)
+        raise ScalimParamsTemplateCompileError(msg, path=node_path)
     if not _RUNTIME_VAR_RE.match(var_name):
         msg = "Legacy `$runtime.<name>` placeholder is not supported; invalid init var name '{}' (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(
             var_name
         )
-        raise ParamsTemplateCompileError(msg, path=node_path)
+        raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
     msg = "Legacy `$runtime.{}` placeholder is not supported; use `{{$init_var: {}}}`".format(var_name, var_name)
-    raise ParamsTemplateCompileError(msg, path=node_path)
+    raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
 
 def _compile_legacy_runtime_directive_node(
@@ -285,10 +285,10 @@ def _compile_legacy_runtime_directive_node(
     var_name_raw = mapping_dict.get(_DIRECTIVE_RUNTIME)
     if isinstance(var_name_raw, str) and var_name_raw and _RUNTIME_VAR_RE.match(var_name_raw):
         msg = "Legacy `{{$runtime: {}}}` directive is not supported; migrate to `{{$init_var: {}}}`".format(var_name_raw, var_name_raw)
-        raise ParamsTemplateCompileError(msg, path=node_path)
+        raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
     msg = "Legacy `{$runtime: <name>}` directive is not supported; migrate to `{$init_var: <name>}`"
-    raise ParamsTemplateCompileError(msg, path=node_path)
+    raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
 
 def _compile_runtime_directive_node(
@@ -301,15 +301,15 @@ def _compile_runtime_directive_node(
     var_name_raw = mapping_dict.get(_DIRECTIVE_INIT_VAR)
     if not isinstance(var_name_raw, str) or not var_name_raw:
         msg = "`$init_var` value must be a non-empty string"
-        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
     if not _RUNTIME_VAR_RE.match(var_name_raw):
         msg = "`$init_var` value '{}' is invalid (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(var_name_raw)
-        raise ParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
 
     if resolve_runtime:
         if opts.init_vars is None or var_name_raw not in opts.init_vars:
             msg = "Missing init var: {}".format(var_name_raw)
-            raise ParamsTemplateCompileError(msg, path=node_path)
+            raise ScalimParamsTemplateCompileError(msg, path=node_path)
         return LiteralNode(opts.init_vars[var_name_raw])
 
     return RuntimeDirectiveNode(name=var_name_raw)
@@ -324,7 +324,7 @@ def _compile_keys_directive_node(
 ) -> Node:
     if not opts.allow_keys:
         msg = "`$keys` is not allowed in this context"
-        raise ParamsTemplateCompileError(msg, path=node_path)
+        raise ScalimParamsTemplateCompileError(msg, path=node_path)
     options_raw = mapping_dict.get(_DIRECTIVE_KEYS)
     as_mode = _parse_keys_options(options_raw, path=_path_child(node_path, _DIRECTIVE_KEYS))
     state.seen_keys(as_mode, path=node_path)
@@ -340,7 +340,7 @@ def _compile_rows_directive_node(
 ) -> Node:
     if not opts.allow_rows:
         msg = "`$rows` is not allowed in this context"
-        raise ParamsTemplateCompileError(msg, path=node_path)
+        raise ScalimParamsTemplateCompileError(msg, path=node_path)
     options_raw = mapping_dict.get(_DIRECTIVE_ROWS)
     cache_mode = _parse_rows_options(options_raw, path=_path_child(node_path, _DIRECTIVE_ROWS))
     state.seen_rows(cache_mode, path=node_path)
@@ -371,7 +371,7 @@ def _maybe_compile_directive_node(
         msg = "Directive node must be a single-key mapping: `{}`, `{}` or `{}`".format(
             _DIRECTIVE_INIT_VAR, _DIRECTIVE_KEYS, _DIRECTIVE_ROWS
         )
-        raise ParamsTemplateCompileError(msg, path=node_path)
+        raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
     if directive_key == _DIRECTIVE_RUNTIME:
         return _compile_legacy_runtime_directive_node(mapping_dict, node_path=node_path)
@@ -503,21 +503,21 @@ def _parse_keys_options(options_raw: object, *, path: str) -> str:
         return "set"
     if not _is_dict(options_raw):
         msg = "`$keys` options must be a mapping or null"
-        raise ParamsTemplateCompileError(msg, path=path)
+        raise ScalimParamsTemplateCompileError(msg, path=path)
     options = options_raw
     for k in options:
         if str(k) != "as":
             msg = "Unknown `$keys` option: {}".format(str(k))
-            raise ParamsTemplateCompileError(msg, path=_path_child(path, k))
+            raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, k))
     raw_as = options.get("as")
     if raw_as is None:
         return "set"
     if not isinstance(raw_as, str):
         msg = "`$keys.as` must be a string"
-        raise ParamsTemplateCompileError(msg, path=_path_child(path, "as"))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "as"))
     if raw_as not in {"set", "list"}:
         msg = "`$keys.as` must be one of: set, list"
-        raise ParamsTemplateCompileError(msg, path=_path_child(path, "as"))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "as"))
     return raw_as
 
 
@@ -526,28 +526,28 @@ def _parse_rows_options(options_raw: object, *, path: str) -> str:
         return "batch"
     if not _is_dict(options_raw):
         msg = "`$rows` options must be a mapping or null"
-        raise ParamsTemplateCompileError(msg, path=path)
+        raise ScalimParamsTemplateCompileError(msg, path=path)
     options = options_raw
     for k in options:
         if str(k) != "cache_mode":
             msg = "Unknown `$rows` option: {}".format(str(k))
-            raise ParamsTemplateCompileError(msg, path=_path_child(path, k))
+            raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, k))
     raw_cache = options.get("cache_mode")
     if raw_cache is None:
         return "batch"
     if not isinstance(raw_cache, str):
         msg = "`$rows.cache_mode` must be a string"
-        raise ParamsTemplateCompileError(msg, path=_path_child(path, "cache_mode"))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "cache_mode"))
     if raw_cache not in {"batch", "none"}:
         msg = "`$rows.cache_mode` must be one of: batch, none"
-        raise ParamsTemplateCompileError(msg, path=_path_child(path, "cache_mode"))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "cache_mode"))
     return raw_cache
 
 
 __all__ = [
     "CompiledParamsTemplate",
-    "ParamsTemplateCompileError",
-    "ParamsTemplateError",
-    "ParamsTemplateRenderError",
+    "ScalimParamsTemplateCompileError",
+    "ScalimParamsTemplateError",
+    "ScalimParamsTemplateRenderError",
     "compile_params_template",
 ]

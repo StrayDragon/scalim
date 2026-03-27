@@ -172,7 +172,7 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 - `stage_compile_demand_ir`
 - `stage_build_execution_request`
 - `YamlDslStageContext`
-- `StageAllowlistMismatchError`
+- `ScalimStageAllowlistMismatchError`
 
 旧命名(例如 `run_yaml`、`parse_yaml_dsl`、`run_stage_*`、`types`、`inspect`)MUST NOT 再作为公开 API 提供.
 

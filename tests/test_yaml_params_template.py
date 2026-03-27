@@ -1,11 +1,11 @@
 import pytest
 
 import scalim.dsl.by_yaml.params_template as params_tmpl
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, MainSourceConfig, SourceConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
@@ -17,7 +17,7 @@ def test_validator_rejects_params_non_mapping() -> None:
         "main_source": {"source_id": "orders", "loader": "tests.conftest.mock_loader", "fields": {"order_id": {"extract": "order_id"}}},
         "sources": {"s1": {"loader": "tests.conftest.mock_loader", "key": "id", "params": []}},
     }
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         ConfigValidator().validate(config)
     assert any("sources.s1.params" in msg and "must be a dictionary" in msg for msg in exc.value.errors)
 
@@ -46,7 +46,7 @@ def test_params_template_runtime_deepcopy_is_alias_safe_and_path_can_be_empty() 
 
 
 def test_params_template_missing_init_var_has_path_and_str() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError) as exc:
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError) as exc:
         params_tmpl.compile_params_template({"x": {"$init_var": "missing"}}, path="root", init_vars={})
     assert exc.value.path == "root.x"
     assert "Missing init var" in str(exc.value)
@@ -70,12 +70,12 @@ def test_params_template_runtime_directive_render_raises_error_when_not_resolved
         resolve_runtime=False,
     )
 
-    with pytest.raises(params_tmpl.ParamsTemplateRenderError, match="must be resolved at compile time"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateRenderError, match="must be resolved at compile time"):
         template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
 
 
 def test_params_template_invalid_runtime_placeholder_is_literal_string() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Legacy `\\$runtime\\.<name>` placeholder is not supported"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="Legacy `\\$runtime\\.<name>` placeholder is not supported"):
         _ = params_tmpl.compile_params_template(
             {"sql": "$runtime.bad-name"},
             path="p",
@@ -84,7 +84,7 @@ def test_params_template_invalid_runtime_placeholder_is_literal_string() -> None
 
 
 def test_params_template_legacy_runtime_placeholder_missing_name_is_rejected() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Legacy `\\$runtime\\.<name>` placeholder is not supported"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="Legacy `\\$runtime\\.<name>` placeholder is not supported"):
         _ = params_tmpl.compile_params_template(
             {"sql": "$runtime."},
             path="p",
@@ -94,7 +94,7 @@ def test_params_template_legacy_runtime_placeholder_missing_name_is_rejected() -
 
 def test_params_template_legacy_runtime_placeholder_valid_name_is_rejected() -> None:
     with pytest.raises(
-        params_tmpl.ParamsTemplateCompileError,
+        params_tmpl.ScalimParamsTemplateCompileError,
         match="Legacy `\\$runtime\\.end_dt` placeholder is not supported",
     ):
         _ = params_tmpl.compile_params_template(
@@ -105,7 +105,7 @@ def test_params_template_legacy_runtime_placeholder_valid_name_is_rejected() -> 
 
 
 def test_params_template_init_var_directive_value_must_be_non_empty_string() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$init_var` value must be a non-empty string"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$init_var` value must be a non-empty string"):
         _ = params_tmpl.compile_params_template(
             {"end_dt": {"$init_var": None}},
             path="p",
@@ -114,7 +114,7 @@ def test_params_template_init_var_directive_value_must_be_non_empty_string() -> 
 
 
 def test_params_template_init_var_directive_value_rejects_invalid_name() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$init_var` value 'bad-name' is invalid"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$init_var` value 'bad-name' is invalid"):
         _ = params_tmpl.compile_params_template(
             {"end_dt": {"$init_var": "bad-name"}},
             path="p",
@@ -134,7 +134,7 @@ def test_params_template_reserved_keys_inside_init_vars_are_treated_as_literal_v
 
 
 def test_params_template_missing_init_var_reports_nested_path() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError) as exc:
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError) as exc:
         params_tmpl.compile_params_template(
             {"params": {"end_dt": {"$init_var": "end_dt"}}},
             path="sources.foo.params",
@@ -169,52 +169,52 @@ def test_params_template_keys_composite_key_injects_tuple_elements() -> None:
 
 
 def test_params_template_compile_validates_options_and_conflicts() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="mutually exclusive"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="mutually exclusive"):
         params_tmpl.compile_params_template({"a": {"$keys": None}, "b": {"$rows": None}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="mutually exclusive"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="mutually exclusive"):
         params_tmpl.compile_params_template({"a": {"$rows": None}, "b": {"$keys": None}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Conflicting `\\$keys\\.as`"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="Conflicting `\\$keys\\.as`"):
         params_tmpl.compile_params_template({"a": {"$keys": {"as": "set"}}, "b": {"$keys": {"as": "list"}}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Conflicting `\\$rows\\.cache_mode`"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="Conflicting `\\$rows\\.cache_mode`"):
         params_tmpl.compile_params_template(
             {"a": {"$rows": {"cache_mode": "batch"}}, "b": {"$rows": {"cache_mode": "none"}}},
             path="p",
         )
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$keys` is not allowed"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$keys` is not allowed"):
         params_tmpl.compile_params_template({"ids": {"$keys": None}}, path="p", allow_keys=False)
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$rows` is not allowed"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$rows` is not allowed"):
         params_tmpl.compile_params_template({"rows": {"$rows": None}}, path="p", allow_rows=False)
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Directive node must be a single-key mapping"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="Directive node must be a single-key mapping"):
         params_tmpl.compile_params_template({"ids": {"$keys": {"as": "set"}, "other": 1}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$keys` options must be a mapping"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$keys` options must be a mapping"):
         params_tmpl.compile_params_template({"ids": {"$keys": 1}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Unknown `\\$keys` option"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="Unknown `\\$keys` option"):
         params_tmpl.compile_params_template({"ids": {"$keys": {"bad": 1}}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$keys\\.as` must be a string"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$keys\\.as` must be a string"):
         params_tmpl.compile_params_template({"ids": {"$keys": {"as": 1}}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$keys\\.as` must be one of"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$keys\\.as` must be one of"):
         params_tmpl.compile_params_template({"ids": {"$keys": {"as": "bad"}}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$rows` options must be a mapping"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$rows` options must be a mapping"):
         params_tmpl.compile_params_template({"rows": {"$rows": 1}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="Unknown `\\$rows` option"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="Unknown `\\$rows` option"):
         params_tmpl.compile_params_template({"rows": {"$rows": {"bad": 1}}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$rows\\.cache_mode` must be a string"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$rows\\.cache_mode` must be a string"):
         params_tmpl.compile_params_template({"rows": {"$rows": {"cache_mode": 1}}}, path="p")
 
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError, match="`\\$rows\\.cache_mode` must be one of"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError, match="`\\$rows\\.cache_mode` must be one of"):
         params_tmpl.compile_params_template({"rows": {"$rows": {"cache_mode": "bad"}}}, path="p")
 
 
@@ -245,11 +245,11 @@ def test_params_template_render_keys_and_rows_and_errors() -> None:
     out4b = rows_template2.render_kwargs(LoaderCallContextIr(is_ref_loader=True, batch_rows=[{"x": 1}]), path="p")
     assert out4b["rows"] == [{"x": 1}]
 
-    with pytest.raises(params_tmpl.ParamsTemplateRenderError) as exc:
+    with pytest.raises(params_tmpl.ScalimParamsTemplateRenderError) as exc:
         _ = keys_list_template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
     assert "`$keys`" in str(exc.value)
 
-    with pytest.raises(params_tmpl.ParamsTemplateRenderError) as exc:
+    with pytest.raises(params_tmpl.ScalimParamsTemplateRenderError) as exc:
         _ = rows_template.render_kwargs(LoaderCallContextIr(is_ref_loader=True), path="p")
     assert "`$rows`" in str(exc.value)
 
@@ -261,13 +261,13 @@ def test_params_template_render_kwargs_requires_mapping_and_allows_none() -> Non
 
     template_scalar = params_tmpl.compile_params_template(1, path="p")
     assert template_scalar.is_empty_mapping() is False
-    with pytest.raises(params_tmpl.ParamsTemplateRenderError, match="must render to a mapping"):
+    with pytest.raises(params_tmpl.ScalimParamsTemplateRenderError, match="must render to a mapping"):
         _ = template_scalar.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
 
 
 def test_params_template_render_kwargs_rejects_non_string_keys() -> None:
     template = params_tmpl.compile_params_template({1: "x"}, path="p")
-    with pytest.raises(params_tmpl.ParamsTemplateRenderError, match="mapping keys must be strings") as exc:
+    with pytest.raises(params_tmpl.ScalimParamsTemplateRenderError, match="mapping keys must be strings") as exc:
         _ = template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
     assert exc.value.path == "p.1"
 
@@ -290,7 +290,7 @@ def test_converter_rejects_disallowed_directives_and_reports_template_errors() -
             )
         },
     )
-    with pytest.raises(ConversionError, match="`\\$keys` is not allowed"):
+    with pytest.raises(ScalimConversionError, match="`\\$keys` is not allowed"):
         ConfigToIRConverter(resolver=resolver).convert(config)
 
     config3 = DemandConfig(
@@ -305,12 +305,12 @@ def test_converter_rejects_disallowed_directives_and_reports_template_errors() -
             )
         },
     )
-    with pytest.raises(ConversionError, match="Missing init var"):
+    with pytest.raises(ScalimConversionError, match="Missing init var"):
         ConfigToIRConverter(resolver=resolver).convert(config3)
 
 
 def test_params_template_legacy_runtime_directive_is_rejected_with_migration_hint_and_path() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError) as exc:
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError) as exc:
         params_tmpl.compile_params_template(
             {"x": {"$runtime": "end_dt"}},
             path="root",
@@ -322,7 +322,7 @@ def test_params_template_legacy_runtime_directive_is_rejected_with_migration_hin
 
 
 def test_params_template_legacy_runtime_directive_invalid_value_is_rejected() -> None:
-    with pytest.raises(params_tmpl.ParamsTemplateCompileError) as exc:
+    with pytest.raises(params_tmpl.ScalimParamsTemplateCompileError) as exc:
         params_tmpl.compile_params_template(
             {"x": {"$runtime": None}},
             path="root",

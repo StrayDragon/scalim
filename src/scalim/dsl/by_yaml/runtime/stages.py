@@ -29,11 +29,11 @@ def stage_validate_allowlist(*, allowed_modules: FrozenSet[str], allowed_functio
     validate_allowlist(allowed_modules=allowed_modules, allowed_functions=allowed_functions)
 
 
-class StageAllowlistMismatchError(ScalimYamlException):
+class ScalimStageAllowlistMismatchError(ScalimYamlException):
     MESSAGE: str = "Stage context allowlist must match RunOptions allowlist"
 
     def __init__(self) -> None:
-        super(StageAllowlistMismatchError, self).__init__(self.MESSAGE)
+        super(ScalimStageAllowlistMismatchError, self).__init__(self.MESSAGE)
 
 
 @dataclass(frozen=True)
@@ -72,12 +72,12 @@ def stage_build_execution_request(
     context: YamlDslStageContext,
 ) -> ExecutionRequest:
     if options.allowed_modules != context.allowed_modules or options.allowed_functions != context.allowed_functions:
-        raise StageAllowlistMismatchError
+        raise ScalimStageAllowlistMismatchError
     return build_request(config, demand_ir, options=options, resolver=context.resolver)
 
 
 __all__ = [
-    "StageAllowlistMismatchError",
+    "ScalimStageAllowlistMismatchError",
     "YamlDslStageContext",
     "stage_build_execution_request",
     "stage_compile_demand_ir",

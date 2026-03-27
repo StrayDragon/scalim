@@ -4,7 +4,7 @@ from scalim.dsl.by_yaml.config_parsing.call_by import parse_call_by
 from scalim.dsl.by_yaml.reference_syntax import is_valid_callable_reference
 from scalim.dsl.by_yaml.runtime.builtin_callables import is_builtin_callable_reference, list_builtin_callable_ids, parse_builtin_callable_id
 from scalim.dsl.by_yaml.runtime.compiler import create_reference_resolver
-from scalim.dsl.by_yaml.runtime.errors import ResolverError
+from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
 from scalim.workflow.loaders import sheetbook_sheet_rows
 from tests.call_by_fns import echo
@@ -32,11 +32,11 @@ def test_parse_call_by_accepts_builtin_reference() -> None:
 
 
 def test_parse_builtin_callable_id_errors() -> None:
-    with pytest.raises(ResolverError, match="Not a builtin callable reference"):
+    with pytest.raises(ScalimResolverError, match="Not a builtin callable reference"):
         parse_builtin_callable_id("tests.call_by_fns:echo")
-    with pytest.raises(ResolverError, match="missing <id>"):
+    with pytest.raises(ScalimResolverError, match="missing <id>"):
         parse_builtin_callable_id("^")
-    with pytest.raises(ResolverError, match="Invalid builtin callable id"):
+    with pytest.raises(ScalimResolverError, match="Invalid builtin callable id"):
         parse_builtin_callable_id("^bad-id")
 
 
@@ -54,7 +54,7 @@ def test_resolver_builtin_cache_eviction_smoke() -> None:
 
 def test_resolver_unknown_builtin_id_fails_fast() -> None:
     resolver = SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.call_by_fns"]))
-    with pytest.raises(ResolverError, match=r"Unknown builtin callable id"):
+    with pytest.raises(ScalimResolverError, match=r"Unknown builtin callable id"):
         resolver.resolve("^unknown/id")
 
 

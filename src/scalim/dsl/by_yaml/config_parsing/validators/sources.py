@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Set
 
-from ...params_template import ParamsTemplateCompileError, compile_params_template
+from ...params_template import ScalimParamsTemplateCompileError, compile_params_template
 from ...reference_syntax import REFERENCE_FORMAT_EXAMPLES, is_valid_callable_reference
 from ...schema_dsl.constants import (
     DEFAULT_CACHE_MODE,
@@ -11,7 +11,7 @@ from ...schema_dsl.constants import (
     NORMALIZE_ON_MISSING_ENUM,
 )
 from ...schema_dsl.models import LOADER_RETRY_KEYS
-from ..field_extract import FieldExtractCompileError, compile_field_extract, derive_source_field_data_key
+from ..field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
 from ..parsers.utils import list_or_none, mapping_or_none
 from .base import ValidatorMixinBase
 from .constants import LEGACY_FIELDS, F
@@ -95,7 +95,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 allow_keys=allow_directives,
                 allow_rows=allow_directives,
             )
-        except ParamsTemplateCompileError as exc:
+        except ScalimParamsTemplateCompileError as exc:
             self._add_error(errors, exc.message, path=exc.path)
 
     def _collect_declared_field_names(self, fields_raw: object) -> Set[str]:
@@ -860,7 +860,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
         try:
             _ = compile_field_extract(extract_expr)
-        except FieldExtractCompileError as exc:
+        except ScalimFieldExtractCompileError as exc:
             self._add_error(errors, "Invalid extract path: {}".format(str(exc)), path="{}.extract".format(rule_path))
 
     def _is_valid_loader_ref(self, loader_ref: str) -> bool:

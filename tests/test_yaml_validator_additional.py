@@ -49,7 +49,7 @@ def _ambiguous_sources_config() -> dict:
 def _assert_validation_errors(config: dict, *expected_messages: str) -> None:
     validator = validator_module.ConfigValidator()
 
-    with pytest.raises(validator_module.ConfigValidationError) as exc:
+    with pytest.raises(validator_module.ScalimConfigValidationError) as exc:
         validator.validate(config)
 
     errors = exc.value.errors

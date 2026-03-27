@@ -13,17 +13,17 @@ from ...execution.run_ir import ExecutionResult
 from ...typedefs import KeyNormalizationMode, ParallelMode
 from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import replace
-from ...workflow.errors import WorkflowConfigError as WorkflowRuntimeConfigError
-from ...workflow.execute import WorkflowRunFailedError
+from ...workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
+from ...workflow.execute import ScalimWorkflowRunFailedError
 from ...workflow.execute import run_workflow_ir as _run_workflow_ir
 from ...workflow.report import WorkflowResult
 from ._public_template_sandbox import validate_public_template_sandbox
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import RunOptions, RunOverrides, RunResult, UnsetType
-from .runtime.output_composition_yaml import PathlessCsvOutputError
+from .runtime.output_composition_yaml import ScalimPathlessCsvOutputError
 from .runtime.output_path_resolve import resolve_output_container_path
 from .schema_dsl.models import DemandConfig
-from .workflow import WorkflowConfigError
+from .workflow import ScalimWorkflowConfigError
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
 from .workflow_load import load_workflow_config_from_path
 
@@ -53,14 +53,14 @@ def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Option
     bundle_viz_base_config: "VizObserverConfig" = viz_config
     if getattr(bundle_viz_base_config, "has_explicit_paths", lambda: False)():  # pragma: allow-dynattr optional-interface: viz_config
         msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`(请勿设置 `output_path`/`snapshot_path`/`trace_path`)."
-        raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+        raise ScalimWorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
     output_dir = getattr(bundle_viz_base_config, "output_dir", None)  # pragma: allow-dynattr optional-interface: viz_config
     use_default_output_dir = bool(
         getattr(bundle_viz_base_config, "use_default_output_dir", False)  # pragma: allow-dynattr optional-interface: viz_config
     )
     if not output_dir and not use_default_output_dir:
         msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`, 或设置 `use_default_output_dir=True`."
-        raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+        raise ScalimWorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
     return bundle_viz_base_config
 
 
@@ -246,7 +246,7 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
 
         try:
             compilation = compile_demand(str(demand_path), options=node_options)
-        except PathlessCsvOutputError as exc:
+        except ScalimPathlessCsvOutputError as exc:
             msg = "run_id={!r}: {}".format(str(workflow_node_id), str(exc))
             raise WorkflowRuntimeConfigError(msg, path=str(exc.config_path)) from exc
 
@@ -282,18 +282,18 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
             cache_pool_consumers_by_logical_key=cache_pool_consumers_by_logical_key,
         )
     except WorkflowRuntimeConfigError as exc:
-        # 将框架层 `WorkflowConfigError` 回写为 `DSL` 层错误类型(保持对外契约).
+        # 将框架层 `ScalimWorkflowConfigError` 回写为 `DSL` 层错误类型(保持对外契约).
         path = str(exc.path or "")
         msg = str(exc)
         if path:
             suffix = " (path={})".format(path)
             if msg.endswith(suffix):
                 msg = msg[: -len(suffix)]
-        raise WorkflowConfigError(msg, path=path) from exc
+        raise ScalimWorkflowConfigError(msg, path=path) from exc
 
 
 __all__ = [
     "WorkflowResult",
-    "WorkflowRunFailedError",
+    "ScalimWorkflowRunFailedError",
     "run_workflow",
 ]

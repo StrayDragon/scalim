@@ -4,7 +4,7 @@ import pytest
 from typing import Dict, List
 
 from scalim.utils.graph import (
-    CyclicDependencyError,
+    ScalimCyclicDependencyError,
     DependencyGraph,
     collect_dependencies,
     compute_levels,
@@ -117,7 +117,7 @@ class TestTopologicalSort:
     def test_cycle_raises(self) -> None:
         """测试循环依赖抛出异常"""
         deps = {"a": ["b"], "b": ["a"]}
-        with pytest.raises(CyclicDependencyError):
+        with pytest.raises(ScalimCyclicDependencyError):
             topological_sort(["a", "b"], lambda x: deps.get(x, []))
 
 

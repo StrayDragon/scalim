@@ -101,7 +101,7 @@ def test_release_write_lock_is_best_effort(tmp_path: Path) -> None:
 def test_clone_exception_for_reraise_handles_fallbacks() -> None:
     clone = resources_base_mod._clone_exception_for_reraise
 
-    first = clone(resources_mod.WorkflowWriteError("boom"))
+    first = clone(resources_mod.ScalimWorkflowWriteError("boom"))
     assert isinstance(first, BaseException)
 
     class _CopyFails(Exception):
@@ -161,15 +161,15 @@ def test_best_effort_close_write_only_workbook_worksheets_handles_variants() -> 
 
 
 def test_read_csv_header_errors(tmp_path: Path) -> None:
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Missing input CSV"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Missing input CSV"):
         _ = resources_csv_mod._read_csv_header(str(tmp_path / "nope.csv"))
 
     empty = _write_csv(tmp_path / "empty.csv", [])
-    with pytest.raises(resources_mod.WorkflowWriteError, match="empty"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="empty"):
         _ = resources_csv_mod._read_csv_header(str(empty))
 
     invalid = _write_csv(tmp_path / "invalid.csv", [["", "ok"], ["x", "y"]])
-    with pytest.raises(resources_mod.WorkflowWriteError, match="invalid header"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="invalid header"):
         _ = resources_csv_mod._read_csv_header(str(invalid))
 
 
@@ -177,7 +177,7 @@ def test_read_csv_header_in_memory_invalid_header_raises() -> None:
     from scalim.sinks.sink_csv import InMemoryCsv
 
     bad = InMemoryCsv(header=["", "ok"], rows=[])
-    with pytest.raises(resources_mod.WorkflowWriteError, match="<in_memory>"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="<in_memory>"):
         _ = resources_csv_mod._read_csv_header(bad)
 
 
@@ -192,7 +192,7 @@ def test_resource_manager_unknown_resource_ids_raise(tmp_path: Path) -> None:
     )
 
     csv_path = _write_csv(tmp_path / "input.csv", [["id"], ["a"]])
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Unknown workbook resource id"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown workbook resource id"):
         manager.apply_workbook_sheet(
             workflow_node_id="n",
             workbook_id="nope",
@@ -203,7 +203,7 @@ def test_resource_manager_unknown_resource_ids_raise(tmp_path: Path) -> None:
             on_conflict="error",
         )
 
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Unknown csv resource id"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown csv resource id"):
         manager.apply_csv_append(
             workflow_node_id="n",
             csv_id="nope",
@@ -214,7 +214,7 @@ def test_resource_manager_unknown_resource_ids_raise(tmp_path: Path) -> None:
             on_mismatch="error",
         )
 
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Unknown sheetbook resource id"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown sheetbook resource id"):
         manager.apply_sheetbook_sheet(
             workflow_node_id="n",
             sheetbook_id="nope",
@@ -251,7 +251,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Field alignment mismatch"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Field alignment mismatch"):
         manager.apply_workbook_append(
             workflow_node_id="n1",
             workbook_id="report",
@@ -356,7 +356,7 @@ def test_resource_manager_csv_append_mismatch_error_and_discard(tmp_path: Path) 
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Field alignment mismatch"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Field alignment mismatch"):
         manager.apply_csv_append(
             workflow_node_id="n1",
             csv_id="merged",
@@ -412,7 +412,7 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
     )
     assert [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE and e["payload"].action == "skip"]
 
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Sheet conflict"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Sheet conflict"):
         manager.apply_sheetbook_sheet(
             workflow_node_id="n2",
             sheetbook_id="sb",
@@ -481,7 +481,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Field alignment mismatch"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Field alignment mismatch"):
         manager.apply_sheetbook_append(
             workflow_node_id="n1",
             sheetbook_id="sb",
@@ -605,7 +605,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.WorkflowWriteError, match="max_sheets"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="max_sheets"):
         manager.apply_sheetbook_append(
             workflow_node_id="n1",
             sheetbook_id="sb",
@@ -650,7 +650,7 @@ def test_resource_manager_sheetbook_append_duplicate_producer_is_rejected(tmp_pa
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Duplicate sheetbook write"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Duplicate sheetbook write"):
         manager.apply_sheetbook_append(
             workflow_node_id="n1",
             sheetbook_id="sb",
@@ -1149,7 +1149,7 @@ def test_joinable_wait_timeout_raises_workflow_write_error_for_waiter_only() -> 
     assert not t1.is_alive()
     assert owner_errors == []
     assert len(waiter_errors) == 1
-    assert isinstance(waiter_errors[0], resources_mod.WorkflowWriteError)
+    assert isinstance(waiter_errors[0], resources_mod.ScalimWorkflowWriteError)
     assert "resource_id=report" in str(waiter_errors[0])
     assert "owner_thread_ident" in str(waiter_errors[0])
 
@@ -1389,7 +1389,7 @@ def test_resource_manager_concurrent_first_csv_write_lock_failure_wakes_waiters_
         lock_started.set()
         if not lock_continue.wait(timeout=5.0):
             raise RuntimeError("test timeout waiting to continue acquire_write_lock")
-        raise resources_mod.WorkflowWriteError("boom")
+        raise resources_mod.ScalimWorkflowWriteError("boom")
 
     monkeypatch.setattr(resources_csv_mod, "acquire_write_lock", _fail_acquire_write_lock)
 
@@ -1435,7 +1435,7 @@ def test_resource_manager_concurrent_first_csv_write_lock_failure_wakes_waiters_
     assert not t2.is_alive()
     assert len(lock_calls) == 1
     assert len(errors) == 2
-    assert all(isinstance(err, resources_mod.WorkflowWriteError) for err in errors)
+    assert all(isinstance(err, resources_mod.ScalimWorkflowWriteError) for err in errors)
     assert all("boom" in str(err) for err in errors)
 
 
@@ -1633,7 +1633,7 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
         raise ImportError("no openpyxl")
 
     monkeypatch.setattr(resources_workbook_mod, "require_optional_dependency", _raise_import)
-    with pytest.raises(resources_mod.WorkflowWriteError, match="openpyxl"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="openpyxl"):
         manager.commit_all()
     assert not Path(str(export_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
@@ -1691,7 +1691,7 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
         lambda *_args, **_kwargs: type("_M", (), {"Workbook": _FakeWB})(),
     )
     monkeypatch.setattr(resources_sheetbook_mod, "create_temp_path", lambda _path, _suffix: str(temp_path))
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Sheetbook export failed"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Sheetbook export failed"):
         manager.commit_all()
     assert not temp_path.exists()
 
@@ -2036,7 +2036,7 @@ def test_resource_manager_commit_workbook_commit_failure_raises(tmp_path: Path) 
         on_conflict="error",
     )
 
-    with pytest.raises(resources_mod.WorkflowWriteError, match="Workbook commit failed"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Workbook commit failed"):
         manager.commit_all()
     assert not Path(str(output_dir) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
@@ -2064,7 +2064,7 @@ def test_resource_manager_commit_csv_commit_failure_raises(tmp_path: Path) -> No
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.WorkflowWriteError, match="CSV commit failed"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="CSV commit failed"):
         manager.commit_all()
     assert not Path(str(output_dir) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
@@ -2095,7 +2095,7 @@ def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_pat
         raise ImportError("missing openpyxl")
 
     monkeypatch.setattr(resources_workbook_mod, "require_optional_dependency", _raise_import_error)
-    with pytest.raises(resources_mod.WorkflowWriteError, match="missing openpyxl"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="missing openpyxl"):
         manager.commit_all()
     assert not Path(str(workbook_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
     assert not workbook_path.exists()

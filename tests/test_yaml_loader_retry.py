@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml import compile
-from scalim.dsl.by_yaml.runtime.errors import ResolverError
+from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 
 
@@ -64,7 +64,7 @@ main_source:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
-    with pytest.raises(ResolverError, match="allowed_modules"):
+    with pytest.raises(ScalimResolverError, match="allowed_modules"):
         _ = compile(
             str(yaml_path),
             allowed_modules=frozenset(["tests.resolver_allowlist_mod"]),
@@ -201,7 +201,7 @@ main_source:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
-    with pytest.raises(ConfigValidationError) as excinfo:
+    with pytest.raises(ScalimConfigValidationError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.loader_retry_allowlist_mod"]))
 
     assert any("_templates.retry.db_default.backoff" in err for err in excinfo.value.errors)

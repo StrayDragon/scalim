@@ -6,7 +6,7 @@ import pytest
 
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
 from scalim.execution.context import BatchContext
-from scalim.execution.guardrails import GuardrailViolationError as GuardrailViolation, GuardrailsComputePolicy, GuardrailsPolicy
+from scalim.execution.guardrails import ScalimGuardrailViolationError as GuardrailViolation, GuardrailsComputePolicy, GuardrailsPolicy
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
 from scalim.hooks.base import HookManager
 from scalim.planning.operators import ComputeOperatorIr, OperatorType

@@ -29,7 +29,7 @@ from .config_parsing.loader import YamlDemandLoader
 from .schema_dsl.models import DemandConfig
 from .workflow import (
     WorkflowConfig,
-    WorkflowConfigError,
+    ScalimWorkflowConfigError,
     WorkflowResources,
     WorkflowWriteToCsvAppend,
     WorkflowWriteToSheetbookAppend,
@@ -198,7 +198,7 @@ def _load_demands_and_precheck_workbook_paths(  # noqa: C901, PLR0912, PLR0915
                 str(yaml_path),
                 exc,
             )
-            raise WorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
+            raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
 
         demand_cfg_by_run_id[str(node_id)] = cfg
 
@@ -250,14 +250,14 @@ def _load_demands_and_precheck_workbook_paths(  # noqa: C901, PLR0912, PLR0915
                     "Excel output path is reserved by workflow shared resources (use resources + write nodes): "
                     + "run_id={!r}, path={!r}".format(str(node_id), str(abs_path))
                 )
-                raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+                raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
             workbook_writers_by_abs_path.setdefault(abs_path, set()).add(str(node_id))
 
     collisions = sorted((path, sorted(node_ids)) for path, node_ids in workbook_writers_by_abs_path.items() if len(node_ids) > 1)
     if collisions:
         path, node_ids = collisions[0]
         msg = "Excel output path collision across workflow nodes: path={!r}, nodes={}".format(str(path), ",".join(node_ids))
-        raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
 
     return demand_cfg_by_run_id
 
@@ -322,7 +322,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                     "Unknown demand output id referenced by workflow writes: "
                     "run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}"
                 ).format(str(run.id), str(kind), str(resource_id), str(output_id))
-                raise WorkflowConfigError(
+                raise ScalimWorkflowConfigError(
                     msg,
                     path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), str(kind)),
                 )
@@ -330,7 +330,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 msg = (
                     "workflow writes currently only supports CSV outputs: run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}"
                 ).format(str(run.id), str(kind), str(resource_id), str(output_id))
-                raise WorkflowConfigError(
+                raise ScalimWorkflowConfigError(
                     msg,
                     path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), str(kind)),
                 )

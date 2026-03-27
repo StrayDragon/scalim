@@ -8,7 +8,7 @@
 - [x] 2.1 新增统一异常根 `ScalimException`(以及必要的分类基类)的实现位置与导入路径,确保 `src/scalim/` Python 3.6 兼容且相对导入。
 - [x] 2.2 迁移现有自定义异常继承 `ScalimException`(保持单继承,避免多根)并按域拆分模块(例如 YAML/Execution/Workflow)。
 - [x] 2.3 若测试必须断言 message,将 message/模板提升为常量并在实现与测试中共享(避免断言漂移)。
-- [ ] 2.4 统一异常类命名:所有 scalim 自定义异常类名 MUST 以 `Scalim` 前缀开头;批量重命名并更新导入/测试/文档,并在完成后重新执行 `just openspec-check` 与 `uv run pytest -q`。
+- [x] 2.4 统一异常类命名:所有 scalim 自定义异常类名 MUST 以 `Scalim` 前缀开头;批量重命名并更新导入/测试/文档,并在完成后重新执行 `just openspec-check` 与 `uv run pytest -q`。
 
 ## 3. Migrate high-signal paths first
 

@@ -1,8 +1,8 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine, SecurityError
+from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine, ScalimSecurityError
 from tests.yaml_fixtures import make_yaml_config
 
 
@@ -146,7 +146,7 @@ result:
 """,
         )
         loader = YamlDemandLoader()
-        with pytest.raises(ConfigValidationError) as exc_info:
+        with pytest.raises(ScalimConfigValidationError) as exc_info:
             _ = loader.load_string(yaml_content)
         assert any("does not allow 'depends_on'" in msg for msg in exc_info.value.errors)
 
@@ -199,7 +199,7 @@ result:
 """,
         )
         loader = YamlDemandLoader()
-        with pytest.raises(ConfigValidationError) as exc_info:
+        with pytest.raises(ScalimConfigValidationError) as exc_info:
             _ = loader.load_string(yaml_content)
         assert any("does not allow 'depends_on'" in msg for msg in exc_info.value.errors)
 
@@ -221,7 +221,7 @@ bad:
 """,
         )
         loader = YamlDemandLoader()
-        with pytest.raises(ConfigValidationError) as exc_info:
+        with pytest.raises(ScalimConfigValidationError) as exc_info:
             _ = loader.load_string(yaml_content)
         assert any("compute has no field dependencies" in msg for msg in exc_info.value.errors)
 
@@ -342,7 +342,7 @@ class TestSecureComputeEngine:
     def test_reject_forbidden_name(self) -> None:
         engine = SecureComputeEngine()
 
-        with pytest.raises(SecurityError) as exc_info:
+        with pytest.raises(ScalimSecurityError) as exc_info:
             engine.compile("__import__('os')", ("x",))
 
         assert "__import__" in str(exc_info.value)
@@ -350,7 +350,7 @@ class TestSecureComputeEngine:
     def test_reject_unknown_function(self) -> None:
         engine = SecureComputeEngine()
 
-        with pytest.raises(SecurityError) as exc_info:
+        with pytest.raises(ScalimSecurityError) as exc_info:
             engine.compile("open('file.txt')", ("x",))
 
         assert "open" in str(exc_info.value)
@@ -358,7 +358,7 @@ class TestSecureComputeEngine:
     def test_reject_unknown_variable(self) -> None:
         engine = SecureComputeEngine()
 
-        with pytest.raises(SecurityError) as exc_info:
+        with pytest.raises(ScalimSecurityError) as exc_info:
             engine.compile("a + unknown_var", ("a",))
 
         assert "unknown_var" in str(exc_info.value)

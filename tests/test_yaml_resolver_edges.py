@@ -3,7 +3,7 @@ import math
 
 import pytest
 
-from scalim.dsl.by_yaml.runtime.errors import ResolverError
+from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.dsl.by_yaml.runtime.allowlist_policy import ResolverTrustedMode
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
 
@@ -11,14 +11,14 @@ from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver, Secur
 def test_resolver_rejects_invalid_dotted_reference() -> None:
     resolver = PythonReferenceResolver()
 
-    with pytest.raises(ResolverError, match="点号形式引用 .* 非法"):
+    with pytest.raises(ScalimResolverError, match="点号形式引用 .* 非法"):
         resolver.resolve("invalid")
 
 
 def test_resolver_rejects_invalid_dotted_callable_name() -> None:
     resolver = PythonReferenceResolver()
 
-    with pytest.raises(ResolverError, match="可调用名 '1bad' 非法"):
+    with pytest.raises(ScalimResolverError, match="可调用名 '1bad' 非法"):
         resolver.resolve("math.1bad")
 
 
@@ -33,7 +33,7 @@ def test_resolver_rejects_disallowed_module_and_function() -> None:
         (PythonReferenceResolver(allowed_functions=frozenset(["math:sqrt"])), "math.pow", "allowed_functions"),
     ]
     for resolver, ref, match in cases:
-        with pytest.raises(ResolverError, match=match):
+        with pytest.raises(ScalimResolverError, match=match):
             resolver.resolve(ref)
 
 
@@ -105,7 +105,7 @@ def test_resolver_trusted_mode_rejects_mixed_allowlist_even_with_env_gate(monkey
 def test_resolver_import_and_attribute_errors(ref: str, match: str) -> None:
     resolver = PythonReferenceResolver()
 
-    with pytest.raises(ResolverError, match=match):
+    with pytest.raises(ScalimResolverError, match=match):
         resolver.resolve(ref)
 
 
@@ -120,7 +120,7 @@ def test_resolver_import_and_attribute_errors(ref: str, match: str) -> None:
 def test_secure_resolver_blocks_dangerous_reference(ref: str, match: str) -> None:
     resolver = SecurePythonReferenceResolver()
 
-    with pytest.raises(ResolverError, match=match):
+    with pytest.raises(ScalimResolverError, match=match):
         resolver.resolve(ref)
 
 
@@ -138,7 +138,7 @@ def test_resolver_class_style_allowlist_matches_full_attr_chain(allowed_fn: str)
     safe = resolver.resolve("tests.resolver_allowlist_mod:Obj.safe")
     assert safe() == "safe"
 
-    with pytest.raises(ResolverError, match="Obj.unsafe"):
+    with pytest.raises(ScalimResolverError, match="Obj.unsafe"):
         resolver.resolve("tests.resolver_allowlist_mod:Obj.unsafe")
 
 

@@ -5,7 +5,7 @@ import pytest
 
 from scalim.dsl.by_yaml.config_parsing.call_by import CallByValue
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
-from scalim.dsl.by_yaml.init_var_nodes import InitVarNodeTypeError, InitVarNodeValueError
+from scalim.dsl.by_yaml.init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError
 from scalim.dsl.by_yaml.runtime import output_composition_yaml as oc_yaml
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
 from scalim.dsl.by_yaml.schema_dsl.models import (
@@ -215,7 +215,7 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
             ),
         )
     )
-    with pytest.raises(InitVarNodeValueError) as excinfo:
+    with pytest.raises(ScalimInitVarNodeValueError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
         )
@@ -231,7 +231,7 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
             ),
         )
     )
-    with pytest.raises(InitVarNodeValueError) as excinfo:
+    with pytest.raises(ScalimInitVarNodeValueError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
         )
@@ -247,7 +247,7 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
             ),
         )
     )
-    with pytest.raises(InitVarNodeTypeError) as excinfo:
+    with pytest.raises(ScalimInitVarNodeTypeError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
         )
@@ -263,7 +263,7 @@ def test_compile_output_composition_rejects_output_container_path_init_var_shape
             ),
         )
     )
-    with pytest.raises(InitVarNodeTypeError) as excinfo:
+    with pytest.raises(ScalimInitVarNodeTypeError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.xlsx"}
         )

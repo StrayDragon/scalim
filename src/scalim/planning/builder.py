@@ -84,7 +84,7 @@ class PlanBuilder:
                     + "Only pre-relation derived fields (depending only on main_source non-ref fields) are allowed."
                 )
 
-            raise graph.CyclicDependencyError(msg, cycles)
+            raise graph.ScalimCyclicDependencyError(msg, cycles)
 
         field_order = graph.topological_sort(required_fields, self._graph.get_deps)
         pre_ref_available = derive_pre_ref_available_field_keys(demand=self.demand)

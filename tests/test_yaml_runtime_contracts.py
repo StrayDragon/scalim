@@ -6,7 +6,7 @@ import pytest
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml import run
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
+from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
 from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink
 
@@ -142,23 +142,23 @@ sources:
 class TestAllowlistRequired:
     def test_run_requires_allowlist(self, tmp_path: Path) -> None:
         yaml_path = _write_simple_yaml(tmp_path, "test.loader")
-        with pytest.raises(AllowlistRequiredError, match="Allowlist is required"):
+        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
             run(str(yaml_path), allowed_modules=frozenset())
 
     def test_converter_requires_allowlist_by_default(self) -> None:
-        with pytest.raises(AllowlistRequiredError, match="Allowlist is required"):
+        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
             _ = ConfigToIRConverter()
 
     def test_converter_rejects_resolver_without_allowlist(self) -> None:
         from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
 
-        with pytest.raises(AllowlistRequiredError, match="Allowlist is required"):
+        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
             _ = ConfigToIRConverter(resolver=SecurePythonReferenceResolver())
 
     def test_converter_from_allowlist_requires_non_empty_allowlist(self) -> None:
-        with pytest.raises(AllowlistRequiredError, match="Allowlist is required"):
+        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
             _ = ConfigToIRConverter.from_allowlist()
-        with pytest.raises(AllowlistRequiredError, match="Allowlist is required"):
+        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
             _ = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset())
 
     def test_converter_from_allowlist_builds_converter(self) -> None:

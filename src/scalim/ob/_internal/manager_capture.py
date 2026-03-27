@@ -4,7 +4,7 @@ from typing import Any, Deque, Dict, List, Optional, Set, Tuple, cast
 
 from ...events.event import Event
 from ..observer import Observer
-from .common import ObserverCaptureOverflowError
+from .common import ScalimObserverCaptureOverflowError
 
 
 class ObserverManagerCaptureMixin:
@@ -41,7 +41,7 @@ class ObserverManagerCaptureMixin:
                         "ObserverManager capture recorded events overflow (limit=0). "
                         "Set max_recorded_events to a positive value, or set capture_overflow_policy to 'drop-oldest'/'drop-newest'."
                     )
-                    raise ObserverCaptureOverflowError(msg)
+                    raise ScalimObserverCaptureOverflowError(msg)
                 return
 
             if len(recorded_events) < limit:
@@ -60,7 +60,7 @@ class ObserverManagerCaptureMixin:
                 "ObserverManager capture recorded events overflow (size={}, limit={}, policy={}). "
                 "Increase max_recorded_events, or set capture_overflow_policy to 'drop-oldest'/'drop-newest'."
             ).format(len(recorded_events), limit, policy)
-            raise ObserverCaptureOverflowError(msg)
+            raise ScalimObserverCaptureOverflowError(msg)
 
     def drain_events(self) -> List[Event]:
         with self._lock:

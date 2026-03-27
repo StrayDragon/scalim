@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.parsers.output import VizEventModeRemovedError
+from scalim.dsl.by_yaml.config_parsing.parsers.output import ScalimVizEventModeRemovedError
 from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
 from scalim.dsl.by_yaml.runtime import observability as runtime_observability
-from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
+from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.schema_dsl.models import ObservabilityConfig, VIZ_KEYS, VizConfig
 from scalim.events.events import DiagnosticWarningEvent, ErrorEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.ob.observability import Observability
@@ -241,7 +241,7 @@ def test_parse_viz_config_enabled_and_infer() -> None:
     assert config.env == "dev"
     assert config.use_default_output_dir is True
 
-    with pytest.raises(ConfigValidationError) as exc_info:
+    with pytest.raises(ScalimConfigValidationError) as exc_info:
         loader.load_string(
             """
 name: viz_event_mode_removed
@@ -260,7 +260,7 @@ observability:
 """
         )
     assert any("observability.viz.event_mode" in line for line in exc_info.value.errors)
-    with pytest.raises(VizEventModeRemovedError):
+    with pytest.raises(ScalimVizEventModeRemovedError):
         loader._parse_viz({VIZ_KEYS["output_dir"]: "/tmp/run", "event_mode": "full"})
 
     config = loader._parse_viz({VIZ_KEYS["enabled"]: False, VIZ_KEYS["output_dir"]: "/tmp/run"})
@@ -300,7 +300,7 @@ def test_runtime_viz_hook_creation_and_registration() -> None:
 
 
 def test_build_viz_observer_allowlist_and_targets(tmp_path: Path) -> None:
-    with pytest.raises(AllowlistRequiredError):
+    with pytest.raises(ScalimAllowlistRequiredError):
         build_viz_observer(str(tmp_path / "missing.yaml"), allowed_modules=frozenset())
 
     try:

@@ -9,11 +9,11 @@ from ..vendor.dataclassesx import replace
 from .run_ir import ExecutionRequest, ExecutionResult, OutputSpec, run_ir
 
 
-class MultiRootWorkbookRunError(ScalimExecutionException):
+class ScalimMultiRootWorkbookRunError(ScalimExecutionException):
     sheet_name: str
 
     def __init__(self, sheet_name: str, exc: Exception) -> None:
-        super(MultiRootWorkbookRunError, self).__init__("Workbook sheet run failed: {}: {}".format(sheet_name, exc))
+        super(ScalimMultiRootWorkbookRunError, self).__init__("Workbook sheet run failed: {}: {}".format(sheet_name, exc))
         self.sheet_name = str(sheet_name)
 
 
@@ -66,7 +66,7 @@ def run_multi_root_workbook(
                 if first_error is None:
                     first_error = exc
                 if policy == "all_fail":
-                    raise MultiRootWorkbookRunError(str(sheet_name), exc) from exc
+                    raise ScalimMultiRootWorkbookRunError(str(sheet_name), exc) from exc
                 # `primary_only`: `best-effort` 跳过该 `sheet`
                 continue
     finally:
@@ -81,6 +81,6 @@ def run_multi_root_workbook(
 
 
 __all__ = [
-    "MultiRootWorkbookRunError",
+    "ScalimMultiRootWorkbookRunError",
     "run_multi_root_workbook",
 ]

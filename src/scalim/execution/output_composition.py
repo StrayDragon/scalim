@@ -378,11 +378,11 @@ class OutputTargetStats:
     error_message_hash: Optional[str] = None
 
 
-class OutputTargetWriteError(ScalimExecutionException):
+class ScalimOutputTargetWriteError(ScalimExecutionException):
     target_id: str
 
     def __init__(self, target_id: str, exc: Exception) -> None:
-        super(OutputTargetWriteError, self).__init__("Output target failed: {}: {}".format(target_id, exc))
+        super(ScalimOutputTargetWriteError, self).__init__("Output target failed: {}: {}".format(target_id, exc))
         self.target_id = str(target_id)
 
 
@@ -646,7 +646,7 @@ class RouterRowSink(BaseRowSink):
                 if self._failure_policy == "primary_only" and not route.is_primary:
                     route.disabled = True
                     continue
-                raise OutputTargetWriteError(route.target_id, exc) from exc
+                raise ScalimOutputTargetWriteError(route.target_id, exc) from exc
             finally:
                 route.duration_seconds += time.perf_counter() - start
 
@@ -660,7 +660,7 @@ class RouterRowSink(BaseRowSink):
             if self._failure_policy == "primary_only" and not route.is_primary:
                 route.disabled = True
                 return
-            raise OutputTargetWriteError(route.target_id, exc) from exc
+            raise ScalimOutputTargetWriteError(route.target_id, exc) from exc
 
     @override
     def close(self) -> None:
@@ -1313,7 +1313,7 @@ __all__ = [
     "OutputCompositionSpec",
     "OutputTargetSpec",
     "OutputTargetStats",
-    "OutputTargetWriteError",
+    "ScalimOutputTargetWriteError",
     "RouterRowSink",
     "TwoStageGroupBySpec",
     "build_output_composition",

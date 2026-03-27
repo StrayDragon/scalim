@@ -8,7 +8,7 @@ from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
 from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
-from scalim.utils.graph import CyclicDependencyError
+from scalim.utils.graph import ScalimCyclicDependencyError
 
 
 def test_relation_from_allows_constant_derived_join_key_and_executes_before_loadref() -> None:
@@ -114,7 +114,7 @@ def test_plan_builder_cycle_error_mentions_pre_relation_hint_for_derived_ref_cyc
         main_source=orders_source,
     )
 
-    with pytest.raises(CyclicDependencyError, match=r"Hint: this may be caused by derived fields participating in relation join keys"):
+    with pytest.raises(ScalimCyclicDependencyError, match=r"Hint: this may be caused by derived fields participating in relation join keys"):
         _ = PlanBuilder(demand).build(targets=["customer_name"])
 
 

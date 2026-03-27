@@ -4,7 +4,7 @@ import pytest
 
 import scalim.dsl.by_yaml.config_parsing.validator as validator_module
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ConversionError, ResolverError
+from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError, ScalimResolverError
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
 from scalim.dsl.by_yaml.schema_dsl.models import (
     DemandConfig,
@@ -15,7 +15,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     SourceConfig,
     SourceFieldConfig,
 )
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
 from scalim.spec.ir.fields import FieldIr
 
@@ -103,7 +103,7 @@ def test_validator_schema_validation_paths(raise_validation_error: bool) -> None
     )
 
     if raise_validation_error:
-        with pytest.raises(ConfigValidationError) as exc_info:
+        with pytest.raises(ScalimConfigValidationError) as exc_info:
             validator.validate(config)
         assert any("Schema validation error" in error for error in exc_info.value.errors)
     else:
@@ -126,7 +126,7 @@ def test_resolver_error_paths_and_allowlist() -> None:
     resolver = PythonReferenceResolver()
 
     for ref in ("json:loads:extra", "json:missing_attr", "json:__doc__", "json.__doc__"):
-        with pytest.raises(ResolverError):
+        with pytest.raises(ScalimResolverError):
             resolver.resolve(ref)
 
     resolver = PythonReferenceResolver(allowed_functions=frozenset(["json:dumps"]))
@@ -134,7 +134,7 @@ def test_resolver_error_paths_and_allowlist() -> None:
 
     assert resolver.resolve("json.dumps") is json.dumps
 
-    with pytest.raises(ResolverError):
+    with pytest.raises(ScalimResolverError):
         resolver.resolve("json.loads")
 
 
@@ -151,7 +151,7 @@ def test_secure_resolver_rejects_invalid_and_patterns() -> None:
     resolver = SecurePythonReferenceResolver()
 
     for ref in ("invalid", "safe.module:lambda"):
-        with pytest.raises(ResolverError):
+        with pytest.raises(ScalimResolverError):
             resolver.resolve(ref)
 
 
@@ -159,7 +159,7 @@ def test_secure_resolver_rejects_dangerous_module_parts() -> None:
     resolver = SecurePythonReferenceResolver()
 
     for ref, match in (("safe.__evil:func", "危险模式 '__'"), ("lambda.safe:func", "危险模式 'lambda'")):
-        with pytest.raises(ResolverError, match=match):
+        with pytest.raises(ScalimResolverError, match=match):
             resolver.resolve(ref)
 
 
@@ -167,7 +167,7 @@ def _assert_conversion_error(config: DemandConfig, match: str) -> None:
     converter = ConfigToIRConverter(
         resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["scalim_misc"])),
     )
-    with pytest.raises(ConversionError, match=match):
+    with pytest.raises(ScalimConversionError, match=match):
         converter.convert(config)
 
 

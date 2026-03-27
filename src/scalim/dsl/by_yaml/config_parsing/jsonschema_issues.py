@@ -5,7 +5,7 @@ from ....vendor.compact.typing_extensionsx import Protocol
 from .validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
 
 
-class JsonSchemaCollectorError(ScalimYamlException):
+class ScalimJsonSchemaCollectorError(ScalimYamlException):
     pass
 
 
@@ -24,7 +24,7 @@ def _build_draft7_validator(schema: Dict[str, Any], *, jsonschema_module: Any) -
         draft7_validator = None
     if not callable(draft7_validator):
         msg = "jsonschema Draft7Validator unavailable"
-        raise JsonSchemaCollectorError(msg)
+        raise ScalimJsonSchemaCollectorError(msg)
 
     validator_factory = cast(
         "_JsonSchemaDraft7ValidatorFactory",
@@ -35,7 +35,7 @@ def _build_draft7_validator(schema: Dict[str, Any], *, jsonschema_module: Any) -
         return validator_factory(schema)
     except Exception as exc:
         msg = "jsonschema Draft7Validator init failed: {}: {}".format(type(exc).__name__, exc)
-        raise JsonSchemaCollectorError(msg) from exc
+        raise ScalimJsonSchemaCollectorError(msg) from exc
 
 
 def _iter_validation_errors(validator: _JsonSchemaValidator, yaml_data: Dict[str, Any]) -> Iterable[Any]:
@@ -45,7 +45,7 @@ def _iter_validation_errors(validator: _JsonSchemaValidator, yaml_data: Dict[str
         iter_errors = None
     if not callable(iter_errors):
         msg = "jsonschema validator missing iter_errors"
-        raise JsonSchemaCollectorError(msg)
+        raise ScalimJsonSchemaCollectorError(msg)
     return iter_errors(yaml_data)
 
 
@@ -159,6 +159,6 @@ def collect_jsonschema_validation_issues(
 
 
 __all__ = [
-    "JsonSchemaCollectorError",
+    "ScalimJsonSchemaCollectorError",
     "collect_jsonschema_validation_issues",
 ]

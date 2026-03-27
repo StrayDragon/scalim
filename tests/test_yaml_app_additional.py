@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config
 
 
@@ -168,7 +168,7 @@ def test_load_output_config_validation_errors(
 ) -> None:
     yaml_path = _write_yaml(tmp_path, filename, content)
 
-    with pytest.raises(ConfigValidationError) as exc:
+    with pytest.raises(ScalimConfigValidationError) as exc:
         load_output_config(str(yaml_path))
 
     assert any(error_match in msg for msg in exc.value.errors)

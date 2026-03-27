@@ -7,7 +7,7 @@
 
 from typing import Mapping, Optional, Tuple
 
-from .workflow import WorkflowConfig, WorkflowConfigError, load_workflow_config
+from .workflow import WorkflowConfig, ScalimWorkflowConfigError, load_workflow_config
 
 
 def load_workflow_config_from_path(
@@ -19,7 +19,7 @@ def load_workflow_config_from_path(
     workflow_path = str(workflow_yaml_path or "").strip()
     if not workflow_path:
         msg = "workflow_yaml_path is required"
-        raise WorkflowConfigError(msg, path="(file)")
+        raise ScalimWorkflowConfigError(msg, path="(file)")
     wf = load_workflow_config(workflow_path, template_vars=template_vars, template_sandbox=template_sandbox)
     return workflow_path, wf
 

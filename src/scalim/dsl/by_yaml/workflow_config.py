@@ -40,12 +40,12 @@ _EXCEL_SHEET_NAME_MAX_LEN = 31
 _EXCEL_SHEET_NAME_INVALID_CHARS = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
 
 
-class WorkflowConfigError(ScalimWorkflowException):
+class ScalimWorkflowConfigError(ScalimWorkflowException):
     path: str
 
     def __init__(self, message: str, *, path: str = "") -> None:
         self.path = str(path or "")
-        super(WorkflowConfigError, self).__init__(self._format(message))
+        super(ScalimWorkflowConfigError, self).__init__(self._format(message))
 
     def _format(self, message: str) -> str:
         if not self.path:
@@ -235,7 +235,7 @@ def load_workflow_config(
         text = yaml_path.read_text(encoding="utf-8")
     except Exception as exc:
         msg = "Failed to read workflow YAML: {}: {}".format(type(exc).__name__, exc)
-        raise WorkflowConfigError(msg, path="(file)") from exc
+        raise ScalimWorkflowConfigError(msg, path="(file)") from exc
 
     try:
         text = maybe_precompile_yaml_text(
@@ -245,17 +245,17 @@ def load_workflow_config(
             template_sandbox=template_sandbox,
         )
     except ValueError as exc:
-        raise WorkflowConfigError(str(exc), path="(file)") from exc
+        raise ScalimWorkflowConfigError(str(exc), path="(file)") from exc
 
     try:
         loaded = _safe_load_yaml_no_duplicates(text)
     except Exception as exc:
         msg = "YAML parse error: {}: {}".format(type(exc).__name__, exc)
-        raise WorkflowConfigError(msg, path="(root)") from exc
+        raise ScalimWorkflowConfigError(msg, path="(root)") from exc
 
     if not isinstance(loaded, dict):
         msg = "workflow YAML root must be a mapping"
-        raise WorkflowConfigError(msg, path="(root)")
+        raise ScalimWorkflowConfigError(msg, path="(root)")
 
     return load_workflow_config_from_mapping(cast("Dict[str, Any]", loaded))  # pragma: allow-cast yaml mapping typed narrowing
 
@@ -272,7 +272,7 @@ def resolve_workflow_demand_path(
     raw = str(demand or "").strip()
     if not raw:
         msg = "run.demand must be a non-empty string"
-        raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
 
     wf_path = Path(str(workflow_yaml_path or "")).expanduser().resolve(strict=False)
     base_dir = wf_path.parent
@@ -284,7 +284,7 @@ def resolve_workflow_demand_path(
         msg = "Invalid allowed_yaml_roots: {}".format(exc)
         if run_id:
             msg = "{} (run_id={})".format(msg, run_id)
-        raise WorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
 
     if raw.startswith("@/"):
         alias = "@"
@@ -326,7 +326,7 @@ def resolve_workflow_demand_path(
         msg = str(exc)
         if run_id:
             msg = "{} (run_id={})".format(msg, run_id)
-        raise WorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
 
     return resolved
 
@@ -347,14 +347,14 @@ def _resolve_alias_path(
         msg = "Unknown path alias '{}' for demand path '{}'".format(alias, raw)
         if run_id:
             msg = "{} (run_id={})".format(msg, run_id)
-        raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
     base = Path(str(base_raw)).expanduser()
     rel_str = str(rel or "").lstrip("/")
     if not rel_str:
         msg = "Invalid demand alias path '{}'".format(raw)
         if run_id:
             msg = "{} (run_id={})".format(msg, run_id)
-        raise WorkflowConfigError(msg, path="workflow.runs[*].demand")
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
     rel_path = Path(rel_str)
     resolved = (base / rel_path).resolve(strict=False)
     try:
@@ -369,7 +369,7 @@ def _resolve_alias_path(
         msg = str(exc)
         if run_id:
             msg = "{} (run_id={})".format(msg, run_id)
-        raise WorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
     return resolved
 
 
@@ -415,7 +415,7 @@ def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
 
     try:
         _ = load_workflow_config_from_mapping(cast("Dict[str, Any]", yaml_data))  # pragma: allow-cast yaml mapping typed narrowing
-    except WorkflowConfigError as exc:
+    except ScalimWorkflowConfigError as exc:
         return {
             "ok": False,
             "errors": [{"path": str(exc.path or "(root)"), "message": str(exc)}],
@@ -434,14 +434,14 @@ def _validate_excel_sheet_name(value: str, *, path: str) -> None:
     name = str(value or "").strip()
     if not name:
         msg = "sheet name must be a non-empty string"
-        raise WorkflowConfigError(msg, path=path)
+        raise ScalimWorkflowConfigError(msg, path=path)
     if len(name) > _EXCEL_SHEET_NAME_MAX_LEN:
         msg = "sheet name is too long (max_len={}): {!r}".format(_EXCEL_SHEET_NAME_MAX_LEN, name)
-        raise WorkflowConfigError(msg, path=path)
+        raise ScalimWorkflowConfigError(msg, path=path)
     invalid = sorted(ch for ch in name if ch in _EXCEL_SHEET_NAME_INVALID_CHARS)
     if invalid:
         msg = "sheet name contains invalid characters: {!r}".format("".join(invalid))
-        raise WorkflowConfigError(msg, path=path)
+        raise ScalimWorkflowConfigError(msg, path=path)
 
 
 def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[str, ...]:
@@ -452,7 +452,7 @@ def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[st
 
     if not isinstance(depends_on_raw, list):
         msg = "run.depends_on must be a list of strings"
-        raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.depends_on".format(item_path))
 
     depends_on_list: List[str] = []
     for dep_idx, dep in enumerate(cast("List[Any]", depends_on_raw)):  # pragma: allow-cast yaml list typed narrowing
@@ -460,7 +460,7 @@ def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[st
         dep_id = str(dep or "").strip() if isinstance(dep, str) else ""
         if not dep_id:
             msg = "run.depends_on items must be non-empty strings"
-            raise WorkflowConfigError(msg, path=dep_path)
+            raise ScalimWorkflowConfigError(msg, path=dep_path)
         depends_on_list.append(dep_id)
 
     # 去重:保留首次出现的顺序,不得影响确定性与可测试性.
@@ -480,12 +480,12 @@ def _parse_run_init_vars(init_vars_raw: object, *, item_path: str) -> Optional[D
         return None
     if not isinstance(init_vars_raw, dict):
         msg = "run.init_vars must be a mapping"
-        raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.init_vars".format(item_path))
     init_vars: Dict[str, object] = {}
     for key, value in cast("Dict[Any, Any]", init_vars_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         if not isinstance(key, str) or not key.strip():
             msg = "run.init_vars keys must be non-empty strings"
-            raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.init_vars".format(item_path))
         init_vars[str(key)] = value
     return init_vars
 
@@ -496,19 +496,19 @@ def _parse_run_main_rows_from(main_rows_from_raw: object, *, item_path: str) -> 
         return None
     if not isinstance(main_rows_from_raw, dict):
         msg = "run.main_rows_from must be a mapping"
-        raise WorkflowConfigError(msg, path="{}.main_rows_from".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.main_rows_from".format(item_path))
     main_rows_from = cast("Dict[str, Any]", main_rows_from_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     unknown_keys = sorted(k for k in main_rows_from if str(k) != "run")
     if unknown_keys:
         msg = "run.main_rows_from contains unknown keys: {}".format(",".join(str(k) for k in unknown_keys))
-        raise WorkflowConfigError(msg, path="{}.main_rows_from".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.main_rows_from".format(item_path))
 
     producer_raw = main_rows_from.get("run")
     producer_run_id = str(producer_raw or "").strip() if isinstance(producer_raw, str) else ""
     if not producer_run_id:
         msg = "run.main_rows_from.run must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
     return producer_run_id
 
 
@@ -516,13 +516,13 @@ def _normalize_write_intent_mapping(write_raw: object, *, write_path: str) -> Di
     msg: str
     if not isinstance(write_raw, dict):
         msg = "write intent must be a mapping"
-        raise WorkflowConfigError(msg, path=write_path)
+        raise ScalimWorkflowConfigError(msg, path=write_path)
 
     intent_mapping: Dict[str, object] = {}
     for raw_key, raw_value in cast("Dict[Any, Any]", write_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         if not isinstance(raw_key, str) or not raw_key.strip():
             msg = "write intent keys must be non-empty strings"
-            raise WorkflowConfigError(msg, path=write_path)
+            raise ScalimWorkflowConfigError(msg, path=write_path)
         intent_mapping[str(raw_key)] = raw_value
     return intent_mapping
 
@@ -531,13 +531,13 @@ def _parse_write_intent_cfg(kind: str, cfg_raw: object, *, write_path: str) -> D
     msg: str
     if not isinstance(cfg_raw, dict):
         msg = "run.writes.{} must be a mapping".format(kind)
-        raise WorkflowConfigError(msg, path="{}.{}".format(write_path, kind))
+        raise ScalimWorkflowConfigError(msg, path="{}.{}".format(write_path, kind))
     cfg_any = cast("Dict[Any, Any]", cfg_raw)  # pragma: allow-cast yaml mapping typed narrowing
     cfg: Dict[str, object] = {}
     for cfg_key, cfg_value in cfg_any.items():
         if not isinstance(cfg_key, str) or not cfg_key.strip():
             msg = "run.writes.{} keys must be non-empty strings".format(kind)
-            raise WorkflowConfigError(msg, path="{}.{}".format(write_path, kind))
+            raise ScalimWorkflowConfigError(msg, path="{}.{}".format(write_path, kind))
         cfg[str(cfg_key)] = cfg_value
     return cfg
 
@@ -550,16 +550,16 @@ def _parse_write_intent_workbook_sheet(cfg: Mapping[str, object], *, write_path:
     on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
     if not workbook:
         msg = "run.writes.workbook_sheet.workbook must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.workbook_sheet.workbook".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_sheet.workbook".format(write_path))
     if not sheet:
         msg = "run.writes.workbook_sheet.sheet must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.workbook_sheet.sheet".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_sheet.sheet".format(write_path))
     if not output_id:
         msg = "run.writes.workbook_sheet.output must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.workbook_sheet.output".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_sheet.output".format(write_path))
     if on_conflict not in _WRITE_INTENT_ON_CONFLICT_POLICIES:
         msg = "run.writes.workbook_sheet.on_conflict must be one of: {}".format("/".join(_WRITE_INTENT_ON_CONFLICT_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.workbook_sheet.on_conflict".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_sheet.on_conflict".format(write_path))
     return WorkflowWriteToWorkbookSheet(
         workbook=workbook,
         sheet=sheet,
@@ -578,22 +578,22 @@ def _parse_write_intent_workbook_append(cfg: Mapping[str, object], *, write_path
     on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
     if not workbook:
         msg = "run.writes.workbook_append.workbook must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.workbook_append.workbook".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_append.workbook".format(write_path))
     if not sheet:
         msg = "run.writes.workbook_append.sheet must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.workbook_append.sheet".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_append.sheet".format(write_path))
     if not output_id:
         msg = "run.writes.workbook_append.output must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.workbook_append.output".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_append.output".format(write_path))
     if align_by not in _WRITE_INTENT_ALIGN_BY:
         msg = "run.writes.workbook_append.align_by must be one of: {}".format("/".join(_WRITE_INTENT_ALIGN_BY))
-        raise WorkflowConfigError(msg, path="{}.workbook_append.align_by".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_append.align_by".format(write_path))
     if header_policy not in _WRITE_INTENT_HEADER_POLICIES:
         msg = "run.writes.workbook_append.header_policy must be one of: {}".format("/".join(_WRITE_INTENT_HEADER_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.workbook_append.header_policy".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_append.header_policy".format(write_path))
     if on_mismatch not in _WRITE_INTENT_ON_MISMATCH_POLICIES:
         msg = "run.writes.workbook_append.on_mismatch must be one of: {}".format("/".join(_WRITE_INTENT_ON_MISMATCH_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.workbook_append.on_mismatch".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.workbook_append.on_mismatch".format(write_path))
     return WorkflowWriteToWorkbookAppend(
         workbook=workbook,
         sheet=sheet,
@@ -612,16 +612,16 @@ def _parse_write_intent_csv_append(cfg: Mapping[str, object], *, write_path: str
     on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
     if not csv_id:
         msg = "run.writes.csv_append.csv must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.csv_append.csv".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_append.csv".format(write_path))
     if not output_id:
         msg = "run.writes.csv_append.output must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.csv_append.output".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_append.output".format(write_path))
     if header_policy not in _WRITE_INTENT_HEADER_POLICIES:
         msg = "run.writes.csv_append.header_policy must be one of: {}".format("/".join(_WRITE_INTENT_HEADER_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.csv_append.header_policy".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_append.header_policy".format(write_path))
     if on_mismatch not in _WRITE_INTENT_ON_MISMATCH_POLICIES:
         msg = "run.writes.csv_append.on_mismatch must be one of: {}".format("/".join(_WRITE_INTENT_ON_MISMATCH_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.csv_append.on_mismatch".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_append.on_mismatch".format(write_path))
     return WorkflowWriteToCsvAppend(
         csv=csv_id,
         output=output_id,
@@ -638,14 +638,14 @@ def _parse_write_intent_sheetbook_sheet(cfg: Mapping[str, object], *, write_path
     on_conflict = str(cfg.get("on_conflict", "error") or "error").strip()
     if not sheetbook_id:
         msg = "run.writes.sheetbook_sheet.sheetbook must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.sheetbook_sheet.sheetbook".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_sheet.sheetbook".format(write_path))
     _validate_excel_sheet_name(sheet, path="{}.sheetbook_sheet.sheet".format(write_path))
     if not output_id:
         msg = "run.writes.sheetbook_sheet.output must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.sheetbook_sheet.output".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_sheet.output".format(write_path))
     if on_conflict not in _WRITE_INTENT_ON_CONFLICT_POLICIES:
         msg = "run.writes.sheetbook_sheet.on_conflict must be one of: {}".format("/".join(_WRITE_INTENT_ON_CONFLICT_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.sheetbook_sheet.on_conflict".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_sheet.on_conflict".format(write_path))
     return WorkflowWriteToSheetbookSheet(
         sheetbook=sheetbook_id,
         sheet=sheet,
@@ -664,20 +664,20 @@ def _parse_write_intent_sheetbook_append(cfg: Mapping[str, object], *, write_pat
     on_mismatch = str(cfg.get("on_mismatch", "error") or "error").strip()
     if not sheetbook_id:
         msg = "run.writes.sheetbook_append.sheetbook must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.sheetbook_append.sheetbook".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_append.sheetbook".format(write_path))
     _validate_excel_sheet_name(sheet, path="{}.sheetbook_append.sheet".format(write_path))
     if not output_id:
         msg = "run.writes.sheetbook_append.output must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.sheetbook_append.output".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_append.output".format(write_path))
     if align_by not in _WRITE_INTENT_ALIGN_BY:
         msg = "run.writes.sheetbook_append.align_by must be one of: {}".format("/".join(_WRITE_INTENT_ALIGN_BY))
-        raise WorkflowConfigError(msg, path="{}.sheetbook_append.align_by".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_append.align_by".format(write_path))
     if header_policy not in _WRITE_INTENT_HEADER_POLICIES:
         msg = "run.writes.sheetbook_append.header_policy must be one of: {}".format("/".join(_WRITE_INTENT_HEADER_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.sheetbook_append.header_policy".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_append.header_policy".format(write_path))
     if on_mismatch not in _WRITE_INTENT_ON_MISMATCH_POLICIES:
         msg = "run.writes.sheetbook_append.on_mismatch must be one of: {}".format("/".join(_WRITE_INTENT_ON_MISMATCH_POLICIES))
-        raise WorkflowConfigError(msg, path="{}.sheetbook_append.on_mismatch".format(write_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.sheetbook_append.on_mismatch".format(write_path))
     return WorkflowWriteToSheetbookAppend(
         sheetbook=sheetbook_id,
         sheet=sheet,
@@ -703,7 +703,7 @@ def _parse_write_intent(kind: str, cfg: Mapping[str, object], *, write_path: str
     msg = "write intent contains unknown key: {}".format(
         kind
     )  # pragma: no cover  # pragma: allow-no-cover invariant: kind validated in caller
-    raise WorkflowConfigError(msg, path=write_path)  # pragma: no cover  # pragma: allow-no-cover invariant: kind validated in caller
+    raise ScalimWorkflowConfigError(msg, path=write_path)  # pragma: no cover  # pragma: allow-no-cover invariant: kind validated in caller
 
 
 def _parse_run_writes(writes_raw: object, *, item_path: str) -> Tuple[WorkflowWriteTo, ...]:
@@ -712,7 +712,7 @@ def _parse_run_writes(writes_raw: object, *, item_path: str) -> Tuple[WorkflowWr
         return ()
     if not isinstance(writes_raw, list):
         msg = "run.writes must be a list of intents"
-        raise WorkflowConfigError(msg, path="{}.writes".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.writes".format(item_path))
 
     parsed: List[WorkflowWriteTo] = []
     for write_idx, write_raw in enumerate(cast("List[Any]", writes_raw)):  # pragma: allow-cast yaml list typed narrowing
@@ -721,12 +721,12 @@ def _parse_run_writes(writes_raw: object, *, item_path: str) -> Tuple[WorkflowWr
 
         if len(intent_mapping) != 1:
             msg = "write intent must contain exactly one of: {}".format("/".join(_WRITE_INTENT_KEYS))
-            raise WorkflowConfigError(msg, path=write_path)
+            raise ScalimWorkflowConfigError(msg, path=write_path)
 
         kind = next(iter(intent_mapping.keys()))
         if kind not in _WRITE_INTENT_KEYS:
             msg = "write intent contains unknown key: {}".format(kind)
-            raise WorkflowConfigError(msg, path=write_path)
+            raise ScalimWorkflowConfigError(msg, path=write_path)
 
         cfg_raw = intent_mapping.get(kind)
         cfg = _parse_write_intent_cfg(str(kind), cfg_raw, write_path=write_path)
@@ -740,7 +740,7 @@ def _load_workflow_runs(wf: Mapping[str, Any]) -> Tuple[List[WorkflowRun], Dict[
     runs_raw = wf.get("runs")
     if not isinstance(runs_raw, list) or not runs_raw:
         msg = "workflow.runs must be a non-empty list"
-        raise WorkflowConfigError(msg, path="workflow.runs")
+        raise ScalimWorkflowConfigError(msg, path="workflow.runs")
 
     seen_ids: Dict[str, int] = {}
     runs: List[WorkflowRun] = []
@@ -748,36 +748,36 @@ def _load_workflow_runs(wf: Mapping[str, Any]) -> Tuple[List[WorkflowRun], Dict[
         item_path = "workflow.runs.{}".format(idx)
         if not isinstance(item, dict):
             msg = "run entry must be a mapping"
-            raise WorkflowConfigError(msg, path=item_path)
+            raise ScalimWorkflowConfigError(msg, path=item_path)
         run_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
         run_id_raw = run_dict.get("id")
         demand_raw = run_dict.get("demand")
         if "deps" in run_dict:
             msg = "run.deps was removed; use run.depends_on"
-            raise WorkflowConfigError(msg, path="{}.deps".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.deps".format(item_path))
         if "write_to" in run_dict:
             msg = (
                 "run.write_to was removed; use run.writes (list of intents). "
                 "Migration: write_to: {<kind>: <cfg>} -> writes: [{<kind>: <cfg>}]"
             )
-            raise WorkflowConfigError(msg, path="{}.write_to".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.write_to".format(item_path))
 
         run_id = str(run_id_raw or "").strip()
         if not run_id:
             msg = "run.id must be a non-empty string"
-            raise WorkflowConfigError(msg, path="{}.id".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.id".format(item_path))
         if run_id.startswith(_INTERNAL_NODE_ID_PREFIX):
             msg = "run.id must not start with reserved prefix '{}'".format(_INTERNAL_NODE_ID_PREFIX)
-            raise WorkflowConfigError(msg, path="{}.id".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.id".format(item_path))
         if run_id in seen_ids:
             msg = "Duplicate run.id '{}'".format(run_id)
-            raise WorkflowConfigError(msg, path="{}.id".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.id".format(item_path))
         seen_ids[run_id] = idx
 
         demand = str(demand_raw or "").strip()
         if not demand:
             msg = "run.demand must be a non-empty string"
-            raise WorkflowConfigError(msg, path="{}.demand".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.demand".format(item_path))
 
         depends_on = _parse_run_depends_on(run_dict.get("depends_on"), item_path=item_path)
         main_rows_from_run_id = _parse_run_main_rows_from(run_dict.get("main_rows_from"), item_path=item_path)
@@ -804,18 +804,18 @@ def _coerce_workflow_resources_mapping(wf: Mapping[str, Any]) -> Dict[str, Any]:
         resources_raw = {}
     if not isinstance(resources_raw, dict):
         msg = "workflow.resources must be a mapping"
-        raise WorkflowConfigError(msg, path="workflow.resources")
+        raise ScalimWorkflowConfigError(msg, path="workflow.resources")
     resources_dict = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     for raw_key in resources_dict:
         if not isinstance(raw_key, str) or not raw_key.strip():
             msg = "workflow.resources keys must be non-empty strings"
-            raise WorkflowConfigError(msg, path="workflow.resources")
+            raise ScalimWorkflowConfigError(msg, path="workflow.resources")
 
     unknown_resource_groups = sorted(k for k in resources_dict if str(k) not in _RESOURCE_GROUP_KEYS)
     if unknown_resource_groups:
         msg = "workflow.resources contains unknown keys: {}".format(",".join(str(k) for k in unknown_resource_groups))
-        raise WorkflowConfigError(msg, path="workflow.resources")
+        raise ScalimWorkflowConfigError(msg, path="workflow.resources")
 
     return resources_dict
 
@@ -827,7 +827,7 @@ def _coerce_workflow_resource_group_mapping(resources: Mapping[str, Any], *, gro
         raw = {}
     if not isinstance(raw, dict):
         msg = "workflow.resources.{} must be a mapping".format(str(group_key))
-        raise WorkflowConfigError(msg, path="workflow.resources.{}".format(str(group_key)))
+        raise ScalimWorkflowConfigError(msg, path="workflow.resources.{}".format(str(group_key)))
     return cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
 
 
@@ -839,20 +839,20 @@ def _parse_workflow_workbook_resources(workbooks_raw: Mapping[str, Any]) -> Dict
         item_path = "workflow.resources.workbooks.{}".format(resource_id or "(invalid)")
         if not resource_id:
             msg = "workflow.resources.workbooks keys must be non-empty strings"
-            raise WorkflowConfigError(msg, path="workflow.resources.workbooks")
+            raise ScalimWorkflowConfigError(msg, path="workflow.resources.workbooks")
         if not isinstance(raw_cfg, dict):
             msg = "workflow.resources.workbooks.<id> must be a mapping"
-            raise WorkflowConfigError(msg, path=item_path)
+            raise ScalimWorkflowConfigError(msg, path=item_path)
         cfg = cast("Dict[str, Any]", raw_cfg)  # pragma: allow-cast yaml mapping typed narrowing
         path_raw = cfg.get("path")
         path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
         if not path_text:
             msg = "workflow.resources.workbooks.<id>.path must be a non-empty string"
-            raise WorkflowConfigError(msg, path="{}.path".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.path".format(item_path))
         allow_formulas_raw = cfg.get("allow_formulas", False)
         if not isinstance(allow_formulas_raw, bool):
             msg = "workflow.resources.workbooks.<id>.allow_formulas must be a bool"
-            raise WorkflowConfigError(msg, path="{}.allow_formulas".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(item_path))
         workbooks[resource_id] = WorkflowWorkbookResource(path=path_text, allow_formulas=bool(allow_formulas_raw))
     return workbooks
 
@@ -865,16 +865,16 @@ def _parse_workflow_csv_resources(csvs_raw: Mapping[str, Any]) -> Dict[str, Work
         item_path = "workflow.resources.csvs.{}".format(resource_id or "(invalid)")
         if not resource_id:
             msg = "workflow.resources.csvs keys must be non-empty strings"
-            raise WorkflowConfigError(msg, path="workflow.resources.csvs")
+            raise ScalimWorkflowConfigError(msg, path="workflow.resources.csvs")
         if not isinstance(raw_cfg, dict):
             msg = "workflow.resources.csvs.<id> must be a mapping"
-            raise WorkflowConfigError(msg, path=item_path)
+            raise ScalimWorkflowConfigError(msg, path=item_path)
         cfg = cast("Dict[str, Any]", raw_cfg)  # pragma: allow-cast yaml mapping typed narrowing
         path_raw = cfg.get("path")
         path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
         if not path_text:
             msg = "workflow.resources.csvs.<id>.path must be a non-empty string"
-            raise WorkflowConfigError(msg, path="{}.path".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.path".format(item_path))
         csvs[resource_id] = WorkflowCsvResource(path=path_text)
     return csvs
 
@@ -883,33 +883,33 @@ def _parse_workflow_sheetbook_budget(budget_raw: object, *, item_path: str) -> W
     msg: str
     if not isinstance(budget_raw, dict):
         msg = "workflow.resources.sheetbooks.<id>.budget must be a mapping"
-        raise WorkflowConfigError(msg, path="{}.budget".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.budget".format(item_path))
     budget_dict = cast("Dict[str, Any]", budget_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_sheets_raw = budget_dict.get("max_sheets")
     max_total_cells_raw = budget_dict.get("max_total_cells")
     if isinstance(max_sheets_raw, bool) or not isinstance(max_sheets_raw, (int, float, str)):
         msg = "workflow.resources.sheetbooks.<id>.budget.max_sheets must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path))
     if isinstance(max_total_cells_raw, bool) or not isinstance(max_total_cells_raw, (int, float, str)):
         msg = "workflow.resources.sheetbooks.<id>.budget.max_total_cells must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path))
     try:
         max_sheets = int(max_sheets_raw)
     except (TypeError, ValueError) as exc:
         msg = "workflow.resources.sheetbooks.<id>.budget.max_sheets must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path)) from exc
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path)) from exc
     try:
         max_total_cells = int(max_total_cells_raw)
     except (TypeError, ValueError) as exc:
         msg = "workflow.resources.sheetbooks.<id>.budget.max_total_cells must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path)) from exc
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path)) from exc
     if max_sheets < 1:
         msg = "workflow.resources.sheetbooks.<id>.budget.max_sheets must be >= 1"
-        raise WorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_sheets".format(item_path))
     if max_total_cells < 1:
         msg = "workflow.resources.sheetbooks.<id>.budget.max_total_cells must be >= 1"
-        raise WorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_total_cells".format(item_path))
 
     return WorkflowSheetbookBudget(max_sheets=max_sheets, max_total_cells=max_total_cells)
 
@@ -920,21 +920,21 @@ def _parse_workflow_sheetbook_export_xlsx(export_raw: object, *, item_path: str)
         return None
     if not isinstance(export_raw, dict):
         msg = "workflow.resources.sheetbooks.<id>.export_xlsx must be a mapping"
-        raise WorkflowConfigError(msg, path="{}.export_xlsx".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(item_path))
     export_dict = cast("Dict[str, Any]", export_raw)  # pragma: allow-cast yaml mapping typed narrowing
     path_raw = export_dict.get("path")
     path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
     if not path_text:
         msg = "workflow.resources.sheetbooks.<id>.export_xlsx.path must be a non-empty string"
-        raise WorkflowConfigError(msg, path="{}.export_xlsx.path".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.path".format(item_path))
     write_lock_raw = export_dict.get("write_lock", False)
     if not isinstance(write_lock_raw, bool):
         msg = "workflow.resources.sheetbooks.<id>.export_xlsx.write_lock must be a bool"
-        raise WorkflowConfigError(msg, path="{}.export_xlsx.write_lock".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.write_lock".format(item_path))
     allow_formulas_raw = export_dict.get("allow_formulas", False)
     if not isinstance(allow_formulas_raw, bool):
         msg = "workflow.resources.sheetbooks.<id>.export_xlsx.allow_formulas must be a bool"
-        raise WorkflowConfigError(msg, path="{}.export_xlsx.allow_formulas".format(item_path))
+        raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.allow_formulas".format(item_path))
 
     return WorkflowSheetbookExportXlsx(
         path=path_text,
@@ -951,10 +951,10 @@ def _parse_workflow_sheetbook_resources(sheetbooks_raw: Mapping[str, Any]) -> Di
         item_path = "workflow.resources.sheetbooks.{}".format(resource_id or "(invalid)")
         if not resource_id:
             msg = "workflow.resources.sheetbooks keys must be non-empty strings"
-            raise WorkflowConfigError(msg, path="workflow.resources.sheetbooks")
+            raise ScalimWorkflowConfigError(msg, path="workflow.resources.sheetbooks")
         if not isinstance(raw_cfg, dict):
             msg = "workflow.resources.sheetbooks.<id> must be a mapping"
-            raise WorkflowConfigError(msg, path=item_path)
+            raise ScalimWorkflowConfigError(msg, path=item_path)
         cfg = cast("Dict[str, Any]", raw_cfg)  # pragma: allow-cast yaml mapping typed narrowing
 
         budget = _parse_workflow_sheetbook_budget(cfg.get("budget"), item_path=item_path)
@@ -978,7 +978,7 @@ def _validate_workflow_resource_ids_unique(
     overlap_all = sorted(overlap_all_set)
     if overlap_all:
         msg = "workflow.resources ids must be unique across workbooks/csvs/sheetbooks: {}".format(",".join(overlap_all))
-        raise WorkflowConfigError(msg, path="workflow.resources")
+        raise ScalimWorkflowConfigError(msg, path="workflow.resources")
 
 
 def _load_workflow_resources(wf: Mapping[str, Any]) -> WorkflowResources:
@@ -1053,7 +1053,7 @@ def _validate_workflow_run_writes_reference_resources(runs: Sequence[WorkflowRun
                     resource_id,
                     str(intent.output or ""),
                 )
-                raise WorkflowConfigError(msg, path="{}.writes.{}.{}.{}".format(item_path, int(write_idx), kind, attr_name))
+                raise ScalimWorkflowConfigError(msg, path="{}.writes.{}.{}.{}".format(item_path, int(write_idx), kind, attr_name))
 
 
 def _load_workflow_ctx_options(ctx_raw: object) -> WorkflowCtxOptions:
@@ -1063,34 +1063,34 @@ def _load_workflow_ctx_options(ctx_raw: object) -> WorkflowCtxOptions:
         return ctx
     if not isinstance(ctx_raw, dict):
         msg = "workflow.options.ctx must be a mapping"
-        raise WorkflowConfigError(msg, path="workflow.options.ctx")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx")
     ctx_dict = cast("Dict[str, Any]", ctx_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_value_bytes_raw = ctx_dict.get("max_value_bytes", 65536)
     if isinstance(max_value_bytes_raw, bool) or not isinstance(max_value_bytes_raw, (int, float, str)):
         msg = "workflow.options.ctx.max_value_bytes must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
     try:
         max_value_bytes = int(max_value_bytes_raw)
     except (TypeError, ValueError) as exc:
         msg = "workflow.options.ctx.max_value_bytes must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes") from exc
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes") from exc
     if max_value_bytes < 1:
         msg = "workflow.options.ctx.max_value_bytes must be >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
 
     max_bytes_raw = ctx_dict.get("max_bytes", 1048576)
     if isinstance(max_bytes_raw, bool) or not isinstance(max_bytes_raw, (int, float, str)):
         msg = "workflow.options.ctx.max_bytes must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
     try:
         max_bytes = int(max_bytes_raw)
     except (TypeError, ValueError) as exc:
         msg = "workflow.options.ctx.max_bytes must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes") from exc
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes") from exc
     if max_bytes < 1:
         msg = "workflow.options.ctx.max_bytes must be >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
 
     return WorkflowCtxOptions(
         max_value_bytes=max_value_bytes,
@@ -1102,26 +1102,26 @@ def _parse_workflow_cache_pool_budget(budget_raw: object) -> "WorkflowCachePoolB
     msg: str
     if not isinstance(budget_raw, dict):
         msg = "workflow.options.cache_pool.budget must be a mapping"
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget")
     budget_dict = cast("Dict[str, Any]", budget_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_entries_raw = budget_dict.get("max_entries")
     if isinstance(max_entries_raw, bool) or not isinstance(max_entries_raw, (int, float, str)):
         msg = "workflow.options.cache_pool.budget.max_entries must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
     try:
         max_entries = int(max_entries_raw)
     except (TypeError, ValueError) as exc:
         msg = "workflow.options.cache_pool.budget.max_entries must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries") from exc
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries") from exc
     if max_entries < 1:
         msg = "workflow.options.cache_pool.budget.max_entries must be >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
 
     over_budget_policy = str(budget_dict.get("over_budget_policy", "") or "").strip()
     if over_budget_policy not in _CACHE_POOL_OVER_BUDGET_POLICIES:
         msg = "workflow.options.cache_pool.budget.over_budget_policy must be one of: {}".format("/".join(_CACHE_POOL_OVER_BUDGET_POLICIES))
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
 
     return WorkflowCachePoolBudget(
         max_entries=max_entries,
@@ -1135,22 +1135,22 @@ def _parse_workflow_cache_pool_pins(pin_raw: object) -> Tuple["WorkflowCachePool
         pin_raw = []
     if not isinstance(pin_raw, list):
         msg = "workflow.options.cache_pool.pin must be a list of mappings"
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.pin")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.pin")
     pins: List[WorkflowCachePoolPin] = []
     for idx, item in enumerate(cast("List[Any]", pin_raw)):  # pragma: allow-cast yaml list typed narrowing
         pin_path = "workflow.options.cache_pool.pin.{}".format(idx)
         if not isinstance(item, dict):
             msg = "workflow.options.cache_pool.pin items must be mappings"
-            raise WorkflowConfigError(msg, path=pin_path)
+            raise ScalimWorkflowConfigError(msg, path=pin_path)
         pin_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
         kind = str(pin_dict.get("kind", "") or "").strip()
         if kind not in _CACHE_POOL_PIN_KINDS:
             msg = "workflow.options.cache_pool.pin[*].kind must be one of: {}".format("/".join(_CACHE_POOL_PIN_KINDS))
-            raise WorkflowConfigError(msg, path="{}.kind".format(pin_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.kind".format(pin_path))
         source_id = str(pin_dict.get("source_id", "") or "").strip()
         if not source_id:
             msg = "workflow.options.cache_pool.pin[*].source_id must be a non-empty string"
-            raise WorkflowConfigError(msg, path="{}.source_id".format(pin_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.source_id".format(pin_path))
         pins.append(WorkflowCachePoolPin(kind=kind, source_id=source_id))
     return tuple(pins)
 
@@ -1161,18 +1161,18 @@ def _load_workflow_cache_pool_options(cache_pool_raw: object) -> Optional["Workf
         return None
     if not isinstance(cache_pool_raw, dict):
         msg = "workflow.options.cache_pool must be a mapping"
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool")
     cache_pool_dict = cast("Dict[str, Any]", cache_pool_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     conflict_policy = str(cache_pool_dict.get("conflict_policy", "") or "").strip()
     if conflict_policy not in _CACHE_POOL_CONFLICT_POLICIES:
         msg = "workflow.options.cache_pool.conflict_policy must be one of: {}".format("/".join(_CACHE_POOL_CONFLICT_POLICIES))
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.conflict_policy")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.conflict_policy")
 
     release_policy = str(cache_pool_dict.get("release_policy", "") or "").strip()
     if release_policy not in _CACHE_POOL_RELEASE_POLICIES:
         msg = "workflow.options.cache_pool.release_policy must be one of: {}".format("/".join(_CACHE_POOL_RELEASE_POLICIES))
-        raise WorkflowConfigError(msg, path="workflow.options.cache_pool.release_policy")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.release_policy")
 
     budget = _parse_workflow_cache_pool_budget(cache_pool_dict.get("budget"))
     pins = _parse_workflow_cache_pool_pins(cache_pool_dict.get("pin"))
@@ -1191,32 +1191,32 @@ def _load_workflow_options(wf: Mapping[str, Any]) -> WorkflowOptions:
         options_raw = {}
     if not isinstance(options_raw, dict):
         msg = "workflow.options must be a mapping"
-        raise WorkflowConfigError(msg, path="workflow.options")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options")
     options_dict = cast("Dict[str, Any]", options_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_concurrency_raw = options_dict.get("max_concurrency", 1)
     if isinstance(max_concurrency_raw, bool) or not isinstance(max_concurrency_raw, (int, float, str)):
         msg = "workflow.options.max_concurrency must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.max_concurrency")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.max_concurrency")
     try:
         max_concurrency = int(max_concurrency_raw)
     except (TypeError, ValueError) as exc:
         msg = "workflow.options.max_concurrency must be an integer >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.max_concurrency") from exc
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.max_concurrency") from exc
     if max_concurrency < 1:
         msg = "workflow.options.max_concurrency must be >= 1"
-        raise WorkflowConfigError(msg, path="workflow.options.max_concurrency")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.max_concurrency")
 
     failure_policy = str(options_dict.get("failure_policy", "all_fail") or "all_fail").strip()
     if failure_policy not in _FAILURE_POLICIES:
         msg = "workflow.options.failure_policy must be one of: {}".format("/".join(_FAILURE_POLICIES))
-        raise WorkflowConfigError(msg, path="workflow.options.failure_policy")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.failure_policy")
 
     ctx = _load_workflow_ctx_options(options_dict.get("ctx"))
 
     if "share_preload_cache" in options_dict:
         msg = "workflow.options.share_preload_cache was removed; use workflow.options.cache_pool"
-        raise WorkflowConfigError(msg, path="workflow.options.share_preload_cache")
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.share_preload_cache")
 
     cache_pool = _load_workflow_cache_pool_options(options_dict.get("cache_pool"))
 
@@ -1234,7 +1234,7 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:
     wf_raw = root.get("workflow")
     if not isinstance(wf_raw, dict):
         msg = "Missing required mapping 'workflow'"
-        raise WorkflowConfigError(msg, path="workflow")
+        raise ScalimWorkflowConfigError(msg, path="workflow")
     wf = cast("Dict[str, Any]", wf_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     runs, seen_ids = _load_workflow_runs(wf)
@@ -1275,18 +1275,18 @@ def _validate_workflow_main_rows_from(
 
         if producer_run_id not in run_ids:
             msg = "Unknown run.main_rows_from.run id '{}'".format(producer_run_id)
-            raise WorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
 
         if producer_run_id == run.id:
             msg = "run.main_rows_from.run must not reference self: '{}'".format(producer_run_id)
-            raise WorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.main_rows_from.run".format(item_path))
 
         if producer_run_id not in run.depends_on:
             msg = "run.main_rows_from requires explicit depends_on: consumer={!r}, producer={!r}".format(
                 str(run.id),
                 str(producer_run_id),
             )
-            raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
+            raise ScalimWorkflowConfigError(msg, path="{}.depends_on".format(item_path))
 
 
 def _validate_workflow_deps_references(
@@ -1301,10 +1301,10 @@ def _validate_workflow_deps_references(
         for dep_id in run.depends_on:
             if dep_id == run.id:
                 msg = "run.depends_on must not include self dependency: '{}'".format(dep_id)
-                raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
+                raise ScalimWorkflowConfigError(msg, path="{}.depends_on".format(item_path))
             if dep_id not in run_ids:
                 msg = "Unknown run.depends_on id '{}'".format(dep_id)
-                raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
+                raise ScalimWorkflowConfigError(msg, path="{}.depends_on".format(item_path))
 
 
 def _validate_workflow_deps_no_cycles(  # noqa: C901
@@ -1349,7 +1349,7 @@ def _validate_workflow_deps_no_cycles(  # noqa: C901
         found = dfs(node_id)
         if found is not None:
             msg = "workflow depends_on must not contain cycles (cycle_path={})".format(json.dumps(found, ensure_ascii=False))
-            raise WorkflowConfigError(msg, path="workflow.runs[*].depends_on")
+            raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].depends_on")
 
 
 __all__ = [
@@ -1357,7 +1357,7 @@ __all__ = [
     "WorkflowCachePoolOptions",
     "WorkflowCachePoolPin",
     "WorkflowConfig",
-    "WorkflowConfigError",
+    "ScalimWorkflowConfigError",
     "WorkflowOptions",
     "WorkflowResources",
     "WorkflowRun",

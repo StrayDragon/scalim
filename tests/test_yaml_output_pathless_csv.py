@@ -26,7 +26,7 @@ outputs:
         encoding="utf-8",
     )
 
-    with pytest.raises(output_composition_yaml_mod.PathlessCsvOutputError) as excinfo:
+    with pytest.raises(output_composition_yaml_mod.ScalimPathlessCsvOutputError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests"]))
     err = excinfo.value
     assert err.output_id == "detail"

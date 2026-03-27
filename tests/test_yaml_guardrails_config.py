@@ -1,7 +1,7 @@
 import pytest
 
 import scalim.dsl.by_yaml.config_parsing.validator as validator_module
-from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
 
@@ -47,7 +47,7 @@ def test_yaml_schema_rejects_invalid_guardrails_mode() -> None:
     config = _base_config()
     config["guardrails"] = {"enabled": True, "mode": "panic"}
 
-    with pytest.raises(ConfigValidationError):
+    with pytest.raises(ScalimConfigValidationError):
         validator.validate(config)
 
 
@@ -61,7 +61,7 @@ def test_yaml_schema_rejects_guardrails_relations_fields_in_v1() -> None:
         "relations": {"null_key_max_rate": 0.0, "fields": ["__ALL__"]},
     }
 
-    with pytest.raises(ConfigValidationError):
+    with pytest.raises(ScalimConfigValidationError):
         validator.validate(config)
 
 

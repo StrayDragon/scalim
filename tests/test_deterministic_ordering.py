@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from scalim.dsl.by_yaml.params_template import ParamsTemplateRenderError, compile_params_template
+from scalim.dsl.by_yaml.params_template import ScalimParamsTemplateRenderError, compile_params_template
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import LoaderCallContextIr, BindingIr, _is_valid_binding_key, _restore_bindings, build_stable_lookup_key_list
@@ -65,7 +65,7 @@ def test_yaml_params_builder_use_keys_as_list_stable_sorts_lookup_keys_when_list
 def test_yaml_params_builder_use_keys_as_list_uses_batch_row_nth_for_non_ref_loader() -> None:
     template = compile_params_template({"row_ids": {"$keys": {"as": "list"}}}, path="sources.s1.params", resolve_runtime=False)
     ctx = LoaderCallContextIr(batch_row_nth=[2, 1])
-    with pytest.raises(ParamsTemplateRenderError, match="only valid in ref loader call contexts"):
+    with pytest.raises(ScalimParamsTemplateRenderError, match="only valid in ref loader call contexts"):
         _ = template.render_kwargs(ctx, path="sources.s1.params")
 
 
@@ -168,6 +168,6 @@ def test_lookup_cast_requires_initialized_registry() -> None:
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     converter._lookup_casts = None
 
-    with pytest.raises(ConversionError) as excinfo:
+    with pytest.raises(ScalimConversionError) as excinfo:
         converter._get_lookup_cast_fn(LookupCastConfig(name="auto", sep=None), is_multi=False)
     assert "Lookup cast registry is not initialized" in str(excinfo.value)

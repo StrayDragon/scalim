@@ -2,7 +2,7 @@ import pytest
 
 from scalim.dsl.by_yaml.runtime._internal.conversion_relations import ConfigToIRConversionRelationMixin
 from scalim.dsl.by_yaml.runtime._internal.conversion_sources import ConfigToIRConversionSourceMixin
-from scalim.dsl.by_yaml.runtime.errors import ConversionError
+from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 
 
 @pytest.mark.parametrize(
@@ -34,7 +34,7 @@ def test_relation_mixin_require_helpers_raise_clear_errors(method_name: str, mat
     mixin = ConfigToIRConversionRelationMixin()
     method = getattr(mixin, method_name)
 
-    with pytest.raises(ConversionError, match=match):
+    with pytest.raises(ScalimConversionError, match=match):
         method()
 
 
@@ -49,5 +49,5 @@ def test_source_mixin_require_helpers_raise_clear_errors(method_name: str, match
     mixin = ConfigToIRConversionSourceMixin()
     method = getattr(mixin, method_name)
 
-    with pytest.raises(ConversionError, match=match):
+    with pytest.raises(ScalimConversionError, match=match):
         method()
