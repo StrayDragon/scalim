@@ -29,7 +29,6 @@ from scalim.spec.ir.demand import DemandIr
 from scalim.spec.ir.fields import FieldIr
 from scalim.spec.ir.relations import LookupStepIr
 from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
-from concurrent.futures import Future
 
 
 def _picklable_test_main_loader() -> List[Dict[str, Any]]:
@@ -233,37 +232,42 @@ def test_maybe_create_adaptive_pool_returns_none_when_workers_le_1() -> None:
     assert pool is None
 
 
-def test_seq_pipeline_adaptive_selects_process_executor_class() -> None:
-    class _ProcessPolicy(AdaptivePolicy):
+@pytest.mark.parametrize("backend", [ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC])
+def test_maybe_create_adaptive_pool_rejects_pruned_backend(backend: str) -> None:
+    class _PrunedBackendPolicy(AdaptivePolicy):
         def choose_backend(self, *, plan, runtime, tuning):  # type: ignore[override]
             _ = plan
             _ = runtime
             _ = tuning
-            return ADAPTIVE_BACKEND_PROCESS
+            return backend
 
-    calls = []
-
-    class _DummyExecutor:
-        def __init__(self, *, max_workers):  # type: ignore[no-untyped-def]
-            calls.append(int(max_workers))
-
-        def __enter__(self):  # type: ignore[no-untyped-def]
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
-            _ = exc_type
-            _ = exc
-            _ = tb
-            return False
-
-    overrides = PipelineOverrides(
-        adaptive_policy=_ProcessPolicy(),
-        adaptive_tuning=AdaptiveTuning(max_workers=2),
-        adaptive_process_executor_cls=_DummyExecutor,
+    main_source = MainSourceIr(source_id="main", loader=lambda: [])
+    plan = ExecutionPlan(target_fields=[])
+    runtime = ExecutionRuntime(
+        plan,
+        HookManager(),
+        ObserverManager(),
+        main_source=main_source,
+        parallel_mode="adaptive",
+        max_workers=2,
     )
-    pipeline = _make_pipeline(overrides=overrides)
-    assert list(pipeline.run(main_rows=[])) == []
-    assert calls == [2]
+    overrides = PipelineOverrides(adaptive_policy=_PrunedBackendPolicy(), adaptive_tuning=AdaptiveTuning(max_workers=2))
+
+    with ExitStack() as stack:
+        with pytest.raises(ValueError) as excinfo:
+            maybe_create_adaptive_pool(
+                plan=plan,
+                runtime=runtime,
+                overrides=overrides,
+                stack=stack,
+                sys_module=object(),
+                warnings_module=object(),
+            )
+
+    msg = str(excinfo.value)
+    assert "暂不支持" in msg
+    assert "当前仅支持 thread" in msg
+    assert "backend 改为 'thread'" in msg
 
 
 def test_adaptive_scheduler_rejects_invalid_backend() -> None:
@@ -309,6 +313,55 @@ def test_adaptive_scheduler_rejects_invalid_backend() -> None:
         )
 
 
+@pytest.mark.parametrize("backend", [ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC])
+def test_adaptive_scheduler_rejects_pruned_backend_selected_in_runtime(backend: str) -> None:
+    s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_picklable_test_load_s1))
+
+    from scalim.planning.operators import LoadRefOperatorIr, OperatorType  # noqa: PLC0415
+
+    op_a = LoadRefOperatorIr(
+        operator_id="load_ref_a",
+        operator_type=OperatorType.LOAD_REF.value,
+        source=s1,
+        field_key="a",
+        field_spec=FieldIr(field_id="a", name="a", source=s1),
+        lookup_steps=(LookupStepIr(from_field="fk1", to_source=s1),),
+    )
+    plan = ExecutionPlan(operators=(op_a,), field_specs={"a": op_a.field_spec})
+    runtime = ExecutionRuntime(
+        plan,
+        HookManager(),
+        ObserverManager(),
+        main_source=MainSourceIr(source_id="main", loader=_picklable_test_main_loader),
+        parallel_mode="adaptive",
+        max_workers=2,
+    )
+    runtime.adaptive_backend = backend
+
+    overrides = PipelineOverrides(adaptive_tuning=AdaptiveTuning(max_workers=2))
+    scheduler = AdaptiveLoadRefScheduler(plan, overrides=overrides)
+
+    ctx = BatchContext()
+    ctx.set_field_value("fk1", 0, 1)
+
+    with pytest.raises(ValueError) as excinfo:
+        scheduler.execute_segment(
+            [op_a],
+            context=ctx,
+            batch_row_nth=[0],
+            runtime=runtime,
+            pool=None,
+            max_workers=2,
+            required_fields=None,
+            after_operator=None,
+        )
+
+    msg = str(excinfo.value)
+    assert "暂不支持" in msg
+    assert "当前仅支持 thread" in msg
+    assert "backend 改为 'thread'" in msg
+
+
 def test_adaptive_scheduler_uses_runtime_backend_selected_by_pool() -> None:
     class _TogglingPolicy(AdaptivePolicy):
         def __init__(self) -> None:
@@ -319,30 +372,7 @@ def test_adaptive_scheduler_uses_runtime_backend_selected_by_pool() -> None:
             _ = runtime
             _ = tuning
             self.calls += 1
-            return ADAPTIVE_BACKEND_PROCESS if self.calls == 1 else ADAPTIVE_BACKEND_THREAD
-
-    class _StrictProcessLikeExecutor:
-        def __init__(self, *, max_workers):  # type: ignore[no-untyped-def]
-            self.max_workers = int(max_workers)
-
-        def __enter__(self):  # type: ignore[no-untyped-def]
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
-            _ = exc_type
-            _ = exc
-            _ = tb
-            return False
-
-        def submit(self, fn, *args, **kwargs):  # type: ignore[no-untyped-def]
-            if getattr(fn, "__self__", None) is not None:
-                raise TypeError("process-like executor requires picklable callables (bound method submitted)")
-            fut: "Future[object]" = Future()
-            try:
-                fut.set_result(fn(*args, **kwargs))
-            except Exception as exc:  # noqa: BLE001
-                fut.set_exception(exc)
-            return fut
+            return ADAPTIVE_BACKEND_THREAD if self.calls == 1 else ADAPTIVE_BACKEND_PROCESS
 
     s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_picklable_test_load_s1))
     s2 = SourceIr(source_id="s2", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_picklable_test_load_s2))
@@ -380,7 +410,6 @@ def test_adaptive_scheduler_uses_runtime_backend_selected_by_pool() -> None:
     overrides = PipelineOverrides(
         adaptive_policy=policy,
         adaptive_tuning=AdaptiveTuning(max_workers=2),
-        adaptive_process_executor_cls=_StrictProcessLikeExecutor,
     )
 
     with ExitStack() as stack:
@@ -417,95 +446,6 @@ def test_load_ref_flow_null_fill_row_is_noop_when_empty() -> None:
     from scalim.execution.executor.operators.load_ref import flow as flow_module  # noqa: PLC0415
 
     flow_module._null_fill_row(exec_ctx=object(), row_id=0, null_fill_fields=())  # type: ignore[arg-type]
-
-
-def test_seq_pipeline_adaptive_selects_async_executor_class() -> None:
-    class _AsyncPolicy(AdaptivePolicy):
-        def choose_backend(self, *, plan, runtime, tuning):  # type: ignore[override]
-            _ = plan
-            _ = runtime
-            _ = tuning
-            return ADAPTIVE_BACKEND_ASYNC
-
-    calls = []
-
-    class _DummyExecutor:
-        def __init__(self, *, max_workers):  # type: ignore[no-untyped-def]
-            calls.append(int(max_workers))
-
-        def __enter__(self):  # type: ignore[no-untyped-def]
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
-            _ = exc_type
-            _ = exc
-            _ = tb
-            return False
-
-    overrides = PipelineOverrides(
-        adaptive_policy=_AsyncPolicy(),
-        adaptive_tuning=AdaptiveTuning(max_workers=2),
-        adaptive_async_executor_cls=_DummyExecutor,
-    )
-    pipeline = _make_pipeline(overrides=overrides)
-    assert list(pipeline.run(main_rows=[])) == []
-    assert calls == [2]
-
-
-def test_seq_pipeline_adaptive_async_warns_and_falls_back_to_thread_on_py36() -> None:
-    class _AsyncPolicy(AdaptivePolicy):
-        def choose_backend(self, *, plan, runtime, tuning):  # type: ignore[override]
-            _ = plan
-            _ = runtime
-            _ = tuning
-            return ADAPTIVE_BACKEND_ASYNC
-
-    thread_calls = []
-    async_calls = []
-
-    class _DummyThreadExecutor:
-        def __init__(self, *, max_workers):  # type: ignore[no-untyped-def]
-            thread_calls.append(int(max_workers))
-
-        def __enter__(self):  # type: ignore[no-untyped-def]
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
-            _ = exc_type
-            _ = exc
-            _ = tb
-            return False
-
-    class _DummyAsyncExecutor:
-        def __init__(self, *, max_workers):  # type: ignore[no-untyped-def]
-            async_calls.append(int(max_workers))
-
-        def __enter__(self):  # type: ignore[no-untyped-def]
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
-            _ = exc_type
-            _ = exc
-            _ = tb
-            return False
-
-    class _FakeSys:
-        version_info = (3, 6, 0, "final", 0)
-
-    overrides = PipelineOverrides(
-        adaptive_policy=_AsyncPolicy(),
-        adaptive_tuning=AdaptiveTuning(max_workers=2),
-        adaptive_executor_cls=_DummyThreadExecutor,
-        adaptive_async_executor_cls=_DummyAsyncExecutor,
-        sys_module=_FakeSys(),
-    )
-    pipeline = _make_pipeline(overrides=overrides)
-
-    with pytest.warns(RuntimeWarning, match="Python 3\\.6"):
-        assert list(pipeline.run(main_rows=[])) == []
-
-    assert thread_calls == [2]
-    assert async_calls == []
 
 
 def test_seq_pipeline_adaptive_invalid_backend_raises() -> None:

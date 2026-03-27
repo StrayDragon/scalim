@@ -1,21 +1,11 @@
 import os
-from typing import Callable, Dict, Hashable, List, MutableMapping, Optional, Sequence, Set, Tuple
+from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 
 from ....events.event import Event
-from ....hooks.base import HookManager
-from ....ob.manager import ObserverManager
-from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
-from ....spec.ir.sources import MainSourceIr
-from ....typedefs import FieldValue, LoaderResultMapping
+from ....typedefs import FieldValue
 from ....vendor.dataclassesx import dataclass
-from ...context import BatchContext
-from ...executor.operators.load_ref.executor import LoadRefOperatorExecutor
-from ...executor.runtime.runtime import ExecutionRuntime
-from ...guardrails import GuardrailsPolicy
-from ...loader_retry import LoaderRetryPolicies
 from ..capture import HookRecordedEvent
-from ..overlay_context import OverlayBatchContext
 
 
 def resolve_adaptive_max_workers(max_workers: int, cpu_count_fn: Optional[Callable[[], Optional[int]]] = None) -> int:
@@ -33,47 +23,6 @@ class AdaptiveTaskResult:
     observer_events: List[Event]
     relation_key: Tuple[Tuple[object, ...], ...]
     group_enabled: bool
-
-
-def run_task_in_process(
-    plan: ExecutionPlan,
-    op: LoadRefOperatorIr,
-    relation_key: Tuple[Tuple[object, ...], ...],
-    base_context: BatchContext,
-    batch_row_nth: List[Hashable],
-    main_source: Optional[MainSourceIr],
-    guardrails: GuardrailsPolicy,
-    loader_retry: LoaderRetryPolicies,
-    preloaded_cache: MutableMapping[str, LoaderResultMapping],
-    batch_num: int,
-    required_fields: Optional[Set[str]],
-    *,
-    group_enabled: bool,
-) -> AdaptiveTaskResult:
-    task_runtime = ExecutionRuntime(
-        plan=plan,
-        hook_manager=HookManager(),
-        observer_manager=ObserverManager(),
-        main_source=main_source,
-        guardrails=guardrails,
-        loader_retry=loader_retry,
-        parallel_mode="seq",
-        max_workers=0,
-    )
-    task_runtime.preloaded_cache = preloaded_cache
-    task_runtime.batch_num = int(batch_num)
-
-    task_context = OverlayBatchContext(base_context, required_fields=required_fields)
-    LoadRefOperatorExecutor().execute(op, task_context, batch_row_nth, task_runtime)
-
-    overlay = task_context.drain_overlay()
-    return AdaptiveTaskResult(
-        overlay=overlay,
-        hook_events=[],
-        observer_events=[],
-        relation_key=relation_key,
-        group_enabled=bool(group_enabled),
-    )
 
 
 def build_ref_deps(plan: ExecutionPlan) -> Dict[str, Tuple[str, ...]]:

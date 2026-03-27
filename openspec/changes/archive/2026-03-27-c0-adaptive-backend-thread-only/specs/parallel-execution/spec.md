@@ -13,13 +13,12 @@
 
 #### Scenario: 选择未实现 backend 失败
 - **WHEN** policy 选择 process 或 async backend
-- **THEN** 系统 MUST 立即失败并明确指出“该 backend 已被裁剪,当前仅支持 thread”
-- **AND** 错误信息 MUST 指引“如需回加请恢复对应实现模块与测试”
+- **THEN** 系统 MUST 立即失败并明确指出“该 backend 暂不支持,当前仅支持 thread”
+- **AND** 错误信息 MUST 指引“请将 backend 改为 thread”
 
 ## REMOVED Requirements
 
 ### Requirement: process/async backend 需明确 guardrails 与失败语义
 **Reason**：process/async backend 的实现已被裁剪,该要求描述的 guardrails 与运行时语义不再适用。
 
-**Migration**：使用默认的 thread backend(或显式选择 thread)。若确有 process/async 需求,需在代码库中恢复对应实现模块与测试后再启用。
-
+**Migration**：使用默认的 thread backend(或显式选择 thread)。若确有 process/async 需求,需要重新实现并补齐测试后再启用。

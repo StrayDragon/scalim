@@ -26,12 +26,6 @@ class PipelineOverrides:
     adaptive_executor_cls: Type[Any] = ThreadPoolExecutor
     """自适应并发默认使用的执行器类型(线程池)."""
 
-    adaptive_process_executor_cls: Optional[Type[Any]] = None
-    """可选:自适应并发使用进程后端时的执行器类型."""
-
-    adaptive_async_executor_cls: Optional[Type[Any]] = None
-    """可选:自适应并发使用异步后端时的执行器类型."""
-
     adaptive_min_parallel_tasks: int = 2
     """每层最小并行任务数阈值(小于该值将倾向于串行)."""
 

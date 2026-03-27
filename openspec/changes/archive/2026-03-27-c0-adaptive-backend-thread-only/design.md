@@ -11,7 +11,7 @@
 **Goals:**
 - 保留 `adaptive` 架构与扩展 seam,调用链路仍以 `policy.choose_backend(...)` 为入口。
 - 主线实现收敛为 thread-only:仅创建 `ThreadPoolExecutor` 路径。
-- 当 policy 选择 `process/async` 时,稳定 fail-fast 并给出明确错误信息(说明 backend 已裁剪、如何回加)。
+- 当 policy 选择 `process/async` 时,稳定 fail-fast 并给出明确错误信息(说明 backend 暂不支持,当前仅支持 thread)。
 - 删除 process/async backend 的实现文件与对应测试,并将所有测试/文档改写为 thread-only。
 
 **Non-Goals:**
@@ -42,7 +42,7 @@
 
 ## Risks / Trade-offs
 
-- [破坏性变更] 依赖 process/async backend 的调用方将失败 → 缓解:错误信息明确指出“backend 已裁剪;目前仅支持 thread;如需回加请恢复对应实现模块与测试”。
+- [破坏性变更] 依赖 process/async backend 的调用方将失败 → 缓解:错误信息明确指出“backend 暂不支持;当前仅支持 thread;请将 backend 改为 thread”。
 - [规范/文档漂移] 并发规范仍描述 process/async 语义 → 缓解:同步增量规范修改 `parallel-execution` 与 `explicit-extension-points`,并更新 `docs/doc/architecture/parallel-modes.md`。
 - [遗漏分支/死代码] process/async 分支散落在 scheduler/pool/support 模块中 → 缓解:实现阶段用 ripgrep 全仓库搜索 `process`/`async` adaptive 相关符号,并以 thread-only 测试回归兜底。
 

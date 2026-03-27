@@ -1,4 +1,3 @@
-import pickle
 from concurrent.futures import Executor, Future
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 
@@ -15,13 +14,10 @@ from ._internal.loadref_scheduler_support import AdaptiveTaskResult as _Adaptive
 from ._internal.loadref_scheduler_support import build_layers as _build_layers
 from ._internal.loadref_scheduler_support import build_ref_deps as _build_ref_deps
 from ._internal.loadref_scheduler_support import resolve_adaptive_max_workers
-from ._internal.loadref_scheduler_support import run_task_in_process as _run_task_in_process
 from .policy import (
     ADAPTIVE_BACKEND_ASYNC,
     ADAPTIVE_BACKEND_PROCESS,
     ADAPTIVE_BACKEND_THREAD,
-    PROCESS_FAILURE_FAIL_FAST,
-    PROCESS_FAILURE_FALLBACK_SERIAL,
     AdaptivePolicy,
     DefaultAdaptivePolicy,
 )
@@ -89,7 +85,11 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
 
         wants_scheduler_decisions = runtime.instrumentation.wants(EVENT_ADAPTIVE_SCHEDULER_DECISION)
         backend = runtime.adaptive_backend or self._policy.choose_backend(plan=self._plan, runtime=runtime, tuning=self._tuning)
-        if backend not in (ADAPTIVE_BACKEND_THREAD, ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC):
+        if backend in (ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC):
+            # `NOTE`: 若需回加 `process`/`async` 后端,请恢复对应实现模块与测试。
+            msg = "adaptive backend '{}' 暂不支持: 当前仅支持 thread;请将 backend 改为 'thread'".format(backend)
+            raise ValueError(msg)
+        if backend != ADAPTIVE_BACKEND_THREAD:
             msg = "Invalid adaptive backend '{}'".format(backend)
             raise ValueError(msg)
 
@@ -201,141 +201,19 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
                 )
                 continue
 
-            process_failure_mode: Optional[str] = None
-
             resolved_pool = pool
 
-            submit_task: Callable[[_TaskSpec], "Future[_AdaptiveTaskResult]"]
-            if backend == ADAPTIVE_BACKEND_PROCESS:
-                failure_mode = runtime.adaptive_process_failure_mode or self._policy.choose_process_failure_mode(
-                    plan=self._plan,
-                    runtime=runtime,
-                    tuning=self._tuning,
+            def _submit_task_thread(spec: _TaskSpec, *, _pool: Executor = resolved_pool) -> "Future[_AdaptiveTaskResult]":
+                return _pool.submit(  # type: ignore[no-any-return]
+                    self._run_task,
+                    spec,
+                    context,
+                    batch_row_nth,
+                    runtime,
+                    required_fields,
                 )
-                if failure_mode not in (PROCESS_FAILURE_FAIL_FAST, PROCESS_FAILURE_FALLBACK_SERIAL):
-                    msg = "Invalid process failure mode '{}'".format(failure_mode)
-                    raise ValueError(msg)
-                process_failure_mode = failure_mode
 
-                observer_list = runtime.observer_manager.observers or []
-                if runtime.hook_manager.hooks or observer_list:
-                    msg = "adaptive process backend is not compatible with hooks/observers (hooks={}, observers={})".format(
-                        len(runtime.hook_manager.hooks),
-                        len(observer_list),
-                    )
-                    if wants_scheduler_decisions:
-                        self._emit_scheduler_decision(
-                            runtime=runtime,
-                            layer_index=layer_index,
-                            decision="serial",
-                            backend=backend,
-                            reason="process_backend_incompatible_hooks",
-                            layer_task_count=len(task_ops),
-                            process_failure_mode=failure_mode,
-                        )
-                    if failure_mode == PROCESS_FAILURE_FAIL_FAST:
-                        raise ValueError(msg)
-                    self._execute_ops_serially(
-                        executable_ops,
-                        context=context,
-                        batch_row_nth=batch_row_nth,
-                        runtime=runtime,
-                        serial_executor=serial_executor,
-                        after_operator=after_operator,
-                    )
-                    continue
-
-                process_pickle_failed = False
-                try:
-                    _ = pickle.dumps(
-                        (
-                            self._plan,
-                            context,
-                            batch_row_nth,
-                            runtime.main_source,
-                            runtime.guardrails,
-                            runtime.loader_retry,
-                            runtime.preloaded_cache,
-                            runtime.batch_num,
-                            required_fields,
-                        )
-                    )
-                except Exception as exc:
-                    msg = "adaptive process backend cannot pickle shared context: {}: {}".format(type(exc).__name__, exc)
-                    if failure_mode == PROCESS_FAILURE_FAIL_FAST:
-                        raise TypeError(msg) from exc
-                    process_pickle_failed = True
-
-                if not process_pickle_failed:
-                    for task_key in task_order:
-                        spec = task_specs[task_key]
-                        try:
-                            _ = pickle.dumps((spec.op, spec.relation_key, spec.group_enabled))
-                        except Exception as exc:
-                            msg = "adaptive process backend cannot pickle task '{}' (pool='{}'): {}: {}".format(
-                                spec.op.field_key,
-                                spec.pool_name,
-                                type(exc).__name__,
-                                exc,
-                            )
-                            if failure_mode == PROCESS_FAILURE_FAIL_FAST:
-                                raise TypeError(msg) from exc
-                            process_pickle_failed = True
-                            break
-
-                if process_pickle_failed:
-                    if wants_scheduler_decisions:
-                        self._emit_scheduler_decision(
-                            runtime=runtime,
-                            layer_index=layer_index,
-                            decision="serial",
-                            backend=backend,
-                            reason="process_backend_unpicklable_task",
-                            layer_task_count=len(task_ops),
-                            process_failure_mode=failure_mode,
-                        )
-                    self._execute_ops_serially(
-                        executable_ops,
-                        context=context,
-                        batch_row_nth=batch_row_nth,
-                        runtime=runtime,
-                        serial_executor=serial_executor,
-                        after_operator=after_operator,
-                    )
-                    continue
-
-                def _submit_task_process(spec: _TaskSpec, *, _pool: Executor = resolved_pool) -> "Future[_AdaptiveTaskResult]":
-                    return _pool.submit(  # type: ignore[no-any-return]
-                        _run_task_in_process,
-                        self._plan,
-                        spec.op,
-                        spec.relation_key,
-                        context,
-                        batch_row_nth,
-                        runtime.main_source,
-                        runtime.guardrails,
-                        runtime.loader_retry,
-                        runtime.preloaded_cache,
-                        runtime.batch_num,
-                        required_fields,
-                        group_enabled=spec.group_enabled,
-                    )
-
-                submit_task = _submit_task_process
-
-            else:
-
-                def _submit_task_thread(spec: _TaskSpec, *, _pool: Executor = resolved_pool) -> "Future[_AdaptiveTaskResult]":
-                    return _pool.submit(  # type: ignore[no-any-return]
-                        self._run_task,
-                        spec,
-                        context,
-                        batch_row_nth,
-                        runtime,
-                        required_fields,
-                    )
-
-                submit_task = _submit_task_thread
+            submit_task: Callable[[_TaskSpec], "Future[_AdaptiveTaskResult]"] = _submit_task_thread
 
             results_by_key, layer_stats = self._run_tasks_in_pool(
                 task_order,
@@ -352,7 +230,6 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
                     backend=backend,
                     reason=None,
                     layer_task_count=len(task_ops),
-                    process_failure_mode=process_failure_mode,
                     layer_stats=layer_stats,
                 )
             self._commit_layer_results(

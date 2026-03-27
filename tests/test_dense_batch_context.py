@@ -133,3 +133,15 @@ def test_batch_context_clear_clears_disabled_rows() -> None:
     ctx.clear()
     ctx.set_field_value("a", 0, 1)
     assert ctx.get_field_value("a", 0) == 1
+
+
+def test_batch_context_on_field_set_callback_is_called() -> None:
+    calls = []
+
+    def _on_set(field_key, row_id):  # type: ignore[no-untyped-def]
+        calls.append((field_key, row_id))
+
+    ctx = BatchContext(on_field_set=_on_set)
+    ctx.set_field_value("a", 1, 123)
+
+    assert calls == [("a", 1)]

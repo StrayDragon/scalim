@@ -1,31 +1,15 @@
 from collections import deque
 import os
-from typing import Any, List, Tuple
+from typing import Any
 
 import pytest
 
-import concurrent.futures
 import threading
 
-from scalim.execution.adaptive._internal.loadref_scheduler_support import run_task_in_process
-from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.events.event import Event
-from scalim.execution.adaptive.policy import (
-    ADAPTIVE_BACKEND_PROCESS,
-    ADAPTIVE_BACKEND_THREAD,
-    PROCESS_FAILURE_FAIL_FAST,
-    PROCESS_FAILURE_FALLBACK_SERIAL,
-    AdaptivePolicy,
-)
-from scalim.execution.adaptive.strategy_unit import TaskSpec
-from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.execution.pipeline.overrides import PipelineOverrides
-from scalim.hooks.base import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.ob._internal.manager_capture import ObserverManagerCaptureMixin
 from scalim.ob._internal.manager_emit import ObserverManagerEmitMixin
-from scalim.planning.plan import ExecutionPlan
-from scalim.execution.context import BatchContext
 from scalim.events.catalog import EVENT_PIPELINE_START
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets._internal import viz_config as viz_config_module
@@ -173,56 +157,3 @@ def test_internal_observer_manager_lazy_branches_and_viz_node_cache() -> None:
     viz_observer = VizObserver()
     viz_observer._node_id_cache = None  # noqa: SLF001
     assert viz_observer._normalize_node_ref_id("field:test") == "field:test"  # noqa: SLF001
-
-
-class _RecordingPool:
-    def __init__(self) -> None:
-        self.calls = []
-
-    def submit(self, fn, *args: Any, **kwargs: Any):  # type: ignore[no-untyped-def]
-        self.calls.append((fn, args, kwargs))
-        fut = concurrent.futures.Future()
-        fut.set_result("submitted")
-        return fut
-
-
-class _InvalidProcessFailurePolicy(AdaptivePolicy):
-    def choose_process_failure_mode(self, *, plan, runtime, tuning):  # type: ignore[override]
-        _ = plan
-        _ = runtime
-        _ = tuning
-        return "invalid"
-
-
-def test_adaptive_execution_internal_helpers_cover_process_paths() -> None:
-    plan = ExecutionPlan()
-    scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides(adaptive_policy=_InvalidProcessFailurePolicy()))
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
-    runtime.adaptive_process_failure_mode = PROCESS_FAILURE_FALLBACK_SERIAL
-
-    assert scheduler._process_failure_mode(runtime) == PROCESS_FAILURE_FALLBACK_SERIAL  # noqa: SLF001
-    runtime.adaptive_process_failure_mode = None
-    assert scheduler._process_failure_mode(runtime) == PROCESS_FAILURE_FAIL_FAST  # noqa: SLF001
-    assert scheduler._should_use_process_backend(ADAPTIVE_BACKEND_PROCESS) is True  # noqa: SLF001
-    assert scheduler._should_use_process_backend(ADAPTIVE_BACKEND_THREAD) is False  # noqa: SLF001
-
-    pool = _RecordingPool()
-    context = BatchContext()
-    spec = TaskSpec(op=object(), relation_key=(("k",),), group_enabled=True, pool_name="default")
-    future = scheduler._submit_process_task(  # noqa: SLF001
-        spec,
-        pool=pool,
-        context=context,
-        batch_row_nth=[0],
-        runtime=runtime,
-        required_fields=None,
-    )
-
-    assert future.result() == "submitted"
-    assert len(pool.calls) == 1
-    fn, args, kwargs = pool.calls[0]
-    assert fn is run_task_in_process
-    assert args[0] is plan
-    assert args[3] is not context
-    assert args[4] == [0]
-    assert kwargs == {"group_enabled": True}

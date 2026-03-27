@@ -16,8 +16,7 @@
     - `LoadRef` 分层/去重/提交点的语义调整
     - `bind.use_rows` 的 barrier 判定逻辑变更
     - `max_workers` 的解析策略与池创建条件调整
-    - `adaptive` backend 的选择/回退策略调整(`thread`/`process`/`async`)
-    - `process` 后端的兼容性检查与失败策略(reason / fail_fast / fallback_to_serial)调整
+    - `adaptive` backend seam(policy/overrides/scheduler)调整(当前仅支持 `thread`;`process`/`async` 暂不支持)
     - hook/observer 的捕获与回放边界调整(影响确定性与可观测性)
 
 ## 1. `seq`: 顺序执行
@@ -117,17 +116,14 @@ flowchart TD
   FANIN --> NEXT
 ```
 
-### 2.3 adaptive backend: `thread` / `process` / `async`
+### 2.3 adaptive backend seam(当前 thread-only)
 
-`adaptive` 模式除了“每层是否并行”之外,还有一个更底层的选择: **并发任务跑在什么后端上**.
+`adaptive` 模式保留 backend 的“选择接口形状”(policy 常量/返回值),但当前版本内置实现**仅支持 `thread`**:
 
-这里的 backend 只影响一件事:
+- backend 选择入口: `AdaptivePolicy.choose_backend(...)`
+- 当选择到 `process`/`async` 时: 系统会立即抛 `ValueError`(暂不支持;当前仅支持 thread;请将 backend 改为 `thread`)
 
-- 当某一层决定并行时,`LoadRef` 任务是提交到线程池、进程池,还是提交到一个托管事件循环的执行器
-
-backend 的选择由 `AdaptivePolicy.choose_backend(...)` 决定;默认策略固定返回 `thread`.
-
-#### 2.3.1 backend 选择 + 池创建(含回退)
+#### 2.3.1 backend 选择 + 池创建(线程)
 
 ```mermaid
 flowchart TD
@@ -136,28 +132,17 @@ flowchart TD
   WORKERS -->|"resolved_workers <= 1"| NOP
   WORKERS -->|"resolved_workers > 1"| PICK["policy.choose_backend()<br/>→ backend"]
 
-  PICK --> ASYNCQ{"backend == async ?"}
-  ASYNCQ -->|否| SETRT["runtime.adaptive_backend = backend"]
-  ASYNCQ -->|是| PYQ{"Python < 3.7 ?"}
-  PYQ -->|是| WARN["warn 一次<br/>backend 回退为 thread"]
-  PYQ -->|否| SETRT
-  WARN --> SETRT
-
-  SETRT --> PROCQ{"backend == process ?"}
-  PROCQ -->|是| SETPM["runtime.adaptive_process_failure_mode<br/>= choose_process_failure_mode()"]
-  PROCQ -->|否| EXEC
-  SETPM --> EXEC["创建 adaptive_pool(Executor)"]
-
-  EXEC --> MAP{"backend"}
-  MAP -->|"thread"| T["ThreadPoolExecutor<br/>(overrides.adaptive_executor_cls)"]
-  MAP -->|"process"| P["ProcessPoolExecutor<br/>(overrides.adaptive_process_executor_cls)"]
-  MAP -->|"async"| A["ThreadLoopExecutor<br/>(overrides.adaptive_async_executor_cls)"]
+  PICK --> OK{"backend == thread ?"}
+  OK -->|否| ERR["抛 ValueError<br/>backend 暂不支持(仅支持 thread)"]
+  OK -->|是| SETRT["runtime.adaptive_backend = thread"]
+  SETRT --> EXEC["创建 adaptive_pool(Executor)"]
+  EXEC --> T["ThreadPoolExecutor<br/>(overrides.adaptive_executor_cls)"]
 ```
 
 说明:
 
 - 如果池没创建出来(例如 `resolved_workers <= 1`),`adaptive` 会在运行时退化成 `seq` 行为.
-- `async` backend 在 Python 3.6 上会直接回退为 `thread`(并发能力仍来自线程池).
+- backend seam 仍保留,但当前不会静默 fallback: 选择到未实现 backend 会明确失败.
 
 #### 2.3.2 scheduler 侧 backend 取值
 
@@ -165,53 +150,7 @@ flowchart TD
 
 这保证了: **只要池创建阶段已经确定了 backend,后续调度不会“每段变一次”**.
 
-#### 2.3.3 三种 backend 的语义差异(按当前实现)
-
-- `thread`(默认)
-    - 任务在同一进程内并发执行.
-    - 每个任务使用独立的 `ExecutionRuntime(parallel_mode="seq")`,并通过捕获管理器收集 hook/observer 事件,在提交点统一回放.
-    - 对任务函数/上下文没有 pickling 要求.
-- `process`(实验性)
-    - 任务会被提交到 `ProcessPoolExecutor`.
-    - **不兼容 hooks/observers**: 只要运行时注册了 hook 或 observer,就不会进入进程并发.
-    - **要求可 pickling**: 共享上下文与每个任务的关键对象必须可序列化,否则无法提交到子进程.
-    - 子进程内会创建新的 `ExecutionRuntime(parallel_mode="seq")`,并使用空的 Hook/Observer 管理器: hook/observer 不会跨进程执行,也不会回放事件.
-- `async`(实验性)
-    - 任务提交到 `ThreadLoopExecutor`(独立线程托管事件循环).
-    - 若提交的任务返回 coroutine,执行器会在该事件循环上 `await`.
-    - 若返回非 coroutine,会在 loop 线程直接执行并 warning 一次(可能阻塞事件循环).
-    - **当前自适应调度器提交的是同步任务**,因此启用 `async` backend 会触发该 warning,并不会自动获得 `asyncio` 的并发收益.
-
-### 2.4 `process` backend 的回退/失败策略(按当前实现)
-
-`process` backend 有两类“硬性边界”,会导致这一层直接按串行执行(或直接抛错):
-
-1. **hooks/observers 不兼容**
-2. **对象无法 pickling**
-
-失败策略由 `choose_process_failure_mode(...)` 决定:
-
-- `fail_fast`(默认): 直接抛错中止
-- `fallback_to_serial`: 回退到本层串行执行,继续跑后续层
-
-```mermaid
-flowchart TD
-  IN["本层准备并行<br/>(backend=process)"] --> MODE["failure_mode = choose_process_failure_mode()"]
-  MODE --> HOOKQ{"hooks/observers 已注册 ?"}
-  HOOKQ -->|是| FAILHOOK["reason = process_backend_incompatible_hooks"]
-  FAILHOOK -->|fail_fast| ERR1["抛 ValueError"]
-  FAILHOOK -->|fallback_to_serial| SERIAL1["本层串行执行"]
-
-  HOOKQ -->|否| PKQ{"共享上下文 + 任务可 pickling ?"}
-  PKQ -->|否| FAILPK["reason = process_backend_unpicklable_task"]
-  FAILPK -->|fail_fast| ERR2["抛 TypeError"]
-  FAILPK -->|fallback_to_serial| SERIAL2["本层串行执行"]
-
-  PKQ -->|是| SUBMIT["提交到 ProcessPoolExecutor<br/>_run_task_in_process(...)"]
-  SUBMIT --> DONE["并发执行并收集 overlay<br/>(无 hook/observer 事件)"]
-```
-
-### 2.5 fan-out / fan-in 的“结果归并 + 事件回放”
+### 2.4 fan-out / fan-in 的“结果归并 + 事件回放”
 
 每个并发任务不会直接往主 `BatchContext` 写数据,而是写到自己的 overlay,任务完成后再统一提交.
 
@@ -228,18 +167,11 @@ sequenceDiagram
 
   loop 每层
     SCH->>POOL: submit(task1/task2/...)
-    alt backend = thread/async
-      POOL-->>T: run LoadRef (task runtime + capture)
-      T-->>POOL: 返回 overlay + 捕获的事件
-      POOL-->>SCH: 收集所有 task 结果
-      SCH->>CTX: fan-in 提交 overlay(按算子顺序)
-      SCH->>SCH: 回放 hook/observer 事件
-    else backend = process
-      POOL-->>T: run LoadRef (child process runtime)
-      T-->>POOL: 仅返回 overlay
-      POOL-->>SCH: 收集所有 task 结果
-      SCH->>CTX: fan-in 提交 overlay(按算子顺序)
-    end
+    POOL-->>T: run LoadRef (task runtime + capture)
+    T-->>POOL: 返回 overlay + 捕获的事件
+    POOL-->>SCH: 收集所有 task 结果
+    SCH->>CTX: fan-in 提交 overlay(按算子顺序)
+    SCH->>SCH: 回放 hook/observer 事件
   end
 ```
 
@@ -247,9 +179,8 @@ sequenceDiagram
 
 - 任务内仍是串行执行 `LoadRef`(只是多个 relation 并发跑)
 - 提交点会把 overlay 归并回主上下文,并把捕获的事件集中回放
-- `process` 后端不会捕获/回放 hook/observer 事件(且在 hooks/observers 存在时可能回退或失败)
 
-### 2.6 barrier: 遇到 `bind.use_rows` 会强制串行
+### 2.5 barrier: 遇到 `bind.use_rows` 会强制串行
 
 调度器会把 `bind.use_rows` 视为层级屏障(barrier),直接把这一层按串行执行:
 
@@ -286,14 +217,14 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
 
 ## 4. 深度调参(需要 Python/IR 注入)
 
-如果你要调的不是“并发上限”,而是“每层是否并行 / 资源池怎么分 / 用哪种后端”,需要走 `PipelineOverrides`.
+如果你要调的不是“并发上限”,而是“每层是否并行 / 资源池怎么分 / backend seam(当前仅支持 `thread`)”,需要走 `PipelineOverrides`.
 
 可调项一览:
 
 - `PipelineOverrides`
   - `adaptive_min_parallel_tasks`: 每层最小并行任务数阈值(默认 2)
   - `adaptive_tuning`: `AdaptiveTuning`(池/阈值/全局上限等)
-  - `adaptive_policy`: `AdaptivePolicy`(决策/后端/池选择)
+  - `adaptive_policy`: `AdaptivePolicy`(决策/backend seam/池选择)
 
 重要约束:
 
@@ -313,10 +244,9 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
     - loader 主要是 I/O 等待(HTTP/DB/远程服务),并发能隐藏等待时间
     - 你能接受并发带来的外部压力,并愿意用 `max_workers` 做上限
 
-- backend 选择(只在 `adaptive` 下生效)
-    - 默认 `thread`: 最少限制,也是默认策略的唯一选择
-    - `process`: 需要接受“hooks/observers 不可用 + 必须可 pickling + 可能 fail_fast”的边界
-    - `async`: 当前调度器提交的是同步任务,启用后会触发 warning;除非你明确需要该实验执行器的语义,否则建议保持 `thread`
+- backend seam(只在 `adaptive` 下生效)
+    - 当前仅支持 `thread`(默认策略也只返回 `thread`;可通过 `overrides.adaptive_executor_cls` 替换线程执行器实现)
+    - `process`/`async` 仅保留接口形状: 选择到这些值会直接失败(暂不支持)
 
 ## 6. 如何观察调度决策(排查用)
 
@@ -325,7 +255,7 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
 事件里会带:
 
 - `decision`: `serial` / `parallel`
-- `backend`: `thread` / `process` / `async`
+- `backend`: 当前固定为 `thread`(选择到 `process`/`async` 会直接失败)
 - `reason`: 串行原因(例如 `rows_binding_barrier` / `single_worker` / `below_min_parallel_tasks`)
 - 可选的 pool 等待统计(开启该事件订阅后才会收集)
 

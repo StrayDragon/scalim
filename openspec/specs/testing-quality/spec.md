@@ -181,14 +181,15 @@
 - **THEN** 边界护栏测试 MUST 失败
 - **AND** 失败信息 MUST 指向具体模块路径与违规类型
 
-### Requirement: process backend 测试必须反映真实 pickling 约束
-当测试覆盖 adaptive process backend 的调度决策与退化路径时,测试 MUST 以真实 pickling 约束为准:
+### Requirement: 若存在 process backend,测试必须反映真实 pickling 约束
+若系统支持 `adaptive` 的 `process` backend(跨进程执行),当测试覆盖该路径的调度决策与退化路径时,测试 MUST 以真实 pickling 约束为准:
 
 - 不可 picklable 时,系统 MUST 按 policy 选择 fail-fast 或 fallback-serial 的既定语义.
 - 测试 MUST NOT 通过 patch `pickle.dumps` 伪造“可 picklable”来覆盖成功路径.
 
 #### Scenario: 不可 picklable 触发正确退化
-- **WHEN** adaptive process backend 需要处理不可 picklable 的任务负载
+- **GIVEN** `adaptive` 的 `process` backend 已启用
+- **WHEN** `adaptive` 的 `process` backend 需要处理不可 picklable 的任务负载
 - **THEN** 系统按 policy 正确 fail-fast 或 fallback 到 serial 执行
 - **AND** 测试通过真实不可 picklable 构造验证该行为(而非 patch `pickle.dumps`)
 

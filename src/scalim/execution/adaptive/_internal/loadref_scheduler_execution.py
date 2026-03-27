@@ -1,8 +1,7 @@
-import pickle
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple, cast
 
 if TYPE_CHECKING:
-    from concurrent.futures import Executor, Future
+    from concurrent.futures import Future
 
 from ....planning.operators import LoadRefOperatorIr
 from ...context import BatchContext
@@ -10,17 +9,11 @@ from ...executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from ...executor.runtime.runtime import ExecutionRuntime
 from ..capture import HookCaptureManager
 from ..overlay_context import OverlayBatchContext
-from ..policy import (
-    ADAPTIVE_BACKEND_PROCESS,
-    PROCESS_FAILURE_FAIL_FAST,
-    PROCESS_FAILURE_FALLBACK_SERIAL,
-)
 from ..strategy_unit import TaskSpec as _TaskSpec
 from ..submission_unit import LayerScheduleStats as _LayerScheduleStats
 from ..submission_unit import run_tasks_in_pool as _run_tasks_in_pool_unit
 from .loadref_scheduler_base import AdaptiveLoadRefSchedulerBase
 from .loadref_scheduler_support import AdaptiveTaskResult as _AdaptiveTaskResult
-from .loadref_scheduler_support import run_task_in_process as _run_task_in_process
 
 
 class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
@@ -104,43 +97,3 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
             ),
         )
         return results_by_key, layer_stats
-
-    def _submit_process_task(
-        self,
-        spec: _TaskSpec,
-        *,
-        pool: "Executor",
-        context: BatchContext,
-        batch_row_nth: List[Hashable],
-        runtime: ExecutionRuntime,
-        required_fields: Optional[Set[str]],
-    ) -> "Future[_AdaptiveTaskResult]":
-        serialized_context = pickle.loads(pickle.dumps(context))  # noqa: S301
-        return pool.submit(
-            _run_task_in_process,
-            self._require_plan(),
-            spec.op,
-            spec.relation_key,
-            serialized_context,
-            list(batch_row_nth),
-            runtime.main_source,
-            runtime.guardrails,
-            runtime.loader_retry,
-            runtime.preloaded_cache,
-            int(runtime.batch_num),
-            required_fields,
-            group_enabled=spec.group_enabled,
-        )
-
-    def _process_failure_mode(self, runtime: ExecutionRuntime) -> str:
-        failure_mode = runtime.adaptive_process_failure_mode or self._require_policy().choose_process_failure_mode(
-            plan=self._require_plan(),
-            runtime=runtime,
-            tuning=self._require_tuning(),
-        )
-        if failure_mode not in (PROCESS_FAILURE_FAIL_FAST, PROCESS_FAILURE_FALLBACK_SERIAL):
-            return PROCESS_FAILURE_FAIL_FAST
-        return failure_mode
-
-    def _should_use_process_backend(self, backend: str) -> bool:
-        return backend == ADAPTIVE_BACKEND_PROCESS

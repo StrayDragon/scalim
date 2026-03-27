@@ -53,7 +53,8 @@
 - **THEN** `customers` 相关并发任务同时运行数 MUST 不超过 2
 
 ### Requirement: backend 选择为高级 opt-in 且同次运行保持一致
-系统 MUST 默认 thread backend;process/async backend 仅在 policy 明确选择时启用.
+系统 MUST 默认 thread backend.
+系统 MUST 保留对 process/async backend 的“选择接口形状”(例如 policy 常量/返回值),但在当前版本中,process/async backend MUST NOT 被实际启用.
 系统 MUST 在创建 adaptive pool/executor 时确定 backend,并在同一次运行内复用该 backend(例如缓存于 runtime),调度器不得按层反复改选 backend.
 
 #### Scenario: backend 决策单次复用
@@ -61,14 +62,10 @@
 - **WHEN** 一次运行创建并执行 adaptive pool
 - **THEN** 实际执行 backend MUST 在本次运行内保持一致
 
-### Requirement: process/async backend 需明确 guardrails 与失败语义
-process backend MUST 对可序列化性失败给出明确行为:`fail_fast` 或确定性 fallback(如 serial/thread).
-picklability 检查 MUST 避免对共享上下文进行 per-task 重复序列化检测.
-async backend 对非 coroutine 任务 SHOULD 发出 warning(提示可能阻塞 loop).
-
-#### Scenario: process 不可序列化 fail-fast
-- **WHEN** policy 选择 process 且 failure_mode=`fail_fast` 且任务不可 pickle
-- **THEN** 系统 MUST 抛出可定位错误并终止该层执行
+#### Scenario: 选择未实现 backend 失败
+- **WHEN** policy 选择 process 或 async backend
+- **THEN** 系统 MUST 立即失败并明确指出“该 backend 暂不支持,当前仅支持 thread”
+- **AND** 错误信息 MUST 指引“请将 backend 改为 thread”
 
 ### Requirement: 并发结果采用完成优先回收与计划顺序提交
 系统 MUST 对并发任务采用完成优先回收(避免慢队头阻塞回收),并按计划顺序提交结果到上下文.

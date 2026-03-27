@@ -23,8 +23,9 @@
 - **THEN** `parallel_mode=adaptive` 的调度 MUST 使用该 tuning/policy 决定并发行为
 
 #### Scenario: 覆盖 adaptive 执行器类型
-- **WHEN** 用户通过 overrides 注入自定义的 `adaptive` backend executor(thread/process/async 的 factory 或等价扩展点)
+- **WHEN** 用户通过 overrides 注入自定义的 `adaptive` thread backend executor(thread 的 factory 或等价扩展点)
 - **THEN** 调度器 MUST 使用该 executor 创建并发 worker
+- **AND** 若用户配置/策略选择到 process/async backend,系统 MUST 失败并说明当前仅支持 thread
 
 ### Requirement: HookManager 分发在注册阶段编译缓存
 系统 MUST 在 hook 注册/注销时编译并缓存事件分发 callables,使 emit 热路径不依赖 `getattr/hasattr` 查找 handler.
