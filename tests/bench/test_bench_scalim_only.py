@@ -6,10 +6,10 @@ import pytest
 from scalim_benchlib import BenchmarkRunner
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
-from scalim.sinks.sink_memory import InMemoryRowSink
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.sinks import InMemoryRowSink
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import MainSourceIr
 
 
 def _bench_scale() -> str:

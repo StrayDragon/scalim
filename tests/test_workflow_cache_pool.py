@@ -6,13 +6,13 @@ import pytest
 
 from scalim.execution.pipeline.base.pipeline import Pipeline
 from scalim.execution.workflow_cache_pool import WorkflowCacheEntrySignature, WorkflowCachePool, ScalimWorkflowCachePoolError
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
-from scalim.spec.ir.workflow import WorkflowCachePoolBudgetIr, WorkflowCachePoolIr, WorkflowCachePoolPinIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir._workflow import WorkflowCachePoolBudgetIr, WorkflowCachePoolIr, WorkflowCachePoolPinIr
 from scalim.typedefs import SourceSpecIrCacheMode
 
 _TIMEOUT_S = 5.0
@@ -37,7 +37,7 @@ def test_json_like_helpers_reject_invalid_values() -> None:
 
 
 def test_ensure_json_like_rejects_empty_dict_key_when_required() -> None:
-    from scalim.utils.json_like import ensure_json_like
+    from scalim._internal.utils.json_like import ensure_json_like
 
     with pytest.raises(ScalimWorkflowCachePoolError, match="dict key must be str"):
         _ = ensure_json_like(
@@ -53,7 +53,7 @@ def test_ensure_json_like_rejects_empty_dict_key_when_required() -> None:
 
 def test_build_preload_forever_signature_normalizes_normalize_payload() -> None:
     from scalim.execution import workflow_cache_pool as mod
-    from scalim.spec.ir.sources import SourceNormalizeIr
+    from scalim.spec.ir import SourceNormalizeIr
 
     source = SourceIr(
         source_id="s1",

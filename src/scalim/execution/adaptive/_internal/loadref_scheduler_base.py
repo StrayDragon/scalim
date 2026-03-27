@@ -22,4 +22,4 @@ class AdaptiveLoadRefSchedulerBase(object):
         raise NotImplementedError
 
 
-__all__ = ["AdaptiveLoadRefSchedulerBase"]
+__all__ = []

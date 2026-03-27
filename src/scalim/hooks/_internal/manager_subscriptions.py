@@ -108,3 +108,6 @@ class HookManagerSubscriptionMixin(HookManagerBase, ABC):
 
     def wants(self, event_type: str) -> bool:
         return self.wants_typed(event_type) or self.wants_on_event(event_type)
+
+
+__all__ = []

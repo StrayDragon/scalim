@@ -10,10 +10,9 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
 
-from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
-from ..events.events import DiagnosticWarningEvent
-from ..sinks.sink_base import create_temp_path
-from ..utils.excel import escape_excel_formula
+from .._internal.utils.excel import escape_excel_formula
+from ..events import EVENT_DIAGNOSTIC_WARNING, DiagnosticWarningEvent
+from ..sinks import create_temp_path
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
@@ -362,11 +361,6 @@ __all__ = [
     "SheetPlan",
     "WorkbookPlan",
     "WorkflowWorkbookResourceMixin",
-    "_SheetPlan",
-    "_WorkbookPlan",
-    "_WorkflowWorkbookResourceMixin",
-    "_best_effort_close_write_only_workbook_worksheets",
-    "_get_openpyxl_workbook_class",
     "best_effort_close_write_only_workbook_worksheets",
     "get_openpyxl_workbook_class",
 ]

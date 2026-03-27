@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from scalim.events.events import BatchEndEvent, PipelineEndEvent, PipelineStartEvent
+from scalim.events import BatchEndEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.ob.presets.performance import PSUTIL_NOT_INSTALLED_WARNING_PREFIX, PerformanceConfig, PerformanceObserver
 from tests.testing_utils import missing_optional_dependency
 

@@ -6,7 +6,7 @@ from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler, resolve_adaptive_max_workers
-from scalim.hooks.base import BaseHook, HookManager, IExecutionHook
+from scalim.hooks import BaseHook, HookManager, IExecutionHook
 from scalim.ob.manager import ScalimObserverCaptureOverflowError, ObserverManager
 from scalim.ob.presets.viz import VizEventEmitter, VizObserver, VizObserverConfig
 

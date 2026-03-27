@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
-from .....spec.ir.aliases import NormalizedLookupKeySpec
-from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from .....spec.ir.fields import DerivedFieldIr, FieldIr
-from .....spec.ir.sources import (
+from .....spec.ir import (
+    DerivedFieldIr,
+    FieldIr,
     KeyIr,
     MainSourceIr,
     OrderByKeyIr,
@@ -13,6 +12,8 @@ from .....spec.ir.sources import (
     SourceNormalizeStepIr,
     SourceRefIr,
 )
+from .....spec.ir.aliases import NormalizedLookupKeySpec
+from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....typedefs import FieldValue, LoaderCallKwargs, RuntimeValue, SourceSpecIrCacheMode
 from ...config_parsing.call_by import CallByValue, ScalimCallByParseError, parse_call_by
 from ...config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
@@ -35,8 +36,8 @@ from .conversion_lookup import CALL_BY_CTX_KEY, validate_source_id
 from .conversion_relations import ConfigToIRConversionRelationMixin
 
 if TYPE_CHECKING:
+    from .....spec.ir import LookupStepIr
     from .....spec.ir.aliases import LoaderResultMapCallable, MainSourceRowIterableCallable
-    from .....spec.ir.relations import LookupStepIr
 
 
 _SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, str)
@@ -598,3 +599,6 @@ def _binding_from_compiled_params_template(
         cache_mode=cache_mode,
         param_name=None,
     )
+
+
+__all__ = []

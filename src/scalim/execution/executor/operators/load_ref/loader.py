@@ -3,15 +3,15 @@ import time
 from collections.abc import Mapping
 from typing import List, Optional, Tuple
 
-from .....events.catalog import EVENT_LOADER_CALL
+from .....events import EVENT_LOADER_CALL
+from .....spec.ir import LookupStepIr
+from .....spec.ir._helpers import call_loader_with_binding, coerce_loader_result_mapping
+from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
-from .....spec.ir.helpers import call_loader_with_binding, coerce_loader_result_mapping
-from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.source_contracts import LookupSourceRefIrBase
 from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData
+from .....utils.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
 from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
-from ...helpers.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
 from ...runtime.runtime import ExecutionRuntime, LoadRefCacheEntry
 from .context import LoadRefExecutionContext
 

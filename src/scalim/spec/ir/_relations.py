@@ -3,9 +3,9 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple, cast, overload
 
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
+from ._source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase
 from .aliases import LookupKeyCast, LookupKeySpec
 from .binding import BindingIr
-from .source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase
 
 
 @dataclass(frozen=True)
@@ -307,3 +307,6 @@ class LookupStepIr:
         if self.to_field is not None:
             return self.to_field
         return self.to_source.key.key
+
+
+__all__ = []

@@ -17,8 +17,8 @@ from scalim.execution.output_composition import (
     build_output_composition,
 )
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, run_ir
-from scalim.sinks.sink_excel import ExcelWorkbookSink
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import ExcelWorkbookSink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 from tests.cases.minimal_ir import build_minimal_ir_case
 
 

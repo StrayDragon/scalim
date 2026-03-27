@@ -3,8 +3,8 @@ from __future__ import absolute_import
 from typing import List, Optional, Sequence, Tuple
 
 from ..exceptions import ScalimExecutionError
-from ..sinks.sink_excel import ExcelWorkbookSink
-from ..spec.ir.demand import DemandIr
+from ..sinks import ExcelWorkbookSink
+from ..spec.ir import DemandIr
 from ..vendor.dataclassesx import replace
 from .run_ir import ExecutionRequest, ExecutionResult, OutputSpec, run_ir
 

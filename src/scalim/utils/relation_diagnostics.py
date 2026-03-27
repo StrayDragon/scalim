@@ -2,8 +2,7 @@ import contextlib
 from collections.abc import Mapping as MappingABC
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
-from ..spec.ir.relations import FieldRefIr, JoinConditionIr, RelationIr
-from ..spec.ir.sources import SourceIr
+from ..spec.ir import FieldRefIr, JoinConditionIr, RelationIr, SourceIr
 from ..vendor.compact.typing_extensionsx import TypeGuard, override
 
 

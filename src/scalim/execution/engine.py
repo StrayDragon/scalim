@@ -3,11 +3,11 @@
 import threading
 from typing import TYPE_CHECKING, Iterable, MutableMapping, Optional, Sequence
 
-from ..hooks.base import HookManager
+from ..hooks import HookManager
 from ..ob.manager import ObserverManager
 from ..planning.plan import ExecutionPlan
-from ..sinks.sink_base import ISink
-from ..spec.ir.demand import DemandIr
+from ..sinks import ISink
+from ..spec.ir import DemandIr
 from ..typedefs import KeyNormalizationMode, LoaderResultMapping, RowData
 from .executor.batch.executor import BatchExecutor
 from .executor.runtime.runtime import ExecutionRuntime
@@ -142,3 +142,6 @@ class ScalimEngine:
         """
         with self._run_lock:
             return self._pipeline.run(main_rows, sink)
+
+
+__all__ = []

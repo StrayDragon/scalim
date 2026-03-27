@@ -5,9 +5,9 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from ..spec.ir.aliases import LookupKeyCast
-from ..typedefs import LookupKey
-from ..vendor.compact.typing_extensionsx import TypeGuard
+from ...spec.ir.aliases import LookupKeyCast
+from ...typedefs import LookupKey
+from ...vendor.compact.typing_extensionsx import TypeGuard
 
 # endregion
 
@@ -274,3 +274,6 @@ def auto_str_normalize_key(value: object) -> Tuple[Optional[LookupKey], str, Opt
         return None, "type_error", msg
 
     return normalized, "ok", None
+
+
+__all__ = []

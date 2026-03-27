@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Tuple
 
-from .....spec.ir.relations import LookupStepIr
+from .....spec.ir import LookupStepIr
 from .....vendor.dataclassesx import dataclass
 from ...guardrails import build_guardrail_once_key, fail_guardrail, record_guardrail
 
@@ -125,6 +125,4 @@ def maybe_enforce_relation_guardrails(
         )
 
 
-__all__ = [
-    "maybe_enforce_relation_guardrails",
-]
+__all__ = []

@@ -7,9 +7,9 @@ import scalim.execution.executor.runtime as runtime_pkg
 import scalim.execution.pipeline.base as pipeline_base_pkg
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.executor.helpers.field_access import extract_field
-from scalim.execution.executor.helpers.relation_signature import build_relation_signature
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.pipeline.base.pipeline import Pipeline, SeqPipeline
+from scalim.utils.relation_signature import build_relation_signature
 
 
 def _assert_defined_outside_init(obj: object) -> None:

@@ -9,10 +9,10 @@
 from decimal import Decimal
 from typing import Iterable, Iterator, List, Optional, Sequence
 
-from ..typedefs import FieldValue, RowData
-from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import dataclass
-from .sink_base import BaseRowSink
+from ...typedefs import FieldValue, RowData
+from ...vendor.compact.typing_extensionsx import override
+from ...vendor.dataclassesx import dataclass
+from .base import BaseRowSink
 from .sink_csv import InMemoryCsv
 
 _FIELD_VALUE_TYPES = (int, float, Decimal, str, bool)
@@ -135,9 +135,4 @@ def iter_in_memory_rows_as_main_rows(artifact: InMemoryRows) -> Iterable[RowData
     return _Iterable(header=list(artifact.header), rows=artifact.rows)
 
 
-__all__ = [
-    "InMemoryRows",
-    "InMemoryRowsSink",
-    "in_memory_rows_to_in_memory_csv",
-    "iter_in_memory_rows_as_main_rows",
-]
+__all__ = []

@@ -1138,3 +1138,6 @@ def _run_upsert_lsp_comment(args: argparse.Namespace) -> int:
         )
 
     return exit_code
+
+
+__all__ = []

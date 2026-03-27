@@ -1,8 +1,7 @@
 from typing import Dict, Sequence, Tuple
 
-from ...spec.ir.demand import DemandIr
-from ...spec.ir.fields import DerivedFieldIr, FieldIr
-from ...utils import graph
+from ..._internal.utils import graph
+from ...spec.ir import DemandIr, DerivedFieldIr, FieldIr
 from .resolver import LookupStepsResolver, extract_relation_dependency_keys
 
 

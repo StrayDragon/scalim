@@ -86,10 +86,7 @@ def _python_constants_text(values: Dict[str, str]) -> str:
     for key in keys:
         lines.append('{} = "{}"'.format(key, values[key].replace('"', '\\"')))
     lines.append("")
-    lines.append("__all__ = (")
-    for key in keys:
-        lines.append('    "{}",'.format(key))
-    lines.append(")")
+    lines.append("__all__ = []")
     lines.append("")
     return "\n".join(lines)
 

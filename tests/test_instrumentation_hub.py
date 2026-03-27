@@ -4,19 +4,19 @@ import pytest
 
 from scalim.dsl.by_yaml.runtime.observability import compile_observability_spec
 from scalim.dsl.by_yaml.schema_dsl.models import ObservabilityConfig, PerformanceConfig as PerformanceConfigYaml
-from scalim.events.catalog import (
+from scalim.events import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_LOADER_CALL,
     EVENT_LOADER_SLIM,
     EVENT_PIPELINE_START,
     EVENT_STAGE_SPAN,
 )
-from scalim.events.event import Event
-from scalim.events.events import PipelineStartEvent, StageSpanEvent
+from scalim.events import Event
+from scalim.events import PipelineStartEvent, StageSpanEvent
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.pipeline.overrides import PipelineOverrides
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.hub import InstrumentationHub
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
@@ -24,8 +24,8 @@ from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
 from scalim.ob.presets.performance import PerformanceObserver
 from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan, PlanMetadata, Stage
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import MainSourceIr
 
 
 class _CaptureOnEventHook(BaseHook):

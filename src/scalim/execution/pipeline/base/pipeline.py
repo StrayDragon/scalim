@@ -15,22 +15,20 @@ from collections.abc import Mapping
 from concurrent.futures import Executor
 from typing import Any, Callable, Dict, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
 
-from ....hooks.base import HookManager
+from ....hooks import HookManager
 from ....ob.manager import ObserverManager
 from ....planning.operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
-from ....sinks.sink_base import IColumnSink, IRowSink, ISink
+from ....sinks import IColumnSink, IRowSink, ISink
+from ....spec.ir import DemandIr, FieldIr, SourceIr
+from ....spec.ir._helpers import coerce_loader_result_mapping
 from ....spec.ir.aliases import LoaderResultMapCallable
 from ....spec.ir.binding import LoaderCallContextIr
-from ....spec.ir.demand import DemandIr
-from ....spec.ir.fields import FieldIr
-from ....spec.ir.helpers import coerce_loader_result_mapping
-from ....spec.ir.sources import SourceIr
 from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, RowData, SinkRowKeySeq
+from ....utils.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext, create_batch_context_for_rows
 from ...executor.batch.executor import BatchExecutor
-from ...executor.helpers.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
 from ...executor.runtime.runtime import ExecutionRuntime
 from ...loader_retry import CALLSITE_MAIN_SOURCE, CALLSITE_PRELOAD_FOREVER, call_with_loader_retry
 from ...workflow_cache_pool import build_preload_forever_signature

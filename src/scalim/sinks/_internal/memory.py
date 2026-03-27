@@ -1,15 +1,10 @@
 # region imports
 
-from typing import TYPE_CHECKING, Any, Dict, Hashable, List, Mapping, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Dict, Hashable, List, Mapping, Optional, Sequence, Type, Union
 
-from ..vendor.compact.importlibx import require_optional_dependency
-
-if TYPE_CHECKING:
-    import pandas as pd
-
-from ..typedefs import FieldValue, RowData, SinkRowKeySeq
-from ..vendor.compact.typing_extensionsx import Self, override
-from .sink_base import IColumnSink, IRowSink
+from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...vendor.compact.typing_extensionsx import Self, override
+from .base import BaseRowSink, IColumnSink
 
 if TYPE_CHECKING:
     import types
@@ -17,65 +12,74 @@ if TYPE_CHECKING:
 # endregion
 
 
-def _get_pandas_module() -> Any:
-    return require_optional_dependency("pandas", context="scalim.sinks.sink_pandas")
+class InMemoryRowSink(BaseRowSink):
+    """内存行写入器:支持行级写入并存储在内存中(FR023).
 
+    主要用于测试与调试.
 
-class PandasRowSink(IRowSink):
-    field_names: List[str]
-    _rows: List[RowData]
-    _closed: bool
+    示例:
+    ```python
+    sink = InMemoryRowSink()
+    sink.write_row({"id": 1, "name": "张三"})
+    sink.write_batch([{"id": 2, "name": "李四"}])
+    data = sink.get_data()
+    ```
+    """
 
-    def __init__(self, field_names: Optional[List[str]] = None) -> None:
-        self.field_names = field_names if field_names is not None else []
-        self._rows = []
-        self._closed = False
+    def __init__(self) -> None:
+        self._data: List[RowData] = []
+        self._closed: bool = False
 
     @override
     def write_row(self, row: RowData) -> None:
-        self._rows.append(dict(row))
-        if not self.field_names:
-            for key in row:
-                if key not in self.field_names:
-                    self.field_names.append(key)
+        self._data.append(dict(row))
 
     def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
         if len(field_keys) != len(values):
             msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
             raise ValueError(msg)
-        self.write_row(dict(zip(field_keys, values)))
+        self._data.append(dict(zip(field_keys, values)))
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
         for row in rows:
-            self.write_row(row)
+            self._data.append(dict(row))
 
     @override
     def close(self) -> None:
         self._closed = True
 
-    def to_dataframe(self) -> "pd.DataFrame":
-        pd_module = _get_pandas_module()
-        if self.field_names:
-            return pd_module.DataFrame(self._rows, columns=self.field_names)
-        return pd_module.DataFrame(self._rows)
-
-    def get_rows(self) -> List[RowData]:
-        return self._rows
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
-    ) -> None:
-        self.close()
+    def get_data(self) -> List[RowData]:
+        return self._data
 
 
-class PandasColumnSink(IColumnSink):
+InMemoryListSink = InMemoryRowSink
+
+
+class InMemoryColumnSink(IColumnSink):
+    """内存列写入器:支持按列追加写入并存储在内存中(FR023).
+
+    主要用于测试、调试,以及需要在内存中进一步处理数据的场景.
+
+    数据访问方式:
+    - `get_columns()`:获取列式数据(`Dict[field_key, Dict[pk, value]]`)
+    - `get_rows()`:获取行式数据(`List[Dict[field_key, value]]`)
+    - `get_2d_list()`:获取二维列表(`List[List[value]]`)
+    - `get_column(field_key)`:获取单列数据
+
+    示例:
+    ```python
+    sink = InMemoryColumnSink(["order_id", "name"])
+    sink.set_row_ids([1, 2, 3])
+    sink.write_column("order_id", {1: 1, 2: 2, 3: 3})
+    sink.write_column("name", {1: "甲", 2: "乙", 3: "丙"})
+    sink.close()
+
+    columns = sink.get_columns()
+    rows = sink.get_rows()
+    ```
+    """
+
     field_names: List[str]
     _row_ids: List[Hashable]
     _columns: Dict[str, Dict[Hashable, FieldValue]]
@@ -105,11 +109,13 @@ class PandasColumnSink(IColumnSink):
         if len(row_ids) != len(values):
             msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
             raise ValueError(msg)
+
         if field_key not in self._columns:
             self._columns[field_key] = {}
         col = self._columns[field_key]
         for row_id, value in zip(row_ids, values):
             col[row_id] = value
+
         if self._auto_field_names and field_key not in self.field_names:
             self.field_names.append(field_key)
 
@@ -133,25 +139,51 @@ class PandasColumnSink(IColumnSink):
     def close(self) -> None:
         self._closed = True
 
-    def to_dataframe(self) -> "pd.DataFrame":
-        pd_module = _get_pandas_module()
-        if not self._row_ids:
-            return pd_module.DataFrame(columns=self.field_names or [])
-
-        fields = self.field_names or list(self._columns.keys())
-        data: Dict[str, List[Union[FieldValue, None]]] = {}
-
-        for field_key in fields:
-            col_data = self._columns.get(field_key, {})
-            data[field_key] = [col_data.get(pk) for pk in self._row_ids]
-
-        return pd_module.DataFrame(data, columns=fields)
+    # ============================================================
+    # 数据访问方法
+    # ============================================================
 
     def get_columns(self) -> Dict[str, Dict[Hashable, FieldValue]]:
         return self._columns
 
+    def get_column(self, field_key: str) -> Dict[Hashable, FieldValue]:
+        return self._columns.get(field_key, {})
+
+    def get_rows(self) -> List[RowData]:
+        rows: List[RowData] = []
+        for pk in self._row_ids:
+            row: Dict[str, FieldValue] = {}
+            for field_key in self._columns:
+                if pk in self._columns[field_key]:
+                    row[field_key] = self._columns[field_key][pk]
+            rows.append(row)
+        return rows
+
+    def get_2d_list(
+        self,
+        *,
+        include_header: bool = False,
+    ) -> List[List[Union[str, FieldValue]]]:
+        result: List[List[Union[str, FieldValue]]] = []
+        fields = self.field_names or list(self._columns.keys())
+
+        if include_header:
+            result.append(list(fields))
+
+        for pk in self._row_ids:
+            row_values: List[Union[str, FieldValue]] = []
+            for field_key in fields:
+                column_data = self._columns.get(field_key, {})
+                row_values.append(column_data.get(pk))
+            result.append(row_values)
+
+        return result
+
     def get_row_ids(self) -> List[Hashable]:
         return self._row_ids
+
+    def get_field_names(self) -> List[str]:
+        return self.field_names or list(self._columns.keys())
 
     def __enter__(self) -> Self:
         return self
@@ -165,7 +197,4 @@ class PandasColumnSink(IColumnSink):
         self.close()
 
 
-__all__ = [
-    "PandasColumnSink",
-    "PandasRowSink",
-]
+__all__ = []

@@ -2,7 +2,7 @@ from typing import Optional
 
 import pytest
 
-from scalim.spec.ir.sources import KeyIr, SourceIr
+from scalim.spec.ir import KeyIr, SourceIr
 from scalim.utils.relation_diagnostics import RelationDiagnostics, TypeMismatchWarning
 
 
@@ -225,7 +225,7 @@ class TestRelationDiagnosticsSampleComparison:
         assert len(results) == 5
 
     def test_sample_comparison_with_relation_ir(self) -> None:
-        from scalim.spec.ir.relations import RelationIr
+        from scalim.spec.ir import RelationIr
 
         source_a = _make_source("orders", "order_id")
         source_b = _make_source("customers", "customer_id")
@@ -241,7 +241,7 @@ class TestRelationDiagnosticsSampleComparison:
         assert results[0]["matched"] is True
 
     def test_sample_comparison_empty_relation(self) -> None:
-        from scalim.spec.ir.relations import RelationIr
+        from scalim.spec.ir import RelationIr
 
         relation = RelationIr(conditions=())
 

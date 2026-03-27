@@ -21,24 +21,4 @@ VIZ_ARTIFACTS_ROOT = "artifacts/scalim-viz"
 VIZ_DIR_NAME = "scalim-viz"
 VIZ_REPLAY_ROUTE = "/__scalim_viz__/replay"
 
-__all__ = (
-    "CLI_NAME",
-    "DIST_NAME",
-    "ENV_BENCH_MAX_WORKERS",
-    "ENV_BENCH_SCALE",
-    "ENV_BENCH_SCOPE",
-    "ENV_SYNC_ANALYSIS_SCRIPT",
-    "ENV_SYNC_ANALYZE_ARGS",
-    "ENV_SYNC_ANALYZE_ARGS_PREFIX",
-    "ENV_SYNC_DEST_DIR",
-    "ENV_SYNC_LOG_DEST_DIR",
-    "ENV_SYNC_LOG_REMOTE_DIR",
-    "ENV_SYNC_REMOTE_HOST",
-    "ENV_SYNC_REPORT_ROOT_DIR",
-    "ENV_SYNC_TMP_REMOTE_DIR",
-    "IMPORT_ROOT",
-    "VERSION",
-    "VIZ_ARTIFACTS_ROOT",
-    "VIZ_DIR_NAME",
-    "VIZ_REPLAY_ROUTE",
-)
+__all__ = []

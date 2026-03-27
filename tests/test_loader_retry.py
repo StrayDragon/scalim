@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pytest
 
 import scalim.execution.loader_retry as lr
-from scalim.events.catalog import EVENT_LOADER_RETRY
+from scalim.events import EVENT_LOADER_RETRY
 from scalim.execution.loader_retry import CALLSITE_LOAD, LoaderRetryContext, LoaderRetryPolicy, call_with_loader_retry
 
 

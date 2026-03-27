@@ -4,16 +4,16 @@ from typing import Any, Dict, List, Optional
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.events.events import LoaderCallEvent
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.events import LoaderCallEvent
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.logs import LoggingObserver
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
 class _LoaderEventCapture(BaseHook):

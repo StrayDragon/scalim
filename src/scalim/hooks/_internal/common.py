@@ -3,7 +3,7 @@ from collections.abc import Set as AbstractSet
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 from ..._internal.loggingx import prefix
-from ...events.catalog import (
+from ...events import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
     EVENT_BATCH_END,
     EVENT_BATCH_START,
@@ -109,3 +109,6 @@ def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
             raise TypeError(msg)
         validated.add(item)
     return validated
+
+
+__all__ = []

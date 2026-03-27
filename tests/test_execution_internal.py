@@ -10,18 +10,18 @@ from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.pipeline.base._row_emission import RowEmissionCoordinator
 from scalim.execution.pipeline.base.pipeline import SeqPipeline
 from scalim.execution.pipeline.overrides import PipelineOverrides
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning import PlanBuilder
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.sinks.sink_base import IColumnSink
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import IColumnSink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr
 from tests.testing_utils import RecordingLoadRefExecutor
 
 

@@ -1,8 +1,6 @@
 from typing import List, Optional, Sequence, Set, Tuple, Union
 
-from ...spec.ir.demand import DemandIr
-from ...spec.ir.fields import DerivedFieldIr, FieldIr
-from ...spec.ir.sources import MainSourceIr, SourceIr
+from ...spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, SourceIr
 from ..operators import (
     ComputeOperatorIr,
     LoadOperatorIr,

@@ -1,10 +1,7 @@
 from typing import Callable, Dict, List, Optional, Tuple
 
-from ...spec.ir.demand import DemandIr
-from ...spec.ir.fields import FieldIr
-from ...spec.ir.helpers import extract_from_fields, infer_lookup_steps
-from ...spec.ir.relations import LookupStepIr
-from ...spec.ir.sources import SourceIr, SourceRefIr
+from ...spec.ir import DemandIr, FieldIr, LookupStepIr, SourceIr, SourceRefIr
+from ...spec.ir._helpers import extract_from_fields, infer_lookup_steps
 
 InferLookupStepsFn = Callable[[object, SourceRefIr, SourceIr], Optional[Tuple[LookupStepIr, ...]]]
 

@@ -12,10 +12,8 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, Union, cast
 
-from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
-from ..events.events import DiagnosticWarningEvent
-from ..sinks.sink_base import create_temp_path
-from ..sinks.sink_csv import InMemoryCsv
+from ..events import EVENT_DIAGNOSTIC_WARNING, DiagnosticWarningEvent
+from ..sinks import InMemoryCsv, create_temp_path
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock
@@ -289,13 +287,6 @@ __all__ = [
     "AppendSegment",
     "CsvPlan",
     "WorkflowCsvResourceMixin",
-    "_AppendSegment",
-    "_CsvPlan",
-    "_WorkflowCsvResourceMixin",
-    "_build_alignment_mapping",
-    "_describe_header_diff",
-    "_iter_csv_rows",
-    "_read_csv_header",
     "build_alignment_mapping",
     "describe_header_diff",
     "iter_csv_rows",

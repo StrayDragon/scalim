@@ -5,7 +5,7 @@ import time
 from collections.abc import Sized
 from typing import Any, Dict, Hashable, Iterable, List, Optional, Union, cast
 
-from ...events.events import (
+from ...events import (
     BatchEndEvent,
     BatchStartEvent,
     FieldSlimEvent,

@@ -1,7 +1,6 @@
 from typing import FrozenSet, Set
 
-from ...spec.ir.demand import DemandIr
-from ...spec.ir.fields import FieldIr
+from ...spec.ir import DemandIr, FieldIr
 from .resolver import LookupStepsResolver
 
 

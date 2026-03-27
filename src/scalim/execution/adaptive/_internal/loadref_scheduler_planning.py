@@ -1,8 +1,7 @@
 from concurrent.futures import Executor
 from typing import Any, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple, cast
 
-from ....events.catalog import EVENT_ADAPTIVE_SCHEDULER_DECISION
-from ....events.events import AdaptiveSchedulerDecisionEvent
+from ....events import EVENT_ADAPTIVE_SCHEDULER_DECISION, AdaptiveSchedulerDecisionEvent
 from ....planning.operators import LoadRefOperatorIr
 from ...context import BatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
@@ -164,3 +163,6 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
             )
 
         _ = runtime.instrumentation.emit_lazy(EVENT_ADAPTIVE_SCHEDULER_DECISION, _build_payload)
+
+
+__all__ = []

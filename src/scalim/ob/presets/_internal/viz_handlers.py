@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Sequence, Set, cast
 
-from ....events.events import (
+from ....events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
     BatchStartEvent,
@@ -416,3 +416,6 @@ class VizObserverHandlerMixin(ABC):
             {"type": "output_target", "id": "output_target:{}".format(event.target_id)},
             payload,
         )
+
+
+__all__ = []

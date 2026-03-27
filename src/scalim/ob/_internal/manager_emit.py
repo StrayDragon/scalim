@@ -4,8 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
 from ..._internal.loggingx import format_kv, prefix
-from ...events.attribution import WORKFLOW_ATTRIBUTION_META_KEYS
-from ...events.catalog import (
+from ...events import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
     EVENT_COLUMN_WRITE,
@@ -22,14 +21,13 @@ from ...events.catalog import (
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
     EVENT_STAGE_SPAN,
-)
-from ...events.event import Event, now_ts
-from ...events.events import (
+    WORKFLOW_ATTRIBUTION_META_KEYS,
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
+    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,
@@ -41,6 +39,7 @@ from ...events.events import (
     RowReleaseEvent,
     RowWriteEvent,
     StageSpanEvent,
+    now_ts,
 )
 from ...typedefs import RelationLookupResult
 from ..observer import Observer
@@ -420,3 +419,6 @@ class ObserverManagerEmitMixin(ABC):
             return
         payload = StageSpanEvent(stage=stage, batch_num=batch_num, duration=duration)
         _ = self.emit_event(EVENT_STAGE_SPAN, payload)
+
+
+__all__ = []

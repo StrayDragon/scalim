@@ -56,3 +56,6 @@ class MainSourceRefIrBase(SourceRefIrBase, Protocol):
 
     @property
     def loader(self) -> object: ...
+
+
+__all__ = []

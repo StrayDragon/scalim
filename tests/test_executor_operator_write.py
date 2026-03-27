@@ -2,10 +2,10 @@
 
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.write import WriteColumnOperatorExecutor, WriteRowOperatorExecutor
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.planning.operators import OperatorType, WriteColumnOperatorIr, WriteRowOperatorIr
 from scalim.planning.plan import ExecutionPlan
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 
 from .fixtures.executor_operator_fixtures import _CaptureHook, _make_runtime
 

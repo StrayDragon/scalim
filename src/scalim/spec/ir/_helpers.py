@@ -1,10 +1,10 @@
 from typing import List, Optional, Tuple, cast
 
 from ...typedefs import LoaderResultMapping, RuntimeValue
+from ._relations import JoinConditionIr, LookupStepIr, RelationIr
+from ._sources import SourceIr, SourceRefIr
 from .aliases import LoaderResultMapCallable
 from .binding import BindingIr, LoaderCallContextIr
-from .relations import JoinConditionIr, LookupStepIr, RelationIr
-from .sources import SourceIr, SourceRefIr
 
 
 def infer_lookup_steps(
@@ -95,3 +95,6 @@ def call_loader_with_binding(
 
 def coerce_loader_result_mapping(result: object) -> LoaderResultMapping:
     return cast("LoaderResultMapping", result)  # pragma: allow-cast loader result boundary typed narrowing
+
+
+__all__ = []

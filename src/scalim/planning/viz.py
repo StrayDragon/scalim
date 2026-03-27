@@ -3,8 +3,7 @@
 import time
 from typing import Any, Dict, List, Set, Tuple, Union
 
-from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
-from ..spec.ir.sources import MainSourceIr, SourceIr
+from ..spec.ir import DerivedFieldIr, FieldIr, MainSourceIr, SourceIr, SupportedFieldIr
 from ..vendor.dataclassesx import asdict
 
 # endregion

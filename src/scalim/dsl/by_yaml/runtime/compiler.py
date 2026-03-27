@@ -19,7 +19,7 @@ from ....execution.guardrails import (
 )
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
-from ....spec.ir.demand import DemandIr
+from ....spec.ir import DemandIr
 from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import replace
 from ..config_parsing.loader import YamlDemandLoader

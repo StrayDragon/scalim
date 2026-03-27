@@ -96,3 +96,6 @@ def build_generated_doc_block(lines: List[str]) -> str:
         return ""
     # 保证输出以 `\\n` 结尾,避免无意义 `diff` 漂移.
     return "\n".join(lines).rstrip() + "\n"
+
+
+__all__ = []

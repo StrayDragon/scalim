@@ -49,3 +49,6 @@ class ValidationReport:
 
     def ok(self) -> bool:
         return not self.errors()
+
+
+__all__ = []

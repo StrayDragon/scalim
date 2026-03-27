@@ -2,7 +2,7 @@ import pytest
 import pickle
 from types import MappingProxyType
 
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.spec.ir.binding import BindingIr, LoaderIr, _restore_bindings
 

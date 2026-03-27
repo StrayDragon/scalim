@@ -195,3 +195,6 @@ class VizObserverOutputMixin(ABC):
         if self._trace_emitter is not None:
             self._trace_emitter.close()
             self._trace_emitter = None
+
+
+__all__ = []

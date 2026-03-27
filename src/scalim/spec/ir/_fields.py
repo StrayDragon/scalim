@@ -3,10 +3,10 @@ from typing import Callable, Hashable, Mapping, Optional, Set, Tuple, Union
 
 from ...typedefs import FieldValue
 from ...vendor.dataclassesx import dataclass
-from .helpers import extract_from_fields
+from ._helpers import extract_from_fields
+from ._relations import JoinConditionIr, LookupStepIr, RelationIr
+from ._sources import SourceRefIr
 from .presentation import FieldPresentationIr
-from .relations import JoinConditionIr, LookupStepIr, RelationIr
-from .sources import SourceRefIr
 
 
 @dataclass(frozen=True)
@@ -243,3 +243,5 @@ class DerivedFieldIr:
 
 
 SupportedFieldIr = Union[FieldIr, DerivedFieldIr]
+
+__all__ = []

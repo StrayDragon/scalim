@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from scalim.events.events import (
+from scalim.events import (
     WorkflowCacheAcquireEvent,
     WorkflowCacheEvictEvent,
     WorkflowCacheReleaseEvent,
@@ -16,7 +16,7 @@ from scalim.events.events import (
 )
 from scalim.ob.presets.viz import VizObserverConfig, WorkflowVizObserver, build_workflow_viz_graph_snapshot
 from scalim.ob.presets.viz import workflow as workflow_viz_module
-from scalim.spec.ir.workflow import (
+from scalim.spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowArtifactsIr,
     WorkflowIr,

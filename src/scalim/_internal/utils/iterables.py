@@ -21,6 +21,4 @@ def ordered_unique_str(items: Sequence[object]) -> Tuple[str, ...]:
     return tuple(out)
 
 
-__all__ = [
-    "ordered_unique_str",
-]
+__all__ = []

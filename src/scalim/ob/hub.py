@@ -3,7 +3,7 @@
 import threading
 from typing import Any, Callable, Dict, Hashable, List, Optional, TypeVar, Union
 
-from ..events.catalog import (
+from ..events import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
     EVENT_COLUMN_WRITE,
@@ -20,14 +20,12 @@ from ..events.catalog import (
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
     EVENT_STAGE_SPAN,
-)
-from ..events.event import Event
-from ..events.events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
+    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,
@@ -40,7 +38,7 @@ from ..events.events import (
     RowWriteEvent,
     StageSpanEvent,
 )
-from ..hooks.base import HookManager, IExecutionHook
+from ..hooks import HookManager, IExecutionHook
 from ..typedefs import RelationLookupResult
 from .components import split_components
 from .manager import ObserverManager

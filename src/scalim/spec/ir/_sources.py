@@ -6,9 +6,9 @@ from typing import Mapping as TypingMapping
 from ...typedefs import LoaderResultMap, LoaderResultMapping, SourceSpecIrCacheMode, StaticParams
 from ...vendor.compact.typing_extensionsx import TypeGuard, override
 from ...vendor.dataclassesx import dataclass, field
+from ._relations import FieldRefIr
 from .aliases import LookupKeyCast, MainSourceRowIterableCallable, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
-from .relations import FieldRefIr
 
 
 @dataclass(frozen=True)
@@ -718,3 +718,5 @@ class OrderByKeyIr:
 
 
 SourceRefIr = Union["SourceIr", "MainSourceIr"]
+
+__all__ = []

@@ -149,3 +149,6 @@ def upsert_schema_modelines_file(
         return UpsertResult(path=path, changed=False, error="Failed to write: {}".format(exc))
 
     return UpsertResult(path=path, changed=True)
+
+
+__all__ = []

@@ -5,6 +5,4 @@ class ScalimExperimentalWarning(UserWarning):
     """
 
 
-__all__ = [
-    "ScalimExperimentalWarning",
-]
+__all__ = []

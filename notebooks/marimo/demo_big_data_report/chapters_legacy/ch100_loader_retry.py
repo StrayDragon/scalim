@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 from scalim.dsl.by_yaml import run
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 from scalim_misc.demo_big_data_report.by_yaml_dsl import loader_retry_demo_mod as demo_mod
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 

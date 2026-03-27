@@ -1,7 +1,7 @@
 from typing import Hashable, List, cast
 
 from ....planning.operators import SupportedOperatorIr, WriteColumnOperatorIr, WriteRowOperatorIr
-from ....sinks.sink_base import IColumnSink, IRowSink
+from ....sinks import IColumnSink, IRowSink
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
 from ..helpers.batch_data import build_column_data, build_row
@@ -73,3 +73,6 @@ class WriteRowOperatorExecutor(OperatorExecutor):
                 batch_num=runtime.batch_num,
                 row_index=row_index,
             )
+
+
+__all__ = []

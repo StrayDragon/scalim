@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Mapping, Sequence
 
-from scalim.sinks.sink_base import BaseRowSink, IColumnSink
+from scalim.sinks import BaseRowSink, IColumnSink
 from scalim.typedefs import FieldValue, RowData
 
 

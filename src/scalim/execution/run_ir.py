@@ -4,8 +4,9 @@ import warnings as py_warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
-from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
-from ..hooks.base import HookManager, IExecutionHook
+from .._internal.warningsx import ScalimExperimentalWarning
+from ..events import EVENT_DIAGNOSTIC_WARNING
+from ..hooks import HookManager, IExecutionHook
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
 from ..ob.observability import Observability
@@ -13,16 +14,26 @@ from ..ob.observer import Observer
 from ..ob.presets.viz import VizObserver, VizObserverConfig
 from ..planning.builder import PlanBuilder
 from ..planning.plan import ExecutionPlan
-from ..sinks.sink_base import BaseRowSink, BaseSink, ColumnBatch, ColumnValues, IColumnSink, IRowSink, ISink
-from ..sinks.sink_csv import ColumnCSVSink, CSVSink, InMemoryCsv, InMemoryCsvSink
-from ..sinks.sink_rows import InMemoryRows, InMemoryRowsSink
-from ..spec.ir.demand import DemandIr
-from ..spec.ir.fields import DerivedFieldIr, FieldIr, SupportedFieldIr
+from ..sinks import (
+    BaseRowSink,
+    BaseSink,
+    ColumnBatch,
+    ColumnCSVSink,
+    ColumnValues,
+    CSVSink,
+    IColumnSink,
+    InMemoryCsv,
+    InMemoryCsvSink,
+    InMemoryRows,
+    InMemoryRowsSink,
+    IRowSink,
+    ISink,
+)
+from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, replace
 from ..vendor.dataclassesx import field as dataclass_field
-from ..warningsx import ScalimExperimentalWarning
 from .engine import ScalimEngine
 from .guardrails import GuardrailsPolicy
 from .key_normalization import normalize_key_normalization
@@ -409,7 +420,7 @@ def _create_file_sink(output: OutputSpec, layout: ExportLayout) -> Optional[ISin
         )
 
     if fmt == "excel":
-        from ..sinks.sink_excel import ColumnExcelSink, ExcelSink  # noqa: PLC0415
+        from ..sinks import ColumnExcelSink, ExcelSink  # noqa: PLC0415
 
         if output.streaming:
             return ExcelSink(

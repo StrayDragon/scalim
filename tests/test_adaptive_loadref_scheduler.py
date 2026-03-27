@@ -6,17 +6,17 @@ import pytest
 from scalim.execution.adaptive import loadref_scheduler
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.context import BatchContext
-from scalim.execution.executor.helpers.relation_signature import has_rows_binding
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.pipeline.overrides import PipelineOverrides
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.utils.relation_signature import has_rows_binding
 from tests.testing_utils import InlineExecutor, NoOpLoadRefExecutor, RecordingLoadRefExecutor
 
 

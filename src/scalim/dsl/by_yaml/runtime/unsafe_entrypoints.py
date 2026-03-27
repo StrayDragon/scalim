@@ -15,9 +15,9 @@ from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
 from ....execution.run_ir import run_ir
-from ....hooks.base import IExecutionHook
+from ....hooks import IExecutionHook
 from ....ob.observer import Observer
-from ....sinks.sink_base import ISink
+from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from .compiler import compile as _compile
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult

@@ -5,8 +5,8 @@ from typing import Any, Dict, List
 
 import pytest
 
-from scalim.events.catalog import EVENT_STAGE_SPAN
-from scalim.events.event import Event
+from scalim.events import EVENT_STAGE_SPAN
+from scalim.events import Event
 from scalim.execution.adaptive.policy import ADAPTIVE_BACKEND_ASYNC, ADAPTIVE_BACKEND_PROCESS, AdaptivePolicy
 from scalim.execution.adaptive.policy import ADAPTIVE_BACKEND_THREAD
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
@@ -18,17 +18,17 @@ from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.pipeline.base._adaptive_pool import maybe_create_adaptive_pool
 from scalim.execution.pipeline.base.pipeline import SeqPipeline
 from scalim.execution.pipeline.overrides import PipelineOverrides
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning import PlanBuilder
 from scalim.planning.plan import ExecutionPlan
-from scalim.sinks.sink_base import ISink
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import ISink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
 def _picklable_test_main_loader() -> List[Dict[str, Any]]:

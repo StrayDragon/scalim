@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Mapping
 
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr
 
 _PRELOAD_COUNTER = {"calls": 0}
 

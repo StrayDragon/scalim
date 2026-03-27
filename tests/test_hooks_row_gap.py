@@ -1,6 +1,6 @@
 import logging
 
-from scalim.events.events import LoaderCallEvent, PipelineEndEvent
+from scalim.events import LoaderCallEvent, PipelineEndEvent
 from scalim.ob.presets.row_gap import ROW_GAP_LOG_PRIMARY, ROW_GAP_LOG_SUMMARY, RowGapObserver
 
 

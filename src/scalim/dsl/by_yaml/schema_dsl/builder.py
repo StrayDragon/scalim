@@ -962,3 +962,6 @@ def schemas_equivalent(left: Any, right: Any) -> bool:
 
 def normalize_schema(value: Any, key: str = "") -> Any:
     return _DEFAULT_BUILDER.normalize_schema(value, key)
+
+
+__all__ = []

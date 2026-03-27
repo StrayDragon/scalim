@@ -4,7 +4,7 @@ import pytest
 
 from scalim.execution import output_composition as mod
 from scalim.execution.output_contracts import ExportLayout, OutputSpec
-from scalim.sinks.sink_base import BaseRowSink
+from scalim.sinks import BaseRowSink
 
 
 class _CollectingRowSink(BaseRowSink):

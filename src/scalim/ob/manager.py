@@ -5,7 +5,7 @@ import threading
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
-from ..events.event import Event, generate_run_id
+from ..events import Event, generate_run_id
 from ._internal.common import (
     DEFAULT_MAX_RECORDED_EVENTS,
     ScalimObserverCaptureOverflowError,

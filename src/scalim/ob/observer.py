@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Set
 
-from ..events.catalog import (
+from ..events import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
     EVENT_BATCH_END,
     EVENT_BATCH_START,
@@ -22,8 +22,8 @@ from ..events.catalog import (
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
     EVENT_STAGE_SPAN,
+    Event,
 )
-from ..events.event import Event
 from ..vendor.compact.typing_extensionsx import override
 
 # endregion

@@ -2,7 +2,7 @@ import secrets
 import time
 from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
 
-from ..events.catalog import EVENT_LOADER_RETRY
+from ..events import EVENT_LOADER_RETRY
 from ..vendor.dataclassesx import dataclass, field
 
 CALLSITE_LOAD = "load"
@@ -391,3 +391,6 @@ def call_with_loader_retry(
 
             if sleep_seconds > 0:
                 time.sleep(sleep_seconds)
+
+
+__all__ = []

@@ -169,3 +169,6 @@ class DerivedFieldConfig:
 
     depends_on: Tuple[str, ...] = dataclass_field(default_factory=tuple, metadata=schema_omit())
     """依赖字段标识列表(内部字段;解析后填充)."""
+
+
+__all__ = []

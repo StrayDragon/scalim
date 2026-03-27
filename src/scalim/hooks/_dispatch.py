@@ -18,4 +18,4 @@ class HookDispatchStrategy:
             safe_call(hook, handler, event)
 
 
-__all__ = ["HookDispatchStrategy"]
+__all__ = []

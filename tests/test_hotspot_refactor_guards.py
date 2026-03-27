@@ -3,7 +3,7 @@ from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
-from scalim.hooks.base import BaseHook, HookManager, IExecutionHook
+from scalim.hooks import BaseHook, HookManager, IExecutionHook
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.viz import VizObserver, VizObserverConfig
 

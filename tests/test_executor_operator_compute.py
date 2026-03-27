@@ -8,10 +8,10 @@ from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
 from scalim.execution.context import BatchContext
 from scalim.execution.guardrails import ScalimGuardrailViolationError as GuardrailViolation, GuardrailsComputePolicy, GuardrailsPolicy
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir.fields import DerivedFieldIr
+from scalim.spec.ir import DerivedFieldIr
 
 from .fixtures.executor_operator_fixtures import _CaptureHook, _make_runtime
 

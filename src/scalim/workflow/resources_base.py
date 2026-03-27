@@ -18,14 +18,12 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from .._internal import loggingx
-from ..events.catalog import (
+from ..events import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_RESOURCE_COMMIT,
     EVENT_WORKFLOW_RESOURCE_CREATE,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
-)
-from ..events.events import (
     DiagnosticWarningEvent,
     WorkflowResourceCommitEvent,
     WorkflowResourceCreateEvent,
@@ -583,9 +581,6 @@ __all__ = [
     "ScalimWorkflowWriteError",
     "WorkflowResourceManagerBase",
     "WorkflowResourceWaitDiagnostics",
-    "_WorkflowResourceManagerBase",
-    "_acquire_write_lock",
-    "_release_write_lock",
     "acquire_write_lock",
     "release_write_lock",
 ]

@@ -4,7 +4,7 @@ import pytest
 
 from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_int
 from scalim.typedefs import SourceSpecIrCacheMode
-from scalim.utils.converters import (
+from scalim._internal.utils.converters import (
     get_seps_values_first_int,
     must_get_seps_values_first_int,
     must_to_int,

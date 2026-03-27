@@ -9,7 +9,7 @@ from itertools import islice
 from typing import Any, Dict, List, Mapping, Sequence, Set, Tuple, cast
 
 from ...vendor.compact.typing_extensionsx import override
-from ..dispatch import HookDispatchStrategy
+from .._dispatch import HookDispatchStrategy
 from .manager_base import HookManagerBase, HookOnEventHandlerPair, HookTypedHandlerPair
 
 
@@ -94,3 +94,6 @@ class HookManagerStateMixin(HookManagerBase, ABC):
         if sample is None:
             return self._summarize_result(result)
         return sample
+
+
+__all__ = []

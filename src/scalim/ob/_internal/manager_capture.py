@@ -2,7 +2,7 @@ import threading
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple, cast
 
-from ...events.event import Event
+from ...events import Event
 from ..observer import Observer
 from .common import ScalimObserverCaptureOverflowError
 
@@ -91,3 +91,6 @@ class ObserverManagerCaptureMixin:
         capture._capture_event_types = set(self._supported_event_types or ())  # noqa: SLF001
         capture._capture_unknown_event_types = bool(self._observers_for_unknown_event_type)  # noqa: SLF001
         return capture
+
+
+__all__ = []

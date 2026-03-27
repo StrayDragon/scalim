@@ -2,10 +2,8 @@
 
 from typing import Dict, List, Optional, Set, Tuple
 
-from ..spec.ir.demand import DemandIr
-from ..spec.ir.fields import DerivedFieldIr, FieldIr
-from ..spec.ir.sources import SourceIr
-from ..utils import graph
+from .._internal.utils import graph
+from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SourceIr
 from .builder_helpers.dep_graph import build_dependency_graph, build_field_dependencies
 from .builder_helpers.key_fields import compute_key_fields
 from .builder_helpers.operators import (
@@ -254,3 +252,6 @@ class PlanBuilder:
             return self._graph.get_deps(field_key)
 
         return graph.collect_dependencies(targets, get_deps_with_fk)
+
+
+__all__ = []

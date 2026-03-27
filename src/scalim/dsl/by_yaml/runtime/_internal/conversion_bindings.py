@@ -22,3 +22,6 @@ class ConfigToIRConversionBindingMixin:
             msg = "Lookup cast registry is not initialized"
             raise ScalimConversionError(msg)
         return self._lookup_casts.build(lookup_cast, is_multi=is_multi)
+
+
+__all__ = []

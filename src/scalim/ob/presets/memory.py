@@ -3,7 +3,7 @@
 import logging
 from typing import List, Set
 
-from ...events.events import ColumnWriteEvent, FieldSlimEvent, LoaderSlimEvent, RowReleaseEvent, RowWriteEvent
+from ...events import ColumnWriteEvent, FieldSlimEvent, LoaderSlimEvent, RowReleaseEvent, RowWriteEvent
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.literich import Table
 from ..observer import EventDispatchObserver

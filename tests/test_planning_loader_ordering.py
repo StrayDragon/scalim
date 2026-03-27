@@ -4,10 +4,10 @@ import pytest
 
 from scalim.planning.loader_ordering.deps import build_ref_field_ordering_deps
 from scalim.planning.loader_ordering.sorting import REF_LOADER_ORDERING_DEGRADED_PREFIX, sort_ref_loaders
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.utils.graph import ScalimCyclicDependencyError
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim._internal.utils.graph import ScalimCyclicDependencyError
 
 from .fixtures.planning_fixtures import make_main_source, make_source
 

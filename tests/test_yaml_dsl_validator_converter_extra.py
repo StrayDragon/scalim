@@ -17,7 +17,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
 )
 from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
-from scalim.spec.ir.fields import FieldIr
+from scalim.spec.ir import FieldIr
 
 _ORDER_LOADER = "scalim_misc.example_report_ir:DAL.paged_get_order_list"
 _CUSTOMER_LOADER = "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"

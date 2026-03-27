@@ -32,7 +32,7 @@ _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = "workflow bundle viz requires run_
 if TYPE_CHECKING:
     from ...execution.guardrails import GuardrailsPolicy
     from ...execution.loader_retry import LoaderRetryPoliciesSpec
-    from ...hooks.base import IExecutionHook
+    from ...hooks import IExecutionHook
     from ...ob.observer import Observer
     from ...ob.presets.viz import VizObserverConfig
 

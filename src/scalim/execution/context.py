@@ -306,3 +306,6 @@ def create_batch_context_for_rows(
         return BatchContext(required_fields=required_fields, on_field_set=on_field_set)
     base, row_count = resolved
     return DenseBatchContext(base_row_id=base, row_count=row_count, required_fields=required_fields, on_field_set=on_field_set)
+
+
+__all__ = []

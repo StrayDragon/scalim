@@ -8,12 +8,12 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple, Type
 
-from .._internal.loggingx import prefix
-from ..typedefs import FieldValue, RowData, SinkRowKeySeq
-from ..utils.excel import escape_excel_formula
-from ..vendor.compact.importlibx import require_optional_dependency
-from ..vendor.compact.typing_extensionsx import Self, override
-from .sink_base import (
+from ..._internal.loggingx import prefix
+from ..._internal.utils.excel import escape_excel_formula
+from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...vendor.compact.importlibx import require_optional_dependency
+from ...vendor.compact.typing_extensionsx import Self, override
+from .base import (
     BaseRowSink,
     ColumnBatch,
     ColumnData,
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 def _excel_atomic_save_errors() -> Tuple[Type[BaseException], ...]:
     openpyxl_utils_exceptions: Any = require_optional_dependency(
         "openpyxl.utils.exceptions",
-        context="scalim.sinks.sink_excel",
+        context="scalim.sinks",
         install_name="openpyxl",
     )
 
@@ -58,7 +58,7 @@ def _excel_sink_outer_close_errors() -> Tuple[Type[BaseException], ...]:
 
 
 def _default_workbook_factory(*args: Any, **kwargs: Any) -> Any:
-    openpyxl_mod: Any = require_optional_dependency("openpyxl", context="scalim.sinks.sink_excel")
+    openpyxl_mod: Any = require_optional_dependency("openpyxl", context="scalim.sinks")
     workbook_cls: Any = openpyxl_mod.Workbook
     return workbook_cls(*args, **kwargs)
 
@@ -66,7 +66,7 @@ def _default_workbook_factory(*args: Any, **kwargs: Any) -> Any:
 Workbook: Any = _default_workbook_factory
 
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("scalim.sinks.sink_excel")
 
 _SINKS_PREFIX = prefix("sinks")
 
@@ -593,7 +593,4 @@ class ColumnExcelSink(IColumnSink):
         self.close()
 
 
-__all__ = [
-    "ColumnExcelSink",
-    "ExcelSink",
-]
+__all__ = []

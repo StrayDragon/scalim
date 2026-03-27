@@ -12,15 +12,15 @@ from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
 from scalim.dsl.by_yaml.runtime import observability as runtime_observability
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.schema_dsl.models import ObservabilityConfig, VIZ_KEYS, VizConfig
-from scalim.events.events import DiagnosticWarningEvent, ErrorEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
+from scalim.events import DiagnosticWarningEvent, ErrorEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.ob.observability import Observability
 from scalim.ob.presets.viz import VizObserver, VizObserverConfig
 from scalim.planning.plan import ExecutionPlan, PlanMetadata, Stage
 from scalim.planning.viz import _viz_add_node, _viz_add_source_edges, _viz_collect_fields
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 # endregion
 

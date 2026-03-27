@@ -5,7 +5,7 @@ import pytest
 
 
 def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
-    from scalim.spec.ir.workflow import (
+    from scalim.spec.ir._workflow import (
         WorkflowArtifactsIr,
         WorkflowCachePoolBudgetIr,
         WorkflowCachePoolIr,
@@ -42,7 +42,7 @@ def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
 def test_run_workflow_ir_works_without_build_demand_run_result_fn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
 
     monkeypatch.chdir(tmp_path)
@@ -97,8 +97,8 @@ outputs:
 
 
 def test_workflow_artifacts_directory_discard_variants() -> None:
-    from scalim.sinks.sink_csv import InMemoryCsv
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.sinks import InMemoryCsv
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
 
     workflow_ir = WorkflowIr(
@@ -131,7 +131,7 @@ def test_workflow_artifacts_directory_discard_variants() -> None:
 
 
 def test_resolve_workflow_input_csv_missing_in_memory_artifact_raises() -> None:
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
 
     workflow_ir = WorkflowIr(
@@ -158,7 +158,7 @@ def test_workflow_write_consumer_counts_missing_is_best_effort(tmp_path: Path) -
     from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.by_yaml.runtime.contracts import RunOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
-    from scalim.spec.ir.workflow import (
+    from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
         WorkflowArtifactsIr,
         WorkflowIr,
@@ -255,7 +255,7 @@ def test_workflow_negative_write_consumer_count_is_reported(tmp_path: Path) -> N
     from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.by_yaml.runtime.contracts import RunOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
-    from scalim.spec.ir.workflow import (
+    from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
         WorkflowArtifactsIr,
         WorkflowIr,

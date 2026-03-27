@@ -11,7 +11,7 @@ from scalim.dsl.by_yaml.config_parsing.field_extract import (
 )
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.execution.executor.helpers.field_access import extract_field_segments
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 
 
 def test_compile_field_extract_parses_dot_and_bracket_segments() -> None:

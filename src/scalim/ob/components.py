@@ -2,7 +2,7 @@
 
 from typing import Any, List, Optional, Sequence, Tuple
 
-from ..hooks.base import IExecutionHook
+from ..hooks import IExecutionHook
 from .observer import Observer
 
 # endregion

@@ -148,3 +148,6 @@ class SourceSpecIrCacheMode(StrEnum):
     def is_caching(self) -> bool:
         """是否启用缓存模式"""
         return self != SourceSpecIrCacheMode.NONE
+
+
+__all__ = []

@@ -23,3 +23,6 @@ def escape_excel_formula(value: Any, *, allow_formulas: bool) -> Any:
     if stripped and stripped[0] in _FORMULA_PREFIXES:
         return "'" + value
     return value
+
+
+__all__ = []

@@ -1,7 +1,7 @@
 import math
 from typing import Callable, Dict, List, Sequence, Union
 
-from ..vendor.compact.typing_extensionsx import TypeGuard
+from ...vendor.compact.typing_extensionsx import TypeGuard
 
 JsonScalar = Union[None, bool, int, float, str]
 JsonLike = Union[JsonScalar, List["JsonLike"], Dict[str, "JsonLike"]]
@@ -72,3 +72,6 @@ def ensure_json_like(
         return out
     msg = "{} must be JSON-like ({}), got {}".format(str(value_name), str(allowed_types_desc), type(value).__name__)
     raise error_cls(msg, path=str(path))
+
+
+__all__ = []

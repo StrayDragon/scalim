@@ -14,10 +14,10 @@ from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import LoaderCallContextIr, BindingIr, _is_valid_binding_key, _restore_bindings, build_stable_lookup_key_list
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.sources import MainSourceIr
-from scalim.utils.graph import topological_sort
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import MainSourceIr
+from scalim._internal.utils.graph import topological_sort
 
 
 def test_topological_sort_empty_returns_empty() -> None:
@@ -102,9 +102,9 @@ def test_plan_order_is_hashseed_stable() -> None:
     snippet = """
 import json
 from scalim.planning import PlanBuilder
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import MainSourceIr
 
 main = MainSourceIr(source_id="main", loader=lambda: [])
 id_field = FieldIr(field_id="id", name="ID", source=main, is_primary=True)

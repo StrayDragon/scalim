@@ -14,3 +14,6 @@ class ParsedFieldsResult:
     source_fields_by_source: Dict[str, Dict[str, SourceFieldConfig]]
     source_field_id_map: Dict[str, Dict[str, str]]
     field_def_index: FieldDefIndex
+
+
+__all__ = []

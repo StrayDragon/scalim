@@ -2,7 +2,7 @@ import threading
 from collections import deque
 from typing import Deque, Dict, List, Optional, Set, Tuple, cast
 
-from ...events.event import Event
+from ...events import Event
 from ..observer import EventDispatchObserver, Observer
 from .common import CATALOG_EVENT_TYPES, CATALOG_EVENT_TYPES_SET, validate_event_types
 
@@ -166,3 +166,6 @@ class ObserverManagerRegistryMixin:
         if not self._has_observers:
             return False
         return bool(self._observers_for_unknown_event_type)
+
+
+__all__ = []

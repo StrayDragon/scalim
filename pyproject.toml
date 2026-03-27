@@ -272,7 +272,7 @@ strict = [
     "src/scalim/execution/executor/operators/load_ref",
     "src/scalim/hooks",
     "src/scalim/spec/ir",
-    "src/scalim/utils/converters.py",
+    "src/scalim/_internal/utils/converters.py",
     "src/scalim/utils/relation_signature.py",
 ]
 

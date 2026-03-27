@@ -11,7 +11,7 @@ from itertools import islice
 from typing import Any, Deque, Dict, Optional, cast
 from typing import Iterable as TypingIterable
 
-from ...events.event import Event
+from ...events import Event
 from .common import CAPTURE_OVERFLOW_POLICIES, DEFAULT_MAX_RECORDED_EVENTS
 
 
@@ -120,3 +120,6 @@ class ObserverManagerStateMixin(ABC):
 
     def sample_result(self, result: Any) -> Any:
         return self._sample_result(result)
+
+
+__all__ = []

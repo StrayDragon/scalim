@@ -3,24 +3,22 @@
 import logging
 from typing import Any, Dict, FrozenSet, Hashable, List, MutableMapping, Optional, Set, Tuple
 
-from ....hooks.base import HookManager
+from ...._internal.utils.converters import auto_str_normalize_key
+from ....hooks import HookManager
 from ....ob.hub import InstrumentationHub
 from ....ob.manager import ObserverManager
 from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
-from ....sinks.sink_base import ISink
+from ....sinks import ISink
+from ....spec.ir import LookupStepIr, MainSourceIr, SupportedFieldIr
 from ....spec.ir.aliases import LookupKeyCast
-from ....spec.ir.fields import SupportedFieldIr
-from ....spec.ir.relations import LookupStepIr
-from ....spec.ir.sources import MainSourceIr
 from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LookupKey, ParallelMode, RowData
-from ....utils.converters import auto_str_normalize_key
+from ....utils.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
 from ....vendor.dataclassesx import dataclass
 from ...guardrails import GuardrailsPolicy
 from ...key_normalization import normalize_key_normalization, should_apply_str_key_normalization
 from ...loader_retry import LoaderRetryPolicies
 from ...workflow_cache_pool import WorkflowCachePool
-from ..helpers.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
 from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
 
 # endregion
@@ -302,3 +300,6 @@ class ExecutionRuntime:
         if status != "ok":
             return None
         return normalized
+
+
+__all__ = []

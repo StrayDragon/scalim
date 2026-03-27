@@ -3,7 +3,13 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.utils.converters import _format_decimal_no_exponent, auto_normalize_key, auto_str_normalize, auto_str_normalize_key, must_to_int
+from scalim._internal.utils.converters import (
+    _format_decimal_no_exponent,
+    auto_normalize_key,
+    auto_str_normalize,
+    auto_str_normalize_key,
+    must_to_int,
+)
 
 
 class TestAutoStrNormalize:

@@ -3,11 +3,11 @@ import marimo
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from scalim.events.catalog import EVENT_LOADER_CALL, EVENT_PIPELINE_END, EVENT_PIPELINE_START
+from scalim.events import EVENT_LOADER_CALL, EVENT_PIPELINE_END, EVENT_PIPELINE_START
 from scalim.execution.run_ir import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
-from scalim.hooks.base import BaseHook
+from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
 

@@ -1,16 +1,22 @@
 from typing import Dict, FrozenSet, List, Mapping, Optional, Union
 
-from ....spec.ir.demand import DemandIr
-from ....spec.ir.fields import DerivedFieldIr, FieldIr  # noqa: TC001
-from ....spec.ir.sources import MainSourceIr, SourceIr
+from ....spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, SourceIr
 from ..config_parsing.security import SecureComputeEngine
 from ..schema_dsl.models import DemandConfig
-from ._internal.conversion_lookup import LookupCastRegistry
-from ._internal.conversion_lookup import validate_source_id as _validate_source_id
+from ._internal.conversion_lookup import LookupCastRegistry, validate_source_id
 from ._internal.conversion_relations import StepInfo
 from ._internal.conversion_sources import ConfigToIRConversionSourceMixin
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimConversionError
 from .references import PythonReferenceResolver, SecurePythonReferenceResolver
+
+
+def _validate_source_id(source_id: str, context: str) -> None:
+    validate_source_id(source_id, context)
+
+
+# 保持 `_validate_source_id` 可导入(用于测试/门禁),但不纳入 `__all__`.
+_non_public_exports = (_validate_source_id,)
+del _non_public_exports
 
 
 class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
@@ -104,4 +110,4 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
         )
 
 
-__all__ = ["ConfigToIRConverter", "LookupCastRegistry", "_validate_source_id"]
+__all__ = ["ConfigToIRConverter", "LookupCastRegistry"]

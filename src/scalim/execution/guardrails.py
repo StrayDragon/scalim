@@ -64,3 +64,6 @@ class GuardrailsPolicy:
 
     def relations_enabled(self) -> bool:
         return self.relations.null_key_max_rate is not None or self.relations.type_error_max_rate is not None
+
+
+__all__ = []

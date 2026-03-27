@@ -7,11 +7,11 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
-from .._internal.loggingx import prefix
-from ..typedefs import FieldValue, RowData, SinkRowKeySeq
-from ..vendor.compact.typing_extensionsx import Self, override
-from ..vendor.dataclassesx import dataclass
-from .sink_base import (
+from ..._internal.loggingx import prefix
+from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...vendor.compact.typing_extensionsx import Self, override
+from ...vendor.dataclassesx import dataclass
+from .base import (
     BaseRowSink,
     ColumnBatch,
     ColumnData,
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 # endregion
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("scalim.sinks.sink_csv")
 
 _SINKS_PREFIX = prefix("sinks")
 
@@ -644,10 +644,4 @@ class BlockColumnCSVSink(IColumnSink):
         self.close()
 
 
-__all__ = [
-    "BlockColumnCSVSink",
-    "CSVSink",
-    "ColumnCSVSink",
-    "InMemoryCsv",
-    "InMemoryCsvSink",
-]
+__all__ = []

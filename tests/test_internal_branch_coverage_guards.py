@@ -6,11 +6,11 @@ import pytest
 
 import threading
 
-from scalim.events.event import Event
+from scalim.events import Event
 from scalim.ob.manager import ObserverManager
 from scalim.ob._internal.manager_capture import ObserverManagerCaptureMixin
 from scalim.ob._internal.manager_emit import ObserverManagerEmitMixin
-from scalim.events.catalog import EVENT_PIPELINE_START
+from scalim.events import EVENT_PIPELINE_START
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets._internal import viz_config as viz_config_module
 from scalim.ob.observer import EventDispatchObserver, Observer

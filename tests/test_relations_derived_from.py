@@ -5,10 +5,10 @@ from scalim.planning import PlanBuilder
 from scalim.planning.builder_helpers.operators import derive_pre_ref_available_field_keys
 from scalim.planning.operators import ComputeOperatorIr, LoadRefOperatorIr
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
-from scalim.utils.graph import ScalimCyclicDependencyError
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim._internal.utils.graph import ScalimCyclicDependencyError
 
 
 def test_relation_from_allows_constant_derived_join_key_and_executes_before_loadref() -> None:

@@ -1,14 +1,14 @@
 """Executor operator tests: load."""
 
 from scalim.execution.context import BatchContext
-from scalim.events.catalog import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
+from scalim.events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
 from scalim.execution.executor.operators.load import LoadOperatorExecutor
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, SourceIr, SourceNormalizeIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, SourceIr, SourceNormalizeIr
 
 from .fixtures.executor_operator_fixtures import (
     _Order,

@@ -1,10 +1,9 @@
 from collections import deque
 from typing import Deque, Dict, List, Optional, Set, Tuple, Union
 
+from .....spec.ir import LookupStepIr, MainSourceIr, SourceIr
 from .....spec.ir.aliases import LookupKeyCast, NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr
-from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.sources import MainSourceIr, SourceIr
 from ...schema_dsl.models import (
     DemandConfig,
     LookupCastConfig,
@@ -274,3 +273,6 @@ class ConfigToIRConversionRelationMixin:
                 )
                 raise ScalimConversionError(msg)
         return mapped
+
+
+__all__ = []

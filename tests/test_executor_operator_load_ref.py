@@ -4,7 +4,7 @@ from typing import Dict, List
 
 import pytest
 
-from scalim.events.catalog import EVENT_LOADER_CALL, EVENT_RELATION_LOOKUP
+from scalim.events import EVENT_LOADER_CALL, EVENT_RELATION_LOOKUP
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.context import LoadRefExecutionContext
 from scalim.execution.executor.operators.load_ref import loader as load_ref_loader
@@ -16,9 +16,9 @@ from scalim.ob.presets.relations import RelationConfig, RelationObserver
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, SourceIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, SourceIr
 
 from .fixtures.executor_operator_fixtures import (
     _FailLoader,
@@ -1157,8 +1157,8 @@ def test_load_ref_cached_mapping_key_normalization_collision_fail_fast() -> None
 
 
 def test_load_ref_cached_mapping_key_normalization_collision_merges_when_values_equal_and_warns_redacted() -> None:
-    from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
-    from scalim.events.event import Event
+    from scalim.events import EVENT_DIAGNOSTIC_WARNING
+    from scalim.events import Event
     from scalim.ob.manager import ObserverManager
     from scalim.ob.observer import Observer
 
@@ -1213,8 +1213,8 @@ def test_load_ref_cached_mapping_key_normalization_collision_merges_when_values_
 
 
 def test_load_ref_key_normalization_auto_str_with_explicit_cast_mismatch_warns_redacted() -> None:
-    from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
-    from scalim.events.event import Event
+    from scalim.events import EVENT_DIAGNOSTIC_WARNING
+    from scalim.events import Event
     from scalim.ob.manager import ObserverManager
     from scalim.ob.observer import Observer
 
@@ -1273,8 +1273,8 @@ def test_load_ref_key_normalization_auto_str_with_explicit_cast_mismatch_warns_r
 
 
 def test_load_ref_key_normalization_auto_str_with_explicit_cast_unnormalizable_key_probe_is_skipped() -> None:
-    from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
-    from scalim.events.event import Event
+    from scalim.events import EVENT_DIAGNOSTIC_WARNING
+    from scalim.events import Event
     from scalim.ob.manager import ObserverManager
     from scalim.ob.observer import Observer
 

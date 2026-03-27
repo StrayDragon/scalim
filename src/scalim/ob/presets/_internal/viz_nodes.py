@@ -82,3 +82,6 @@ class VizObserverNodeMixin:
         if normalized and normalized != raw_id:
             return {"type": node_ref.get("type", ""), "id": normalized}
         return node_ref
+
+
+__all__ = []

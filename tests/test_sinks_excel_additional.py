@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.sinks import sink_excel as excel_mod
+import scalim.sinks._internal.excel as excel_mod
 
 
 def _read_excel_rows(path: Path):
@@ -221,7 +221,7 @@ def test_excel_sink_close_exception_cleans_temp_file(
     if set_worksheet:
         sink._worksheet = _FakeWorksheet()
 
-    caplog.set_level(logging.ERROR, logger=excel_mod.__name__)
+    caplog.set_level(logging.ERROR, logger="scalim.sinks.sink_excel")
     with pytest.raises(OSError, match="simulated save failure"):
         sink.close()
     assert list(tmp_path.glob("*.xlsx.tmp")) == []
@@ -236,7 +236,7 @@ def test_excel_sink_close_exception_closes_open_worksheet(tmp_path: Path, monkey
     worksheet = _CloseableWorksheet()
     sink._worksheet = worksheet
 
-    caplog.set_level(logging.ERROR, logger=excel_mod.__name__)
+    caplog.set_level(logging.ERROR, logger="scalim.sinks.sink_excel")
 
     with pytest.raises(OSError, match="simulated save failure"):
         sink.close()
@@ -356,7 +356,7 @@ def test_column_excel_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:
 
 
 def test_excel_workbook_sink_close_exception_logs_unlink_failure(tmp_path: Path, monkeypatch, caplog) -> None:
-    caplog.set_level(logging.WARNING, logger=excel_mod.__name__)
+    caplog.set_level(logging.WARNING, logger="scalim.sinks.sink_excel")
     monkeypatch.setattr(excel_mod, "Workbook", _FailingSaveWorkbook)
 
     output_path = tmp_path / "exc_wb.xlsx"
@@ -397,7 +397,7 @@ def test_excel_sink_close_exception_logs_unlink_failure(
     workbook_cls,
     filename: str,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger=excel_mod.__name__)
+    caplog.set_level(logging.WARNING, logger="scalim.sinks.sink_excel")
     monkeypatch.setattr(excel_mod, "Workbook", workbook_cls)
     sink = _init_sink_for_failure(tmp_path, sink_cls, filename)
 
@@ -432,7 +432,7 @@ def test_excel_write_lock_release_logs_warning_on_oserror(tmp_path: Path, monkey
     lock_path = tmp_path / "held.scalim.lock"
     lock_path.write_text("held", encoding="utf-8")
 
-    caplog.set_level(logging.WARNING, logger=excel_mod.__name__)
+    caplog.set_level(logging.WARNING, logger="scalim.sinks.sink_excel")
 
     original_unlink = excel_mod.Path.unlink
 

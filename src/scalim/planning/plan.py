@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
 
 from ..planning.operators import PlanOperatorIr
-from ..spec.ir.fields import SupportedFieldIr
+from ..spec.ir import SupportedFieldIr
 from ..vendor.dataclassesx import dataclass, field
 from .viz import build_viz_graph_snapshot
 from .viz_schedule import build_viz_schedule_plan
@@ -11,7 +11,7 @@ from .viz_schedule import build_viz_schedule_plan
 # endregion
 
 if TYPE_CHECKING:
-    from ..spec.ir.sources import SourceIr
+    from ..spec.ir import SourceIr
 
 
 @dataclass

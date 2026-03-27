@@ -1,4 +1,4 @@
-from scalim.utils.iterables import ordered_unique_str
+from scalim._internal.utils.iterables import ordered_unique_str
 
 
 def test_ordered_unique_str_removes_duplicates_while_preserving_order() -> None:

@@ -6,7 +6,7 @@ from typing import cast
 
 from scalim.planning.operators import LoadRefOperatorIr
 from scalim.vendor.compact import importlibx
-from scalim.sinks.sink_base import IColumnSink, IRowSink, ISink
+from scalim.sinks import IColumnSink, IRowSink, ISink
 from scalim.typedefs import FieldValue, RowData
 
 CI_TIMEOUT_S = float(os.environ.get("SCALIM_TEST_TIMEOUT", "10.0"))

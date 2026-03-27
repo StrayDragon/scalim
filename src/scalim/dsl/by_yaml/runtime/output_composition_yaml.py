@@ -16,7 +16,7 @@ from ....execution.output_composition import (
 )
 from ....execution.output_contracts import ExportLayout, OutputSpec
 from ....execution.run_ir import export_layout_from_demand_ir
-from ....spec.ir.demand import DemandIr
+from ....spec.ir import DemandIr
 from ....typedefs import FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
 from ..config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by

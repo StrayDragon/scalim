@@ -1,10 +1,10 @@
 from typing import FrozenSet, Optional, Tuple, Union
 
+from .._internal.utils.converters import NamedLookupCast, auto_normalize_key
+from ..spec.ir import LookupStepIr
 from ..spec.ir.aliases import LookupKeySpec, NormalizedLookupKeySpec
 from ..spec.ir.binding import BindingIr
-from ..spec.ir.relations import LookupStepIr
 from ..typedefs import LookupKey
-from .converters import NamedLookupCast, auto_normalize_key
 
 LookupCastSignature = Tuple[str, Union[str, int]]
 BindingParamMarker = Union[str, int]

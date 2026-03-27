@@ -22,7 +22,7 @@ from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.planning import PlanBuilder
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 
 
 def _bench_scale() -> str:

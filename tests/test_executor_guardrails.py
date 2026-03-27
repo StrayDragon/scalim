@@ -13,14 +13,14 @@ from scalim.execution.guardrails import (
     GuardrailsPolicy,
     GuardrailsRelationsPolicy,
 )
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
 def _make_main_source(source_id: str = "orders") -> MainSourceIr:

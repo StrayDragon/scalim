@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from scalim.events.catalog import EVENT_OUTPUT_TARGET_END
-from scalim.events.event import Event
-from scalim.events.events import (
+from scalim.events import EVENT_OUTPUT_TARGET_END
+from scalim.events import Event
+from scalim.events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
     BatchStartEvent,

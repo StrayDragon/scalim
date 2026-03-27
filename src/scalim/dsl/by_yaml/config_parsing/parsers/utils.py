@@ -15,3 +15,6 @@ def list_or_none(value: object) -> Optional[List[Any]]:
     if not isinstance(value, list):
         return None
     return cast("List[Any]", value)  # pragma: allow-cast yaml list typed narrowing
+
+
+__all__ = []

@@ -12,12 +12,12 @@ from scalim.workflow import resources_base as resources_base_mod
 from scalim.workflow import resources_csv as resources_csv_mod
 from scalim.workflow import resources_sheetbook as resources_sheetbook_mod
 from scalim.workflow import resources_workbook as resources_workbook_mod
-from scalim.events.catalog import (
+from scalim.events import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
-from scalim.events.events import DiagnosticWarningEvent, WorkflowResourceWriteEvent
+from scalim.events import DiagnosticWarningEvent, WorkflowResourceWriteEvent
 
 _TIMEOUT_S = 5.0
 
@@ -174,7 +174,7 @@ def test_read_csv_header_errors(tmp_path: Path) -> None:
 
 
 def test_read_csv_header_in_memory_invalid_header_raises() -> None:
-    from scalim.sinks.sink_csv import InMemoryCsv
+    from scalim.sinks import InMemoryCsv
 
     bad = InMemoryCsv(header=["", "ok"], rows=[])
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="<in_memory>"):

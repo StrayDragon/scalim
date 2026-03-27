@@ -12,15 +12,15 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pytest
 
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
-from scalim.utils.converters import (
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim._internal.utils.converters import (
     NamedLookupCast,
     auto_normalize_key,
     must_get_seps_values_first_int,

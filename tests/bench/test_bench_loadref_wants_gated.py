@@ -4,19 +4,19 @@ from typing import Callable, Dict, List, Sequence
 import pytest
 
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.events.catalog import EVENT_RELATION_LOOKUP
+from scalim.events import EVENT_RELATION_LOOKUP
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 from scalim_benchlib import BenchmarkRunner
 
 

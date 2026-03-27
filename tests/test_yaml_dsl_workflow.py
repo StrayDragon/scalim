@@ -11,7 +11,7 @@ from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.workflow import loaders as workflow_loaders_mod
 from scalim.workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
-from scalim.events.catalog import (
+from scalim.events import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_PIPELINE_START,
     EVENT_WORKFLOW_CACHE_ACQUIRE,
@@ -25,7 +25,7 @@ from scalim.events.catalog import (
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
-from scalim.hooks.base import BaseHook
+from scalim.hooks import BaseHook
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
 from scalim.dsl.by_yaml.workflow import (
@@ -2486,7 +2486,14 @@ def test_run_workflow_all_fail_cancels_pending_queue(tmp_path: Path) -> None:
 
 
 def test_workflow_entrypoints_artifacts_directory_enforces_visibility() -> None:
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.spec.ir._workflow import (
+        WorkflowArtifactsIr,
+        WorkflowEdgeIr,
+        WorkflowIr,
+        WorkflowNodeIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+    )
 
     ir = WorkflowIr(
         nodes=(
@@ -2538,7 +2545,7 @@ def test_workflow_entrypoints_ensure_json_like_variants() -> None:
 
 
 def test_workflow_entrypoints_ctx_store_total_bytes_guardrail() -> None:
-    from scalim.spec.ir.workflow import (
+    from scalim.spec.ir._workflow import (
         WorkflowArtifactsIr,
         WorkflowCtxOptionsIr,
         WorkflowEdgeIr,
@@ -2563,7 +2570,14 @@ def test_workflow_entrypoints_ctx_store_total_bytes_guardrail() -> None:
 
 
 def test_workflow_entrypoints_ctx_store_resolve_errors() -> None:
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.spec.ir._workflow import (
+        WorkflowArtifactsIr,
+        WorkflowEdgeIr,
+        WorkflowIr,
+        WorkflowNodeIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+    )
 
     ir = WorkflowIr(
         nodes=(
@@ -2606,7 +2620,14 @@ def test_workflow_entrypoints_iter_ctx_directives_variants() -> None:
 
 
 def test_workflow_entrypoints_render_ctx_directives_variants() -> None:
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.spec.ir._workflow import (
+        WorkflowArtifactsIr,
+        WorkflowEdgeIr,
+        WorkflowIr,
+        WorkflowNodeIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+    )
 
     ir = WorkflowIr(
         nodes=(
@@ -4183,8 +4204,8 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
 
 
 def test_workflow_artifacts_directory_discard_all_in_memory_rows_removes_empty_producer_entry() -> None:
-    from scalim.sinks.sink_rows import InMemoryRows
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.sinks import InMemoryRows
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
 
     workflow_ir = WorkflowIr(
         nodes=(WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=()),),
@@ -4251,7 +4272,14 @@ def test_workflow_execute_release_main_rows_artifact_returns_when_missing_count_
     from typing import Any
 
     from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.spec.ir._workflow import (
+        WorkflowArtifactsIr,
+        WorkflowEdgeIr,
+        WorkflowIr,
+        WorkflowNodeIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+    )
     from scalim.vendor.dataclassesx import dataclass
 
     @dataclass(frozen=True)
@@ -4332,7 +4360,14 @@ def test_workflow_execute_release_main_rows_artifact_raises_on_negative_count(tm
     from typing import Any
 
     from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec
-    from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowEdgeIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.spec.ir._workflow import (
+        WorkflowArtifactsIr,
+        WorkflowEdgeIr,
+        WorkflowIr,
+        WorkflowNodeIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+    )
     from scalim.vendor.dataclassesx import dataclass
 
     @dataclass(frozen=True)

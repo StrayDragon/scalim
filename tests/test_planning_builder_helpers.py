@@ -6,8 +6,8 @@ from scalim.planning.builder_helpers.dep_graph import build_dependency_graph
 from scalim.planning.builder_helpers.key_fields import compute_key_fields
 from scalim.planning.builder_helpers.operators import build_plan_operators
 from scalim.planning.builder_helpers.resolver import LookupStepsResolver, extract_relation_dependency_keys
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
 
 from .fixtures.planning_fixtures import make_main_source, make_source
 

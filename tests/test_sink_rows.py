@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.sinks.sink_rows import (
+from scalim.sinks import (
     InMemoryRows,
     InMemoryRowsSink,
     in_memory_rows_to_in_memory_csv,

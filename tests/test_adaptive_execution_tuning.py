@@ -4,20 +4,20 @@ from typing import Any, Hashable, List, Tuple, cast
 
 import pytest
 
-from scalim.events.catalog import EVENT_ADAPTIVE_SCHEDULER_DECISION
+from scalim.events import EVENT_ADAPTIVE_SCHEDULER_DECISION
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.pipeline.overrides import PipelineOverrides
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, SourceIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, SourceIr
 
 from scalim.execution.adaptive.policy import (
     PROCESS_FAILURE_FAIL_FAST,
@@ -674,7 +674,7 @@ def test_commit_layer_results_skips_field_keys_in_commit_loop() -> None:
 
 def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     from scalim.spec.ir.binding import BindingIr
-    from scalim.spec.ir.sources import MainSourceIr
+    from scalim.spec.ir import MainSourceIr
 
     source = _make_source("s1")
     rows_binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}), mode="rows")

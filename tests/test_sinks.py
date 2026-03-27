@@ -2,8 +2,8 @@ import csv
 
 import pytest
 
-from scalim.sinks.sink_base import IColumnSink
-from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink, InMemoryCsvSink
+from scalim.sinks import IColumnSink
+from scalim.sinks import CSVSink, ColumnCSVSink, InMemoryCsvSink
 
 
 def _write_rows_to_csv(output_path, sink_cls, rows, header_names=None):

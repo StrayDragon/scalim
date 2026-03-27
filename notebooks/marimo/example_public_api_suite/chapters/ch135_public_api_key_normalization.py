@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, FrozenSet, Optional
 
 from scalim.dsl import by_yaml as api
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"

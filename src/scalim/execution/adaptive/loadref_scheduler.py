@@ -1,12 +1,12 @@
 from concurrent.futures import Executor, Future
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 
-from ...events.catalog import EVENT_ADAPTIVE_SCHEDULER_DECISION
+from ...events import EVENT_ADAPTIVE_SCHEDULER_DECISION
 from ...planning.operators import LoadRefOperatorIr
 from ...planning.plan import ExecutionPlan
+from ...utils.relation_signature import build_relation_signature, has_rows_binding
 from ...vendor.compact.typing_extensionsx import override
 from ..context import BatchContext
-from ..executor.helpers.relation_signature import build_relation_signature, has_rows_binding
 from ..executor.runtime.runtime import ExecutionRuntime
 from ._internal.loadref_scheduler_execution import AdaptiveLoadRefSchedulerExecutionMixin
 from ._internal.loadref_scheduler_planning import AdaptiveLoadRefSchedulerPlanningMixin

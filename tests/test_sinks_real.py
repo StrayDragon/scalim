@@ -9,10 +9,10 @@ try:
 except Exception as exc:
     pytest.skip("pandas unavailable in this environment: {}".format(exc), allow_module_level=True)
 
-from scalim.sinks.sink_csv import BlockColumnCSVSink
-from scalim.sinks.sink_excel import ColumnExcelSink, ExcelSink
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
-from scalim.sinks.sink_pandas import PandasColumnSink, PandasRowSink
+from scalim.sinks import BlockColumnCSVSink
+from scalim.sinks import ColumnExcelSink, ExcelSink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import PandasColumnSink, PandasRowSink
 
 
 @pytest.fixture

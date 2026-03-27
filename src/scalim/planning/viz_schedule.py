@@ -1,7 +1,7 @@
 import time
 from typing import Any, Dict, List, Sequence, Set, Tuple, Union
 
-from ..spec.ir.sources import SourceIr
+from ..spec.ir import SourceIr
 from ..utils.relation_signature import RelationSignature, build_relation_signature, has_rows_binding
 from ..vendor.compact.typing_extensionsx import Protocol, TypedDict
 from .operators import LoadRefOperatorIr, PlanOperatorIr

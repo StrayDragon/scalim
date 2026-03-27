@@ -3,7 +3,7 @@
 import pytest
 from typing import Dict, List
 
-from scalim.utils.graph import (
+from scalim._internal.utils.graph import (
     ScalimCyclicDependencyError,
     DependencyGraph,
     collect_dependencies,

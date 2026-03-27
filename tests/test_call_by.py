@@ -11,11 +11,11 @@ from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, DerivedFieldConfi
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir.fields import DerivedFieldIr
+from scalim.spec.ir import DerivedFieldIr
 
 
 def test_parse_call_by_extracts_reference_and_dependencies() -> None:

@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
-from scalim.sinks.sink_memory import InMemoryColumnSink
+from scalim.sinks import InMemoryColumnSink
 from scalim.typedefs import RowData
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config

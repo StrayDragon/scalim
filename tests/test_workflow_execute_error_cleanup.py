@@ -6,7 +6,7 @@ import pytest
 from scalim.dsl.by_yaml import run_workflow
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.ob.observer import Observer
-from scalim.spec.ir.workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])
 

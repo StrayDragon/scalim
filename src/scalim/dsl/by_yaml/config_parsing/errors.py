@@ -11,3 +11,6 @@ class ScalimConfigValidationError(ScalimYamlError):
         super(ScalimConfigValidationError, self).__init__(message)
         self.errors = errors or []
         self.issues = issues or []
+
+
+__all__ = []

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import run
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 
 import tests.params_template_loaders as loaders
 

@@ -1,13 +1,13 @@
 import threading
 from typing import List
 
-from scalim.events.catalog import EVENT_PIPELINE_START
+from scalim.events import EVENT_PIPELINE_START
 from scalim.execution import ScalimEngine
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import MainSourceIr
 
 from tests.testing_utils import CI_TIMEOUT_S, NEGATIVE_TIMEOUT_S
 

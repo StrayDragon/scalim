@@ -2,7 +2,7 @@ import io
 
 import pytest
 
-from scalim.sinks.sink_csv import CSVSink
+from scalim.sinks import CSVSink
 
 
 class _FlushCounter:

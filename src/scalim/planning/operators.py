@@ -6,9 +6,7 @@ from ..vendor.compact import StrEnum
 from ..vendor.dataclassesx import dataclass, field
 
 if TYPE_CHECKING:
-    from ..spec.ir.fields import DerivedFieldIr, FieldIr
-    from ..spec.ir.relations import LookupStepIr
-    from ..spec.ir.sources import SourceIr
+    from ..spec.ir import DerivedFieldIr, FieldIr, LookupStepIr, SourceIr
 
 # endregion
 

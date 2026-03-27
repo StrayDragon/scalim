@@ -26,13 +26,10 @@ except ImportError as e:
     msg = "pandas is required for this module, please install it!"
     raise ImportError(msg) from e
 
+from scalim._internal.utils.converters import must_get_seps_values_first_int
+from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, KeyIr, LookupStepIr, MainSourceIr, SourceIr
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
 from scalim.typedefs import SourceSpecIrCacheMode
-from scalim.utils.converters import must_get_seps_values_first_int
 
 # 配置日志记录器
 FORMAT = "%(asctime)s | %(message)s"

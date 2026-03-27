@@ -1,6 +1,6 @@
 from typing import Dict, Tuple
 
-from .....events.catalog import EVENT_STAGE_SPAN
+from .....events import EVENT_STAGE_SPAN
 from .....planning.operators import OperatorType
 from ...runtime.runtime import ExecutionRuntime
 
@@ -24,6 +24,4 @@ def init_stage_span_tracking(
     return wants_stage_spans, stage_durations, stage_map
 
 
-__all__ = [
-    "init_stage_span_tracking",
-]
+__all__ = []

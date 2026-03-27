@@ -4,9 +4,9 @@ from scalim.planning import PlanBuilder
 from scalim.planning.loader_ordering.sequences import build_loader_sequences
 from scalim.planning.operators import LoadOperatorIr
 from scalim.planning.operators import LoadRefOperatorIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.relations import LookupStepIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import LookupStepIr
 
 from .fixtures.planning_fixtures import build_relation_model, make_main_source, make_source
 

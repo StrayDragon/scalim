@@ -16,8 +16,8 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     SourceFieldConfig,
 )
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
 class _DerivedFieldsDict(dict):

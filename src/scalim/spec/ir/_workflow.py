@@ -122,3 +122,6 @@ class WorkflowIr:
     options: WorkflowOptionsIr
     resources: Tuple[WorkflowResourceIr, ...]
     artifacts: WorkflowArtifactsIr
+
+
+__all__ = []

@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Dict, List, Set, Tuple, Union
 
-from ...spec.ir.fields import FieldIr
-from ...spec.ir.sources import SourceIr
+from ...spec.ir import FieldIr, SourceIr
 from .deps import build_ref_field_ordering_deps
 from .sorting import sort_ref_loaders
 
@@ -45,7 +44,7 @@ def build_loader_sequences(
 
 
 if TYPE_CHECKING:
-    from ...spec.ir.demand import DemandIr
+    from ...spec.ir import DemandIr
 
 
 __all__ = [

@@ -1,9 +1,9 @@
 from typing import Dict, List, Optional, Sequence
 
 from ...vendor.dataclassesx import dataclass
-from .fields import FieldIr, SupportedFieldIr
+from ._fields import FieldIr, SupportedFieldIr
+from ._sources import MainSourceIr, SourceIr
 from .presentation import ExportProfileIr
-from .sources import MainSourceIr, SourceIr
 
 
 @dataclass(frozen=True)
@@ -114,3 +114,6 @@ class DemandIr:
             if isinstance(field_spec, FieldIr) and field_spec.is_primary:
                 return field_spec
         return None
+
+
+__all__ = []

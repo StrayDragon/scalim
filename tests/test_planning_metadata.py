@@ -1,6 +1,6 @@
 from scalim.planning import PlanBuilder
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
 
 from .fixtures.planning_fixtures import build_derived_model, build_multi_level_model, build_relation_model, make_main_source
 

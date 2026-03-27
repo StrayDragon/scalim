@@ -8,8 +8,8 @@ from scalim.execution import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 from scalim.planning import PlanBuilder
-from scalim.sinks.sink_csv import BlockColumnCSVSink, ColumnCSVSink
-from scalim.sinks.sink_memory import InMemoryColumnSink
+from scalim.sinks import BlockColumnCSVSink, ColumnCSVSink
+from scalim.sinks import InMemoryColumnSink
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
 from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model

@@ -3,7 +3,7 @@
 from typing import Dict, List, Sequence
 
 from ..vendor.dataclassesx import dataclass
-from .events import (
+from ._events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
     BatchStartEvent,
@@ -342,45 +342,4 @@ def get_event_catalog_map() -> Dict[str, EventDescriptor]:
     return {item.name: item for item in _EVENT_CATALOG}
 
 
-__all__ = [
-    "EVENT_ADAPTIVE_SCHEDULER_DECISION",
-    "EVENT_BATCH_END",
-    "EVENT_BATCH_START",
-    "EVENT_COLUMN_WRITE",
-    "EVENT_DIAGNOSTIC_WARNING",
-    "EVENT_ERROR",
-    "EVENT_FIELD_COMPUTE",
-    "EVENT_FIELD_SLIM",
-    "EVENT_LOADER_CALL",
-    "EVENT_LOADER_RETRY",
-    "EVENT_LOADER_SLIM",
-    "EVENT_OUTPUT_TARGET_END",
-    "EVENT_PIPELINE_END",
-    "EVENT_PIPELINE_START",
-    "EVENT_RELATION_LOOKUP",
-    "EVENT_ROW_RELEASE",
-    "EVENT_ROW_WRITE",
-    "EVENT_STAGE_SPAN",
-    "EVENT_WORKFLOW_CACHE_ACQUIRE",
-    "EVENT_WORKFLOW_CACHE_EVICT",
-    "EVENT_WORKFLOW_CACHE_RELEASE",
-    "EVENT_WORKFLOW_NODE_CANCELLED",
-    "EVENT_WORKFLOW_NODE_END",
-    "EVENT_WORKFLOW_NODE_START",
-    "EVENT_WORKFLOW_RESOURCE_COMMIT",
-    "EVENT_WORKFLOW_RESOURCE_CREATE",
-    "EVENT_WORKFLOW_RESOURCE_DISCARD",
-    "EVENT_WORKFLOW_RESOURCE_WRITE",
-    "WORKFLOW_EVENT_PREFIXES",
-    "WORKFLOW_EVENT_PREFIX_CACHE",
-    "WORKFLOW_EVENT_PREFIX_NODE",
-    "WORKFLOW_EVENT_PREFIX_RESOURCE",
-    "WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED",
-    "WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL",
-    "WORKFLOW_NODE_CANCELLED_REASON_UPSTREAM_CANCELLED",
-    "WORKFLOW_NODE_END_STATUS_ERROR",
-    "WORKFLOW_NODE_END_STATUS_OK",
-    "EventDescriptor",
-    "get_event_catalog",
-    "get_event_catalog_map",
-]
+__all__ = []

@@ -3,12 +3,11 @@ from collections.abc import Mapping
 from typing import Hashable, List, Optional, Set
 from typing import Mapping as TypingMapping
 
-from ....events.catalog import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
+from ....events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
 from ....planning.operators import LoadOperatorIr, SupportedOperatorIr
+from ....spec.ir import FieldIr, SourceIr
+from ....spec.ir._helpers import call_loader_with_binding, coerce_loader_result_mapping
 from ....spec.ir.binding import BindingIr, LoaderCallContextIr
-from ....spec.ir.fields import FieldIr
-from ....spec.ir.helpers import call_loader_with_binding, coerce_loader_result_mapping
-from ....spec.ir.sources import SourceIr
 from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping
 from ....vendor.compact.typing_extensionsx import TypeGuard, override
 from ...context import BatchContext
@@ -291,3 +290,6 @@ class LoadOperatorExecutor(OperatorExecutor):
             batch_row_nth=batch_row_nth,
             result=result,
         )
+
+
+__all__ = []

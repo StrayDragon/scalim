@@ -4,19 +4,22 @@ import threading
 from collections import OrderedDict
 from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, overload
 
-from ..events.catalog import (
+from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from ..events import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_CACHE_ACQUIRE,
     EVENT_WORKFLOW_CACHE_EVICT,
     EVENT_WORKFLOW_CACHE_RELEASE,
+    DiagnosticWarningEvent,
+    WorkflowCacheAcquireEvent,
+    WorkflowCacheEvictEvent,
+    WorkflowCacheReleaseEvent,
 )
-from ..events.events import DiagnosticWarningEvent, WorkflowCacheAcquireEvent, WorkflowCacheEvictEvent, WorkflowCacheReleaseEvent
 from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
-from ..spec.ir.sources import SourceIr
-from ..spec.ir.workflow import WorkflowCachePoolIr
+from ..spec.ir import SourceIr
+from ..spec.ir._workflow import WorkflowCachePoolIr
 from ..typedefs import LoaderCallKwargs, LoaderResultMapping
-from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, field
 

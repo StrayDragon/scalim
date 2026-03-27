@@ -5,14 +5,14 @@
 
 from typing import TYPE_CHECKING, Dict, Hashable, List, Set
 
-from .....events.catalog import EVENT_RELATION_LOOKUP
+from ....._internal.utils.converters import auto_str_normalize_key
+from .....events import EVENT_RELATION_LOOKUP
 from .....planning.operators import LoadRefOperatorIr, SupportedOperatorIr
-from .....spec.ir.relations import LookupStepIr
+from .....spec.ir import LookupStepIr
 from .....typedefs import LoaderResultMapping
-from .....utils.converters import auto_str_normalize_key
+from .....utils.relation_signature import RelationSignature, build_relation_signature, can_group_by_relation
 from .....vendor.compact.typing_extensionsx import override
 from ....context import BatchContext
-from ...helpers.relation_signature import RelationSignature, build_relation_signature, can_group_by_relation
 from ...runtime.runtime import ExecutionRuntime
 from ..base import OperatorExecutor
 from .context import LoadRefExecutionContext
@@ -146,3 +146,6 @@ class LoadRefOperatorExecutor(OperatorExecutor):
                     steps[step_idx + 1],
                     null_fill_fields=group_field_keys,
                 )
+
+
+__all__ = []

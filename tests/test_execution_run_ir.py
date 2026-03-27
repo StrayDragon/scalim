@@ -3,20 +3,20 @@ from pathlib import Path
 import pytest
 
 import scalim.execution.run_ir as run_ir_mod
-from scalim.events.catalog import EVENT_DIAGNOSTIC_WARNING
-from scalim.events.event import Event
+from scalim.events import EVENT_DIAGNOSTIC_WARNING
+from scalim.events import Event
 from scalim.execution.output_composition import OutputCompositionSpec, OutputTargetSpec
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.ob.observer import Observer
 from scalim.ob.presets.viz import VizObserverConfig
-from scalim.sinks.sink_base import BaseRowSink, BaseSink, IColumnSink, IRowSink
-from scalim.sinks.sink_csv import ColumnCSVSink
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryListSink, InMemoryRowSink
-from scalim.sinks.sink_rows import InMemoryRows
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.sources import MainSourceIr
-from scalim.warningsx import ScalimExperimentalWarning
+from scalim.sinks import BaseRowSink, BaseSink, IColumnSink, IRowSink
+from scalim.sinks import ColumnCSVSink
+from scalim.sinks import InMemoryColumnSink, InMemoryListSink, InMemoryRowSink
+from scalim.sinks import InMemoryRows
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import MainSourceIr
+from scalim._internal.warningsx import ScalimExperimentalWarning
 from scalim.vendor.compact.typing_extensionsx import override
 
 

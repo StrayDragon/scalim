@@ -2,8 +2,8 @@ import json
 import logging
 
 import pytest
-from scalim.events.event import Event
-from scalim.events.events import (
+from scalim.events import Event
+from scalim.events import (
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
@@ -11,13 +11,13 @@ from scalim.events.events import (
     LoaderCallEvent,
     LoaderSlimEvent,
 )
-from scalim.events.catalog import (
+from scalim.events import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
 )
-from scalim.hooks.base import HOOK_RAISED_EXCEPTION_WARNING, BaseHook, HookManager
+from scalim.hooks import HOOK_RAISED_EXCEPTION_WARNING, BaseHook, HookManager
 from scalim.ob.observer import EventDispatchObserver, Observer
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.logs import (
@@ -28,7 +28,7 @@ from scalim.ob.presets.logs import (
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 from scalim.typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY
 
 

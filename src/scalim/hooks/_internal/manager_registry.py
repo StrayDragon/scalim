@@ -30,3 +30,6 @@ class HookManagerRegistryMixin(HookManagerBase, ABC):
             manager.hooks.clear()
             manager.has_hooks = False
             self._rebuild_subscription_cache()
+
+
+__all__ = []

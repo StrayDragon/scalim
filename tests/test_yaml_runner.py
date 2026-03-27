@@ -24,15 +24,15 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     TraceConfig,
     MemoryOptimizationConfig,
 )
-from scalim.events.catalog import EVENT_PIPELINE_START
-from scalim.events.events import BatchEndEvent, BatchStartEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
-from scalim.hooks.base import BaseHook
+from scalim.events import EVENT_PIPELINE_START
+from scalim.events import BatchEndEvent, BatchStartEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
+from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr
 from tests.testing_utils import missing_optional_dependency
 

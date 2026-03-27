@@ -8,7 +8,7 @@ from scalim.dsl.by_yaml import run
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
-from scalim.sinks.sink_csv import CSVSink, ColumnCSVSink
+from scalim.sinks import CSVSink, ColumnCSVSink
 
 
 def _write_simple_yaml(tmp_path: Path, loader_path: str) -> Path:
@@ -249,7 +249,7 @@ class TestExcelIncludeHeader:
         ],
     )
     def test_excel_sink_include_header(self, tmp_path: Path, openpyxl, include_header: bool, expected_rows: List[tuple]) -> None:
-        from scalim.sinks.sink_excel import ExcelSink
+        from scalim.sinks import ExcelSink
 
         output_path = tmp_path / ("with_header.xlsx" if include_header else "no_header.xlsx")
         sink = ExcelSink(str(output_path), field_names=["id", "name"], include_header=include_header)
@@ -270,7 +270,7 @@ class TestExcelIncludeHeader:
         ],
     )
     def test_column_excel_sink_include_header(self, tmp_path: Path, openpyxl, include_header: bool, expected_rows: List[tuple]) -> None:
-        from scalim.sinks.sink_excel import ColumnExcelSink
+        from scalim.sinks import ColumnExcelSink
 
         output_path = tmp_path / ("column_with_header.xlsx" if include_header else "column_no_header.xlsx")
         sink = ColumnExcelSink(str(output_path), field_names=["id", "name"], include_header=include_header)

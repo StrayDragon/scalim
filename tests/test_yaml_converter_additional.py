@@ -4,7 +4,7 @@ from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
 
 
 def _load_config(yaml_content: str):

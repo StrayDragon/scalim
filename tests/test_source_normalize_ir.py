@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.spec.ir.sources import SourceNormalizeIr
+from scalim.spec.ir import SourceNormalizeIr
 
 
 def test_source_normalize_index_by_key_success() -> None:
@@ -103,7 +103,7 @@ def test_source_normalize_take_first_rejects_list_result() -> None:
 
 def test_source_normalize_project_fields_supports_int_key_extract_and_from_key() -> None:
     from scalim.dsl.by_yaml.config_parsing.field_extract import compile_field_extract
-    from scalim.spec.ir.sources import SourceNormalizeProjectFieldRuleIr
+    from scalim.spec.ir import SourceNormalizeProjectFieldRuleIr
 
     fields = (
         SourceNormalizeProjectFieldRuleIr(name="order_id", from_key=True),
@@ -142,7 +142,7 @@ def test_source_normalize_project_fields_supports_int_key_extract_and_from_key()
 
 def test_source_normalize_map_values_pipeline_take_first_then_project_fields() -> None:
     from scalim.dsl.by_yaml.config_parsing.field_extract import compile_field_extract
-    from scalim.spec.ir.sources import SourceNormalizeProjectFieldRuleIr, SourceNormalizeStepIr
+    from scalim.spec.ir import SourceNormalizeProjectFieldRuleIr, SourceNormalizeStepIr
 
     project_fields = (
         SourceNormalizeProjectFieldRuleIr(name="order_id", from_key=True),
@@ -183,7 +183,7 @@ def test_source_normalize_call_by_accepts_ctx_keyword() -> None:
 
 
 def test_source_normalize_step_apply_value_rejects_unknown_kind() -> None:
-    from scalim.spec.ir.sources import SourceNormalizeStepIr
+    from scalim.spec.ir import SourceNormalizeStepIr
 
     step = SourceNormalizeStepIr(kind="bad")
     with pytest.raises(ValueError, match="Unknown normalize\\.step\\.kind"):
@@ -191,7 +191,7 @@ def test_source_normalize_step_apply_value_rejects_unknown_kind() -> None:
 
 
 def test_normalize_call_by_rejects_non_mapping_input() -> None:
-    from scalim.spec.ir.sources import _normalize_call_by
+    from scalim.spec.ir._sources import _normalize_call_by
 
     def identity(result: object) -> object:
         return result
@@ -201,7 +201,7 @@ def test_normalize_call_by_rejects_non_mapping_input() -> None:
 
 
 def test_normalize_call_by_rejects_fn_without_args() -> None:
-    from scalim.spec.ir.sources import _normalize_call_by
+    from scalim.spec.ir._sources import _normalize_call_by
 
     def bad_call_by() -> object:  # type: ignore[no-untyped-def]
         return {}
@@ -211,7 +211,7 @@ def test_normalize_call_by_rejects_fn_without_args() -> None:
 
 
 def test_normalize_call_by_falls_back_when_signature_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir.sources as sources_module
+    import scalim.spec.ir._sources as sources_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
@@ -226,7 +226,7 @@ def test_normalize_call_by_falls_back_when_signature_unavailable(monkeypatch: py
 
 
 def test_normalize_call_by_fallback_supports_ctx_keyword(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir.sources as sources_module
+    import scalim.spec.ir._sources as sources_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
@@ -242,7 +242,7 @@ def test_normalize_call_by_fallback_supports_ctx_keyword(monkeypatch: pytest.Mon
 
 
 def test_normalize_call_by_fallback_does_not_swallow_type_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir.sources as sources_module
+    import scalim.spec.ir._sources as sources_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
@@ -259,7 +259,7 @@ def test_normalize_call_by_fallback_does_not_swallow_type_error(monkeypatch: pyt
 
 
 def test_normalize_call_by_fallback_does_not_swallow_type_error_from_ctx_keyword_call(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir.sources as sources_module
+    import scalim.spec.ir._sources as sources_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
@@ -276,7 +276,7 @@ def test_normalize_call_by_fallback_does_not_swallow_type_error_from_ctx_keyword
 
 
 def test_normalize_call_by_works_when_positional_only_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir.sources as sources_module
+    import scalim.spec.ir._sources as sources_module
 
     parameter_cls = sources_module.inspect.Parameter
     if not hasattr(parameter_cls, "POSITIONAL_ONLY"):
@@ -293,7 +293,7 @@ def test_normalize_call_by_works_when_positional_only_is_unavailable(monkeypatch
 
 
 def test_normalize_call_by_accepts_varargs() -> None:
-    from scalim.spec.ir.sources import _normalize_call_by
+    from scalim.spec.ir._sources import _normalize_call_by
 
     def identity(*args: object) -> object:
         return args[0]
@@ -303,7 +303,7 @@ def test_normalize_call_by_accepts_varargs() -> None:
 
 
 def test_normalize_call_by_accepts_varargs_with_ctx_kwonly() -> None:
-    from scalim.spec.ir.sources import _normalize_call_by
+    from scalim.spec.ir._sources import _normalize_call_by
 
     def identity(*args: object, ctx: object) -> object:
         _ = ctx
@@ -351,7 +351,7 @@ def test_source_normalize_project_fields_rejects_non_mapping_row() -> None:
 
 def test_source_normalize_project_fields_on_missing_variants() -> None:
     from scalim.dsl.by_yaml.config_parsing.field_extract import compile_field_extract
-    from scalim.spec.ir.sources import SourceNormalizeProjectFieldRuleIr
+    from scalim.spec.ir import SourceNormalizeProjectFieldRuleIr
 
     fields = (
         SourceNormalizeProjectFieldRuleIr(
@@ -382,7 +382,7 @@ def test_source_normalize_map_values_rejects_non_mapping_result() -> None:
 
 
 def test_extract_segments_with_presence_branches() -> None:
-    from scalim.spec.ir.sources import _extract_segments_with_presence
+    from scalim.spec.ir._sources import _extract_segments_with_presence
 
     ok, value = _extract_segments_with_presence({"x": None}, ("x", "y"))
     assert ok is False
@@ -396,7 +396,7 @@ def test_extract_segments_with_presence_branches() -> None:
 def test_extract_segment_with_presence_branches() -> None:
     from types import SimpleNamespace
 
-    from scalim.spec.ir.sources import _extract_segment_with_presence
+    from scalim.spec.ir._sources import _extract_segment_with_presence
 
     ok, value = _extract_segment_with_presence(SimpleNamespace(x=1), "x")
     assert ok is True

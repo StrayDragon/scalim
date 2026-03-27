@@ -2,10 +2,10 @@ from typing import Any, Dict, List, Optional
 
 from scalim.execution.guardrails import GuardrailsPolicy
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.spec.ir import MainSourceIr
 
 
 class _CaptureHook(BaseHook):

@@ -1,9 +1,9 @@
 import pytest
 
-from scalim.sinks.sink_csv import BlockColumnCSVSink, CSVSink, ColumnCSVSink
-from scalim.sinks.sink_excel import ColumnExcelSink, ExcelSink
-from scalim.sinks.sink_memory import InMemoryColumnSink, InMemoryRowSink
-from scalim.sinks.sink_pandas import PandasColumnSink, PandasRowSink
+from scalim.sinks import BlockColumnCSVSink, CSVSink, ColumnCSVSink
+from scalim.sinks import ColumnExcelSink, ExcelSink
+from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks import PandasColumnSink, PandasRowSink
 
 
 def test_in_memory_row_sink_write_row_aligned_and_mismatch() -> None:
@@ -100,7 +100,7 @@ def test_pandas_sinks_aligned_write_and_mismatch() -> None:
 
 
 def test_block_column_csv_sink_write_column_aligned_unknown_field_and_sleep(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    import scalim.sinks.sink_csv as csv_mod
+    import scalim.sinks._internal.sink_csv as csv_mod
 
     output_path = tmp_path / "block_sleep.csv"
     sink = BlockColumnCSVSink(str(output_path), ["id"], col_width=8, write_delay=0.1)

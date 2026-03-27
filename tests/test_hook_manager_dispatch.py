@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from scalim.events.catalog import (
+from scalim.events import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
     EVENT_COLUMN_WRITE,
@@ -17,9 +17,9 @@ from scalim.events.catalog import (
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
 )
-from scalim.events.event import Event
-from scalim.hooks.base import BaseHook, HookManager
-from scalim.hooks.dispatch import HookDispatchStrategy
+from scalim.events import Event
+from scalim.hooks import BaseHook, HookManager
+from scalim.hooks import HookDispatchStrategy
 
 
 def test_base_hook_on_event_is_noop() -> None:

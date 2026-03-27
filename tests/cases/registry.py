@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable, Dict, Sequence
 
-from scalim.spec.ir.demand import DemandIr
+from scalim.spec.ir import DemandIr
 
 from .minimal_ir import build_minimal_ir_case
 

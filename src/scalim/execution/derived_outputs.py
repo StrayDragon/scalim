@@ -5,12 +5,12 @@ from abc import ABC, abstractmethod
 from decimal import Decimal, InvalidOperation
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
+from .._internal.utils import graph as graph_utils
+from .._internal.utils.converters import auto_str_normalize
+from .._internal.utils.iterables import ordered_unique_str
 from ..exceptions import ScalimExecutionError
-from ..sinks.sink_base import BaseRowSink, IRowSink
+from ..sinks import BaseRowSink, IRowSink
 from ..typedefs import FieldValue, KeyNormalizationMode, RowData
-from ..utils import graph as graph_utils
-from ..utils.converters import auto_str_normalize
-from ..utils.iterables import ordered_unique_str
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, field
 from .key_normalization import normalize_key_normalization
@@ -1263,3 +1263,5 @@ def fingerprint_for_meta(
 
 
 NonNullFieldValue = Union[int, float, Decimal, str, bool]
+
+__all__ = []

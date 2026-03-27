@@ -28,3 +28,6 @@ class ReleaseOperatorExecutor(OperatorExecutor):
             batch_num=runtime.batch_num,
             remaining_fields=context.get_field_count(),
         )
+
+
+__all__ = []

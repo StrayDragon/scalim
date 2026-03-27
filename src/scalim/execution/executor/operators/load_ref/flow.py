@@ -1,8 +1,7 @@
 from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Set, Tuple
 
-from .....spec.ir.fields import FieldIr
-from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.source_contracts import LookupSourceRefIrBase
+from .....spec.ir import FieldIr, LookupStepIr
+from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....typedefs import FieldValue, LoaderResultMapping, LookupKey
 from ...helpers.field_access import extract_field, extract_field_segments
 from .._internal.loader_guardrails import (

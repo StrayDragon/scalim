@@ -137,3 +137,6 @@ def fail_guardrail(
     violation = ScalimGuardrailViolationError(message, code=code, context=payload)
     runtime.instrumentation.emit_error(violation, payload)
     raise violation
+
+
+__all__ = []

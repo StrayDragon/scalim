@@ -7,8 +7,7 @@ from typing import (
     Union,
 )
 
-from ..spec.ir.fields import DerivedFieldIr, FieldIr
-from ..spec.ir.sources import SourceIr
+from ..spec.ir import DerivedFieldIr, FieldIr, SourceIr
 from .plan import PlanMetadata
 
 
@@ -58,4 +57,6 @@ def build_metadata(
 
 
 if TYPE_CHECKING:
-    from ..spec.ir.demand import DemandIr
+    from ..spec.ir import DemandIr
+
+__all__ = []

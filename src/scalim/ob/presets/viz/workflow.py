@@ -1,7 +1,7 @@
 import time
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, cast
 
-from ....events.catalog import (
+from ....events import (
     EVENT_WORKFLOW_CACHE_ACQUIRE,
     EVENT_WORKFLOW_CACHE_EVICT,
     EVENT_WORKFLOW_CACHE_RELEASE,
@@ -12,8 +12,6 @@ from ....events.catalog import (
     EVENT_WORKFLOW_RESOURCE_CREATE,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
-)
-from ....events.events import (
     WorkflowCacheAcquireEvent,
     WorkflowCacheEvictEvent,
     WorkflowCacheReleaseEvent,
@@ -25,7 +23,7 @@ from ....events.events import (
     WorkflowResourceDiscardEvent,
     WorkflowResourceWriteEvent,
 )
-from ....spec.ir.workflow import (
+from ....spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
     WorkflowIr,

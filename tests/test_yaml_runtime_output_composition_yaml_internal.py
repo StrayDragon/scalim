@@ -16,9 +16,9 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputExtraSheetConfig,
     OutputTargetConfig,
 )
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import MainSourceIr
 
 
 def _dummy_main_loader(*_args, **_kwargs):  # type: ignore[no-untyped-def]

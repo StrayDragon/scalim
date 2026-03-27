@@ -1,10 +1,10 @@
 import logging
 from typing import Any, Dict, Hashable, List, Tuple, cast
 
-from .....events.catalog import EVENT_FIELD_COMPUTE
+from .....events import EVENT_FIELD_COMPUTE
 from .....planning.operators import ComputeOperatorIr, SupportedOperatorIr
 from .....secure_compute_contracts import is_secure_compute_calculator
-from .....spec.ir.fields import ComputeCallContextIr, DerivedFieldIr
+from .....spec.ir import ComputeCallContextIr, DerivedFieldIr
 from .....vendor.compact.typing_extensionsx import override
 from ....context import BatchContext
 from ...runtime.runtime import ExecutionRuntime

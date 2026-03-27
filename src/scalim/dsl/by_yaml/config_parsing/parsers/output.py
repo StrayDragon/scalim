@@ -264,3 +264,6 @@ class ParserOutputMixin:
             batch_duration_warn=float(batch_duration_warn) if batch_duration_warn is not None else None,
             memory_increase_warn=float(memory_increase_warn) if memory_increase_warn is not None else None,
         )
+
+
+__all__ = []

@@ -1,12 +1,12 @@
 import pytest
 
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir.relations import LookupStepIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
 def _make_runtime(*, key_normalization: str) -> ExecutionRuntime:

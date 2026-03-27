@@ -6,15 +6,13 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from .._internal.loggingx import format_kv, get_logger, prefix
+from .._internal.utils.iterables import ordered_unique_str
 from .._project_constants import VERSION as SCALIM_VERSION
-from ..events.catalog import EVENT_OUTPUT_TARGET_END
-from ..events.events import OutputTargetEndEvent
+from ..events import EVENT_OUTPUT_TARGET_END, OutputTargetEndEvent
 from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
-from ..sinks.sink_base import BaseRowSink, IRowSink
-from ..sinks.sink_csv import CSVSink, InMemoryCsvSink
+from ..sinks import BaseRowSink, CSVSink, InMemoryCsvSink, IRowSink
 from ..typedefs import KeyNormalizationMode, RowData
-from ..utils.iterables import ordered_unique_str
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
 from .derived_outputs import (
@@ -37,7 +35,7 @@ OutputRowPredicate = Callable[[RowData], bool]
 _logger = get_logger("derived_outputs")
 
 if TYPE_CHECKING:
-    from ..sinks.sink_excel import ExcelWorkbookSink
+    from ..sinks import ExcelWorkbookSink
 
 
 @dataclass(frozen=True)
@@ -446,7 +444,7 @@ def _create_in_memory_csv_sink(layout: ExportLayout) -> InMemoryCsvSink:
 
 
 def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink:
-    from ..sinks.sink_excel import ExcelSink  # noqa: PLC0415
+    from ..sinks import ExcelSink  # noqa: PLC0415
 
     field_names = list(layout.field_ids)
     header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
@@ -901,7 +899,7 @@ def _get_or_create_excel_workbook_sink(
     *,
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> "ExcelWorkbookSink":
-    from ..sinks.sink_excel import ExcelWorkbookSink  # noqa: PLC0415
+    from ..sinks import ExcelWorkbookSink  # noqa: PLC0415
 
     path = str(output.path)
     wb = workbook_by_path.get(path)

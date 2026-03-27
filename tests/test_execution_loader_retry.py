@@ -2,15 +2,15 @@ from typing import List, Optional, Set
 
 import pytest
 
-from scalim.events.catalog import EVENT_ERROR, EVENT_LOADER_RETRY
-from scalim.events.event import Event
+from scalim.events import EVENT_ERROR, EVENT_LOADER_RETRY
+from scalim.events import Event
 from scalim.execution.loader_retry import LoaderRetryPolicies, LoaderRetryPolicy
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, run_ir
 from scalim.ob.observer import Observer
-from scalim.sinks.sink_memory import InMemoryListSink
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.sources import MainSourceIr
+from scalim.sinks import InMemoryListSink
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import MainSourceIr
 
 
 class _CaptureObserver(Observer):

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Dict, Hashable, List, Sequence, Set, cast
 
-from ....sinks.sink_base import IRowSink
+from ....sinks import IRowSink
 from ...context import BatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
 
@@ -141,6 +141,4 @@ class RowEmissionCoordinator:
             self._next_release_idx += 1
 
 
-__all__ = [
-    "RowEmissionCoordinator",
-]
+__all__ = []

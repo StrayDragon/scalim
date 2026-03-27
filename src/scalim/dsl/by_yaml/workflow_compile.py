@@ -8,7 +8,7 @@
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
-from ...spec.ir.workflow import (
+from ...spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
     WorkflowArtifactsIr,

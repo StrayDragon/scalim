@@ -3,14 +3,14 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
-from scalim.events.catalog import EVENT_LOADER_CALL
+from scalim.events import EVENT_LOADER_CALL
 from scalim.ob.manager import ScalimObserverCaptureOverflowError, ObserverManager
 from scalim.ob.observer import Observer
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
 class _LoaderCallObserver(Observer):

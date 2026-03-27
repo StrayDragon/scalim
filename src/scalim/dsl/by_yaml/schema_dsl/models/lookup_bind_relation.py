@@ -208,3 +208,6 @@ class InlineRelationConfig:
         metadata=schema_meta(schema=RELATION_STEPS_SCHEMA, desc=DESC_RELATION_STEPS),
     )
     """关系路径的步骤列表."""
+
+
+__all__ = []

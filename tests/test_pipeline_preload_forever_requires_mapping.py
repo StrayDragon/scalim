@@ -3,8 +3,8 @@ import pytest
 from scalim.execution import ScalimEngine
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 from scalim.typedefs import SourceSpecIrCacheMode
 
 

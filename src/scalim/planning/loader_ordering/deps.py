@@ -2,9 +2,8 @@ import logging
 from collections import OrderedDict
 from typing import TYPE_CHECKING, List, Tuple
 
-from ...spec.ir.fields import FieldIr
-from ...spec.ir.helpers import extract_from_fields, infer_lookup_steps
-from ...spec.ir.sources import SourceIr
+from ...spec.ir import FieldIr, SourceIr
+from ...spec.ir._helpers import extract_from_fields, infer_lookup_steps
 
 _logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: Fie
 
 
 if TYPE_CHECKING:
-    from ...spec.ir.demand import DemandIr
+    from ...spec.ir import DemandIr
 
 
 __all__ = [

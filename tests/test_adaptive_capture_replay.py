@@ -4,18 +4,18 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
-from scalim.events.catalog import EVENT_BATCH_START, EVENT_LOADER_CALL
-from scalim.events.events import BatchStartEvent
+from scalim.events import EVENT_BATCH_START, EVENT_LOADER_CALL
+from scalim.events import BatchStartEvent
 from scalim.execution.adaptive.capture import HookCaptureManager
 from scalim.execution import ScalimEngine
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.hooks import BaseHook, HookManager
 from scalim.planning import PlanBuilder
 from scalim.planning.operators import LoadRefOperatorIr
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import FieldIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import FieldIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 from tests.testing_utils import CI_TIMEOUT_S
 

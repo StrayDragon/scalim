@@ -175,7 +175,7 @@ def _(mo):
 def _(Path, yaml_path):
     # region SCALIM-SKILL:example-full:run-yaml
     from scalim.dsl.by_yaml import run
-    from scalim.sinks.sink_memory import InMemoryRowSink
+    from scalim.sinks import InMemoryRowSink
 
     # 注意: `run()` 需要 `allowlist` 配置
     _loaders_module = "scalim_misc.demo_big_data_report.loaders"

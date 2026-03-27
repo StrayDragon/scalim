@@ -3,7 +3,7 @@ from abc import ABC
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple, TypeVar
 
 from ..._internal.loggingx import format_kv, prefix
-from ...events.catalog import (
+from ...events import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
     EVENT_COLUMN_WRITE,
@@ -17,14 +17,12 @@ from ...events.catalog import (
     EVENT_PIPELINE_START,
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
-)
-from ...events.event import Event
-from ...events.events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
+    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,
@@ -296,3 +294,6 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         if handler_pairs is None:
             return
         self._dispatch(handler_pairs, ColumnWriteEvent(field_key, row_count, batch_num))
+
+
+__all__ = []

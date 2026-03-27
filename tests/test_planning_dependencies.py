@@ -1,9 +1,9 @@
 import pytest
 
 from scalim.planning import PlanBuilder
-from scalim.utils.graph import ScalimCyclicDependencyError
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
+from scalim._internal.utils.graph import ScalimCyclicDependencyError
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
 
 from .fixtures.planning_fixtures import (
     build_derived_model,

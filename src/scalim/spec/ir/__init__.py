@@ -3,6 +3,19 @@
 此包提供稳定的 IR 类型导入路径,供用户侧直接构造/读取 IR 结构.
 """
 
+from ._demand import DemandIr
+from ._fields import ComputeCallContextIr, DerivedFieldIr, FieldIr, SupportedFieldIr
+from ._relations import FieldRefIr, JoinConditionIr, LookupStepIr, RelationIr
+from ._sources import (
+    KeyIr,
+    MainSourceIr,
+    OrderByKeyIr,
+    SourceIr,
+    SourceNormalizeIr,
+    SourceNormalizeProjectFieldRuleIr,
+    SourceNormalizeStepIr,
+    SourceRefIr,
+)
 from .aliases import (
     LoaderExtractor,
     LoaderParamsBuilder,
@@ -13,8 +26,6 @@ from .aliases import (
     NormalizedLookupKeySpec,
 )
 from .binding import BindingIr, LoaderCallContextIr, LoaderIr, build_stable_lookup_key_list
-from .demand import DemandIr
-from .fields import ComputeCallContextIr, DerivedFieldIr, FieldIr, SupportedFieldIr
 from .presentation import (
     CsvFieldPresentationIr,
     ExportProfileIr,
@@ -22,8 +33,10 @@ from .presentation import (
     PandasFieldPresentationIr,
     SpreadsheetFieldPresentationIr,
 )
-from .relations import FieldRefIr, JoinConditionIr, LookupStepIr, RelationIr
-from .sources import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr, SourceNormalizeIr, SourceRefIr
+
+# 这些符号允许从 `scalim.spec.ir` 直接导入以便内部复用,但不纳入 `__all__`(非稳定公开契约).
+_non_public_exports = (SourceNormalizeProjectFieldRuleIr, SourceNormalizeStepIr)
+del _non_public_exports
 
 __all__ = (
     "BindingIr",

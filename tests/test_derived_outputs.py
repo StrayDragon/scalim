@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 
 from scalim.execution import derived_outputs as mod
-from scalim.sinks.sink_base import BaseRowSink
+from scalim.sinks import BaseRowSink
 
 
 class _CollectingRowSink(BaseRowSink):

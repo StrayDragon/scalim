@@ -1,5 +1,3 @@
 MISSING = object()
 
-__all__ = [
-    "MISSING",
-]
+__all__ = []

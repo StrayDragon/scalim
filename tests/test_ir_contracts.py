@@ -1,11 +1,11 @@
 import pytest
 
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from scalim.spec.ir.demand import DemandIr
-from scalim.spec.ir.fields import DerivedFieldIr, FieldIr
-from scalim.spec.ir.helpers import extract_from_fields, infer_lookup_steps
-from scalim.spec.ir.relations import JoinConditionIr, LookupStepIr, RelationIr
-from scalim.spec.ir.sources import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import DemandIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir._helpers import extract_from_fields, infer_lookup_steps
+from scalim.spec.ir import JoinConditionIr, LookupStepIr, RelationIr
+from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
 def _make_source(source_id: str, pk_key: object = "id") -> SourceIr:

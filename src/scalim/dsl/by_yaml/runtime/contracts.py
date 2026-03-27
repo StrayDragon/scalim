@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional,
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
 from ....execution.run_ir import ExecutionResult
-from ....hooks.base import IExecutionHook
+from ....hooks import IExecutionHook
 from ....ob.observer import Observer
-from ....sinks.sink_base import ISink
+from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from ....execution.run_ir import ExecutionRequest
     from ....ob.presets.viz import VizObserverConfig
     from ....planning.plan import ExecutionPlan
-    from ....spec.ir.demand import DemandIr
+    from ....spec.ir import DemandIr
 
 
 class _UnsetType:

@@ -7,7 +7,7 @@ from scalim_misc.examples.public_api._coverage import (
     coverage_failure_summary,
     coverage_to_details,
 )
-from scalim.events.catalog import EVENT_PIPELINE_END, EVENT_PIPELINE_START
+from scalim.events import EVENT_PIPELINE_END, EVENT_PIPELINE_START
 from scalim import ob as api
 from scalim_misc.examples._types import EXAMPLE_KIND_SMOKE, ExampleResult
 

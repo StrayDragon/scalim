@@ -1,6 +1,6 @@
 import pickle
 
-from scalim.hooks.base import HookManager
+from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 
 

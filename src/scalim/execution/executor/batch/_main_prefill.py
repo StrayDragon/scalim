@@ -1,6 +1,6 @@
 from typing import Dict, Hashable, List, Mapping, Optional, Set, Tuple
 
-from ....spec.ir.fields import FieldIr
+from ....spec.ir import FieldIr
 from ....typedefs import FieldValue, RowData
 from ...context import BatchContext
 from ..helpers.field_access import extract_field, extract_field_segments
@@ -106,6 +106,4 @@ def prefill_main_source_fields(
             )
 
 
-__all__ = [
-    "prefill_main_source_fields",
-]
+__all__ = []

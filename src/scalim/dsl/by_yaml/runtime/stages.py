@@ -11,7 +11,7 @@ from typing import FrozenSet, Mapping, Optional
 
 from ....exceptions import ScalimYamlError
 from ....execution.run_ir import ExecutionRequest
-from ....spec.ir.demand import DemandIr
+from ....spec.ir import DemandIr
 from ....vendor.dataclassesx import dataclass
 from ..schema_dsl.models import DemandConfig
 from .compiler import (

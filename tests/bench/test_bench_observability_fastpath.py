@@ -5,8 +5,8 @@ import pytest
 
 from scalim_benchlib import BenchmarkRunner
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.events.catalog import EVENT_PIPELINE_START
-from scalim.hooks.base import HookManager
+from scalim.events import EVENT_PIPELINE_START
+from scalim.hooks import HookManager
 from scalim.ob.hub import InstrumentationHub
 from scalim.ob.manager import ObserverManager
 

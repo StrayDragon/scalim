@@ -1,12 +1,12 @@
 from typing import Hashable, List, Optional
 
-from .....spec.ir.relations import LookupStepIr
-from .....spec.ir.source_contracts import LookupSourceRefIrBase
+from .....spec.ir import LookupStepIr
+from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY, LookupKey, RelationLookupResult, RowData
+from .....utils.relation_signature import RelationSignature, is_auto_lookup_cast
 from ....context import BatchContext
 from ...helpers.batch_data import build_row
 from ...helpers.field_access import contains_float
-from ...helpers.relation_signature import RelationSignature, is_auto_lookup_cast
 from ...runtime.runtime import ExecutionRuntime
 from .._internal.sentinels import MISSING
 

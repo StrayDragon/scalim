@@ -8,7 +8,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, cast
 
-from ..events.catalog import (
+from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from ..events import (
     EVENT_WORKFLOW_NODE_CANCELLED,
     EVENT_WORKFLOW_NODE_END,
     EVENT_WORKFLOW_NODE_START,
@@ -16,14 +17,16 @@ from ..events.catalog import (
     WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
     WORKFLOW_NODE_END_STATUS_ERROR,
     WORKFLOW_NODE_END_STATUS_OK,
+    WorkflowNodeCancelledEvent,
+    WorkflowNodeEndEvent,
+    WorkflowNodeStartEvent,
+    generate_run_id,
 )
-from ..events.event import generate_run_id
-from ..events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
 from ..exceptions import ScalimWorkflowError
 from ..execution.engine import ScalimEngine
 from ..execution.run_ir import ExecutionResult, run_ir
 from ..execution.workflow_cache_pool import ScalimWorkflowCachePoolError, WorkflowCachePool
-from ..hooks.base import HookManager
+from ..hooks import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
 from ..ob.manager import ObserverManager
@@ -35,8 +38,8 @@ from ..ob.presets.viz import (
     WorkflowVizObserver,
     build_workflow_viz_graph_snapshot,
 )
-from ..sinks.sink_rows import InMemoryRows, iter_in_memory_rows_as_main_rows
-from ..spec.ir.workflow import (
+from ..sinks import InMemoryRows, iter_in_memory_rows_as_main_rows
+from ..spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
     WorkflowCtxOptionsIr,
@@ -45,7 +48,6 @@ from ..spec.ir.workflow import (
     WorkflowNodeType,
     WriteSheetNodeIr,
 )
-from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
 from .errors import ScalimWorkflowConfigError

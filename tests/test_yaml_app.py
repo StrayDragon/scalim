@@ -7,7 +7,7 @@ from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config, resolve_required_field_ids
 from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 
 _ALLOWED_MODULES = frozenset(["scalim_misc.example_report_ir"])
 

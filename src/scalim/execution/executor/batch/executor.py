@@ -12,7 +12,7 @@ from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
 from ....planning.operators import LoadRefOperatorIr as LoadRefOp
 from ....planning.operators import OperatorType, SupportedOperatorIr
 from ....planning.plan import ExecutionPlan
-from ....sinks.sink_base import ISink
+from ....sinks import ISink
 from ....typedefs import FieldValue, RowData
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
 from ...adaptive.loadref_scheduler import AdaptiveLoadRefScheduler

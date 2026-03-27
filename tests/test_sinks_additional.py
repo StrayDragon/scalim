@@ -9,16 +9,16 @@ try:
 except Exception as exc:
     pytest.skip("pandas unavailable in this environment: {}".format(exc), allow_module_level=True)
 
-from scalim.sinks.sink_base import BaseColumnSink, BaseRowSink, BaseSink, IColumnSink, IRowSink
-from scalim.sinks.sink_csv import (
+from scalim.sinks import BaseColumnSink, BaseRowSink, BaseSink, IColumnSink, IRowSink
+from scalim.sinks import (
     COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED,
     CSV_SINK_REMOVE_TEMP_FILE_FAILED,
     BlockColumnCSVSink,
     CSVSink,
     ColumnCSVSink,
 )
-from scalim.sinks.sink_memory import InMemoryColumnSink
-from scalim.sinks.sink_pandas import PandasColumnSink, PandasRowSink
+from scalim.sinks import InMemoryColumnSink
+from scalim.sinks import PandasColumnSink, PandasRowSink
 
 
 class _RowSink(IRowSink):
@@ -287,7 +287,7 @@ def test_block_column_csv_sink_internal_branches(tmp_path: Path) -> None:
 
 
 def test_column_csv_sink_close_exception_cleans_temp_file(tmp_path: Path, monkeypatch) -> None:
-    import scalim.sinks.sink_csv as csv_mod
+    import scalim.sinks._internal.sink_csv as csv_mod
 
     output_path = tmp_path / "cols_exc.csv"
     sink = ColumnCSVSink(str(output_path), ["id"])
@@ -308,7 +308,7 @@ def test_column_csv_sink_close_exception_cleans_temp_file(tmp_path: Path, monkey
 
 
 def test_csv_sink_close_replace_exception_cleans_temp_file(tmp_path: Path, monkeypatch) -> None:
-    import scalim.sinks.sink_csv as csv_mod
+    import scalim.sinks._internal.sink_csv as csv_mod
 
     output_path = tmp_path / "rows_replace_exc.csv"
     sink = CSVSink(str(output_path), field_names=["id"])
@@ -331,7 +331,7 @@ def test_csv_sink_close_replace_exception_cleans_temp_file(tmp_path: Path, monke
 
 
 def test_csv_sink_close_replace_exception_unlink_failure_logs_warning(tmp_path: Path, monkeypatch, caplog) -> None:
-    import scalim.sinks.sink_csv as csv_mod
+    import scalim.sinks._internal.sink_csv as csv_mod
 
     output_path = tmp_path / "rows_unlink_exc.csv"
     sink = CSVSink(str(output_path), field_names=["id"])
@@ -358,7 +358,7 @@ def test_csv_sink_close_replace_exception_unlink_failure_logs_warning(tmp_path: 
 
 
 def test_column_csv_sink_close_replace_exception_unlink_failure_logs_warning(tmp_path: Path, monkeypatch, caplog) -> None:
-    import scalim.sinks.sink_csv as csv_mod
+    import scalim.sinks._internal.sink_csv as csv_mod
 
     output_path = tmp_path / "cols_unlink_exc.csv"
     sink = ColumnCSVSink(str(output_path), ["id"])

@@ -7,7 +7,7 @@ from collections.abc import Sized
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
-from ...events.catalog import (
+from ...events import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
     EVENT_BATCH_END,
     EVENT_BATCH_START,
@@ -15,8 +15,6 @@ from ...events.catalog import (
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
     EVENT_STAGE_SPAN,
-)
-from ...events.events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
     BatchStartEvent,

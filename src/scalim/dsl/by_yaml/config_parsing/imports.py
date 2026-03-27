@@ -724,3 +724,6 @@ def contains_import_syntax(raw: Any) -> bool:
         raw_list = cast("List[Any]", raw)  # pragma: allow-cast yaml import syntax scan typed narrowing
         return any(contains_import_syntax(item) for item in raw_list)
     return False
+
+
+__all__ = []

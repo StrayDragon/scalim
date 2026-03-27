@@ -154,3 +154,6 @@ class VizObserverConfig:
     @classmethod
     def default_local(cls, **kwargs: Any) -> "VizObserverConfig":
         return cls(output_dir=default_viz_dir(), **kwargs)
+
+
+__all__ = []

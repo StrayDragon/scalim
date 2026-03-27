@@ -6,7 +6,7 @@ import scalim.dsl.by_yaml.config_parsing.validator as validator_module
 from scalim.dsl.by_yaml import run
 from scalim.dsl.by_yaml.config_parsing.parsers.sources import ParserSourcesMixin
 from scalim.dsl.by_yaml.config_parsing.validators.sources import ValidatorSourcesMixin
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 
 import tests.source_normalize_loaders as loaders
 

@@ -3,8 +3,8 @@ import logging
 from typing import Dict, List, Set, Tuple, Union
 
 from ..._internal.loggingx import prefix
-from ...spec.ir.sources import SourceIr
-from ...utils import graph
+from ..._internal.utils import graph
+from ...spec.ir import SourceIr
 
 _logger = logging.getLogger(__name__)
 _UNMAPPED_DEPS_PREVIEW_LIMIT = 10

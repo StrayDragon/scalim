@@ -10,7 +10,7 @@ from scalim_misc.examples.public_api._coverage import (
     coverage_to_details,
 )
 from scalim.dsl import by_yaml as api
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import get_preload_counter_calls, reset_preload_counter_calls
 

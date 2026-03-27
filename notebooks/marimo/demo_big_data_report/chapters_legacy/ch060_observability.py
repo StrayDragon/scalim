@@ -8,7 +8,7 @@ from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim.planning import PlanBuilder
-from scalim.sinks.sink_memory import InMemoryColumnSink
+from scalim.sinks import InMemoryColumnSink
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
 from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model

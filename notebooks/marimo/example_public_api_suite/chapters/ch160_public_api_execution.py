@@ -9,7 +9,7 @@ from scalim_misc.examples.public_api._coverage import (
 )
 from scalim import execution as api
 from scalim.planning import PlanBuilder
-from scalim.sinks.sink_memory import InMemoryRowSink
+from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
 

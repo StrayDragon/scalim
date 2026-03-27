@@ -1,5 +1,5 @@
-from scalim.events.catalog import EVENT_PIPELINE_END, EVENT_PIPELINE_START
-from scalim.hooks.base import BaseHook, HookManager
+from scalim.events import EVENT_PIPELINE_END, EVENT_PIPELINE_START
+from scalim.hooks import BaseHook, HookManager
 from scalim.ob.observer import Observer
 from scalim.ob.manager import ObserverManager
 
