@@ -57,10 +57,9 @@
    - 目标: 把 `getattr(x, "literal")` 变成 `x.literal` 或更明确的接口调用.
    - 前提: 该属性在运行时确实存在,且可以通过类型/接口表达（`Protocol`/dataclass/ABC 等）.
 2. **把第三方/无 stubs 的动态边界显式化**（任务 2.2）
-   - 目标: 对确属必要的点加 `# pragma: allow-dynattr <reason>`，避免隐式扩散.
+   - 目标: 对确属必要的点加 `# pragma: allow-dynattr <prefix>: <detail>`，避免隐式扩散.
    - 示例候选: CLI/YAML 错误对象字段读取（依赖第三方异常对象结构时）.
 3. **对 dispatch/registry 场景优先改为表驱动**（任务 2.1/2.2）
    - 目标: 避免通过 `handler_name` 拼接再 `getattr` 的隐式分发.
 4. **每改一个文件就做最小验证**
    - 建议顺序: `uv run basedpyright <file>` → `uv run pytest --no-cov <focused tests>`（必要时再跑 `just qa`）.
-

@@ -12,8 +12,8 @@
 
 - 新增 `scripts/check-dynattr.py`,统一扫描 `src/scalim/` 中的 `getattr` / `setattr` / `hasattr`.
 - 提供显式例外约定:
-  - 行级 `# pragma: allow-dynattr <reason>`
-  - 文件级 `# pragma: allow-dynattr-file <reason>`
+  - 行级 `# pragma: allow-dynattr <prefix>: <detail>`
+  - 文件级 `# pragma: allow-dynattr-file <prefix>: <detail>`
 - 报告必须输出位置、调用类型、属性表达式摘要与 allow/block 状态,便于分批重构.
 - 先以“报告优先”方式建立基线,后续在基线收口后再接入 `just qa` 强门禁.
 

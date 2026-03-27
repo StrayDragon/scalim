@@ -18,17 +18,19 @@
 系统 MUST 要求所有 `dynattr` 例外均通过显式注释声明,不得依赖隐式白名单或隐藏规则.
 
 系统 MUST 支持以下两类例外:
-- 行级 `# pragma: allow-dynattr <reason>`
-- 文件级 `# pragma: allow-dynattr-file <reason>`
+- 行级 `# pragma: allow-dynattr <prefix>: <detail>`
+- 文件级 `# pragma: allow-dynattr-file <prefix>: <detail>`
+
+其中 `prefix` MUST 为一组有限枚举,用于将例外原因聚类并提升可审阅性(例如: `compat` / `dispatch` / `dsl` / `introspection` / `legacy` / `metadata` / `optional-interface` / `plugin` / `third-party`).
 
 文件级例外 SHOULD 仅用于框架型、反射型、整文件动态职责明显的模块;普通业务逻辑 SHOULD 优先使用局部 allow 或重构为静态访问.
 
 #### Scenario: explicit allow suppresses only declared hits
-- **WHEN** 某个 `dynattr` 调用所在行带有 `# pragma: allow-dynattr <reason>`
+- **WHEN** 某个 `dynattr` 调用所在行带有 `# pragma: allow-dynattr <prefix>: <detail>`
 - **THEN** 扫描器 MUST 将该命中标记为 allow
 
 #### Scenario: file-level allow marks the file as allowed
-- **WHEN** 文件头注释区包含 `# pragma: allow-dynattr-file <reason>`
+- **WHEN** 文件头注释区包含 `# pragma: allow-dynattr-file <prefix>: <detail>`
 - **THEN** 扫描器 MUST 将该文件内命中标记为 allow
 
 ### Requirement: dynattr gate MUST be promotable into `just qa`
