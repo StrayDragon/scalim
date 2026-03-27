@@ -93,7 +93,7 @@ def _call_ref_loader(
     loader_duration = time.perf_counter() - loader_start
 
     result_obj: object = result_raw
-    normalize_spec = getattr(source, "normalize", None)
+    normalize_spec = source.normalize
     if normalize_spec is not None:
         result_obj = normalize_spec.apply(result_raw, source_id=source.source_id)
 

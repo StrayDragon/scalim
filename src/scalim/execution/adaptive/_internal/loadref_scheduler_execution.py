@@ -27,7 +27,7 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
     def _build_loadref_executor(self) -> LoadRefOperatorExecutor:
         factory = self._require_overrides().adaptive_loadref_executor_factory
         if factory is not None:
-            return cast("LoadRefOperatorExecutor", factory())
+            return cast("LoadRefOperatorExecutor", factory())  # pragma: allow-cast overrides factory typed narrowing
         return LoadRefOperatorExecutor()
 
     def _execute_ops_serially(
@@ -103,7 +103,7 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
                 resolved_max_workers=resolved,
             ),
         )
-        return cast("Dict[Tuple[str, object], _AdaptiveTaskResult]", results_by_key), layer_stats
+        return results_by_key, layer_stats
 
     def _submit_process_task(
         self,

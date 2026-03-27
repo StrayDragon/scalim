@@ -89,7 +89,7 @@ class EventDispatchObserver(Observer):
             if not handler_name:
                 handler_cache[event_type] = None
                 return
-            resolved = getattr(self, handler_name, None)
+            resolved = getattr(self, handler_name, None)  # pragma: allow-dynattr dispatch: handler_name
             if resolved is None or not callable(resolved):
                 handler_cache[event_type] = None
                 return

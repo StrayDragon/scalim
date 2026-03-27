@@ -2,7 +2,7 @@
 
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from ..events.event import Event
 from ..events.events import (
@@ -22,6 +22,7 @@ from ..events.events import (
 )
 from ..vendor.compact.typing_extensionsx import override
 from ._internal.common import HOOK_RAISED_EXCEPTION_WARNING, HOOK_TYPED_DISPATCH_MAP
+from ._internal.manager_base import ExecutionHookLike, HookOnEventHandlerPair, HookTypedHandlerPair
 from ._internal.manager_events import HookManagerEventMixin
 from ._internal.manager_registry import HookManagerRegistryMixin
 from ._internal.manager_state import HookManagerStateMixin
@@ -29,9 +30,6 @@ from ._internal.manager_subscriptions import HookManagerSubscriptionMixin
 from .dispatch import HookDispatchStrategy
 
 # endregion
-
-_TypedHandlerPair = Tuple["IExecutionHook", Callable[[Any], Any]]
-_OnEventHandlerPair = Tuple["IExecutionHook", Callable[[Event], Any]]
 
 
 class IExecutionHook(ABC):
@@ -161,10 +159,10 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
     注意: 请使用 `register`/`unregister`/`clear` 管理钩子,不要直接修改 `hooks` 列表,否则 `fastpath` 缓存可能失效.
     """
 
-    hooks: List[IExecutionHook]
+    hooks: List[ExecutionHookLike]
     _has_hooks: bool
-    _typed_handlers_by_event_type: Dict[str, Tuple[_TypedHandlerPair, ...]]
-    _on_event_handlers_by_event_type: Dict[str, Tuple[_OnEventHandlerPair, ...]]
+    _typed_handlers_by_event_type: Dict[str, Tuple[HookTypedHandlerPair, ...]]
+    _on_event_handlers_by_event_type: Dict[str, Tuple[HookOnEventHandlerPair, ...]]
     debug_mode: bool
     fallback_logger_enabled: bool
     loader_result_policy: str
@@ -172,7 +170,7 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool
     _dispatch_strategy: HookDispatchStrategy
-    _base_hook_on_event: Optional[Callable[[BaseHook, Event], None]]
+    _base_hook_on_event: Optional[Callable[..., None]]
     _base_hook_typed_handlers: Dict[str, Optional[Callable[..., None]]]
 
     def __init__(
@@ -198,66 +196,82 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
         self._dispatch_strategy = dispatch_strategy or HookDispatchStrategy()
 
     @property
+    @override
     def has_hooks(self) -> bool:
         return self._has_hooks
 
     @has_hooks.setter
+    @override
     def has_hooks(self, value: bool) -> None:
         self._has_hooks = value
 
     @property
-    def typed_handlers_by_event_type(self) -> Dict[str, Tuple[_TypedHandlerPair, ...]]:
+    @override
+    def typed_handlers_by_event_type(self) -> Dict[str, Tuple[HookTypedHandlerPair, ...]]:
         return self._typed_handlers_by_event_type
 
     @typed_handlers_by_event_type.setter
-    def typed_handlers_by_event_type(self, value: Dict[str, Tuple[_TypedHandlerPair, ...]]) -> None:
+    @override
+    def typed_handlers_by_event_type(self, value: Dict[str, Tuple[HookTypedHandlerPair, ...]]) -> None:
         self._typed_handlers_by_event_type = value
 
     @property
-    def on_event_handlers_by_event_type(self) -> Dict[str, Tuple[_OnEventHandlerPair, ...]]:
+    @override
+    def on_event_handlers_by_event_type(self) -> Dict[str, Tuple[HookOnEventHandlerPair, ...]]:
         return self._on_event_handlers_by_event_type
 
     @on_event_handlers_by_event_type.setter
-    def on_event_handlers_by_event_type(self, value: Dict[str, Tuple[_OnEventHandlerPair, ...]]) -> None:
+    @override
+    def on_event_handlers_by_event_type(self, value: Dict[str, Tuple[HookOnEventHandlerPair, ...]]) -> None:
         self._on_event_handlers_by_event_type = value
 
     @property
+    @override
     def lock(self) -> "threading.RLock":
         return self._lock
 
     @lock.setter
+    @override
     def lock(self, value: "threading.RLock") -> None:
         self._lock = value
 
     @property
+    @override
     def diagnostic_warning_emitted(self) -> bool:
         return self._diagnostic_warning_emitted
 
     @diagnostic_warning_emitted.setter
+    @override
     def diagnostic_warning_emitted(self, value: bool) -> None:
         self._diagnostic_warning_emitted = value
 
     @property
+    @override
     def dispatch_strategy(self) -> HookDispatchStrategy:
         return self._dispatch_strategy
 
     @dispatch_strategy.setter
+    @override
     def dispatch_strategy(self, value: HookDispatchStrategy) -> None:
         self._dispatch_strategy = value
 
     @property
-    def base_hook_on_event(self) -> Optional[Callable[[BaseHook, Event], None]]:
+    @override
+    def base_hook_on_event(self) -> Optional[Callable[..., None]]:
         return self._base_hook_on_event
 
     @base_hook_on_event.setter
-    def base_hook_on_event(self, value: Optional[Callable[[BaseHook, Event], None]]) -> None:
+    @override
+    def base_hook_on_event(self, value: Optional[Callable[..., None]]) -> None:
         self._base_hook_on_event = value
 
     @property
+    @override
     def base_hook_typed_handlers(self) -> Dict[str, Optional[Callable[..., None]]]:
         return self._base_hook_typed_handlers
 
     @base_hook_typed_handlers.setter
+    @override
     def base_hook_typed_handlers(self, value: Dict[str, Optional[Callable[..., None]]]) -> None:
         self._base_hook_typed_handlers = value
 

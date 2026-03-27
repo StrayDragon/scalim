@@ -1,13 +1,11 @@
 # region imports
 
-from typing import TYPE_CHECKING, Dict, Hashable, List, Mapping, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Hashable, List, Mapping, Optional, Sequence, Type, Union
 
 from ..vendor.compact.importlibx import require_optional_dependency
 
 if TYPE_CHECKING:
     import pandas as pd
-else:
-    pd = require_optional_dependency("pandas", context="scalim.sinks.sink_pandas")
 
 from ..typedefs import FieldValue, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import Self, override
@@ -17,6 +15,10 @@ if TYPE_CHECKING:
     import types
 
 # endregion
+
+
+def _get_pandas_module() -> Any:
+    return require_optional_dependency("pandas", context="scalim.sinks.sink_pandas")
 
 
 class PandasRowSink(IRowSink):
@@ -53,9 +55,10 @@ class PandasRowSink(IRowSink):
         self._closed = True
 
     def to_dataframe(self) -> "pd.DataFrame":
+        pd_module = _get_pandas_module()
         if self.field_names:
-            return pd.DataFrame(self._rows, columns=self.field_names)
-        return pd.DataFrame(self._rows)
+            return pd_module.DataFrame(self._rows, columns=self.field_names)
+        return pd_module.DataFrame(self._rows)
 
     def get_rows(self) -> List[RowData]:
         return self._rows
@@ -131,8 +134,9 @@ class PandasColumnSink(IColumnSink):
         self._closed = True
 
     def to_dataframe(self) -> "pd.DataFrame":
+        pd_module = _get_pandas_module()
         if not self._row_ids:
-            return pd.DataFrame(columns=self.field_names or [])
+            return pd_module.DataFrame(columns=self.field_names or [])
 
         fields = self.field_names or list(self._columns.keys())
         data: Dict[str, List[Union[FieldValue, None]]] = {}
@@ -141,7 +145,7 @@ class PandasColumnSink(IColumnSink):
             col_data = self._columns.get(field_key, {})
             data[field_key] = [col_data.get(pk) for pk in self._row_ids]
 
-        return pd.DataFrame(data, columns=fields)
+        return pd_module.DataFrame(data, columns=fields)
 
     def get_columns(self) -> Dict[str, Dict[Hashable, FieldValue]]:
         return self._columns

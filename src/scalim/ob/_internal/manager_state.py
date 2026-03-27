@@ -57,7 +57,7 @@ class ObserverManagerStateMixin(ABC):
         elif isinstance(recorded, deque):
             self._recorded_events = recorded
         elif isinstance(recorded, Iterable):
-            self._recorded_events = deque(cast("TypingIterable[Event]", recorded))
+            self._recorded_events = deque(cast("TypingIterable[Event]", recorded))  # pragma: allow-cast iterable typed narrowing
         else:
             self._recorded_events = deque()
         self._rebuild_subscription_cache()
@@ -95,13 +95,13 @@ class ObserverManagerStateMixin(ABC):
     def _sample_result(self, result: Any) -> Any:
         sample: Any = None
         if isinstance(result, MappingABC):
-            mapping = cast("MappingABC[Any, Any]", result)
+            mapping = cast("MappingABC[Any, Any]", result)  # pragma: allow-cast mapping typed narrowing
             sample = dict(list(mapping.items())[: self.loader_result_sample_size])
         elif isinstance(result, list):
-            items = cast("list[Any]", result)
+            items = cast("list[Any]", result)  # pragma: allow-cast list typed narrowing
             sample = items[: self.loader_result_sample_size]
         elif isinstance(result, tuple):
-            items = cast("tuple[Any, ...]", result)
+            items = cast("tuple[Any, ...]", result)  # pragma: allow-cast tuple typed narrowing
             sample = list(items[: self.loader_result_sample_size])
         elif isinstance(result, AbstractSet):
             sample = list(islice(result, self.loader_result_sample_size))
@@ -109,7 +109,7 @@ class ObserverManagerStateMixin(ABC):
             sample = result[: self.loader_result_sample_size]
         elif isinstance(result, SequenceABC):
             with contextlib.suppress(Exception):
-                sequence = cast("SequenceABC[Any]", result)
+                sequence = cast("SequenceABC[Any]", result)  # pragma: allow-cast sequence typed narrowing
                 sample = list(sequence[: self.loader_result_sample_size])
         if sample is None:
             return self._summarize_result(result)

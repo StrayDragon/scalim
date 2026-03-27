@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Set, Tuple
 
 from ...planning.operators import LoadRefOperatorIr
 from ..context import BatchContext
@@ -32,7 +32,7 @@ def commit_layer_results(
     *,
     skipped_field_keys: Set[str],
     op_task_key: Dict[str, Tuple[str, object]],
-    results_by_key: Dict[Tuple[str, object], object],
+    results_by_key: Mapping[Tuple[str, object], Any],
     context: BatchContext,
     runtime: ExecutionRuntime,
     committed_relation_keys: Set[Tuple[Tuple[object, ...], ...]],

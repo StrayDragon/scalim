@@ -265,6 +265,13 @@ def test_params_template_render_kwargs_requires_mapping_and_allows_none() -> Non
         _ = template_scalar.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
 
 
+def test_params_template_render_kwargs_rejects_non_string_keys() -> None:
+    template = params_tmpl.compile_params_template({1: "x"}, path="p")
+    with pytest.raises(params_tmpl.ParamsTemplateRenderError, match="mapping keys must be strings") as exc:
+        _ = template.render_kwargs(LoaderCallContextIr(is_ref_loader=False), path="p")
+    assert exc.value.path == "p.1"
+
+
 def test_converter_rejects_disallowed_directives_and_reports_template_errors() -> None:
     resolver = PythonReferenceResolver(allowed_modules=frozenset(["tests.conftest"]))
 

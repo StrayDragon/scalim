@@ -155,28 +155,19 @@ def test_binding_key_validation_and_restore_guards() -> None:
 def test_restore_bindings_rejects_invalid_state_entries() -> None:
     valid_binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}))
 
-    try:
+    with pytest.raises(TypeError) as excinfo:
         _restore_bindings({1: valid_binding})
-    except TypeError as exc:
-        assert "Invalid binding key" in str(exc)
-    else:  # pragma: no cover
-        raise AssertionError("expected invalid binding key to raise")
+    assert "Invalid binding key" in str(excinfo.value)
 
-    try:
+    with pytest.raises(TypeError) as excinfo:
         _restore_bindings({"id": object()})
-    except TypeError as exc:
-        assert "Invalid binding value" in str(exc)
-    else:  # pragma: no cover
-        raise AssertionError("expected invalid binding value to raise")
+    assert "Invalid binding value" in str(excinfo.value)
 
 
 def test_lookup_cast_requires_initialized_registry() -> None:
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.conftest"]))
     converter._lookup_casts = None
 
-    try:
+    with pytest.raises(ConversionError) as excinfo:
         converter._get_lookup_cast_fn(LookupCastConfig(name="auto", sep=None), is_multi=False)
-    except ConversionError as exc:
-        assert "Lookup cast registry is not initialized" in str(exc)
-    else:  # pragma: no cover
-        raise AssertionError("expected missing lookup cast registry to raise")
+    assert "Lookup cast registry is not initialized" in str(excinfo.value)

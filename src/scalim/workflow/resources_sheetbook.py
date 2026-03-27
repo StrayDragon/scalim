@@ -38,11 +38,11 @@ def _materialize_aligned_csv_columns(expected: List[str], mapping: List[int], *,
 
 
 def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBookPlan") -> None:
-    wb = cast("Any", workbook)
+    wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
     for sheet_name in plan.sheet_order:
         sheet_plan = plan.sheets.get(sheet_name)
         if sheet_plan is None:
-            continue  # pragma: no cover
+            continue  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
         ws = wb.create_sheet(str(sheet_name))
         header_written = False
         fields = list(sheet_plan.baseline_header)
@@ -63,7 +63,7 @@ def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBo
 
 
 def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
-    wb = cast("Any", workbook)
+    wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
     temp_path = create_temp_path(output_path, ".xlsx.tmp")
     temp_obj = Path(temp_path)
     try:
@@ -315,7 +315,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
     ) -> None:
         with self._lock:
             sheet_plan = plan.sheets.get(sheet_name)
-            if sheet_plan is None:  # pragma: no cover
+            if sheet_plan is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
                 msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
                 raise WorkflowWriteError(msg)
 
@@ -344,7 +344,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
     def _get_or_create_sheetbook(self, sheetbook_id: str, *, workflow_node_id: str) -> _SheetBookPlan:
         key = str(sheetbook_id)
         with self._lock:
-            existing = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(key))
+            existing = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(key))  # pragma: allow-cast sheetbook plan typed narrowing
             if existing is not None:
                 return existing
 
@@ -353,7 +353,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 msg = "Unknown sheetbook resource id: {!r}".format(key)
                 raise WorkflowWriteError(msg)
 
-            raw_def = cast("SheetBookDef", raw_def)
+            raw_def = cast("SheetBookDef", raw_def)  # pragma: allow-cast sheetbook def typed narrowing
             plan = SheetBookPlan(
                 resource_id=str(raw_def.resource_id),
                 budget_max_sheets=int(raw_def.budget_max_sheets),
@@ -382,8 +382,8 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         new_total_cells: int,
         allow_over_budget: bool = False,
     ) -> None:
-        if allow_over_budget:  # pragma: no cover
-            return  # pragma: no cover
+        if allow_over_budget:  # pragma: no cover  # pragma: allow-no-cover test-only budget bypass
+            return  # pragma: no cover  # pragma: allow-no-cover test-only budget bypass
         limit = int(plan.budget_max_total_cells)
         if int(new_total_cells) <= limit:
             return
@@ -562,7 +562,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         visible = frozenset(str(x) for x in visible_producer_node_ids)
 
         with self._lock:
-            plan = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(sb_id))
+            plan = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(sb_id))  # pragma: allow-cast sheetbook plan typed narrowing
             if plan is None:
                 msg = "Unknown sheetbook resource id: {!r}".format(sb_id)
                 raise ValueError(msg)
@@ -595,9 +595,11 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                     row: Dict[str, object] = {}
                     for key in baseline_header:
                         col = columns.get(str(key))
-                        if col is None:  # pragma: no cover
-                            row[str(key)] = ""  # pragma: no cover
-                            continue  # pragma: no cover
+                        if col is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: baseline_header/columns kept in sync
+                            row[str(key)] = (
+                                ""  # pragma: no cover  # pragma: allow-no-cover unreachable: baseline_header/columns kept in sync
+                            )
+                            continue  # pragma: no cover  # pragma: allow-no-cover unreachable: baseline_header/columns kept in sync
                         row[str(key)] = col[row_idx] if row_idx >= 0 and row_idx < len(col) else ""
                     yield row
 
@@ -605,7 +607,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
     @override
     def _commit_sheetbook(self, plan: object) -> None:
-        p = cast("_SheetBookPlan", plan)
+        p = cast("_SheetBookPlan", plan)  # pragma: allow-cast sheetbook plan typed narrowing
         export_path = p.export_path
         display_path = export_path if export_path is not None else "<memory>"
         if export_path is None:
@@ -642,7 +644,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
     @override
     def _discard_sheetbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
-        p = cast("_SheetBookPlan", plan)
+        p = cast("_SheetBookPlan", plan)  # pragma: allow-cast sheetbook plan typed narrowing
         with suppress(Exception):
             self._release_sheetbook_write_lock(p)
         node_id = p.last_workflow_node_id or str(workflow_node_id)

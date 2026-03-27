@@ -37,7 +37,7 @@ def _normalize_dict_keys(value: Dict[Any, Any]) -> Dict[str, Any]:
     for key, item in value.items():
         item_value = item
         if isinstance(item_value, dict):
-            item_value = _normalize_dict_keys(cast("Dict[Any, Any]", item_value))
+            item_value = _normalize_dict_keys(cast("Dict[Any, Any]", item_value))  # pragma: allow-cast dict typed narrowing
         normalized[str(key)] = item_value
     return normalized
 
@@ -48,21 +48,21 @@ def _sample_value(value: Any, size: int) -> Any:
     if value is None:
         return None
     if isinstance(value, dict):
-        value = _normalize_dict_keys(cast("Dict[Any, Any]", value))
+        value = _normalize_dict_keys(cast("Dict[Any, Any]", value))  # pragma: allow-cast dict typed narrowing
     if isinstance(value, dict):
-        value_dict = cast("Dict[Any, Any]", value)
+        value_dict = cast("Dict[Any, Any]", value)  # pragma: allow-cast dict typed narrowing
         return dict(list(value_dict.items())[:size])
     if isinstance(value, (list, tuple)):
-        value_seq = cast("Sequence[Any]", value)
+        value_seq = cast("Sequence[Any]", value)  # pragma: allow-cast sequence typed narrowing
         return list(value_seq[:size])
     if isinstance(value, set):
-        value_set = cast("Set[Any]", value)
+        value_set = cast("Set[Any]", value)  # pragma: allow-cast set typed narrowing
         return list(list(value_set)[:size])
     return value
 
 
 class VizObserverHandlerMixin(ABC):
-    config: VizObserverConfig = cast("VizObserverConfig", object())
+    config: VizObserverConfig
     run_id: Optional[str] = None
     _events_emitter: Optional[VizEventEmitter] = None
     _trace_emitter: Optional[VizEventEmitter] = None
@@ -169,7 +169,7 @@ class VizObserverHandlerMixin(ABC):
         full_event = asdict(event)
         result_value = full_event.get("result")
         if isinstance(result_value, dict):
-            full_event["result"] = _normalize_dict_keys(cast("Dict[Any, Any]", result_value))
+            full_event["result"] = _normalize_dict_keys(cast("Dict[Any, Any]", result_value))  # pragma: allow-cast dict typed narrowing
         sample = {
             "sample_size": self.config.sample_size,
             "sample": _sample_value(event.result, self.config.sample_size),

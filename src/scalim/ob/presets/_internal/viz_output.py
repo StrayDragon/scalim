@@ -49,7 +49,7 @@ class VizEventEmitter:
 
 
 class VizObserverOutputMixin(ABC):
-    config: VizObserverConfig = cast("VizObserverConfig", object())
+    config: VizObserverConfig
     snapshot: Optional[Dict[str, Any]] = None
     run_id: Optional[str] = None
     _events_emitter: Optional[VizEventEmitter] = None
@@ -63,7 +63,7 @@ class VizObserverOutputMixin(ABC):
     def _ensure_run_id(self) -> None:
         if self.run_id is not None:
             return
-        configured = str(getattr(self.config, "run_id", "") or "").strip()
+        configured = str(self.config.run_id or "").strip()
         if configured:
             self.run_id = configured
             return
@@ -112,11 +112,11 @@ class VizObserverOutputMixin(ABC):
         if not isinstance(meta, dict):
             meta = {}
             snapshot["meta"] = meta
-        meta = cast("Dict[str, Any]", meta)
+        meta = cast("Dict[str, Any]", meta)  # pragma: allow-cast dict typed narrowing
         viz_meta = meta.get("viz")
         if not isinstance(viz_meta, dict):
             viz_meta = {}
-        viz_meta = cast("Dict[str, Any]", viz_meta)
+        viz_meta = cast("Dict[str, Any]", viz_meta)  # pragma: allow-cast dict typed narrowing
         trace_enabled = self.config.trace_enabled_effective()
         viz_meta.update(
             {

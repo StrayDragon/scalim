@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, cast
 
 import pytest
 
+from scalim.dsl.by_yaml import RunOverrides
 from scalim.dsl.by_yaml import run_workflow
 from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
 from scalim.workflow import execute as workflow_execute_mod
@@ -373,7 +374,7 @@ def _write_workflow_yaml(
 
         main_rows_from_lines = ""
         if "main_rows_from" in item:
-            main_rows_from = cast("Any", item.get("main_rows_from"))
+            main_rows_from = cast("Any", item.get("main_rows_from"))  # pragma: allow-cast test yaml builder typed narrowing
             if main_rows_from is None:
                 main_rows_from_lines = "\n      main_rows_from: null"
             else:
@@ -382,7 +383,7 @@ def _write_workflow_yaml(
                 producer = main_rows_from.get("run")
                 main_rows_from_lines = "\n      main_rows_from:\n        run: {}".format(json.dumps(producer))
 
-        init_vars = cast("Optional[Dict[str, object]]", item.get("init_vars"))
+        init_vars = cast("Optional[Dict[str, object]]", item.get("init_vars"))  # pragma: allow-cast test yaml builder typed narrowing
         init_vars_lines = ""
         if init_vars:
             rendered = []
@@ -390,7 +391,7 @@ def _write_workflow_yaml(
                 rendered.append("        {}: {}".format(str(key), json.dumps(value)))
             init_vars_lines = "\n      init_vars:\n{}".format("\n".join(rendered))
 
-        writes = cast("Any", item.get("writes"))
+        writes = cast("Any", item.get("writes"))  # pragma: allow-cast test yaml builder typed narrowing
         writes_lines = ""
         if writes is not None:
             if not isinstance(writes, list):
@@ -412,7 +413,7 @@ def _write_workflow_yaml(
                     rendered.append("        - {}:\n{}".format(str(kind), "\n".join(cfg_lines)))
                 writes_lines = "\n      writes:\n{}".format("\n".join(rendered))
 
-        write_to = cast("Any", item.get("write_to"))
+        write_to = cast("Any", item.get("write_to"))  # pragma: allow-cast test yaml builder typed narrowing
         write_to_lines = ""
         if write_to:
             if writes is not None:
@@ -445,18 +446,18 @@ def _write_workflow_yaml(
         group_lines: List[str] = []
         for group_key, group_cfg in resources.items():
             group_lines.append("    {}:".format(str(group_key)))
-            for res_id, cfg in cast("Dict[str, Any]", group_cfg).items():
+            for res_id, cfg in cast("Dict[str, Any]", group_cfg).items():  # pragma: allow-cast test yaml builder typed narrowing
                 group_lines.append("      {}:".format(str(res_id)))
-                for key, value in cast("Dict[str, Any]", cfg).items():
+                for key, value in cast("Dict[str, Any]", cfg).items():  # pragma: allow-cast test yaml builder typed narrowing
                     group_lines.append("        {}: {}".format(str(key), json.dumps(value)))
         resources_lines = "\n  resources:\n{}".format("\n".join(group_lines))
 
     cache_pool_lines = ""
     if cache_pool is not None:
-        budget = cast("Dict[str, Any]", cache_pool.get("budget") or {})
+        budget = cast("Dict[str, Any]", cache_pool.get("budget") or {})  # pragma: allow-cast test yaml builder typed narrowing
         max_entries = int(budget.get("max_entries", 1))
         over_budget_policy = str(budget.get("over_budget_policy", "fail_fast"))
-        pins = cast("List[Dict[str, Any]]", cache_pool.get("pin") or [])
+        pins = cast("List[Dict[str, Any]]", cache_pool.get("pin") or [])  # pragma: allow-cast test yaml builder typed narrowing
         pin_lines = ""
         if pins:
             pin_item_lines = []
@@ -813,6 +814,25 @@ def test_run_workflow_primary_only_collects_errors(tmp_path: Path) -> None:
     assert result.outcomes[1].error is not None
     assert result.outcomes[1].error.exc_type in {"ValueError", "WorkflowRunFailedError", "RuntimeError"}
     assert result.errors()
+
+
+def test_run_workflow_accepts_overrides_default_unset(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, overrides=RunOverrides())
+    assert [o.run_id for o in result.outcomes] == ["ok"]
 
 
 def test_run_workflow_all_fail_raises(tmp_path: Path) -> None:

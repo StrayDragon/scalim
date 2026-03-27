@@ -258,7 +258,7 @@ def main(argv: List[str]) -> int:
             schedule_plan = result.plan.to_viz_schedule_plan()
             with (output_dir / "viz_schedule_plan.json").open("w", encoding="utf-8") as handle:
                 json.dump(schedule_plan, handle, ensure_ascii=False, indent=2, default=str)
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             # 计划视角产物是可选项: 不应阻塞现有可视化数据生成流程.
             print("[警告] 写入 `viz_schedule_plan.json` 失败:", exc)
 

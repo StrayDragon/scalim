@@ -80,8 +80,7 @@ class InstrumentationHub:
     def __setstate__(self, state: Dict[str, Any]) -> None:
         self.__dict__.update(state)
         self._lock = threading.RLock()
-        if not hasattr(self, "_diagnostic_warning_emitted"):
-            self._diagnostic_warning_emitted = False
+        self._diagnostic_warning_emitted = bool(state.get("_diagnostic_warning_emitted", False))
 
     def register(self, subscriber: Union[Observer, IExecutionHook]) -> None:
         observers, hooks = split_components([subscriber])

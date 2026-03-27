@@ -20,7 +20,7 @@ class WriteColumnOperatorExecutor(OperatorExecutor):
         batch_row_nth: List[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
-        op = cast("WriteColumnOperatorIr", operator)
+        op = cast("WriteColumnOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing
         field_key = op.field_key
 
         if not isinstance(runtime.sink, IColumnSink):
@@ -57,7 +57,7 @@ class WriteRowOperatorExecutor(OperatorExecutor):
         batch_row_nth: List[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
-        op = cast("WriteRowOperatorIr", operator)
+        op = cast("WriteRowOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing
         target_fields = list(op.target_fields)
 
         if not isinstance(runtime.sink, IRowSink):

@@ -34,23 +34,23 @@ def maybe_create_adaptive_pool(
             "检测到 parallel_mode='adaptive' 且 backend='process':该实现仍不成熟/实验性,可能不稳定;建议优先使用 backend='thread'.",
             RuntimeWarning,
             stacklevel=2,
-        )  # pragma: no cover
+        )
     elif backend == ADAPTIVE_BACKEND_ASYNC:
-        version_info = getattr(sys_module, "version_info", None)
+        version_info = getattr(sys_module, "version_info", None)  # pragma: allow-dynattr compat: sys.version_info
         is_py36 = version_info is not None and tuple(version_info) < (3, 7)
         if is_py36:
             warn(
                 "检测到 parallel_mode='adaptive' 且 backend='async':该实现仍不成熟,且在 Python 3.6 下不支持;将回退到 backend='thread'.",
                 RuntimeWarning,
                 stacklevel=2,
-            )  # pragma: no cover
+            )
             backend = ADAPTIVE_BACKEND_THREAD
         else:
             warn(
                 "检测到 parallel_mode='adaptive' 且 backend='async':该实现仍不成熟(Python 3.6 更不成熟);建议优先使用 backend='thread'.",
                 RuntimeWarning,
                 stacklevel=2,
-            )  # pragma: no cover
+            )
 
     runtime.adaptive_backend = backend
     runtime.adaptive_process_failure_mode = None

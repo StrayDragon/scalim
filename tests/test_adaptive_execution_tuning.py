@@ -219,7 +219,7 @@ def test_adaptive_scheduler_enforces_pool_limits() -> None:
             self._lock = shared_lock
 
         def execute(self, operator, context, batch_row_nth, runtime) -> None:  # type: ignore[no-untyped-def]
-            op = cast("LoadRefOperatorIr", operator)
+            op = cast("LoadRefOperatorIr", operator)  # pragma: allow-cast test executor typed narrowing
             with self._lock:
                 self._current["n"] += 1
                 self._current["max"] = max(self._current["max"], self._current["n"])
@@ -677,7 +677,7 @@ def test_adaptive_scheduler_emits_pool_wait_stats_when_subscribed(monkeypatch) -
             self._finish = shared_finish
 
         def execute(self, operator, context, batch_row_nth, runtime) -> None:  # type: ignore[no-untyped-def]
-            op = cast("LoadRefOperatorIr", operator)
+            op = cast("LoadRefOperatorIr", operator)  # pragma: allow-cast test executor typed narrowing
             self._started[op.field_key].set()
             if not self._finish.wait(timeout=1.0):
                 raise RuntimeError("timeout waiting for finish")

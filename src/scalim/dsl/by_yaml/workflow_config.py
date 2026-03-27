@@ -63,21 +63,21 @@ def _safe_load_yaml_no_duplicates(text: str) -> object:
 
     def _construct_mapping(loader: object, node: object, deep: bool = False) -> Dict[object, object]:  # noqa: FBT001, FBT002
         mapping: Dict[object, object] = {}
-        pairs = cast("Any", node).value
+        pairs = cast("Any", node).value  # pragma: allow-cast pyyaml loader typed narrowing
         for key_node, value_node in pairs:
-            key = cast("Any", loader).construct_object(key_node, deep=deep)
+            key = cast("Any", loader).construct_object(key_node, deep=deep)  # pragma: allow-cast pyyaml loader typed narrowing
             if key in mapping:
                 msg = "Duplicate key in YAML mapping: {!r}".format(key)
                 raise ValueError(msg)
-            value = cast("Any", loader).construct_object(value_node, deep=deep)
+            value = cast("Any", loader).construct_object(value_node, deep=deep)  # pragma: allow-cast pyyaml loader typed narrowing
             mapping[key] = value
         return mapping
 
     _Loader.add_constructor(  # type: ignore[attr-defined]
-        cast("Any", yaml).resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        cast("Any", yaml).resolver.BaseResolver.DEFAULT_MAPPING_TAG,  # pragma: allow-cast pyyaml resolver typed narrowing
         _construct_mapping,
     )
-    return cast("Any", yaml).load(text, Loader=_Loader)
+    return cast("Any", yaml).load(text, Loader=_Loader)  # pragma: allow-cast pyyaml loader typed narrowing
 
 
 @dataclass(frozen=True)
@@ -256,7 +256,7 @@ def load_workflow_config(
         msg = "workflow YAML root must be a mapping"
         raise WorkflowConfigError(msg, path="(root)")
 
-    return load_workflow_config_from_mapping(cast("Dict[str, Any]", loaded))
+    return load_workflow_config_from_mapping(cast("Dict[str, Any]", loaded))  # pragma: allow-cast yaml mapping typed narrowing
 
 
 def resolve_workflow_demand_path(
@@ -413,7 +413,7 @@ def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
         }
 
     try:
-        _ = load_workflow_config_from_mapping(cast("Dict[str, Any]", yaml_data))
+        _ = load_workflow_config_from_mapping(cast("Dict[str, Any]", yaml_data))  # pragma: allow-cast yaml mapping typed narrowing
     except WorkflowConfigError as exc:
         return {
             "ok": False,
@@ -454,7 +454,7 @@ def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[st
         raise WorkflowConfigError(msg, path="{}.depends_on".format(item_path))
 
     depends_on_list: List[str] = []
-    for dep_idx, dep in enumerate(cast("List[Any]", depends_on_raw)):
+    for dep_idx, dep in enumerate(cast("List[Any]", depends_on_raw)):  # pragma: allow-cast yaml list typed narrowing
         dep_path = "{}.depends_on.{}".format(item_path, dep_idx)
         dep_id = str(dep or "").strip() if isinstance(dep, str) else ""
         if not dep_id:
@@ -481,7 +481,7 @@ def _parse_run_init_vars(init_vars_raw: object, *, item_path: str) -> Optional[D
         msg = "run.init_vars must be a mapping"
         raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
     init_vars: Dict[str, object] = {}
-    for key, value in cast("Dict[Any, Any]", init_vars_raw).items():
+    for key, value in cast("Dict[Any, Any]", init_vars_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         if not isinstance(key, str) or not key.strip():
             msg = "run.init_vars keys must be non-empty strings"
             raise WorkflowConfigError(msg, path="{}.init_vars".format(item_path))
@@ -496,7 +496,7 @@ def _parse_run_main_rows_from(main_rows_from_raw: object, *, item_path: str) -> 
     if not isinstance(main_rows_from_raw, dict):
         msg = "run.main_rows_from must be a mapping"
         raise WorkflowConfigError(msg, path="{}.main_rows_from".format(item_path))
-    main_rows_from = cast("Dict[str, Any]", main_rows_from_raw)
+    main_rows_from = cast("Dict[str, Any]", main_rows_from_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     unknown_keys = sorted(k for k in main_rows_from if str(k) != "run")
     if unknown_keys:
@@ -518,7 +518,7 @@ def _normalize_write_intent_mapping(write_raw: object, *, write_path: str) -> Di
         raise WorkflowConfigError(msg, path=write_path)
 
     intent_mapping: Dict[str, object] = {}
-    for raw_key, raw_value in cast("Dict[Any, Any]", write_raw).items():
+    for raw_key, raw_value in cast("Dict[Any, Any]", write_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         if not isinstance(raw_key, str) or not raw_key.strip():
             msg = "write intent keys must be non-empty strings"
             raise WorkflowConfigError(msg, path=write_path)
@@ -531,7 +531,7 @@ def _parse_write_intent_cfg(kind: str, cfg_raw: object, *, write_path: str) -> D
     if not isinstance(cfg_raw, dict):
         msg = "run.writes.{} must be a mapping".format(kind)
         raise WorkflowConfigError(msg, path="{}.{}".format(write_path, kind))
-    cfg_any = cast("Dict[Any, Any]", cfg_raw)
+    cfg_any = cast("Dict[Any, Any]", cfg_raw)  # pragma: allow-cast yaml mapping typed narrowing
     cfg: Dict[str, object] = {}
     for cfg_key, cfg_value in cfg_any.items():
         if not isinstance(cfg_key, str) or not cfg_key.strip():
@@ -699,8 +699,10 @@ def _parse_write_intent(kind: str, cfg: Mapping[str, object], *, write_path: str
     if kind == "sheetbook_append":
         return _parse_write_intent_sheetbook_append(cfg, write_path=write_path)
 
-    msg = "write intent contains unknown key: {}".format(kind)  # pragma: no cover
-    raise WorkflowConfigError(msg, path=write_path)  # pragma: no cover
+    msg = "write intent contains unknown key: {}".format(
+        kind
+    )  # pragma: no cover  # pragma: allow-no-cover invariant: kind validated in caller
+    raise WorkflowConfigError(msg, path=write_path)  # pragma: no cover  # pragma: allow-no-cover invariant: kind validated in caller
 
 
 def _parse_run_writes(writes_raw: object, *, item_path: str) -> Tuple[WorkflowWriteTo, ...]:
@@ -712,7 +714,7 @@ def _parse_run_writes(writes_raw: object, *, item_path: str) -> Tuple[WorkflowWr
         raise WorkflowConfigError(msg, path="{}.writes".format(item_path))
 
     parsed: List[WorkflowWriteTo] = []
-    for write_idx, write_raw in enumerate(cast("List[Any]", writes_raw)):
+    for write_idx, write_raw in enumerate(cast("List[Any]", writes_raw)):  # pragma: allow-cast yaml list typed narrowing
         write_path = "{}.writes.{}".format(item_path, int(write_idx))
         intent_mapping = _normalize_write_intent_mapping(write_raw, write_path=write_path)
 
@@ -741,12 +743,12 @@ def _load_workflow_runs(wf: Mapping[str, Any]) -> Tuple[List[WorkflowRun], Dict[
 
     seen_ids: Dict[str, int] = {}
     runs: List[WorkflowRun] = []
-    for idx, item in enumerate(cast("List[Any]", runs_raw)):
+    for idx, item in enumerate(cast("List[Any]", runs_raw)):  # pragma: allow-cast yaml list typed narrowing
         item_path = "workflow.runs.{}".format(idx)
         if not isinstance(item, dict):
             msg = "run entry must be a mapping"
             raise WorkflowConfigError(msg, path=item_path)
-        run_dict = cast("Dict[str, Any]", item)
+        run_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
         run_id_raw = run_dict.get("id")
         demand_raw = run_dict.get("demand")
         if "deps" in run_dict:
@@ -802,7 +804,7 @@ def _coerce_workflow_resources_mapping(wf: Mapping[str, Any]) -> Dict[str, Any]:
     if not isinstance(resources_raw, dict):
         msg = "workflow.resources must be a mapping"
         raise WorkflowConfigError(msg, path="workflow.resources")
-    resources_dict = cast("Dict[str, Any]", resources_raw)
+    resources_dict = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     for raw_key in resources_dict:
         if not isinstance(raw_key, str) or not raw_key.strip():
@@ -825,13 +827,13 @@ def _coerce_workflow_resource_group_mapping(resources: Mapping[str, Any], *, gro
     if not isinstance(raw, dict):
         msg = "workflow.resources.{} must be a mapping".format(str(group_key))
         raise WorkflowConfigError(msg, path="workflow.resources.{}".format(str(group_key)))
-    return cast("Dict[str, Any]", raw)
+    return cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
 
 
 def _parse_workflow_workbook_resources(workbooks_raw: Mapping[str, Any]) -> Dict[str, WorkflowWorkbookResource]:
     msg: str
     workbooks: Dict[str, WorkflowWorkbookResource] = {}
-    for raw_id, raw_cfg in cast("Dict[Any, Any]", workbooks_raw).items():
+    for raw_id, raw_cfg in cast("Dict[Any, Any]", workbooks_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         resource_id = str(raw_id or "").strip() if isinstance(raw_id, str) else ""
         item_path = "workflow.resources.workbooks.{}".format(resource_id or "(invalid)")
         if not resource_id:
@@ -840,7 +842,7 @@ def _parse_workflow_workbook_resources(workbooks_raw: Mapping[str, Any]) -> Dict
         if not isinstance(raw_cfg, dict):
             msg = "workflow.resources.workbooks.<id> must be a mapping"
             raise WorkflowConfigError(msg, path=item_path)
-        cfg = cast("Dict[str, Any]", raw_cfg)
+        cfg = cast("Dict[str, Any]", raw_cfg)  # pragma: allow-cast yaml mapping typed narrowing
         path_raw = cfg.get("path")
         path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
         if not path_text:
@@ -857,7 +859,7 @@ def _parse_workflow_workbook_resources(workbooks_raw: Mapping[str, Any]) -> Dict
 def _parse_workflow_csv_resources(csvs_raw: Mapping[str, Any]) -> Dict[str, WorkflowCsvResource]:
     msg: str
     csvs: Dict[str, WorkflowCsvResource] = {}
-    for raw_id, raw_cfg in cast("Dict[Any, Any]", csvs_raw).items():
+    for raw_id, raw_cfg in cast("Dict[Any, Any]", csvs_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         resource_id = str(raw_id or "").strip() if isinstance(raw_id, str) else ""
         item_path = "workflow.resources.csvs.{}".format(resource_id or "(invalid)")
         if not resource_id:
@@ -866,7 +868,7 @@ def _parse_workflow_csv_resources(csvs_raw: Mapping[str, Any]) -> Dict[str, Work
         if not isinstance(raw_cfg, dict):
             msg = "workflow.resources.csvs.<id> must be a mapping"
             raise WorkflowConfigError(msg, path=item_path)
-        cfg = cast("Dict[str, Any]", raw_cfg)
+        cfg = cast("Dict[str, Any]", raw_cfg)  # pragma: allow-cast yaml mapping typed narrowing
         path_raw = cfg.get("path")
         path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
         if not path_text:
@@ -881,7 +883,7 @@ def _parse_workflow_sheetbook_budget(budget_raw: object, *, item_path: str) -> W
     if not isinstance(budget_raw, dict):
         msg = "workflow.resources.sheetbooks.<id>.budget must be a mapping"
         raise WorkflowConfigError(msg, path="{}.budget".format(item_path))
-    budget_dict = cast("Dict[str, Any]", budget_raw)
+    budget_dict = cast("Dict[str, Any]", budget_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_sheets_raw = budget_dict.get("max_sheets")
     max_total_cells_raw = budget_dict.get("max_total_cells")
@@ -918,7 +920,7 @@ def _parse_workflow_sheetbook_export_xlsx(export_raw: object, *, item_path: str)
     if not isinstance(export_raw, dict):
         msg = "workflow.resources.sheetbooks.<id>.export_xlsx must be a mapping"
         raise WorkflowConfigError(msg, path="{}.export_xlsx".format(item_path))
-    export_dict = cast("Dict[str, Any]", export_raw)
+    export_dict = cast("Dict[str, Any]", export_raw)  # pragma: allow-cast yaml mapping typed narrowing
     path_raw = export_dict.get("path")
     path_text = str(path_raw or "").strip() if isinstance(path_raw, str) else ""
     if not path_text:
@@ -943,7 +945,7 @@ def _parse_workflow_sheetbook_export_xlsx(export_raw: object, *, item_path: str)
 def _parse_workflow_sheetbook_resources(sheetbooks_raw: Mapping[str, Any]) -> Dict[str, WorkflowSheetbookResource]:
     msg: str
     sheetbooks: Dict[str, WorkflowSheetbookResource] = {}
-    for raw_id, raw_cfg in cast("Dict[Any, Any]", sheetbooks_raw).items():
+    for raw_id, raw_cfg in cast("Dict[Any, Any]", sheetbooks_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         resource_id = str(raw_id or "").strip() if isinstance(raw_id, str) else ""
         item_path = "workflow.resources.sheetbooks.{}".format(resource_id or "(invalid)")
         if not resource_id:
@@ -952,7 +954,7 @@ def _parse_workflow_sheetbook_resources(sheetbooks_raw: Mapping[str, Any]) -> Di
         if not isinstance(raw_cfg, dict):
             msg = "workflow.resources.sheetbooks.<id> must be a mapping"
             raise WorkflowConfigError(msg, path=item_path)
-        cfg = cast("Dict[str, Any]", raw_cfg)
+        cfg = cast("Dict[str, Any]", raw_cfg)  # pragma: allow-cast yaml mapping typed narrowing
 
         budget = _parse_workflow_sheetbook_budget(cfg.get("budget"), item_path=item_path)
         export_xlsx = _parse_workflow_sheetbook_export_xlsx(cfg.get("export_xlsx"), item_path=item_path)
@@ -1008,13 +1010,6 @@ def _validate_workflow_run_writes_reference_resources(runs: Sequence[WorkflowRun
         WorkflowWriteToSheetbookSheet: "sheetbook_sheet",
         WorkflowWriteToSheetbookAppend: "sheetbook_append",
     }
-    resource_ref_by_type = {
-        WorkflowWriteToWorkbookSheet: ("workbooks", "workbook", "workbook"),
-        WorkflowWriteToWorkbookAppend: ("workbooks", "workbook", "workbook"),
-        WorkflowWriteToCsvAppend: ("csvs", "csv", "csv"),
-        WorkflowWriteToSheetbookSheet: ("sheetbooks", "sheetbook", "sheetbook"),
-        WorkflowWriteToSheetbookAppend: ("sheetbooks", "sheetbook", "sheetbook"),
-    }
     resources_by_group = {
         "workbooks": resources.workbooks,
         "csvs": resources.csvs,
@@ -1027,18 +1022,35 @@ def _validate_workflow_run_writes_reference_resources(runs: Sequence[WorkflowRun
         item_path = "workflow.runs.{}".format(idx)
         for write_idx, intent in enumerate(run.writes):
             kind = kind_by_type.get(type(intent), "unknown")
-            ref = resource_ref_by_type.get(type(intent))
-            if ref is None:
-                continue  # pragma: no cover
-            group_key, attr_name, resource_label = ref
-            resource_id = str(getattr(intent, attr_name, "") or "")
+            group_key: str
+            attr_name: str
+            resource_label: str
+            resource_id: str
+            if isinstance(intent, (WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend)):
+                group_key = "workbooks"
+                attr_name = "workbook"
+                resource_label = "workbook"
+                resource_id = str(intent.workbook or "")
+            elif isinstance(intent, WorkflowWriteToCsvAppend):
+                group_key = "csvs"
+                attr_name = "csv"
+                resource_label = "csv"
+                resource_id = str(intent.csv or "")
+            elif isinstance(intent, (WorkflowWriteToSheetbookSheet, WorkflowWriteToSheetbookAppend)):
+                group_key = "sheetbooks"
+                attr_name = "sheetbook"
+                resource_label = "sheetbook"
+                resource_id = str(intent.sheetbook or "")
+            else:
+                continue  # pragma: no cover  # pragma: allow-no-cover invariant: all WorkflowWrite types handled above
+
             if resource_id not in resources_by_group[group_key]:
                 msg = "Unknown {} resource id: run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}".format(
                     str(resource_label),
                     str(run.id),
                     kind,
                     resource_id,
-                    str(getattr(intent, "output", "") or ""),
+                    str(intent.output or ""),
                 )
                 raise WorkflowConfigError(msg, path="{}.writes.{}.{}.{}".format(item_path, int(write_idx), kind, attr_name))
 
@@ -1051,7 +1063,7 @@ def _load_workflow_ctx_options(ctx_raw: object) -> WorkflowCtxOptions:
     if not isinstance(ctx_raw, dict):
         msg = "workflow.options.ctx must be a mapping"
         raise WorkflowConfigError(msg, path="workflow.options.ctx")
-    ctx_dict = cast("Dict[str, Any]", ctx_raw)
+    ctx_dict = cast("Dict[str, Any]", ctx_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_value_bytes_raw = ctx_dict.get("max_value_bytes", 65536)
     if isinstance(max_value_bytes_raw, bool) or not isinstance(max_value_bytes_raw, (int, float, str)):
@@ -1090,7 +1102,7 @@ def _parse_workflow_cache_pool_budget(budget_raw: object) -> "WorkflowCachePoolB
     if not isinstance(budget_raw, dict):
         msg = "workflow.options.cache_pool.budget must be a mapping"
         raise WorkflowConfigError(msg, path="workflow.options.cache_pool.budget")
-    budget_dict = cast("Dict[str, Any]", budget_raw)
+    budget_dict = cast("Dict[str, Any]", budget_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_entries_raw = budget_dict.get("max_entries")
     if isinstance(max_entries_raw, bool) or not isinstance(max_entries_raw, (int, float, str)):
@@ -1124,12 +1136,12 @@ def _parse_workflow_cache_pool_pins(pin_raw: object) -> Tuple["WorkflowCachePool
         msg = "workflow.options.cache_pool.pin must be a list of mappings"
         raise WorkflowConfigError(msg, path="workflow.options.cache_pool.pin")
     pins: List[WorkflowCachePoolPin] = []
-    for idx, item in enumerate(cast("List[Any]", pin_raw)):
+    for idx, item in enumerate(cast("List[Any]", pin_raw)):  # pragma: allow-cast yaml list typed narrowing
         pin_path = "workflow.options.cache_pool.pin.{}".format(idx)
         if not isinstance(item, dict):
             msg = "workflow.options.cache_pool.pin items must be mappings"
             raise WorkflowConfigError(msg, path=pin_path)
-        pin_dict = cast("Dict[str, Any]", item)
+        pin_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
         kind = str(pin_dict.get("kind", "") or "").strip()
         if kind not in _CACHE_POOL_PIN_KINDS:
             msg = "workflow.options.cache_pool.pin[*].kind must be one of: {}".format("/".join(_CACHE_POOL_PIN_KINDS))
@@ -1149,7 +1161,7 @@ def _load_workflow_cache_pool_options(cache_pool_raw: object) -> Optional["Workf
     if not isinstance(cache_pool_raw, dict):
         msg = "workflow.options.cache_pool must be a mapping"
         raise WorkflowConfigError(msg, path="workflow.options.cache_pool")
-    cache_pool_dict = cast("Dict[str, Any]", cache_pool_raw)
+    cache_pool_dict = cast("Dict[str, Any]", cache_pool_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     conflict_policy = str(cache_pool_dict.get("conflict_policy", "") or "").strip()
     if conflict_policy not in _CACHE_POOL_CONFLICT_POLICIES:
@@ -1179,7 +1191,7 @@ def _load_workflow_options(wf: Mapping[str, Any]) -> WorkflowOptions:
     if not isinstance(options_raw, dict):
         msg = "workflow.options must be a mapping"
         raise WorkflowConfigError(msg, path="workflow.options")
-    options_dict = cast("Dict[str, Any]", options_raw)
+    options_dict = cast("Dict[str, Any]", options_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     max_concurrency_raw = options_dict.get("max_concurrency", 1)
     if isinstance(max_concurrency_raw, bool) or not isinstance(max_concurrency_raw, (int, float, str)):
@@ -1222,7 +1234,7 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:
     if not isinstance(wf_raw, dict):
         msg = "Missing required mapping 'workflow'"
         raise WorkflowConfigError(msg, path="workflow")
-    wf = cast("Dict[str, Any]", wf_raw)
+    wf = cast("Dict[str, Any]", wf_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
     runs, seen_ids = _load_workflow_runs(wf)
     _validate_workflow_deps(runs, seen_ids=seen_ids)
@@ -1255,7 +1267,7 @@ def _validate_workflow_main_rows_from(
     msg: str
     run_ids = set(seen_ids.keys())
     for idx, run in enumerate(runs):
-        producer_run_id = str(getattr(run, "main_rows_from_run_id", "") or "").strip()
+        producer_run_id = str(run.main_rows_from_run_id or "").strip()
         if not producer_run_id:
             continue
         item_path = "workflow.runs.{}".format(idx)
@@ -1313,14 +1325,14 @@ def _validate_workflow_deps_no_cycles(  # noqa: C901
         run = by_id[node_id]
         for dep_id in run.depends_on:
             if dep_id not in by_id:
-                continue  # pragma: no cover
+                continue  # pragma: no cover  # pragma: allow-no-cover invariant: depends_on references validated earlier
             if dep_id in visited:
                 continue
             if dep_id in visiting:
                 if dep_id in stack:
                     idx = stack.index(dep_id)
                     return [*stack[idx:], dep_id]
-                return [dep_id, node_id, dep_id]  # pragma: no cover
+                return [dep_id, node_id, dep_id]  # pragma: no cover  # pragma: allow-no-cover invariant: visiting mirrors stack
             found = dfs(dep_id)
             if found is not None:
                 return found

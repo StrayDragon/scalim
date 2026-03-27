@@ -16,29 +16,29 @@ from ...vendor.compact.typing_extensionsx import override
 def _best_effort_all_tasks(loop: "asyncio.AbstractEventLoop", asyncio_module: Any = asyncio) -> "Set[Any]":
     try:
         all_tasks = asyncio_module.all_tasks
-    except AttributeError:  # pragma: no cover
+    except AttributeError:  # pragma: no cover  # pragma: allow-no-cover asyncio compat: all_tasks unavailable
         all_tasks = None
     if all_tasks is not None:
         try:
             return all_tasks(loop=loop)  # type: ignore[call-arg]
-        except TypeError:  # pragma: no cover
+        except TypeError:  # pragma: no cover  # pragma: allow-no-cover asyncio compat: all_tasks signature
             return all_tasks(loop)  # type: ignore[call-arg]
 
     try:
         task_cls = asyncio_module.Task
-    except AttributeError:  # pragma: no cover
+    except AttributeError:  # pragma: no cover  # pragma: allow-no-cover asyncio compat: Task unavailable
         task_cls = None
-    if task_cls is None:  # pragma: no cover
+    if task_cls is None:  # pragma: no cover  # pragma: allow-no-cover asyncio compat: Task unavailable
         return set()
     try:
         legacy_all_tasks = task_cls.all_tasks
-    except AttributeError:  # pragma: no cover
+    except AttributeError:  # pragma: no cover  # pragma: allow-no-cover asyncio compat: Task.all_tasks unavailable
         legacy_all_tasks = None
-    if legacy_all_tasks is None:  # pragma: no cover
+    if legacy_all_tasks is None:  # pragma: no cover  # pragma: allow-no-cover asyncio compat: Task.all_tasks unavailable
         return set()
     try:
         return legacy_all_tasks(loop=loop)  # type: ignore[call-arg]
-    except TypeError:  # pragma: no cover
+    except TypeError:  # pragma: no cover  # pragma: allow-no-cover asyncio compat: Task.all_tasks signature
         return legacy_all_tasks(loop)  # type: ignore[call-arg]
 
 
@@ -101,7 +101,7 @@ class ThreadLoopExecutor(Executor):
 
             async def _call() -> Any:
                 sem = self._sem
-                if sem is None:  # pragma: no cover
+                if sem is None:  # pragma: no cover  # pragma: allow-no-cover defensive: loop thread initializes semaphore
                     sem = asyncio.Semaphore(self._max_workers)
                     self._sem = sem
                 async with sem:
@@ -121,7 +121,7 @@ class ThreadLoopExecutor(Executor):
             if self._shutdown:
                 return
             self._shutdown = True
-        _ = cast("Any", self._loop).call_soon_threadsafe(self._loop.stop)
+        _ = cast("Any", self._loop).call_soon_threadsafe(self._loop.stop)  # pragma: allow-cast asyncio stub uses Unknown context
         if wait:
             self._thread.join(timeout=5.0)
 

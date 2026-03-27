@@ -183,13 +183,18 @@ class Pipeline(ABC):
         load_fn: Callable[[], LoaderResultMapping],
     ) -> Optional[LoaderResultMapping]:
         """通过 `preloaded_cache.get_or_load` 扩展点加载/复用结果(若不存在则返回 `None`)."""
-        get_or_load = getattr(cache, "get_or_load", None)
+        get_or_load = getattr(cache, "get_or_load", None)  # pragma: allow-dynattr optional-interface: preloaded_cache
         if not callable(get_or_load):
             return None
-        if bool(getattr(cache, "signature_guardrail_enabled", False)):
+        if bool(
+            getattr(cache, "signature_guardrail_enabled", False)  # pragma: allow-dynattr optional-interface: preloaded_cache
+        ):
             digest = build_preload_forever_signature(source, rendered_params=rendered_params).digest()
-            return cast("LoaderResultMapping", get_or_load(source_id, load_fn, signature_digest=digest))
-        return cast("LoaderResultMapping", get_or_load(source_id, load_fn))
+            return cast(  # pragma: allow-cast preloaded_cache boundary typed narrowing
+                "LoaderResultMapping",
+                get_or_load(source_id, load_fn, signature_digest=digest),
+            )
+        return cast("LoaderResultMapping", get_or_load(source_id, load_fn))  # pragma: allow-cast preloaded_cache boundary typed narrowing
 
     def _preload_cached_sources(self) -> None:
         """预加载缓存数据源"""
@@ -230,11 +235,17 @@ class Pipeline(ABC):
 
                     result_obj: object = result
                     if normalize is not None:
-                        result_obj = cast("Any", normalize).apply(result, source_id=source_id)
-                    if not isinstance(result_obj, Mapping):
+                        result_obj = cast("Any", normalize).apply(  # pragma: allow-cast normalize apply typed narrowing
+                            result,
+                            source_id=source_id,
+                        )
+                    is_mapping = isinstance(result_obj, Mapping)
+                    if not is_mapping:
                         msg = "Loader '{}' result must be a Mapping".format(source_id)
                         raise TypeError(msg)
-                    result_mapping = coerce_loader_result_mapping(cast("object", result_obj))
+                    result_mapping = coerce_loader_result_mapping(
+                        cast("LoaderResultMapping", result_obj)  # pragma: allow-cast Mapping generic params unknown after isinstance
+                    )
 
                     self.runtime.instrumentation.emit_loader_call(
                         loader_name=source_id,
@@ -307,10 +318,15 @@ class Pipeline(ABC):
         row_iter = iter(main_rows)
         next_row_id = 0
 
+        def _make_row_ids(start: int, count: int) -> List[Hashable]:
+            ids: List[Hashable] = []
+            ids.extend(range(start, start + count))
+            return ids
+
         if self.batch_size is None:
             batch_rows = list(row_iter)
             if batch_rows:
-                row_ids = cast("List[Hashable]", list(range(next_row_id, next_row_id + len(batch_rows))))
+                row_ids = _make_row_ids(next_row_id, len(batch_rows))
                 single_batch_map: Dict[Hashable, RowData] = dict(zip(row_ids, batch_rows))
                 yield row_ids, single_batch_map
             return
@@ -319,7 +335,7 @@ class Pipeline(ABC):
         for batch_rows in self._overrides.chunk_iterable(row_iter, chunk_size):
             if not batch_rows:
                 break
-            row_ids = cast("List[Hashable]", list(range(next_row_id, next_row_id + len(batch_rows))))
+            row_ids = _make_row_ids(next_row_id, len(batch_rows))
             next_row_id += len(batch_rows)
             batch_map: Dict[Hashable, RowData] = dict(zip(row_ids, batch_rows))
             yield row_ids, batch_map
@@ -479,7 +495,7 @@ class SeqPipeline(Pipeline):
         self.executor.prefill_main_source_fields(context, batch_rows, required_fields=self._required_fields)
 
         write_row_ids = self._sort_row_ids_for_write(row_ids, context)
-        column_sink.set_row_ids(cast("SinkRowKeySeq", list(write_row_ids)))
+        column_sink.set_row_ids(cast("SinkRowKeySeq", list(write_row_ids)))  # pragma: allow-cast sink row ids typed narrowing
 
         self._write_main_source_columns(write_row_ids, context, column_sink, batch_num)
 
@@ -540,11 +556,14 @@ class SeqPipeline(Pipeline):
         if field_key not in self.plan.target_fields:
             return
 
-        write_column_aligned = getattr(column_sink, "write_column_aligned", None)
+        write_column_aligned = getattr(column_sink, "write_column_aligned", None)  # pragma: allow-dynattr optional-interface: sink
         if callable(write_column_aligned):
             values: List[FieldValue] = [context.get_field_value(field_key, row_id) for row_id in row_ids]
-            aligned_row_ids = cast("SinkRowKeySeq", row_ids)
-            _ = cast("Callable[[str, SinkRowKeySeq, Sequence[FieldValue]], None]", write_column_aligned)(field_key, aligned_row_ids, values)
+            aligned_row_ids = cast("SinkRowKeySeq", row_ids)  # pragma: allow-cast sink row ids typed narrowing
+            _ = cast(  # pragma: allow-cast sink optional interface typed narrowing
+                "Callable[[str, SinkRowKeySeq, Sequence[FieldValue]], None]",
+                write_column_aligned,
+            )(field_key, aligned_row_ids, values)
             row_count = len(values)
         else:
             col_data: Dict[Hashable, FieldValue] = {}

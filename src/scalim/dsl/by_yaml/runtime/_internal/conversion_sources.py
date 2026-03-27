@@ -23,6 +23,7 @@ from ...schema_dsl.models import (
     DerivedFieldConfig,
     MainSourceConfig,
     NormalizeConfig,
+    NormalizeProjectFieldRuleConfig,
     NormalizeStepConfig,
     SourceConfig,
     SourceFieldConfig,
@@ -61,10 +62,10 @@ def _require_call_by_context(field_values: Dict[str, RuntimeValue]) -> object:
 
 
 def _resolve_call_by_ctx_attr(ctx: object, attr_name: str) -> RuntimeValue:
-    if not hasattr(ctx, attr_name):
+    if not hasattr(ctx, attr_name):  # pragma: allow-dynattr dsl: call_by ctx attrs
         msg = "call_by context missing attribute '{}'".format(attr_name)
         raise AttributeError(msg)
-    return getattr(ctx, attr_name)
+    return getattr(ctx, attr_name)  # pragma: allow-dynattr dsl: call_by ctx attrs
 
 
 def _eval_call_by_value(*, field_id: str, value: CallByValue, field_values: Dict[str, RuntimeValue]) -> RuntimeValue:
@@ -78,8 +79,8 @@ def _eval_call_by_value(*, field_id: str, value: CallByValue, field_values: Dict
         return ctx
     if kind == "ctx_attr":
         return _resolve_call_by_ctx_attr(ctx, str(value.value))
-    msg = "Unknown call_by value kind: {}".format(kind)  # pragma: no cover
-    raise ValueError(msg)  # pragma: no cover
+    msg = "Unknown call_by value kind: {}".format(kind)  # pragma: no cover  # pragma: allow-no-cover invariant: exhaustive CallByValue kind
+    raise ValueError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: exhaustive CallByValue kind
 
 
 class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigToIRConversionRelationMixin):
@@ -116,7 +117,10 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             msg = "Main source 'loader' is required"
             raise ConversionError(msg)
 
-        loader_fn = cast("MainSourceRowIterableCallable", self._require_resolver().resolve(config.loader))
+        loader_fn = cast(  # pragma: allow-cast resolver callable typed narrowing
+            "MainSourceRowIterableCallable",
+            self._require_resolver().resolve(config.loader),
+        )
         order_by = self._convert_main_source_order_by(config.order_by)
 
         init_vars = self._init_vars
@@ -158,7 +162,10 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
     def _convert_source(self, source_config: SourceConfig) -> SourceIr:
         validate_source_id(source_config.source_id, "Source")
-        loader_fn = cast("LoaderResultMapCallable", self._require_resolver().resolve(source_config.loader))
+        loader_fn = cast(  # pragma: allow-cast resolver callable typed narrowing
+            "LoaderResultMapCallable",
+            self._require_resolver().resolve(source_config.loader),
+        )
 
         lookup_cast_fn = None
         if source_config.lookup_cast is not None:
@@ -218,8 +225,8 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         msg = "sources.{}.normalize.kind must be one of: index_by_key/take_first/project_fields/map_values".format(
             source_id
-        )  # pragma: no cover
-        raise ConversionError(msg)  # pragma: no cover
+        )  # pragma: no cover  # pragma: allow-no-cover invariant: normalize kind validated above
+        raise ConversionError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: normalize kind validated above
 
     def _convert_source_normalize_call_by_fn(
         self,
@@ -235,7 +242,10 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             msg = "sources.{}.normalize.call_by must not be empty".format(source_id)
             raise ConversionError(msg)
         try:
-            return cast("Callable[..., object]", self._require_resolver().resolve(call_by_ref))
+            return cast(  # pragma: allow-cast resolver callable typed narrowing
+                "Callable[..., object]",
+                self._require_resolver().resolve(call_by_ref),
+            )
         except Exception as exc:
             msg = "sources.{}.normalize.call_by failed to resolve reference '{}': {}".format(source_id, call_by_ref, str(exc))
             raise ConversionError(msg) from exc
@@ -296,7 +306,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             raise ConversionError(msg)
 
         fields = self._convert_source_normalize_project_fields_rules(
-            cast("Mapping[str, object]", norm.fields),
+            norm.fields,
             config_path="sources.{}.normalize.fields".format(source_id),
         )
         return SourceNormalizeIr(kind="project_fields", fields=fields, on_missing=on_missing, call_by=call_by_fn)
@@ -342,7 +352,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
                 msg = "{}.on_missing must be one of: error/null".format(step_path)
                 raise ConversionError(msg)
             step_fields = self._convert_source_normalize_project_fields_rules(
-                cast("Mapping[str, object]", step.fields),
+                step.fields,
                 config_path="{}.fields".format(step_path),
             )
             return SourceNormalizeStepIr(kind="project_fields", on_missing=step_on_missing, fields=step_fields)
@@ -372,12 +382,12 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         rule_obj: object,
         config_path: str,
     ) -> SourceNormalizeProjectFieldRuleIr:
-        if not hasattr(rule_obj, "from_key") and not hasattr(rule_obj, "extract"):
+        if not isinstance(rule_obj, NormalizeProjectFieldRuleConfig):
             msg = "{}.{} must be a normalize project_fields rule".format(config_path, name)
             raise ConversionError(msg)
 
-        from_key = bool(getattr(rule_obj, "from_key", False))
-        extract_expr = str(getattr(rule_obj, "extract", "") or "").strip()
+        from_key = bool(rule_obj.from_key)
+        extract_expr = str(rule_obj.extract or "").strip()
         if from_key and extract_expr:
             msg = "{}.{} must not declare both from_key and extract".format(config_path, name)
             raise ConversionError(msg)
@@ -501,7 +511,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         is_constant_compute = False
         calculator: Callable[..., FieldValue]
         if derived_config.compute:
-            raw_calculator = cast(
+            raw_calculator = cast(  # pragma: allow-cast compute engine compile typed narrowing
                 "Callable[..., object]",
                 self._require_compute_engine().compile(derived_config.compute, derived_config.depends_on),
             )
@@ -532,7 +542,10 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             raise ConversionError(msg) from exc
 
         try:
-            fn = cast("Callable[..., object]", self._require_resolver().resolve(parsed.reference))
+            fn = cast(  # pragma: allow-cast resolver callable typed narrowing
+                "Callable[..., object]",
+                self._require_resolver().resolve(parsed.reference),
+            )
         except Exception as exc:
             msg = "Derived field '{}' failed to resolve call_by reference '{}': {}".format(field_id, parsed.reference, exc)
             raise ConversionError(msg) from exc

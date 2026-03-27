@@ -525,5 +525,5 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return 1 if failures else 0
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     raise SystemExit(main())

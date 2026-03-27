@@ -2,7 +2,7 @@ import contextlib
 import time
 import warnings as py_warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from ..events.catalog import EVENT_DIAGNOSTIC_WARNING
 from ..hooks.base import HookManager, IExecutionHook
@@ -330,7 +330,9 @@ def _prepare_engine_sink(
         with contextlib.suppress(Exception):
             sink.close()
         with contextlib.suppress(Exception):
-            cast("Any", observer_manager).close()
+            close = getattr(observer_manager, "close", None)  # pragma: allow-dynattr optional-interface: observer_manager
+            if callable(close):
+                _ = close()
         raise
 
 
@@ -343,7 +345,7 @@ def _wrap_sink_for_row_count(sink: ISink, tracker: InternalStatsCollector) -> IS
 
 
 def _get_field_name(field_id: str, field_ir: SupportedFieldIr) -> str:
-    name = getattr(field_ir, "name", "") or ""
+    name = field_ir.name
     if name and name != field_id:
         return name
     return field_id

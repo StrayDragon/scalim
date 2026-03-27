@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional
 
 from ...events.catalog import EVENT_LOADER_CALL
 from ...events.events import LoaderCallEvent
-from ...hooks.base import HookManager, IExecutionHook
+from ...hooks.base import HookManager
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
 
@@ -20,7 +20,6 @@ class HookCaptureManager(HookManager):
     `hook.on_event(Event)` 会通过 `ObserverManager` 的捕获模式被记录,并在提交时回放.
     """
 
-    hooks: List[IExecutionHook]
     _recorded_events: List[HookRecordedEvent]
 
     def __init__(self, source: HookManager) -> None:
@@ -31,7 +30,7 @@ class HookCaptureManager(HookManager):
             loader_result_sample_size=source.loader_result_sample_size,
         )
         # 仅复用原始 `hook` 实例用于订阅发现;捕获模式下不进行分发调用.
-        self.hooks = list(source.hooks)
+        self.hooks.extend(source.hooks)
         self._rebuild_subscription_cache()
         self._recorded_events = []
 

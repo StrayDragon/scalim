@@ -1,6 +1,6 @@
 import threading
 from collections import deque
-from typing import Any, Deque, List, Optional, Set, Tuple, cast
+from typing import Any, Deque, Dict, List, Optional, Set, Tuple, cast
 
 from ...events.event import Event
 from ..observer import Observer
@@ -21,12 +21,13 @@ class ObserverManagerCaptureMixin:
     _capture_event_types: Optional[Set[str]] = None
     _capture_unknown_event_types: bool = False
     _recorded_events: Optional[Deque[Event]] = None
+    _event_meta_defaults: Optional[Dict[str, Any]] = None
 
     def _record_event(self, event: Event) -> None:
         with self._lock:
             recorded_events = self._recorded_events
             if recorded_events is None:
-                recorded_events = cast("Deque[Event]", deque())
+                recorded_events = cast("Deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
                 self._recorded_events = recorded_events
             max_recorded_events = self.max_recorded_events
             if max_recorded_events is None:
@@ -65,7 +66,7 @@ class ObserverManagerCaptureMixin:
         with self._lock:
             recorded_events = self._recorded_events
             if recorded_events is None:
-                recorded_events = cast("Deque[Event]", deque())
+                recorded_events = cast("Deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
                 self._recorded_events = recorded_events
             if not recorded_events:
                 return []
@@ -74,7 +75,7 @@ class ObserverManagerCaptureMixin:
             return events
 
     def create_capture_manager(self) -> Any:
-        manager_cls = cast("Any", type(self))
+        manager_cls = cast("Any", type(self))  # pragma: allow-cast manager class boundary typed narrowing
         capture = manager_cls(
             observers=None,
             enable_debugging=self.debug_mode,
@@ -82,7 +83,7 @@ class ObserverManagerCaptureMixin:
             loader_result_policy=self.loader_result_policy,
             loader_result_sample_size=self.loader_result_sample_size,
             run_id=self.run_id,
-            event_meta_defaults=getattr(self, "_event_meta_defaults", None),
+            event_meta_defaults=self._event_meta_defaults,
             mode="capture",
             max_recorded_events=self.max_recorded_events,
             capture_overflow_policy=self.capture_overflow_policy,

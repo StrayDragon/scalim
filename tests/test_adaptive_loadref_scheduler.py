@@ -222,7 +222,7 @@ def test_adaptive_scheduler_exception_propagates_and_cancels_futures_best_effort
 
     class _BoomExecutor:
         def execute(self, operator, context, batch_row_nth, runtime) -> None:  # type: ignore[no-untyped-def]
-            op = cast("LoadRefOperatorIr", operator)
+            op = cast("LoadRefOperatorIr", operator)  # pragma: allow-cast test executor typed narrowing
             if op.field_key == "boom":
                 raise RuntimeError("boom")
             context.set_field_value(op.field_key, batch_row_nth[0], 1)

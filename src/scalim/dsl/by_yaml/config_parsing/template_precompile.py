@@ -1,7 +1,8 @@
 import re
-from typing import Dict, Mapping, Optional, Sequence, Tuple, cast
+from typing import Dict, List, Mapping, Optional, Tuple
 
 from ...._internal.loggingx import format_kv, get_logger, prefix
+from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.litejinja2 import TemplateError, from_string
 
 __all__ = [
@@ -13,6 +14,18 @@ _logger = get_logger("dsl.by_yaml.template_vars")
 _TEMPLATE_SANDBOX_SAFE = "safe"
 _TEMPLATE_SANDBOX_LEGACY = "legacy"
 _TEMPLATE_VARS_JSON_LIKE_SCALARS: Tuple[type, ...] = (bool, int, float, str)
+
+
+def _is_json_like_list(value: object) -> TypeGuard[List[object]]:
+    return isinstance(value, list)
+
+
+def _is_json_like_tuple(value: object) -> TypeGuard[Tuple[object, ...]]:
+    return isinstance(value, tuple)
+
+
+def _is_json_like_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
 
 
 def _validate_template_sandbox(template_sandbox: str) -> str:
@@ -51,27 +64,22 @@ def _raise_template_vars_not_json_like(
     raise ValueError(msg)
 
 
-def _validate_json_like_sequence(seq: Sequence[object], *, path: str) -> None:
-    for idx, item in enumerate(seq):
-        _validate_json_like_value(item, path="{}[{}]".format(path, idx))
-
-
-def _validate_json_like_dict(mapping: Dict[object, object], *, path: str) -> None:
-    for k, v in mapping.items():
-        if not isinstance(k, str):
-            _raise_template_vars_not_json_like(path, type_name=type(mapping).__name__, key_type_name=type(k).__name__)
-        key_str = cast("str", k)
-        _validate_json_like_value(v, path="{}['{}']".format(path, key_str))
-
-
 def _validate_json_like_value(value: object, *, path: str) -> None:
     if value is None or isinstance(value, _TEMPLATE_VARS_JSON_LIKE_SCALARS):
         return
-    if isinstance(value, (list, tuple)):
-        _validate_json_like_sequence(cast("Sequence[object]", value), path=path)
+    if _is_json_like_list(value) or _is_json_like_tuple(value):
+        for idx, item in enumerate(value):
+            _validate_json_like_value(item, path="{}[{}]".format(path, idx))
         return
-    if isinstance(value, dict):
-        _validate_json_like_dict(cast("Dict[object, object]", value), path=path)
+    if _is_json_like_dict(value):
+        for raw_key, raw_value in value.items():
+            if not isinstance(raw_key, str):
+                _raise_template_vars_not_json_like(
+                    path,
+                    type_name=type(value).__name__,
+                    key_type_name=type(raw_key).__name__,
+                )
+            _validate_json_like_value(raw_value, path="{}['{}']".format(path, raw_key))
         return
     _raise_template_vars_not_json_like(path, type_name=type(value).__name__)
 

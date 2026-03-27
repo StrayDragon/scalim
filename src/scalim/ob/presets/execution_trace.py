@@ -43,7 +43,7 @@ class LoaderCallStep:
         result: Dict[str, str] = {}
         for key, pv in params.items():
             if isinstance(pv, (set, list, tuple)):
-                items = list(cast("Iterable[Any]", pv))
+                items = list(cast("Iterable[Any]", pv))  # pragma: allow-cast iterable typed narrowing
                 result[key] = str(items)
             else:
                 result[key] = str(pv)

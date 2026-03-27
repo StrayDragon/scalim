@@ -644,6 +644,24 @@ def test_observer_manager_skips_unsupported_events() -> None:
     assert observer.events == []
 
 
+def test_observer_manager_swallows_supports_errors() -> None:
+    class _ExplodingSupportsObserver(Observer):
+        def __init__(self) -> None:
+            self.events = []
+
+        def supports(self, event_type: str) -> bool:  # noqa: ARG002
+            raise RuntimeError("boom supports")
+
+        def on_event(self, event) -> None:  # type: ignore[override]
+            self.events.append(event)
+
+    observer = _ExplodingSupportsObserver()
+    manager = ObserverManager(observers=[observer])
+
+    manager.emit_event(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
+    assert observer.events == []
+
+
 def test_observer_manager_close_handles_errors(caplog) -> None:
     observer = _ExplodingObserver()
     manager = ObserverManager(observers=[observer])

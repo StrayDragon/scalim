@@ -1,4 +1,4 @@
-from typing import Iterator, List, Sequence, Tuple, cast
+from typing import Iterator, List, Sequence, Tuple
 
 from .....planning.operators import LoadRefOperatorIr as LoadRefOp
 from .....planning.operators import SupportedOperatorIr
@@ -12,8 +12,11 @@ def iter_operator_segments(
         operator = operators[idx]
         if isinstance(operator, LoadRefOp):
             segment: List[LoadRefOp] = []
-            while idx < len(operators) and isinstance(operators[idx], LoadRefOp):
-                segment.append(cast("LoadRefOp", operators[idx]))
+            while idx < len(operators):
+                op = operators[idx]
+                if not isinstance(op, LoadRefOp):
+                    break
+                segment.append(op)
                 idx += 1
             yield True, segment
             continue

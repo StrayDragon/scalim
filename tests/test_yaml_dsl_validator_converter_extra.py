@@ -270,3 +270,22 @@ def test_converter_infers_unique_path() -> None:
     assert isinstance(field, FieldIr)
     assert field.lookup_steps is not None
     assert len(field.lookup_steps) == 1
+
+
+def test_converter_resolves_relation_reference() -> None:
+    converter = ConfigToIRConverter(
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["scalim_misc"])),
+    )
+    config = copy.deepcopy(_base_converter_config())
+    config.source_fields["customer_name"] = SourceFieldConfig(
+        field_id="customer_name",
+        source="customers",
+        extract="customer_name",
+        relation="r1",
+    )
+
+    demand = converter.convert(config)
+    field = demand.fields["customer_name"]
+    assert isinstance(field, FieldIr)
+    assert field.lookup_steps is not None
+    assert len(field.lookup_steps) == 1

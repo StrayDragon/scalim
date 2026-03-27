@@ -1,9 +1,9 @@
 import re
-from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 from ...spec.ir.binding import LoaderCallContextIr, build_stable_lookup_key_list
 from ...typedefs import LoaderCallKwargs, RuntimeValue
-from ...vendor.compact.typing_extensionsx import override
+from ...vendor.compact.typing_extensionsx import TypeGuard, override
 from ...vendor.dataclassesx import dataclass
 
 _RUNTIME_PREFIX = "$runtime."
@@ -57,21 +57,37 @@ def _path_index(path: str, idx: int) -> str:
     return "{}[{}]".format(path, idx)
 
 
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
+
+
+def _is_list(value: object) -> TypeGuard[List[object]]:
+    return isinstance(value, list)
+
+
+def _is_tuple(value: object) -> TypeGuard[Tuple[object, ...]]:
+    return isinstance(value, tuple)
+
+
+def _is_set(value: object) -> TypeGuard[Set[object]]:
+    return isinstance(value, set)
+
+
 def _deepcopy_literal(value: RuntimeValue) -> RuntimeValue:
     # 这里刻意只对常见容器做深拷贝,避免对任意对象进行 `deepcopy`.
     # `init_vars` 可能注入任意对象(例如 `datetime`/`Decimal` 等),应按“不透明字面值”透传.
-    if isinstance(value, dict):
+    if _is_dict(value):
         copied: Dict[object, RuntimeValue] = {}
-        for k, v in cast("Mapping[object, RuntimeValue]", value).items():
+        for k, v in value.items():
             copied[k] = _deepcopy_literal(v)
         return copied
-    if isinstance(value, list):
-        return [_deepcopy_literal(v) for v in cast("List[RuntimeValue]", value)]
-    if isinstance(value, tuple):
-        return tuple(_deepcopy_literal(v) for v in cast("Tuple[RuntimeValue, ...]", value))
-    if isinstance(value, set):
+    if _is_list(value):
+        return [_deepcopy_literal(v) for v in value]
+    if _is_tuple(value):
+        return tuple(_deepcopy_literal(v) for v in value)
+    if _is_set(value):
         copied_set: Set[RuntimeValue] = set()
-        for v in cast("Set[RuntimeValue]", value):
+        for v in value:
             copied_set.add(_deepcopy_literal(v))
         return copied_set
     return value
@@ -182,10 +198,17 @@ class CompiledParamsTemplate:
         rendered = self.root.render(ctx, path=path)
         if rendered is None:
             return {}
-        if not isinstance(rendered, dict):
+        if not _is_dict(rendered):
             msg = "params template must render to a mapping"
             raise ParamsTemplateRenderError(msg, path=path)
-        return cast("LoaderCallKwargs", rendered)
+
+        typed: LoaderCallKwargs = {}
+        for key, value in rendered.items():
+            if not isinstance(key, str):
+                msg = "params template mapping keys must be strings"
+                raise ParamsTemplateRenderError(msg, path=_path_child(path, key))
+            typed[key] = value
+        return typed
 
 
 # endregion
@@ -415,8 +438,8 @@ def _compile_params_template_node(
 ) -> Node:
     _maybe_compile_runtime_literal(node_value, node_path=node_path)
 
-    if isinstance(node_value, dict):
-        mapping_dict = cast("Dict[object, object]", node_value)
+    if _is_dict(node_value):
+        mapping_dict = node_value
         directive_node = _maybe_compile_directive_node(
             mapping_dict,
             node_path=node_path,
@@ -434,9 +457,9 @@ def _compile_params_template_node(
             resolve_runtime=resolve_runtime,
         )
 
-    if isinstance(node_value, list):
+    if _is_list(node_value):
         return _compile_list_node(
-            cast("Sequence[object]", node_value),
+            node_value,
             node_path=node_path,
             opts=opts,
             state=state,
@@ -477,10 +500,10 @@ def compile_params_template(
 def _parse_keys_options(options_raw: object, *, path: str) -> str:
     if options_raw is None:
         return "set"
-    if not isinstance(options_raw, dict):
+    if not _is_dict(options_raw):
         msg = "`$keys` options must be a mapping or null"
         raise ParamsTemplateCompileError(msg, path=path)
-    options = cast("Dict[object, object]", options_raw)
+    options = options_raw
     for k in options:
         if str(k) != "as":
             msg = "Unknown `$keys` option: {}".format(str(k))
@@ -500,10 +523,10 @@ def _parse_keys_options(options_raw: object, *, path: str) -> str:
 def _parse_rows_options(options_raw: object, *, path: str) -> str:
     if options_raw is None:
         return "batch"
-    if not isinstance(options_raw, dict):
+    if not _is_dict(options_raw):
         msg = "`$rows` options must be a mapping or null"
         raise ParamsTemplateCompileError(msg, path=path)
-    options = cast("Dict[object, object]", options_raw)
+    options = options_raw
     for k in options:
         if str(k) != "cache_mode":
             msg = "Unknown `$rows` option: {}".format(str(k))

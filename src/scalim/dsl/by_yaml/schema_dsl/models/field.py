@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
 
 from .....vendor.dataclassesx import dataclass
 from .....vendor.dataclassesx import field as dataclass_field
@@ -68,7 +68,7 @@ class SourceFieldConfig:
     name: str = dataclass_field(default="", metadata=schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
     """字段展示名称(可选)."""
 
-    relation: Optional[InlineRelationConfig] = dataclass_field(
+    relation: Optional[Union[str, InlineRelationConfig]] = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={

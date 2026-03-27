@@ -30,7 +30,7 @@ class ObserverManagerRegistryMixin:
     def _ensure_recorded_events(self) -> Deque[Event]:
         recorded_events = self._recorded_events
         if recorded_events is None:
-            recorded_events = cast("Deque[Event]", deque())
+            recorded_events = cast("Deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
             self._recorded_events = recorded_events
         return recorded_events
 
@@ -44,26 +44,34 @@ class ObserverManagerRegistryMixin:
         self,
         observer: EventDispatchObserver,
     ) -> Tuple[str, ...]:
-        dispatch_map_value = getattr(observer, "dispatch_map", None)
+        dispatch_map_value = observer.dispatch_map
         if not isinstance(dispatch_map_value, dict):
             return ()
 
         supported: List[str] = []
-        for event_type, handler_name in dispatch_map_value.items():  # pyright: ignore[reportUnknownVariableType]
+        for event_type, handler_name in dispatch_map_value.items():
             if not isinstance(event_type, str) or not isinstance(handler_name, str):
                 continue
             if event_type not in CATALOG_EVENT_TYPES_SET:
                 continue
-            handler = getattr(observer, handler_name, None)
+            handler = getattr(observer, handler_name, None)  # pragma: allow-dynattr dispatch: observer handler
             if handler is None or not callable(handler):
                 continue
             supported.append(event_type)
         return tuple(supported)
 
     def _infer_observer_subscriptions(self, observer: Observer) -> Tuple[str, ...]:
-        supports_attr = getattr(type(observer), "supports", None)
-        event_types = validate_event_types(observer, getattr(observer, "event_types", None))
-        on_event_attr = getattr(type(observer), "on_event", None)
+        try:
+            supports_attr = type(observer).supports
+        except AttributeError:
+            # 允许鸭子类型的 `observer` (例如仅实现了 `on_event`).
+            supports_attr = Observer.supports
+        try:
+            event_types_value = observer.event_types
+        except AttributeError:
+            event_types_value = None
+        event_types = validate_event_types(observer, event_types_value)
+        on_event_attr = type(observer).on_event
 
         if (
             isinstance(observer, EventDispatchObserver)
@@ -94,7 +102,12 @@ class ObserverManagerRegistryMixin:
             observer_event_types = self._infer_observer_subscriptions(observer)
             for event_type in observer_event_types:
                 observers_by_event_type[event_type].append(observer)
-            if getattr(observer, "supports_unknown_event_types", False):
+            supports_unknown = False
+            try:
+                supports_unknown = bool(observer.supports_unknown_event_types)
+            except AttributeError:
+                supports_unknown = False
+            if supports_unknown:
                 unknown_observers.append(observer)
 
         supported_event_types: Set[str] = {event_type for event_type, observers in observers_by_event_type.items() if observers}
@@ -121,7 +134,11 @@ class ObserverManagerRegistryMixin:
 
     def register(self, observer: Observer) -> None:
         with self._lock:
-            _ = validate_event_types(observer, getattr(observer, "event_types", None))
+            try:
+                event_types_value = observer.event_types
+            except AttributeError:
+                event_types_value = None
+            _ = validate_event_types(observer, event_types_value)
             self._has_observers = True
             self._get_observers().append(observer)
             self._rebuild_subscription_cache()

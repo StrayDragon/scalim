@@ -74,10 +74,14 @@ def _parse_call_by_call(raw: str) -> Tuple[str, ast.Call]:
         raise CallByParseError(msg) from e
 
     node = tree.body
-    if not isinstance(node, ast.Call):  # pragma: no cover
+    if not isinstance(
+        node, ast.Call
+    ):  # pragma: no cover  # pragma: allow-no-cover ast.parse(eval) with placeholder call should always yield ast.Call
         msg = "Invalid call_by syntax: expected a function call"
         raise CallByParseError(msg)
-    if not isinstance(node.func, ast.Name) or node.func.id != _CALL_PLACEHOLDER:  # pragma: no cover
+    if (
+        not isinstance(node.func, ast.Name) or node.func.id != _CALL_PLACEHOLDER
+    ):  # pragma: no cover  # pragma: allow-no-cover ast.parse(eval) placeholder call should always use ast.Name
         msg = "Invalid call_by syntax: expected a simple function call"
         raise CallByParseError(msg)
 
@@ -302,21 +306,29 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
         msg = "Unsupported literal type in call_by: {}".format(type(value).__name__)
         raise CallByParseError(msg)
 
-    if isinstance(node, ast.Num):  # pragma: no cover  # py<3.8
-        value = node.n  # type: ignore[attr-defined]  # pragma: no cover
-        if isinstance(value, (int, float)):  # pragma: no cover
-            return value  # pragma: no cover
-        msg = "Unsupported numeric literal in call_by"  # pragma: no cover
-        raise CallByParseError(msg)  # pragma: no cover
+    if isinstance(
+        node, ast.Num
+    ):  # pragma: no cover  # py<3.8  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        value = node.n  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        if isinstance(
+            value, (int, float)
+        ):  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+            return value  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        msg = "Unsupported numeric literal in call_by"  # pragma: no cover  # pragma: allow-no-cover py<3.8 compat
+        raise CallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
 
-    if isinstance(node, ast.Str):  # pragma: no cover  # py<3.8
-        return node.s  # type: ignore[attr-defined]  # pragma: no cover
+    if isinstance(
+        node, ast.Str
+    ):  # pragma: no cover  # py<3.8  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        return node.s  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
 
-    if isinstance(node, ast.NameConstant):  # pragma: no cover  # py<3.8
-        if node.value in (True, False, None):  # type: ignore[attr-defined]  # pragma: no cover
-            return node.value  # type: ignore[attr-defined]  # pragma: no cover
-        msg = "Unsupported literal in call_by"  # pragma: no cover
-        raise CallByParseError(msg)  # pragma: no cover
+    if isinstance(
+        node, ast.NameConstant
+    ):  # pragma: no cover  # py<3.8  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        if node.value in (True, False, None):  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+            return node.value  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        msg = "Unsupported literal in call_by"  # pragma: no cover  # pragma: allow-no-cover py<3.8 compat
+        raise CallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
 
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
         operand = _parse_literal(node.operand)

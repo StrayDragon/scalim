@@ -73,7 +73,7 @@ class RowGapObserver(EventDispatchObserver):
 
         sample_missing: List[Hashable] = []
         if expected_keys is not None and isinstance(event.result, dict) and self.sample_limit > 0:
-            result_dict = cast("Dict[Hashable, Any]", event.result)
+            result_dict = cast("Dict[Hashable, Any]", event.result)  # pragma: allow-cast loader result typed narrowing
             for key in expected_keys:
                 try:
                     if key not in result_dict:
@@ -131,10 +131,10 @@ class RowGapObserver(EventDispatchObserver):
                 if value is None:
                     return None
                 if isinstance(value, dict):
-                    value_dict = cast("Dict[Hashable, Any]", value)
+                    value_dict = cast("Dict[Hashable, Any]", value)  # pragma: allow-cast params typed narrowing
                     return list(value_dict.keys())
                 if isinstance(value, (list, tuple, set)):
-                    value_iter = cast("Iterable[Hashable]", value)
+                    value_iter = cast("Iterable[Hashable]", value)  # pragma: allow-cast params typed narrowing
                     return list(value_iter)
                 return None
         return None

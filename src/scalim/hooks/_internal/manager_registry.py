@@ -1,8 +1,10 @@
+from abc import ABC
+
 from .common import read_optional_attr, validate_event_types
 from .manager_base import ExecutionHookLike, HookManagerBase
 
 
-class HookManagerRegistryMixin(HookManagerBase):
+class HookManagerRegistryMixin(HookManagerBase, ABC):
     def register(self, hook: ExecutionHookLike) -> None:
         manager = self._manager()
         with manager.lock:

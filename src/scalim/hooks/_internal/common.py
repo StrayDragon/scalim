@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Set as AbstractSet
-from typing import Any, Callable, Dict, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 from ..._internal.loggingx import prefix
 from ...events.catalog import (
@@ -91,7 +91,7 @@ def read_callable_attr(obj: Any, name: str) -> Optional[Callable[..., Any]]:
     value = read_optional_attr(obj, name)
     if value is None or not callable(value):
         return None
-    return cast("Callable[..., Any]", value)
+    return value
 
 
 def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
@@ -100,10 +100,12 @@ def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
     if not isinstance(value, AbstractSet):
         msg = "hook.event_types must be None or Set[str]; got {} for {}".format(type(value).__name__, type(hook).__name__)
         raise TypeError(msg)
+    validated: Set[str] = set()
     for item in value:
         if not isinstance(item, str):
             msg = "hook.event_types must contain only str; got {} element {!r} for {}".format(
                 type(item).__name__, item, type(hook).__name__
             )
             raise TypeError(msg)
-    return cast("Set[str]", value)
+        validated.add(item)
+    return validated

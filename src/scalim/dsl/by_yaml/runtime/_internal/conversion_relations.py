@@ -7,7 +7,6 @@ from .....spec.ir.relations import LookupStepIr
 from .....spec.ir.sources import MainSourceIr, SourceIr
 from ...schema_dsl.models import (
     DemandConfig,
-    InlineRelationConfig,
     LookupCastConfig,
     RelationStepConfig,
     SourceFieldConfig,
@@ -160,12 +159,17 @@ class ConfigToIRConversionRelationMixin:
             path = self._infer_unique_path(self._main_source_ir.source_id, target_source.source_id)
             return tuple(step for _from_id, _to_id, step in path) if path else None
 
-        relation = getattr(field_config, "relation", None)
-        if not isinstance(relation, InlineRelationConfig):
-            msg = "Unsupported relation reference; use inline steps object"
-            raise ConversionError(msg)
+        relation = field_config.relation
+        if isinstance(relation, str):
+            relation_config = config.relations.get(relation)
+            if relation_config is None:
+                msg = "Unsupported relation reference: '{}'".format(relation)
+                raise ConversionError(msg)
+            relation_steps = relation_config.steps
+        else:
+            relation_steps = relation.steps
 
-        steps = self._convert_steps(relation.steps, config)
+        steps = self._convert_steps(relation_steps, config)
         return tuple(step for _from_id, _to_id, step in steps)
 
     def _infer_unique_path(self, start_id: str, target_id: str) -> Optional[List[StepInfo]]:

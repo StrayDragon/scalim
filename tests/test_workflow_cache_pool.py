@@ -51,7 +51,7 @@ def test_ensure_json_like_rejects_empty_dict_key_when_required() -> None:
         )
 
 
-def test_build_preload_forever_signature_rejects_unexpected_normalize_payload_shape(monkeypatch) -> None:
+def test_build_preload_forever_signature_normalizes_normalize_payload() -> None:
     from scalim.execution import workflow_cache_pool as mod
     from scalim.spec.ir.sources import SourceNormalizeIr
 
@@ -62,10 +62,10 @@ def test_build_preload_forever_signature_rejects_unexpected_normalize_payload_sh
         normalize=SourceNormalizeIr(kind="index_by_key", key_field="id"),
     )
 
-    monkeypatch.setattr(mod, "_normalize_json_like", lambda _value: 1)
-
-    with pytest.raises(WorkflowCachePoolError, match="expected dict"):
-        _ = mod.build_preload_forever_signature(source, rendered_params={})  # type: ignore[arg-type]
+    signature = mod.build_preload_forever_signature(source, rendered_params={})  # type: ignore[arg-type]
+    assert signature.normalize is not None
+    assert signature.normalize.get("kind") == "index_by_key"
+    assert signature.normalize.get("key_field") == "id"
 
 
 def test_format_callable_reference_and_lookup_cast_signature_variants() -> None:

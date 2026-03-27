@@ -18,7 +18,7 @@ class ReleaseOperatorExecutor(OperatorExecutor):
         batch_row_nth: List[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
-        op = cast("ReleaseOperatorIr", operator)
+        op = cast("ReleaseOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing
         field_key = op.field_key
 
         context.delete_field(field_key)

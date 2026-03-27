@@ -9,7 +9,7 @@ def ensure_mapping(raw: Any) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         msg = "YAML config must be a mapping"
         raise TypeError(msg)
-    return cast("Dict[str, Any]", raw)
+    return cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
 
 
 @dataclass(frozen=True)
@@ -23,13 +23,13 @@ class RawDemand:
     def get_mapping(self, key: str) -> Optional[Dict[str, Any]]:
         value = self.data.get(key)
         if isinstance(value, dict):
-            return cast("Dict[str, Any]", value)
+            return cast("Dict[str, Any]", value)  # pragma: allow-cast yaml mapping typed narrowing
         return None
 
     def get_list(self, key: str) -> Optional[List[Any]]:
         value = self.data.get(key)
         if isinstance(value, list):
-            return cast("List[Any]", value)
+            return cast("List[Any]", value)  # pragma: allow-cast yaml list typed narrowing
         return None
 
 
@@ -87,7 +87,7 @@ def _add_field_def(
     if not isinstance(data_raw, dict):
         return
     field_id = str(field_id_raw)
-    data = cast("Dict[str, Any]", data_raw)
+    data = cast("Dict[str, Any]", data_raw)  # pragma: allow-cast yaml mapping typed narrowing
     field_def = FieldDef(field_id=field_id, kind=kind, data=data, source_id=source_id)
     field_defs.append(field_def)
     defs_by_id.setdefault(field_id, []).append(field_def)
@@ -107,7 +107,7 @@ def _collect_main_source_fields(
     main_fields_raw = raw_main_source.get(MAIN_SOURCE_KEYS["fields"])
     if not isinstance(main_fields_raw, dict):
         return
-    main_fields_raw = cast("Dict[str, Any]", main_fields_raw)
+    main_fields_raw = cast("Dict[str, Any]", main_fields_raw)  # pragma: allow-cast yaml mapping typed narrowing
     source_id = main_source_id or None
     for field_id_raw, field_data_raw in main_fields_raw.items():
         _add_field_def(field_defs, defs_by_id, alias_index, field_id_raw, FIELD_KIND_SOURCE, field_data_raw, source_id)
@@ -125,11 +125,11 @@ def _collect_source_fields(
     for source_id_raw, source_data_raw in raw_sources.items():
         if not isinstance(source_data_raw, dict):
             continue
-        source_dict = cast("Dict[str, Any]", source_data_raw)
+        source_dict = cast("Dict[str, Any]", source_data_raw)  # pragma: allow-cast yaml mapping typed narrowing
         source_fields_raw = source_dict.get(SOURCE_KEYS["fields"])
         if not isinstance(source_fields_raw, dict):
             continue
-        source_fields_raw = cast("Dict[str, Any]", source_fields_raw)
+        source_fields_raw = cast("Dict[str, Any]", source_fields_raw)  # pragma: allow-cast yaml mapping typed narrowing
         source_id = str(source_id_raw)
         for field_id_raw, field_data_raw in source_fields_raw.items():
             _add_field_def(field_defs, defs_by_id, alias_index, field_id_raw, FIELD_KIND_SOURCE, field_data_raw, source_id)
@@ -147,7 +147,7 @@ def _collect_derived_fields(
     for field_id_raw, field_data_raw in raw_fields.items():
         if not isinstance(field_data_raw, dict):
             continue
-        field_dict = cast("Dict[str, Any]", field_data_raw)
+        field_dict = cast("Dict[str, Any]", field_data_raw)  # pragma: allow-cast yaml mapping typed narrowing
         if DERIVED_FIELD_KEYS["compute"] in field_dict or DERIVED_FIELD_KEYS["call_by"] in field_dict:
             _add_field_def(field_defs, defs_by_id, alias_index, field_id_raw, FIELD_KIND_DERIVED, field_dict, None)
 

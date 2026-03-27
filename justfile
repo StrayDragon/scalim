@@ -518,6 +518,14 @@ report-no-cover:
 check-no-cover:
     uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check
 
+# 报告: dynattr 使用基线
+report-dynattr:
+    uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py
+
+# 检查: dynattr 使用必须显式 allow
+check-dynattr:
+    uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py --check
+
 # 报告: `object` 类型标注基线
 report-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py
@@ -527,7 +535,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

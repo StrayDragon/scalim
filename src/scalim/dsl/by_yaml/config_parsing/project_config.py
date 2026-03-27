@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from ....vendor.compact.importlibx import require_optional_dependency
+from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import dataclass
 
 if TYPE_CHECKING:
@@ -29,6 +30,14 @@ class YamlDslProjectConfig:
     import_allowed_roots: Tuple[Path, ...]
 
 
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
+
+
+def _is_list(value: object) -> TypeGuard[List[object]]:
+    return isinstance(value, list)
+
+
 def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
     loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     if loaded is None:
@@ -36,7 +45,7 @@ def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
     if not isinstance(loaded, dict):
         msg = "scalim.yaml must be a mapping: path='{}'".format(str(path))
         raise TypeError(msg)
-    return cast("Dict[str, Any]", loaded)
+    return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
 
 
 def _resolve_dir(value: object, *, base_dir: Path, context_label: str) -> Path:
@@ -64,7 +73,7 @@ def _parse_yaml_dsl_section(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -
     if yaml_dsl is None:
         yaml_dsl_dict = {}
     elif isinstance(yaml_dsl, dict):
-        yaml_dsl_dict = cast("Dict[str, Any]", yaml_dsl)
+        yaml_dsl_dict = cast("Dict[str, Any]", yaml_dsl)  # pragma: allow-cast yaml mapping typed narrowing
     else:
         msg = "scalim.yaml yaml_dsl must be a mapping: path='{}'".format(str(scalim_yaml_path))
         raise TypeError(msg)
@@ -73,12 +82,11 @@ def _parse_yaml_dsl_section(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -
     raw_aliases = yaml_dsl_dict.get("import_aliases")
     if raw_aliases is None:
         import_aliases = {}
-    elif not isinstance(raw_aliases, dict):
+    elif not _is_dict(raw_aliases):
         msg = "scalim.yaml yaml_dsl.import_aliases must be a mapping: path='{}'".format(str(scalim_yaml_path))
         raise TypeError(msg)
     else:
-        aliases_dict = cast("Dict[object, object]", raw_aliases)
-        for raw_key, raw_value in aliases_dict.items():
+        for raw_key, raw_value in raw_aliases.items():
             if not isinstance(raw_key, str) or not raw_key.strip():
                 msg = "scalim.yaml yaml_dsl.import_aliases keys must be non-empty strings: path='{}'".format(str(scalim_yaml_path))
                 raise TypeError(msg)
@@ -90,12 +98,12 @@ def _parse_yaml_dsl_section(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -
     raw_roots = yaml_dsl_dict.get("import_allowed_roots")
     if raw_roots is None:
         roots = ()
-    elif not isinstance(raw_roots, list):
+    elif not _is_list(raw_roots):
         msg = "scalim.yaml yaml_dsl.import_allowed_roots must be a list: path='{}'".format(str(scalim_yaml_path))
         raise TypeError(msg)
     else:
         resolved_roots: List[Path] = []
-        for idx, raw_root in enumerate(cast("List[object]", raw_roots)):
+        for idx, raw_root in enumerate(raw_roots):
             resolved_roots.append(
                 _resolve_dir(raw_root, base_dir=project_root, context_label="yaml_dsl.import_allowed_roots[{}]".format(idx))
             )

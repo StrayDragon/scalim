@@ -199,8 +199,16 @@ class ExpressionValidator:
     def _visit(self, node: ast.AST) -> None:
         if isinstance(node, ast.Constant):
             return
-        if not _PY38_PLUS and isinstance(node, (ast.Str, ast.Num, ast.Bytes, ast.NameConstant)):  # pragma: no cover
-            return  # pragma: no cover
+        if not _PY38_PLUS and isinstance(
+            node,
+            (
+                ast.Str,
+                ast.Num,
+                ast.Bytes,
+                ast.NameConstant,
+            ),
+        ):  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
+            return  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
 
         handler = self._handlers.get(type(node))
         if handler is None:
@@ -209,7 +217,7 @@ class ExpressionValidator:
         handler(node)
 
     def _validate_name_node(self, node: ast.AST) -> None:
-        typed = cast("ast.Name", node)
+        typed = cast("ast.Name", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         name = typed.id
         if name in self._forbidden_names:
             msg = "Forbidden name '{}' in expression".format(name)
@@ -219,7 +227,7 @@ class ExpressionValidator:
             raise SecurityError(msg)
 
     def _validate_binop_node(self, node: ast.AST) -> None:
-        typed = cast("ast.BinOp", node)
+        typed = cast("ast.BinOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         if type(typed.op) not in self._safe_operators:
             msg = "Unsupported operator: {}".format(type(typed.op).__name__)
             raise SecurityError(msg)
@@ -227,14 +235,16 @@ class ExpressionValidator:
         self._visit(typed.right)
 
     def _validate_unaryop_node(self, node: ast.AST) -> None:
-        typed = cast("ast.UnaryOp", node)
-        if type(typed.op) not in self._safe_unary:  # pragma: no cover
-            msg = "Unsupported unary operator: {}".format(type(typed.op).__name__)  # pragma: no cover
-            raise SecurityError(msg)  # pragma: no cover
+        typed = cast("ast.UnaryOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
+        if type(typed.op) not in self._safe_unary:  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
+            msg = "Unsupported unary operator: {}".format(
+                type(typed.op).__name__
+            )  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
+            raise SecurityError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
         self._visit(typed.operand)
 
     def _validate_compare_node(self, node: ast.AST) -> None:
-        typed = cast("ast.Compare", node)
+        typed = cast("ast.Compare", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         self._visit(typed.left)
         for comp in typed.comparators:
             self._visit(comp)
@@ -244,13 +254,13 @@ class ExpressionValidator:
                 raise SecurityError(msg)
 
     def _validate_ifexp_node(self, node: ast.AST) -> None:
-        typed = cast("ast.IfExp", node)
+        typed = cast("ast.IfExp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         self._visit(typed.test)
         self._visit(typed.body)
         self._visit(typed.orelse)
 
     def _validate_call_node(self, node: ast.AST) -> None:
-        typed = cast("ast.Call", node)
+        typed = cast("ast.Call", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         if isinstance(typed.func, ast.Attribute):
             msg = (
                 "Method calls (attribute calls) are not allowed in compute expressions "
@@ -272,7 +282,7 @@ class ExpressionValidator:
             raise SecurityError(msg)
 
     def _validate_attribute_node(self, node: ast.AST) -> None:
-        typed = cast("ast.Attribute", node)
+        typed = cast("ast.Attribute", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         msg = (
             "Attribute access is not allowed in compute expressions (got attribute={!r}); "
             'move this logic to call_by (allowlisted), e.g. call_by: "myapp.module:fn(value=value, ctx=$ctx)"'
@@ -280,12 +290,12 @@ class ExpressionValidator:
         raise SecurityError(msg)
 
     def _validate_boolop_node(self, node: ast.AST) -> None:
-        typed = cast("ast.BoolOp", node)
+        typed = cast("ast.BoolOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         for value in typed.values:
             self._visit(value)
 
     def _validate_sequence_node(self, node: ast.AST) -> None:
-        typed = cast("Union[ast.List, ast.Tuple]", node)
+        typed = cast("Union[ast.List, ast.Tuple]", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         for elt in typed.elts:
             self._visit(elt)
 
@@ -529,9 +539,11 @@ class SecureComputeEngine:
             if isinstance(value, (str, bytes)):
                 return len(value)
             return None
-        if not _PY38_PLUS and isinstance(node, (ast.Str, ast.Bytes)):  # pragma: no cover
-            literal = cast("Union[str, bytes]", node.s)  # pragma: no cover
-            return len(literal)  # pragma: no cover
+        if not _PY38_PLUS and isinstance(node, (ast.Str, ast.Bytes)):  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
+            literal = cast(
+                "Union[str, bytes]", node.s
+            )  # pragma: no cover  # pragma: allow-no-cover py<3.8  # pragma: allow-cast py<3.8 ast.Str/Bytes .s
+            return len(literal)  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
         return None
 
     @staticmethod
@@ -540,7 +552,9 @@ class SecureComputeEngine:
             return True
         if isinstance(node, ast.Constant):
             return isinstance(node.value, (str, bytes))
-        return not _PY38_PLUS and isinstance(node, (ast.Str, ast.Bytes))  # pragma: no cover
+        return not _PY38_PLUS and isinstance(
+            node, (ast.Str, ast.Bytes)
+        )  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
 
     @staticmethod
     def _check_collection_literal_limit(node: ast.AST, max_collection_literal_len: int) -> None:
@@ -580,7 +594,7 @@ class SecureComputeEngine:
             return
 
         try:
-            range_len = len(range(*cast("Tuple[int, ...]", tuple(args))))
+            range_len = len(range(*cast("Tuple[int, ...]", tuple(args))))  # pragma: allow-cast args not-none guard typed narrowing
         except (OverflowError, TypeError, ValueError):
             return
 
@@ -689,14 +703,15 @@ class SecureComputeEngine:
             safe_globals[dep_keys[i]] = dep_values[i]
             i += 1
 
-        field_values: Optional[Dict[str, Any]] = None
-        if self._audit_callback is not None:
-            field_values = {dep_keys[i]: dep_values[i] for i in range(len(dep_keys))}
+        audit_callback = self._audit_callback
+        audit_field_values: Dict[str, Any] = {}
+        if audit_callback is not None:
+            audit_field_values = {dep_keys[i]: dep_values[i] for i in range(len(dep_keys))}
 
         try:
             result = eval(code, safe_globals, {})  # noqa: S307
-            if self._audit_callback is not None:
-                self._audit_callback(expression, cast("Dict[str, Any]", field_values), result)
+            if audit_callback is not None:
+                audit_callback(expression, audit_field_values, result)
         except ComputeExpressionError:
             raise
         except Exception as e:

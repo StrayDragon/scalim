@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import Dict, List, Optional, Set, Tuple, cast
 
 from ...vendor.compact.typing_extensionsx import override
@@ -19,7 +20,7 @@ from .manager_base import (
 )
 
 
-class HookManagerSubscriptionMixin(HookManagerBase):
+class HookManagerSubscriptionMixin(HookManagerBase, ABC):
     def _hook_overrides_on_event(self, hook: ExecutionHookLike) -> bool:
         manager = self._manager()
         on_event_attr = resolve_mro_attr(type(hook), "on_event")
@@ -54,7 +55,9 @@ class HookManagerSubscriptionMixin(HookManagerBase):
             handler = read_callable_attr(hook, handler_name)
             if handler is None:
                 continue
-            typed_handlers_by_type[event_type].append((hook, cast("HookTypedHandler", handler)))
+            typed_handlers_by_type[event_type].append(
+                (hook, cast("HookTypedHandler", handler))  # pragma: allow-cast hook method typed narrowing
+            )
 
     def _append_hook_on_event_handlers(
         self,
@@ -67,7 +70,7 @@ class HookManagerSubscriptionMixin(HookManagerBase):
         on_event_handler = read_callable_attr(hook, "on_event")
         if on_event_handler is None:
             return
-        typed_on_event_handler = cast("HookOnEventHandler", on_event_handler)
+        typed_on_event_handler = cast("HookOnEventHandler", on_event_handler)  # pragma: allow-cast hook method typed narrowing
         if event_types is None:
             for event_type in CATALOG_EVENT_TYPES:
                 on_event_handlers_by_type[event_type].append((hook, typed_on_event_handler))

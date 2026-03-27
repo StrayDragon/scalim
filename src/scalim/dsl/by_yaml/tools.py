@@ -1,19 +1,12 @@
-from typing import Any, Dict, List, Optional, Sequence, cast
+from typing import Optional, Sequence
 
-from ...vendor.compact.typing_extensionsx import TypedDict
+from .runtime.introspection import OutputConfigDict
 from .runtime.introspection import load_output_config as _load_output_config
 from .runtime.references import derive_base_module_path as _derive_base_module_path
 
 
-class OutputConfigDict(TypedDict):
-    params: Dict[str, Any]
-    field_name_mapping: Dict[str, str]
-    output_fields: List[str]
-    outputs: List[Dict[str, Any]]
-
-
 def load_output_config(yaml_path: str) -> OutputConfigDict:
-    return cast("OutputConfigDict", cast("object", _load_output_config(yaml_path)))
+    return _load_output_config(yaml_path)
 
 
 def derive_base_module_path(

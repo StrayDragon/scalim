@@ -30,7 +30,7 @@ class VizObserverNodeMixin:
         if snapshot and isinstance(snapshot, dict):
             nodes = snapshot.get("nodes")
             if isinstance(nodes, list):
-                typed_nodes = cast("list[Dict[str, Any]]", nodes)
+                typed_nodes = cast("list[Dict[str, Any]]", nodes)  # pragma: allow-cast snapshot nodes typed narrowing
                 for typed_item_dict in typed_nodes:
                     node_id = typed_item_dict.get("id")
                     if node_id:

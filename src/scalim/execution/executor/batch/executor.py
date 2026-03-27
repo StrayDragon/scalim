@@ -126,9 +126,11 @@ class BatchExecutor:
         if runtime.parallel_mode == "adaptive":
             _, _, resolved_workers = resolve_adaptive_policy_tuning_and_workers(runtime=runtime, overrides=self._overrides)
 
-        for is_loadref, segment in iter_operator_segments(cast("Sequence[SupportedOperatorIr]", self.plan.operators)):
+        for is_loadref, segment in iter_operator_segments(
+            cast("Sequence[SupportedOperatorIr]", self.plan.operators)  # pragma: allow-cast plan operators typed narrowing
+        ):
             if is_loadref:
-                loadref_ops = cast("List[LoadRefOp]", segment)
+                loadref_ops = cast("List[LoadRefOp]", segment)  # pragma: allow-cast segment typed narrowing
                 stage = stage_map.get(OperatorType.LOAD_REF.value)
                 if wants_stage_spans and stage:
                     perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
@@ -157,7 +159,7 @@ class BatchExecutor:
                     )
                 continue
 
-            operator = cast("SupportedOperatorIr", segment)
+            operator = cast("SupportedOperatorIr", segment)  # pragma: allow-cast segment typed narrowing
             executor = self._executors.get(operator.operator_type)
 
             if executor:
@@ -225,7 +227,10 @@ class BatchExecutor:
             pool=pool,
             max_workers=max_workers,
             required_fields=required_fields,
-            after_operator=cast("Optional[Callable[[LoadRefOp], None]]", after_operator),
+            after_operator=cast(  # pragma: allow-cast callback typed narrowing
+                "Optional[Callable[[LoadRefOp], None]]",
+                after_operator,
+            ),
         )
 
     def _execute_loadref_ops_serially(

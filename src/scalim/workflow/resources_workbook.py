@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 def _get_openpyxl_workbook_class() -> "Type[Workbook]":
     openpyxl_mod = require_optional_dependency("openpyxl", context="scalim.workflow.resources")
-    return cast("Any", openpyxl_mod).Workbook
+    return cast("Any", openpyxl_mod).Workbook  # pragma: allow-cast openpyxl module runtime boundary
 
 
 def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
@@ -94,7 +94,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             )
 
         def _on_create(plan: object) -> None:
-            p = cast("_WorkbookPlan", plan)
+            p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
             self._emit_resource_create(
                 workflow_node_id=str(workflow_node_id),
                 resource_type="workbook",
@@ -110,7 +110,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             create_fn=_create,
             on_create=_on_create,
         )
-        return cast("_WorkbookPlan", plan)
+        return cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
 
     def apply_workbook_sheet(
         self,
@@ -278,7 +278,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
 
     @override
     def _commit_workbook(self, plan: object) -> None:  # noqa: C901, PLR0912, PLR0915
-        p = cast("_WorkbookPlan", plan)
+        p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
         if not p.sheets:
             if p.lock_path is not None:
                 release_write_lock(p.lock_path)
@@ -301,8 +301,8 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         try:
             for sheet_name in p.sheet_order:
                 sheet_plan = p.sheets.get(sheet_name)
-                if sheet_plan is None:  # pragma: no cover
-                    continue  # pragma: no cover
+                if sheet_plan is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
+                    continue  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
                 ws = wb.create_sheet(str(sheet_name))
                 header_written = False
                 for seg in sheet_plan.segments:
@@ -344,7 +344,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
 
     @override
     def _discard_workbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
-        p = cast("_WorkbookPlan", plan)
+        p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
         if p.lock_path is not None:
             release_write_lock(p.lock_path)
             p.lock_path = None

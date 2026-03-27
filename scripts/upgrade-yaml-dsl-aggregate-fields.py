@@ -16,13 +16,13 @@ import yaml
 
 def _as_mapping(value: object) -> Optional[Dict[str, Any]]:
     if isinstance(value, dict):
-        return cast("Dict[str, Any]", value)
+        return cast("Dict[str, Any]", value)  # pragma: allow-cast yaml safe_load typed narrowing
     return None
 
 
 def _as_list(value: object) -> Optional[List[Any]]:
     if isinstance(value, list):
-        return cast("List[Any]", value)
+        return cast("List[Any]", value)  # pragma: allow-cast yaml safe_load typed narrowing
     return None
 
 
@@ -178,7 +178,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
-    paths = [p.resolve() for p in cast("List[Path]", args.yaml_files)]
+    paths = [p.resolve() for p in cast("List[Path]", args.yaml_files)]  # pragma: allow-cast argparse typed narrowing
     in_place = bool(args.in_place)
 
     if not in_place and len(paths) != 1:

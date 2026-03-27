@@ -148,7 +148,7 @@ class ParserOutputsMixin:
                 continue
             if not isinstance(field_raw, dict):
                 continue
-            field_dict = cast("Dict[str, Any]", field_raw)
+            field_dict = cast("Dict[str, Any]", field_raw)  # pragma: allow-cast yaml output aggregate field typed narrowing
             field_defs.append(_AggregateFieldDef(out_field_id=out_field_id, data=field_dict))
             alias_index.add(field_dict, out_field_id)
         return _AggregateFieldIndex(field_defs=field_defs, alias_index=alias_index)
@@ -371,7 +371,7 @@ class ParserOutputsMixin:
         if isinstance(path_raw, dict):
             path = {
                 "$init_var": parse_init_var_mapping_node(
-                    cast("Dict[str, Any]", path_raw),
+                    cast("Dict[str, Any]", path_raw),  # pragma: allow-cast init_var mapping typed narrowing
                     path="{}.path".format(base_path),
                 )
             }
@@ -602,7 +602,7 @@ class ParserOutputsMixin:
             required_keys = ("field", "threshold")
         elif producer_key == "count_distinct":
             allowed_keys = ("field", "fields")
-        else:  # pragma: no cover
+        else:  # pragma: no cover  # pragma: allow-no-cover producer_key validated by caller dispatch
             msg = "Unknown agg producer_key: {!r}".format(producer_key)
             raise ValueError(msg)
 
@@ -977,7 +977,7 @@ class ParserOutputsMixin:
         rank_with_top_k: List[str] = []
         for fid in rank_field_ids:
             cfg = agg.fields[fid]
-            rank_cfg = cast("Dict[str, Any]", cfg.config)
+            rank_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
             by = str(rank_cfg.get("by") or "").strip()
             if by not in allowed_agg_out_fields:
                 msg = "outputs.{}.aggregate.fields.{}.{} by={!r} must reference group_by fields or aggregate.fields ids: {}".format(
@@ -989,7 +989,9 @@ class ParserOutputsMixin:
                 )
                 raise ValueError(msg)
 
-            partition_by = cast("Tuple[str, ...]", rank_cfg.get("partition_by") or ())
+            partition_by = cast(
+                "Tuple[str, ...]", rank_cfg.get("partition_by") or ()
+            )  # pragma: allow-cast output aggregate config typed narrowing
             missing = [x for x in partition_by if x not in agg.group_by]
             if missing:
                 msg = "outputs.{}.aggregate.fields.{}.{} partition_by must be a subset of group_by: {}".format(
@@ -1000,7 +1002,7 @@ class ParserOutputsMixin:
                 )
                 raise ValueError(msg)
 
-            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())
+            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())  # pragma: allow-cast output aggregate config typed narrowing
             missing = [x for x in order_by if x not in allowed_agg_out_fields]
             if missing:
                 msg = "outputs.{}.aggregate.fields.{}.{} order_by reference unknown agg output fields: {}".format(
@@ -1042,7 +1044,7 @@ class ParserOutputsMixin:
         for fid in post_field_ids:
             cfg = agg.fields[fid]
             if cfg.producer_key == "score_by_rank":
-                score_cfg = cast("Dict[str, Any]", cfg.config)
+                score_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
                 rank_field = str(score_cfg.get("rank_field") or "rank").strip()
                 if rank_field not in rank_field_ids:
                     msg = "outputs.{}.aggregate.fields.{}.score_by_rank rank_field={!r} must reference a rank field id: {}".format(
@@ -1068,8 +1070,10 @@ class ParserOutputsMixin:
                 continue
 
             if cfg.producer_key == "compute":
-                compute_cfg = cast("Dict[str, Any]", cfg.config)
-                compute_deps = cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
+                compute_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
+                compute_deps = cast(
+                    "Tuple[str, ...]", compute_cfg.get("dependencies") or ()
+                )  # pragma: allow-cast output aggregate config typed narrowing
                 missing = [d for d in compute_deps if d not in allowed]
                 if missing:
                     msg = "outputs.{}.aggregate.fields.{}.compute reference unknown fields: {}".format(
@@ -1083,9 +1087,9 @@ class ParserOutputsMixin:
     def _derived_deps_for_aggregate_derived_field(self, cfg: OutputAggregateFieldConfig) -> Tuple[str, ...]:
         producer_key = str(cfg.producer_key)
         if producer_key in _RANK_FUNC_KEYS:
-            rank_cfg = cast("Dict[str, Any]", cfg.config)
+            rank_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
             by = str(rank_cfg.get("by") or "").strip()
-            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())
+            order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())  # pragma: allow-cast output aggregate config typed narrowing
             deps_list: List[str] = []
             if by:
                 deps_list.append(by)
@@ -1095,7 +1099,7 @@ class ParserOutputsMixin:
             return ordered_unique_str([x for x in deps_list if x])
 
         if producer_key == "score_by_rank":
-            score_cfg = cast("Dict[str, Any]", cfg.config)
+            score_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
             rf = str(score_cfg.get("rank_field") or "rank").strip() or "rank"
             return (rf,)
 
@@ -1104,8 +1108,10 @@ class ParserOutputsMixin:
             return tuple(str(x) for x in extract_call_by_dependencies(call_by))
 
         if producer_key == "compute":
-            compute_cfg = cast("Dict[str, Any]", cfg.config)
-            return cast("Tuple[str, ...]", compute_cfg.get("dependencies") or ())
+            compute_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
+            return cast(
+                "Tuple[str, ...]", compute_cfg.get("dependencies") or ()
+            )  # pragma: allow-cast output aggregate config typed narrowing
 
         return ()
 
@@ -1143,7 +1149,7 @@ class ParserOutputsMixin:
             raise ValueError(msg) from exc
 
     def _validate_aggregate_semantics(self, t: OutputTargetConfig, name: str, known_field_ids: Set[str]) -> None:
-        agg = cast("OutputAggregateConfig", t.aggregate)
+        agg = cast("OutputAggregateConfig", t.aggregate)  # pragma: allow-cast output target typed narrowing
         rank_field_ids, post_field_ids, allowed_agg_out_fields = self._validate_aggregate_group_and_metrics(t, name, known_field_ids, agg)
         agg_field_ids = set(agg.fields.keys())
         self._validate_rank_semantics(name, agg, rank_field_ids, allowed_agg_out_fields)
@@ -1160,7 +1166,7 @@ class ParserOutputsMixin:
                 continue
             missing_sheet: List[str] = []
             for t in outputs:
-                c = cast("OutputContainerConfig", t.container)
+                c = cast("OutputContainerConfig", t.container)  # pragma: allow-cast output target typed narrowing
                 if c.type != "workbook" or str(c.path) != str(path):
                     continue
                 if not c.sheet:
@@ -1195,7 +1201,7 @@ class ParserOutputsMixin:
         for cfg in agg.fields.values():
             if cfg.producer_key not in _AGG_FUNC_KEYS:
                 continue
-            agg_cfg = cast("Dict[str, Any]", cfg.config)
+            agg_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
             field_id = agg_cfg.get("field")
             if field_id:
                 required.append(str(field_id))

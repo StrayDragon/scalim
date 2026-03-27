@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional,
 
 from ...._internal.loggingx import format_kv, get_logger, prefix
 from ....vendor.compact.importlibx import import_module, require_optional_dependency
+from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import asdict, dataclass
 from ....vendor.dataclassesx import field as dataclass_field
 
@@ -86,12 +87,12 @@ def _field_def_path(field_def: FieldDef, *, main_source_id: str) -> str:
 def _output_item_requires_unique_effective_display_names(output_item: object) -> bool:
     if not isinstance(output_item, dict):
         return False
-    out_dict = cast("Dict[str, Any]", output_item)
+    out_dict = cast("Dict[str, Any]", output_item)  # pragma: allow-cast yaml mapping typed narrowing
     container_raw: Any = out_dict.get(OUTPUT_TARGET_KEYS["container"])
     if not isinstance(container_raw, dict):
         return False
 
-    container_dict = cast("Dict[str, Any]", container_raw)
+    container_dict = cast("Dict[str, Any]", container_raw)  # pragma: allow-cast yaml mapping typed narrowing
     include_header_raw: Any = container_dict.get(OUTPUT_CONTAINER_KEYS["include_header"])
     include_header = include_header_raw if isinstance(include_header_raw, bool) else DEFAULT_OUTPUT_INCLUDE_HEADER
 
@@ -134,6 +135,14 @@ def _format_duplicate_effective_display_names_message(duplicates: Dict[str, List
     )
 
 
+def _is_list(value: object) -> TypeGuard[List[object]]:
+    return isinstance(value, list)
+
+
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
+
+
 class ConfigValidator(ValidatorFieldsMixin):
     _schema_path: str
     _schema: Optional[Dict[str, Any]]
@@ -167,7 +176,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         obs_raw: Any = config.get("observability")
         if not isinstance(obs_raw, dict):
             return
-        obs_dict = cast("Dict[str, Any]", obs_raw)
+        obs_dict = cast("Dict[str, Any]", obs_raw)  # pragma: allow-cast yaml mapping typed narrowing
         viz_raw: Any = obs_dict.get("viz")
         if isinstance(viz_raw, dict) and "event_mode" in viz_raw:
             self._add_error(
@@ -236,10 +245,10 @@ class ConfigValidator(ValidatorFieldsMixin):
         if validate_raw is False:
             return
 
-        outputs_raw: Any = raw.data.get(DEMAND_KEYS["outputs"])
-        if not isinstance(outputs_raw, list):
+        outputs_raw: object = raw.data.get(DEMAND_KEYS["outputs"])
+        if not _is_list(outputs_raw):
             return
-        outputs = cast("List[object]", outputs_raw)
+        outputs = outputs_raw
         if not _outputs_require_unique_effective_display_names(outputs):
             return
 
@@ -252,10 +261,10 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._add_error(errors, msg, path=DEMAND_KEYS["validate_unique_field_names"])
 
     def _build_aggregate_field_index(self, aggregate: Dict[str, Any]) -> Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]:
-        fields_raw = aggregate.get("fields")
-        if not isinstance(fields_raw, dict):
+        fields_raw: object = aggregate.get("fields")
+        if not _is_dict(fields_raw):
             return {}, []
-        fields_dict = cast("Dict[object, object]", fields_raw)
+        fields_dict = fields_raw
 
         alias_index: Dict[int, str] = {}
         field_defs: List[Tuple[str, Dict[str, Any]]] = []
@@ -265,7 +274,7 @@ class ConfigValidator(ValidatorFieldsMixin):
                 continue
             if not isinstance(field_raw, dict):
                 continue
-            field_dict = cast("Dict[str, Any]", field_raw)
+            field_dict = cast("Dict[str, Any]", field_raw)  # pragma: allow-cast yaml mapping typed narrowing
             alias_index[id(field_dict)] = out_field_id
             field_defs.append((out_field_id, field_dict))
         return alias_index, field_defs
@@ -280,7 +289,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         if not isinstance(item, dict):
             return "must be field_id string, YAML alias(object), or YAML alias(list)"
 
-        typed = cast("Dict[str, Any]", item)
+        typed = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
         if agg_field_index is not None:
             alias_index, _ = agg_field_index
             if alias_index.get(id(typed)) is not None:
@@ -314,9 +323,9 @@ class ConfigValidator(ValidatorFieldsMixin):
         agg_field_index: Optional[Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]] = None,
     ) -> None:
         def _walk(item: object, *, path: str) -> List[Tuple[str, object]]:
-            if isinstance(item, list):
+            if _is_list(item):
                 out: List[Tuple[str, object]] = []
-                for idx, sub in enumerate(cast("List[object]", item)):
+                for idx, sub in enumerate(item):
                     out.extend(_walk(sub, path="{}.{}".format(path, idx)))
                 return out
             return [(path, item)]
@@ -345,23 +354,25 @@ class ConfigValidator(ValidatorFieldsMixin):
         outputs_raw = raw.data.get(outputs_key)
         if not isinstance(outputs_raw, list):
             return
-        outputs_list = cast("List[Any]", outputs_raw)
+        outputs_list = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
 
         fields_key = OUTPUT_TARGET_KEYS["fields"]
 
         for output_idx, output_raw in enumerate(outputs_list):
             if not isinstance(output_raw, dict):
                 continue
-            output_dict = cast("Dict[str, Any]", output_raw)
+            output_dict = cast("Dict[str, Any]", output_raw)  # pragma: allow-cast yaml mapping typed narrowing
             fields_raw = output_dict.get(fields_key)
             if not isinstance(fields_raw, list):
                 continue
-            fields_list = cast("List[Any]", fields_raw)
+            fields_list = cast("List[Any]", fields_raw)  # pragma: allow-cast yaml list typed narrowing
 
             agg_field_index = None
             agg_raw = output_dict.get("aggregate")
             if isinstance(agg_raw, dict):
-                agg_field_index = self._build_aggregate_field_index(cast("Dict[str, Any]", agg_raw))
+                agg_field_index = self._build_aggregate_field_index(
+                    cast("Dict[str, Any]", agg_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                )
 
             base_path = "{}.{}.{}".format(outputs_key, output_idx, fields_key)
             self._validate_outputs_fields_list_object_refs(
@@ -376,7 +387,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         if self._schema is None:
             with Path(self._schema_path).open("r", encoding="utf-8") as f:
                 self._schema = json.load(f)
-        if self._schema is None:  # pragma: no cover
+        if self._schema is None:  # pragma: no cover  # pragma: allow-no-cover invariant: schema loaded or raised above
             msg = "Schema failed to load"
             raise RuntimeError(msg)
         return self._schema
@@ -388,7 +399,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         *,
         filter_additional_properties: bool,
     ) -> None:
-        if not HAS_JSONSCHEMA or jsonschema is None:  # pragma: no cover
+        if not HAS_JSONSCHEMA or jsonschema is None:  # pragma: no cover  # pragma: allow-no-cover optional dependency boundary
             # `JSONSchema` 校验是可选项. 某些旧运行时可能存在但因依赖版本不匹配(例如旧 `attrs`)而不可用,因此这里不能直接失败.
             reason = None
             detail = None
@@ -423,7 +434,7 @@ class ConfigValidator(ValidatorFieldsMixin):
             for issue in issues:
                 self._add_error(errors, issue.message, path=issue.path)
         except jsonschema.ValidationError as e:  # type: ignore[union-attr]
-            absolute_path = getattr(e, "absolute_path", None)
+            absolute_path = getattr(e, "absolute_path", None)  # pragma: allow-dynattr third-party: jsonschema ValidationError
             path = ".".join(str(p) for p in absolute_path) if absolute_path else ""
             self._add_error(errors, "Schema validation error: {}".format(e.message), path=path)
         except JsonSchemaCollectorError as exc:
@@ -455,13 +466,19 @@ class ConfigValidator(ValidatorFieldsMixin):
         if not isinstance(outputs_raw, list):
             return
 
-        outputs = cast("List[Any]", outputs_raw)
+        outputs = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
         for output_idx, output_raw in enumerate(outputs):
-            output_dict = cast("Optional[Dict[str, Any]]", output_raw if isinstance(output_raw, dict) else None)
+            output_dict = cast(  # pragma: allow-cast yaml mapping typed narrowing
+                "Optional[Dict[str, Any]]",
+                output_raw if isinstance(output_raw, dict) else None,
+            )
             if output_dict is None:
                 continue
             container_raw: Any = output_dict.get(OUTPUT_TARGET_KEYS["container"])
-            container_dict = cast("Optional[Dict[str, Any]]", container_raw if isinstance(container_raw, dict) else None)
+            container_dict = cast(  # pragma: allow-cast yaml mapping typed narrowing
+                "Optional[Dict[str, Any]]",
+                container_raw if isinstance(container_raw, dict) else None,
+            )
             if container_dict is None:
                 continue
 
@@ -475,7 +492,10 @@ class ConfigValidator(ValidatorFieldsMixin):
                 OUTPUT_CONTAINER_KEYS["path"],
             )
             try:
-                _ = parse_init_var_mapping_node(cast("Dict[str, Any]", path_raw), path=base_path)
+                _ = parse_init_var_mapping_node(
+                    cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
+                    path=base_path,
+                )
             except (InitVarNodeValueError, InitVarNodeTypeError) as exc:
                 self._add_error(errors, exc.reason, path=exc.path)
 
@@ -514,13 +534,16 @@ class YamlValidationResult:
         }
 
 
-def _issues_to_rows(issues: Iterable[Any]) -> List[YamlValidationIssue]:
+def _issues_to_rows(issues: Iterable[ValidationIssue]) -> List[YamlValidationIssue]:
     rows: List[YamlValidationIssue] = []
     for issue in issues:
-        path = getattr(issue, "path", "") or ""
-        message = getattr(issue, "message", str(issue))
-        suggestions = list(getattr(issue, "suggestions", []) or [])
-        rows.append(YamlValidationIssue(path=path, message=message, suggestions=suggestions))
+        rows.append(
+            YamlValidationIssue(
+                path=str(issue.path or ""),
+                message=str(issue.message),
+                suggestions=list(issue.suggestions),
+            )
+        )
     return rows
 
 
@@ -554,25 +577,38 @@ def _index_yaml_node(
     if node is None:
         return
     if record_current:
-        _record_location(locations, path, getattr(node, "start_mark", None))
+        _record_location(locations, path, getattr(node, "start_mark", None))  # pragma: allow-dynattr third-party: pyyaml node.start_mark
 
     if isinstance(node, MappingNode):
         for key_node, value_node in node.value:
-            key = str(getattr(key_node, "value", ""))
+            key = str(getattr(key_node, "value", ""))  # pragma: allow-dynattr third-party: pyyaml node.value
             key_path = [*path, key]
-            _record_location(locations, key_path, getattr(key_node, "start_mark", None))
+            key_mark = getattr(key_node, "start_mark", None)  # pragma: allow-dynattr third-party: pyyaml node.start_mark
+            _record_location(
+                locations,
+                key_path,
+                key_mark,
+            )
             _index_yaml_node(value_node, key_path, locations, record_current=False)
         return
 
     if isinstance(node, SequenceNode):
         for idx, item_node in enumerate(node.value):
             idx_path = [*path, str(idx)]
-            _record_location(locations, idx_path, getattr(item_node, "start_mark", None))
+            item_mark = getattr(item_node, "start_mark", None)  # pragma: allow-dynattr third-party: pyyaml node.start_mark
+            _record_location(
+                locations,
+                idx_path,
+                item_mark,
+            )
             _index_yaml_node(item_node, idx_path, locations, record_current=False)
 
 
 def _compose_yaml_node(yaml_text: str) -> Optional[object]:
-    return cast("Optional[object]", yaml.compose(yaml_text, Loader=yaml.SafeLoader))  # pyright: ignore[reportUnknownMemberType]
+    return cast(
+        "Optional[object]",
+        yaml.compose(yaml_text, Loader=yaml.SafeLoader),  # pyright: ignore[reportUnknownMemberType]
+    )  # pragma: allow-cast pyyaml compose typed narrowing
 
 
 def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:
@@ -636,11 +672,13 @@ def attach_locations(
 
 
 def _extract_yaml_error_location(exc: Exception) -> Optional[Tuple[int, int]]:
-    mark = getattr(exc, "problem_mark", None) or getattr(exc, "context_mark", None)
+    problem_mark = getattr(exc, "problem_mark", None)  # pragma: allow-dynattr third-party: pyyaml YAMLError mark
+    context_mark = getattr(exc, "context_mark", None)  # pragma: allow-dynattr third-party: pyyaml YAMLError mark
+    mark = problem_mark or context_mark
     if mark is None:
         return None
-    line = getattr(mark, "line", None)
-    column = getattr(mark, "column", None)
+    line = getattr(mark, "line", None)  # pragma: allow-dynattr third-party: pyyaml Mark
+    column = getattr(mark, "column", None)  # pragma: allow-dynattr third-party: pyyaml Mark
     if not isinstance(line, int) or not isinstance(column, int):
         return None
     return line + 1, column + 1

@@ -150,7 +150,7 @@ class RelationIr:
             if isinstance(next_source, MainSourceRefIrBase):
                 msg = "主数据源不支持作为关联查找目标"
                 raise TypeError(msg)
-            lookup_source = cast("LookupSourceRefIrBase", next_source)
+            lookup_source = cast("LookupSourceRefIrBase", next_source)  # pragma: allow-cast lookup source typed narrowing
             if to_field == lookup_source.key.key:
                 steps.append(LookupStepIr(from_field=from_field, to_source=lookup_source))
             else:

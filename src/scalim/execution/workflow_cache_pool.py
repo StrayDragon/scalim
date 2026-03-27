@@ -2,7 +2,7 @@ import hashlib
 import json
 import threading
 from collections import OrderedDict
-from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple
+from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, overload
 
 from ..events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
@@ -48,6 +48,18 @@ def _ensure_json_like(value: object, *, path: str) -> object:
     )
 
 
+@overload
+def _normalize_json_like(value: Dict[str, object]) -> Dict[str, object]: ...
+
+
+@overload
+def _normalize_json_like(value: List[object]) -> List[object]: ...
+
+
+@overload
+def _normalize_json_like(value: object) -> object: ...
+
+
 def _normalize_json_like(value: object) -> object:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
@@ -71,9 +83,9 @@ def _canonical_json_dumps(value: object) -> str:
 
 
 def _format_callable_reference(fn: object) -> str:
-    module = str(getattr(fn, "__module__", "") or "").strip()  # pragma: allow-dynattr callable metadata fallback
-    qualname = str(getattr(fn, "__qualname__", "") or "").strip()  # pragma: allow-dynattr callable metadata fallback
-    name = str(getattr(fn, "__name__", "") or "").strip()  # pragma: allow-dynattr callable metadata fallback
+    module = str(getattr(fn, "__module__", "") or "").strip()  # pragma: allow-dynattr metadata: callable metadata
+    qualname = str(getattr(fn, "__qualname__", "") or "").strip()  # pragma: allow-dynattr metadata: callable metadata
+    name = str(getattr(fn, "__name__", "") or "").strip()  # pragma: allow-dynattr metadata: callable metadata
 
     if not module or module == "builtins":
         return qualname or name or repr(fn)
@@ -88,10 +100,10 @@ def _format_callable_reference(fn: object) -> str:
 def _lookup_cast_signature(cast_fn: object) -> Optional[Dict[str, object]]:
     if cast_fn is None:
         return None
-    name = getattr(cast_fn, "scalim_lookup_cast_name", None)  # pragma: allow-dynattr plugin cast metadata
+    name = getattr(cast_fn, "scalim_lookup_cast_name", None)  # pragma: allow-dynattr plugin: lookup cast metadata
     if isinstance(name, str) and name.strip():
         payload: Dict[str, object] = {"name": str(name)}
-        meta = getattr(cast_fn, "scalim_lookup_cast_meta", None)  # pragma: allow-dynattr plugin cast metadata
+        meta = getattr(cast_fn, "scalim_lookup_cast_meta", None)  # pragma: allow-dynattr plugin: lookup cast metadata
         if _is_dict(meta):
             for k, v in meta.items():
                 if k == "name":
@@ -146,30 +158,24 @@ def build_preload_forever_signature(source: SourceIr, *, rendered_params: Loader
     normalize_dict: Optional[Dict[str, object]] = None
     if source.normalize is not None:
         norm = source.normalize
-        normalize_payload = _ensure_json_like(
-            {
-                "kind": norm.kind,
-                "key_field": norm.key_field,
-                "on_conflict": norm.on_conflict,
-                "on_empty": norm.on_empty,
-                "on_missing": norm.on_missing,
-                "fields": [
-                    {
-                        "name": rule.name,
-                        "from_key": rule.from_key,
-                        "extract_expr": rule.extract_expr,
-                        "extract_segments": list(rule.extract_segments or ()),
-                    }
-                    for rule in norm.fields
-                ],
-            },
-            path="sources.{}.normalize".format(source.source_id),
-        )
-        normalized = _normalize_json_like(normalize_payload)
-        if not _is_dict(normalized):
-            msg = "Signature value must be JSON-like (expected dict)"
-            raise WorkflowCachePoolError(msg, path="sources.{}.normalize".format(source.source_id))
-        normalize_dict = {str(k): v for k, v in normalized.items()}
+        normalize_payload: Dict[str, object] = {
+            "kind": norm.kind,
+            "key_field": norm.key_field,
+            "on_conflict": norm.on_conflict,
+            "on_empty": norm.on_empty,
+            "on_missing": norm.on_missing,
+            "fields": [
+                {
+                    "name": rule.name,
+                    "from_key": rule.from_key,
+                    "extract_expr": rule.extract_expr,
+                    "extract_segments": list(rule.extract_segments or ()),
+                }
+                for rule in norm.fields
+            ],
+        }
+        _ = _ensure_json_like(normalize_payload, path="sources.{}.normalize".format(source.source_id))
+        normalize_dict = _normalize_json_like(normalize_payload)
 
     signature = WorkflowCacheEntrySignature(
         kind="preload_forever",
@@ -439,7 +445,7 @@ class WorkflowCachePool:
             _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
 
     def _ensure_budget_for_new_entry(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> None:
-        if self._max_entries < 1:  # pragma: no cover
+        if self._max_entries < 1:  # pragma: no cover  # pragma: allow-no-cover invariant: budget validated by config loader
             msg = "cache_pool budget.max_entries must be >= 1"
             raise WorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.max_entries")
         if len(self._entries) < self._max_entries:

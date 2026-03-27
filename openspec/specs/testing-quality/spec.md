@@ -5,7 +5,10 @@
 定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现.
 ## Related Code (as implemented)
 - `pyproject.toml` (`[tool.pytest.ini_options]` addopts/cov gate + `[tool.coverage.run]` omit)
-- `justfile` (`test`/`bench`/`schema-drift-check`/`lintfix` quality gates)
+- `justfile` (`test`/`bench`/`schema-drift-check`/`lintfix`/`check-*` quality gates)
+- `scripts/check-cast-usage.py` (`cast` 使用扫描器)
+- `scripts/check-no-cover.py` (`# pragma: no cover` 使用扫描器)
+- `scripts/check-dynattr.py` (`getattr`/`setattr`/`hasattr` 使用扫描器)
 - `tests/test_yaml_schema_generation.py` (YAML schema generation drift guard)
 - `tests/test_et_yaml_parse_regression.py` (INTEGRATION_APP YAML parse regression; parser-only, no business loaders)
 - `notebooks/marimo/demo_big_data_report/_verification.py` (demo verification logic reused by pytest)
@@ -36,6 +39,89 @@
 #### Scenario: 边缘模块被覆盖率忽略
 - **WHEN** 生成覆盖率报告
 - **THEN** `src/IMPL_ROOT/cli/**` 与 `packages/scalim-misc/**` 不参与覆盖率统计
+
+### Requirement: cast usage MUST be inventoryable by an explicit scanner
+系统 MUST 提供一个可重复运行的扫描入口,用于清点仓库中 `cast(...)` 的使用位置,并输出可审阅报告.
+
+报告 MUST 至少包含:
+- 文件路径
+- 行列位置
+- `cast` 来源摘要(例如 `typing.cast`、直接导入 `cast` 或别名)
+- 当前是否被 allow
+
+#### Scenario: scanner produces a reviewable cast baseline
+- **WHEN** 开发者运行 `uv run scripts/check-cast-usage.py --report ...`
+- **THEN** 系统 MUST 输出 `cast` 命中清单与汇总统计
+
+### Requirement: no-cover pragmas MUST be explicit and reviewable
+系统 MUST 提供一个可重复运行的扫描入口,用于清点 `# pragma: no cover` 的使用位置,并要求这些位置具备显式、局部、可审阅的理由说明.
+
+系统 MUST NOT 允许无理由的 `# pragma: no cover` 作为默认写法长期扩散.
+
+#### Scenario: scanner reports no-cover locations and justification state
+- **WHEN** 开发者运行 `uv run scripts/check-no-cover.py --report ...`
+- **THEN** 系统 MUST 输出 `# pragma: no cover` 的命中位置
+- **AND** 系统 MUST 标记该位置是否具备允许该例外的显式理由
+
+### Requirement: cast and no-cover exceptions MUST use explicit local allow markers
+系统 MUST 要求 `cast` 与 `# pragma: no cover` 的例外均通过显式注释声明,不得依赖隐式白名单或 review 口头约定.
+
+系统 SHOULD 支持与 `dynattr` 治理风格一致的局部 allow 机制,优先行级,谨慎使用文件级.
+
+#### Scenario: explicit allow suppresses a justified cast hit
+- **WHEN** 某个 `cast(...)` 调用所在行带有 `# pragma: allow-cast <reason>`
+- **THEN** 扫描器 MUST 将该命中标记为 allow
+
+#### Scenario: explicit allow marks a justified no-cover hit
+- **WHEN** 某个 `# pragma: no cover` 命中携带 `# pragma: allow-no-cover <reason>` 或等价的局部允许标记
+- **THEN** 扫描器 MUST 将该命中标记为 allow
+
+### Requirement: guardrail checks MUST be promotable into just qa
+系统 MUST 为 `cast` 与 `# pragma: no cover` 检查提供稳定的 `just` 命令入口与非零退出码模式,以便后续接入 `quick-check-only-py` / `just qa`.
+
+#### Scenario: unallowed cast or no-cover usage causes check failure
+- **WHEN** 开发者运行相应的 `check` 命令
+- **THEN** 若存在未 allow 的 `cast` 或 `# pragma: no cover` 命中,命令 MUST 失败
+
+### Requirement: dynattr usage MUST be inventoryable by an explicit scanner
+系统 MUST 提供一个可重复运行的扫描入口,用于清点 `src/IMPL_ROOT/` 中的 `getattr` / `setattr` / `hasattr` 调用,并输出可审阅的报告.
+
+报告 MUST 至少包含:
+- 文件路径
+- 行列位置
+- 调用类型
+- 属性表达式摘要
+- 当前是否被 allow
+
+#### Scenario: scanner produces a reviewable baseline report
+- **WHEN** 开发者运行 `uv run scripts/check-dynattr.py --report ...`
+- **THEN** 系统 MUST 输出 `dynattr` 命中清单与汇总统计
+
+### Requirement: dynattr exceptions MUST be explicit and local
+系统 MUST 要求所有 `dynattr` 例外均通过显式注释声明,不得依赖隐式白名单或隐藏规则.
+
+系统 MUST 支持以下两类例外:
+- 行级 `# pragma: allow-dynattr <prefix>: <detail>`
+- 文件级 `# pragma: allow-dynattr-file <prefix>: <detail>`
+
+其中 `prefix` MUST 为一组有限枚举,用于将例外原因聚类并提升可审阅性(例如: `compat` / `dispatch` / `dsl` / `introspection` / `legacy` / `metadata` / `optional-interface` / `plugin` / `third-party`).
+
+文件级例外 SHOULD 仅用于框架型、反射型、整文件动态职责明显的模块;普通业务逻辑 SHOULD 优先使用局部 allow 或重构为静态访问.
+
+#### Scenario: explicit allow suppresses only declared hits
+- **WHEN** 某个 `dynattr` 调用所在行带有 `# pragma: allow-dynattr <prefix>: <detail>`
+- **THEN** 扫描器 MUST 将该命中标记为 allow
+
+#### Scenario: file-level allow marks the file as allowed
+- **WHEN** 文件头注释区包含 `# pragma: allow-dynattr-file <prefix>: <detail>`
+- **THEN** 扫描器 MUST 将该文件内命中标记为 allow
+
+### Requirement: dynattr gate MUST be promotable into `just qa`
+系统 MUST 提供 `--check` 模式,使 `dynattr` 扫描器可在存在未 allow 命中时返回非零退出码,从而接入 `quick-check-only-py` / `just qa`.
+
+#### Scenario: unallowed dynattr causes non-zero exit
+- **WHEN** 开发者运行 `uv run scripts/check-dynattr.py --check`
+- **THEN** 若存在未 allow 的 `dynattr` 命中,命令 MUST 失败
 
 ### Requirement: 小规模数据与共享夹具
 - 非 bench 测试 MUST 使用小规模、可重复的数据集与共享 fixture,避免重复构建高成本模型.

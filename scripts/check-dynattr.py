@@ -8,10 +8,11 @@
 设计目标:
 - 为 `dynattr` 治理提供可审阅基线,默认先“报告”,再逐步收紧到 `QA` 门禁.
 - 允许对确属必要的动态场景做显式例外,避免隐式扩散:
-  - 行级: `# pragma: allow-dynattr <reason>`
-  - 文件级: `# pragma: allow-dynattr-file <reason>`
+  - 行级: `# pragma: allow-dynattr <prefix>: <detail>`
+  - 文件级: `# pragma: allow-dynattr-file <prefix>: <detail>`
+  - `prefix` 可选: `compat` / `dispatch` / `dsl` / `introspection` / `legacy` / `metadata` / `optional-interface` / `plugin` / `third-party`
 - `allow pragma` 属于治理标记;在未完成静态化重构或替代说明前,不要直接删除.
-- 输出尽量贴近重构决策: 给出位置、调用类型、属性表达式摘要和是否 `allow`.
+- 输出尽量贴近重构决策: 给出位置、调用类型、属性表达式摘要与 `allow` 理由.
 
 用法:
     `uv run scripts/check-dynattr.py`
@@ -29,7 +30,7 @@ import sys
 import tokenize
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Optional, Protocol, Sequence, cast
+from typing import Iterable, Iterator, Optional, Sequence
 
 
 _DYNATTR_ALLOW_MARK = "pragma: allow-dynattr"
@@ -38,6 +39,19 @@ _TARGET_CALLS = frozenset({"getattr", "setattr", "hasattr"})
 _DEFAULT_REL_ROOTS = (Path("src") / "scalim",)
 _DEFAULT_TEXT_REPORT_REL = Path(".tmp") / "artifacts" / "dynattr.report.txt"
 _DEFAULT_JSON_REPORT_REL = Path(".tmp") / "artifacts" / "dynattr.report.json"
+_ALLOW_REASON_PREFIXES = frozenset(
+    {
+        "compat",
+        "dispatch",
+        "dsl",
+        "introspection",
+        "legacy",
+        "metadata",
+        "optional-interface",
+        "plugin",
+        "third-party",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -50,19 +64,13 @@ class _Hit:
     call_name: str
     attr_expr: str
     status: str
+    allow_reason: str
 
 
 @dataclass(frozen=True)
 class _CommentPolicy:
-    allow_lines: frozenset[int]
-    allow_file: bool
-
-
-class _LocatedAstNode(Protocol):
-    lineno: int
-    col_offset: int
-    end_lineno: Optional[int]
-    end_col_offset: Optional[int]
+    allow_lines: dict[int, str]
+    allow_file_reason: str
 
 
 def _is_excluded(path: Path) -> bool:
@@ -123,18 +131,55 @@ def _iter_python_files(*, repo_root: Path, rel_roots: Sequence[Path]) -> Iterato
             yield path
 
 
+def _reason_after_marker(text: str, marker: str) -> str:
+    if marker not in text:
+        return ""
+    return text.split(marker, 1)[1].strip()
+
+
+def _normalize_allow_reason(reason: str) -> str:
+    """
+    `allow` 理由属于治理标记,需要可审阅且可聚类.
+
+    约定格式: `<prefix>: <detail>`
+    - `prefix` 必须在 `_ALLOW_REASON_PREFIXES` 中
+    - `detail` 不能为空
+    """
+
+    stripped = reason.strip()
+    if not stripped:
+        return ""
+    if ":" not in stripped:
+        return ""
+    prefix, detail = stripped.split(":", 1)
+    prefix = prefix.strip()
+    detail = detail.strip()
+    if prefix not in _ALLOW_REASON_PREFIXES:
+        return ""
+    if not detail:
+        return ""
+    return "{}: {}".format(prefix, detail)
+
+
 def _parse_comment_policy(source: str) -> _CommentPolicy:
-    allow_lines: set[int] = set()
-    allow_file = False
+    allow_lines: dict[int, str] = {}
+    allow_file_reason = ""
     in_header = True
 
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
         if token.type == tokenize.COMMENT:
+            line = int(token.start[0])
             stripped = token.string.lstrip("#").strip()
             if _DYNATTR_ALLOW_FILE_MARK in stripped and in_header:
-                allow_file = True
+                reason = _reason_after_marker(stripped, _DYNATTR_ALLOW_FILE_MARK)
+                normalized = _normalize_allow_reason(reason)
+                if normalized:
+                    allow_file_reason = normalized
             if _DYNATTR_ALLOW_MARK in stripped:
-                allow_lines.add(int(token.start[0]))
+                reason = _reason_after_marker(stripped, _DYNATTR_ALLOW_MARK)
+                normalized = _normalize_allow_reason(reason)
+                if normalized:
+                    allow_lines[line] = normalized
             continue
 
         if token.type in (tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER):
@@ -143,7 +188,7 @@ def _parse_comment_policy(source: str) -> _CommentPolicy:
             continue
         in_header = False
 
-    return _CommentPolicy(allow_lines=frozenset(allow_lines), allow_file=allow_file)
+    return _CommentPolicy(allow_lines=allow_lines, allow_file_reason=allow_file_reason)
 
 
 def _resolve_call_name(node: ast.Call) -> Optional[str]:
@@ -157,27 +202,33 @@ def _resolve_call_name(node: ast.Call) -> Optional[str]:
 
 
 def _node_end_line(node: ast.AST) -> int:
-    located = cast("_LocatedAstNode", node)
-    end_line = int(located.end_lineno or 0)
-    if end_line > 0:
+    end_line = getattr(node, "end_lineno", None)
+    if isinstance(end_line, int) and end_line > 0:
         return end_line
-    return int(located.lineno or 0)
+    return int(getattr(node, "lineno", 0) or 0)
 
 
 def _node_end_col(node: ast.AST) -> int:
-    located = cast("_LocatedAstNode", node)
-    end_col = int(located.end_col_offset or 0)
-    if end_col > 0:
+    end_col = getattr(node, "end_col_offset", None)
+    if isinstance(end_col, int) and end_col > 0:
         return end_col
-    return int(located.col_offset or 0)
+    return int(getattr(node, "col_offset", 0) or 0)
 
 
 def _is_allowed(*, node: ast.Call, comment_policy: _CommentPolicy) -> bool:
-    if comment_policy.allow_file:
-        return True
-    start = int(cast("_LocatedAstNode", node).lineno or 0)
+    return bool(_allow_reason_for(node=node, comment_policy=comment_policy))
+
+
+def _allow_reason_for(*, node: ast.Call, comment_policy: _CommentPolicy) -> str:
+    if comment_policy.allow_file_reason:
+        return comment_policy.allow_file_reason
+    start = int(getattr(node, "lineno", 0) or 0)
     end = _node_end_line(node)
-    return any(line in comment_policy.allow_lines for line in range(start, end + 1))
+    for line in range(start, end + 1):
+        reason = comment_policy.allow_lines.get(line, "")
+        if reason:
+            return reason
+    return ""
 
 
 def _summarize_expr(source: str, node: Optional[ast.AST]) -> str:
@@ -206,16 +257,18 @@ def _scan_file(path: Path) -> list[_Hit]:
             continue
 
         attr_node = node.args[1] if len(node.args) >= 2 else None
+        allow_reason = _allow_reason_for(node=node, comment_policy=comment_policy)
         hits.append(
             _Hit(
                 path=path,
-                line=int(cast("_LocatedAstNode", node).lineno or 0),
-                col=int(cast("_LocatedAstNode", node).col_offset or 0) + 1,
+                line=int(getattr(node, "lineno", 0) or 0),
+                col=int(getattr(node, "col_offset", 0) or 0) + 1,
                 end_line=_node_end_line(node),
                 end_col=_node_end_col(node),
                 call_name=call_name,
                 attr_expr=_summarize_expr(source, attr_node),
-                status="allow" if _is_allowed(node=node, comment_policy=comment_policy) else "block",
+                status="allow" if allow_reason else "block",
+                allow_reason=allow_reason,
             )
         )
     return sorted(hits, key=lambda item: (item.line, item.col, item.call_name, item.attr_expr))
@@ -274,8 +327,8 @@ def _render_text_report(*, repo_root: Path, hits: Sequence[_Hit]) -> str:
     lines.append("  1. 已知固定字段时,改为直接属性访问 `obj.attr`.")
     lines.append("  2. 分支已知时,改为显式 `if/elif` 或 dispatch table,不要拼接 handler 名后再 `getattr`.")
     lines.append("  3. 结构可约束时,引入 `Protocol` / dataclass / 明确接口,把字段名收敛到类型系统.")
-    lines.append("  4. 确属动态框架点时,在调用行加 `# pragma: allow-dynattr <reason>`.")
-    lines.append("  5. 文件整体必须动态时,在文件头注释区加 `# pragma: allow-dynattr-file <reason>`.")
+    lines.append("  4. 确属动态框架点时,在调用行加 `# pragma: allow-dynattr <prefix>: <detail>`.")
+    lines.append("  5. 文件整体必须动态时,在文件头注释区加 `# pragma: allow-dynattr-file <prefix>: <detail>`.")
     lines.append("  6. allow pragma 属于治理标记;未完成替代前不要直接删除.")
 
     if hits:
@@ -283,13 +336,15 @@ def _render_text_report(*, repo_root: Path, hits: Sequence[_Hit]) -> str:
         lines.append("明细:")
         for hit in hits:
             rel = hit.path.relative_to(repo_root).as_posix()
+            suffix = " reason={}".format(hit.allow_reason) if hit.allow_reason else ""
             lines.append(
-                "  [{}] {}:{}:{} {} attr={}".format(
+                "  [{}] {}:{}:{} {}{} attr={}".format(
                     hit.status.upper(),
                     rel,
                     hit.line,
                     hit.col,
                     hit.call_name,
+                    suffix,
                     hit.attr_expr,
                 )
             )
@@ -319,6 +374,7 @@ def _render_json(*, repo_root: Path, hits: Sequence[_Hit]) -> str:
                 "call_name": hit.call_name,
                 "attr_expr": hit.attr_expr,
                 "status": hit.status,
+                "allow_reason": hit.allow_reason,
             }
             for hit in hits
         ],
@@ -366,5 +422,5 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     raise SystemExit(main())

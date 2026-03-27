@@ -149,7 +149,7 @@ def main(argv: List[str]) -> int:
                 json.dumps(schedule_plan, ensure_ascii=False, indent=2, default=str) + "\n",
                 encoding="utf-8",
             )
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             print(
                 "警告: 写入 `viz_schedule_plan.json` 失败(run_id={}): {}".format(outcome.run_id, exc),
                 file=sys.stderr,

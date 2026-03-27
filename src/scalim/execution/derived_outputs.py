@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import hashlib
 from abc import ABC, abstractmethod
 from decimal import Decimal, InvalidOperation
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..typedefs import FieldValue, KeyNormalizationMode, RowData
@@ -213,7 +213,7 @@ def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields
     try:
         topo_order = graph_utils.topological_sort(node_ids, _get_derived_deps)
     except graph_utils.CyclicDependencyError as exc:
-        cycles = getattr(exc, "cycles", None) or ()
+        cycles = exc.cycles or ()
         cycle = cycles[0] if cycles else ()
         chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"
         msg = "Aggregate finalize fields has cyclic dependency: {}".format(chain)
@@ -874,7 +874,9 @@ class RankedGroupByAggregator(IRowAggregator):
                 continue
 
             post_spec = post_by_id.get(str(fid))
-            if post_spec is None:  # pragma: no cover
+            if (
+                post_spec is None
+            ):  # pragma: no cover  # pragma: allow-no-cover invariant: finalize plan ids are derived from rank/post specs
                 msg = "Unknown finalize field id: {!r}".format(fid)
                 raise ValueError(msg)
             out_key = str(post_spec.out_field_id)
@@ -887,12 +889,14 @@ class RankedGroupByAggregator(IRowAggregator):
 
         for fid in self._finalize_plan.post_top_k_ids:
             rank_spec = rank_by_id.get(str(fid))
-            if rank_spec is not None:  # pragma: no cover
+            if rank_spec is not None:  # pragma: no cover  # pragma: allow-no-cover invariant: post_top_k ids should refer to post specs
                 self._apply_rank_field(rows, rank_spec)
                 continue
 
             post_spec = post_by_id.get(str(fid))
-            if post_spec is None:  # pragma: no cover
+            if (
+                post_spec is None
+            ):  # pragma: no cover  # pragma: allow-no-cover invariant: finalize plan ids are derived from rank/post specs
                 msg = "Unknown finalize field id: {!r}".format(fid)
                 raise ValueError(msg)
             out_key = str(post_spec.out_field_id)
@@ -950,7 +954,7 @@ class RankedGroupByAggregator(IRowAggregator):
         # `None` 永远排在最后;其余尽量按数值排序(失败时回退为稳定字符串键).
         if value is None:
             return (1, 0, _ReversibleValue(_DECIMAL_ZERO, desc=False))
-        dec = _to_decimal(cast("NonNullFieldValue", value))
+        dec = _to_decimal(value)
         if dec is not None:
             return (0, 0, _ReversibleValue(dec, desc=desc))
         return (0, 1, _ReversibleValue(_stable_sort_key(value), desc=desc))
@@ -1007,7 +1011,9 @@ class _ReversibleValue:
         return hash((self.desc, self.value))
 
     def __lt__(self, other: object) -> bool:
-        if not isinstance(other, _ReversibleValue):  # pragma: no cover
+        if not isinstance(
+            other, _ReversibleValue
+        ):  # pragma: no cover  # pragma: allow-no-cover defensive: rich comparison protocol fallback
             return NotImplemented  # type: ignore[return-value]
         if isinstance(self.value, Decimal) and isinstance(other.value, Decimal):  # noqa: SIM114
             result = other.value < self.value if self.desc else self.value < other.value
@@ -1022,7 +1028,9 @@ class _ReversibleValue:
 
     @override
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, _ReversibleValue):  # pragma: no cover
+        if not isinstance(
+            other, _ReversibleValue
+        ):  # pragma: no cover  # pragma: allow-no-cover defensive: rich comparison protocol fallback
             return False
         return bool(self.desc) == bool(other.desc) and self.value == other.value
 

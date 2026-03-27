@@ -1,4 +1,5 @@
 import logging
+from abc import ABC
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple, TypeVar
 
 from ..._internal.loggingx import format_kv, prefix
@@ -40,7 +41,7 @@ _logger = logging.getLogger("scalim.hooks.base")
 _EventT = TypeVar("_EventT")
 
 
-class HookManagerEventMixin(HookManagerBase):
+class HookManagerEventMixin(HookManagerBase, ABC):
     def _safe_call(
         self,
         hook: ExecutionHookLike,

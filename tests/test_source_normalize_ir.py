@@ -225,10 +225,88 @@ def test_normalize_call_by_falls_back_when_signature_unavailable(monkeypatch: py
     assert returned == {}
 
 
+def test_normalize_call_by_fallback_supports_ctx_keyword(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scalim.spec.ir.sources as sources_module
+
+    def _raise_value_error(_: object) -> object:
+        raise ValueError("no signature")
+
+    monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+
+    def identity(result: object, *, ctx: object) -> object:
+        _ = ctx
+        return result
+
+    returned = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    assert returned == {}
+
+
+def test_normalize_call_by_fallback_does_not_swallow_type_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scalim.spec.ir.sources as sources_module
+
+    def _raise_value_error(_: object) -> object:
+        raise ValueError("no signature")
+
+    monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+
+    def boom(result: object, ctx: object) -> object:
+        _ = result
+        _ = ctx
+        raise TypeError("boom")
+
+    with pytest.raises(TypeError, match="boom"):
+        _ = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=boom)
+
+
+def test_normalize_call_by_fallback_does_not_swallow_type_error_from_ctx_keyword_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scalim.spec.ir.sources as sources_module
+
+    def _raise_value_error(_: object) -> object:
+        raise ValueError("no signature")
+
+    monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+
+    def boom_kwonly_ctx(result: object, *, ctx: object) -> object:
+        _ = result
+        _ = ctx
+        raise TypeError("boom")
+
+    with pytest.raises(TypeError, match="boom"):
+        _ = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=boom_kwonly_ctx)
+
+
+def test_normalize_call_by_works_when_positional_only_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scalim.spec.ir.sources as sources_module
+
+    parameter_cls = sources_module.inspect.Parameter
+    if not hasattr(parameter_cls, "POSITIONAL_ONLY"):
+        pytest.skip("inspect.Parameter.POSITIONAL_ONLY not available")
+
+    monkeypatch.delattr(parameter_cls, "POSITIONAL_ONLY")
+
+    def identity(result: object, *, ctx: object) -> object:
+        _ = ctx
+        return result
+
+    returned = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    assert returned == {}
+
+
 def test_normalize_call_by_accepts_varargs() -> None:
     from scalim.spec.ir.sources import _normalize_call_by
 
     def identity(*args: object) -> object:
+        return args[0]
+
+    returned = _normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    assert returned == {}
+
+
+def test_normalize_call_by_accepts_varargs_with_ctx_kwonly() -> None:
+    from scalim.spec.ir.sources import _normalize_call_by
+
+    def identity(*args: object, ctx: object) -> object:
+        _ = ctx
         return args[0]
 
     returned = _normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)

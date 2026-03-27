@@ -8,16 +8,19 @@ def extract_field(data: Any, field_key: str) -> FieldValue:
     if isinstance(data, Mapping):
         # 注意:在 `basedpyright` 中,`isinstance(data, Mapping)` 会把类型收窄为 `Mapping[Unknown, Unknown]`,
         # 从而使 `get()` 的返回值变成“部分未知”.这里我们有意将映射的键按字符串处理.
-        mapping = cast("Mapping[str, Any]", data)
-        return cast("FieldValue", mapping.get(field_key))
+        mapping = cast("Mapping[str, Any]", data)  # pragma: allow-cast mapping keys typed narrowing
+        return cast("FieldValue", mapping.get(field_key))  # pragma: allow-cast field value typed narrowing
 
     try:
-        return cast("FieldValue", object.__getattribute__(data, field_key))  # type: ignore[call-arg]
+        return cast(  # pragma: allow-cast attribute field value typed narrowing
+            "FieldValue",
+            object.__getattribute__(data, field_key),
+        )  # type: ignore[call-arg]
     except AttributeError:
         pass
 
     try:
-        return cast("FieldValue", data[field_key])
+        return cast("FieldValue", data[field_key])  # pragma: allow-cast item field value typed narrowing
     except (LookupError, TypeError):
         return None
 
@@ -36,12 +39,12 @@ def extract_field_segments(data: Any, segments: Tuple[Union[str, int], ...]) -> 
         if current is None:
             return None
         current = _extract_field_segment(current, segment)
-    return cast("FieldValue", current)
+    return cast("FieldValue", current)  # pragma: allow-cast extracted field value typed narrowing
 
 
 def _extract_field_segment(data: Any, segment: Union[str, int]) -> Any:
     if isinstance(data, Mapping):
-        mapping = cast("Mapping[Any, Any]", data)
+        mapping = cast("Mapping[Any, Any]", data)  # pragma: allow-cast mapping typed narrowing
         if segment in mapping:
             return mapping[segment]
         return None
@@ -65,7 +68,7 @@ def contains_float(value: Any) -> bool:
     if isinstance(value, float):
         return True
     if isinstance(value, (list, tuple)):
-        for item in cast("Iterable[Any]", value):
+        for item in cast("Iterable[Any]", value):  # pragma: allow-cast iterable typed narrowing
             if isinstance(item, float):
                 return True
     return False

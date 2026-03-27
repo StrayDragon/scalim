@@ -90,8 +90,7 @@ def _clone_exception_for_reraise(exc: BaseException) -> BaseException:
         return cloned
 
     try:
-        args = getattr(exc, "args", ())
-        return exc.__class__(*args)
+        return exc.__class__(*exc.args)
     except Exception:  # noqa: BLE001
         return exc
 
@@ -113,11 +112,11 @@ def _capture_owner_callsite() -> str:
     # 仅用于诊断模式: 尽量保持简短、稳定、且不包含不必要的栈深信息.
     stack = traceback.extract_stack(limit=12)
     for frame in reversed(stack[:-1]):
-        filename = str(getattr(frame, "filename", "") or "")
+        filename = str(frame.filename or "")
         if filename.endswith("resources_base.py"):
             continue
-        func = str(getattr(frame, "name", "") or "")
-        lineno = int(getattr(frame, "lineno", 0) or 0)
+        func = str(frame.name or "")
+        lineno = int(frame.lineno or 0)
         return "{}:{}:{}".format(filename, lineno, func)
     return "(unknown)"
 
@@ -375,10 +374,10 @@ class _WorkflowResourceManagerBase(ABC):
             return existing
         if error is not None:
             raise _clone_exception_for_reraise(error)
-        msg = (  # pragma: no cover
+        msg = (  # pragma: no cover  # pragma: allow-no-cover unreachable: inflight always stores plan or error
             "WorkflowResourceManager internal error: inflight done but missing plan/error for resource_id: {!r}".format(key)
         )
-        raise RuntimeError(msg)  # pragma: no cover
+        raise RuntimeError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: inflight always stores plan or error
 
     def _get_joinable_plan_owner(
         self,
@@ -548,27 +547,33 @@ class _WorkflowResourceManagerBase(ABC):
             self._discard_sheetbook(plan, workflow_node_id=str(workflow_node_id), reason=str(reason))
 
     @abstractmethod
-    def _commit_workbook(self, plan: object) -> None:  # pragma: no cover
+    def _commit_workbook(self, plan: object) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
-    def _commit_csv(self, plan: object) -> None:  # pragma: no cover
+    def _commit_csv(self, plan: object) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
-    def _commit_sheetbook(self, plan: object) -> None:  # pragma: no cover
+    def _commit_sheetbook(self, plan: object) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
-    def _discard_workbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:  # pragma: no cover
+    def _discard_workbook(
+        self, plan: object, *, workflow_node_id: str, reason: str
+    ) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
-    def _discard_csv(self, plan: object, *, workflow_node_id: str, reason: str) -> None:  # pragma: no cover
+    def _discard_csv(
+        self, plan: object, *, workflow_node_id: str, reason: str
+    ) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
-    def _discard_sheetbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:  # pragma: no cover
+    def _discard_sheetbook(
+        self, plan: object, *, workflow_node_id: str, reason: str
+    ) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
 

@@ -18,5 +18,10 @@ def test_optional_sink_import_errors(monkeypatch, module_path: str, missing_dep:
 
     with missing_optional_dependency(monkeypatch, missing_dep):
         with pytest.raises(ImportError, match=error_match):
-            importlib.reload(module)
-    importlib.reload(module)
+            if module_path == "scalim.sinks.sink_excel":
+                _ = module.ExcelSink("test.xlsx", field_names=["id"])  # type: ignore[attr-defined]
+            elif module_path == "scalim.sinks.sink_pandas":
+                sink = module.PandasRowSink()  # type: ignore[attr-defined]
+                _ = sink.to_dataframe()
+            else:
+                raise AssertionError("Unexpected module_path: {}".format(module_path))

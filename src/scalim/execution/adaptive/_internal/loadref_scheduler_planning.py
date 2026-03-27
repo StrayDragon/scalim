@@ -78,7 +78,7 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
                 raw_parts = [context.get_field_value(key, row_id) for key in from_fields]
                 if any(val is None for val in raw_parts):
                     continue
-                raw_key = cast("Hashable", tuple(raw_parts))
+                raw_key = cast("Hashable", tuple(raw_parts))  # pragma: allow-cast set key typed narrowing
                 try:
                     seen.add(raw_key)
                 except TypeError:
@@ -91,7 +91,7 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
             if raw_value is None:
                 continue
             try:
-                seen.add(cast("Hashable", raw_value))
+                seen.add(cast("Hashable", raw_value))  # pragma: allow-cast set key typed narrowing
             except TypeError:
                 continue
         return len(seen)
@@ -118,7 +118,7 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
             layer_ops,
             skipped_field_keys=skipped_field_keys,
             op_task_key=op_task_key,
-            results_by_key=cast("Dict[Tuple[str, object], object]", results_by_key),
+            results_by_key=results_by_key,
             context=context,
             runtime=runtime,
             committed_relation_keys=committed_relation_keys,

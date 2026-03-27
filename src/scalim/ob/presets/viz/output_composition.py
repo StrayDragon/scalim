@@ -1,12 +1,56 @@
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
+from ....vendor.compact.typing_extensionsx import Protocol
+
+
+class _OutputSpecLike(Protocol):
+    path: object
+    sheet_name: object
+
+
+class _ExportLayoutLike(Protocol):
+    field_ids: Iterable[str]
+
+
+class _OutputTargetNodeLike(Protocol):
+    target_id: object
+    output: Optional[_OutputSpecLike]
+    is_primary: bool
+
+
+class _OutputTargetDirectLike(_OutputTargetNodeLike, Protocol):
+    layout: Optional[_ExportLayoutLike]
+    requires: Optional[Tuple[str, ...]]
+
+
+class _DerivedSpecLike(Protocol):
+    def required_fields(self) -> Iterable[str]: ...
+
+
+class _OutputTargetDerivedLike(_OutputTargetNodeLike, Protocol):
+    derived: Optional[_DerivedSpecLike]
+    requires: Optional[Tuple[str, ...]]
+
+
+class _OutputSheetLike(Protocol):
+    target_id: object
+    output: Optional[_OutputSpecLike]
+    sheet_name: object
+
+
+class _OutputCompositionLike(Protocol):
+    targets: Iterable[_OutputTargetDirectLike]
+    derived_targets: Iterable[_OutputTargetDerivedLike]
+    meta_sheet: Optional[_OutputSheetLike]
+    audit_sheet: Optional[_OutputSheetLike]
+
 
 def _get_snapshot_node_ids(snapshot: Dict[str, Any]) -> Set[str]:
     ids: Set[str] = set()
     nodes_value = snapshot.get("nodes")
     if not isinstance(nodes_value, list):
         return ids
-    nodes = cast("List[Dict[str, Any]]", nodes_value)
+    nodes = cast("List[Dict[str, Any]]", nodes_value)  # pragma: allow-cast snapshot nodes typed narrowing
     for item in nodes:
         node_id = item.get("id")
         if node_id:
@@ -17,7 +61,7 @@ def _get_snapshot_node_ids(snapshot: Dict[str, Any]) -> Set[str]:
 def _ensure_snapshot_list(snapshot: Dict[str, Any], key: str) -> List[Dict[str, Any]]:
     value = snapshot.get(key)
     if isinstance(value, list):
-        return cast("List[Dict[str, Any]]", value)
+        return cast("List[Dict[str, Any]]", value)  # pragma: allow-cast snapshot list typed narrowing
     out: List[Dict[str, Any]] = []
     snapshot[key] = out
     return out
@@ -43,11 +87,11 @@ def _as_optional_text(value: Any) -> Optional[str]:
     return text
 
 
-def _describe_output_spec(output: Any) -> Tuple[Optional[str], Optional[str]]:
+def _describe_output_spec(output: Optional[_OutputSpecLike]) -> Tuple[Optional[str], Optional[str]]:
     if output is None:
         return None, None
-    output_path = _as_optional_text(getattr(output, "path", None))
-    sheet_name = _as_optional_text(getattr(output, "sheet_name", None))
+    output_path = _as_optional_text(output.path)
+    sheet_name = _as_optional_text(output.sheet_name)
     return output_path, sheet_name
 
 
@@ -55,14 +99,14 @@ def _append_output_target_nodes_for_targets(
     nodes: List[Dict[str, Any]],
     node_ids: Set[str],
     *,
-    targets: Iterable[Any],
+    targets: Iterable[_OutputTargetNodeLike],
     kind: str,
 ) -> None:
     for target in targets:
-        target_id = _as_optional_text(getattr(target, "target_id", None))
+        target_id = _as_optional_text(target.target_id)
         if not target_id:
             continue
-        output_path, sheet_name = _describe_output_spec(getattr(target, "output", None))
+        output_path, sheet_name = _describe_output_spec(target.output)
         _add_output_target_node(
             nodes,
             node_ids,
@@ -70,7 +114,7 @@ def _append_output_target_nodes_for_targets(
             kind=kind,
             output_path=output_path,
             sheet_name=sheet_name,
-            is_primary=bool(getattr(target, "is_primary", False)),
+            is_primary=bool(target.is_primary),
         )
 
 
@@ -78,14 +122,14 @@ def _append_output_target_node_for_sheet(
     nodes: List[Dict[str, Any]],
     node_ids: Set[str],
     *,
-    sheet: Any,
+    sheet: _OutputSheetLike,
     kind: str,
 ) -> None:
-    target_id = _as_optional_text(getattr(sheet, "target_id", None))
+    target_id = _as_optional_text(sheet.target_id)
     if not target_id:
         return
-    output_path, _sheet_name = _describe_output_spec(getattr(sheet, "output", None))
-    sheet_name = _as_optional_text(getattr(sheet, "sheet_name", None))
+    output_path, _sheet_name = _describe_output_spec(sheet.output)
+    sheet_name = _as_optional_text(sheet.sheet_name)
     _add_output_target_node(
         nodes,
         node_ids,
@@ -102,18 +146,21 @@ def _append_output_target_edges_for_direct_targets(
     edge_keys: Set[Tuple[str, str, str]],
     node_ids: Set[str],
     *,
-    targets: Iterable[Any],
+    targets: Iterable[_OutputTargetDirectLike],
 ) -> None:
     for target in targets:
-        target_id = _as_optional_text(getattr(target, "target_id", None))
+        target_id = _as_optional_text(target.target_id)
         if not target_id:
             continue
-        layout = getattr(target, "layout", None)
-        field_ids = getattr(layout, "field_ids", None) if layout is not None else None
-        if field_ids is None:
+        layout = target.layout
+        if layout is None:
             continue
-        requires = getattr(target, "requires", None)
-        for field_id in _iter_unique_field_ids(cast("Iterable[str]", field_ids), requires):
+        try:
+            field_ids = layout.field_ids
+        except AttributeError:
+            continue
+        requires = target.requires
+        for field_id in _iter_unique_field_ids(field_ids, requires):
             _maybe_add_output_target_edge(edges, edge_keys, node_ids, source_field_id=field_id, target_id=target_id)
 
 
@@ -122,18 +169,24 @@ def _append_output_target_edges_for_derived_targets(
     edge_keys: Set[Tuple[str, str, str]],
     node_ids: Set[str],
     *,
-    targets: Iterable[Any],
+    targets: Iterable[_OutputTargetDerivedLike],
 ) -> None:
     for target in targets:
-        target_id = _as_optional_text(getattr(target, "target_id", None))
+        target_id = _as_optional_text(target.target_id)
         if not target_id:
             continue
-        derived = getattr(target, "derived", None)
-        if derived is None or not hasattr(derived, "required_fields"):
+        derived = target.derived
+        if derived is None:
             continue
-        required_fields = derived.required_fields()  # type: ignore[no-any-call]
-        requires = getattr(target, "requires", None)
-        for field_id in _iter_unique_field_ids(cast("Iterable[str]", required_fields), requires):
+        try:
+            required_fields = derived.required_fields
+        except AttributeError:
+            continue
+        if not callable(required_fields):
+            continue
+        required_fields = required_fields()
+        requires = target.requires
+        for field_id in _iter_unique_field_ids(required_fields, requires):
             _maybe_add_output_target_edge(edges, edge_keys, node_ids, source_field_id=field_id, target_id=target_id)
 
 
@@ -231,7 +284,7 @@ def _maybe_add_output_target_edge(
 def augment_viz_graph_snapshot_for_output_composition(
     snapshot: Dict[str, Any],
     *,
-    output_composition: Any,
+    output_composition: _OutputCompositionLike,
 ) -> Dict[str, Any]:
     """对 `VizGraphSnapshot` 做最小增强:追加 `output_target:*` 节点与 `composed_from` 边."""
 
@@ -244,10 +297,10 @@ def augment_viz_graph_snapshot_for_output_composition(
     node_ids = _get_snapshot_node_ids(snapshot)
     edge_keys = _get_snapshot_edge_keys(edges)
 
-    targets = getattr(output_composition, "targets", None) or ()
-    derived_targets = getattr(output_composition, "derived_targets", None) or ()
-    meta_sheet = getattr(output_composition, "meta_sheet", None)
-    audit_sheet = getattr(output_composition, "audit_sheet", None)
+    targets = output_composition.targets
+    derived_targets = output_composition.derived_targets
+    meta_sheet = output_composition.meta_sheet
+    audit_sheet = output_composition.audit_sheet
 
     _append_output_target_nodes_for_targets(nodes, node_ids, targets=targets, kind="direct")
     _append_output_target_nodes_for_targets(nodes, node_ids, targets=derived_targets, kind="derived")

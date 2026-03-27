@@ -218,10 +218,10 @@ class PythonReferenceResolver:
             if attr_name.startswith("__"):
                 msg = "引用 '{}' 禁止访问双下划线属性 '{}'".format(parsed.reference, attr_name)
                 raise ResolverError(msg)
-            if not hasattr(obj, attr_name):  # pragma: allow-dynattr resolver attribute traversal
+            if not hasattr(obj, attr_name):  # pragma: allow-dynattr dsl: resolver attr traversal
                 msg = "对象 '{}' 不存在属性 '{}'".format(obj, attr_name)
                 raise ResolverError(msg)
-            obj = getattr(obj, attr_name)  # pragma: allow-dynattr resolver attribute traversal
+            obj = getattr(obj, attr_name)  # pragma: allow-dynattr dsl: resolver attr traversal
 
         if not callable(obj):
             msg = "'{}:{}' 不是可调用对象".format(parsed.module_path, ".".join(parsed.attr_path))
@@ -240,11 +240,11 @@ class PythonReferenceResolver:
 
         module = self._import_module(parsed.module_path)
 
-        if not hasattr(module, func_name):  # pragma: allow-dynattr module callable resolution
+        if not hasattr(module, func_name):  # pragma: allow-dynattr dsl: module callable resolution
             msg = "模块 '{}' 不存在属性 '{}'".format(parsed.module_path, func_name)
             raise ResolverError(msg)
 
-        obj = getattr(module, func_name)  # pragma: allow-dynattr module callable resolution
+        obj = getattr(module, func_name)  # pragma: allow-dynattr dsl: module callable resolution
         if not callable(obj):
             msg = "'{}' 不是可调用对象".format(parsed.reference)
             raise ResolverError(msg)
@@ -456,12 +456,14 @@ def derive_base_module_path(
     sys_prefix = max(candidates, key=lambda p: len(p.parts))
     rel_path = yaml_dir.relative_to(sys_prefix)
     if rel_path == Path():
-        return ""  # pragma: no cover
+        return ""  # pragma: no cover  # pragma: allow-no-cover invariant: would have matched earlier valid-prefix branch
 
     parts = [p for p in rel_path.parts if p and p != "."]
     _validate_module_parts(parts=parts, raw_yaml_path=raw_yaml_path, yaml_dir=yaml_dir, prefix=sys_prefix)
 
-    return ".".join(parts)  # pragma: no cover
+    return ".".join(
+        parts
+    )  # pragma: no cover  # pragma: allow-no-cover invariant: valid parts would have matched earlier valid-prefix branch
 
 
 def _normalize_sys_path_entry(entry: Optional[str], *, cwd_path: Path) -> Optional[Path]:

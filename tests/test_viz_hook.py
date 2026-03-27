@@ -513,6 +513,7 @@ def test_viz_output_composition_snapshot_helpers_cover_branches() -> None:
         targets=[
             SimpleNamespace(target_id=None),
             SimpleNamespace(target_id="t_skip_layout", layout=None, requires=None),
+            SimpleNamespace(target_id="t_skip_field_ids", layout=SimpleNamespace(), requires=None),
             SimpleNamespace(target_id="t3", layout=ExportLayout(field_ids=("a",)), requires=("b",)),
         ],
     )
@@ -536,6 +537,7 @@ def test_viz_output_composition_snapshot_helpers_cover_branches() -> None:
             SimpleNamespace(target_id=None),
             SimpleNamespace(target_id="d_none", derived=None, requires=None),
             SimpleNamespace(target_id="d_no_method", derived=SimpleNamespace(), requires=None),
+            SimpleNamespace(target_id="d_not_callable", derived=SimpleNamespace(required_fields="nope"), requires=None),
             SimpleNamespace(target_id="d_ok", derived=DummyDerived(["x", "y"]), requires=("z",)),
         ],
     )

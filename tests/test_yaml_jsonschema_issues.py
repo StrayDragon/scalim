@@ -118,3 +118,36 @@ def test_collect_jsonschema_validation_issues_error_cases_and_context_collection
         "Schema validation error: root",
         "↳ ctx kept",
     ]
+
+    # 兼容分支: jsonschema error 对象缺少部分常见属性时,仍应给出稳定输出.
+    class _AttrLessError:
+        def __str__(self) -> str:
+            return "fallback"
+
+    class _AttrLessJsonSchema:
+        class Draft7Validator:
+            def __init__(self, _schema: object) -> None:
+                self._ = _schema
+
+            def iter_errors(self, _data: object):
+                return [_AttrLessError()]
+
+    collected = issues_mod.collect_jsonschema_validation_issues(
+        {"x": 1},
+        {"type": "object"},
+        jsonschema_module=_AttrLessJsonSchema,
+        include_context=True,
+        filter_additional_properties=True,
+    )
+    assert [issue.message for issue in collected] == ["Schema validation error: fallback"]
+    assert [issue.path for issue in collected] == [""]
+
+
+def test_absolute_path_fallback_handles_non_iterable_absolute_path() -> None:
+    class _DummyError:
+        def __init__(self) -> None:
+            self.absolute_path = 123
+
+    err = _DummyError()
+    assert issues_mod._absolute_path(err) == ("123",)  # noqa: SLF001
+    assert issues_mod._format_error_path(err) == "123"  # noqa: SLF001

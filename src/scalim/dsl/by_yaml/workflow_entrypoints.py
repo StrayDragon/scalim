@@ -7,9 +7,11 @@
 """
 
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, Union
 
 from ...execution.run_ir import ExecutionResult
+from ...typedefs import KeyNormalizationMode, ParallelMode
+from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import replace
 from ...workflow.errors import WorkflowConfigError as WorkflowRuntimeConfigError
 from ...workflow.execute import WorkflowRunFailedError
@@ -17,29 +19,48 @@ from ...workflow.execute import run_workflow_ir as _run_workflow_ir
 from ...workflow.report import WorkflowResult
 from ._public_template_sandbox import validate_public_template_sandbox
 from .runtime.compiler import compile as _compile_demand_default
-from .runtime.contracts import UNSET, RunOptions, RunOverrides, RunResult
+from .runtime.contracts import RunOptions, RunOverrides, RunResult, UnsetType
 from .runtime.output_composition_yaml import PathlessCsvOutputError
 from .runtime.output_path_resolve import resolve_output_container_path
+from .schema_dsl.models import DemandConfig
 from .workflow import WorkflowConfigError
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
 from .workflow_load import load_workflow_config_from_path
 
+_WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = "workflow bundle viz requires run_workflow(..., overrides=RunOverrides(viz_config=...))"
 
-def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Optional[object]:
+if TYPE_CHECKING:
+    from ...execution.guardrails import GuardrailsPolicy
+    from ...execution.loader_retry import LoaderRetryPoliciesSpec
+    from ...hooks.base import IExecutionHook
+    from ...ob.observer import Observer
+    from ...ob.presets.viz import VizObserverConfig
+
+
+class _CompilationLike(Protocol):
+    @property
+    def config(self) -> DemandConfig: ...
+
+
+def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Optional["VizObserverConfig"]:
     # 工作流 `bundle` 可视化: 通过 `run_workflow(..., overrides=RunOverrides(viz_config=...))` 显式启用.
-    bundle_viz_base_config: Optional[object] = None
-    if overrides is not None and overrides.viz_config is not UNSET:
-        viz_override = cast("Any", overrides.viz_config)
-        if viz_override is not None:
-            bundle_viz_base_config = viz_override
-            if getattr(bundle_viz_base_config, "has_explicit_paths", lambda: False)():
-                msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`(请勿设置 `output_path`/`snapshot_path`/`trace_path`)."
-                raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
-            output_dir = getattr(bundle_viz_base_config, "output_dir", None)
-            use_default_output_dir = bool(getattr(bundle_viz_base_config, "use_default_output_dir", False))
-            if not output_dir and not use_default_output_dir:
-                msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`, 或设置 `use_default_output_dir=True`."
-                raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+    if overrides is None:
+        return None
+    viz_config = overrides.viz_config
+    if viz_config is None or isinstance(viz_config, UnsetType):
+        return None
+
+    bundle_viz_base_config: "VizObserverConfig" = viz_config
+    if getattr(bundle_viz_base_config, "has_explicit_paths", lambda: False)():  # pragma: allow-dynattr optional-interface: viz_config
+        msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`(请勿设置 `output_path`/`snapshot_path`/`trace_path`)."
+        raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+    output_dir = getattr(bundle_viz_base_config, "output_dir", None)  # pragma: allow-dynattr optional-interface: viz_config
+    use_default_output_dir = bool(
+        getattr(bundle_viz_base_config, "use_default_output_dir", False)  # pragma: allow-dynattr optional-interface: viz_config
+    )
+    if not output_dir and not use_default_output_dir:
+        msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`, 或设置 `use_default_output_dir=True`."
+        raise WorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
     return bundle_viz_base_config
 
 
@@ -48,21 +69,21 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
     *,
     allowed_modules: FrozenSet[str],
     allowed_functions: Optional[FrozenSet[str]] = None,
-    components: Optional[List[object]] = None,
+    components: Optional[List[Union["Observer", "IExecutionHook"]]] = None,
     overrides: Optional[RunOverrides] = None,
-    guardrails: Optional[object] = None,
-    loader_retry: Optional[object] = None,
+    guardrails: Optional["GuardrailsPolicy"] = None,
+    loader_retry: Optional["LoaderRetryPoliciesSpec"] = None,
     batch_size: Optional[int] = None,
-    parallel_mode: str = "seq",
+    parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
-    key_normalization: str = "raw",
+    key_normalization: KeyNormalizationMode = "raw",
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     path_aliases: Optional[Mapping[str, str]] = None,
     run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
-    compile_demand_yaml_fn: Optional[Callable[..., object]] = None,
+    compile_demand_yaml_fn: Optional[Callable[..., _CompilationLike]] = None,
 ) -> WorkflowResult:
     template_sandbox = validate_public_template_sandbox(template_sandbox)
     # 1) 加载并编译 `workflow` `YAML` -> `IR`(`DSL` 层)
@@ -96,15 +117,15 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
     base_options = RunOptions(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
-        components=cast("Any", components),
+        components=components,
         sink=None,
         overrides=overrides,
-        guardrails=cast("Any", guardrails),
-        loader_retry=cast("Any", loader_retry),
+        guardrails=guardrails,
+        loader_retry=loader_retry,
         batch_size=batch_size,
-        parallel_mode=cast("Any", parallel_mode),
+        parallel_mode=parallel_mode,
         max_workers=int(max_workers),
-        key_normalization=cast("Any", key_normalization),
+        key_normalization=key_normalization,
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
@@ -113,9 +134,9 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
 
     reserved_xlsx_paths: Set[str] = set()
     for res in workflow_ir.resources:
-        if str(getattr(res, "resource_type", "")) not in {"workbook", "sheetbook"}:
+        if str(res.resource_type or "") not in {"workbook", "sheetbook"}:
             continue
-        res_path = str(getattr(res, "path", "") or "").strip()
+        res_path = str(res.path or "").strip()
         if not res_path:
             continue
         reserved_xlsx_paths.add(str(Path(res_path).expanduser().resolve(strict=False)))
@@ -124,18 +145,18 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
     def _as_abs_path(raw_path: str) -> str:
         return str(Path(str(raw_path)).expanduser().resolve(strict=False))
 
-    def _collect_workbook_output_paths(cfg: object, *, init_vars: Optional[Dict[str, object]]) -> Set[str]:
+    def _collect_workbook_output_paths(cfg: Any, *, init_vars: Optional[Dict[str, object]]) -> Set[str]:
         raw_paths: Set[str] = set()
 
         default_workbook_path: Optional[str] = None
-        for idx, out_cfg in enumerate(getattr(cfg, "outputs", ()) or ()):
-            container = getattr(out_cfg, "container", None)
+        for idx, out_cfg in enumerate(cfg.outputs or ()):
+            container = out_cfg.container
             if container is None:
-                continue  # pragma: no cover
-            if str(getattr(container, "type", "") or "").lower() != "workbook":
+                continue  # pragma: no cover  # pragma: allow-no-cover invariant: container should exist for workbook outputs
+            if str(container.type or "").lower() != "workbook":
                 continue
             path_str = resolve_output_container_path(
-                getattr(container, "path", None),
+                container.path,
                 init_vars=init_vars,
                 path="outputs.{}.container.path".format(int(idx)),
             )
@@ -143,10 +164,10 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
             if default_workbook_path is None:
                 default_workbook_path = path_str
 
-        for extra in (getattr(cfg, "meta", None), getattr(cfg, "audit", None)):
+        for extra in (cfg.meta, cfg.audit):
             if extra is None:
                 continue
-            p = str(getattr(extra, "path", "") or "").strip()
+            p = str(extra.path or "").strip()
             if p:
                 raw_paths.add(p)
             elif default_workbook_path:
@@ -186,7 +207,9 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
             if existing is None:
                 workbook_writers_by_abs_path[abs_path] = [str(run_id)]
 
-    compile_demand_yaml_fn = compile_demand_yaml_fn or _compile_demand_default
+    if compile_demand_yaml_fn is None:
+        compile_demand_yaml_fn = _compile_demand_default
+    compile_demand = compile_demand_yaml_fn
 
     def _compile_demand_node(
         demand_path: str,
@@ -196,8 +219,8 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         workflow_node_decl_order: int,
         node_init_vars: Dict[str, object],
         managed_output_ids: Optional[FrozenSet[str]],
-        viz_config: Optional[object],
-    ) -> object:
+        viz_config: Optional["VizObserverConfig"],
+    ) -> _CompilationLike:
         _ = workflow_exec_id, workflow_node_decl_order
         node_options = base_options
         if node_init_vars:
@@ -206,40 +229,44 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
             node_options = replace(node_options, init_vars=merged)
 
         if viz_config is not None:
-            base_overrides = cast("Any", node_options.overrides)
+            base_overrides = node_options.overrides
             if base_overrides is None:
-                msg = "workflow bundle viz requires run_workflow(..., overrides=RunOverrides(viz_config=...))"  # pragma: no cover
-                raise WorkflowRuntimeConfigError(msg, path="run_workflow.overrides.viz_config")  # pragma: no cover
-            base_overrides = replace(cast("RunOverrides", base_overrides), viz_config=viz_config)
+                raise WorkflowRuntimeConfigError(
+                    _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG,
+                    path="run_workflow.overrides.viz_config",
+                )  # pragma: no cover  # pragma: allow-no-cover invariant: viz_config requires overrides
+            base_overrides = replace(
+                base_overrides,
+                viz_config=viz_config,
+            )
             node_options = replace(node_options, overrides=base_overrides)
 
         if managed_output_ids:
             node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
 
         try:
-            compilation = compile_demand_yaml_fn(str(demand_path), options=node_options)
+            compilation = compile_demand(str(demand_path), options=node_options)
         except PathlessCsvOutputError as exc:
             msg = "run_id={!r}: {}".format(str(workflow_node_id), str(exc))
             raise WorkflowRuntimeConfigError(msg, path=str(exc.config_path)) from exc
 
         _precheck_and_register_workbook_output_paths(
             run_id=str(workflow_node_id),
-            demand_config=getattr(compilation, "config", None),
-            init_vars=getattr(node_options, "init_vars", None),
+            demand_config=compilation.config,
+            init_vars=node_options.init_vars,
         )
         return compilation
 
     def _build_demand_run_result(
         core: ExecutionResult,
         *,
-        compilation: object,
+        compilation: _CompilationLike,
         demand_yaml_path: str,
         workflow_exec_id: str,
         workflow_node_id: str,
     ) -> object:
         _ = workflow_exec_id, workflow_node_id
-        comp = cast("Any", compilation)
-        return RunResult(core, config=comp.config, yaml_path=str(demand_yaml_path), sink=None)
+        return RunResult(core, config=compilation.config, yaml_path=str(demand_yaml_path), sink=None)
 
     # 5) 执行 `workflow` `IR`(框架层)
     try:
@@ -250,13 +277,13 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
             build_demand_run_result_fn=_build_demand_run_result,
             run_ir_fn=run_ir_fn,
             components=components,
-            bundle_viz_base_config=cast("Any", bundle_viz_base_config),
+            bundle_viz_base_config=bundle_viz_base_config,
             cache_pool_logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
             cache_pool_consumers_by_logical_key=cache_pool_consumers_by_logical_key,
         )
     except WorkflowRuntimeConfigError as exc:
         # 将框架层 `WorkflowConfigError` 回写为 `DSL` 层错误类型(保持对外契约).
-        path = str(getattr(exc, "path", "") or "")
+        path = str(exc.path or "")
         msg = str(exc)
         if path:
             suffix = " (path={})".format(path)

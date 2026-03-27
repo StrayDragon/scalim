@@ -19,9 +19,10 @@ else:
 
 from ..dsl.by_yaml.config_parsing.imports import YamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from ..dsl.by_yaml.config_parsing.jsonschema_issues import JsonSchemaCollectorError, collect_jsonschema_validation_issues
-from ..dsl.by_yaml.config_parsing.unknown_fields import find_unknown_fields
+from ..dsl.by_yaml.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
 from ..dsl.by_yaml.config_parsing.validator import ConfigValidator, attach_locations, build_yaml_location_index
 from ..dsl.by_yaml.config_parsing.validator import YamlValidationIssue as Issue
+from ..dsl.by_yaml.config_parsing.validators.issues import ValidationIssue
 from ..dsl.by_yaml.workflow_config import load_workflow_config
 from ..dsl.by_yaml.workflow_paths import resolve_workflow_demand_path
 from ..dsl.by_yaml.workflow_types import (
@@ -241,19 +242,21 @@ def _find_legacy_field_errors(yaml_data: Dict[str, Any]) -> List[Issue]:
 
     sources = yaml_data.get("sources", {})
     if isinstance(sources, dict):
-        sources_dict = cast("Dict[str, Any]", sources)
+        sources_dict = cast("Dict[str, Any]", sources)  # pragma: allow-cast yaml mapping typed narrowing for legacy field scan
         for source_id, source_data in sources_dict.items():
             if not isinstance(source_data, dict):
                 continue
-            _collect_legacy_fields(errors, cast("Dict[str, Any]", source_data), "sources.{}".format(source_id))
+            source_data_dict = cast("Dict[str, Any]", source_data)  # pragma: allow-cast yaml mapping typed narrowing for legacy field scan
+            _collect_legacy_fields(errors, source_data_dict, "sources.{}".format(source_id))
 
     fields = yaml_data.get("fields", {})
     if isinstance(fields, dict):
-        fields_dict = cast("Dict[str, Any]", fields)
+        fields_dict = cast("Dict[str, Any]", fields)  # pragma: allow-cast yaml mapping typed narrowing for legacy field scan
         for field_id, field_data in fields_dict.items():
             if not isinstance(field_data, dict):
                 continue
-            _collect_legacy_fields(errors, cast("Dict[str, Any]", field_data), "fields.{}".format(field_id))
+            field_data_dict = cast("Dict[str, Any]", field_data)  # pragma: allow-cast yaml mapping typed narrowing for legacy field scan
+            _collect_legacy_fields(errors, field_data_dict, "fields.{}".format(field_id))
 
     return errors
 
@@ -266,13 +269,19 @@ def _collect_legacy_fields(errors: List[Issue], data: Dict[str, Any], prefix: Op
         errors.append(Issue(path=path, message="Legacy field '{}' is not allowed".format(key)))
 
 
-def _issues_to_rows(issues: Iterable[Any]) -> List[Issue]:
+def _issues_to_rows(issues: Iterable[object]) -> List[Issue]:
     rows: List[Issue] = []
     for issue in issues:
-        path = getattr(issue, "path", "") or ""
-        message = getattr(issue, "message", str(issue))
-        suggestions = list(getattr(issue, "suggestions", []) or [])
-        rows.append(Issue(path=path, message=message, suggestions=suggestions))
+        if isinstance(issue, Issue):
+            rows.append(issue)
+            continue
+        if isinstance(issue, ValidationIssue):
+            rows.append(Issue(path=issue.path, message=issue.message, suggestions=list(issue.suggestions)))
+            continue
+        if isinstance(issue, UnknownFieldIssue):
+            rows.append(Issue(path=issue.path, message=issue.message, suggestions=list(issue.suggestions)))
+            continue
+        rows.append(Issue(path="", message=str(issue)))
     return rows
 
 
@@ -423,12 +432,25 @@ def _read_yaml_or_error(
     return yaml_data, 0
 
 
-def _extract_yaml_error_location(exc: Exception) -> Optional[Tuple[int, int]]:
-    mark = getattr(exc, "problem_mark", None) or getattr(exc, "context_mark", None)
+def _extract_yaml_error_location(exc: Any) -> Optional[Tuple[int, int]]:
+    mark = None
+    try:
+        mark = exc.problem_mark
+    except AttributeError:
+        mark = None
+    if mark is None:
+        try:
+            mark = exc.context_mark
+        except AttributeError:
+            mark = None
     if mark is None:
         return None
-    line = getattr(mark, "line", None)
-    column = getattr(mark, "column", None)
+
+    try:
+        line = mark.line
+        column = mark.column
+    except AttributeError:
+        return None
     if not isinstance(line, int) or not isinstance(column, int):
         return None
     return line + 1, column + 1
@@ -491,10 +513,11 @@ def _extract_demand_outputs(yaml_data: Optional[Dict[str, Any]]) -> Set[str]:
     if not isinstance(outputs_raw, list):
         return set()
     output_ids: Set[str] = set()
-    for item in cast("List[Any]", outputs_raw):
+    for item in cast("List[Any]", outputs_raw):  # pragma: allow-cast yaml outputs typed narrowing
         if not isinstance(item, dict):
             continue
-        name_raw = cast("Dict[str, Any]", item).get("name")
+        item_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml outputs typed narrowing
+        name_raw = item_dict.get("name")
         if not isinstance(name_raw, str):
             continue
         name = str(name_raw or "").strip()
@@ -577,7 +600,7 @@ def _validate_demand_yaml_text(
             source_lines,
         )
 
-    yaml_data_dict = cast("Dict[str, Any]", yaml_data)
+    yaml_data_dict = cast("Dict[str, Any]", yaml_data)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
     locations = build_yaml_location_index(yaml_text)
 
     try:
@@ -675,19 +698,20 @@ def _validate_demand_yaml_path(
 def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0915
     yaml_path = args.yaml_file.resolve()
     schema_path = _resolve_schema_path(args.schema)
-    yaml_type = str(getattr(args, "yaml_type", "auto") or "auto").strip()
+    args_dict = vars(args)
+    yaml_type = str(args_dict.get("yaml_type", "auto") or "auto").strip()
     if yaml_type == "auto":
         try:
             yaml_text = yaml_path.read_text(encoding="utf-8")
         except Exception:  # noqa: BLE001
             yaml_text = ""
         yaml_type = _infer_yaml_type(yaml_text)
-    raw_aliases = cast("List[str]", list(getattr(args, "path_aliases", []) or []))
+    raw_aliases = list(args_dict.get("path_aliases", []) or [])
     path_aliases, alias_error = _parse_path_aliases(raw_aliases)
     if alias_error is not None:
         _emit_error(alias_error, json_output=bool(args.json), yaml_path=yaml_path, schema_path=schema_path, mode="validate")
         return 1
-    allowed_yaml_roots = cast("List[Path]", list(getattr(args, "allowed_yaml_roots", []) or []))
+    allowed_yaml_roots = list(args_dict.get("allowed_yaml_roots", []) or [])
 
     if not schema_path.exists():
         _emit_error(
@@ -790,7 +814,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                 if outputs is None:
                     continue
                 for write_idx, intent in enumerate(run.writes):
-                    output_id = str(getattr(intent, "output", "") or "")
+                    output_id = str(intent.output or "")
                     if output_id in outputs:
                         continue
                     kind = _intent_kind(intent)
@@ -905,7 +929,7 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
         errors = [Issue(path="(root)", message="YAML root must be a mapping")]
         return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=None)
 
-    yaml_data_dict = cast("Dict[str, Any]", yaml_data)
+    yaml_data_dict = cast("Dict[str, Any]", yaml_data)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
     try:
         if contains_import_syntax(yaml_data_dict):
             _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
@@ -1059,9 +1083,10 @@ def _run_schema_path(_args: argparse.Namespace) -> int:
 
 
 def _run_upsert_lsp_comment(args: argparse.Namespace) -> int:
-    schema_type = str(getattr(args, "schema_type", yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE) or yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE)
-    schema_path = str(getattr(args, "schema_path", yaml_dsl_lsp.DEFAULT_SCHEMA_PATH) or yaml_dsl_lsp.DEFAULT_SCHEMA_PATH)
-    comment_style = str(getattr(args, "comment_style", yaml_dsl_lsp.DEFAULT_COMMENT_STYLE) or yaml_dsl_lsp.DEFAULT_COMMENT_STYLE).strip()
+    args_dict = vars(args)
+    schema_type = str(args_dict.get("schema_type", yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE) or yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE)
+    schema_path = str(args_dict.get("schema_path", yaml_dsl_lsp.DEFAULT_SCHEMA_PATH) or yaml_dsl_lsp.DEFAULT_SCHEMA_PATH)
+    comment_style = str(args_dict.get("comment_style", yaml_dsl_lsp.DEFAULT_COMMENT_STYLE) or yaml_dsl_lsp.DEFAULT_COMMENT_STYLE).strip()
 
     try:
         schema_ref = yaml_dsl_lsp.resolve_schema_ref(schema_type, schema_path)
@@ -1079,7 +1104,7 @@ def _run_upsert_lsp_comment(args: argparse.Namespace) -> int:
     changed: List[Path] = []
     unchanged: List[Path] = []
 
-    paths = cast("List[Path]", list(getattr(args, "paths", []) or []))
+    paths = list(args_dict.get("paths", []) or [])
     for raw_path in paths:
         path = raw_path
         if not path.exists():

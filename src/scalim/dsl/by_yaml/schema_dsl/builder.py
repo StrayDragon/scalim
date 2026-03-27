@@ -130,7 +130,9 @@ class SchemaBuilder:
         }
         if "markdownDescription" in types_mod.DEMAND_SCHEMA_META:
             schema["markdownDescription"] = types_mod.DEMAND_SCHEMA_META["markdownDescription"]
-        additional_props = getattr(types_mod.DemandConfig, "SCHEMA_ADDITIONAL_PROPERTIES", None)
+        additional_props = getattr(
+            types_mod.DemandConfig, "SCHEMA_ADDITIONAL_PROPERTIES", None
+        )  # pragma: allow-dynattr metadata: schema meta
         if additional_props is not None:
             schema["additionalProperties"] = bool(additional_props)
         return schema
@@ -692,16 +694,16 @@ class SchemaBuilder:
             "properties": properties,
         }
 
-        required = getattr(cls, "SCHEMA_REQUIRED", ())
+        required = getattr(cls, "SCHEMA_REQUIRED", ())  # pragma: allow-dynattr metadata: schema meta
         if required:
             # `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
             schema["anyOf"] = [{"required": list(required)}, {"required": [_IMPORT_KEY]}]
 
-        additional_props = getattr(cls, "SCHEMA_ADDITIONAL_PROPERTIES", None)
+        additional_props = getattr(cls, "SCHEMA_ADDITIONAL_PROPERTIES", None)  # pragma: allow-dynattr metadata: schema meta
         if additional_props is not None:
             schema["additionalProperties"] = bool(additional_props)
 
-        all_of = getattr(cls, "SCHEMA_ALL_OF", None)
+        all_of = getattr(cls, "SCHEMA_ALL_OF", None)  # pragma: allow-dynattr metadata: schema meta
         if all_of is not None:
             schema["allOf"] = copy.deepcopy(all_of)
 
@@ -792,7 +794,7 @@ class SchemaBuilder:
             expanded["allOf"] = [{"$ref": "#/definitions/{}".format(ref_name)}]
             return expanded
         if "schema" in meta_payload:
-            schema = cast("Dict[str, Any]", copy.deepcopy(meta_payload.pop("schema")))
+            schema = cast("Dict[str, Any]", copy.deepcopy(meta_payload.pop("schema")))  # pragma: allow-cast meta schema typed narrowing
             schema.update(self._expand_meta(meta_payload))
             return schema
 
@@ -805,16 +807,16 @@ class SchemaBuilder:
 
     def normalize_schema(self, value: Any, key: str = "") -> Any:
         if isinstance(value, dict):
-            typed = cast("Dict[str, Any]", value)
+            typed = cast("Dict[str, Any]", value)  # pragma: allow-cast yaml mapping typed narrowing
             return {k: self.normalize_schema(v, k) for k, v in typed.items() if k not in self.IGNORED_KEYS}
         if isinstance(value, list):
-            items = cast("List[Any]", value)
+            items = cast("List[Any]", value)  # pragma: allow-cast yaml list typed narrowing
             normalized = [self.normalize_schema(item) for item in items]
             if key in self.ORDER_INSENSITIVE_KEYS:
                 return sorted(normalized, key=self._sort_key)
             return normalized
         if isinstance(value, tuple):
-            items = cast("Tuple[Any, ...]", value)
+            items = cast("Tuple[Any, ...]", value)  # pragma: allow-cast yaml tuple typed narrowing
             return self.normalize_schema(list(items), key)
         return value
 
@@ -837,7 +839,7 @@ class SchemaBuilder:
             if "items" not in expanded:
                 expanded["items"] = {}
             if isinstance(expanded["items"], dict):
-                items_schema = cast("Dict[str, Any]", expanded["items"])
+                items_schema = cast("Dict[str, Any]", expanded["items"])  # pragma: allow-cast schema expansion typed narrowing
                 items_schema["enum"] = copy.deepcopy(items_choices)
 
         if "examples" in expanded and not isinstance(expanded["examples"], list):
@@ -854,7 +856,7 @@ class SchemaBuilder:
 
     def _schema_for_type(self, tp: Any) -> Dict[str, Any]:
         tp = self._strip_optional(tp)
-        origin = getattr(tp, "__origin__", None)
+        origin = getattr(tp, "__origin__", None)  # pragma: allow-dynattr introspection: __origin__
         primitive = self._primitive_schema(tp)
         if primitive:
             return primitive
@@ -870,9 +872,9 @@ class SchemaBuilder:
         return {}
 
     def _strip_optional(self, tp: Any) -> Any:
-        origin = getattr(tp, "__origin__", None)
+        origin = getattr(tp, "__origin__", None)  # pragma: allow-dynattr introspection: __origin__
         if origin is Union:
-            args = [arg for arg in getattr(tp, "__args__", ()) if arg is not type(None)]
+            args = [arg for arg in getattr(tp, "__args__", ()) if arg is not type(None)]  # pragma: allow-dynattr introspection: __args__
             if len(args) == 1:
                 return args[0]
         return tp
@@ -884,7 +886,7 @@ class SchemaBuilder:
 
     def _container_schema(self, tp: Any, origin: Any) -> Dict[str, Any]:
         if origin is list or tp is list:
-            args = getattr(tp, "__args__", ())
+            args = getattr(tp, "__args__", ())  # pragma: allow-dynattr introspection: __args__
             item_type = args[0] if args else object
             return {"type": "array", "items": self._schema_for_type(item_type)}
 
@@ -897,7 +899,8 @@ class SchemaBuilder:
         return {}
 
     def _tuple_schema(self, tp: Any) -> Dict[str, Any]:
-        args = cast("Tuple[Any, ...]", getattr(tp, "__args__", ()))
+        raw_args = getattr(tp, "__args__", ())  # pragma: allow-dynattr introspection: __args__
+        args = cast("Tuple[Any, ...]", raw_args)  # pragma: allow-cast typing args typed narrowing
         if len(args) == self.ELLIPSIS_TUPLE_LEN and args[1] is Ellipsis:
             return {"type": "array", "items": self._schema_for_type(args[0])}
 
@@ -915,7 +918,7 @@ class SchemaBuilder:
 
     def _ref_schema(self, tp: Any) -> Dict[str, Any]:
         if isinstance(tp, type):
-            schema_name = getattr(tp, "SCHEMA_NAME", None)
+            schema_name = getattr(tp, "SCHEMA_NAME", None)  # pragma: allow-dynattr metadata: schema meta
             if isinstance(schema_name, str):
                 return {"$ref": "#/definitions/{}".format(schema_name)}
         return {}

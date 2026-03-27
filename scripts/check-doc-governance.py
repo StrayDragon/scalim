@@ -31,13 +31,13 @@ def _check_claude_symlink(root: Path) -> list[str]:
 
     try:
         resolved = claude.resolve()
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         return ["failed to resolve `CLAUDE.md` symlink: {}".format(exc)]
 
     if resolved != agents.resolve():
         try:
             raw = claude.readlink()
-        except Exception:  # pragma: no cover
+        except Exception:
             raw = None
         hint = " (readlink={!r})".format(str(raw)) if raw is not None else ""
         return ["`CLAUDE.md` MUST point to `AGENTS.md`{}.".format(hint)]

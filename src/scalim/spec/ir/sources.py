@@ -1,9 +1,10 @@
 import inspect
 from collections.abc import Hashable, Mapping
 from typing import Any, Callable, Dict, FrozenSet, Optional, Sequence, Tuple, Union, cast
+from typing import Mapping as TypingMapping
 
 from ...typedefs import LoaderResultMap, LoaderResultMapping, SourceSpecIrCacheMode, StaticParams
-from ...vendor.compact.typing_extensionsx import override
+from ...vendor.compact.typing_extensionsx import TypeGuard, override
 from ...vendor.dataclassesx import dataclass, field
 from .aliases import LookupKeyCast, MainSourceRowIterableCallable, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
@@ -54,6 +55,22 @@ class NormalizeCallByContext:
 NormalizeCallByFn = Callable[..., object]
 
 _CALL_BY_CTX_POSITIONAL_ARGC = 2
+
+
+def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+    return isinstance(value, (list, tuple))
+
+
+def _is_mapping(value: object) -> TypeGuard[TypingMapping[object, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_hashable_mapping(value: object) -> TypeGuard[TypingMapping[Hashable, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_str_mapping(value: object) -> TypeGuard[TypingMapping[str, object]]:
+    return isinstance(value, Mapping)
 
 
 @dataclass(frozen=True)
@@ -174,11 +191,11 @@ def _normalize_call_by(
     call_by: NormalizeCallByFn,
 ) -> LoaderResultMapping:
     config_path = "sources.{}.normalize.call_by".format(source_id)
-    if not isinstance(result, Mapping):
+    if not _is_mapping(result):
         msg = "Source '{}' normalize.call_by expected Mapping input at '{}', got '{}'".format(source_id, config_path, type(result).__name__)
         raise TypeError(msg)
 
-    result_mapping = cast("Mapping[object, object]", result)
+    result_mapping = result
     ctx = NormalizeCallByContext(source_id=source_id, kind=kind, config_path=config_path)
     try:
         returned = _call_normalize_call_by(call_by, result_mapping, ctx)
@@ -189,41 +206,87 @@ def _normalize_call_by(
     if not isinstance(returned, Mapping):
         msg = "Source '{}' normalize.call_by must return Mapping at '{}', got '{}'".format(source_id, config_path, type(returned).__name__)
         raise TypeError(msg)
-    return cast("LoaderResultMapping", returned)
+    return cast("LoaderResultMapping", returned)  # pragma: allow-cast normalize.call_by return typed narrowing
 
 
 def _call_normalize_call_by(fn: NormalizeCallByFn, result: object, ctx: NormalizeCallByContext) -> object:
     try:
         sig = inspect.signature(fn)
     except (TypeError, ValueError):
-        # 回退策略: 先尝试 `(result, ctx)`, 再尝试 `(result)`.
-        try:
-            return fn(result, ctx)
-        except TypeError:
-            return fn(result)
+        return _call_normalize_call_by_fallback(fn, result, ctx)
 
-    accepts_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values())
-    if accepts_varargs:
-        return fn(result, ctx)
+    params = list(sig.parameters.values())
+    accepts_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in params)
 
-    positional_only = getattr(inspect.Parameter, "POSITIONAL_ONLY", None)
+    try:
+        positional_only = inspect.Parameter.POSITIONAL_ONLY
+    except AttributeError:
+        positional_only = None  # 兼容 `py<3.8`: `inspect.Parameter` 不支持 `POSITIONAL_ONLY`
     positional_kinds = [inspect.Parameter.POSITIONAL_OR_KEYWORD]
     if positional_only is not None:
         positional_kinds.append(positional_only)
-    positional = [p for p in sig.parameters.values() if p.kind in tuple(positional_kinds)]
-    kwonly = [p for p in sig.parameters.values() if p.kind == inspect.Parameter.KEYWORD_ONLY]
-    accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+    positional = [p for p in params if p.kind in tuple(positional_kinds)]
+    kwonly = [p for p in params if p.kind == inspect.Parameter.KEYWORD_ONLY]
+    accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
+    accepts_ctx_kwonly = any(p.name == "ctx" for p in kwonly)
 
     if len(positional) >= _CALL_BY_CTX_POSITIONAL_ARGC:
         return fn(result, ctx)
 
-    if len(positional) == 1:
-        if any(p.name == "ctx" for p in kwonly) or accepts_kwargs:
+    if len(positional) >= 1 or accepts_varargs:
+        if accepts_ctx_kwonly or accepts_kwargs:
             return fn(result, ctx=ctx)  # type: ignore[call-arg]
-        return fn(result)
+        if accepts_varargs:
+            return fn(result, ctx)
+        if len(positional) == 1:
+            return fn(result)
 
     msg = "normalize.call_by must accept at least 1 positional argument: (result) or (result, ctx)"
     raise TypeError(msg)
+
+
+_CALL_BY_MISMATCH_TOKENS = (
+    "positional argument",
+    "keyword-only argument",
+    "unexpected keyword argument",
+    "multiple values for argument",
+    "missing ",
+    "takes ",
+)
+
+
+def _call_normalize_call_by_fallback(fn: NormalizeCallByFn, result: object, ctx: NormalizeCallByContext) -> object:
+    """
+    当 `inspect.signature` 无法获取签名时,按约定尝试调用顺序:
+
+    1) `fn(result, ctx)`(推荐签名)
+    2) `fn(result, ctx=ctx)`(`keyword-only` 或 `**kwargs`)
+    3) `fn(result)`(不接受 `ctx`)
+
+    仅当 `TypeError` 看起来是“参数绑定失败”时才会继续尝试下一个形态,避免吞掉函数体内抛出的 `TypeError`.
+    """
+
+    try:
+        return fn(result, ctx)
+    except TypeError as exc:
+        if not _looks_like_call_by_argument_mismatch(exc):
+            raise
+
+    try:
+        return fn(result, ctx=ctx)  # type: ignore[call-arg]
+    except TypeError as exc:
+        if not _looks_like_call_by_argument_mismatch(exc):
+            raise
+
+    return fn(result)
+
+
+def _looks_like_call_by_argument_mismatch(exc: TypeError) -> bool:
+    tb = exc.__traceback__
+    if tb is not None and tb.tb_next is not None:
+        return False
+    msg = str(exc)
+    return any(token in msg for token in _CALL_BY_MISMATCH_TOKENS)
 
 
 def _normalize_index_by_key(
@@ -235,14 +298,14 @@ def _normalize_index_by_key(
 ) -> LoaderResultMapping:
     # 若 `loader` 已返回 `mapping`,则直接透传.
     if isinstance(result, Mapping):
-        return cast("LoaderResultMapping", result)
+        return cast("LoaderResultMapping", result)  # pragma: allow-cast normalize.index_by_key mapping passthrough
 
-    if not isinstance(result, (list, tuple)):
+    if not _is_sequence(result):
         msg = "Source '{}' normalize.index_by_key expected loader result list[row], got '{}'".format(source_id, type(result).__name__)
         raise TypeError(msg)
 
     indexed: LoaderResultMap = {}
-    for idx, item in enumerate(cast("Sequence[object]", result)):
+    for idx, item in enumerate(result):
         row = _normalize_index_by_key_require_row(item, source_id=source_id, idx=idx)
         key = _normalize_index_by_key_extract_key(row, source_id=source_id, key_field=key_field, idx=idx)
         _normalize_index_by_key_insert(indexed, key=key, row=row, source_id=source_id, on_conflict=on_conflict)
@@ -263,14 +326,14 @@ def _normalize_take_first(
         ).format(source_id)
         raise TypeError(msg)
 
-    if not isinstance(result, Mapping):
+    if not _is_hashable_mapping(result):
         msg = "Source '{}' normalize.take_first expected loader result mapping[key -> list[row]], got '{}'".format(
             source_id, type(result).__name__
         )
         raise TypeError(msg)
 
     out: LoaderResultMap = {}
-    for lookup_key, candidates_obj in cast("Mapping[Hashable, object]", result).items():
+    for lookup_key, candidates_obj in result.items():
         normalized = _normalize_take_first_value(
             candidates_obj,
             source_id=source_id,
@@ -292,13 +355,13 @@ def _normalize_take_first_value(
     on_empty: str,
     config_label: str,
 ) -> object:
-    if not isinstance(candidates_obj, (list, tuple)):
+    if not _is_sequence(candidates_obj):
         msg = "Source '{}' {} expected list[row] for key '{}', got '{}'".format(
             source_id, config_label, lookup_key, type(candidates_obj).__name__
         )
         raise TypeError(msg)
 
-    candidates = cast("Sequence[object]", candidates_obj)
+    candidates = candidates_obj
     if not candidates:
         if on_empty == "miss":
             return _NORMALIZE_MISS
@@ -311,12 +374,12 @@ def _normalize_take_first_value(
         raise ValueError(msg)
 
     first = candidates[0]
-    if not isinstance(first, Mapping):
+    if not _is_mapping(first):
         msg = "Source '{}' {} expected row to be a Mapping for key '{}', got '{}'".format(
             source_id, config_label, lookup_key, type(first).__name__
         )
         raise TypeError(msg)
-    return cast("Mapping[str, object]", first)
+    return first
 
 
 def _normalize_project_fields(
@@ -326,14 +389,14 @@ def _normalize_project_fields(
     fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...],
     on_missing: str,
 ) -> LoaderResultMapping:
-    if not isinstance(result, Mapping):
+    if not _is_hashable_mapping(result):
         msg = "Source '{}' normalize.project_fields expected loader result mapping[key -> row], got '{}'".format(
             source_id, type(result).__name__
         )
         raise TypeError(msg)
 
     out: LoaderResultMap = {}
-    for lookup_key, row_obj in cast("Mapping[Hashable, object]", result).items():
+    for lookup_key, row_obj in result.items():
         projected = _normalize_project_fields_value(
             row_obj,
             source_id=source_id,
@@ -355,13 +418,13 @@ def _normalize_project_fields_value(
     on_missing: str,
     config_label: str,
 ) -> object:
-    if not isinstance(row_obj, Mapping):
+    if not _is_mapping(row_obj):
         msg = "Source '{}' {} expected row to be a Mapping for key '{}', got '{}'".format(
             source_id, config_label, lookup_key, type(row_obj).__name__
         )
         raise TypeError(msg)
 
-    row = cast("Mapping[object, object]", row_obj)
+    row = row_obj
     projected: Dict[str, object] = {}
     for rule in fields:
         if rule.from_key:
@@ -397,12 +460,12 @@ def _normalize_map_values(
     source_id: str,
     steps: Tuple[SourceNormalizeStepIr, ...],
 ) -> LoaderResultMapping:
-    if not isinstance(result, Mapping):
+    if not _is_hashable_mapping(result):
         msg = "Source '{}' normalize.map_values expected loader result Mapping, got '{}'".format(source_id, type(result).__name__)
         raise TypeError(msg)
 
     out: LoaderResultMap = {}
-    for lookup_key, value in cast("Mapping[Hashable, object]", result).items():
+    for lookup_key, value in result.items():
         current: object = value
         skip = False
         for idx, step in enumerate(steps):
@@ -434,8 +497,8 @@ def _extract_segment_with_presence(
     data: object,
     segment: Union[str, int],
 ) -> Tuple[bool, object]:
-    if isinstance(data, Mapping):
-        mapping = cast("Mapping[object, object]", data)
+    if _is_mapping(data):
+        mapping = data
         if segment in mapping:
             return True, mapping[segment]
         return False, None
@@ -457,14 +520,14 @@ def _extract_segment_with_presence(
 
 
 def _normalize_index_by_key_require_row(item: object, *, source_id: str, idx: int) -> "Mapping[str, object]":
-    if not isinstance(item, Mapping):
+    if not _is_str_mapping(item):
         msg = "Source '{}' normalize.index_by_key expected list[row] where row is a Mapping, got '{}' at index {}".format(
             source_id,
             type(item).__name__,
             idx,
         )
         raise TypeError(msg)
-    return cast("Mapping[str, object]", item)
+    return item
 
 
 def _normalize_index_by_key_extract_key(

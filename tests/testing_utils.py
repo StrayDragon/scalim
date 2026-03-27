@@ -34,7 +34,7 @@ class RecordingLoadRefExecutor:
         self._calls = calls
 
     def execute(self, operator, context, batch_row_nth, runtime) -> None:  # type: ignore[no-untyped-def]
-        load_ref_operator = cast("LoadRefOperatorIr", operator)
+        load_ref_operator = cast("LoadRefOperatorIr", operator)  # pragma: allow-cast test executor typed narrowing
         self._calls.append(load_ref_operator.field_key)
         _ = context
         _ = batch_row_nth

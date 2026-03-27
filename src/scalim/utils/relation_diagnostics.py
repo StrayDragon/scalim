@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Mapping as MappingABC
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
@@ -45,7 +46,7 @@ class RelationDiagnostics:
     def _extract_field_value(data: Any, field_name: str) -> Any:
         if _is_mapping(data):
             return data.get(field_name)
-        return getattr(data, field_name, None)
+        return getattr(data, field_name, None)  # pragma: allow-dynattr optional-interface: row field access
 
     @staticmethod
     def _collect_field_values(data: Any, fields: Tuple[str, ...]) -> Tuple[Tuple[Any, ...], bool]:
@@ -77,7 +78,10 @@ class RelationDiagnostics:
                 key_info = " [LOOKUP_KEY]"
 
             if source.key.cast:
-                transform_info = " (cast: {})".format(source.key.cast.__name__ if hasattr(source.key.cast, "__name__") else "custom")
+                cast_name = "custom"
+                with contextlib.suppress(AttributeError):
+                    cast_name = source.key.cast.__name__  # type: ignore[attr-defined]
+                transform_info = " (cast: {})".format(cast_name)
 
         return key_info, transform_info
 

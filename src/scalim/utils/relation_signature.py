@@ -20,7 +20,7 @@ def is_auto_lookup_cast(lookup_cast: object) -> bool:
     if isinstance(lookup_cast, NamedLookupCast) and lookup_cast.scalim_lookup_cast_name == "auto":
         return True
     # 兼容历史的私有标记字段.
-    return getattr(lookup_cast, "_scalim_lookup_cast_name", None) == "auto"
+    return getattr(lookup_cast, "_scalim_lookup_cast_name", None) == "auto"  # pragma: allow-dynattr legacy: lookup_cast marker
 
 
 def normalize_key_field(key_field: LookupKeySpec) -> NormalizedLookupKeySpec:

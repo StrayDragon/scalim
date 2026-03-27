@@ -31,6 +31,7 @@ class _UnsetType:
 
 
 UNSET = _UnsetType()
+UnsetType = _UnsetType
 
 
 @dataclass(frozen=True)
@@ -173,12 +174,13 @@ class RunResult:
 
     def to_dataframe(self) -> "pd.DataFrame":
         sink = self.sink
-        if sink is None or not hasattr(sink, "get_data"):
+        if sink is None or not hasattr(sink, "get_data"):  # pragma: allow-dynattr optional-interface: sink.get_data
             msg = "to_dataframe() requires an in-memory sink with get_data() (e.g. InMemoryRowSink)"
             raise ValueError(msg)
         try:
             pd = import_module("pandas")
-            return pd.DataFrame(cast("Any", sink).get_data())  # type: ignore[no-any-return]
+            sink_with_data = cast("Any", sink)  # pragma: allow-cast sink get_data typed narrowing
+            return pd.DataFrame(sink_with_data.get_data())  # type: ignore[no-any-return]
         except ImportError as e:
             msg = "pandas is required for to_dataframe()"
             raise ImportError(msg) from e
@@ -191,4 +193,5 @@ __all__ = [
     "RunOptions",
     "RunOverrides",
     "RunResult",
+    "UnsetType",
 ]

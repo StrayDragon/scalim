@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from typing import List, Optional, Tuple, cast
 
 from ...typedefs import LoaderResultMapping, RuntimeValue
@@ -95,6 +94,4 @@ def call_loader_with_binding(
 
 
 def coerce_loader_result_mapping(result: object) -> LoaderResultMapping:
-    if isinstance(result, Mapping):
-        return cast("LoaderResultMapping", result)
-    return cast("LoaderResultMapping", result)
+    return cast("LoaderResultMapping", result)  # pragma: allow-cast loader result boundary typed narrowing

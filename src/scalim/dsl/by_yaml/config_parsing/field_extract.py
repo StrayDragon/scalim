@@ -96,9 +96,13 @@ def _parse_identifier(expr: str, i: int) -> Tuple[str, int]:
 
 def _parse_bracket_segment(expr: str, i: int) -> Tuple[ExtractSegment, int]:
     n = len(expr)
-    if i >= n or expr[i] != "[":  # pragma: no cover
+    if (
+        i >= n or expr[i] != "["
+    ):  # pragma: no cover  # pragma: allow-no-cover internal invariant: caller only dispatches to bracket parser on '['
         msg = "internal error: expected '['"
-        raise FieldExtractCompileError(msg)  # pragma: no cover
+        raise FieldExtractCompileError(
+            msg
+        )  # pragma: no cover  # pragma: allow-no-cover internal invariant: caller only dispatches to bracket parser on '['
     if i + 1 >= n:
         msg = "extract has unclosed bracket at position {}".format(i)
         raise FieldExtractCompileError(msg)
@@ -121,7 +125,9 @@ def _parse_bracket_int(expr: str, i: int) -> Tuple[int, int]:
         j += 1
     if j == start:
         msg = "extract has empty int bracket segment"
-        raise FieldExtractCompileError(msg)  # pragma: no cover
+        raise FieldExtractCompileError(
+            msg
+        )  # pragma: no cover  # pragma: allow-no-cover internal invariant: digit branch only enters when first char is [0-9]
     if j >= n or expr[j] != "]":
         msg = "extract has invalid int bracket segment at position {}; use '[1]' (no spaces, no sign)".format(start - 1)
         raise FieldExtractCompileError(msg)

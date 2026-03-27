@@ -1,5 +1,6 @@
 import contextlib
 import threading
+from abc import ABC
 from collections.abc import Mapping as MappingABC
 from collections.abc import Sequence as SequenceABC
 from collections.abc import Set as AbstractSet
@@ -9,10 +10,10 @@ from typing import Any, Dict, List, Mapping, Sequence, Set, Tuple, cast
 
 from ...vendor.compact.typing_extensionsx import override
 from ..dispatch import HookDispatchStrategy
-from .manager_base import ExecutionHookLike, HookManagerBase, HookOnEventHandlerPair, HookTypedHandlerPair
+from .manager_base import HookManagerBase, HookOnEventHandlerPair, HookTypedHandlerPair
 
 
-class HookManagerStateMixin(HookManagerBase):
+class HookManagerStateMixin(HookManagerBase, ABC):
     def __getstate__(self) -> Dict[str, Any]:
         state = dict(self.__dict__)
         state.pop("_lock", None)
@@ -22,14 +23,14 @@ class HookManagerStateMixin(HookManagerBase):
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         manager = self._manager()
-        self.__dict__.update(state)
+        vars(self).update(state)
         manager.lock = threading.RLock()
 
         hooks_obj = state.get("hooks", self.__dict__.get("hooks", []))
         if isinstance(hooks_obj, list):
-            manager.hooks = cast("List[ExecutionHookLike]", hooks_obj)
+            manager.hooks = hooks_obj
         elif hooks_obj:
-            manager.hooks = cast("List[ExecutionHookLike]", list(hooks_obj))
+            manager.hooks = list(hooks_obj)
         else:
             manager.hooks = []
 
@@ -73,20 +74,21 @@ class HookManagerStateMixin(HookManagerBase):
         sample_size = self._manager().loader_result_sample_size
         sample: Any = None
         if isinstance(result, MappingABC):
-            mapping = cast("Mapping[Any, Any]", result)
+            mapping = cast("Mapping[Any, Any]", result)  # pragma: allow-cast mapping typed narrowing
             sample = dict(list(mapping.items())[:sample_size])
         elif isinstance(result, list):
-            items = cast("List[Any]", result)
+            items = cast("List[Any]", result)  # pragma: allow-cast list typed narrowing
             sample = items[:sample_size]
         elif isinstance(result, tuple):
-            items = cast("Tuple[Any, ...]", result)
+            items = cast("Tuple[Any, ...]", result)  # pragma: allow-cast tuple typed narrowing
             sample = list(items[:sample_size])
         elif isinstance(result, AbstractSet):
-            sample = list(islice(cast("Set[Any]", result), sample_size))
+            iterable = cast("Set[Any]", result)  # pragma: allow-cast set typed narrowing
+            sample = list(islice(iterable, sample_size))
         elif isinstance(result, (str, bytes)):
             sample = result[:sample_size]
         elif isinstance(result, SequenceABC):
-            sequence = cast("Sequence[Any]", result)
+            sequence = cast("Sequence[Any]", result)  # pragma: allow-cast sequence typed narrowing
             with contextlib.suppress(Exception):
                 sample = list(sequence[:sample_size])
         if sample is None:

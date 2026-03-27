@@ -123,7 +123,7 @@ def _parse_scalim_preset_uri(raw: str) -> str:
 def _apply_import_aliases(raw_path: str, *, project_config: Optional[YamlDslProjectConfig]) -> Optional[Tuple[str, Path]]:
     if project_config is None:
         return None
-    aliases = dict(getattr(project_config, "import_aliases", {}) or {})
+    aliases = dict(project_config.import_aliases)
     if not aliases:
         return None
 
@@ -218,7 +218,7 @@ def _parse_imports_mapping(
     if not isinstance(raw, dict):
         msg = "imports must be a mapping"
         raise TypeError(msg)
-    raw_dict = cast("Dict[str, Any]", raw)
+    raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml imports mapping typed narrowing
     imports: Dict[str, ImportSource] = {}
     for alias, path_raw in raw_dict.items():
         if not isinstance(alias, str) or not alias.strip():
@@ -271,7 +271,7 @@ def _select_mapping_fragment(
         if not isinstance(current, dict):
             msg = "$import ref '{}' points to a non-mapping value".format(ref)
             raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
-        current_dict = cast("Dict[str, Any]", current)
+        current_dict = cast("Dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
         if seg not in current_dict:
             msg = "$import ref '{}' missing key '{}'".format(ref, seg)
             raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
@@ -280,7 +280,7 @@ def _select_mapping_fragment(
     if not isinstance(current, dict):
         msg = "$import ref '{}' points to a non-mapping value".format(ref)
         raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
-    return cast("Dict[str, Any]", current)
+    return cast("Dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
 
 
 def _deep_merge_override_inplace(
@@ -298,8 +298,8 @@ def _deep_merge_override_inplace(
         right = value
         if isinstance(left, dict) and isinstance(right, dict):
             _deep_merge_override_inplace(
-                cast("Dict[str, Any]", left),
-                cast("Dict[str, Any]", right),
+                cast("Dict[str, Any]", left),  # pragma: allow-cast yaml import deep merge typed narrowing
+                cast("Dict[str, Any]", right),  # pragma: allow-cast yaml import deep merge typed narrowing
                 trace=trace,
                 logical_path="{}.{}".format(logical_path, key) if logical_path else str(key),
             )
@@ -309,10 +309,12 @@ def _deep_merge_override_inplace(
             continue
         if isinstance(left, (dict, list)) or isinstance(right, (dict, list)):
             conflict_path = "{}.{}".format(logical_path, key) if logical_path else str(key)
+            left_name = "dict" if isinstance(left, dict) else "list" if isinstance(left, list) else type(left).__name__
+            right_name = "dict" if isinstance(right, dict) else "list" if isinstance(right, list) else type(right).__name__
             msg = "Type mismatch during import merge at '{}' ({} vs {})".format(
                 key,
-                type(cast("object", left)).__name__,
-                type(cast("object", right)).__name__,
+                left_name,
+                right_name,
             )
             raise YamlImportExpansionError(msg, trace=trace, logical_path=conflict_path)
         target[key] = right
@@ -332,8 +334,8 @@ def _deep_merge_fill_inplace(
         local_value = local[key]
         if isinstance(local_value, dict) and isinstance(imported_value, dict):
             _deep_merge_fill_inplace(
-                cast("Dict[str, Any]", local_value),
-                cast("Dict[str, Any]", imported_value),
+                cast("Dict[str, Any]", local_value),  # pragma: allow-cast yaml import deep merge typed narrowing
+                cast("Dict[str, Any]", imported_value),  # pragma: allow-cast yaml import deep merge typed narrowing
                 trace=trace,
                 logical_path="{}.{}".format(logical_path, key) if logical_path else str(key),
             )
@@ -342,10 +344,20 @@ def _deep_merge_fill_inplace(
             continue
         if isinstance(local_value, (dict, list)) or isinstance(imported_value, (dict, list)):
             conflict_path = "{}.{}".format(logical_path, key) if logical_path else str(key)
+            local_name = (
+                "dict" if isinstance(local_value, dict) else "list" if isinstance(local_value, list) else type(local_value).__name__
+            )
+            imported_name = (
+                "dict"
+                if isinstance(imported_value, dict)
+                else "list"
+                if isinstance(imported_value, list)
+                else type(imported_value).__name__
+            )
             msg = "Type mismatch during import merge at '{}' ({} vs {})".format(
                 key,
-                type(cast("object", local_value)).__name__,
-                type(cast("object", imported_value)).__name__,
+                local_name,
+                imported_name,
             )
             raise YamlImportExpansionError(msg, trace=trace, logical_path=conflict_path)
         continue
@@ -466,7 +478,7 @@ def _load_yaml_mapping(
     if not isinstance(loaded, dict):
         msg = "YAML config must be a mapping"
         raise TypeError(msg)
-    return cast("Dict[str, Any]", loaded)
+    return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
 
 
 def _load_and_expand_source(
@@ -538,7 +550,7 @@ def _load_yaml_mapping_from_source(
         if not isinstance(loaded, dict):
             msg = "YAML config must be a mapping"
             raise TypeError(msg)
-        return cast("Dict[str, Any]", loaded)
+        return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
     msg = "Unknown ImportSource.kind: '{}'".format(source.kind)
     raise ValueError(msg)
 
@@ -596,7 +608,7 @@ def _expand_node_inplace(
 ) -> None:
     if isinstance(node, dict):
         _expand_mapping_inplace(
-            cast("Dict[str, Any]", node),
+            cast("Dict[str, Any]", node),  # pragma: allow-cast yaml import expansion typed narrowing
             imports=imports,
             cache=cache,
             trace=trace,
@@ -606,7 +618,7 @@ def _expand_node_inplace(
             allowed_yaml_roots=allowed_yaml_roots,
             project_config=project_config,
         )
-        for key, value in list(cast("Dict[str, Any]", node).items()):
+        for key, value in list(cast("Dict[str, Any]", node).items()):  # pragma: allow-cast yaml import expansion typed narrowing
             next_path = "{}.{}".format(logical_path, key) if logical_path else str(key)
             _expand_node_inplace(
                 value,
@@ -621,7 +633,7 @@ def _expand_node_inplace(
             )
         return
     if isinstance(node, list):
-        for idx, item in enumerate(cast("List[Any]", node)):
+        for idx, item in enumerate(cast("List[Any]", node)):  # pragma: allow-cast yaml import expansion typed narrowing
             next_path = "{}.{}".format(logical_path, idx) if logical_path else str(idx)
             _expand_node_inplace(
                 item,
@@ -657,7 +669,7 @@ def _expand_mapping_inplace(
     if isinstance(import_raw, str):
         import_refs = [import_raw]
     elif isinstance(import_raw, list):
-        for item in cast("List[Any]", import_raw):
+        for item in cast("List[Any]", import_raw):  # pragma: allow-cast yaml $import list typed narrowing
             if not isinstance(item, str):
                 msg = "$import list entries must be strings"
                 raise YamlImportExpansionError(msg, trace=trace, logical_path=logical_path)
@@ -703,10 +715,11 @@ def _expand_mapping_inplace(
 
 def contains_import_syntax(raw: Any) -> bool:
     if isinstance(raw, dict):
-        raw_dict = cast("Dict[str, Any]", raw)
+        raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml import syntax scan typed narrowing
         if IMPORTS_KEY in raw_dict or IMPORT_KEY in raw_dict:
             return True
         return any(contains_import_syntax(value) for value in raw_dict.values())
     if isinstance(raw, list):
-        return any(contains_import_syntax(item) for item in cast("List[Any]", raw))
+        raw_list = cast("List[Any]", raw)  # pragma: allow-cast yaml import syntax scan typed narrowing
+        return any(contains_import_syntax(item) for item in raw_list)
     return False

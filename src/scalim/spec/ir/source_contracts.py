@@ -25,6 +25,13 @@ class SourceRefIrBase(Protocol):
 
 
 @runtime_checkable
+class SourceNormalizeIrBase(Protocol):
+    """数据源 `normalize` 契约: 供 `execution` 模块使用的最小接口."""
+
+    def apply(self, result: object, *, source_id: str) -> object: ...
+
+
+@runtime_checkable
 class LookupSourceRefIrBase(SourceRefIrBase, Protocol):
     """具备键定义、可作为关联查找目标的数据源契约."""
 
@@ -36,6 +43,9 @@ class LookupSourceRefIrBase(SourceRefIrBase, Protocol):
 
     @property
     def lookup_chunk_size(self) -> Optional[int]: ...
+
+    @property
+    def normalize(self) -> Optional[SourceNormalizeIrBase]: ...
 
     def get_binding(self, key_field: NormalizedLookupKeySpec) -> Optional[BindingIr]: ...
 

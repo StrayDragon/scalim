@@ -122,7 +122,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             return _CsvPlan(resource_id=key, path=str(raw_path), lock_path=lock_path)
 
         def _on_create(plan: object) -> None:
-            p = cast("_CsvPlan", plan)
+            p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
             self._emit_resource_create(
                 workflow_node_id=str(workflow_node_id),
                 resource_type="csv",
@@ -138,7 +138,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             create_fn=_create,
             on_create=_on_create,
         )
-        return cast("_CsvPlan", plan)
+        return cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
 
     def apply_csv_append(
         self,
@@ -185,7 +185,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                     pending_skip = True
 
             if not pending_skip:
-                cast("List[_AppendSegment]", plan.segments).append(
+                cast("List[_AppendSegment]", plan.segments).append(  # pragma: allow-cast csv segments typed narrowing
                     _AppendSegment(
                         input_csv=input_csv,
                         header_policy=str(header_policy),
@@ -226,7 +226,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
 
     @override
     def _commit_csv(self, plan: object) -> None:
-        p = cast("_CsvPlan", plan)
+        p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
         if p.segments is None or p.baseline_header is None:
             if p.lock_path is not None:
                 release_write_lock(p.lock_path)
@@ -271,7 +271,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
 
     @override
     def _discard_csv(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
-        p = cast("_CsvPlan", plan)
+        p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
         if p.lock_path is not None:
             release_write_lock(p.lock_path)
             p.lock_path = None

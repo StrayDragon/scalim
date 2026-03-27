@@ -2,15 +2,23 @@ from types import MappingProxyType
 from typing import Dict, List, Mapping, Optional, Tuple, cast
 
 from ....typedefs import LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData
+from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import dataclass, field
 from ..aliases import LoaderExtractor, LoaderParamsBuilder, LoaderResultMapCallable, NormalizedLookupKeySpec
 
 
+def _is_tuple(value: object) -> TypeGuard[Tuple[object, ...]]:
+    return isinstance(value, tuple)
+
+
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
+
+
 def _stable_lookup_key_sort_key(value: object) -> Tuple[str, object]:
-    if isinstance(value, tuple):
-        items = cast("Tuple[object, ...]", value)
+    if _is_tuple(value):
         item_keys: List[Tuple[str, object]] = []
-        for item in items:
+        for item in value:
             item_keys.append(_stable_lookup_key_sort_key(item))
         return ("tuple", tuple(item_keys))
     return (type(value).__name__, repr(value))
@@ -143,27 +151,24 @@ def _clone_bindings(bindings: Mapping[NormalizedLookupKeySpec, BindingIr]) -> Di
 def _is_valid_binding_key(value: object) -> bool:
     if isinstance(value, str):
         return True
-    if not isinstance(value, tuple):
-        return False
-
-    items = cast("Tuple[object, ...]", value)
-    return all(isinstance(item, str) for item in items)
+    if _is_tuple(value):
+        return all(isinstance(item, str) for item in value)
+    return False
 
 
 def _restore_bindings(bindings: object) -> Optional[Mapping[NormalizedLookupKeySpec, BindingIr]]:
-    if not isinstance(bindings, dict):
+    if not _is_dict(bindings):
         return None
 
-    bindings_dict = cast("Dict[object, object]", bindings)
     typed_bindings: Dict[NormalizedLookupKeySpec, BindingIr] = {}
-    for key, value in bindings_dict.items():
+    for key, value in bindings.items():
         if not _is_valid_binding_key(key):
             msg = "Invalid binding key in state: {!r}".format(key)
             raise TypeError(msg)
         if not isinstance(value, BindingIr):
             msg = "Invalid binding value in state for key {!r}".format(key)
             raise TypeError(msg)
-        typed_key = cast("NormalizedLookupKeySpec", key)
+        typed_key = cast("NormalizedLookupKeySpec", key)  # pragma: allow-cast runtime validated binding key type
         typed_bindings[typed_key] = value
     return MappingProxyType(typed_bindings)
 
@@ -197,13 +202,15 @@ class LoaderIr:
         state = dict(self.__dict__)
         bindings = state.get("bindings")
         if isinstance(bindings, MappingProxyType):
-            state["bindings"] = _clone_bindings(cast("Mapping[NormalizedLookupKeySpec, BindingIr]", bindings))
+            state["bindings"] = _clone_bindings(
+                cast("Mapping[NormalizedLookupKeySpec, BindingIr]", bindings)  # pragma: allow-cast MappingProxyType typed narrowing
+            )
         return state
 
     def __setstate__(self, state: Dict[str, object]) -> None:
         for key, value in state.items():
             object.__setattr__(self, key, value)
-        bindings = _restore_bindings(getattr(self, "bindings", None))
+        bindings = _restore_bindings(state.get("bindings"))
         if bindings is not None:
             object.__setattr__(self, "bindings", bindings)
 

@@ -2,6 +2,7 @@ from typing import Any, Dict, FrozenSet, List, Optional, Set
 
 from ....ob.presets.viz import VizObserver, VizObserverConfig
 from ....planning.builder import PlanBuilder
+from ....vendor.compact.typing_extensionsx import TypedDict
 from ..config_parsing.errors import ConfigValidationError
 from ..config_parsing.loader import YamlDemandLoader
 from ..schema_dsl.models import DemandConfig
@@ -16,6 +17,13 @@ from ..schema_dsl.output_enums import (
 )
 from .compiler import compile  # noqa: A004
 from .contracts import RunOptions
+
+
+class OutputConfigDict(TypedDict):
+    params: Dict[str, Any]
+    field_name_mapping: Dict[str, str]
+    output_fields: List[str]
+    outputs: List[Dict[str, Any]]
 
 
 def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str]:
@@ -111,7 +119,7 @@ def build_viz_observer(
     return VizObserver.from_plan(plan, actual_config, output_composition=compilation.request.output_composition)
 
 
-def load_output_config(yaml_path: str) -> Dict[str, Any]:
+def load_output_config(yaml_path: str) -> OutputConfigDict:
     loader = YamlDemandLoader()
     try:
         config = loader.load(yaml_path)
@@ -132,7 +140,7 @@ def load_output_config(yaml_path: str) -> Dict[str, Any]:
         if field_config.name:
             field_name_mapping[field_id] = field_config.name
 
-    return {
+    out: OutputConfigDict = {
         "params": params,
         "field_name_mapping": field_name_mapping,
         "output_fields": output_fields,
@@ -170,9 +178,11 @@ def load_output_config(yaml_path: str) -> Dict[str, Any]:
             for t in (config.outputs or ())
         ],
     }
+    return out
 
 
 __all__ = [
+    "OutputConfigDict",
     "build_viz_observer",
     "load_output_config",
     "resolve_required_field_ids",

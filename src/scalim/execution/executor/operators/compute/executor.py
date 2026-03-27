@@ -218,7 +218,7 @@ class ComputeOperatorExecutor(OperatorExecutor):
         batch_row_nth: List[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
-        op = cast("ComputeOperatorIr", operator)
+        op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing
         field_spec = op.field_spec
         guardrails = runtime.guardrails
         compute_mode = guardrails.effective_compute_mode()

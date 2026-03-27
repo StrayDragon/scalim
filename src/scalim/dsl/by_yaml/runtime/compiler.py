@@ -20,6 +20,7 @@ from ....execution.guardrails import (
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
 from ....spec.ir.demand import DemandIr
+from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import replace
 from ..config_parsing.loader import YamlDemandLoader
 from ..init_var_nodes import parse_init_var_mapping_node
@@ -32,7 +33,7 @@ from ..schema_dsl.constants import (
 )
 from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfig, OutputContainerConfig, OutputTargetConfig
 from .builtin_callables import parse_builtin_callable_id
-from .contracts import UNSET, Compilation, ResolverTrustedMode, RunOptions
+from .contracts import Compilation, ResolverTrustedMode, RunOptions, UnsetType
 from .conversion import ConfigToIRConverter
 from .errors import ALLOWLIST_REQUIRED_MSG, AllowlistRequiredError, ResolverError
 from .observability import compile_observability_spec
@@ -41,7 +42,6 @@ from .references import SecurePythonReferenceResolver, derive_base_module_path
 
 if TYPE_CHECKING:
     from ....execution.output_composition import OutputCompositionSpec
-    from ....ob.presets.viz import VizObserverConfig
 
 
 def _ensure_allowlist(
@@ -72,7 +72,11 @@ def _require_dict(raw: object, *, path: str) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         msg = "{} must be an object".format(path)
         raise TypeError(msg)
-    return cast("Dict[str, Any]", raw)
+    return cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
+
+
+def _is_list(value: object) -> TypeGuard[List[object]]:
+    return isinstance(value, list)
 
 
 def _parse_overrides_outputs_container_type(container: Dict[str, Any], *, path: str) -> str:
@@ -89,7 +93,12 @@ def _parse_overrides_outputs_container_type(container: Dict[str, Any], *, path: 
 
 def _parse_overrides_outputs_container_path(path_raw: Any, *, container_type: str, path: str) -> Any:
     if isinstance(path_raw, dict):
-        path_value: Any = {"$init_var": parse_init_var_mapping_node(cast("Dict[str, Any]", path_raw), path="{}.path".format(path))}
+        path_value: Any = {
+            "$init_var": parse_init_var_mapping_node(
+                cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
+                path="{}.path".format(path),
+            )
+        }
     elif path_raw is None:
         path_value = ""
     elif isinstance(path_raw, os.PathLike):
@@ -210,11 +219,11 @@ def _parse_overrides_output_name(typed: Dict[str, Any], *, idx: int, path: str, 
 
 
 def _parse_overrides_output_fields(typed: Dict[str, Any], *, idx: int, path: str, known_field_ids: Set[str]) -> Tuple[str, ...]:
-    fields_raw = typed.get("fields")
-    if not isinstance(fields_raw, list):
+    fields_raw: object = typed.get("fields")
+    if not _is_list(fields_raw):
         msg = "{}.{}.fields must be a list".format(path, idx)
         raise TypeError(msg)
-    fields_list = cast("List[object]", fields_raw)
+    fields_list = fields_raw
     if not fields_list:
         msg = "{}.{}.fields must not be empty".format(path, idx)
         raise ValueError(msg)
@@ -244,10 +253,10 @@ def _parse_overrides_outputs_targets(
     *,
     path: str,
 ) -> Tuple[OutputTargetConfig, ...]:
-    if not isinstance(raw, list):
+    if not _is_list(raw):
         msg = "{} must be a list".format(path)
         raise TypeError(msg)
-    outputs = cast("List[object]", raw)
+    outputs = raw
     if not outputs:
         msg = "{} cannot be empty".format(path)
         raise ValueError(msg)
@@ -260,7 +269,7 @@ def _parse_overrides_outputs_targets(
         if not isinstance(item, dict):
             msg = "{}.{} must be an object".format(path, idx)
             raise TypeError(msg)
-        typed = cast("Dict[str, Any]", item)
+        typed = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
 
         _validate_overrides_output_keys(typed, idx=idx, path=path)
         name = _parse_overrides_output_name(typed, idx=idx, path=path, seen_names=seen_names)
@@ -365,7 +374,7 @@ def _retry_spec_from_yaml(
         return LoaderRetryPolicySpec()
     should_retry = None
     if config.should_retry:
-        should_retry = cast("Any", resolver.resolve(str(config.should_retry)))
+        should_retry = cast("Any", resolver.resolve(str(config.should_retry)))  # pragma: allow-cast resolver callable signature boundary
     return LoaderRetryPolicySpec(
         enabled=bool(config.enabled) if config.enabled is not None else None,
         should_retry=should_retry,
@@ -410,7 +419,7 @@ def _finalize_retry_policy(spec: LoaderRetryPolicySpec, *, base: Optional[Loader
 
     return LoaderRetryPolicy(
         enabled=bool(enabled),
-        should_retry=cast("Any", should_retry),
+        should_retry=should_retry,
         max_attempts=int(max_attempts),
         max_elapsed_seconds=float(max_elapsed),
         backoff=str(backoff),
@@ -504,7 +513,7 @@ def _compile_builtin_callable_vocab_value(
     trusted_resolver: SecurePythonReferenceResolver,
 ) -> Callable[..., Any]:
     if callable(value_raw):
-        return cast("Callable[..., Any]", value_raw)
+        return cast("Callable[..., Any]", value_raw)  # pragma: allow-cast callable() typed narrowing
 
     if isinstance(value_raw, str):
         reference = value_raw.strip()
@@ -626,7 +635,7 @@ def _compile_output_composition_for_outputs(
         _validate_unique_effective_field_display_names(demand_ir)
 
     config_for_outputs = config if effective_outputs == tuple(config.outputs) else replace(config, outputs=effective_outputs)
-    return cast(
+    return cast(  # pragma: allow-cast output composition typed narrowing
         "OutputCompositionSpec",
         compile_output_composition_from_yaml(
             config_for_outputs,
@@ -674,15 +683,17 @@ def build_request(
         observability, observers = compile_observability_spec(config.observability)
         components.extend(observers)
 
-    if options.overrides is not None and options.overrides.viz_config is not UNSET:
-        viz_override = cast("Optional[VizObserverConfig]", options.overrides.viz_config)
-        if viz_override is None:
-            if observability is not None:
-                observability = replace(observability, viz_config=None)
-        elif observability is None:
-            observability = ObservabilitySpec(viz_config=viz_override)
-        else:
-            observability = replace(observability, viz_config=viz_override)
+    if options.overrides is not None:
+        viz_config = options.overrides.viz_config
+        if not isinstance(viz_config, UnsetType):
+            viz_override = viz_config
+            if viz_override is None:
+                if observability is not None:
+                    observability = replace(observability, viz_config=None)
+            elif observability is None:
+                observability = ObservabilitySpec(viz_config=viz_override)
+            else:
+                observability = replace(observability, viz_config=viz_override)
     if not components:
         components = None
 

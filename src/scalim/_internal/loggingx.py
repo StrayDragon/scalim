@@ -8,7 +8,9 @@
 
 import json
 import logging
-from typing import Any, Dict, Iterable, List, Mapping, Optional, cast
+from typing import Any, Dict, Iterable, List, Mapping, Optional
+
+from ..vendor.compact.typing_extensionsx import TypeGuard
 
 _SCALIM_ROOT_LOGGER_NAME = "scalim"
 
@@ -41,19 +43,31 @@ def prefix(subsystem: str) -> str:
     return "[scalim] {}: ".format(subsystem_text)
 
 
+def _is_list_or_tuple(value: object) -> TypeGuard[Iterable[object]]:
+    return isinstance(value, (list, tuple))
+
+
+def _is_set(value: object) -> TypeGuard[Iterable[object]]:
+    return isinstance(value, set)
+
+
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
+
+
 def _stringify_value(value: Any) -> str:
-    if isinstance(value, (list, tuple)):
-        return ",".join(str(x) for x in cast("Iterable[object]", value))
-    if isinstance(value, set):
-        items = [str(x) for x in cast("Iterable[object]", value)]
+    if _is_list_or_tuple(value):
+        return ",".join(str(x) for x in value)
+    if _is_set(value):
+        items = [str(x) for x in value]
         items.sort()
         return ",".join(items)
-    if isinstance(value, dict):
+    if _is_dict(value):
         try:
-            return json.dumps(cast("Any", value), ensure_ascii=False, sort_keys=True, default=str)
+            return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
         except TypeError:
-            return str(cast("object", value))
-    return str(cast("object", value))
+            return str(value)
+    return str(value)
 
 
 def format_kv(mapping: Optional[Mapping[str, Any]] = None, **kwargs: Any) -> str:

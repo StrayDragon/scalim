@@ -104,10 +104,13 @@ class RowEmissionCoordinator:
         return int(self._ready_counts.get(row_id, 0)) >= int(self._required_non_global_targets)
 
     def _write_row(self, *, row_id: Hashable, row_index: int) -> None:
-        write_row_aligned = getattr(self._sink, "write_row_aligned", None)
+        write_row_aligned = getattr(self._sink, "write_row_aligned", None)  # pragma: allow-dynattr optional-interface: sink
         if callable(write_row_aligned):
             values: List["FieldValue"] = [self._context.get_field_value(field_key, row_id) for field_key in self._target_fields]
-            _ = cast("Callable[[Sequence[str], Sequence[FieldValue]], None]", write_row_aligned)(self._target_fields, values)
+            _ = cast(  # pragma: allow-cast sink optional interface typed narrowing
+                "Callable[[Sequence[str], Sequence[FieldValue]], None]",
+                write_row_aligned,
+            )(self._target_fields, values)
             field_count = len(self._target_fields)
         else:
             row: "RowData" = self._context.get_field_values_for_row(row_id, self._target_fields)

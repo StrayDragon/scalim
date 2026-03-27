@@ -1102,14 +1102,23 @@ class OutputExtraSheetConfig:
 def _validate_output_aggregate_producer_keys_schema() -> None:
     expected: Set[str] = set(AGG_METRIC_PRODUCER_KEYS + AGG_RANK_PRODUCER_KEYS + AGG_POST_PRODUCER_KEYS)
 
-    meta = cast("Dict[str, Any]", OutputAggregateConfig.__dataclass_fields__["fields"].metadata.get("schema") or {})
-    schema = cast("Dict[str, Any]", meta.get("schema") or {})
-    additional_props = cast("Dict[str, Any]", schema.get("additionalProperties") or {})
-    one_of: List[Dict[str, Any]] = cast("List[Dict[str, Any]]", additional_props.get("oneOf") or [])
+    meta = cast(  # pragma: allow-cast dataclass schema metadata typed narrowing
+        "Dict[str, Any]",
+        OutputAggregateConfig.__dataclass_fields__["fields"].metadata.get("schema") or {},
+    )
+    schema = cast("Dict[str, Any]", meta.get("schema") or {})  # pragma: allow-cast dataclass schema metadata typed narrowing
+    additional_props = cast(  # pragma: allow-cast dataclass schema metadata typed narrowing
+        "Dict[str, Any]",
+        schema.get("additionalProperties") or {},
+    )
+    one_of: List[Dict[str, Any]] = cast(  # pragma: allow-cast dataclass schema metadata typed narrowing
+        "List[Dict[str, Any]]",
+        additional_props.get("oneOf") or [],
+    )
 
     actual: Set[str] = set()
     for item in one_of:
-        required = cast("List[object]", item.get("required") or [])
+        required = list(item.get("required") or [])
         if len(required) != 1:
             continue
         key = required[0]

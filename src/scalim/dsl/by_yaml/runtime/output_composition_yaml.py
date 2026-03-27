@@ -81,7 +81,7 @@ def _ensure_field_value(value: object, *, field_id: str, producer: str) -> Field
     if value is None:
         return None
     if isinstance(value, (int, float, Decimal, str, bool)):
-        return cast("FieldValue", value)
+        return cast("FieldValue", value)  # pragma: allow-cast literal typed narrowing
     msg = "aggregate field {!r} produced unsupported value type {} from {}".format(field_id, type(value).__name__, producer)
     raise TypeError(msg)
 
@@ -134,8 +134,10 @@ def _eval_call_by_value(*, field_id: str, value: CallByValue, row: RowData, ctx:
     if kind == "ctx":
         return ctx
     if kind == "ctx_attr":
-        return getattr(ctx, str(value.value))
-    msg = "Unknown call_by value kind: {} (field_id={!r})".format(kind, field_id)  # pragma: no cover
+        return getattr(ctx, str(value.value))  # pragma: allow-dynattr dsl: ctx_attr access
+    msg = "Unknown call_by value kind: {} (field_id={!r})".format(
+        kind, field_id
+    )  # pragma: no cover  # pragma: allow-no-cover invariant: exhaustive CallByValue kind
     raise ValueError(msg)
 
 
@@ -152,14 +154,14 @@ def _compile_call_by_post_field(
         raise ValueError(msg) from exc
 
     try:
-        fn = cast("Callable[..., object]", resolver.resolve(parsed.reference))
+        fn = resolver.resolve(parsed.reference)
     except Exception as exc:
         msg = "aggregate.fields.{} failed to resolve call_by reference '{}': {}".format(out_field_id, parsed.reference, exc)
         raise ValueError(msg) from exc
 
     deps = tuple(str(x) for x in (parsed.field_names or ()))
 
-    def calculator(row: RowData, p: ParsedCallBy = parsed, f: Callable[..., object] = fn) -> FieldValue:
+    def calculator(row: RowData, p: ParsedCallBy = parsed, f: Callable[..., Any] = fn) -> FieldValue:
         dep_values: Dict[str, FieldValue] = {name: row.get(name) for name in deps}
         ctx = _AggregateCallByContext(
             row_id=None,
@@ -228,13 +230,15 @@ def _compile_compute_post_field(
     engine: SecureComputeEngine,
 ) -> PostFieldSpec:
     expr = str(cfg.get("expression") or "").strip()
-    deps = tuple(str(x) for x in cast("Tuple[str, ...]", cfg.get("dependencies") or ()))
+    deps = tuple(str(x) for x in cast("Tuple[str, ...]", cfg.get("dependencies") or ()))  # pragma: allow-cast yaml tuple typed narrowing
     if not expr:
         msg = "aggregate.fields.{} has invalid compute config: missing expression".format(out_field_id)
         raise ValueError(msg)
 
     try:
-        raw_calculator = cast("Callable[..., object]", engine.compile(expr, deps))
+        raw_calculator = cast(
+            "Callable[..., object]", engine.compile(expr, deps)
+        )  # pragma: allow-cast compute engine compile typed narrowing
     except (ComputeExpressionError, SecurityError) as exc:
         msg = "aggregate.fields.{} has invalid compute expression: {}".format(out_field_id, exc)
         raise ValueError(msg) from exc
@@ -257,7 +261,7 @@ def _compile_compute_post_field(
 
 def _get_field_name(field_id: str, demand_ir: DemandIr) -> str:
     field_ir = demand_ir.fields.get(field_id)
-    name = getattr(field_ir, "name", "") or ""
+    name = field_ir.name if field_ir is not None else ""
     if name and name != field_id:
         return str(name)
     return field_id
@@ -270,7 +274,7 @@ def _get_derived_field_name(field_id: str, demand_ir: DemandIr, agg: OutputAggre
 
     agg_field = agg.fields.get(field_id)
     if agg_field is not None:
-        name = str(getattr(agg_field, "name", "") or "").strip()
+        name = str(agg_field.name or "").strip()
         if name and name != field_id:
             return name
     return field_id
@@ -357,7 +361,7 @@ def _derived_group_by_spec_from_yaml(
         _metric_spec_from_agg_field(
             out_field_id=metric_id,
             producer_key=str(cfg.fields[metric_id].producer_key),
-            cfg=cast("Dict[str, Any]", cfg.fields[metric_id].config),
+            cfg=cast("Dict[str, Any]", cfg.fields[metric_id].config),  # pragma: allow-cast yaml mapping typed narrowing
         )
         for metric_id in metric_ids
     )
@@ -366,15 +370,17 @@ def _derived_group_by_spec_from_yaml(
     for out_field_id, field_cfg in cfg.fields.items():
         if str(field_cfg.producer_key) not in _RANK_FUNC_KEYS:
             continue
-        raw = cast("Dict[str, Any]", field_cfg.config)
+        raw = cast("Dict[str, Any]", field_cfg.config)  # pragma: allow-cast yaml mapping typed narrowing
+        partition_by_raw = cast("Tuple[str, ...]", raw.get("partition_by") or ())  # pragma: allow-cast yaml tuple typed narrowing
+        order_by_raw = cast("Tuple[str, ...]", raw.get("order_by") or ())  # pragma: allow-cast yaml tuple typed narrowing
         rank_specs.append(
             RankFieldSpec(
                 out_field_id=str(out_field_id),
                 kind=str(field_cfg.producer_key),
                 by=str(raw.get("by")),
-                partition_by=tuple(str(x) for x in cast("Tuple[str, ...]", raw.get("partition_by") or ())),
+                partition_by=tuple(str(x) for x in partition_by_raw),
                 order=str(raw.get("order") or "desc"),
-                order_by=tuple(str(x) for x in cast("Tuple[str, ...]", raw.get("order_by") or ())),
+                order_by=tuple(str(x) for x in order_by_raw),
                 top_k=int(raw.get("top_k") or 0),
                 top_k_mode=str(raw.get("top_k_mode") or "rank"),
             )
@@ -395,14 +401,14 @@ def _derived_group_by_spec_from_yaml(
             post_specs.append(
                 _compile_score_by_rank_post_field(
                     out_field_id=str(out_field_id),
-                    cfg=cast("Dict[str, Any]", field_cfg.config),
+                    cfg=cast("Dict[str, Any]", field_cfg.config),  # pragma: allow-cast yaml mapping typed narrowing
                 )
             )
         elif producer_key == "compute":
             post_specs.append(
                 _compile_compute_post_field(
                     out_field_id=str(out_field_id),
-                    cfg=cast("Dict[str, Any]", field_cfg.config),
+                    cfg=cast("Dict[str, Any]", field_cfg.config),  # pragma: allow-cast yaml mapping typed narrowing
                     engine=compute_engine,
                 )
             )

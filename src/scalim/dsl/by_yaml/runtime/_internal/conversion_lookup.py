@@ -1,15 +1,20 @@
 import re
 from decimal import Decimal, InvalidOperation
-from typing import Callable, ClassVar, Dict, List, Optional, Sequence, cast
+from typing import Callable, ClassVar, Dict, List, Optional, Sequence
 
 from .....spec.ir.aliases import LookupKeyCast
 from .....typedefs import FieldValue, LookupKey
 from .....utils.converters import NamedLookupCast, auto_normalize_key, auto_str_normalize, must_to_int, must_to_str
+from .....vendor.compact.typing_extensionsx import TypeGuard
 from ...schema_dsl.models import LookupCastConfig
 from ..errors import ConversionError
 
 _SOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 CALL_BY_CTX_KEY = "$ctx"
+
+
+def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+    return isinstance(value, (list, tuple))
 
 
 def cast_int(value: object) -> Optional[int]:
@@ -113,11 +118,10 @@ class LookupCastRegistry:
 
     def _wrap_multi(self, base: LookupKeyCast) -> LookupKeyCast:
         def _cast_multi(value: object) -> Optional[LookupKey]:
-            if not isinstance(value, (list, tuple)):
+            if not _is_sequence(value):
                 return None
             casted: List[LookupKey] = []
-            items = cast("Sequence[object]", value)
-            for item in items:
+            for item in value:
                 converted = base(item)
                 if converted is None:
                     return None

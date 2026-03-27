@@ -22,7 +22,7 @@ def resolve_output_container_path(
     """
 
     if isinstance(raw, dict):
-        var_name = parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)
+        var_name = parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)  # pragma: allow-cast yaml mapping typed narrowing
         if init_vars is None or var_name not in init_vars:
             msg = "Missing init_var '{}' for {}".format(var_name, path)
             raise ValueError(msg)

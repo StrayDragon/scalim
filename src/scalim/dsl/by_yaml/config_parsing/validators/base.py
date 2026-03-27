@@ -58,7 +58,7 @@ class ValidatorFieldBaseMixin(ValidatorMixinBase):
             self._add_error(errors, "Field '{}' must be a dictionary".format(field_id_raw))
             return None
         field_id = str(field_id_raw)
-        field_dict = cast("Dict[str, Any]", data_raw)
+        field_dict = cast("Dict[str, Any]", data_raw)  # pragma: allow-cast yaml mapping typed narrowing
         field_def = FieldDef(field_id=field_id, kind=kind, source_id=source_id, data=field_dict)
         field_defs.append(field_def)
         defs_by_id.setdefault(field_id, []).append(field_def)

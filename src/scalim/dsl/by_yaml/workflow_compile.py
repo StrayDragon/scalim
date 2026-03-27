@@ -206,7 +206,7 @@ def _load_demands_and_precheck_workbook_paths(  # noqa: C901, PLR0912, PLR0915
         for out_cfg in cfg.outputs:
             container = out_cfg.container
             if container is None:
-                continue  # pragma: no cover
+                continue  # pragma: no cover  # pragma: allow-no-cover workbook-only precheck; container-less outputs irrelevant
             if str(container.type or "").lower() != "workbook":
                 continue
             raw = container.path
@@ -220,7 +220,7 @@ def _load_demands_and_precheck_workbook_paths(  # noqa: C901, PLR0912, PLR0915
         for out_cfg in cfg.outputs:
             container = out_cfg.container
             if container is None:
-                continue  # pragma: no cover
+                continue  # pragma: no cover  # pragma: allow-no-cover workbook-only precheck; container-less outputs irrelevant
             if str(container.type or "").lower() != "workbook":
                 continue
             raw = container.path
@@ -273,7 +273,7 @@ def _write_intent_kind(value: object) -> str:
         return "sheetbook_sheet"
     if isinstance(value, WorkflowWriteToSheetbookAppend):
         return "sheetbook_append"
-    return "unknown"  # pragma: no cover
+    return "unknown"  # pragma: no cover  # pragma: allow-no-cover invariant: all WorkflowWrite types handled above
 
 
 def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
@@ -417,8 +417,8 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                     on_mismatch=str(intent.on_mismatch or "error"),
                 )
                 sheetbook_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
-            else:  # pragma: no cover
-                continue  # pragma: no cover
+            else:  # pragma: no cover  # pragma: allow-no-cover invariant: all WorkflowWrite types handled above
+                continue  # pragma: no cover  # pragma: allow-no-cover invariant: all WorkflowWrite types handled above
 
             resource_key = (resource_type, str(resource_id))
             prev_write_id = last_write_node_id_by_resource.get(resource_key)
@@ -445,10 +445,10 @@ def _inject_sheetbook_write_dependencies(
         for consumer_node_id in direct_dependents_by_run_id.get(str(producer_node_id), []):
             pos = demand_node_pos_by_run_id.get(str(consumer_node_id))
             if pos is None:
-                continue  # pragma: no cover
+                continue  # pragma: no cover  # pragma: allow-no-cover invariant: consumer node must exist in graph
             consumer = nodes[int(pos)]
             if not isinstance(consumer, WorkflowNodeIr):
-                continue  # pragma: no cover
+                continue  # pragma: no cover  # pragma: allow-no-cover invariant: demand nodes are WorkflowNodeIr
             deps: List[str] = list(consumer.deps or ())
             for write_node_id in write_node_ids:
                 if str(write_node_id) not in deps:
@@ -496,7 +496,7 @@ def compile_workflow_ir(
     template_vars: Optional[Mapping[str, object]] = None,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> WorkflowIr:
-    wf_obj = cast("WorkflowConfig", wf)
+    wf_obj = cast("WorkflowConfig", wf)  # pragma: allow-cast workflow config typed narrowing
 
     wf_path = Path(str(workflow_yaml_path or "")).expanduser().resolve(strict=False)
     base_dir = wf_path.parent

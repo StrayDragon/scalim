@@ -70,14 +70,12 @@ class PlanBuilder:
             msg = "检测到循环依赖: {}".format(cycle_path)
 
             has_derived = any(isinstance(self.demand.fields.get(str(x)), DerivedFieldIr) for x in cycle)
-            has_ref = any(
-                isinstance(self.demand.fields.get(str(x)), FieldIr)
-                and bool(
-                    getattr(self.demand.fields.get(str(x)), "lookup_steps", None)
-                    or getattr(self.demand.fields.get(str(x)), "relation", None)
-                )
-                for x in cycle
-            )
+            has_ref = False
+            for node_id in cycle:
+                field = self.demand.fields.get(str(node_id))
+                if isinstance(field, FieldIr) and (field.lookup_steps or field.relation):
+                    has_ref = True
+                    break
             if has_derived and has_ref:
                 msg = (
                     msg

@@ -418,6 +418,15 @@ def test_compile_call_by_post_field_rejects_parse_and_resolve_errors() -> None:
         )
 
 
+def test_compile_call_by_post_field_rejects_non_callable_reference() -> None:
+    with pytest.raises(ValueError, match=r"failed to resolve call_by reference"):
+        _ = oc_yaml._compile_call_by_post_field(  # noqa: SLF001
+            out_field_id="v",
+            call_by="tests.call_by_fns:NOT_CALLABLE()",
+            resolver=_tests_resolver(),
+        )
+
+
 def test_score_by_rank_post_field_handles_missing_rank_and_invalid_rank_types() -> None:
     spec = oc_yaml._compile_score_by_rank_post_field(out_field_id="score", cfg={})  # noqa: SLF001
     assert spec.calculator({}) is None

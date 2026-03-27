@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+NOT_CALLABLE = 1
+
 
 def dummy_main_loader(**_kwargs):  # type: ignore[no-untyped-def]
     return []

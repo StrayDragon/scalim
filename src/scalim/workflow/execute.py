@@ -6,7 +6,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, cast
 
 from ..events.catalog import (
     EVENT_WORKFLOW_NODE_CANCELLED,
@@ -45,6 +45,7 @@ from ..spec.ir.workflow import (
     WriteSheetNodeIr,
 )
 from ..utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
 from .errors import WorkflowConfigError
 from .loaders import workflow_loader_context
@@ -57,7 +58,7 @@ class _CompilationLike(ABC):
     @property
     @abstractmethod
     def request(self) -> object:
-        raise NotImplementedError  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover  # pragma: allow-no-cover abstract property
 
 
 class WorkflowArtifactsDirectory:
@@ -133,7 +134,7 @@ class WorkflowArtifactsDirectory:
             mem = by_artifact.get("in_memory_csv_outputs")
             if not isinstance(mem, dict):
                 return
-            mem_outputs = cast("Dict[str, WorkflowCsvInput]", mem)
+            mem_outputs = cast("Dict[str, WorkflowCsvInput]", mem)  # pragma: allow-cast artifacts dict typed narrowing
             _ = mem_outputs.pop(out_id, None)
             if not mem_outputs:
                 _ = by_artifact.pop("in_memory_csv_outputs", None)
@@ -281,18 +282,29 @@ class WorkflowCtxStore:
             return by_key[ctx_key]
 
 
+def _is_list(value: object) -> TypeGuard[List[object]]:
+    return isinstance(value, list)
+
+
+def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+    return isinstance(value, dict)
+
+
+def _is_dict_str_any(value: object) -> TypeGuard[Dict[str, Any]]:
+    return isinstance(value, dict)
+
+
 def iter_ctx_directives(value: object, *, path: str) -> List[Tuple[str, str]]:
     out: List[Tuple[str, str]] = []
-    if isinstance(value, dict):
-        mapping = cast("Dict[object, object]", value)
+    if _is_dict(value):
+        mapping = value
         if len(mapping) == 1 and "$ctx" in mapping:
             directive = mapping.get("$ctx")
-            if not isinstance(directive, dict):
+            if not _is_dict(directive):
                 msg = "$ctx directive must be a mapping"
                 raise WorkflowConfigError(msg, path=path)
-            directive_dict = cast("Dict[str, object]", directive)
-            node_raw = directive_dict.get("node")
-            key_raw = directive_dict.get("key")
+            node_raw = directive.get("node")
+            key_raw = directive.get("key")
             node_id = str(node_raw or "").strip() if isinstance(node_raw, str) else ""
             ctx_key = str(key_raw or "").strip() if isinstance(key_raw, str) else ""
             if not node_id:
@@ -308,24 +320,23 @@ def iter_ctx_directives(value: object, *, path: str) -> List[Tuple[str, str]]:
             out.extend(iter_ctx_directives(raw_value, path=child_path))
         return out
 
-    if isinstance(value, list):
-        for idx, item in enumerate(cast("List[object]", value)):
+    if _is_list(value):
+        for idx, item in enumerate(value):
             child_path = "{}.{}".format(path, idx)
             out.extend(iter_ctx_directives(item, path=child_path))
     return out
 
 
 def render_ctx_directives(value: object, *, consumer_node_id: str, ctx_store: WorkflowCtxStore, path: str) -> object:
-    if isinstance(value, dict):
-        mapping = cast("Dict[object, object]", value)
+    if _is_dict(value):
+        mapping = value
         if len(mapping) == 1 and "$ctx" in mapping:
             directive = mapping.get("$ctx")
-            if not isinstance(directive, dict):
+            if not _is_dict(directive):
                 msg = "$ctx directive must be a mapping"
                 raise WorkflowConfigError(msg, path=path)
-            directive_dict = cast("Dict[str, object]", directive)
-            node_raw = directive_dict.get("node")
-            key_raw = directive_dict.get("key")
+            node_raw = directive.get("node")
+            key_raw = directive.get("key")
             node_id = str(node_raw or "").strip() if isinstance(node_raw, str) else ""
             ctx_key = str(key_raw or "").strip() if isinstance(key_raw, str) else ""
             if not node_id:
@@ -343,11 +354,10 @@ def render_ctx_directives(value: object, *, consumer_node_id: str, ctx_store: Wo
             out[raw_key] = render_ctx_directives(raw_value, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=child_path)
         return out
 
-    if isinstance(value, list):
-        items = cast("List[object]", value)
+    if _is_list(value):
         return [
             render_ctx_directives(item, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path="{}.{}".format(path, idx))
-            for idx, item in enumerate(items)
+            for idx, item in enumerate(value)
         ]
 
     return value
@@ -414,7 +424,7 @@ def _resolve_workflow_input_csv(
     error_prefix: str,
 ) -> WorkflowCsvInput:
     outputs_obj = artifacts_dir.get(str(consumer_node_id), str(input_node_id), "outputs")
-    outputs = cast("Optional[Dict[str, str]]", outputs_obj)
+    outputs = cast("Optional[Dict[str, str]]", outputs_obj)  # pragma: allow-cast workflow output mapping typed narrowing
     if outputs_obj is None:
         msg = "{} requires demand outputs mapping: input_node_id={!r}".format(str(error_prefix), str(input_node_id))
         raise WorkflowWriteError(msg)
@@ -436,7 +446,7 @@ def _resolve_workflow_input_csv(
         mem_map_obj = artifacts_dir.get(str(consumer_node_id), str(input_node_id), "in_memory_csv_outputs")
     except KeyError:
         mem_map_obj = None
-    mem_map = cast("Optional[Dict[str, WorkflowCsvInput]]", mem_map_obj)
+    mem_map = cast("Optional[Dict[str, WorkflowCsvInput]]", mem_map_obj)  # pragma: allow-cast workflow csv mapping typed narrowing
     csv_artifact = mem_map.get(output_id) if mem_map is not None else None
     if csv_artifact is not None:
         return csv_artifact
@@ -485,8 +495,10 @@ def _run_workflow_write_sheet_node(
         )
         return
 
-    msg = "Unsupported write_sheet resource_type: {!r}".format(str(node.resource_type))  # pragma: no cover
-    raise WorkflowWriteError(msg)  # pragma: no cover
+    msg = "Unsupported write_sheet resource_type: {!r}".format(
+        str(node.resource_type)
+    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
 def _run_workflow_append_sheet_node(
@@ -504,9 +516,11 @@ def _run_workflow_append_sheet_node(
     )
 
     if str(node.resource_type) == "workbook":
-        if not node.sheet:  # pragma: no cover
-            msg = "append_sheet requires sheet for workbook resource (resource_id={!r})".format(str(node.resource_id))  # pragma: no cover
-            raise WorkflowWriteError(msg)  # pragma: no cover
+        if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            msg = "append_sheet requires sheet for workbook resource (resource_id={!r})".format(
+                str(node.resource_id)
+            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_workbook_append(
             workflow_node_id=str(node.node_id),
             workbook_id=str(node.resource_id),
@@ -533,9 +547,11 @@ def _run_workflow_append_sheet_node(
         return
 
     if str(node.resource_type) == "sheetbook":
-        if not node.sheet:  # pragma: no cover
-            msg = "append_sheet requires sheet for sheetbook resource (resource_id={!r})".format(str(node.resource_id))  # pragma: no cover
-            raise WorkflowWriteError(msg)  # pragma: no cover
+        if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            msg = "append_sheet requires sheet for sheetbook resource (resource_id={!r})".format(
+                str(node.resource_id)
+            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_sheetbook_append(
             workflow_node_id=str(node.node_id),
             sheetbook_id=str(node.resource_id),
@@ -549,8 +565,10 @@ def _run_workflow_append_sheet_node(
         )
         return
 
-    msg = "Unsupported append_sheet resource_type: {!r}".format(str(node.resource_type))  # pragma: no cover
-    raise WorkflowWriteError(msg)  # pragma: no cover
+    msg = "Unsupported append_sheet resource_type: {!r}".format(
+        str(node.resource_type)
+    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
 def _run_workflow_write_node(
@@ -575,8 +593,10 @@ def _run_workflow_write_node(
         )
         return
 
-    msg = "Unsupported workflow node type: {}".format(type(node).__name__)  # pragma: no cover
-    raise WorkflowWriteError(msg)  # pragma: no cover
+    msg = "Unsupported workflow node type: {}".format(
+        type(node).__name__
+    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    raise WorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
 def _bundle_run_dir(config: VizObserverConfig, run_id: str) -> Path:
@@ -621,7 +641,7 @@ def _build_workflow_instrumentation(
     workflow_path: str,
     workflow_ir: WorkflowIr,
     max_concurrency: int,
-    components: Optional[List[object]],
+    components: Optional[Sequence[object]],
     bundle_viz_base_config: Optional[VizObserverConfig],
 ) -> Tuple[ObserverManager, Optional[WorkflowVizObserver], InstrumentationHub]:
     # 工作流层事件:复用 `hooks`/`observers` 分发通道,并以 `workflow_exec_id` 作为 `run_id` 分区.
@@ -706,7 +726,7 @@ def _build_workflow_resource_defs(
             opts = res.options or {}
             allow_formulas = False
             if isinstance(opts, dict):
-                allow_formulas = bool(cast("Any", opts).get("allow_formulas", False))
+                allow_formulas = bool(opts.get("allow_formulas", False))
             workbook_allow_formulas_by_id[str(res.resource_id)] = bool(allow_formulas)
             continue
 
@@ -716,15 +736,15 @@ def _build_workflow_resource_defs(
 
         if res_type == "sheetbook":
             opts = res.options or {}
-            budget = cast("Dict[str, object]", opts.get("budget") or {})
-            max_sheets = int(cast("Any", budget.get("max_sheets") or 0))
-            max_total_cells = int(cast("Any", budget.get("max_total_cells") or 0))
-            export_write_lock = False
-            export_allow_formulas = False
-            export_cfg = opts.get("export_xlsx")
-            if isinstance(export_cfg, dict):
-                export_write_lock = bool(cast("Any", export_cfg).get("write_lock", False))
-                export_allow_formulas = bool(cast("Any", export_cfg).get("allow_formulas", False))
+            budget_obj = opts.get("budget")
+            budget: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
+            max_sheets = int(budget.get("max_sheets") or 0)
+            max_total_cells = int(budget.get("max_total_cells") or 0)
+
+            export_cfg_obj = opts.get("export_xlsx")
+            export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
+            export_write_lock = bool(export_cfg.get("write_lock", False))
+            export_allow_formulas = bool(export_cfg.get("allow_formulas", False))
             export_path = str(res.path or "").strip() or None
             sheetbook_defs[str(res.resource_id)] = SheetBookDef(
                 resource_id=str(res.resource_id),
@@ -772,7 +792,7 @@ def _prepare_workflow_run_ir(
     workflow_path: str,
     workflow_ir: WorkflowIr,
     *,
-    components: Optional[List[object]],
+    components: Optional[Sequence[object]],
     bundle_viz_base_config: Optional[VizObserverConfig],
     cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]],
     cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]],
@@ -884,7 +904,7 @@ def _compile_demand_node(
         managed_output_ids=managed_output_ids,
         viz_config=node_viz_config,
     )
-    comp = cast("_CompilationLike", compilation)
+    comp = cast("_CompilationLike", compilation)  # pragma: allow-cast compile_demand typed narrowing
     request = comp.request
     next_request = request
     if node_id in main_rows_consumers_remaining_by_run_id:
@@ -1016,7 +1036,7 @@ def _workflow_process_completed_future(  # noqa: PLR0913
         result_obj = fut.result()
 
         if isinstance(node, WorkflowNodeIr):
-            core = cast("ExecutionResult", result_obj)
+            core = cast("ExecutionResult", result_obj)  # pragma: allow-cast future result typed narrowing
             demand_yaml_path = str(demand_path or "")
             artifacts_dir.publish(str(node_id), "output_path", core.output_path)
             artifacts_dir.publish(str(node_id), "outputs", core.outputs)
@@ -1101,7 +1121,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
 
     def _maybe_release_workflow_managed_in_memory_output(node: WorkflowAnyNodeIr) -> None:
         if not isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
-            return  # pragma: no cover
+            return  # pragma: no cover  # pragma: allow-no-cover invariant: helper called only for write nodes
         producer_node_id = str(node.input_node_id)
         output_id = str(node.input_output_id)
         key = (producer_node_id, output_id)
@@ -1211,11 +1231,12 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
         )
 
     def _run_one(compilation: object, workflow_node_id: str) -> ExecutionResult:
-        comp = cast("Any", compilation)
+        comp = cast("Any", compilation)  # pragma: allow-cast compilation runtime boundary
 
         def _engine_factory(**kwargs: object) -> ScalimEngine:
+            engine_kwargs = cast("Any", kwargs)  # pragma: allow-cast engine kwargs typed narrowing
             return ScalimEngine(
-                **cast("Any", kwargs),
+                **engine_kwargs,
                 workflow_cache_pool=workflow_cache_pool,
                 workflow_node_id=str(workflow_node_id),
             )
@@ -1379,17 +1400,19 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
 
     final_outcomes: List[WorkflowRunOutcome] = []
     for idx, outcome in enumerate(outcomes):
-        if outcome is None:  # pragma: no cover
-            node_id = str(workflow_ir.nodes[idx].node_id)  # pragma: no cover
-            demand_path = str(_node_demand_path(workflow_ir.nodes[idx]) or "")  # pragma: no cover
-            missing = WorkflowRunOutcome(  # pragma: no cover
+        if outcome is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: outcome always set
+            node_id = str(workflow_ir.nodes[idx].node_id)  # pragma: no cover  # pragma: allow-no-cover unreachable: outcome always set
+            demand_path = str(
+                _node_demand_path(workflow_ir.nodes[idx]) or ""
+            )  # pragma: no cover  # pragma: allow-no-cover unreachable: outcome always set
+            missing = WorkflowRunOutcome(  # pragma: no cover  # pragma: allow-no-cover unreachable: outcome always set
                 run_id=node_id,
                 demand_path=demand_path,
                 result=None,
                 error=WorkflowRunError(run_id=node_id, demand_path=demand_path, exc_type="Unknown", message="Missing outcome"),
             )
-            final_outcomes.append(missing)  # pragma: no cover
-            continue  # pragma: no cover
+            final_outcomes.append(missing)  # pragma: no cover  # pragma: allow-no-cover unreachable: outcome always set
+            continue  # pragma: no cover  # pragma: allow-no-cover unreachable: outcome always set
         final_outcomes.append(outcome)
 
     return final_outcomes, failed_outcome_holder[0], failed_exc_holder[0]
@@ -1439,7 +1462,7 @@ def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
                 continue
             node_id = str(node.node_id or "").strip()
             if not node_id:
-                continue  # pragma: no cover
+                continue  # pragma: no cover  # pragma: allow-no-cover unreachable: node_id required by IR
             if _bundle_has_child_replay(prepared.bundle_viz_base_config, node_id):
                 demand_run_id_by_workflow_node_id[node_id] = node_id
 
@@ -1467,7 +1490,7 @@ def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_final
         with contextlib.suppress(Exception):
             prepared.workflow_cache_pool.close()
     with contextlib.suppress(Exception):
-        cast("Any", prepared.workflow_observer_manager).close()
+        cast("Any", prepared.workflow_observer_manager).close()  # pragma: allow-cast observer manager close boundary
 
 
 def run_workflow_ir(
@@ -1477,7 +1500,7 @@ def run_workflow_ir(
     compile_demand_fn: Callable[..., object],
     build_demand_run_result_fn: Optional[Callable[..., object]] = None,
     run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
-    components: Optional[List[object]] = None,
+    components: Optional[Sequence[object]] = None,
     bundle_viz_base_config: Optional[VizObserverConfig] = None,
     cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]] = None,
     cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]] = None,

@@ -69,7 +69,7 @@ class ObserverManagerEmitMixin(ABC):
     _event_meta_defaults: Optional[Dict[str, Any]] = None
 
     def _merge_event_meta_defaults(self, meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        defaults = getattr(self, "_event_meta_defaults", None)
+        defaults = self._event_meta_defaults
         if not defaults:
             return meta or {}
         if not meta:
