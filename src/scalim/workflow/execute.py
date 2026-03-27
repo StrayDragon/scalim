@@ -116,6 +116,23 @@ class WorkflowArtifactsDirectory:
                 raise KeyError(msg)
             return by_artifact[artifact_key]
 
+    def get_optional(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> Optional[object]:
+        consumer = str(consumer_node_id)
+        producer = str(producer_node_id)
+        artifact_key = str(artifact_id)
+
+        if producer != consumer and producer not in self.visible_producer_node_ids(consumer):
+            msg = "Artifact '{}' from node '{}' is not visible to node '{}' (declare deps)".format(artifact_key, producer, consumer)
+            raise ValueError(msg)
+
+        with self._lock:
+            by_artifact = self._values_by_producer_node_id.get(producer)
+            if by_artifact is None:
+                return None
+            if artifact_key not in by_artifact:
+                return None
+            return by_artifact[artifact_key]
+
     def discard(self, producer_node_id: str, artifact_id: str) -> None:
         producer = str(producer_node_id)
         artifact_key = str(artifact_id)
@@ -426,7 +443,7 @@ def _resolve_workflow_input_csv(
     input_output_id: str,
     error_prefix: str,
 ) -> WorkflowCsvInput:
-    outputs_obj = artifacts_dir.get(str(consumer_node_id), str(input_node_id), "outputs")
+    outputs_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "outputs")
     outputs = cast("Optional[Dict[str, str]]", outputs_obj)  # pragma: allow-cast workflow output mapping typed narrowing
     if outputs_obj is None:
         msg = "{} requires demand outputs mapping: input_node_id={!r}".format(str(error_prefix), str(input_node_id))
@@ -444,11 +461,7 @@ def _resolve_workflow_input_csv(
             raise ScalimWorkflowWriteError(msg)
         return output_path
 
-    mem_map_obj = None
-    try:
-        mem_map_obj = artifacts_dir.get(str(consumer_node_id), str(input_node_id), "in_memory_csv_outputs")
-    except KeyError:
-        mem_map_obj = None
+    mem_map_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "in_memory_csv_outputs")
     mem_map = cast("Optional[Dict[str, WorkflowCsvInput]]", mem_map_obj)  # pragma: allow-cast workflow csv mapping typed narrowing
     csv_artifact = mem_map.get(output_id) if mem_map is not None else None
     if csv_artifact is not None:

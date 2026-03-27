@@ -77,10 +77,9 @@ def _is_excluded(path: Path) -> bool:
 def _resolve_input_path(*, repo_root: Path, raw_path: Path) -> Optional[Path]:
     candidate = raw_path if raw_path.is_absolute() else (repo_root / raw_path)
     resolved = candidate.resolve()
-    try:
-        rel = resolved.relative_to(repo_root)
-    except ValueError:
+    if resolved != repo_root and repo_root not in resolved.parents:
         return None
+    rel = resolved.relative_to(repo_root)
     if _is_excluded(rel):
         return None
     return resolved
@@ -96,10 +95,9 @@ def _iter_python_files(*, repo_root: Path, rel_roots: Sequence[Path]) -> Iterato
         for path in paths:
             if path.suffix != ".py":
                 continue
-            try:
-                rel = path.relative_to(repo_root)
-            except ValueError:
+            if path != repo_root and repo_root not in path.parents:
                 continue
+            rel = path.relative_to(repo_root)
             if _is_excluded(rel) or path in seen:
                 continue
             seen.add(path)

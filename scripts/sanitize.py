@@ -212,9 +212,7 @@ def main() -> int:
     if not root.exists() or not root.is_dir():
         print("未找到根目录：{}".format(root), file=sys.stderr)
         return 2
-    try:
-        root.relative_to(repo_root)
-    except ValueError:
+    if root != repo_root and repo_root not in root.parents:
         print("根目录必须位于仓库内：{}".format(repo_root), file=sys.stderr)
         return 2
 

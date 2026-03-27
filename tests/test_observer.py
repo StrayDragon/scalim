@@ -233,7 +233,7 @@ def test_performance_observer_json_output(plan_builder, engine_factory) -> None:
         engine.run(main_rows=main_rows)
 
         assert Path(output_path).exists()
-        content = Path(output_path).read_text()
+        content = Path(output_path).read_text(encoding="utf-8")
         assert "summary" in content
 
 
@@ -252,7 +252,7 @@ def test_performance_observer_csv_output(plan_builder, engine_factory) -> None:
         engine.run(main_rows=main_rows)
 
         assert Path(output_path).exists()
-        content = Path(output_path).read_text()
+        content = Path(output_path).read_text(encoding="utf-8")
         assert "batch_num" in content
         assert "duration" in content
 

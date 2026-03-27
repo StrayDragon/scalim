@@ -154,6 +154,25 @@ def test_resolve_workflow_input_csv_missing_in_memory_artifact_raises() -> None:
         )
 
 
+def test_workflow_artifacts_directory_get_optional_variants() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
+
+    assert artifacts_dir.get_optional("a", "a", "outputs") is None
+
+    with pytest.raises(ValueError, match="not visible"):
+        _ = artifacts_dir.get_optional("consumer", "producer", "outputs")
+
+
 def test_workflow_write_consumer_counts_missing_is_best_effort(tmp_path: Path) -> None:
     from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.by_yaml.runtime.contracts import RunOptions

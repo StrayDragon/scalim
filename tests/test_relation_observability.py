@@ -342,7 +342,7 @@ class TestRelationObserver:
         observer._output_report()
 
         assert output_file.exists()
-        content = output_file.read_text()
+        content = output_file.read_text(encoding="utf-8")
         assert "total_lookups" in content
 
     def test_json_report_creates_parent_dirs(self, tmp_path: "Path") -> None:
@@ -366,7 +366,7 @@ class TestRelationObserver:
 
     def test_json_report_write_failure(self, tmp_path: "Path") -> None:
         blocking_file = tmp_path / "blocker"
-        blocking_file.write_text("blocked")
+        blocking_file.write_text("blocked", encoding="utf-8")
         output_file = blocking_file / "report.json"
 
         config = RelationConfig(report_format="json", output_path=str(output_file))

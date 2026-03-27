@@ -232,10 +232,9 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
 def _format_path(path: Optional[Path], *, root: Path) -> str:
     if not path:
         return "—"
-    try:
+    if path == root or root in path.parents:
         return str(path.relative_to(root))
-    except ValueError:
-        return str(path)
+    return str(path)
 
 
 def _markdown_report(root: Path, rows: Sequence[_Row], warnings: Sequence[str]) -> str:

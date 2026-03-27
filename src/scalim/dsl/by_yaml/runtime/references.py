@@ -484,9 +484,7 @@ def _collect_sys_path_prefixes(*, yaml_dir: Path, sys_path: Optional[Sequence[Op
         p = _normalize_sys_path_entry(entry, cwd_path=cwd_path)
         if p is None:
             continue
-        try:
-            _ = yaml_dir.relative_to(p)
-        except ValueError:
+        if yaml_dir != p and p not in yaml_dir.parents:
             continue
         candidates.append(p)
     return candidates

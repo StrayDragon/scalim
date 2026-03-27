@@ -21,10 +21,7 @@ def _discover_notebooks(notebook_root: Path) -> list[Path]:
 
 def _to_output_path(src: Path, *, notebook_root: Path, docs_notebook_root: Path) -> Path:
     examples_root = notebook_root / "examples"
-    try:
-        rel = src.relative_to(examples_root)
-    except ValueError:
-        rel = src.relative_to(notebook_root)
+    rel = src.relative_to(examples_root) if examples_root in src.parents else src.relative_to(notebook_root)
     return (docs_notebook_root / rel).with_suffix(".html")
 
 
@@ -37,7 +34,7 @@ def _detect_docs_dir(repo_root: Path) -> Path:
 
     try:
         text = zensical_toml.read_text(encoding="utf-8")
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         return default
 
     m = re.search(r'^\s*docs_dir\s*=\s*"(.+?)"\s*$', text, flags=re.MULTILINE)
@@ -96,7 +93,7 @@ def export_all(*, include_code: bool, clean: bool) -> None:
             cmd.append("--no-include-code")
 
         print(f"【导出 `marimo`】{src.relative_to(repo_root)} -> {dst.relative_to(repo_root)}")
-        proc = subprocess.run(cmd, cwd=repo_root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        proc = subprocess.run(cmd, cwd=repo_root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         if proc.returncode != 0:
             print(proc.stdout, file=sys.stderr)
             proc.check_returncode()

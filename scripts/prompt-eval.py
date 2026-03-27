@@ -338,7 +338,7 @@ def _write_promptfoo_failures_md(path: Path, payload: Dict[str, Any]) -> None:
 def _promptfoo_version() -> Optional[str]:
     try:
         out = subprocess.check_output(["promptfoo", "--version"])
-    except Exception:
+    except (FileNotFoundError, subprocess.CalledProcessError):
         return None
     value = out.decode("utf-8", errors="ignore").strip()
     return value or None
@@ -349,10 +349,9 @@ def _file_url(path: Path) -> str:
 
 
 def _rel_or_abs(path: Path, root: Path) -> str:
-    try:
+    if path == root or root in path.parents:
         return str(path.relative_to(root))
-    except ValueError:
-        return str(path)
+    return str(path)
 
 
 def _extract_git_archive(*, root: Path, ref: str, rel_path: str, dest_dir: Path) -> None:
