@@ -132,7 +132,7 @@ class BatchContext:
 class DenseBatchContext(BatchContext):
     """针对连续整数 `row_id` 批次的 `BatchContext` `Dense` 优化实现.
 
-    仅用于批次内 `row_id` 为连续 `int` 的场景(例如 `pipeline` 生成的 `range` 行号)。
+    仅用于批次内 `row_id` 为连续 `int` 的场景(例如 `pipeline` 生成的 `range` 行号).
     若需要通用 `row_id`,请使用 `BatchContext`.
     """
 

@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 
-from ...exceptions import ScalimWorkflowException
+from ...exceptions import ScalimWorkflowError
 from ...vendor.compact.importlibx import require_optional_dependency
 from ...vendor.dataclassesx import dataclass
 from ...vendor.dataclassesx import field as dataclass_field
@@ -40,7 +40,7 @@ _EXCEL_SHEET_NAME_MAX_LEN = 31
 _EXCEL_SHEET_NAME_INVALID_CHARS = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
 
 
-class ScalimWorkflowConfigError(ScalimWorkflowException):
+class ScalimWorkflowConfigError(ScalimWorkflowError):
     path: str
 
     def __init__(self, message: str, *, path: str = "") -> None:
@@ -1353,11 +1353,11 @@ def _validate_workflow_deps_no_cycles(  # noqa: C901
 
 
 __all__ = [
+    "ScalimWorkflowConfigError",
     "WorkflowCachePoolBudget",
     "WorkflowCachePoolOptions",
     "WorkflowCachePoolPin",
     "WorkflowConfig",
-    "ScalimWorkflowConfigError",
     "WorkflowOptions",
     "WorkflowResources",
     "WorkflowRun",

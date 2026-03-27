@@ -4,7 +4,11 @@ import pytest
 
 from scalim.dsl.by_yaml import run
 from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml.config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
+from scalim.dsl.by_yaml.config_parsing.field_extract import (
+    ScalimFieldExtractCompileError,
+    compile_field_extract,
+    derive_source_field_data_key,
+)
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.execution.executor.helpers.field_access import extract_field_segments
 from scalim.sinks.sink_memory import InMemoryRowSink

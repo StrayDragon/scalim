@@ -5,10 +5,10 @@
 - `DSL` 适配层(`scalim.dsl.by_yaml.workflow_entrypoints`) 可以在必要时将该错误包装为 `DSL` 层的 `ScalimWorkflowConfigError`.
 """
 
-from ..exceptions import ScalimWorkflowException
+from ..exceptions import ScalimWorkflowError
 
 
-class ScalimWorkflowConfigError(ScalimWorkflowException):
+class ScalimWorkflowConfigError(ScalimWorkflowError):
     path: str
 
     def __init__(self, message: str, *, path: str = "") -> None:

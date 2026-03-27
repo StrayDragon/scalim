@@ -1,11 +1,11 @@
 from typing import List, Optional, Tuple, Union
 
-from ....exceptions import ScalimYamlException
+from ....exceptions import ScalimYamlError
 
 ExtractSegment = Union[str, int]
 
 
-class ScalimFieldExtractCompileError(ScalimYamlException):
+class ScalimFieldExtractCompileError(ScalimYamlError):
     pass
 
 

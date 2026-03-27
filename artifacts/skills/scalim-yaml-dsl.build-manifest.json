@@ -451,7 +451,7 @@
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "51888b221dbc44599718ed1f15fbed57efc638361d3c476345bfba2fe3d2f7b3"
+      "sha256": "b02b2d3d14e07f95fd63125fb3f851ce4e21172c2b745471e8537467aa1121b9"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",

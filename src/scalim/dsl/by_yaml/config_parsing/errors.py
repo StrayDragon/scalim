@@ -1,9 +1,9 @@
 from typing import Any, List, Optional
 
-from ....exceptions import ScalimYamlException
+from ....exceptions import ScalimYamlError
 
 
-class ScalimConfigValidationError(ScalimYamlException):
+class ScalimConfigValidationError(ScalimYamlError):
     errors: List[str]
     issues: List[Any]
 

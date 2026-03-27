@@ -7,4 +7,3 @@ def test_safe_error_message_redacts_when_str_raises() -> None:
             raise RuntimeError("boom")
 
     assert safe_error_message(BadStrError()) == REDACTED_ERROR_MESSAGE
-

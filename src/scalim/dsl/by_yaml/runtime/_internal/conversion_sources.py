@@ -14,7 +14,7 @@ from .....spec.ir.sources import (
     SourceRefIr,
 )
 from .....typedefs import FieldValue, LoaderCallKwargs, RuntimeValue, SourceSpecIrCacheMode
-from ...config_parsing.call_by import ScalimCallByParseError, CallByValue, parse_call_by
+from ...config_parsing.call_by import CallByValue, ScalimCallByParseError, parse_call_by
 from ...config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
 from ...config_parsing.security import SecureComputeEngine, is_constant_compute_expression
 from ...params_template import CompiledParamsTemplate, ScalimParamsTemplateCompileError, compile_params_template

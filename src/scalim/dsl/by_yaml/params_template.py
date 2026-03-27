@@ -1,7 +1,7 @@
 import re
 from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
-from ...exceptions import ScalimYamlException
+from ...exceptions import ScalimYamlError
 from ...spec.ir.binding import LoaderCallContextIr, build_stable_lookup_key_list
 from ...typedefs import LoaderCallKwargs, RuntimeValue
 from ...vendor.compact.typing_extensionsx import TypeGuard, override
@@ -16,7 +16,7 @@ _DIRECTIVE_KEYS = "$keys"
 _DIRECTIVE_ROWS = "$rows"
 
 
-class ScalimParamsTemplateError(ScalimYamlException):
+class ScalimParamsTemplateError(ScalimYamlError):
     """`params` 模板编译/渲染相关异常基类."""
 
 

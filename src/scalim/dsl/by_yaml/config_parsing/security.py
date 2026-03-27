@@ -9,7 +9,7 @@ from decimal import Decimal
 from types import CodeType
 from typing import Any, Callable, ClassVar, Container, Dict, FrozenSet, List, Optional, Set, Tuple, Type, Union, cast
 
-from ....exceptions import ScalimYamlException
+from ....exceptions import ScalimYamlError
 from ....secure_compute_contracts import (
     SecureComputeCalculatorContract,
 )
@@ -94,11 +94,11 @@ def _not_in(a: Container[Any], b: Any) -> bool:
     return not operator.contains(a, b)
 
 
-class ScalimSecurityError(ScalimYamlException):
+class ScalimSecurityError(ScalimYamlError):
     pass
 
 
-class ScalimComputeExpressionError(ScalimYamlException):
+class ScalimComputeExpressionError(ScalimYamlError):
     pass
 
 

@@ -16,7 +16,7 @@ from ..sinks.sink_base import create_temp_path
 from ..utils.excel import escape_excel_formula
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import WorkflowResourceManagerBase, ScalimWorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock
 from .resources_csv import WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 from .resources_workbook import best_effort_close_write_only_workbook_worksheets, get_openpyxl_workbook_class
 

@@ -18,7 +18,7 @@ from ..sinks.sink_base import create_temp_path
 from ..sinks.sink_csv import InMemoryCsv
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import WorkflowResourceManagerBase, ScalimWorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock
 
 WorkflowCsvInput = Union[str, InMemoryCsv]
 

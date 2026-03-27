@@ -1,7 +1,7 @@
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
-from ....exceptions import ScalimYamlException
+from ....exceptions import ScalimYamlError
 from ....execution.output_composition import (
     AggMetricSpec,
     AuditSheetSpec,
@@ -20,7 +20,7 @@ from ....spec.ir.demand import DemandIr
 from ....typedefs import FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
 from ..config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
-from ..config_parsing.security import ScalimComputeExpressionError, SecureComputeEngine, ScalimSecurityError
+from ..config_parsing.security import ScalimComputeExpressionError, ScalimSecurityError, SecureComputeEngine
 from ..schema_dsl.models import (
     DemandConfig,
     OutputAggregateConfig,
@@ -39,11 +39,10 @@ from ..schema_dsl.output_enums import (
 from .output_path_resolve import resolve_output_container_path
 from .references import SecurePythonReferenceResolver
 
-
 PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT = "workflow manages temp outputs for writes"
 
 
-class ScalimPathlessCsvOutputError(ScalimYamlException):
+class ScalimPathlessCsvOutputError(ScalimYamlError):
     output_id: str
     config_path: str
 

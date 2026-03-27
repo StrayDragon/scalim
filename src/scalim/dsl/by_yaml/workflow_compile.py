@@ -28,8 +28,8 @@ from ...vendor.dataclassesx import replace
 from .config_parsing.loader import YamlDemandLoader
 from .schema_dsl.models import DemandConfig
 from .workflow import (
-    WorkflowConfig,
     ScalimWorkflowConfigError,
+    WorkflowConfig,
     WorkflowResources,
     WorkflowWriteToCsvAppend,
     WorkflowWriteToSheetbookAppend,

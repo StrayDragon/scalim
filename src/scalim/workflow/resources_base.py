@@ -32,7 +32,7 @@ from ..events.events import (
     WorkflowResourceDiscardEvent,
     WorkflowResourceWriteEvent,
 )
-from ..exceptions import ScalimWorkflowException
+from ..exceptions import ScalimWorkflowError
 from ..vendor.dataclassesx import dataclass
 
 _WRITE_LOCK_SUFFIX = ".scalim.lock"
@@ -43,8 +43,8 @@ class WorkflowResourceWaitDiagnostics:
     """共享资源 `joinable get-or-create` 的 `waiter` 等待诊断配置(默认关闭).
 
     说明:
-    - 当 `enabled=False` 且 `max_wait_s` 未配置时,`waiter` 路径保持单次 `Event.wait()` (不引入循环/时间计算开销)。
-    - 仅在显式开启后,当等待超过阈值才输出告警 (便于定位卡住的资源创建)。
+    - 当 `enabled=False` 且 `max_wait_s` 未配置时,`waiter` 路径保持单次 `Event.wait()` (不引入循环/时间计算开销).
+    - 仅在显式开启后,当等待超过阈值才输出告警 (便于定位卡住的资源创建).
     """
 
     enabled: bool
@@ -74,7 +74,7 @@ class WorkflowResourceWaitDiagnostics:
         return cls(enabled=False)
 
 
-class ScalimWorkflowWriteError(ScalimWorkflowException):
+class ScalimWorkflowWriteError(ScalimWorkflowError):
     diff: Optional[List[str]]
 
     def __init__(self, message: str, *, diff: Optional[List[str]] = None) -> None:
@@ -580,9 +580,9 @@ class _WorkflowResourceManagerBase(ABC):
 
 __all__ = [
     "WRITE_LOCK_SUFFIX",
+    "ScalimWorkflowWriteError",
     "WorkflowResourceManagerBase",
     "WorkflowResourceWaitDiagnostics",
-    "ScalimWorkflowWriteError",
     "_WorkflowResourceManagerBase",
     "_acquire_write_lock",
     "_release_write_lock",

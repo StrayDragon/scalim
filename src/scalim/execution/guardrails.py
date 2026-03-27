@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Tuple
 
-from ..exceptions import ScalimExecutionException
+from ..exceptions import ScalimExecutionError
 from ..vendor.compact.typing_extensionsx import Literal
 from ..vendor.dataclassesx import dataclass
 from ..vendor.dataclassesx import field as dataclass_field
@@ -8,7 +8,7 @@ from ..vendor.dataclassesx import field as dataclass_field
 GuardrailMode = Literal["quiet", "fast_fail"]
 
 
-class ScalimGuardrailViolationError(ScalimExecutionException):
+class ScalimGuardrailViolationError(ScalimExecutionError):
     """当运行时防护触发时抛出(或记录)的异常."""
 
     code: str

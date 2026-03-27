@@ -293,7 +293,7 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
 
 
 __all__ = [
-    "WorkflowResult",
     "ScalimWorkflowRunFailedError",
+    "WorkflowResult",
     "run_workflow",
 ]

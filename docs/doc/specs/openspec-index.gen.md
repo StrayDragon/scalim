@@ -66,6 +66,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/dsl-runtime-structure/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 by_yaml runtime 作为 DSL adapter/编译器的边界与对外入口,并明确 YAML `output`/`observability` 在编译期映射为 DSL-agnostic 运行请求对象的规则.
 
+### `error-taxonomy`
+- Title: error-taxonomy Specification
+- Source: [spec.md](#code=openspec/specs/error-taxonomy/spec.md)
+- Summary: **状态: ✅ 已实现** 为 `scalim` 建立统一的异常体系规范:以 `ScalimError(Exception)` 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
+
 ### `execution-structure`
 - Title: execution-structure Specification
 - Source: [spec.md](#code=openspec/specs/execution-structure/spec.md)

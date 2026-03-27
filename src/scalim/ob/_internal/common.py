@@ -1,7 +1,6 @@
 from collections.abc import Set as AbstractSet
 from typing import Any, Optional, Set, Tuple
 
-from ...exceptions import ScalimObserverException
 from ..._internal.loggingx import prefix
 from ...events.catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
@@ -33,6 +32,7 @@ from ...events.catalog import (
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
+from ...exceptions import ScalimObserverError
 
 OBSERVER_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s.%s 抛出异常"
 OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s 关闭时抛出异常"
@@ -73,7 +73,7 @@ DEFAULT_MAX_RECORDED_EVENTS = 10_000
 CAPTURE_OVERFLOW_POLICIES = ("raise", "drop-oldest", "drop-newest")
 
 
-class ScalimObserverCaptureOverflowError(ScalimObserverException):
+class ScalimObserverCaptureOverflowError(ScalimObserverError):
     pass
 
 

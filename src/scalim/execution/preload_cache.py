@@ -40,8 +40,8 @@ class PreloadCacheWaitDiagnostics(object):
     """`PreloadCache` `inflight` 等待诊断配置(默认关闭).
 
     说明:
-    - 当 `enabled=False` 时,`waiter` 路径保持单次 `Event.wait()` (不引入循环/时间计算开销)。
-    - 仅在显式开启后,当等待超过阈值才输出告警 (便于定位卡住的 `source_id`)。
+    - 当 `enabled=False` 时,`waiter` 路径保持单次 `Event.wait()` (不引入循环/时间计算开销).
+    - 仅在显式开启后,当等待超过阈值才输出告警 (便于定位卡住的 `source_id`).
     """
 
     def __init__(

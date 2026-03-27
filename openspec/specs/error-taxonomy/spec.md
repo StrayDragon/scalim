@@ -3,24 +3,24 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-为 `scalim` 建立统一的异常体系规范:以 `ScalimException(Exception)` 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
+为 `scalim` 建立统一的异常体系规范:以 `ScalimError(Exception)` 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
 
 ## Requirements
 
 ### Requirement: scalim MUST 暴露单根异常类型
-系统 MUST 定义 `ScalimException(Exception)` 作为 scalim 内所有自定义异常的根。
-仓库内新增的 scalim 自定义异常 MUST 直接或间接继承 `ScalimException`，并 SHOULD 使用单继承以保持严格树形结构。
+系统 MUST 定义 `ScalimError(Exception)` 作为 scalim 内所有自定义异常的根。
+仓库内新增的 scalim 自定义异常 MUST 直接或间接继承 `ScalimError`，并 SHOULD 使用单继承以保持严格树形结构。
 
 #### Scenario: user catches scalim root exception
 - **WHEN** 用户希望兜底处理 scalim 抛出的全部自定义异常
-- **THEN** `except ScalimException:` MUST 捕获到这些异常
+- **THEN** `except ScalimError:` MUST 捕获到这些异常
 
 ### Requirement: scalim 自定义异常类名 MUST 以 `Scalim` 前缀开头
 系统 MUST 为所有 scalim 自定义异常统一使用 `Scalim*` 的类名命名约定(包括分类基类与叶子异常),以避免跨模块命名冲突并提升可搜索性/可治理性.
 
 #### Scenario: exception class name has Scalim prefix
 - **WHEN** 任意 scalim 自定义异常对外暴露
-- **THEN** 其异常类名 MUST 以 `Scalim` 开头(例如 `ScalimYamlException`)
+- **THEN** 其异常类名 MUST 以 `Scalim` 开头(例如 `ScalimYamlError`)
 
 ### Requirement: 用户可感知错误 MUST 以异常类型作为稳定契约
 系统 MUST 为常见用户可感知错误提供清晰的异常类型层级(例如 YAML/Execution/Workflow 维度的基类与叶子类)。

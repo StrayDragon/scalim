@@ -7,11 +7,11 @@
 """
 
 from .workflow_config import (
+    ScalimWorkflowConfigError,
     WorkflowCachePoolBudget,
     WorkflowCachePoolOptions,
     WorkflowCachePoolPin,
     WorkflowConfig,
-    ScalimWorkflowConfigError,
     WorkflowOptions,
     WorkflowResources,
     WorkflowRun,
@@ -24,11 +24,11 @@ from .workflow_config import (
 )
 
 __all__ = [
+    "ScalimWorkflowConfigError",
     "WorkflowCachePoolBudget",
     "WorkflowCachePoolOptions",
     "WorkflowCachePoolPin",
     "WorkflowConfig",
-    "ScalimWorkflowConfigError",
     "WorkflowOptions",
     "WorkflowResources",
     "WorkflowRun",

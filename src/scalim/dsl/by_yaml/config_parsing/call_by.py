@@ -2,7 +2,7 @@ import ast
 import sys
 from typing import Any, FrozenSet, List, Optional, Set, Tuple
 
-from ....exceptions import ScalimYamlException
+from ....exceptions import ScalimYamlError
 from ....vendor.dataclassesx import dataclass
 from ..reference_syntax import REFERENCE_FORMAT_EXAMPLES, is_valid_callable_reference
 
@@ -23,7 +23,7 @@ ALLOWED_CTX_ATTRS: Tuple[str, ...] = (
 _NON_PY_LITERAL_NAMES: FrozenSet[str] = frozenset(["true", "false", "null"])
 
 
-class ScalimCallByParseError(ScalimYamlException):
+class ScalimCallByParseError(ScalimYamlError):
     pass
 
 
@@ -316,7 +316,9 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
         ):  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
             return value  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
         msg = "Unsupported numeric literal in call_by"  # pragma: no cover  # pragma: allow-no-cover py<3.8 compat
-        raise ScalimCallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        raise ScalimCallByParseError(
+            msg
+        )  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
 
     if isinstance(
         node, ast.Str
@@ -329,7 +331,9 @@ def _parse_literal(node: ast.AST) -> Any:  # noqa: C901
         if node.value in (True, False, None):  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
             return node.value  # type: ignore[attr-defined]  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
         msg = "Unsupported literal in call_by"  # pragma: no cover  # pragma: allow-no-cover py<3.8 compat
-        raise ScalimCallByParseError(msg)  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
+        raise ScalimCallByParseError(
+            msg
+        )  # pragma: no cover  # pragma: allow-no-cover py<3.8 compatibility branch unreachable on test matrix
 
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
         operand = _parse_literal(node.operand)
@@ -351,9 +355,9 @@ def _is_valid_loader_ref(loader_ref: str) -> bool:
 
 __all__ = [
     "ALLOWED_CTX_ATTRS",
-    "ScalimCallByParseError",
     "CallByValue",
     "ParsedCallBy",
+    "ScalimCallByParseError",
     "extract_call_by_dependencies",
     "parse_call_by",
 ]

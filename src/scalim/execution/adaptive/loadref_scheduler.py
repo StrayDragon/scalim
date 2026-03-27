@@ -86,7 +86,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
         wants_scheduler_decisions = runtime.instrumentation.wants(EVENT_ADAPTIVE_SCHEDULER_DECISION)
         backend = runtime.adaptive_backend or self._policy.choose_backend(plan=self._plan, runtime=runtime, tuning=self._tuning)
         if backend in (ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC):
-            # `NOTE`: 若需回加 `process`/`async` 后端,请恢复对应实现模块与测试。
+            # `NOTE`: 若需回加 `process`/`async` 后端,请恢复对应实现模块与测试.
             msg = "adaptive backend '{}' 暂不支持: 当前仅支持 thread;请将 backend 改为 'thread'".format(backend)
             raise ValueError(msg)
         if backend != ADAPTIVE_BACKEND_THREAD:

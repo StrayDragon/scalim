@@ -2,14 +2,14 @@ from __future__ import absolute_import
 
 from typing import List, Optional, Sequence, Tuple
 
-from ..exceptions import ScalimExecutionException
+from ..exceptions import ScalimExecutionError
 from ..sinks.sink_excel import ExcelWorkbookSink
 from ..spec.ir.demand import DemandIr
 from ..vendor.dataclassesx import replace
 from .run_ir import ExecutionRequest, ExecutionResult, OutputSpec, run_ir
 
 
-class ScalimMultiRootWorkbookRunError(ScalimExecutionException):
+class ScalimMultiRootWorkbookRunError(ScalimExecutionError):
     sheet_name: str
 
     def __init__(self, sheet_name: str, exc: Exception) -> None:

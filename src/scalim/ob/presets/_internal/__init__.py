@@ -1,1 +1,1 @@
-"""`Viz preset` 内部模块。"""
+"""`Viz preset` 内部模块."""

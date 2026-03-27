@@ -9,7 +9,7 @@ from .._internal.loggingx import format_kv, get_logger, prefix
 from .._project_constants import VERSION as SCALIM_VERSION
 from ..events.catalog import EVENT_OUTPUT_TARGET_END
 from ..events.events import OutputTargetEndEvent
-from ..exceptions import ScalimExecutionException
+from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..sinks.sink_csv import CSVSink, InMemoryCsvSink
@@ -378,7 +378,7 @@ class OutputTargetStats:
     error_message_hash: Optional[str] = None
 
 
-class ScalimOutputTargetWriteError(ScalimExecutionException):
+class ScalimOutputTargetWriteError(ScalimExecutionError):
     target_id: str
 
     def __init__(self, target_id: str, exc: Exception) -> None:
@@ -1313,8 +1313,8 @@ __all__ = [
     "OutputCompositionSpec",
     "OutputTargetSpec",
     "OutputTargetStats",
-    "ScalimOutputTargetWriteError",
     "RouterRowSink",
+    "ScalimOutputTargetWriteError",
     "TwoStageGroupBySpec",
     "build_output_composition",
     "required_demand_fields",

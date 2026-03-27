@@ -9,7 +9,7 @@
 
 from typing import FrozenSet, Mapping, Optional
 
-from ....exceptions import ScalimYamlException
+from ....exceptions import ScalimYamlError
 from ....execution.run_ir import ExecutionRequest
 from ....spec.ir.demand import DemandIr
 from ....vendor.dataclassesx import dataclass
@@ -29,7 +29,7 @@ def stage_validate_allowlist(*, allowed_modules: FrozenSet[str], allowed_functio
     validate_allowlist(allowed_modules=allowed_modules, allowed_functions=allowed_functions)
 
 
-class ScalimStageAllowlistMismatchError(ScalimYamlException):
+class ScalimStageAllowlistMismatchError(ScalimYamlError):
     MESSAGE: str = "Stage context allowlist must match RunOptions allowlist"
 
     def __init__(self) -> None:

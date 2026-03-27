@@ -114,7 +114,9 @@ def test_plan_builder_cycle_error_mentions_pre_relation_hint_for_derived_ref_cyc
         main_source=orders_source,
     )
 
-    with pytest.raises(ScalimCyclicDependencyError, match=r"Hint: this may be caused by derived fields participating in relation join keys"):
+    with pytest.raises(
+        ScalimCyclicDependencyError, match=r"Hint: this may be caused by derived fields participating in relation join keys"
+    ):
         _ = PlanBuilder(demand).build(targets=["customer_name"])
 
 

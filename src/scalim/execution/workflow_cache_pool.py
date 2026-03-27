@@ -4,7 +4,6 @@ import threading
 from collections import OrderedDict
 from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, overload
 
-from ..exceptions import ScalimExecutionException
 from ..events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_CACHE_ACQUIRE,
@@ -12,6 +11,7 @@ from ..events.catalog import (
     EVENT_WORKFLOW_CACHE_RELEASE,
 )
 from ..events.events import DiagnosticWarningEvent, WorkflowCacheAcquireEvent, WorkflowCacheEvictEvent, WorkflowCacheReleaseEvent
+from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
 from ..spec.ir.sources import SourceIr
 from ..spec.ir.workflow import WorkflowCachePoolIr
@@ -21,7 +21,7 @@ from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, field
 
 
-class ScalimWorkflowCachePoolError(ScalimExecutionException):
+class ScalimWorkflowCachePoolError(ScalimExecutionError):
     path: str
 
     def __init__(self, message: str, *, path: str) -> None:
@@ -517,9 +517,9 @@ class WorkflowCachePool:
 
 
 __all__ = [
+    "ScalimWorkflowCachePoolError",
     "WorkflowCacheEntrySignature",
     "WorkflowCachePool",
-    "ScalimWorkflowCachePoolError",
     "build_preload_forever_signature",
     "diff_signature_fields",
 ]

@@ -19,10 +19,10 @@ from ..events.catalog import (
 )
 from ..events.event import generate_run_id
 from ..events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
-from ..exceptions import ScalimWorkflowException
+from ..exceptions import ScalimWorkflowError
 from ..execution.engine import ScalimEngine
 from ..execution.run_ir import ExecutionResult, run_ir
-from ..execution.workflow_cache_pool import WorkflowCachePool, ScalimWorkflowCachePoolError
+from ..execution.workflow_cache_pool import ScalimWorkflowCachePoolError, WorkflowCachePool
 from ..hooks.base import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
@@ -51,7 +51,7 @@ from ..vendor.dataclassesx import dataclass, replace
 from .errors import ScalimWorkflowConfigError
 from .loaders import workflow_loader_context
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
-from .resources import SheetBookDef, WorkflowResourceManager, ScalimWorkflowWriteError
+from .resources import ScalimWorkflowWriteError, SheetBookDef, WorkflowResourceManager
 from .resources_csv import WorkflowCsvInput
 
 
@@ -406,7 +406,7 @@ def _validate_workflow_ctx_refs(workflow_ir: WorkflowIr, *, ctx_store: WorkflowC
                     raise ScalimWorkflowConfigError(msg, path=item_path)
 
 
-class ScalimWorkflowRunFailedError(ScalimWorkflowException):
+class ScalimWorkflowRunFailedError(ScalimWorkflowError):
     run_id: str
     demand_path: str
 
@@ -1549,9 +1549,9 @@ def run_workflow_ir(
 
 
 __all__ = [
+    "ScalimWorkflowRunFailedError",
     "WorkflowResult",
     "WorkflowRunError",
-    "ScalimWorkflowRunFailedError",
     "WorkflowRunOutcome",
     "run_workflow_ir",
 ]

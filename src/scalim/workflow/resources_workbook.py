@@ -17,7 +17,7 @@ from ..utils.excel import escape_excel_formula
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import WorkflowResourceManagerBase, ScalimWorkflowWriteError, acquire_write_lock, release_write_lock
+from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock
 from .resources_csv import AppendSegment, WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 
 # 内部实现仍沿用原有局部命名,减少重构噪音.

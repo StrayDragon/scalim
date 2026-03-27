@@ -102,6 +102,6 @@ class ObserverManager(
 
 
 __all__ = [
-    "ScalimObserverCaptureOverflowError",
     "ObserverManager",
+    "ScalimObserverCaptureOverflowError",
 ]

@@ -1,7 +1,7 @@
 import re
 from typing import Tuple
 
-from ...exceptions import ScalimYamlException
+from ...exceptions import ScalimYamlError
 from ...vendor.dataclassesx import dataclass
 
 _MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
@@ -13,7 +13,7 @@ _BUILTIN_CALLABLE_ID_RE = re.compile(r"^[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*$")
 REFERENCE_FORMAT_EXAMPLES = "`module.path:function` / `module.path:obj.method` / `module.path.function` / `^<id>`"
 
 
-class ScalimReferenceSyntaxError(ScalimYamlException):
+class ScalimReferenceSyntaxError(ScalimYamlError):
     pass
 
 
