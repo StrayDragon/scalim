@@ -5,6 +5,7 @@ import pytest
 from scalim.dsl.by_yaml.runtime.contracts import RunOptions
 from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.stages import (
+    StageAllowlistMismatchError,
     stage_create_context,
     stage_compile_demand_ir,
     stage_build_execution_request,
@@ -59,5 +60,5 @@ def test_stage_map_request_rejects_allowlist_mismatch(tmp_path: Path) -> None:
     demand_ir = stage_compile_demand_ir(config, context=context)
 
     options = RunOptions(allowed_modules=frozenset(["tests.other"]))
-    with pytest.raises(ValueError, match="allowlist"):
+    with pytest.raises(StageAllowlistMismatchError, match=StageAllowlistMismatchError.MESSAGE):
         _ = stage_build_execution_request(config, demand_ir, options=options, context=context)

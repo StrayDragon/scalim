@@ -7,6 +7,7 @@ import pytest
 
 from scalim.dsl.by_yaml.config_parsing.errors import ConfigValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml.config_parsing.parsers.output import VizEventModeRemovedError
 from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
 from scalim.dsl.by_yaml.runtime import observability as runtime_observability
 from scalim.dsl.by_yaml.runtime.errors import AllowlistRequiredError
@@ -259,7 +260,7 @@ observability:
 """
         )
     assert any("observability.viz.event_mode" in line for line in exc_info.value.errors)
-    with pytest.raises(ValueError):
+    with pytest.raises(VizEventModeRemovedError):
         loader._parse_viz({VIZ_KEYS["output_dir"]: "/tmp/run", "event_mode": "full"})
 
     config = loader._parse_viz({VIZ_KEYS["enabled"]: False, VIZ_KEYS["output_dir"]: "/tmp/run"})

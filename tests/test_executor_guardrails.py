@@ -8,7 +8,7 @@ from scalim.execution.executor.operators.load import LoadOperatorExecutor
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.guardrails import (
-    GuardrailViolation,
+    GuardrailViolationError as GuardrailViolation,
     GuardrailsLoaderPolicy,
     GuardrailsPolicy,
     GuardrailsRelationsPolicy,

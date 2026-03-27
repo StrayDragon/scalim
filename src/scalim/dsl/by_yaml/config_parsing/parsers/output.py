@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 
+from .....exceptions import ScalimYamlException
 from ...schema_dsl.constants import (
     DEFAULT_PERF_REPORT_FORMAT,
     DEFAULT_PERF_SAMPLING_INTERVAL,
@@ -38,7 +39,7 @@ from .utils import list_or_none, mapping_or_none, str_or_none
 _VIZ_EVENT_MODE_REMOVED_MESSAGE = "observability.viz.event_mode has been removed; use observability.viz.trace_enabled"
 
 
-class VizEventModeRemovedError(ValueError):
+class VizEventModeRemovedError(ScalimYamlException):
     def __init__(self) -> None:
         super(VizEventModeRemovedError, self).__init__(_VIZ_EVENT_MODE_REMOVED_MESSAGE)
 

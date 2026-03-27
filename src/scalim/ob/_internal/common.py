@@ -1,6 +1,7 @@
 from collections.abc import Set as AbstractSet
 from typing import Any, Optional, Set, Tuple
 
+from ...exceptions import ScalimObserverException
 from ..._internal.loggingx import prefix
 from ...events.catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
@@ -72,7 +73,7 @@ DEFAULT_MAX_RECORDED_EVENTS = 10_000
 CAPTURE_OVERFLOW_POLICIES = ("raise", "drop-oldest", "drop-newest")
 
 
-class ObserverCaptureOverflowError(RuntimeError):
+class ObserverCaptureOverflowError(ScalimObserverException):
     pass
 
 

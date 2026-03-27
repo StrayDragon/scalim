@@ -2,6 +2,7 @@ import ast
 import sys
 from typing import Any, FrozenSet, List, Optional, Set, Tuple
 
+from ....exceptions import ScalimYamlException
 from ....vendor.dataclassesx import dataclass
 from ..reference_syntax import REFERENCE_FORMAT_EXAMPLES, is_valid_callable_reference
 
@@ -22,7 +23,7 @@ ALLOWED_CTX_ATTRS: Tuple[str, ...] = (
 _NON_PY_LITERAL_NAMES: FrozenSet[str] = frozenset(["true", "false", "null"])
 
 
-class CallByParseError(ValueError):
+class CallByParseError(ScalimYamlException):
     pass
 
 

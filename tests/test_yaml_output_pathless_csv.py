@@ -26,8 +26,12 @@ outputs:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match=r"Pathless CSV output.*workflow manages temp outputs for writes"):
+    with pytest.raises(output_composition_yaml_mod.PathlessCsvOutputError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests"]))
+    err = excinfo.value
+    assert err.output_id == "detail"
+    assert err.config_path == "outputs.0.container.path"
+    assert output_composition_yaml_mod.PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT in str(err)
 
 
 def test_is_pathless_container_path_branches() -> None:

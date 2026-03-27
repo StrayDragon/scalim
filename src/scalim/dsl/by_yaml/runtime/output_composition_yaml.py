@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
+from ....exceptions import ScalimYamlException
 from ....execution.output_composition import (
     AggMetricSpec,
     AuditSheetSpec,
@@ -39,7 +40,10 @@ from .output_path_resolve import resolve_output_container_path
 from .references import SecurePythonReferenceResolver
 
 
-class PathlessCsvOutputError(ValueError):
+PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT = "workflow manages temp outputs for writes"
+
+
+class PathlessCsvOutputError(ScalimYamlException):
     output_id: str
     config_path: str
 
@@ -69,9 +73,9 @@ def _resolve_output_container_path_with_overrides(
         managed = workflow_managed_output_ids or frozenset()
         if str(output_id) not in managed:
             msg = (
-                "Pathless CSV output is only allowed when workflow manages temp outputs for writes "
+                "Pathless CSV output is only allowed when {} "
                 "(set outputs.*.container.path or reference via workflow writes): output_id={!r}, path={}"
-            ).format(output_id, config_path)
+            ).format(PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT, output_id, config_path)
             raise PathlessCsvOutputError(msg, output_id=output_id, config_path=config_path)
         return None, True
     return resolve_output_container_path(container.path, init_vars=init_vars, path=config_path), False

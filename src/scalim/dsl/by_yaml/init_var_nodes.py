@@ -1,9 +1,10 @@
 from typing import Any, Dict
 
+from ...exceptions import ScalimYamlException
 from ...vendor.compact.typing_extensionsx import override
 
 
-class InitVarNodeValueError(ValueError):
+class InitVarNodeValueError(ScalimYamlException):
     path: str
     reason: str
 
@@ -17,7 +18,7 @@ class InitVarNodeValueError(ValueError):
         return "{} {}".format(self.path, self.reason)
 
 
-class InitVarNodeTypeError(TypeError):
+class InitVarNodeTypeError(ScalimYamlException):
     path: str
     reason: str
 

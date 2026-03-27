@@ -2,8 +2,9 @@
 
 from typing import Any, Dict, Hashable, List, Optional, Tuple
 
+from ..exceptions import safe_error_message, safe_error_type
 from ..typedefs import RelationLookupResult
-from ..vendor.dataclassesx import dataclass
+from ..vendor.dataclassesx import dataclass, field
 
 # endregion
 
@@ -166,6 +167,17 @@ class ErrorEvent:
 
     context: Dict[str, Any]
     """额外的上下文信息."""
+
+    error_type: str = field(init=False)
+    """异常类型名称(稳定字段)."""
+
+    error_message: Optional[str] = field(init=False)
+    """安全的异常信息(稳定字段,默认脱敏)."""
+
+    def __post_init__(self) -> None:
+        # 冻结数据类:使用 `object.__setattr__` 填充派生字段.
+        object.__setattr__(self, "error_type", safe_error_type(self.error))
+        object.__setattr__(self, "error_message", safe_error_message(self.error))
 
 
 @dataclass(frozen=True)

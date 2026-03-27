@@ -32,6 +32,7 @@ from ..events.events import (
     WorkflowResourceDiscardEvent,
     WorkflowResourceWriteEvent,
 )
+from ..exceptions import ScalimWorkflowException
 from ..vendor.dataclassesx import dataclass
 
 _WRITE_LOCK_SUFFIX = ".scalim.lock"
@@ -73,7 +74,7 @@ class WorkflowResourceWaitDiagnostics:
         return cls(enabled=False)
 
 
-class WorkflowWriteError(RuntimeError):
+class WorkflowWriteError(ScalimWorkflowException):
     diff: Optional[List[str]]
 
     def __init__(self, message: str, *, diff: Optional[List[str]] = None) -> None:

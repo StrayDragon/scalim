@@ -214,8 +214,8 @@ class VizObserverHandlerMixin(ABC):
         else:
             node_ref = {"type": "pipeline", "id": "pipeline"}
         summary: Dict[str, Any] = {
-            "error_type": type(event.error).__name__,
-            "message": str(event.error),
+            "error_type": event.error_type,
+            "message": event.error_message,
         }
         if "row_id" in context:
             summary["row_id"] = str(context.get("row_id"))
@@ -225,8 +225,8 @@ class VizObserverHandlerMixin(ABC):
         if context:
             sample["context_sample"] = _sample_value(context, self.config.sample_size)
         full = {
-            "error_type": type(event.error).__name__,
-            "message": str(event.error),
+            "error_type": event.error_type,
+            "message": event.error_message,
             "context": context,
         }
         payload = self._select_payload(summary, sample, full)

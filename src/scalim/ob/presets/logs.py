@@ -84,7 +84,7 @@ class LoggingObserver(EventDispatchObserver):
         self.logger.debug("%s计算 %s", prefix("pipeline"), kv)
 
     def on_error(self, event: ErrorEvent) -> None:
-        self.logger.error("%s错误: %s", prefix("pipeline"), str(event.error))
+        self.logger.error("%s错误[%s]: %s", prefix("pipeline"), str(event.error_type), str(event.error_message))
         if event.context:
             for key, ctx_value in event.context.items():
                 self.logger.error("%s  %s: %s", prefix("pipeline"), key, ctx_value)

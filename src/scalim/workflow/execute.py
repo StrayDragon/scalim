@@ -19,6 +19,7 @@ from ..events.catalog import (
 )
 from ..events.event import generate_run_id
 from ..events.events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
+from ..exceptions import ScalimWorkflowException
 from ..execution.engine import ScalimEngine
 from ..execution.run_ir import ExecutionResult, run_ir
 from ..execution.workflow_cache_pool import WorkflowCachePool, WorkflowCachePoolError
@@ -405,7 +406,7 @@ def _validate_workflow_ctx_refs(workflow_ir: WorkflowIr, *, ctx_store: WorkflowC
                     raise WorkflowConfigError(msg, path=item_path)
 
 
-class WorkflowRunFailedError(RuntimeError):
+class WorkflowRunFailedError(ScalimWorkflowException):
     run_id: str
     demand_path: str
 

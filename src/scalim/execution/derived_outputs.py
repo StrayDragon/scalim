@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal, InvalidOperation
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
+from ..exceptions import ScalimExecutionException
 from ..sinks.sink_base import BaseRowSink, IRowSink
 from ..typedefs import FieldValue, KeyNormalizationMode, RowData
 from ..utils import graph as graph_utils
@@ -25,7 +26,7 @@ def _auto_str_normalize_derived_key_part(*, value: object, field_id: str, contex
     return normalized
 
 
-class AggregationKeyLimitExceededError(RuntimeError):
+class AggregationKeyLimitExceededError(ScalimExecutionException):
     group_count: int
     max_groups: int
 
@@ -37,7 +38,7 @@ class AggregationKeyLimitExceededError(RuntimeError):
         self.max_groups = int(max_groups)
 
 
-class DistinctKeyLimitExceededError(RuntimeError):
+class DistinctKeyLimitExceededError(ScalimExecutionException):
     distinct_count: int
     max_distinct: int
     on_overflow: str
@@ -65,7 +66,7 @@ class DistinctKeyLimitExceededError(RuntimeError):
         self.key_fields = tuple(str(x) for x in key_fields)
 
 
-class DedupKeyConflictError(RuntimeError):
+class DedupKeyConflictError(ScalimExecutionException):
     key_fields: Tuple[str, ...]
     on_conflict: str
 

@@ -1,10 +1,11 @@
 from typing import Any, Dict, Iterable, List, Tuple, cast
 
+from ....exceptions import ScalimYamlException
 from ....vendor.compact.typing_extensionsx import Protocol
 from .validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
 
 
-class JsonSchemaCollectorError(RuntimeError):
+class JsonSchemaCollectorError(ScalimYamlException):
     pass
 
 

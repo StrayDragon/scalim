@@ -4,6 +4,7 @@ import threading
 from collections import OrderedDict
 from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, overload
 
+from ..exceptions import ScalimExecutionException
 from ..events.catalog import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_CACHE_ACQUIRE,
@@ -20,7 +21,7 @@ from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, field
 
 
-class WorkflowCachePoolError(RuntimeError):
+class WorkflowCachePoolError(ScalimExecutionException):
     path: str
 
     def __init__(self, message: str, *, path: str) -> None:

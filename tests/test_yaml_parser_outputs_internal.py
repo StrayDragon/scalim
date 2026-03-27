@@ -4,6 +4,7 @@ from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.models import AliasIndex, FieldDef, FieldDefIndex, RawDemand
 from scalim.dsl.by_yaml.config_parsing.parsers.outputs import _resolve_output_targets_from_inheritance
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
+from scalim.dsl.by_yaml.init_var_nodes import InitVarNodeTypeError, InitVarNodeValueError
 from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputAggregateConfig,
     OutputAggregateFieldConfig,
@@ -211,36 +212,51 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
 
 
 @pytest.mark.parametrize(
-    "raw,base_path,exc_type,match",
+    "raw,base_path,exc_type,match,expected_path,expected_reason",
     [
-        ({"path": "./out.csv"}, "outputs.0.container", ValueError, r"outputs\.0\.container\.type is required"),
-        ({"type": "bad", "path": "./out.csv"}, "outputs.0.container", ValueError, r"type='bad' is invalid"),
-        ({"type": "workbook"}, "outputs.0.container", ValueError, r"path is required for workbook outputs"),
+        ({"path": "./out.csv"}, "outputs.0.container", ValueError, r"outputs\.0\.container\.type is required", None, None),
+        ({"type": "bad", "path": "./out.csv"}, "outputs.0.container", ValueError, r"type='bad' is invalid", None, None),
+        ({"type": "workbook"}, "outputs.0.container", ValueError, r"path is required for workbook outputs", None, None),
         (
             {"type": "csv", "path": {"$init_var": "out_path", "other": 1}},
             "outputs.0.container",
-            ValueError,
-            r"only supports \{\$init_var: <name>\}; unexpected keys: other",
+            InitVarNodeValueError,
+            None,
+            "outputs.0.container.path",
+            "only supports {$init_var: <name>}; unexpected keys: other",
         ),
         (
             {"type": "csv", "path": {}},
             "outputs.0.container",
-            ValueError,
-            r"only supports \{\$init_var: <name>\}; missing '\$init_var'",
+            InitVarNodeValueError,
+            None,
+            "outputs.0.container.path",
+            "only supports {$init_var: <name>}; missing '$init_var'",
         ),
         (
             {"type": "csv", "path": {"$init_var": None}},
             "outputs.0.container",
-            TypeError,
-            r"path\.\$init_var must be a non-empty string",
+            InitVarNodeTypeError,
+            None,
+            "outputs.0.container.path.$init_var",
+            "must be a non-empty string",
         ),
-        ({"type": "csv", "path": {"$init_var": " "}}, "outputs.0.container", TypeError, r"path\.\$init_var must be a non-empty string"),
-        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a string"),
+        (
+            {"type": "csv", "path": {"$init_var": " "}},
+            "outputs.0.container",
+            InitVarNodeTypeError,
+            None,
+            "outputs.0.container.path.$init_var",
+            "must be a non-empty string",
+        ),
+        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a string", None, None),
         (
             {"type": "csv", "path": "./out.csv", "header_fields_output_by": "bad"},
             "outputs.0.container",
             ValueError,
             r"header_fields_output_by='bad' is invalid",
+            None,
+            None,
         ),
     ],
     ids=[
@@ -255,10 +271,19 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         "bad-header-by",
     ],
 )
-def test_parse_output_container_defensive_checks(raw, base_path, exc_type, match) -> None:
+def test_parse_output_container_defensive_checks(raw, base_path, exc_type, match, expected_path, expected_reason) -> None:
     loader = YamlDemandLoader()
-    with pytest.raises(exc_type, match=match):
-        _ = loader._parse_output_container(raw, base_path=base_path)
+    if match is None:
+        with pytest.raises(exc_type) as excinfo:
+            _ = loader._parse_output_container(raw, base_path=base_path)
+    else:
+        with pytest.raises(exc_type, match=match) as excinfo:
+            _ = loader._parse_output_container(raw, base_path=base_path)
+
+    if expected_path is not None:
+        assert excinfo.value.path == expected_path
+        assert excinfo.value.reason == expected_reason
+        assert str(excinfo.value) == "{} {}".format(expected_path, expected_reason)
 
 
 def test_parse_output_container_allows_pathless_csv() -> None:

@@ -1,12 +1,15 @@
-class ResolverError(Exception):
+from ....exceptions import ScalimYamlException
+
+
+class ResolverError(ScalimYamlException):
     pass
 
 
-class ConversionError(Exception):
+class ConversionError(ScalimYamlException):
     pass
 
 
-class AllowlistRequiredError(Exception):
+class AllowlistRequiredError(ScalimYamlException):
     pass
 
 

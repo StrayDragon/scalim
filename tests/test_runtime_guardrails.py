@@ -6,7 +6,7 @@ import pytest
 
 from scalim.execution import ScalimEngine
 from scalim.execution.guardrails import (
-    GuardrailViolation,
+    GuardrailViolationError as GuardrailViolation,
     GuardrailsComputePolicy,
     GuardrailsLoaderPolicy,
     GuardrailsPolicy,

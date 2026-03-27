@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
+from ....exceptions import ScalimYamlException
 from ....vendor.compact.importlibx import require_optional_dependency
 from ....vendor.dataclassesx import dataclass
 from .allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
@@ -45,7 +46,7 @@ class ImportTraceItem:
     via: Optional[str] = None
 
 
-class YamlImportExpansionError(ValueError):
+class YamlImportExpansionError(ScalimYamlException):
     trace: Tuple[ImportTraceItem, ...]
     logical_path: str
 

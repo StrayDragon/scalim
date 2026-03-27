@@ -1,7 +1,9 @@
 from typing import Any, List, Optional
 
+from ....exceptions import ScalimYamlException
 
-class ConfigValidationError(Exception):
+
+class ConfigValidationError(ScalimYamlException):
     errors: List[str]
     issues: List[Any]
 

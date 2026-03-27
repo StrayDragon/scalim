@@ -19,6 +19,8 @@
 import heapq
 from typing import Callable, Dict, Generic, Hashable, Iterable, List, Optional, Sequence, Set, Tuple, TypeVar
 
+from ..exceptions import ScalimExecutionException
+
 # endregion
 
 T = TypeVar("T", bound=Hashable)
@@ -30,7 +32,7 @@ def _stable_tie_break_key(node: Hashable) -> str:
     return "{}:{}".format(type(node).__name__, repr(node))
 
 
-class CyclicDependencyError(Exception):
+class CyclicDependencyError(ScalimExecutionException):
     """循环依赖异常"""
 
     cycles: Sequence[Sequence[Hashable]]
