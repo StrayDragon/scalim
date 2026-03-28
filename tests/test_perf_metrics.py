@@ -8,7 +8,7 @@ from scalim.ob.perf_metrics import (
     PerformanceMetrics,
     StageMetrics,
 )
-from scalim.events import AdaptiveSchedulerDecisionEvent
+from scalim.events._events import AdaptiveSchedulerDecisionEvent
 
 
 def test_memory_sample_to_dict() -> None:

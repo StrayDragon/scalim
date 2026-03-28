@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Set,
 from .._internal.loggingx import format_kv, get_logger, prefix
 from .._internal.utils.iterables import ordered_unique_str
 from .._project_constants import VERSION as SCALIM_VERSION
-from ..events import EVENT_OUTPUT_TARGET_END, OutputTargetEndEvent
+from ..events import EVENT_OUTPUT_TARGET_END
+from ..events._events import OutputTargetEndEvent
 from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
 from ..sinks import BaseRowSink, CSVSink, InMemoryCsvSink, IRowSink

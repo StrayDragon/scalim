@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 import pytest
 
-from scalim.events import LoaderCallEvent
+from scalim.events._events import LoaderCallEvent
 from scalim.ob.observer import EventDispatchObserver
 from scalim.ob.manager import ObserverManager
 

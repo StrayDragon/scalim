@@ -12,7 +12,7 @@ from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
 from scalim.dsl.by_yaml.runtime import observability as runtime_observability
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.schema_dsl.models import ObservabilityConfig, VIZ_KEYS, VizConfig
-from scalim.events import DiagnosticWarningEvent, ErrorEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
+from scalim.events._events import DiagnosticWarningEvent, ErrorEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.ob.observability import Observability
 from scalim.ob.presets.viz import VizObserver, VizObserverConfig
 from scalim.planning.plan import ExecutionPlan, PlanMetadata, Stage

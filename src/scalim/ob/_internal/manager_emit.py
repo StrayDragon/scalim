@@ -22,12 +22,15 @@ from ...events import (
     EVENT_ROW_WRITE,
     EVENT_STAGE_SPAN,
     WORKFLOW_ATTRIBUTION_META_KEYS,
+    Event,
+    now_ts,
+)
+from ...events._events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
-    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,
@@ -39,7 +42,6 @@ from ...events import (
     RowReleaseEvent,
     RowWriteEvent,
     StageSpanEvent,
-    now_ts,
 )
 from ...typedefs import RelationLookupResult
 from ..observer import Observer

@@ -1,7 +1,8 @@
 from concurrent.futures import Executor
 from typing import Any, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple, cast
 
-from ....events import EVENT_ADAPTIVE_SCHEDULER_DECISION, AdaptiveSchedulerDecisionEvent
+from ....events import EVENT_ADAPTIVE_SCHEDULER_DECISION
+from ....events._events import AdaptiveSchedulerDecisionEvent
 from ....planning.operators import LoadRefOperatorIr
 from ...context import BatchContext
 from ...executor.runtime.runtime import ExecutionRuntime

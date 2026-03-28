@@ -4,9 +4,7 @@
 
 ## Purpose
 定义稳定公开入口的编目规则与回归门禁,避免内部实现路径在文档/skills/examples/tests 中被误固化为事实公共 API.
-
 ## Requirements
-
 ### Requirement: stable public entrypoints MUST be explicitly cataloged
 
 系统 MUST 为用户侧可依赖的公共入口维护一份显式、可审计的稳定目录，而不是让“当前能 import 的路径”自然演化成公共契约。
@@ -19,12 +17,16 @@
 - `scalim.dsl.by_yaml.workflow_paths`
 - `scalim.spec.ir`
 - `scalim.workflow.loaders`（workflow YAML 中可通过字符串引用的内置 loader 入口）
+- `scalim.events`（事件 envelope、事件类型常量与事件目录查询入口；typed payload 不作为公共导入契约）
+- `scalim.sinks`（sink 契约与常用 sinks；内部 helper 不作为公共导入契约）
 
 系统 MUST 将未列入目录的路径视为非公共契约；其中至少包括：
 
 - `scalim.dsl.by_yaml.runtime.*`（例如 `scalim.dsl.by_yaml.runtime.workflow_loaders`）
 - `scalim.dsl.by_yaml.config_parsing.*`
 - `scalim.dsl.by_yaml.schema_dsl.*`
+- `scalim.events._*`
+- `scalim.sinks._internal.*`
 
 #### Scenario: curated public entrypoints are import-smoke covered
 - **WHEN** 维护者执行 public-surface import smoke gate
@@ -40,7 +42,8 @@
 #### Scenario: docs and examples avoid internal implementation imports
 - **WHEN** 维护者审阅或检查用户可见文档、skills 与 examples
 - **THEN** 其中的官方导入示例 MUST 仅引用已编目的稳定公开入口
-- **AND** 不得把 `scalim.dsl.by_yaml.runtime.*`、`config_parsing.*` 或 `schema_dsl.*` 写成推荐用户路径
+- **AND** 不得把 `scalim.dsl.by_yaml.runtime.*`、`scalim.dsl.by_yaml.config_parsing.*` 或 `scalim.dsl.by_yaml.schema_dsl.*` 写成推荐用户路径
+- **AND** 不得把 `scalim.events._*` 或 `scalim.sinks._internal.*` 写成推荐用户路径
 
 ### Requirement: unsafe capabilities MUST NOT live on default public facades
 
@@ -73,3 +76,12 @@
 - **WHEN** 回归门禁扫描 `_internal/` 目录与 `_*.py` 模块
 - **THEN** 每个模块 MUST 定义 `__all__`
 - **AND** 其 `__all__` MUST 为空（`[]` 或 `()`）
+
+### Requirement: events/sinks public facades MUST be pinned by explicit __all__ gates
+
+系统 MUST 将 `scalim.events` 与 `scalim.sinks` 视为稳定公开入口的一部分，并通过显式 `__all__` 白名单回归门禁固定其公共导出面。
+
+#### Scenario: changing facade exports fails fast in curated gate
+- **WHEN** 维护者在 `scalim.events` 或 `scalim.sinks` 调整对外导出符号集合
+- **THEN** curated public surface gate MUST fail-fast 指出缺失或新增的导出符号
+

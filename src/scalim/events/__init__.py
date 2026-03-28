@@ -1,7 +1,9 @@
 """事件类型与辅助工具.
 
-对外推荐优先从包根导入(避免绑定到内部模块文件名),例如:
-- `from scalim.events import EVENT_PIPELINE_START, PipelineStartEvent`
+对外推荐优先从包根导入稳定事件契约(避免绑定到内部模块文件名),例如:
+- `from scalim.events import Event, EVENT_PIPELINE_START, get_event_catalog`
+
+类型化 `payload` 数据类属于内部实现细节,不作为公共导入契约.
 """
 
 from ._attribution import (
@@ -52,36 +54,6 @@ from ._catalog import (
     get_event_catalog_map,
 )
 from ._event import Event, generate_run_id, now_ts
-from ._events import (
-    AdaptiveSchedulerDecisionEvent,
-    BatchEndEvent,
-    BatchStartEvent,
-    ColumnWriteEvent,
-    DiagnosticWarningEvent,
-    ErrorEvent,
-    FieldComputeEvent,
-    FieldSlimEvent,
-    LoaderCallEvent,
-    LoaderRetryEvent,
-    LoaderSlimEvent,
-    OutputTargetEndEvent,
-    PipelineEndEvent,
-    PipelineStartEvent,
-    RelationLookupEvent,
-    RowReleaseEvent,
-    RowWriteEvent,
-    StageSpanEvent,
-    WorkflowCacheAcquireEvent,
-    WorkflowCacheEvictEvent,
-    WorkflowCacheReleaseEvent,
-    WorkflowNodeCancelledEvent,
-    WorkflowNodeEndEvent,
-    WorkflowNodeStartEvent,
-    WorkflowResourceCommitEvent,
-    WorkflowResourceCreateEvent,
-    WorkflowResourceDiscardEvent,
-    WorkflowResourceWriteEvent,
-)
 
 __all__ = (
     "EVENT_ADAPTIVE_SCHEDULER_DECISION",
@@ -124,36 +96,8 @@ __all__ = (
     "WORKFLOW_NODE_END_STATUS_ERROR",
     "WORKFLOW_NODE_END_STATUS_OK",
     "WORKFLOW_NODE_ID_META_KEY",
-    "AdaptiveSchedulerDecisionEvent",
-    "BatchEndEvent",
-    "BatchStartEvent",
-    "ColumnWriteEvent",
-    "DiagnosticWarningEvent",
-    "ErrorEvent",
     "Event",
     "EventDescriptor",
-    "FieldComputeEvent",
-    "FieldSlimEvent",
-    "LoaderCallEvent",
-    "LoaderRetryEvent",
-    "LoaderSlimEvent",
-    "OutputTargetEndEvent",
-    "PipelineEndEvent",
-    "PipelineStartEvent",
-    "RelationLookupEvent",
-    "RowReleaseEvent",
-    "RowWriteEvent",
-    "StageSpanEvent",
-    "WorkflowCacheAcquireEvent",
-    "WorkflowCacheEvictEvent",
-    "WorkflowCacheReleaseEvent",
-    "WorkflowNodeCancelledEvent",
-    "WorkflowNodeEndEvent",
-    "WorkflowNodeStartEvent",
-    "WorkflowResourceCommitEvent",
-    "WorkflowResourceCreateEvent",
-    "WorkflowResourceDiscardEvent",
-    "WorkflowResourceWriteEvent",
     "generate_run_id",
     "get_event_catalog",
     "get_event_catalog_map",

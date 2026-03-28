@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Sequence, Set, cast
 
-from ....events import (
+from ....events._events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
     BatchStartEvent,

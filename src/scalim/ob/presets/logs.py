@@ -5,7 +5,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
-from ...events import (
+from ...events._events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,

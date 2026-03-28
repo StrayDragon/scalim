@@ -286,7 +286,7 @@ class TestRelationObserver:
         assert len(observer.metrics.samples) == 0
 
     def test_on_pipeline_start_resets_metrics(self) -> None:
-        from scalim.events import PipelineStartEvent
+        from scalim.events._events import PipelineStartEvent
 
         observer = RelationObserver()
         observer.record_lookup(1, 10, 10, "customers", "hit")
@@ -297,7 +297,7 @@ class TestRelationObserver:
         assert observer.metrics.total_lookups == 0
 
     def test_on_pipeline_end_outputs_report(self) -> None:
-        from scalim.events import PipelineEndEvent
+        from scalim.events._events import PipelineEndEvent
 
         config = RelationConfig(report_format="none")
         observer = RelationObserver(config=config)

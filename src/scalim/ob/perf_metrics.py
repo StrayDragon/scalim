@@ -3,7 +3,7 @@
 import json
 from typing import Any, Dict, List, Optional
 
-from ..events import AdaptiveSchedulerDecisionEvent
+from ..events._events import AdaptiveSchedulerDecisionEvent
 from ..vendor.dataclassesx import asdict, dataclass, field
 
 # endregion

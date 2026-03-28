@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
-from scalim.events import LoaderCallEvent
+from scalim.events._events import LoaderCallEvent
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.logs import LoggingObserver

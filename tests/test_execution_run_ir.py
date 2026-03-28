@@ -12,7 +12,7 @@ from scalim.ob.presets.viz import VizObserverConfig
 from scalim.sinks import BaseRowSink, BaseSink, IColumnSink, IRowSink
 from scalim.sinks import ColumnCSVSink
 from scalim.sinks import InMemoryColumnSink, InMemoryListSink, InMemoryRowSink
-from scalim.sinks import InMemoryRows
+from scalim.sinks._internal.rows import InMemoryRows
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import FieldIr
 from scalim.spec.ir import MainSourceIr

@@ -15,6 +15,8 @@ from ...events import (
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
     EVENT_STAGE_SPAN,
+)
+from ...events._events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
     BatchStartEvent,

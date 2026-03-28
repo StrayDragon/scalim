@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
 
 from .._internal.utils.excel import escape_excel_formula
-from ..events import EVENT_DIAGNOSTIC_WARNING, DiagnosticWarningEvent
-from ..sinks import create_temp_path
+from ..events import EVENT_DIAGNOSTIC_WARNING
+from ..events._events import DiagnosticWarningEvent
+from ..sinks._internal.base import create_temp_path
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass

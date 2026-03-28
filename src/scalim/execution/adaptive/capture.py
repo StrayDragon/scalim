@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
-from ...events import EVENT_LOADER_CALL, LoaderCallEvent
+from ...events import EVENT_LOADER_CALL
+from ...events._events import LoaderCallEvent
 from ...hooks import HookManager
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass

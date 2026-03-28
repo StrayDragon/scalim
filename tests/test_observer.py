@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.events import (
+from scalim.events._events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,

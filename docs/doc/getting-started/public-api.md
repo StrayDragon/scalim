@@ -24,6 +24,8 @@
 | `scalim.dsl.by_yaml.workflow_paths` | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
 | `scalim.spec.ir` | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
+| `scalim.events` | 事件 envelope + 事件类型常量 + 事件目录查询入口 | 写 Observer/Hook；按 `event_type` 订阅/过滤 |
+| `scalim.sinks` | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
 
 最常见的“只关心导入”的用法:
 
@@ -49,6 +51,18 @@ from scalim.dsl.by_yaml.workflow import WorkflowConfig, load_workflow_config
 from scalim.spec import ir as ir
 ```
 
+需要事件常量/目录查询入口时:
+
+```python
+from scalim.events import Event, EVENT_PIPELINE_START, get_event_catalog
+```
+
+需要常用 sinks 时:
+
+```python
+from scalim.sinks import CSVSink, InMemoryRowSink
+```
+
 ## 2) 其它可用导入（Tier 2:可用但不在稳定白名单）
 
 这些模块当前也对外导出了 `__all__`,但**不在 Tier 1 curated 白名单**内:适合高级用户/贡献者使用,但不建议“把它当成稳定入口依赖”。
@@ -60,8 +74,6 @@ from scalim.spec import ir as ir
 常见的 Tier 2 模块(非穷举):
 
 - `scalim.exceptions`:异常 taxonomy
-- `scalim.events`:事件/观测相关导出
-- `scalim.sinks`:输出 sinks 导出
 - `scalim.hooks`:hook 扩展点导出
 - `scalim.planning`:计划/编排相关导出
 - `scalim.execution`:执行相关导出
@@ -85,19 +97,19 @@ from scalim.spec import ir as ir
 
 ```bash
 python3 scripts/check-api-surface-governance.py --check
-pytest -q tests/test_public_api_surface_hardening.py
+pytest -q tests/test_public_api_surface_hardening.py --no-cov
 just qa
 ```
 
 ## 4) 结构评估与打分（截至 2026-03-28）
 
-**综合评分: 8.6/10**
+**综合评分: 9.1/10**
 
 理由(摘要):
 
 - 优点:Tier 1 入口清晰,有 `__all__` 白名单 + gate,回归成本低
 - 优点:YAML DSL 运行入口(`scalim.dsl.by_yaml`)与 workflow/IR 的稳定导入路径已明确拆出
-- 代价:部分 Tier 2 模块导出面偏大/偏“平铺”(尤其 `scalim.events` / `scalim.sinks`),对外契约更难精确治理
+- 代价:仍有部分 Tier 2 模块导出面偏大/偏“平铺”,但它们不在 curated 白名单内；若需依赖建议自行 pin 版本并维护回归
 
 当前 `__all__` 导出规模快照(来自运行时实测):
 
@@ -109,9 +121,9 @@ just qa
   - `scalim.dsl.by_yaml.workflow_paths`:1
   - `scalim.spec.ir`:31
   - `scalim.workflow.loaders`:2
+  - `scalim.events`:46
+  - `scalim.sinks`:22
 - Tier 2(代表性模块):
-  - `scalim.events`:74
-  - `scalim.sinks`:33
   - `scalim.planning`:9
   - `scalim.hooks`:6
 
@@ -121,13 +133,12 @@ just qa
 
 ### 5.1 主要代价点
 
-- `scalim.events` / `scalim.sinks` 的导出面偏大且平铺:
+- 部分 Tier 2 模块的导出面仍可能偏大且平铺:
   - 使用方容易“随手 import 一个看起来能用的符号”并形成隐式依赖
   - 贡献者很难判断“删/改一个符号是否 breaking”
 
 ### 5.2 可选优化方向（不落地,仅用于评估）
 
 1) **文档侧收敛(最低成本)**:保留现状,但把“推荐导入组合”写清楚,并将 Tier 2 明确标为高级入口(本页已做)。
-2) **引入更细粒度稳定子模块(中成本,可能 breaking)**:为 `events`/`sinks` 引入稳定分组模块(例如按 domain 拆分),并把推荐导入从“平铺符号”转向“分组模块”。
-3) **收窄导出面(高成本,明确 breaking)**:对 `events`/`sinks` 直接缩减 `__all__`,只保留“长期承诺”的符号;该方向建议用 OpenSpec 变更管理并配合版本策略,避免静默破坏下游。
-
+2) **引入更细粒度稳定子模块(中成本,可能 breaking)**:为部分高 churn 的 Tier 2 领域引入稳定分组模块,并把推荐导入从“平铺符号”转向“分组模块”。
+3) **收窄导出面(高成本,明确 breaking)**:对代表性的大导出面模块做显式收敛,只保留“长期承诺”的符号;该方向建议用 OpenSpec 变更管理并配合版本策略,避免静默破坏下游。

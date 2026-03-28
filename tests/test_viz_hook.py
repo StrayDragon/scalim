@@ -10,7 +10,7 @@ import pytest
 
 from scalim.events import EVENT_OUTPUT_TARGET_END
 from scalim.events import Event
-from scalim.events import (
+from scalim.events._events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
     BatchStartEvent,

@@ -1,13 +1,13 @@
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
-from ...events import (
+from ...events import Event
+from ...events._events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
-    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,

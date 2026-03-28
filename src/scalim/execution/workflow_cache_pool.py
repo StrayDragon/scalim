@@ -10,6 +10,8 @@ from ..events import (
     EVENT_WORKFLOW_CACHE_ACQUIRE,
     EVENT_WORKFLOW_CACHE_EVICT,
     EVENT_WORKFLOW_CACHE_RELEASE,
+)
+from ..events._events import (
     DiagnosticWarningEvent,
     WorkflowCacheAcquireEvent,
     WorkflowCacheEvictEvent,

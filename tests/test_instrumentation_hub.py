@@ -12,7 +12,7 @@ from scalim.events import (
     EVENT_STAGE_SPAN,
 )
 from scalim.events import Event
-from scalim.events import PipelineStartEvent, StageSpanEvent
+from scalim.events._events import PipelineStartEvent, StageSpanEvent
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.pipeline.overrides import PipelineOverrides
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime

@@ -92,4 +92,23 @@
 ## Open Questions
 
 - 是否需要提供一个独立的、明确标注为“高级/可变”的 typed payload 模块（例如 `scalim.events.payloads`），以便强类型使用方可 opt-in？
+> ok的 但是最好模块名要和标准库区分开 避免有的pythonpath异常导致问题
 
+## Implementation Summary (2026-03-28)
+
+### Audit results (user-visible imports)
+
+- `docs/doc`: 未发现直接导入 `scalim.events` / `scalim.sinks`（仅存在概述性引用,例如 public API 页面中的结构评估段落）。
+- `notebooks/marimo`:
+  - `scalim.events`: `EVENT_LOADER_CALL` / `EVENT_PIPELINE_START` / `EVENT_PIPELINE_END` / `EVENT_ERROR`
+  - `scalim.sinks`: `InMemoryRowSink` / `InMemoryColumnSink` / `CSVSink` / `ColumnCSVSink` / `BlockColumnCSVSink`
+
+### Target stable public exports
+
+- `scalim.events`: `Event` envelope + `now_ts`/`generate_run_id` + `EVENT_*` 常量 + `EventDescriptor`/`get_event_catalog*` + workflow attribution/prefix keys。
+- `scalim.sinks`: sink contracts(`ISink`/`IRowSink`/`IColumnSink` + `Base*`) + 常用 sinks(内存/CSV/Excel/Pandas) + 与列式契约相关的类型别名(`Column*`)。
+
+### Removed from package-root re-exports
+
+- `scalim.events`: `scalim.events._events` 中的 typed payload 数据类不再从包根 re-export（例如 `PipelineStartEvent`/`BatchStartEvent`/`LoaderCallEvent` 等）。
+- `scalim.sinks`: 移除内部 helper/中间态工具在包根的聚合导出(例如 `create_temp_path`/`update_columns`/`InMemoryRows`/`iter_in_memory_rows_as_main_rows` 等)。

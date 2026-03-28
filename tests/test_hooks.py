@@ -3,7 +3,7 @@ import logging
 
 import pytest
 from scalim.events import Event
-from scalim.events import (
+from scalim.events._events import (
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,

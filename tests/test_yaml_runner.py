@@ -25,7 +25,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     MemoryOptimizationConfig,
 )
 from scalim.events import EVENT_PIPELINE_START
-from scalim.events import BatchEndEvent, BatchStartEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
+from scalim.events._events import BatchEndEvent, BatchStartEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver

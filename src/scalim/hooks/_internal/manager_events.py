@@ -17,12 +17,14 @@ from ...events import (
     EVENT_PIPELINE_START,
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
+    Event,
+)
+from ...events._events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
-    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,

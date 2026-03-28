@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
 
 from .._internal.utils.excel import escape_excel_formula
-from ..events import EVENT_DIAGNOSTIC_WARNING, DiagnosticWarningEvent
-from ..sinks import create_temp_path
+from ..events import EVENT_DIAGNOSTIC_WARNING
+from ..events._events import DiagnosticWarningEvent
+from ..sinks._internal.base import create_temp_path
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock

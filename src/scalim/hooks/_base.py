@@ -4,13 +4,13 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from ..events import (
+from ..events import Event
+from ..events._events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
-    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,

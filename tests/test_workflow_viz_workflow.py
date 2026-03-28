@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from scalim.events import (
+from scalim.events._events import (
     WorkflowCacheAcquireEvent,
     WorkflowCacheEvictEvent,
     WorkflowCacheReleaseEvent,

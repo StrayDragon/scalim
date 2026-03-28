@@ -17,7 +17,7 @@ from scalim.events import (
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
 )
-from scalim.events import DiagnosticWarningEvent, WorkflowResourceWriteEvent
+from scalim.events._events import DiagnosticWarningEvent, WorkflowResourceWriteEvent
 
 _TIMEOUT_S = 5.0
 

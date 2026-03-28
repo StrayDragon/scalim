@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
-from ...events import RelationLookupEvent
+from ...events._events import RelationLookupEvent
 from ...typedefs import RelationLookupResult, RelationReportFormat
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import asdict, dataclass, field

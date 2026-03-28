@@ -20,12 +20,14 @@ from ..events import (
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
     EVENT_STAGE_SPAN,
+    Event,
+)
+from ..events._events import (
     BatchEndEvent,
     BatchStartEvent,
     ColumnWriteEvent,
     DiagnosticWarningEvent,
     ErrorEvent,
-    Event,
     FieldComputeEvent,
     FieldSlimEvent,
     LoaderCallEvent,

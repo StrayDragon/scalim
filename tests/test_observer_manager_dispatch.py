@@ -2,7 +2,7 @@ import pytest
 
 from scalim.events import EVENT_BATCH_END, EVENT_BATCH_START, EVENT_LOADER_RETRY, EVENT_PIPELINE_END, EVENT_PIPELINE_START
 from scalim.events import Event
-from scalim.events import PipelineStartEvent
+from scalim.events._events import PipelineStartEvent
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver, Observer
 

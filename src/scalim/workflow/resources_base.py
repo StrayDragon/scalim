@@ -24,6 +24,8 @@ from ..events import (
     EVENT_WORKFLOW_RESOURCE_CREATE,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
+)
+from ..events._events import (
     DiagnosticWarningEvent,
     WorkflowResourceCommitEvent,
     WorkflowResourceCreateEvent,

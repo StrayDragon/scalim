@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, Hashable, Iterable, List, Optional, Set, Sized, cast
 
 from ..._internal.loggingx import get_logger, prefix
-from ...events import LoaderCallEvent, PipelineEndEvent
+from ...events._events import LoaderCallEvent, PipelineEndEvent
 from ..observer import EventDispatchObserver
 
 # endregion

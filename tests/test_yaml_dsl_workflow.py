@@ -4204,7 +4204,7 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
 
 
 def test_workflow_artifacts_directory_discard_all_in_memory_rows_removes_empty_producer_entry() -> None:
-    from scalim.sinks import InMemoryRows
+    from scalim.sinks._internal.rows import InMemoryRows
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
 
     workflow_ir = WorkflowIr(

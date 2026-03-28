@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Set
 import pytest
 
 from scalim.events import EVENT_BATCH_START, EVENT_LOADER_CALL
-from scalim.events import BatchStartEvent
+from scalim.events._events import BatchStartEvent
 from scalim.execution.adaptive.capture import HookCaptureManager
 from scalim.execution import ScalimEngine
 from scalim.hooks import BaseHook, HookManager

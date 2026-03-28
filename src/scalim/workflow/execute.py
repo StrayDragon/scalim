@@ -17,11 +17,9 @@ from ..events import (
     WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
     WORKFLOW_NODE_END_STATUS_ERROR,
     WORKFLOW_NODE_END_STATUS_OK,
-    WorkflowNodeCancelledEvent,
-    WorkflowNodeEndEvent,
-    WorkflowNodeStartEvent,
     generate_run_id,
 )
+from ..events._events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
 from ..exceptions import ScalimWorkflowError
 from ..execution.engine import ScalimEngine
 from ..execution.run_ir import ExecutionResult, run_ir
@@ -38,7 +36,7 @@ from ..ob.presets.viz import (
     WorkflowVizObserver,
     build_workflow_viz_graph_snapshot,
 )
-from ..sinks import InMemoryRows, iter_in_memory_rows_as_main_rows
+from ..sinks._internal.rows import InMemoryRows, iter_in_memory_rows_as_main_rows
 from ..spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,

@@ -1,6 +1,6 @@
 import logging
 
-from scalim.events import BatchEndEvent, BatchStartEvent, LoaderCallEvent
+from scalim.events._events import BatchEndEvent, BatchStartEvent, LoaderCallEvent
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver, FieldSlimStep, LoaderCallStep, RowWriteStep
 
 

@@ -24,11 +24,10 @@ from ..sinks import (
     IColumnSink,
     InMemoryCsv,
     InMemoryCsvSink,
-    InMemoryRows,
-    InMemoryRowsSink,
     IRowSink,
     ISink,
 )
+from ..sinks._internal.rows import InMemoryRows, InMemoryRowsSink
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
