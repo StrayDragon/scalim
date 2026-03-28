@@ -118,7 +118,7 @@ workflow:
         a_output_path: {$ctx: {node: a, key: output_path}}
 ```
 
-## 3.1) `main_rows_from`: 上游 `InMemoryRows` → 下游 `main_rows`
+## 3.1) `main_rows_from`: 上游内存 rows → 下游 `main_rows`
 
 当 workflow 内部需要把上游 run 的结果作为下游 run 的主行流输入(不落盘/不字符串化)时,可以使用:
 
@@ -127,7 +127,7 @@ workflow:
 语义:
 
 - consumer MUST 显式 `depends_on` producer(否则启动前 fail-fast)
-- producer 仅在被引用时才会启用 typed rows 捕获(避免无意间常驻大对象)
+- producer 仅在被引用时才会启用内存 rows 捕获(避免无意间常驻大对象)
 - 下游 demand 执行时会注入 `main_rows` 并绕过 main source loader
 
 ```yaml
