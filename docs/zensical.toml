@@ -45,6 +45,7 @@ nav = [
     { "Prompt 评测(Coding agent / T1)" = "dev/prompt-eval-agent.md" },
     { "仓库开发约定" = "dev/repo-guide.md" },
     { "文档治理" = "dev/doc-governance.md" },
+    { "SSOT/生成物地图" = "dev/ssot-map.md" },
     { "如何阅读本项目" = "getting-started/reading-guide.md" },
     { "Schema Meta 参考" = "yaml-dsl/schema-meta.md" },
     { "Dev Container" = "dev/devcontainer.md" },

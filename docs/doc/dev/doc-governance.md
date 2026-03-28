@@ -9,6 +9,10 @@
    - `<!-- BEGIN AUTOGEN:<id> -->`
    - `<!-- END AUTOGEN:<id> -->`
 
+如果你不确定“某个文档/产物到底该改 SSOT 还是改生成物、要跑哪个生成入口”,先看:
+
+- [SSOT / 生成物 / 门禁地图](ssot-map.md)
+
 ## YAML DSL upgrades 的 SSOT
 
 为避免在 docs 与 skill 中重复维护 YAML DSL 的 breaking/migration 说明:
@@ -19,6 +23,7 @@
 
 ## 入口命令
 
+- 刷新**所有**受控生成物(贡献者/重构常用): `just gen`
 - 刷新 docs 相关受控输出: `just gen-docs`
 - 漂移门禁(只检查不写入): `just docs-drift-check` (也会被 `just qa`/CI 覆盖)
 

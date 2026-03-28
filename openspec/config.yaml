@@ -30,7 +30,7 @@ context: |
   若缺少 `openspec/sanitize_rules.local.yaml`,sanitize 步骤会在非 CI 环境给出 warning;当 `CI` 环境变量为有效值时跳过该提示.
   若 CI 环境未安装 `openspec` CLI,`just openspec-check` 会在 sanitize 后给出 warning 并跳过结构校验;共享/发布前仍需在具备该 CLI 的环境完成完整校验.
   规范校验命令: `openspec validate --all --strict --no-interactive`.
-  提交前缀建议: `fix:`、`tests:`、`doc:`、`PROJECT_DIST_NAME:`、`sync`、`tmp`.
+  提交前缀建议: `feat:`、`refactor:`、`fix:`、`docs:`、`specs:`、`qa:`、`tests:`、`chore:`、`PROJECT_DIST_NAME:`、`sync:`、`tmp:`.
   示例策略: 优先扩展现有 demo/YAML:,再新增文件.
   Active changes 命名规范(仅对 `openspec/changes/` 下未归档变更生效):
   - 统一使用 `c<priority>-<kebab-case>` 形式,例如 `c10-workflow-ir-roadmap`
