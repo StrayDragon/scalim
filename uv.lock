@@ -3097,7 +3097,7 @@ wheels = [
 
 [[package]]
 name = "scalim"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },
@@ -3199,12 +3199,12 @@ dev = [
 
 [[package]]
 name = "scalim-benchlib"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "packages/scalim-benchlib" }
 
 [[package]]
 name = "scalim-misc"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "packages/scalim-misc" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
