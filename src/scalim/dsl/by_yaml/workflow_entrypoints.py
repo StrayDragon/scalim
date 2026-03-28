@@ -18,6 +18,7 @@ from ...workflow.execute import ScalimWorkflowRunFailedError
 from ...workflow.execute import run_workflow_ir as _run_workflow_ir
 from ...workflow.report import WorkflowResult
 from ._public_template_sandbox import validate_public_template_sandbox
+from .config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import RunOptions, RunOverrides, RunResult, UnsetType
 from .runtime.output_composition_yaml import ScalimPathlessCsvOutputError
@@ -80,6 +81,7 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     path_aliases: Optional[Mapping[str, str]] = None,
     run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
@@ -91,6 +93,7 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         workflow_yaml_path,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
     )
     workflow_ir = compile_workflow_ir(
         wf,
@@ -129,6 +132,7 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
     )
 

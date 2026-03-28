@@ -9,7 +9,7 @@ from ...vendor.dataclassesx import dataclass
 from ...vendor.dataclassesx import field as dataclass_field
 from ._public_template_sandbox import validate_public_template_sandbox
 from .config_parsing.allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
-from .config_parsing.template_precompile import maybe_precompile_yaml_text
+from .config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 
 if TYPE_CHECKING:
     import yaml
@@ -227,6 +227,7 @@ def load_workflow_config(
     *,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
 ) -> WorkflowConfig:
     template_sandbox = validate_public_template_sandbox(template_sandbox)
     msg: str
@@ -242,7 +243,9 @@ def load_workflow_config(
             text,
             template_vars=template_vars,
             context_label="工作流 `YAML` 文件 `{}`".format(str(yaml_path)),
+            context_kind="workflow",
             template_sandbox=template_sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
         )
     except ValueError as exc:
         raise ScalimWorkflowConfigError(str(exc), path="(file)") from exc

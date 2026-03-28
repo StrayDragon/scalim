@@ -6,6 +6,7 @@ from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.litejinja2 import TemplateError, from_string
 
 __all__ = [
+    "DEFAULT_RENDERED_YAML_MAX_LEN",
     "maybe_precompile_yaml_text",
 ]
 
@@ -14,6 +15,7 @@ _logger = get_logger("dsl.by_yaml.template_vars")
 _TEMPLATE_SANDBOX_SAFE = "safe"
 _TEMPLATE_SANDBOX_LEGACY = "legacy"
 _TEMPLATE_VARS_JSON_LIKE_SCALARS: Tuple[type, ...] = (bool, int, float, str)
+DEFAULT_RENDERED_YAML_MAX_LEN = 1048576
 
 
 def _is_json_like_list(value: object) -> TypeGuard[List[object]]:
@@ -95,12 +97,51 @@ def _validate_template_vars_json_like(template_vars: Mapping[str, object]) -> No
         _validate_json_like_value(value, path="template_vars['{}']".format(key))
 
 
+def _validate_template_vars_json_like_or_raise(template_vars: Mapping[str, object], *, context_label: str) -> None:
+    try:
+        _validate_template_vars_json_like(template_vars)
+    except ValueError as exc:
+        msg = "`YAML` 模板预编译失败: {}: {}".format(str(context_label or ""), exc)
+        raise ValueError(msg) from exc
+
+
+def _validate_rendered_yaml_max_len(rendered_yaml_max_len: int) -> int:
+    if isinstance(rendered_yaml_max_len, bool) or not isinstance(rendered_yaml_max_len, int):
+        msg = "`rendered_yaml_max_len` must be an integer >= 1"
+        raise TypeError(msg)
+    max_len = int(rendered_yaml_max_len)
+    if max_len < 1:
+        msg = "`rendered_yaml_max_len` must be >= 1"
+        raise ValueError(msg)
+    return max_len
+
+
+def _ensure_rendered_yaml_within_limit(
+    rendered: str,
+    *,
+    context_label: str,
+    context_kind: str,
+    max_len: int,
+) -> None:
+    if len(rendered) <= max_len:
+        return
+    msg = "渲染后的 YAML 文本超出上限: kind={}, context={}, rendered_len={}, max_len={}".format(
+        str(context_kind or ""),
+        str(context_label or ""),
+        len(rendered),
+        int(max_len),
+    )
+    raise ValueError(msg)
+
+
 def maybe_precompile_yaml_text(
     text: str,
     *,
     template_vars: Optional[Mapping[str, object]],
     context_label: str,
+    context_kind: str,
     template_sandbox: str = _TEMPLATE_SANDBOX_SAFE,
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
 ) -> str:
     """按需对 `YAML` 文本执行 `LiteJinja2` 预编译.
 
@@ -112,6 +153,8 @@ def maybe_precompile_yaml_text(
         return str(text or "")
 
     sandbox = _validate_template_sandbox(template_sandbox)
+    max_len = _validate_rendered_yaml_max_len(rendered_yaml_max_len)
+
     if sandbox == _TEMPLATE_SANDBOX_LEGACY:
         _logger.warning(
             "%s启用 `template_sandbox=legacy`(不安全): %s",
@@ -126,11 +169,8 @@ def maybe_precompile_yaml_text(
     # 轻量优化: 无模板标记时跳过渲染(不影响语义).
     raw = str(text or "")
     if "{{" not in raw and "{%" not in raw:
-        try:
-            _validate_template_vars_json_like(template_vars)
-        except ValueError as exc:
-            msg = "`YAML` 模板预编译失败: {}: {}".format(str(context_label or ""), exc)
-            raise ValueError(msg) from exc
+        _validate_template_vars_json_like_or_raise(template_vars, context_label=context_label)
+        _ensure_rendered_yaml_within_limit(raw, context_label=context_label, context_kind=context_kind, max_len=max_len)
         return raw
 
     try:
@@ -140,13 +180,12 @@ def maybe_precompile_yaml_text(
                 continue
             _scan_template_expr_sandbox_violation(str(node.get("content") or ""), template_sandbox=sandbox)
 
-        try:
-            _validate_template_vars_json_like(template_vars)
-        except ValueError as exc:
-            msg = "`YAML` 模板预编译失败: {}: {}".format(str(context_label or ""), exc)
-            raise ValueError(msg) from exc
+        _validate_template_vars_json_like_or_raise(template_vars, context_label=context_label)
 
-        return template.render(dict(template_vars), strict_undefined=True, template_sandbox=sandbox)
+        rendered = template.render(dict(template_vars), strict_undefined=True, template_sandbox=sandbox)
+        _ensure_rendered_yaml_within_limit(rendered, context_label=context_label, context_kind=context_kind, max_len=max_len)
     except TemplateError as exc:
         msg = "`YAML` 模板预编译失败: {}: {}".format(str(context_label or ""), exc)
         raise ValueError(msg) from exc
+    else:
+        return rendered

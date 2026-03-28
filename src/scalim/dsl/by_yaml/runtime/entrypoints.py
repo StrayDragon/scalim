@@ -9,6 +9,7 @@ from ....ob.observer import Observer
 from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from .._public_template_sandbox import validate_public_template_sandbox
+from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .compiler import compile as _compile
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult
 
@@ -31,6 +32,7 @@ def run(  # noqa: PLR0913
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     builtin_callables: Optional[Mapping[str, object]] = None,
     public_builtin_callable_ids: Optional[Tuple[str, ...]] = None,
@@ -65,6 +67,7 @@ def run(  # noqa: PLR0913
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
         builtin_callables=builtin_callables,
         public_builtin_callable_ids=public_builtin_callable_ids,
@@ -92,6 +95,7 @@ def compile(  # noqa: A001, PLR0913
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     builtin_callables: Optional[Mapping[str, object]] = None,
     public_builtin_callable_ids: Optional[Tuple[str, ...]] = None,
@@ -113,6 +117,7 @@ def compile(  # noqa: A001, PLR0913
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
         builtin_callables=builtin_callables,
         public_builtin_callable_ids=public_builtin_callable_ids,

@@ -23,6 +23,7 @@ from ....spec.ir import DemandIr
 from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import replace
 from ..config_parsing.loader import YamlDemandLoader
+from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from ..init_var_nodes import parse_init_var_mapping_node
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from ..schema_dsl.constants import (
@@ -479,6 +480,7 @@ def load_config(
     *,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Sequence[str]] = None,
 ) -> DemandConfig:
     loader = YamlDemandLoader()
@@ -486,6 +488,7 @@ def load_config(
         yaml_path,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
     )
 
@@ -727,6 +730,7 @@ def compile(  # noqa: A001
         yaml_path,
         template_vars=options.template_vars,
         template_sandbox=options.template_sandbox,
+        rendered_yaml_max_len=options.rendered_yaml_max_len,
         allowed_yaml_roots=options.allowed_yaml_roots,
     )
     base_module_path = None

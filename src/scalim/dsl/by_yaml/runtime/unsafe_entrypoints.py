@@ -19,6 +19,7 @@ from ....hooks import IExecutionHook
 from ....ob.observer import Observer
 from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
+from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .compiler import compile as _compile
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult
 
@@ -73,6 +74,7 @@ def unsafe_run(  # noqa: PLR0913
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> RunResult:
     """不安全入口: 允许显式启用 `legacy` 模板沙箱等能力.
@@ -97,6 +99,7 @@ def unsafe_run(  # noqa: PLR0913
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
     )
     compilation = _compile(yaml_path, options=options)
@@ -122,6 +125,7 @@ def unsafe_compile(  # noqa: PLR0913
     init_vars: Optional[Dict[str, object]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> Compilation:
     """不安全入口: 允许显式启用 `legacy` 模板沙箱等能力.
@@ -146,6 +150,7 @@ def unsafe_compile(  # noqa: PLR0913
         init_vars=init_vars,
         template_vars=template_vars,
         template_sandbox=sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
     )
     return _compile(yaml_path, options=options)

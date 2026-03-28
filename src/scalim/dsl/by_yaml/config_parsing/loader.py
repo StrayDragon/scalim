@@ -24,7 +24,7 @@ from .parsers.output import ParserOutputMixin
 from .parsers.outputs import ParserOutputsMixin
 from .parsers.results import ParsedFieldsResult
 from .parsers.utils import mapping_or_none, str_or_none
-from .template_precompile import maybe_precompile_yaml_text
+from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 
 __all__ = [
     "ParsedFieldsResult",
@@ -59,6 +59,7 @@ class YamlDemandLoader(
         *,
         template_vars: Optional[Mapping[str, object]] = None,
         template_sandbox: str = "safe",
+        rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
         allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
         scalim_yaml_override: Optional[Union[str, Path]] = None,
         project_root_override: Optional[Union[str, Path]] = None,
@@ -71,7 +72,9 @@ class YamlDemandLoader(
                 text,
                 template_vars=template_vars,
                 context_label="需求 `YAML` 文件 `{}`".format(str(yaml_path)),
+                context_kind="demand",
                 template_sandbox=template_sandbox,
+                rendered_yaml_max_len=rendered_yaml_max_len,
             )
             raw = _safe_load_yaml(text)
         else:
@@ -80,7 +83,9 @@ class YamlDemandLoader(
                 text,
                 template_vars=template_vars,
                 context_label="需求 `YAML` 文本",
+                context_kind="demand",
                 template_sandbox=template_sandbox,
+                rendered_yaml_max_len=rendered_yaml_max_len,
             )
             raw = _safe_load_yaml(text)
         raw_demand = RawDemand.from_raw(raw)
@@ -93,6 +98,7 @@ class YamlDemandLoader(
                         yaml_path=yaml_path,
                         template_vars=template_vars,
                         template_sandbox=template_sandbox,
+                        rendered_yaml_max_len=rendered_yaml_max_len,
                         allowed_yaml_roots=allowed_yaml_roots,
                         scalim_yaml_override=scalim_yaml_override,
                         project_root_override=project_root_override,
@@ -115,12 +121,15 @@ class YamlDemandLoader(
         *,
         template_vars: Optional[Mapping[str, object]] = None,
         template_sandbox: str = "safe",
+        rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     ) -> DemandConfig:
         text = maybe_precompile_yaml_text(
             yaml_string,
             template_vars=template_vars,
             context_label="需求 `YAML` 字符串",
+            context_kind="demand",
             template_sandbox=template_sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
         )
         raw = _safe_load_yaml(text)
         raw_demand = RawDemand.from_raw(raw)

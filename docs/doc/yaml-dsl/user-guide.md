@@ -1658,7 +1658,7 @@ run(
 
 - `allowed_modules`: 粗粒度,适合把 loader 统一收敛到单一模块(如 `myapp.loaders`)
 - `allowed_functions`: 细粒度,推荐在生产使用;支持 `module:function` 与 `module.function` 两种写法
-- wildcard `*` 默认被禁止(避免误用导致 allowlist 形同虚设);仅在 `resolver_trusted_mode=trusted_allow_all_modules` 下允许显式放宽
+- wildcard `*` 默认被禁止(避免误用导致 allowlist 形同虚设);如确需在可信环境显式放宽,请走内部受控流程(不在公开示例中给出)
 
 **reference 形式与注意事项**:
 
@@ -1682,19 +1682,12 @@ main_source:
 - 旧代码如果绕过官方 facade 直接调用内部编译器/转换器,建议迁移到 `scalim.dsl.by_yaml.compile/run`,并显式配置 allowlist:
 
 ```python
-from scalim.dsl.by_yaml import ResolverTrustedMode, compile
+from scalim.dsl.by_yaml import compile
 
 # 推荐:显式 allowlist(安全默认)
 _ = compile(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-)
-
-# 仅用于可信环境/测试:显式启用 trusted-mode 放宽为允许任意模块(不推荐生产使用)
-_ = compile(
-    "path/to/config.yaml",
-    allowed_modules=frozenset(["*"]),
-    resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
 )
 ```
 
@@ -1935,12 +1928,15 @@ print(f"输出路径: {result.output_path}")
 
 - `template_vars` 不是 YAML schema 字段;`scalim-cli yaml-dsl validate/schema validate` 当前也不支持注入 `template_vars`。
 - 能用结构化注入时,优先用 `init_vars` + `{$init_var: <name>}`(CLI 可直接校验;也更稳定/可维护)。
+- `template_sandbox` 默认为 `safe`：禁止无参方法调用,并禁止访问以下划线开头属性(含 `__dunder__`)；若你确实需要遗留能力,只能通过内部 `unsafe` 入口显式启用 `legacy`(不建议用于不可信输入)。
+- 当启用 `template_vars` 时,系统会对“渲染后的 YAML 文本”施加长度上限 `rendered_yaml_max_len`(默认 `1048576`)：同时覆盖 demand/workflow 与 imports fragments,并在 YAML parse 前 fail-fast；超限错误只回显 `rendered_len/max_len` 与位置,不会回显渲染正文。
 
 ```python
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
     template_vars={"output_path": "./out/report.csv"},
+    rendered_yaml_max_len=2_000_000,  # (可选)按需调大
 )
 ```
 

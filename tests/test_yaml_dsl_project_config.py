@@ -56,14 +56,24 @@ def test_parse_import_source_requires_base_dir_for_file_paths() -> None:
 def test_load_yaml_mapping_from_source_rejects_file_source_missing_path() -> None:
     source = imports_mod.ImportSource(kind="file", key="/tmp/x.yaml", path=None)
     with pytest.raises(ValueError) as excinfo:
-        _ = imports_mod._load_yaml_mapping_from_source(source, template_vars=None, template_sandbox="safe")  # noqa: SLF001
+        _ = imports_mod._load_yaml_mapping_from_source(  # noqa: SLF001
+            source,
+            template_vars=None,
+            template_sandbox="safe",
+            rendered_yaml_max_len=imports_mod.DEFAULT_RENDERED_YAML_MAX_LEN,
+        )
     assert "requires path" in str(excinfo.value)
 
 
 def test_load_yaml_mapping_from_source_rejects_preset_source_missing_preset_id() -> None:
     source = imports_mod.ImportSource(kind="preset", key="scalim://x", preset_id=None)
     with pytest.raises(ValueError) as excinfo:
-        _ = imports_mod._load_yaml_mapping_from_source(source, template_vars=None, template_sandbox="safe")  # noqa: SLF001
+        _ = imports_mod._load_yaml_mapping_from_source(  # noqa: SLF001
+            source,
+            template_vars=None,
+            template_sandbox="safe",
+            rendered_yaml_max_len=imports_mod.DEFAULT_RENDERED_YAML_MAX_LEN,
+        )
     assert "requires preset_id" in str(excinfo.value)
 
 
@@ -71,14 +81,24 @@ def test_load_yaml_mapping_from_source_rejects_non_mapping_preset(monkeypatch: p
     monkeypatch.setattr(imports_mod, "load_scalim_preset_yaml_text", lambda _preset_id: "- 1\n")
     source = imports_mod.ImportSource(kind="preset", key="scalim://bad", preset_id="bad")
     with pytest.raises(TypeError) as excinfo:
-        _ = imports_mod._load_yaml_mapping_from_source(source, template_vars=None, template_sandbox="safe")  # noqa: SLF001
+        _ = imports_mod._load_yaml_mapping_from_source(  # noqa: SLF001
+            source,
+            template_vars=None,
+            template_sandbox="safe",
+            rendered_yaml_max_len=imports_mod.DEFAULT_RENDERED_YAML_MAX_LEN,
+        )
     assert "must be a mapping" in str(excinfo.value)
 
 
 def test_load_yaml_mapping_from_source_rejects_unknown_kind() -> None:
     source = imports_mod.ImportSource(kind="nope", key="nope")
     with pytest.raises(ValueError) as excinfo:
-        _ = imports_mod._load_yaml_mapping_from_source(source, template_vars=None, template_sandbox="safe")  # noqa: SLF001
+        _ = imports_mod._load_yaml_mapping_from_source(  # noqa: SLF001
+            source,
+            template_vars=None,
+            template_sandbox="safe",
+            rendered_yaml_max_len=imports_mod.DEFAULT_RENDERED_YAML_MAX_LEN,
+        )
     assert "Unknown ImportSource.kind" in str(excinfo.value)
 
 

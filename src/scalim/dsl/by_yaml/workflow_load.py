@@ -7,6 +7,7 @@
 
 from typing import Mapping, Optional, Tuple
 
+from .config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig, load_workflow_config
 
 
@@ -15,12 +16,18 @@ def load_workflow_config_from_path(
     *,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
 ) -> Tuple[str, WorkflowConfig]:
     workflow_path = str(workflow_yaml_path or "").strip()
     if not workflow_path:
         msg = "workflow_yaml_path is required"
         raise ScalimWorkflowConfigError(msg, path="(file)")
-    wf = load_workflow_config(workflow_path, template_vars=template_vars, template_sandbox=template_sandbox)
+    wf = load_workflow_config(
+        workflow_path,
+        template_vars=template_vars,
+        template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
+    )
     return workflow_path, wf
 
 

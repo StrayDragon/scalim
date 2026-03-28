@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 from ..._internal.loggingx import prefix
+from ..._internal.utils.excel import escape_excel_formula
 from ...typedefs import FieldValue, RowData, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Self, override
 from ...vendor.dataclassesx import dataclass
@@ -45,6 +46,13 @@ COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_CSV_SINK_REMOVE_TEMP_FILE_F
 
 def _normalize_csv_value(value: Any) -> str:
     return "" if value is None else str(value)
+
+
+def _normalize_csv_value_for_spreadsheet(value: Any, *, allow_formulas: bool) -> str:
+    if value is None:
+        return ""
+    escaped = escape_excel_formula(value, allow_formulas=allow_formulas)
+    return "" if escaped is None else str(escaped)
 
 
 @dataclass(frozen=True)
@@ -142,6 +150,7 @@ class CSVSink(BaseRowSink):
     include_header: bool
     flush_policy: str
     flush_every_rows: int
+    allow_formulas: bool
     _rows_since_flush: int
     _closed: bool
     field_names: List[str]
@@ -164,6 +173,7 @@ class CSVSink(BaseRowSink):
         flush_policy: str = "every_n_rows",
         flush_every_rows: int = 1000,
         open_fn: Optional[Callable[..., io.TextIOWrapper]] = None,
+        allow_formulas: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.delimiter = delimiter
@@ -172,6 +182,7 @@ class CSVSink(BaseRowSink):
         self.flush_policy = flush_policy
         self.flush_every_rows = flush_every_rows
         self._open_fn = open_fn or io.open
+        self.allow_formulas = bool(allow_formulas)
         self._rows_since_flush = 0
         self._closed = False
 
@@ -200,10 +211,14 @@ class CSVSink(BaseRowSink):
         self._aligned_cache_indexes = None
 
     def _write_header(self) -> None:
-        self._writer.writerow(self.header_names)
+        self._writer.writerow(
+            [_normalize_csv_value_for_spreadsheet(value, allow_formulas=self.allow_formulas) for value in self.header_names]
+        )
 
     def _format_row(self, row: RowData) -> List[str]:
-        return [_normalize_csv_value(row.get(field_name)) for field_name in self.field_names]
+        return [
+            _normalize_csv_value_for_spreadsheet(row.get(field_name), allow_formulas=self.allow_formulas) for field_name in self.field_names
+        ]
 
     def _maybe_flush(self, rows_written: int) -> None:
         if self.flush_policy == "always":
@@ -238,7 +253,7 @@ class CSVSink(BaseRowSink):
             if idx is None:
                 row_values.append("")
             else:
-                row_values.append(_normalize_csv_value(values[idx]))
+                row_values.append(_normalize_csv_value_for_spreadsheet(values[idx], allow_formulas=self.allow_formulas))
         self._writer.writerow(row_values)
         self._maybe_flush(1)
 
@@ -311,6 +326,7 @@ class ColumnCSVSink(IColumnSink):
     delimiter: str
     encoding: str
     include_header: bool
+    allow_formulas: bool
     _row_ids: List[Any]
     _columns: ColumnData
     _closed: bool
@@ -323,6 +339,7 @@ class ColumnCSVSink(IColumnSink):
         delimiter: str = ",",
         encoding: str = "utf-8",
         include_header: bool = True,  # noqa: FBT001, FBT002
+        allow_formulas: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.field_names = field_names
@@ -330,6 +347,7 @@ class ColumnCSVSink(IColumnSink):
         self.delimiter = delimiter
         self.encoding = encoding
         self.include_header = include_header
+        self.allow_formulas = bool(allow_formulas)
         self._row_ids = []
         self._columns = {}
         self._closed = False
@@ -378,10 +396,14 @@ class ColumnCSVSink(IColumnSink):
             with io.open(temp_path, "w", encoding=self.encoding, newline="") as f:
                 writer = csv.writer(f, delimiter=self.delimiter)
                 if self.include_header:
-                    writer.writerow(self.header_names)
+                    writer.writerow(
+                        [_normalize_csv_value_for_spreadsheet(value, allow_formulas=self.allow_formulas) for value in self.header_names]
+                    )
 
                 for row_values in iter_row_values(self._row_ids, self.field_names, self._columns):
-                    writer.writerow([_normalize_csv_value(value) for value in row_values])
+                    writer.writerow(
+                        [_normalize_csv_value_for_spreadsheet(value, allow_formulas=self.allow_formulas) for value in row_values]
+                    )
 
             # 原子重命名临时文件到目标路径
             _ = temp_path_obj.replace(self.output_path)
@@ -455,6 +477,7 @@ class BlockColumnCSVSink(IColumnSink):
     col_width: int
     delimiter: bytes
     encoding: str
+    allow_formulas: bool
     _row_ids: List[Any]
     _pk_to_index: Dict[Any, int]
     _field_to_col_index: Dict[str, int]
@@ -473,12 +496,14 @@ class BlockColumnCSVSink(IColumnSink):
         delimiter: str = ",",
         encoding: str = "utf-8",
         write_delay: float = 0.5,
+        allow_formulas: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.field_names = field_names
         self.col_width = col_width
         self.delimiter = delimiter.encode(encoding)
         self.encoding = encoding
+        self.allow_formulas = bool(allow_formulas)
         self._row_ids = []
         self._pk_to_index = {}
         self._field_to_col_index = {name: i for i, name in enumerate(field_names)}
@@ -500,7 +525,8 @@ class BlockColumnCSVSink(IColumnSink):
 
         header_parts: List[bytes] = []
         for name in self.field_names:
-            name_bytes = name.encode(self.encoding)
+            escaped = escape_excel_formula(name, allow_formulas=self.allow_formulas)
+            name_bytes = str(escaped).encode(self.encoding)
             padded = name_bytes[: self.col_width].ljust(self.col_width, b" ")
             header_parts.append(padded)
         header_line = self.delimiter.join(header_parts) + b"\n"
@@ -548,7 +574,8 @@ class BlockColumnCSVSink(IColumnSink):
         if value is None:
             value_str = ""
         else:
-            value_str = str(value)
+            escaped = escape_excel_formula(value, allow_formulas=self.allow_formulas)
+            value_str = str(escaped)
 
         value_bytes = value_str.encode(self.encoding)
         padded = value_bytes[: self.col_width].ljust(self.col_width, b" ")

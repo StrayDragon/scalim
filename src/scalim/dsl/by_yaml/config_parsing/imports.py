@@ -9,7 +9,7 @@ from ....vendor.dataclassesx import dataclass
 from .allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
 from .presets import load_scalim_preset_yaml_text
 from .project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
-from .template_precompile import maybe_precompile_yaml_text
+from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 
 if TYPE_CHECKING:
     import yaml
@@ -371,6 +371,7 @@ def expand_imports_inplace(
     cache: Optional[Dict[str, Dict[str, Any]]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
     scalim_yaml_override: Optional[Union[str, Path]] = None,
     project_root_override: Optional[Union[str, Path]] = None,
@@ -398,6 +399,7 @@ def expand_imports_inplace(
         logical_path="",
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=roots,
         project_config=project_config,
     )
@@ -409,6 +411,7 @@ def load_and_expand_imports(
     cache: Optional[Dict[str, Dict[str, Any]]] = None,
     template_vars: Optional[Mapping[str, object]] = None,
     template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
     scalim_yaml_override: Optional[Union[str, Path]] = None,
     project_root_override: Optional[Union[str, Path]] = None,
@@ -434,6 +437,7 @@ def load_and_expand_imports(
         trace=trace,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=roots,
         project_config=project_config,
     )
@@ -467,13 +471,16 @@ def _load_yaml_mapping(
     *,
     template_vars: Optional[Mapping[str, object]],
     template_sandbox: str,
+    rendered_yaml_max_len: int,
 ) -> Dict[str, Any]:
     text = yaml_path.read_text(encoding="utf-8")
     text = maybe_precompile_yaml_text(
         text,
         template_vars=template_vars,
         context_label="导入片段 `YAML` 文件 `{}`".format(str(yaml_path)),
+        context_kind="fragment",
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
     )
     loaded = yaml.safe_load(text)
     if not isinstance(loaded, dict):
@@ -489,6 +496,7 @@ def _load_and_expand_source(
     trace: List[ImportTraceItem],
     template_vars: Optional[Mapping[str, object]],
     template_sandbox: str,
+    rendered_yaml_max_len: int,
     allowed_yaml_roots: Sequence[Path],
     project_config: Optional[YamlDslProjectConfig],
 ) -> Dict[str, Any]:
@@ -506,6 +514,7 @@ def _load_and_expand_source(
             source,
             template_vars=template_vars,
             template_sandbox=template_sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
         )
     except Exception as exc:
         msg = "Failed to load fragment YAML: {}: {}".format(type(exc).__name__, exc)
@@ -518,6 +527,7 @@ def _load_and_expand_source(
         logical_path="",
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
         project_config=project_config,
     )
@@ -530,12 +540,18 @@ def _load_yaml_mapping_from_source(
     *,
     template_vars: Optional[Mapping[str, object]],
     template_sandbox: str,
+    rendered_yaml_max_len: int,
 ) -> Dict[str, Any]:
     if source.kind == "file":
         if source.path is None:
             msg = "ImportSource(kind='file') requires path"
             raise ValueError(msg)
-        return _load_yaml_mapping(source.path, template_vars=template_vars, template_sandbox=template_sandbox)
+        return _load_yaml_mapping(
+            source.path,
+            template_vars=template_vars,
+            template_sandbox=template_sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
+        )
     if source.kind == "preset":
         if source.preset_id is None:
             msg = "ImportSource(kind='preset') requires preset_id"
@@ -545,7 +561,9 @@ def _load_yaml_mapping_from_source(
             text,
             template_vars=template_vars,
             context_label="导入片段 `YAML` preset `{}`".format(source.key),
+            context_kind="fragment",
             template_sandbox=template_sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
         )
         loaded = yaml.safe_load(text)
         if not isinstance(loaded, dict):
@@ -565,6 +583,7 @@ def _expand_file_inplace(
     logical_path: str,
     template_vars: Optional[Mapping[str, object]],
     template_sandbox: str,
+    rendered_yaml_max_len: int,
     allowed_yaml_roots: Sequence[Path],
     project_config: Optional[YamlDslProjectConfig],
 ) -> Dict[str, Any]:
@@ -589,6 +608,7 @@ def _expand_file_inplace(
         logical_path=logical_path,
         template_vars=template_vars,
         template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
         project_config=project_config,
     )
@@ -604,6 +624,7 @@ def _expand_node_inplace(
     logical_path: str,
     template_vars: Optional[Mapping[str, object]],
     template_sandbox: str,
+    rendered_yaml_max_len: int,
     allowed_yaml_roots: Sequence[Path],
     project_config: Optional[YamlDslProjectConfig],
 ) -> None:
@@ -616,6 +637,7 @@ def _expand_node_inplace(
             logical_path=logical_path,
             template_vars=template_vars,
             template_sandbox=template_sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
             allowed_yaml_roots=allowed_yaml_roots,
             project_config=project_config,
         )
@@ -629,6 +651,7 @@ def _expand_node_inplace(
                 logical_path=next_path,
                 template_vars=template_vars,
                 template_sandbox=template_sandbox,
+                rendered_yaml_max_len=rendered_yaml_max_len,
                 allowed_yaml_roots=allowed_yaml_roots,
                 project_config=project_config,
             )
@@ -644,6 +667,7 @@ def _expand_node_inplace(
                 logical_path=next_path,
                 template_vars=template_vars,
                 template_sandbox=template_sandbox,
+                rendered_yaml_max_len=rendered_yaml_max_len,
                 allowed_yaml_roots=allowed_yaml_roots,
                 project_config=project_config,
             )
@@ -659,6 +683,7 @@ def _expand_mapping_inplace(
     logical_path: str,
     template_vars: Optional[Mapping[str, object]],
     template_sandbox: str,
+    rendered_yaml_max_len: int,
     allowed_yaml_roots: Sequence[Path],
     project_config: Optional[YamlDslProjectConfig],
 ) -> None:
@@ -697,6 +722,7 @@ def _expand_mapping_inplace(
             trace=next_trace,
             template_vars=template_vars,
             template_sandbox=template_sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
             allowed_yaml_roots=allowed_yaml_roots,
             project_config=project_config,
         )

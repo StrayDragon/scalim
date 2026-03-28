@@ -227,6 +227,79 @@ def test_csv_sink_escapes_special_chars(tmp_path, sink_cls):
     ]
 
 
+@pytest.mark.parametrize(
+    "sink_cls",
+    [CSVSink, ColumnCSVSink],
+    ids=["row-sink", "column-sink"],
+)
+def test_csv_sinks_escape_formula_like_values_by_default(tmp_path, sink_cls) -> None:
+    output_path = tmp_path / "formula.csv"
+    rows = [
+        {"id": 1, "name": "=1+1"},
+        {"id": 2, "name": "  -2+2"},
+        {"id": 3, "name": "'=already"},
+    ]
+    _write_rows_to_csv(
+        output_path,
+        sink_cls,
+        rows,
+        header_names=["=id", "name"],
+    )
+
+    with output_path.open(encoding="utf-8", newline="") as f:
+        out_rows = list(csv.reader(f))
+
+    assert out_rows == [
+        ["'=id", "name"],
+        ["1", "'=1+1"],
+        ["2", "'  -2+2"],
+        ["3", "'=already"],
+    ]
+
+
+def test_csv_sinks_allow_formulas_preserves_raw_values(tmp_path) -> None:
+    rows = [
+        {"id": 1, "name": "=1+1"},
+        {"id": 2, "name": "  -2+2"},
+        {"id": 3, "name": "'=already"},
+    ]
+
+    output_path = tmp_path / "allow_row.csv"
+    with CSVSink(
+        str(output_path),
+        field_names=["id", "name"],
+        header_names=["=id", "name"],
+        allow_formulas=True,
+    ) as sink:
+        sink.write_batch(rows)
+
+    with output_path.open(encoding="utf-8", newline="") as f:
+        out_rows = list(csv.reader(f))
+    assert out_rows == [
+        ["=id", "name"],
+        ["1", "=1+1"],
+        ["2", "  -2+2"],
+        ["3", "'=already"],
+    ]
+
+    output_path2 = tmp_path / "allow_column.csv"
+    sink2 = ColumnCSVSink(
+        str(output_path2),
+        field_names=["id", "name"],
+        header_names=["=id", "name"],
+        allow_formulas=True,
+    )
+    row_ids = [row["id"] for row in rows]
+    sink2.set_row_ids(row_ids)
+    sink2.write_column("id", {row["id"]: row["id"] for row in rows})
+    sink2.write_column("name", {row["id"]: row["name"] for row in rows})
+    sink2.close()
+
+    with output_path2.open(encoding="utf-8", newline="") as f:
+        out_rows2 = list(csv.reader(f))
+    assert out_rows2 == out_rows
+
+
 def test_csv_sink_atomic_write(tmp_path):
     """Test that CSVSink uses atomic write (temp file + rename)."""
     import os

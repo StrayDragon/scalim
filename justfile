@@ -530,6 +530,10 @@ check-dynattr:
 check-api-surface-governance:
     uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check
 
+# 检查: user-facing materials 不得引用内部/不安全导入路径
+check-user-material-import-boundaries:
+    uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check
+
 # 报告: `object` 类型标注基线
 report-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py
@@ -539,7 +543,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-api-surface-governance py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-api-surface-governance check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

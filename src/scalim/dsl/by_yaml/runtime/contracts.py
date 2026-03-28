@@ -10,6 +10,7 @@ from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
 from ....vendor.dataclassesx import dataclass
+from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
 
@@ -103,6 +104,9 @@ class RunOptions:
     - `safe`(默认): 禁止无参 `method call`,并禁止访问以下划线开头属性(含 `__dunder__`).
     - `legacy`: 显式放宽(不安全);仅用于可信输入/内部测试.
     """
+
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN
+    """当启用 `template_vars` 预编译时,渲染后 `YAML` 文本长度上限(字符数)."""
 
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None
     """可选:允许读取 `YAML` 文件的根目录集合.
