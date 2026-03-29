@@ -6,8 +6,7 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 from ...execution.run_ir import ExecutionResult
 from ...typedefs import KeyNormalizationMode, ParallelMode
@@ -21,8 +20,6 @@ from ._public_template_sandbox import validate_public_template_sandbox
 from .config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import RunOptions, RunOverrides, RunResult, UnsetType
-from .runtime.output_composition_yaml import ScalimPathlessCsvOutputError
-from .runtime.output_path_resolve import resolve_output_container_path
 from .schema_dsl.models import DemandConfig
 from .workflow import ScalimWorkflowConfigError
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
@@ -65,7 +62,7 @@ def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Option
     return bundle_viz_base_config
 
 
-def run_workflow(  # noqa: PLR0913, C901, PLR0915
+def run_workflow(  # noqa: PLR0913, C901
     workflow_yaml_path: str,
     *,
     allowed_modules: FrozenSet[str],
@@ -101,6 +98,16 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         path_aliases=path_aliases,
         template_vars=template_vars,
         allowed_yaml_roots=allowed_yaml_roots,
+        init_vars=init_vars,
+        overrides=(
+            None
+            if overrides is None
+            else {
+                "outputs": overrides.outputs,
+                "resources": overrides.resources,
+                "outputs_defaults": overrides.outputs_defaults,
+            }
+        ),
     )
 
     # 2) 推导 `workflow` 缓存池消费关系上界(`DSL` 层;依赖 `demand` `YAML`)
@@ -136,81 +143,6 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         allowed_yaml_roots=allowed_yaml_roots,
     )
 
-    reserved_xlsx_paths: Set[str] = set()
-    for res in workflow_ir.resources:
-        if str(res.resource_type or "") not in {"workbook", "sheetbook"}:
-            continue
-        res_path = str(res.path or "").strip()
-        if not res_path:
-            continue
-        reserved_xlsx_paths.add(str(Path(res_path).expanduser().resolve(strict=False)))
-    workbook_writers_by_abs_path: Dict[str, List[str]] = {}
-
-    def _as_abs_path(raw_path: str) -> str:
-        return str(Path(str(raw_path)).expanduser().resolve(strict=False))
-
-    def _collect_workbook_output_paths(cfg: Any, *, init_vars: Optional[Dict[str, object]]) -> Set[str]:
-        raw_paths: Set[str] = set()
-
-        default_workbook_path: Optional[str] = None
-        for idx, out_cfg in enumerate(cfg.outputs or ()):
-            container = out_cfg.container
-            if container is None:
-                continue  # pragma: no cover  # pragma: allow-no-cover invariant: container should exist for workbook outputs
-            if str(container.type or "").lower() != "workbook":
-                continue
-            path_str = resolve_output_container_path(
-                container.path,
-                init_vars=init_vars,
-                path="outputs.{}.container.path".format(int(idx)),
-            )
-            raw_paths.add(path_str)
-            if default_workbook_path is None:
-                default_workbook_path = path_str
-
-        for extra in (cfg.meta, cfg.audit):
-            if extra is None:
-                continue
-            p = str(extra.path or "").strip()
-            if p:
-                raw_paths.add(p)
-            elif default_workbook_path:
-                raw_paths.add(default_workbook_path)
-
-        abs_paths: Set[str] = set()
-        for raw_path in raw_paths:
-            abs_paths.add(_as_abs_path(str(raw_path)))
-        return abs_paths
-
-    def _precheck_and_register_workbook_output_paths(
-        *,
-        run_id: str,
-        demand_config: object,
-        init_vars: Optional[Dict[str, object]],
-    ) -> None:
-        abs_paths = _collect_workbook_output_paths(demand_config, init_vars=init_vars)
-        for abs_path in sorted(abs_paths):
-            if abs_path in reserved_xlsx_paths:
-                msg = (
-                    "Excel output path is reserved by workflow shared resources (use resources + write nodes): "
-                    + "run_id={!r}, path={!r}".format(str(run_id), str(abs_path))
-                )
-                raise WorkflowRuntimeConfigError(msg, path="workflow.runs[*].demand")
-
-            existing = workbook_writers_by_abs_path.get(abs_path)
-            if existing is not None and str(run_id) not in existing:
-                nodes = list(existing)
-                nodes.append(str(run_id))
-                msg = "Excel output path collision across workflow nodes: run_id={!r}, path={!r}, nodes={}".format(
-                    str(run_id),
-                    str(abs_path),
-                    ",".join(nodes),
-                )
-                raise WorkflowRuntimeConfigError(msg, path="workflow.runs[*].demand")
-
-            if existing is None:
-                workbook_writers_by_abs_path[abs_path] = [str(run_id)]
-
     if compile_demand_yaml_fn is None:
         compile_demand_yaml_fn = _compile_demand_default
     compile_demand = compile_demand_yaml_fn
@@ -225,7 +157,7 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         managed_output_ids: Optional[FrozenSet[str]],
         viz_config: Optional["VizObserverConfig"],
     ) -> _CompilationLike:
-        _ = workflow_exec_id, workflow_node_decl_order
+        _ = workflow_exec_id, workflow_node_id, workflow_node_decl_order
         node_options = base_options
         if node_init_vars:
             merged = dict(base_options.init_vars or {})
@@ -248,18 +180,7 @@ def run_workflow(  # noqa: PLR0913, C901, PLR0915
         if managed_output_ids:
             node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
 
-        try:
-            compilation = compile_demand(str(demand_path), options=node_options)
-        except ScalimPathlessCsvOutputError as exc:
-            msg = "run_id={!r}: {}".format(str(workflow_node_id), str(exc))
-            raise WorkflowRuntimeConfigError(msg, path=str(exc.config_path)) from exc
-
-        _precheck_and_register_workbook_output_paths(
-            run_id=str(workflow_node_id),
-            demand_config=compilation.config,
-            init_vars=node_options.init_vars,
-        )
-        return compilation
+        return compile_demand(str(demand_path), options=node_options)
 
     def _build_demand_run_result(
         core: ExecutionResult,

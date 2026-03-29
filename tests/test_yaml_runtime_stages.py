@@ -46,7 +46,13 @@ def test_stage_parse_convert_and_map_request(tmp_path: Path) -> None:
     demand_ir = stage_compile_demand_ir(config, context=context)
 
     options = RunOptions(allowed_modules=frozenset(["tests.conftest"]))
-    request = stage_build_execution_request(config, demand_ir, options=options, context=context)
+    request = stage_build_execution_request(
+        config,
+        demand_ir,
+        yaml_base_dir=str(Path(str(yaml_path)).parent),
+        options=options,
+        context=context,
+    )
 
     assert config.name == "stages"
     assert demand_ir.main_source.source_id == "orders"
@@ -61,4 +67,10 @@ def test_stage_map_request_rejects_allowlist_mismatch(tmp_path: Path) -> None:
 
     options = RunOptions(allowed_modules=frozenset(["tests.other"]))
     with pytest.raises(ScalimStageAllowlistMismatchError, match=ScalimStageAllowlistMismatchError.MESSAGE):
-        _ = stage_build_execution_request(config, demand_ir, options=options, context=context)
+        _ = stage_build_execution_request(
+            config,
+            demand_ir,
+            yaml_base_dir=str(Path(str(yaml_path)).parent),
+            options=options,
+            context=context,
+        )

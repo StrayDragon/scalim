@@ -164,6 +164,7 @@ class _WorkflowResourceManagerBase(ABC):
     _instrumentation: Any
     _workbook_defs: Dict[str, str]
     _workbook_allow_formulas: Dict[str, bool]
+    _workbook_write_lock: Dict[str, bool]
     _csv_defs: Dict[str, str]
     _sheetbook_defs: Dict[str, object]
     _workbooks: Dict[str, object]
@@ -182,6 +183,7 @@ class _WorkflowResourceManagerBase(ABC):
         instrumentation: Any,
         workbook_defs: Mapping[str, str],
         workbook_allow_formulas: Optional[Mapping[str, bool]] = None,
+        workbook_write_lock: Optional[Mapping[str, bool]] = None,
         csv_defs: Mapping[str, str],
         sheetbook_defs: Mapping[str, object],
         wait_diagnostics: Optional[WorkflowResourceWaitDiagnostics] = None,
@@ -191,6 +193,7 @@ class _WorkflowResourceManagerBase(ABC):
         self._instrumentation = instrumentation
         self._workbook_defs = dict(workbook_defs)
         self._workbook_allow_formulas = dict(workbook_allow_formulas or {})
+        self._workbook_write_lock = dict(workbook_write_lock or {})
         self._csv_defs = dict(csv_defs)
         self._sheetbook_defs = dict(sheetbook_defs)
         self._workbooks = {}

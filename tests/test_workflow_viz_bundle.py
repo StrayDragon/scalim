@@ -35,7 +35,7 @@ main_source:
     )
 
 
-def _write_table_demand_yaml_with_csv_output(tmp_path: Path, *, file_name: str, name: str, output_path: Path) -> Path:
+def _write_table_demand_yaml_with_book_output(tmp_path: Path, *, file_name: str, name: str, book_id: str) -> Path:
     return _write_text(
         tmp_path / file_name,
         (
@@ -51,11 +51,16 @@ main_source:
     id: {{extract: id}}
     value: {{extract: value}}
 
+outputs_defaults:
+  to:
+    book: {book_id}
+
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: "{str(output_path)}"
+    to:
+      sheet: detail
+    write:
+      mode: sheet
     fields: ["id", "value"]
 """
         ).lstrip(),
@@ -180,23 +185,22 @@ def test_workflow_viz_bundle_uses_default_output_dir_and_skips_write_nodes(tmp_p
     default_dir = tmp_path / "default"
     monkeypatch.setattr(viz_config_module, "default_viz_dir", lambda: str(default_dir))
 
-    _ = _write_table_demand_yaml_with_csv_output(tmp_path, file_name="ok.yaml", name="ok", output_path=tmp_path / "ok_detail.csv")
+    _ = _write_table_demand_yaml_with_book_output(tmp_path, file_name="ok.yaml", name="ok", book_id="report")
     wf = _write_text(
         tmp_path / "wf.yaml",
         (
             f"""
 workflow:
   resources:
-    csvs:
-      merged:
-        path: "{str(tmp_path / "merged.csv")}"
+    books:
+      report:
+        kind: xlsx_memory
+        budget:
+          max_sheets: 10
+          max_total_cells: 1000
   runs:
     - id: ok
       demand: ok.yaml
-      writes:
-        - csv_append:
-            csv: merged
-            output: detail
   options:
     max_concurrency: 1
     failure_policy: primary_only

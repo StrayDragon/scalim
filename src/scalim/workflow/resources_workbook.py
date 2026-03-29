@@ -83,7 +83,9 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             if raw_path is None:
                 msg = "Unknown workbook resource id: {!r}".format(key)
                 raise ScalimWorkflowWriteError(msg)
-            lock_path = acquire_write_lock(raw_path)
+            lock_path = None
+            if bool(self._workbook_write_lock.get(key, False)):
+                lock_path = acquire_write_lock(raw_path)
             return _WorkbookPlan(
                 resource_id=key,
                 path=str(raw_path),

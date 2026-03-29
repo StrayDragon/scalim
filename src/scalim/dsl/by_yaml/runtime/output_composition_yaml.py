@@ -1,7 +1,6 @@
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
-from ....exceptions import ScalimYamlError
 from ....execution.output_composition import (
     AggMetricSpec,
     AuditSheetSpec,
@@ -22,10 +21,12 @@ from ....vendor.dataclassesx import dataclass
 from ..config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
 from ..config_parsing.security import ScalimComputeExpressionError, ScalimSecurityError, SecureComputeEngine
 from ..schema_dsl.models import (
+    BookConfig,
     DemandConfig,
     OutputAggregateConfig,
     OutputContainerConfig,
     OutputExtraSheetConfig,
+    OutputTargetConfig,
 )
 from ..schema_dsl.output_enums import (
     AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,
@@ -36,48 +37,28 @@ from ..schema_dsl.output_enums import (
 from ..schema_dsl.output_enums import (
     AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
 )
-from .output_path_resolve import resolve_output_container_path
+from .output_path_resolve import resolve_output_container_path, resolve_yaml_relative_output_path
 from .references import SecurePythonReferenceResolver
 
-PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT = "workflow manages temp outputs for writes"
+_EXCEL_SHEET_NAME_MAX_LEN = 31
+_EXCEL_SHEET_NAME_INVALID_CHARS = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
 
 
-class ScalimPathlessCsvOutputError(ScalimYamlError):
-    output_id: str
-    config_path: str
-
-    def __init__(self, message: str, *, output_id: str, config_path: str) -> None:
-        super(ScalimPathlessCsvOutputError, self).__init__(message)
-        self.output_id = str(output_id)
-        self.config_path = str(config_path)
-
-
-def _is_pathless_container_path(raw: object) -> bool:
-    if raw is None:
-        return True
-    if isinstance(raw, dict):
-        return False
-    return not str(raw).strip()
-
-
-def _resolve_output_container_path_with_overrides(
-    container: OutputContainerConfig,
-    *,
-    output_id: str,
-    config_path: str,
-    init_vars: Optional[Dict[str, object]],
-    workflow_managed_output_ids: Optional[FrozenSet[str]],
-) -> Tuple[Optional[str], bool]:
-    if str(container.type).lower() == "csv" and _is_pathless_container_path(container.path):
-        managed = workflow_managed_output_ids or frozenset()
-        if str(output_id) not in managed:
-            msg = (
-                "Pathless CSV output is only allowed when {} "
-                "(set outputs.*.container.path or reference via workflow writes): output_id={!r}, path={}"
-            ).format(PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT, output_id, config_path)
-            raise ScalimPathlessCsvOutputError(msg, output_id=output_id, config_path=config_path)
-        return None, True
-    return resolve_output_container_path(container.path, init_vars=init_vars, path=config_path), False
+def _validate_excel_sheet_name(sheet: str, *, path: str) -> None:
+    name = str(sheet or "").strip()
+    if not name:
+        msg = "Excel sheet name must be non-empty"
+        err = "{} (path={})".format(msg, path)
+        raise ValueError(err)
+    if len(name) > _EXCEL_SHEET_NAME_MAX_LEN:
+        msg = "Excel sheet name is too long (max_len={})".format(_EXCEL_SHEET_NAME_MAX_LEN)
+        err = "{} (path={})".format(msg, path)
+        raise ValueError(err)
+    invalid = sorted(set(name).intersection(_EXCEL_SHEET_NAME_INVALID_CHARS))
+    if invalid:
+        msg = "Excel sheet name contains invalid characters: {}".format("".join(invalid))
+        err = "{} (path={})".format(msg, path)
+        raise ValueError(err)
 
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
@@ -307,19 +288,13 @@ def _export_layout_for_derived(
 
 
 def _output_spec_from_container(container: OutputContainerConfig, *, path: Optional[str]) -> OutputSpec:
-    fmt = "excel" if str(container.type).lower() == "workbook" else "csv"
-    sheet_name = str(container.sheet) if container.sheet else None
-    if fmt != "excel":
-        sheet_name = None
     return OutputSpec(
-        format=fmt,
+        format="csv",
         path=path,
         encoding=str(container.encoding),
         streaming=bool(container.streaming),
         include_header=bool(container.include_header),
-        sheet_name=sheet_name,
-        excel_allow_formulas=bool(container.allow_formulas),
-        write_lock=bool(container.write_lock),
+        sheet_name=None,
     )
 
 
@@ -443,13 +418,20 @@ def _compile_extra_sheet(
     default_workbook_path: Optional[str],
     default_allow_formulas: bool,
     default_write_lock: bool,
+    as_in_memory_csv: bool,
 ) -> Tuple[OutputSpec, str]:
+    sheet = str(cfg.sheet) if cfg.sheet else str(default_sheet)
+
+    if as_in_memory_csv:
+        if cfg.path:
+            msg = "{}.path is not supported in workflow-managed mode (meta/audit must be written via books write nodes)".format(target_id)
+            raise ValueError(msg)
+        return (OutputSpec(format="csv", path=None, streaming=True, include_header=True), sheet)
+
     path = str(cfg.path).strip() if cfg.path else (str(default_workbook_path) if default_workbook_path else "")
     if not path:
         msg = "{} requires a workbook path (set {}.path or provide at least one workbook output)".format(target_id, target_id)
         raise ValueError(msg)
-    sheet = str(cfg.sheet) if cfg.sheet else str(default_sheet)
-
     allow_formulas = default_allow_formulas if cfg.allow_formulas is None else bool(cfg.allow_formulas)
     write_lock = default_write_lock if cfg.write_lock is None else bool(cfg.write_lock)
     return (
@@ -472,8 +454,9 @@ def _maybe_compile_extra_sheet(
     default_allow_formulas: bool,
     default_write_lock: bool,
     skip_without_workbook: bool,
+    as_in_memory_csv: bool,
 ) -> Optional[Tuple[OutputSpec, str]]:
-    if cfg is None or (skip_without_workbook and cfg.path is None and default_workbook_path is None):
+    if cfg is None or (not as_in_memory_csv and skip_without_workbook and cfg.path is None and default_workbook_path is None):
         return None
 
     out, sheet_name = _compile_extra_sheet(
@@ -483,6 +466,7 @@ def _maybe_compile_extra_sheet(
         default_workbook_path=default_workbook_path,
         default_allow_formulas=default_allow_formulas,
         default_write_lock=default_write_lock,
+        as_in_memory_csv=as_in_memory_csv,
     )
     return out, sheet_name
 
@@ -498,12 +482,103 @@ def _validate_extra_sheet_target_names(config: DemandConfig, *, outputs_path: st
         raise ValueError(msg)
 
 
-def compile_output_composition_from_yaml(
+def _effective_book_id_for_output(
+    config: DemandConfig,
+    out_cfg: OutputTargetConfig,
+    *,
+    idx: int,
+    outputs_path: str,
+) -> Tuple[Optional[str], str]:
+    book_ref_path = "{}.{}.to.book".format(outputs_path, int(idx))
+    to_cfg = out_cfg.to
+    if to_cfg is not None and to_cfg.book is not None:
+        candidate = str(to_cfg.book or "").strip()
+        if candidate:
+            return candidate, book_ref_path
+
+    defaults = config.outputs_defaults
+    if defaults is not None:
+        default_book = str(defaults.to.book or "").strip()
+        if default_book:
+            return default_book, "outputs_defaults.to.book"
+
+    return None, book_ref_path
+
+
+def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, outputs_path: str) -> Tuple[str, str, bool]:
+    to_cfg = out_cfg.to
+    if to_cfg is not None and to_cfg.sheet is not None:
+        sheet_raw = str(to_cfg.sheet or "").strip()
+        return sheet_raw, "{}.{}.to.sheet".format(outputs_path, int(idx)), False
+    return str(out_cfg.name or ""), "{}.{}.name".format(outputs_path, int(idx)), True
+
+
+def _require_book_resource(config: DemandConfig, *, book_id: str, book_ref_path: str) -> BookConfig:
+    resources = config.resources
+    books = resources.books if resources is not None else {}
+    book = books.get(str(book_id))
+    if book is None:
+        msg = (
+            "Missing book resource id {!r} referenced by {}. "
+            "Hint: declare resources.books.{} in the demand YAML, declare workflow.resources.books.{} in the workflow YAML, "
+            "or provide overrides.resources.books.{} in Python."
+        ).format(str(book_id), str(book_ref_path), str(book_id), str(book_id), str(book_id))
+        err = "{} (path={})".format(msg, str(book_ref_path))
+        raise ValueError(err)
+    return book
+
+
+def _resolve_book_export_path(
+    config: DemandConfig,
+    *,
+    book_id: str,
+    book_ref_path: str,
+    yaml_base_dir: str,
+    init_vars: Optional[Dict[str, object]],
+) -> Tuple[str, bool, bool]:
+    book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
+
+    kind = str(book.kind or "").strip()
+    if kind == "xlsx_file":
+        export_path = resolve_yaml_relative_output_path(
+            book.path,
+            base_dir=str(yaml_base_dir),
+            init_vars=init_vars,
+            path="resources.books.{}.path".format(str(book_id)),
+        )
+        return export_path, bool(book.allow_formulas), bool(book.write_lock)
+
+    if kind == "xlsx_memory":
+        export = book.export_xlsx
+        if export is None:
+            msg = (
+                "books.kind=xlsx_memory requires export_xlsx for standalone xlsx export (book_id={!r}); "
+                "set resources.books.{}.export_xlsx.path or run in a workflow"
+            ).format(str(book_id), str(book_id))
+            path_ref = "resources.books.{}.export_xlsx".format(str(book_id))
+            err = "{} (path={})".format(msg, path_ref)
+            raise ValueError(err)
+        export_path = resolve_yaml_relative_output_path(
+            export.path,
+            base_dir=str(yaml_base_dir),
+            init_vars=init_vars,
+            path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+        )
+        return export_path, bool(export.allow_formulas), bool(export.write_lock)
+
+    msg = "Unknown book kind: {!r}".format(kind)
+    path_ref = "resources.books.{}.kind".format(str(book_id))
+    err = "{} (path={})".format(msg, path_ref)
+    raise ValueError(err)
+
+
+def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
     resolver: SecurePythonReferenceResolver,
     init_vars: Optional[Dict[str, object]] = None,
+    yaml_base_dir: Optional[str] = None,
     workflow_managed_output_ids: Optional[FrozenSet[str]] = None,
     outputs_path: str = "outputs",
     skip_extra_sheets_without_workbook: bool = False,
@@ -529,24 +604,68 @@ def compile_output_composition_from_yaml(
         requires = tuple(str(x) for x in (out_cfg.requires or ()))
         requires_opt = requires or None
 
-        container = out_cfg.container
-        if container is None:
-            msg = "{}.{} missing container".format(outputs_path, out_cfg.name)
-            raise ValueError(msg)
+        in_memory = False
+        output_spec: OutputSpec
+        header_by = "field_id"
 
-        container_path_key = "{}.{}.container.path".format(outputs_path, idx)
-        container_path, in_memory = _resolve_output_container_path_with_overrides(
-            container,
-            output_id=str(out_cfg.name),
-            config_path=container_path_key,
-            init_vars=init_vars,
-            workflow_managed_output_ids=workflow_managed_output_ids,
-        )
-        output_spec = _output_spec_from_container(container, path=container_path)
-        if workbook_default_path is None and str(output_spec.format) == "excel":
-            workbook_default_path = str(container_path)
-            workbook_default_allow_formulas = bool(container.allow_formulas)
-            workbook_default_write_lock = bool(container.write_lock)
+        container = out_cfg.container
+        if container is not None:
+            # CSV 文件输出.
+            container_path_key = "{}.{}.container.path".format(outputs_path, idx)
+            container_path = resolve_output_container_path(container.path, init_vars=init_vars, path=container_path_key)
+            output_spec = _output_spec_from_container(container, path=container_path)
+            header_by = str(container.header_fields_output_by)
+        else:
+            # `books` 绑定输出.
+            book_id, book_ref_path = _effective_book_id_for_output(config, out_cfg, idx=int(idx), outputs_path=str(outputs_path))
+            if book_id is None:
+                msg = ("Missing outputs to.book binding for output {!r}; set outputs_defaults.to.book or {}.{}.to.book").format(
+                    str(out_cfg.name), str(outputs_path), int(idx)
+                )
+                err = "{} (path={})".format(msg, book_ref_path)
+                raise ValueError(err)
+
+            sheet_name, sheet_ref_path, defaulted_from_name = _effective_sheet_name_for_output(
+                out_cfg, idx=int(idx), outputs_path=str(outputs_path)
+            )
+            sheet_name = str(sheet_name or "").strip()
+            try:
+                _validate_excel_sheet_name(sheet_name, path=sheet_ref_path)
+            except ValueError as exc:
+                if defaulted_from_name:
+                    msg = ("Invalid default Excel sheet name for output {!r}; set {}.{}.to.sheet explicitly. {}").format(
+                        str(out_cfg.name), str(outputs_path), int(idx), exc
+                    )
+                    raise ValueError(msg) from None
+                raise
+
+            if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:
+                in_memory = True
+                output_spec = OutputSpec(format="csv", path=None, streaming=True, include_header=True)
+            else:
+                if yaml_base_dir is None:
+                    msg = "yaml_base_dir is required to resolve resources.books output paths"
+                    raise ValueError(msg)
+                export_path, allow_formulas, write_lock = _resolve_book_export_path(
+                    config,
+                    book_id=str(book_id),
+                    book_ref_path=str(book_ref_path),
+                    yaml_base_dir=str(yaml_base_dir),
+                    init_vars=init_vars,
+                )
+                output_spec = OutputSpec(
+                    format="excel",
+                    path=str(export_path),
+                    streaming=True,
+                    include_header=True,
+                    sheet_name=str(sheet_name),
+                    excel_allow_formulas=bool(allow_formulas),
+                    write_lock=bool(write_lock),
+                )
+                if workbook_default_path is None:
+                    workbook_default_path = str(export_path)
+                    workbook_default_allow_formulas = bool(allow_formulas)
+                    workbook_default_write_lock = bool(write_lock)
 
         predicate = None
         if out_cfg.where:
@@ -557,7 +676,7 @@ def compile_output_composition_from_yaml(
             layout = export_layout_from_demand_ir(
                 demand_ir,
                 list(fields),
-                header_fields_output_by=str(container.header_fields_output_by),
+                header_fields_output_by=str(header_by),
             )
             direct_targets.append(
                 OutputTargetSpec(
@@ -579,7 +698,7 @@ def compile_output_composition_from_yaml(
             demand_ir=demand_ir,
             agg=agg,
             field_ids=out_layout_fields,
-            header_fields_output_by=str(container.header_fields_output_by),
+            header_fields_output_by=str(header_by),
         )
         derived_targets.append(
             DerivedOutputTargetSpec(
@@ -603,10 +722,16 @@ def compile_output_composition_from_yaml(
         default_allow_formulas=workbook_default_allow_formulas,
         default_write_lock=workbook_default_write_lock,
         skip_without_workbook=skip_extra_sheets_without_workbook,
+        as_in_memory_csv=workflow_managed_output_ids is not None,
     )
     if meta_sheet_compiled is not None:
         meta_out, meta_sheet_name = meta_sheet_compiled
-        meta_sheet_spec = MetaSheetSpec(target_id="meta", output=meta_out, sheet_name=meta_sheet_name)
+        meta_sheet_spec = MetaSheetSpec(
+            target_id="meta",
+            output=meta_out,
+            sheet_name=meta_sheet_name,
+            in_memory=workflow_managed_output_ids is not None,
+        )
 
     audit_sheet_spec = None
     audit_sheet_compiled = _maybe_compile_extra_sheet(
@@ -617,10 +742,16 @@ def compile_output_composition_from_yaml(
         default_allow_formulas=workbook_default_allow_formulas,
         default_write_lock=workbook_default_write_lock,
         skip_without_workbook=skip_extra_sheets_without_workbook,
+        as_in_memory_csv=workflow_managed_output_ids is not None,
     )
     if audit_sheet_compiled is not None:
         audit_out, audit_sheet_name = audit_sheet_compiled
-        audit_sheet_spec = AuditSheetSpec(target_id="audit", output=audit_out, sheet_name=audit_sheet_name)
+        audit_sheet_spec = AuditSheetSpec(
+            target_id="audit",
+            output=audit_out,
+            sheet_name=audit_sheet_name,
+            in_memory=workflow_managed_output_ids is not None,
+        )
 
     return OutputCompositionSpec(
         targets=tuple(direct_targets),
@@ -633,6 +764,5 @@ def compile_output_composition_from_yaml(
 
 
 __all__ = [
-    "ScalimPathlessCsvOutputError",
     "compile_output_composition_from_yaml",
 ]

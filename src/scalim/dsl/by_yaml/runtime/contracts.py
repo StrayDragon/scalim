@@ -39,14 +39,19 @@ UnsetType = _UnsetType
 class RunOverrides:
     """运行期覆盖项.
 
-    `outputs` 为与 `YAML` 顶层 `outputs` 同形的输出覆盖片段:
+    - `outputs`: 与需求 `YAML` 顶层 `outputs` 同形的输出覆盖片段,语义为整体 `replace`.
+      - `outputs: list[dict]` (非空)
+      - 本变更仅承诺明细输出(`detail`)的最小子集: `name` / `to` / `fields`
+      - 提供则整体替换 `YAML` 的 `outputs`(不做 `deep-merge`)
 
-    - `outputs: list[dict]` (非空)
-    - 本变更仅承诺明细输出(`detail`)最小子集: `name` / `container` / `fields`
-    - 语义为整体替换(`replace`): 提供则整体替换 `YAML` 的 `outputs`(不做 `deep-merge`)
+    - `resources` / `outputs_defaults`: 仅 `IO` 层的补丁覆盖,语义为 `overlay` / `deep-merge`.
+      - `resources`: `YAML-shaped patch`; 至少支持 `resources.books`
+      - `outputs_defaults`: `YAML-shaped patch`; 至少支持 `outputs_defaults.to.book`
     """
 
     outputs: Optional[List[Dict[str, Any]]] = None
+    resources: Optional[Dict[str, Any]] = None
+    outputs_defaults: Optional[Dict[str, Any]] = None
     viz_config: Union[Optional["VizObserverConfig"], _UnsetType] = UNSET
 
 

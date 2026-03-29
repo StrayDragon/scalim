@@ -41,17 +41,18 @@ sources: {}
         outputs=[
             {
                 "name": "detail",
-                "container": {
-                    "type": "workbook",
-                    "path": out_path,
-                    "sheet": "Detail",
-                    "encoding": "utf-16",
-                    "include_header": True,
-                    "header_fields_output_by": "name",
-                },
+                "to": {"book": "report", "sheet": "Detail"},
                 "fields": ["amount", "order_id"],
             }
-        ]
+        ],
+        resources={
+            "books": {
+                "report": {
+                    "kind": "xlsx_file",
+                    "path": out_path,
+                }
+            }
+        },
     )
 
     compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.conftest"]), overrides=overrides)
@@ -63,10 +64,9 @@ sources: {}
     assert target.output.format == "excel"
     assert target.output.path == out_path
     assert target.output.sheet_name == "Detail"
-    assert target.output.encoding == "utf-16"
     assert target.output.include_header is True
     assert target.layout.field_ids == ("amount", "order_id")
-    assert target.layout.header_names == ("Amount", "Order ID")
+    assert target.layout.header_names is None
 
 
 def test_compile_overrides_outputs_empty_rejected(tmp_path: Path) -> None:
@@ -135,19 +135,19 @@ sources: {}
             r"overrides\.outputs\.0\.container\.type is required",
         ),
         (
-            [{"name": "detail", "container": {"type": "json"}, "fields": ["order_id"]}],
+            [{"name": "detail", "container": {"type": "json", "path": "./out.csv"}, "fields": ["order_id"]}],
             ValueError,
             r"overrides\.outputs\.0\.container\.type='json' is invalid",
         ),
         (
-            [{"name": "detail", "container": {"type": "workbook"}, "fields": ["order_id"]}],
+            [{"name": "detail", "container": {"type": "csv"}, "fields": ["order_id"]}],
             ValueError,
-            r"overrides\.outputs\.0\.container\.path is required for workbook outputs",
+            r"overrides\.outputs\.0\.container\.path is required",
         ),
         (
             [{"name": "detail", "container": {"type": "csv", "path": 123}, "fields": ["order_id"]}],
             TypeError,
-            r"overrides\.outputs\.0\.container\.path must be a string",
+            r"overrides\.outputs\.0\.container\.path must be a non-empty string",
         ),
         (
             [
@@ -168,23 +168,22 @@ sources: {}
         (
             [{"name": "detail", "container": {"type": "csv", "path": "./out.csv", "sheet": "Detail"}, "fields": ["order_id"]}],
             ValueError,
-            r"overrides\.outputs\.0\.container\.sheet is only allowed for type=workbook",
+            r"overrides\.outputs\.0\.container has unknown keys: sheet",
         ),
         (
-            [
-                {
-                    "name": "detail",
-                    "container": {"type": "csv", "path": "./out.csv", "allow_formulas": True},
-                    "fields": ["order_id"],
-                }
-            ],
-            ValueError,
-            r"overrides\.outputs\.0\.container\.allow_formulas is only allowed for type=workbook",
+            [{"name": "detail", "to": "report", "fields": ["order_id"]}],
+            TypeError,
+            r"overrides\.outputs\.0\.to must be an object",
         ),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv", "write_lock": True}, "fields": ["order_id"]}],
-            ValueError,
-            r"overrides\.outputs\.0\.container\.write_lock is only allowed for type=workbook",
+            [{"name": "detail", "write": "append", "fields": ["order_id"]}],
+            TypeError,
+            r"overrides\.outputs\.0\.write must be an object",
+        ),
+        (
+            [{"name": "detail", "write": {"mode": 123}, "fields": ["order_id"]}],
+            TypeError,
+            r"overrides\.outputs\.0\.write\.mode must be a string",
         ),
         (
             [{"container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]}],
@@ -229,6 +228,23 @@ sources: {}
             ValueError,
             r"overrides\.outputs\.0\.fields reference unknown fields: unknown",
         ),
+        (
+            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "to": {"book": "report"}, "fields": ["order_id"]}],
+            ValueError,
+            r"overrides\.outputs\.0 cannot declare both container and to",
+        ),
+        (
+            [
+                {
+                    "name": "detail",
+                    "container": {"type": "csv", "path": "./out.csv"},
+                    "write": {"mode": "append"},
+                    "fields": ["order_id"],
+                }
+            ],
+            ValueError,
+            r"overrides\.outputs\.0 cannot declare write for csv container outputs",
+        ),
     ],
     ids=[
         "outputs-not-list",
@@ -236,13 +252,14 @@ sources: {}
         "container-not-object",
         "container-type-required",
         "container-type-invalid",
-        "workbook-path-required",
+        "container-path-required",
         "path-invalid-type",
         "header-by-invalid",
         "streaming-must-be-true",
-        "sheet-only-workbook",
-        "allow-formulas-only-workbook",
-        "write-lock-only-workbook",
+        "container-unknown-key",
+        "to-not-object",
+        "write-not-object",
+        "write-mode-not-string",
         "name-required",
         "name-invalid-pattern",
         "duplicate-name",
@@ -251,6 +268,8 @@ sources: {}
         "fields-item-not-string",
         "fields-item-empty",
         "fields-unknown",
+        "container-and-to-conflict",
+        "container-and-write-conflict",
     ],
 )
 def test_compile_overrides_outputs_rejects_invalid_payloads(tmp_path: Path, outputs, exc_type, match: str) -> None:
@@ -349,10 +368,6 @@ main_source:
   loader: tests.conftest.mock_loader
   fields:
     order_id: {extract: order_id}
-outputs:
-  - name: detail
-    container: {type: workbook, path: ./report.xlsx, sheet: Detail}
-    fields: [order_id]
 meta: true
 sources: {}
 """,

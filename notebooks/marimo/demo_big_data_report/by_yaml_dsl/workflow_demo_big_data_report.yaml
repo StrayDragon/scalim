@@ -2,49 +2,26 @@
 
 workflow:
   resources:
-    sheetbooks:
+    books:
       report:
+        kind: xlsx_memory
         budget:
           max_sheets: 8
           max_total_cells: 200000
         export_xlsx:
           path: ./report.xlsx
           write_lock: true
-    csvs:
-      detail:
-        path: ./detail.csv
-      metrics:
-        path: ./metrics.csv
+        write_defaults:
+          mode: sheet
+          on_conflict: overwrite
 
   runs:
     - id: detail
       demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_detail_demand.yaml"
-      writes:
-        - sheetbook_sheet:
-            sheetbook: report
-            sheet: Detail
-            output: detail
-            on_conflict: error
-        - csv_append:
-            csv: detail
-            output: detail
-            header_policy: once
-            on_mismatch: error
 
     - id: metrics
       demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_metrics_demand.yaml"
       depends_on: [detail]
-      writes:
-        - sheetbook_sheet:
-            sheetbook: report
-            sheet: Metrics
-            output: metrics
-            on_conflict: error
-        - csv_append:
-            csv: metrics
-            output: metrics
-            header_policy: once
-            on_mismatch: error
 
   options:
     max_concurrency: 2

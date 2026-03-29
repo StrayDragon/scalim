@@ -78,22 +78,17 @@ def run_workflow_shared_workbooks(
                 )
 
             errors = wf_result.errors()
-            detail_csv = out_dir / "detail.csv"
             shared_report_xlsx = out_dir / "shared_report.xlsx"
             sheetbook_report_xlsx = out_dir / "sheetbook_report.xlsx"
 
-            artifacts_ok = bool(detail_csv.exists() and shared_report_xlsx.exists() and sheetbook_report_xlsx.exists())
-
-            header, data_rows = _read_csv_header_and_count_rows(detail_csv) if detail_csv.exists() else ([], 0)
-            even_rows = bool(data_rows > 0 and data_rows % 2 == 0)
-            single_run_rows = data_rows // 2 if even_rows else 0
+            artifacts_ok = bool(shared_report_xlsx.exists() and sheetbook_report_xlsx.exists())
 
             wb_ok = False
             sb_ok = False
             wb_checks: Dict[str, Any] = {}
             sb_checks: Dict[str, Any] = {}
 
-            if shared_report_xlsx.exists() and sheetbook_report_xlsx.exists() and header and even_rows:
+            if shared_report_xlsx.exists() and sheetbook_report_xlsx.exists():
                 from openpyxl import load_workbook
 
                 wb = load_workbook(shared_report_xlsx, read_only=True, data_only=True)
@@ -103,16 +98,20 @@ def run_workflow_shared_workbooks(
                 finally:
                     wb.close()
 
+                single_run_rows = int(wb_detail_rows) - 1 if wb_detail_rows else 0
+                expected_append_rows = 1 + (2 * single_run_rows) if single_run_rows >= 0 else 0
                 wb_ok = bool(
-                    wb_detail_header == header
-                    and wb_append_header == header
+                    wb_detail_header
+                    and wb_append_header
+                    and single_run_rows > 0
+                    and wb_detail_header == wb_append_header
                     and wb_detail_rows == 1 + single_run_rows
-                    and wb_append_rows == 1 + (2 * single_run_rows)
+                    and wb_append_rows == expected_append_rows
                 )
                 wb_checks = {
-                    "header": header,
+                    "header": wb_detail_header,
                     "detail": {"rows_total": wb_detail_rows, "expected": 1 + single_run_rows},
-                    "detail_append": {"rows_total": wb_append_rows, "expected": 1 + (2 * single_run_rows)},
+                    "detail_append": {"rows_total": wb_append_rows, "expected": expected_append_rows},
                 }
 
                 sb = load_workbook(sheetbook_report_xlsx, read_only=True, data_only=True)
@@ -123,22 +122,22 @@ def run_workflow_shared_workbooks(
                     sb.close()
 
                 sb_ok = bool(
-                    sb_detail_header == header
-                    and sb_append_header == header
+                    wb_ok
+                    and sb_detail_header == wb_detail_header
+                    and sb_append_header == wb_detail_header
                     and sb_detail_rows == 1 + single_run_rows
-                    and sb_append_rows == 1 + (2 * single_run_rows)
+                    and sb_append_rows == expected_append_rows
                 )
                 sb_checks = {
-                    "header": header,
+                    "header": sb_detail_header,
                     "detail": {"rows_total": sb_detail_rows, "expected": 1 + single_run_rows},
-                    "detail_append": {"rows_total": sb_append_rows, "expected": 1 + (2 * single_run_rows)},
+                    "detail_append": {"rows_total": sb_append_rows, "expected": expected_append_rows},
                 }
 
-            passed = bool(not errors and artifacts_ok and even_rows and wb_ok and sb_ok)
-            summary = "errors={} artifacts_ok={} even_rows={} wb_ok={} sheetbook_ok={}".format(
+            passed = bool(not errors and artifacts_ok and wb_ok and sb_ok)
+            summary = "errors={} artifacts_ok={} wb_ok={} sheetbook_ok={}".format(
                 len(errors),
                 artifacts_ok,
-                even_rows,
                 wb_ok,
                 sb_ok,
             )
@@ -148,10 +147,8 @@ def run_workflow_shared_workbooks(
             details: Dict[str, Any] = {
                 "output_dir": str(out_dir),
                 "workflow_yaml_path": str(workflow_yaml_path),
-                "detail_csv": str(detail_csv),
                 "shared_report_xlsx": str(shared_report_xlsx),
                 "sheetbook_report_xlsx": str(sheetbook_report_xlsx),
-                "csv": {"header": header, "data_rows": data_rows, "single_run_rows": single_run_rows},
                 "workbook": wb_checks,
                 "sheetbook": sb_checks,
                 "errors": errors,

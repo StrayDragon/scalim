@@ -6,28 +6,28 @@ from scalim.dsl.by_yaml.runtime.builtin_callables import is_builtin_callable_ref
 from scalim.dsl.by_yaml.runtime.compiler import create_reference_resolver
 from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
-from scalim.workflow.loaders import sheetbook_sheet_rows
+from scalim.workflow.loaders import book_sheet_rows
 from tests.call_by_fns import echo
 
 
 def test_is_valid_callable_reference_accepts_builtin_prefix() -> None:
-    assert is_valid_callable_reference("^workflow/sheetbook_sheet_rows") is True
+    assert is_valid_callable_reference("^workflow/book_sheet_rows") is True
     assert is_valid_callable_reference("^") is False
     assert is_valid_callable_reference("^bad-id") is False
 
 
 def test_is_builtin_callable_reference_smoke() -> None:
-    assert is_builtin_callable_reference("^workflow/sheetbook_sheet_rows") is True
+    assert is_builtin_callable_reference("^workflow/book_sheet_rows") is True
     assert is_builtin_callable_reference("tests.call_by_fns:echo") is False
 
 
 def test_list_builtin_callable_ids_smoke() -> None:
-    assert "workflow/sheetbook_sheet_rows" in list_builtin_callable_ids()
+    assert "workflow/book_sheet_rows" in list_builtin_callable_ids()
 
 
 def test_parse_call_by_accepts_builtin_reference() -> None:
-    parsed = parse_call_by("^workflow/sheetbook_sheet_rows(ref)")
-    assert parsed.reference == "^workflow/sheetbook_sheet_rows"
+    parsed = parse_call_by("^workflow/book_sheet_rows(ref)")
+    assert parsed.reference == "^workflow/book_sheet_rows"
     assert parsed.field_names == ("ref",)
 
 
@@ -42,14 +42,14 @@ def test_parse_builtin_callable_id_errors() -> None:
 
 def test_resolver_resolves_builtin_scheme_without_allowlist_for_scalim() -> None:
     resolver = SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.call_by_fns"]))
-    fn = resolver.resolve("^workflow/sheetbook_sheet_rows")
-    assert fn is sheetbook_sheet_rows
+    fn = resolver.resolve("^workflow/book_sheet_rows")
+    assert fn is book_sheet_rows
 
 
 def test_resolver_builtin_cache_eviction_smoke() -> None:
     resolver = SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.call_by_fns"]), max_cache_size=1)
-    _ = resolver.resolve("^workflow/sheetbook_sheet_rows")
-    _ = resolver.resolve("^workflow/sheetbook_sheet_rows ")
+    _ = resolver.resolve("^workflow/book_sheet_rows")
+    _ = resolver.resolve("^workflow/book_sheet_rows ")
 
 
 def test_resolver_unknown_builtin_id_fails_fast() -> None:
@@ -112,7 +112,7 @@ def test_create_reference_resolver_rejects_invalid_custom_builtin_callables_voca
         _ = create_reference_resolver(
             allowed_modules=frozenset(["tests.call_by_fns"]),
             allowed_functions=None,
-            builtin_callables={"custom/echo": "^workflow/sheetbook_sheet_rows"},
+            builtin_callables={"custom/echo": "^workflow/book_sheet_rows"},
         )
 
     with pytest.raises(ValueError, match=r"failed to resolve Python reference"):

@@ -1,12 +1,12 @@
 """`workflow` 编译阶段实现(内部模块).
 
 说明:
-- 承载 `workflow` `config` -> `workflow IR` 的编译逻辑
+- 承载 `workflow config` -> `workflow IR` 的编译逻辑
 - 运行时需兼容 `Python 3.6`
 """
 
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
 from ...spec.ir._workflow import (
     AppendSheetNodeIr,
@@ -26,91 +26,599 @@ from ...spec.ir._workflow import (
 )
 from ...vendor.dataclassesx import replace
 from .config_parsing.loader import YamlDemandLoader
-from .schema_dsl.models import DemandConfig
-from .workflow import (
-    ScalimWorkflowConfigError,
-    WorkflowConfig,
-    WorkflowResources,
-    WorkflowWriteToCsvAppend,
-    WorkflowWriteToSheetbookAppend,
-    WorkflowWriteToSheetbookSheet,
-    WorkflowWriteToWorkbookAppend,
-    WorkflowWriteToWorkbookSheet,
-    resolve_workflow_demand_path,
+from .runtime.output_path_resolve import resolve_yaml_relative_output_path
+from .schema_dsl.models import (
+    BookBudgetConfig,
+    BookConfig,
+    BookExportXlsxConfig,
+    BookWriteDefaultsConfig,
+    DemandConfig,
+    OutputTargetConfig,
+    OutputToConfig,
+    OutputWriteConfig,
 )
+from .schema_dsl.output_enums import (
+    BOOK_WRITE_ALIGN_BY_ENUM,
+    BOOK_WRITE_HEADER_POLICY_ENUM,
+    BOOK_WRITE_MODE_ENUM,
+    BOOK_WRITE_ON_CONFLICT_ENUM,
+    BOOK_WRITE_ON_MISMATCH_ENUM,
+    DEFAULT_BOOK_WRITE_ALIGN_BY,
+    DEFAULT_BOOK_WRITE_HEADER_POLICY,
+    DEFAULT_BOOK_WRITE_MODE,
+    DEFAULT_BOOK_WRITE_ON_CONFLICT,
+    DEFAULT_BOOK_WRITE_ON_MISMATCH,
+)
+from .workflow import ScalimWorkflowConfigError, WorkflowConfig, resolve_workflow_demand_path
+
+_INTERNAL_NODE_ID_PREFIX = "__wf__"
+
+_INVALID_EXCEL_SHEET_CHARS: FrozenSet[str] = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
+_EXCEL_SHEET_NAME_MAX_LEN = 31
 
 
-def _compile_workflow_resources(wf_obj: WorkflowConfig, base_dir: Path) -> List[WorkflowResourceIr]:
-    resources: List[WorkflowResourceIr] = []
-    raw_resources: WorkflowResources = wf_obj.resources
-    for workbook_id, wb in raw_resources.workbooks.items():
-        raw_path = str(wb.path or "").strip()
-        resolved = (
-            (base_dir / raw_path).resolve(strict=False)
-            if raw_path and not Path(raw_path).is_absolute()
-            else Path(raw_path).resolve(strict=False)
+def _as_abs_path(raw_path: str) -> str:
+    return str(Path(str(raw_path)).expanduser().resolve(strict=False))
+
+
+def _try_resolve_book_export_abs_path(
+    book: BookConfig,
+    *,
+    book_id: str,
+    base_dir: str,
+    init_vars: Optional[Dict[str, object]],
+    path_prefix: str,
+) -> Optional[str]:
+    try:
+        export_path, _opts = _book_export_path_and_options(
+            book,
+            book_id=str(book_id),
+            base_dir=str(base_dir),
+            init_vars=init_vars,
+            path_prefix=str(path_prefix),
         )
-        resources.append(
-            WorkflowResourceIr(
-                resource_id=str(workbook_id),
-                resource_type="workbook",
-                path=str(resolved),
-                options={"allow_formulas": bool(wb.allow_formulas)},
+    except (TypeError, ValueError):
+        return None
+    if not export_path:
+        return None
+    return _as_abs_path(str(export_path))
+
+
+def _validate_excel_sheet_name(sheet: str, *, path: str) -> None:
+    name = str(sheet or "").strip()
+    if not name:
+        msg = "{} is required".format(path)
+        raise ValueError(msg)
+    if len(name) > _EXCEL_SHEET_NAME_MAX_LEN:
+        msg = "Excel sheet name is too long: len={} > {}".format(len(name), _EXCEL_SHEET_NAME_MAX_LEN)
+        err = "{} (path={})".format(msg, path)
+        raise ValueError(err)
+    for ch in _INVALID_EXCEL_SHEET_CHARS:
+        if ch in name:
+            msg = "Excel sheet name contains invalid character {!r}".format(ch)
+            err = "{} (path={})".format(msg, path)
+            raise ValueError(err)
+
+
+def _workflow_base_dir(workflow_yaml_path: str) -> Path:
+    wf_path = Path(str(workflow_yaml_path or "")).expanduser().resolve(strict=False)
+    return wf_path.parent
+
+
+def _demand_base_dir(demand_yaml_path: str) -> Path:
+    p = Path(str(demand_yaml_path or "")).expanduser().resolve(strict=False)
+    return p.parent
+
+
+def _outputs_path_ref(outputs_path: str, idx: int, suffix: str) -> str:
+    return "{}.{}.{}".format(str(outputs_path), int(idx), suffix)
+
+
+def _effective_default_book_id(
+    config: DemandConfig, *, overrides_outputs_defaults: Optional[Mapping[str, object]]
+) -> Tuple[Optional[str], str]:
+    if overrides_outputs_defaults is not None:
+        to_obj = overrides_outputs_defaults.get("to")
+        if isinstance(to_obj, dict):
+            to_raw = cast("Mapping[str, object]", to_obj)  # pragma: allow-cast yaml mapping typed narrowing
+            raw = to_raw.get("book")
+            book = str(raw or "").strip() if isinstance(raw, str) else ""
+            if book:
+                return book, "overrides.outputs_defaults.to.book"
+
+    defaults = config.outputs_defaults
+    if defaults is not None:
+        book = str(defaults.to.book or "").strip()
+        if book:
+            return book, "outputs_defaults.to.book"
+
+    return None, "outputs_defaults.to.book"
+
+
+def _effective_book_binding_for_output(
+    config: DemandConfig,
+    out_cfg: OutputTargetConfig,
+    *,
+    idx: int,
+    outputs_path: str,
+    overrides_outputs_defaults: Optional[Mapping[str, object]],
+) -> Tuple[Optional[str], str]:
+    to_cfg = out_cfg.to
+    if to_cfg is not None and to_cfg.book is not None:
+        book = str(to_cfg.book or "").strip()
+        if book:
+            return book, _outputs_path_ref(outputs_path, int(idx), "to.book")
+
+    default_book, default_ref = _effective_default_book_id(config, overrides_outputs_defaults=overrides_outputs_defaults)
+    if default_book:
+        return default_book, default_ref
+    return None, _outputs_path_ref(outputs_path, int(idx), "to.book")
+
+
+def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, outputs_path: str) -> Tuple[str, str]:
+    to_cfg = out_cfg.to
+    if to_cfg is not None and to_cfg.sheet is not None:
+        return str(to_cfg.sheet or "").strip(), _outputs_path_ref(outputs_path, int(idx), "to.sheet")
+    return str(out_cfg.name or ""), _outputs_path_ref(outputs_path, int(idx), "name")
+
+
+def _effective_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
+    base = book.write_defaults
+    if base is not None:
+        return base
+    return BookWriteDefaultsConfig(
+        mode=str(DEFAULT_BOOK_WRITE_MODE),
+        align_by=str(DEFAULT_BOOK_WRITE_ALIGN_BY),
+        header_policy=str(DEFAULT_BOOK_WRITE_HEADER_POLICY),
+        on_mismatch=str(DEFAULT_BOOK_WRITE_ON_MISMATCH),
+        on_conflict=str(DEFAULT_BOOK_WRITE_ON_CONFLICT),
+    )
+
+
+def _overlay_write_defaults(base: BookWriteDefaultsConfig, override: Optional[OutputWriteConfig]) -> BookWriteDefaultsConfig:
+    if override is None:
+        return base
+
+    mode = base.mode if override.mode is None else str(override.mode)
+    align_by = base.align_by if override.align_by is None else str(override.align_by)
+    header_policy = base.header_policy if override.header_policy is None else str(override.header_policy)
+    on_mismatch = base.on_mismatch if override.on_mismatch is None else str(override.on_mismatch)
+    on_conflict = base.on_conflict if override.on_conflict is None else str(override.on_conflict)
+
+    if mode not in BOOK_WRITE_MODE_ENUM:
+        msg = "Invalid write.mode={!r}; expected one of: {}".format(mode, ", ".join(BOOK_WRITE_MODE_ENUM))
+        raise ValueError(msg)
+    if align_by not in BOOK_WRITE_ALIGN_BY_ENUM:
+        msg = "Invalid write.align_by={!r}; expected one of: {}".format(align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
+        raise ValueError(msg)
+    if header_policy not in BOOK_WRITE_HEADER_POLICY_ENUM:
+        msg = "Invalid write.header_policy={!r}; expected one of: {}".format(header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM))
+        raise ValueError(msg)
+    if on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
+        msg = "Invalid write.on_mismatch={!r}; expected one of: {}".format(on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM))
+        raise ValueError(msg)
+    if on_conflict not in BOOK_WRITE_ON_CONFLICT_ENUM:
+        msg = "Invalid write.on_conflict={!r}; expected one of: {}".format(on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM))
+        raise ValueError(msg)
+
+    return BookWriteDefaultsConfig(
+        mode=str(mode),
+        align_by=str(align_by),
+        header_policy=str(header_policy),
+        on_mismatch=str(on_mismatch),
+        on_conflict=str(on_conflict),
+    )
+
+
+def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
+    base: Optional[BookConfig],
+    patch: Mapping[str, object],
+    *,
+    path: str,
+) -> BookConfig:
+    msg: str
+
+    kind = str(base.kind or "").strip() if base is not None else ""
+    book_path: Any = base.path if base is not None else None
+    budget = base.budget if base is not None else None
+    export_xlsx = base.export_xlsx if base is not None else None
+    allow_formulas = bool(base.allow_formulas) if base is not None else False
+    write_lock = bool(base.write_lock) if base is not None else False
+    write_defaults = base.write_defaults if base is not None else None
+
+    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_lock", "write_defaults"}
+    unknown = sorted({str(k) for k in patch} - allowed_keys)
+    if unknown:
+        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+        raise ScalimWorkflowConfigError(msg, path=path)
+
+    if "kind" in patch:
+        raw = patch.get("kind")
+        kind = str(raw or "").strip() if isinstance(raw, str) else ""
+        if not kind:
+            msg = "{}.kind must be a non-empty string".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+    if "path" in patch:
+        book_path = patch.get("path")
+
+    if "allow_formulas" in patch:
+        raw = patch.get("allow_formulas")
+        if not isinstance(raw, bool):
+            msg = "{}.allow_formulas must be a bool".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
+        allow_formulas = bool(raw)
+
+    if "write_lock" in patch:
+        raw = patch.get("write_lock")
+        if not isinstance(raw, bool):
+            msg = "{}.write_lock must be a bool".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+        write_lock = bool(raw)
+
+    if "budget" in patch:
+        raw = patch.get("budget")
+        if raw is None:
+            budget = None
+        elif not isinstance(raw, dict):
+            msg = "{}.budget must be a mapping".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
+        else:
+            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime overrides dict narrowing
+            max_sheets_raw = raw_dict.get("max_sheets")
+            max_total_cells_raw = raw_dict.get("max_total_cells")
+            if budget is None:
+                if max_sheets_raw is None or max_total_cells_raw is None:
+                    msg = "{}.budget requires max_sheets and max_total_cells when creating a new xlsx_memory book".format(path)
+                    raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
+                budget = BookBudgetConfig(max_sheets=int(max_sheets_raw), max_total_cells=int(max_total_cells_raw))
+            else:
+                max_sheets = int(budget.max_sheets)
+                max_total_cells = int(budget.max_total_cells)
+                if max_sheets_raw is not None:
+                    max_sheets = int(max_sheets_raw)
+                if max_total_cells_raw is not None:
+                    max_total_cells = int(max_total_cells_raw)
+                budget = BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
+
+    if "export_xlsx" in patch:
+        raw = patch.get("export_xlsx")
+        if raw is None:
+            export_xlsx = None
+        elif not isinstance(raw, dict):
+            msg = "{}.export_xlsx must be a mapping".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
+        else:
+            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime overrides dict narrowing
+            path_raw = raw_dict.get("path")
+            write_lock_raw = raw_dict.get("write_lock")
+            allow_formulas_raw = raw_dict.get("allow_formulas")
+            if export_xlsx is None:
+                if path_raw is None:
+                    msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
+                    raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.path".format(path))
+                export_xlsx = BookExportXlsxConfig(
+                    path=path_raw,
+                    write_lock=bool(write_lock_raw) if isinstance(write_lock_raw, bool) else False,
+                    allow_formulas=bool(allow_formulas_raw) if isinstance(allow_formulas_raw, bool) else False,
+                )
+            else:
+                next_path = export_xlsx.path if path_raw is None else path_raw
+                next_write_lock = export_xlsx.write_lock if write_lock_raw is None else bool(write_lock_raw)
+                next_allow_formulas = export_xlsx.allow_formulas if allow_formulas_raw is None else bool(allow_formulas_raw)
+                export_xlsx = BookExportXlsxConfig(
+                    path=next_path,
+                    write_lock=bool(next_write_lock),
+                    allow_formulas=bool(next_allow_formulas),
+                )
+
+    if "write_defaults" in patch:
+        raw = patch.get("write_defaults")
+        if raw is None:
+            write_defaults = None
+        elif not isinstance(raw, dict):
+            msg = "{}.write_defaults must be a mapping".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.write_defaults".format(path))
+        else:
+            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime overrides dict narrowing
+            base_defaults = _effective_write_defaults(
+                BookConfig(
+                    kind=str(kind),
+                    path=book_path,
+                    budget=budget,
+                    export_xlsx=export_xlsx,
+                    allow_formulas=bool(allow_formulas),
+                    write_lock=bool(write_lock),
+                    write_defaults=write_defaults,
+                )
             )
-        )
-    for csv_id, csv_cfg in raw_resources.csvs.items():
-        raw_path = str(csv_cfg.path or "").strip()
-        resolved = (
-            (base_dir / raw_path).resolve(strict=False)
-            if raw_path and not Path(raw_path).is_absolute()
-            else Path(raw_path).resolve(strict=False)
-        )
-        resources.append(
-            WorkflowResourceIr(
-                resource_id=str(csv_id),
-                resource_type="csv",
-                path=str(resolved),
-                options=None,
+            override_cfg = OutputWriteConfig(
+                mode=raw_dict.get("mode"),
+                align_by=raw_dict.get("align_by"),
+                header_policy=raw_dict.get("header_policy"),
+                on_mismatch=raw_dict.get("on_mismatch"),
+                on_conflict=raw_dict.get("on_conflict"),
             )
+            write_defaults = _overlay_write_defaults(base_defaults, override_cfg)
+
+    # 校验 `kind` 分支约束(与 `YAML` 解析器语义保持一致).
+    if kind == "xlsx_file":
+        if not book_path or (isinstance(book_path, str) and not str(book_path).strip()):
+            msg = "{}.path is required for kind=xlsx_file".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+        if budget is not None:
+            msg = "{}.budget is not allowed for kind=xlsx_file".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
+        if export_xlsx is not None:
+            msg = "{}.export_xlsx is not allowed for kind=xlsx_file".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
+    elif kind == "xlsx_memory":
+        if budget is None:
+            msg = "{}.budget is required for kind=xlsx_memory".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
+        if book_path is not None:
+            msg = "{}.path is not allowed for kind=xlsx_memory".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+        if allow_formulas:
+            msg = "{}.allow_formulas is not allowed for kind=xlsx_memory".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
+        if write_lock:
+            msg = "{}.write_lock is not allowed for kind=xlsx_memory".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+    else:
+        msg = "{}.kind={!r} is invalid; expected one of: xlsx_file, xlsx_memory".format(path, kind)
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+    return BookConfig(
+        kind=str(kind),
+        path=book_path,
+        budget=budget,
+        export_xlsx=export_xlsx,
+        allow_formulas=bool(allow_formulas),
+        write_lock=bool(write_lock),
+        write_defaults=write_defaults,
+    )
+
+
+def _book_export_path_and_options(
+    book: BookConfig,
+    *,
+    book_id: str,
+    base_dir: str,
+    init_vars: Optional[Dict[str, object]],
+    path_prefix: str,
+) -> Tuple[str, Dict[str, object]]:
+    kind = str(book.kind or "").strip()
+    if kind == "xlsx_file":
+        export_path = resolve_yaml_relative_output_path(
+            book.path,
+            base_dir=str(base_dir),
+            init_vars=init_vars,
+            path="{}.path".format(path_prefix),
         )
-    for sheetbook_id, sb_cfg in raw_resources.sheetbooks.items():
-        budget = sb_cfg.budget
-        export_cfg = sb_cfg.export_xlsx
-        raw_path = str(export_cfg.path or "").strip() if export_cfg is not None else ""
-        resolved = Path()
-        if raw_path:
-            resolved = (
-                (base_dir / raw_path).resolve(strict=False) if not Path(raw_path).is_absolute() else Path(raw_path).resolve(strict=False)
-            )
-        resource_options: Dict[str, object] = {
-            "budget": {"max_sheets": int(budget.max_sheets), "max_total_cells": int(budget.max_total_cells)},
+        options: Dict[str, object] = {
+            "kind": "xlsx_file",
+            "allow_formulas": bool(book.allow_formulas),
+            "write_lock": bool(book.write_lock),
         }
-        if export_cfg is not None and raw_path:
-            resource_options["export_xlsx"] = {
+        return export_path, options
+
+    if kind == "xlsx_memory":
+        budget = book.budget
+        if budget is None:
+            msg = "books.kind=xlsx_memory requires budget (book_id={!r})".format(str(book_id))
+            path_ref = "{}.budget".format(path_prefix)
+            err = "{} (path={})".format(msg, path_ref)
+            raise ValueError(err)
+
+        export_cfg = book.export_xlsx
+        export_path = ""
+        export_options = None
+        if export_cfg is not None:
+            export_path = resolve_yaml_relative_output_path(
+                export_cfg.path,
+                base_dir=str(base_dir),
+                init_vars=init_vars,
+                path="{}.export_xlsx.path".format(path_prefix),
+            )
+            export_options = {
                 "write_lock": bool(export_cfg.write_lock),
                 "allow_formulas": bool(export_cfg.allow_formulas),
             }
 
+        options = {
+            "kind": "xlsx_memory",
+            "budget": {"max_sheets": int(budget.max_sheets), "max_total_cells": int(budget.max_total_cells)},
+        }
+        if export_options is not None:
+            options["export_xlsx"] = export_options
+        return export_path, options
+
+    msg = "Unknown book kind {!r} for book_id={!r}".format(kind, str(book_id))
+    path_ref = "{}.kind".format(path_prefix)
+    err = "{} (path={})".format(msg, path_ref)
+    raise ValueError(err)
+
+
+def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
+    wf_obj: WorkflowConfig,
+    *,
+    workflow_base_dir: Path,
+    demand_cfg_by_run_id: Mapping[str, DemandConfig],
+    demand_yaml_paths_by_run_id: Mapping[str, str],
+    init_vars: Optional[Dict[str, object]],
+    overrides_resources: Optional[Mapping[str, object]],
+) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, str]]:
+    """编译工作流的有效 `books` 资源并返回:
+
+    - 资源列表(`IR`)
+    - 有效 `BookConfig` 映射(`book_id` -> 配置)
+    - 每个 `book_id` 的 `base_dir`(用于路径解析语义)
+    """
+
+    msg: str
+
+    workflow_books: Dict[str, BookConfig] = dict(wf_obj.resources.books or {})
+    demand_books: Dict[str, BookConfig] = {}
+    demand_base_dir_by_book_id: Dict[str, str] = {}
+
+    # 1) 收集需求侧声明的 `books`(用于与 `standalone` 行为对齐).
+    for run in wf_obj.runs:
+        run_id = str(run.id)
+        cfg = demand_cfg_by_run_id.get(run_id)
+        if cfg is None:
+            continue
+        res = cfg.resources
+        books = res.books if res is not None else {}
+        if not books:
+            continue
+        base_dir = str(_demand_base_dir(demand_yaml_paths_by_run_id.get(run_id, "")))
+
+        for book_id, book in books.items():
+            bid = str(book_id)
+            if bid in workflow_books:
+                # 工作流声明同名 `book_id` 时,要求与需求侧的 `kind` 兼容.
+                wf_kind = str(workflow_books[bid].kind or "").strip()
+                demand_kind = str(book.kind or "").strip()
+                if wf_kind and demand_kind and wf_kind != demand_kind:
+                    msg = "Book kind mismatch between workflow and demand (book_id={!r}, workflow_kind={!r}, demand_kind={!r})".format(
+                        bid, wf_kind, demand_kind
+                    )
+                    raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(bid))
+                continue
+
+            existing = demand_books.get(bid)
+            if existing is None:
+                demand_books[bid] = book
+                demand_base_dir_by_book_id[bid] = base_dir
+                continue
+
+            # 多个需求声明同一 `book_id` 时,在路径解析后要求配置等价.
+            if existing != book:
+                msg = "Conflicting demand book definitions for book_id={!r}; declare workflow.resources.books.{} to override".format(
+                    bid, bid
+                )
+                raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
+
+            # 配置相同但相对路径可能在不同 `YAML` 目录下解析出不同结果:
+            # - 使用第一个 `base_dir` 作为基准
+            # - 尽量确保其它需求解析得到的绝对路径一致
+            # - 若需要跨目录共享,应在工作流级声明该 `book`
+            first_dir = demand_base_dir_by_book_id.get(bid, base_dir)
+            first_abs_path = _try_resolve_book_export_abs_path(
+                existing,
+                book_id=bid,
+                base_dir=str(first_dir),
+                init_vars=init_vars,
+                path_prefix="resources.books.{}".format(bid),
+            )
+            current_abs_path = _try_resolve_book_export_abs_path(
+                book,
+                book_id=bid,
+                base_dir=str(base_dir),
+                init_vars=init_vars,
+                path_prefix="resources.books.{}".format(bid),
+            )
+            if first_abs_path and current_abs_path and str(first_abs_path) != str(current_abs_path):
+                msg = (
+                    "Conflicting demand book paths for shared book_id={!r} across different YAML dirs; "
+                    "declare workflow.resources.books.{} to unify"
+                ).format(bid, bid)
+                raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
+
+    # 2) 计算有效配置,优先级: 需求 < 工作流 < `overrides`.
+    effective_books: Dict[str, BookConfig] = {}
+    base_dir_by_book_id: Dict[str, str] = {}
+    path_prefix_by_book_id: Dict[str, str] = {}
+
+    all_book_ids: Set[str] = set()
+    all_book_ids.update(demand_books)
+    all_book_ids.update(workflow_books)
+
+    overrides_books_raw: Optional[Mapping[str, object]] = None
+    if overrides_resources is not None:
+        books_obj = overrides_resources.get("books")
+        if isinstance(books_obj, dict):
+            overrides_books_raw = cast("Mapping[str, object]", books_obj)  # pragma: allow-cast yaml mapping typed narrowing
+            all_book_ids.update(str(k) for k in overrides_books_raw)
+
+    for book_id in sorted(all_book_ids):
+        bid = str(book_id)
+        book = None
+        base_dir = None
+        path_prefix = ""
+
+        if bid in workflow_books:
+            book = workflow_books[bid]
+            base_dir = str(workflow_base_dir)
+            path_prefix = "workflow.resources.books.{}".format(bid)
+        elif bid in demand_books:
+            book = demand_books[bid]
+            base_dir = str(demand_base_dir_by_book_id.get(bid, workflow_base_dir))
+            path_prefix = "resources.books.{}".format(bid)
+
+        # 应用仅 `IO` 的 `overrides.resources.books.<id>` 补丁覆盖(按 `deep-merge` 语义).
+        if overrides_books_raw is not None and bid in overrides_books_raw:
+            patch_obj = overrides_books_raw.get(bid)
+            if not isinstance(patch_obj, dict):
+                msg = "overrides.resources.books.{} must be a mapping".format(bid)
+                raise ScalimWorkflowConfigError(msg, path="overrides.resources.books.{}".format(bid))
+            patch = cast("Mapping[str, object]", patch_obj)  # pragma: allow-cast runtime overrides dict narrowing
+
+            if book is None:
+                book = BookConfig(kind="")
+                if base_dir is None:
+                    base_dir = str(workflow_base_dir)
+            book = _apply_book_patch(book, patch, path="overrides.resources.books.{}".format(bid))
+            path_prefix = "overrides.resources.books.{}".format(bid)
+
+        if book is None or base_dir is None:
+            continue
+        effective_books[bid] = book
+        base_dir_by_book_id[bid] = base_dir
+        path_prefix_by_book_id[bid] = path_prefix
+
+    resources: List[WorkflowResourceIr] = []
+    for bid, book in sorted(effective_books.items(), key=lambda kv: str(kv[0])):
+        base_dir = base_dir_by_book_id.get(str(bid), str(workflow_base_dir))
+        prefix = path_prefix_by_book_id.get(str(bid)) or (
+            "workflow.resources.books.{}".format(str(bid)) if str(bid) in workflow_books else "resources.books.{}".format(str(bid))
+        )
+        try:
+            export_path, options = _book_export_path_and_options(
+                book,
+                book_id=str(bid),
+                base_dir=str(base_dir),
+                init_vars=init_vars,
+                path_prefix=prefix,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ScalimWorkflowConfigError(str(exc), path=prefix) from None
+
         resources.append(
             WorkflowResourceIr(
-                resource_id=str(sheetbook_id),
-                resource_type="sheetbook",
-                path=str(resolved) if raw_path else "",
-                options=resource_options,
+                resource_id=str(bid),
+                resource_type="book",
+                path=str(export_path or ""),
+                options=options,
             )
         )
-    return resources
 
-
-def _reserved_xlsx_paths_from_resources(resources: List[WorkflowResourceIr]) -> Set[str]:
-    reserved_xlsx_paths: Set[str] = set()
+    # 预检 `xlsx` 导出路径冲突(跨 `books`,且顺序确定).
+    by_abs_path: Dict[str, List[str]] = {}
     for res in resources:
-        if str(res.resource_type) in {"workbook", "sheetbook"}:
-            res_path = str(res.path or "").strip()
-            if not res_path:
-                continue
-            reserved_xlsx_paths.add(str(Path(res_path).expanduser().resolve(strict=False)))
-    return reserved_xlsx_paths
+        p = str(res.path or "").strip()
+        if not p:
+            continue
+        abs_path = _as_abs_path(p)
+        by_abs_path.setdefault(abs_path, []).append(str(res.resource_id))
+    collisions = sorted((path, sorted(ids)) for path, ids in by_abs_path.items() if len(ids) > 1)
+    if collisions:
+        path, ids = collisions[0]
+        msg = "Excel output path collision across books: path={!r}, book_ids={}".format(str(path), ",".join(ids))
+        raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
+
+    return resources, effective_books, base_dir_by_book_id
 
 
 def _build_demand_nodes_and_graph(
@@ -178,277 +686,322 @@ def _build_demand_nodes_and_graph(
     )
 
 
-def _load_demands_and_precheck_workbook_paths(  # noqa: C901, PLR0912, PLR0915
-    demand_yaml_paths_by_run_id: Dict[str, str],
+def _load_demands(
+    demand_yaml_paths_by_run_id: Mapping[str, str],
     *,
-    reserved_xlsx_paths: Set[str],
     template_vars: Optional[Mapping[str, object]],
     allowed_yaml_roots: Optional[Tuple[str, ...]],
 ) -> Dict[str, DemandConfig]:
     loader = YamlDemandLoader()
     demand_cfg_by_run_id: Dict[str, DemandConfig] = {}
-    workbook_writers_by_abs_path: Dict[str, Set[str]] = {}
-
     for node_id, yaml_path in demand_yaml_paths_by_run_id.items():
         try:
             cfg = loader.load(str(yaml_path), template_vars=template_vars, allowed_yaml_roots=allowed_yaml_roots)
         except Exception as exc:
-            msg = "Failed to load demand YAML for workflow collision precheck: run_id={!r}, demand_path={!r}: {}".format(
+            msg = "Failed to load demand YAML for workflow compile: run_id={!r}, demand_path={!r}: {}".format(
                 str(node_id),
                 str(yaml_path),
                 exc,
             )
             raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand") from exc
-
         demand_cfg_by_run_id[str(node_id)] = cfg
-
-        raw_paths: Set[str] = set()
-        for out_cfg in cfg.outputs:
-            container = out_cfg.container
-            if container is None:
-                continue  # pragma: no cover  # pragma: allow-no-cover workbook-only precheck; container-less outputs irrelevant
-            if str(container.type or "").lower() != "workbook":
-                continue
-            raw = container.path
-            if isinstance(raw, dict):
-                continue
-            p = str(raw or "").strip()
-            if p:
-                raw_paths.add(p)
-
-        default_workbook_path = None
-        for out_cfg in cfg.outputs:
-            container = out_cfg.container
-            if container is None:
-                continue  # pragma: no cover  # pragma: allow-no-cover workbook-only precheck; container-less outputs irrelevant
-            if str(container.type or "").lower() != "workbook":
-                continue
-            raw = container.path
-            if isinstance(raw, dict):
-                continue
-            p = str(raw or "").strip()
-            if p:
-                default_workbook_path = p
-                break
-
-        for extra in (cfg.meta, cfg.audit):
-            if extra is None:
-                continue
-            p = str(extra.path or "").strip()
-            if p:
-                raw_paths.add(p)
-            elif default_workbook_path:
-                raw_paths.add(str(default_workbook_path))
-
-        resolved_paths: Set[str] = set()
-        for raw_path in raw_paths:
-            resolved_paths.add(str(Path(str(raw_path)).expanduser().resolve(strict=False)))
-
-        for abs_path in sorted(resolved_paths):
-            if abs_path in reserved_xlsx_paths:
-                msg = (
-                    "Excel output path is reserved by workflow shared resources (use resources + write nodes): "
-                    + "run_id={!r}, path={!r}".format(str(node_id), str(abs_path))
-                )
-                raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
-            workbook_writers_by_abs_path.setdefault(abs_path, set()).add(str(node_id))
-
-    collisions = sorted((path, sorted(node_ids)) for path, node_ids in workbook_writers_by_abs_path.items() if len(node_ids) > 1)
-    if collisions:
-        path, node_ids = collisions[0]
-        msg = "Excel output path collision across workflow nodes: path={!r}, nodes={}".format(str(path), ",".join(node_ids))
-        raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
-
     return demand_cfg_by_run_id
 
 
-def _write_intent_kind(value: object) -> str:
-    if isinstance(value, WorkflowWriteToWorkbookSheet):
-        return "workbook_sheet"
-    if isinstance(value, WorkflowWriteToWorkbookAppend):
-        return "workbook_append"
-    if isinstance(value, WorkflowWriteToCsvAppend):
-        return "csv_append"
-    if isinstance(value, WorkflowWriteToSheetbookSheet):
-        return "sheetbook_sheet"
-    if isinstance(value, WorkflowWriteToSheetbookAppend):
-        return "sheetbook_append"
-    return "unknown"  # pragma: no cover  # pragma: allow-no-cover invariant: all WorkflowWrite types handled above
+def _effective_outputs_for_workflow_compile(
+    config: DemandConfig,
+    *,
+    overrides_outputs: Optional[Sequence[Mapping[str, object]]],
+) -> Tuple[OutputTargetConfig, ...]:
+    if overrides_outputs is None:
+        return tuple(config.outputs or ())
+
+    # 最小解析器: 仅抽取 `name`/`to`/`write`/`container`;完整校验在需求编译阶段完成.
+    outputs: List[OutputTargetConfig] = []
+    for idx, raw in enumerate(overrides_outputs):
+        if not isinstance(raw, dict):
+            msg = "overrides.outputs.{} must be a mapping".format(int(idx))
+            raise ScalimWorkflowConfigError(msg, path="overrides.outputs")
+        name_raw = raw.get("name")
+        name = str(name_raw or "").strip() if isinstance(name_raw, str) else ""
+        if not name:
+            msg = "overrides.outputs.{}.name is required".format(int(idx))
+            raise ScalimWorkflowConfigError(msg, path="overrides.outputs")
+
+        to_obj = raw.get("to")
+        to_cfg = None
+        if isinstance(to_obj, dict):
+            to_raw = cast("Mapping[str, object]", to_obj)  # pragma: allow-cast yaml mapping typed narrowing
+            book_raw = to_raw.get("book")
+            sheet_raw = to_raw.get("sheet")
+            book = str(book_raw or "").strip() if isinstance(book_raw, str) else None
+            sheet = str(sheet_raw or "").strip() if isinstance(sheet_raw, str) else None
+            if book is not None or sheet is not None:
+                to_cfg = OutputToConfig(book=book, sheet=sheet)
+
+        write_obj = raw.get("write")
+        write_cfg = None
+        if isinstance(write_obj, dict):
+            write_raw = cast("Dict[str, Any]", write_obj)  # pragma: allow-cast yaml mapping typed narrowing
+            write_cfg = OutputWriteConfig(
+                mode=write_raw.get("mode"),
+                align_by=write_raw.get("align_by"),
+                header_policy=write_raw.get("header_policy"),
+                on_mismatch=write_raw.get("on_mismatch"),
+                on_conflict=write_raw.get("on_conflict"),
+            )
+
+        outputs.append(
+            OutputTargetConfig(
+                name=str(name),
+                to=to_cfg,
+                write=write_cfg,
+                container=cast("Any", raw).get("container"),  # pragma: allow-cast yaml mapping typed narrowing
+                fields=None,
+            )
+        )
+    return tuple(outputs)
 
 
 def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     wf_obj: WorkflowConfig,
     *,
-    demand_cfg_by_run_id: Dict[str, DemandConfig],
+    demand_cfg_by_run_id: Mapping[str, DemandConfig],
     nodes: List[WorkflowAnyNodeIr],
     edges: List[WorkflowEdgeIr],
+    effective_books: Mapping[str, BookConfig],
+    overrides_outputs: Optional[Sequence[Mapping[str, object]]],
+    overrides_outputs_defaults: Optional[Mapping[str, object]],
 ) -> Dict[str, List[str]]:
-    last_write_node_id_by_resource: Dict[Tuple[str, str], str] = {}
-    sheetbook_write_node_ids_by_run_id: Dict[str, List[str]] = {}
+    last_write_node_id_by_book_id: Dict[str, str] = {}
+    xlsx_memory_write_node_ids_by_run_id: Dict[str, List[str]] = {}
 
-    for run_idx, run in enumerate(wf_obj.runs):
-        writes = tuple(run.writes or ())
-        if not writes:
+    for run in wf_obj.runs:
+        cfg = demand_cfg_by_run_id.get(str(run.id))
+        if cfg is None:
             continue
 
-        output_type_by_id: Dict[str, str] = {}
-        cfg = demand_cfg_by_run_id.get(str(run.id))
-        if cfg is not None:
-            for out_cfg in cfg.outputs:
-                out_id = str(out_cfg.name or "").strip()
-                container = out_cfg.container
-                out_type = str(container.type or "") if container is not None else ""
-                if out_id:
-                    output_type_by_id[out_id] = out_type
+        outputs = _effective_outputs_for_workflow_compile(cfg, overrides_outputs=overrides_outputs)
+        if not outputs:
+            continue
 
-        for write_idx, intent in enumerate(writes):
-            kind = _write_intent_kind(intent)
-            output_id = str(intent.output or "").strip()
-            resource_type = ""
-            resource_id = ""
+        outputs_path = "outputs" if overrides_outputs is None else "overrides.outputs"
 
-            if isinstance(intent, (WorkflowWriteToWorkbookSheet, WorkflowWriteToWorkbookAppend)):
-                resource_type = "workbook"
-                resource_id = str(intent.workbook or "")
-            elif isinstance(intent, WorkflowWriteToCsvAppend):
-                resource_type = "csv"
-                resource_id = str(intent.csv or "")
-            elif isinstance(intent, (WorkflowWriteToSheetbookSheet, WorkflowWriteToSheetbookAppend)):
-                resource_type = "sheetbook"
-                resource_id = str(intent.sheetbook or "")
+        next_write_idx = 0
+        for out_idx, out_cfg in enumerate(outputs):
+            container = out_cfg.container
+            if container is not None:
+                continue
 
-            if output_id not in output_type_by_id:
-                msg = (
-                    "Unknown demand output id referenced by workflow writes: "
-                    "run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}"
-                ).format(str(run.id), str(kind), str(resource_id), str(output_id))
-                raise ScalimWorkflowConfigError(
-                    msg,
-                    path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), str(kind)),
+            book_id, book_ref_path = _effective_book_binding_for_output(
+                cfg,
+                out_cfg,
+                idx=int(out_idx),
+                outputs_path=outputs_path,
+                overrides_outputs_defaults=overrides_outputs_defaults,
+            )
+            if book_id is None:
+                msg = ("Missing outputs to.book binding for output {!r}; set outputs_defaults.to.book or {}.{}.to.book").format(
+                    str(out_cfg.name), str(outputs_path), int(out_idx)
                 )
-            if str(output_type_by_id.get(output_id, "")).lower() != "csv":
-                msg = (
-                    "workflow writes currently only supports CSV outputs: run_id={!r}, intent_kind={!r}, resource_id={!r}, output_id={!r}"
-                ).format(str(run.id), str(kind), str(resource_id), str(output_id))
-                raise ScalimWorkflowConfigError(
-                    msg,
-                    path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), str(kind)),
-                )
+                raise ScalimWorkflowConfigError(msg, path=str(book_ref_path))
 
-            node_id = "{}write.{}.{}".format("__wf__", str(run.id), int(write_idx))
+            book = effective_books.get(str(book_id))
+            if book is None:
+                msg = (
+                    "Missing book resource id {!r} referenced by {}. "
+                    "Hint: declare resources.books.{} in the demand YAML, declare workflow.resources.books.{} in the workflow YAML, "
+                    "or provide overrides.resources.books.{} in Python."
+                ).format(str(book_id), str(book_ref_path), str(book_id), str(book_id), str(book_id))
+                raise ScalimWorkflowConfigError(msg, path=str(book_ref_path))
+
+            sheet_name, sheet_ref_path = _effective_sheet_name_for_output(out_cfg, idx=int(out_idx), outputs_path=outputs_path)
+            try:
+                _validate_excel_sheet_name(sheet_name, path=str(sheet_ref_path))
+            except ValueError as exc:
+                raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from None
+
+            base_defaults = _effective_write_defaults(book)
+            effective_defaults = _overlay_write_defaults(base_defaults, out_cfg.write)
+            mode = str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
+
+            node_id = "{}write.{}.{}".format(_INTERNAL_NODE_ID_PREFIX, str(run.id), int(next_write_idx))
+            next_write_idx += 1
             decl_order = len(nodes)
             write_deps: List[str] = [str(run.id)]
 
-            node: WorkflowAnyNodeIr
-            if isinstance(intent, WorkflowWriteToWorkbookSheet):
-                sheet_name = str(intent.sheet)
-                on_conflict = str(intent.on_conflict or "error")
-                node = WriteSheetNodeIr(
-                    node_id=str(node_id),
-                    node_type=WorkflowNodeType.WRITE_SHEET,
-                    decl_order=int(decl_order),
-                    deps=(),
-                    resource_type=resource_type,
-                    resource_id=str(resource_id),
-                    sheet=sheet_name,
-                    input_node_id=str(run.id),
-                    input_output_id=str(output_id),
-                    on_conflict=on_conflict,
-                )
-            elif isinstance(intent, WorkflowWriteToWorkbookAppend):
-                node = AppendSheetNodeIr(
-                    node_id=str(node_id),
-                    node_type=WorkflowNodeType.APPEND_SHEET,
-                    decl_order=int(decl_order),
-                    deps=(),
-                    resource_type=resource_type,
-                    resource_id=str(resource_id),
-                    sheet=str(intent.sheet),
-                    input_node_id=str(run.id),
-                    input_output_id=str(output_id),
-                    align_by=str(intent.align_by or "field_id"),
-                    header_policy=str(intent.header_policy or "once"),
-                    on_mismatch=str(intent.on_mismatch or "error"),
-                )
-            elif isinstance(intent, WorkflowWriteToCsvAppend):
-                node = AppendSheetNodeIr(
-                    node_id=str(node_id),
-                    node_type=WorkflowNodeType.APPEND_SHEET,
-                    decl_order=int(decl_order),
-                    deps=(),
-                    resource_type=resource_type,
-                    resource_id=str(resource_id),
-                    sheet=None,
-                    input_node_id=str(run.id),
-                    input_output_id=str(output_id),
-                    align_by="header",
-                    header_policy=str(intent.header_policy or "once"),
-                    on_mismatch=str(intent.on_mismatch or "error"),
-                )
-            elif isinstance(intent, WorkflowWriteToSheetbookSheet):
-                sheet_name = str(intent.sheet)
-                on_conflict = str(intent.on_conflict or "error")
-                node = WriteSheetNodeIr(
-                    node_id=str(node_id),
-                    node_type=WorkflowNodeType.WRITE_SHEET,
-                    decl_order=int(decl_order),
-                    deps=(),
-                    resource_type=resource_type,
-                    resource_id=str(resource_id),
-                    sheet=sheet_name,
-                    input_node_id=str(run.id),
-                    input_output_id=str(output_id),
-                    on_conflict=on_conflict,
-                )
-                sheetbook_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
-            elif isinstance(intent, WorkflowWriteToSheetbookAppend):
-                node = AppendSheetNodeIr(
-                    node_id=str(node_id),
-                    node_type=WorkflowNodeType.APPEND_SHEET,
-                    decl_order=int(decl_order),
-                    deps=(),
-                    resource_type=resource_type,
-                    resource_id=str(resource_id),
-                    sheet=str(intent.sheet),
-                    input_node_id=str(run.id),
-                    input_output_id=str(output_id),
-                    align_by=str(intent.align_by or "field_id"),
-                    header_policy=str(intent.header_policy or "once"),
-                    on_mismatch=str(intent.on_mismatch or "error"),
-                )
-                sheetbook_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
-            else:  # pragma: no cover  # pragma: allow-no-cover invariant: all WorkflowWrite types handled above
-                continue  # pragma: no cover  # pragma: allow-no-cover invariant: all WorkflowWrite types handled above
-
-            resource_key = (resource_type, str(resource_id))
-            prev_write_id = last_write_node_id_by_resource.get(resource_key)
+            prev_write_id = last_write_node_id_by_book_id.get(str(book_id))
             if prev_write_id is not None:
                 write_deps.append(str(prev_write_id))
-            last_write_node_id_by_resource[resource_key] = str(node_id)
+            last_write_node_id_by_book_id[str(book_id)] = str(node_id)
 
-            node = replace(node, deps=tuple(write_deps))
+            node: WorkflowAnyNodeIr
+            if mode == "sheet":
+                node = WriteSheetNodeIr(
+                    node_id=str(node_id),
+                    node_type=WorkflowNodeType.WRITE_SHEET,
+                    decl_order=int(decl_order),
+                    deps=tuple(write_deps),
+                    resource_type="book",
+                    resource_id=str(book_id),
+                    sheet=str(sheet_name),
+                    input_node_id=str(run.id),
+                    input_output_id=str(out_cfg.name),
+                    on_conflict=str(effective_defaults.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT),
+                )
+            elif mode == "append":
+                node = AppendSheetNodeIr(
+                    node_id=str(node_id),
+                    node_type=WorkflowNodeType.APPEND_SHEET,
+                    decl_order=int(decl_order),
+                    deps=tuple(write_deps),
+                    resource_type="book",
+                    resource_id=str(book_id),
+                    sheet=str(sheet_name),
+                    input_node_id=str(run.id),
+                    input_output_id=str(out_cfg.name),
+                    align_by=str(effective_defaults.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY),
+                    header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
+                    on_mismatch=str(effective_defaults.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH),
+                )
+            else:
+                msg = "Unsupported books.write_defaults.mode={!r} (book_id={!r})".format(mode, str(book_id))
+                raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}.write_defaults.mode".format(str(book_id)))
+
             nodes.append(node)
             for dep_id in write_deps:
                 edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
 
-    return sheetbook_write_node_ids_by_run_id
+            kind = str(book.kind or "").strip()
+            if kind == "xlsx_memory":
+                xlsx_memory_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
+
+        # `meta`/`audit` 额外工作表: 在工作流模式下通过推导的写入节点写出.
+        extras: List[Tuple[str, object, str]] = []
+        if cfg.meta is not None:
+            extras.append(("meta", cfg.meta, "__meta__"))
+        if cfg.audit is not None:
+            extras.append(("audit", cfg.audit, "__audit__"))
+        if extras:
+            # 将 `meta`/`audit` 绑定到有效的默认 `book`.
+            default_book_id, default_book_ref = _effective_default_book_id(cfg, overrides_outputs_defaults=overrides_outputs_defaults)
+            if default_book_id is None:
+                # 回退到第一个绑定到 `book` 的输出(若存在).
+                for scan_idx, scan_out in enumerate(outputs):
+                    if scan_out.container is not None:
+                        continue
+                    candidate, cand_ref = _effective_book_binding_for_output(
+                        cfg,
+                        scan_out,
+                        idx=int(scan_idx),
+                        outputs_path=outputs_path,
+                        overrides_outputs_defaults=overrides_outputs_defaults,
+                    )
+                    if candidate:
+                        default_book_id, default_book_ref = candidate, cand_ref
+                        break
+
+            if default_book_id is None:
+                msg = "meta/audit requires a default books binding; set outputs_defaults.to.book or outputs[*].to.book"
+                raise ScalimWorkflowConfigError(msg, path=str(default_book_ref))
+
+            book = effective_books.get(str(default_book_id))
+            if book is None:
+                msg = (
+                    "Missing book resource id {!r} referenced by {}. "
+                    "Hint: declare resources.books.{} in the demand YAML, declare workflow.resources.books.{} in the workflow YAML, "
+                    "or provide overrides.resources.books.{} in Python."
+                ).format(
+                    str(default_book_id),
+                    str(default_book_ref),
+                    str(default_book_id),
+                    str(default_book_id),
+                    str(default_book_id),
+                )
+                raise ScalimWorkflowConfigError(msg, path=str(default_book_ref))
+
+            base_defaults = _effective_write_defaults(book)
+            effective_defaults = _overlay_write_defaults(base_defaults, None)
+            mode = str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
+
+            for extra_id, extra_cfg_obj, default_sheet in extras:
+                extra_cfg = cast("Any", extra_cfg_obj)  # pragma: allow-cast output extra sheet cfg typed narrowing
+                sheet_name = str(extra_cfg.sheet or default_sheet)
+                sheet_ref_path = "{}.{}".format(extra_id, "sheet")
+                try:
+                    _validate_excel_sheet_name(sheet_name, path=str(sheet_ref_path))
+                except ValueError as exc:
+                    raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from None
+
+                node_id = "{}write.{}.{}".format(_INTERNAL_NODE_ID_PREFIX, str(run.id), int(next_write_idx))
+                next_write_idx += 1
+                decl_order = len(nodes)
+                write_deps = [str(run.id)]
+                prev_write_id = last_write_node_id_by_book_id.get(str(default_book_id))
+                if prev_write_id is not None:
+                    write_deps.append(str(prev_write_id))
+                last_write_node_id_by_book_id[str(default_book_id)] = str(node_id)
+
+                if mode == "sheet":
+                    node = WriteSheetNodeIr(
+                        node_id=str(node_id),
+                        node_type=WorkflowNodeType.WRITE_SHEET,
+                        decl_order=int(decl_order),
+                        deps=tuple(write_deps),
+                        resource_type="book",
+                        resource_id=str(default_book_id),
+                        sheet=str(sheet_name),
+                        input_node_id=str(run.id),
+                        input_output_id=str(extra_id),
+                        on_conflict=str(effective_defaults.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT),
+                    )
+                elif mode == "append":
+                    node = AppendSheetNodeIr(
+                        node_id=str(node_id),
+                        node_type=WorkflowNodeType.APPEND_SHEET,
+                        decl_order=int(decl_order),
+                        deps=tuple(write_deps),
+                        resource_type="book",
+                        resource_id=str(default_book_id),
+                        sheet=str(sheet_name),
+                        input_node_id=str(run.id),
+                        input_output_id=str(extra_id),
+                        align_by=str(effective_defaults.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY),
+                        header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
+                        on_mismatch=str(effective_defaults.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH),
+                    )
+                else:
+                    msg = "Unsupported books.write_defaults.mode={!r} (book_id={!r})".format(mode, str(default_book_id))
+                    raise ScalimWorkflowConfigError(
+                        msg, path="workflow.resources.books.{}.write_defaults.mode".format(str(default_book_id))
+                    )
+
+                nodes.append(node)
+                for dep_id in write_deps:
+                    edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
+
+                kind = str(book.kind or "").strip()
+                if kind == "xlsx_memory":
+                    xlsx_memory_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
+
+    return xlsx_memory_write_node_ids_by_run_id
 
 
-def _inject_sheetbook_write_dependencies(
-    sheetbook_write_node_ids_by_run_id: Dict[str, List[str]],
-    direct_dependents_by_run_id: Dict[str, List[str]],
-    demand_node_pos_by_run_id: Dict[str, int],
+def _inject_xlsx_memory_write_dependencies(
+    xlsx_memory_write_node_ids_by_run_id: Mapping[str, List[str]],
+    direct_dependents_by_run_id: Mapping[str, List[str]],
+    demand_node_pos_by_run_id: Mapping[str, int],
     nodes: List[WorkflowAnyNodeIr],
     edges: List[WorkflowEdgeIr],
 ) -> None:
-    for producer_node_id, write_node_ids in sheetbook_write_node_ids_by_run_id.items():
+    for producer_node_id, write_node_ids in xlsx_memory_write_node_ids_by_run_id.items():
         for consumer_node_id in direct_dependents_by_run_id.get(str(producer_node_id), []):
             pos = demand_node_pos_by_run_id.get(str(consumer_node_id))
             if pos is None:
-                continue  # pragma: no cover  # pragma: allow-no-cover invariant: consumer node must exist in graph
+                continue
             consumer = nodes[int(pos)]
             if not isinstance(consumer, WorkflowNodeIr):
-                continue  # pragma: no cover  # pragma: allow-no-cover invariant: demand nodes are WorkflowNodeIr
+                continue
             deps: List[str] = list(consumer.deps or ())
             for write_node_id in write_node_ids:
                 if str(write_node_id) not in deps:
@@ -495,14 +1048,17 @@ def compile_workflow_ir(
     path_aliases: Optional[Mapping[str, str]],
     template_vars: Optional[Mapping[str, object]] = None,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
+    init_vars: Optional[Dict[str, object]] = None,
+    overrides: Optional[Mapping[str, object]] = None,
 ) -> WorkflowIr:
+    """将工作流配置编译为工作流 `IR`.
+
+    说明:
+    - `overrides` 为与 `YAML` 同形的 `mapping`(通常来自 `RunOverrides`),用于仅 `IO` 层的资源/默认绑定覆盖.
+    """
     wf_obj = cast("WorkflowConfig", wf)  # pragma: allow-cast workflow config typed narrowing
 
-    wf_path = Path(str(workflow_yaml_path or "")).expanduser().resolve(strict=False)
-    base_dir = wf_path.parent
-
-    resources = _compile_workflow_resources(wf_obj, base_dir)
-    reserved_xlsx_paths = _reserved_xlsx_paths_from_resources(resources)
+    workflow_base_dir = _workflow_base_dir(workflow_yaml_path)
 
     (
         nodes,
@@ -518,22 +1074,47 @@ def compile_workflow_ir(
         allowed_yaml_roots=allowed_yaml_roots,
     )
 
-    demand_cfg_by_run_id = _load_demands_and_precheck_workbook_paths(
+    demand_cfg_by_run_id = _load_demands(
         demand_yaml_paths_by_run_id,
-        reserved_xlsx_paths=reserved_xlsx_paths,
         template_vars=template_vars,
         allowed_yaml_roots=allowed_yaml_roots,
     )
 
-    sheetbook_write_node_ids_by_run_id = _append_write_nodes_from_runs(
+    overrides_resources = None
+    overrides_outputs_defaults = None
+    overrides_outputs = None
+    if overrides is not None:
+        res_obj = overrides.get("resources")
+        if isinstance(res_obj, dict):
+            overrides_resources = cast("Mapping[str, object]", res_obj)  # pragma: allow-cast yaml mapping typed narrowing
+        od_obj = overrides.get("outputs_defaults")
+        if isinstance(od_obj, dict):
+            overrides_outputs_defaults = cast("Mapping[str, object]", od_obj)  # pragma: allow-cast yaml mapping typed narrowing
+        outs_obj = overrides.get("outputs")
+        if isinstance(outs_obj, list):
+            overrides_outputs = cast("Sequence[Mapping[str, object]]", outs_obj)  # pragma: allow-cast yaml list typed narrowing
+
+    resources, effective_books, _base_dir_by_book_id = _compile_workflow_resources(
+        wf_obj,
+        workflow_base_dir=workflow_base_dir,
+        demand_cfg_by_run_id=demand_cfg_by_run_id,
+        demand_yaml_paths_by_run_id=demand_yaml_paths_by_run_id,
+        init_vars=init_vars,
+        overrides_resources=overrides_resources,
+    )
+
+    xlsx_memory_write_node_ids_by_run_id = _append_write_nodes_from_runs(
         wf_obj,
         demand_cfg_by_run_id=demand_cfg_by_run_id,
         nodes=nodes,
         edges=edges,
+        effective_books=effective_books,
+        overrides_outputs=overrides_outputs,
+        overrides_outputs_defaults=overrides_outputs_defaults,
     )
 
-    _inject_sheetbook_write_dependencies(
-        sheetbook_write_node_ids_by_run_id,
+    _inject_xlsx_memory_write_dependencies(
+        xlsx_memory_write_node_ids_by_run_id,
         direct_dependents_by_run_id,
         demand_node_pos_by_run_id,
         nodes,

@@ -1,7 +1,8 @@
 import pytest
 
 from scalim.dsl.by_yaml import compile
-from scalim.dsl.by_yaml.runtime import output_composition_yaml as output_composition_yaml_mod
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml.runtime.output_path_resolve import resolve_output_container_path
 
 
 def test_compile_pathless_csv_output_fails_fast_with_workflow_managed_hint(tmp_path) -> None:
@@ -26,14 +27,18 @@ outputs:
         encoding="utf-8",
     )
 
-    with pytest.raises(output_composition_yaml_mod.ScalimPathlessCsvOutputError) as excinfo:
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests"]))
-    err = excinfo.value
-    assert err.output_id == "detail"
-    assert err.config_path == "outputs.0.container.path"
-    assert output_composition_yaml_mod.PATHLESS_CSV_OUTPUT_WORKFLOW_MANAGED_HINT in str(err)
+    assert any(e.path == "outputs.0.container" for e in excinfo.value.errors)
 
 
-def test_is_pathless_container_path_branches() -> None:
-    assert output_composition_yaml_mod._is_pathless_container_path(None) is True  # noqa: SLF001
-    assert output_composition_yaml_mod._is_pathless_container_path({"$init_var": "x"}) is False  # noqa: SLF001
+def test_resolve_output_container_path_branches() -> None:
+    with pytest.raises(ValueError, match=r"x is required"):
+        _ = resolve_output_container_path(None, init_vars=None, path="x")
+    with pytest.raises(ValueError, match=r"x is required"):
+        _ = resolve_output_container_path("   ", init_vars=None, path="x")
+
+    assert resolve_output_container_path({"$init_var": "p"}, init_vars={"p": "./out.csv"}, path="x") == "./out.csv"
+
+    with pytest.raises(ValueError, match=r"Missing init_var 'p'"):
+        _ = resolve_output_container_path({"$init_var": "p"}, init_vars=None, path="x")

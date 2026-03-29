@@ -2,9 +2,7 @@
 
 ## Purpose
 为 `YAML DSL` 中的 loader/call_by/... 等 Python 可调用对象引用点提供一套 **稳定、受控、无需扩大 allowlist** 的内置 callable 引用语法,避免下游依赖 `scalim.*` 内部模块路径。
-
 ## Requirements
-
 ### Requirement: YAML MUST support `^<id>` as a builtin callable reference
 系统 MUST 支持在所有“期待 Python callable 引用”的字段中使用 `^<id>` 语法,作为 `module.path:function` / `module.path:obj.method` 的并列替代。
 
@@ -63,11 +61,12 @@
 - **WHEN** YAML 引用 `^x`
 - **THEN** 系统 MUST 解析成功且不要求将 `scalim.*` 加入 allowlist
 
-### Requirement: default vocabulary MUST include workflow sheetbook loader id
+### Requirement: default vocabulary MUST include workflow book sheet rows loader id
 系统 MUST 至少提供一个可用的内置 callable id,用于 workflow 场景的内置 loader:
 
-- `^workflow/sheetbook_sheet_rows` → workflow sheetbook rows loader
+- `^workflow/book_sheet_rows` → workflow book sheet rows loader (`scalim.workflow.loaders:book_sheet_rows`)
 
-#### Scenario: workflow sheetbook loader id is available
-- **WHEN** 调用方在 YAML 中声明 `loader: ^workflow/sheetbook_sheet_rows`
+#### Scenario: workflow book sheet rows loader id is available
+- **WHEN** 调用方在 YAML 中声明 `loader: ^workflow/book_sheet_rows`
 - **THEN** 解析与运行期 callable 解析 MUST 成功
+

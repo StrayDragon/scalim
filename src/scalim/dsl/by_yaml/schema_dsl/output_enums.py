@@ -7,11 +7,62 @@
 
 from typing import Tuple
 
-OUTPUT_CONTAINER_TYPES: Tuple[str, ...] = (
-    "workbook",
-    "csv",
-)
+OUTPUT_CONTAINER_TYPES: Tuple[str, ...] = ("csv",)
 """`outputs.*.container.type` 枚举."""
+
+BOOK_KINDS: Tuple[str, ...] = (
+    "xlsx_file",
+    "xlsx_memory",
+)
+"""`resources.books.*.kind` 枚举."""
+
+BOOK_WRITE_MODE_ENUM: Tuple[str, ...] = (
+    "sheet",
+    "append",
+)
+"""`resources.books.*.write_defaults.mode` 枚举."""
+
+DEFAULT_BOOK_WRITE_MODE: str = "append"
+"""`resources.books.*.write_defaults.mode` 默认值."""
+
+BOOK_WRITE_ALIGN_BY_ENUM: Tuple[str, ...] = (
+    "field_id",
+    "header",
+)
+"""`resources.books.*.write_defaults.align_by` 枚举."""
+
+DEFAULT_BOOK_WRITE_ALIGN_BY: str = "field_id"
+"""`resources.books.*.write_defaults.align_by` 默认值."""
+
+BOOK_WRITE_HEADER_POLICY_ENUM: Tuple[str, ...] = (
+    "once",
+    "always",
+    "never",
+)
+"""`resources.books.*.write_defaults.header_policy` 枚举."""
+
+DEFAULT_BOOK_WRITE_HEADER_POLICY: str = "once"
+"""`resources.books.*.write_defaults.header_policy` 默认值."""
+
+BOOK_WRITE_ON_MISMATCH_ENUM: Tuple[str, ...] = (
+    "error",
+    "warn",
+    "skip",
+)
+"""`resources.books.*.write_defaults.on_mismatch` 枚举."""
+
+DEFAULT_BOOK_WRITE_ON_MISMATCH: str = "error"
+"""`resources.books.*.write_defaults.on_mismatch` 默认值."""
+
+BOOK_WRITE_ON_CONFLICT_ENUM: Tuple[str, ...] = (
+    "error",
+    "overwrite",
+    "skip",
+)
+"""`resources.books.*.write_defaults.on_conflict` 枚举."""
+
+DEFAULT_BOOK_WRITE_ON_CONFLICT: str = "error"
+"""`resources.books.*.write_defaults.on_conflict` 默认值."""
 
 
 OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM: Tuple[str, ...] = (
@@ -89,9 +140,20 @@ __all__ = [
     "AGG_RANK_ORDER_ENUM",
     "AGG_RANK_PRODUCER_KEYS",
     "AGG_RANK_TOP_K_MODE_ENUM",
+    "BOOK_KINDS",
+    "BOOK_WRITE_ALIGN_BY_ENUM",
+    "BOOK_WRITE_HEADER_POLICY_ENUM",
+    "BOOK_WRITE_MODE_ENUM",
+    "BOOK_WRITE_ON_CONFLICT_ENUM",
+    "BOOK_WRITE_ON_MISMATCH_ENUM",
     "DEFAULT_AGG_DISTINCT_ON_OVERFLOW",
     "DEFAULT_AGG_RANK_ORDER",
     "DEFAULT_AGG_RANK_TOP_K_MODE",
+    "DEFAULT_BOOK_WRITE_ALIGN_BY",
+    "DEFAULT_BOOK_WRITE_HEADER_POLICY",
+    "DEFAULT_BOOK_WRITE_MODE",
+    "DEFAULT_BOOK_WRITE_ON_CONFLICT",
+    "DEFAULT_BOOK_WRITE_ON_MISMATCH",
     "OUTPUT_CONTAINER_TYPES",
     "OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM",
 ]

@@ -216,7 +216,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
     [
         ({"path": "./out.csv"}, "outputs.0.container", ValueError, r"outputs\.0\.container\.type is required", None, None),
         ({"type": "bad", "path": "./out.csv"}, "outputs.0.container", ValueError, r"type='bad' is invalid", None, None),
-        ({"type": "workbook"}, "outputs.0.container", ValueError, r"path is required for workbook outputs", None, None),
+        ({"type": "csv"}, "outputs.0.container", ValueError, r"outputs\.0\.container\.path is required for csv outputs", None, None),
         (
             {"type": "csv", "path": {"$init_var": "out_path", "other": 1}},
             "outputs.0.container",
@@ -249,7 +249,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
             "outputs.0.container.path.$init_var",
             "must be a non-empty string",
         ),
-        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a string", None, None),
+        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a non-empty string", None, None),
         (
             {"type": "csv", "path": "./out.csv", "header_fields_output_by": "bad"},
             "outputs.0.container",
@@ -286,13 +286,10 @@ def test_parse_output_container_defensive_checks(raw, base_path, exc_type, match
         assert str(excinfo.value) == "{} {}".format(expected_path, expected_reason)
 
 
-def test_parse_output_container_allows_pathless_csv() -> None:
+def test_parse_output_container_rejects_pathless_csv() -> None:
     loader = YamlDemandLoader()
-    container = loader._parse_output_container(
-        {"type": "csv"},
-        base_path="outputs.0.container",
-    )
-    assert container.path == ""
+    with pytest.raises(ValueError, match=r"outputs\.0\.container\.path is required for csv outputs"):
+        _ = loader._parse_output_container({"type": "csv"}, base_path="outputs.0.container")
 
 
 def test_parse_output_container_accepts_init_var_mapping_path() -> None:
@@ -757,7 +754,7 @@ def test_parse_where_requires_defensive_blank_and_errors() -> None:
 
 def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")
+    container = OutputContainerConfig(type="csv", path="./out.csv")
 
     def _detail() -> OutputTargetConfig:
         return OutputTargetConfig(name="detail", container=container, fields=("order_id",))
@@ -999,7 +996,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
 
 def test_validate_outputs_semantics_allows_aggregate_dag_rank_by_compute_post_depends_on_post_and_rank_after_post() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")
+    container = OutputContainerConfig(type="csv", path="./out.csv")
 
     agg = OutputAggregateConfig(
         group_by=("g",),
@@ -1050,7 +1047,7 @@ def test_validate_outputs_semantics_allows_aggregate_dag_rank_by_compute_post_de
 
 def test_validate_outputs_semantics_rejects_compute_referencing_unknown_agg_fields() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")
+    container = OutputContainerConfig(type="csv", path="./out.csv")
 
     agg = OutputAggregateConfig(
         group_by=("g",),
@@ -1075,7 +1072,7 @@ def test_validate_outputs_semantics_rejects_compute_referencing_unknown_agg_fiel
 
 def test_validate_outputs_semantics_aggregate_dag_cycle_detection_is_actionable() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="S")
+    container = OutputContainerConfig(type="csv", path="./out.csv")
 
     agg = OutputAggregateConfig(
         group_by=("g",),
@@ -1105,12 +1102,12 @@ def test_validate_outputs_semantics_shared_workbook_loop_skips_non_workbook_targ
     outputs = [
         OutputTargetConfig(
             name="a",
-            container=OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="A"),
+            container=OutputContainerConfig(type="csv", path="./a.csv"),
             fields=("order_id",),
         ),
         OutputTargetConfig(
             name="b",
-            container=OutputContainerConfig(type="workbook", path="./out.xlsx", sheet="B"),
+            container=OutputContainerConfig(type="csv", path="./b.csv"),
             fields=("order_id",),
         ),
         OutputTargetConfig(
@@ -1144,21 +1141,8 @@ def test_parse_outputs_from_inherits_fields_requires_base_fields() -> None:
         loader._parse_outputs(raw, field_def_index=field_index)
 
 
-@pytest.mark.parametrize(
-    "container_kwargs,match",
-    [
-        ({"sheet": "S"}, r"container\.sheet is only allowed for type=workbook"),
-        ({"allow_formulas": True}, r"container\.allow_formulas is only allowed for type=workbook"),
-        ({"write_lock": True}, r"container\.write_lock is only allowed for type=workbook"),
-    ],
-    ids=["csv-sheet", "csv-allow-formulas", "csv-write-lock"],
-)
-def test_validate_outputs_semantics_csv_disallows_workbook_only_options(container_kwargs, match) -> None:
+def test_validate_outputs_semantics_rejects_container_type_workbook_migration_hint() -> None:
     loader = YamlDemandLoader()
 
-    container = OutputContainerConfig(type="csv", path="./out.csv", **container_kwargs)
-    with pytest.raises(ValueError, match=match):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="csv1", container=container, fields=("order_id",))],
-            known_field_ids={"order_id"},
-        )
+    with pytest.raises(ValueError, match=r"container\.type='workbook' was removed"):
+        _ = loader._parse_output_container({"type": "workbook", "path": "./out.xlsx"}, base_path="outputs.0.container")

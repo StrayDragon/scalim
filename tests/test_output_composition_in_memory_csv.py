@@ -20,10 +20,16 @@ main_source:
   fields:
     id: {extract: id}
     value: {extract: value}
+resources:
+  books:
+    report:
+      kind: xlsx_memory
+      budget: {max_sheets: 10, max_total_cells: 1000}
+outputs_defaults:
+  to:
+    book: report
 outputs:
   - name: detail
-    container:
-      type: csv
     fields: [id, value]
 """
         ).lstrip(),

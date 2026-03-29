@@ -87,7 +87,7 @@ DESC_LOADER_MD = (
     "示例:\n"
     "- `.loaders:load_orders`\n"
     "- `.loaders.load_orders`\n"
-    "- `^workflow/sheetbook_sheet_rows`"
+    "- `^workflow/book_sheet_rows`"
 )
 DESC_LOOKUP_CAST = "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}"
 DESC_LOOKUP_CAST_MD = (
@@ -644,6 +644,8 @@ DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "fields",
     "relations",
     "guardrails",
+    "resources",
+    "outputs_defaults",
     "outputs",
     "validate_unique_field_names",
     "failure_policy",

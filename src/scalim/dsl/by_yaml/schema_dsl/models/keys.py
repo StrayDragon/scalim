@@ -31,7 +31,18 @@ from .outputs import (
     OutputAggregateConfig,
     OutputContainerConfig,
     OutputExtraSheetConfig,
+    OutputsDefaultsConfig,
+    OutputsDefaultsToConfig,
     OutputTargetConfig,
+    OutputToConfig,
+    OutputWriteConfig,
+)
+from .resources import (
+    BookBudgetConfig,
+    BookConfig,
+    BookExportXlsxConfig,
+    BookWriteDefaultsConfig,
+    ResourcesConfig,
 )
 from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, SourceConfig
 
@@ -86,6 +97,15 @@ OUTPUT_CONTAINER_KEYS = _build_key_map(OutputContainerConfig)
 OUTPUT_AGGREGATE_KEYS = _build_key_map(OutputAggregateConfig)
 OUTPUT_TARGET_KEYS = _build_key_map(OutputTargetConfig)
 OUTPUT_EXTRA_SHEET_KEYS = _build_key_map(OutputExtraSheetConfig)
+OUTPUT_TO_KEYS = _build_key_map(OutputToConfig)
+OUTPUT_WRITE_KEYS = _build_key_map(OutputWriteConfig)
+OUTPUTS_DEFAULTS_TO_KEYS = _build_key_map(OutputsDefaultsToConfig)
+OUTPUTS_DEFAULTS_KEYS = _build_key_map(OutputsDefaultsConfig)
+BOOK_BUDGET_KEYS = _build_key_map(BookBudgetConfig)
+BOOK_EXPORT_XLSX_KEYS = _build_key_map(BookExportXlsxConfig)
+BOOK_WRITE_DEFAULTS_KEYS = _build_key_map(BookWriteDefaultsConfig)
+BOOK_KEYS = _build_key_map(BookConfig)
+RESOURCES_KEYS = _build_key_map(ResourcesConfig)
 PERFORMANCE_KEYS = _build_key_map(PerformanceConfig)
 PERFORMANCE_REPORT_KEYS = _build_key_map(PerformanceReportConfig)
 PERFORMANCE_THRESHOLDS_KEYS = _build_key_map(PerformanceThresholdsConfig)

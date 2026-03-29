@@ -30,10 +30,12 @@ workflow:
     - id: a
       demand: a.yaml
   resources:
-    workbooks:
+    books:
       report:
+        kind: xlsx_file
         path: ./a.xlsx
       report:
+        kind: xlsx_file
         path: ./b.xlsx
 """
         ).lstrip(),
@@ -53,129 +55,193 @@ def test_workflow_run_id_rejects_internal_prefix() -> None:
 
 
 @pytest.mark.parametrize(
-    ("writes_raw", "match"),
+    "writes_raw",
     [
-        ("nope", "run.writes must be a list of intents"),
-        (["nope"], "write intent must be a mapping"),
-        ([{1: {}}], "write intent keys must be non-empty strings"),
-        ([{}], "write intent must contain exactly one of"),
-        ([{"workbook_sheet": {}, "csv_append": {}}], "write intent must contain exactly one of"),
-        ([{"nope": {}}], "write intent contains unknown key"),
-        ([{"workbook_sheet": "nope"}], "run.writes.workbook_sheet must be a mapping"),
-        ([{"workbook_sheet": {1: "nope"}}], "run.writes.workbook_sheet keys must be non-empty strings"),
-        ([{"workbook_sheet": {"sheet": "S", "output": "o"}}], "run.writes.workbook_sheet.workbook must be a non-empty string"),
-        ([{"workbook_sheet": {"workbook": "r", "output": "o"}}], "run.writes.workbook_sheet.sheet must be a non-empty string"),
-        ([{"workbook_sheet": {"workbook": "r", "sheet": "S"}}], "run.writes.workbook_sheet.output must be a non-empty string"),
-        (
-            [{"workbook_sheet": {"workbook": "r", "sheet": "S", "output": "o", "on_conflict": "bad"}}],
-            "run.writes.workbook_sheet.on_conflict must be one of",
-        ),
-        ([{"workbook_append": {"sheet": "S", "output": "o"}}], "run.writes.workbook_append.workbook must be a non-empty string"),
-        ([{"workbook_append": {"workbook": "r", "output": "o"}}], "run.writes.workbook_append.sheet must be a non-empty string"),
-        ([{"workbook_append": {"workbook": "r", "sheet": "S"}}], "run.writes.workbook_append.output must be a non-empty string"),
-        (
-            [{"workbook_append": {"workbook": "r", "sheet": "S", "output": "o", "align_by": "bad"}}],
-            "run.writes.workbook_append.align_by must be one of",
-        ),
-        (
-            [{"workbook_append": {"workbook": "r", "sheet": "S", "output": "o", "header_policy": "bad"}}],
-            "run.writes.workbook_append.header_policy must be one of",
-        ),
-        (
-            [{"workbook_append": {"workbook": "r", "sheet": "S", "output": "o", "on_mismatch": "bad"}}],
-            "run.writes.workbook_append.on_mismatch must be one of",
-        ),
-        ([{"csv_append": {"output": "o"}}], "run.writes.csv_append.csv must be a non-empty string"),
-        ([{"csv_append": {"csv": "c"}}], "run.writes.csv_append.output must be a non-empty string"),
-        ([{"csv_append": {"csv": "c", "output": "o", "header_policy": "bad"}}], "run.writes.csv_append.header_policy must be one of"),
-        ([{"csv_append": {"csv": "c", "output": "o", "on_mismatch": "bad"}}], "run.writes.csv_append.on_mismatch must be one of"),
-        ([{"sheetbook_sheet": {"sheet": "S", "output": "o"}}], "run.writes.sheetbook_sheet.sheetbook must be a non-empty string"),
-        ([{"sheetbook_sheet": {"sheetbook": "sb", "output": "o"}}], "sheet name must be a non-empty string"),
-        ([{"sheetbook_sheet": {"sheetbook": "sb", "sheet": "S"}}], "run.writes.sheetbook_sheet.output must be a non-empty string"),
-        ([{"sheetbook_sheet": {"sheetbook": "sb", "sheet": "Bad:Name", "output": "o"}}], "invalid characters"),
-        ([{"sheetbook_sheet": {"sheetbook": "sb", "sheet": "x" * 32, "output": "o"}}], "too long"),
-        (
-            [{"sheetbook_sheet": {"sheetbook": "sb", "sheet": "S", "output": "o", "on_conflict": "bad"}}],
-            "run.writes.sheetbook_sheet.on_conflict must be one of",
-        ),
-        ([{"sheetbook_sheet": {"sheetbook": "sb", "sheet": "S", "output": "o"}}], "Unknown sheetbook resource id"),
-        ([{"sheetbook_append": {"sheet": "S", "output": "o"}}], "run.writes.sheetbook_append.sheetbook must be a non-empty string"),
-        ([{"sheetbook_append": {"sheetbook": "sb", "sheet": "S"}}], "run.writes.sheetbook_append.output must be a non-empty string"),
-        (
-            [{"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "o", "align_by": "bad"}}],
-            "run.writes.sheetbook_append.align_by must be one of",
-        ),
-        (
-            [{"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "o", "header_policy": "bad"}}],
-            "run.writes.sheetbook_append.header_policy must be one of",
-        ),
-        (
-            [{"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "o", "on_mismatch": "bad"}}],
-            "run.writes.sheetbook_append.on_mismatch must be one of",
-        ),
+        None,
+        "nope",
+        [],
+        [{"workbook_sheet": {"workbook": "r", "sheet": "S", "output": "o"}}],
     ],
 )
-def test_load_workflow_config_from_mapping_writes_errors(writes_raw: Any, match: str) -> None:
+def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> None:
     root = _base_root()
     root["workflow"]["runs"][0]["writes"] = writes_raw
-    with pytest.raises(ScalimWorkflowConfigError, match=match):
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config_from_mapping(root)
+    assert "run.writes was removed" in str(excinfo.value)
+    assert excinfo.value.path == "workflow.runs.0.writes"
 
 
 @pytest.mark.parametrize(
     ("resources_raw", "match"),
     [
-        ({"oops": {}}, "contains unknown keys"),
-        ({"workbooks": "nope"}, "workbooks must be a mapping"),
-        ({"csvs": "nope"}, "csvs must be a mapping"),
-        ({"sheetbooks": "nope"}, "sheetbooks must be a mapping"),
-        ({"workbooks": {1: {"path": "a.xlsx"}}}, "workbooks keys must be non-empty strings"),
-        ({"workbooks": {"report": "nope"}}, "workbooks.<id> must be a mapping"),
-        ({"workbooks": {"report": {}}}, "workbooks.<id>.path must be a non-empty string"),
-        ({"workbooks": {"report": {"path": "a.xlsx", "allow_formulas": "nope"}}}, "allow_formulas must be a bool"),
-        ({"csvs": {1: {"path": "a.csv"}}}, "csvs keys must be non-empty strings"),
-        ({"csvs": {"merged": "nope"}}, "csvs.<id> must be a mapping"),
-        ({"csvs": {"merged": {}}}, "csvs.<id>.path must be a non-empty string"),
-        ({"sheetbooks": {1: {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}, "sheetbooks keys must be non-empty strings"),
-        ({"sheetbooks": {"sb": "nope"}}, "sheetbooks.<id> must be a mapping"),
-        ({"sheetbooks": {"sb": {}}}, "budget must be a mapping"),
-        ({"sheetbooks": {"sb": {"budget": {}}}}, "max_sheets must be an integer"),
-        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1}}}}, "max_total_cells must be an integer"),
-        ({"sheetbooks": {"sb": {"budget": {"max_sheets": "nope", "max_total_cells": 1}}}}, "max_sheets must be an integer"),
-        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": "nope"}}}}, "max_total_cells must be an integer"),
-        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 0, "max_total_cells": 1}}}}, "max_sheets must be"),
-        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 0}}}}, "max_total_cells must be"),
+        ("nope", "workflow.resources must be a mapping"),
+        ({1: {}}, "workflow.resources keys must be non-empty strings"),
+        ({"": {}}, "workflow.resources keys must be non-empty strings"),
+        ({"workbooks": {"report": {"path": "a.xlsx"}}}, "workflow.resources.workbooks was removed"),
+        ({"csvs": {"merged": {"path": "a.csv"}}}, "workflow.resources.csvs was removed"),
+        ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}, "workflow.resources.sheetbooks was removed"),
+        ({"oops": {}}, "workflow.resources contains unknown keys"),
+        ({"books": "nope"}, "workflow.resources.books must be a mapping"),
+        ({"books": {1: {"kind": "xlsx_file", "path": "a.xlsx"}}}, "workflow.resources.books keys must be non-empty strings"),
+        ({"books": {"report": "nope"}}, "workflow.resources.books.report must be a mapping"),
+        ({"books": {"report": {}}}, "workflow.resources.books.report.kind is required"),
+        ({"books": {"report": {"kind": "nope"}}}, r"workflow.resources.books.report.kind=.*expected one of"),
+        ({"books": {"report": {"kind": "xlsx_file"}}}, "path is required for kind=xlsx_file"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": 1}}}, "must be a non-empty string"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "nope": 1}}}, "has unknown keys"),
         (
-            {"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}},
+            {"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "budget": {"max_sheets": 1, "max_total_cells": 1}}}},
+            "budget is not allowed",
+        ),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "export_xlsx": {"path": "b.xlsx"}}}}, "export_xlsx is not allowed"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "allow_formulas": "nope"}}}, "allow_formulas must be a bool"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "write_lock": "nope"}}}, "write_lock must be a bool"),
+        ({"books": {"mem": {"kind": "xlsx_memory"}}}, "budget is required for kind=xlsx_memory"),
+        ({"books": {"mem": {"kind": "xlsx_memory", "budget": "nope"}}}, "budget must be a mapping"),
+        (
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1, "nope": 1}}}},
+            "budget has unknown keys",
+        ),
+        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {}}}}, "max_sheets must be an integer"),
+        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1}}}}, "max_total_cells must be an integer"),
+        (
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": "nope", "max_total_cells": 1}}}},
+            "max_sheets must be an integer",
+        ),
+        (
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": "nope"}}}},
+            "max_total_cells must be an integer",
+        ),
+        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 0, "max_total_cells": 1}}}}, "max_sheets must be"),
+        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 0}}}}, "max_total_cells must be"),
+        (
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "path": "a.xlsx"}}},
+            "path is not allowed",
+        ),
+        (
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "allow_formulas": False}}},
+            "allow_formulas is not allowed",
+        ),
+        (
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "write_lock": False}}},
+            "write_lock is not allowed",
+        ),
+        (
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}},
             "export_xlsx must be a mapping",
         ),
         (
-            {"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {}}}},
-            "export_xlsx.path must be a non-empty string",
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {}}}},
+            "export_xlsx.path is required",
         ),
         (
             {
-                "sheetbooks": {
-                    "sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "write_lock": "nope"}}
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "export_xlsx": {"path": "x.xlsx", "nope": 1},
+                    }
+                }
+            },
+            "export_xlsx has unknown keys",
+        ),
+        (
+            {
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "export_xlsx": {"path": "x.xlsx", "write_lock": "nope"},
+                    }
                 }
             },
             "write_lock must be a bool",
         ),
         (
             {
-                "sheetbooks": {
-                    "sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "allow_formulas": "nope"}}
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "export_xlsx": {"path": "x.xlsx", "allow_formulas": "nope"},
+                    }
                 }
             },
             "export_xlsx.allow_formulas must be a bool",
         ),
         (
-            {"workbooks": {"same": {"path": "a.xlsx"}}, "csvs": {"same": {"path": "a.csv"}}},
-            "ids must be unique",
+            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "write_defaults": "nope"}}},
+            "write_defaults must be a mapping",
         ),
         (
-            {"workbooks": {"same": {"path": "a.xlsx"}}, "sheetbooks": {"same": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}},
-            "ids must be unique",
+            {
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "write_defaults": {"nope": 1},
+                    }
+                }
+            },
+            "write_defaults has unknown keys",
+        ),
+        (
+            {
+                "books": {
+                    "mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "write_defaults": {"mode": "nope"}}
+                }
+            },
+            r"write_defaults.mode=.*expected one of",
+        ),
+        (
+            {
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "write_defaults": {"align_by": "nope"},
+                    }
+                }
+            },
+            r"write_defaults.align_by=.*expected one of",
+        ),
+        (
+            {
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "write_defaults": {"header_policy": "nope"},
+                    }
+                }
+            },
+            r"write_defaults.header_policy=.*expected one of",
+        ),
+        (
+            {
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "write_defaults": {"on_mismatch": "nope"},
+                    }
+                }
+            },
+            r"write_defaults.on_mismatch=.*expected one of",
+        ),
+        (
+            {
+                "books": {
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 1, "max_total_cells": 1},
+                        "write_defaults": {"on_conflict": "nope"},
+                    }
+                }
+            },
+            r"write_defaults.on_conflict=.*expected one of",
         ),
     ],
 )
@@ -186,64 +252,29 @@ def test_load_workflow_config_from_mapping_resources_errors(resources_raw: Any, 
         _ = load_workflow_config_from_mapping(root)
 
 
+def test_load_workflow_config_from_mapping_books_path_accepts_pathlike(tmp_path: Path) -> None:
+    root = _base_root()
+    root["workflow"]["resources"] = {"books": {"report": {"kind": "xlsx_file", "path": tmp_path / "a.xlsx"}}}
+    cfg = load_workflow_config_from_mapping(root)
+    assert cfg.resources.books["report"].path.endswith("a.xlsx")
+
+
 def test_load_workflow_config_from_mapping_allows_null_resource_groups() -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"workbooks": None, "csvs": None, "sheetbooks": None}
+    root["workflow"]["resources"] = {"books": None}
     cfg = load_workflow_config_from_mapping(root)
-    assert cfg.resources.workbooks == {}
-    assert cfg.resources.csvs == {}
-    assert cfg.resources.sheetbooks == {}
+    assert cfg.resources.books == {}
 
 
-def test_load_workflow_config_from_mapping_validates_unknown_workbook_reference() -> None:
+def test_load_workflow_config_from_mapping_resources_raw_none_branch_is_exercised() -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"workbooks": {"ok": {"path": "a.xlsx"}}}
-    root["workflow"]["runs"][0]["writes"] = [{"workbook_sheet": {"workbook": "nope", "sheet": "S", "output": "detail"}}]
-    with pytest.raises(ScalimWorkflowConfigError, match="Unknown workbook resource id"):
-        _ = load_workflow_config_from_mapping(root)
-
-
-def test_load_workflow_config_from_mapping_validates_unknown_csv_reference() -> None:
-    root = _base_root()
-    root["workflow"]["resources"] = {"csvs": {"ok": {"path": "a.csv"}}}
-    root["workflow"]["runs"][0]["writes"] = [{"csv_append": {"csv": "nope", "output": "detail"}}]
-    with pytest.raises(ScalimWorkflowConfigError, match="Unknown csv resource id"):
-        _ = load_workflow_config_from_mapping(root)
-
-
-def test_load_workflow_config_from_mapping_validates_unknown_sheetbook_reference() -> None:
-    root = _base_root()
-    root["workflow"]["resources"] = {"sheetbooks": {"ok": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}
-    root["workflow"]["runs"][0]["writes"] = [{"sheetbook_sheet": {"sheetbook": "nope", "sheet": "S", "output": "detail"}}]
-    with pytest.raises(ScalimWorkflowConfigError, match="Unknown sheetbook resource id"):
-        _ = load_workflow_config_from_mapping(root)
-
-
-def test_load_workflow_config_from_mapping_accepts_sheetbook_append_surface() -> None:
-    root = _base_root()
-    root["workflow"]["resources"] = {"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 10}}}}
-    root["workflow"]["runs"][0]["writes"] = [{"sheetbook_append": {"sheetbook": "sb", "sheet": "S", "output": "detail"}}]
-    cfg = load_workflow_config_from_mapping(root)
-    assert len(cfg.runs[0].writes) == 1
-    assert type(cfg.runs[0].writes[0]).__name__ == "WorkflowWriteToSheetbookAppend"
-
-
-def test_load_workflow_config_from_mapping_workbooks_raw_none_branch_is_exercised() -> None:
-    root = _base_root()
-    root["workflow"]["resources"] = {"workbooks": None}
+    root["workflow"]["resources"] = None
     cfg = load_workflow_config_from_mapping(copy.deepcopy(root))
-    assert cfg.resources.workbooks == {}
+    assert cfg.resources.books == {}
 
 
-def test_load_workflow_config_from_mapping_csvs_raw_none_branch_is_exercised() -> None:
+def test_load_workflow_config_from_mapping_books_raw_none_branch_is_exercised() -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"csvs": None}
+    root["workflow"]["resources"] = {"books": None}
     cfg = load_workflow_config_from_mapping(copy.deepcopy(root))
-    assert cfg.resources.csvs == {}
-
-
-def test_load_workflow_config_from_mapping_sheetbooks_raw_none_branch_is_exercised() -> None:
-    root = _base_root()
-    root["workflow"]["resources"] = {"sheetbooks": None}
-    cfg = load_workflow_config_from_mapping(copy.deepcopy(root))
-    assert cfg.resources.sheetbooks == {}
+    assert cfg.resources.books == {}

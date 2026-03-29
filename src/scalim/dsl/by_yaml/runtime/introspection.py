@@ -170,6 +170,25 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
                 "where": str(t.where) if t.where else None,
                 "requires": list(t.requires or ()),
                 "fields": list(t.fields) if t.fields is not None else None,
+                "to": (
+                    None
+                    if t.to is None
+                    else {
+                        "book": str(t.to.book) if t.to.book else None,
+                        "sheet": str(t.to.sheet) if t.to.sheet else None,
+                    }
+                ),
+                "write": (
+                    None
+                    if t.write is None
+                    else {
+                        "mode": str(t.write.mode) if t.write.mode else None,
+                        "align_by": str(t.write.align_by) if t.write.align_by else None,
+                        "header_policy": str(t.write.header_policy) if t.write.header_policy else None,
+                        "on_mismatch": str(t.write.on_mismatch) if t.write.on_mismatch else None,
+                        "on_conflict": str(t.write.on_conflict) if t.write.on_conflict else None,
+                    }
+                ),
                 "aggregate": (
                     None
                     if t.aggregate is None
@@ -190,7 +209,10 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
                     else {
                         "type": str(t.container.type),
                         "path": str(t.container.path),
-                        "sheet": str(t.container.sheet) if t.container.sheet else None,
+                        "encoding": str(t.container.encoding),
+                        "streaming": bool(t.container.streaming),
+                        "include_header": bool(t.container.include_header),
+                        "header_fields_output_by": str(t.container.header_fields_output_by),
                     }
                 ),
             }

@@ -68,12 +68,13 @@ def stage_build_execution_request(
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
+    yaml_base_dir: str,
     options: RunOptions,
     context: YamlDslStageContext,
 ) -> ExecutionRequest:
     if options.allowed_modules != context.allowed_modules or options.allowed_functions != context.allowed_functions:
         raise ScalimStageAllowlistMismatchError
-    return build_request(config, demand_ir, options=options, resolver=context.resolver)
+    return build_request(config, demand_ir, yaml_base_dir=str(yaml_base_dir), options=options, resolver=context.resolver)
 
 
 __all__ = [

@@ -23,14 +23,6 @@ imports:
 # ==============================================================================
 
 _templates:
-  # 输出模板: composed outputs(workbook) + 字段列表复用
-  workbook_container_base: &workbook_container_base
-    type: workbook
-    path: ./.tmp/output/ecommerce_report.xlsx
-    header_fields_output_by: name
-    allow_formulas: true
-    write_lock: true
-
   detail_fields: &detail_fields
     - order_id
     - order_date
@@ -478,27 +470,36 @@ fields:
 # 输出配置(composed outputs)
 # ==============================================================================
 
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./.tmp/output/ecommerce_report.xlsx
+      allow_formulas: true
+      write_lock: true
+
+outputs_defaults:
+  to:
+    book: report
+
 meta: true
 audit: true
 
 outputs:
   - name: detail
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 订单明细
     fields:
       - *detail_fields
 
   - name: no_promo
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 无促销明细
     fields: *detail_fields
     where: "no_promotion"
 
   - name: by_region
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 区域汇总
     aggregate:
       group_by: [region_name_display]
@@ -512,8 +513,7 @@ outputs:
   # ==============================================================================
 
   - name: by_region_no_promo
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 区域汇总-无促销
     where: "no_promotion"
     aggregate:
@@ -524,8 +524,7 @@ outputs:
         customer_cnt: {count_distinct: {field: customer_id}}
 
   - name: by_region_ops
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 区域汇总-算子
     aggregate:
       group_by: [region_name_display]
@@ -545,8 +544,7 @@ outputs:
         customer_product_cnt: {count_distinct: {fields: [customer_id, product_id]}}
 
   - name: by_region_import
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 区域汇总-$import
     aggregate:
       $import: fragments.agg_by_region_guardrails
@@ -556,8 +554,7 @@ outputs:
         customer_cnt: {count_distinct: {field: customer_id}}
 
   - name: by_region_top_amount
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 区域Top-金额
     aggregate:
       group_by: [region_name_display]
@@ -572,8 +569,7 @@ outputs:
             top_k_mode: rank
 
   - name: by_region_category
-    container:
-      <<: *workbook_container_base
+    to:
       sheet: 区域x分类
     aggregate:
       group_by: [region_name_display, category_name]

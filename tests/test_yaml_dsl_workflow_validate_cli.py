@@ -16,7 +16,7 @@ def _workflow_args(path: Path, *, json_output: bool) -> argparse.Namespace:
     )
 
 
-def test_yaml_dsl_validate_workflow_fails_when_writes_reference_missing_output(tmp_path: Path, capsys) -> None:
+def test_yaml_dsl_validate_workflow_fails_when_writes_is_present(tmp_path: Path, capsys) -> None:
     demand_path = tmp_path / "demand.yaml"
     demand_path.write_text(
         """
@@ -53,11 +53,11 @@ workflow:
     payload = json.loads(capsys.readouterr().out)
     assert payload["mode"] == "workflow-validate"
     assert payload["ok"] is False
-    assert len(payload["results"]) == 2
+    assert len(payload["results"]) == 1
 
     workflow_result = payload["results"][0]
     assert workflow_result["yaml_path"] == str(workflow_path.resolve())
-    assert any(item["path"].endswith(".csv_append.output") for item in workflow_result["errors"])
+    assert any(item["path"] == "workflow.runs.0.writes" for item in workflow_result["errors"])
 
 
 def test_yaml_dsl_validate_workflow_fails_when_demand_has_semantic_errors(tmp_path: Path, capsys) -> None:

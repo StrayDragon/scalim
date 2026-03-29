@@ -185,7 +185,7 @@
 - **WHEN** workflow YAML 声明 `workflow.resources.books.report.allow_formulas=false`
 - **THEN** schema-only 校验 MUST 通过
 
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: workflow MUST precheck Excel output-path collisions across books deterministically
 当 workflow 声明多个 `xlsx` 导出路径时,系统 MUST 在“写入发生前”检测潜在的路径冲突,并采用确定性规则 fail-fast:
@@ -206,4 +206,3 @@
 - **AND** `workflow.resources.books.b.path=./out/report.xlsx`
 - **WHEN** workflow 被编译/校验
 - **THEN** 系统 MUST fail-fast 并报告冲突路径与 book ids
-

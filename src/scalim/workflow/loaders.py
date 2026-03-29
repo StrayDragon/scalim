@@ -67,49 +67,49 @@ def _require_context() -> _WorkflowLoaderContext:
     return ctx
 
 
-def sheetbook_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
-    """内置 `loader`: 读取 `workflow` `sheetbook` 的 `sheet` 行数据(`rows`).
+def book_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
+    """内置 `loader`: 读取 `workflow` `books.kind=xlsx_memory` 的某个 `sheet` 行数据(`rows`).
 
     参数:
-    - `ref`: 映射对象,必填键: `node`/`sheetbook`/`sheet`
+    - `ref`: 映射对象,必填键: `node`/`book`/`sheet`
     """
     ctx = _require_context()
 
     if not _is_mapping(ref):
-        msg = "sheetbook_sheet_rows requires params.ref as a mapping"
+        msg = "book_sheet_rows requires params.ref as a mapping"
         raise TypeError(msg)
     ref_dict = ref
 
     producer_node_id = str(ref_dict.get("node", "") or "").strip()
-    sheetbook_id = str(ref_dict.get("sheetbook", "") or "").strip()
+    book_id = str(ref_dict.get("book", "") or "").strip()
     sheet_name = str(ref_dict.get("sheet", "") or "").strip()
 
     if not producer_node_id:
-        msg = "sheetbook_sheet_rows ref.node must be a non-empty string"
+        msg = "book_sheet_rows ref.node must be a non-empty string"
         raise ValueError(msg)
-    if not sheetbook_id:
-        msg = "sheetbook_sheet_rows ref.sheetbook must be a non-empty string"
+    if not book_id:
+        msg = "book_sheet_rows ref.book must be a non-empty string"
         raise ValueError(msg)
     if not sheet_name:
-        msg = "sheetbook_sheet_rows ref.sheet must be a non-empty string"
+        msg = "book_sheet_rows ref.sheet must be a non-empty string"
         raise ValueError(msg)
 
     consumer_node_id = str(ctx.workflow_node_id)
     visible = ctx.visible_producer_node_ids
     if producer_node_id != consumer_node_id and producer_node_id not in visible:
-        msg = "Sheetbook ref node {!r} is not visible to node {!r} (declare depends_on)".format(producer_node_id, consumer_node_id)
+        msg = "Book ref node {!r} is not visible to node {!r} (declare depends_on)".format(producer_node_id, consumer_node_id)
         raise ValueError(msg)
 
-    return ctx.resource_manager.iter_sheetbook_sheet_rows(
+    return ctx.resource_manager.iter_book_sheet_rows(
         consumer_node_id=consumer_node_id,
         visible_producer_node_ids=visible,
         producer_node_id=producer_node_id,
-        sheetbook_id=sheetbook_id,
+        book_id=book_id,
         sheet=sheet_name,
     )
 
 
 __all__ = [
-    "sheetbook_sheet_rows",
+    "book_sheet_rows",
     "workflow_loader_context",
 ]

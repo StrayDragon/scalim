@@ -226,6 +226,62 @@ def test_resource_manager_unknown_resource_ids_raise(tmp_path: Path) -> None:
         )
 
 
+def test_resource_manager_book_unknown_resource_ids_raise(tmp_path: Path) -> None:
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    csv_path = _write_csv(tmp_path / "input.csv", [["id"], ["a1"]])
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown book resource id"):
+        manager.apply_book_sheet(
+            workflow_node_id="n",
+            book_id="nope",
+            sheet="S",
+            input_node_id="a",
+            input_output_id="out",
+            input_csv=str(csv_path),
+            on_conflict="error",
+        )
+
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown book resource id"):
+        manager.apply_book_append(
+            workflow_node_id="n",
+            book_id="nope",
+            sheet="S",
+            input_node_id="a",
+            input_output_id="out",
+            input_csv=str(csv_path),
+            align_by="field_id",
+            header_policy="once",
+            on_mismatch="error",
+        )
+
+
+def test_resource_manager_iter_book_sheet_rows_requires_xlsx_memory(tmp_path: Path) -> None:
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(tmp_path / "report.xlsx")},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    with pytest.raises(ValueError, match="only supports xlsx_memory"):
+        _ = manager.iter_book_sheet_rows(
+            consumer_node_id="consumer",
+            visible_producer_node_ids=frozenset(["producer"]),
+            producer_node_id="producer",
+            book_id="report",
+            sheet="S",
+        )
+
+
 def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
     workbook_path = tmp_path / "report.xlsx"
@@ -233,6 +289,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         workbook_defs={"report": str(workbook_path)},
+        workbook_write_lock={"report": True},
         csv_defs={},
         sheetbook_defs={},
     )
@@ -366,6 +423,56 @@ def test_resource_manager_csv_append_mismatch_error_and_discard(tmp_path: Path) 
             header_policy="once",
             on_mismatch="error",
         )
+
+    manager.discard_all(workflow_node_id="n_discard", reason="test")
+
+
+def test_resource_manager_csv_append_mismatch_warn_and_skip(tmp_path: Path) -> None:
+    instrumentation = _Instrumentation()
+    csv_path = tmp_path / "merged.csv"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={"merged": str(csv_path)},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    manager.apply_csv_append(
+        workflow_node_id="n0",
+        csv_id="merged",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        header_policy="once",
+        on_mismatch="error",
+    )
+
+    mismatch = _write_csv(tmp_path / "b.csv", [["id", "other"], ["b1", "B1"]])
+    manager.apply_csv_append(
+        workflow_node_id="n1",
+        csv_id="merged",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(mismatch),
+        header_policy="once",
+        on_mismatch="warn",
+    )
+    assert [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+
+    mismatch2 = _write_csv(tmp_path / "c.csv", [["id", "another"], ["c1", "C1"]])
+    manager.apply_csv_append(
+        workflow_node_id="n2",
+        csv_id="merged",
+        input_node_id="c",
+        input_output_id="detail",
+        input_csv=str(mismatch2),
+        header_policy="once",
+        on_mismatch="skip",
+    )
+    skip_events = [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE and e["payload"].action == "skip"]
+    assert skip_events
 
     manager.discard_all(workflow_node_id="n_discard", reason="test")
 
@@ -1256,6 +1363,7 @@ def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         workbook_defs={"report": str(workbook_path)},
+        workbook_write_lock={"report": True},
         csv_defs={},
         sheetbook_defs={},
     )
@@ -1744,6 +1852,7 @@ def test_resource_manager_commit_all_releases_locks_when_no_segments(tmp_path: P
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         workbook_defs={"report": str(workbook_path)},
+        workbook_write_lock={"report": True},
         csv_defs={},
         sheetbook_defs={},
     )
@@ -2076,6 +2185,7 @@ def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_pat
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         workbook_defs={"report": str(workbook_path)},
+        workbook_write_lock={"report": True},
         csv_defs={},
         sheetbook_defs={},
     )
@@ -2090,6 +2200,7 @@ def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_pat
         input_csv=str(csv_path),
         on_conflict="error",
     )
+    assert Path(str(workbook_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
     def _raise_import_error(*args: object, **kwargs: object) -> object:
         raise ImportError("missing openpyxl")

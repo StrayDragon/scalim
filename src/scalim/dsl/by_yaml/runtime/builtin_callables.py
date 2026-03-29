@@ -1,17 +1,17 @@
 import re
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple
 
-from ....workflow.loaders import sheetbook_sheet_rows
+from ....workflow.loaders import book_sheet_rows
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from .errors import ScalimResolverError
 
 _BUILTIN_ID_RE = re.compile(r"^[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*$")
 
 _DEFAULT_BUILTIN_CALLABLES_BY_ID: Dict[str, Callable[..., Any]] = {
-    "workflow/sheetbook_sheet_rows": sheetbook_sheet_rows,
+    "workflow/book_sheet_rows": book_sheet_rows,
 }
 
-_DEFAULT_PUBLIC_BUILTIN_CALLABLE_IDS: Tuple[str, ...] = ("workflow/sheetbook_sheet_rows",)
+_DEFAULT_PUBLIC_BUILTIN_CALLABLE_IDS: Tuple[str, ...] = ("workflow/book_sheet_rows",)
 
 
 def is_builtin_callable_reference(reference: str) -> bool:

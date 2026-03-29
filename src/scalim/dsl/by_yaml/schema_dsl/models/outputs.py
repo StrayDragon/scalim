@@ -18,6 +18,11 @@ from ..output_enums import (
     AGG_RANK_ORDER_ENUM,
     AGG_RANK_PRODUCER_KEYS,
     AGG_RANK_TOP_K_MODE_ENUM,
+    BOOK_WRITE_ALIGN_BY_ENUM,
+    BOOK_WRITE_HEADER_POLICY_ENUM,
+    BOOK_WRITE_MODE_ENUM,
+    BOOK_WRITE_ON_CONFLICT_ENUM,
+    BOOK_WRITE_ON_MISMATCH_ENUM,
     DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
     DEFAULT_AGG_RANK_ORDER,
     DEFAULT_AGG_RANK_TOP_K_MODE,
@@ -68,22 +73,8 @@ class OutputContainerConfig:
     SCHEMA_NAME: ClassVar[str] = "output_container"
     """输出容器配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("type",)
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("type", "path")
     """该配置对象在 `YAML` 中的必填字段列表."""
-
-    SCHEMA_ALL_OF: ClassVar[Tuple[Dict[str, Any], ...]] = (
-        {
-            # `workbook` 输出必须显式提供非空 `path`.
-            "if": {"properties": {"type": {"const": "workbook"}}},
-            "then": {"required": ["path"]},
-        },
-        {
-            # 生成的 `JSON Schema` 为工作流托管的临时 `CSV` 输出允许空字符串; 但对 `workbook` 禁止该形态.
-            "if": {"properties": {"type": {"const": "workbook"}}},
-            "then": {"properties": {"path": {"not": {"type": "string", "maxLength": 0}}}},
-        },
-    )
-    """用于约束: `workbook` 输出必须显式提供非空 `path`; 仅 `csv` 允许省略/为空."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
@@ -91,28 +82,23 @@ class OutputContainerConfig:
     type: str = dataclass_field(
         default="",
         metadata=schema_meta(
-            desc="输出容器类型(workbook/csv)",
-            md=("输出容器类型.\n\n- `workbook`: Excel 工作簿容器(支持多 sheet)\n- `csv`: CSV 文件"),
+            desc="输出容器类型(csv)",
+            md="输出容器类型.\n\n- `csv`: CSV 文件",
             choices=list(OUTPUT_CONTAINER_TYPES),
-            examples=["workbook"],
+            examples=["csv"],
         ),
     )
     """输出容器类型."""
 
     path: Any = dataclass_field(
-        default="",
+        default=None,
         metadata=schema_meta(
             schema={
                 "oneOf": [
                     {
                         "type": "string",
                         "minLength": 1,
-                        "description": "输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)",
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0,
-                        "description": "空字符串表示 pathless CSV 输出(仅 workflow 托管 writes 场景可用)",
+                        "description": "输出文件路径(相对路径以进程CWD为基准;自动 mkdir 父目录)",
                     },
                     {
                         "type": "object",
@@ -128,16 +114,13 @@ class OutputContainerConfig:
                         "description": "运行时动态路径: {$init_var: <name>}",
                     },
                 ],
-                "description": "输出文件路径(支持静态字符串/空字符串 或 {$init_var: <name>} 动态注入)",
+                "description": "输出文件路径(支持静态字符串 或 {$init_var: <name>} 动态注入)",
                 "markdownDescription": (
                     "输出文件路径.\n\n"
                     "- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n"
                     "- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n"
                     "- 可能覆盖同名文件\n"
                     "- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\n"
-                    "workflow 托管临时输出(pathless;仅 `csv`):\n"
-                    "- 当 `type: csv` 且该 output 仅用于 workflow `writes` 消费时,允许省略/留空 `path`\n"
-                    "- standalone demand 编译/运行会 fail-fast; 需要在 workflow 中运行或显式提供 `path`\n\n"
                     "动态注入:\n"
                     "- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n"
                     "- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n"
@@ -146,33 +129,16 @@ class OutputContainerConfig:
                     "```yaml\n"
                     "path: ./output/report.xlsx\n"
                     "path: {$init_var: output_path}\n"
-                    'path: ""  # pathless csv (workflow-managed only)\n'
                     "```"
                 ),
                 "examples": [
-                    "./output/report.xlsx",
                     "./output/report.csv",
                     {"$init_var": "output_path"},
-                    "",
                 ],
             }
         ),
     )
     """输出文件路径."""
-
-    sheet: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={
-                "type": "string",
-                "minLength": 1,
-                "description": "Excel sheet 名称(仅 workbook)",
-                "markdownDescription": "Excel sheet 名称(仅 `type: workbook`).",
-                "examples": ["订单明细", "Summary"],
-            }
-        ),
-    )
-    """可选:工作表名称(仅 `workbook`)."""
 
     encoding: str = dataclass_field(
         default=DEFAULT_OUTPUT_ENCODING,
@@ -219,27 +185,131 @@ class OutputContainerConfig:
     )
     """表头字段名来源."""
 
-    allow_formulas: bool = dataclass_field(
-        default=False,
-        metadata=schema_meta(
-            desc="允许 Excel 公式(仅 workbook)",
-            md="允许 Excel 公式(仅 `type: workbook`).",
-            default=False,
-            examples=[False],
-        ),
-    )
-    """是否允许 `Excel` 公式(仅 `workbook`)."""
 
-    write_lock: bool = dataclass_field(
-        default=False,
+@dataclass(frozen=True)
+class OutputToConfig:
+    SCHEMA_NAME: ClassVar[str] = "output_to"
+    """输出 `IO` 绑定(`to`)配置对象在 `YAML` 中的节点名称."""
+
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    """是否允许出现未声明的额外键."""
+
+    book: Optional[str] = dataclass_field(
+        default=None,
         metadata=schema_meta(
-            desc="写锁(仅 workbook)",
-            md="写锁(仅 `type: workbook`; 多目标共享同一 workbook 时建议开启).",
-            default=False,
-            examples=[True],
+            schema={"type": "string", "minLength": 1, "description": "可选:目标 book_id"},
+            desc="可选:目标 book_id",
+            examples=["report"],
         ),
     )
-    """是否启用 `Excel` 写锁(仅 `workbook`)."""
+    """可选:目标 `book_id`."""
+
+    sheet: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "minLength": 1, "description": "可选:目标 sheet 名称"},
+            desc="可选:目标 sheet 名称",
+            examples=["metrics", "Summary"],
+        ),
+    )
+    """可选:目标 `sheet` 名称."""
+
+
+@dataclass(frozen=True)
+class OutputWriteConfig:
+    SCHEMA_NAME: ClassVar[str] = "output_write"
+    """输出写入策略覆盖(`write`)配置对象在 `YAML` 中的节点名称."""
+
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    """是否允许出现未声明的额外键."""
+
+    mode: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "enum": list(BOOK_WRITE_MODE_ENUM)},
+            desc="可选:写入语义(sheet/append)",
+            examples=["append"],
+        ),
+    )
+
+    align_by: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "enum": list(BOOK_WRITE_ALIGN_BY_ENUM)},
+            desc="可选:字段对齐策略(field_id/header;仅 append 生效)",
+            examples=["field_id"],
+        ),
+    )
+
+    header_policy: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "enum": list(BOOK_WRITE_HEADER_POLICY_ENUM)},
+            desc="可选:表头策略(once/always/never;仅 append 生效)",
+            examples=["once"],
+        ),
+    )
+
+    on_mismatch: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "enum": list(BOOK_WRITE_ON_MISMATCH_ENUM)},
+            desc="可选:字段不匹配策略(error/warn/skip;仅 append 生效)",
+            examples=["error"],
+        ),
+    )
+
+    on_conflict: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "enum": list(BOOK_WRITE_ON_CONFLICT_ENUM)},
+            desc="可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)",
+            examples=["error"],
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class OutputsDefaultsToConfig:
+    SCHEMA_NAME: ClassVar[str] = "outputs_defaults_to"
+    """`outputs_defaults.to` 配置对象在 `YAML` 中的节点名称."""
+
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("book",)
+    """该配置对象在 `YAML` 中的必填字段列表."""
+
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    """是否允许出现未声明的额外键."""
+
+    book: str = dataclass_field(
+        default="",
+        metadata=schema_meta(
+            schema={"type": "string", "minLength": 1, "description": "默认输出目标 book_id"},
+            desc="默认输出目标 book_id",
+            examples=["report"],
+        ),
+    )
+    """默认输出目标 `book_id`."""
+
+
+@dataclass(frozen=True)
+class OutputsDefaultsConfig:
+    SCHEMA_NAME: ClassVar[str] = "outputs_defaults"
+    """`outputs_defaults` 配置对象在 `YAML` 中的节点名称."""
+
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("to",)
+    """该配置对象在 `YAML` 中的必填字段列表."""
+
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    """是否允许出现未声明的额外键."""
+
+    to: OutputsDefaultsToConfig = dataclass_field(
+        default_factory=OutputsDefaultsToConfig,
+        metadata=schema_meta(
+            ref="outputs_defaults_to",
+            desc="默认 IO 绑定(to.* defaults)",
+        ),
+    )
+    """默认 `IO` 绑定配置."""
 
 
 @dataclass(frozen=True)
@@ -957,10 +1027,30 @@ class OutputTargetConfig:
         default=None,
         metadata=schema_meta(
             ref="output_container",
-            desc="输出容器配置(workbook/csv)",
+            desc="输出容器配置(csv)",
         ),
     )
     """可选:输出容器配置(允许通过 `from` 继承)."""
+
+    to: Optional[OutputToConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            ref="output_to",
+            desc="可选:输出 IO 绑定(to: book/sheet)",
+            md="可选:输出 IO 绑定.\n\n- 用于将输出绑定到 `resources.books` 的某个 `book_id` + `sheet`",
+        ),
+    )
+    """可选:输出 `IO` 绑定."""
+
+    write: Optional[OutputWriteConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            ref="output_write",
+            desc="可选:写入策略覆盖(write)",
+            md="可选:写入策略覆盖.\n\n- 仅允许覆盖 `resources.books.*.write_defaults` 的字段集合",
+        ),
+    )
+    """可选:写入策略覆盖."""
 
     fields: Optional[Tuple[str, ...]] = dataclass_field(
         default=None,

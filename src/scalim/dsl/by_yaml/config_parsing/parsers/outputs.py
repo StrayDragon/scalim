@@ -16,15 +16,24 @@ from ...schema_dsl.models import (
     OUTPUT_AGGREGATE_KEYS,
     OUTPUT_CONTAINER_KEYS,
     OUTPUT_TARGET_KEYS,
+    OUTPUT_TO_KEYS,
+    OUTPUT_WRITE_KEYS,
     OutputAggregateConfig,
     OutputAggregateFieldConfig,
     OutputContainerConfig,
     OutputTargetConfig,
+    OutputToConfig,
+    OutputWriteConfig,
 )
 from ...schema_dsl.output_enums import (
     AGG_DISTINCT_ON_OVERFLOW_ENUM,
     AGG_RANK_ORDER_ENUM,
     AGG_RANK_TOP_K_MODE_ENUM,
+    BOOK_WRITE_ALIGN_BY_ENUM,
+    BOOK_WRITE_HEADER_POLICY_ENUM,
+    BOOK_WRITE_MODE_ENUM,
+    BOOK_WRITE_ON_CONFLICT_ENUM,
+    BOOK_WRITE_ON_MISMATCH_ENUM,
     DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
     DEFAULT_AGG_RANK_ORDER,
     DEFAULT_AGG_RANK_TOP_K_MODE,
@@ -124,6 +133,8 @@ class _OutputFromResolver:
 
     def _merge_one(self, current: OutputTargetConfig, *, name: str) -> OutputTargetConfig:
         container = current.container
+        to = current.to
+        write = current.write
         fields = current.fields
 
         from_name = str(current.from_ or "").strip() or None
@@ -134,13 +145,17 @@ class _OutputFromResolver:
             base_resolved = self._resolve_one(from_name)
             if container is None:
                 container = base_resolved.container
+            if to is None:
+                to = base_resolved.to
+            if write is None:
+                write = base_resolved.write
             if current.aggregate is None and fields is None:
                 fields = base_resolved.fields
                 if fields is None:
                     msg = "outputs.{} inherits fields from '{}', but base output has no fields".format(name, from_name)
                     raise ValueError(msg)
 
-        return replace(current, container=container, fields=fields)
+        return replace(current, container=container, to=to, write=write, fields=fields)
 
 
 class ParserOutputsMixin:
@@ -299,6 +314,12 @@ class ParserOutputsMixin:
             self._parse_output_container(container_raw, base_path="{}.{}.container".format(outputs_key, idx)) if container_raw else None
         )
 
+        to_raw = mapping_or_none(raw_target.get(OUTPUT_TARGET_KEYS["to"]))
+        to_cfg = self._parse_output_to(to_raw) if to_raw else None
+
+        write_raw = mapping_or_none(raw_target.get(OUTPUT_TARGET_KEYS["write"]))
+        write_cfg = self._parse_output_write(write_raw, base_path="{}.{}.write".format(outputs_key, idx)) if write_raw else None
+
         where = str_or_none(raw_target.get(OUTPUT_TARGET_KEYS["where"]))
         where = _non_empty_str(where) or None
         requires = self._parse_where_requires(
@@ -362,6 +383,8 @@ class ParserOutputsMixin:
             name=name,
             from_=from_name,
             container=container,
+            to=to_cfg,
+            write=write_cfg,
             fields=fields,
             where=where,
             aggregate=aggregate,
@@ -381,29 +404,31 @@ class ParserOutputsMixin:
                 )
             }
         elif path_raw is None:
-            path = ""
+            path = None
         elif isinstance(path_raw, str):
             path = path_raw.strip()
         else:
-            msg = "{}.path must be a string (empty allowed for workflow-managed CSV) or {{$init_var: <name>}}".format(base_path)
+            msg = "{}.path must be a non-empty string or {{$init_var: <name>}}".format(base_path)
             raise TypeError(msg)
-        sheet = str_or_none(raw.get(OUTPUT_CONTAINER_KEYS["sheet"]))
-        sheet = _non_empty_str(sheet) or None
         encoding = _non_empty_str(raw.get(OUTPUT_CONTAINER_KEYS["encoding"])) or DEFAULT_OUTPUT_ENCODING
         streaming = bool(raw.get(OUTPUT_CONTAINER_KEYS["streaming"], DEFAULT_OUTPUT_STREAMING))
         include_header = bool(raw.get(OUTPUT_CONTAINER_KEYS["include_header"], DEFAULT_OUTPUT_INCLUDE_HEADER))
         header_by = _non_empty_str(raw.get(OUTPUT_CONTAINER_KEYS["header_fields_output_by"])) or DEFAULT_OUTPUT_HEADER_BY
-        allow_formulas = bool(raw.get(OUTPUT_CONTAINER_KEYS["allow_formulas"], False))
-        write_lock = bool(raw.get(OUTPUT_CONTAINER_KEYS["write_lock"], False))
 
         if not typ:
             msg = "{}.type is required".format(base_path)
             raise ValueError(msg)
         if typ not in OUTPUT_CONTAINER_TYPES:
+            if typ == "workbook":
+                msg = (
+                    "{}.type='workbook' was removed; use resources.books + outputs_defaults.to.book / outputs[*].to for .xlsx outputs"
+                ).format(base_path)
+                raise ValueError(msg)
+
             msg = "{}.type={!r} is invalid; expected one of: {}".format(base_path, typ, ", ".join(OUTPUT_CONTAINER_TYPES))
             raise ValueError(msg)
-        if typ == "workbook" and not path:
-            msg = "{}.path is required for workbook outputs".format(base_path)
+        if not path:
+            msg = "{}.path is required for csv outputs".format(base_path)
             raise ValueError(msg)
         if header_by not in OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM:
             msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(
@@ -414,13 +439,62 @@ class ParserOutputsMixin:
         return OutputContainerConfig(
             type=typ,
             path=path,
-            sheet=sheet,
             encoding=encoding,
             streaming=streaming,
             include_header=include_header,
             header_fields_output_by=header_by,
-            allow_formulas=allow_formulas,
-            write_lock=write_lock,
+        )
+
+    def _parse_output_to(self, raw: Dict[str, Any]) -> OutputToConfig:
+        book = str_or_none(raw.get(OUTPUT_TO_KEYS["book"]))
+        book = _non_empty_str(book) or None
+        sheet = str_or_none(raw.get(OUTPUT_TO_KEYS["sheet"]))
+        sheet = _non_empty_str(sheet) or None
+        return OutputToConfig(book=book, sheet=sheet)
+
+    def _parse_output_write(self, raw: Dict[str, Any], *, base_path: str) -> OutputWriteConfig:
+        mode = str_or_none(raw.get(OUTPUT_WRITE_KEYS["mode"]))
+        mode = _non_empty_str(mode) or None
+        if mode is not None and mode not in BOOK_WRITE_MODE_ENUM:
+            msg = "{}.mode={!r} is invalid; expected one of: {}".format(base_path, mode, ", ".join(BOOK_WRITE_MODE_ENUM))
+            raise ValueError(msg)
+
+        align_by = str_or_none(raw.get(OUTPUT_WRITE_KEYS["align_by"]))
+        align_by = _non_empty_str(align_by) or None
+        if align_by is not None and align_by not in BOOK_WRITE_ALIGN_BY_ENUM:
+            msg = "{}.align_by={!r} is invalid; expected one of: {}".format(base_path, align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
+            raise ValueError(msg)
+
+        header_policy = str_or_none(raw.get(OUTPUT_WRITE_KEYS["header_policy"]))
+        header_policy = _non_empty_str(header_policy) or None
+        if header_policy is not None and header_policy not in BOOK_WRITE_HEADER_POLICY_ENUM:
+            msg = "{}.header_policy={!r} is invalid; expected one of: {}".format(
+                base_path, header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM)
+            )
+            raise ValueError(msg)
+
+        on_mismatch = str_or_none(raw.get(OUTPUT_WRITE_KEYS["on_mismatch"]))
+        on_mismatch = _non_empty_str(on_mismatch) or None
+        if on_mismatch is not None and on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
+            msg = "{}.on_mismatch={!r} is invalid; expected one of: {}".format(
+                base_path, on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM)
+            )
+            raise ValueError(msg)
+
+        on_conflict = str_or_none(raw.get(OUTPUT_WRITE_KEYS["on_conflict"]))
+        on_conflict = _non_empty_str(on_conflict) or None
+        if on_conflict is not None and on_conflict not in BOOK_WRITE_ON_CONFLICT_ENUM:
+            msg = "{}.on_conflict={!r} is invalid; expected one of: {}".format(
+                base_path, on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM)
+            )
+            raise ValueError(msg)
+
+        return OutputWriteConfig(
+            mode=mode,
+            align_by=align_by,
+            header_policy=header_policy,
+            on_mismatch=on_mismatch,
+            on_conflict=on_conflict,
         )
 
     def _parse_output_aggregate(  # noqa: C901, PLR0912
@@ -889,30 +963,27 @@ class ParserOutputsMixin:
         self,
         t: OutputTargetConfig,
         name: str,
-        workbook_targets_by_path: Dict[str, List[str]],
     ) -> None:
         container = t.container
         if container is None:
-            msg = "outputs.{} missing required container (or inherit via from)".format(name)
+            # `book` 绑定场景允许无 `container`(通过 `outputs_defaults`/`to`/`write` 表达).
+            return
+
+        # `csv` 文件输出场景.
+        if t.to is not None:
+            msg = "outputs.{} cannot declare both container and to".format(name)
+            raise ValueError(msg)
+        if t.write is not None:
+            msg = "outputs.{} cannot declare write for csv container outputs".format(name)
+            raise ValueError(msg)
+
+        if str(container.type or "").lower() != "csv":
+            msg = "outputs.{}.container.type={!r} is invalid; expected 'csv'".format(name, container.type)
             raise ValueError(msg)
 
         if not container.streaming:
             msg = "outputs.{}.container.streaming must be true (composed outputs only support streaming=true)".format(name)
             raise ValueError(msg)
-
-        if container.type == "workbook":
-            if container.path:
-                workbook_targets_by_path.setdefault(str(container.path), []).append(name)
-        elif container.type == "csv":
-            if container.sheet:
-                msg = "outputs.{}.container.sheet is only allowed for type=workbook".format(name)
-                raise ValueError(msg)
-            if container.allow_formulas:
-                msg = "outputs.{}.container.allow_formulas is only allowed for type=workbook".format(name)
-                raise ValueError(msg)
-            if container.write_lock:
-                msg = "outputs.{}.container.write_lock is only allowed for type=workbook".format(name)
-                raise ValueError(msg)
 
     def _validate_detail_output_semantics(self, t: OutputTargetConfig, name: str, known_field_ids: Set[str]) -> None:
         if t.fields is None or not t.fields:
@@ -1167,45 +1238,19 @@ class ParserOutputsMixin:
         self._validate_aggregate_post_semantics(name, agg, agg_field_ids, rank_field_ids, post_field_ids)
         self._validate_aggregate_derived_dag(name, agg, rank_field_ids, post_field_ids)
 
-    def _validate_shared_workbook_path_semantics(
-        self,
-        outputs: List[OutputTargetConfig],
-        workbook_targets_by_path: Dict[str, List[str]],
-    ) -> None:
-        for path, names in workbook_targets_by_path.items():
-            if len(names) <= 1:
-                continue
-            missing_sheet: List[str] = []
-            for t in outputs:
-                c = cast("OutputContainerConfig", t.container)  # pragma: allow-cast output target typed narrowing
-                if c.type != "workbook" or str(c.path) != str(path):
-                    continue
-                if not c.sheet:
-                    missing_sheet.append(str(t.name))
-            if missing_sheet:
-                msg = "Multiple outputs share the same workbook path {!r}; each must set container.sheet. Missing: {}".format(
-                    path,
-                    ", ".join(sorted(missing_sheet)),
-                )
-                raise ValueError(msg)
-
     def _validate_outputs_semantics(
         self,
         outputs: List[OutputTargetConfig],
         *,
         known_field_ids: Set[str],
     ) -> None:
-        workbook_targets_by_path: Dict[str, List[str]] = {}
-
         for t in outputs:
             name = str(t.name or "").strip()
-            self._validate_output_container_semantics(t, name, workbook_targets_by_path)
+            self._validate_output_container_semantics(t, name)
             if t.aggregate is None:
                 self._validate_detail_output_semantics(t, name, known_field_ids)
             else:
                 self._validate_aggregate_semantics(t, name, known_field_ids)
-
-        self._validate_shared_workbook_path_semantics(outputs, workbook_targets_by_path)
 
     def _collect_required_field_ids_from_aggregate(self, agg: OutputAggregateConfig) -> List[str]:
         required: List[str] = []

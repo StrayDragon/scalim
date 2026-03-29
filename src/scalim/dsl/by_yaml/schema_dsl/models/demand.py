@@ -18,7 +18,8 @@ from .field import DerivedFieldConfig, SourceFieldConfig
 from .guardrails import GuardrailsConfig
 from .lookup_bind_relation import RelationConfig
 from .observability import ObservabilityConfig
-from .outputs import OutputExtraSheetConfig, OutputTargetConfig
+from .outputs import OutputExtraSheetConfig, OutputsDefaultsConfig, OutputTargetConfig
+from .resources import ResourcesConfig
 from .source import LoaderRetryConfig, MainSourceConfig, SourceConfig
 
 
@@ -123,6 +124,26 @@ class DemandConfig:
     )
     """运行时护栏配置(可选)."""
 
+    resources: Optional[ResourcesConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            ref="resources",
+            desc="可选:IO 资源声明(resources.*)",
+            md="可选:IO 资源声明.\n\n- 当前稳定入口: `resources.books`",
+        ),
+    )
+    """可选:`IO` 资源声明."""
+
+    outputs_defaults: Optional[OutputsDefaultsConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            ref="outputs_defaults",
+            desc="可选:输出默认 IO 绑定(outputs_defaults.*)",
+            md="可选:输出默认 IO 绑定.\n\n- 例如 `outputs_defaults.to.book`",
+        ),
+    )
+    """可选:输出默认 `IO` 绑定."""
+
     outputs: Tuple[OutputTargetConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
@@ -141,7 +162,7 @@ class DemandConfig:
                 [
                     {
                         "name": "detail",
-                        "container": {"type": "workbook", "path": "./output/report.xlsx", "sheet": "明细"},
+                        "to": {"sheet": "明细"},
                         "fields": ["order_id", "user_id"],
                     }
                 ]

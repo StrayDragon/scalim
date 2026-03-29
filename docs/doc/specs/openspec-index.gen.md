@@ -366,6 +366,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-allowlist-policy/spec.md)
 - Summary: TBD - created by archiving change c2-allowlist-footgun-hardening. Update Purpose after archive.
 
+### `yaml-dsl-books-resources`
+- Title: yaml-dsl-books-resources Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-books-resources/spec.md)
+- Summary: TBD - created by archiving change c35-workflow-io-books-resources. Update Purpose after archive.
+
 ### `yaml-dsl-builtin-callables`
 - Title: yaml-dsl-builtin-callables Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-builtin-callables/spec.md)

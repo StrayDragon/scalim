@@ -485,6 +485,18 @@ def _run_workflow_write_sheet_node(
         error_prefix="write node",
     )
 
+    if str(node.resource_type) == "book":
+        resource_manager.apply_book_sheet(
+            workflow_node_id=str(node.node_id),
+            book_id=str(node.resource_id),
+            sheet=str(node.sheet),
+            input_node_id=str(node.input_node_id),
+            input_output_id=str(node.input_output_id),
+            input_csv=input_csv,
+            on_conflict=str(node.on_conflict or "error"),
+        )
+        return
+
     if str(node.resource_type) == "workbook":
         resource_manager.apply_workbook_sheet(
             workflow_node_id=str(node.node_id),
@@ -528,6 +540,25 @@ def _run_workflow_append_sheet_node(
         input_output_id=str(node.input_output_id),
         error_prefix="append node",
     )
+
+    if str(node.resource_type) == "book":
+        if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            msg = "append_sheet requires sheet for book resource (resource_id={!r})".format(
+                str(node.resource_id)
+            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+        resource_manager.apply_book_append(
+            workflow_node_id=str(node.node_id),
+            book_id=str(node.resource_id),
+            sheet=str(node.sheet),
+            input_node_id=str(node.input_node_id),
+            input_output_id=str(node.input_output_id),
+            input_csv=input_csv,
+            align_by=str(node.align_by or "field_id"),
+            header_policy=str(node.header_policy or "once"),
+            on_mismatch=str(node.on_mismatch or "error"),
+        )
+        return
 
     if str(node.resource_type) == "workbook":
         if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
@@ -725,16 +756,52 @@ def _maybe_build_workflow_cache_pool(
     )
 
 
-def _build_workflow_resource_defs(
+def _build_workflow_resource_defs(  # noqa: PLR0915
     workflow_ir: WorkflowIr,
-) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, str], Dict[str, SheetBookDef]]:
+) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, bool], Dict[str, str], Dict[str, SheetBookDef]]:
     workbook_defs: Dict[str, str] = {}
     workbook_allow_formulas_by_id: Dict[str, bool] = {}
+    workbook_write_lock_by_id: Dict[str, bool] = {}
     csv_defs: Dict[str, str] = {}
     sheetbook_defs: Dict[str, SheetBookDef] = {}
 
     for res in workflow_ir.resources:
         res_type = str(res.resource_type)
+        if res_type == "book":
+            opts = res.options or {}
+            if not _is_dict_str_any(opts):
+                msg = "Invalid workflow resource options for book: resource_id={!r}".format(str(res.resource_id))
+                raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
+            kind = str(opts.get("kind") or "").strip()
+            if kind == "xlsx_file":
+                workbook_defs[str(res.resource_id)] = str(res.path)
+                workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", False))
+                workbook_write_lock_by_id[str(res.resource_id)] = bool(opts.get("write_lock", False))
+                continue
+            if kind == "xlsx_memory":
+                budget_obj = opts.get("budget")
+                budget_dict: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
+                max_sheets = int(budget_dict.get("max_sheets") or 0)
+                max_total_cells = int(budget_dict.get("max_total_cells") or 0)
+
+                export_cfg_obj = opts.get("export_xlsx")
+                export_cfg_dict: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
+                export_write_lock = bool(export_cfg_dict.get("write_lock", False))
+                export_allow_formulas = bool(export_cfg_dict.get("allow_formulas", False))
+                export_path = str(res.path or "").strip() or None
+                sheetbook_defs[str(res.resource_id)] = SheetBookDef(
+                    resource_id=str(res.resource_id),
+                    budget_max_sheets=int(max_sheets),
+                    budget_max_total_cells=int(max_total_cells),
+                    export_path=str(export_path) if export_path is not None else None,
+                    export_write_lock=bool(export_write_lock),
+                    export_allow_formulas=bool(export_allow_formulas),
+                )
+                continue
+
+            msg = "Unknown book kind: {!r} (book_id={!r})".format(kind, str(res.resource_id))
+            raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(str(res.resource_id)))
+
         if res_type == "workbook":
             workbook_defs[str(res.resource_id)] = str(res.path)
             opts = res.options or {}
@@ -742,6 +809,7 @@ def _build_workflow_resource_defs(
             if isinstance(opts, dict):
                 allow_formulas = bool(opts.get("allow_formulas", False))
             workbook_allow_formulas_by_id[str(res.resource_id)] = bool(allow_formulas)
+            workbook_write_lock_by_id[str(res.resource_id)] = True
             continue
 
         if res_type == "csv":
@@ -751,14 +819,14 @@ def _build_workflow_resource_defs(
         if res_type == "sheetbook":
             opts = res.options or {}
             budget_obj = opts.get("budget")
-            budget: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
-            max_sheets = int(budget.get("max_sheets") or 0)
-            max_total_cells = int(budget.get("max_total_cells") or 0)
+            sheetbook_budget: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
+            max_sheets = int(sheetbook_budget.get("max_sheets") or 0)
+            max_total_cells = int(sheetbook_budget.get("max_total_cells") or 0)
 
             export_cfg_obj = opts.get("export_xlsx")
-            export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
-            export_write_lock = bool(export_cfg.get("write_lock", False))
-            export_allow_formulas = bool(export_cfg.get("allow_formulas", False))
+            sheetbook_export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
+            export_write_lock = bool(sheetbook_export_cfg.get("write_lock", False))
+            export_allow_formulas = bool(sheetbook_export_cfg.get("allow_formulas", False))
             export_path = str(res.path or "").strip() or None
             sheetbook_defs[str(res.resource_id)] = SheetBookDef(
                 resource_id=str(res.resource_id),
@@ -770,7 +838,7 @@ def _build_workflow_resource_defs(
             )
             continue
 
-    return workbook_defs, workbook_allow_formulas_by_id, csv_defs, sheetbook_defs
+    return workbook_defs, workbook_allow_formulas_by_id, workbook_write_lock_by_id, csv_defs, sheetbook_defs
 
 
 def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, FrozenSet[str]]:
@@ -839,12 +907,19 @@ def _prepare_workflow_run_ir(
             consumers_by_logical_key=cache_pool_consumers_by_logical_key,
         )
 
-        workbook_defs, workbook_allow_formulas_by_id, csv_defs, sheetbook_defs = _build_workflow_resource_defs(workflow_ir)
+        (
+            workbook_defs,
+            workbook_allow_formulas_by_id,
+            workbook_write_lock_by_id,
+            csv_defs,
+            sheetbook_defs,
+        ) = _build_workflow_resource_defs(workflow_ir)
         resource_manager = WorkflowResourceManager(
             workflow_exec_id=workflow_exec_id,
             instrumentation=workflow_instrumentation,
             workbook_defs=workbook_defs,
             workbook_allow_formulas=workbook_allow_formulas_by_id,
+            workbook_write_lock=workbook_write_lock_by_id,
             csv_defs=csv_defs,
             sheetbook_defs=sheetbook_defs,
         )

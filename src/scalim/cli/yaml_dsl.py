@@ -31,14 +31,7 @@ from ..dsl.by_yaml.config_parsing.yaml_load import (
 )
 from ..dsl.by_yaml.workflow_config import load_workflow_config_from_mapping
 from ..dsl.by_yaml.workflow_paths import resolve_workflow_demand_path
-from ..dsl.by_yaml.workflow_types import (
-    ScalimWorkflowConfigError,
-    WorkflowWriteToCsvAppend,
-    WorkflowWriteToSheetbookAppend,
-    WorkflowWriteToSheetbookSheet,
-    WorkflowWriteToWorkbookAppend,
-    WorkflowWriteToWorkbookSheet,
-)
+from ..dsl.by_yaml.workflow_types import ScalimWorkflowConfigError
 
 try:
     jsonschema = import_module("jsonschema")
@@ -537,18 +530,82 @@ def _extract_demand_outputs(yaml_data: Optional[Dict[str, Any]]) -> Set[str]:
     return output_ids
 
 
-def _intent_kind(value: object) -> str:
-    if isinstance(value, WorkflowWriteToWorkbookSheet):
-        return "workbook_sheet"
-    if isinstance(value, WorkflowWriteToWorkbookAppend):
-        return "workbook_append"
-    if isinstance(value, WorkflowWriteToCsvAppend):
-        return "csv_append"
-    if isinstance(value, WorkflowWriteToSheetbookSheet):
-        return "sheetbook_sheet"
-    if isinstance(value, WorkflowWriteToSheetbookAppend):
-        return "sheetbook_append"
-    return "unknown"
+def _extract_demand_book_ids(yaml_data: Optional[Dict[str, Any]]) -> Set[str]:
+    if not isinstance(yaml_data, dict):
+        return set()
+    resources_obj = yaml_data.get("resources")
+    if not isinstance(resources_obj, dict):
+        return set()
+    resources = cast("Dict[str, Any]", resources_obj)  # pragma: allow-cast yaml mapping typed narrowing
+    books_obj = resources.get("books")
+    if not isinstance(books_obj, dict):
+        return set()
+    books = cast("Dict[str, Any]", books_obj)  # pragma: allow-cast yaml mapping typed narrowing
+    out: Set[str] = set()
+    for raw_book_id in books:
+        if not isinstance(raw_book_id, str):
+            continue
+        bid = str(raw_book_id or "").strip()
+        if bid:
+            out.add(bid)
+    return out
+
+
+def _extract_outputs_defaults_book_id(yaml_data: Dict[str, Any]) -> Optional[str]:
+    defaults_raw_obj = yaml_data.get("outputs_defaults")
+    if not isinstance(defaults_raw_obj, dict):
+        return None
+    defaults_raw = cast("Dict[str, Any]", defaults_raw_obj)  # pragma: allow-cast yaml mapping typed narrowing
+    to_raw_obj = defaults_raw.get("to")
+    if not isinstance(to_raw_obj, dict):
+        return None
+    to_raw = cast("Dict[str, Any]", to_raw_obj)  # pragma: allow-cast yaml mapping typed narrowing
+    book_raw = to_raw.get("book")
+    if not isinstance(book_raw, str):
+        return None
+    book = str(book_raw or "").strip()
+    return book or None
+
+
+def _extract_output_book_ref(item: Dict[str, Any], *, idx: int, defaults_book: Optional[str]) -> Tuple[str, str]:
+    to_raw_obj = item.get("to")
+    if isinstance(to_raw_obj, dict):
+        to_raw = cast("Dict[str, Any]", to_raw_obj)  # pragma: allow-cast yaml mapping typed narrowing
+        book_raw = to_raw.get("book")
+        if isinstance(book_raw, str) and book_raw.strip():
+            return "outputs.{}.to.book".format(int(idx)), str(book_raw).strip()
+
+    if defaults_book is not None:
+        return "outputs_defaults.to.book", str(defaults_book)
+    return "outputs.{}.to.book".format(int(idx)), ""
+
+
+def _extract_demand_outputs_book_refs(yaml_data: Optional[Dict[str, Any]]) -> List[Tuple[str, str]]:
+    """提取需求 `outputs` 中绑定到 `books` 的引用信息.
+
+    返回 `(ref_path, book_id)` 列表:
+    - 对于包含 `container` 的 `outputs[*]`(`CSV` 文件输出),不返回任何项.
+    - 若某个输出缺失有效 `book_id`,仍返回其 `ref_path`,但 `book_id` 为空字符串.
+    """
+    if not isinstance(yaml_data, dict):
+        return []
+    outputs_raw = yaml_data.get("outputs")
+    if not isinstance(outputs_raw, list):
+        return []
+    outputs_list = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml outputs typed narrowing
+
+    defaults_book = _extract_outputs_defaults_book_id(yaml_data)
+
+    out: List[Tuple[str, str]] = []
+    for idx, item in enumerate(outputs_list):
+        if not isinstance(item, dict):
+            continue
+        item_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
+        if item_dict.get("container") is not None:
+            continue
+        out.append(_extract_output_book_ref(item_dict, idx=int(idx), defaults_book=defaults_book))
+
+    return out
 
 
 def _validate_demand_yaml_text(
@@ -793,6 +850,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
         demand_results: List[ValidationPayload] = []
         demand_source_lines: List[Optional[List[str]]] = []
         demand_outputs: List[Optional[Set[str]]] = []
+        demand_yaml_data: List[Optional[Dict[str, Any]]] = []
 
         demand_validator = ConfigValidator(schema_path=str(schema_path))
         if wf_config is not None:
@@ -837,6 +895,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                     )
                     demand_outputs.append(None)
                     demand_source_lines.append(None)
+                    demand_yaml_data.append(None)
                     continue
 
                 if not demand_path.exists():
@@ -861,6 +920,7 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                     demand_results.append(payload)
                     demand_outputs.append(_extract_demand_outputs(demand_data) if demand_data is not None else None)
                     demand_source_lines.append(lines)
+                    demand_yaml_data.append(demand_data)
                     continue
 
                 payload, demand_data, lines = _validate_demand_yaml_path(
@@ -872,29 +932,51 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                 demand_results.append(payload)
                 demand_outputs.append(_extract_demand_outputs(demand_data) if demand_data is not None else None)
                 demand_source_lines.append(lines)
+                demand_yaml_data.append(demand_data)
 
-            for run_idx, run in enumerate(wf_config.runs):
-                outputs = demand_outputs[run_idx] if run_idx < len(demand_outputs) else None
-                if outputs is None:
+            workflow_book_ids = set((wf_config.resources.books or {}).keys())
+
+            # 交叉校验: 需求 `outputs` 绑定到的 `book_id` 必须能解析到已声明的 `resources.books`.
+            for run_idx, _run in enumerate(wf_config.runs):
+                if run_idx >= len(demand_results):
                     continue
-                for write_idx, intent in enumerate(run.writes):
-                    output_id = str(intent.output or "")
-                    if output_id in outputs:
+                payload = demand_results[run_idx]
+                demand_data = demand_yaml_data[run_idx] if run_idx < len(demand_yaml_data) else None
+                if demand_data is None:
+                    continue
+
+                demand_book_ids = _extract_demand_book_ids(demand_data)
+                available = sorted(demand_book_ids.union(workflow_book_ids))
+                for ref_path, book_id in _extract_demand_outputs_book_refs(demand_data):
+                    if not book_id:
+                        payload.errors.append(
+                            ErrorEnvelope(
+                                code="workflow_validate_error",
+                                message="Missing outputs to.book binding (set outputs_defaults.to.book or outputs[*].to.book)",
+                                source_path=str(payload.yaml_path or ""),
+                                path=str(ref_path),
+                                loc=None,
+                                suggestions=tuple(available),
+                            )
+                        )
+                        payload.ok = False
                         continue
-                    kind = _intent_kind(intent)
-                    workflow_errors.append(
+                    if book_id in demand_book_ids or book_id in workflow_book_ids:
+                        continue
+                    payload.errors.append(
                         ErrorEnvelope(
-                            code="workflow_unknown_demand_output_id",
-                            message="Unknown demand output id: {!r}".format(output_id),
-                            source_path=str(yaml_path),
-                            path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), kind),
-                            loc=error_loc_for_yaml_path(
-                                "workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), kind),
-                                workflow_locations,
-                            ),
-                            suggestions=tuple(sorted(outputs)) if outputs else (),
+                            code="workflow_validate_error",
+                            message=(
+                                "Unknown book id referenced by outputs binding: {!r} "
+                                "(declare resources.books.{} in demand or workflow.resources.books.{} in workflow)"
+                            ).format(book_id, book_id, book_id),
+                            source_path=str(payload.yaml_path or ""),
+                            path=str(ref_path),
+                            loc=None,
+                            suggestions=tuple(available),
                         )
                     )
+                    payload.ok = False
         workflow_ok = not workflow_errors
 
         workflow_payload = ValidationPayload(

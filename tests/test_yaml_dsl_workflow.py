@@ -257,6 +257,70 @@ outputs:
     )
 
 
+def _write_table_demand_yaml_with_book_output(
+    tmp_path: Path,
+    *,
+    file_name: str,
+    name: str,
+    loader_ref: str,
+    output_name: str,
+    book_id: str,
+    sheet: str,
+    field_ids: List[str],
+    write_mode: str = "sheet",
+    write_overrides: Optional[Dict[str, object]] = None,
+) -> Path:
+    field_lines = []
+    for fid in field_ids:
+        field_lines.append("    {}: {{extract: {}}}".format(str(fid), str(fid)))
+
+    write_lines = [
+        "    write:",
+        "      mode: {}".format(str(write_mode)),
+    ]
+    if write_overrides:
+        for key, value in write_overrides.items():
+            write_lines.append("      {}: {}".format(str(key), json.dumps(value)))
+    write_block = "\n".join(write_lines)
+
+    return _write_text(
+        tmp_path / file_name,
+        (
+            """
+name: {name}
+
+main_source:
+  source_id: main
+  loader: "{loader_ref}"
+  fields:
+{fields}
+
+outputs_defaults:
+  to:
+    book: {book_id}
+
+outputs:
+  - name: {output_name}
+    to:
+      sheet: {sheet}
+{write_block}
+    fields: {fields_list}
+"""
+        )
+        .format(
+            name=str(name),
+            loader_ref=str(loader_ref),
+            fields="\n".join(field_lines),
+            book_id=str(book_id),
+            output_name=str(output_name),
+            sheet=str(sheet),
+            write_block=write_block,
+            fields_list=json.dumps([str(x) for x in field_ids]),
+        )
+        .lstrip(),
+    )
+
+
 def _write_table_demand_yaml_with_workbook_output(
     tmp_path: Path,
     *,
@@ -328,7 +392,7 @@ name: {name}
 
 main_source:
   source_id: main
-  loader: "scalim.workflow.loaders:sheetbook_sheet_rows"
+  loader: "scalim.workflow.loaders:book_sheet_rows"
   params:
     ref:
       $init_var: {init_var_name}
@@ -668,7 +732,7 @@ workflow:
 
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config(str(workflow_path))
-    assert "run.main_rows_from contains unknown keys" in str(excinfo.value)
+    assert "run.main_rows_from has unknown keys" in str(excinfo.value)
     assert "path=workflow.runs.1.main_rows_from" in str(excinfo.value)
 
 
@@ -716,70 +780,30 @@ workflow:
     assert "path=workflow.runs.0.main_rows_from.run" in str(excinfo.value)
 
 
-def test_load_workflow_config_parses_multiple_writes(tmp_path: Path) -> None:
-    cfg = load_workflow_config_from_mapping(
-        {
-            "workflow": {
-                "resources": {
-                    "workbooks": {"report": {"path": str(tmp_path / "out.xlsx")}},
-                    "csvs": {"merged": {"path": str(tmp_path / "merged.csv")}},
-                },
-                "runs": [
-                    {
-                        "id": "a",
-                        "demand": "a.yaml",
-                        "writes": [
-                            {"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}},
-                            {"csv_append": {"csv": "merged", "output": "detail"}},
-                        ],
-                    }
-                ],
-            }
-        }
-    )
-    assert cfg.runs[0].id == "a"
-    assert len(cfg.runs[0].writes) == 2
-
-
 def test_load_workflow_config_rejects_write_to_with_migration_hint(tmp_path: Path) -> None:
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
-                    "resources": {"csvs": {"merged": {"path": str(tmp_path / "merged.csv")}}},
-                    "runs": [{"id": "a", "demand": "a.yaml", "write_to": {"csv_append": {"csv": "merged", "output": "detail"}}}],
+                    "runs": [{"id": "a", "demand": "a.yaml", "write_to": {}}],
                 }
             }
         )
     assert "run.write_to was removed" in str(excinfo.value)
-    assert "Migration: write_to:" in str(excinfo.value)
+    assert excinfo.value.path == "workflow.runs.0.write_to"
 
 
-def test_load_workflow_config_rejects_writes_items_with_multiple_intent_keys(tmp_path: Path) -> None:
+def test_load_workflow_config_rejects_writes_with_migration_hint(tmp_path: Path) -> None:
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
-                    "resources": {
-                        "workbooks": {"report": {"path": str(tmp_path / "out.xlsx")}},
-                        "csvs": {"merged": {"path": str(tmp_path / "merged.csv")}},
-                    },
-                    "runs": [
-                        {
-                            "id": "a",
-                            "demand": "a.yaml",
-                            "writes": [
-                                {
-                                    "workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"},
-                                    "csv_append": {"csv": "merged", "output": "detail"},
-                                }
-                            ],
-                        }
-                    ],
+                    "runs": [{"id": "a", "demand": "a.yaml", "writes": []}],
                 }
             }
         )
-    assert "write intent must contain exactly one" in str(excinfo.value)
+    assert "run.writes was removed" in str(excinfo.value)
+    assert excinfo.value.path == "workflow.runs.0.writes"
 
 
 def test_run_workflow_primary_only_collects_errors(tmp_path: Path) -> None:
@@ -2376,8 +2400,7 @@ def test_load_workflow_config_from_mapping_rejects_init_vars_key_invalid() -> No
 
 def test_load_workflow_config_from_mapping_accepts_null_resources() -> None:
     cfg = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "resources": None}})
-    assert cfg.resources.workbooks == {}
-    assert cfg.resources.csvs == {}
+    assert cfg.resources.books == {}
 
 
 def test_load_workflow_config_from_mapping_accepts_resources_mapping() -> None:
@@ -2386,14 +2409,12 @@ def test_load_workflow_config_from_mapping_accepts_resources_mapping() -> None:
             "workflow": {
                 "runs": [{"id": "a", "demand": "a.yaml"}],
                 "resources": {
-                    "workbooks": {"report": {"path": "./out/report.xlsx"}},
-                    "csvs": {"merged": {"path": "./out/merged.csv"}},
+                    "books": {"report": {"kind": "xlsx_file", "path": "./out/report.xlsx"}},
                 },
             }
         }
     )
-    assert cfg.resources.workbooks["report"].path == "./out/report.xlsx"
-    assert cfg.resources.csvs["merged"].path == "./out/merged.csv"
+    assert cfg.resources.books["report"].path == "./out/report.xlsx"
 
 
 def test_load_workflow_config_from_mapping_rejects_resources_not_mapping() -> None:
@@ -2739,7 +2760,7 @@ def _read_xlsx_rows(path: Path, sheet: str) -> List[List[object]]:
         ws = wb[str(sheet)]
         rows: List[List[object]] = []
         for row in ws.iter_rows(values_only=True):
-            rows.append(list(row))
+            rows.append(["" if v is None else v for v in row])
         return rows
     finally:
         wb.close()
@@ -2763,42 +2784,34 @@ def _read_csv_rows(path: Path) -> List[List[str]]:
 
 
 def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="A",
         field_ids=["id", "value"],
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="b.yaml",
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=b_out,
+        book_id="report",
+        sheet="B",
         field_ids=["id", "value"],
     )
 
     workbook_path = tmp_path / "report.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
         runs=[
-            {
-                "id": "a",
-                "demand": "a.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "A", "output": "detail"}}],
-            },
-            {
-                "id": "b",
-                "demand": "b.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "B", "output": "detail"}}],
-            },
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -2833,24 +2846,24 @@ def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: 
 
 
 def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="A",
         field_ids=["id", "value"],
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="b.yaml",
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=b_out,
+        book_id="report",
+        sheet="B",
         field_ids=["id", "value"],
     )
 
@@ -2858,16 +2871,17 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
+            "books": {
                 "report": {
+                    "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
                     "export_xlsx": {"path": str(export_path), "write_lock": True},
                 }
             }
         },
         runs=[
-            {"id": "a", "demand": "a.yaml", "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "A", "output": "detail"}}]},
-            {"id": "b", "demand": "b.yaml", "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "B", "output": "detail"}}]},
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -2904,42 +2918,50 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
 
 
 def test_workflow_run_writes_two_outputs_to_same_sheetbook_sheets(tmp_path: Path) -> None:
-    metrics_out = tmp_path / "metrics.csv"
-    detail_out = tmp_path / "detail.csv"
-    _ = _write_table_demand_yaml_with_two_csv_outputs(
-        tmp_path,
-        file_name="report.yaml",
-        name="report",
-        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
-        output1_name="metrics",
-        output1_path=metrics_out,
-        output1_field_ids=["id"],
-        output2_name="detail",
-        output2_path=detail_out,
-        output2_field_ids=["id", "value"],
-        main_field_ids=["id", "value"],
+    _ = _write_text(
+        tmp_path / "report.yaml",
+        (
+            """
+name: report
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id: {extract: id}
+    value: {extract: value}
+
+outputs_defaults:
+  to:
+    book: report
+
+outputs:
+  - name: metrics
+    to: {sheet: Metrics}
+    write: {mode: sheet}
+    fields: ["id"]
+  - name: detail
+    to: {sheet: Detail}
+    write: {mode: sheet}
+    fields: ["id", "value"]
+"""
+        ).lstrip(),
     )
 
     export_path = tmp_path / "multi.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
+            "books": {
                 "report": {
+                    "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
                     "export_xlsx": {"path": str(export_path), "write_lock": True},
                 }
             }
         },
         runs=[
-            {
-                "id": "report",
-                "demand": "report.yaml",
-                "writes": [
-                    {"sheetbook_sheet": {"sheetbook": "report", "sheet": "Metrics", "output": "metrics"}},
-                    {"sheetbook_sheet": {"sheetbook": "report", "sheet": "Detail", "output": "detail"}},
-                ],
-            }
+            {"id": "report", "demand": "report.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -2970,14 +2992,14 @@ def test_workflow_run_writes_two_outputs_to_same_sheetbook_sheets(tmp_path: Path
 
 
 def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="Orders",
         field_ids=["id", "value"],
     )
 
@@ -2994,18 +3016,17 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"sheetbooks": {"report": {"budget": {"max_sheets": 8, "max_total_cells": 1000}}}},
+        resources={"books": {"report": {"kind": "xlsx_memory", "budget": {"max_sheets": 8, "max_total_cells": 1000}}}},
         runs=[
             {
                 "id": "a",
                 "demand": "a.yaml",
-                "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "Orders", "output": "detail"}}],
             },
             {
                 "id": "consume",
                 "demand": "consume.yaml",
                 "depends_on": ["a"],
-                "init_vars": {"orders_sheet_ref": {"node": "a", "sheetbook": "report", "sheet": "Orders"}},
+                "init_vars": {"orders_sheet_ref": {"node": "a", "book": "report", "sheet": "Orders"}},
             },
         ],
         max_concurrency=2,
@@ -3023,17 +3044,16 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
     # Outside depends_on closure: MUST fail-fast.
     wf_bad = _write_workflow_yaml(
         tmp_path,
-        resources={"sheetbooks": {"report": {"budget": {"max_sheets": 8, "max_total_cells": 1000}}}},
+        resources={"books": {"report": {"kind": "xlsx_memory", "budget": {"max_sheets": 8, "max_total_cells": 1000}}}},
         runs=[
             {
                 "id": "a",
                 "demand": "a.yaml",
-                "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "Orders", "output": "detail"}}],
             },
             {
                 "id": "c",
                 "demand": "consume.yaml",
-                "init_vars": {"orders_sheet_ref": {"node": "a", "sheetbook": "report", "sheet": "Orders"}},
+                "init_vars": {"orders_sheet_ref": {"node": "a", "book": "report", "sheet": "Orders"}},
             },
         ],
         max_concurrency=2,
@@ -3046,24 +3066,24 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
 
 
 def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="A",
         field_ids=["id", "value"],
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="b.yaml",
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=b_out,
+        book_id="report",
+        sheet="B",
         field_ids=["id", "value"],
     )
 
@@ -3071,16 +3091,17 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
     wf_max_sheets = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
+            "books": {
                 "report": {
+                    "kind": "xlsx_memory",
                     "budget": {"max_sheets": 1, "max_total_cells": 1000},
                     "export_xlsx": {"path": str(export_path), "write_lock": True},
                 }
             }
         },
         runs=[
-            {"id": "a", "demand": "a.yaml", "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "A", "output": "detail"}}]},
-            {"id": "b", "demand": "b.yaml", "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "B", "output": "detail"}}]},
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -3094,14 +3115,15 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
     wf_max_cells = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
+            "books": {
                 "report": {
+                    "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 3},
                     "export_xlsx": {"path": str(export_path2), "write_lock": True},
                 }
             }
         },
-        runs=[{"id": "a", "demand": "a.yaml", "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "A", "output": "detail"}}]}],
+        runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )
@@ -3121,15 +3143,16 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
     wf_failed = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
+            "books": {
                 "report": {
+                    "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
                     "export_xlsx": {"path": str(export_path3), "write_lock": True},
                 }
             }
         },
         runs=[
-            {"id": "a", "demand": "a.yaml", "writes": [{"sheetbook_sheet": {"sheetbook": "report", "sheet": "A", "output": "detail"}}]},
+            {"id": "a", "demand": "a.yaml"},
             {"id": "bad", "demand": "bad.yaml", "depends_on": ["a"]},
         ],
         max_concurrency=2,
@@ -3143,62 +3166,80 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
 
 def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: Path) -> None:
     out_path = tmp_path / "dup.xlsx"
-    _ = _write_table_demand_yaml_with_workbook_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
-        file_name="a.xlsx.yaml",
+        file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=out_path,
+        book_id="a_book",
         sheet="A",
         field_ids=["id", "value"],
     )
-    _ = _write_table_demand_yaml_with_workbook_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
-        file_name="b.xlsx.yaml",
+        file_name="b.yaml",
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=out_path,
+        book_id="b_book",
         sheet="B",
         field_ids=["id", "value"],
     )
 
     wf_collision = _write_workflow_yaml(
         tmp_path,
-        runs=[{"id": "a", "demand": "a.xlsx.yaml"}, {"id": "b", "demand": "b.xlsx.yaml"}],
+        resources={
+            "books": {
+                "a_book": {"kind": "xlsx_file", "path": str(out_path)},
+                "b_book": {"kind": "xlsx_file", "path": str(out_path)},
+            }
+        },
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match="collision"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Excel output path collision"):
         _ = run_workflow(str(wf_collision), allowed_modules=_ALLOWED_MODULES)
 
     reserved_export = tmp_path / "reserved.xlsx"
-    _ = _write_table_demand_yaml_with_workbook_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
-        file_name="reserved.xlsx.yaml",
-        name="reserved",
+        file_name="file.yaml",
+        name="file",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=reserved_export,
+        book_id="file_book",
+        sheet="S",
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="mem.yaml",
+        name="mem",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="mem_book",
         sheet="S",
         field_ids=["id", "value"],
     )
     wf_reserved = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
-                "report": {
+            "books": {
+                "file_book": {"kind": "xlsx_file", "path": str(reserved_export)},
+                "mem_book": {
+                    "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
                     "export_xlsx": {"path": str(reserved_export), "write_lock": True},
-                }
+                },
             }
         },
-        runs=[{"id": "a", "demand": "reserved.xlsx.yaml"}],
+        runs=[{"id": "file", "demand": "file.yaml"}, {"id": "mem", "demand": "mem.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match="reserved"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Excel output path collision"):
         _ = run_workflow(str(wf_reserved), allowed_modules=_ALLOWED_MODULES)
 
 
@@ -3206,40 +3247,43 @@ def test_workflow_excel_output_collision_precheck_allows_dynamic_init_var_paths(
     a_path = tmp_path / "a.xlsx"
     b_path = tmp_path / "b.xlsx"
 
-    _ = _write_text(
-        tmp_path / "demand.yaml",
-        (
-            f"""
-name: demand
-
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {{extract: id}}
-    value: {{extract: value}}
-
-outputs:
-  - name: detail
-    container:
-      type: workbook
-      path: {{$init_var: output_path}}
-      sheet: "S"
-    fields: [id, value]
-"""
-        ).lstrip(),
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="a_book",
+        sheet="S",
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="b_book",
+        sheet="S",
+        field_ids=["id", "value"],
     )
 
     wf = _write_workflow_yaml(
         tmp_path,
+        resources={
+            "books": {
+                "a_book": {"kind": "xlsx_file", "path": {"$init_var": "a_path"}},
+                "b_book": {"kind": "xlsx_file", "path": {"$init_var": "b_path"}},
+            }
+        },
         runs=[
-            {"id": "a", "demand": "demand.yaml", "init_vars": {"output_path": str(a_path)}},
-            {"id": "b", "demand": "demand.yaml", "init_vars": {"output_path": str(b_path)}},
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, init_vars={"a_path": str(a_path), "b_path": str(b_path)})
     assert not result.errors()
     assert a_path.exists()
     assert b_path.exists()
@@ -3248,100 +3292,102 @@ outputs:
 def test_workflow_excel_output_collision_precheck_rejects_dynamic_init_var_collisions(tmp_path: Path) -> None:
     out_path = tmp_path / "dup.xlsx"
 
-    _ = _write_text(
-        tmp_path / "demand.yaml",
-        (
-            f"""
-name: demand
-
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {{extract: id}}
-    value: {{extract: value}}
-
-outputs:
-  - name: detail
-    container:
-      type: workbook
-      path: {{$init_var: output_path}}
-      sheet: "S"
-    fields: [id, value]
-"""
-        ).lstrip(),
-    )
-
-    wf = _write_workflow_yaml(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
-        runs=[
-            {"id": "a", "demand": "demand.yaml", "init_vars": {"output_path": str(out_path)}},
-            {"id": "b", "demand": "demand.yaml", "init_vars": {"output_path": str(out_path)}},
-        ],
-        max_concurrency=2,
-        failure_policy="primary_only",
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="a_book",
+        sheet="S",
+        field_ids=["id", "value"],
     )
-    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
-    msg = str(excinfo.value)
-    assert "collision" in msg
-    assert "run_id='b'" in msg
-    assert str(out_path.expanduser().resolve(strict=False)) in msg
-    assert "nodes=a,b" in msg
-
-
-def test_workflow_excel_output_reserved_paths_check_uses_resolved_dynamic_init_var_path(tmp_path: Path) -> None:
-    reserved_export = tmp_path / "reserved.xlsx"
-
-    _ = _write_text(
-        tmp_path / "demand.yaml",
-        (
-            f"""
-name: demand
-
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {{extract: id}}
-    value: {{extract: value}}
-
-outputs:
-  - name: detail
-    container:
-      type: workbook
-      path: {{$init_var: output_path}}
-      sheet: "S"
-    fields: [id, value]
-"""
-        ).lstrip(),
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="b_book",
+        sheet="S",
+        field_ids=["id", "value"],
     )
 
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
-                "report": {
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(reserved_export), "write_lock": True},
-                }
+            "books": {
+                "a_book": {"kind": "xlsx_file", "path": {"$init_var": "a_path"}},
+                "b_book": {"kind": "xlsx_file", "path": {"$init_var": "b_path"}},
             }
         },
-        runs=[{"id": "a", "demand": "demand.yaml", "init_vars": {"output_path": str(reserved_export)}}],
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml"},
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, init_vars={"a_path": str(out_path), "b_path": str(out_path)})
+    msg = str(excinfo.value)
+    assert "Excel output path collision" in msg
+    assert str(out_path.expanduser().resolve(strict=False)) in msg
+    assert "a_book" in msg
+    assert "b_book" in msg
+
+
+def test_workflow_excel_output_reserved_paths_check_uses_resolved_dynamic_init_var_path(tmp_path: Path) -> None:
+    reserved_export = tmp_path / "reserved.xlsx"
+
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="file.yaml",
+        name="file",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="file_book",
+        sheet="S",
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="mem.yaml",
+        name="mem",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="mem_book",
+        sheet="S",
+        field_ids=["id", "value"],
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        resources={
+            "books": {
+                "file_book": {"kind": "xlsx_file", "path": {"$init_var": "reserved_path"}},
+                "mem_book": {
+                    "kind": "xlsx_memory",
+                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                    "export_xlsx": {"path": {"$init_var": "reserved_path"}, "write_lock": True},
+                },
+            }
+        },
+        runs=[{"id": "file", "demand": "file.yaml"}, {"id": "mem", "demand": "mem.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, init_vars={"reserved_path": str(reserved_export)})
     msg = str(excinfo.value)
-    assert "reserved" in msg
-    assert "run_id='a'" in msg
+    assert "Excel output path collision" in msg
     assert str(reserved_export.expanduser().resolve(strict=False)) in msg
+    assert "file_book" in msg
+    assert "mem_book" in msg
 
 
 def test_workflow_excel_output_runtime_precheck_includes_meta_and_audit_paths(tmp_path: Path) -> None:
     workbook_path = tmp_path / "out.xlsx"
-    audit_path = tmp_path / "audit.xlsx"
 
     _ = _write_text(
         tmp_path / "demand.yaml",
@@ -3356,24 +3402,25 @@ main_source:
     id: {{extract: id}}
     value: {{extract: value}}
 
+outputs_defaults:
+  to:
+    book: report
+
 outputs:
   - name: detail
-    container:
-      type: workbook
-      path: "{workbook_path}"
-      sheet: "S"
+    to: {{sheet: S}}
+    write: {{mode: sheet}}
     fields: [id, value]
 
 meta: true
-audit:
-  path: "{audit_path}"
-  sheet: "__audit__"
+audit: true
 """
         ).lstrip(),
     )
 
     wf = _write_workflow_yaml(
         tmp_path,
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path), "write_defaults": {"mode": "sheet"}}}},
         runs=[{"id": "a", "demand": "demand.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
@@ -3381,7 +3428,7 @@ audit:
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert not result.errors()
     assert workbook_path.exists()
-    assert audit_path.exists()
+    assert _read_xlsx_sheetnames(workbook_path) == ["S", "__meta__", "__audit__"]
 
 
 def test_workflow_excel_output_collision_precheck_reports_demand_yaml_load_failures(tmp_path: Path) -> None:
@@ -3392,155 +3439,49 @@ def test_workflow_excel_output_collision_precheck_reports_demand_yaml_load_failu
         failure_policy="primary_only",
     )
     cfg = load_workflow_config(str(wf))
-    with pytest.raises(ScalimWorkflowConfigError, match="Failed to load demand YAML for workflow collision precheck"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Failed to load demand YAML for workflow compile"):
         _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
-
-
-@pytest.mark.parametrize("extra_key", ("meta", "audit"))
-def test_workflow_excel_output_collision_precheck_includes_meta_and_audit_paths(tmp_path: Path, extra_key: str) -> None:
-    workbook_path = tmp_path / "out.xlsx"
-    extra_path = tmp_path / "{}.xlsx".format(extra_key)
-
-    _ = _write_text(
-        tmp_path / "a.yaml",
-        (
-            f"""
-name: a
-
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {{extract: id}}
-    value: {{extract: value}}
-
-outputs:
-  - name: detail
-    container:
-      type: workbook
-      path: "{workbook_path}"
-      sheet: "S"
-    fields: [id, value]
-
-{extra_key}:
-  path: "{extra_path}"
-  sheet: "__{extra_key}__"
-"""
-        ).lstrip(),
-    )
-    _ = _write_text(
-        tmp_path / "b.yaml",
-        (
-            f"""
-name: b
-
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {{extract: id}}
-    value: {{extract: value}}
-
-outputs:
-  - name: detail
-    container:
-      type: workbook
-      path: "{extra_path}"
-      sheet: "S"
-    fields: [id, value]
-"""
-        ).lstrip(),
-    )
-
-    wf = _write_workflow_yaml(
-        tmp_path,
-        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    cfg = load_workflow_config(str(wf))
-    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
-    msg = str(excinfo.value)
-    assert "collision" in msg
-    assert str(extra_path.expanduser().resolve(strict=False)) in msg
-
-
-@pytest.mark.parametrize("extra_key", ("meta", "audit"))
-def test_workflow_excel_output_collision_precheck_allows_meta_audit_true_without_explicit_path(tmp_path: Path, extra_key: str) -> None:
-    workbook_path = tmp_path / "out.xlsx"
-    _ = _write_text(
-        tmp_path / "demand.yaml",
-        (
-            f"""
-name: demand
-
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {{extract: id}}
-    value: {{extract: value}}
-
-outputs:
-  - name: detail
-    container:
-      type: workbook
-      path: "{workbook_path}"
-      sheet: "S"
-    fields: [id, value]
-
-{extra_key}: true
-"""
-        ).lstrip(),
-    )
-    wf = _write_workflow_yaml(
-        tmp_path,
-        runs=[{"id": "a", "demand": "demand.yaml"}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    cfg = load_workflow_config(str(wf))
-    ir = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
-    assert ir is not None
 
 
 def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="S",
         field_ids=["id", "value"],
+        write_mode="append",
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="b.yaml",
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=b_out,
+        book_id="report",
+        sheet="S",
         field_ids=["id", "value"],
+        write_mode="append",
     )
 
     export_path = tmp_path / "append.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
-            "sheetbooks": {
+            "books": {
                 "report": {
+                    "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
                     "export_xlsx": {"path": str(export_path), "write_lock": True},
                 }
             }
         },
         runs=[
-            {"id": "a", "demand": "a.yaml", "writes": [{"sheetbook_append": {"sheetbook": "report", "sheet": "S", "output": "detail"}}]},
-            {"id": "b", "demand": "b.yaml", "writes": [{"sheetbook_append": {"sheetbook": "report", "sheet": "S", "output": "detail"}}]},
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -3559,14 +3500,14 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
     ]
 
 
-def test_sheetbook_sheet_rows_loader_requires_context() -> None:
+def test_book_sheet_rows_loader_requires_context() -> None:
     with pytest.raises(ValueError, match="requires workflow context"):
-        _ = workflow_loaders_mod.sheetbook_sheet_rows(ref={"node": "a", "sheetbook": "sb", "sheet": "S"})
+        _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "book": "sb", "sheet": "S"})
 
 
-def test_sheetbook_sheet_rows_loader_validates_ref_and_context_cleanup() -> None:
+def test_book_sheet_rows_loader_validates_ref_and_context_cleanup() -> None:
     class _DummyManager:
-        def iter_sheetbook_sheet_rows(self, **_kwargs: object) -> Any:  # noqa: ANN401
+        def iter_book_sheet_rows(self, **_kwargs: object) -> Any:  # noqa: ANN401
             return iter(())
 
     dummy = _DummyManager()
@@ -3578,13 +3519,13 @@ def test_sheetbook_sheet_rows_loader_validates_ref_and_context_cleanup() -> None
         resource_manager=dummy,  # type: ignore[arg-type]
     ):
         with pytest.raises(TypeError, match="params.ref"):
-            _ = workflow_loaders_mod.sheetbook_sheet_rows(ref="nope")  # type: ignore[arg-type]
+            _ = workflow_loaders_mod.book_sheet_rows(ref="nope")  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="ref.node"):
-            _ = workflow_loaders_mod.sheetbook_sheet_rows(ref={"sheetbook": "sb", "sheet": "S"})
-        with pytest.raises(ValueError, match="ref.sheetbook"):
-            _ = workflow_loaders_mod.sheetbook_sheet_rows(ref={"node": "a", "sheet": "S"})
+            _ = workflow_loaders_mod.book_sheet_rows(ref={"book": "sb", "sheet": "S"})
+        with pytest.raises(ValueError, match="ref.book"):
+            _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "sheet": "S"})
         with pytest.raises(ValueError, match="ref.sheet"):
-            _ = workflow_loaders_mod.sheetbook_sheet_rows(ref={"node": "a", "sheetbook": "sb"})
+            _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "book": "sb"})
 
     with workflow_loaders_mod.workflow_loader_context(
         workflow_exec_id="wf",
@@ -3595,35 +3536,37 @@ def test_sheetbook_sheet_rows_loader_validates_ref_and_context_cleanup() -> None
         delattr(workflow_loaders_mod._TLS, "ctx")
 
 
-def test_sheetbook_sheet_rows_loader_rejects_corrupted_context() -> None:
+def test_book_sheet_rows_loader_rejects_corrupted_context() -> None:
     workflow_loaders_mod._TLS.ctx = object()
     try:
         with pytest.raises(TypeError, match="context is corrupted"):
-            _ = workflow_loaders_mod.sheetbook_sheet_rows(ref={"node": "a", "sheetbook": "sb", "sheet": "S"})
+            _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "book": "sb", "sheet": "S"})
     finally:
         delattr(workflow_loaders_mod._TLS, "ctx")
 
 
 def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path: Path) -> None:
-    slow_out = tmp_path / "slow_detail.csv"
-    fast_out = tmp_path / "fast_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="slow.yaml",
         name="slow",
         loader_ref="tests.fixtures.workflow_loaders:load_table_c_slow",
         output_name="detail",
-        output_path=slow_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "value"],
+        write_mode="append",
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="fast.yaml",
         name="fast",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=fast_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "value"],
+        write_mode="append",
     )
 
     expected_rows = [
@@ -3636,38 +3579,10 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         workbook_path = tmp_path / "append_{}.xlsx".format(int(idx))
         wf = _write_workflow_yaml(
             tmp_path,
-            resources={"workbooks": {"report": {"path": str(workbook_path)}}},
+            resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
             runs=[
-                {
-                    "id": "slow",
-                    "demand": "slow.yaml",
-                    "writes": [
-                        {
-                            "workbook_append": {
-                                "workbook": "report",
-                                "sheet": "All",
-                                "output": "detail",
-                                "header_policy": "once",
-                                "on_mismatch": "error",
-                            }
-                        }
-                    ],
-                },
-                {
-                    "id": "fast",
-                    "demand": "fast.yaml",
-                    "writes": [
-                        {
-                            "workbook_append": {
-                                "workbook": "report",
-                                "sheet": "All",
-                                "output": "detail",
-                                "header_policy": "once",
-                                "on_mismatch": "error",
-                            }
-                        }
-                    ],
-                },
+                {"id": "slow", "demand": "slow.yaml"},
+                {"id": "fast", "demand": "fast.yaml"},
             ],
             max_concurrency=2,
             failure_policy="primary_only",
@@ -3684,57 +3599,51 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
 
 
 def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    c_out = tmp_path / "c_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "value"],
+        write_mode="append",
+        write_overrides={"header_policy": "once"},
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="b.yaml",
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=b_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "value"],
+        write_mode="append",
+        write_overrides={"header_policy": "always"},
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="c.yaml",
         name="c",
         loader_ref="tests.fixtures.workflow_loaders:load_table_c_slow",
         output_name="detail",
-        output_path=c_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "value"],
+        write_mode="append",
+        write_overrides={"header_policy": "never"},
     )
 
     workbook_path = tmp_path / "policies.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
         runs=[
-            {
-                "id": "a",
-                "demand": "a.yaml",
-                "writes": [{"workbook_append": {"workbook": "report", "sheet": "All", "output": "detail", "header_policy": "once"}}],
-            },
-            {
-                "id": "b",
-                "demand": "b.yaml",
-                "writes": [{"workbook_append": {"workbook": "report", "sheet": "All", "output": "detail", "header_policy": "always"}}],
-            },
-            {
-                "id": "c",
-                "demand": "c.yaml",
-                "writes": [{"workbook_append": {"workbook": "report", "sheet": "All", "output": "detail", "header_policy": "never"}}],
-            },
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b.yaml"},
+            {"id": "c", "demand": "c.yaml"},
         ],
         max_concurrency=3,
         failure_policy="primary_only",
@@ -3754,74 +3663,65 @@ def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
     ]
 
 
-def test_workflow_shared_csv_append_warn_skip_and_header_policies(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    m_out = tmp_path / "m_detail.csv"
-    m2_out = tmp_path / "m2_detail.csv"
-
-    _ = _write_table_demand_yaml_with_csv_output(
+def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Path) -> None:
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "value"],
+        write_mode="append",
+        write_overrides={"header_policy": "once", "on_mismatch": "error"},
     )
-    _ = _write_table_demand_yaml_with_csv_output(
-        tmp_path,
-        file_name="b.yaml",
-        name="b",
-        loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
-        output_name="detail",
-        output_path=b_out,
-        field_ids=["id", "value"],
-    )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="m.yaml",
         name="m",
         loader_ref="tests.fixtures.workflow_loaders:load_table_mismatch",
         output_name="detail",
-        output_path=m_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "other"],
+        write_mode="append",
+        write_overrides={"header_policy": "always", "on_mismatch": "warn"},
     )
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
+        output_name="detail",
+        book_id="report",
+        sheet="All",
+        field_ids=["id", "value"],
+        write_mode="append",
+        write_overrides={"header_policy": "never", "on_mismatch": "error"},
+    )
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="m2.yaml",
         name="m2",
         loader_ref="tests.fixtures.workflow_loaders:load_table_mismatch",
         output_name="detail",
-        output_path=m2_out,
+        book_id="report",
+        sheet="All",
         field_ids=["id", "other"],
+        write_mode="append",
+        write_overrides={"header_policy": "once", "on_mismatch": "skip"},
     )
 
-    merged_path = tmp_path / "merged.csv"
+    workbook_path = tmp_path / "merged.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"csvs": {"merged": {"path": str(merged_path)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
         runs=[
-            {
-                "id": "a",
-                "demand": "a.yaml",
-                "writes": [{"csv_append": {"csv": "merged", "output": "detail", "header_policy": "once", "on_mismatch": "error"}}],
-            },
-            {
-                "id": "m",
-                "demand": "m.yaml",
-                "writes": [{"csv_append": {"csv": "merged", "output": "detail", "header_policy": "always", "on_mismatch": "warn"}}],
-            },
-            {
-                "id": "b",
-                "demand": "b.yaml",
-                "writes": [{"csv_append": {"csv": "merged", "output": "detail", "header_policy": "never", "on_mismatch": "error"}}],
-            },
-            {
-                "id": "m2",
-                "demand": "m2.yaml",
-                "writes": [{"csv_append": {"csv": "merged", "output": "detail", "header_policy": "once", "on_mismatch": "skip"}}],
-            },
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "m", "demand": "m.yaml"},
+            {"id": "b", "demand": "b.yaml"},
+            {"id": "m2", "demand": "m2.yaml"},
         ],
         max_concurrency=4,
         failure_policy="primary_only",
@@ -3830,9 +3730,9 @@ def test_workflow_shared_csv_append_warn_skip_and_header_policies(tmp_path: Path
     recorder = _WorkflowEventRecorder()
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
     assert not result.errors()
-    assert merged_path.exists()
+    assert workbook_path.exists()
 
-    assert _read_csv_rows(merged_path) == [
+    assert _read_xlsx_rows(workbook_path, "All") == [
         ["id", "value"],
         ["a1", "A1"],
         ["a2", "A2"],
@@ -3847,14 +3747,14 @@ def test_workflow_shared_csv_append_warn_skip_and_header_policies(tmp_path: Path
 
 
 def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
-    ok_out = tmp_path / "ok_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="ok.yaml",
         name="ok",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=ok_out,
+        book_id="report",
+        sheet="OK",
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -3870,9 +3770,9 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
     workbook_path = tmp_path / "discard.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
         runs=[
-            {"id": "ok", "demand": "ok.yaml", "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "OK", "output": "detail"}}]},
+            {"id": "ok", "demand": "ok.yaml"},
             {"id": "bad", "demand": "bad.yaml"},
         ],
         max_concurrency=2,
@@ -3890,39 +3790,38 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
 
 
 def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        book_id="report",
+        sheet="S",
         field_ids=["id", "value"],
-    )
-    _ = _write_table_demand_yaml_with_csv_output(
-        tmp_path,
-        file_name="b.yaml",
-        name="b",
-        loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
-        output_name="detail",
-        output_path=b_out,
-        field_ids=["id", "value"],
+        write_mode="sheet",
     )
 
     # on_conflict=error
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="b_err.yaml",
+        name="b_err",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
+        output_name="detail",
+        book_id="report",
+        sheet="S",
+        field_ids=["id", "value"],
+        write_mode="sheet",
+        write_overrides={"on_conflict": "error"},
+    )
     workbook_err = tmp_path / "conflict_err.xlsx"
     wf_err = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_err)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_err)}}},
         runs=[
-            {"id": "a", "demand": "a.yaml", "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}]},
-            {
-                "id": "b",
-                "demand": "b.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail", "on_conflict": "error"}}],
-            },
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b_err.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -3932,17 +3831,25 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
     assert not workbook_err.exists()
 
     # on_conflict=overwrite
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="b_over.yaml",
+        name="b_over",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
+        output_name="detail",
+        book_id="report",
+        sheet="S",
+        field_ids=["id", "value"],
+        write_mode="sheet",
+        write_overrides={"on_conflict": "overwrite"},
+    )
     workbook_over = tmp_path / "conflict_over.xlsx"
     wf_over = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_over)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_over)}}},
         runs=[
-            {"id": "a", "demand": "a.yaml", "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}]},
-            {
-                "id": "b",
-                "demand": "b.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail", "on_conflict": "overwrite"}}],
-            },
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b_over.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -3953,17 +3860,25 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
     assert _read_xlsx_rows(workbook_over, "S")[-1] == ["b2", "B2"]
 
     # on_conflict=skip
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="b_skip.yaml",
+        name="b_skip",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
+        output_name="detail",
+        book_id="report",
+        sheet="S",
+        field_ids=["id", "value"],
+        write_mode="sheet",
+        write_overrides={"on_conflict": "skip"},
+    )
     workbook_skip = tmp_path / "conflict_skip.xlsx"
     wf_skip = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_skip)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_skip)}}},
         runs=[
-            {"id": "a", "demand": "a.yaml", "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}]},
-            {
-                "id": "b",
-                "demand": "b.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail", "on_conflict": "skip"}}],
-            },
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "b", "demand": "b_skip.yaml"},
         ],
         max_concurrency=2,
         failure_policy="primary_only",
@@ -3975,15 +3890,16 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
 
 
 def test_workflow_shared_output_lock_failure_fails_fast(tmp_path: Path) -> None:
-    out = tmp_path / "a_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=out,
+        book_id="report",
+        sheet="S",
         field_ids=["id", "value"],
+        write_mode="sheet",
     )
 
     workbook_path = tmp_path / "locked.xlsx"
@@ -3992,8 +3908,8 @@ def test_workflow_shared_output_lock_failure_fails_fast(tmp_path: Path) -> None:
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
-        runs=[{"id": "a", "demand": "a.yaml", "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}]}],
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path), "write_lock": True}}},
+        runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )
@@ -4030,45 +3946,34 @@ outputs:
         failure_policy="primary_only",
     )
 
-    with pytest.raises(ScalimWorkflowConfigError, match="Pathless CSV output"):
+    with pytest.raises(ScalimWorkflowConfigError, match="YAML DSL validation failed"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
-def test_workflow_managed_temp_outputs_injects_pathless_csv_and_cleans_up(tmp_path: Path) -> None:
-    _ = _write_text(
-        tmp_path / "a.yaml",
-        (
-            """
-name: a
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {extract: id}
-    value: {extract: value}
-outputs:
-  - name: detail
-    container:
-      type: csv
-    fields: [id, value]
-"""
-        ).lstrip(),
+def test_workflow_managed_temp_outputs_does_not_require_pathless_csv_authoring_and_cleans_up(tmp_path: Path) -> None:
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="report",
+        sheet="S",
+        field_ids=["id", "value"],
+        write_mode="sheet",
     )
 
     workbook_path = tmp_path / "managed.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
-        runs=[{"id": "a", "demand": "a.yaml", "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}]}],
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
+        runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )
 
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
     assert not result.errors()
-    demand_outcome = next(o for o in result.outcomes if o.run_id == "a")
-    assert demand_outcome.result is not None
-    assert demand_outcome.result.core.in_memory_csv_outputs == {}
     assert workbook_path.exists()
     assert _read_xlsx_rows(workbook_path, "S")[-1] == ["a2", "A2"]
     assert not (tmp_path / ".scalim").exists()
@@ -4441,19 +4346,9 @@ def test_workflow_execute_release_main_rows_artifact_raises_on_negative_count(tm
         workflow_execute_mod._cleanup_workflow_finally(prepared, resources_finalized=False)  # type: ignore[attr-defined]
 
 
-def test_workflow_shared_write_node_validates_demand_outputs_mapping_and_output_id(tmp_path: Path) -> None:
-    ok_out = tmp_path / "ok_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
-        tmp_path,
-        file_name="ok.yaml",
-        name="ok",
-        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
-        output_name="detail",
-        output_path=ok_out,
-        field_ids=["id", "value"],
-    )
-    no_outputs = _write_text(
-        tmp_path / "no_outputs.yaml",
+def test_workflow_derived_write_nodes_fail_fast_on_missing_to_book_binding(tmp_path: Path) -> None:
+    _ = _write_text(
+        tmp_path / "missing_binding.yaml",
         (
             """
 name: demo
@@ -4463,266 +4358,61 @@ main_source:
   fields:
     id: {extract: id}
     value: {extract: value}
+outputs:
+  - name: detail
+    to:
+      sheet: S
+    write:
+      mode: sheet
+    fields: [id, value]
 """
         ).lstrip(),
     )
 
-    workbook_path = tmp_path / "validate.xlsx"
-
-    wf_missing_outputs = _write_workflow_yaml(
+    wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
-        runs=[
-            {"id": "a", "demand": str(no_outputs), "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}]}
-        ],
+        runs=[{"id": "a", "demand": "missing_binding.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
-        _ = run_workflow(str(wf_missing_outputs), allowed_modules=_ALLOWED_MODULES)
-
-    wf_unknown_output_id = _write_workflow_yaml(
-        tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
-        runs=[{"id": "ok", "demand": "ok.yaml", "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "nope"}}]}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
-        _ = run_workflow(str(wf_unknown_output_id), allowed_modules=_ALLOWED_MODULES)
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Missing outputs to\.book binding"):
+        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
-def test_workflow_shared_append_write_node_validates_outputs_mapping_and_output_id(tmp_path: Path) -> None:
-    ok_out = tmp_path / "ok_detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
-        tmp_path,
-        file_name="ok.yaml",
-        name="ok",
-        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
-        output_name="detail",
-        output_path=ok_out,
-        field_ids=["id", "value"],
-    )
-    no_outputs = _write_text(
-        tmp_path / "no_outputs.yaml",
-        (
-            """
-name: demo
-main_source:
-  source_id: main
-  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
-  fields:
-    id: {extract: id}
-    value: {extract: value}
-"""
-        ).lstrip(),
-    )
-
-    workbook_path = tmp_path / "append_validate.xlsx"
-
-    wf_missing_outputs = _write_workflow_yaml(
-        tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
-        runs=[
-            {
-                "id": "a",
-                "demand": str(no_outputs),
-                "writes": [{"workbook_append": {"workbook": "report", "sheet": "S", "output": "detail"}}],
-            }
-        ],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
-        _ = run_workflow(str(wf_missing_outputs), allowed_modules=_ALLOWED_MODULES)
-
-    wf_unknown_output_id = _write_workflow_yaml(
-        tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
-        runs=[
-            {
-                "id": "ok",
-                "demand": "ok.yaml",
-                "writes": [{"workbook_append": {"workbook": "report", "sheet": "S", "output": "nope"}}],
-            }
-        ],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    with pytest.raises(ScalimWorkflowConfigError, match="Unknown demand output id referenced by workflow writes"):
-        _ = run_workflow(str(wf_unknown_output_id), allowed_modules=_ALLOWED_MODULES)
-
-
-def test_workflow_shared_write_node_rejects_non_csv_output_paths(tmp_path: Path) -> None:
-    out = tmp_path / "detail.txt"
-    _ = _write_table_demand_yaml_with_csv_output(
-        tmp_path,
-        file_name="badext.yaml",
-        name="badext",
-        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
-        output_name="detail",
-        output_path=out,
-        field_ids=["id", "value"],
-    )
-
-    workbook_path = tmp_path / "report.xlsx"
-    wf_sheet = _write_workflow_yaml(
-        tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path)}}},
-        runs=[
-            {
-                "id": "a",
-                "demand": "badext.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}],
-            }
-        ],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    result_sheet = run_workflow(str(wf_sheet), allowed_modules=_ALLOWED_MODULES)
-    assert result_sheet.errors()
-
-    workbook_path2 = tmp_path / "append.xlsx"
-    wf_append = _write_workflow_yaml(
-        tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_path2)}}},
-        runs=[
-            {
-                "id": "a",
-                "demand": "badext.yaml",
-                "writes": [{"workbook_append": {"workbook": "report", "sheet": "S", "output": "detail"}}],
-            }
-        ],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    result_append = run_workflow(str(wf_append), allowed_modules=_ALLOWED_MODULES)
-    assert result_append.errors()
-
-
-@pytest.mark.parametrize(
-    ("outputs_override", "expected_substrings"),
-    [
-        (
-            None,
-            (
-                "write node requires demand outputs mapping",
-                "append node requires demand outputs mapping",
-            ),
-        ),
-        (
-            {"other": "./other.csv"},
-            ("Unknown demand output id: input_node_id='a', output_id='detail'",),
-        ),
-    ],
-    ids=["missing-outputs-mapping", "unknown-output-id"],
-)
-def test_workflow_write_nodes_validate_outputs_mapping_runtime(
-    tmp_path: Path,
-    outputs_override: Optional[Dict[str, str]],
-    expected_substrings: tuple,
-) -> None:
-    out = tmp_path / "detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+def test_workflow_derived_write_nodes_fail_fast_on_missing_book_resource(tmp_path: Path) -> None:
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=out,
-        field_ids=["id", "value"],
-    )
-
-    workbook_path = tmp_path / "report.xlsx"
-    merged_path = tmp_path / "merged.csv"
-    wf = _write_workflow_yaml(
-        tmp_path,
-        resources={
-            "workbooks": {"report": {"path": str(workbook_path)}},
-            "csvs": {"merged": {"path": str(merged_path)}},
-        },
-        runs=[
-            {
-                "id": "a",
-                "demand": "a.yaml",
-                "writes": [
-                    {"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}},
-                    {"csv_append": {"csv": "merged", "output": "detail"}},
-                ],
-            }
-        ],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-
-    from scalim.execution.run_ir import ExecutionResult, run_ir as real_run_ir  # noqa: PLC0415
-
-    def fake_run_ir(demand_ir, request, engine_factory=None, event_meta_defaults=None):  # type: ignore[no-untyped-def]
-        real = real_run_ir(
-            demand_ir,
-            request,
-            engine_factory=engine_factory,
-            event_meta_defaults=event_meta_defaults,
-        )
-        return ExecutionResult(
-            output_path=real.output_path,
-            total_rows=real.total_rows,
-            duration=real.duration,
-            demand_ir=real.demand_ir,
-            plan=real.plan,
-            outputs=outputs_override,
-            output_target_stats=real.output_target_stats,
-        )
-
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, run_ir_fn=fake_run_ir)
-    errors = result.errors()
-    assert len(errors) == 2
-    messages = sorted(str(e.message) for e in errors)
-    for expected in expected_substrings:
-        assert any(expected in msg for msg in messages)
-
-
-def test_workflow_writes_rejects_non_csv_output_types(tmp_path: Path) -> None:
-    workbook_out = tmp_path / "demand.xlsx"
-    _ = _write_table_demand_yaml_with_workbook_output(
-        tmp_path,
-        file_name="a.xlsx.yaml",
-        name="a",
-        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
-        output_name="detail",
-        output_path=workbook_out,
+        book_id="report",
         sheet="S",
         field_ids=["id", "value"],
+        write_mode="sheet",
     )
 
-    report_path = tmp_path / "report.xlsx"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(report_path)}}},
-        runs=[
-            {
-                "id": "a",
-                "demand": "a.xlsx.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}],
-            }
-        ],
+        runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match=r"only supports CSV outputs"):
+    with pytest.raises(ScalimWorkflowConfigError, match="Missing book resource id"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 
-def test_workflow_shared_resource_commit_failure_raises_workflow_config_error(tmp_path: Path) -> None:
-    out = tmp_path / "detail.csv"
-    _ = _write_table_demand_yaml_with_csv_output(
+def test_workflow_shared_book_commit_failure_raises_workflow_config_error(tmp_path: Path) -> None:
+    _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
-        file_name="ok.yaml",
-        name="ok",
+        file_name="a.yaml",
+        name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=out,
+        book_id="report",
+        sheet="S",
         field_ids=["id", "value"],
+        write_mode="sheet",
     )
 
     workbook_dir = tmp_path / "outdir"
@@ -4731,14 +4421,8 @@ def test_workflow_shared_resource_commit_failure_raises_workflow_config_error(tm
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"workbooks": {"report": {"path": str(workbook_dir)}}},
-        runs=[
-            {
-                "id": "a",
-                "demand": "ok.yaml",
-                "writes": [{"workbook_sheet": {"workbook": "report", "sheet": "S", "output": "detail"}}],
-            }
-        ],
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_dir), "write_lock": True}}},
+        runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
     )

@@ -94,8 +94,17 @@ class SchemaBuilder:
             "source_field_inline": self._build_definition(types_mod.SourceFieldConfig),
             "field": self._build_field_definition(),
             "relation": self._build_definition(types_mod.RelationConfig),
+            "book_budget": self._build_definition(types_mod.BookBudgetConfig),
+            "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
+            "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig),
+            "book": self._build_definition(types_mod.BookConfig),
+            "resources": self._build_definition(types_mod.ResourcesConfig),
             "output_container": self._build_definition(types_mod.OutputContainerConfig),
             "output_aggregate": self._build_definition(types_mod.OutputAggregateConfig),
+            "output_to": self._build_definition(types_mod.OutputToConfig),
+            "output_write": self._build_definition(types_mod.OutputWriteConfig),
+            "outputs_defaults_to": self._build_definition(types_mod.OutputsDefaultsToConfig),
+            "outputs_defaults": self._build_definition(types_mod.OutputsDefaultsConfig),
             "output_target": self._build_definition(types_mod.OutputTargetConfig),
             "output_extra_sheet": self._build_definition(types_mod.OutputExtraSheetConfig),
             "logging": self._build_definition(types_mod.LoggingConfig),
@@ -262,256 +271,12 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
 
-        workbook_resource: Dict[str, Any] = {
-            "type": "object",
-            "required": ["path"],
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "workbook 输出路径(非空字符串)",
-                    "markdownDescription": "workbook 输出路径(非空字符串).",
-                    "examples": ["./out/report.xlsx"],
-                },
-                "allow_formulas": {
-                    "type": "boolean",
-                    "default": False,
-                    "description": "允许公式(可信输入显式放宽,将禁用公式前缀转义)",
-                    "markdownDescription": "允许公式(可信输入显式放宽,将禁用公式前缀转义).",
-                    "examples": [True],
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        csv_resource: Dict[str, Any] = {
-            "type": "object",
-            "required": ["path"],
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "csv 输出路径(非空字符串)",
-                    "markdownDescription": "csv 输出路径(非空字符串).",
-                    "examples": ["./out/report.csv"],
-                }
-            },
-            "additionalProperties": False,
-        }
-
-        write_to_workbook_sheet: Dict[str, Any] = {
-            "type": "object",
-            "required": ["workbook", "sheet", "output"],
-            "properties": {
-                "workbook": {"type": "string", "minLength": 1},
-                "sheet": {"type": "string", "minLength": 1},
-                "output": {"type": "string", "minLength": 1},
-                "on_conflict": {
-                    "type": "string",
-                    "enum": ["error", "overwrite", "skip"],
-                    "default": "error",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        write_to_workbook_append: Dict[str, Any] = {
-            "type": "object",
-            "required": ["workbook", "sheet", "output"],
-            "properties": {
-                "workbook": {"type": "string", "minLength": 1},
-                "sheet": {"type": "string", "minLength": 1},
-                "output": {"type": "string", "minLength": 1},
-                "align_by": {
-                    "type": "string",
-                    "enum": ["field_id", "header"],
-                    "default": "field_id",
-                },
-                "header_policy": {
-                    "type": "string",
-                    "enum": ["once", "always", "never"],
-                    "default": "once",
-                },
-                "on_mismatch": {
-                    "type": "string",
-                    "enum": ["error", "warn", "skip"],
-                    "default": "error",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        write_to_csv_append: Dict[str, Any] = {
-            "type": "object",
-            "required": ["csv", "output"],
-            "properties": {
-                "csv": {"type": "string", "minLength": 1},
-                "output": {"type": "string", "minLength": 1},
-                "header_policy": {
-                    "type": "string",
-                    "enum": ["once", "always", "never"],
-                    "default": "once",
-                },
-                "on_mismatch": {
-                    "type": "string",
-                    "enum": ["error", "warn", "skip"],
-                    "default": "error",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        sheetbook_budget: Dict[str, Any] = {
-            "type": "object",
-            "required": ["max_sheets", "max_total_cells"],
-            "properties": {
-                "max_sheets": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": "sheetbook budget: max_sheets(正整数)",
-                    "markdownDescription": "sheetbook budget: `max_sheets`(正整数).",
-                    "examples": [32],
-                },
-                "max_total_cells": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": "sheetbook budget: max_total_cells(正整数)",
-                    "markdownDescription": "sheetbook budget: `max_total_cells`(正整数).",
-                    "examples": [5000000],
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        sheetbook_export_xlsx: Dict[str, Any] = {
-            "type": "object",
-            "required": ["path"],
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "导出 xlsx 路径(非空字符串)",
-                    "markdownDescription": "导出 xlsx 路径(非空字符串).",
-                    "examples": ["./out/report.xlsx"],
-                },
-                "write_lock": {
-                    "type": "boolean",
-                    "default": False,
-                    "description": "导出阶段启用写锁(可选)",
-                    "markdownDescription": "导出阶段启用写锁(可选).",
-                    "examples": [True],
-                },
-                "allow_formulas": {
-                    "type": "boolean",
-                    "default": False,
-                    "description": "允许公式(可信输入显式放宽,将禁用公式前缀转义)",
-                    "markdownDescription": "允许公式(可信输入显式放宽,将禁用公式前缀转义).",
-                    "examples": [True],
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        sheetbook_resource: Dict[str, Any] = {
-            "type": "object",
-            "required": ["budget"],
-            "properties": {
-                "budget": sheetbook_budget,
-                "export_xlsx": sheetbook_export_xlsx,
-            },
-            "additionalProperties": False,
-        }
-
-        write_to_sheetbook_sheet: Dict[str, Any] = {
-            "type": "object",
-            "required": ["sheetbook", "sheet", "output"],
-            "properties": {
-                "sheetbook": {"type": "string", "minLength": 1},
-                "sheet": {"type": "string", "minLength": 1},
-                "output": {"type": "string", "minLength": 1},
-                "on_conflict": {
-                    "type": "string",
-                    "enum": ["error", "overwrite", "skip"],
-                    "default": "error",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        write_to_sheetbook_append: Dict[str, Any] = {
-            "type": "object",
-            "required": ["sheetbook", "sheet", "output"],
-            "properties": {
-                "sheetbook": {"type": "string", "minLength": 1},
-                "sheet": {"type": "string", "minLength": 1},
-                "output": {"type": "string", "minLength": 1},
-                "align_by": {
-                    "type": "string",
-                    "enum": ["field_id", "header"],
-                    "default": "field_id",
-                },
-                "header_policy": {
-                    "type": "string",
-                    "enum": ["once", "always", "never"],
-                    "default": "once",
-                },
-                "on_mismatch": {
-                    "type": "string",
-                    "enum": ["error", "warn", "skip"],
-                    "default": "error",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        write_intent_item: Dict[str, Any] = {
-            "oneOf": [
-                {
-                    "type": "object",
-                    "required": ["workbook_sheet"],
-                    "properties": {"workbook_sheet": write_to_workbook_sheet},
-                    "additionalProperties": False,
-                },
-                {
-                    "type": "object",
-                    "required": ["workbook_append"],
-                    "properties": {"workbook_append": write_to_workbook_append},
-                    "additionalProperties": False,
-                },
-                {
-                    "type": "object",
-                    "required": ["csv_append"],
-                    "properties": {"csv_append": write_to_csv_append},
-                    "additionalProperties": False,
-                },
-                {
-                    "type": "object",
-                    "required": ["sheetbook_sheet"],
-                    "properties": {"sheetbook_sheet": write_to_sheetbook_sheet},
-                    "additionalProperties": False,
-                },
-                {
-                    "type": "object",
-                    "required": ["sheetbook_append"],
-                    "properties": {"sheetbook_append": write_to_sheetbook_append},
-                    "additionalProperties": False,
-                },
-            ],
-            "description": "写入意图单条声明(item 必须恰好选择一个 intent key)",
-            "markdownDescription": "写入意图单条声明.\n\n- item MUST 恰好选择一个 intent key",
-        }
-
-        writes: Dict[str, Any] = {
-            "type": "array",
-            "items": write_intent_item,
-            "default": [],
-            "description": "共享输出写入意图列表(可选)",
-            "markdownDescription": (
-                "共享输出写入意图列表(可选).\n\n"
-                "- 缺省/空数组表示无写入意图\n"
-                "- 每个 item MUST 恰好选择一个 write intent\n"
-                "- 写入顺序 SSOT: run 顺序 + writes 顺序"
-            ),
+        definitions: Dict[str, Any] = {
+            "book_budget": self._build_definition(types_mod.BookBudgetConfig),
+            "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
+            "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig),
+            "book": self._build_definition(types_mod.BookConfig),
+            "resources": self._build_definition(types_mod.ResourcesConfig),
         }
 
         run_item: Dict[str, Any] = {
@@ -579,7 +344,6 @@ class SchemaBuilder:
                     "description": "demand compile-time init_vars(可选,支持 $ctx 指令)",
                     "markdownDescription": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令).",
                 },
-                "writes": writes,
             },
             "additionalProperties": False,
         }
@@ -595,30 +359,10 @@ class SchemaBuilder:
                 },
                 "options": options,
                 "resources": {
-                    "type": "object",
-                    "properties": {
-                        "workbooks": {
-                            "type": "object",
-                            "default": {},
-                            "propertyNames": {"type": "string", "minLength": 1},
-                            "additionalProperties": workbook_resource,
-                        },
-                        "csvs": {
-                            "type": "object",
-                            "default": {},
-                            "propertyNames": {"type": "string", "minLength": 1},
-                            "additionalProperties": csv_resource,
-                        },
-                        "sheetbooks": {
-                            "type": "object",
-                            "default": {},
-                            "propertyNames": {"type": "string", "minLength": 1},
-                            "additionalProperties": sheetbook_resource,
-                        },
-                    },
-                    "description": "workflow-scope shared output resources",
-                    "markdownDescription": "workflow-scope shared output resources.",
-                    "additionalProperties": False,
+                    "allOf": [{"$ref": "#/definitions/resources"}],
+                    "default": {},
+                    "description": "workflow-scope shared IO resources",
+                    "markdownDescription": "workflow-scope shared IO resources.\n\n- stable surface: `workflow.resources.books`",
                 },
             },
             "additionalProperties": False,
@@ -633,6 +377,7 @@ class SchemaBuilder:
             "type": "object",
             "required": ["workflow"],
             "properties": {"workflow": workflow},
+            "definitions": definitions,
             "additionalProperties": False,
         }
         return schema

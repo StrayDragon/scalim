@@ -22,6 +22,8 @@ Sources:
 - `fields`: type=object; 字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用
 - `relations`: type=object; 命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`
 - `guardrails`: ref=guardrails; 运行时护栏配置. - 默认关闭 - 用于控制 loader/relations/compute 等运行期护栏策略
+- `resources`: ref=resources; 可选:IO 资源声明. - 当前稳定入口: `resources.books`
+- `outputs_defaults`: ref=outputs_defaults; 可选:输出默认 IO 绑定. - 例如 `outputs_defaults.to.book`
 - `outputs`: type=array[ref=output_target]; 输出目标列表(有序; 可选). - 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体) - 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs` - 通过 `where` 分发到不同 sheet - 通过 `aggregate` 声明派生汇总输出 - 通过 `from` 复用字段集合与容器配置 - 不再支持旧写法: 顶层 `output:`
 - `validate_unique_field_names`: type=boolean; 预检查: 字段有效展示名(`effective display name`)全局唯一. - 默认启用: 未声明时等价 `true` - 有效展示名定义: - 若 `field.name` 非空: 使用 `name` - 否则回退为 `field_id` - 仅当 `effective outputs` 使用 `container.include_header: true`(显式或默认) 且 `container.header_fields_output_by: name` 时触发 - 显式设置为 `false` 可关闭该检查(不推荐长期使用)
 - `failure_policy`: type=string; 多输出失败策略. - `all_fail`: 任一目标失败即失败 - `primary_only`: 非主输出失败将被禁用但不阻断主输出
@@ -31,6 +33,35 @@ Sources:
 - `observability`: ref=observability; 可观测性配置. 包含 `logging`、`performance`、`relations`、`viz`、`trace`、`row_gap` 与 `memory_opt` 子配置.
 
 ## Definitions
+
+### `book`
+- `$import`: $import 引用(支持 string 或 string list)
+- `allow_formulas`: type=boolean; default=false; xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)
+- `budget`: ref=book_budget; xlsx_memory: 预算配置(必填)
+- `export_xlsx`: ref=book_export_xlsx; xlsx_memory: 可选导出配置
+- `kind`: type=string; enum=xlsx_file|xlsx_memory; book kind(xlsx_file/xlsx_memory)
+- `path`: xlsx_file: 输出路径(字符串或 {$init_var: <name>})
+- `write_defaults`: ref=book_write_defaults; 可选:默认写入语义与冲突策略
+- `write_lock`: type=boolean; default=false; xlsx_file: 写锁(默认 false)
+
+### `book_budget`
+- `$import`: $import 引用(支持 string 或 string list)
+- `max_sheets`: type=integer; sheet 数量预算(>=1)
+- `max_total_cells`: type=integer; 总 cell 数预算(>=1)
+
+### `book_export_xlsx`
+- `$import`: $import 引用(支持 string 或 string list)
+- `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(可信输入显式 opt-out;默认 false)
+- `path`: 导出 xlsx 的输出路径(字符串或 {$init_var: <name>})
+- `write_lock`: type=boolean; default=false; 写锁(导出时;默认 false)
+
+### `book_write_defaults`
+- `$import`: $import 引用(支持 string 或 string list)
+- `align_by`: type=string; default=field_id; enum=field_id|header; 字段对齐策略(field_id/header;仅 append 生效)
+- `header_policy`: type=string; default=once; enum=once|always|never; 表头策略(once/always/never;仅 append 生效)
+- `mode`: type=string; default=append; enum=sheet|append; 写入语义(sheet/append)
+- `on_conflict`: type=string; default=error; enum=error|overwrite|skip; sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)
+- `on_mismatch`: type=string; default=error; enum=error|warn|skip; 字段不匹配策略(error/warn/skip;仅 append 生效)
 
 ### `field`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -116,15 +147,12 @@ Sources:
 
 ### `output_container`
 - `$import`: $import 引用(支持 string 或 string list)
-- `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(仅 workbook)
 - `encoding`: type=string; default=utf-8; 文件编码(CSV 输出使用)
 - `header_fields_output_by`: type=string; default=name; enum=field_id|name; 表头字段名来源: field_id/name
 - `include_header`: type=boolean; default=true; 包含表头行
-- `path`: 输出文件路径(支持静态字符串/空字符串 或 {$init_var: <name>} 动态注入)
-- `sheet`: type=string; Excel sheet 名称(仅 workbook)
+- `path`: 输出文件路径(支持静态字符串 或 {$init_var: <name>} 动态注入)
 - `streaming`: type=boolean; default=true; 启用流式输出(必须为 true)
-- `type`: type=string; enum=workbook|csv; 输出容器类型(workbook/csv)
-- `write_lock`: type=boolean; default=false; 写锁(仅 workbook)
+- `type`: type=string; enum=csv; 输出容器类型(csv)
 
 ### `output_extra_sheet`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -136,11 +164,34 @@ Sources:
 ### `output_target`
 - `$import`: $import 引用(支持 string 或 string list)
 - `aggregate`: ref=output_aggregate; 可选:派生汇总配置(声明后视为 derived output)
-- `container`: ref=output_container; 输出容器配置(workbook/csv)
+- `container`: ref=output_container; 输出容器配置(csv)
 - `fields`: type=array; 输出字段顺序(field_id/out_field_id 列表; 支持 YAML alias)
 - `from`: type=string; 可选:继承来源输出(name)
 - `name`: type=string; 输出名称(name)
+- `to`: ref=output_to; 可选:输出 IO 绑定(to: book/sheet)
 - `where`: type=string; 可选:过滤表达式(安全表达式)
+- `write`: ref=output_write; 可选:写入策略覆盖(write)
+
+### `output_to`
+- `$import`: $import 引用(支持 string 或 string list)
+- `book`: type=string; 可选:目标 book_id
+- `sheet`: type=string; 可选:目标 sheet 名称
+
+### `output_write`
+- `$import`: $import 引用(支持 string 或 string list)
+- `align_by`: type=string; enum=field_id|header; 可选:字段对齐策略(field_id/header;仅 append 生效)
+- `header_policy`: type=string; enum=once|always|never; 可选:表头策略(once/always/never;仅 append 生效)
+- `mode`: type=string; enum=sheet|append; 可选:写入语义(sheet/append)
+- `on_conflict`: type=string; enum=error|overwrite|skip; 可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)
+- `on_mismatch`: type=string; enum=error|warn|skip; 可选:字段不匹配策略(error/warn/skip;仅 append 生效)
+
+### `outputs_defaults`
+- `$import`: $import 引用(支持 string 或 string list)
+- `to`: ref=outputs_defaults_to; 默认 IO 绑定(to.* defaults)
+
+### `outputs_defaults_to`
+- `$import`: $import 引用(支持 string 或 string list)
+- `book`: type=string; 默认输出目标 book_id
 
 ### `performance`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -177,6 +228,10 @@ Sources:
 - `max_samples`: type=integer; default=1000; 最大采样数量
 - `report`: ref=relation_report
 - `sampling_rate`: default=0.01; 采样率(0.0-1.0)
+
+### `resources`
+- `$import`: $import 引用(支持 string 或 string list)
+- `books`: type=object; books 资源映射(Excel book; key 为 book_id)
 
 ### `row_gap`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -227,6 +282,41 @@ Sources:
 
 ### Top-Level Fields
 - `workflow` (required): type=object
+
+### Definitions
+
+#### `book`
+- `$import`: $import 引用(支持 string 或 string list)
+- `allow_formulas`: type=boolean; default=false; xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)
+- `budget`: ref=book_budget; xlsx_memory: 预算配置(必填)
+- `export_xlsx`: ref=book_export_xlsx; xlsx_memory: 可选导出配置
+- `kind`: type=string; enum=xlsx_file|xlsx_memory; book kind(xlsx_file/xlsx_memory)
+- `path`: xlsx_file: 输出路径(字符串或 {$init_var: <name>})
+- `write_defaults`: ref=book_write_defaults; 可选:默认写入语义与冲突策略
+- `write_lock`: type=boolean; default=false; xlsx_file: 写锁(默认 false)
+
+#### `book_budget`
+- `$import`: $import 引用(支持 string 或 string list)
+- `max_sheets`: type=integer; sheet 数量预算(>=1)
+- `max_total_cells`: type=integer; 总 cell 数预算(>=1)
+
+#### `book_export_xlsx`
+- `$import`: $import 引用(支持 string 或 string list)
+- `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(可信输入显式 opt-out;默认 false)
+- `path`: 导出 xlsx 的输出路径(字符串或 {$init_var: <name>})
+- `write_lock`: type=boolean; default=false; 写锁(导出时;默认 false)
+
+#### `book_write_defaults`
+- `$import`: $import 引用(支持 string 或 string list)
+- `align_by`: type=string; default=field_id; enum=field_id|header; 字段对齐策略(field_id/header;仅 append 生效)
+- `header_policy`: type=string; default=once; enum=once|always|never; 表头策略(once/always/never;仅 append 生效)
+- `mode`: type=string; default=append; enum=sheet|append; 写入语义(sheet/append)
+- `on_conflict`: type=string; default=error; enum=error|overwrite|skip; sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)
+- `on_mismatch`: type=string; default=error; enum=error|warn|skip; 字段不匹配策略(error/warn/skip;仅 append 生效)
+
+#### `resources`
+- `$import`: $import 引用(支持 string 或 string list)
+- `books`: type=object; books 资源映射(Excel book; key 为 book_id)
 
 ## Notes
 - 完整字段语义以 `scalim-cli yaml-dsl validate` 的运行时行为为准.

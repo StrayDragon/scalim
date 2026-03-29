@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+name: demo_big_data_report_workflow_shared_workbooks
+description: |
+  demo_big_data_report workflow demo: shared workbooks via `resources.books` + output bindings.
+
+  Notes:
+  - workflow manages the book resources (paths/budgets/export)
+  - demand defines stable output contracts: `outputs[*].to` + `outputs[*].write`
+
+batch_size: 30
+
+main_source:
+  source_id: orders
+  loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
+  params:
+    ids: {$init_var: order_ids}
+  order_by: [order_id]
+  fields:
+    order_id: {name: 订单ID}
+    order_date: {name: 订单日期}
+    quantity: {name: 数量}
+    unit_price: {name: 单价}
+
+outputs:
+  # overwrite each run (final rows == single run)
+  - name: detail_workbook
+    to:
+      book: shared_report
+      sheet: Detail
+    write:
+      mode: sheet
+      on_conflict: overwrite
+    fields: &detail_fields [order_id, order_date, quantity, unit_price]
+
+  # append across runs (final rows == 2x single run)
+  - name: detail_workbook_append
+    to:
+      book: shared_report
+      sheet: DetailAppend
+    write:
+      mode: append
+      align_by: header
+      header_policy: once
+      on_mismatch: error
+    fields: *detail_fields
+
+  - name: detail_sheetbook
+    to:
+      book: sheetbook_report
+      sheet: Detail
+    write:
+      mode: sheet
+      on_conflict: overwrite
+    fields: *detail_fields
+
+  - name: detail_sheetbook_append
+    to:
+      book: sheetbook_report
+      sheet: DetailAppend
+    write:
+      mode: append
+      align_by: header
+      header_policy: once
+      on_mismatch: error
+    fields: *detail_fields
+

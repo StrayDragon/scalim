@@ -1,6 +1,7 @@
 import marimo
 
 import csv
+import os
 import tempfile
 from decimal import Decimal
 from pathlib import Path
@@ -94,13 +95,18 @@ def run_workflow_demo_big_data_report(
             wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
 
             try:
-                result = run_workflow(
-                    str(wf_copy),
-                    allowed_modules=allowed_modules,
-                    init_vars={"order_ids": []},
-                    path_aliases={"@": str(repo_root)},
-                    allowed_yaml_roots=(str(repo_root),),
-                )
+                prev_cwd = os.getcwd()
+                os.chdir(str(out_dir))
+                try:
+                    result = run_workflow(
+                        str(wf_copy),
+                        allowed_modules=allowed_modules,
+                        init_vars={"order_ids": []},
+                        path_aliases={"@": str(repo_root)},
+                        allowed_yaml_roots=(str(repo_root),),
+                    )
+                finally:
+                    os.chdir(prev_cwd)
             except Exception as exc:  # noqa: BLE001
                 summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)
                 return ExampleResult(

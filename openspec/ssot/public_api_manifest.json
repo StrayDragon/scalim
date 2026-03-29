@@ -66,14 +66,7 @@
       "WorkflowCachePoolPin",
       "WorkflowConfig",
       "WorkflowOptions",
-      "WorkflowResources",
       "WorkflowRun",
-      "WorkflowWriteTo",
-      "WorkflowWriteToCsvAppend",
-      "WorkflowWriteToSheetbookAppend",
-      "WorkflowWriteToSheetbookSheet",
-      "WorkflowWriteToWorkbookAppend",
-      "WorkflowWriteToWorkbookSheet",
       "load_workflow_config",
       "load_workflow_config_from_mapping",
       "resolve_workflow_demand_path",
@@ -89,14 +82,7 @@
       "WorkflowCachePoolPin",
       "WorkflowConfig",
       "WorkflowOptions",
-      "WorkflowResources",
-      "WorkflowRun",
-      "WorkflowWriteTo",
-      "WorkflowWriteToCsvAppend",
-      "WorkflowWriteToSheetbookAppend",
-      "WorkflowWriteToSheetbookSheet",
-      "WorkflowWriteToWorkbookAppend",
-      "WorkflowWriteToWorkbookSheet"
+      "WorkflowRun"
     ],
     "scalim.events": [
       "EVENT_ADAPTIVE_SCHEDULER_DECISION",
@@ -221,7 +207,7 @@
       "build_stable_lookup_key_list"
     ],
     "scalim.workflow.loaders": [
-      "sheetbook_sheet_rows",
+      "book_sheet_rows",
       "workflow_loader_context"
     ]
   }

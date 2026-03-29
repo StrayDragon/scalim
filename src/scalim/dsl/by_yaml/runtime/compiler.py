@@ -8,6 +8,7 @@
 
 import os
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
 from ....execution.guardrails import (
@@ -32,7 +33,35 @@ from ..schema_dsl.constants import (
     DEFAULT_OUTPUT_INCLUDE_HEADER,
     DEFAULT_OUTPUT_STREAMING,
 )
-from ..schema_dsl.models import DemandConfig, GuardrailsConfig, LoaderRetryConfig, OutputContainerConfig, OutputTargetConfig
+from ..schema_dsl.models import (
+    BookBudgetConfig,
+    BookConfig,
+    BookExportXlsxConfig,
+    BookWriteDefaultsConfig,
+    DemandConfig,
+    GuardrailsConfig,
+    LoaderRetryConfig,
+    OutputContainerConfig,
+    OutputsDefaultsConfig,
+    OutputsDefaultsToConfig,
+    OutputTargetConfig,
+    OutputToConfig,
+    OutputWriteConfig,
+    ResourcesConfig,
+)
+from ..schema_dsl.output_enums import (
+    BOOK_KINDS,
+    BOOK_WRITE_ALIGN_BY_ENUM,
+    BOOK_WRITE_HEADER_POLICY_ENUM,
+    BOOK_WRITE_MODE_ENUM,
+    BOOK_WRITE_ON_CONFLICT_ENUM,
+    BOOK_WRITE_ON_MISMATCH_ENUM,
+    DEFAULT_BOOK_WRITE_ALIGN_BY,
+    DEFAULT_BOOK_WRITE_HEADER_POLICY,
+    DEFAULT_BOOK_WRITE_MODE,
+    DEFAULT_BOOK_WRITE_ON_CONFLICT,
+    DEFAULT_BOOK_WRITE_ON_MISMATCH,
+)
 from .builtin_callables import parse_builtin_callable_id
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, UnsetType
 from .conversion import ConfigToIRConverter
@@ -63,9 +92,9 @@ def validate_allowlist(
 
 
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-_OVERRIDES_OUTPUT_ALLOWED_KEYS: FrozenSet[str] = frozenset(["name", "container", "fields"])
+_OVERRIDES_OUTPUT_ALLOWED_KEYS: FrozenSet[str] = frozenset(["name", "container", "to", "write", "fields"])
 _OVERRIDES_OUTPUT_FORBIDDEN_KEYS: FrozenSet[str] = frozenset(["where", "from", "aggregate"])
-_OUTPUT_CONTAINER_TYPES: Tuple[str, ...] = ("workbook", "csv")
+_OUTPUT_CONTAINER_TYPES: Tuple[str, ...] = ("csv",)
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
 
 
@@ -92,28 +121,31 @@ def _parse_overrides_outputs_container_type(container: Dict[str, Any], *, path: 
     return typ
 
 
-def _parse_overrides_outputs_container_path(path_raw: Any, *, container_type: str, path: str) -> Any:
+def _parse_overrides_outputs_container_path(path_raw: Any, *, path: str) -> Any:
     if isinstance(path_raw, dict):
-        path_value: Any = {
+        return {
             "$init_var": parse_init_var_mapping_node(
                 cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
                 path="{}.path".format(path),
             )
         }
-    elif path_raw is None:
-        path_value = ""
-    elif isinstance(path_raw, os.PathLike):
-        path_value = str(os.fspath(path_raw)).strip()
-    elif isinstance(path_raw, str):
-        path_value = path_raw.strip()
-    else:
-        msg = "{}.path must be a string (empty allowed for workflow-managed CSV) or {{$init_var: <name>}}".format(path)
-        raise TypeError(msg)
-
-    if container_type == "workbook" and not path_value:
-        msg = "{}.path is required for workbook outputs".format(path)
+    if path_raw is None:
+        msg = "{}.path is required".format(path)
         raise ValueError(msg)
-    return path_value
+    if isinstance(path_raw, os.PathLike):
+        value = str(os.fspath(path_raw)).strip()
+        if not value:
+            msg = "{}.path is required".format(path)
+            raise ValueError(msg)
+        return value
+    if isinstance(path_raw, str):
+        value = path_raw.strip()
+        if not value:
+            msg = "{}.path is required".format(path)
+            raise ValueError(msg)
+        return value
+    msg = "{}.path must be a non-empty string or {{$init_var: <name>}}".format(path)
+    raise TypeError(msg)
 
 
 def _parse_overrides_outputs_container_header_by(header_by_raw: Any, *, path: str) -> str:
@@ -129,36 +161,25 @@ def _validate_overrides_outputs_container_semantics(
     container_type: str,
     *,
     path: str,
-    sheet: Optional[str],
     streaming: bool,
-    allow_formulas: bool,
-    write_lock: bool,
 ) -> None:
+    if container_type != "csv":
+        msg = "{}.type={!r} is invalid; expected one of: {}".format(path, container_type, ", ".join(_OUTPUT_CONTAINER_TYPES))
+        raise ValueError(msg)
     if not streaming:
         msg = "{}.streaming must be true (composed outputs only support streaming=true)".format(path)
-        raise ValueError(msg)
-
-    if container_type != "csv":
-        return
-    if sheet:
-        msg = "{}.sheet is only allowed for type=workbook".format(path)
-        raise ValueError(msg)
-    if allow_formulas:
-        msg = "{}.allow_formulas is only allowed for type=workbook".format(path)
-        raise ValueError(msg)
-    if write_lock:
-        msg = "{}.write_lock is only allowed for type=workbook".format(path)
         raise ValueError(msg)
 
 
 def _parse_overrides_outputs_container(raw: object, *, path: str) -> OutputContainerConfig:
     typed = _require_dict(raw, path=path)
+    allowed_keys = {"type", "path", "encoding", "streaming", "include_header", "header_fields_output_by"}
+    unknown = sorted({str(k) for k in typed} - allowed_keys)
+    if unknown:
+        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
+        raise ValueError(msg)
     typ = _parse_overrides_outputs_container_type(typed, path=path)
-    path_value: Any = _parse_overrides_outputs_container_path(typed.get("path"), container_type=typ, path=path)
-
-    sheet_raw = typed.get("sheet")
-    sheet = str(sheet_raw).strip() if isinstance(sheet_raw, str) else ""
-    sheet = sheet or None
+    path_value: Any = _parse_overrides_outputs_container_path(typed.get("path"), path=path)
 
     encoding_raw = typed.get("encoding")
     encoding = str(encoding_raw).strip() if isinstance(encoding_raw, str) else ""
@@ -169,28 +190,80 @@ def _parse_overrides_outputs_container(raw: object, *, path: str) -> OutputConta
 
     header_by = _parse_overrides_outputs_container_header_by(typed.get("header_fields_output_by"), path=path)
 
-    allow_formulas = bool(typed.get("allow_formulas", False))
-    write_lock = bool(typed.get("write_lock", False))
-
     _validate_overrides_outputs_container_semantics(
         typ,
         path=path,
-        sheet=sheet,
         streaming=streaming,
-        allow_formulas=allow_formulas,
-        write_lock=write_lock,
     )
 
     return OutputContainerConfig(
         type=typ,
         path=path_value,
-        sheet=sheet,
         encoding=encoding,
         streaming=streaming,
         include_header=include_header,
         header_fields_output_by=header_by,
-        allow_formulas=allow_formulas,
-        write_lock=write_lock,
+    )
+
+
+def _parse_overrides_output_to(raw: object, *, path: str) -> Optional[OutputToConfig]:
+    if raw is None:
+        return None
+    typed = _require_dict(raw, path=path)
+    allowed_keys = {"book", "sheet"}
+    unknown = sorted({str(k) for k in typed} - allowed_keys)
+    if unknown:
+        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
+        raise ValueError(msg)
+
+    book_raw = typed.get("book")
+    sheet_raw = typed.get("sheet")
+
+    book = None
+    if book_raw is not None:
+        if not isinstance(book_raw, str):
+            msg = "{}.book must be a string".format(path)
+            raise TypeError(msg)
+        book = str(book_raw).strip() or None
+
+    sheet = None
+    if sheet_raw is not None:
+        if not isinstance(sheet_raw, str):
+            msg = "{}.sheet must be a string".format(path)
+            raise TypeError(msg)
+        sheet = str(sheet_raw).strip() or None
+
+    if book is None and sheet is None:
+        return None
+    return OutputToConfig(book=book, sheet=sheet)
+
+
+def _parse_overrides_output_write(raw: object, *, path: str) -> Optional[OutputWriteConfig]:
+    if raw is None:
+        return None
+    typed = _require_dict(raw, path=path)
+    allowed_keys = {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"}
+    unknown = sorted({str(k) for k in typed} - allowed_keys)
+    if unknown:
+        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
+        raise ValueError(msg)
+
+    def _as_opt_str(key: str) -> Optional[str]:
+        value = typed.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            msg = "{}.{} must be a string".format(path, key)
+            raise TypeError(msg)
+        raw_str = str(value).strip()
+        return raw_str or None
+
+    return OutputWriteConfig(
+        mode=_as_opt_str("mode"),
+        align_by=_as_opt_str("align_by"),
+        header_policy=_as_opt_str("header_policy"),
+        on_mismatch=_as_opt_str("on_mismatch"),
+        on_conflict=_as_opt_str("on_conflict"),
     )
 
 
@@ -200,7 +273,7 @@ def _validate_overrides_output_keys(typed: Dict[str, Any], *, idx: int, path: st
         return
     forbidden = sorted([k for k in extra_keys if k in _OVERRIDES_OUTPUT_FORBIDDEN_KEYS])
     unsupported = forbidden or extra_keys
-    msg = "{}.{} has unsupported keys: {} (only supports: name/container/fields)".format(path, idx, ", ".join(unsupported))
+    msg = "{}.{} has unsupported keys: {} (only supports: name/to/write/container/fields)".format(path, idx, ", ".join(unsupported))
     raise ValueError(msg)
 
 
@@ -274,14 +347,28 @@ def _parse_overrides_outputs_targets(
 
         _validate_overrides_output_keys(typed, idx=idx, path=path)
         name = _parse_overrides_output_name(typed, idx=idx, path=path, seen_names=seen_names)
-        container = _parse_overrides_outputs_container(typed.get("container"), path="{}.{}.container".format(path, idx))
+        container_raw = typed.get("container")
+        container = (
+            None if container_raw is None else _parse_overrides_outputs_container(container_raw, path="{}.{}.container".format(path, idx))
+        )
+        to_cfg = _parse_overrides_output_to(typed.get("to"), path="{}.{}.to".format(path, idx))
+        write_cfg = _parse_overrides_output_write(typed.get("write"), path="{}.{}.write".format(path, idx))
         field_ids = _parse_overrides_output_fields(typed, idx=idx, path=path, known_field_ids=known_field_ids)
+
+        if container is not None and to_cfg is not None:
+            msg = "{}.{} cannot declare both container and to".format(path, idx)
+            raise ValueError(msg)
+        if container is not None and write_cfg is not None:
+            msg = "{}.{} cannot declare write for csv container outputs".format(path, idx)
+            raise ValueError(msg)
 
         parsed.append(
             OutputTargetConfig(
                 name=name,
                 from_=None,
                 container=container,
+                to=to_cfg,
+                write=write_cfg,
                 fields=field_ids,
                 where=None,
                 aggregate=None,
@@ -622,12 +709,407 @@ def _resolve_effective_outputs_and_path(
     return (), "outputs"
 
 
+def _parse_non_empty_path_or_init_var(raw: object, *, path: str) -> Any:
+    if isinstance(raw, dict):
+        return {"$init_var": parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)}  # pragma: allow-cast dict narrowing
+    if raw is None:
+        msg = "{} is required".format(path)
+        raise ValueError(msg)
+    if isinstance(raw, os.PathLike):
+        value = str(os.fspath(raw)).strip()
+        if not value:
+            msg = "{} is required".format(path)
+            raise ValueError(msg)
+        return value
+    if isinstance(raw, str):
+        value = raw.strip()
+        if not value:
+            msg = "{} is required".format(path)
+            raise ValueError(msg)
+        return value
+    msg = "{} must be a non-empty string or {{$init_var: <name>}}".format(path)
+    raise TypeError(msg)
+
+
+def _parse_optional_path_or_init_var(raw: object, *, path: str) -> Any:
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return {"$init_var": parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)}  # pragma: allow-cast dict narrowing
+    if isinstance(raw, os.PathLike):
+        value = str(os.fspath(raw)).strip()
+        if not value:
+            msg = "{} must not be empty".format(path)
+            raise ValueError(msg)
+        return value
+    if isinstance(raw, str):
+        value = raw.strip()
+        if not value:
+            msg = "{} must not be empty".format(path)
+            raise ValueError(msg)
+        return value
+    msg = "{} must be a string or {{$init_var: <name>}}".format(path)
+    raise TypeError(msg)
+
+
+def _overlay_optional_str_field(patch: Mapping[str, object], *, key: str, value: str, path: str) -> str:
+    if key not in patch:
+        return value
+    raw = patch.get(key)
+    if raw is None:
+        return value
+    if not isinstance(raw, str):
+        msg = "{}.{} must be a string".format(path, str(key))
+        raise TypeError(msg)
+    return str(raw).strip()
+
+
+def _overlay_book_write_defaults(base: BookWriteDefaultsConfig, patch: Mapping[str, object], *, path: str) -> BookWriteDefaultsConfig:
+    allowed_keys = {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"}
+    unknown = sorted({str(k) for k in patch} - allowed_keys)
+    if unknown:
+        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+        raise ValueError(msg)
+
+    mode = str(base.mode or DEFAULT_BOOK_WRITE_MODE)
+    align_by = str(base.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY)
+    header_policy = str(base.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY)
+    on_mismatch = str(base.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH)
+    on_conflict = str(base.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT)
+
+    mode = _overlay_optional_str_field(patch, key="mode", value=mode, path=path)
+    align_by = _overlay_optional_str_field(patch, key="align_by", value=align_by, path=path)
+    header_policy = _overlay_optional_str_field(patch, key="header_policy", value=header_policy, path=path)
+    on_mismatch = _overlay_optional_str_field(patch, key="on_mismatch", value=on_mismatch, path=path)
+    on_conflict = _overlay_optional_str_field(patch, key="on_conflict", value=on_conflict, path=path)
+
+    validations = (
+        ("mode", mode, BOOK_WRITE_MODE_ENUM),
+        ("align_by", align_by, BOOK_WRITE_ALIGN_BY_ENUM),
+        ("header_policy", header_policy, BOOK_WRITE_HEADER_POLICY_ENUM),
+        ("on_mismatch", on_mismatch, BOOK_WRITE_ON_MISMATCH_ENUM),
+        ("on_conflict", on_conflict, BOOK_WRITE_ON_CONFLICT_ENUM),
+    )
+    for key, value, allowed in validations:
+        if value not in allowed:
+            msg = "Invalid write_defaults.{}={!r}; expected one of: {}".format(str(key), value, ", ".join(allowed))
+            err = "{} (path={}.{})".format(msg, path, str(key))
+            raise ValueError(err)
+
+    return BookWriteDefaultsConfig(
+        mode=str(mode),
+        align_by=str(align_by),
+        header_policy=str(header_policy),
+        on_mismatch=str(on_mismatch),
+        on_conflict=str(on_conflict),
+    )
+
+
+def _apply_book_patch(base: Optional[BookConfig], patch: Mapping[str, object], *, path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
+    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_lock", "write_defaults"}
+    unknown = sorted({str(k) for k in patch} - allowed_keys)
+    if unknown:
+        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+        raise ValueError(msg)
+
+    kind = str(base.kind or "").strip() if base is not None else ""
+    book_path: Any = base.path if base is not None else None
+    budget = base.budget if base is not None else None
+    export_xlsx = base.export_xlsx if base is not None else None
+    allow_formulas = bool(base.allow_formulas) if base is not None else False
+    write_lock = bool(base.write_lock) if base is not None else False
+    write_defaults = base.write_defaults if base is not None else None
+
+    has_path_key = "path" in patch
+    has_allow_formulas_key = "allow_formulas" in patch
+    has_write_lock_key = "write_lock" in patch
+    has_budget_key = "budget" in patch
+    has_export_key = "export_xlsx" in patch
+
+    if "kind" in patch:
+        raw = patch.get("kind")
+        kind = str(raw or "").strip() if isinstance(raw, str) else ""
+        if not kind:
+            msg = "{}.kind must be a non-empty string".format(path)
+            raise ValueError(msg)
+
+    if has_path_key:
+        book_path = _parse_optional_path_or_init_var(patch.get("path"), path="{}.path".format(path))
+
+    if has_allow_formulas_key:
+        raw = patch.get("allow_formulas")
+        if not isinstance(raw, bool):
+            msg = "{}.allow_formulas must be a bool".format(path)
+            raise TypeError(msg)
+        allow_formulas = bool(raw)
+
+    if has_write_lock_key:
+        raw = patch.get("write_lock")
+        if not isinstance(raw, bool):
+            msg = "{}.write_lock must be a bool".format(path)
+            raise TypeError(msg)
+        write_lock = bool(raw)
+
+    if has_budget_key:
+        raw = patch.get("budget")
+        if raw is None:
+            budget = None
+        elif not isinstance(raw, dict):
+            msg = "{}.budget must be a mapping".format(path)
+            raise TypeError(msg)
+        else:
+            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
+            max_sheets_raw = raw_dict.get("max_sheets")
+            max_total_cells_raw = raw_dict.get("max_total_cells")
+            if budget is None:
+                if max_sheets_raw is None or max_total_cells_raw is None:
+                    msg = "{}.budget requires max_sheets and max_total_cells when creating a new xlsx_memory book".format(path)
+                    raise ValueError(msg)
+                try:
+                    max_sheets = int(max_sheets_raw)
+                except (TypeError, ValueError):
+                    msg = "{}.budget.max_sheets must be an integer >= 1".format(path)
+                    raise ValueError(msg) from None
+                try:
+                    max_total_cells = int(max_total_cells_raw)
+                except (TypeError, ValueError):
+                    msg = "{}.budget.max_total_cells must be an integer >= 1".format(path)
+                    raise ValueError(msg) from None
+                if int(max_sheets) < 1:
+                    msg = "{}.budget.max_sheets must be >= 1".format(path)
+                    raise ValueError(msg)
+                if int(max_total_cells) < 1:
+                    msg = "{}.budget.max_total_cells must be >= 1".format(path)
+                    raise ValueError(msg)
+                budget = BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
+            else:
+                max_sheets = int(budget.max_sheets)
+                max_total_cells = int(budget.max_total_cells)
+                if max_sheets_raw is not None:
+                    try:
+                        max_sheets = int(max_sheets_raw)
+                    except (TypeError, ValueError):
+                        msg = "{}.budget.max_sheets must be an integer >= 1".format(path)
+                        raise ValueError(msg) from None
+                if max_total_cells_raw is not None:
+                    try:
+                        max_total_cells = int(max_total_cells_raw)
+                    except (TypeError, ValueError):
+                        msg = "{}.budget.max_total_cells must be an integer >= 1".format(path)
+                        raise ValueError(msg) from None
+                if int(max_sheets) < 1:
+                    msg = "{}.budget.max_sheets must be >= 1".format(path)
+                    raise ValueError(msg)
+                if int(max_total_cells) < 1:
+                    msg = "{}.budget.max_total_cells must be >= 1".format(path)
+                    raise ValueError(msg)
+                budget = BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
+
+    if has_export_key:
+        raw = patch.get("export_xlsx")
+        if raw is None:
+            export_xlsx = None
+        elif not isinstance(raw, dict):
+            msg = "{}.export_xlsx must be a mapping".format(path)
+            raise TypeError(msg)
+        else:
+            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
+            path_raw = raw_dict.get("path")
+            write_lock_raw = raw_dict.get("write_lock")
+            allow_formulas_raw = raw_dict.get("allow_formulas")
+            if write_lock_raw is not None and not isinstance(write_lock_raw, bool):
+                msg = "{}.export_xlsx.write_lock must be a bool".format(path)
+                raise TypeError(msg)
+            if allow_formulas_raw is not None and not isinstance(allow_formulas_raw, bool):
+                msg = "{}.export_xlsx.allow_formulas must be a bool".format(path)
+                raise TypeError(msg)
+            if export_xlsx is None:
+                if path_raw is None:
+                    msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
+                    raise ValueError(msg)
+                export_xlsx = BookExportXlsxConfig(
+                    path=_parse_non_empty_path_or_init_var(path_raw, path="{}.export_xlsx.path".format(path)),
+                    write_lock=bool(write_lock_raw) if write_lock_raw is not None else False,
+                    allow_formulas=bool(allow_formulas_raw) if allow_formulas_raw is not None else False,
+                )
+            else:
+                next_path = (
+                    export_xlsx.path
+                    if path_raw is None
+                    else _parse_non_empty_path_or_init_var(path_raw, path="{}.export_xlsx.path".format(path))
+                )
+                next_write_lock = export_xlsx.write_lock if write_lock_raw is None else bool(write_lock_raw)
+                next_allow_formulas = export_xlsx.allow_formulas if allow_formulas_raw is None else bool(allow_formulas_raw)
+                export_xlsx = BookExportXlsxConfig(
+                    path=next_path,
+                    write_lock=bool(next_write_lock),
+                    allow_formulas=bool(next_allow_formulas),
+                )
+
+    if "write_defaults" in patch:
+        raw = patch.get("write_defaults")
+        if raw is None:
+            write_defaults = None
+        elif not isinstance(raw, dict):
+            msg = "{}.write_defaults must be a mapping".format(path)
+            raise TypeError(msg)
+        else:
+            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
+            base_defaults = write_defaults
+            if base_defaults is None:
+                base_defaults = BookWriteDefaultsConfig(
+                    mode=str(DEFAULT_BOOK_WRITE_MODE),
+                    align_by=str(DEFAULT_BOOK_WRITE_ALIGN_BY),
+                    header_policy=str(DEFAULT_BOOK_WRITE_HEADER_POLICY),
+                    on_mismatch=str(DEFAULT_BOOK_WRITE_ON_MISMATCH),
+                    on_conflict=str(DEFAULT_BOOK_WRITE_ON_CONFLICT),
+                )
+            write_defaults = _overlay_book_write_defaults(base_defaults, raw_dict, path="{}.write_defaults".format(path))
+
+    if kind not in BOOK_KINDS:
+        msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(BOOK_KINDS))
+        raise ValueError(msg)
+
+    if kind == "xlsx_file":
+        if has_budget_key or has_export_key:
+            msg = "{}.budget/export_xlsx are not allowed for kind=xlsx_file".format(path)
+            raise ValueError(msg)
+        if book_path is None:
+            msg = "{}.path is required for kind=xlsx_file".format(path)
+            raise ValueError(msg)
+        if budget is not None:
+            msg = "{}.budget is not allowed for kind=xlsx_file".format(path)
+            raise ValueError(msg)
+        if export_xlsx is not None:
+            msg = "{}.export_xlsx is not allowed for kind=xlsx_file".format(path)
+            raise ValueError(msg)
+
+    if kind == "xlsx_memory":
+        if has_path_key or has_allow_formulas_key or has_write_lock_key:
+            msg = "{}.path/allow_formulas/write_lock are not allowed for kind=xlsx_memory (use export_xlsx.*)".format(path)
+            raise ValueError(msg)
+        if budget is None:
+            msg = "{}.budget is required for kind=xlsx_memory".format(path)
+            raise ValueError(msg)
+        if book_path is not None:
+            msg = "{}.path is not allowed for kind=xlsx_memory".format(path)
+            raise ValueError(msg)
+        if allow_formulas:
+            msg = "{}.allow_formulas is not allowed for kind=xlsx_memory".format(path)
+            raise ValueError(msg)
+        if write_lock:
+            msg = "{}.write_lock is not allowed for kind=xlsx_memory".format(path)
+            raise ValueError(msg)
+
+    return BookConfig(
+        kind=str(kind),
+        path=book_path,
+        budget=budget,
+        export_xlsx=export_xlsx,
+        allow_formulas=bool(allow_formulas),
+        write_lock=bool(write_lock),
+        write_defaults=write_defaults,
+    )
+
+
+def _apply_outputs_defaults_io_override(config: DemandConfig, patch_raw: object) -> DemandConfig:
+    if not isinstance(patch_raw, dict):
+        msg = "overrides.outputs_defaults must be an object"
+        raise TypeError(msg)
+    patch = cast("Dict[str, Any]", patch_raw)  # pragma: allow-cast runtime dict typed narrowing
+    unknown = sorted({str(k) for k in patch} - {"to"})
+    if unknown:
+        msg = "overrides.outputs_defaults has unknown keys: {}".format(", ".join(unknown))
+        raise ValueError(msg)
+
+    to_obj = patch.get("to")
+    if to_obj is None:
+        return config
+    if not isinstance(to_obj, dict):
+        msg = "overrides.outputs_defaults.to must be an object"
+        raise TypeError(msg)
+    to_dict = cast("Dict[str, Any]", to_obj)  # pragma: allow-cast runtime dict typed narrowing
+    unknown_to = sorted({str(k) for k in to_dict} - {"book"})
+    if unknown_to:
+        msg = "overrides.outputs_defaults.to has unknown keys: {}".format(", ".join(unknown_to))
+        raise ValueError(msg)
+    book_raw = to_dict.get("book")
+    if not isinstance(book_raw, str) or not str(book_raw).strip():
+        msg = "overrides.outputs_defaults.to.book must be a non-empty string"
+        raise ValueError(msg)
+    book_id = str(book_raw).strip()
+
+    base = config.outputs_defaults
+    if base is None:
+        base = OutputsDefaultsConfig(to=OutputsDefaultsToConfig(book=str(book_id)))
+    else:
+        base = replace(base, to=replace(base.to, book=str(book_id)))
+    return replace(config, outputs_defaults=base)
+
+
+def _apply_resources_io_override(config: DemandConfig, patch_raw: object) -> DemandConfig:
+    if not isinstance(patch_raw, dict):
+        msg = "overrides.resources must be an object"
+        raise TypeError(msg)
+    patch = cast("Dict[str, Any]", patch_raw)  # pragma: allow-cast runtime dict typed narrowing
+    unknown = sorted({str(k) for k in patch} - {"books"})
+    if unknown:
+        msg = "overrides.resources has unknown keys: {}".format(", ".join(unknown))
+        raise ValueError(msg)
+
+    books_obj = patch.get("books")
+    if books_obj is None:
+        return config
+    if not isinstance(books_obj, dict):
+        msg = "overrides.resources.books must be an object"
+        raise TypeError(msg)
+    books_patch = cast("Dict[str, Any]", books_obj)  # pragma: allow-cast runtime dict typed narrowing
+    base_resources = config.resources
+    merged_books: Dict[str, BookConfig] = dict(base_resources.books) if base_resources is not None else {}
+
+    for raw_book_id, raw_book_patch in books_patch.items():
+        if not isinstance(raw_book_id, str) or not str(raw_book_id).strip():
+            msg = "overrides.resources.books keys must be non-empty strings"
+            raise ValueError(msg)
+        book_id = str(raw_book_id).strip()
+        if not isinstance(raw_book_patch, dict):
+            msg = "overrides.resources.books.{} must be an object".format(book_id)
+            raise TypeError(msg)
+        base_book = merged_books.get(book_id)
+        merged_books[book_id] = _apply_book_patch(
+            base_book,
+            cast("Mapping[str, object]", raw_book_patch),  # pragma: allow-cast runtime dict typed narrowing
+            path="overrides.resources.books.{}".format(book_id),
+        )
+
+    return replace(config, resources=ResourcesConfig(books=merged_books))
+
+
+def _apply_io_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:
+    overrides = options.overrides
+    if overrides is None:
+        return config
+
+    next_config = config
+
+    outputs_defaults_patch = overrides.outputs_defaults
+    if outputs_defaults_patch is not None:
+        next_config = _apply_outputs_defaults_io_override(next_config, outputs_defaults_patch)
+
+    resources_patch = overrides.resources
+    if resources_patch is not None:
+        next_config = _apply_resources_io_override(next_config, resources_patch)
+
+    return next_config
+
+
 def _compile_output_composition_for_outputs(
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
     effective_outputs: Tuple[OutputTargetConfig, ...],
     outputs_path: str,
+    yaml_base_dir: str,
     options: RunOptions,
     resolver: SecurePythonReferenceResolver,
 ) -> Optional["OutputCompositionSpec"]:
@@ -645,6 +1127,7 @@ def _compile_output_composition_for_outputs(
             demand_ir,
             resolver=resolver,
             init_vars=options.init_vars,
+            yaml_base_dir=str(yaml_base_dir),
             workflow_managed_output_ids=options.workflow_managed_output_ids,
             outputs_path=outputs_path,
             skip_extra_sheets_without_workbook=options.overrides is not None and options.overrides.outputs is not None,
@@ -656,15 +1139,18 @@ def build_request(
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
+    yaml_base_dir: str,
     options: RunOptions,
     resolver: SecurePythonReferenceResolver,
 ) -> ExecutionRequest:
-    effective_outputs, outputs_path = _resolve_effective_outputs_and_path(config, demand_ir, options=options)
+    effective_config = _apply_io_overrides(config, options=options)
+    effective_outputs, outputs_path = _resolve_effective_outputs_and_path(effective_config, demand_ir, options=options)
     output_composition = _compile_output_composition_for_outputs(
-        config,
+        effective_config,
         demand_ir,
         effective_outputs=effective_outputs,
         outputs_path=outputs_path,
+        yaml_base_dir=str(yaml_base_dir),
         options=options,
         resolver=resolver,
     )
@@ -682,8 +1168,8 @@ def build_request(
 
     observability: Optional[ObservabilitySpec] = None
     components = list(options.components or [])
-    if config.observability is not None:
-        observability, observers = compile_observability_spec(config.observability)
+    if effective_config.observability is not None:
+        observability, observers = compile_observability_spec(effective_config.observability)
         components.extend(observers)
 
     if options.overrides is not None:
@@ -700,9 +1186,9 @@ def build_request(
     if not components:
         components = None
 
-    guardrails = options.guardrails or _compile_guardrails_policy(config.guardrails)
-    loader_retry = _compile_loader_retry_policies(config, resolver=resolver, overrides=options.loader_retry)
-    batch_size = options.batch_size if options.batch_size is not None else config.batch_size
+    guardrails = options.guardrails or _compile_guardrails_policy(effective_config.guardrails)
+    loader_retry = _compile_loader_retry_policies(effective_config, resolver=resolver, overrides=options.loader_retry)
+    batch_size = options.batch_size if options.batch_size is not None else effective_config.batch_size
 
     return ExecutionRequest(
         export_layout=export_layout,
@@ -745,7 +1231,8 @@ def compile(  # noqa: A001
         public_builtin_callable_ids=options.public_builtin_callable_ids,
     )
     demand_ir = compile_ir(config, resolver=resolver, init_vars=options.init_vars)
-    request = build_request(config, demand_ir, options=options, resolver=resolver)
+    yaml_base_dir = str(Path(str(yaml_path)).expanduser().resolve(strict=False).parent)
+    request = build_request(config, demand_ir, yaml_base_dir=yaml_base_dir, options=options, resolver=resolver)
     return Compilation(
         config=config,
         demand_ir=demand_ir,

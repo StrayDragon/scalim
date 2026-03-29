@@ -72,6 +72,7 @@ workflow snapshot MAY 提供 stages 信息用于 staged layout：
 - **THEN** 前端 MUST 仍能通过 run id 找到 `scalim-viz/run_foo/` 并完成 drill-down
 
 ### Requirement: workflow events MUST be joinable to workflow snapshot nodes
+
 `scalim-viz/workflow/viz_events.jsonl` MUST 承载 workflow 级事件流，并与 workflow snapshot 共享稳定的 node_ref 命名空间。
 
 top-level workflow events MUST 至少覆盖：
@@ -85,7 +86,7 @@ top-level workflow events MUST 至少覆盖：
 这些事件的 `node_ref.id` MUST 能映射回 `scalim-viz/workflow/viz_snapshot.json` 中的某个节点。
 
 #### Scenario: resource lifecycle events can highlight workflow graph nodes
-- **GIVEN** workflow bundle 中存在 sheetbook 资源节点
+- **GIVEN** workflow bundle 中存在 `books.kind=xlsx_memory` 的资源节点
 - **WHEN** 事件流包含该资源的 `workflow_resource_write`
 - **THEN** 该事件的 `node_ref.id` MUST 能映射到对应的 workflow resource node
 

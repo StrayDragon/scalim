@@ -334,6 +334,7 @@ class MetaSheetSpec:
     target_id: str
     output: OutputSpec
     sheet_name: str
+    in_memory: bool = False
 
 
 @dataclass(frozen=True)
@@ -343,6 +344,7 @@ class AuditSheetSpec:
     target_id: str
     output: OutputSpec
     sheet_name: str
+    in_memory: bool = False
 
 
 @dataclass(frozen=True)
@@ -661,6 +663,66 @@ class RouterRowSink(BaseRowSink):
                 return
             raise ScalimOutputTargetWriteError(route.target_id, exc) from exc
 
+    def _routes_by_output_path(self, output_path: Optional[str]) -> List[_RouteState]:
+        key = str(output_path or "")
+        return [r for r in self._routes if str(r.output_path or "") == key]
+
+    def _record_routes_error(self, routes: Sequence[_RouteState], exc: Exception) -> None:
+        for r in routes:
+            r.error_count += 1
+            if r.first_error is None:
+                r.first_error = exc
+
+    def _disable_routes(self, routes: Sequence[_RouteState]) -> None:
+        for r in routes:
+            r.disabled = True
+
+    def _has_primary_route(self, routes: Sequence[_RouteState]) -> bool:
+        return any(r.is_primary for r in routes)
+
+    def _select_target_id(self, routes: Sequence[_RouteState]) -> str:
+        # 优先选择主输出的 `target_id`,便于定位问题.
+        for r in routes:
+            if r.is_primary:
+                return str(r.target_id)
+        return str(routes[0].target_id)
+
+    def _close_workbook_resource(self, wb: "ExcelWorkbookSink") -> None:
+        try:
+            wb.close()
+        except Exception as exc:
+            related = self._routes_by_output_path(wb.output_path)
+            if not related:
+                raise
+
+            self._record_routes_error(related, exc)
+
+            if self._failure_policy == "primary_only" and not self._has_primary_route(related):
+                self._disable_routes(related)
+                return
+
+            target_id = self._select_target_id(related)
+            raise ScalimOutputTargetWriteError(target_id, exc) from exc
+
+    def _emit_target_end_events(self) -> None:
+        if not self._emit_events or self._instrumentation is None:
+            return
+        for stat in self.get_target_stats():
+            _ = self._instrumentation.emit(
+                EVENT_OUTPUT_TARGET_END,
+                OutputTargetEndEvent(
+                    target_id=stat.target_id,
+                    output_path=stat.output_path,
+                    sheet_name=stat.sheet_name,
+                    row_count=int(stat.row_count),
+                    error_count=int(stat.error_count),
+                    duration=float(stat.duration_seconds),
+                    disabled=bool(stat.disabled),
+                    error_type=stat.error_type,
+                    error_message=stat.error_message,
+                ),
+            )
+
     @override
     def close(self) -> None:
         if self._closed:
@@ -676,25 +738,10 @@ class RouterRowSink(BaseRowSink):
 
         # 3) 保存工作簿容器(原子替换)
         for wb in self._workbook_resources:
-            wb.close()
+            self._close_workbook_resource(wb)
 
         # 4) 输出级观测结束事件
-        if self._emit_events and self._instrumentation is not None:
-            for stat in self.get_target_stats():
-                _ = self._instrumentation.emit(
-                    EVENT_OUTPUT_TARGET_END,
-                    OutputTargetEndEvent(
-                        target_id=stat.target_id,
-                        output_path=stat.output_path,
-                        sheet_name=stat.sheet_name,
-                        row_count=int(stat.row_count),
-                        error_count=int(stat.error_count),
-                        duration=float(stat.duration_seconds),
-                        disabled=bool(stat.disabled),
-                        error_type=stat.error_type,
-                        error_message=stat.error_message,
-                    ),
-                )
+        self._emit_target_end_events()
 
     def _write_meta_and_audit(self) -> None:
         self._write_meta()
@@ -1128,6 +1175,7 @@ def _maybe_create_meta_target(
     meta_sheet: Optional[MetaSheetSpec],
     output_paths: Dict[str, str],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
+    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
 ) -> Optional[_FinalTargetState]:
     if meta_sheet is None:
         return None
@@ -1143,12 +1191,15 @@ def _maybe_create_meta_target(
         excel_allow_formulas=bool(meta_sheet.output.excel_allow_formulas),
         write_lock=bool(meta_sheet.output.write_lock),
     )
-    sink, counter, _ = _create_row_sink_for_composed_output(
+    sink, counter, mem_sink = _create_row_sink_for_composed_output(
         target_id=str(meta_sheet.target_id),
         output=meta_output,
         layout=layout,
         workbook_by_path=workbook_by_path,
+        in_memory=bool(meta_sheet.in_memory),
     )
+    if mem_sink is not None:
+        in_memory_csv_sinks[str(meta_sheet.target_id)] = mem_sink
     output_paths[str(meta_sheet.target_id)] = str(meta_output.path) if meta_output.path else ""
     return _FinalTargetState(
         target_id=str(meta_sheet.target_id),
@@ -1164,6 +1215,7 @@ def _maybe_create_audit_target(
     audit_sheet: Optional[AuditSheetSpec],
     output_paths: Dict[str, str],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
+    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
 ) -> Optional[_FinalTargetState]:
     if audit_sheet is None:
         return None
@@ -1200,12 +1252,15 @@ def _maybe_create_audit_target(
         excel_allow_formulas=bool(audit_sheet.output.excel_allow_formulas),
         write_lock=bool(audit_sheet.output.write_lock),
     )
-    sink, counter, _ = _create_row_sink_for_composed_output(
+    sink, counter, mem_sink = _create_row_sink_for_composed_output(
         target_id=str(audit_sheet.target_id),
         output=audit_output,
         layout=layout,
         workbook_by_path=workbook_by_path,
+        in_memory=bool(audit_sheet.in_memory),
     )
+    if mem_sink is not None:
+        in_memory_csv_sinks[str(audit_sheet.target_id)] = mem_sink
     output_paths[str(audit_sheet.target_id)] = str(audit_output.path) if audit_output.path else ""
     return _FinalTargetState(
         target_id=str(audit_sheet.target_id),
@@ -1265,11 +1320,13 @@ def build_output_composition(
         meta_sheet=spec.meta_sheet,
         output_paths=output_paths,
         workbook_by_path=workbook_by_path,
+        in_memory_csv_sinks=in_memory_csv_sinks,
     )
     audit_target = _maybe_create_audit_target(
         audit_sheet=spec.audit_sheet,
         output_paths=output_paths,
         workbook_by_path=workbook_by_path,
+        in_memory_csv_sinks=in_memory_csv_sinks,
     )
 
     # 构建路由器

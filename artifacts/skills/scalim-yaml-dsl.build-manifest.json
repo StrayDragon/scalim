@@ -58,6 +58,10 @@
       "yaml-dsl upsert-lsp-comment"
     ],
     "definitions": [
+      "book",
+      "book_budget",
+      "book_export_xlsx",
+      "book_write_defaults",
       "field",
       "guardrails",
       "guardrails_compute",
@@ -72,12 +76,17 @@
       "output_container",
       "output_extra_sheet",
       "output_target",
+      "output_to",
+      "output_write",
+      "outputs_defaults",
+      "outputs_defaults_to",
       "performance",
       "performance_report",
       "performance_thresholds",
       "relation",
       "relation_report",
       "relations",
+      "resources",
       "row_gap",
       "source",
       "source_field_inline",
@@ -118,7 +127,9 @@
           "alias identity 失败时允许唯一内容匹配",
           "schema 允许 `outputs.*.fields` 包含 object 条目",
           "schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法",
-          "schema MAY allow pathless CSV outputs for workflow-managed temp outputs"
+          "schema MUST support `{$init_var: <name>}` for book export paths",
+          "demand schema MUST reject legacy output container types and shapes (`workbook`, pathless `csv`)",
+          "workflow schema MUST reject legacy workflow IO fields (`writes`, `workbooks`, `csvs`, `sheetbooks`)"
         ],
         "slug": "yaml-dsl-schema"
       },
@@ -160,7 +171,8 @@
           "workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)",
           "workflow entrypoints MUST be importable under Python 3.6",
           "workflow emits workflow-level events and injects attribution for demand events",
-          "max_concurrency>1 requires thread-safe or stateless components"
+          "max_concurrency>1 requires thread-safe or stateless components",
+          "workflow YAML MUST use `workflow.resources.books` and MUST reject `writes` authoring surface"
         ],
         "slug": "yaml-dsl-workflow"
       },
@@ -242,23 +254,15 @@
           "joinable get-or-create 的可选超时",
           "commit_all/discard_all 与 inflight 并发交错语义",
           "workflow workbook exports MUST escape Excel formulas by default",
-          "workflow workbook resource authoring surface MUST support allow_formulas"
+          "workflow workbook resource authoring surface MUST support allow_formulas",
+          "workflow MUST precheck Excel output-path collisions across books deterministically"
         ],
         "slug": "workflow-shared-output-containers"
       },
       {
         "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
         "requirements": [
-          "workflow YAML exposes a stable authoring surface for sheetbooks",
-          "workflow MUST support in-memory sheetbook resources",
-          "writes to a sheetbook MUST be deterministic and conflict-safe",
-          "workflow MUST support exporting a sheetbook to an Excel workbook atomically",
-          "demand nodes MUST be able to consume sheetbook sheet rows via a built-in loader",
-          "workflow MUST precheck Excel output-path collisions across nodes",
-          "sheetbook lifecycle MUST be observable and joinable",
-          "sheetbook plan creation MUST be atomic within a workflow exec",
-          "sheetbook xlsx export MUST escape Excel formulas by default",
-          "sheetbook export_xlsx authoring surface MUST support allow_formulas"
+          "legacy sheetbook authoring surface MUST be rejected and migrated to books"
         ],
         "slug": "workflow-sheetbook-resources"
       },
@@ -347,6 +351,8 @@
       "fields",
       "relations",
       "guardrails",
+      "resources",
+      "outputs_defaults",
       "outputs",
       "validate_unique_field_names",
       "failure_policy",
@@ -364,20 +370,16 @@
       "workflow.runs[*].demand",
       "workflow.runs[*].depends_on",
       "workflow.runs[*].init_vars",
-      "workflow.runs[*].writes",
       "workflow.options.max_concurrency",
       "workflow.options.failure_policy",
       "workflow.options.cache_pool",
-      "workflow.options.ctx",
-      "workflow.resources.workbooks",
-      "workflow.resources.csvs",
-      "workflow.resources.sheetbooks"
+      "workflow.options.ctx"
     ]
   },
   "inputs": [
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
-      "sha256": "ab9d641d170bd1f7550ce7129a88f4d969b65f4d678f9f511007e22c7a3e7961"
+      "sha256": "d862b955bf57fa612d050dcfa59aadf9e5c858c2cafd2a4ee10dea6cbf499120"
     },
     {
       "path": "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml",
@@ -429,11 +431,11 @@
     },
     {
       "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "ca8c2f9b01c8b80fc3476c8f115fd62ad5c33fc033633f3fc949677daf84f9ce"
+      "sha256": "0e022ffd38ea3deaa5dab4735a2286dc5dcf6993919dc2972c96e94b463e0426"
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-      "sha256": "c0bfcf7fd5432430cf28bce0d1d9d26ff088a274ea98ce949ac71e0067f950f5"
+      "sha256": "f8a0f657304c97ef3a332d36ed26aa74484db781d66feeeb45365cf2d2026f68"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -445,23 +447,23 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "81c4243a0f0c5acb79342c23f9170c6b6fb4f3cfbe582fddc219006d8f30c2ee"
+      "sha256": "9c6166f9053eabafa706f36763ba58197b7d7d92a047a0c86f9ebb37c0f70d38"
     },
     {
       "path": "openspec/specs/yaml-dsl-workflow/spec.md",
-      "sha256": "06c3dd2bd8d4cf22687982d2d798e8ad6a5615cbe8065a002fb827b3a8c4c237"
+      "sha256": "eed86fd04c848448cb95341d7df0f0f882b5b20b677ef62f2272b4d97cd33f82"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "f166f7b13412cbcf082540c5e07f7551e282104f03c62999dc4f2e6aa12c1b13"
+      "sha256": "e274a958994c5b082e2852e7f23d1d08672f0d47b1c146f137466ca185057c63"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
-      "sha256": "2fcce8882ab9707539d59940d577e47fc046c2e54cc2ebf7be0fbbc99827fb3f"
+      "sha256": "dd2f91774566de61a1a4d659cf8ec5b161aca5757385f70005282540db6adefd"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/workflow.gen.json",
-      "sha256": "b35bb8c37a0c9f6b040dab5bfd656fadf006d2e20427c693a4792f4a496da36a"
+      "sha256": "afc293a827b6c4b883abcb89a95a592763bdcdff469291a600d46dd74fda1eaf"
     }
   ],
   "outputs": [
@@ -471,7 +473,7 @@
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
-      "sha256": "fd41c346ecf83c68f2d0d2eab593a7167369eb459d532df581810acdd06429d5"
+      "sha256": "eeafe036c0835ca41a1b7d7cfe38956cb13f67f990f3a5f74e37809daa9e0aff"
     },
     {
       "path": "references/generated/example-full/ecommerce_report_fragments.yaml",
@@ -483,7 +485,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "102aa99708a545f29a3a7ea8b3269ccce4aa6b7ad140e6ff5c449a1081382f9f"
+      "sha256": "c55690ada8a5db3250785f2a3603f7be21a332cffaf6abf91dbbd96061fe4496"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

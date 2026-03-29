@@ -161,7 +161,7 @@ class DerivedFieldConfig:
                 "myapp.enums:get_status_text(status)",
                 "myapp.enums:get_status_text(status=status, ctx=$ctx)",
                 ".helpers:to_text(status)",
-                "^workflow/sheetbook_sheet_rows(ref)",
+                "^workflow/book_sheet_rows(ref)",
             ],
         ),
     )

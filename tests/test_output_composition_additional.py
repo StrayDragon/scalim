@@ -312,6 +312,91 @@ def test_router_row_sink_close_raises_on_close_error_all_fail() -> None:
         router.close()
 
 
+def test_router_row_sink_close_swallows_workbook_close_error_for_primary_only_non_primary_route() -> None:
+    class _FailingWorkbook:
+        def __init__(self, output_path: str) -> None:
+            self.output_path = str(output_path)
+
+        def close(self) -> None:
+            raise ValueError("boom-wb")
+
+    route = mod._RouteState(  # noqa: SLF001
+        target_id="secondary",
+        sink=_CollectingRowSink(),
+        predicate=None,
+        is_primary=False,
+        output_path="bad.xlsx",
+        sheet_name="S",
+        output_counter=mod._RowCounter(),  # noqa: SLF001
+    )
+    router = mod.RouterRowSink(routes=(route,), failure_policy="primary_only", workbook_resources=(_FailingWorkbook("bad.xlsx"),))
+    router.close()
+    assert route.disabled is True
+    assert route.error_count >= 1
+
+
+def test_router_row_sink_close_raises_workbook_close_error_for_primary_route() -> None:
+    class _FailingWorkbook:
+        def __init__(self, output_path: str) -> None:
+            self.output_path = str(output_path)
+
+        def close(self) -> None:
+            raise ValueError("boom-wb")
+
+    route = mod._RouteState(  # noqa: SLF001
+        target_id="primary_excel",
+        sink=_CollectingRowSink(),
+        predicate=None,
+        is_primary=True,
+        output_path="bad.xlsx",
+        sheet_name="S",
+        output_counter=mod._RowCounter(),  # noqa: SLF001
+    )
+    router = mod.RouterRowSink(routes=(route,), failure_policy="primary_only", workbook_resources=(_FailingWorkbook("bad.xlsx"),))
+    with pytest.raises(mod.ScalimOutputTargetWriteError, match=r"primary_excel"):
+        router.close()
+    assert route.error_count >= 1
+    assert route.first_error is not None
+
+
+def test_router_row_sink_close_raises_workbook_close_error_for_non_primary_route_all_fail() -> None:
+    class _FailingWorkbook:
+        def __init__(self, output_path: str) -> None:
+            self.output_path = str(output_path)
+
+        def close(self) -> None:
+            raise ValueError("boom-wb")
+
+    route = mod._RouteState(  # noqa: SLF001
+        target_id="secondary",
+        sink=_CollectingRowSink(),
+        predicate=None,
+        is_primary=False,
+        output_path="bad.xlsx",
+        sheet_name="S",
+        output_counter=mod._RowCounter(),  # noqa: SLF001
+    )
+    router = mod.RouterRowSink(routes=(route,), failure_policy="all_fail", workbook_resources=(_FailingWorkbook("bad.xlsx"),))
+    with pytest.raises(mod.ScalimOutputTargetWriteError, match=r"secondary"):
+        router.close()
+    assert route.error_count >= 1
+    assert route.first_error is not None
+
+
+def test_router_row_sink_close_reraises_workbook_close_error_when_unattributable() -> None:
+    class _FailingWorkbook:
+        def __init__(self, output_path: str) -> None:
+            self.output_path = str(output_path)
+
+        def close(self) -> None:
+            raise ValueError("boom-wb")
+
+    # No routes reference this workbook path, so the original exception is re-raised.
+    router = mod.RouterRowSink(routes=(), failure_policy="primary_only", workbook_resources=(_FailingWorkbook("bad.xlsx"),))
+    with pytest.raises(ValueError, match=r"boom-wb"):
+        router.close()
+
+
 def test_output_target_write_error_str_includes_target_id() -> None:
     err = mod.ScalimOutputTargetWriteError("t", Exception("x"))
     assert "t" in str(err)

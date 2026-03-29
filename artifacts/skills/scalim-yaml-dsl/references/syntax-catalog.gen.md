@@ -9,7 +9,7 @@
 - Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`
 
 ## Builtin Callable IDs (Public)
-- `^workflow/sheetbook_sheet_rows`
+- `^workflow/book_sheet_rows`
 
 > 注: `^<id>` 由运行入口参数 `builtin_callables` 提供词表;此处仅列出默认公开子集(保守暴露).
 
@@ -26,6 +26,8 @@
 - `fields`
 - `relations`
 - `guardrails`
+- `resources`
+- `outputs_defaults`
 - `outputs`
 - `validate_unique_field_names`
 - `failure_policy`
@@ -35,6 +37,10 @@
 - `observability`
 
 ## Definitions
+- `book`
+- `book_budget`
+- `book_export_xlsx`
+- `book_write_defaults`
 - `field`
 - `guardrails`
 - `guardrails_compute`
@@ -49,12 +55,17 @@
 - `output_container`
 - `output_extra_sheet`
 - `output_target`
+- `output_to`
+- `output_write`
+- `outputs_defaults`
+- `outputs_defaults_to`
 - `performance`
 - `performance_report`
 - `performance_thresholds`
 - `relation`
 - `relation_report`
 - `relations`
+- `resources`
 - `row_gap`
 - `source`
 - `source_field_inline`
@@ -96,7 +107,9 @@
   - alias identity 失败时允许唯一内容匹配
   - schema 允许 `outputs.*.fields` 包含 object 条目
   - schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法
-  - schema MAY allow pathless CSV outputs for workflow-managed temp outputs
+  - schema MUST support `{$init_var: <name>}` for book export paths
+  - demand schema MUST reject legacy output container types and shapes (`workbook`, pathless `csv`)
+  - workflow schema MUST reject legacy workflow IO fields (`writes`, `workbooks`, `csvs`, `sheetbooks`)
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`
 - Purpose: 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
@@ -135,6 +148,7 @@
   - workflow entrypoints MUST be importable under Python 3.6
   - workflow emits workflow-level events and injects attribution for demand events
   - max_concurrency>1 requires thread-safe or stateless components
+  - workflow YAML MUST use `workflow.resources.books` and MUST reject `writes` authoring surface
 ### `source-relations`
 - Source: `openspec/specs/source-relations/spec.md`
 - Purpose: 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.
@@ -207,20 +221,12 @@
   - commit_all/discard_all 与 inflight 并发交错语义
   - workflow workbook exports MUST escape Excel formulas by default
   - workflow workbook resource authoring surface MUST support allow_formulas
+  - workflow MUST precheck Excel output-path collisions across books deterministically
 ### `workflow-sheetbook-resources`
 - Source: `openspec/specs/workflow-sheetbook-resources/spec.md`
 - Purpose: 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`writes[*].sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
 - Requirements:
-  - workflow YAML exposes a stable authoring surface for sheetbooks
-  - workflow MUST support in-memory sheetbook resources
-  - writes to a sheetbook MUST be deterministic and conflict-safe
-  - workflow MUST support exporting a sheetbook to an Excel workbook atomically
-  - demand nodes MUST be able to consume sheetbook sheet rows via a built-in loader
-  - workflow MUST precheck Excel output-path collisions across nodes
-  - sheetbook lifecycle MUST be observable and joinable
-  - sheetbook plan creation MUST be atomic within a workflow exec
-  - sheetbook xlsx export MUST escape Excel formulas by default
-  - sheetbook export_xlsx authoring surface MUST support allow_formulas
+  - legacy sheetbook authoring surface MUST be rejected and migrated to books
 ### `workflow-observability-bridge`
 - Source: `openspec/specs/workflow-observability-bridge/spec.md`
 - Purpose: 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
@@ -418,6 +424,22 @@
 - `allOf`:
   - 1. ref `#/definitions/guardrails`
 
+### `resources`
+- Description:
+  可选:IO 资源声明.
+  
+  - 当前稳定入口: `resources.books`
+- `allOf`:
+  - 1. ref `#/definitions/resources`
+
+### `outputs_defaults`
+- Description:
+  可选:输出默认 IO 绑定.
+  
+  - 例如 `outputs_defaults.to.book`
+- `allOf`:
+  - 1. ref `#/definitions/outputs_defaults`
+
 ### `outputs`
 - Type: `array`
 - Description:
@@ -429,7 +451,7 @@
   - 通过 `aggregate` 声明派生汇总输出
   - 通过 `from` 复用字段集合与容器配置
   - 不再支持旧写法: 顶层 `output:`
-- Examples: `[{"container": {"path": "./output/report.xlsx", "sheet": "明细", "type": "workbook"}, "fields": ["order_id", "user_id"], "name": "detail"}]`
+- Examples: `[{"fields": ["order_id", "user_id"], "name": "detail", "to": {"sheet": "明细"}}]`
 - `minItems`: `0`
 - `items`: ref `#/definitions/output_target`
 
@@ -500,6 +522,63 @@
 
 
 ## Definition Details
+### `book`
+- Definition path: `definitions.book`
+- Type: `object`
+- `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
+- `allOf`:
+  - 1. `object`
+  - 2. `object`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `allow_formulas`: `boolean`
+  - `budget`: allOf(1)
+  - `export_xlsx`: allOf(1)
+  - `kind`: `string`, enum `xlsx_file`, `xlsx_memory`
+  - `path`: `string` | `object`, oneOf(2)
+  - `write_defaults`: allOf(1)
+  - `write_lock`: `boolean`
+
+### `book_budget`
+- Definition path: `definitions.book_budget`
+- Type: `object`
+- `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `max_sheets`: `integer`
+  - `max_total_cells`: `integer`
+
+### `book_export_xlsx`
+- Definition path: `definitions.book_export_xlsx`
+- Type: `object`
+- `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `allow_formulas`: `boolean`
+  - `path`: `string` | `object`, oneOf(2)
+  - `write_lock`: `boolean`
+
+### `book_write_defaults`
+- Definition path: `definitions.book_write_defaults`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `align_by`: `string`, enum `field_id`, `header`
+  - `header_policy`: `string`, enum `once`, `always`, `never`
+  - `mode`: `string`, enum `sheet`, `append`
+  - `on_conflict`: `string`, enum `error`, `overwrite`, `skip`
+  - `on_mismatch`: `string`, enum `error`, `warn`, `skip`
+
 ### `field`
 - Definition path: `definitions.field`
 - Type: `object`
@@ -641,20 +720,14 @@
 - `anyOf`:
   - 1. `object`
   - 2. `object`
-- `allOf`:
-  - 1. `object`
-  - 2. `object`
 - Properties:
   - `$import`: `string` | `array`, oneOf(2)
-  - `allow_formulas`: `boolean`
   - `encoding`: `string`
   - `header_fields_output_by`: `string`, enum `field_id`, `name`
   - `include_header`: `boolean`
-  - `path`: `string` | `string` | `object`, oneOf(3)
-  - `sheet`: `string`
+  - `path`: `string` | `object`, oneOf(2)
   - `streaming`: `boolean`
-  - `type`: `string`, enum `workbook`, `csv`
-  - `write_lock`: `boolean`
+  - `type`: `string`, enum `csv`
 
 ### `output_extra_sheet`
 - Definition path: `definitions.output_extra_sheet`
@@ -681,7 +754,52 @@
   - `aggregate`: allOf(1)
   - `container`: allOf(1)
   - `from`: `string`
+  - `to`: allOf(1)
   - `where`: `string`
+  - `write`: allOf(1)
+
+### `output_to`
+- Definition path: `definitions.output_to`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `book`: `string`
+  - `sheet`: `string`
+
+### `output_write`
+- Definition path: `definitions.output_write`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `align_by`: `string`, enum `field_id`, `header`
+  - `header_policy`: `string`, enum `once`, `always`, `never`
+  - `mode`: `string`, enum `sheet`, `append`
+  - `on_conflict`: `string`, enum `error`, `overwrite`, `skip`
+  - `on_mismatch`: `string`, enum `error`, `warn`, `skip`
+
+### `outputs_defaults`
+- Definition path: `definitions.outputs_defaults`
+- Type: `object`
+- `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `to`: allOf(1)
+
+### `outputs_defaults_to`
+- Definition path: `definitions.outputs_defaults_to`
+- Type: `object`
+- `additionalProperties`: `false`
+- `anyOf`:
+  - 1. `object`
+  - 2. `object`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `book`: `string`
 
 ### `performance`
 - Definition path: `definitions.performance`
@@ -745,6 +863,14 @@
   - `max_samples`: `integer`
   - `report`: ref `#/definitions/relation_report`
   - `sampling_rate`: 采样率(0.0-1.0)
+
+### `resources`
+- Definition path: `definitions.resources`
+- Type: `object`
+- `additionalProperties`: `false`
+- Properties:
+  - `$import`: `string` | `array`, oneOf(2)
+  - `books`: `object`, properties `$import`
 
 ### `row_gap`
 - Definition path: `definitions.row_gap`
@@ -843,9 +969,9 @@
 - Type: `object`
 - `additionalProperties`: `false`
 - Properties:
+  - `resources`: allOf(1)
   - `options`: `object`, properties `failure_policy`, `cache_pool`, `ctx`, `max_concurrency`
-  - `resources`: `object`, properties `csvs`, `sheetbooks`, `workbooks`
-  - `runs` (required): `array`, items `object`, properties `demand`, `depends_on`, `id`, `init_vars`, `main_rows_from`, `writes`
+  - `runs` (required): `array`, items `object`, properties `demand`, `depends_on`, `id`, `init_vars`, `main_rows_from`
 
 ### `workflow.runs[*]`
 - Type: `object`
@@ -856,18 +982,6 @@
   - `id` (required): `string`
   - `init_vars`: `object` | `null`, oneOf(2)
   - `main_rows_from`: `object` | `null`, oneOf(2)
-  - `writes`: `array`, items `object` | `object` | `object` | `object` | `object`, oneOf(5)
-
-### `workflow.runs[*].writes`
-- Type: `array`
-- Description:
-  共享输出写入意图列表(可选).
-  
-  - 缺省/空数组表示无写入意图
-  - 每个 item MUST 恰好选择一个 write intent
-  - 写入顺序 SSOT: run 顺序 + writes 顺序
-- Default: `[]`
-- `items`: `object` | `object` | `object` | `object` | `object`, oneOf(5)
 
 ### `workflow.options`
 - Type: `object`
@@ -879,11 +993,10 @@
   - `max_concurrency`: `integer`
 
 ### `workflow.resources`
-- Type: `object`
 - Description:
-  workflow-scope shared output resources.
-- `additionalProperties`: `false`
-- Properties:
-  - `csvs`: `object`
-  - `sheetbooks`: `object`
-  - `workbooks`: `object`
+  workflow-scope shared IO resources.
+  
+  - stable surface: `workflow.resources.books`
+- Default: `{}`
+- `allOf`:
+  - 1. ref `#/definitions/resources`

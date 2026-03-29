@@ -252,7 +252,7 @@ class SourceConfig:
         metadata=schema_meta(
             desc=DESC_LOADER,
             md=DESC_LOADER_MD,
-            examples=["myapp.loaders:load_orders", "^workflow/sheetbook_sheet_rows"],
+            examples=["myapp.loaders:load_orders", "^workflow/book_sheet_rows"],
         ),
     )
     """加载器引用(模块路径 + 可调用对象)."""
@@ -361,7 +361,7 @@ class MainSourceConfig:
         metadata=schema_meta(
             desc=DESC_LOADER,
             md=DESC_LOADER_MD,
-            examples=["myapp.loaders:load_orders", "^workflow/sheetbook_sheet_rows"],
+            examples=["myapp.loaders:load_orders", "^workflow/book_sheet_rows"],
         ),
     )
     """主数据源加载器引用."""

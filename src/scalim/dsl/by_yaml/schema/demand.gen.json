@@ -204,6 +204,24 @@
         }
       ]
     },
+    "resources": {
+      "description": "可选:IO 资源声明(resources.*)",
+      "markdownDescription": "可选:IO 资源声明.\n\n- 当前稳定入口: `resources.books`",
+      "allOf": [
+        {
+          "$ref": "#/definitions/resources"
+        }
+      ]
+    },
+    "outputs_defaults": {
+      "description": "可选:输出默认 IO 绑定(outputs_defaults.*)",
+      "markdownDescription": "可选:输出默认 IO 绑定.\n\n- 例如 `outputs_defaults.to.book`",
+      "allOf": [
+        {
+          "$ref": "#/definitions/outputs_defaults"
+        }
+      ]
+    },
     "outputs": {
       "type": "array",
       "items": {
@@ -216,9 +234,7 @@
         [
           {
             "name": "detail",
-            "container": {
-              "type": "workbook",
-              "path": "./output/report.xlsx",
+            "to": {
               "sheet": "明细"
             },
             "fields": [
@@ -319,10 +335,10 @@
         "loader": {
           "type": "string",
           "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
-          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/sheetbook_sheet_rows`",
+          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`",
           "examples": [
             "myapp.loaders:load_orders",
-            "^workflow/sheetbook_sheet_rows"
+            "^workflow/book_sheet_rows"
           ]
         },
         "fields": {
@@ -452,10 +468,10 @@
         "loader": {
           "type": "string",
           "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
-          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/sheetbook_sheet_rows`",
+          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`",
           "examples": [
             "myapp.loaders:load_orders",
-            "^workflow/sheetbook_sheet_rows"
+            "^workflow/book_sheet_rows"
           ]
         },
         "key": {
@@ -1512,7 +1528,7 @@
             "myapp.enums:get_status_text(status)",
             "myapp.enums:get_status_text(status=status, ctx=$ctx)",
             ".helpers:to_text(status)",
-            "^workflow/sheetbook_sheet_rows(ref)"
+            "^workflow/book_sheet_rows(ref)"
           ]
         },
         "$import": {
@@ -1710,32 +1726,75 @@
       ],
       "additionalProperties": false
     },
-    "output_container": {
+    "book_budget": {
       "type": "object",
       "properties": {
-        "type": {
-          "type": "string",
-          "description": "输出容器类型(workbook/csv)",
-          "markdownDescription": "输出容器类型.\n\n- `workbook`: Excel 工作簿容器(支持多 sheet)\n- `csv`: CSV 文件",
-          "enum": [
-            "workbook",
-            "csv"
-          ],
+        "max_sheets": {
+          "type": "integer",
+          "description": "sheet 数量预算(>=1)",
+          "markdownDescription": "sheet 数量预算(>=1).",
+          "minimum": 1,
           "examples": [
-            "workbook"
+            64
           ]
         },
+        "max_total_cells": {
+          "type": "integer",
+          "description": "总 cell 数预算(>=1)",
+          "markdownDescription": "总 cell 数预算(>=1).",
+          "minimum": 1,
+          "examples": [
+            1000000
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "max_sheets",
+            "max_total_cells"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "book_export_xlsx": {
+      "type": "object",
+      "properties": {
         "path": {
           "oneOf": [
             {
               "type": "string",
               "minLength": 1,
-              "description": "输出文件路径(相对路径以进程CWD为基准;自动mkdir父目录)"
-            },
-            {
-              "type": "string",
-              "maxLength": 0,
-              "description": "空字符串表示 pathless CSV 输出(仅 workflow 托管 writes 场景可用)"
+              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
             },
             {
               "type": "object",
@@ -1753,25 +1812,454 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "输出文件路径(支持静态字符串/空字符串 或 {$init_var: <name>} 动态注入)",
-          "markdownDescription": "输出文件路径.\n\n- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n- 可能覆盖同名文件\n- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\nworkflow 托管临时输出(pathless;仅 `csv`):\n- 当 `type: csv` 且该 output 仅用于 workflow `writes` 消费时,允许省略/留空 `path`\n- standalone demand 编译/运行会 fail-fast; 需要在 workflow 中运行或显式提供 `path`\n\n动态注入:\n- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n- 缺失 `init_vars[<name>]` 时会 fail-fast\n\n示例:\n```yaml\npath: ./output/report.xlsx\npath: {$init_var: output_path}\npath: \"\"  # pathless csv (workflow-managed only)\n```",
+          "description": "导出 xlsx 的输出路径(字符串或 {$init_var: <name>})",
           "examples": [
             "./output/report.xlsx",
+            {
+              "$init_var": "output_path"
+            }
+          ],
+          "markdownDescription": "导出 xlsx 的输出路径(字符串或 {$init_var: <name>})"
+        },
+        "write_lock": {
+          "type": "boolean",
+          "description": "写锁(导出时;默认 false)",
+          "markdownDescription": "写锁(导出时;默认 false).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        },
+        "allow_formulas": {
+          "type": "boolean",
+          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false)",
+          "markdownDescription": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "book_write_defaults": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "写入语义(sheet/append)",
+          "markdownDescription": "写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet",
+          "enum": [
+            "sheet",
+            "append"
+          ],
+          "default": "append",
+          "examples": [
+            "append"
+          ]
+        },
+        "align_by": {
+          "type": "string",
+          "description": "字段对齐策略(field_id/header;仅 append 生效)",
+          "markdownDescription": "字段对齐策略(仅 `mode=append` 生效).\n\n- `field_id`: 按 field_id 对齐(忽略 header 名)\n- `header`: 按 header 名对齐(严格匹配)",
+          "enum": [
+            "field_id",
+            "header"
+          ],
+          "default": "field_id",
+          "examples": [
+            "field_id"
+          ]
+        },
+        "header_policy": {
+          "type": "string",
+          "description": "表头策略(once/always/never;仅 append 生效)",
+          "markdownDescription": "表头策略(仅 `mode=append` 生效).\n\n- `once`: 只在第一段输出表头\n- `always`: 每段都输出表头\n- `never`: 不输出表头",
+          "enum": [
+            "once",
+            "always",
+            "never"
+          ],
+          "default": "once",
+          "examples": [
+            "once"
+          ]
+        },
+        "on_mismatch": {
+          "type": "string",
+          "description": "字段不匹配策略(error/warn/skip;仅 append 生效)",
+          "markdownDescription": "字段不匹配策略(仅 `mode=append` 生效).\n\n- `error`: 失败\n- `warn`: 告警并继续\n- `skip`: 跳过该段写入",
+          "enum": [
+            "error",
+            "warn",
+            "skip"
+          ],
+          "default": "error",
+          "examples": [
+            "error"
+          ]
+        },
+        "on_conflict": {
+          "type": "string",
+          "description": "sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)",
+          "markdownDescription": "sheet 冲突策略(仅 `mode=sheet` 生效).\n\n- `error`: 失败\n- `overwrite`: 覆盖\n- `skip`: 跳过",
+          "enum": [
+            "error",
+            "overwrite",
+            "skip"
+          ],
+          "default": "error",
+          "examples": [
+            "error"
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "book": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "book kind(xlsx_file/xlsx_memory)",
+          "markdownDescription": "book kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)",
+          "enum": [
+            "xlsx_file",
+            "xlsx_memory"
+          ],
+          "examples": [
+            "xlsx_file"
+          ]
+        },
+        "path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "$init_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                }
+              },
+              "required": [
+                "$init_var"
+              ],
+              "additionalProperties": false,
+              "description": "运行时动态路径: {$init_var: <name>}"
+            }
+          ],
+          "description": "xlsx_file: 输出路径(字符串或 {$init_var: <name>})",
+          "examples": [
+            "./output/report.xlsx",
+            {
+              "$init_var": "output_path"
+            }
+          ],
+          "markdownDescription": "xlsx_file: 输出路径(字符串或 {$init_var: <name>})"
+        },
+        "budget": {
+          "description": "xlsx_memory: 预算配置(必填)",
+          "markdownDescription": "xlsx_memory: 预算配置(必填)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_budget"
+            }
+          ]
+        },
+        "export_xlsx": {
+          "description": "xlsx_memory: 可选导出配置",
+          "markdownDescription": "xlsx_memory: 可选导出配置",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_export_xlsx"
+            }
+          ]
+        },
+        "allow_formulas": {
+          "type": "boolean",
+          "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)",
+          "markdownDescription": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        },
+        "write_lock": {
+          "type": "boolean",
+          "description": "xlsx_file: 写锁(默认 false)",
+          "markdownDescription": "xlsx_file: 写锁(默认 false).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        },
+        "write_defaults": {
+          "description": "可选:默认写入语义与冲突策略",
+          "markdownDescription": "可选:默认写入语义与冲突策略",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_write_defaults"
+            }
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "xlsx_file"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "budget": {
+                "not": {}
+              },
+              "export_xlsx": {
+                "not": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "xlsx_memory"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "budget"
+            ],
+            "properties": {
+              "path": {
+                "not": {}
+              },
+              "allow_formulas": {
+                "not": {}
+              },
+              "write_lock": {
+                "not": {}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "books": {
+          "type": "object",
+          "properties": {
+            "$import": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              ],
+              "description": "$import 引用(支持 string 或 string list)",
+              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+              "examples": [
+                "common.sources",
+                [
+                  "common.sources",
+                  "other.sources"
+                ]
+              ]
+            }
+          },
+          "description": "books 资源映射(Excel book; key 为 book_id)",
+          "markdownDescription": "books 资源映射(Excel book; key 为 `book_id`).\n\n- 对外稳定术语: `book`\n- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs_defaults.to.book` / `outputs[*].to.book` 引用该 mapping 的 key",
+          "additionalProperties": {
+            "$ref": "#/definitions/book"
+          },
+          "minProperties": 0
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output_container": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "输出容器类型(csv)",
+          "markdownDescription": "输出容器类型.\n\n- `csv`: CSV 文件",
+          "enum": [
+            "csv"
+          ],
+          "examples": [
+            "csv"
+          ]
+        },
+        "path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "输出文件路径(相对路径以进程CWD为基准;自动 mkdir 父目录)"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "$init_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                }
+              },
+              "required": [
+                "$init_var"
+              ],
+              "additionalProperties": false,
+              "description": "运行时动态路径: {$init_var: <name>}"
+            }
+          ],
+          "description": "输出文件路径(支持静态字符串 或 {$init_var: <name>} 动态注入)",
+          "markdownDescription": "输出文件路径.\n\n- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n- 可能覆盖同名文件\n- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\n动态注入:\n- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n- 缺失 `init_vars[<name>]` 时会 fail-fast\n\n示例:\n```yaml\npath: ./output/report.xlsx\npath: {$init_var: output_path}\n```",
+          "examples": [
             "./output/report.csv",
             {
               "$init_var": "output_path"
-            },
-            ""
-          ]
-        },
-        "sheet": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Excel sheet 名称(仅 workbook)",
-          "markdownDescription": "Excel sheet 名称(仅 `type: workbook`).",
-          "examples": [
-            "订单明细",
-            "Summary"
+            }
           ]
         },
         "encoding": {
@@ -1814,24 +2302,6 @@
             "name"
           ]
         },
-        "allow_formulas": {
-          "type": "boolean",
-          "description": "允许 Excel 公式(仅 workbook)",
-          "markdownDescription": "允许 Excel 公式(仅 `type: workbook`).",
-          "default": false,
-          "examples": [
-            false
-          ]
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "写锁(仅 workbook)",
-          "markdownDescription": "写锁(仅 `type: workbook`; 多目标共享同一 workbook 时建议开启).",
-          "default": false,
-          "examples": [
-            true
-          ]
-        },
         "$import": {
           "oneOf": [
             {
@@ -1859,7 +2329,8 @@
       "anyOf": [
         {
           "required": [
-            "type"
+            "type",
+            "path"
           ]
         },
         {
@@ -1868,42 +2339,7 @@
           ]
         }
       ],
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "workbook"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "path"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "workbook"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "path": {
-                "not": {
-                  "type": "string",
-                  "maxLength": 0
-                }
-              }
-            }
-          }
-        }
-      ]
+      "additionalProperties": false
     },
     "output_aggregate": {
       "type": "object",
@@ -3145,6 +3581,246 @@
       ],
       "additionalProperties": false
     },
+    "output_to": {
+      "type": "object",
+      "properties": {
+        "book": {
+          "type": "string",
+          "minLength": 1,
+          "description": "可选:目标 book_id",
+          "examples": [
+            "report"
+          ],
+          "markdownDescription": "可选:目标 book_id"
+        },
+        "sheet": {
+          "type": "string",
+          "minLength": 1,
+          "description": "可选:目标 sheet 名称",
+          "examples": [
+            "metrics",
+            "Summary"
+          ],
+          "markdownDescription": "可选:目标 sheet 名称"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output_write": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "sheet",
+            "append"
+          ],
+          "description": "可选:写入语义(sheet/append)",
+          "examples": [
+            "append"
+          ],
+          "markdownDescription": "可选:写入语义(sheet/append)"
+        },
+        "align_by": {
+          "type": "string",
+          "enum": [
+            "field_id",
+            "header"
+          ],
+          "description": "可选:字段对齐策略(field_id/header;仅 append 生效)",
+          "examples": [
+            "field_id"
+          ],
+          "markdownDescription": "可选:字段对齐策略(field_id/header;仅 append 生效)"
+        },
+        "header_policy": {
+          "type": "string",
+          "enum": [
+            "once",
+            "always",
+            "never"
+          ],
+          "description": "可选:表头策略(once/always/never;仅 append 生效)",
+          "examples": [
+            "once"
+          ],
+          "markdownDescription": "可选:表头策略(once/always/never;仅 append 生效)"
+        },
+        "on_mismatch": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "skip"
+          ],
+          "description": "可选:字段不匹配策略(error/warn/skip;仅 append 生效)",
+          "examples": [
+            "error"
+          ],
+          "markdownDescription": "可选:字段不匹配策略(error/warn/skip;仅 append 生效)"
+        },
+        "on_conflict": {
+          "type": "string",
+          "enum": [
+            "error",
+            "overwrite",
+            "skip"
+          ],
+          "description": "可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)",
+          "examples": [
+            "error"
+          ],
+          "markdownDescription": "可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputs_defaults_to": {
+      "type": "object",
+      "properties": {
+        "book": {
+          "type": "string",
+          "minLength": 1,
+          "description": "默认输出目标 book_id",
+          "examples": [
+            "report"
+          ],
+          "markdownDescription": "默认输出目标 book_id"
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "book"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "outputs_defaults": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "description": "默认 IO 绑定(to.* defaults)",
+          "markdownDescription": "默认 IO 绑定(to.* defaults)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/outputs_defaults_to"
+            }
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "to"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
     "output_target": {
       "type": "object",
       "properties": {
@@ -3169,11 +3845,29 @@
           ]
         },
         "container": {
-          "description": "输出容器配置(workbook/csv)",
-          "markdownDescription": "输出容器配置(workbook/csv)",
+          "description": "输出容器配置(csv)",
+          "markdownDescription": "输出容器配置(csv)",
           "allOf": [
             {
               "$ref": "#/definitions/output_container"
+            }
+          ]
+        },
+        "to": {
+          "description": "可选:输出 IO 绑定(to: book/sheet)",
+          "markdownDescription": "可选:输出 IO 绑定.\n\n- 用于将输出绑定到 `resources.books` 的某个 `book_id` + `sheet`",
+          "allOf": [
+            {
+              "$ref": "#/definitions/output_to"
+            }
+          ]
+        },
+        "write": {
+          "description": "可选:写入策略覆盖(write)",
+          "markdownDescription": "可选:写入策略覆盖.\n\n- 仅允许覆盖 `resources.books.*.write_defaults` 的字段集合",
+          "allOf": [
+            {
+              "$ref": "#/definitions/output_write"
             }
           ]
         },

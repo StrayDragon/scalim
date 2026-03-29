@@ -2,86 +2,42 @@
 
 workflow:
   resources:
-    workbooks:
+    books:
       shared_report:
+        kind: xlsx_file
         path: ./shared_report.xlsx
+        write_lock: true
+        allow_formulas: false
+        write_defaults:
+          mode: append
+          align_by: header
+          header_policy: once
+          on_mismatch: error
+          on_conflict: overwrite
 
-    sheetbooks:
       sheetbook_report:
+        kind: xlsx_memory
         budget:
           max_sheets: 6
           max_total_cells: 200000
         export_xlsx:
           path: ./sheetbook_report.xlsx
           write_lock: true
-
-    csvs:
-      detail:
-        path: ./detail.csv
+          allow_formulas: false
+        write_defaults:
+          mode: append
+          align_by: header
+          header_policy: once
+          on_mismatch: error
+          on_conflict: overwrite
 
   runs:
     - id: detail_a
-      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_detail_demand.yaml"
-      writes:
-        - csv_append:
-            csv: detail
-            output: detail
-            header_policy: once
-            on_mismatch: error
-
-        - workbook_sheet:
-            workbook: shared_report
-            sheet: Detail
-            output: detail
-            on_conflict: error
-
-        - workbook_append:
-            workbook: shared_report
-            sheet: DetailAppend
-            output: detail
-            align_by: header
-            header_policy: once
-            on_mismatch: error
-
-        - sheetbook_sheet:
-            sheetbook: sheetbook_report
-            sheet: Detail
-            output: detail
-            on_conflict: error
-
-        - sheetbook_append:
-            sheetbook: sheetbook_report
-            sheet: DetailAppend
-            output: detail
-            align_by: header
-            header_policy: once
-            on_mismatch: error
+      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_shared_workbooks_demand.yaml"
 
     - id: detail_b
-      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_detail_demand.yaml"
+      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_shared_workbooks_demand.yaml"
       depends_on: [detail_a]
-      writes:
-        - csv_append:
-            csv: detail
-            output: detail
-            header_policy: once
-            on_mismatch: error
-
-        - workbook_append:
-            workbook: shared_report
-            sheet: DetailAppend
-            output: detail
-            align_by: header
-            header_policy: once
-            on_mismatch: error
-
-        - sheetbook_append:
-            sheetbook: sheetbook_report
-            sheet: DetailAppend
-            output: detail
-            align_by: header
-            header_policy: once
-            on_mismatch: error
 
   options:
     max_concurrency: 2
@@ -92,4 +48,3 @@ workflow:
       budget:
         max_entries: 16
         over_budget_policy: fail_fast
-

@@ -160,7 +160,7 @@ outputs:
         _ = _load(yaml_content)
 
 
-def test_loader_rejects_output_missing_container() -> None:
+def test_loader_allows_output_missing_container_for_book_binding() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -174,8 +174,10 @@ outputs:
   - name: detail
     fields: [order_id]
 """
-    with pytest.raises(ValueError, match="missing required container"):
-        _ = _load(yaml_content)
+    config = _load(yaml_content)
+    assert len(config.outputs) == 1
+    assert config.outputs[0].name == "detail"
+    assert config.outputs[0].container is None
 
 
 def test_loader_rejects_detail_output_missing_fields() -> None:
@@ -208,7 +210,7 @@ main_source:
 sources: {}
 outputs:
   - name: by_id
-    container: {type: workbook, path: ./out.xlsx, sheet: Summary}
+    container: {type: csv, path: ./out.csv}
     aggregate:
       group_by: [order_id]
       fields:
@@ -221,7 +223,7 @@ outputs:
     assert config.outputs[0].fields == ("order_id", "order_cnt")
 
 
-def test_loader_rejects_shared_workbook_missing_sheet() -> None:
+def test_loader_rejects_workbook_output_container() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -235,12 +237,10 @@ outputs:
   - name: a
     container: {type: workbook, path: ./out.xlsx, sheet: A}
     fields: [order_id]
-  - name: b
-    container: {type: workbook, path: ./out.xlsx}
-    fields: [order_id]
 """
-    with pytest.raises(ValueError, match="Multiple outputs share the same workbook path"):
+    with pytest.raises(ScalimYamlValidationError) as exc:
         _ = _load(yaml_content)
+    assert any(env.path == "outputs.0.container.type" for env in exc.value.errors)
 
 
 def test_loader_rejects_container_streaming_false() -> None:

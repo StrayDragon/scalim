@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from scalim.dsl.by_yaml import run_workflow
@@ -24,13 +25,18 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path) -> None:
         wf_copy = tmp_path / "workflow.yaml"
         wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
 
-        result = run_workflow(
-            str(wf_copy),
-            allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"]),
-            init_vars={"order_ids": []},
-            path_aliases={"@": str(repo_root)},
-            allowed_yaml_roots=(str(repo_root),),
-        )
+        prev_cwd = os.getcwd()
+        os.chdir(str(tmp_path))
+        try:
+            result = run_workflow(
+                str(wf_copy),
+                allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"]),
+                init_vars={"order_ids": []},
+                path_aliases={"@": str(repo_root)},
+                allowed_yaml_roots=(str(repo_root),),
+            )
+        finally:
+            os.chdir(prev_cwd)
 
         assert not result.errors()
         assert get_workflow_preload_counter_calls() == 1

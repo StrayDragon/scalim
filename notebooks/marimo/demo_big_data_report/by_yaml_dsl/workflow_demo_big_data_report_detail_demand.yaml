@@ -208,15 +208,15 @@ fields:
     name: 最终价格
     call_by: "scalim_misc.demo_big_data_report.loaders:calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)"
 
+outputs_defaults:
+  to:
+    book: report
+
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: "" # workflow-managed temp output (writes consumer only)
-      header_fields_output_by: field_id
-      include_header: true
-      streaming: true
-    fields:
+    to:
+      sheet: Detail
+    fields: &detail_fields
       - order_id
       - order_date
       - quantity
@@ -246,3 +246,12 @@ outputs:
       - profit
       - tax_amount
       - final_price
+
+  - name: detail_csv
+    container:
+      type: csv
+      path: ./detail.csv
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+    fields: *detail_fields

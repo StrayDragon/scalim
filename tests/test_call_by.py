@@ -115,7 +115,7 @@ def test_is_valid_loader_ref_coverage() -> None:
     assert call_by_module._is_valid_loader_ref(".module:attr") is True
     assert call_by_module._is_valid_loader_ref("..module:attr") is True
     assert call_by_module._is_valid_loader_ref(".module.attr") is True
-    assert call_by_module._is_valid_loader_ref("^workflow/sheetbook_sheet_rows") is True
+    assert call_by_module._is_valid_loader_ref("^workflow/book_sheet_rows") is True
     assert call_by_module._is_valid_loader_ref(".attr") is False
     assert call_by_module._is_valid_loader_ref("bad-mod.attr") is False
     assert call_by_module._is_valid_loader_ref("module:attr:extra") is False

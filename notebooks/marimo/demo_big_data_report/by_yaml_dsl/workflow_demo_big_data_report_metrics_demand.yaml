@@ -13,11 +13,11 @@ batch_size: 30
 
 main_source:
   source_id: detail_rows
-  loader: "scalim.workflow.loaders:sheetbook_sheet_rows"
+  loader: "scalim.workflow.loaders:book_sheet_rows"
   params:
     ref:
       node: detail
-      sheetbook: report
+      book: report
       sheet: Detail
   fields:
     region_name_display: {name: 区域名称(展示)}
@@ -29,16 +29,25 @@ sources:
     key: id
     cache_mode: preload_forever
 
+outputs_defaults:
+  to:
+    book: report
+
 outputs:
   - name: metrics
-    container:
-      type: csv
-      path: "" # workflow-managed temp output (writes consumer only)
-      header_fields_output_by: field_id
-      include_header: true
-      streaming: true
-    aggregate:
+    to:
+      sheet: Metrics
+    aggregate: &metrics_agg
       group_by: [region_name_display]
       fields:
         order_cnt: {count: {}}
         sum_order_amount: {sum: {field: order_amount}}
+
+  - name: metrics_csv
+    container:
+      type: csv
+      path: ./metrics.csv
+      header_fields_output_by: field_id
+      include_header: true
+      streaming: true
+    aggregate: *metrics_agg

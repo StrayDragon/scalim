@@ -53,7 +53,7 @@ main_source:
 sources: {}
 outputs:
   - name: detail
-    container: {type: workbook, path: ./out.xlsx, sheet: S}
+    container: {type: csv, path: ./out.csv}
     fields: [amount]
 """.lstrip(),
         encoding="utf-8",
