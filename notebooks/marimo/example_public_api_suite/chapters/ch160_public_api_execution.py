@@ -7,6 +7,7 @@ from scalim_misc.examples.public_api._coverage import (
     coverage_failure_summary,
     coverage_to_details,
 )
+from scalim_misc.examples.public_api._manifest import load_public_api_manifest
 from scalim import execution as api
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryRowSink
@@ -17,9 +18,8 @@ __generated_with = "0.20.2"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "example_public_api_suite/ch160_public_api_execution"
 
-_COVERED_PUBLIC_ALL = {
-    "ScalimEngine",
-}
+_MANIFEST = load_public_api_manifest(__file__)
+_COVERED_PUBLIC_ALL = _MANIFEST.stable_modules["scalim.execution"]
 
 
 def run_public_api_execution() -> ExampleResult:

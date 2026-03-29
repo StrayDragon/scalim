@@ -7,6 +7,7 @@ from scalim_misc.examples.public_api._coverage import (
     coverage_failure_summary,
     coverage_to_details,
 )
+from scalim_misc.examples.public_api._manifest import load_public_api_manifest
 from scalim import planning as api
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
@@ -15,17 +16,8 @@ __generated_with = "0.20.2"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "example_public_api_suite/ch150_public_api_planning"
 
-_COVERED_PUBLIC_ALL = {
-    "ComputeOperatorIr",
-    "ExecutionPlan",
-    "LoadOperatorIr",
-    "LoadRefOperatorIr",
-    "OperatorType",
-    "PlanBuilder",
-    "PlanMetadata",
-    "PlanOperatorIr",
-    "Stage",
-}
+_MANIFEST = load_public_api_manifest(__file__)
+_COVERED_PUBLIC_ALL = _MANIFEST.stable_modules["scalim.planning"]
 
 
 def run_public_api_planning() -> ExampleResult:

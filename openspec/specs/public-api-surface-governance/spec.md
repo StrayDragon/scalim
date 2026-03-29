@@ -45,6 +45,30 @@
 - **AND** 不得把 `scalim.dsl.by_yaml.runtime.*`、`scalim.dsl.by_yaml.config_parsing.*` 或 `scalim.dsl.by_yaml.schema_dsl.*` 写成推荐用户路径
 - **AND** 不得把 `scalim.events._*` 或 `scalim.sinks._internal.*` 写成推荐用户路径
 
+### Requirement: public facades MUST NOT re-export internal implementation modules
+
+系统 MUST 将 internal 实现细节与稳定公开入口物理隔离.
+
+至少对以下类型的 internal 路径,public facades MUST NOT re-export,且用户材料 MUST NOT 引用：
+- `*_internal*` 或 `._internal.*`
+- `events._*`
+- `dsl.by_yaml.runtime.*`
+- 其它在 public API manifest 中未编目的模块路径
+
+#### Scenario: internal re-exports are detected and rejected
+- **WHEN** 维护者在 public facade 中新增对 internal 模块的 re-export
+- **THEN** public surface gate MUST fail-fast 指出具体模块路径与建议的 facade 迁移方式
+
+### Requirement: stable public surface changes MUST be explicit and auditable
+
+系统 MUST 将 public surface 的新增/删除/重命名视为需要显式决策的变更：
+- 任何变更 MUST 同步更新 public API manifest
+- 任何变更 MUST 同步更新 public API suite（或等价回归）以覆盖新的公开面
+
+#### Scenario: changing exports requires manifest and suite updates
+- **WHEN** 维护者调整任一稳定公开入口模块的 `__all__`
+- **THEN** 对应 gate MUST 要求同时更新 manifest 与 suite,否则 fail-fast
+
 ### Requirement: unsafe capabilities MUST NOT live on default public facades
 
 系统 MUST 将“放宽安全边界”的能力与默认公共 facade 隔离。
@@ -84,4 +108,3 @@
 #### Scenario: changing facade exports fails fast in curated gate
 - **WHEN** 维护者在 `scalim.events` 或 `scalim.sinks` 调整对外导出符号集合
 - **THEN** curated public surface gate MUST fail-fast 指出缺失或新增的导出符号
-

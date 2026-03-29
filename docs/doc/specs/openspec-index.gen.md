@@ -246,6 +246,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/prompt-eval-workflow/spec.md)
 - Summary: **状态: ✅ 已实现** 定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。
 
+### `public-api-manifest`
+- Title: public-api-manifest Specification
+- Source: [spec.md](#code=openspec/specs/public-api-manifest/spec.md)
+- Summary: **状态: ✅ 已实现** 定义一份机器可读的 public API manifest 作为“稳定公开入口”的单一事实来源(SSOT),并用于 public surface 回归门禁与用户材料导入治理.
+
 ### `public-api-surface-governance`
 - Title: public-api-surface-governance Specification
 - Source: [spec.md](#code=openspec/specs/public-api-surface-governance/spec.md)

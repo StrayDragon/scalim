@@ -9,6 +9,7 @@ from scalim_misc.examples.public_api._coverage import (
     coverage_failure_summary,
     coverage_to_details,
 )
+from scalim_misc.examples.public_api._manifest import load_public_api_manifest
 from scalim.dsl import by_yaml as api
 from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -17,97 +18,15 @@ from scalim_misc.examples.public_api._fixtures import get_preload_counter_calls,
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
 
-_COVERED_PUBLIC_ALL = {
-    "UNSET",
-    "Compilation",
-    "ResolverTrustedMode",
-    "RunOverrides",
-    "RunResult",
-    "compile",
-    "run",
-    "run_workflow",
-}
+_MANIFEST = load_public_api_manifest(__file__)
+_STABLE = _MANIFEST.stable_modules
 
-_COVERED_WORKFLOW_ALL = {
-    "WorkflowCachePoolBudget",
-    "WorkflowCachePoolOptions",
-    "WorkflowCachePoolPin",
-    "WorkflowConfig",
-    "ScalimWorkflowConfigError",
-    "WorkflowOptions",
-    "WorkflowResources",
-    "WorkflowRun",
-    "WorkflowWriteTo",
-    "WorkflowWriteToCsvAppend",
-    "WorkflowWriteToSheetbookAppend",
-    "WorkflowWriteToSheetbookSheet",
-    "WorkflowWriteToWorkbookAppend",
-    "WorkflowWriteToWorkbookSheet",
-    "load_workflow_config",
-    "load_workflow_config_from_mapping",
-    "resolve_workflow_demand_path",
-    "validate_workflow_yaml_text_json",
-}
-
-_COVERED_WORKFLOW_TYPES_ALL = {
-    "WorkflowCachePoolBudget",
-    "WorkflowCachePoolOptions",
-    "WorkflowCachePoolPin",
-    "WorkflowConfig",
-    "ScalimWorkflowConfigError",
-    "WorkflowOptions",
-    "WorkflowResources",
-    "WorkflowRun",
-    "WorkflowWriteTo",
-    "WorkflowWriteToCsvAppend",
-    "WorkflowWriteToSheetbookAppend",
-    "WorkflowWriteToSheetbookSheet",
-    "WorkflowWriteToWorkbookAppend",
-    "WorkflowWriteToWorkbookSheet",
-}
-
-_COVERED_WORKFLOW_PATHS_ALL = {
-    "resolve_workflow_demand_path",
-}
-
-_COVERED_SPEC_IR_ALL = {
-    "BindingIr",
-    "ComputeCallContextIr",
-    "CsvFieldPresentationIr",
-    "DemandIr",
-    "DerivedFieldIr",
-    "ExportProfileIr",
-    "FieldIr",
-    "FieldPresentationIr",
-    "FieldRefIr",
-    "JoinConditionIr",
-    "KeyIr",
-    "LoaderCallContextIr",
-    "LoaderExtractor",
-    "LoaderIr",
-    "LoaderParamsBuilder",
-    "LoaderResultMapCallable",
-    "LookupKeyCast",
-    "LookupKeySpec",
-    "LookupStepIr",
-    "MainSourceIr",
-    "MainSourceRowIterableCallable",
-    "NormalizedLookupKeySpec",
-    "OrderByKeyIr",
-    "PandasFieldPresentationIr",
-    "RelationIr",
-    "SourceIr",
-    "SourceNormalizeIr",
-    "SourceRefIr",
-    "SpreadsheetFieldPresentationIr",
-    "SupportedFieldIr",
-    "build_stable_lookup_key_list",
-}
-
-_COVERED_WORKFLOW_LOADERS_ALL = {
-    "sheetbook_sheet_rows",
-    "workflow_loader_context",
-}
+_COVERED_PUBLIC_ALL = _STABLE["scalim.dsl.by_yaml"]
+_COVERED_WORKFLOW_ALL = _STABLE["scalim.dsl.by_yaml.workflow"]
+_COVERED_WORKFLOW_TYPES_ALL = _STABLE["scalim.dsl.by_yaml.workflow_types"]
+_COVERED_WORKFLOW_PATHS_ALL = _STABLE["scalim.dsl.by_yaml.workflow_paths"]
+_COVERED_SPEC_IR_ALL = _STABLE["scalim.spec.ir"]
+_COVERED_WORKFLOW_LOADERS_ALL = _STABLE["scalim.workflow.loaders"]
 
 _ALLOWED_MODULES: FrozenSet[str] = frozenset(["scalim_misc.examples.public_api._fixtures"])
 _EXPECTED_WORKFLOW_RUNS = 2

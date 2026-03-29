@@ -7,8 +7,9 @@
 本仓库将“public API”定义为:用户在 Python 侧可稳定导入、并被回归门禁覆盖的一组 `scalim.*` 模块与符号。
 核心约束来自三处(SSOT):
 
-- curated 白名单(模块级): [`tests/test_public_api_surface_hardening.py`](#code=tests/test_public_api_surface_hardening.py)
+- public API manifest(模块+符号 SSOT): `openspec/ssot/public_api_manifest.json`
 - `__all__` 治理规则(模块内符号级): [`scripts/check-api-surface-governance.py`](#code=scripts/check-api-surface-governance.py)
+- manifest 回归门禁(符号级): `scripts/check-public-api-manifest.py` + [`tests/test_public_api_surface_hardening.py`](#code=tests/test_public_api_surface_hardening.py)
 - 示例覆盖(可交互/可对拍): `notebooks/marimo/example_public_api_suite/`(见 [主线教程](demo-big-data-report.md))
 
 ## 1) 推荐导入（Tier 1:稳定入口）
@@ -24,6 +25,9 @@
 | `scalim.dsl.by_yaml.workflow_paths` | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
 | `scalim.spec.ir` | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
+| `scalim.planning` | 规划层入口 | 规划/编排/可视化分析 |
+| `scalim.execution` | 执行层入口 | `ScalimEngine` 执行 |
+| `scalim.ob` | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 事件 envelope + 事件类型常量 + 事件目录查询入口 | 写 Observer/Hook；按 `event_type` 订阅/过滤 |
 | `scalim.sinks` | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
 
@@ -97,6 +101,7 @@ from scalim.sinks import CSVSink, InMemoryRowSink
 
 ```bash
 python3 scripts/check-api-surface-governance.py --check
+python3 scripts/check-public-api-manifest.py --check
 pytest -q tests/test_public_api_surface_hardening.py --no-cov
 just qa
 ```
@@ -121,10 +126,12 @@ just qa
   - `scalim.dsl.by_yaml.workflow_paths`:1
   - `scalim.spec.ir`:31
   - `scalim.workflow.loaders`:2
+  - `scalim.planning`:9
+  - `scalim.execution`:1
+  - `scalim.ob`:1
   - `scalim.events`:46
   - `scalim.sinks`:22
 - Tier 2(代表性模块):
-  - `scalim.planning`:9
   - `scalim.hooks`:6
 
 ## 5) 代价与优化方向（Brainstorming）

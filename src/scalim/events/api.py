@@ -1,12 +1,16 @@
-"""事件类型与辅助工具.
+"""`events` 稳定导出面.
 
-对外推荐优先从包根导入稳定事件契约(避免绑定到内部模块文件名),例如:
-- `from scalim.events import Event, EVENT_PIPELINE_START, get_event_catalog`
-
-类型化 `payload` 数据类属于内部实现细节,不作为公共导入契约.
+说明:
+- 对外稳定导入路径仍为 `scalim.events`
+- 具体实现细节分散在 `_*.py` 内部模块中(非公共契约)
 """
 
-from .api import (
+from ._attribution import (
+    WORKFLOW_ATTRIBUTION_META_KEYS,
+    WORKFLOW_EXEC_ID_META_KEY,
+    WORKFLOW_NODE_ID_META_KEY,
+)
+from ._catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
     EVENT_BATCH_END,
     EVENT_BATCH_START,
@@ -35,25 +39,20 @@ from .api import (
     EVENT_WORKFLOW_RESOURCE_CREATE,
     EVENT_WORKFLOW_RESOURCE_DISCARD,
     EVENT_WORKFLOW_RESOURCE_WRITE,
-    WORKFLOW_ATTRIBUTION_META_KEYS,
     WORKFLOW_EVENT_PREFIX_CACHE,
     WORKFLOW_EVENT_PREFIX_NODE,
     WORKFLOW_EVENT_PREFIX_RESOURCE,
     WORKFLOW_EVENT_PREFIXES,
-    WORKFLOW_EXEC_ID_META_KEY,
     WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED,
     WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
     WORKFLOW_NODE_CANCELLED_REASON_UPSTREAM_CANCELLED,
     WORKFLOW_NODE_END_STATUS_ERROR,
     WORKFLOW_NODE_END_STATUS_OK,
-    WORKFLOW_NODE_ID_META_KEY,
-    Event,
     EventDescriptor,
-    generate_run_id,
     get_event_catalog,
     get_event_catalog_map,
-    now_ts,
 )
+from ._event import Event, generate_run_id, now_ts
 
 __all__ = (
     "EVENT_ADAPTIVE_SCHEDULER_DECISION",
