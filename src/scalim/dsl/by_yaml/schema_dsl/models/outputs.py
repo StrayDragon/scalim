@@ -12,9 +12,17 @@ from ..constants import (
     schema_omit,
 )
 from ..output_enums import (
+    AGG_DISTINCT_ON_OVERFLOW_ENUM,
     AGG_METRIC_PRODUCER_KEYS,
     AGG_POST_PRODUCER_KEYS,
+    AGG_RANK_ORDER_ENUM,
     AGG_RANK_PRODUCER_KEYS,
+    AGG_RANK_TOP_K_MODE_ENUM,
+    DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
+    DEFAULT_AGG_RANK_ORDER,
+    DEFAULT_AGG_RANK_TOP_K_MODE,
+    OUTPUT_CONTAINER_TYPES,
+    OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM,
 )
 
 _OUTPUT_NAME_SCHEMA = {
@@ -85,7 +93,7 @@ class OutputContainerConfig:
         metadata=schema_meta(
             desc="输出容器类型(workbook/csv)",
             md=("输出容器类型.\n\n- `workbook`: Excel 工作簿容器(支持多 sheet)\n- `csv`: CSV 文件"),
-            choices=["workbook", "csv"],
+            choices=list(OUTPUT_CONTAINER_TYPES),
             examples=["workbook"],
         ),
     )
@@ -204,7 +212,7 @@ class OutputContainerConfig:
         metadata=schema_meta(
             desc="表头字段名来源: field_id/name",
             md=("表头字段名来源.\n\n- `field_id`: 使用字段 ID\n- `name`: 使用字段的 `name`(为空或等于 field_id 时回退为 field_id)"),
-            choices=["field_id", "name"],
+            choices=list(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM),
             default=DEFAULT_OUTPUT_HEADER_BY,
             examples=["name"],
         ),
@@ -551,8 +559,8 @@ class OutputAggregateConfig:
                                         },
                                         "order": {
                                             "type": "string",
-                                            "enum": ["asc", "desc"],
-                                            "default": "desc",
+                                            "enum": list(AGG_RANK_ORDER_ENUM),
+                                            "default": DEFAULT_AGG_RANK_ORDER,
                                             "description": "排序方向(asc/desc)",
                                             "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
                                             "examples": ["desc"],
@@ -579,8 +587,8 @@ class OutputAggregateConfig:
                                         },
                                         "top_k_mode": {
                                             "type": "string",
-                                            "enum": ["rank", "rows"],
-                                            "default": "rank",
+                                            "enum": list(AGG_RANK_TOP_K_MODE_ENUM),
+                                            "default": DEFAULT_AGG_RANK_TOP_K_MODE,
                                             "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
                                             "markdownDescription": (
                                                 "top_k 模式.\n\n"
@@ -633,8 +641,8 @@ class OutputAggregateConfig:
                                         },
                                         "order": {
                                             "type": "string",
-                                            "enum": ["asc", "desc"],
-                                            "default": "desc",
+                                            "enum": list(AGG_RANK_ORDER_ENUM),
+                                            "default": DEFAULT_AGG_RANK_ORDER,
                                             "description": "排序方向(asc/desc)",
                                             "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
                                             "examples": ["desc"],
@@ -661,8 +669,8 @@ class OutputAggregateConfig:
                                         },
                                         "top_k_mode": {
                                             "type": "string",
-                                            "enum": ["rank", "rows"],
-                                            "default": "rank",
+                                            "enum": list(AGG_RANK_TOP_K_MODE_ENUM),
+                                            "default": DEFAULT_AGG_RANK_TOP_K_MODE,
                                             "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
                                             "markdownDescription": (
                                                 "top_k 模式.\n\n"
@@ -715,8 +723,8 @@ class OutputAggregateConfig:
                                         },
                                         "order": {
                                             "type": "string",
-                                            "enum": ["asc", "desc"],
-                                            "default": "desc",
+                                            "enum": list(AGG_RANK_ORDER_ENUM),
+                                            "default": DEFAULT_AGG_RANK_ORDER,
                                             "description": "排序方向(asc/desc)",
                                             "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
                                             "examples": ["desc"],
@@ -743,8 +751,8 @@ class OutputAggregateConfig:
                                         },
                                         "top_k_mode": {
                                             "type": "string",
-                                            "enum": ["rank", "rows"],
-                                            "default": "rank",
+                                            "enum": list(AGG_RANK_TOP_K_MODE_ENUM),
+                                            "default": DEFAULT_AGG_RANK_TOP_K_MODE,
                                             "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
                                             "markdownDescription": (
                                                 "top_k 模式.\n\n"
@@ -904,12 +912,12 @@ class OutputAggregateConfig:
     """可选:去重护栏(0 表示不限制)."""
 
     distinct_on_overflow: str = dataclass_field(
-        default="error",
+        default=DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
         metadata=schema_meta(
             desc="distinct 护栏溢出策略(error/truncate)",
             md="distinct 护栏溢出策略.\n\n- `error`: 失败\n- `truncate`: 截断并继续",
-            choices=["error", "truncate"],
-            default="error",
+            choices=list(AGG_DISTINCT_ON_OVERFLOW_ENUM),
+            default=DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
             examples=["error"],
         ),
     )

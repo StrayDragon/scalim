@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 
 
@@ -19,10 +19,10 @@ sources: {}
 output:
   format: csv
 """
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         _ = _load(yaml_content)
 
-    assert any("Legacy YAML syntax is not supported: top-level 'output'" in msg for msg in exc.value.errors)
+    assert any("Legacy YAML syntax is not supported: top-level 'output'" in env.message for env in exc.value.errors)
 
 
 def test_loader_parses_outputs_from_inheritance_and_prunes_fields() -> None:

@@ -54,7 +54,7 @@ def test_yaml_dsl_validate_json_output_has_line(tmp_path, capsys) -> None:
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["errors"]
-    assert payload["errors"][0]["line"] == 8
+    assert payload["errors"][0]["loc"]["line"] == 8
 
 
 def test_yaml_dsl_validate_order_by_error(tmp_path, capsys) -> None:

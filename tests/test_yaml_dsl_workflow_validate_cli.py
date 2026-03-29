@@ -95,7 +95,7 @@ workflow:
     demand_result = payload["results"][1]
     assert demand_result["mode"] == "validate"
     assert demand_result["ok"] is False
-    assert any(item["path"] == "main_source.unknown_field" and item["line"] for item in demand_result["errors"])
+    assert any(item["path"] == "main_source.unknown_field" and item.get("loc", {}).get("line") for item in demand_result["errors"])
 
 
 def test_yaml_dsl_validate_workflow_json_ok_matches_exit_code(tmp_path: Path, capsys) -> None:

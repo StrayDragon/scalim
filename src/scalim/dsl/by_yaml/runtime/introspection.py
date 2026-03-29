@@ -3,6 +3,7 @@ from typing import Any, Dict, FrozenSet, List, Optional, Set
 from ....ob.presets.viz import VizObserver, VizObserverConfig
 from ....planning.builder import PlanBuilder
 from ....vendor.compact.typing_extensionsx import TypedDict
+from ..config_parsing.error_envelope import ScalimYamlValidationError
 from ..config_parsing.errors import ScalimConfigValidationError
 from ..config_parsing.loader import YamlDemandLoader
 from ..schema_dsl.models import DemandConfig
@@ -119,12 +120,30 @@ def build_viz_observer(
     return VizObserver.from_plan(plan, actual_config, output_composition=compilation.request.output_composition)
 
 
+def _yaml_validation_errors_to_lines(exc: ScalimYamlValidationError) -> List[str]:
+    errors: List[str] = []
+    for env in exc.errors:
+        if env.path and env.path != "(root)":
+            errors.append("{}: {}".format(env.path, env.message))
+        else:
+            errors.append(env.message)
+    return errors
+
+
+def _raise_type_error_if_non_mapping_yaml_root(exc: ScalimYamlValidationError) -> None:
+    if any(env.code in ("yaml_empty_document", "yaml_root_not_mapping") for env in exc.errors):
+        msg = "expected mapping"
+        raise TypeError(msg) from exc
+
+
 def load_output_config(yaml_path: str) -> OutputConfigDict:
     loader = YamlDemandLoader()
     try:
         config = loader.load(yaml_path)
-    except ScalimConfigValidationError:
-        raise
+    except ScalimYamlValidationError as exc:
+        _raise_type_error_if_non_mapping_yaml_root(exc)
+        errors = _yaml_validation_errors_to_lines(exc)
+        raise ScalimConfigValidationError(str(exc), errors=errors, issues=list(exc.errors)) from exc
     except ValueError as exc:
         msg = str(exc)
         raise ScalimConfigValidationError(msg, errors=[msg]) from exc

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.parsers.output import ScalimVizEventModeRemovedError
 from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
@@ -241,7 +241,7 @@ def test_parse_viz_config_enabled_and_infer() -> None:
     assert config.env == "dev"
     assert config.use_default_output_dir is True
 
-    with pytest.raises(ScalimConfigValidationError) as exc_info:
+    with pytest.raises(ScalimYamlValidationError) as exc_info:
         loader.load_string(
             """
 name: viz_event_mode_removed
@@ -259,7 +259,7 @@ observability:
     event_mode: full
 """
         )
-    assert any("observability.viz.event_mode" in line for line in exc_info.value.errors)
+    assert any("observability.viz.event_mode" in err.path for err in exc_info.value.errors)
     with pytest.raises(ScalimVizEventModeRemovedError):
         loader._parse_viz({VIZ_KEYS["output_dir"]: "/tmp/run", "event_mode": "full"})
 

@@ -1,6 +1,7 @@
 import pytest
 
 from scalim.dsl.by_yaml import compile, run_workflow
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.template_precompile import maybe_precompile_yaml_text
 from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config
 
@@ -146,15 +147,16 @@ main_source:
     order_id: {}
 sources:
   $import: common.sources
-""".lstrip(),
+    """.lstrip(),
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ScalimYamlValidationError) as exc_info:
         _ = compile(str(demand), allowed_modules=frozenset(["tests"]), template_vars={})
-    assert "missing" in str(exc_info.value)
-    assert "import trace" in str(exc_info.value)
-    assert "common.yaml" in str(exc_info.value)
+    msg = "\n".join(env.message for env in exc_info.value.errors)
+    assert "missing" in msg
+    assert "import trace" in msg
+    assert "common.yaml" in msg
 
 
 def test_template_vars_precompile_applies_to_workflow_yaml_max_concurrency(tmp_path) -> None:
@@ -568,14 +570,14 @@ outputs: []
     )
 
     big = "x" * 300
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ScalimYamlValidationError) as exc_info:
         _ = compile(
             str(demand),
             allowed_modules=frozenset(["tests"]),
             template_vars={"big": big},
             rendered_yaml_max_len=250,
         )
-    msg = str(exc_info.value)
+    msg = "\n".join(env.message for env in exc_info.value.errors)
     assert "kind=fragment" in msg
     assert "rendered_len" in msg and "max_len" in msg
     assert "import trace" in msg

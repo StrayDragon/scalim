@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import UNSET, RunOverrides, compile
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -472,12 +472,12 @@ outputs:
 """,
     )
 
-    with pytest.raises(ScalimConfigValidationError) as excinfo:
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.conftest"]))
-    assert any("Duplicate effective field display names" in msg for msg in excinfo.value.errors)
-    assert any("'ID'" in msg for msg in excinfo.value.errors)
-    assert any("main_source.fields.order_id" in msg for msg in excinfo.value.errors)
-    assert any("main_source.fields.amount" in msg for msg in excinfo.value.errors)
+    assert any("Duplicate effective field display names" in env.message for env in excinfo.value.errors)
+    assert any("'ID'" in env.message for env in excinfo.value.errors)
+    assert any("main_source.fields.order_id" in env.message for env in excinfo.value.errors)
+    assert any("main_source.fields.amount" in env.message for env in excinfo.value.errors)
 
 
 def test_validate_unique_field_names_can_be_disabled(tmp_path: Path) -> None:

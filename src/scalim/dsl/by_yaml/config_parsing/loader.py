@@ -4,11 +4,10 @@ from typing import IO, TYPE_CHECKING, Mapping, Optional, Sequence, Union
 from ....vendor.compact.importlibx import require_optional_dependency
 
 if TYPE_CHECKING:
-    import yaml
-
     from .validator import ConfigValidator
 else:
-    yaml = require_optional_dependency(
+    # 说明: 在模块导入时显式检查可选依赖,当缺少 `pyyaml` 时让导入/重载快速失败并给出友好提示.
+    require_optional_dependency(
         "yaml",
         context="scalim.dsl.by_yaml.config_parsing.loader",
         install_name="pyyaml",
@@ -16,6 +15,7 @@ else:
 
 from ..schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_EXTRA_SHEET_KEYS, DemandConfig, OutputExtraSheetConfig
+from .error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from .imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
@@ -25,15 +25,12 @@ from .parsers.outputs import ParserOutputsMixin
 from .parsers.results import ParsedFieldsResult
 from .parsers.utils import mapping_or_none, str_or_none
 from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
+from .yaml_load import envelope_from_validation_issue, error_loc_for_yaml_path, load_yaml_mapping_text
 
 __all__ = [
     "ParsedFieldsResult",
     "YamlDemandLoader",
 ]
-
-
-def _safe_load_yaml(source: Union[str, IO[str]]) -> object:
-    return yaml.safe_load(source)
 
 
 def _create_validator() -> "ConfigValidator":
@@ -76,7 +73,11 @@ class YamlDemandLoader(
                 template_sandbox=template_sandbox,
                 rendered_yaml_max_len=rendered_yaml_max_len,
             )
-            raw = _safe_load_yaml(text)
+            data, locations, _lines = load_yaml_mapping_text(
+                text,
+                source_path=str(yaml_path),
+                detect_duplicate_keys=True,
+            )
         else:
             text = source.read()
             text = maybe_precompile_yaml_text(
@@ -87,8 +88,12 @@ class YamlDemandLoader(
                 template_sandbox=template_sandbox,
                 rendered_yaml_max_len=rendered_yaml_max_len,
             )
-            raw = _safe_load_yaml(text)
-        raw_demand = RawDemand.from_raw(raw)
+            data, locations, _lines = load_yaml_mapping_text(
+                text,
+                source_path="(inline)",
+                detect_duplicate_keys=True,
+            )
+        raw_demand = RawDemand.from_raw(data)
 
         if contains_import_syntax(raw_demand.data):
             if yaml_path is not None:
@@ -104,14 +109,68 @@ class YamlDemandLoader(
                         project_root_override=project_root_override,
                     )
                 except ScalimYamlImportExpansionError as exc:
-                    raise ValueError(str(exc)) from exc
+                    logical_path = str(exc.logical_path or "(root)")
+                    error_message = "YAML imports expansion failed"
+                    raise ScalimYamlValidationError(
+                        error_message,
+                        errors=[
+                            ErrorEnvelope(
+                                code="yaml_import_expansion_error",
+                                message=str(exc),
+                                source_path=str(yaml_path),
+                                path=logical_path,
+                                loc=error_loc_for_yaml_path(logical_path, locations),
+                            )
+                        ],
+                    ) from None
             else:
                 msg = "imports/$import is only supported for file path entrypoints; use YamlDemandLoader.load(<yaml_path>)"
-                raise ValueError(msg)
+                error_message = "YAML imports expansion is not supported for inline YAML"
+                raise ScalimYamlValidationError(
+                    error_message,
+                    errors=[
+                        ErrorEnvelope(
+                            code="yaml_import_unsupported",
+                            message=msg,
+                            source_path="(inline)",
+                            path="(root)",
+                            loc=error_loc_for_yaml_path("(root)", locations),
+                        )
+                    ],
+                )
 
         self._ensure_validator()
         if self._validator:
-            self._validator.validate(raw_demand.data)
+            report = self._validator.validate_report(
+                raw_demand.data,
+                strict_unknown_fields=True,
+                enable_jsonschema_validation=True,
+            )
+            errors = [
+                envelope_from_validation_issue(
+                    issue,
+                    source_path=str(yaml_path) if yaml_path is not None else "(inline)",
+                    locations=locations,
+                    default_code="yaml_validate_error",
+                )
+                for issue in report.errors()
+            ]
+            warnings = [
+                envelope_from_validation_issue(
+                    issue,
+                    source_path=str(yaml_path) if yaml_path is not None else "(inline)",
+                    locations=locations,
+                    default_code="yaml_validate_warning",
+                )
+                for issue in report.warnings()
+            ]
+            if errors:
+                error_message = "YAML DSL validation failed"
+                raise ScalimYamlValidationError(
+                    error_message,
+                    errors=errors,
+                    warnings=warnings,
+                )
 
         return self._parse_config(raw_demand)
 
@@ -131,16 +190,61 @@ class YamlDemandLoader(
             template_sandbox=template_sandbox,
             rendered_yaml_max_len=rendered_yaml_max_len,
         )
-        raw = _safe_load_yaml(text)
-        raw_demand = RawDemand.from_raw(raw)
+        data, locations, _lines = load_yaml_mapping_text(
+            text,
+            source_path="(inline)",
+            detect_duplicate_keys=True,
+        )
+        raw_demand = RawDemand.from_raw(data)
 
         if contains_import_syntax(raw_demand.data):
             msg = "imports/$import is only supported for file path entrypoints; use YamlDemandLoader.load(<yaml_path>)"
-            raise ValueError(msg)
+            error_message = "YAML imports expansion is not supported for inline YAML"
+            raise ScalimYamlValidationError(
+                error_message,
+                errors=[
+                    ErrorEnvelope(
+                        code="yaml_import_unsupported",
+                        message=msg,
+                        source_path="(inline)",
+                        path="(root)",
+                        loc=error_loc_for_yaml_path("(root)", locations),
+                    )
+                ],
+            )
 
         self._ensure_validator()
         if self._validator:
-            self._validator.validate(raw_demand.data)
+            report = self._validator.validate_report(
+                raw_demand.data,
+                strict_unknown_fields=True,
+                enable_jsonschema_validation=True,
+            )
+            errors = [
+                envelope_from_validation_issue(
+                    issue,
+                    source_path="(inline)",
+                    locations=locations,
+                    default_code="yaml_validate_error",
+                )
+                for issue in report.errors()
+            ]
+            warnings = [
+                envelope_from_validation_issue(
+                    issue,
+                    source_path="(inline)",
+                    locations=locations,
+                    default_code="yaml_validate_warning",
+                )
+                for issue in report.warnings()
+            ]
+            if errors:
+                error_message = "YAML DSL validation failed"
+                raise ScalimYamlValidationError(
+                    error_message,
+                    errors=errors,
+                    warnings=warnings,
+                )
 
         return self._parse_config(raw_demand)
 

@@ -4,6 +4,7 @@
       {
         "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
         "requirements": [
+          "CLI validation MUST reuse the unified YAML load facade",
           "CLI validate 与 schema validate 职责边界(避免重复诊断)",
           "CLI Schema-Only Validation",
           "JSONSchema 错误收集(完整 + 稳定 + 去噪)",
@@ -87,6 +88,7 @@
       {
         "path": "openspec/specs/yaml-dsl-schema/spec.md",
         "requirements": [
+          "enums and defaults MUST be sourced from schema_dsl SSOT",
           "schema 元数据生成与 hover 指引",
           "schema 为 `value_cast` 增加 `decimal` 枚举值",
           "outputs 字段 hover 指引明确可选与 overrides 推荐写法",
@@ -435,7 +437,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
-      "sha256": "efbcf32635442f42ca3a36478e4cfdbb323cb665a703e6b5a790a050bbc83dcf"
+      "sha256": "509bd5c805b6041bb90377481685c3072c05d7cf164cdfb23c88812e842d884b"
     },
     {
       "path": "openspec/specs/yaml-dsl-editor-core/spec.md",
@@ -443,7 +445,7 @@
     },
     {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "6b5a9d498d97da0ae211a329d08a2b82672cecd4df4c95a320a1d0d83f2a674f"
+      "sha256": "81c4243a0f0c5acb79342c23f9170c6b6fb4f3cfbe582fddc219006d8f30c2ee"
     },
     {
       "path": "openspec/specs/yaml-dsl-workflow/spec.md",
@@ -451,7 +453,7 @@
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
-      "sha256": "a1a72132fe7e026526cf42cc67c87d8f91805f1858c4fb03ee615742b351710b"
+      "sha256": "f166f7b13412cbcf082540c5e07f7551e282104f03c62999dc4f2e6aa12c1b13"
     },
     {
       "path": "src/scalim/dsl/by_yaml/schema/demand.gen.json",
@@ -465,7 +467,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "bc79053b9dd4ccfaf5b379f3b370ddd038238f110c7392a595b1478613cb00f8"
+      "sha256": "bc76b9b0e5b206d42df0f96f90854a9a4124788e919ea59513a533211737df0b"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -481,7 +483,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "e9bdf35d33681bff6a73ea5285756f63fbb6c9bee8bef64bf0236ae3e8d493b7"
+      "sha256": "102aa99708a545f29a3a7ea8b3269ccce4aa6b7ad140e6ff5c449a1081382f9f"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

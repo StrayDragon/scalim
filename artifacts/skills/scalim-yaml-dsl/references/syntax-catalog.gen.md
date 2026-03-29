@@ -66,6 +66,7 @@
 - Source: `openspec/specs/yaml-dsl-schema/spec.md`
 - Purpose: 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 - Requirements:
+  - enums and defaults MUST be sourced from schema_dsl SSOT
   - schema 元数据生成与 hover 指引
   - schema 为 `value_cast` 增加 `decimal` 枚举值
   - outputs 字段 hover 指引明确可选与 overrides 推荐写法

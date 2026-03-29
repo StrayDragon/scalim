@@ -38,6 +38,19 @@
 - `demand.gen.json` 用于 **编辑器提示 / schema-only 校验**(例如 `PROJECT_CLI_NAME yaml-dsl schema validate`).
 - 运行时严格校验由 `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validator.py` 执行,可能比 schema 更严格(例如 schema 对 `fields` 允许额外键,但严格校验会报告未知字段).
 ## Requirements
+### Requirement: enums and defaults MUST be sourced from schema_dsl SSOT
+
+系统 MUST 将 YAML DSL 的枚举/默认值/描述文本收敛到 schema_dsl 作为单点 SSOT.
+
+约束:
+- runtime validator/parser MUST 引用 schema_dsl 的导出,不得复制同一份枚举/默认值常量
+- 系统 MUST 提供一致性自检（测试或脚本），确保 schema 接受的枚举与 runtime 接受的枚举一致
+
+#### Scenario: enum drift is detected
+- **WHEN** 维护者修改 schema_dsl 中某个 enum/默认值
+- **AND** runtime validator/parser 未同步（出现不一致）
+- **THEN** 一致性自检 MUST fail-fast 并指出不一致字段
+
 ### Requirement: schema 元数据生成与 hover 指引
 系统 SHALL 使用 `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/` 的元数据(见 `constants.py` 与 `models/__init__.py`)生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` 并将其视为唯一 canonical schema.
 - schema 顶层不包含 `dsl_version`

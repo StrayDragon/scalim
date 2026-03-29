@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine, ScalimSecurityError
 from tests.yaml_fixtures import make_yaml_config
@@ -143,12 +143,12 @@ result:
   name: Result
   compute: "a + b"
   depends_on: ["a", "b"]
-""",
+        """,
         )
         loader = YamlDemandLoader()
-        with pytest.raises(ScalimConfigValidationError) as exc_info:
+        with pytest.raises(ScalimYamlValidationError) as exc_info:
             _ = loader.load_string(yaml_content)
-        assert any("does not allow 'depends_on'" in msg for msg in exc_info.value.errors)
+        assert any("does not allow 'depends_on'" in env.message for env in exc_info.value.errors)
 
     def test_load_string_with_call_by_auto_depends_on(self) -> None:
         yaml_content = make_yaml_config(
@@ -196,12 +196,12 @@ result:
   name: Result
   call_by: "tests.call_by_fns:add(a, b=b)"
   depends_on: ["a", "b", "extra"]
-""",
+        """,
         )
         loader = YamlDemandLoader()
-        with pytest.raises(ScalimConfigValidationError) as exc_info:
+        with pytest.raises(ScalimYamlValidationError) as exc_info:
             _ = loader.load_string(yaml_content)
-        assert any("does not allow 'depends_on'" in msg for msg in exc_info.value.errors)
+        assert any("does not allow 'depends_on'" in env.message for env in exc_info.value.errors)
 
     def test_load_string_with_compute_empty_deps_call_rejected(self) -> None:
         yaml_content = make_yaml_config(
@@ -218,12 +218,12 @@ fields:
 bad:
   name: Bad
   compute: "int('1')"
-""",
+        """,
         )
         loader = YamlDemandLoader()
-        with pytest.raises(ScalimConfigValidationError) as exc_info:
+        with pytest.raises(ScalimYamlValidationError) as exc_info:
             _ = loader.load_string(yaml_content)
-        assert any("compute has no field dependencies" in msg for msg in exc_info.value.errors)
+        assert any("compute has no field dependencies" in env.message for env in exc_info.value.errors)
 
     def test_load_string_with_relations_steps(self) -> None:
         yaml_content = make_yaml_config(

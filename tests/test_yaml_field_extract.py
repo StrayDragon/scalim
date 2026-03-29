@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import run
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.field_extract import (
     ScalimFieldExtractCompileError,
     compile_field_extract,
@@ -100,10 +100,10 @@ main_source:
       extract: "a..b"
 """.lstrip()
 
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_text)
 
-    assert any("invalid extract" in msg for msg in exc.value.errors)
+    assert any("invalid extract" in env.message for env in exc.value.errors)
 
 
 def test_extract_field_segments_traverses_mapping_attr_and_getitem_and_rejects_list_index() -> None:

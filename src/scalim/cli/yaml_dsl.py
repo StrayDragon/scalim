@@ -17,13 +17,19 @@ else:
         install_name="pyyaml",
     )
 
+from ..dsl.by_yaml.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from ..dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from ..dsl.by_yaml.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
 from ..dsl.by_yaml.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
-from ..dsl.by_yaml.config_parsing.validator import ConfigValidator, attach_locations, build_yaml_location_index
-from ..dsl.by_yaml.config_parsing.validator import YamlValidationIssue as Issue
+from ..dsl.by_yaml.config_parsing.validator import ConfigValidator
 from ..dsl.by_yaml.config_parsing.validators.issues import ValidationIssue
-from ..dsl.by_yaml.workflow_config import load_workflow_config
+from ..dsl.by_yaml.config_parsing.yaml_load import (
+    YamlLocationIndex,
+    envelope_from_validation_issue,
+    error_loc_for_yaml_path,
+    load_yaml_mapping_text,
+)
+from ..dsl.by_yaml.workflow_config import load_workflow_config_from_mapping
 from ..dsl.by_yaml.workflow_paths import resolve_workflow_demand_path
 from ..dsl.by_yaml.workflow_types import (
     ScalimWorkflowConfigError,
@@ -57,10 +63,10 @@ class ValidationPayload:
     schema_path: Optional[str] = None
     """可选:使用的 `JSON Schema` 文件路径."""
 
-    errors: List[Issue] = field(default_factory=list)
+    errors: List[ErrorEnvelope] = field(default_factory=list)
     """错误列表."""
 
-    warnings: List[Issue] = field(default_factory=list)
+    warnings: List[ErrorEnvelope] = field(default_factory=list)
     """告警列表."""
 
     def as_dict(self) -> Dict[str, Any]:
@@ -230,15 +236,15 @@ def _load_json_schema(schema_path: Path) -> Dict[str, Any]:
         return json.load(handle)
 
 
-def _load_yaml_file(yaml_path: Path) -> Any:
-    with yaml_path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
+def _find_legacy_field_errors(
+    yaml_data: Dict[str, Any],
+    *,
+    source_path: str,
+    locations: YamlLocationIndex,
+) -> List[ErrorEnvelope]:
+    errors: List[ErrorEnvelope] = []
 
-
-def _find_legacy_field_errors(yaml_data: Dict[str, Any]) -> List[Issue]:
-    errors: List[Issue] = []
-
-    _collect_legacy_fields(errors, yaml_data, None)
+    _collect_legacy_fields(errors, yaml_data, None, source_path=source_path, locations=locations)
 
     sources = yaml_data.get("sources", {})
     if isinstance(sources, dict):
@@ -247,7 +253,13 @@ def _find_legacy_field_errors(yaml_data: Dict[str, Any]) -> List[Issue]:
             if not isinstance(source_data, dict):
                 continue
             source_data_dict = cast("Dict[str, Any]", source_data)  # pragma: allow-cast yaml mapping typed narrowing for legacy field scan
-            _collect_legacy_fields(errors, source_data_dict, "sources.{}".format(source_id))
+            _collect_legacy_fields(
+                errors,
+                source_data_dict,
+                "sources.{}".format(source_id),
+                source_path=source_path,
+                locations=locations,
+            )
 
     fields = yaml_data.get("fields", {})
     if isinstance(fields, dict):
@@ -256,32 +268,84 @@ def _find_legacy_field_errors(yaml_data: Dict[str, Any]) -> List[Issue]:
             if not isinstance(field_data, dict):
                 continue
             field_data_dict = cast("Dict[str, Any]", field_data)  # pragma: allow-cast yaml mapping typed narrowing for legacy field scan
-            _collect_legacy_fields(errors, field_data_dict, "fields.{}".format(field_id))
+            _collect_legacy_fields(
+                errors,
+                field_data_dict,
+                "fields.{}".format(field_id),
+                source_path=source_path,
+                locations=locations,
+            )
 
     return errors
 
 
-def _collect_legacy_fields(errors: List[Issue], data: Dict[str, Any], prefix: Optional[str]) -> None:
+def _collect_legacy_fields(
+    errors: List[ErrorEnvelope],
+    data: Dict[str, Any],
+    prefix: Optional[str],
+    *,
+    source_path: str,
+    locations: YamlLocationIndex,
+) -> None:
     for key in data:
         if key not in LEGACY_FIELDS:
             continue
         path = "{}.{}".format(prefix, key) if prefix else str(key)
-        errors.append(Issue(path=path, message="Legacy field '{}' is not allowed".format(key)))
+        errors.append(
+            ErrorEnvelope(
+                code="yaml_legacy_field",
+                message="Legacy field '{}' is not allowed".format(key),
+                source_path=source_path,
+                path=path,
+                loc=error_loc_for_yaml_path(path, locations),
+            )
+        )
 
 
-def _issues_to_rows(issues: Iterable[object]) -> List[Issue]:
-    rows: List[Issue] = []
+def _issues_to_rows(
+    issues: Iterable[object],
+    *,
+    source_path: str,
+    locations: YamlLocationIndex,
+    default_code: str,
+) -> List[ErrorEnvelope]:
+    rows: List[ErrorEnvelope] = []
     for issue in issues:
-        if isinstance(issue, Issue):
+        if isinstance(issue, ErrorEnvelope):
             rows.append(issue)
             continue
         if isinstance(issue, ValidationIssue):
-            rows.append(Issue(path=issue.path, message=issue.message, suggestions=list(issue.suggestions)))
+            rows.append(
+                envelope_from_validation_issue(
+                    issue,
+                    source_path=source_path,
+                    locations=locations,
+                    default_code=default_code,
+                )
+            )
             continue
         if isinstance(issue, UnknownFieldIssue):
-            rows.append(Issue(path=issue.path, message=issue.message, suggestions=list(issue.suggestions)))
+            path = str(issue.path or "(root)")
+            rows.append(
+                ErrorEnvelope(
+                    code=str(default_code),
+                    message=str(issue.message),
+                    source_path=source_path,
+                    path=path,
+                    loc=error_loc_for_yaml_path(path, locations),
+                    suggestions=tuple(issue.suggestions),
+                )
+            )
             continue
-        rows.append(Issue(path="", message=str(issue)))
+        rows.append(
+            ErrorEnvelope(
+                code=str(default_code),
+                message=str(issue),
+                source_path=source_path,
+                path="(root)",
+                loc=error_loc_for_yaml_path("(root)", locations),
+            )
+        )
     return rows
 
 
@@ -301,7 +365,7 @@ def _display_issue_path(path: str) -> str:
     return path or "(root)"
 
 
-def _format_issue_location(yaml_path: Path, issue: Issue) -> str:
+def _format_issue_location(yaml_path: Path, issue: ErrorEnvelope) -> str:
     if issue.line is None:
         return str(yaml_path)
     if issue.column is not None:
@@ -309,7 +373,7 @@ def _format_issue_location(yaml_path: Path, issue: Issue) -> str:
     return "{}:{}".format(yaml_path, issue.line)
 
 
-def _emit_source_snippet(issue: Issue, source_lines: Optional[List[str]], *, verbose: bool) -> None:
+def _emit_source_snippet(issue: ErrorEnvelope, source_lines: Optional[List[str]], *, verbose: bool) -> None:
     if source_lines is None or issue.line is None:
         return
     total_lines = len(source_lines)
@@ -336,8 +400,8 @@ def _emit_source_snippet(issue: Issue, source_lines: Optional[List[str]], *, ver
 def _print_linter_result(
     yaml_path: Path,
     *,
-    errors: List[Issue],
-    warnings: List[Issue],
+    errors: List[ErrorEnvelope],
+    warnings: List[ErrorEnvelope],
     verbose: bool,
     source_lines: Optional[List[str]],
 ) -> None:
@@ -379,8 +443,8 @@ def _print_linter_result(
 def _render_result(
     yaml_path: Path,
     *,
-    errors: List[Issue],
-    warnings: List[Issue],
+    errors: List[ErrorEnvelope],
+    warnings: List[ErrorEnvelope],
     verbose: bool,
     source_lines: Optional[List[str]],
 ) -> None:
@@ -393,69 +457,6 @@ def _render_result(
     )
 
 
-def _read_yaml_or_error(
-    yaml_path: Path,
-    *,
-    json_output: bool,
-    mode: Optional[str] = None,
-    schema_path: Optional[Path] = None,
-) -> Tuple[Optional[Any], int]:
-    if not yaml_path.exists():
-        _emit_error(
-            "YAML 文件不存在: {}".format(yaml_path),
-            json_output=json_output,
-            yaml_path=yaml_path,
-            schema_path=schema_path,
-            mode=mode,
-        )
-        return None, 1
-    try:
-        yaml_data = _load_yaml_file(yaml_path)
-    except yaml.YAMLError as exc:
-        _emit_error(
-            "YAML 文件解析失败: {}".format(exc),
-            json_output=json_output,
-            yaml_path=yaml_path,
-            schema_path=schema_path,
-            mode=mode,
-        )
-        return None, 1
-    if yaml_data is None:
-        _emit_error(
-            "YAML 文件内容为空",
-            json_output=json_output,
-            yaml_path=yaml_path,
-            schema_path=schema_path,
-            mode=mode,
-        )
-        return None, 1
-    return yaml_data, 0
-
-
-def _extract_yaml_error_location(exc: Any) -> Optional[Tuple[int, int]]:
-    mark = None
-    try:
-        mark = exc.problem_mark
-    except AttributeError:
-        mark = None
-    if mark is None:
-        try:
-            mark = exc.context_mark
-        except AttributeError:
-            mark = None
-    if mark is None:
-        return None
-
-    try:
-        line = mark.line
-        column = mark.column
-    except AttributeError:
-        return None
-    if not isinstance(line, int) or not isinstance(column, int):
-        return None
-    return line + 1, column + 1
-
-
 def _emit_error(
     message: str,
     *,
@@ -465,12 +466,21 @@ def _emit_error(
     mode: Optional[str] = None,
 ) -> None:
     if json_output:
+        source_path = str(yaml_path) if yaml_path is not None else "(unknown)"
         payload = ValidationPayload(
             mode=mode or "error",
             ok=False,
             yaml_path=str(yaml_path) if yaml_path is not None else None,
             schema_path=str(schema_path) if schema_path is not None else None,
-            errors=[Issue(path="(root)", message=message)],
+            errors=[
+                ErrorEnvelope(
+                    code="cli_error",
+                    message=message,
+                    source_path=source_path,
+                    path="(root)",
+                    loc=None,
+                )
+            ],
         )
         _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
         return
@@ -551,64 +561,39 @@ def _validate_demand_yaml_text(
 ) -> Tuple[ValidationPayload, Optional[Dict[str, Any]], Optional[List[str]]]:
     source_lines: List[str] = yaml_text.splitlines()
     try:
-        yaml_data = yaml.safe_load(yaml_text)
-    except yaml.YAMLError as exc:
-        loc = _extract_yaml_error_location(exc)
-        line = loc[0] if loc is not None else None
-        column = loc[1] if loc is not None else None
-        errors = [Issue(path="(root)", message="YAML parse error: {}".format(exc), line=line, column=column)]
+        yaml_data_dict, locations, _lines = load_yaml_mapping_text(
+            yaml_text,
+            source_path=str(yaml_path),
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
         return (
             ValidationPayload(
                 mode="validate",
                 ok=False,
                 yaml_path=str(yaml_path),
                 schema_path=str(schema_path),
-                errors=errors,
-                warnings=[],
+                errors=list(exc.errors),
+                warnings=list(exc.warnings),
             ),
             None,
             source_lines,
         )
-
-    if yaml_data is None:
-        errors = [Issue(path="(root)", message="YAML document is empty", line=1, column=1)]
-        return (
-            ValidationPayload(
-                mode="validate",
-                ok=False,
-                yaml_path=str(yaml_path),
-                schema_path=str(schema_path),
-                errors=errors,
-                warnings=[],
-            ),
-            None,
-            source_lines,
-        )
-
-    if not isinstance(yaml_data, dict):
-        errors = [Issue(path="(root)", message="YAML root must be a mapping", line=1, column=1)]
-        return (
-            ValidationPayload(
-                mode="validate",
-                ok=False,
-                yaml_path=str(yaml_path),
-                schema_path=str(schema_path),
-                errors=errors,
-                warnings=[],
-            ),
-            None,
-            source_lines,
-        )
-
-    yaml_data_dict = cast("Dict[str, Any]", yaml_data)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
-    locations = build_yaml_location_index(yaml_text)
 
     try:
         if contains_import_syntax(yaml_data_dict):
             _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path, allowed_yaml_roots=allowed_yaml_roots)
     except ScalimYamlImportExpansionError as exc:
-        errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
-        errors = attach_locations(errors, locations)
+        logical_path = str(exc.logical_path or "(root)")
+        errors = [
+            ErrorEnvelope(
+                code="yaml_import_expansion_error",
+                message=str(exc),
+                source_path=str(yaml_path),
+                path=logical_path,
+                loc=error_loc_for_yaml_path(logical_path, locations),
+            )
+        ]
         return (
             ValidationPayload(
                 mode="validate",
@@ -628,11 +613,24 @@ def _validate_demand_yaml_text(
         strict_unknown_fields=True,
         enable_jsonschema_validation=True,
     )
-    errors = _issues_to_rows(report.errors())
-    warnings = _issues_to_rows(report.warnings())
-
-    errors = attach_locations(errors, locations)
-    warnings = attach_locations(warnings, locations)
+    errors = [
+        envelope_from_validation_issue(
+            issue,
+            source_path=str(yaml_path),
+            locations=locations,
+            default_code="yaml_validate_error",
+        )
+        for issue in report.errors()
+    ]
+    warnings = [
+        envelope_from_validation_issue(
+            issue,
+            source_path=str(yaml_path),
+            locations=locations,
+            default_code="yaml_validate_warning",
+        )
+        for issue in report.warnings()
+    ]
 
     ok = not errors
     return (
@@ -657,7 +655,15 @@ def _validate_demand_yaml_path(
     allowed_yaml_roots: Optional[Sequence[Path]] = None,
 ) -> Tuple[ValidationPayload, Optional[Dict[str, Any]], Optional[List[str]]]:
     if not yaml_path.exists():
-        errors = [Issue(path="(file)", message="YAML 文件不存在: {}".format(yaml_path))]
+        errors = [
+            ErrorEnvelope(
+                code="yaml_file_not_found",
+                message="YAML 文件不存在: {}".format(yaml_path),
+                source_path=str(yaml_path),
+                path="(file)",
+                loc=None,
+            )
+        ]
         return (
             ValidationPayload(
                 mode="validate",
@@ -673,7 +679,15 @@ def _validate_demand_yaml_path(
     try:
         yaml_text = yaml_path.read_text(encoding="utf-8")
     except Exception:  # noqa: BLE001
-        errors = [Issue(path="(file)", message="YAML 文件读取失败: {}".format(yaml_path))]
+        errors = [
+            ErrorEnvelope(
+                code="yaml_file_read_error",
+                message="YAML 文件读取失败: {}".format(yaml_path),
+                source_path=str(yaml_path),
+                path="(file)",
+                loc=None,
+            )
+        ]
         return (
             ValidationPayload(
                 mode="validate",
@@ -737,17 +751,44 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
             return 1
 
         workflow_source_lines: List[str] = workflow_text.splitlines()
-        workflow_locations = build_yaml_location_index(workflow_text)
-        workflow_errors: List[Issue] = []
-        workflow_warnings: List[Issue] = []
+        workflow_locations: YamlLocationIndex = {}
+        workflow_errors: List[ErrorEnvelope] = []
+        workflow_warnings: List[ErrorEnvelope] = []
 
         wf_config = None
         try:
-            wf_config = load_workflow_config(str(yaml_path))
-        except ScalimWorkflowConfigError as exc:
-            workflow_errors.append(Issue(path=str(exc.path or "(root)"), message=str(exc)))
-        except Exception as exc:  # noqa: BLE001
-            workflow_errors.append(Issue(path="(root)", message="Unexpected error: {}: {}".format(type(exc).__name__, exc)))
+            root, workflow_locations, _lines = load_yaml_mapping_text(
+                workflow_text,
+                source_path=str(yaml_path),
+                detect_duplicate_keys=True,
+            )
+        except ScalimYamlValidationError as exc:
+            workflow_errors.extend(list(exc.errors))
+            workflow_warnings.extend(list(exc.warnings))
+        else:
+            try:
+                wf_config = load_workflow_config_from_mapping(root)
+            except ScalimWorkflowConfigError as exc:
+                path = str(exc.path or "(root)")
+                workflow_errors.append(
+                    ErrorEnvelope(
+                        code="workflow_validate_error",
+                        message=str(exc),
+                        source_path=str(yaml_path),
+                        path=path,
+                        loc=error_loc_for_yaml_path(path, workflow_locations),
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                workflow_errors.append(
+                    ErrorEnvelope(
+                        code="workflow_validate_error",
+                        message="Unexpected error: {}: {}".format(type(exc).__name__, exc),
+                        source_path=str(yaml_path),
+                        path="(root)",
+                        loc=error_loc_for_yaml_path("(root)", workflow_locations),
+                    )
+                )
 
         demand_results: List[ValidationPayload] = []
         demand_source_lines: List[Optional[List[str]]] = []
@@ -766,14 +807,31 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                         allowed_yaml_roots=allowed_yaml_roots,
                     )
                 except ScalimWorkflowConfigError as exc:
-                    workflow_errors.append(Issue(path="workflow.runs.{}.demand".format(int(run_idx)), message=str(exc)))
+                    wf_path = "workflow.runs.{}.demand".format(int(run_idx))
+                    workflow_errors.append(
+                        ErrorEnvelope(
+                            code="workflow_validate_error",
+                            message=str(exc),
+                            source_path=str(yaml_path),
+                            path=wf_path,
+                            loc=error_loc_for_yaml_path(wf_path, workflow_locations),
+                        )
+                    )
                     demand_results.append(
                         ValidationPayload(
                             mode="validate",
                             ok=False,
                             yaml_path=str(run.demand),
                             schema_path=str(schema_path),
-                            errors=[Issue(path="(file)", message="Demand path resolve failed: {}".format(str(exc)))],
+                            errors=[
+                                ErrorEnvelope(
+                                    code="demand_path_resolve_failed",
+                                    message="Demand path resolve failed: {}".format(str(exc)),
+                                    source_path=str(run.demand),
+                                    path="(file)",
+                                    loc=None,
+                                )
+                            ],
                             warnings=[],
                         )
                     )
@@ -783,9 +841,15 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
 
                 if not demand_path.exists():
                     workflow_errors.append(
-                        Issue(
-                            path="workflow.runs.{}.demand".format(int(run_idx)),
+                        ErrorEnvelope(
+                            code="demand_file_not_found",
                             message="Demand YAML 文件不存在: {}".format(demand_path),
+                            source_path=str(yaml_path),
+                            path="workflow.runs.{}.demand".format(int(run_idx)),
+                            loc=error_loc_for_yaml_path(
+                                "workflow.runs.{}.demand".format(int(run_idx)),
+                                workflow_locations,
+                            ),
                         )
                     )
                     payload, demand_data, lines = _validate_demand_yaml_path(
@@ -819,15 +883,18 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                         continue
                     kind = _intent_kind(intent)
                     workflow_errors.append(
-                        Issue(
-                            path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), kind),
+                        ErrorEnvelope(
+                            code="workflow_unknown_demand_output_id",
                             message="Unknown demand output id: {!r}".format(output_id),
-                            suggestions=sorted(outputs) if outputs else [],
+                            source_path=str(yaml_path),
+                            path="workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), kind),
+                            loc=error_loc_for_yaml_path(
+                                "workflow.runs.{}.writes.{}.{}.output".format(int(run_idx), int(write_idx), kind),
+                                workflow_locations,
+                            ),
+                            suggestions=tuple(sorted(outputs)) if outputs else (),
                         )
                     )
-
-        workflow_errors = attach_locations(workflow_errors, workflow_locations)
-        workflow_warnings = attach_locations(workflow_warnings, workflow_locations)
         workflow_ok = not workflow_errors
 
         workflow_payload = ValidationPayload(
@@ -912,44 +979,65 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
     if exit_code != 0 or schema is None:
         return exit_code
 
-    yaml_data, exit_code = _read_yaml_or_error(
-        yaml_path,
-        json_output=args.json,
-        mode="schema-validate",
-        schema_path=schema_path,
-    )
-    if exit_code != 0 or yaml_data is None:
-        return exit_code
+    try:
+        yaml_text = yaml_path.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        _emit_error(
+            "YAML 文件读取失败: {}".format(yaml_path),
+            json_output=args.json,
+            yaml_path=yaml_path,
+            schema_path=schema_path,
+            mode="schema-validate",
+        )
+        return 1
+    source_lines: Optional[List[str]] = yaml_text.splitlines()
+
+    try:
+        yaml_data_dict, locations, _lines = load_yaml_mapping_text(
+            yaml_text,
+            source_path=str(yaml_path),
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
+        return _emit_schema_result(
+            yaml_path,
+            schema_path,
+            list(exc.errors),
+            list(exc.warnings),
+            args,
+            ok=False,
+            source_lines=source_lines,
+        )
 
     jsonschema_module = _get_jsonschema_module(args, yaml_path=yaml_path, schema_path=schema_path)
     if jsonschema_module is None:
         return 1
 
-    if not isinstance(yaml_data, dict):
-        errors = [Issue(path="(root)", message="YAML root must be a mapping")]
-        return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=None)
-
-    yaml_data_dict = cast("Dict[str, Any]", yaml_data)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
     try:
         if contains_import_syntax(yaml_data_dict):
             _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
     except ScalimYamlImportExpansionError as exc:
-        errors = [Issue(path=exc.logical_path or "(root)", message=str(exc))]
-        return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=None)
-    errors, warnings = _collect_schema_issues(yaml_data_dict, schema, args, jsonschema_module)
-    ok = not errors
-    source_lines: Optional[List[str]] = None
-    locations: Dict[str, Tuple[int, int]] = {}
-    try:
-        yaml_text = yaml_path.read_text(encoding="utf-8")
-        source_lines = yaml_text.splitlines()
-        locations = build_yaml_location_index(yaml_text)
-    except Exception:  # noqa: BLE001
-        source_lines = None
-        locations = {}
+        logical_path = str(exc.logical_path or "(root)")
+        errors = [
+            ErrorEnvelope(
+                code="yaml_import_expansion_error",
+                message=str(exc),
+                source_path=str(yaml_path),
+                path=logical_path,
+                loc=error_loc_for_yaml_path(logical_path, locations),
+            )
+        ]
+        return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=source_lines)
 
-    errors = attach_locations(errors, locations)
-    warnings = attach_locations(warnings, locations)
+    errors, warnings = _collect_schema_issues(
+        yaml_data_dict,
+        schema,
+        args,
+        jsonschema_module,
+        source_path=str(yaml_path),
+        locations=locations,
+    )
+    ok = not errors
 
     return _emit_schema_result(
         yaml_path,
@@ -1014,7 +1102,10 @@ def _collect_schema_issues(
     schema: Dict[str, Any],
     args: argparse.Namespace,
     jsonschema_module: Any,
-) -> Tuple[List[Issue], List[Issue]]:
+    *,
+    source_path: str,
+    locations: YamlLocationIndex,
+) -> Tuple[List[ErrorEnvelope], List[ErrorEnvelope]]:
     try:
         issues = collect_jsonschema_validation_issues(
             yaml_data,
@@ -1024,20 +1115,46 @@ def _collect_schema_issues(
             filter_additional_properties=True,
         )
     except ScalimJsonSchemaCollectorError as exc:
-        errors = [Issue(path="(root)", message=str(exc))]
+        errors = [
+            ErrorEnvelope(
+                code="yaml_schema_validate_error",
+                message=str(exc),
+                source_path=source_path,
+                path="(root)",
+                loc=error_loc_for_yaml_path("(root)", locations),
+            )
+        ]
         return errors, []
 
-    errors = _issues_to_rows(issues)
-    errors.extend(_find_legacy_field_errors(yaml_data))
-    errors.extend(_issues_to_rows(find_unknown_fields(yaml_data, schema)))
+    errors = _issues_to_rows(
+        issues,
+        source_path=source_path,
+        locations=locations,
+        default_code="yaml_schema_validate_error",
+    )
+    errors.extend(
+        _find_legacy_field_errors(
+            yaml_data,
+            source_path=source_path,
+            locations=locations,
+        )
+    )
+    errors.extend(
+        _issues_to_rows(
+            find_unknown_fields(yaml_data, schema),
+            source_path=source_path,
+            locations=locations,
+            default_code="yaml_unknown_field",
+        )
+    )
     return errors, []
 
 
 def _emit_schema_result(
     yaml_path: Path,
     schema_path: Path,
-    errors: List[Issue],
-    warnings: List[Issue],
+    errors: List[ErrorEnvelope],
+    warnings: List[ErrorEnvelope],
     args: argparse.Namespace,
     *,
     ok: bool,

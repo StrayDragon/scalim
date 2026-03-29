@@ -6,6 +6,7 @@ import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
 from scalim.dsl.by_yaml.config_parsing import imports as imports_mod
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError, load_and_expand_imports
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import validate_yaml_text
@@ -569,7 +570,7 @@ sources:
 
 def test_yaml_demand_loader_load_string_fail_fast_on_imports() -> None:
     loader = YamlDemandLoader()
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         _ = loader.load_string(
             """
 name: demo
@@ -581,7 +582,7 @@ main_source:
 sources: {}
 """.lstrip()
         )
-    assert "imports/$import" in str(exc.value)
+    assert any("imports/$import" in env.message for env in exc.value.errors)
 
 
 def test_cli_validate_and_schema_validate_expand_imports(tmp_path) -> None:
@@ -872,7 +873,7 @@ $import: f
     )
     with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
         _ = load_and_expand_imports(demand)
-    assert "YAML config must be a mapping" in str(excinfo.value)
+    assert "YAML root must be a mapping" in str(excinfo.value)
 
 
 def test_imports_cache_shortcuts_repeat_import_of_same_fragment(tmp_path) -> None:
@@ -929,7 +930,7 @@ demo:
 
 def test_yaml_demand_loader_load_file_handle_rejects_import_syntax() -> None:
     loader = YamlDemandLoader()
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = loader.load(
             io.StringIO(
                 (
@@ -945,7 +946,7 @@ sources: {}
                 ).lstrip()
             )
         )
-    assert "imports/$import" in str(excinfo.value)
+    assert any("imports/$import" in env.message for env in excinfo.value.errors)
 
 
 def test_yaml_demand_loader_load_wraps_import_expansion_error(tmp_path) -> None:
@@ -967,6 +968,6 @@ sources:
     )
 
     loader = YamlDemandLoader()
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = loader.load(demand)
-    assert "Unknown $import alias" in str(excinfo.value)
+    assert any("Unknown $import alias" in env.message for env in excinfo.value.errors)

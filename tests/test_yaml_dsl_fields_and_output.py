@@ -1,6 +1,7 @@
 import pytest
 
 from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
 
@@ -239,12 +240,12 @@ outputs:
       - {extract: id}
 """
     loader = YamlDemandLoader()
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
-    assert any("ambiguous object entry" in msg for msg in exc.value.errors)
-    assert any("a" in msg and "b" in msg for msg in exc.value.errors)
+    assert any(env.path == "outputs.0.fields.0" for env in exc.value.errors)
+    assert any("ambiguous object entry" in env.message for env in exc.value.errors)
+    assert any("a" in env.message and "b" in env.message for env in exc.value.errors)
 
 
 def test_validator_rejects_outputs_fields_object_when_not_found() -> None:
@@ -264,11 +265,11 @@ outputs:
       - {extract: missing}
 """
     loader = YamlDemandLoader()
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
-    assert any("cannot resolve object to a unique field_id" in msg for msg in exc.value.errors)
+    assert any(env.path == "outputs.0.fields.0" for env in exc.value.errors)
+    assert any("cannot resolve object to a unique field_id" in env.message for env in exc.value.errors)
 
 
 def test_validator_rejects_outputs_fields_non_str_and_non_object_item() -> None:
@@ -288,11 +289,11 @@ outputs:
       - 1
 """
     loader = YamlDemandLoader()
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("outputs.0.fields.0" in msg for msg in exc.value.errors)
-    assert any("must be field_id string" in msg for msg in exc.value.errors)
+    assert any(env.path == "outputs.0.fields.0" for env in exc.value.errors)
+    assert any("must be field_id string" in env.message for env in exc.value.errors)
 
 
 def test_validator_outputs_object_ref_check_skips_non_object_outputs_items() -> None:

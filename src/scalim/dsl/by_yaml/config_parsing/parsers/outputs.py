@@ -22,6 +22,16 @@ from ...schema_dsl.models import (
     OutputTargetConfig,
 )
 from ...schema_dsl.output_enums import (
+    AGG_DISTINCT_ON_OVERFLOW_ENUM,
+    AGG_RANK_ORDER_ENUM,
+    AGG_RANK_TOP_K_MODE_ENUM,
+    DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
+    DEFAULT_AGG_RANK_ORDER,
+    DEFAULT_AGG_RANK_TOP_K_MODE,
+    OUTPUT_CONTAINER_TYPES,
+    OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM,
+)
+from ...schema_dsl.output_enums import (
     AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,
 )
 from ...schema_dsl.output_enums import (
@@ -36,11 +46,6 @@ from ..security import ScalimComputeExpressionError, ScalimSecurityError, Secure
 from .utils import list_or_none, mapping_or_none, str_or_none
 
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-_OUTPUT_CONTAINER_TYPES = ("workbook", "csv")
-_OUTPUT_HEADER_BY_ENUM = ("field_id", "name")
-_AGG_DISTINCT_ON_OVERFLOW_ENUM = ("error", "truncate")
-_AGG_RANK_ORDER_ENUM = ("asc", "desc")
-_AGG_RANK_TOP_K_MODE_ENUM = ("rank", "rows")
 
 
 def _non_empty_str(raw: object) -> str:
@@ -394,15 +399,15 @@ class ParserOutputsMixin:
         if not typ:
             msg = "{}.type is required".format(base_path)
             raise ValueError(msg)
-        if typ not in _OUTPUT_CONTAINER_TYPES:
-            msg = "{}.type={!r} is invalid; expected one of: {}".format(base_path, typ, ", ".join(_OUTPUT_CONTAINER_TYPES))
+        if typ not in OUTPUT_CONTAINER_TYPES:
+            msg = "{}.type={!r} is invalid; expected one of: {}".format(base_path, typ, ", ".join(OUTPUT_CONTAINER_TYPES))
             raise ValueError(msg)
         if typ == "workbook" and not path:
             msg = "{}.path is required for workbook outputs".format(base_path)
             raise ValueError(msg)
-        if header_by not in _OUTPUT_HEADER_BY_ENUM:
+        if header_by not in OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM:
             msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(
-                base_path, header_by, ", ".join(_OUTPUT_HEADER_BY_ENUM)
+                base_path, header_by, ", ".join(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM)
             )
             raise ValueError(msg)
 
@@ -479,12 +484,18 @@ class ParserOutputsMixin:
             msg = "{}.max_distinct must be >= 0".format(base_path)
             raise ValueError(msg)
 
-        distinct_on_overflow = str(raw.get(OUTPUT_AGGREGATE_KEYS["distinct_on_overflow"], "error") or "error").lower()
-        if distinct_on_overflow not in _AGG_DISTINCT_ON_OVERFLOW_ENUM:
+        distinct_on_overflow = str(
+            raw.get(
+                OUTPUT_AGGREGATE_KEYS["distinct_on_overflow"],
+                DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
+            )
+            or DEFAULT_AGG_DISTINCT_ON_OVERFLOW
+        ).lower()
+        if distinct_on_overflow not in AGG_DISTINCT_ON_OVERFLOW_ENUM:
             msg = "{}.distinct_on_overflow={!r} is invalid; expected one of: {}".format(
                 base_path,
                 distinct_on_overflow,
-                ", ".join(_AGG_DISTINCT_ON_OVERFLOW_ENUM),
+                ", ".join(AGG_DISTINCT_ON_OVERFLOW_ENUM),
             )
             raise ValueError(msg)
 
@@ -726,9 +737,9 @@ class ParserOutputsMixin:
                 raise ValueError(msg)
             partition_by = tuple(normalized_partition_by)
 
-        order = str(args.get("order") or "desc").lower()
-        if order not in _AGG_RANK_ORDER_ENUM:
-            msg = "{}.{}.order={!r} is invalid; expected one of: {}".format(base_path, producer_key, order, ", ".join(_AGG_RANK_ORDER_ENUM))
+        order = str(args.get("order") or DEFAULT_AGG_RANK_ORDER).lower()
+        if order not in AGG_RANK_ORDER_ENUM:
+            msg = "{}.{}.order={!r} is invalid; expected one of: {}".format(base_path, producer_key, order, ", ".join(AGG_RANK_ORDER_ENUM))
             raise ValueError(msg)
 
         order_by_list = list_or_none(args.get("order_by"))
@@ -759,13 +770,13 @@ class ParserOutputsMixin:
             msg = "{}.{}.top_k must be >= 0".format(base_path, producer_key)
             raise ValueError(msg)
 
-        top_k_mode = str(args.get("top_k_mode") or "rank").lower()
-        if top_k_mode not in _AGG_RANK_TOP_K_MODE_ENUM:
+        top_k_mode = str(args.get("top_k_mode") or DEFAULT_AGG_RANK_TOP_K_MODE).lower()
+        if top_k_mode not in AGG_RANK_TOP_K_MODE_ENUM:
             msg = "{}.{}.top_k_mode={!r} is invalid; expected one of: {}".format(
                 base_path,
                 producer_key,
                 top_k_mode,
-                ", ".join(_AGG_RANK_TOP_K_MODE_ENUM),
+                ", ".join(AGG_RANK_TOP_K_MODE_ENUM),
             )
             raise ValueError(msg)
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml import compile
 from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
@@ -201,7 +201,7 @@ main_source:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
-    with pytest.raises(ScalimConfigValidationError) as excinfo:
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.loader_retry_allowlist_mod"]))
 
-    assert any("_templates.retry.db_default.backoff" in err for err in excinfo.value.errors)
+    assert any("_templates.retry.db_default.backoff" in env.path for env in excinfo.value.errors)

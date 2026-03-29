@@ -1874,6 +1874,17 @@ observability:
 scalim-cli yaml-dsl validate config.yaml
 ```
 
+机器消费(JSON)输出:
+
+```bash
+scalim-cli yaml-dsl validate --json config.yaml
+```
+
+约定:
+- `errors`/`warnings` 中每条均为稳定结构: `code/message/source_path/path/loc(line,column)`(可选 `suggestions`)
+- `loc` 的行/列为 **1-based**;同一份 YAML 在 `CLI validate` / `compile` / `workflow validate` 下定位口径一致
+- 出于安全考虑,`YAML parse error` 不回显完整 YAML 文本正文(仅给出可诊断的摘要 + 定位信息)
+
 ```python
 # 或在代码中(编译时会自动校验;需配置 allowlist)
 from scalim.dsl.by_yaml import compile

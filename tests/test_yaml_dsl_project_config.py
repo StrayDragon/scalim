@@ -5,6 +5,7 @@ import pytest
 from scalim.dsl.by_yaml.config_parsing import imports as imports_mod
 from scalim.dsl.by_yaml.config_parsing import presets as presets_mod
 from scalim.dsl.by_yaml.config_parsing import project_config as project_config_mod
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 
 
 def test_parse_scalim_preset_uri_rejects_non_scalim_scheme() -> None:
@@ -80,14 +81,14 @@ def test_load_yaml_mapping_from_source_rejects_preset_source_missing_preset_id()
 def test_load_yaml_mapping_from_source_rejects_non_mapping_preset(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(imports_mod, "load_scalim_preset_yaml_text", lambda _preset_id: "- 1\n")
     source = imports_mod.ImportSource(kind="preset", key="scalim://bad", preset_id="bad")
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = imports_mod._load_yaml_mapping_from_source(  # noqa: SLF001
             source,
             template_vars=None,
             template_sandbox="safe",
             rendered_yaml_max_len=imports_mod.DEFAULT_RENDERED_YAML_MAX_LEN,
         )
-    assert "must be a mapping" in str(excinfo.value)
+    assert any(env.code == "yaml_root_not_mapping" for env in excinfo.value.errors)
 
 
 def test_load_yaml_mapping_from_source_rejects_unknown_kind() -> None:

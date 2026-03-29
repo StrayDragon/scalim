@@ -111,6 +111,48 @@ def test_validate_yaml_text_reports_parse_error_with_location() -> None:
     assert issue.column is not None
 
 
+def test_validate_yaml_text_parse_error_without_mark_has_no_loc(monkeypatch) -> None:
+    import scalim.dsl.by_yaml.config_parsing.validator as validator_mod
+
+    class _NoMarkError(validator_mod.yaml.YAMLError):  # pyright: ignore[reportUnknownMemberType]
+        pass
+
+    def _raise(_text: str) -> object:
+        raise _NoMarkError("boom")
+
+    monkeypatch.setattr(validator_mod.yaml, "safe_load", _raise)
+    result = validator_mod.validate_yaml_text("name: demo\n")
+
+    assert result.ok is False
+    issue = result.errors[0]
+    assert issue.line is None
+    assert issue.column is None
+
+
+def test_validate_yaml_text_parse_error_with_non_int_mark_has_no_loc(monkeypatch) -> None:
+    import scalim.dsl.by_yaml.config_parsing.validator as validator_mod
+
+    class _BadMark:
+        line = "x"
+        column = 1
+
+    class _BadMarkError(validator_mod.yaml.YAMLError):  # pyright: ignore[reportUnknownMemberType]
+        def __init__(self, message: str) -> None:
+            super(_BadMarkError, self).__init__(message)
+            self.problem_mark = _BadMark()
+
+    def _raise(_text: str) -> object:
+        raise _BadMarkError("boom")
+
+    monkeypatch.setattr(validator_mod.yaml, "safe_load", _raise)
+    result = validator_mod.validate_yaml_text("name: demo\n")
+
+    assert result.ok is False
+    issue = result.errors[0]
+    assert issue.line is None
+    assert issue.column is None
+
+
 def test_validate_yaml_text_handles_empty_doc() -> None:
     result = validate_yaml_text("")
     assert result.ok is False
@@ -385,26 +427,33 @@ def test_validate_yaml_text_json_roundtrip() -> None:
 
 
 def test_private_helpers_location_and_error_paths() -> None:
-    from scalim.dsl.by_yaml.config_parsing import validator as validator_module  # noqa: PLC0415
+    from scalim.dsl.by_yaml.config_parsing import yaml_load as yaml_load_module  # noqa: PLC0415
 
     locations = {"a": (9, 9)}
-    validator_module._record_location(locations, ["a"], None)
+    yaml_load_module._record_location(locations, ["a"], None)
     assert locations == {"a": (9, 9)}
 
     mark = type("Mark", (), {"line": 0, "column": 0})()
-    validator_module._record_location(locations, ["a"], mark)
+    yaml_load_module._record_location(locations, ["a"], mark)
     assert locations == {"a": (9, 9)}
 
-    validator_module._record_location(locations, ["b"], mark)
+    yaml_load_module._record_location(locations, ["b"], mark)
     assert locations["b"] == (1, 1)
 
-    validator_module._index_yaml_node(None, [], locations)
+    yaml_load_module._index_yaml_node(None, [], locations)
 
     class DummyExc(Exception):
         pass
 
-    assert validator_module._extract_yaml_error_location(DummyExc()) is None
+    assert yaml_load_module._extract_yaml_error_location(DummyExc()) is None
 
     exc = DummyExc()
     exc.problem_mark = type("BadMark", (), {"line": "nope", "column": 1})()
-    assert validator_module._extract_yaml_error_location(exc) is None
+    assert yaml_load_module._extract_yaml_error_location(exc) is None
+
+
+def test_ensure_mapping_rejects_non_mapping() -> None:
+    from scalim.dsl.by_yaml.config_parsing.models import ensure_mapping
+
+    with pytest.raises(TypeError, match="mapping"):
+        _ = ensure_mapping([])

@@ -19,6 +19,14 @@
 - `PROJECT_CLI_NAME yaml-dsl schema validate` 走 JSON Schema(依赖 `jsonschema`)并补充 unknown fields/legacy fields 的诊断.
 - CLI 的 `--json` 输出提供结构化 payload(含 `ok`/`errors`/`warnings`/`yaml_path`/`schema_path`)供脚本化消费.
 ## Requirements
+### Requirement: CLI validation MUST reuse the unified YAML load facade
+
+系统 MUST 要求 `PROJECT_CLI_NAME yaml-dsl validate`（或等价 CLI 校验入口）复用统一的 YAML load facade,以保证与 runtime/compile/workflow validate 的一致性.
+
+#### Scenario: CLI validate matches compile error structure
+- **WHEN** 某份 YAML 在 runtime compile/run 中因 parse/duplicate key 失败
+- **THEN** 同一份 YAML 在 CLI validate 下 MUST 以相同 ErrorEnvelope 结构失败（差异仅限入口标识/命令上下文）
+
 ### Requirement: CLI validate 与 schema validate 职责边界(避免重复诊断)
 系统 SHALL 将 YAML DSL 校验命令明确分层,并保证 schema/unknown-fields 诊断一致且可预测:
 

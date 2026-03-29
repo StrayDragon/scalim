@@ -1,24 +1,15 @@
 import copy
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from ....exceptions import ScalimYamlError
-from ....vendor.compact.importlibx import require_optional_dependency
 from ....vendor.dataclassesx import dataclass
 from .allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
 from .presets import load_scalim_preset_yaml_text
 from .project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
 from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
-
-if TYPE_CHECKING:
-    import yaml
-else:
-    yaml = require_optional_dependency(
-        "yaml",
-        context="scalim.dsl.by_yaml.config_parsing.imports",
-        install_name="pyyaml",
-    )
+from .yaml_load import load_yaml_mapping_text
 
 IMPORTS_KEY = "imports"
 IMPORT_KEY = "$import"
@@ -482,11 +473,12 @@ def _load_yaml_mapping(
         template_sandbox=template_sandbox,
         rendered_yaml_max_len=rendered_yaml_max_len,
     )
-    loaded = yaml.safe_load(text)
-    if not isinstance(loaded, dict):
-        msg = "YAML config must be a mapping"
-        raise TypeError(msg)
-    return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
+    loaded, _locations, _lines = load_yaml_mapping_text(
+        text,
+        source_path=str(yaml_path),
+        detect_duplicate_keys=True,
+    )
+    return loaded
 
 
 def _load_and_expand_source(
@@ -565,11 +557,12 @@ def _load_yaml_mapping_from_source(
             template_sandbox=template_sandbox,
             rendered_yaml_max_len=rendered_yaml_max_len,
         )
-        loaded = yaml.safe_load(text)
-        if not isinstance(loaded, dict):
-            msg = "YAML config must be a mapping"
-            raise TypeError(msg)
-        return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
+        loaded, _locations, _lines = load_yaml_mapping_text(
+            text,
+            source_path=str(source.key),
+            detect_duplicate_keys=True,
+        )
+        return loaded
     msg = "Unknown ImportSource.kind: '{}'".format(source.kind)
     raise ValueError(msg)
 

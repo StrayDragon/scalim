@@ -10,21 +10,12 @@ from ....vendor.dataclassesx import field as dataclass_field
 
 if TYPE_CHECKING:
     import yaml
-    from yaml.nodes import MappingNode, SequenceNode
 else:
     yaml = require_optional_dependency(
         "yaml",
         context="scalim.dsl.by_yaml.config_parsing.validator",
         install_name="pyyaml",
     )
-    _yaml_nodes = require_optional_dependency(
-        "yaml.nodes",
-        context="scalim.dsl.by_yaml.config_parsing.validator",
-        install_name="pyyaml",
-    )
-    MappingNode = _yaml_nodes.MappingNode
-    SequenceNode = _yaml_nodes.SequenceNode
-
 from ..init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
 from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_CONTAINER_KEYS, OUTPUT_TARGET_KEYS
@@ -42,6 +33,7 @@ from .validators.issues import (
     ValidationIssue,
     ValidationReport,
 )
+from .yaml_load import YamlLocationIndex, build_yaml_location_index, lookup_yaml_location, safe_yaml_parse_error_message
 
 try:
     jsonschema = import_module("jsonschema")
@@ -500,9 +492,6 @@ class ConfigValidator(ValidatorFieldsMixin):
                 self._add_error(errors, exc.reason, path=exc.path)
 
 
-YamlLocationIndex = Dict[str, Tuple[int, int]]
-
-
 @dataclass(frozen=True)
 class YamlValidationIssue:
     path: str
@@ -556,85 +545,6 @@ def _normalize_issue_path(path: str) -> str:
     if cleaned == "(root)":
         return ""
     return cleaned
-
-
-def _record_location(locations: YamlLocationIndex, path: List[str], mark: Any) -> None:
-    if mark is None:
-        return
-    path_key = ".".join(path)
-    if path_key in locations:
-        return
-    locations[path_key] = (mark.line + 1, mark.column + 1)
-
-
-def _index_yaml_node(
-    node: Any,
-    path: List[str],
-    locations: YamlLocationIndex,
-    *,
-    record_current: bool = True,
-) -> None:
-    if node is None:
-        return
-    if record_current:
-        _record_location(locations, path, getattr(node, "start_mark", None))  # pragma: allow-dynattr third-party: pyyaml node.start_mark
-
-    if isinstance(node, MappingNode):
-        for key_node, value_node in node.value:
-            key = str(getattr(key_node, "value", ""))  # pragma: allow-dynattr third-party: pyyaml node.value
-            key_path = [*path, key]
-            key_mark = getattr(key_node, "start_mark", None)  # pragma: allow-dynattr third-party: pyyaml node.start_mark
-            _record_location(
-                locations,
-                key_path,
-                key_mark,
-            )
-            _index_yaml_node(value_node, key_path, locations, record_current=False)
-        return
-
-    if isinstance(node, SequenceNode):
-        for idx, item_node in enumerate(node.value):
-            idx_path = [*path, str(idx)]
-            item_mark = getattr(item_node, "start_mark", None)  # pragma: allow-dynattr third-party: pyyaml node.start_mark
-            _record_location(
-                locations,
-                idx_path,
-                item_mark,
-            )
-            _index_yaml_node(item_node, idx_path, locations, record_current=False)
-
-
-def _compose_yaml_node(yaml_text: str) -> Optional[object]:
-    return cast(
-        "Optional[object]",
-        yaml.compose(yaml_text, Loader=yaml.SafeLoader),  # pyright: ignore[reportUnknownMemberType]
-    )  # pragma: allow-cast pyyaml compose typed narrowing
-
-
-def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:
-    try:
-        root = _compose_yaml_node(yaml_text)
-    except Exception:  # noqa: BLE001
-        return {}
-    if root is None:
-        return {}
-    locations: YamlLocationIndex = {}
-    _index_yaml_node(root, [], locations, record_current=True)
-    return locations
-
-
-def lookup_yaml_location(path: str, locations: YamlLocationIndex) -> Optional[Tuple[int, int]]:
-    if path in locations:
-        return locations[path]
-    if not path:
-        return locations.get("")
-    parts = path.split(".")
-    while parts:
-        _ = parts.pop()
-        candidate = ".".join(parts)
-        if candidate in locations:
-            return locations[candidate]
-    return locations.get("")
 
 
 def attach_locations(
@@ -705,7 +615,7 @@ def validate_yaml_text(
             errors=[
                 YamlValidationIssue(
                     path="(root)",
-                    message="YAML parse error: {}".format(exc),
+                    message="YAML parse error: {}".format(safe_yaml_parse_error_message(exc)),
                     line=line,
                     column=column,
                 )

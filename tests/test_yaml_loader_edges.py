@@ -2,18 +2,18 @@ import io
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 
 
 def _assert_load_string_errors(yaml_content: str, *expected_messages: str) -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_content)
 
     for message in expected_messages:
-        assert any(message in msg for msg in exc.value.errors)
+        assert any(message in env.message for env in exc.value.errors)
 
 
 def test_loader_reads_from_stream_and_skips_invalid_sections() -> None:
@@ -28,18 +28,19 @@ sources: []
 fields: []
 relations: []
 """
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load(io.StringIO(yaml_content))
 
-    assert any("'relations' must be a dictionary" in msg for msg in exc.value.errors)
-    assert any("'fields' must be a dictionary" in msg for msg in exc.value.errors)
+    assert any("'relations' must be a dictionary" in env.message for env in exc.value.errors)
+    assert any("'fields' must be a dictionary" in env.message for env in exc.value.errors)
 
 
 def test_loader_rejects_non_mapping_root() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(TypeError, match="mapping"):
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string("- item")
+    assert any("mapping" in env.message for env in exc.value.errors)
 
 
 def test_loader_skips_invalid_source_and_field_entries() -> None:

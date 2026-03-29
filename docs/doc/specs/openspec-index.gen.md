@@ -431,6 +431,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-schema/spec.md)
 - Summary: **状态: ✅ 已实现** 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 
+### `yaml-dsl-unified-loader`
+- Title: yaml-dsl-unified-loader Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-unified-loader/spec.md)
+- Summary: TBD - created by archiving change c30-yaml-dsl-rigor-ssot. Update Purpose after archive.
+
 ### `yaml-dsl-workflow`
 - Title: yaml-dsl-workflow Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow/spec.md)

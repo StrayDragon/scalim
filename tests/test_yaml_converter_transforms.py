@@ -3,11 +3,11 @@ from decimal import Decimal
 import pytest
 
 from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
+from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_str
 from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_decimal
 from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
@@ -119,14 +119,14 @@ fields:
   order_id:
     extract: order_id
     value_cast: not_supported
-""",
+    """,
         sources="{}",
     )
     loader = YamlDemandLoader()
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("invalid value_cast" in msg for msg in exc.value.errors)
+    assert any("invalid value_cast" in env.message for env in exc.value.errors)
 
 
 @pytest.mark.parametrize(
@@ -230,13 +230,13 @@ orders_to_customers: &orders_to_customers
       to: customers.customer_id
       lookup_cast:
         name: bad
-""",
+    """,
     )
     loader = YamlDemandLoader()
-    with pytest.raises(ScalimConfigValidationError) as exc:
+    with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("lookup_cast has invalid name" in msg for msg in exc.value.errors)
+    assert any("lookup_cast has invalid name" in env.message for env in exc.value.errors)
 
 
 def test_converter_private_lookup_cast_raises() -> None:
