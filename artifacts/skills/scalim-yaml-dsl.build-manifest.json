@@ -255,7 +255,9 @@
           "commit_all/discard_all 与 inflight 并发交错语义",
           "workflow workbook exports MUST escape Excel formulas by default",
           "workflow workbook resource authoring surface MUST support allow_formulas",
-          "workflow MUST precheck Excel output-path collisions across books deterministically"
+          "workflow MUST precheck Excel output-path collisions across books deterministically",
+          "commit order MUST NOT depend on thread scheduling",
+          "workbook/sheetbook sheet order MUST be stable"
         ],
         "slug": "workflow-shared-output-containers"
       },
@@ -431,7 +433,7 @@
     },
     {
       "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "0e022ffd38ea3deaa5dab4735a2286dc5dcf6993919dc2972c96e94b463e0426"
+      "sha256": "ee609deb264d321b674cd344b0d17b7bc3d9d6fcddcb443cd7d3c98f48a36c78"
     },
     {
       "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
@@ -485,7 +487,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "c55690ada8a5db3250785f2a3603f7be21a332cffaf6abf91dbbd96061fe4496"
+      "sha256": "71eb622c57d7bb024e79fe79df68c3e31b8157ed667e69862020b08720431abb"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

@@ -69,6 +69,7 @@ class _WorkbookPlan:
     path: str
     lock_path: Optional[Path]
     allow_formulas: bool
+    sheet_decl_order: Dict[str, int]
     sheet_order: List[str]
     sheets: Dict[str, _SheetPlan]
     last_workflow_node_id: Optional[str] = None
@@ -85,12 +86,20 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 raise ScalimWorkflowWriteError(msg)
             lock_path = None
             if bool(self._workbook_write_lock.get(key, False)):
-                lock_path = acquire_write_lock(raw_path)
+                lock_path = acquire_write_lock(
+                    raw_path,
+                    owner={
+                        "workflow_exec_id": self._workflow_exec_id,
+                        "resource_type": "workbook",
+                        "resource_id": key,
+                    },
+                )
             return _WorkbookPlan(
                 resource_id=key,
                 path=str(raw_path),
                 lock_path=lock_path,
                 allow_formulas=bool(self._workbook_allow_formulas.get(key, False)),
+                sheet_decl_order={},
                 sheet_order=[],
                 sheets={},
             )
@@ -118,6 +127,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         self,
         *,
         workflow_node_id: str,
+        decl_order: int,
         workbook_id: str,
         sheet: str,
         input_node_id: str,
@@ -146,11 +156,15 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                     action = "overwrite"
 
             if not pending_skip:
-                if existing is None:
-                    plan.sheet_order.append(sheet_name)
+                existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+                resolved_decl_order = int(decl_order)
+                if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+                    plan.sheet_decl_order[sheet_name] = resolved_decl_order
+                plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
 
                 mapping = _build_alignment_mapping(input_header, input_header)
                 segment = _AppendSegment(
+                    decl_order=int(decl_order),
                     input_csv=input_csv,
                     header_policy="once",
                     mapping=mapping,
@@ -191,6 +205,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         self,
         *,
         workflow_node_id: str,
+        decl_order: int,
         workbook_id: str,
         sheet: str,
         input_node_id: str,
@@ -211,9 +226,19 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         with self._lock:
             sheet_plan = plan.sheets.get(sheet_name)
             if sheet_plan is None:
-                plan.sheet_order.append(sheet_name)
+                plan.sheet_decl_order[sheet_name] = int(decl_order)
+                plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
                 sheet_plan = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[])
                 plan.sheets[sheet_name] = sheet_plan
+            else:
+                existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+                resolved_decl_order = int(decl_order)
+                if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+                    plan.sheet_decl_order[sheet_name] = resolved_decl_order
+                    plan.sheet_order = sorted(
+                        plan.sheet_decl_order.keys(),
+                        key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)),
+                    )
 
             expected = list(sheet_plan.baseline_header)
             mapping = _build_alignment_mapping(expected, input_header)
@@ -239,6 +264,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             if not pending_skip:
                 sheet_plan.segments.append(
                     _AppendSegment(
+                        decl_order=int(decl_order),
                         input_csv=input_csv,
                         header_policy=str(header_policy),
                         mapping=mapping,
@@ -307,7 +333,8 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                     continue  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
                 ws = wb.create_sheet(str(sheet_name))
                 header_written = False
-                for seg in sheet_plan.segments:
+                segments = sorted(sheet_plan.segments, key=lambda seg: int(seg.decl_order))
+                for seg in segments:
                     if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
                         header = [escape_excel_formula(x, allow_formulas=bool(p.allow_formulas)) for x in list(sheet_plan.baseline_header)]
                         _ = ws.append(header)

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from .._internal.warningsx import ScalimExperimentalWarning
-from ..events import EVENT_DIAGNOSTIC_WARNING
+from ..events import EVENT_DIAGNOSTIC_WARNING, Event
 from ..hooks import HookManager, IExecutionHook
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
@@ -33,6 +33,7 @@ from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySe
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, replace
 from ..vendor.dataclassesx import field as dataclass_field
+from .adaptive.capture import HookCaptureManager, HookRecordedEvent
 from .engine import ScalimEngine
 from .guardrails import GuardrailsPolicy
 from .key_normalization import normalize_key_normalization
@@ -519,7 +520,7 @@ def _build_observer_and_hook_managers(
     plan: ExecutionPlan,
     request: ExecutionRequest,
     event_meta_defaults: Optional[Dict[str, Any]] = None,
-) -> Tuple["ObserverManager", HookManager]:
+) -> Tuple["ObserverManager", HookManager, Optional[VizObserver]]:
     fallback_logger_enabled = False
     viz_config: Optional[VizObserverConfig] = None
     if request.observability is not None:
@@ -532,14 +533,16 @@ def _build_observer_and_hook_managers(
     for observer in component_observers:
         observer_manager.register(observer)
 
+    viz_observer: Optional[VizObserver] = None
     if viz_config is not None:
-        observer_manager.register(VizObserver.from_plan(plan, viz_config, output_composition=request.output_composition))
+        viz_observer = VizObserver.from_plan(plan, viz_config, output_composition=request.output_composition)
+        observer_manager.register(viz_observer)
 
     hook_manager = HookManager(fallback_logger_enabled=fallback_logger_enabled)
     for hook in component_hooks:
         hook_manager.register(hook)
 
-    return observer_manager, hook_manager
+    return observer_manager, hook_manager, viz_observer
 
 
 def _build_field_fingerprints_for_meta(demand_ir: DemandIr) -> List[Tuple[str, str, str, str]]:
@@ -684,20 +687,17 @@ def _create_engine_with_cleanup(
         raise
 
 
-def run_ir(
+def _run_ir_with_plan_and_managers(
     demand_ir: DemandIr,
+    plan: ExecutionPlan,
     request: ExecutionRequest,
+    *,
+    hook_manager: HookManager,
+    observer_manager: "ObserverManager",
+    wall_start_time: float,
+    start_time: float,
     engine_factory: Optional[Callable[..., ScalimEngine]] = None,
-    event_meta_defaults: Optional[Dict[str, Any]] = None,
 ) -> ExecutionResult:
-    start_time = time.perf_counter()
-    wall_start_time = time.time()
-
-    request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
-
-    plan = _build_execution_plan(demand_ir, request)
-    observer_manager, hook_manager = _build_observer_and_hook_managers(plan=plan, request=request, event_meta_defaults=event_meta_defaults)
-
     if request.key_normalization != "raw":
         msg = "EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(request.key_normalization)
 
@@ -799,6 +799,76 @@ def run_ir(
         output_target_stats=output_target_stats,
         in_memory_csv_outputs=in_memory_csv_outputs,
         in_memory_rows=in_memory_rows,
+    )
+
+
+def run_ir_capture_events(
+    demand_ir: DemandIr,
+    request: ExecutionRequest,
+    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+    event_meta_defaults: Optional[Dict[str, Any]] = None,
+) -> Tuple[ExecutionResult, List[HookRecordedEvent], List[Event], Optional[VizObserver]]:
+    """运行一次 `demand IR`,但不调用用户 `hooks/observers`;改为捕获事件供上层按确定顺序回放.
+
+    主要用于工作流并发执行时实现 `capture+replay`.
+    """
+    start_time = time.perf_counter()
+    wall_start_time = time.time()
+
+    request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
+
+    plan = _build_execution_plan(demand_ir, request)
+    replay_observer_manager, replay_hook_manager, viz_observer = _build_observer_and_hook_managers(
+        plan=plan,
+        request=request,
+        event_meta_defaults=event_meta_defaults,
+    )
+
+    hook_manager = HookCaptureManager(replay_hook_manager)
+    observer_manager = replay_observer_manager.create_capture_manager()
+    observer_manager.max_recorded_events = None
+
+    result = _run_ir_with_plan_and_managers(
+        demand_ir,
+        plan,
+        request,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        wall_start_time=wall_start_time,
+        start_time=start_time,
+        engine_factory=engine_factory,
+    )
+    hook_events = hook_manager.drain_events()
+    events = observer_manager.drain_events()
+    return result, hook_events, events, viz_observer
+
+
+def run_ir(
+    demand_ir: DemandIr,
+    request: ExecutionRequest,
+    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+    event_meta_defaults: Optional[Dict[str, Any]] = None,
+) -> ExecutionResult:
+    start_time = time.perf_counter()
+    wall_start_time = time.time()
+
+    request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
+
+    plan = _build_execution_plan(demand_ir, request)
+    observer_manager, hook_manager, _viz_observer = _build_observer_and_hook_managers(
+        plan=plan,
+        request=request,
+        event_meta_defaults=event_meta_defaults,
+    )
+    return _run_ir_with_plan_and_managers(
+        demand_ir,
+        plan,
+        request,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        wall_start_time=wall_start_time,
+        start_time=start_time,
+        engine_factory=engine_factory,
     )
 
 

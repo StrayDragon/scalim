@@ -32,6 +32,7 @@ class WorkflowResourceManager(
         self,
         *,
         workflow_node_id: str,
+        decl_order: int,
         book_id: str,
         sheet: str,
         input_node_id: str,
@@ -43,6 +44,7 @@ class WorkflowResourceManager(
         if kind == "xlsx_file":
             return self.apply_workbook_sheet(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(decl_order),
                 workbook_id=str(book_id),
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
@@ -53,6 +55,7 @@ class WorkflowResourceManager(
         if kind == "xlsx_memory":
             return self.apply_sheetbook_sheet(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(decl_order),
                 sheetbook_id=str(book_id),
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
@@ -67,6 +70,7 @@ class WorkflowResourceManager(
         self,
         *,
         workflow_node_id: str,
+        decl_order: int,
         book_id: str,
         sheet: str,
         input_node_id: str,
@@ -80,6 +84,7 @@ class WorkflowResourceManager(
         if kind == "xlsx_file":
             return self.apply_workbook_append(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(decl_order),
                 workbook_id=str(book_id),
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
@@ -92,6 +97,7 @@ class WorkflowResourceManager(
         if kind == "xlsx_memory":
             return self.apply_sheetbook_append(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(decl_order),
                 sheetbook_id=str(book_id),
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),

@@ -195,6 +195,7 @@ def test_resource_manager_unknown_resource_ids_raise(tmp_path: Path) -> None:
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown workbook resource id"):
         manager.apply_workbook_sheet(
             workflow_node_id="n",
+            decl_order=0,
             workbook_id="nope",
             sheet="S",
             input_node_id="a",
@@ -206,6 +207,7 @@ def test_resource_manager_unknown_resource_ids_raise(tmp_path: Path) -> None:
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown csv resource id"):
         manager.apply_csv_append(
             workflow_node_id="n",
+            decl_order=0,
             csv_id="nope",
             input_node_id="a",
             input_output_id="out",
@@ -217,6 +219,7 @@ def test_resource_manager_unknown_resource_ids_raise(tmp_path: Path) -> None:
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown sheetbook resource id"):
         manager.apply_sheetbook_sheet(
             workflow_node_id="n",
+            decl_order=0,
             sheetbook_id="nope",
             sheet="S",
             input_node_id="a",
@@ -240,6 +243,7 @@ def test_resource_manager_book_unknown_resource_ids_raise(tmp_path: Path) -> Non
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown book resource id"):
         manager.apply_book_sheet(
             workflow_node_id="n",
+            decl_order=0,
             book_id="nope",
             sheet="S",
             input_node_id="a",
@@ -251,6 +255,7 @@ def test_resource_manager_book_unknown_resource_ids_raise(tmp_path: Path) -> Non
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Unknown book resource id"):
         manager.apply_book_append(
             workflow_node_id="n",
+            decl_order=0,
             book_id="nope",
             sheet="S",
             input_node_id="a",
@@ -299,6 +304,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
 
     manager.apply_workbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -311,6 +317,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Field alignment mismatch"):
         manager.apply_workbook_append(
             workflow_node_id="n1",
+            decl_order=1,
             workbook_id="report",
             sheet="S",
             input_node_id="b",
@@ -332,6 +339,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
     )
     manager.apply_workbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -343,6 +351,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
     )
     manager.apply_workbook_append(
         workflow_node_id="n1",
+        decl_order=1,
         workbook_id="report",
         sheet="S",
         input_node_id="b",
@@ -365,6 +374,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
     )
     manager.apply_workbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -376,6 +386,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
     )
     manager.apply_workbook_append(
         workflow_node_id="n1",
+        decl_order=1,
         workbook_id="report",
         sheet="S",
         input_node_id="b",
@@ -406,6 +417,7 @@ def test_resource_manager_csv_append_mismatch_error_and_discard(tmp_path: Path) 
 
     manager.apply_csv_append(
         workflow_node_id="n0",
+        decl_order=0,
         csv_id="merged",
         input_node_id="a",
         input_output_id="detail",
@@ -416,6 +428,7 @@ def test_resource_manager_csv_append_mismatch_error_and_discard(tmp_path: Path) 
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Field alignment mismatch"):
         manager.apply_csv_append(
             workflow_node_id="n1",
+            decl_order=1,
             csv_id="merged",
             input_node_id="b",
             input_output_id="detail",
@@ -441,6 +454,7 @@ def test_resource_manager_csv_append_mismatch_warn_and_skip(tmp_path: Path) -> N
     first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
     manager.apply_csv_append(
         workflow_node_id="n0",
+        decl_order=0,
         csv_id="merged",
         input_node_id="a",
         input_output_id="detail",
@@ -452,6 +466,7 @@ def test_resource_manager_csv_append_mismatch_warn_and_skip(tmp_path: Path) -> N
     mismatch = _write_csv(tmp_path / "b.csv", [["id", "other"], ["b1", "B1"]])
     manager.apply_csv_append(
         workflow_node_id="n1",
+        decl_order=1,
         csv_id="merged",
         input_node_id="b",
         input_output_id="detail",
@@ -464,6 +479,7 @@ def test_resource_manager_csv_append_mismatch_warn_and_skip(tmp_path: Path) -> N
     mismatch2 = _write_csv(tmp_path / "c.csv", [["id", "another"], ["c1", "C1"]])
     manager.apply_csv_append(
         workflow_node_id="n2",
+        decl_order=2,
         csv_id="merged",
         input_node_id="c",
         input_output_id="detail",
@@ -500,6 +516,7 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
 
     manager.apply_sheetbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -510,6 +527,7 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
 
     manager.apply_sheetbook_sheet(
         workflow_node_id="n1",
+        decl_order=1,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="b",
@@ -522,6 +540,7 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Sheet conflict"):
         manager.apply_sheetbook_sheet(
             workflow_node_id="n2",
+            decl_order=2,
             sheetbook_id="sb",
             sheet="S",
             input_node_id="b",
@@ -532,6 +551,7 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
 
     manager.apply_sheetbook_sheet(
         workflow_node_id="n3",
+        decl_order=3,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="c",
@@ -579,6 +599,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
 
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -591,6 +612,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Field alignment mismatch"):
         manager.apply_sheetbook_append(
             workflow_node_id="n1",
+            decl_order=1,
             sheetbook_id="sb",
             sheet="S",
             input_node_id="b",
@@ -620,6 +642,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
     )
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -631,6 +654,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
     )
     manager.apply_sheetbook_append(
         workflow_node_id="n1",
+        decl_order=1,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="b",
@@ -661,6 +685,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
     )
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -672,6 +697,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
     )
     manager.apply_sheetbook_append(
         workflow_node_id="n1",
+        decl_order=1,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="b",
@@ -703,6 +729,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
     )
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S1",
         input_node_id="a",
@@ -715,6 +742,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="max_sheets"):
         manager.apply_sheetbook_append(
             workflow_node_id="n1",
+            decl_order=1,
             sheetbook_id="sb",
             sheet="S2",
             input_node_id="b",
@@ -748,6 +776,7 @@ def test_resource_manager_sheetbook_append_duplicate_producer_is_rejected(tmp_pa
 
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -760,6 +789,7 @@ def test_resource_manager_sheetbook_append_duplicate_producer_is_rejected(tmp_pa
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Duplicate sheetbook write"):
         manager.apply_sheetbook_append(
             workflow_node_id="n1",
+            decl_order=1,
             sheetbook_id="sb",
             sheet="S",
             input_node_id="a",
@@ -792,6 +822,7 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
             self._reentered = True
             self.manager.apply_csv_append(  # type: ignore[union-attr]
                 workflow_node_id="reentry",
+                decl_order=0,
                 csv_id="merged",
                 input_node_id="r",
                 input_output_id="out",
@@ -815,6 +846,7 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
 
     manager.apply_workbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -830,6 +862,7 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
         try:
             manager.apply_workbook_sheet(
                 workflow_node_id="n1",
+                decl_order=1,
                 workbook_id="report",
                 sheet="S",
                 input_node_id="b",
@@ -1348,12 +1381,12 @@ def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_
     lock_calls: List[str] = []
     orig_acquire_write_lock = resources_workbook_mod.acquire_write_lock
 
-    def _delayed_acquire_write_lock(output_path: str) -> Path:
+    def _delayed_acquire_write_lock(output_path: str, **kwargs: object) -> Path:
         lock_calls.append(str(output_path))
         lock_started.set()
         if not lock_continue.wait(timeout=5.0):
             raise RuntimeError("test timeout waiting to continue acquire_write_lock")
-        return orig_acquire_write_lock(output_path)
+        return orig_acquire_write_lock(output_path, **kwargs)
 
     monkeypatch.setattr(resources_workbook_mod, "acquire_write_lock", _delayed_acquire_write_lock)
 
@@ -1377,6 +1410,7 @@ def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_
         try:
             manager.apply_workbook_sheet(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(str(workflow_node_id).lstrip("n") or 0),
                 workbook_id="report",
                 sheet=str(sheet),
                 input_node_id=str(workflow_node_id),
@@ -1423,12 +1457,12 @@ def test_resource_manager_concurrent_first_csv_write_joins_single_plan_and_acqui
     lock_calls: List[str] = []
     orig_acquire_write_lock = resources_csv_mod.acquire_write_lock
 
-    def _delayed_acquire_write_lock(output_path: str) -> Path:
+    def _delayed_acquire_write_lock(output_path: str, **kwargs: object) -> Path:
         lock_calls.append(str(output_path))
         lock_started.set()
         if not lock_continue.wait(timeout=5.0):
             raise RuntimeError("test timeout waiting to continue acquire_write_lock")
-        return orig_acquire_write_lock(output_path)
+        return orig_acquire_write_lock(output_path, **kwargs)
 
     monkeypatch.setattr(resources_csv_mod, "acquire_write_lock", _delayed_acquire_write_lock)
 
@@ -1451,6 +1485,7 @@ def test_resource_manager_concurrent_first_csv_write_joins_single_plan_and_acqui
         try:
             manager.apply_csv_append(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(str(workflow_node_id).lstrip("n") or 0),
                 csv_id="merged",
                 input_node_id=str(workflow_node_id),
                 input_output_id="detail",
@@ -1492,7 +1527,7 @@ def test_resource_manager_concurrent_first_csv_write_lock_failure_wakes_waiters_
     lock_continue = threading.Event()
     lock_calls: List[str] = []
 
-    def _fail_acquire_write_lock(output_path: str) -> Path:
+    def _fail_acquire_write_lock(output_path: str, **kwargs: object) -> Path:
         lock_calls.append(str(output_path))
         lock_started.set()
         if not lock_continue.wait(timeout=5.0):
@@ -1519,6 +1554,7 @@ def test_resource_manager_concurrent_first_csv_write_lock_failure_wakes_waiters_
         try:
             manager.apply_csv_append(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(str(workflow_node_id).lstrip("n") or 0),
                 csv_id="merged",
                 input_node_id=str(workflow_node_id),
                 input_output_id="detail",
@@ -1588,6 +1624,7 @@ def test_resource_manager_concurrent_first_sheetbook_write_creates_single_plan(t
         try:
             manager.apply_sheetbook_sheet(
                 workflow_node_id=str(workflow_node_id),
+                decl_order=int(str(workflow_node_id).lstrip("n") or 0),
                 sheetbook_id="sb",
                 sheet=str(sheet),
                 input_node_id=str(workflow_node_id),
@@ -1640,6 +1677,7 @@ def test_resource_manager_sheetbook_iter_rows_visibility_and_errors(tmp_path: Pa
 
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -1651,6 +1689,7 @@ def test_resource_manager_sheetbook_iter_rows_visibility_and_errors(tmp_path: Pa
     )
     manager.apply_sheetbook_append(
         workflow_node_id="n1",
+        decl_order=1,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="b",
@@ -1727,6 +1766,7 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
     first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -1782,6 +1822,7 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
     )
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -1824,6 +1865,7 @@ def test_resource_manager_sheetbook_discard_releases_lock_if_present(tmp_path: P
     first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
     manager.apply_sheetbook_append(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -1899,6 +1941,7 @@ def test_resource_manager_commit_workbook_escapes_excel_formulas_by_default(tmp_
     )
     manager.apply_workbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -1949,6 +1992,7 @@ def test_resource_manager_commit_workbook_allow_formulas_preserves_raw_strings(t
     )
     manager.apply_workbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -2006,6 +2050,7 @@ def test_resource_manager_commit_sheetbook_escapes_excel_formulas_by_default(tmp
     )
     manager.apply_sheetbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -2064,6 +2109,7 @@ def test_resource_manager_commit_sheetbook_allow_formulas_preserves_raw_strings(
     )
     manager.apply_sheetbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         sheetbook_id="sb",
         sheet="S",
         input_node_id="a",
@@ -2105,6 +2151,7 @@ def test_resource_manager_commit_workbook_handles_missing_sheet_plan(tmp_path: P
     csv_path = _write_csv(tmp_path / "input.csv", [["id"], ["a1"]])
     manager.apply_workbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -2137,6 +2184,7 @@ def test_resource_manager_commit_workbook_commit_failure_raises(tmp_path: Path) 
     csv_path = _write_csv(tmp_path / "input.csv", [["id"], ["a1"]])
     manager.apply_workbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",
@@ -2166,6 +2214,7 @@ def test_resource_manager_commit_csv_commit_failure_raises(tmp_path: Path) -> No
     csv_path = _write_csv(tmp_path / "input.csv", [["id"], ["a1"]])
     manager.apply_csv_append(
         workflow_node_id="n0",
+        decl_order=0,
         csv_id="merged",
         input_node_id="a",
         input_output_id="detail",
@@ -2193,6 +2242,7 @@ def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_pat
     csv_path = _write_csv(tmp_path / "input.csv", [["id"], ["a1"]])
     manager.apply_workbook_sheet(
         workflow_node_id="n0",
+        decl_order=0,
         workbook_id="report",
         sheet="S",
         input_node_id="a",

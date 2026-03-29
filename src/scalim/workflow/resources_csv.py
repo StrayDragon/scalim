@@ -91,6 +91,7 @@ def _build_alignment_mapping(expected: Sequence[str], actual: Sequence[str]) -> 
 
 @dataclass
 class _AppendSegment:
+    decl_order: int
     input_csv: WorkflowCsvInput
     header_policy: str
     mapping: List[int]
@@ -118,7 +119,14 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             if raw_path is None:
                 msg = "Unknown csv resource id: {!r}".format(key)
                 raise ScalimWorkflowWriteError(msg)
-            lock_path = acquire_write_lock(raw_path)
+            lock_path = acquire_write_lock(
+                raw_path,
+                owner={
+                    "workflow_exec_id": self._workflow_exec_id,
+                    "resource_type": "csv",
+                    "resource_id": key,
+                },
+            )
             return _CsvPlan(resource_id=key, path=str(raw_path), lock_path=lock_path)
 
         def _on_create(plan: object) -> None:
@@ -144,6 +152,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         self,
         *,
         workflow_node_id: str,
+        decl_order: int,
         csv_id: str,
         input_node_id: str,
         input_output_id: str,
@@ -187,6 +196,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             if not pending_skip:
                 cast("List[_AppendSegment]", plan.segments).append(  # pragma: allow-cast csv segments typed narrowing
                     _AppendSegment(
+                        decl_order=int(decl_order),
                         input_csv=input_csv,
                         header_policy=str(header_policy),
                         mapping=mapping,
@@ -244,7 +254,8 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             with io.open(str(temp_obj), "w", encoding="utf-8", newline="") as handle:
                 writer = csv.writer(handle)
                 header_written = False
-                for seg in p.segments:
+                segments = sorted(p.segments, key=lambda seg: int(seg.decl_order))
+                for seg in segments:
                     if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
                         writer.writerow(list(p.baseline_header))
                         header_written = True

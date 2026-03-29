@@ -945,6 +945,57 @@ def test_workflow_dag_respects_depends_on_under_concurrency(tmp_path: Path) -> N
     assert by_start["b"].seq > by_end["a"].seq
 
 
+def test_workflow_concurrency_does_not_call_components_concurrently_by_default(tmp_path: Path) -> None:
+    import time
+
+    for idx in range(4):
+        _ = _write_demand_yaml(
+            tmp_path,
+            file_name="n{}.yaml".format(int(idx)),
+            name="n{}".format(int(idx)),
+            main_loader_ref="tests.fixtures.workflow_loaders:load_main_slow",
+            preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+            cache_mode="none",
+        )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "n0", "demand": "n0.yaml"},
+            {"id": "n1", "demand": "n1.yaml"},
+            {"id": "n2", "demand": "n2.yaml"},
+            {"id": "n3", "demand": "n3.yaml"},
+        ],
+        max_concurrency=4,
+        failure_policy="primary_only",
+    )
+
+    class _ConcurrentCallProbe(Observer):
+        event_types = {EVENT_PIPELINE_START}
+
+        def __init__(self) -> None:
+            self._guard = threading.Lock()
+            self._active = 0
+            self.max_active = 0
+            self.seen = 0
+
+        def on_event(self, event) -> None:  # type: ignore[override]
+            _ = event
+            with self._guard:
+                self._active += 1
+                self.max_active = max(int(self.max_active), int(self._active))
+                self.seen += 1
+            time.sleep(0.001)
+            with self._guard:
+                self._active -= 1
+
+    probe = _ConcurrentCallProbe()
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[probe])
+    assert not result.errors()
+    assert int(probe.seen) > 0
+    assert int(probe.max_active) == 1
+
+
 def test_workflow_ctx_init_vars_are_resolved_after_prereq_completion(tmp_path: Path) -> None:
     _ = _write_demand_yaml(
         tmp_path,
@@ -2823,6 +2874,7 @@ def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: 
     assert workbook_path.exists()
     assert not Path(str(workbook_path) + ".scalim.lock").exists()
 
+    assert _read_xlsx_sheetnames(workbook_path) == ["A", "B"]
     assert _read_xlsx_rows(workbook_path, "A") == [
         ["id", "value"],
         ["a1", "A1"],
@@ -3467,37 +3519,39 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
         write_mode="append",
     )
 
-    export_path = tmp_path / "append.xlsx"
-    wf = _write_workflow_yaml(
-        tmp_path,
-        resources={
-            "books": {
-                "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(export_path), "write_lock": True},
-                }
-            }
-        },
-        runs=[
-            {"id": "a", "demand": "a.yaml"},
-            {"id": "b", "demand": "b.yaml"},
-        ],
-        max_concurrency=2,
-        failure_policy="primary_only",
-    )
-
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
-    assert not result.errors()
-    assert export_path.exists()
-    assert _read_xlsx_sheetnames(export_path) == ["S"]
-    assert _read_xlsx_rows(export_path, "S") == [
+    expected_rows = [
         ["id", "value"],
         ["a1", "A1"],
         ["a2", "A2"],
         ["b1", "B1"],
         ["b2", "B2"],
     ]
+    for idx in range(3):
+        export_path = tmp_path / "append_{}.xlsx".format(int(idx))
+        wf = _write_workflow_yaml(
+            tmp_path,
+            resources={
+                "books": {
+                    "report": {
+                        "kind": "xlsx_memory",
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(export_path), "write_lock": True},
+                    }
+                }
+            },
+            runs=[
+                {"id": "a", "demand": "a.yaml"},
+                {"id": "b", "demand": "b.yaml"},
+            ],
+            max_concurrency=2,
+            failure_policy="primary_only",
+        )
+
+        result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        assert not result.errors()
+        assert export_path.exists()
+        assert _read_xlsx_sheetnames(export_path) == ["S"]
+        assert _read_xlsx_rows(export_path, "S") == expected_rows
 
 
 def test_book_sheet_rows_loader_requires_context() -> None:
@@ -3575,6 +3629,7 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         ["b1", "B1"],
         ["b2", "B2"],
     ]
+    expected_order_signature: Optional[List[Any]] = None
     for idx in range(3):
         workbook_path = tmp_path / "append_{}.xlsx".format(int(idx))
         wf = _write_workflow_yaml(
@@ -3593,6 +3648,27 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         assert not result.errors()
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
+
+        order_signature: List[Any] = []
+        for event in recorder.events:
+            if event.event_type == EVENT_PIPELINE_START:
+                meta = event.meta if isinstance(event.meta, dict) else {}
+                order_signature.append((event.event_type, str(meta.get("workflow_node_id") or ""), list(event.payload.targets)))
+            if event.event_type in (EVENT_WORKFLOW_NODE_START, EVENT_WORKFLOW_NODE_END):
+                order_signature.append((event.event_type, str(event.payload.workflow_node_id)))
+            if event.event_type == EVENT_WORKFLOW_RESOURCE_COMMIT:
+                order_signature.append(
+                    (
+                        event.event_type,
+                        str(event.payload.workflow_node_id),
+                        str(event.payload.resource_type),
+                        str(event.payload.resource_id),
+                    )
+                )
+        if expected_order_signature is None:
+            expected_order_signature = list(order_signature)
+        else:
+            assert list(order_signature) == list(expected_order_signature)
 
         write_events = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_WRITE and e.payload.resource_id == "report"]
         assert [e.payload.workflow_node_id for e in write_events] == ["__wf__write.slow.0", "__wf__write.fast.0"]

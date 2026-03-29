@@ -1,6 +1,7 @@
 # region imports
 
 import time
+import uuid
 from typing import Any, Dict
 
 from ..vendor.dataclassesx import asdict, dataclass, field, is_dataclass
@@ -56,7 +57,7 @@ def now_ts() -> float:
 
 
 def generate_run_id(prefix: str = "run") -> str:
-    return "{}_{}".format(prefix, int(time.time() * 1000))
+    return "{}_{}".format(prefix, uuid.uuid4().hex)
 
 
 __all__ = []

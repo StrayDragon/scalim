@@ -9,13 +9,14 @@
 import copy
 import math
 import os
+import socket
 import threading
 import time
 import traceback
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from .._internal import loggingx
 from ..events import (
@@ -133,19 +134,95 @@ def _compute_poll_interval_s(diagnostics: WorkflowResourceWaitDiagnostics, *, ma
     return max(0.01, float(poll_s))
 
 
-def _acquire_write_lock(output_path: str) -> Path:
-    lock_path = Path(str(output_path) + _WRITE_LOCK_SUFFIX)
+def _read_lock_owner_info(lock_path: Path) -> Tuple[Dict[str, str], Optional[float]]:
+    info: Dict[str, str] = {}
+    mtime_s = None
     try:
-        fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        msg = "Output path is locked (possible concurrent writers): output_path={!r}, lock_path={!r}".format(
-            str(output_path),
-            str(lock_path),
-        )
-        raise ScalimWorkflowWriteError(msg) from None
-    with os.fdopen(fd, "w") as f:
-        _ = f.write("pid={}\n".format(os.getpid()))
-    return lock_path
+        st = lock_path.stat()
+    except FileNotFoundError:
+        return info, None
+    except OSError:
+        st = None
+    if st is not None:
+        try:
+            mtime_s = float(st.st_mtime)
+        except Exception:  # noqa: BLE001
+            mtime_s = None
+
+    try:
+        raw = lock_path.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        return info, mtime_s
+    for raw_line in raw.splitlines():
+        line = str(raw_line or "").strip()
+        if not line or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k = str(k or "").strip()
+        v = str(v or "").strip()
+        if not k:
+            continue
+        info[str(k)] = str(v)
+    return info, mtime_s
+
+
+def _acquire_write_lock(  # noqa: C901
+    output_path: str,
+    *,
+    owner: Optional[Mapping[str, object]] = None,
+    stale_after_s: Optional[float] = None,
+    force: bool = False,
+) -> Path:
+    lock_path = Path(str(output_path) + _WRITE_LOCK_SUFFIX)
+    stale_after = None if stale_after_s is None else float(stale_after_s)
+    if stale_after is not None and (not math.isfinite(stale_after) or stale_after < 0):
+        msg = "stale_after_s must be a finite non-negative float"
+        raise ValueError(msg)
+
+    max_force_attempts = 3
+    attempts = 0
+    while True:
+        attempts += 1
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            lock_info, lock_mtime_s = _read_lock_owner_info(lock_path)
+            lock_age_s = None
+            if lock_mtime_s is not None:
+                lock_age_s = max(0.0, float(time.time()) - float(lock_mtime_s))
+            if stale_after is not None and lock_age_s is not None and lock_age_s >= float(stale_after) and bool(force):
+                with suppress(Exception):
+                    lock_path.unlink()
+                if attempts < max_force_attempts:
+                    continue
+
+            diff: List[str] = [
+                "lock_path={!r}".format(str(lock_path)),
+            ]
+            if lock_age_s is not None:
+                diff.append("lock_age_s={}".format(round(float(lock_age_s), 3)))
+            for k in sorted(lock_info.keys()):
+                diff.append("lock_owner.{}={!r}".format(str(k), str(lock_info.get(k) or "")))
+            if stale_after is not None:
+                diff.append("stale_after_s={}".format(float(stale_after)))
+                diff.append("force={}".format(bool(force)))
+            diff.append("hint=delete_lock_file_if_safe:{!r}".format(str(lock_path)))
+
+            msg = "Output path is locked (possible concurrent writers): output_path={!r}".format(str(output_path))
+            raise ScalimWorkflowWriteError(msg, diff=diff) from None
+
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            _ = f.write("pid={}\n".format(os.getpid()))
+            _ = f.write("created_at_unix_s={}\n".format(int(time.time())))
+            with suppress(Exception):
+                _ = f.write("hostname={}\n".format(socket.gethostname()))
+            if owner:
+                for k, v in owner.items():
+                    key = str(k or "").strip()
+                    if not key:
+                        continue
+                    _ = f.write("{}={}\n".format(key, str(v)))
+        return lock_path
 
 
 def _release_write_lock(lock_path: Path) -> None:

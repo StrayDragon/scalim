@@ -29,12 +29,19 @@ _best_effort_close_write_only_workbook_worksheets = best_effort_close_write_only
 _get_openpyxl_workbook_class = get_openpyxl_workbook_class
 
 
-def _materialize_aligned_csv_columns(expected: List[str], mapping: List[int], *, input_csv: WorkflowCsvInput) -> List[List[str]]:
-    col_lists: List[List[str]] = [[] for _ in expected]
+def _materialize_aligned_csv_rows(expected: List[str], mapping: List[int], *, input_csv: WorkflowCsvInput) -> List[List[str]]:
+    _ = list(expected)
+    rows: List[List[str]] = []
     for row in _iter_csv_rows(input_csv):
-        for col_idx, src_idx in enumerate(mapping):
-            col_lists[col_idx].append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
-    return col_lists
+        out_row: List[str] = []
+        for src_idx in mapping:
+            out_row.append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
+        rows.append(out_row)
+    return rows
+
+
+def _sorted_sheetbook_segments(segments: List["_SheetBookSegment"]) -> List["_SheetBookSegment"]:
+    return sorted(segments, key=lambda seg: (int(seg.decl_order), str(seg.producer_node_id)))
 
 
 def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBookPlan") -> None:
@@ -47,18 +54,14 @@ def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBo
         header_written = False
         fields = list(sheet_plan.baseline_header)
         escaped_fields = [escape_excel_formula(x, allow_formulas=bool(plan.export_allow_formulas)) for x in fields]
-        for seg in sheet_plan.segments:
+        for seg in _sorted_sheetbook_segments(sheet_plan.segments):
             if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
                 _ = ws.append(list(escaped_fields))
                 header_written = True
             # `never`: 不输出表头
 
-            for row_idx in range(int(seg.start_row), int(seg.end_row)):
-                out_row: List[object] = []
-                for field_key in fields:
-                    col = sheet_plan.columns.get(str(field_key))
-                    value = col[row_idx] if col is not None and row_idx >= 0 and row_idx < len(col) else ""
-                    out_row.append(escape_excel_formula(value, allow_formulas=bool(plan.export_allow_formulas)))
+            for row in seg.rows:
+                out_row = [escape_excel_formula(v, allow_formulas=bool(plan.export_allow_formulas)) for v in row]
                 _ = ws.append(out_row)
 
 
@@ -89,8 +92,8 @@ class SheetBookDef:
 @dataclass
 class _SheetBookSegment:
     producer_node_id: str
-    start_row: int
-    end_row: int
+    decl_order: int
+    rows: List[List[str]]
     header_policy: str
 
 
@@ -98,9 +101,8 @@ class _SheetBookSegment:
 class _SheetBookSheetPlan:
     sheet: str
     baseline_header: List[str]
-    columns: Dict[str, List[str]]
     segments: List[_SheetBookSegment]
-    row_count: int = 0
+    cell_count: int = 0
 
 
 @dataclass
@@ -111,6 +113,7 @@ class _SheetBookPlan:
     export_path: Optional[str]
     export_write_lock: bool
     export_allow_formulas: bool
+    sheet_decl_order: Dict[str, int]
     sheet_order: List[str]
     sheets: Dict[str, _SheetBookSheetPlan]
     lock_path: Optional[Path] = None
@@ -138,7 +141,14 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
     def _maybe_acquire_sheetbook_write_lock(self, plan: _SheetBookPlan, *, output_path: str) -> None:
         if not bool(plan.export_write_lock):
             return
-        lock_path = acquire_write_lock(output_path)
+        lock_path = acquire_write_lock(
+            output_path,
+            owner={
+                "workflow_exec_id": self._workflow_exec_id,
+                "resource_type": "sheetbook",
+                "resource_id": str(plan.resource_id),
+            },
+        )
         plan.lock_path = lock_path
 
     def _release_sheetbook_write_lock(self, plan: _SheetBookPlan) -> None:
@@ -186,36 +196,38 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         *,
         workflow_node_id: str,
         sheet_name: str,
+        decl_order: int,
         input_node_id: str,
         expected: List[str],
-        columns: Dict[str, List[str]],
-        row_count: int,
+        rows: List[List[str]],
         new_sheet_cells: int,
     ) -> None:
         with self._lock:
             existing = plan.sheets.get(sheet_name)
             old_cells = 0
             if existing is not None:
-                old_cells = int(existing.row_count) * len(existing.baseline_header)
+                old_cells = int(existing.cell_count)
 
             new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
             self._check_sheetbook_budget(plan, new_total_cells=new_total)
 
-            if existing is None:
-                plan.sheet_order.append(sheet_name)
+            existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+            resolved_decl_order = int(decl_order)
+            if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+                plan.sheet_decl_order[sheet_name] = resolved_decl_order
+            plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
 
             sheet_plan = _SheetBookSheetPlan(
                 sheet=sheet_name,
                 baseline_header=list(expected),
-                columns=columns,
                 segments=[],
-                row_count=int(row_count),
+                cell_count=int(new_sheet_cells),
             )
             sheet_plan.segments.append(
                 _SheetBookSegment(
                     producer_node_id=str(input_node_id),
-                    start_row=0,
-                    end_row=int(row_count),
+                    decl_order=int(decl_order),
+                    rows=rows,
                     header_policy="once",
                 )
             )
@@ -223,23 +235,23 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             plan.total_cells = int(new_total)
             plan.last_workflow_node_id = str(workflow_node_id)
 
-    def _sheetbook_append_prepare(
+    def _sheetbook_append_prepare(  # noqa: C901
         self,
         plan: _SheetBookPlan,
         *,
         workflow_node_id: str,
         sheetbook_id: str,
         sheet_name: str,
+        decl_order: int,
         input_node_id: str,
         input_header: List[str],
         align_by: str,
         on_mismatch: str,
-    ) -> Tuple[List[str], List[int], int, Optional[DiagnosticWarningEvent], Optional[Dict[str, object]], bool]:
+    ) -> Tuple[List[str], List[int], Optional[DiagnosticWarningEvent], Optional[Dict[str, object]], bool]:
         msg: str
         pending_warning: Optional[DiagnosticWarningEvent] = None
         pending_warning_meta: Optional[Dict[str, object]] = None
         pending_skip = False
-        start_row = 0
 
         with self._lock:
             sheet_plan = plan.sheets.get(sheet_name)
@@ -252,15 +264,24 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                         "new_sheet={!r}".format(sheet_name),
                     ]
                     raise ScalimWorkflowWriteError(msg, diff=diff)
-                plan.sheet_order.append(sheet_name)
+                plan.sheet_decl_order[sheet_name] = int(decl_order)
+                plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
                 sheet_plan = _SheetBookSheetPlan(
                     sheet=sheet_name,
                     baseline_header=list(input_header),
-                    columns={},
                     segments=[],
-                    row_count=0,
+                    cell_count=0,
                 )
                 plan.sheets[sheet_name] = sheet_plan
+            else:
+                existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+                resolved_decl_order = int(decl_order)
+                if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+                    plan.sheet_decl_order[sheet_name] = resolved_decl_order
+                    plan.sheet_order = sorted(
+                        plan.sheet_decl_order.keys(),
+                        key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)),
+                    )
 
             expected = list(sheet_plan.baseline_header)
             mapping = _build_alignment_mapping(expected, input_header)
@@ -293,10 +314,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                             str(input_node_id),
                         )
                         raise ScalimWorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
-
-                start_row = int(sheet_plan.row_count)
-
-        return expected, mapping, start_row, pending_warning, pending_warning_meta, pending_skip
+        return expected, mapping, pending_warning, pending_warning_meta, pending_skip
 
     def _sheetbook_append_apply(
         self,
@@ -304,13 +322,11 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         *,
         sheetbook_id: str,
         sheet_name: str,
-        expected: List[str],
-        col_lists: List[List[str]],
-        append_rows: int,
         append_cells: int,
-        start_row: int,
         workflow_node_id: str,
         input_node_id: str,
+        decl_order: int,
+        rows: List[List[str]],
         header_policy: str,
     ) -> None:
         with self._lock:
@@ -321,23 +337,15 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
             new_total = int(plan.total_cells) + int(append_cells)
             self._check_sheetbook_budget(plan, new_total_cells=new_total)
-
-            for idx, field_key in enumerate(expected):
-                col = sheet_plan.columns.get(field_key)
-                if col is None:
-                    col = []
-                    sheet_plan.columns[str(field_key)] = col
-                col.extend(col_lists[idx])
-
-            sheet_plan.row_count = int(sheet_plan.row_count) + int(append_rows)
             sheet_plan.segments.append(
                 _SheetBookSegment(
                     producer_node_id=str(input_node_id),
-                    start_row=int(start_row),
-                    end_row=int(start_row) + int(append_rows),
+                    decl_order=int(decl_order),
+                    rows=rows,
                     header_policy=str(header_policy),
                 )
             )
+            sheet_plan.cell_count = int(sheet_plan.cell_count) + int(append_cells)
             plan.total_cells = int(new_total)
             plan.last_workflow_node_id = str(workflow_node_id)
 
@@ -361,6 +369,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
                 export_write_lock=bool(raw_def.export_write_lock),
                 export_allow_formulas=bool(raw_def.export_allow_formulas),
+                sheet_decl_order={},
                 sheet_order=[],
                 sheets={},
             )
@@ -398,6 +407,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         self,
         *,
         workflow_node_id: str,
+        decl_order: int,
         sheetbook_id: str,
         sheet: str,
         input_node_id: str,
@@ -434,20 +444,18 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         expected = list(input_header)
         mapping = _build_alignment_mapping(expected, input_header)
 
-        # 读取并物化到内存(列式),用于下游读取与导出.
-        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv=input_csv)
-        columns: Dict[str, List[str]] = {str(key): col_lists[idx] for idx, key in enumerate(expected)}
-        row_count = len(col_lists[0]) if col_lists else 0
+        rows = _materialize_aligned_csv_rows(expected, mapping, input_csv=input_csv)
+        row_count = len(rows)
         new_sheet_cells = int(row_count) * len(expected)
 
         self._sheetbook_sheet_store(
             plan,
             workflow_node_id=str(workflow_node_id),
             sheet_name=sheet_name,
+            decl_order=int(decl_order),
             input_node_id=str(input_node_id),
             expected=expected,
-            columns=columns,
-            row_count=int(row_count),
+            rows=rows,
             new_sheet_cells=int(new_sheet_cells),
         )
 
@@ -468,6 +476,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         self,
         *,
         workflow_node_id: str,
+        decl_order: int,
         sheetbook_id: str,
         sheet: str,
         input_node_id: str,
@@ -480,11 +489,12 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
         input_header = _read_csv_header(input_csv)
-        expected, mapping, start_row, pending_warning, pending_warning_meta, pending_skip = self._sheetbook_append_prepare(
+        expected, mapping, pending_warning, pending_warning_meta, pending_skip = self._sheetbook_append_prepare(
             plan,
             workflow_node_id=str(workflow_node_id),
             sheetbook_id=str(sheetbook_id),
             sheet_name=sheet_name,
+            decl_order=int(decl_order),
             input_node_id=str(input_node_id),
             input_header=list(input_header),
             align_by=str(align_by),
@@ -509,23 +519,20 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             )
             return
 
-        # 读取并对齐到基线表头(列式追加).
-        col_lists = _materialize_aligned_csv_columns(expected, mapping, input_csv=input_csv)
+        rows = _materialize_aligned_csv_rows(expected, mapping, input_csv=input_csv)
 
-        append_rows = len(col_lists[0]) if col_lists else 0
+        append_rows = len(rows)
         append_cells = int(append_rows) * len(expected)
 
         self._sheetbook_append_apply(
             plan,
             sheetbook_id=str(sheetbook_id),
             sheet_name=sheet_name,
-            expected=expected,
-            col_lists=col_lists,
-            append_rows=int(append_rows),
             append_cells=int(append_cells),
-            start_row=int(start_row),
             workflow_node_id=str(workflow_node_id),
             input_node_id=str(input_node_id),
+            decl_order=int(decl_order),
+            rows=rows,
             header_policy=str(header_policy),
         )
 
@@ -572,7 +579,8 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 raise ValueError(msg)
 
             cutoff_idx = None
-            for idx, seg in enumerate(sheet_plan.segments):
+            ordered_segments = _sorted_sheetbook_segments(list(sheet_plan.segments))
+            for idx, seg in enumerate(ordered_segments):
                 if str(seg.producer_node_id) == producer:
                     cutoff_idx = int(idx)
                     break
@@ -581,26 +589,19 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 raise ValueError(msg)
 
             baseline_header = list(sheet_plan.baseline_header)
-            columns = dict(sheet_plan.columns)
-            segments: List[Tuple[str, int, int]] = []
-            for seg in sheet_plan.segments[: cutoff_idx + 1]:
+            segments: List[Tuple[str, List[List[str]]]] = []
+            for seg in ordered_segments[: cutoff_idx + 1]:
                 seg_producer = str(seg.producer_node_id)
                 if seg_producer != producer and seg_producer not in visible:
                     continue
-                segments.append((seg_producer, int(seg.start_row), int(seg.end_row)))
+                segments.append((seg_producer, list(seg.rows)))
 
         def _iter() -> Iterator[Dict[str, object]]:
-            for _seg_producer, start, end in segments:
-                for row_idx in range(int(start), int(end)):
+            for _seg_producer, seg_rows in segments:
+                for row_values in seg_rows:
                     row: Dict[str, object] = {}
-                    for key in baseline_header:
-                        col = columns.get(str(key))
-                        if col is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: baseline_header/columns kept in sync
-                            row[str(key)] = (
-                                ""  # pragma: no cover  # pragma: allow-no-cover unreachable: baseline_header/columns kept in sync
-                            )
-                            continue  # pragma: no cover  # pragma: allow-no-cover unreachable: baseline_header/columns kept in sync
-                        row[str(key)] = col[row_idx] if row_idx >= 0 and row_idx < len(col) else ""
+                    for idx, key in enumerate(baseline_header):
+                        row[str(key)] = row_values[idx] if idx >= 0 and idx < len(row_values) else ""
                     yield row
 
         return _iter()

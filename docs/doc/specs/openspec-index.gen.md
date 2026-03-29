@@ -161,6 +161,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/no-external-callback-under-lock/spec.md)
 - Summary: 为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。
 
+### `observer-concurrency-contract`
+- Title: observer-concurrency-contract Specification
+- Source: [spec.md](#code=openspec/specs/observer-concurrency-contract/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 workflow 并发执行（例如 `max_concurrency>1`）时 observers/hooks/components 的默认并发语义,确保在不要求 observer 实现方线程安全的前提下仍具备可解释、可复现的事件回放顺序,并保持 `no-external-callback-under-lock` 护栏不被破坏.
+
 ### `ordered-unique-ssot`
 - Title: ordered-unique-ssot Specification
 - Source: [spec.md](#code=openspec/specs/ordered-unique-ssot/spec.md)

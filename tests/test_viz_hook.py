@@ -150,6 +150,45 @@ def test_viz_event_emitter_success_and_error(monkeypatch: pytest.MonkeyPatch, tm
     assert emitter._output_handle is None
 
 
+def test_viz_event_emitter_concurrent_emission_keeps_jsonl_valid(tmp_path: Path) -> None:
+    import threading
+
+    out_path = tmp_path / "viz_events.jsonl"
+    emitter = VizEventEmitter(str(out_path))
+    threads = []
+    started = threading.Barrier(parties=8)
+
+    def _worker(tid: int) -> None:
+        started.wait()
+        for idx in range(50):
+            emitter.emit({"t": int(tid), "i": int(idx)})
+
+    for tid in range(8):
+        threads.append(threading.Thread(target=_worker, args=(tid,)))
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=5.0)
+        assert not t.is_alive()
+    emitter.close()
+
+    lines = out_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 400
+    for line in lines:
+        _ = json.loads(line)
+
+
+def test_viz_event_emitter_handles_serialization_error_and_disabled_output() -> None:
+    logger = DummyLogger()
+    emitter = VizEventEmitter(None, logger=logger)
+    emitter.emit({"ok": True})
+
+    circular: Any = {}
+    circular["self"] = circular
+    emitter.emit(circular)
+    assert logger.messages
+
+
 def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
     output_path = tmp_path / "viz_events.jsonl"
     snapshot_path = tmp_path / "viz_snapshot.json"

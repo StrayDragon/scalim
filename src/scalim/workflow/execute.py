@@ -6,29 +6,38 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, Union, cast
 
 from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
 from ..events import (
     EVENT_WORKFLOW_NODE_CANCELLED,
     EVENT_WORKFLOW_NODE_END,
     EVENT_WORKFLOW_NODE_START,
+    EVENT_WORKFLOW_RESOURCE_COMMIT,
     WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED,
     WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
     WORKFLOW_NODE_END_STATUS_ERROR,
     WORKFLOW_NODE_END_STATUS_OK,
+    Event,
     generate_run_id,
 )
-from ..events._events import WorkflowNodeCancelledEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent
+from ..events._events import (
+    WorkflowNodeCancelledEvent,
+    WorkflowNodeEndEvent,
+    WorkflowNodeStartEvent,
+    WorkflowResourceCommitEvent,
+)
 from ..exceptions import ScalimWorkflowError
+from ..execution.adaptive.capture import HookCaptureManager, HookRecordedEvent
 from ..execution.engine import ScalimEngine
-from ..execution.run_ir import ExecutionResult, run_ir
+from ..execution.run_ir import ExecutionRequest, ExecutionResult, run_ir, run_ir_capture_events
 from ..execution.workflow_cache_pool import ScalimWorkflowCachePoolError, WorkflowCachePool
 from ..hooks import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
 from ..ob.manager import ObserverManager
 from ..ob.observability import Observability
+from ..ob.observer import Observer
 from ..ob.presets._internal import viz_config as viz_config_module
 from ..ob.presets._internal.viz_config import normalize_output_dir as _normalize_viz_output_dir
 from ..ob.presets.viz import (
@@ -488,6 +497,7 @@ def _run_workflow_write_sheet_node(
     if str(node.resource_type) == "book":
         resource_manager.apply_book_sheet(
             workflow_node_id=str(node.node_id),
+            decl_order=int(node.decl_order),
             book_id=str(node.resource_id),
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
@@ -500,6 +510,7 @@ def _run_workflow_write_sheet_node(
     if str(node.resource_type) == "workbook":
         resource_manager.apply_workbook_sheet(
             workflow_node_id=str(node.node_id),
+            decl_order=int(node.decl_order),
             workbook_id=str(node.resource_id),
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
@@ -512,6 +523,7 @@ def _run_workflow_write_sheet_node(
     if str(node.resource_type) == "sheetbook":
         resource_manager.apply_sheetbook_sheet(
             workflow_node_id=str(node.node_id),
+            decl_order=int(node.decl_order),
             sheetbook_id=str(node.resource_id),
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
@@ -549,6 +561,7 @@ def _run_workflow_append_sheet_node(
             raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_book_append(
             workflow_node_id=str(node.node_id),
+            decl_order=int(node.decl_order),
             book_id=str(node.resource_id),
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
@@ -568,6 +581,7 @@ def _run_workflow_append_sheet_node(
             raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_workbook_append(
             workflow_node_id=str(node.node_id),
+            decl_order=int(node.decl_order),
             workbook_id=str(node.resource_id),
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
@@ -582,6 +596,7 @@ def _run_workflow_append_sheet_node(
     if str(node.resource_type) == "csv":
         resource_manager.apply_csv_append(
             workflow_node_id=str(node.node_id),
+            decl_order=int(node.decl_order),
             csv_id=str(node.resource_id),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
@@ -599,6 +614,7 @@ def _run_workflow_append_sheet_node(
             raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_sheetbook_append(
             workflow_node_id=str(node.node_id),
+            decl_order=int(node.decl_order),
             sheetbook_id=str(node.resource_id),
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
@@ -659,10 +675,22 @@ def _bundle_has_child_replay(config: VizObserverConfig, run_id: str) -> bool:
     return snapshot_path.exists() and events_path.exists()
 
 
+@dataclass(frozen=True)
+class _CapturedNodeRun:
+    core: ExecutionResult
+    captured_hook_events: List[HookRecordedEvent]
+    captured_events: List[Event]
+    viz_observer: Optional[Observer]
+
+
+_NodeRunResult = Union[ExecutionResult, _CapturedNodeRun]
+
+
 @dataclass
 class _PreparedWorkflowRun:
     workflow_path: str
     workflow_exec_id: str
+    workflow_components: Tuple[object, ...]
     workflow_ir: WorkflowIr
     artifacts_dir: WorkflowArtifactsDirectory
     ctx_store: WorkflowCtxStore
@@ -678,6 +706,12 @@ class _PreparedWorkflowRun:
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]]
     write_consumers_remaining_by_output_key: Dict[Tuple[str, str], int]
     main_rows_consumers_remaining_by_run_id: Dict[str, int]
+    capture_observability: bool
+    workflow_replay_instrumentation: Optional[InstrumentationHub]
+    captured_demand_events_by_node_id: Dict[str, List[Event]]
+    captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]]
+    captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]]
+    captured_demand_request_by_node_id: Dict[str, object]
 
 
 def _build_workflow_instrumentation(
@@ -685,7 +719,6 @@ def _build_workflow_instrumentation(
     workflow_exec_id: str,
     workflow_path: str,
     workflow_ir: WorkflowIr,
-    max_concurrency: int,
     components: Optional[Sequence[object]],
     bundle_viz_base_config: Optional[VizObserverConfig],
 ) -> Tuple[ObserverManager, Optional[WorkflowVizObserver], InstrumentationHub]:
@@ -715,15 +748,6 @@ def _build_workflow_instrumentation(
             hook_manager=workflow_hook_manager,
             observer_manager=workflow_observer_manager,
         )
-        if workflow_viz_observer is not None:
-            _ = workflow_instrumentation.emit(
-                "workflow_started",
-                {
-                    "workflow_id": str(Path(workflow_path).name),
-                    "workflow_exec_id": str(workflow_exec_id),
-                    "max_concurrency": int(max_concurrency),
-                },
-            )
     except Exception:
         with contextlib.suppress(Exception):
             workflow_observer_manager.close()
@@ -895,10 +919,33 @@ def _prepare_workflow_run_ir(
             workflow_exec_id=workflow_exec_id,
             workflow_path=workflow_path,
             workflow_ir=workflow_ir,
-            max_concurrency=int(max_concurrency),
             components=components,
             bundle_viz_base_config=bundle_viz_base_config,
         )
+
+        component_observers, component_hooks = split_components(components)
+        capture_observability = int(max_concurrency) > 1 and bool(component_observers or component_hooks)
+        workflow_replay_instrumentation: Optional[InstrumentationHub] = None
+        if capture_observability:
+            workflow_replay_instrumentation = workflow_instrumentation
+            capture_hook_manager = HookCaptureManager(workflow_instrumentation.hook_manager)
+            capture_observer_manager = workflow_observer_manager.create_capture_manager()
+            capture_observer_manager.max_recorded_events = None
+            workflow_instrumentation = InstrumentationHub(
+                hook_manager=capture_hook_manager,
+                observer_manager=capture_observer_manager,
+            )
+
+        if workflow_viz_observer is not None:
+            _ = workflow_instrumentation.emit(
+                "workflow_started",
+                {
+                    "workflow_id": str(Path(workflow_path).name),
+                    "workflow_exec_id": str(workflow_exec_id),
+                    "max_concurrency": int(max_concurrency),
+                },
+            )
+
         workflow_cache_pool = _maybe_build_workflow_cache_pool(
             workflow_exec_id=workflow_exec_id,
             workflow_ir=workflow_ir,
@@ -931,6 +978,7 @@ def _prepare_workflow_run_ir(
         return _PreparedWorkflowRun(
             workflow_path=workflow_path,
             workflow_exec_id=workflow_exec_id,
+            workflow_components=tuple(components or ()),
             workflow_ir=workflow_ir,
             artifacts_dir=artifacts_dir,
             ctx_store=ctx_store,
@@ -946,6 +994,12 @@ def _prepare_workflow_run_ir(
             write_output_ids_by_run_id=write_output_ids_by_run_id,
             write_consumers_remaining_by_output_key=write_consumers_remaining_by_output_key,
             main_rows_consumers_remaining_by_run_id=main_rows_consumers_remaining_by_run_id,
+            capture_observability=bool(capture_observability),
+            workflow_replay_instrumentation=workflow_replay_instrumentation,
+            captured_demand_events_by_node_id={},
+            captured_demand_hook_events_by_node_id={},
+            captured_demand_viz_observer_by_node_id={},
+            captured_demand_request_by_node_id={},
         )
     except Exception:
         if workflow_cache_pool is not None:
@@ -1034,7 +1088,7 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
     main_rows_consumers_remaining_by_run_id: Dict[str, int],
     resource_manager: WorkflowResourceManager,
-    run_one: Callable[[object, str], ExecutionResult],
+    run_one: Callable[[object, str], _NodeRunResult],
     emit_workflow_node_start: Callable[[WorkflowAnyNodeIr], None],
     emit_workflow_node_end: Callable[..., None],
     maybe_release_workflow_main_rows_artifact: Callable[[WorkflowAnyNodeIr], None],
@@ -1097,7 +1151,7 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
         submitted[fut] = (str(node_id), node, None, None)
 
 
-def _workflow_process_completed_future(  # noqa: PLR0913
+def _workflow_process_completed_future(  # noqa: C901, PLR0912, PLR0913, PLR0915
     fut: "concurrent.futures.Future[Any]",
     *,
     node_id: str,
@@ -1120,12 +1174,27 @@ def _workflow_process_completed_future(  # noqa: PLR0913
     maybe_release_workflow_main_rows_artifact: Callable[[WorkflowAnyNodeIr], None],
     on_terminal: Callable[..., None],
     cancel_all_not_started_due_to_all_fail: Callable[[], None],
+    captured_demand_events_by_node_id: Dict[str, List[Event]],
+    captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]],
+    captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]],
+    captured_demand_request_by_node_id: Dict[str, object],
 ) -> None:
     try:
         result_obj = fut.result()
+        capture_obj: Optional[_CapturedNodeRun] = None
+        if isinstance(result_obj, _CapturedNodeRun):
+            capture_obj = result_obj
+            result_obj = capture_obj.core
 
         if isinstance(node, WorkflowNodeIr):
             core = cast("ExecutionResult", result_obj)  # pragma: allow-cast future result typed narrowing
+            if capture_obj is not None:
+                captured_demand_events_by_node_id[str(node_id)] = list(capture_obj.captured_events)
+                captured_demand_hook_events_by_node_id[str(node_id)] = list(capture_obj.captured_hook_events)
+                captured_demand_viz_observer_by_node_id[str(node_id)] = capture_obj.viz_observer
+                if compilation is not None:
+                    capture_comp = cast("_CompilationLike", compilation)  # pragma: allow-cast compilation boundary
+                    captured_demand_request_by_node_id[str(node_id)] = capture_comp.request
             demand_yaml_path = str(demand_path or "")
             artifacts_dir.publish(str(node_id), "output_path", core.output_path)
             artifacts_dir.publish(str(node_id), "outputs", core.outputs)
@@ -1319,7 +1388,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
             },
         )
 
-    def _run_one(compilation: object, workflow_node_id: str) -> ExecutionResult:
+    def _run_one(compilation: object, workflow_node_id: str) -> _NodeRunResult:
         comp = cast("Any", compilation)  # pragma: allow-cast compilation runtime boundary
 
         def _engine_factory(**kwargs: object) -> ScalimEngine:
@@ -1331,20 +1400,36 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
             )
 
         visible = ctx_store.visible_producer_node_ids(str(workflow_node_id))
+        decl_order = int(index_by_node_id.get(str(workflow_node_id), 0))
+        event_meta_defaults = {
+            "workflow_exec_id": workflow_exec_id,
+            "workflow_node_id": str(workflow_node_id),
+            "workflow_node_decl_order": int(decl_order),
+        }
         with workflow_loader_context(
             workflow_exec_id=workflow_exec_id,
             workflow_node_id=str(workflow_node_id),
             visible_producer_node_ids=visible,
             resource_manager=resource_manager,
         ):
+            if prepared.capture_observability and run_ir_fn is run_ir:
+                core, captured_hook_events, captured_events, viz_observer = run_ir_capture_events(
+                    comp.demand_ir,
+                    comp.request,
+                    engine_factory=_engine_factory,
+                    event_meta_defaults=event_meta_defaults,
+                )
+                return _CapturedNodeRun(
+                    core=core,
+                    captured_hook_events=list(captured_hook_events),
+                    captured_events=list(captured_events),
+                    viz_observer=viz_observer,
+                )
             return run_ir_fn(
                 comp.demand_ir,
                 comp.request,
                 engine_factory=_engine_factory,
-                event_meta_defaults={
-                    "workflow_exec_id": workflow_exec_id,
-                    "workflow_node_id": str(workflow_node_id),
-                },
+                event_meta_defaults=event_meta_defaults,
             )
 
     node_by_id: Dict[str, WorkflowAnyNodeIr] = {node.node_id: node for node in workflow_ir.nodes}
@@ -1483,6 +1568,10 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
                     maybe_release_workflow_main_rows_artifact=_maybe_release_workflow_main_rows_artifact,
                     on_terminal=_on_terminal,
                     cancel_all_not_started_due_to_all_fail=_cancel_all_not_started_due_to_all_fail,
+                    captured_demand_events_by_node_id=prepared.captured_demand_events_by_node_id,
+                    captured_demand_hook_events_by_node_id=prepared.captured_demand_hook_events_by_node_id,
+                    captured_demand_viz_observer_by_node_id=prepared.captured_demand_viz_observer_by_node_id,
+                    captured_demand_request_by_node_id=prepared.captured_demand_request_by_node_id,
                 )
 
             _try_submit_ready()
@@ -1567,6 +1656,190 @@ def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
             json.dump(workflow_snapshot, handle, ensure_ascii=False, indent=2, default=str)
 
 
+def _build_demand_replay_instrumentation(  # noqa: C901
+    request: Optional[object],
+    viz_observer: Optional[Observer],
+    *,
+    workflow_components: Tuple[object, ...],
+) -> Optional[InstrumentationHub]:
+    if request is None and viz_observer is None:
+        return None
+
+    fallback_logger_enabled = False
+    components: List[object] = []
+    if request is not None:
+        req = cast("ExecutionRequest", request)  # pragma: allow-cast request runtime boundary
+        obs_spec = req.observability
+        if obs_spec is not None:
+            fallback_logger_enabled = bool(obs_spec.fallback_logger_enabled)
+        req_components = req.components
+        if req_components:
+            workflow_component_ids = {id(c) for c in workflow_components}
+            for component in list(req_components):
+                if id(component) in workflow_component_ids:
+                    continue
+                components.append(component)
+
+    observers, hooks = split_components(components)
+    if viz_observer is None and not observers and not hooks:
+        return None
+
+    observer_manager = Observability(fallback_logger_enabled=fallback_logger_enabled).build_manager()
+    for observer in observers:
+        observer_manager.register(observer)
+    if viz_observer is not None:
+        observer_manager.register(viz_observer)
+
+    hook_manager = HookManager(fallback_logger_enabled=fallback_logger_enabled)
+    for hook in hooks:
+        hook_manager.register(hook)
+
+    return InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)
+
+
+def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> None:  # noqa: C901, PLR0912, PLR0915
+    if not prepared.capture_observability:
+        return
+    replay = prepared.workflow_replay_instrumentation
+    if replay is None:
+        return
+
+    capture = prepared.workflow_instrumentation
+    workflow_hook_events: List[HookRecordedEvent] = []
+    with contextlib.suppress(Exception):
+        workflow_hook_events = cast("Any", capture.hook_manager).drain_events()  # pragma: allow-cast capture hook manager drain
+    for event in workflow_hook_events:
+        replay.hook_manager.emit_typed(str(event.event_type), event.payload)
+
+    workflow_events: List[Event] = []
+    with contextlib.suppress(Exception):
+        workflow_events = cast("Any", capture.observer_manager).drain_events()  # pragma: allow-cast capture observer manager drain
+
+    known_node_ids: Set[str] = {node.node_id for node in prepared.workflow_ir.nodes}
+    started_events: List[Event] = []
+    finished_events: List[Event] = []
+    other_global_events: List[Event] = []
+    unknown_node_events: List[Event] = []
+
+    node_start_events_by_node_id: Dict[str, List[Event]] = {}
+    node_end_events_by_node_id: Dict[str, List[Event]] = {}
+    node_cancelled_events_by_node_id: Dict[str, List[Event]] = {}
+    node_other_events_by_node_id: Dict[str, List[Event]] = {}
+    resource_commit_events: List[Event] = []
+
+    for event in workflow_events:
+        if str(event.event_type) == "workflow_started":
+            started_events.append(event)
+            continue
+        if str(event.event_type) == "workflow_finished":
+            finished_events.append(event)
+            continue
+        if str(event.event_type) == EVENT_WORKFLOW_RESOURCE_COMMIT:
+            resource_commit_events.append(event)
+            continue
+
+        node_id = ""
+        meta = event.meta
+        if meta and isinstance(meta, dict):
+            raw_node_id = meta.get("workflow_node_id")
+            if raw_node_id is not None:
+                node_id = str(raw_node_id)
+        node_id = str(node_id or "").strip()
+        if not node_id:
+            other_global_events.append(event)
+            continue
+        if node_id not in known_node_ids:
+            unknown_node_events.append(event)
+            continue
+
+        if str(event.event_type) == EVENT_WORKFLOW_NODE_START:
+            node_start_events_by_node_id.setdefault(node_id, []).append(event)
+            continue
+        if str(event.event_type) == EVENT_WORKFLOW_NODE_END:
+            node_end_events_by_node_id.setdefault(node_id, []).append(event)
+            continue
+        if str(event.event_type) == EVENT_WORKFLOW_NODE_CANCELLED:
+            node_cancelled_events_by_node_id.setdefault(node_id, []).append(event)
+            continue
+        node_other_events_by_node_id.setdefault(node_id, []).append(event)
+
+    workflow_seq = 0
+
+    def _emit_workflow_event(event: Event) -> None:
+        nonlocal workflow_seq
+        workflow_seq += 1
+        meta = dict(event.meta) if event.meta else {}
+        replay.emit_recorded_event(
+            Event(
+                event_type=str(event.event_type),
+                timestamp=float(event.timestamp),
+                run_id=str(prepared.workflow_exec_id),
+                payload=event.payload,
+                meta=meta,
+                seq=int(workflow_seq),
+            )
+        )
+
+    def _replay_demand_node(node_id: str) -> None:
+        hook_events = prepared.captured_demand_hook_events_by_node_id.get(str(node_id), [])
+        observer_events = prepared.captured_demand_events_by_node_id.get(str(node_id), [])
+        if observer_events:
+            observer_events = sorted(observer_events, key=lambda e: int(e.seq))
+
+        viz_observer = prepared.captured_demand_viz_observer_by_node_id.get(str(node_id))
+        request = prepared.captured_demand_request_by_node_id.get(str(node_id))
+        node_replay = _build_demand_replay_instrumentation(
+            request,
+            viz_observer,
+            workflow_components=prepared.workflow_components,
+        )
+        for event in hook_events:
+            replay.hook_manager.emit_typed(str(event.event_type), event.payload)
+            if node_replay is not None:
+                node_replay.hook_manager.emit_typed(str(event.event_type), event.payload)
+        for event in observer_events:
+            replay.emit_recorded_event(event)
+            if node_replay is not None:
+                node_replay.emit_recorded_event(event)
+        if node_replay is not None:
+            with contextlib.suppress(Exception):
+                node_replay.observer_manager.close()
+
+    for event in started_events:
+        _emit_workflow_event(event)
+
+    nodes_in_order = sorted(prepared.workflow_ir.nodes, key=lambda n: int(n.decl_order))
+    for node in nodes_in_order:
+        node_id = str(node.node_id)
+        for event in node_start_events_by_node_id.get(node_id, []):
+            _emit_workflow_event(event)
+        if isinstance(node, WorkflowNodeIr) and node_id in prepared.captured_demand_events_by_node_id:
+            _replay_demand_node(node_id)
+        for event in node_other_events_by_node_id.get(node_id, []):
+            _emit_workflow_event(event)
+        for event in node_cancelled_events_by_node_id.get(node_id, []):
+            _emit_workflow_event(event)
+        for event in node_end_events_by_node_id.get(node_id, []):
+            _emit_workflow_event(event)
+
+    def _resource_commit_sort_key(event: Event) -> Tuple[str, str, str]:
+        payload = cast("WorkflowResourceCommitEvent", event.payload)  # pragma: allow-cast resource commit payload boundary
+        return (
+            str(payload.resource_type),
+            str(payload.resource_id),
+            str(payload.path),
+        )
+
+    for event in sorted(resource_commit_events, key=_resource_commit_sort_key):
+        _emit_workflow_event(event)
+    for event in unknown_node_events:
+        _emit_workflow_event(event)
+    for event in other_global_events:
+        _emit_workflow_event(event)
+    for event in finished_events:
+        _emit_workflow_event(event)
+
+
 def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_finalized: bool) -> None:
     if not resources_finalized:
         with contextlib.suppress(Exception):
@@ -1633,6 +1906,8 @@ def run_workflow_ir(
     finally:
         if prepared is not None:
             _report_workflow_viz_finished(prepared)
+            with contextlib.suppress(Exception):
+                _replay_captured_workflow_observability(prepared)
             _cleanup_workflow_finally(prepared, resources_finalized=resources_finalized)
 
 

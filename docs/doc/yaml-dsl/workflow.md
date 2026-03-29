@@ -275,5 +275,7 @@ for outcome in result.outcomes:
 
 并发契约:
 
-- 当 `max_concurrency>1` 时,同一 `components` 列表中的 hook/observer 实例可能被并发复用; components 必须线程安全或无状态
-- 否则行为未定义;调用方可将 `max_concurrency` 降为 `1`
+- 当 `max_concurrency>1` 且提供了 `components`(hooks/observers)时,系统会在并发执行阶段 capture 事件,并在 workflow 结束后以单线程按稳定顺序 replay 给 components(仍满足 `no-external-callback-under-lock`)
+  - components 默认不要求线程安全(同一时刻最多一个回调在执行)
+  - 代价: 并发模式下 components 的回调可能非实时(在 replay 阶段触发)
+- 如需严格实时回调,请将 `max_concurrency` 设为 `1`

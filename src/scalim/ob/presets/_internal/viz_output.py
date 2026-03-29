@@ -1,11 +1,13 @@
 import json
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import IO, Any, Dict, Optional, cast
 
 from ...._internal.loggingx import get_logger, prefix
+from ....events import generate_run_id
 from .viz_config import VizObserverConfig
 from .viz_config import default_viz_dir as _default_viz_dir
 from .viz_config import normalize_output_dir as _normalize_output_dir
@@ -16,9 +18,11 @@ _LOGGER = get_logger("viz")
 class VizEventEmitter:
     _output_handle: Optional[IO[str]]
     _logger: logging.Logger
+    _lock: "threading.Lock"
 
     def __init__(self, path: Optional[str], *, logger: Optional[logging.Logger] = None, append: bool = True) -> None:
         self._logger = logger or _LOGGER
+        self._lock = threading.Lock()
         self._output_handle = None
         if not path:
             return
@@ -33,19 +37,28 @@ class VizEventEmitter:
             self._output_handle = None
 
     def emit(self, event: Dict[str, Any]) -> None:
-        if self._output_handle:
-            try:
-                line = json.dumps(event, ensure_ascii=False, default=str)
-                _ = self._output_handle.write(line + "\n")
-                self._output_handle.flush()
-            except OSError as exc:
-                self._logger.warning("%s写入事件失败: %s", prefix("viz"), exc)
+        try:
+            line = json.dumps(event, ensure_ascii=False, default=str)
+        except (TypeError, ValueError, RecursionError) as exc:
+            self._logger.warning("%s序列化事件失败: %s", prefix("viz"), exc)
+            return
+
+        try:
+            with self._lock:
+                output_handle = self._output_handle
+                if output_handle is None:
+                    return
+                _ = output_handle.write(line + "\n")
+                output_handle.flush()
+        except OSError as exc:
+            self._logger.warning("%s写入事件失败: %s", prefix("viz"), exc)
 
     def close(self, timeout: float = 2.0) -> None:
         _ = timeout
-        if self._output_handle:
-            self._output_handle.close()
-            self._output_handle = None
+        with self._lock:
+            if self._output_handle:
+                self._output_handle.close()
+                self._output_handle = None
 
 
 class VizObserverOutputMixin(ABC):
@@ -67,7 +80,7 @@ class VizObserverOutputMixin(ABC):
         if configured:
             self.run_id = configured
             return
-        self.run_id = "run_{}".format(int(time.time() * 1000))
+        self.run_id = generate_run_id(prefix="run")
 
     def _apply_run_output_dir(self) -> None:
         if self._run_dir_applied:
