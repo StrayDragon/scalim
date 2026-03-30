@@ -299,6 +299,62 @@ def test_pretty_logging_observer_renders_batch_duration_from_event(capsys) -> No
     assert "1.23s" in output
 
 
+def test_pretty_logging_observer_reuses_user_stdout_handler_by_name() -> None:
+    import logging
+    import sys
+
+    import scalim.ob.presets.logs as logs_mod
+
+    logger = logs_mod._PRETTY_LOGGER
+    orig_handlers = list(logger.handlers)
+    orig_level = int(logger.level)
+    orig_propagate = bool(logger.propagate)
+    orig_slot_handler = logs_mod._pretty_stdout_handler_slot.handler
+    orig_slot_owned = bool(logs_mod._pretty_stdout_handler_slot.owned)
+
+    try:
+        logger.handlers[:] = []
+        logs_mod._pretty_stdout_handler_slot.handler = None
+        logs_mod._pretty_stdout_handler_slot.owned = False
+
+        other_handler = logging.StreamHandler(stream=sys.stdout)
+        other_handler.name = "other"
+        logger.addHandler(other_handler)
+
+        user_handler = logging.StreamHandler(stream=sys.stdout)
+        user_handler.name = logs_mod._PRETTY_STDOUT_HANDLER_NAME
+        logger.addHandler(user_handler)
+
+        _ = PrettyLoggingObserver()
+
+        assert logger.handlers == [other_handler, user_handler]
+        assert logs_mod._pretty_stdout_handler_slot.handler is user_handler
+        assert not logs_mod._pretty_stdout_handler_slot.owned
+
+        logger.handlers[:] = []
+        logs_mod._pretty_stdout_handler_slot.handler = None
+        logs_mod._pretty_stdout_handler_slot.owned = False
+
+        _ = PrettyLoggingObserver()
+        owned_handler = logs_mod._pretty_stdout_handler_slot.handler
+        assert owned_handler is not None
+        assert logs_mod._pretty_stdout_handler_slot.owned
+
+        user_handler2 = logging.StreamHandler(stream=sys.stdout)
+        user_handler2.name = logs_mod._PRETTY_STDOUT_HANDLER_NAME
+        logger.addHandler(user_handler2)
+
+        _ = PrettyLoggingObserver()
+        assert user_handler2 in logger.handlers
+        assert owned_handler not in logger.handlers
+    finally:
+        logger.handlers[:] = orig_handlers
+        logger.setLevel(orig_level)
+        logger.propagate = orig_propagate
+        logs_mod._pretty_stdout_handler_slot.handler = orig_slot_handler
+        logs_mod._pretty_stdout_handler_slot.owned = orig_slot_owned
+
+
 def test_pretty_logging_observer_handles_non_sized_result() -> None:
     observer = PrettyLoggingObserver()
 

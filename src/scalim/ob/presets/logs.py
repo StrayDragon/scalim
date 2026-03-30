@@ -33,6 +33,18 @@ LOGGING_OBSERVER_LOADER_SLIM_LOG = prefix("pipeline") + "加载器瘦身"
 LOGGING_OBSERVER_COLUMN_WRITE_LOG = prefix("pipeline") + "写入列"
 
 
+class _PrettyStdoutHandlerSlot:
+    handler: Optional[logging.Handler]
+    owned: bool
+
+    def __init__(self) -> None:
+        self.handler = None
+        self.owned = False
+
+
+_pretty_stdout_handler_slot = _PrettyStdoutHandlerSlot()
+
+
 class LoggingObserver(EventDispatchObserver):
     """日志观察者:将执行进度写入日志系统"""
 
@@ -142,17 +154,36 @@ class PrettyLoggingObserver(EventDispatchObserver):
         说明:
         - `pytest capsys` 会在每个测试用例中替换 `sys.stdout` 对象;若复用旧的 `StreamHandler.stream`,
           会导致输出无法被当前用例捕获.
-        - 因此这里不做“一次性初始化”,而是每次实例化都重建 `StreamHandler`,确保其绑定当前 `sys.stdout`.
+        - 若用户已自行向 `scalim.pretty` 绑定同名 `handler`,则优先复用该 `handler`,避免覆盖/重复输出.
         """
 
-        for handler in list(_PRETTY_LOGGER.handlers):
-            if handler.name == _PRETTY_STDOUT_HANDLER_NAME:
-                _PRETTY_LOGGER.removeHandler(handler)
+        fmt = logging.Formatter("%(message)s")
 
-        handler = logging.StreamHandler(stream=sys.stdout)
-        handler.name = _PRETTY_STDOUT_HANDLER_NAME
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        _PRETTY_LOGGER.addHandler(handler)
+        owned_handler = _pretty_stdout_handler_slot.handler if _pretty_stdout_handler_slot.owned else None
+
+        user_named_handler: Optional[logging.Handler] = None
+        for handler in _PRETTY_LOGGER.handlers:
+            if handler.name != _PRETTY_STDOUT_HANDLER_NAME:
+                continue
+            if owned_handler is not None and handler is owned_handler:
+                continue
+            user_named_handler = handler
+            break
+
+        if user_named_handler is not None:
+            if owned_handler is not None and owned_handler in _PRETTY_LOGGER.handlers:
+                _PRETTY_LOGGER.removeHandler(owned_handler)
+            _pretty_stdout_handler_slot.handler = user_named_handler
+            _pretty_stdout_handler_slot.owned = False
+        else:
+            if owned_handler is not None and owned_handler in _PRETTY_LOGGER.handlers:
+                _PRETTY_LOGGER.removeHandler(owned_handler)
+            handler = logging.StreamHandler(stream=sys.stdout)
+            handler.name = _PRETTY_STDOUT_HANDLER_NAME
+            handler.setFormatter(fmt)
+            _PRETTY_LOGGER.addHandler(handler)
+            _pretty_stdout_handler_slot.handler = handler
+            _pretty_stdout_handler_slot.owned = True
 
         _PRETTY_LOGGER.setLevel(logging.INFO)
         _PRETTY_LOGGER.propagate = False
