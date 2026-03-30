@@ -85,7 +85,7 @@ def _(mo):
         - 不执行引擎,对 IR/relations/derived 字段等做静态诊断统计
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch080_diagnostics.py::run_diagnostics`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch080_diagnostics.py::run_diagnostics`
 
         Gate:
         - `just examples`（跑全量）

@@ -33,7 +33,7 @@ notebooks 本体是交互式 demo,但同时也是 **确定性回归入口** 的 
 
 - 交互式入口(本地): `uv run marimo edit notebooks/marimo/`
 - 回归入口(headless/CI): `just examples`（`just qa` 会覆盖）
-  - 实际执行入口: `notebooks/marimo/run_examples.py`
+  - 实际执行入口: `justfile` 的 `examples:` recipe（内联 runner）
   - 覆盖报告(生成物): `notebooks/marimo/marimo_coverage.gen.md`
     - 生成: `just gen-marimo-coverage`
     - 漂移门禁: `just marimo-coverage-drift-check`（`just qa`/CI 会覆盖）

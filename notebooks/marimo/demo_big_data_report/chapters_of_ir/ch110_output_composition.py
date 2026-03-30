@@ -153,7 +153,7 @@ def _(mo):
         - 演示 composed outputs(workbook) 的端到端写出与对拍口径
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch110_output_composition.py::run_output_composition`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch110_output_composition.py::run_output_composition`
 
         Gate:
         - `just examples`（跑全量）

@@ -3,7 +3,7 @@ import marimo
 import csv
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from scalim.dsl.by_yaml import compile as compile_yaml
 from scalim.execution.run_ir import run_ir
@@ -13,7 +13,7 @@ from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
 
-_EXAMPLE_ID = "demo_big_data_report/yaml_dsl_lookup_cast_sep_first_type_error_guardrail"
+_EXAMPLE_ID = "demo_big_data_report/yaml_dsl_guardrails_compute_on_error"
 _ALLOWED_MODULES = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario"])
 
 
@@ -28,13 +28,21 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
     return rows
 
 
-def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Optional[Path] = None) -> ExampleResult:
+def _guardrail_codes(components: Optional[Sequence[object]]) -> List[str]:
+    codes: List[str] = []
+    for c in components or ():
+        if isinstance(c, GuardrailCaptureObserver):
+            codes.extend([s.code for s in c.signals if s.code])
+    return sorted(set(codes))
+
+
+def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None) -> ExampleResult:
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_lookup_cast_sep_first_type_error_guardrail.yaml"
+        yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_guardrails_compute_on_error.yaml"
 
     guardrail_capture = GuardrailCaptureObserver()
-    with tempfile.TemporaryDirectory(prefix="scalim-lookup-cast-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="scalim-guardrails-compute-") as tmpdir:
         tmp = Path(tmpdir)
         out_detail = tmp / "detail.csv"
 
@@ -57,28 +65,30 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
             )
 
         rows = _read_csv_rows(out_detail) if out_detail.exists() else []
-        got_codes = {s.code for s in guardrail_capture.signals if s.code}
-        has_type_error_guardrail = "relation_type_error_rate_exceeded" in got_codes
+        codes = _guardrail_codes(compilation.request.components)
+        has_compute_error = "compute_error" in set(codes)
 
-        by_ticket = {r.get("ticket_id") or "": r for r in rows}
-        ok_2001 = (by_ticket.get("2001") or {}).get("agent_team") == "team-a"
-        ok_2002 = (by_ticket.get("2002") or {}).get("agent_team") == ""
+        # 对拍: ticket_id=1001 必然触发除零 -> risky_score 为空;其余至少一个非空.
+        by_id = {r.get("ticket_id") or "": r for r in rows}
+        r_1001 = by_id.get("1001") or {}
+        blank_for_1001 = (r_1001.get("risky_score") or "") == ""
+        any_non_blank = any((r.get("risky_score") or "") != "" for r in rows if (r.get("ticket_id") or "") != "1001")
 
-        passed = bool(len(rows) == 3 and has_type_error_guardrail and ok_2001 and ok_2002 and core.outputs)
-        summary = "rows={} type_error_guardrail={} ok_2001={} ok_2002={} outputs={}".format(
+        passed = bool(len(rows) == 5 and has_compute_error and blank_for_1001 and any_non_blank and core.outputs)
+        summary = "rows={} compute_error={} blank_1001={} any_non_blank={} outputs={}".format(
             len(rows),
-            has_type_error_guardrail,
-            ok_2001,
-            ok_2002,
+            has_compute_error,
+            blank_for_1001,
+            any_non_blank,
             sorted(core.outputs.keys()) if core.outputs else None,
         )
+
         details: Dict[str, Any] = {
             "yaml_path": str(yaml_path),
             "detail_csv": str(out_detail),
             "rows": len(rows),
-            "guardrail_codes": sorted(got_codes),
-            "row_2001": by_ticket.get("2001"),
-            "row_2002": by_ticket.get("2002"),
+            "guardrail_codes": codes,
+            "row_1001": r_1001,
         }
         return ExampleResult(
             example_id=_EXAMPLE_ID,
@@ -90,42 +100,44 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
 
 
 def run_chapter() -> ExampleResult:
-    return run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail()
+    return run_yaml_dsl_guardrails_compute_on_error()
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         r"""
-        # demo_big_data_report / yaml_dsl_lookup_cast_sep_first_type_error_guardrail
+        # demo_big_data_report / yaml_dsl_guardrails_compute_on_error
 
         ## 背景
 
-        真实业务里,“维表关联不上”经常不是逻辑错,而是 **key 脏**：
-        - `"11,legacy"` 这种拼接后缀
-        - `""` 这种空字符串(不是 `null`,但同样不可用)
+        工程同学在 YAML 里写 `compute` 时,最常见的风险不是“算错”,而是“算崩”：
+        - 分母为 0
+        - 上游字段偶发缺失/类型异常
+        - 规则迭代引入边界遗漏
 
-        如果我们把清洗逻辑散落在 Python 里,后续很难在配置审查阶段发现 drift。
+        如果每次都要改 Python 才能兜底,维护成本会迅速上升。
 
         ## 需求方提问（自然语言）
 
-        维护者：我能不能在 YAML 里声明 join key 的清洗,并在出现清洗失败时有确定性信号？
+        维护者：能不能在不改代码的情况下,让 compute 的异常既 **不阻断主流程**,又能在 CI 里稳定暴露？
 
-        ## 本章覆盖的 YAML DSL 能力
+        ## 方案选择（取舍）
 
-        - relation step `lookup_cast.sep_first` + `sep`：按分隔符取首段后做 key normalize
-        - `guardrails.relations.type_error_max_rate`：把 key 清洗失败(type_error)变成可回归 guardrail
+        - 全局 `guardrails.mode=quiet`：简单,但会把其他错误也放过(不够严格)
+        - **本章**：全局保持 `fast_fail`,仅对 `compute` 这一类错误放宽:
+          - `guardrails.compute.on_error=quiet` -> compute 失败写 `None` 并记录 `compute_error` guardrail
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_lookup_cast_sep_first_type_error_guardrail.yaml`
+        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_guardrails_compute_on_error.yaml`
         - 断言:
-          - ticket_id=2001 关联到 `team-a`
-          - ticket_id=2002 为空字符串触发 type_error -> agent_team 为空
-          - guardrail codes 包含 `relation_type_error_rate_exceeded`
+          - 输出行数仍为 5
+          - ticket_id=1001 的 risky_score 为空(除零触发)
+          - guardrail codes 包含 `compute_error`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/12_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py::run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/11_yaml_dsl_guardrails_compute_on_error.py::run_yaml_dsl_guardrails_compute_on_error`
         """
     )
     return
@@ -144,7 +156,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_lookup_cast_sep_first_type_error_guardrail.yaml"
+    yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_guardrails_compute_on_error.yaml"
     return demo_dir, yaml_path
 
 
@@ -152,14 +164,14 @@ def _():
 def _(mo, yaml_path):
     from scalim_misc.notebook_support.yaml_excerpt import excerpt_head
 
-    mo.md("## lookup_cast + guardrails demand YAML (head)")
+    mo.md("## Guardrails compute YAML (head)")
     mo.md("```yaml\n{}\n```".format(excerpt_head(yaml_path, max_lines=140)))
     return (excerpt_head,)
 
 
 @app.cell
 def _(yaml_path):
-    result = run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(yaml_path=yaml_path)
+    result = run_yaml_dsl_guardrails_compute_on_error(yaml_path=yaml_path)
     return (result,)
 
 

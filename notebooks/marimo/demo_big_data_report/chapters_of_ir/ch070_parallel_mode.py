@@ -82,7 +82,7 @@ def _(mo):
         - 演示并行执行相关配置与行为的最小回归入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch070_parallel_mode.py::run_parallel_mode`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch070_parallel_mode.py::run_parallel_mode`
 
         Gate:
         - `just examples`（跑全量）

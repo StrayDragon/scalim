@@ -1,7 +1,7 @@
 """Helpers for Marimo notebooks and headless examples.
 
 This package MUST NOT depend on `marimo` so it can be safely imported by:
-- `notebooks/marimo/run_examples.py`
+- `just examples`
 - pytest
 """
 

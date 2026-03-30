@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from scalim.events import EVENT_ERROR
 from scalim.execution import ScalimEngine
-from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, GuardrailViolation
+from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, ScalimGuardrailViolationError
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver
 from scalim.planning import PlanBuilder
@@ -89,7 +89,7 @@ def run_guardrails() -> ExampleResult:
     fast_fail_ok = False
     try:
         _ = engine_fast.run()
-    except GuardrailViolation as exc:
+    except ScalimGuardrailViolationError as exc:
         fast_fail_ok = exc.code == "loader_transform_error"
 
     passed = bool(quiet_rows_ok and codes_ok and fast_fail_ok)
@@ -118,7 +118,7 @@ def _(mo):
         - 演示 runtime guardrails 的 quiet 模式与可对拍边界
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch090_guardrails.py::run_guardrails`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch090_guardrails.py::run_guardrails`
 
         Gate:
         - `just examples`（跑全量）

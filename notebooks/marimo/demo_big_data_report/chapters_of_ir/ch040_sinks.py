@@ -169,7 +169,7 @@ def _(mo):
         - 演示多种 sink 的使用与输出形态
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch040_sinks.py::run_sinks`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch040_sinks.py::run_sinks`
 
         Gate:
         - `just examples`（跑全量）

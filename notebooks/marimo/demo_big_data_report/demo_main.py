@@ -15,10 +15,10 @@ def _(mo):
         - 章节代码可复用: 既能演示,也能当集成对拍 runner 的实现
 
         结构:
-        - `notebooks/marimo/index.py`: notebooks 总入口(hub)
-        - `chapters/*.py`: 每章一本 Marimo notebook(用户第一: 含 `run_<chapter_id>()` SSOT 入口)
+        - `chapters_of_yaml_dsl/*.py`: YAML DSL + workflow 章节(含 `run_<chapter_id>()` SSOT 入口)
+        - `chapters_of_ir/*.py`: IR 主线章节(含 `run_chapter()`/`run_*()` SSOT 入口)
         - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/`: fixtures/oracle/工具函数(不承载教学主流程)
-        - `notebooks/marimo/run_examples.py`: `just examples` 的 gate 入口(快速对拍)
+        - `just examples`: 唯一 gate 入口(快速对拍,justfile 内联 runner)
         - `by_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
         """
     )
@@ -49,18 +49,24 @@ def _():
 def _(Path, repo_root):
     demo_dir = Path(__file__).parent
     yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
-    chapters_dir = demo_dir / "chapters"
+    chapters_of_yaml_dsl_dir = demo_dir / "chapters_of_yaml_dsl"
+    chapters_of_ir_dir = demo_dir / "chapters_of_ir"
     _ = repo_root
-    return chapters_dir, demo_dir, yaml_path
+    return chapters_of_ir_dir, chapters_of_yaml_dsl_dir, demo_dir, yaml_path
 
 
 @app.cell(hide_code=True)
-def _(chapters_dir, mo):
-    chapter_files = []
-    if chapters_dir.exists():
-        chapter_files = sorted([p.name for p in chapters_dir.glob("*.py")])
+def _(chapters_of_ir_dir, chapters_of_yaml_dsl_dir, mo):
+    yaml_chapter_files = []
+    if chapters_of_yaml_dsl_dir.exists():
+        yaml_chapter_files = sorted([p.name for p in chapters_of_yaml_dsl_dir.glob("*.py")])
 
-    lines = ["- `chapters/{}`".format(name) for name in chapter_files]
+    ir_chapter_files = []
+    if chapters_of_ir_dir.exists():
+        ir_chapter_files = sorted([p.name for p in chapters_of_ir_dir.glob("*.py")])
+
+    lines = ["- `chapters_of_yaml_dsl/{}`".format(name) for name in yaml_chapter_files]
+    lines.extend(["- `chapters_of_ir/{}`".format(name) for name in ir_chapter_files])
     mo.md(
         r"""
         ---
@@ -75,8 +81,8 @@ def _(chapters_dir, mo):
     if lines:
         mo.md("\n".join(lines))
     else:
-        mo.callout(mo.md("`chapters/` 目录尚未生成。"), kind="warn")
-    return chapter_files, lines
+        mo.callout(mo.md("章节目录尚未生成。"), kind="warn")
+    return ir_chapter_files, lines, yaml_chapter_files
 
 
 @app.cell(hide_code=True)
@@ -129,10 +135,11 @@ def _(mo):
 
 @app.cell
 def _(yaml_path):
-    from notebooks.marimo.demo_big_data_report.chapters.registry import run_all_chapters
+    from notebooks.marimo.demo_big_data_report.chapters_of_ir.registry import run_all_chapters as run_all_ir_chapters
+    from notebooks.marimo.demo_big_data_report.chapters_of_yaml_dsl.registry import run_all_chapters as run_all_yaml_dsl_chapters
 
     _ = yaml_path
-    chapter_results = run_all_chapters()
+    chapter_results = run_all_yaml_dsl_chapters() + run_all_ir_chapters()
     return chapter_results
 
 

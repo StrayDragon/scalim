@@ -99,7 +99,7 @@ def _(mo):
         - 演示 observability 相关路径的最小回归入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch060_observability.py::run_observability`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch060_observability.py::run_observability`
 
         Gate:
         - `just examples`（跑全量）

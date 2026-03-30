@@ -177,7 +177,7 @@ def _(mo):
         - `memory_opt` 至少应记录到行写入事件(>=5)
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/08_yaml_dsl_observability_full.py::run_yaml_dsl_observability_full`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/08_yaml_dsl_observability_full.py::run_yaml_dsl_observability_full`
         """
     )
     return

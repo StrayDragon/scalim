@@ -113,7 +113,7 @@ def _(mo):
         - 演示 YAML DSL 的 loader retry 策略：不开启则失败/开启后可恢复
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch100_loader_retry.py::run_loader_retry`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch100_loader_retry.py::run_loader_retry`
 
         Gate:
         - `just examples`（跑全量）

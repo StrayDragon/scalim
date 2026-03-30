@@ -348,17 +348,6 @@
 - **WHEN** 在 pytest 中运行该章节的回归用例
 - **THEN** oracle 对拍 MUST 通过且结果确定(顺序与数值口径稳定)
 
-### Requirement: `just examples` 入口收敛为 `notebooks/marimo/run_examples.py`
-系统 MUST 将 `just examples` 的执行入口收敛为单一脚本 `notebooks/marimo/run_examples.py`,并使其覆盖:
-
-- `demo_big_data_report` 的示例/对拍（YAML DSL 主线教程 + 场景化回归）
-- public API suite 的示例/对拍（`__all__` 覆盖断言 + 扩展点演示）
-
-#### Scenario: `just examples` 统一入口覆盖示例套件
-- **WHEN** 开发者运行 `just examples`
-- **THEN** 系统 MUST 执行 `notebooks/marimo/run_examples.py`
-- **AND** 该 runner MUST 覆盖上述示例套件的全部回归点
-
 ### Requirement: `demo_big_data_report` 覆盖 workflow YAML 的可运行对拍
 系统 MUST 在 `demo_big_data_report` 主线中提供至少一个 deterministic 的 workflow YAML 示例,并将其纳入 `just examples` 的对拍回归范围。
 
@@ -367,7 +356,7 @@
 - 启用 `workflow.options.cache_pool` 的共享 `preload_forever` 行为(需可对拍/可断言)
 
 #### Scenario: workflow 示例在 examples gate 中通过
-- **WHEN** 开发者运行 `just examples`(或等价 `notebooks/marimo/run_examples.py`)
+- **WHEN** 开发者运行 `just examples`
 - **THEN** workflow 示例 MUST 被执行
 - **AND** 示例 MUST 通过对拍验证并返回稳定 summary(失败时可定位到章节/用例上下文)
 
@@ -380,7 +369,7 @@
 - `count_distinct` 的 `max_distinct` / `distinct_on_overflow`
 
 #### Scenario: 派生聚合示例在 examples gate 中通过
-- **WHEN** 开发者运行 `just examples`(或等价 `notebooks/marimo/run_examples.py`)
+- **WHEN** 开发者运行 `just examples`
 - **THEN** 派生聚合示例 MUST 被执行
 - **AND** 示例 MUST 通过对拍验证且结果确定(输出顺序/数值口径稳定)
 
@@ -389,7 +378,7 @@
 
 - Marimo notebooks(教学入口)
 - notebooks 侧 SSOT 入口/实现文件（执行真相）
-- headless runner(`notebooks/marimo/run_examples.py`)与 pytest 复用点(如存在)
+- headless gate(`just examples`)与 pytest 复用点(如存在)
 - canonical YAML fixtures 与其 schema 绑定(至少 demand/workflow 两类 schema)
 
 该 coverage 报告 MUST 由脚本 `scripts/gen-marimo-coverage.py` 生成,不得手工维护.
@@ -399,3 +388,18 @@
 - **THEN** MUST 存在 `notebooks/marimo/marimo_coverage.gen.md`
 - **AND** 运行 `just gen-marimo-coverage` MUST 能稳定生成相同内容
 - **AND** 运行 `just marimo-coverage-drift-check` MUST 在无漂移时返回 0
+
+### Requirement: `just examples` 入口收敛为 `justfile` 内联 headless runner
+系统 MUST 将 `just examples` 的执行入口收敛为 `justfile` 内联的 headless runner,并使其覆盖:
+
+- `demo_big_data_report` 的示例/对拍（YAML DSL 主线教程 + IR 回归章节）
+- public API suite 的示例/对拍（`__all__` 覆盖断言 + 扩展点演示）
+
+该 runner MUST 自动发现并执行 `notebooks/marimo/` 下的 suites 与章节集合,并输出可定位的 PASS/FAIL 与章节级 summary.
+
+#### Scenario: `just examples` 统一入口覆盖示例套件
+- **WHEN** 开发者运行 `just examples`
+- **THEN** 系统 MUST 执行 `justfile` 内联的 headless runner
+- **AND** 该 runner MUST 覆盖上述示例套件的全部回归点
+- **AND** 当存在失败时,进程退出码 MUST 非零
+

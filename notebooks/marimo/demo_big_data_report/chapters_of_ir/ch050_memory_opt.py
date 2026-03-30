@@ -100,7 +100,7 @@ def _(mo):
         - 演示内存/写出相关优化路径的最小回归入口
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch050_memory_opt.py::run_memory_optimization`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch050_memory_opt.py::run_memory_optimization`
 
         Gate:
         - `just examples`（跑全量）

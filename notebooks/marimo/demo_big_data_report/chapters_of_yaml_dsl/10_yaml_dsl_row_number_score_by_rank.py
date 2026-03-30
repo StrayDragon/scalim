@@ -126,7 +126,7 @@ def _(mo):
         - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/10_yaml_dsl_row_number_score_by_rank.py::run_yaml_dsl_row_number_score_by_rank`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/10_yaml_dsl_row_number_score_by_rank.py::run_yaml_dsl_row_number_score_by_rank`
         """
     )
     return

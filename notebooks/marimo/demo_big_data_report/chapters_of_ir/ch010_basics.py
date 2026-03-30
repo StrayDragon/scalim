@@ -90,7 +90,7 @@ def _(mo):
         - 对拍(oracle)失败时可在本 notebook 里交互定位
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch010_basics.py::run_basics`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py::run_basics`
 
         Gate:
         - `just examples`（跑全量）

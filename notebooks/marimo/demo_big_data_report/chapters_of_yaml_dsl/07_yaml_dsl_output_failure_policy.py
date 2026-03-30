@@ -273,7 +273,7 @@ def _(mo):
         - `include_full_error_message=true`：错误信息包含全文
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/07_yaml_dsl_output_failure_policy.py::run_yaml_dsl_output_failure_policy`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/07_yaml_dsl_output_failure_policy.py::run_yaml_dsl_output_failure_policy`
         """
     )
     return

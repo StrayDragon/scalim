@@ -169,7 +169,7 @@ def _(mo):
         - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/03_yaml_dsl_support.py::run_yaml_dsl_support`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/03_yaml_dsl_support.py::run_yaml_dsl_support`
         """
     )
     return

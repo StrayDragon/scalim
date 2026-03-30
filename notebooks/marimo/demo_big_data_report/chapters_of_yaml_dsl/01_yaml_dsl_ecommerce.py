@@ -156,7 +156,7 @@ def _(mo):
         - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/01_yaml_dsl_ecommerce.py::run_yaml_dsl_ecommerce`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/01_yaml_dsl_ecommerce.py::run_yaml_dsl_ecommerce`
         """
     )
     return

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import importlib
 import re
 import sys
 from dataclasses import dataclass
@@ -28,7 +29,7 @@ class _Row:
     item_id: str
     notebook: Optional[Path]
     ssot: Optional[Path]
-    gate: Optional[Path]
+    gate: Optional[str]
     pytest: Optional[Path]
     ok: bool
     notes: str = ""
@@ -72,6 +73,14 @@ def _ensure_repo_on_syspath(root: Path) -> None:
         sys.path.insert(0, root_str)
 
 
+def _justfile_has_examples_recipe(root: Path) -> bool:
+    justfile_path = root / "justfile"
+    if not justfile_path.exists():
+        return False
+    text = justfile_path.read_text(encoding="utf-8")
+    return bool(re.search(r"(?m)^examples:\s*$", text))
+
+
 def _parse_yaml_schema_header(path: Path) -> Tuple[bool, str]:
     """检查 `# yaml-language-server: $schema=...` 指向的 `schema` 文件是否存在。"""
     try:
@@ -96,15 +105,31 @@ def _find_demo_notebook_for_chapter(chapters_dir: Path, chapter_id: str) -> Opti
     return matches[0] if matches else None
 
 
-def _load_demo_chapter_ids() -> List[str]:
-    from notebooks.marimo.demo_big_data_report.chapters.registry import all_chapter_ids  # noqa: PLC0415
+def _discover_chapter_groups(*, suite_root: Path) -> List[Path]:
+    groups: List[Path] = []
+    for path in suite_root.iterdir():
+        if not path.is_dir():
+            continue
+        if not str(path.name).startswith("chapters"):
+            continue
+        if (path / "registry.py").is_file():
+            groups.append(path)
 
-    return list(all_chapter_ids())
+    def _key(p: Path) -> object:
+        if p.name == "chapters_of_yaml_dsl":
+            return (0, p.name)
+        if p.name == "chapters_of_ir":
+            return (1, p.name)
+        return (2, p.name)
+
+    return sorted(groups, key=_key)
 
 
-def _load_public_api_chapter_ids() -> List[str]:
-    from notebooks.marimo.example_public_api_suite.chapters.registry import all_chapter_ids  # noqa: PLC0415
-
+def _load_chapter_ids_from_registry(registry_module: str) -> List[str]:
+    reg = importlib.import_module(registry_module)
+    all_chapter_ids = getattr(reg, "all_chapter_ids", None)
+    if all_chapter_ids is None or not callable(all_chapter_ids):
+        raise AttributeError("缺少可调用的 `all_chapter_ids()`：{}".format(registry_module))
     return list(all_chapter_ids())
 
 
@@ -114,17 +139,16 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
 
     notebooks_root = root / "notebooks" / "marimo"
     demo_root = notebooks_root / "demo_big_data_report"
-    demo_chapters_dir = demo_root / "chapters"
     public_api_root = notebooks_root / "example_public_api_suite"
     public_api_chapters_dir = public_api_root / "chapters"
 
-    gate_runner = notebooks_root / "run_examples.py"
+    gate_label = "just examples"
+    gate_ok = _justfile_has_examples_recipe(root)
     pytest_demo_chapters = root / "tests" / "test_demo_big_data_report_chapters.py"
     pytest_public_api = root / "tests" / "test_example_public_api_suite.py"
 
     # --- 入口页 ---
     hubs = [
-        ("hub", "notebooks/marimo/index.py", notebooks_root / "index.py"),
         ("hub", "demo_big_data_report/demo_main.py", demo_root / "demo_main.py"),
         ("hub", "example_public_api_suite/demo_main.py", public_api_root / "demo_main.py"),
     ]
@@ -136,7 +160,7 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
                 item_id=item_id,
                 notebook=path if ok else None,
                 ssot=None,
-                gate=gate_runner if gate_runner.exists() else None,
+                gate=gate_label,
                 pytest=None,
                 ok=ok,
                 notes="" if ok else "missing",
@@ -167,49 +191,52 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
                 item_id=item_id,
                 notebook=path if path.exists() else None,
                 ssot=None,
-                gate=gate_runner if gate_runner.exists() else None,
+                gate=gate_label,
                 pytest=None,
-                ok=ok,
-                notes=note if note else ("missing" if not ok else ""),
+                ok=bool(ok and gate_ok),
+                notes=note if note else ("missing" if not ok else ("missing_gate" if not gate_ok else "")),
             )
         )
 
     # --- 主线章节 ---
-    chapter_ids = _load_demo_chapter_ids()
-    for chapter_id in chapter_ids:
-        notebook = _find_demo_notebook_for_chapter(demo_chapters_dir, chapter_id) if demo_chapters_dir.exists() else None
-        ssot = notebook
-        pytest_path = pytest_demo_chapters
-        ok = bool(notebook and gate_runner.exists())
-        note_parts: List[str] = []
-        if not notebook:
-            note_parts.append("missing_notebook")
-        if not gate_runner.exists():
-            note_parts.append("missing_gate")
-        rows.append(
-            _Row(
-                kind="chapter",
-                item_id="demo_big_data_report/{}".format(chapter_id),
-                notebook=notebook,
-                ssot=ssot,
-                gate=gate_runner if gate_runner.exists() else None,
-                pytest=pytest_path if pytest_path.exists() else None,
-                ok=ok,
-                notes=",".join(note_parts),
+    demo_groups = _discover_chapter_groups(suite_root=demo_root) if demo_root.exists() else []
+    for group_dir in demo_groups:
+        registry_mod = "notebooks.marimo.demo_big_data_report.{}.registry".format(group_dir.name)
+        chapter_ids = _load_chapter_ids_from_registry(registry_mod)
+        for chapter_id in chapter_ids:
+            notebook = _find_demo_notebook_for_chapter(group_dir, chapter_id) if group_dir.exists() else None
+            ssot = notebook
+            pytest_path = pytest_demo_chapters
+            ok = bool(notebook and gate_ok)
+            note_parts: List[str] = []
+            if not notebook:
+                note_parts.append("missing_notebook")
+            if not gate_ok:
+                note_parts.append("missing_gate")
+            rows.append(
+                _Row(
+                    kind="chapter",
+                    item_id="demo_big_data_report/{}".format(chapter_id),
+                    notebook=notebook,
+                    ssot=ssot,
+                    gate=gate_label,
+                    pytest=pytest_path if pytest_path.exists() else None,
+                    ok=ok,
+                    notes=",".join(note_parts),
+                )
             )
-        )
 
     # --- `public API` 套件章节 ---
-    chapter_ids = _load_public_api_chapter_ids()
+    chapter_ids = _load_chapter_ids_from_registry("notebooks.marimo.example_public_api_suite.chapters.registry")
     for chapter_id in chapter_ids:
         notebook = _find_demo_notebook_for_chapter(public_api_chapters_dir, chapter_id) if public_api_chapters_dir.exists() else None
         ssot = notebook
         pytest_path = pytest_public_api
-        ok = bool(notebook and gate_runner.exists())
+        ok = bool(notebook and gate_ok)
         note_parts = []
         if not notebook:
             note_parts.append("missing_notebook")
-        if not gate_runner.exists():
+        if not gate_ok:
             note_parts.append("missing_gate")
         rows.append(
             _Row(
@@ -217,15 +244,15 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
                 item_id="example_public_api_suite/{}".format(chapter_id),
                 notebook=notebook,
                 ssot=ssot,
-                gate=gate_runner if gate_runner.exists() else None,
+                gate=gate_label,
                 pytest=pytest_path if pytest_path.exists() else None,
                 ok=ok,
                 notes=",".join(note_parts),
             )
         )
 
-    if not gate_runner.exists():
-        warnings.append("missing gate runner: {}".format(gate_runner))
+    if not gate_ok:
+        warnings.append("missing `examples:` recipe in justfile (required gate: `just examples`)")
     return rows, warnings
 
 
@@ -235,6 +262,10 @@ def _format_path(path: Optional[Path], *, root: Path) -> str:
     if path == root or root in path.parents:
         return str(path.relative_to(root))
     return str(path)
+
+
+def _format_gate(gate: Optional[str]) -> str:
+    return str(gate or "—")
 
 
 def _markdown_report(root: Path, rows: Sequence[_Row], warnings: Sequence[str]) -> str:
@@ -266,7 +297,7 @@ def _markdown_report(root: Path, rows: Sequence[_Row], warnings: Sequence[str]) 
                 r.item_id,
                 _format_path(r.notebook, root=root),
                 _format_path(r.ssot, root=root),
-                _format_path(r.gate, root=root),
+                _format_gate(r.gate),
                 _format_path(r.pytest, root=root),
                 status,
                 r.notes or "",

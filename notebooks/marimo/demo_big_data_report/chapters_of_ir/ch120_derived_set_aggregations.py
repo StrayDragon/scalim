@@ -197,7 +197,7 @@ def _(mo):
         - 演示派生聚合 set 口径的关键原语与护栏边界(可对拍)
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/ch120_derived_set_aggregations.py::run_derived_set_aggregations`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch120_derived_set_aggregations.py::run_derived_set_aggregations`
 
         Gate:
         - `just examples`（跑全量）

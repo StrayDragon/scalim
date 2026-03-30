@@ -17,13 +17,13 @@ TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update
 - **THEN** MUST 能找到一个独立于 `demo_big_data_report/` 的 public API suite 目录
 
 ### Requirement: headless runner 必须覆盖 public API suite
-系统 MUST 更新 `notebooks/marimo/run_examples.py`，使其默认执行：
+系统 MUST 将 `just examples` 的 headless runner 覆盖默认执行：
 
 - `demo_big_data_report`（YAML DSL 主线教学 + 场景化对拍）
 - public API suite（`__all__` 覆盖 + 扩展点演示）
 
 #### Scenario: `just examples` 覆盖 public API suite
-- **WHEN** 开发者运行 `just examples`（或等价 `python notebooks/marimo/run_examples.py`）
+- **WHEN** 开发者运行 `just examples`
 - **THEN** runner MUST 执行 public API suite 的章节
 - **AND** public API suite MUST 通过并输出可定位 summary
 

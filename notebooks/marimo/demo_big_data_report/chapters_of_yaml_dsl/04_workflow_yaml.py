@@ -110,7 +110,7 @@ def _(mo):
         - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/04_workflow_yaml.py::run_workflow_yaml`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/04_workflow_yaml.py::run_workflow_yaml`
         """
     )
     return

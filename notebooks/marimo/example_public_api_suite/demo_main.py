@@ -17,7 +17,6 @@ def _(mo):
 
         Gate:
         - `just examples`
-        - 或直接运行：`python notebooks/marimo/run_examples.py --suite example_public_api_suite`
         """
     )
     return

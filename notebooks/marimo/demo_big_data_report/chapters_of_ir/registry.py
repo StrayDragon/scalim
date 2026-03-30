@@ -8,8 +8,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tupl
 
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-
-_CHAPTER_FILE_RE = re.compile(r"^(?:\d+_)?([a-z][a-z0-9_]+)\.py$")
+_CHAPTER_FILE_RE = re.compile(r"^(ch\d+_[a-z][a-z0-9_]+)\.py$")
 
 
 def _discover_chapter_modules() -> List[Tuple[str, str]]:
@@ -24,7 +23,7 @@ def _discover_chapter_modules() -> List[Tuple[str, str]]:
         if not match:
             continue
         chapter_id = match.group(1)
-        module_name = "notebooks.marimo.demo_big_data_report.chapters.{}".format(path.stem)
+        module_name = "notebooks.marimo.demo_big_data_report.chapters_of_ir.{}".format(path.stem)
         found.append((path.name, chapter_id, module_name))
     found.sort(key=lambda item: item[0])
 
@@ -58,20 +57,32 @@ class _Case:
 
 def _load_case(chapter_id: str) -> _Case:
     mod = importlib.import_module(_CHAPTER_MODULES_BY_ID[chapter_id])
-    run_fn_name = "run_{}".format(chapter_id)
-    run = getattr(mod, run_fn_name, None)
-    if run is None:
-        run = getattr(mod, "run_chapter", None)
+    run = getattr(mod, "run_chapter", None)
     if run is None:
         run = getattr(mod, "run", None)
-    if run is None or not callable(run):
-        msg = "missing callable `{}` (or `run_chapter()`/`run()`) in chapter module: {}".format(run_fn_name, mod.__name__)
+    if run is None:
+        candidates = []
+        for name in dir(mod):
+            if not name.startswith("run_"):
+                continue
+            if name == "run_chapter":
+                continue
+            fn = getattr(mod, name, None)
+            if callable(fn):
+                candidates.append((name, fn))
+        if len(candidates) == 1:
+            run = candidates[0][1]
+        else:
+            msg = "missing callable `run_chapter()`/`run()`/single `run_*()` in chapter module: {}".format(mod.__name__)
+            raise AttributeError(msg)
+    if not callable(run):
+        msg = "missing callable `run_chapter()`/`run()` in chapter module: {}".format(mod.__name__)
         raise AttributeError(msg)
     return _Case(chapter_id=chapter_id, run=run)
 
 
 def _safe_run(case: _Case) -> ExampleResult:
-    example_id = f"demo_big_data_report/{case.chapter_id}"
+    example_id = "demo_big_data_report/{}".format(case.chapter_id)
     try:
         result = case.run()
     except Exception as exc:  # noqa: BLE001

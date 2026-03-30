@@ -9,16 +9,15 @@
 示例体系需要同时满足“可学”(交互讲解)与“可测”(确定性回归).若 UI 与 headless 执行路径分叉,将形成第二套真相并导致 drift/门禁碎片化.
 
 ## Related Code (as implemented)
-- `notebooks/marimo/index.py` (示例 hub/导航与约定说明)
-- `notebooks/marimo/run_examples.py` (`just examples` headless runner)
+- `justfile` (`just examples` gate 入口; runner 内联实现)
+- `notebooks/marimo/` (示例 suites: `demo_*`/`example_*` + `chapters*/registry.py` 契约)
 - `scripts/gen-marimo-coverage.py` + `notebooks/marimo/marimo_coverage.gen.md` (覆盖报告生成与 drift-check)
 - `packages/scalim-misc/src/scalim_misc/notebook_support/*` (notebook 复用 helper; 不依赖 marimo)
-
 ## Requirements
 ### Requirement: 示例 notebooks 以 Marimo 为唯一交互载体
 系统 MUST 将 `notebooks/marimo/` 作为示例/教程的交互载体目录;其中用于教学展示的示例 notebooks MUST 为 Marimo notebook(即包含 `marimo.App`).
 
-系统 MAY 在 `notebooks/marimo/` 下保留非 Marimo 的 headless 脚本,但该脚本 MUST 明确定位为 runner/工具脚本,不得承担交互教学入口职责(例如 `notebooks/marimo/run_examples.py`).
+系统 MAY 在 `notebooks/marimo/` 下保留非 Marimo 的 headless runner 实现,但该实现 MUST 明确定位为 runner/工具实现,不得承担交互教学入口职责.
 
 #### Scenario: 示例 notebooks 可被识别为 Marimo
 - **WHEN** 维护者枚举 `notebooks/marimo/**.py` 中用于教学展示的 notebooks
@@ -40,13 +39,13 @@
 
 该 SSOT 入口 MUST 满足：
 
-- MUST 可被 `notebooks/marimo/run_examples.py` 与 pytest 直接导入并执行（允许导入 `marimo` 与 notebook 模块，但不得要求启动 marimo UI server）。
+- MUST 可被 `just examples` 所执行的 headless runner 与 pytest 直接导入并执行（允许导入 `marimo` 与 notebook 模块，但不得要求启动 marimo UI server）。
 - MUST 产生可定位的结果摘要（至少包含 `passed` 与 `summary`；可选 `details` 供 notebook UI 展示与排障）。
 - MUST 与对应的 Marimo notebook 交互入口同源：notebook 侧展示的核心执行路径 MUST 复用同一 SSOT 入口（避免 “UI 一套逻辑 / headless 一套逻辑” 的漂移）。
 
 #### Scenario: 新增章节时 SSOT 入口可被 runner/pytest 复用
 - **WHEN** 维护者为示例体系新增一个纳入 gate 的章节 notebook
-- **THEN** 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 `notebooks/marimo/run_examples.py` 与 pytest 复用
+- **THEN** 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 `just examples` 的 headless runner 与 pytest 复用
 - **AND** 该 notebook 的交互执行路径 MUST 调用同一入口函数得到结果并展示
 
 ### Requirement: Marimo notebooks 必须是薄封装,不得形成第二套真相
@@ -82,7 +81,7 @@ runner MUST 输出可定位的 PASS/FAIL 与章节级 summary,并以非零退出
 
 - 对应的 Marimo notebook(教学入口)
 - 对应的 notebooks 侧 SSOT 入口/实现文件(执行真相来源)
-- 对应的 headless gate(`notebooks/marimo/run_examples.py`)与 pytest 复用点(如存在)
+- 对应的 headless gate(`just examples`)与 pytest 复用点(如存在)
 
 该文件 MUST 由脚本 `scripts/gen-marimo-coverage.py` 生成,不得手工维护.
 

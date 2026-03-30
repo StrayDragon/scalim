@@ -379,7 +379,207 @@ examples-big-data:
 
 # 运行示例: 运行所有示例
 examples:
-    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python notebooks/marimo/run_examples.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cd "{{ justfile_directory() }}"
+
+    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python - <<'PY'
+    import importlib
+    import logging
+    import multiprocessing as mp
+    import os
+    import sys
+    from concurrent.futures import ProcessPoolExecutor
+    from pathlib import Path
+    from typing import Dict, List, Optional, Sequence
+
+    from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
+    from scalim_misc.examples.harness import exit_code, format_results, summarize_failures
+
+
+    def _is_ci() -> bool:
+        raw = str(os.environ.get("CI") or "").strip().lower()
+        if not raw:
+            return False
+        return raw not in {"0", "false", "no"}
+
+
+    def _parse_jobs() -> int:
+        raw = str(os.environ.get("SCALIM_EXAMPLES_JOBS") or "").strip()
+        if raw:
+            jobs = int(raw)
+            return max(1, jobs)
+        return 1 if _is_ci() else 2
+
+
+    def _parse_suites_whitelist() -> Optional[Sequence[str]]:
+        raw = str(os.environ.get("SCALIM_EXAMPLES_SUITES") or "").strip()
+        if not raw:
+            return None
+        parts: List[str] = []
+        for item in raw.replace(";", ",").split(","):
+            token = str(item).strip()
+            if token:
+                parts.append(token)
+        if not parts:
+            return None
+        return sorted(set(parts))
+
+
+    def _discover_suites(*, marimo_root: Path) -> List[str]:
+        suites: List[str] = []
+        for path in marimo_root.iterdir():
+            if not path.is_dir():
+                continue
+            name = str(path.name)
+            if name.startswith("demo_") or name.startswith("example_"):
+                suites.append(name)
+        return sorted(suites)
+
+
+    def _discover_chapter_groups(*, suite_dir: Path) -> List[str]:
+        groups: List[str] = []
+        for path in suite_dir.iterdir():
+            if not path.is_dir():
+                continue
+            group_id = str(path.name)
+            if not group_id.startswith("chapters"):
+                continue
+            if (path / "registry.py").is_file():
+                groups.append(group_id)
+
+        def _key(group_id: str) -> object:
+            if group_id == "chapters_of_yaml_dsl":
+                return (0, group_id)
+            if group_id == "chapters_of_ir":
+                return (1, group_id)
+            return (2, group_id)
+
+        return sorted(groups, key=_key)
+
+
+    def _configure_logging() -> None:
+        logging.basicConfig(level=logging.WARNING)
+        noisy_loggers = [
+            "scalim.execution.executor.runtime.runtime",
+            "scalim.ob.presets.row_gap",
+            "scalim.sinks.sink_csv",
+        ]
+        for name in noisy_loggers:
+            logging.getLogger(name).setLevel(logging.ERROR if name == "scalim.sinks.sink_csv" else logging.WARNING)
+
+
+    def _run_suite(suite_id: str) -> List[ExampleResult]:
+        _configure_logging()
+
+        repo_root = Path(".").resolve()
+        suite_dir = repo_root / "notebooks" / "marimo" / str(suite_id)
+        if not suite_dir.is_dir():
+            return [
+                ExampleResult(
+                    example_id="suite/{}".format(suite_id),
+                    passed=False,
+                    kind=EXAMPLE_KIND_ORACLE,
+                    summary="suite directory missing: {}".format(str(suite_dir)),
+                    details={"suite_dir": str(suite_dir)},
+                )
+            ]
+
+        groups = _discover_chapter_groups(suite_dir=suite_dir)
+        if not groups:
+            return [
+                ExampleResult(
+                    example_id="suite/{}".format(suite_id),
+                    passed=False,
+                    kind=EXAMPLE_KIND_ORACLE,
+                    summary="no chapter groups found (expected `chapters*/registry.py`)",
+                    details={"suite_dir": str(suite_dir)},
+                )
+            ]
+
+        all_results: List[ExampleResult] = []
+        for group_id in groups:
+            registry_mod = "notebooks.marimo.{}.{}.registry".format(str(suite_id), str(group_id))
+            try:
+                reg = importlib.import_module(registry_mod)
+                results = reg.run_all_chapters()
+            except Exception as exc:  # noqa: BLE001
+                all_results.append(
+                    ExampleResult(
+                        example_id="{}/{}".format(suite_id, group_id),
+                        passed=False,
+                        kind=EXAMPLE_KIND_ORACLE,
+                        summary="{}: {}".format(type(exc).__name__, exc),
+                        details={"registry_module": registry_mod, "exc_type": type(exc).__name__, "message": str(exc)},
+                    )
+                )
+                continue
+            all_results.extend(results)
+        # 说明:
+        # - 章节可能把局部函数/闭包等对象放入 `details`,导致多进程返回时无法 pickle。
+        # - gate 输出仅依赖 example_id/passed/kind/summary,因此在 runner 边界主动丢弃 details。
+        return [
+            ExampleResult(
+                example_id=str(r.example_id),
+                passed=bool(r.passed),
+                kind=str(r.kind or ""),
+                summary=str(r.summary or ""),
+                details=None,
+            )
+            for r in all_results
+        ]
+
+
+    def main() -> int:
+        repo_root = Path(".").resolve()
+        marimo_root = repo_root / "notebooks" / "marimo"
+        suites = _discover_suites(marimo_root=marimo_root)
+        if not suites:
+            raise RuntimeError("no suites discovered under {}".format(str(marimo_root)))
+
+        whitelist = _parse_suites_whitelist()
+        if whitelist is not None:
+            unknown = sorted(set(whitelist) - set(suites))
+            if unknown:
+                msg = "unknown suites in `SCALIM_EXAMPLES_SUITES`: {} (known: {})".format(", ".join(unknown), ", ".join(suites))
+                raise ValueError(msg)
+            suites = [s for s in suites if s in set(whitelist)]
+
+        jobs = _parse_jobs()
+        suite_results: Dict[str, List[ExampleResult]] = {}
+        if jobs <= 1 or len(suites) <= 1:
+            for suite_id in suites:
+                suite_results[suite_id] = _run_suite(suite_id)
+        else:
+            try:
+                ctx = mp.get_context("fork")
+            except ValueError:
+                ctx = mp.get_context()
+            max_workers = min(int(jobs), len(suites))
+            with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+                futures = {executor.submit(_run_suite, suite_id): suite_id for suite_id in suites}
+                for fut, suite_id in futures.items():
+                    suite_results[suite_id] = fut.result()
+
+        all_results: List[ExampleResult] = []
+        for suite_id in suites:
+            all_results.extend(suite_results.get(suite_id, []))
+
+        for line in format_results(all_results):
+            print(line)
+
+        failures = summarize_failures(all_results)
+        if failures:
+            print("\n--- 失败详情 ---\n{}".format(failures), file=sys.stderr)
+        if not failures:
+            print("\n所有示例执行完成!")
+        return exit_code(all_results)
+
+
+    if __name__ == "__main__":
+        raise SystemExit(main())
+    PY
 
 alias example := examples
 

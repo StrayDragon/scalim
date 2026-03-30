@@ -200,7 +200,7 @@ def _(mo):
         - workbook 与 sheetbook 导出的 header 与 CSV header 必须一致
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters/09_workflow_shared_workbooks.py::run_workflow_shared_workbooks`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/09_workflow_shared_workbooks.py::run_workflow_shared_workbooks`
         """
     )
     return
