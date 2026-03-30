@@ -950,11 +950,13 @@
 - `workflow.runs[*].demand` (required)
 - `workflow.runs[*].depends_on` (optional)
 - `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)
+- `workflow.runs[*].writes` (legacy; rejected; use `workflow.resources.books` + output overrides)
 - `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)
 - `workflow.options.ctx` (optional; ctx guardrails)
 - `workflow.options.cache_pool` (optional; workflow-scope cache pool)
 - `workflow.resources` (optional)
 - `workflow.resources.books` (optional; shared Excel book outputs)
+- `workflow.resources.sheetbooks` (legacy; rejected; use `workflow.resources.books`)
 
 ### Validation
 - Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`

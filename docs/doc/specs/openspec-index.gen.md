@@ -14,7 +14,7 @@ Sources:
 ### `agent-skill-export`
 - Title: agent-skill-export Specification
 - Source: [spec.md](#code=openspec/specs/agent-skill-export/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物与构建清单,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
+- Summary: **状态: ✅ 已实现** 定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
 
 ### `agent-skill-workflow-writes-docs`
 - Title: agent-skill-workflow-writes-docs Specification

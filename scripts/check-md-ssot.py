@@ -31,13 +31,15 @@ def _git_ls_files(root: Path, pattern: str) -> List[str]:
     try:
         output = subprocess.check_output(["git", "-C", str(root), "ls-files", pattern], text=True)
     except Exception as exc:
-        raise RuntimeError("failed to list markdown files via git: {}".format(exc)) from exc
+        raise RuntimeError("通过 `git ls-files` 列出 `*.md` 文件失败: {}".format(exc)) from exc
     return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
 
 
 def _is_allowed_markdown(rel_posix: str) -> bool:
     # 迁移/历史区域允许保留旧写法(辅助作者升级或回溯)
     if rel_posix.startswith("artifacts/skills/scalim-yaml-dsl/references/upgrades/"):
+        return True
+    if rel_posix == "artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md":
         return True
     if rel_posix == "artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md":
         return True
@@ -133,20 +135,21 @@ def main() -> int:
             errors.append("{}:{}: {}: {}\n  hint: {}".format(rel_posix, lineno, rule.name, line.strip(), rule.message))
 
     if errors:
-        sys.stderr.write("Markdown SSOT check failed: legacy authoring surfaces detected.\n")
-        sys.stderr.write("Allowed exceptions: artifacts/skills/.../references/upgrades/, yaml-dsl-upgrades.gen.md, openspec/changes/archive/\n")
-        sys.stderr.write("Violations:\n")
+        sys.stderr.write("`md` `SSOT` 检查失败: 检测到旧写法.\n")
+        sys.stderr.write(
+            "允许的例外: `artifacts/skills/.../references/upgrades/`, `yaml-dsl-upgrades.gen.md`, `openspec/changes/archive/`\n"
+        )
+        sys.stderr.write("违规项:\n")
         for item in errors[:200]:
             sys.stderr.write("- {}\n".format(item))
         if len(errors) > 200:
-            sys.stderr.write("... and {} more.\n".format(len(errors) - 200))
-        sys.stderr.write("\nFix: update docs/specs to match current schema/runtime SSOT.\n")
+            sys.stderr.write("…… 以及另外 {} 条.\n".format(len(errors) - 200))
+        sys.stderr.write("\n修复: 更新文档/规格以匹配当前 `schema`/运行时 `SSOT`.\n")
         return 1
 
-    sys.stdout.write("OK: Markdown SSOT check passed.\n")
+    sys.stdout.write("通过: `md` `SSOT` 检查通过.\n")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

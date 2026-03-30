@@ -1,5 +1,4 @@
 import argparse
-import json
 from pathlib import Path
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
@@ -32,9 +31,16 @@ def test_build_generates_generated_references_only(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     output_root = tmp_path / "out"
 
-    manifest = agent_skill_gen.build_skill(repo_root, output_root)
+    managed_files = agent_skill_gen.build_skill(repo_root, output_root)
 
     skill_dir = output_root / agent_skill_gen.SKILL_NAME
+    assert managed_files == [
+        "references/generated/cli-lsp-reference.gen.md",
+        "references/generated/example-full/ecommerce_report.gen.yaml",
+        "references/generated/example-full/ecommerce_report_fragments.yaml",
+        "references/generated/yaml-dsl-upgrades.gen.md",
+        "references/syntax-catalog.gen.md",
+    ]
     assert agent_skill_gen.list_files(skill_dir) == [
         "references/generated/cli-lsp-reference.gen.md",
         "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -42,18 +48,6 @@ def test_build_generates_generated_references_only(tmp_path: Path) -> None:
         "references/generated/yaml-dsl-upgrades.gen.md",
         "references/syntax-catalog.gen.md",
     ]
-
-    manifest_path = agent_skill_gen.build_manifest_path(output_root)
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert payload["outputs"] == manifest["outputs"]
-    assert [item["path"] for item in payload["outputs"]] == [
-        "references/generated/cli-lsp-reference.gen.md",
-        "references/generated/example-full/ecommerce_report.gen.yaml",
-        "references/generated/example-full/ecommerce_report_fragments.yaml",
-        "references/generated/yaml-dsl-upgrades.gen.md",
-        "references/syntax-catalog.gen.md",
-    ]
-    assert "path_normalization" not in payload
 
 
 def test_build_preserves_manual_files(tmp_path: Path) -> None:

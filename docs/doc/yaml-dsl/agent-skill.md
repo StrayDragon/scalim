@@ -94,9 +94,10 @@ workflow YAML 同理,只是 `--type` 与 schema 文件名不同:
 - 生成:`just gen-agent-skill`
 - 漂移校验:`just validate-agent-skill`
 
-generated 产物清单与输入/输出校验和在:
+漂移校验会在临时目录重建受控输出并逐字节对拍,覆盖范围仅包含:
 
-- [`artifacts/skills/scalim-yaml-dsl.build-manifest.json`](#code=artifacts/skills/scalim-yaml-dsl.build-manifest.json)
+- `artifacts/skills/scalim-yaml-dsl/references/*.gen.*`
+- `artifacts/skills/scalim-yaml-dsl/references/generated/`
 
 ## 5. 贡献者:如何评估 skill 效果(prompt-eval)
 

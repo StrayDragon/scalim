@@ -2,8 +2,7 @@
 `scalim-yaml-dsl` skill 生成器.
 
 本模块只负责生成 `artifacts/skills/scalim-yaml-dsl/references/*.gen.*`、
-`artifacts/skills/scalim-yaml-dsl/references/generated/` 与
-`scalim-yaml-dsl.build-manifest.json`.
+`artifacts/skills/scalim-yaml-dsl/references/generated/`.
 
 生成内容分层如下:
 - 语法目录: `src/scalim/dsl/by_yaml/schema/demand.gen.json` 与 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 为语法真相
@@ -16,7 +15,6 @@
 注入“升级批次索引”,用于把 `artifacts/skills/scalim-yaml-dsl/references/upgrades/` 的升级文档同步到 skill 参考中.
 """
 
-import hashlib
 import json
 import re
 import tempfile
@@ -132,7 +130,7 @@ def is_forbidden_output(path: Path) -> bool:
     return False
 
 
-def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
+def build_skill(repo_root: Path, output_root: Path) -> List[str]:
     skill_dir = output_root / SKILL_NAME
     if is_forbidden_output(skill_dir):
         raise GenerationError("拒绝写入到用户技能目录下.")
@@ -171,43 +169,21 @@ def build_skill(repo_root: Path, output_root: Path) -> Dict[str, Any]:
     sync_upgrade_legacy_reference(repo_root, skill_dir)
     sync_skill_cli_min_commands(skill_dir)
 
-    outputs = [skill_dir / rel_path for rel_path in sorted(generated_files.keys(), key=lambda item: str(item))]
-    fragment_inputs = [canonical_example_source.parent / name for name in sorted(canonical_example_fragments)]
-    inputs = (
-        [schema_path, workflow_schema_path, cli_path, canonical_example_source]
-        + fragment_inputs
-        + [repo_root / rel for rel in SYNTAX_SPEC_RELS + CLI_SPEC_RELS]
-    )
-
-    manifest = build_manifest(
-        repo_root=repo_root,
-        skill_dir=skill_dir,
-        inputs=inputs,
-        outputs=outputs,
-        coverage_index=build_coverage_index(schema, workflow_schema, syntax_specs, cli_specs, command_docs),
-    )
-    write_text(build_manifest_path(output_root), dump_json(manifest))
-    return manifest
+    return list_managed_output_files(skill_dir)
 
 
 def validate_skill(repo_root: Path, output_root: Path) -> bool:
     skill_dir = output_root / SKILL_NAME
-    manifest_path = build_manifest_path(output_root)
     generated_root = skill_dir / GENERATED_ROOT_REL
 
     if not generated_root.exists():
         print("未找到 `references/generated/` 目录: {}".format(generated_root))
-        return False
-    if not manifest_path.exists():
-        print("未找到构建清单: {}".format(manifest_path))
         return False
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_root = Path(tmpdir)
         build_skill(repo_root, tmp_root)
         tmp_skill_dir = tmp_root / SKILL_NAME
-        tmp_manifest_path = build_manifest_path(tmp_root)
-        tmp_generated_root = tmp_skill_dir / GENERATED_ROOT_REL
 
         expected_files = list_managed_output_files(tmp_skill_dir)
         actual_files = list_managed_output_files(skill_dir)
@@ -223,10 +199,6 @@ def validate_skill(repo_root: Path, output_root: Path) -> bool:
             if read_bytes(expected_path) != read_bytes(actual_path):
                 print("检测到受控产物内容漂移: {}".format(rel_path))
                 return False
-
-        if read_bytes(tmp_manifest_path) != read_bytes(manifest_path):
-            print("检测到内容漂移: {}".format(manifest_path.name))
-            return False
 
     return True
 
@@ -437,11 +409,13 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
         "- `workflow.runs[*].demand` (required)",
         "- `workflow.runs[*].depends_on` (optional)",
         "- `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)",
+        "- `workflow.runs[*].writes` (legacy; rejected; use `workflow.resources.books` + output overrides)",
         "- `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)",
         "- `workflow.options.ctx` (optional; ctx guardrails)",
         "- `workflow.options.cache_pool` (optional; workflow-scope cache pool)",
         "- `workflow.resources` (optional)",
         "- `workflow.resources.books` (optional; shared Excel book outputs)",
+        "- `workflow.resources.sheetbooks` (legacy; rejected; use `workflow.resources.books`)",
         "",
         "### Validation",
         "- Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`",
@@ -881,71 +855,6 @@ def extract_markdown_section(text: str, heading: str) -> str:
     return " ".join(buffer)
 
 
-def build_coverage_index(
-    schema: Dict[str, Any],
-    workflow_schema: Dict[str, Any],
-    syntax_specs: Sequence[Dict[str, Any]],
-    cli_specs: Sequence[Dict[str, Any]],
-    command_docs: Sequence[Dict[str, Any]],
-) -> Dict[str, Any]:
-    properties = schema.get("properties", {})
-    top_level_fields = list(yaml_schema_constants.DEMAND_SCHEMA_PROPERTIES_ORDER)
-    for key in sorted(properties.keys()):
-        if key not in top_level_fields:
-            top_level_fields.append(key)
-
-    return {
-        "top_level_fields": top_level_fields,
-        "definitions": sorted(schema.get("definitions", {}).keys()),
-        "workflow_fields": build_workflow_field_paths(workflow_schema),
-        "syntax_specs": [{"slug": item["slug"], "path": item["path"], "requirements": item["requirements"]} for item in syntax_specs],
-        "cli_specs": [{"slug": item["slug"], "path": item["path"], "requirements": item["requirements"]} for item in cli_specs],
-        "commands": [" ".join(item["tokens"]) for item in command_docs],
-    }
-
-
-def build_workflow_field_paths(workflow_schema: Dict[str, Any]) -> List[str]:
-    """Extract a stable list of key workflow field paths for coverage tracking."""
-    workflow_entry = workflow_schema.get("properties", {}).get("workflow", {})
-    if not isinstance(workflow_entry, dict):
-        return []
-    workflow_props = workflow_entry.get("properties", {})
-    if not isinstance(workflow_props, dict):
-        return []
-
-    paths = ["workflow"]
-    for key in ("runs", "options", "resources"):
-        if key in workflow_props:
-            paths.append("workflow.{}".format(key))
-
-    runs = workflow_props.get("runs", {})
-    if isinstance(runs, dict):
-        item = runs.get("items", {})
-        if isinstance(item, dict):
-            item_props = item.get("properties", {})
-            if isinstance(item_props, dict):
-                for key in ("id", "demand", "depends_on", "init_vars", "writes"):
-                    if key in item_props:
-                        paths.append("workflow.runs[*].{}".format(key))
-
-    options = workflow_props.get("options", {})
-    if isinstance(options, dict):
-        option_props = options.get("properties", {})
-        if isinstance(option_props, dict):
-            for key in ("max_concurrency", "failure_policy", "cache_pool", "ctx"):
-                if key in option_props:
-                    paths.append("workflow.options.{}".format(key))
-
-    resources = workflow_props.get("resources", {})
-    if isinstance(resources, dict):
-        res_props = resources.get("properties", {})
-        if isinstance(res_props, dict):
-            if "books" in res_props:
-                paths.append("workflow.resources.books")
-
-    return paths
-
-
 def sync_generated_files(skill_dir: Path, generated_files: Dict[Path, str]) -> None:
     generated_root = skill_dir / GENERATED_ROOT_REL
     references_root = skill_dir / REFERENCES_ROOT_REL
@@ -965,37 +874,6 @@ def sync_generated_files(skill_dir: Path, generated_files: Dict[Path, str]) -> N
 
     for rel_path, content in generated_files.items():
         write_text(skill_dir / rel_path, content)
-
-
-def build_manifest(
-    repo_root: Path,
-    skill_dir: Path,
-    inputs: Iterable[Path],
-    outputs: Iterable[Path],
-    coverage_index: Dict[str, Any],
-) -> Dict[str, Any]:
-    input_entries = []
-    for path in sorted(set(inputs), key=lambda item: str(item)):
-        if not path.exists():
-            continue
-        input_entries.append({"path": path_to_posix(path.relative_to(repo_root)), "sha256": sha256_file(path)})
-
-    output_entries = []
-    for path in sorted(set(outputs), key=lambda item: str(item)):
-        if not path.exists():
-            continue
-        output_entries.append({"path": path_to_posix(path.relative_to(skill_dir)), "sha256": sha256_file(path)})
-
-    return {
-        "skill_name": SKILL_NAME,
-        "inputs": input_entries,
-        "outputs": output_entries,
-        "coverage_index": coverage_index,
-    }
-
-
-def build_manifest_path(output_root: Path) -> Path:
-    return output_root / "{}.build-manifest.json".format(SKILL_NAME)
 
 
 def list_files(root: Path, base: Optional[Path] = None) -> List[str]:
@@ -1032,10 +910,6 @@ def load_json_file(path: Path, label: str) -> Dict[str, Any]:
         raise GenerationError("{} JSON 无法解析: {}".format(label, path)) from exc
 
 
-def dump_json(data: Dict[str, Any]) -> str:
-    return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-
-
 def validate_frontmatter(name: str, description: str) -> None:
     if not name or len(name) > 64:
         raise GenerationError("技能名称长度不合法.")
@@ -1068,14 +942,6 @@ def write_text(path: Path, content: str) -> None:
     if content and not content.endswith("\n"):
         content += "\n"
     path.write_text(content, encoding="utf-8")
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(8192), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def path_to_posix(path: Any) -> str:

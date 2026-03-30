@@ -3,7 +3,7 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物与构建清单,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
+定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
 
 ## Context
 实现位于 `packages/scalim-misc/src/scalim_misc/agent_skill_gen.py` 与 `scripts/gen-agent-skill.py`.
@@ -28,21 +28,20 @@
 - **THEN** 生成器失败并提示拒绝写入
 
 ### Requirement: Skill Output Artifacts
-系统 MUST 仅生成和校验受控参考产物与构建清单,不得再把完整 skill 包视为自动生成产物.
+系统 MUST 仅生成和校验受控参考产物,不得再把完整 skill 包视为自动生成产物.
 
-受控输出 MUST 位于 `artifacts/skills/scalim-yaml-dsl/references/` 与 output_root 下的 `scalim-yaml-dsl.build-manifest.json`,并至少包含:
+受控输出 MUST 位于 `artifacts/skills/scalim-yaml-dsl/references/`,并至少包含:
 - `references/syntax-catalog.gen.md`
 - `references/generated/cli-lsp-reference.gen.md`
 - `references/generated/example-full/ecommerce_report.gen.yaml`
 
 #### Scenario: 生成产物仅包含受控参考产物
 - **WHEN** 生成器运行
-- **THEN** 它仅更新受控产物与 `scalim-yaml-dsl.build-manifest.json`
+- **THEN** 它仅更新受控产物(不覆盖 `SKILL.md`/非 generated references)
 
 #### Scenario: 生成产物仍可单独消费
 - **WHEN** 生成器成功完成
-- **THEN** manifest 中登记的每个受控产物都必须存在且可读取
-- **THEN** build manifest 必须记录这些受控输出文件
+- **THEN** 每个受控产物都必须存在且可读取
 
 ### Requirement: Auto-Extracted References
 系统 MUST 从 schema 与 CLI 实现自动导出受控参考产物,并从受控 notebook YAML 来源导出唯一 canonical example.
@@ -91,19 +90,19 @@
 - **THEN** 导出结果必须移除该头部
 - **THEN** 不得把 `.venv/...`、`site-packages/...` 或输出目录相关路径写入 canonical example
 
-### Requirement: Deterministic Manifest and Validation Mode
-系统 MUST 输出 output_root 下的 `scalim-yaml-dsl.build-manifest.json`,记录受控参考产物的输入/输出校验和与覆盖索引,并保证排序确定性.
+### Requirement: Deterministic Outputs and Validation Mode
+系统 MUST 保证受控参考产物输出确定性(稳定排序/无随机/无机器路径泄漏).
 
 系统 MUST 提供校验模式,重建受控参考产物并逐字节比较受控输出;发现漂移即失败.
 校验范围 MUST 仅包含生成器负责的受控输出,不得把手工维护的 skill 文件当作“应由生成器重建”的内容.
 
 #### Scenario: 重复构建一致
 - **WHEN** 输入不变且运行两次
-- **THEN** `scalim-yaml-dsl.build-manifest.json` 与 generated outputs 保持确定性一致
+- **THEN** generated outputs 保持确定性一致
 
 #### Scenario: 校验模式仅比较受控输出
 - **WHEN** 已有 skill 目录下同时存在手工维护文件与 generated references
-- **THEN** 校验模式只比较 manifest 中登记的受控文件
+- **THEN** 校验模式只比较生成器负责的受控文件
 - **THEN** 不得因为手工维护文件内容不同而报告生成漂移
 
 #### Scenario: 发生 generated reference 漂移
@@ -152,7 +151,7 @@
 
 至少 MUST 满足:
 
-- 生成器 MUST 将 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 视为 workflow YAML 的 canonical schema 输入,并将其纳入构建清单输入哈希.
+- 生成器 MUST 将 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 视为 workflow YAML 的 canonical schema 输入,并将其纳入校验/回归输入集.
 - `references/syntax-catalog.gen.md` MUST 包含 workflow YAML 的语法索引,至少覆盖:
   - `workflow.runs[*]` 的关键字段: `id`、`demand`、`depends_on`、`init_vars`、`main_rows_from`
   - `workflow.options` 的关键字段: `max_concurrency`、`failure_policy`、`cache_pool`、`ctx`
@@ -170,4 +169,3 @@
 - **WHEN** 维护者运行 `just gen-agent-skill`
 - **THEN** `references/generated/cli-lsp-reference.gen.md` 必须包含 workflow schema-only 校验命令示例
 - **THEN** 且必须包含 `upsert-lsp-comment --type workflow` 的命令示例
-
