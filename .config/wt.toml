@@ -42,7 +42,7 @@
 # Post-Create: Runs after worktree creation, BLOCKS until complete
 # Use for: installing dependencies, setting up databases, copying configs
 #
-[post-create]
+[pre-start]
 activate-venv = "source {{ primary_worktree_path }}/.venv/bin/activate"
 # env = "cp .env.example .env"
 
