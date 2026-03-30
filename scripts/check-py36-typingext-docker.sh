@@ -86,7 +86,20 @@ def star_import(module_name: str) -> None:
 failures = []
 modules = iter_scalim_modules()
 
-for module_name in modules:
+SKIP_STAR_IMPORT_MODULES = frozenset(
+    [
+        # 说明:
+        # - 这些模块依赖可选 C-extension; 在 docker/不同架构下可能不可用(但主线功能可回退 pure-python)。
+        # - 该门禁的目标是捕获 “关键入口/工作流模块 import 时炸” 的回归,不要求强行覆盖这些可选模块。
+        "scalim.vendor.yamlx._yaml",
+        "scalim.vendor.yamlx.ruamel.yaml.cyaml",
+        "scalim.vendor.yamlx.yaml.cyaml",
+    ]
+)
+
+tested_modules = [m for m in modules if m not in SKIP_STAR_IMPORT_MODULES]
+
+for module_name in tested_modules:
     try:
         star_import(module_name)
     except BaseException as exc:
@@ -102,7 +115,7 @@ if failures:
         print("  - {}: {}: {}".format(module_name, type(exc).__name__, exc))
     raise SystemExit(1)
 
-print("检查通过: py36 + typing-extensions 4.1.1 + import* smoke (modules={})".format(len(modules)))
+print("检查通过: py36 + typing-extensions 4.1.1 + import* smoke (modules={})".format(len(tested_modules)))
 PY
 
 SCALIM_PY36_TMP_ROOT="$tmp_root" PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src:$repo_root/packages/scalim-misc/src" python - <<'PY'

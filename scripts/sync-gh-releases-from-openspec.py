@@ -219,7 +219,7 @@ def _example_priority(change_id: str) -> int:
     cid = change_id.lower()
     if "normalize" in cid:
         return 1
-    # `resources.books` / workflow IO 收敛：属于 outputs/IO authoring surface 的核心变化。
+    # `resources.books` / `workflow IO` 收敛：属于 `outputs/IO` 编写面的核心变化。
     if "books-resources" in cid or "io-books-resources" in cid:
         return 5
     # 字段级：`extract` / `value_cast` / 显式 `decimal` 等都归为同一档（`field-level authoring surface`）。
@@ -784,7 +784,7 @@ def _render_notes(
         seen.add(item)
         breaking_uniq.append(item)
 
-    # 若同一迁移点同时出现“把 old 改为 new”与“不要再用 old”，保留前者即可。
+    # 若同一迁移点同时出现“把 `old` 改为 `new`”与“不要再用 `old`”，保留前者即可。
     replaced_old_tokens: Set[str] = set()
     for item in breaking_uniq:
         match = re.search(r"^把 `([^`]+)` 改为 `([^`]+)`", item)

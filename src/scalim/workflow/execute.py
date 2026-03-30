@@ -45,7 +45,8 @@ from ..ob.presets.viz import (
     WorkflowVizObserver,
     build_workflow_viz_graph_snapshot,
 )
-from ..sinks._internal.rows import InMemoryRows, iter_in_memory_rows_as_main_rows
+from ..sinks.rows import InMemoryRows, iter_in_memory_rows_as_main_rows
+from ..spec.ir import DemandIr
 from ..spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
@@ -57,11 +58,13 @@ from ..spec.ir._workflow import (
 )
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
+from ._internal.request_overrides import WorkflowNodeRequestOverrides, merge_workflow_node_request
 from .errors import ScalimWorkflowConfigError
 from .loaders import workflow_loader_context
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
 from .resources import ScalimWorkflowWriteError, SheetBookDef, WorkflowResourceManager
 from .resources_csv import WorkflowCsvInput
+from .visibility_index import WorkflowVisibilityIndex
 
 
 class _CompilationLike(ABC):
@@ -77,25 +80,8 @@ class WorkflowArtifactsDirectory:
     _lock: threading.Lock
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
-        deps_by_node_id = {node.node_id: node.deps for node in workflow_ir.nodes}
-        cache: Dict[str, Set[str]] = {}
-
-        def _visible(node_id: str) -> Set[str]:
-            cached = cache.get(node_id)
-            if cached is not None:
-                return cached
-            out: Set[str] = set()
-            for dep_id in deps_by_node_id.get(node_id, ()):
-                out.add(str(dep_id))
-                out.update(_visible(str(dep_id)))
-            cache[node_id] = out
-            return out
-
-        visible: Dict[str, FrozenSet[str]] = {}
-        for node in workflow_ir.nodes:
-            visible[node.node_id] = frozenset(_visible(node.node_id))
-
-        self._visible_by_consumer_node_id = visible
+        visibility = WorkflowVisibilityIndex.from_workflow_ir(workflow_ir)
+        self._visible_by_consumer_node_id = visibility.visible_by_consumer_node_id
         self._values_by_producer_node_id = {}
         self._lock = threading.Lock()
 
@@ -221,25 +207,8 @@ class WorkflowCtxStore:
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
         self._guardrails = workflow_ir.options.ctx
-        deps_by_node_id = {node.node_id: node.deps for node in workflow_ir.nodes}
-        cache: Dict[str, Set[str]] = {}
-
-        def _visible(node_id: str) -> Set[str]:
-            cached = cache.get(node_id)
-            if cached is not None:
-                return cached
-            out: Set[str] = set()
-            for dep_id in deps_by_node_id.get(node_id, ()):
-                out.add(str(dep_id))
-                out.update(_visible(str(dep_id)))
-            cache[node_id] = out
-            return out
-
-        visible: Dict[str, FrozenSet[str]] = {}
-        for node in workflow_ir.nodes:
-            visible[node.node_id] = frozenset(_visible(node.node_id))
-
-        self._visible_by_consumer_node_id = visible
+        visibility = WorkflowVisibilityIndex.from_workflow_ir(workflow_ir)
+        self._visible_by_consumer_node_id = visibility.visible_by_consumer_node_id
         self._values_by_producer_node_id = {}
         self._value_bytes_by_producer_node_id = {}
         self._total_bytes = 0
@@ -446,11 +415,16 @@ def _resolve_workflow_input_csv(
     *,
     artifacts_dir: WorkflowArtifactsDirectory,
     consumer_node_id: str,
+    consumer_decl_order: int,
     input_node_id: str,
     input_output_id: str,
     error_prefix: str,
 ) -> WorkflowCsvInput:
-    outputs_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "outputs")
+    path_prefix = "workflow.runs.{}".format(int(consumer_decl_order))
+    try:
+        outputs_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "outputs")
+    except ValueError as exc:
+        raise ScalimWorkflowConfigError(str(exc), path="{}.input_node_id".format(path_prefix)) from exc
     outputs = cast("Optional[Dict[str, str]]", outputs_obj)  # pragma: allow-cast workflow output mapping typed narrowing
     if outputs_obj is None:
         msg = "{} requires demand outputs mapping: input_node_id={!r}".format(str(error_prefix), str(input_node_id))
@@ -468,7 +442,10 @@ def _resolve_workflow_input_csv(
             raise ScalimWorkflowWriteError(msg)
         return output_path
 
-    mem_map_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "in_memory_csv_outputs")
+    try:
+        mem_map_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "in_memory_csv_outputs")
+    except ValueError as exc:
+        raise ScalimWorkflowConfigError(str(exc), path="{}.input_node_id".format(path_prefix)) from exc
     mem_map = cast("Optional[Dict[str, WorkflowCsvInput]]", mem_map_obj)  # pragma: allow-cast workflow csv mapping typed narrowing
     csv_artifact = mem_map.get(output_id) if mem_map is not None else None
     if csv_artifact is not None:
@@ -489,6 +466,7 @@ def _run_workflow_write_sheet_node(
     input_csv = _resolve_workflow_input_csv(
         artifacts_dir=artifacts_dir,
         consumer_node_id=str(node.node_id),
+        consumer_decl_order=int(node.decl_order),
         input_node_id=str(node.input_node_id),
         input_output_id=str(node.input_output_id),
         error_prefix="write node",
@@ -548,6 +526,7 @@ def _run_workflow_append_sheet_node(
     input_csv = _resolve_workflow_input_csv(
         artifacts_dir=artifacts_dir,
         consumer_node_id=str(node.node_id),
+        consumer_decl_order=int(node.decl_order),
         input_node_id=str(node.input_node_id),
         input_output_id=str(node.input_output_id),
         error_prefix="append node",
@@ -1021,7 +1000,7 @@ def _compile_demand_node(
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
     main_rows_consumers_remaining_by_run_id: Dict[str, int],
     artifacts_dir: WorkflowArtifactsDirectory,
-) -> object:
+) -> Tuple[object, ExecutionRequest]:
     node_id = str(node.node_id)
     demand_path = str(node.demand_path or "")
 
@@ -1048,29 +1027,35 @@ def _compile_demand_node(
         viz_config=node_viz_config,
     )
     comp = cast("_CompilationLike", compilation)  # pragma: allow-cast compile_demand typed narrowing
-    request = comp.request
-    next_request = request
+    base_request = cast("ExecutionRequest", comp.request)  # pragma: allow-cast compilation.request narrow
+    overrides = WorkflowNodeRequestOverrides()
     if node_id in main_rows_consumers_remaining_by_run_id:
-        next_request = replace(next_request, capture_in_memory_rows=True)
+        overrides = replace(overrides, capture_in_memory_rows=True)
 
     producer_run_id = str(node.main_rows_from_run_id or "").strip()
     if producer_run_id:
-        typed_rows_obj = artifacts_dir.get(str(node_id), producer_run_id, "in_memory_rows")
+        try:
+            typed_rows_obj = artifacts_dir.get(str(node_id), producer_run_id, "in_memory_rows")
+        except ValueError as exc:
+            path = "workflow.runs.{}.main_rows_from_run_id".format(int(node.decl_order))
+            raise ScalimWorkflowConfigError(str(exc), path=path) from exc
         if not isinstance(typed_rows_obj, InMemoryRows):
             msg = "Missing workflow-managed typed rows artifact: producer_node_id={!r}".format(producer_run_id)
             raise ScalimWorkflowWriteError(msg)
-        next_request = replace(next_request, main_rows=iter_in_memory_rows_as_main_rows(typed_rows_obj))
+        overrides = replace(overrides, main_rows=iter_in_memory_rows_as_main_rows(typed_rows_obj))
 
-    if next_request is request:
-        return compilation
-    return replace(compilation, request=next_request)
+    request_for_run = merge_workflow_node_request(base_request, overrides)
+    return compilation, request_for_run
 
 
 def _workflow_try_submit_ready(  # noqa: PLR0913
     executor: concurrent.futures.ThreadPoolExecutor,
     *,
     ready_queue: List[str],
-    submitted: Dict["concurrent.futures.Future[Any]", Tuple[str, WorkflowAnyNodeIr, Optional[str], Optional[object]]],
+    submitted: Dict[
+        "concurrent.futures.Future[Any]",
+        Tuple[str, WorkflowAnyNodeIr, Optional[str], Optional[object], Optional[ExecutionRequest]],
+    ],
     max_concurrency: int,
     failure_policy: str,
     failed_outcome_holder: List[Optional[WorkflowRunOutcome]],
@@ -1088,7 +1073,7 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
     main_rows_consumers_remaining_by_run_id: Dict[str, int],
     resource_manager: WorkflowResourceManager,
-    run_one: Callable[[object, str], _NodeRunResult],
+    run_one: Callable[[DemandIr, ExecutionRequest, str], _NodeRunResult],
     emit_workflow_node_start: Callable[[WorkflowAnyNodeIr], None],
     emit_workflow_node_end: Callable[..., None],
     maybe_release_workflow_main_rows_artifact: Callable[[WorkflowAnyNodeIr], None],
@@ -1104,7 +1089,7 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
         if isinstance(node, WorkflowNodeIr):
             demand_path = str(node.demand_path or "")
             try:
-                compilation = _compile_demand_node(
+                compilation, request_for_run = _compile_demand_node(
                     node,
                     workflow_exec_id=str(workflow_exec_id),
                     ctx_store=ctx_store,
@@ -1138,8 +1123,10 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
                     cancel_all_not_started_due_to_all_fail()
                 continue
 
-            fut = executor.submit(run_one, compilation, str(node_id))
-            submitted[fut] = (str(node_id), node, str(demand_path), compilation)
+            comp = cast("Any", compilation)  # pragma: allow-cast compilation runtime boundary
+            demand_ir = cast("DemandIr", comp.demand_ir)  # pragma: allow-cast compilation.demand_ir narrow
+            fut = executor.submit(run_one, demand_ir, request_for_run, str(node_id))
+            submitted[fut] = (str(node_id), node, str(demand_path), compilation, request_for_run)
             continue
 
         fut = executor.submit(
@@ -1148,7 +1135,7 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
             artifacts_dir=artifacts_dir,
             resource_manager=resource_manager,
         )
-        submitted[fut] = (str(node_id), node, None, None)
+        submitted[fut] = (str(node_id), node, None, None, None)
 
 
 def _workflow_process_completed_future(  # noqa: C901, PLR0912, PLR0913, PLR0915
@@ -1158,6 +1145,7 @@ def _workflow_process_completed_future(  # noqa: C901, PLR0912, PLR0913, PLR0915
     node: WorkflowAnyNodeIr,
     demand_path: Optional[str],
     compilation: Optional[object],
+    request: Optional[ExecutionRequest],
     idx: int,
     outcomes: List[Optional[WorkflowRunOutcome]],
     node_state: Dict[str, str],
@@ -1192,9 +1180,8 @@ def _workflow_process_completed_future(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 captured_demand_events_by_node_id[str(node_id)] = list(capture_obj.captured_events)
                 captured_demand_hook_events_by_node_id[str(node_id)] = list(capture_obj.captured_hook_events)
                 captured_demand_viz_observer_by_node_id[str(node_id)] = capture_obj.viz_observer
-                if compilation is not None:
-                    capture_comp = cast("_CompilationLike", compilation)  # pragma: allow-cast compilation boundary
-                    captured_demand_request_by_node_id[str(node_id)] = capture_comp.request
+                if request is not None:
+                    captured_demand_request_by_node_id[str(node_id)] = request
             demand_yaml_path = str(demand_path or "")
             artifacts_dir.publish(str(node_id), "output_path", core.output_path)
             artifacts_dir.publish(str(node_id), "outputs", core.outputs)
@@ -1388,9 +1375,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
             },
         )
 
-    def _run_one(compilation: object, workflow_node_id: str) -> _NodeRunResult:
-        comp = cast("Any", compilation)  # pragma: allow-cast compilation runtime boundary
-
+    def _run_one(demand_ir: DemandIr, request: ExecutionRequest, workflow_node_id: str) -> _NodeRunResult:
         def _engine_factory(**kwargs: object) -> ScalimEngine:
             engine_kwargs = cast("Any", kwargs)  # pragma: allow-cast engine kwargs typed narrowing
             return ScalimEngine(
@@ -1414,8 +1399,8 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
         ):
             if prepared.capture_observability and run_ir_fn is run_ir:
                 core, captured_hook_events, captured_events, viz_observer = run_ir_capture_events(
-                    comp.demand_ir,
-                    comp.request,
+                    demand_ir,
+                    request,
                     engine_factory=_engine_factory,
                     event_meta_defaults=event_meta_defaults,
                 )
@@ -1426,8 +1411,8 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
                     viz_observer=viz_observer,
                 )
             return run_ir_fn(
-                comp.demand_ir,
-                comp.request,
+                demand_ir,
+                request,
                 engine_factory=_engine_factory,
                 event_meta_defaults=event_meta_defaults,
             )
@@ -1453,7 +1438,10 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
             ready_queue.append(node.node_id)
     ready_queue.sort(key=lambda nid: index_by_node_id.get(str(nid), 0))
 
-    submitted: Dict["concurrent.futures.Future[Any]", Tuple[str, WorkflowAnyNodeIr, Optional[str], Optional[object]]] = {}
+    submitted: Dict[
+        "concurrent.futures.Future[Any]",
+        Tuple[str, WorkflowAnyNodeIr, Optional[str], Optional[object], Optional[ExecutionRequest]],
+    ] = {}
 
     def _cancel_node(node_id: str, *, reason: str, message: str) -> None:
         idx = index_by_node_id[str(node_id)]
@@ -1544,7 +1532,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
         while submitted:
             done, _pending = concurrent.futures.wait(submitted.keys(), return_when=concurrent.futures.FIRST_COMPLETED)
             for fut in done:
-                node_id, node, demand_path, compilation = submitted.pop(fut)
+                node_id, node, demand_path, compilation, request = submitted.pop(fut)
                 idx = index_by_node_id.get(str(node_id), 0)
                 _workflow_process_completed_future(
                     fut,
@@ -1552,6 +1540,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
                     node=node,
                     demand_path=demand_path,
                     compilation=compilation,
+                    request=request,
                     idx=idx,
                     outcomes=outcomes,
                     node_state=node_state,

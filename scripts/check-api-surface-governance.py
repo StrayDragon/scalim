@@ -72,8 +72,9 @@ def _extract_module_all(tree: ast.AST) -> Optional[AllAssignment]:
 
     values: List[str] = []
     for elt in elts:
-        if isinstance(elt, ast.Str):  # py<3.8
-            values.append(str(elt.s))
+        ast_str = getattr(ast, "Str", None)
+        if ast_str is not None and isinstance(elt, ast_str):  # `py<3.8`: 新版运行时已移除
+            values.append(str(getattr(elt, "s", "")))
             continue
         if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
             values.append(str(elt.value))

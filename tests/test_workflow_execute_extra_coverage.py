@@ -113,6 +113,7 @@ def test_workflow_artifacts_directory_discard_variants() -> None:
     artifacts_dir.discard("p0", "outputs")
 
     artifacts_dir.publish("p1", "outputs", {"detail": "./out.csv"})
+    assert artifacts_dir.get_optional("p1", "p1", "missing") is None
     artifacts_dir.discard("p1", "outputs")
     with pytest.raises(KeyError):
         _ = artifacts_dir.get("p1", "p1", "outputs")
@@ -152,10 +153,72 @@ def test_resolve_workflow_input_csv_missing_in_memory_artifact_raises() -> None:
         _ = workflow_execute_mod._resolve_workflow_input_csv(
             artifacts_dir=artifacts_dir,
             consumer_node_id="a",
+            consumer_decl_order=0,
             input_node_id="a",
             input_output_id="detail",
             error_prefix="write node",
         )
+
+
+def test_resolve_workflow_input_csv_invisible_input_node_id_raises_config_error() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
+
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError) as excinfo:
+        _ = workflow_execute_mod._resolve_workflow_input_csv(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id="consumer",
+            consumer_decl_order=1,
+            input_node_id="producer",
+            input_output_id="detail",
+            error_prefix="write node",
+        )
+
+    assert excinfo.value.path == "workflow.runs.1.input_node_id"
+
+
+def test_resolve_workflow_input_csv_in_memory_map_visibility_error_path_is_wrapped(monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
+
+    def _fake_get_optional(consumer_node_id: str, producer_node_id: str, artifact_id: str) -> object:
+        if artifact_id == "outputs":
+            return {"detail": ""}
+        if artifact_id == "in_memory_csv_outputs":
+            raise ValueError("boom")
+        raise AssertionError("unexpected artifact_id={!r}".format(artifact_id))
+
+    monkeypatch.setattr(artifacts_dir, "get_optional", _fake_get_optional)
+
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError) as excinfo:
+        _ = workflow_execute_mod._resolve_workflow_input_csv(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id="a",
+            consumer_decl_order=0,
+            input_node_id="a",
+            input_output_id="detail",
+            error_prefix="write node",
+        )
+
+    assert excinfo.value.path == "workflow.runs.0.input_node_id"
 
 
 def test_resolve_workflow_input_csv_missing_outputs_mapping_and_unknown_and_non_csv() -> None:
@@ -175,6 +238,7 @@ def test_resolve_workflow_input_csv_missing_outputs_mapping_and_unknown_and_non_
         _ = workflow_execute_mod._resolve_workflow_input_csv(
             artifacts_dir=artifacts_dir,
             consumer_node_id="a",
+            consumer_decl_order=0,
             input_node_id="a",
             input_output_id="detail",
             error_prefix="write node",
@@ -185,6 +249,7 @@ def test_resolve_workflow_input_csv_missing_outputs_mapping_and_unknown_and_non_
         _ = workflow_execute_mod._resolve_workflow_input_csv(
             artifacts_dir=artifacts_dir,
             consumer_node_id="a",
+            consumer_decl_order=0,
             input_node_id="a",
             input_output_id="detail",
             error_prefix="write node",
@@ -195,6 +260,7 @@ def test_resolve_workflow_input_csv_missing_outputs_mapping_and_unknown_and_non_
         _ = workflow_execute_mod._resolve_workflow_input_csv(
             artifacts_dir=artifacts_dir,
             consumer_node_id="a",
+            consumer_decl_order=0,
             input_node_id="a",
             input_output_id="detail",
             error_prefix="write node",

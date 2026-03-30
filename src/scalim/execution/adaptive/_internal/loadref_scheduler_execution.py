@@ -58,6 +58,7 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
             loader_retry=runtime.loader_retry,
             parallel_mode="seq",
             max_workers=0,
+            key_normalization=runtime.key_normalization,
         )
         task_runtime.preloaded_cache = runtime.preloaded_cache
         task_runtime.batch_num = runtime.batch_num

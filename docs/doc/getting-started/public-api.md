@@ -29,6 +29,7 @@
 | `scalim.ob` | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 事件 envelope + 事件类型常量 + 事件目录查询入口 | 写 Observer/Hook；按 `event_type` 订阅/过滤 |
 | `scalim.sinks` | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
+| `scalim.sinks.rows` | workflow typed rows artifact 稳定入口 | `InMemoryRows` 中间态 / 转换与适配 |
 
 最常见的“只关心导入”的用法:
 
@@ -64,6 +65,12 @@ from scalim.events import Event, EVENT_PIPELINE_START, get_event_catalog
 
 ```python
 from scalim.sinks import CSVSink, InMemoryRowSink
+```
+
+需要 workflow typed rows artifact (`InMemoryRows`) 时:
+
+```python
+from scalim.sinks.rows import InMemoryRows, InMemoryRowsSink
 ```
 
 ## 2) 其它可用导入（Tier 2:可用但不在稳定白名单）

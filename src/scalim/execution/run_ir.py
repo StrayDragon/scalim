@@ -2,15 +2,14 @@ import contextlib
 import time
 import warnings as py_warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .._internal.warningsx import ScalimExperimentalWarning
 from ..events import EVENT_DIAGNOSTIC_WARNING, Event
-from ..hooks import HookManager, IExecutionHook
+from ..hooks import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
 from ..ob.observability import Observability
-from ..ob.observer import Observer
 from ..ob.presets.viz import VizObserver, VizObserverConfig
 from ..planning.builder import PlanBuilder
 from ..planning.plan import ExecutionPlan
@@ -27,111 +26,20 @@ from ..sinks import (
     IRowSink,
     ISink,
 )
-from ..sinks._internal.rows import InMemoryRows, InMemoryRowsSink
+from ..sinks.rows import InMemoryRows, InMemoryRowsSink
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SupportedFieldIr
-from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, SinkRowKeySeq
+from ..typedefs import RowData, SinkRowKeySeq
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, replace
-from ..vendor.dataclassesx import field as dataclass_field
 from .adaptive.capture import HookCaptureManager, HookRecordedEvent
+from .contracts import ExecutionRequest, ExecutionResult, ObservabilitySpec
 from .engine import ScalimEngine
-from .guardrails import GuardrailsPolicy
 from .key_normalization import normalize_key_normalization
-from .loader_retry import LoaderRetryPolicies
 from .output_contracts import ExportLayout, OutputSpec
 
 if TYPE_CHECKING:
     from ..ob.manager import ObserverManager
     from .output_composition import OutputCompositionSpec, OutputTargetStats, RouterRowSink
-
-
-@dataclass(frozen=True)
-class ObservabilitySpec:
-    """与 `DSL` 无关的可观测性请求(用于运行编排).
-
-    - `viz_config` 可选;在构建执行计划后会物化为 `VizObserver`.
-    """
-
-    fallback_logger_enabled: bool = False
-    viz_config: Optional[VizObserverConfig] = None
-
-
-@dataclass(frozen=True)
-class ExecutionRequest:
-    export_layout: ExportLayout
-    """导出布局(字段顺序与可选表头)."""
-
-    output: OutputSpec = dataclass_field(default_factory=OutputSpec)
-    """输出策略(例如输出格式、路径、编码、是否流式)."""
-
-    sink: Optional[ISink] = None
-    """可选:显式指定输出端;若为 `None` 则按 `output` 策略创建."""
-
-    observability: Optional[ObservabilitySpec] = None
-    """可选:可观测性请求(例如 `viz` 配置)."""
-
-    components: Optional[List[Union[Observer, IExecutionHook]]] = None
-    """可选:要挂载的 `Observer`/`Hook` 组件列表."""
-
-    batch_size: Optional[int] = None
-    """可选:覆盖批大小(`None` 表示不覆盖)."""
-
-    parallel_mode: ParallelMode = "seq"
-    """并行模式(`seq` 或 `adaptive`)."""
-
-    max_workers: int = 0
-    """最大并发工作数提示(`0` 表示自动)."""
-
-    key_normalization: KeyNormalizationMode = "raw"
-    """可选: `key` 规范化模式(实验性;默认 `raw`)."""
-
-    guardrails: Optional[GuardrailsPolicy] = None
-    """可选:运行时护栏策略."""
-
-    loader_retry: Optional[LoaderRetryPolicies] = None
-    """可选:加载重试策略."""
-
-    output_composition: Optional["OutputCompositionSpec"] = None
-    """可选:多输出组合请求(`IR/Python-only`).
-
-    当提供该字段时:
-    - `output`/`sink` 的单输出装配将被忽略
-    - 运行计划的目标字段将由组合请求的 `required_demand_fields` 计算得出
-    """
-
-    main_rows: Optional[Iterable[RowData]] = None
-    """可选:显式注入 `main_rows`(当提供时绕过主数据源 `loader`)."""
-
-    capture_in_memory_rows: bool = False
-    """可选:捕获本次运行输出的 `InMemoryRows`(保留 `FieldValue` 类型域;默认关闭)."""
-
-
-@dataclass(frozen=True)
-class ExecutionResult:
-    """与 `DSL` 无关的执行结果.
-
-    注意:
-    - `total_rows` 统计写入到实际输出端的行数(包括 `NullSink`),这是输出/写出的行数.
-    - 可观测性指标可能使用不同口径来做低开销吞吐估算
-      (例如 `PerformanceMetrics.total_rows` 统计的是输入 `row_ids`).
-    """
-
-    output_path: Optional[str]
-    total_rows: int
-    duration: float
-    demand_ir: DemandIr
-    plan: ExecutionPlan
-    outputs: Optional[Dict[str, str]] = None
-    """可选:输出目标到 `output_path` 的映射(多输出组合时提供)."""
-
-    output_target_stats: Optional[List["OutputTargetStats"]] = None
-    """可选:每个输出目标的统计(行数/耗时/错误/禁用)(多输出组合时提供)."""
-
-    in_memory_csv_outputs: Optional[Dict[str, InMemoryCsv]] = None
-    """可选: `workflow-managed` 无路径 CSV 输出的内存中间态(多输出组合时提供)."""
-
-    in_memory_rows: Optional[InMemoryRows] = None
-    """可选: `workflow-intermediate-store` 的 `InMemoryRows` 中间态(显式启用时提供)."""
 
 
 class _TeeRowSink(BaseRowSink):
