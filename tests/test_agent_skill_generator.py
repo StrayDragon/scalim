@@ -201,11 +201,12 @@ def test_generated_syntax_catalog_covers_top_level_and_definitions(tmp_path: Pat
     assert "## Workflow YAML (Generated)" in catalog
     assert "workflow.runs[*].depends_on" in catalog
     assert "workflow.runs[*].init_vars" in catalog
-    assert "workflow.runs[*].writes" in catalog
+    assert "workflow.runs[*].writes" not in catalog
     assert "workflow.runs[*].write_to" not in catalog
     assert "write_to" not in catalog
     assert "workflow.options.ctx" in catalog
-    assert "workflow.resources.sheetbooks" in catalog
+    assert "workflow.resources.books" in catalog
+    assert "workflow.resources.sheetbooks" not in catalog
 
 
 def test_manual_skill_contract_matches_generated_layout() -> None:

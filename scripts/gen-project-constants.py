@@ -136,14 +136,12 @@ def _targets(root: Path, values: Dict[str, str]) -> List[Tuple[Path, str]]:
     import_root = values["IMPORT_ROOT"]
     python_path = root / "src" / import_root / "_project_constants.py"
     viz_ts_path = root / "frontend" / "scalim-viz" / "src" / "generated" / "project_constants.ts"
-    editor_ts_path = root / "frontend" / "scalim-yaml-dsl-editor" / "src" / "generated" / "project_constants.ts"
 
     python_text = _python_constants_text(values)
     ts_text = _ts_constants_text(values)
     return [
         (python_path, python_text),
         (viz_ts_path, ts_text),
-        (editor_ts_path, ts_text),
     ]
 
 

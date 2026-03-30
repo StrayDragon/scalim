@@ -35,7 +35,6 @@
   - `openspec/specs/demand-dsl/spec.md`
   - `openspec/specs/source-cache/spec.md`
   - `openspec/specs/yaml-dsl-schema/spec.md`
-  - `openspec/specs/yaml-dsl-editor-core/spec.md`
   - `openspec/specs/yaml-dsl-agent-guidance/spec.md`
 
 ## 2026-03-11: yaml-params-template
@@ -156,7 +155,6 @@
   - `openspec/specs/yaml-dsl-workflow/spec.md`
   - `openspec/specs/yaml-dsl-schema/spec.md`
   - `openspec/specs/yaml-dsl-cli-validation/spec.md`
-  - `openspec/specs/yaml-dsl-editor-core/spec.md`
   - `openspec/specs/source-cache/spec.md`
   下游同步盘点:
   - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

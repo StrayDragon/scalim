@@ -36,6 +36,5 @@ workflow 并发执行（`ThreadPoolExecutor` / `max_concurrency`）下,共享输
 - 受影响测试：workflow 资源并发（join/wait/timeout）、写锁后端（file/mkdir/none）、NFS 风险提示/诊断信息、Dagster/容器“避免 hang”回归。
 - 文档与生成物边界（SSOT vs generated）：
   - SSOT 文档：`docs/doc/yaml-dsl/workflow.md`（若涉及 injected blocks,使用 `just gen-docs` 刷新）
-  - SSOT schema：`src/scalim/dsl/by_yaml/schema_dsl/builder.py`；生成物 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 与前端 editor schema（用 `just gen-yaml-dsl-schema` / `just gen-yaml-dsl-editor-schema` 或 `just gen` 刷新）
+  - SSOT schema：`src/scalim/dsl/by_yaml/schema_dsl/builder.py`；生成物 `src/scalim/dsl/by_yaml/schema/workflow.gen.json`（用 `just gen-yaml-dsl-schema` 或 `just gen` 刷新）
   - OpenSpec 规范：变更完成后需同步到 `openspec/specs/**/spec.md`,并运行 `just openspec-check` 校验
-

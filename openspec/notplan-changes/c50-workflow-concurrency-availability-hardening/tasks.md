@@ -2,7 +2,7 @@
 
 - [ ] 1.1 扩展 workflow config 类型以表达 `resources_wait` 与 `write_locks`（SSOT：`src/scalim/dsl/by_yaml/workflow_config/_models.py`）
 - [ ] 1.2 在 `src/scalim/dsl/by_yaml/workflow_config/_parse.py` 解析与校验新 options（有限非负数/enum/unknown keys fail-fast）
-- [ ] 1.3 扩展 workflow schema SSOT（`src/scalim/dsl/by_yaml/schema_dsl/builder.py`）并刷新生成物（`just gen-yaml-dsl-schema` + `just gen-yaml-dsl-editor-schema`；验收：`just schema-drift-check`）
+- [ ] 1.3 扩展 workflow schema SSOT（`src/scalim/dsl/by_yaml/schema_dsl/builder.py`）并刷新生成物（`just gen-yaml-dsl-schema`；验收：`just schema-drift-check`）
 
 ## 2. IR 传播（DSL → IR → runtime）
 
@@ -28,4 +28,3 @@
 ## 6. Server/Web API 场景（后续决策）
 
 - [ ] 6.1 明确是否需要提供“输出路径随机后缀/隔离”的 opt-in 能力（若需要,优先以 entrypoint override 方式落地,并考虑拆分为独立 change）
-

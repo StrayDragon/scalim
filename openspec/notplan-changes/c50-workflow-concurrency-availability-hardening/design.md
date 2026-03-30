@@ -44,7 +44,7 @@ workflow runtime 当前采用 `ThreadPoolExecutor` 并发调度 runs,调度队�
 - SSOT（解析与类型）：`src/scalim/dsl/by_yaml/workflow_config/_models.py` 与 `src/scalim/dsl/by_yaml/workflow_config/_parse.py`。
 - SSOT（schema 定义）：`src/scalim/dsl/by_yaml/schema_dsl/builder.py`。
 - 生成物：
-  - `src/scalim/dsl/by_yaml/schema/workflow.gen.json`（以及 editor schema 拷贝）由 `just gen-yaml-dsl-schema` / `just gen-yaml-dsl-editor-schema`（或 `just gen`）刷新。
+  - `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 由 `just gen-yaml-dsl-schema`（或 `just gen`）刷新。
   - 文档站点生成与 injected blocks 由 `just gen-docs` 刷新。
 - 规范校验：在共享/归档前运行 `just openspec-check`（sanitize + `openspec validate --all --strict --no-interactive`）。
 
@@ -64,4 +64,3 @@ workflow runtime 当前采用 `ThreadPoolExecutor` 并发调度 runs,调度队�
 ## Open Questions
 
 - server/web API 场景下,是否需要提供“输出路径随机后缀/隔离”能力以允许同一 workflow 并发多次写到逻辑同名目标？若需要,更适合做成 entrypoint 侧的 opt-in override 还是 YAML authoring surface？
-

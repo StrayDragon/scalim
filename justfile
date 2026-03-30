@@ -39,52 +39,13 @@ _frontend-check DIR LABEL:
     pnpm -C "$dir" lint
     pnpm -C "$dir" build
 
-# 检查: YAML DSL 编辑器 (install + lint + build)
-frontend-yaml-dsl-editor-check:
-    just _frontend-check frontend/scalim-yaml-dsl-editor frontend-yaml-dsl-editor-check
-    uv {{ UV_OPTIONS }} run python scripts/check-yaml-dsl-editor-dist-schema.py
-
 # 检查: Scalim Viz 前端 (install + lint + build)
 frontend-scalim-viz-check:
     just _frontend-check frontend/scalim-viz frontend-scalim-viz-check
 
 # 检查: 所有 frontend (install + lint + build)
 frontend-check:
-    just frontend-yaml-dsl-editor-check
     just frontend-scalim-viz-check
-
-# 准备: YAML DSL 编辑器 exact (Pyodide) 资源
-frontend-yaml-dsl-editor-exact-prepare:
-    #!/usr/bin/env bash
-    set -e
-    bash frontend/scalim-yaml-dsl-editor/scripts/build_scalim_wheel.sh
-
-# 准备: YAML DSL 编辑器 exact (Pyodide) 资源 (离线/本地 Pyodide)
-frontend-yaml-dsl-editor-exact-prepare-local:
-    #!/usr/bin/env bash
-    set -e
-    bash frontend/scalim-yaml-dsl-editor/scripts/prepare_pyodide.sh
-    bash frontend/scalim-yaml-dsl-editor/scripts/build_scalim_wheel.sh
-
-# 检查: YAML DSL 编辑器 exact (Pyodide) 资源
-frontend-yaml-dsl-editor-exact-check-assets:
-    #!/usr/bin/env bash
-    set -e
-    bash frontend/scalim-yaml-dsl-editor/scripts/check_exact_assets.sh
-
-# 检查: YAML DSL 编辑器 exact (Pyodide) 资源 (assets + lint + build)
-frontend-yaml-dsl-editor-exact-check:
-    #!/usr/bin/env bash
-    set -e
-    just frontend-yaml-dsl-editor-exact-check-assets
-    just frontend-yaml-dsl-editor-check
-
-# 开发: YAML DSL 编辑器 exact (Pyodide) 开发服务器
-frontend-yaml-dsl-editor-dev-exact:
-    #!/usr/bin/env bash
-    set -e
-    just frontend-yaml-dsl-editor-exact-prepare
-    pnpm -C frontend/scalim-yaml-dsl-editor dev
 
 # 生成: YAML DSL 校验 schema
 gen-yaml-dsl-schema:
@@ -94,10 +55,6 @@ gen-yaml-dsl-schema:
 gen-project-constants:
     uv {{ UV_OPTIONS }} run python scripts/gen-project-constants.py
 
-# 生成: YAML DSL 编辑器 schema
-gen-yaml-dsl-editor-schema: gen-yaml-dsl-schema
-    uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-editor-schema.py
-
 # 检查: 项目常量生成物是否有 drift
 project-constants-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-project-constants.py --check
@@ -105,7 +62,6 @@ project-constants-drift-check:
 # 检查: YAML DSL schema 生成物是否有 drift (含 canonical 文本形式)
 schema-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-schema.py --check
-    uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-editor-schema.py --check
 
 # 检查: 受控生成物漂移 (约定: `*.gen.*` + injected blocks)
 generated-artifacts-drift-check: project-constants-drift-check schema-drift-check validate-agent-skill marimo-coverage-drift-check docs-drift-check
@@ -330,7 +286,7 @@ docs-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
 
 # 生成: 所有需要生成的数据
-gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-agent-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
+gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
 
 # 检查: 类型检查
 type-check:

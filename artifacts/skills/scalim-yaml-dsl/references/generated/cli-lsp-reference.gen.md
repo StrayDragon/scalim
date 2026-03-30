@@ -70,33 +70,6 @@
   - validate 对 `outputs.*.fields` object 条目给出可行动诊断
   - CLI can upsert schema modeline in YAML files (IntelliJ compatible)
   - upsert-lsp-comment resolves schema reference from type + schema-path
-### `yaml-dsl-editor-core`
-- Source: `openspec/specs/yaml-dsl-editor-core/spec.md`
-- Purpose: 定义 YAML DSL 编辑器的核心能力:文本优先编辑、Visual 双向同步、统一校验模型、roundtrip 稳定性与可选 exact(Pyodide)语义校验.
-- Requirements:
-  - 作为纯前端应用运行
-  - 文本编辑为主路径(Text-first)
-  - 可视化与 YAML 双向编辑(Split)
-  - 使用 canonical JSON Schema 提供补全与 hover
-  - 编辑器对相对模块引用提供一致提示
-  - 编辑器暴露与 canonical schema 语义一致的 `extract`
-  - 导入/导出与模板新建
-  - Outline 与快速导航
-  - 可选多 schema 选择(demand vs workflow)
-  - 可视化辅助视图(关系与依赖)
-  - 统一 issue 数据模型与定位能力
-  - 默认提供 schema-only 校验并支持 strict
-  - 支持 local semantic 与 exact semantic 并合并展示
-  - exact semantic 基于 Worker + Pyodide 且默认关闭
-  - exact 初始化失败自动降级
-  - exact 依赖最小化
-  - roundtrip 优先补丁并尽量保留格式
-  - 重写前必须 diff 预览并显式确认
-  - alias 编辑提供共享与拆分策略
-  - 可视化编辑块必须提供稳定可发现的新增入口
-  - 同一编辑器中的可操作项必须采用一致的交互视觉体系
-  - 关键操作的可见性不得依赖 hover-only
-  - 编辑器暴露源代码级 `normalize` 并提供与 canonical schema 一致的指引
 
 ## Command Details
 ### `yaml-dsl validate`

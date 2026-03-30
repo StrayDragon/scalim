@@ -1,9 +1,0 @@
-sources:
-  countries:
-    loader: "myapp.loaders:load_countries"
-    key: country_id
-    fields:
-      country_name:
-        extract: country_name
-        name: 国家名称
-

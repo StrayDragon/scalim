@@ -401,16 +401,6 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-docs-skills-autogen-sync/spec.md)
 - Summary: TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update Purpose after archive.
 
-### `yaml-dsl-editor-core`
-- Title: yaml-dsl-editor-core Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-core/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 YAML DSL 编辑器的核心能力:文本优先编辑、Visual 双向同步、统一校验模型、roundtrip 稳定性与可选 exact(Pyodide)语义校验.
-
-### `yaml-dsl-editor-schema-blocks`
-- Title: yaml-dsl-editor-schema-blocks Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-schema-blocks/spec.md)
-- Summary: TBD - created by archiving change c1-yaml-dsl-editor-schema-blocks. Update Purpose after archive.
-
 ### `yaml-dsl-import-aliases-and-presets`
 - Title: yaml-dsl-import-aliases-and-presets Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-import-aliases-and-presets/spec.md)

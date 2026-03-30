@@ -44,12 +44,12 @@ just examples
 just qa
 ```
 
-## 3) 怎么看 YAML / Workflow / 编辑器能力
+## 3) 怎么看 YAML / Workflow / 编辑体验
 
 本主线 demo 的 YAML 是 canonical 示例，它也被用作:
 
 - YAML DSL 语法/用户指南的真实参照
-- schema/编辑器补全与 drift gate 的回归入口之一
+- schema 补全与 drift gate 的回归入口之一
 - Workflow 能力(多 demand 编排)的最小可复现实例
 
 相关文档入口(按常见阅读路径):
@@ -57,7 +57,7 @@ just qa
 - [YAML DSL 语法速查](../yaml-dsl/syntax.md)
 - [YAML DSL 用户指南](../yaml-dsl/user-guide.md)
 - [Workflow](../yaml-dsl/workflow.md)
-- [配置补全与在线编辑器](../yaml-dsl/editor.md)
+- [配置补全与编辑体验](../yaml-dsl/editor.md)
 - [升级指南](../yaml-dsl/upgrades/index.md)
 
 ## 4) doc governance 边界(避免手改生成物)

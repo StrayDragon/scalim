@@ -8,6 +8,6 @@
 
 - 写配置/跑起来: [写 YAML](../yaml-dsl/index.md) → [语法速查](../yaml-dsl/syntax.md) → [用户指南](../yaml-dsl/user-guide.md)
 - Python 导入入口: [公共 API 导入指南](public-api.md)
-- 配套工具: [编辑器](../yaml-dsl/editor.md) / [集成AI环境](../yaml-dsl/agent-skill.md) / [可视化工具](../viz/scalim-viz.md) / [基准测试](../benchmark/index.md)
+- 配套工具: [补全/编辑体验](../yaml-dsl/editor.md) / [集成AI环境](../yaml-dsl/agent-skill.md) / [可视化工具](../viz/scalim-viz.md) / [基准测试](../benchmark/index.md)
 - 需要调参时再看: [并行模式(seq/adaptive)](../architecture/parallel-modes.md)
 - 想贡献代码: [仓库开发约定](../dev/repo-guide.md) → [如何阅读本项目](reading-guide.md)

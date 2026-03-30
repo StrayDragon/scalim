@@ -4,8 +4,8 @@
 - [x] 1.2 在 `src/scalim/dsl/by_yaml/schema_dsl/` 增加 workflow 侧 `workflow.resources.books` 的 schema_dsl 模型,并在 schema-only 校验阶段拒绝 `workflow.runs[*].writes` 与 `workflow.resources.workbooks/csvs/sheetbooks`。
 - [x] 1.3 破坏性收敛输出 authoring surface：在 demand schema-only 与 runtime semantic 校验阶段拒绝 `outputs[*].container.type=workbook` 与 `container.path: ""`(pathless csv),并将 `.xlsx` 输出统一迁移到 books 绑定。
 - [x] 1.4 更新生成物并通过漂移门禁：
-  - 运行 `just gen-yaml-dsl-schema` 与 `just gen-yaml-dsl-editor-schema`
-  - 运行 `just schema-drift-check`（确保 `src/scalim/dsl/by_yaml/schema/*.gen.json` 与 `frontend/**/schema/*.gen.json` 无 drift）
+  - 运行 `just gen-yaml-dsl-schema`
+  - 运行 `just schema-drift-check`（确保 `src/scalim/dsl/by_yaml/schema/*.gen.json` 无 drift）
 
 ## 2. Demand 编译：books 解析 + 输出绑定（standalone 可运行）
 
@@ -58,7 +58,7 @@
 
 ## 9. 验收/验证命令（建议顺序）
 
-- [x] 9.1 `just gen-yaml-dsl-schema && just gen-yaml-dsl-editor-schema && just schema-drift-check`
+- [x] 9.1 `just gen-yaml-dsl-schema && just schema-drift-check`
 - [x] 9.2 `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/demand.gen.json <demand.yaml>`
 - [x] 9.3 `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
 - [x] 9.4 `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`

@@ -31,7 +31,7 @@ def _git_ls_files(root: Path, pattern: str) -> List[str]:
     try:
         output = subprocess.check_output(["git", "-C", str(root), "ls-files", pattern], text=True)
     except Exception as exc:
-        raise RuntimeError("通过 `git ls-files` 列出 `*.md` 文件失败: {}".format(exc)) from exc
+        raise RuntimeError("通过 `git` 列出 `Markdown` 文件失败: {}".format(exc)) from exc
     return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
 
 
@@ -53,57 +53,57 @@ def _rules() -> Tuple[_Rule, ...]:
         _Rule(
             name="legacy-workflow-writes",
             pattern=re.compile(r"workflow\.runs\[\*\]\.writes"),
-            message="Removed workflow authoring surface: use `workflow.resources.books` + demand outputs `to/write` bindings.",
+            message="已移除旧写法 `workflow.runs[*].writes`: 使用 `workflow.resources.books` + `demand` 输出的 `to/write` 绑定.",
         ),
         _Rule(
             name="legacy-workflow-resources-groups",
             pattern=re.compile(r"workflow\.resources\.(workbooks|csvs|sheetbooks)\b"),
-            message="Removed workflow authoring surface: use `workflow.resources.books`.",
+            message="已移除旧写法 `workflow.resources.workbooks/csvs/sheetbooks`: 使用 `workflow.resources.books`.",
         ),
         _Rule(
             name="legacy-writes-output",
             pattern=re.compile(r"writes\[\*\]\.output\b"),
-            message="Removed workflow writes surface: use demand outputs `to/write` bindings (plus `resources.books.*.write_defaults`).",
+            message="已移除旧写法 `writes[*].output`: 使用 `demand` 输出的 `to/write` 绑定(并配合 `resources.books.*.write_defaults`).",
         ),
         _Rule(
             name="legacy-write-to",
             pattern=re.compile(r"\bwrite_to\b"),
-            message="Removed field: use demand outputs `to/write` bindings.",
+            message="已移除字段 `write_to`: 使用 `demand` 输出的 `to/write` 绑定.",
         ),
         _Rule(
             name="legacy-sheetbook-loader-id",
             pattern=re.compile(r"workflow/sheetbook_sheet_rows"),
-            message="Removed builtin callable id: use `^workflow/book_sheet_rows`.",
+            message="已移除可调用 id `^workflow/sheetbook_sheet_rows`: 使用 `^workflow/book_sheet_rows`.",
         ),
         _Rule(
             name="legacy-sheetbook-loader",
             pattern=re.compile(r"\bsheetbook_sheet_rows\b"),
-            message="Removed loader: use `scalim.workflow.loaders:book_sheet_rows` / `^workflow/book_sheet_rows`.",
+            message="已移除 loader `sheetbook_sheet_rows`: 使用 `scalim.workflow.loaders:book_sheet_rows` / `^workflow/book_sheet_rows`.",
         ),
         _Rule(
             name="legacy-workbook-container-type",
             pattern=re.compile(r"container\.type:\s*workbook\b"),
-            message="Removed `.xlsx` output authoring surface: use `resources.books` + outputs→book bindings.",
+            message="已移除 `.xlsx` 输出旧写法: 使用 `resources.books` + `outputs→book` 绑定.",
         ),
         _Rule(
             name="legacy-type-workbook",
             pattern=re.compile(r"(?<!container\.)\btype:\s*workbook\b"),
-            message="Removed `.xlsx` output authoring surface: use `resources.books` + outputs→book bindings.",
+            message="已移除 `.xlsx` 输出旧写法: 使用 `resources.books` + `outputs→book` 绑定.",
         ),
         _Rule(
             name="legacy-writes-sheetbook-intent",
             pattern=re.compile(r"writes\[\*\]\.sheetbook_"),
-            message="Removed workflow sheetbook intents: use `resources.books` + outputs `write`.",
+            message="已移除 `sheetbook` 写入意图: 使用 `resources.books` + `outputs` 的 `write`.",
         ),
         _Rule(
             name="legacy-writes-sheetbook-intent-inline",
             pattern=re.compile(r"writes\.sheetbook_"),
-            message="Removed workflow sheetbook intents: use `resources.books` + outputs `write`.",
+            message="已移除 `sheetbook` 写入意图: 使用 `resources.books` + `outputs` 的 `write`.",
         ),
         _Rule(
             name="legacy-writes-workbook-intent-inline",
             pattern=re.compile(r"writes\.workbook_"),
-            message="Removed workflow workbook intents: use `resources.books` + outputs `write`.",
+            message="已移除 `workbook` 写入意图: 使用 `resources.books` + `outputs` 的 `write`.",
         ),
     )
 
@@ -132,10 +132,10 @@ def main() -> int:
             continue
         hits = _scan_markdown(path, rel_posix=rel_posix, rules=rules)
         for lineno, rule, line in hits:
-            errors.append("{}:{}: {}: {}\n  hint: {}".format(rel_posix, lineno, rule.name, line.strip(), rule.message))
+            errors.append("{}:{}: {}: {}\n  提示: {}".format(rel_posix, lineno, rule.name, line.strip(), rule.message))
 
     if errors:
-        sys.stderr.write("`md` `SSOT` 检查失败: 检测到旧写法.\n")
+        sys.stderr.write("`Markdown` SSOT 检查失败: 检测到遗留写法.\n")
         sys.stderr.write(
             "允许的例外: `artifacts/skills/.../references/upgrades/`, `yaml-dsl-upgrades.gen.md`, `openspec/changes/archive/`\n"
         )
@@ -143,11 +143,11 @@ def main() -> int:
         for item in errors[:200]:
             sys.stderr.write("- {}\n".format(item))
         if len(errors) > 200:
-            sys.stderr.write("…… 以及另外 {} 条.\n".format(len(errors) - 200))
-        sys.stderr.write("\n修复: 更新文档/规格以匹配当前 `schema`/运行时 `SSOT`.\n")
+            sys.stderr.write("... 以及更多 {} 项.\n".format(len(errors) - 200))
+        sys.stderr.write("\n修复: 更新相关文档/规范以匹配当前 SSOT.\n")
         return 1
 
-    sys.stdout.write("通过: `md` `SSOT` 检查通过.\n")
+    sys.stdout.write("OK: `Markdown` SSOT 检查通过.\n")
     return 0
 
 

@@ -16,7 +16,6 @@ OpenSpec 归档变更(含 proposal/design/spec/tasks):
 - `openspec/specs/demand-dsl/spec.md`
 - `openspec/specs/source-cache/spec.md`
 - `openspec/specs/yaml-dsl-schema/spec.md`
-- `openspec/specs/yaml-dsl-editor-core/spec.md`
 - `openspec/specs/yaml-dsl-agent-guidance/spec.md`
 
 ## 适用场景

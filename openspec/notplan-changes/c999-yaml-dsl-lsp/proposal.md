@@ -1,9 +1,10 @@
 ## Why
 
-当前 Scalim YAML DSL 的“开发者写配置”编辑体验主要依赖两条路径：
+当前 Scalim YAML DSL 的“开发者写配置”编辑体验主要依赖本地 IDE/编辑器：
 
-- `frontend/scalim-yaml-dsl-editor/`：面向 Web 的文本 + Visual 编辑器（带 schema + 语义校验）。
-- 本地 IDE/编辑器：依赖 `redhat.vscode-yaml` 等通用 YAML 扩展提供的 schema 体验，但缺少 DSL 语义能力（诊断、跳转、补全、hover）以及 `loader`/`call_by` 等关键字段的工程化导航能力。
+- 依赖 `redhat.vscode-yaml` 等通用 YAML 扩展提供的 schema 体验，但缺少 DSL 语义能力（诊断、跳转、补全、hover）以及 `loader`/`call_by` 等关键字段的工程化导航能力。
+
+历史上仓库内曾有 `frontend/scalim-yaml-dsl-editor/` Web 编辑器实现，现已移除；后续以 LSP/IDE 集成为主路径。
 
 我们希望把 DSL 的语义能力带到 VSCode（以及未来可扩展到其他编辑器），并且：
 
@@ -43,7 +44,7 @@
   - schema 产出：LSP/扩展需要稳定获取 `demand.gen.json` / `workflow.gen.json`（可通过资源读取或发布包携带）。
 - 兼容性与边界：
   - `src/scalim/` 运行时边界仍需兼容 Python 3.6；LSP server 运行时版本由 `pygls` 决定（建议 `>=3.9`，在独立仓库约束）。
-  - 本变更不要求立即移除 `frontend/scalim-yaml-dsl-editor/`，但为后续“开发者写配置”主路径迁移提供规范基础。
+  - 本提案不再考虑仓库内 Web 编辑器；编辑体验以 LSP/IDE 集成为主。
 
 ## Calibration Notes (2026-03-25)
 
@@ -53,9 +54,8 @@
   - `yaml-template-vars-precompile` / `yaml-template-vars-sandbox`
   - `yaml-dsl-micro-tunes`（语法减痛改良）
   - `yaml-dsl-import-aliases-and-presets`
-  - `yaml-dsl-editor-schema-blocks`（编辑器 schema 分块）
   - 以上均已归档并同步到主规范
 - LSP server 的 Diagnostics 能力边界需重新校准:demand validator 已包含 imports 展开/unknown fields/legacy fields/template vars 等,workflow 则已有独立的 validate CLI
 - `yaml-dsl-extensions` 方向已从 notplan 移除,LSP 设计不再需要考虑 extensions 语义
-- `frontend/scalim-yaml-dsl-editor/` 仍存在(Svelte/Vite Web 编辑器),但未见近期变更
+- `frontend/scalim-yaml-dsl-editor/` Web 编辑器已移除
 - 建议: 如启动此提案,优先评估 `scalim.config.yaml` 是否可与 `pyproject.toml` 或 `scalim-cli` 已有的项目发现机制整合,避免引入额外配置文件

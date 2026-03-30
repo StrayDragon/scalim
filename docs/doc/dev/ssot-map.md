@@ -18,7 +18,6 @@
 | OpenSpec 变更(正式) | `openspec/changes/<active>/` | 归档后的 change | `openspec sync` / `openspec archive` | `just openspec-check`、`just qa` |
 | OpenSpec 脱敏规则 | `openspec/sanitize_rules.yaml` | (无) | `just openspec-sanitize CONFIRM=YES`(一般只在发布/共享前需要) | `just openspec-check`(默认 dry-run) |
 | YAML DSL schema | `src/scalim/dsl/by_yaml/schema_dsl/**` | `src/scalim/dsl/by_yaml/schema/*.gen.json` | `just gen-yaml-dsl-schema` | `just qa`(包含 schema drift check) |
-| YAML DSL editor schema | 同上 | `frontend/scalim-yaml-dsl-editor/**/schema/*.gen.json` | `just gen-yaml-dsl-editor-schema` | `just qa` |
 | Agent Skill (YAML DSL) | schema + CLI + specs + canonical example | `artifacts/skills/scalim-yaml-dsl/references/**/*.gen.*` + manifest | `just gen-agent-skill` | `just validate-agent-skill`、`just qa` |
 | notebooks 示例回归 | `notebooks/marimo/**` | `notebooks/marimo/marimo_coverage.gen.md` | `just gen-marimo-coverage` | `just marimo-coverage-drift-check`、`just examples`、`just qa` |
 | 项目常量 | `pyproject.toml` | `src/scalim/_project_constants.py` | `just gen-project-constants` | `uv run python scripts/gen-project-constants.py --check`、`just qa` |
@@ -28,4 +27,3 @@
 - `just qa`: 最终验收入口(含 lint/tests + 漂移门禁 + OpenSpec check 等)
 - `just gen`: 刷新“所有受控生成物”的统一入口(更偏贡献者/重构场景)
 - `just gen-docs`: 只刷新 docs-site 的 `.gen.*` 与注入区块(改文档/规范摘要时常用)
-

@@ -20,7 +20,7 @@ nav = [
 	    { "YAML Schema 参考(生成)" = "yaml-dsl/schema-reference.gen.md" },
 	    { "YAML→IR 能力矩阵" = "yaml-dsl/capability-matrix.md" },
 	    { "YAML DSL 升级指南" = "yaml-dsl/upgrades/index.md" },
-	    { "配置补全与在线编辑器" = "yaml-dsl/editor.md" },
+	    { "配置补全与编辑体验" = "yaml-dsl/editor.md" },
 	    { "集成AI环境 (Agent Skill)" = "yaml-dsl/agent-skill.md" },
 	  ] },
   { "运行与调参" = [

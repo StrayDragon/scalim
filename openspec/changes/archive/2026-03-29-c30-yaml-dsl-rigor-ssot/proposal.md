@@ -24,11 +24,9 @@ YAML DSL 是 Scalim 的核心 SSOT 入口之一，但当前在“加载/定位/�
 - `yaml-dsl-cli-validation`: CLI 校验的错误结构与定位口径与 runtime/compile 保持一致。
 - `yaml-dsl-schema`: 枚举/默认值/markdownDescription 的 SSOT 收敛与一致性自检。
 - `yaml-dsl-workflow-validate`: workflow validate 与 demand compile 的 parse/validate 行为一致（至少在 duplicate key / imports / location / error envelope 上一致）。
-- `yaml-dsl-editor-schema-blocks` / `yaml-dsl-editor-core`: editor schema 分发链路与 Python 侧 schema 生成保持一致并可 drift gate。
 
 ## Impact
 
-- 受影响代码（SSOT）：`src/scalim/dsl/by_yaml/**`（loader、location index、parsers/validators、CLI validate、workflow validate）；以及 schema 生成脚本与 editor schema 分发脚本。
+- 受影响代码（SSOT）：`src/scalim/dsl/by_yaml/**`（loader、location index、parsers/validators、CLI validate、workflow validate）；以及 schema 生成脚本。
 - 受影响测试：需要补充一致性回归（同 YAML 在 CLI/compile/workflow validate 下报错结构一致）。
 - 受影响文档：`docs/doc/yaml-dsl/**`（SSOT 文档；若涉及生成/注入区块则通过 `just gen-docs` 刷新）。
-

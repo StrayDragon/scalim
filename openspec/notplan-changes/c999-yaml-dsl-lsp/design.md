@@ -76,7 +76,7 @@
 本仓库 SSOT：
 
 - 语义校验逻辑：`src/scalim/dsl/by_yaml/**`
-- schema 生成入口：`scripts/gen-yaml-dsl-schema.py` 与 `scripts/gen-yaml-dsl-editor-schema.py`（由 `just gen`/`just qa` 兜底一致性检查）
+- schema 生成入口：`scripts/gen-yaml-dsl-schema.py`（由 `just gen`/`just qa` 兜底一致性检查）
 - OpenSpec 工件：`openspec/changes/c11-yaml-dsl-lsp/**`
 
 外部扩展仓库 SHOULD：
@@ -99,7 +99,7 @@
 
 本仓库内：
 
-- 不要求立刻移除 `frontend/scalim-yaml-dsl-editor/`；但后续若将“开发者写配置”主路径迁移至 VSCode 插件，需要另起变更管理收敛与退场计划。
+- `frontend/scalim-yaml-dsl-editor/` Web 编辑器已移除；后续“开发者写配置”主路径以 VSCode 插件/LSP 为主。
 
 ## Open Questions
 
