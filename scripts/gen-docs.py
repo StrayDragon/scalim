@@ -420,30 +420,15 @@ def _render_yaml_dsl_upgrades_index(repo_root: Path) -> str:
     docs: List[str] = []
     for path in sorted(ssot_dir.glob("*.md"), key=lambda item: item.name):
         title = _extract_markdown_h1(_read_text(path)) or path.name
-        docs.append("- [{}]({}.gen.md)".format(title, path.stem))
+        if path.name == "index.md":
+            continue
+        rel = (UPGRADES_SSOT_DIR_REL / path.name).as_posix()
+        docs.append("- [{}](#code={})".format(title, rel))
 
     if not docs:
         docs.append("- (未发现升级文档)")
 
     return "\n".join(docs).rstrip() + "\n"
-
-
-def _render_yaml_dsl_upgrade_pages(repo_root: Path, docs_dir: Path) -> Dict[Path, str]:
-    ssot_dir = (repo_root / UPGRADES_SSOT_DIR_REL).resolve()
-    if not ssot_dir.exists():
-        return {}
-
-    expected: Dict[Path, str] = {}
-    docs_upgrades_dir = docs_dir / "yaml-dsl" / "upgrades"
-
-    for path in sorted(ssot_dir.glob("*.md"), key=lambda item: item.name):
-        if path.name == "index.md":
-            continue
-        content = _read_text(path)
-        header = _autogen_md_header(sources=[str(UPGRADES_SSOT_DIR_REL / path.name)])
-        expected[docs_upgrades_dir / "{}.gen.md".format(path.stem)] = header + content
-
-    return expected
 
 
 def _cleanup_yaml_dsl_upgrades_dir(docs_dir: Path) -> List[Path]:
@@ -482,7 +467,6 @@ def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, 
         cli_reference: cli_reference_content,
         docs_dir / "specs" / "openspec-index.gen.md": _render_openspec_index(repo_root),
     }
-    expected.update(_render_yaml_dsl_upgrade_pages(repo_root, docs_dir))
     return expected
 
 

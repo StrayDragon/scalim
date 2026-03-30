@@ -1,7 +1,7 @@
 # yaml-dsl-books-resources Specification
 
 ## Purpose
-TBD - created by archiving change c35-workflow-io-books-resources. Update Purpose after archive.
+定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs_defaults.to.book` / `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.
 ## Requirements
 ### Requirement: demand/workflow YAML MUST support `resources.books` as the unified Excel IO resource surface
 
@@ -212,9 +212,9 @@ loader MUST 接收 `params.ref` 映射对象,并满足以下结构:
 - **WHEN** node C 的 demand 通过内置 loader 引用 node A 的 book sheet
 - **THEN** 系统 MUST fail-fast 并报告“引用超出 deps 可见范围”
 
-### Requirement: `.xlsx` outputs MUST use books binding; `container.type: workbook` MUST be rejected (BREAKING)
+### Requirement: `.xlsx` outputs MUST use books binding; legacy workbook container surface MUST be rejected (BREAKING)
 
-系统 MUST 将 `.xlsx` 输出的用户侧 authoring surface 收敛到 `resources.books` + outputs→book 绑定,并拒绝 `outputs[*].container.type: workbook` 写法(避免双路径导致心智负担与实现漂移).
+系统 MUST 将 `.xlsx` 输出的用户侧 authoring surface 收敛到 `resources.books` + outputs→book 绑定,并拒绝旧 workbook container 输出写法(避免双路径导致心智负担与实现漂移).
 
 约束:
 
@@ -222,8 +222,7 @@ loader MUST 接收 `params.ref` 映射对象,并满足以下结构:
 - `outputs[*].container.sheet/allow_formulas/write_lock` MUST 不再作为输出层 authoring surface(其语义移动到 `outputs[*].to.sheet` 与 `resources.books.*` 中)
 - 若用户仍需要 CSV 文件输出,仍可继续使用 `outputs[*].container.type=csv` + 非空 `path`
 
-#### Scenario: schema rejects workbook container type deterministically
-- **WHEN** demand YAML 包含 `outputs[0].container.type=workbook`
+#### Scenario: schema rejects legacy workbook container surface deterministically
+- **WHEN** demand YAML 仍采用旧 workbook container 输出写法
 - **THEN** schema-only 校验 MUST 失败
 - **AND** 错误信息 MUST 提示迁移到 `resources.books` + `outputs_defaults.to.book` / `outputs[*].to`
-

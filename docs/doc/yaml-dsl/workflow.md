@@ -193,60 +193,63 @@ workflow:
 
 - `workflow.options.share_preload_cache` 已移除,请改用 `workflow.options.cache_pool`
 
-## 6) `resources` + `writes`: 声明共享输出资源并写入
+## 6) `workflow.resources.books`: 共享 book 资源（无 `writes`）
 
-workflow YAML 支持在 workflow scope 声明共享输出资源,并通过 run 的 `writes` 列表声明 0..N 条写入意图:
+workflow YAML 只负责两件事:
 
-- `workflow.resources.workbooks.<id>.path`: 共享 workbook 输出路径
-- `workflow.resources.csvs.<id>.path`: 共享 csv 输出路径
-- `workflow.resources.sheetbooks.<id>`: 共享 sheetbook 资源(内存工作簿) + 可选 `export_xlsx`
-  - `budget.max_sheets/max_total_cells` 为必填护栏
-  - `export_xlsx.path` 可选,用于 workflow 结束时导出为最终 xlsx
+- 编排多条 demand(`workflow.runs/options/ctx/cache_pool`)
+- 声明 workflow-scope 的共享 IO 资源: `workflow.resources.books`
 
-`runs[*].writes` 为写入意图数组(缺省/空数组表示无写入意图),每个 item MUST 恰好包含一个 intent key:
+当前实现里,workflow **不再**提供显式的“写入意图”字段;共享输出的写入由 demand 的 outputs 绑定表达,并由 workflow 编译期推导写入节点。
+共享输出的写入顺序与写入语义由 demand YAML 的 outputs 绑定表达,并由 workflow 编译期推导写入节点(确定性、串行化、可冲突检查):
 
-- `workbook_sheet` / `workbook_append`
-- `csv_append`
-- `sheetbook_sheet` / `sheetbook_append`
+- book 资源声明: `resources.books.<book_id>`
+  - 既可以在 demand YAML 声明(standalone 也能跑),也可以在 workflow YAML 的 `workflow.resources.books` 统一声明/覆盖
+  - `kind: xlsx_file|xlsx_memory`
+- 输出到 book 的绑定: `outputs_defaults.to.book` / `outputs[*].to.book` / `outputs[*].to.sheet`
+- 写入策略: `resources.books.*.write_defaults` + `outputs[*].write`(覆盖 mode/align/header/冲突策略)
 
-示例: 同一个 run 产出两个 outputs,并通过两条 `writes` 写入同一个 sheetbook 的不同 sheet,在末尾导出:
+约定:
+
+- `outputs[*].container` 存在时表示 CSV 输出(当前仅支持 `type: csv`)
+- `outputs[*].container` 缺省时表示 Excel 输出(依赖 `to.book/to.sheet` 绑定到某个 `book_id`)
+
+示例: workflow 统一声明一个共享 book(`xlsx_memory`),各 run 的 demand 只负责声明 outputs 绑定:
+
+workflow YAML:
 
 ```yaml
 workflow:
   resources:
-    sheetbooks:
+    books:
       report:
+        kind: xlsx_memory
         budget:
           max_sheets: 16
           max_total_cells: 2000000
         export_xlsx:
           path: ./out/report.xlsx
           write_lock: true
+
   runs:
     - id: main
       demand: ./main.yaml
-      writes:
-        - sheetbook_sheet:
-            sheetbook: report
-            sheet: Metrics
-            output: metrics
-            on_conflict: error
-        - sheetbook_sheet:
-            sheetbook: report
-            sheet: Detail
-            output: detail
-            on_conflict: error
+    - id: agg
+      demand: ./agg.yaml
+      depends_on: [main]
 ```
 
-注意:
+main.yaml(示意):
 
-- `writes` 目前只支持消费 CSV outputs: `writes[*].*.output` 指向的 demand output 需要生成 `.csv` 文件(通常在上游 demand 用 `outputs.*.container.type: csv`). workbook 输出暂不支持直接作为 write node 输入.
-- 写入顺序 SSOT: 以 `workflow.runs` 声明顺序为一级,以 `writes` 声明顺序为二级(同一共享资源互斥串行,不依赖并发完成时序),以保证确定性
-- 当存在潜在的输出路径冲突(多个 nodes 写同一路径)时,系统会在写入发生前 fail-fast
+```yaml
+outputs_defaults:
+  to: {book: report}
 
-迁移:
-
-- `runs[*].write_to` 已移除,请改用 `writes: [{<kind>: <cfg>}]`；旧写法会 fail-fast 并给出可复制的迁移提示
+outputs:
+  - name: detail
+    to: {sheet: 明细}
+    fields: [order_id, amount_yuan]
+```
 
 ## 7) Python 运行入口
 

@@ -108,8 +108,8 @@
   - schema 允许 `outputs.*.fields` 包含 object 条目
   - schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法
   - schema MUST support `{$init_var: <name>}` for book export paths
-  - demand schema MUST reject legacy output container types and shapes (`workbook`, pathless `csv`)
-  - workflow schema MUST reject legacy workflow IO fields (`writes`, `workbooks`, `csvs`, `sheetbooks`)
+  - demand schema MUST reject legacy output container types and shapes (legacy workbook container surface, pathless `csv`)
+  - workflow schema MUST reject legacy workflow IO fields
 ### `demand-dsl`
 - Source: `openspec/specs/demand-dsl/spec.md`
 - Purpose: 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
@@ -148,7 +148,29 @@
   - workflow entrypoints MUST be importable under Python 3.6
   - workflow emits workflow-level events and injects attribution for demand events
   - max_concurrency>1 requires thread-safe or stateless components
-  - workflow YAML MUST use `workflow.resources.books` and MUST reject `writes` authoring surface
+  - workflow YAML MUST use `workflow.resources.books` and MUST reject the legacy workflow write authoring surface
+### `yaml-dsl-books-resources`
+- Source: `openspec/specs/yaml-dsl-books-resources/spec.md`
+- Purpose: 定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs_defaults.to.book` / `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.
+- Requirements:
+  - demand/workflow YAML MUST support `resources.books` as the unified Excel IO resource surface
+  - `books.kind=xlsx_file` MUST define file export semantics and path resolution base
+  - `books.kind=xlsx_memory` MUST define in-memory budget guards and optional export_xlsx
+  - demand MUST bind outputs to books via `outputs_defaults.to.book` and `outputs[*].to`
+  - standalone demand MUST fail-fast when a referenced book resource is missing
+  - workflow MUST merge books from demand/workflow with deterministic precedence and strict contracts
+  - books MUST support default write behavior and per-output overrides for append vs sheet semantics
+  - Excel exports MUST escape formula-like strings by default (opt-out via allow_formulas)
+  - downstream demands MUST be able to load xlsx_memory book sheet rows via a built-in loader
+  - `.xlsx` outputs MUST use books binding; legacy workbook container surface MUST be rejected (BREAKING)
+### `yaml-dsl-output-overrides`
+- Source: `openspec/specs/yaml-dsl-output-overrides/spec.md`
+- Purpose: 为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过与 YAML 同形的 `overrides.outputs` 显式指定输出。
+- Requirements:
+  - by_yaml runtime MUST accept YAML-shaped `overrides.outputs`
+  - `overrides.outputs` MUST take precedence over YAML `outputs`
+  - `overrides.outputs` MUST compile through the same outputs pipeline
+  - by_yaml runtime MUST accept IO-only overrides for `resources.books` and `outputs_defaults`
 ### `source-relations`
 - Source: `openspec/specs/source-relations/spec.md`
 - Purpose: 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.
@@ -204,31 +226,6 @@
   - cache pool enforces budgets with a clear policy
   - cache pool eviction MUST NOT evict in-flight (loading) entries
   - cache pool MUST be observable via workflow-level events
-### `workflow-shared-output-containers`
-- Source: `openspec/specs/workflow-shared-output-containers/spec.md`
-- Purpose: TBD - created by archiving change c30-workflow-shared-output-containers. Update Purpose after archive.
-- Requirements:
-  - workflow YAML exposes a stable authoring surface for shared resources and write intents
-  - workflow declares shared output resources at workflow scope
-  - shared output is written via explicit workflow write nodes
-  - writes to shared resources are deterministic and serialized
-  - append/merge semantics are explicit and verifiable
-  - shared resources commit atomically at workflow end
-  - shared resource lifecycle MUST be observable
-  - shared resource plan creation MUST be atomic and joinable within a workflow exec
-  - joinable get-or-create 的等待诊断
-  - joinable get-or-create 的可选超时
-  - commit_all/discard_all 与 inflight 并发交错语义
-  - workflow workbook exports MUST escape Excel formulas by default
-  - workflow workbook resource authoring surface MUST support allow_formulas
-  - workflow MUST precheck Excel output-path collisions across books deterministically
-  - commit order MUST NOT depend on thread scheduling
-  - workbook/sheetbook sheet order MUST be stable
-### `workflow-sheetbook-resources`
-- Source: `openspec/specs/workflow-sheetbook-resources/spec.md`
-- Purpose: 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`writes[*].sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
-- Requirements:
-  - legacy sheetbook authoring surface MUST be rejected and migrated to books
 ### `workflow-observability-bridge`
 - Source: `openspec/specs/workflow-observability-bridge/spec.md`
 - Purpose: 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
@@ -953,14 +950,11 @@
 - `workflow.runs[*].demand` (required)
 - `workflow.runs[*].depends_on` (optional)
 - `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)
-- `workflow.runs[*].writes` (optional; list of intents)
 - `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)
 - `workflow.options.ctx` (optional; ctx guardrails)
 - `workflow.options.cache_pool` (optional; workflow-scope cache pool)
-- `workflow.resources` (optional; workbooks/csvs/sheetbooks)
-- `workflow.resources.workbooks` (optional; shared workbook outputs)
-- `workflow.resources.csvs` (optional; shared csv outputs)
-- `workflow.resources.sheetbooks` (optional; in-memory sheetbook outputs)
+- `workflow.resources` (optional)
+- `workflow.resources.books` (optional; shared Excel book outputs)
 
 ### Validation
 - Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`

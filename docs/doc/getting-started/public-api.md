@@ -106,7 +106,7 @@ pytest -q tests/test_public_api_surface_hardening.py --no-cov
 just qa
 ```
 
-## 4) 结构评估与打分（截至 2026-03-28）
+## 4) 结构评估与打分（阶段性）
 
 **综合评分: 9.1/10**
 
@@ -116,23 +116,10 @@ just qa
 - 优点:YAML DSL 运行入口(`scalim.dsl.by_yaml`)与 workflow/IR 的稳定导入路径已明确拆出
 - 代价:仍有部分 Tier 2 模块导出面偏大/偏“平铺”,但它们不在 curated 白名单内；若需依赖建议自行 pin 版本并维护回归
 
-当前 `__all__` 导出规模快照(来自运行时实测):
+导出规模与白名单以 SSOT 与门禁为准,不在文档里维护数值快照:
 
-- Tier 1:
-  - `scalim.dsl.by_yaml`:8
-  - `scalim.dsl.by_yaml.tools`:3
-  - `scalim.dsl.by_yaml.workflow`:18
-  - `scalim.dsl.by_yaml.workflow_types`:14
-  - `scalim.dsl.by_yaml.workflow_paths`:1
-  - `scalim.spec.ir`:31
-  - `scalim.workflow.loaders`:2
-  - `scalim.planning`:9
-  - `scalim.execution`:1
-  - `scalim.ob`:1
-  - `scalim.events`:46
-  - `scalim.sinks`:22
-- Tier 2(代表性模块):
-  - `scalim.hooks`:6
+- SSOT: `openspec/ssot/public_api_manifest.json`
+- Gate: `python3 scripts/check-public-api-manifest.py --check`
 
 ## 5) 代价与优化方向（Brainstorming）
 

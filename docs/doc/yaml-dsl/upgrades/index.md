@@ -8,20 +8,21 @@
 
 说明:
 
-- 本目录下除 `index.md` 外的升级指南页由 SSOT 自动生成(文件名 `*.gen.md`); SSOT 在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/`(运行 `just gen-docs` 更新)。
+- 升级指南 SSOT 仅维护在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/`。
+- docs-site 不再生成升级页副本；本页仅提供到 SSOT 的链接索引(运行 `just gen-docs` 更新索引区块)。
 
 升级清单:
 
 <!-- BEGIN AUTOGEN:yaml-dsl-upgrades-index -->
-- [2026-03-10: yaml-field-extract](2026-03-10-yaml-field-extract.gen.md)
-- [2026-03-10: yaml-source-normalize](2026-03-10-yaml-source-normalize.gen.md)
-- [2026-03-11: yaml-params-template](2026-03-11-yaml-params-template.gen.md)
-- [2026-03-13: demand-dsl-breaking](2026-03-13-demand-dsl-breaking.gen.md)
-- [2026-03-13: derived-outputs-set-aggregations](2026-03-13-derived-outputs-set-aggregations.gen.md)
-- [2026-03-13: yaml-dsl-outputs](2026-03-13-yaml-dsl-outputs.gen.md)
-- [2026-03-13: yaml-reuse-workflow](2026-03-13-yaml-reuse-workflow.gen.md)
-- [2026-03-13: yaml-source-normalize-shapes](2026-03-13-yaml-source-normalize-shapes.gen.md)
-- [2026-03-14: yaml-dsl-output-fields-alias](2026-03-14-yaml-dsl-output-fields-alias.gen.md)
-- [2026-03-16: yaml-dsl-outputs-aggregate-fields](2026-03-16-yaml-dsl-outputs-aggregate-fields.gen.md)
-- [2026-03-18: yaml-workflow-dag-ctx-resources](2026-03-18-yaml-workflow-dag-ctx-resources.gen.md)
+- [2026-03-10: yaml-field-extract](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-10-yaml-field-extract.md)
+- [2026-03-10: yaml-source-normalize](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-10-yaml-source-normalize.md)
+- [2026-03-11: yaml-params-template](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-11-yaml-params-template.md)
+- [2026-03-13: demand-dsl-breaking](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-demand-dsl-breaking.md)
+- [2026-03-13: derived-outputs-set-aggregations](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-derived-outputs-set-aggregations.md)
+- [2026-03-13: yaml-dsl-outputs](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-dsl-outputs.md)
+- [2026-03-13: yaml-reuse-workflow](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-reuse-workflow.md)
+- [2026-03-13: yaml-source-normalize-shapes](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-source-normalize-shapes.md)
+- [2026-03-14: yaml-dsl-output-fields-alias](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md)
+- [2026-03-16: yaml-dsl-outputs-aggregate-fields](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md)
+- [2026-03-18: yaml-workflow-dag-ctx-resources](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

@@ -66,6 +66,17 @@ FORBIDDEN_SKILL_ROOTS = (
     Path("/etc") / "codex" / "skills",
 )
 
+SPEC_SUMMARY_REPLACEMENTS = (
+    (
+        "workflow schema MUST reject legacy workflow IO fields (`writes`, `workbooks`, `csvs`, `sheetbooks`)",
+        "workflow schema MUST reject legacy workflow IO fields",
+    ),
+    (
+        "workflow YAML MUST use `workflow.resources.books` and MUST reject `writes` authoring surface",
+        "workflow YAML MUST use `workflow.resources.books` and MUST reject the legacy workflow write authoring surface",
+    ),
+)
+
 GENERATED_ROOT_REL = Path("references") / "generated"
 REFERENCES_ROOT_REL = Path("references")
 SYNTAX_CATALOG_REL = REFERENCES_ROOT_REL / "syntax-catalog.gen.md"
@@ -87,12 +98,12 @@ SYNTAX_SPEC_RELS = (
     Path("openspec") / "specs" / "yaml-dsl-schema" / "spec.md",
     Path("openspec") / "specs" / "demand-dsl" / "spec.md",
     Path("openspec") / "specs" / "yaml-dsl-workflow" / "spec.md",
+    Path("openspec") / "specs" / "yaml-dsl-books-resources" / "spec.md",
+    Path("openspec") / "specs" / "yaml-dsl-output-overrides" / "spec.md",
     Path("openspec") / "specs" / "source-relations" / "spec.md",
     Path("openspec") / "specs" / "field-compute" / "spec.md",
     Path("openspec") / "specs" / "source-cache" / "spec.md",
     Path("openspec") / "specs" / "workflow-cache-pool" / "spec.md",
-    Path("openspec") / "specs" / "workflow-shared-output-containers" / "spec.md",
-    Path("openspec") / "specs" / "workflow-sheetbook-resources" / "spec.md",
     Path("openspec") / "specs" / "workflow-observability-bridge" / "spec.md",
     Path("openspec") / "specs" / "runtime-pruning" / "spec.md",
     Path("openspec") / "specs" / "loader-retry-policy" / "spec.md",
@@ -411,9 +422,10 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
     runs_schema = workflow_props.get("runs", {}) if isinstance(workflow_props, dict) else {}
     run_item_schema = runs_schema.get("items", {}) if isinstance(runs_schema, dict) else {}
     run_props = run_item_schema.get("properties", {}) if isinstance(run_item_schema, dict) else {}
-    writes_schema = run_props.get("writes", {}) if isinstance(run_props, dict) else {}
     options_schema = workflow_props.get("options", {}) if isinstance(workflow_props, dict) else {}
     resources_schema = workflow_props.get("resources", {}) if isinstance(workflow_props, dict) else {}
+    resource_props = resources_schema.get("properties", {}) if isinstance(resources_schema, dict) else {}
+    books_schema = resource_props.get("books", {}) if isinstance(resource_props, dict) else {}
 
     lines = [
         "",
@@ -425,14 +437,11 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
         "- `workflow.runs[*].demand` (required)",
         "- `workflow.runs[*].depends_on` (optional)",
         "- `workflow.runs[*].init_vars` (optional; supports `$ctx` directives)",
-        "- `workflow.runs[*].writes` (optional; list of intents)",
         "- `workflow.options` (optional; max_concurrency/failure_policy/cache_pool/ctx)",
         "- `workflow.options.ctx` (optional; ctx guardrails)",
         "- `workflow.options.cache_pool` (optional; workflow-scope cache pool)",
-        "- `workflow.resources` (optional; workbooks/csvs/sheetbooks)",
-        "- `workflow.resources.workbooks` (optional; shared workbook outputs)",
-        "- `workflow.resources.csvs` (optional; shared csv outputs)",
-        "- `workflow.resources.sheetbooks` (optional; in-memory sheetbook outputs)",
+        "- `workflow.resources` (optional)",
+        "- `workflow.resources.books` (optional; shared Excel book outputs)",
         "",
         "### Validation",
         "- Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`",
@@ -444,12 +453,12 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
         lines.extend(render_schema_entry("`workflow`", workflow_entry, required=workflow_required, level=3))
     if isinstance(run_item_schema, dict) and run_item_schema:
         lines.extend(render_schema_entry("`workflow.runs[*]`", run_item_schema, required=False, level=3))
-    if isinstance(writes_schema, dict) and writes_schema:
-        lines.extend(render_schema_entry("`workflow.runs[*].writes`", writes_schema, required=False, level=3))
     if isinstance(options_schema, dict) and options_schema:
         lines.extend(render_schema_entry("`workflow.options`", options_schema, required=False, level=3))
     if isinstance(resources_schema, dict) and resources_schema:
         lines.extend(render_schema_entry("`workflow.resources`", resources_schema, required=False, level=3))
+    if isinstance(books_schema, dict) and books_schema:
+        lines.extend(render_schema_entry("`workflow.resources.books`", books_schema, required=False, level=3))
 
     return lines
 
@@ -828,11 +837,11 @@ def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dic
         if not abs_path.exists():
             raise GenerationError("未找到 OpenSpec 文件: {}".format(abs_path))
         text = read_text(abs_path)
-        purpose = extract_markdown_section(text, "## Purpose")
+        purpose = sanitize_spec_summary_text(extract_markdown_section(text, "## Purpose"))
         requirements = []
         for line in text.splitlines():
             if line.startswith("### Requirement:"):
-                requirements.append(line.split(":", 1)[1].strip())
+                requirements.append(sanitize_spec_summary_text(line.split(":", 1)[1].strip()))
         if not requirements:
             raise GenerationError("OpenSpec 文件未包含需求条目: {}".format(abs_path))
         summaries.append(
@@ -844,6 +853,13 @@ def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dic
             }
         )
     return summaries
+
+
+def sanitize_spec_summary_text(text: str) -> str:
+    sanitized = text
+    for old, new in SPEC_SUMMARY_REPLACEMENTS:
+        sanitized = sanitized.replace(old, new)
+    return sanitized
 
 
 def extract_markdown_section(text: str, heading: str) -> str:
@@ -924,9 +940,8 @@ def build_workflow_field_paths(workflow_schema: Dict[str, Any]) -> List[str]:
     if isinstance(resources, dict):
         res_props = resources.get("properties", {})
         if isinstance(res_props, dict):
-            for key in ("workbooks", "csvs", "sheetbooks"):
-                if key in res_props:
-                    paths.append("workflow.resources.{}".format(key))
+            if "books" in res_props:
+                paths.append("workflow.resources.books")
 
     return paths
 

@@ -76,38 +76,30 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
     if not ssot_dir.exists():
         return ["missing directory: {}".format(ssot_dir)]
 
-    ssot_files = sorted(p for p in ssot_dir.glob("*.md") if p.is_file())
-    expected_docs_names = {"{}.gen.md".format(p.stem) for p in ssot_files}
+    index_md = docs_dir / "index.md"
+    if not index_md.exists():
+        errors.append("missing file: {}".format(index_md))
+        return errors
+    if index_md.is_symlink():
+        errors.append("`{}` MUST be a regular file (zensical does not build symlinked markdown).".format(index_md))
+        return errors
 
-    docs_files = sorted(p for p in docs_dir.glob("*.md") if p.exists())
-
-    docs_names = {p.name for p in docs_files if p.name != "index.md"}
-
-    missing_pages = sorted(expected_docs_names - docs_names)
-    if missing_pages:
-        errors.append(
-            "missing docs pages under {}:\n{}".format(
-                docs_dir,
-                "\n".join("- {}".format(name) for name in missing_pages),
-            )
-        )
-
-    unexpected = sorted(docs_names - expected_docs_names)
+    unexpected = sorted(p.name for p in docs_dir.glob("*.md") if p.is_file() and p.name != "index.md")
     if unexpected:
         errors.append(
-            "unexpected markdown files under {} (expected generated copies from SSOT):\n{}".format(
+            "unexpected markdown files under {} (upgrades pages SSOT lives under skills; keep docs dir index-only):\n{}".format(
                 docs_dir,
                 "\n".join("- {}".format(name) for name in unexpected),
             )
         )
 
-    for name in sorted(expected_docs_names & docs_names):
-        doc_path = docs_dir / name
-        if doc_path.is_symlink():
-            errors.append("`{}` MUST be a regular file (zensical does not build symlinked markdown).".format(doc_path))
-            continue
-        if not doc_path.is_file():
-            errors.append("`{}` MUST be a file.".format(doc_path))
+    text = _read_text(index_md)
+    if "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades-index -->" not in text or "<!-- END AUTOGEN:yaml-dsl-upgrades-index -->" not in text:
+        errors.append("`{}` MUST include injected upgrades index block markers.".format(index_md))
+
+    ssot_dir_rel = "artifacts/skills/scalim-yaml-dsl/references/upgrades/"
+    if "#code={}".format(ssot_dir_rel) not in text:
+        errors.append("`{}` upgrades links MUST point to SSOT under `#code={}`.".format(index_md, ssot_dir_rel))
 
     return errors
 

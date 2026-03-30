@@ -3,7 +3,7 @@
 ## 何时读取
 
 - 你在写/改 workflow YAML 时遇到校验失败或运行时报错
-- 你需要定位 `depends_on` / `$ctx` / `resources` / `writes` 的常见错误
+- 你需要定位 `depends_on` / `$ctx` / `resources.books` 的常见错误
 - 你怀疑自己把 workflow YAML 当成 demand YAML 去跑了错误的校验命令
 
 ## 最小命令入口(先跑起来再排错)
@@ -46,7 +46,7 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style al
 ## 工作顺序(推荐)
 
 1. 先用 `schema validate` 收敛结构/未知字段问题(显式指定 workflow schema)
-2. 再用 `yaml-dsl validate --type workflow` 做跨文件/递归校验(包含 demands 语义校验与 `writes[*].output` 一致性)
+2. 再用 `yaml-dsl validate --type workflow` 做跨文件/递归校验(包含 demands 语义校验与 outputs/books 绑定一致性)
 3. validate 过了但 workflow 仍失败时,用 Python 入口跑一次,定位运行期的 fail-fast 校验(例如 cycle、ctx 越界、输出路径冲突等)
 
 ```python
@@ -105,27 +105,25 @@ run_workflow(
 - 下游 run 必须显式 `depends_on: [A]`(或依赖闭包中包含 A)
 - 避免把大对象塞进 ctx；只放小体量 summary/path 等
 
-### 5) `resources.sheetbooks.*` 缺少 budget 护栏
+### 5) `workflow.resources.books.*.kind=xlsx_memory` 缺少 budget 护栏
 
 症状:
 
-- schema validate 报错: 缺少 `budget.max_sheets/max_total_cells`
+- schema validate 报错: 缺少 `budget.max_sheets/max_total_cells`(或类型不匹配)
 
 修复:
 
-- 每个 sheetbook 资源必须声明 `budget.max_sheets` 与 `budget.max_total_cells`
+- 每个 `kind=xlsx_memory` 的 book 必须声明 `budget.max_sheets` 与 `budget.max_total_cells`
 
-### 6) `write_to` 已移除,请改用 `writes`
+### 6) 把“写入意图”写进了 workflow YAML
 
 症状:
 
-- workflow validate 报错: “run.write_to was removed; use run.writes ...”
-- 或你把旧的 `write_to: {<kind>: <cfg>}` 结构直接搬了过来
+- schema validate 报错 unknown-fields,或 full validate 报错“字段已移除/不支持”
 
 修复:
 
-- 迁移: `write_to: {<kind>: <cfg>}` → `writes: [{<kind>: <cfg>}]`
-- `writes` 是 intent 列表;每个 intent 必须且只能包含一个 kind key
+- workflow YAML 只声明 `workflow.resources.books`(共享 book 资源)与 runs DAG；写到哪个 book/sheet 由 demand outputs 的 `to/write` 绑定表达,并由 workflow 编译期推导写入节点
 
 ### 7) 输出路径冲突或共享资源路径被直接写入
 
@@ -137,15 +135,17 @@ run_workflow(
 修复:
 
 - 要么每个 demand 输出到唯一路径
-- 要么把共享输出收敛到 `workflow.resources.*` + `writes` 的机制,避免多方直接写同一路径
+- 要么把共享输出收敛到 `workflow.resources.books` + demand outputs 的 `to/write` 绑定,避免多方直接写同一路径
 
-### 8) `writes.*.output` 引用的 demand output 不是 CSV
+### 8) 输出未绑定到 book/sheet 或 book_id 不存在
 
 症状:
 
-- 运行期 fail-fast: `workflow writes currently only supports CSV outputs: output_path=...`
+- workflow compile fail-fast: 缺少 `outputs_defaults.to.book` / `outputs[*].to.book`
+- 或提示 book_id 不存在/冲突(需要统一声明)
 
 修复:
 
-- 确保 `writes.*.output` 指向的上游 demand output 生成的是 `.csv` 文件(通常上游 demand 用 `outputs.*.container.type: csv`)
-- 如果最终目标是 workbook/sheetbook,仍然让上游先产出 csv,再由 workflow 的 `writes.workbook_*` / `writes.sheetbook_*` 导入写入
+- 为 Excel outputs 显式声明 book 绑定:
+  - demand YAML: `outputs_defaults.to.book` / `outputs[*].to.book` + `outputs[*].to.sheet`
+  - workflow YAML: `workflow.resources.books.<book_id>`(用于统一/覆盖共享 book 资源)

@@ -12,7 +12,7 @@
 系统 MUST 定义一份“builtin callable 词表”(vocabulary),用于将 `<id>` 映射为具体可调用对象:
 
 - 词表为显式白名单(仅允许词表中出现的 `<id>`)
-- `<id>` MUST 为稳定命名,推荐使用 `/` 分段表示命名空间(例如 `workflow/sheetbook_sheet_rows`)
+- `<id>` MUST 为稳定命名,推荐使用 `/` 分段表示命名空间(例如 `workflow/book_sheet_rows`)
 - 词表 MUST 支持调用方自定义(可扩展/覆盖默认词表),以满足下游集成的受控扩展点需求
 
 #### Scenario: builtin callable reference parses in loader fields
@@ -69,4 +69,3 @@
 #### Scenario: workflow book sheet rows loader id is available
 - **WHEN** 调用方在 YAML 中声明 `loader: ^workflow/book_sheet_rows`
 - **THEN** 解析与运行期 callable 解析 MUST 成功
-

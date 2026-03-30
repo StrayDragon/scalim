@@ -114,6 +114,10 @@ generated-artifacts-drift-check:
 doc-governance-check:
     uv {{ UV_OPTIONS }} run python scripts/check-doc-governance.py
 
+# 检查: Markdown SSOT (legacy authoring surface)
+md-ssot-check:
+    uv {{ UV_OPTIONS }} run python scripts/check-md-ssot.py
+
 # 检查: stdlib 同名模块冲突
 stdlib-collisions-check:
     uv {{ UV_OPTIONS }} run python scripts/check-stdlib-module-collisions.py
@@ -516,7 +520,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-public-api-manifest check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-public-api-manifest check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

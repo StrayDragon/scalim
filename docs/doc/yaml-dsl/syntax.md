@@ -144,14 +144,14 @@ YAML 里引用 Python 可调用对象的地方主要有两类:
 
 - Python 引用仍受 allowlist 约束
 - `^<id>` 的解析与执行 **不要求**把其目标模块加入 allowlist(unknown id 会 fail-fast 并提示一份保守的可用 id 列表)
-- `<id>` 为可定制的词表 key,推荐使用 `/` 分段表示命名空间(例如 `workflow/sheetbook_sheet_rows`)
+- `<id>` 为可定制的词表 key,推荐使用 `/` 分段表示命名空间(例如 `workflow/book_sheet_rows`)
 - 默认词表仅提供少量 Scalim 内置 id(保守暴露);下游可在 `run/compile(..., builtin_callables=...)` 中注入/扩展词表
 
 示例(loader):
 
 ```yaml
 main_source:
-  loader: ^workflow/sheetbook_sheet_rows
+  loader: ^workflow/book_sheet_rows
 ```
 
 示例(call_by):
@@ -159,7 +159,7 @@ main_source:
 ```yaml
 fields:
   rows:
-    call_by: "^workflow/sheetbook_sheet_rows(ref)"
+    call_by: "^workflow/book_sheet_rows(ref)"
 ```
 
 ### 4.3 allowlist 是运行时参数
@@ -226,8 +226,9 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 `outputs` 是 demand YAML 的“多输出编排”入口(有序列表):
 
 - 每个 output 必填唯一 `name`(供 `from` 引用)
-- `container` 描述输出容器(workbook/csv)与路径/工作表等
-- `container.path` 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
+- `container` 描述 CSV 输出容器(当前仅支持 `type: csv`)
+  - `container.path` 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
+- Excel 输出不通过 `container` 表达: 声明 `resources.books` 并用 `outputs_defaults.to` / `outputs[*].to` 绑定到 `book_id + sheet`
 - 明细输出使用 `fields: [field_id, ...]` 指定导出列顺序
 - `where` 是安全表达式,用于分发过滤;其依赖字段会在编译期注入 required fields
 - 派生汇总输出使用 `aggregate`(与 `fields` 互斥)
@@ -236,9 +237,8 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 辅助配置:
 
 - 顶层 `failure_policy` / `include_full_error_message` 控制 composed outputs 的失败策略与错误信息脱敏
-- 顶层 `meta` / `audit` 可开启额外 sheet(默认写入 primary workbook)
-- 若 Python 侧用 `overrides.outputs` 把 workbook outputs 整体替换为纯 `csv` 等非 workbook 输出,且 `meta/audit`
-  未显式提供 `path`,则运行时会跳过这些隐式 extra sheets;如需保留,请显式设置 `meta.path` / `audit.path`
+- 顶层 `meta` / `audit` 可开启额外 sheet(默认写入 primary Excel 输出的 book)
+- 若运行时没有任何 Excel 输出可作为默认 book,则 `meta/audit` 可能被跳过；如需强制输出,请显式设置 `meta.path` / `audit.path`
 
 一个最小示例:
 
@@ -246,18 +246,28 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 meta: true
 audit: true
 
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./out.xlsx
+      write_lock: true
+
+outputs_defaults:
+  to: {book: report}
+
 outputs:
   - name: detail
-    container: {type: workbook, path: ./out.xlsx, sheet: 明细, write_lock: true}
+    to: {sheet: 明细}
     fields: [order_id, customer_name, amount_yuan]
 
   - name: direct
     from: detail
-    container: {type: workbook, path: ./out.xlsx, sheet: 直客明细, write_lock: true}
+    to: {sheet: 直客明细}
     where: "channel == 'direct'"
 
   - name: by_channel
-    container: {type: workbook, path: ./out.xlsx, sheet: 渠道汇总, write_lock: true}
+    to: {sheet: 渠道汇总}
     aggregate:
       group_by: [channel]
       fields:

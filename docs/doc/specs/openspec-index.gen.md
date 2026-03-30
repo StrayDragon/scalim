@@ -19,7 +19,7 @@ Sources:
 ### `agent-skill-workflow-writes-docs`
 - Title: agent-skill-workflow-writes-docs Specification
 - Source: [spec.md](#code=openspec/specs/agent-skill-workflow-writes-docs/spec.md)
-- Summary: 定义并约束 `scalim-yaml-dsl` skill 的 workflow YAML 语法索引生成规则,确保生成物的关键 key paths 与 canonical workflow schema 一致（`writes` 是唯一写入字段）,避免文档漂移误导作者与工具链.
+- Summary: 定义并约束 `scalim-yaml-dsl` skill 的 workflow YAML 语法索引生成规则,确保生成物的关键 key paths 与 canonical workflow schema 一致,避免文档漂移误导作者与工具链.
 
 ### `benchmarking`
 - Title: benchmarking Specification
@@ -289,7 +289,7 @@ Sources:
 ### `skill-docs-write-to-cleanup`
 - Title: skill-docs-write-to-cleanup Specification
 - Source: [spec.md](#code=openspec/specs/skill-docs-write-to-cleanup/spec.md)
-- Summary: 定义并约束 `scalim-yaml-dsl` skill 与相关 OpenSpec 文档对 workflow 写入字段的表述口径,确保作者不会被已移除字段 `write_to` 误导,并以 `writes` 作为唯一可用的写入 authoring surface.
+- Summary: 定义并约束 `scalim-yaml-dsl` skill 与相关 OpenSpec 文档对 workflow 写入语义的表述口径,确保作者不会被已移除的旧写入字段误导,并以 `workflow.resources.books` + demand outputs 的 `to/write` 绑定作为唯一可用的 authoring surface(SSOT).
 
 ### `source-cache`
 - Title: source-cache Specification
@@ -359,7 +359,7 @@ Sources:
 ### `workflow-sheetbook-resources`
 - Title: workflow-sheetbook-resources Specification
 - Source: [spec.md](#code=openspec/specs/workflow-sheetbook-resources/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 workflow YAML 的 sheetbook 资源(authoring surface)、预算护栏与写入 intent(`writes[*].sheetbook_*`)契约,并要求写入行为确定性、冲突安全、可观测且可原子导出为最终 xlsx,同时提供内置 loader 供下游节点读取 sheet rows.
+- Summary: **状态: ✅ 已实现** 定义 workflow YAML 的共享 `.xlsx` book 资源(以 `workflow.resources.books` 表达)的迁移约束与运行期契约: 预算护栏、确定性写入、冲突安全、可观测且可原子导出为最终 xlsx,并提供可稳定引用的内置 loader 供下游节点读取 sheet rows.
 
 ### `yaml-dsl-agent-guidance`
 - Title: yaml-dsl-agent-guidance Specification
@@ -379,7 +379,7 @@ Sources:
 ### `yaml-dsl-books-resources`
 - Title: yaml-dsl-books-resources Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-books-resources/spec.md)
-- Summary: TBD - created by archiving change c35-workflow-io-books-resources. Update Purpose after archive.
+- Summary: 定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs_defaults.to.book` / `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.
 
 ### `yaml-dsl-builtin-callables`
 - Title: yaml-dsl-builtin-callables Specification

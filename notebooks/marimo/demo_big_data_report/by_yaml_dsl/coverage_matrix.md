@@ -203,18 +203,13 @@
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml`
   - Demand YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_metrics_demand.yaml`
 
-### resources + writes（多输出资源托管）
+### resources.books + outputs→book 绑定（共享输出容器）
 
-- `workflow.resources.sheetbooks` / `csvs`
+- `workflow.resources.books`
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml`
-- `workflow.resources.workbooks`
   - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_shared_workbooks.yaml`
-- `writes`（sheetbook_sheet + csv_append）
-  - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml`
-- `writes.sheetbook_append`
-  - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_shared_workbooks.yaml`
-- `writes.workbook_sheet` / `writes.workbook_append`
-  - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_shared_workbooks.yaml`
+- 通过 demand outputs 绑定共享 book（`outputs_defaults.to.book` / `outputs[*].to.book` + `outputs[*].write`）
+  - YAML: `notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_shared_workbooks_demand.yaml`
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters/09_workflow_shared_workbooks.py`
 

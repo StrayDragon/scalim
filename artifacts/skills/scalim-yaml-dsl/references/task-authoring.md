@@ -144,7 +144,8 @@ retry:
 
 ## 设计偏好
 
-- 输出路径在 `outputs.*.container.path` 显式声明; 多目标共享同一 workbook 时建议开启 `write_lock: true`
+- CSV 输出路径在 `outputs.*.container.path` 显式声明; Excel 输出路径在 `resources.books.*.path` / `resources.books.*.export_xlsx.path` 声明
+- 多 outputs 共享同一 book 输出时,建议显式开启 `write_lock: true`(避免并发/多进程写入导致冲突)
 - 优先使用 string ref / string sugar;仅在需要大段复用/覆写时再用 anchor
 - 输出字段优先显式声明(避免隐式全量导出);简单场景可用 string sugar
 - 只有在 DSL 无法表达时才退回 Python

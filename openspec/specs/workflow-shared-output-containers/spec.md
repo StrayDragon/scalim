@@ -9,16 +9,16 @@ TBD - created by archiving change c30-workflow-shared-output-containers. Update 
 - 资源声明:
   - `workflow.resources.books.<book_id>` MUST 为 mapping 且 MUST 满足 `yaml-dsl-books-resources` 对 book 的约束
 - 写入意图:
-  - workflow YAML MUST NOT 再暴露 `workflow.runs[*].writes` authoring surface
+  - workflow YAML MUST NOT 再暴露已移除的 workflow-level 写入 intents authoring surface
   - 系统 MUST 从每个 run 引用的 demand YAML 中读取 `outputs_defaults`/`outputs[*].to`/`outputs[*].write` 推导等价的写入节点集合
 
 迁移约束(破坏性变更):
 
-- `workflow.resources.workbooks` / `workflow.resources.csvs` / `workflow.resources.sheetbooks` MUST 被拒绝并给出迁移提示(迁移到 `workflow.resources.books`)
-- `workflow.runs[*].writes` MUST 被拒绝并给出迁移提示(迁移到 demand outputs 的 `to/write` 绑定)
+- legacy workflow resource groups(workbooks/csvs/sheetbooks) MUST 被拒绝并给出迁移提示(迁移到 `workflow.resources.books`)
+- 已移除的 workflow-level 写入 intents MUST 被拒绝并给出迁移提示(迁移到 demand outputs 的 `to/write` 绑定)
 
 #### Scenario: shared-output authoring surface passes schema validation
-- **WHEN** workflow YAML 包含 `workflow.resources.books` 且不包含 `workflow.runs[*].writes`
+- **WHEN** workflow YAML 包含 `workflow.resources.books` 且不包含已移除的 workflow-level 写入 intents
 - **THEN** schema-only 校验 MUST 通过
 
 ### Requirement: workflow declares shared output resources at workflow scope
@@ -226,4 +226,3 @@ TBD - created by archiving change c30-workflow-shared-output-containers. Update 
 #### Scenario: sheet order is stable across concurrent runs
 - **WHEN** 并发执行多个写入不同 sheets 的 write intents
 - **THEN** 导出的 workbook/sheetbook 内 sheet 顺序 MUST 可复现
-

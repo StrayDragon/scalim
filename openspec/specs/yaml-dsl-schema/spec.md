@@ -465,15 +465,15 @@ Schema MUST 为 retry policy 字段提供:
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` 与 `workflow.gen.json`
 - **THEN** book 的 `path`/`export_xlsx.path` 字段 MUST 通过 `oneOf` 接受 string 或 `{$init_var: <name>}` object
 
-### Requirement: demand schema MUST reject legacy output container types and shapes (`workbook`, pathless `csv`)
+### Requirement: demand schema MUST reject legacy output container types and shapes (legacy workbook container surface, pathless `csv`)
 
 系统 MUST 在 demand schema-only 校验阶段拒绝以下已移除/不再作为主路径的形态:
 
-- `outputs[*].container.type: workbook`
+- `.xlsx` 输出的旧 workbook container authoring surface(迁移到 `resources.books` + outputs→book 绑定)
 - `outputs[*].container.type: csv` 且 `outputs[*].container.path: ""`
 
 #### Scenario: workbook container type is rejected by schema
-- **WHEN** 执行 demand schema-only 校验且 `outputs[0].container.type=workbook`
+- **WHEN** 执行 demand schema-only 校验且 demand outputs 使用旧 workbook container authoring surface
 - **THEN** 校验 MUST 失败
 
 #### Scenario: pathless csv is rejected by schema
@@ -484,20 +484,17 @@ Schema MUST 为 retry policy 字段提供:
 
 系统 MUST 在 workflow JSON schema 中拒绝已移除的 workflow IO authoring surface:
 
-- `workflow.runs[*].writes`
-- `workflow.resources.workbooks`
-- `workflow.resources.csvs`
-- `workflow.resources.sheetbooks`
+- 已移除的 workflow-level 写入 intents authoring surface
+- legacy workflow resource groups(workbooks/csvs/sheetbooks)
 
 并要求 workflow 的共享 IO 统一通过:
 
 - `workflow.resources.books`
 
 #### Scenario: workflow schema rejects removed `writes`
-- **WHEN** 执行 workflow schema-only 校验且出现 `workflow.runs[0].writes`
+- **WHEN** 执行 workflow schema-only 校验且出现已移除的 workflow-level 写入 intents
 - **THEN** 校验 MUST 失败
 
 #### Scenario: workflow schema rejects legacy resources
-- **WHEN** 执行 workflow schema-only 校验且出现 `workflow.resources.sheetbooks`
+- **WHEN** 执行 workflow schema-only 校验且出现 legacy workflow resource groups(workbooks/csvs/sheetbooks)
 - **THEN** 校验 MUST 失败
-

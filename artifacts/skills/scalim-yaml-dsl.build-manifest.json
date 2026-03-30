@@ -128,8 +128,8 @@
           "schema 允许 `outputs.*.fields` 包含 object 条目",
           "schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法",
           "schema MUST support `{$init_var: <name>}` for book export paths",
-          "demand schema MUST reject legacy output container types and shapes (`workbook`, pathless `csv`)",
-          "workflow schema MUST reject legacy workflow IO fields (`writes`, `workbooks`, `csvs`, `sheetbooks`)"
+          "demand schema MUST reject legacy output container types and shapes (legacy workbook container surface, pathless `csv`)",
+          "workflow schema MUST reject legacy workflow IO fields"
         ],
         "slug": "yaml-dsl-schema"
       },
@@ -172,9 +172,35 @@
           "workflow entrypoints MUST be importable under Python 3.6",
           "workflow emits workflow-level events and injects attribution for demand events",
           "max_concurrency>1 requires thread-safe or stateless components",
-          "workflow YAML MUST use `workflow.resources.books` and MUST reject `writes` authoring surface"
+          "workflow YAML MUST use `workflow.resources.books` and MUST reject the legacy workflow write authoring surface"
         ],
         "slug": "yaml-dsl-workflow"
+      },
+      {
+        "path": "openspec/specs/yaml-dsl-books-resources/spec.md",
+        "requirements": [
+          "demand/workflow YAML MUST support `resources.books` as the unified Excel IO resource surface",
+          "`books.kind=xlsx_file` MUST define file export semantics and path resolution base",
+          "`books.kind=xlsx_memory` MUST define in-memory budget guards and optional export_xlsx",
+          "demand MUST bind outputs to books via `outputs_defaults.to.book` and `outputs[*].to`",
+          "standalone demand MUST fail-fast when a referenced book resource is missing",
+          "workflow MUST merge books from demand/workflow with deterministic precedence and strict contracts",
+          "books MUST support default write behavior and per-output overrides for append vs sheet semantics",
+          "Excel exports MUST escape formula-like strings by default (opt-out via allow_formulas)",
+          "downstream demands MUST be able to load xlsx_memory book sheet rows via a built-in loader",
+          "`.xlsx` outputs MUST use books binding; legacy workbook container surface MUST be rejected (BREAKING)"
+        ],
+        "slug": "yaml-dsl-books-resources"
+      },
+      {
+        "path": "openspec/specs/yaml-dsl-output-overrides/spec.md",
+        "requirements": [
+          "by_yaml runtime MUST accept YAML-shaped `overrides.outputs`",
+          "`overrides.outputs` MUST take precedence over YAML `outputs`",
+          "`overrides.outputs` MUST compile through the same outputs pipeline",
+          "by_yaml runtime MUST accept IO-only overrides for `resources.books` and `outputs_defaults`"
+        ],
+        "slug": "yaml-dsl-output-overrides"
       },
       {
         "path": "openspec/specs/source-relations/spec.md",
@@ -238,35 +264,6 @@
           "cache pool MUST be observable via workflow-level events"
         ],
         "slug": "workflow-cache-pool"
-      },
-      {
-        "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-        "requirements": [
-          "workflow YAML exposes a stable authoring surface for shared resources and write intents",
-          "workflow declares shared output resources at workflow scope",
-          "shared output is written via explicit workflow write nodes",
-          "writes to shared resources are deterministic and serialized",
-          "append/merge semantics are explicit and verifiable",
-          "shared resources commit atomically at workflow end",
-          "shared resource lifecycle MUST be observable",
-          "shared resource plan creation MUST be atomic and joinable within a workflow exec",
-          "joinable get-or-create 的等待诊断",
-          "joinable get-or-create 的可选超时",
-          "commit_all/discard_all 与 inflight 并发交错语义",
-          "workflow workbook exports MUST escape Excel formulas by default",
-          "workflow workbook resource authoring surface MUST support allow_formulas",
-          "workflow MUST precheck Excel output-path collisions across books deterministically",
-          "commit order MUST NOT depend on thread scheduling",
-          "workbook/sheetbook sheet order MUST be stable"
-        ],
-        "slug": "workflow-shared-output-containers"
-      },
-      {
-        "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-        "requirements": [
-          "legacy sheetbook authoring surface MUST be rejected and migrated to books"
-        ],
-        "slug": "workflow-sheetbook-resources"
       },
       {
         "path": "openspec/specs/workflow-observability-bridge/spec.md",
@@ -432,12 +429,8 @@
       "sha256": "bb7d976b24872851dbf3a223617dc44b6a202fb264db1c57f560dde52a74f1b4"
     },
     {
-      "path": "openspec/specs/workflow-shared-output-containers/spec.md",
-      "sha256": "ee609deb264d321b674cd344b0d17b7bc3d9d6fcddcb443cd7d3c98f48a36c78"
-    },
-    {
-      "path": "openspec/specs/workflow-sheetbook-resources/spec.md",
-      "sha256": "f8a0f657304c97ef3a332d36ed26aa74484db781d66feeeb45365cf2d2026f68"
+      "path": "openspec/specs/yaml-dsl-books-resources/spec.md",
+      "sha256": "7c532046ba13200d2a7abc1ed9b9a102f14cd655ad2eced1a29214e07bff7a87"
     },
     {
       "path": "openspec/specs/yaml-dsl-cli-validation/spec.md",
@@ -448,12 +441,16 @@
       "sha256": "972780001775d8741bb6ee9e5aa8c5ef39bf4f62c638f237dfad95a7c5c49f3f"
     },
     {
+      "path": "openspec/specs/yaml-dsl-output-overrides/spec.md",
+      "sha256": "f7a3da0fac9718fc7ffa09c51898624f782a9ae0bfc7bd97427dc121b1e1b533"
+    },
+    {
       "path": "openspec/specs/yaml-dsl-schema/spec.md",
-      "sha256": "9c6166f9053eabafa706f36763ba58197b7d7d92a047a0c86f9ebb37c0f70d38"
+      "sha256": "64c765028764c13dd681d7aca527fa8c538244c085ddd580db7a0947f1d24bc9"
     },
     {
       "path": "openspec/specs/yaml-dsl-workflow/spec.md",
-      "sha256": "eed86fd04c848448cb95341d7df0f0f882b5b20b677ef62f2272b4d97cd33f82"
+      "sha256": "78c896be2fa141a4f74979f4d487f2dd7b4ec149c2c2ee9b9713c01a0d9e4997"
     },
     {
       "path": "src/scalim/cli/yaml_dsl.py",
@@ -471,7 +468,7 @@
   "outputs": [
     {
       "path": "references/generated/cli-lsp-reference.gen.md",
-      "sha256": "bc76b9b0e5b206d42df0f96f90854a9a4124788e919ea59513a533211737df0b"
+      "sha256": "613a957f3ce77b14771664fc2eef5ba74e474888f986997d11640f454c2d102a"
     },
     {
       "path": "references/generated/example-full/ecommerce_report.gen.yaml",
@@ -487,7 +484,7 @@
     },
     {
       "path": "references/syntax-catalog.gen.md",
-      "sha256": "71eb622c57d7bb024e79fe79df68c3e31b8157ed667e69862020b08720431abb"
+      "sha256": "0f26dda25add07165cdddf1a3924e7a45e440d3d4dbd9fc4f3fade3bf68322a4"
     }
   ],
   "skill_name": "scalim-yaml-dsl"

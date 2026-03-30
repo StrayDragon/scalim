@@ -8,7 +8,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 先识别任务类型,只读取最少的 reference:
 
 - 新写或改写 YAML: 读 [references/task-authoring.md](references/task-authoring.md)
-- 新写或改写 workflow YAML(编排多 demand / resources / writes): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
+- 新写或改写 workflow YAML(编排多 demand / `workflow.resources.books` / outputs→book 绑定): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
 - 校验、订正、排错 workflow YAML: 读 [references/task-workflow-validate-debug.md](references/task-workflow-validate-debug.md)
@@ -50,7 +50,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 不要硬记/猜语法: 以 schema / 生成文档为准(需要时看 `references/syntax-catalog.gen.md`、`references/generated/cli-lsp-reference.gen.md`、`references/generated/example-full/ecommerce_report.gen.yaml`)
 - 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
-- workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 `writes[*].output` 等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
+- workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 outputs→book 绑定等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证
 - 若 Python 侧使用 `overrides.outputs` 把 workbook outputs 整体替换为非 workbook 输出,未显式 `path` 的 `meta/audit`
   会被运行时跳过;仍需保留时请显式配置 `meta.path` / `audit.path`

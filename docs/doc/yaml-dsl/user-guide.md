@@ -51,7 +51,7 @@ main_source:
       name: 订单ID
 ```
 
-如果希望写文件输出,推荐在 Python 调用侧使用与 YAML `outputs` 同形的 `overrides.outputs` 指定输出编排(字段/路径/sheet/表头策略等),而不是把路径写死在 YAML 里:
+如果希望写文件输出,推荐在 Python 调用侧使用与 YAML `outputs` 同形的 `overrides.outputs` 指定输出编排(字段/路径/表头策略等),而不是把路径写死在 YAML 里(更易复用/更易对拍):
 
 ```python
 from scalim.dsl.by_yaml import RunOverrides, run
@@ -63,7 +63,7 @@ result = run(
         outputs=[
             {
                 "name": "detail",
-                "container": {"type": "workbook", "path": "./output/minimal_order_report.xlsx", "sheet": "明细"},
+                "container": {"type": "csv", "path": "./output/minimal_order_report.csv"},
                 "fields": ["order_id"],
             }
         ]
@@ -71,12 +71,22 @@ result = run(
 )
 ```
 
-当然,也可以在 YAML 内固定输出路径(可选;使用 `outputs`):
+当然,也可以在 YAML 内直接声明 Excel 输出(可选;使用 `resources.books` + outputs 绑定):
 
 ```yaml
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./output/minimal_order_report.xlsx
+      write_lock: true
+
+outputs_defaults:
+  to: {book: report}
+
 outputs:
   - name: detail
-    container: {type: workbook, path: ./output/minimal_order_report.xlsx, sheet: 明细}
+    to: {sheet: 明细}
     fields: [order_id]
 ```
 
@@ -177,16 +187,25 @@ main_source:
     end_dt: {$init_var: end_dt}
 ```
 
-`outputs.*.container.path` 也支持同样的注入语法:
+`outputs.*.container.path`(CSV 输出)也支持同样的注入语法:
 
 ```yaml
 outputs:
   - name: detail
     container:
-      type: workbook
+      type: csv
       path: {$init_var: output_path}
-      sheet: 明细
     fields: [order_id]
+```
+
+Excel 输出路径注入在 `resources.books.*.path` / `resources.books.*.export_xlsx.path`:
+
+```yaml
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: {$init_var: output_path}
 ```
 
 ```python
@@ -197,7 +216,7 @@ result = run(
     allowed_modules=frozenset(["myapp.loaders"]),
     init_vars={
         "end_dt": datetime(2024, 1, 31),
-        "output_path": "./output/report.xlsx",
+        "output_path": "./output/report.csv",
     },
 )
 ```
@@ -283,37 +302,34 @@ relations:
 
 ### 2.5 输出配置 (outputs)
 
-定义报表的多输出编排(有序列表),支持 workbook 多 sheet 分发(where)与派生汇总(aggregate):
+定义报表的多输出编排(有序列表),支持 Excel 多 sheet 分发(where)与派生汇总(aggregate):
 
 ```yaml
 meta: true
 audit: true
 
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./output/report.xlsx
+      write_lock: true
+
+outputs_defaults:
+  to: {book: report}
+
 outputs:
   - name: detail
-    container:
-      type: workbook
-      path: ./output/report.xlsx
-      sheet: 明细
-      header_fields_output_by: name
-      write_lock: true
+    to: {sheet: 明细}
     fields: [order_id, customer_name, amount]
 
   - name: direct
     from: detail
-    container:
-      type: workbook
-      path: ./output/report.xlsx
-      sheet: 直客
-      write_lock: true
+    to: {sheet: 直客}
     where: "channel == 'direct'"
 
   - name: by_channel
-    container:
-      type: workbook
-      path: ./output/report.xlsx
-      sheet: 渠道汇总
-      write_lock: true
+    to: {sheet: 渠道汇总}
     aggregate:
       group_by: [channel]
       fields:
@@ -1149,28 +1165,37 @@ sources:
 
 ### 4.5 多输出编排与派生汇总 (outputs / output_composition)
 
-`YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 workbook 多 sheet / where 分发 / aggregate 派生汇总 / meta/audit),
+`YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 Excel 多 sheet / where 分发 / aggregate 派生汇总 / meta/audit),
 运行时会将其编译为执行层的 `ExecutionRequest.output_composition`.
 
 关键点:
 
 - `outputs` 是有序列表;顺序决定 primary 输出
-- 当多个 outputs 共享同一 Excel `path` 时,每个 output 必须显式设置 `sheet`(否则会覆盖同一个 sheet)
+- 当多个 outputs 绑定到同一 book 时,建议显式设置 `outputs[*].to.sheet`(或确保 `outputs[*].name` 本身是合法且唯一的 sheet 名)
 - Python 调用侧可通过 `overrides.outputs` **整体替换** YAML 的 `outputs`(replace).优先级: `overrides.outputs` > YAML `outputs` > 默认(不写文件;仅 sink 保留数据)
-- `overrides.outputs` 必须为非空 list;本版本仅承诺明细输出(detail)最小子集: `name/container/fields`(不支持 `where/from/aggregate`)
-- 若 `overrides.outputs` 把原本的 workbook outputs 替换成纯 `csv` 等非 workbook 输出,则未显式设置 `path` 的
-  `meta/audit` 不再继承原 YAML 的 workbook,而是会被跳过;若仍需输出这些 extra sheets,请显式配置 `meta.path`
-  / `audit.path`
+- `overrides.outputs` 必须为非空 list;本版本仅承诺最小子集: `name/container/to/write/fields`(不支持 `where/from/aggregate`)
+- 若 `overrides.outputs` 使运行期不再存在可作为默认目标的 Excel 输出,则未显式设置 `path` 的 `meta/audit` 可能会被跳过;
+  若仍需输出这些 extra sheets,请显式配置 `meta.path` / `audit.path`
 
 #### 4.5.1 示例: YAML 声明多 sheet(明细 + 汇总 + meta + audit)
 
 ```yaml
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./output/report.xlsx
+      write_lock: true
+
+outputs_defaults:
+  to: {book: report}
+
 outputs:
   - name: detail
-    container: {type: workbook, path: ./output/report.xlsx, sheet: 明细}
+    to: {sheet: 明细}
     fields: [order_id, order_source, amount, cost, profit]
   - name: summary
-    container: {type: workbook, path: ./output/report.xlsx, sheet: 汇总}
+    to: {sheet: 汇总}
     aggregate:
       group_by: [order_source]
       fields:
@@ -1190,10 +1215,20 @@ result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
     overrides=RunOverrides(
+        resources={
+            "books": {
+                "report": {
+                    "kind": "xlsx_file",
+                    "path": "./output/report.xlsx",
+                    "write_lock": True,
+                }
+            }
+        },
+        outputs_defaults={"to": {"book": "report"}},
         outputs=[
             {
                 "name": "detail",
-                "container": {"type": "workbook", "path": "./output/report.xlsx", "sheet": "明细"},
+                "to": {"sheet": "明细"},
                 "fields": ["order_id", "amount", "profit"],
             }
         ]
@@ -1896,12 +1931,22 @@ _ = compile("config.yaml", allowed_modules=frozenset(["myapp.loaders"]))
 **A**:
 
 - **CSV**: `outputs.*.container.type: csv`
-- **Excel(workbook)**: `outputs.*.container.type: workbook`(需要 `openpyxl` 依赖)
+- **Excel**: `resources.books` + `outputs_defaults.to` / `outputs[*].to` 绑定(需要 `openpyxl` 依赖)
 
 ```yaml
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./output/report.xlsx
+      write_lock: true
+
+outputs_defaults:
+  to: {book: report}
+
 outputs:
   - name: detail
-    container: {type: workbook, path: ./output/report.xlsx, sheet: 明细}
+    to: {sheet: 明细}
     fields: [order_id]
 ```
 
