@@ -439,7 +439,7 @@ def _render_promptfoo_config_with_replacements(*, ssot_path: Path, dest_path: Pa
 
 
 def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, scenario: str) -> None:
-    fixture_dir = root / "openspec/prompt-eval/fixtures/agent_stub_project"
+    fixture_dir = root / "agentdev/prompt-eval/fixtures/agent_stub_project"
     if not fixture_dir.exists():
         msg = "agent fixture missing: {}".format(fixture_dir)
         raise FileNotFoundError(msg)
@@ -844,7 +844,7 @@ def _compare_promptfoo_outputs(*, baseline_path: Path, candidate_path: Path) -> 
 
 
 def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: Optional[str], check: bool) -> int:
-    config_dir = root / "openspec/prompt-eval/promptfoo"
+    config_dir = root / "agentdev/prompt-eval/promptfoo"
     ssot_config_path = config_dir / "promptfooconfig.agent.yaml"
     pinned_version_path = config_dir / "promptfoo-version.txt"
 
@@ -1030,7 +1030,7 @@ def _run_promptfoo_agent_suite(*, root: Path, output_base_dir: Path, git_head: O
 
 
 def _run_promptfoo_llm_suite(*, root: Path, output_base_dir: Path, git_head: Optional[str], check: bool) -> int:
-    config_dir = root / "openspec/prompt-eval/promptfoo"
+    config_dir = root / "agentdev/prompt-eval/promptfoo"
     ssot_config_path = config_dir / "promptfooconfig.yaml"
     pinned_version_path = config_dir / "promptfoo-version.txt"
 
@@ -1201,7 +1201,7 @@ def _print_summary(results: Sequence[CaseResult]) -> None:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog=_RUNNER_NAME)
     parser.add_argument(
-        "--cases-root", default="openspec/prompt-eval/cases", help="Cases root directory (default: openspec/prompt-eval/cases)"
+        "--cases-root", default="agentdev/prompt-eval/cases", help="Cases root directory (default: agentdev/prompt-eval/cases)"
     )
     parser.add_argument("--output-dir", default=".tmp/artifacts/prompt-eval", help="Output directory (default: .tmp/artifacts/prompt-eval)")
     parser.add_argument("--check", action="store_true", help="CI mode: deterministic core only")

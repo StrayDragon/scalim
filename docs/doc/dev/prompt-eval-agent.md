@@ -15,14 +15,14 @@
 - 提供最小 fixture 项目与工具(避免依赖你本机的 scalim/uv 环境)
 
 ??? note "维护提示"
-    - 配置 SSOT: `openspec/prompt-eval/promptfoo/promptfooconfig.agent.yaml`
-    - workspace fixture: `openspec/prompt-eval/fixtures/agent_stub_project/`
-    - assertions: `openspec/prompt-eval/promptfoo/assertions/`
+    - 配置 SSOT: `agentdev/prompt-eval/promptfoo/promptfooconfig.agent.yaml`
+    - workspace fixture: `agentdev/prompt-eval/fixtures/agent_stub_project/`
+    - assertions: `agentdev/prompt-eval/promptfoo/assertions/`
     - fixture CLI: workspace 内部命令为 `scalim-fixture-cli`；同时在 workspace venv 中生成 `scalim-cli` shim 以兼容 skill 文档中的命令模板
 
 ## 前置条件
 
-- 本机安装 `promptfoo` 且版本与 pin 一致: `openspec/prompt-eval/promptfoo/promptfoo-version.txt`
+- 本机安装 `promptfoo` 且版本与 pin 一致: `agentdev/prompt-eval/promptfoo/promptfoo-version.txt`
 - 已设置模型侧环境变量(例如 `OPENAI_API_KEY`)
 - 已安装 agent provider 的依赖(当前默认配置为 `openai:codex-sdk`)
 
@@ -74,7 +74,7 @@ T1 会更贵,建议先小样本跑通流水线:
 
 ## 修改模型 / provider
 
-T1 配置 SSOT: `openspec/prompt-eval/promptfoo/promptfooconfig.agent.yaml`
+T1 配置 SSOT: `agentdev/prompt-eval/promptfoo/promptfooconfig.agent.yaml`
 
 - 更换模型: 修改 provider 的 `model`
 - 更换用户常用 provider: 直接替换 `providers` 配置(保持 output_schema 与 assertions 可用)

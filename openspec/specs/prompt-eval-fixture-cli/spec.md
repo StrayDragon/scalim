@@ -6,7 +6,7 @@
 
 ## Related Code (as implemented)
 - `scripts/prompt-eval.py` (agent workspace 生成 + workspace venv 内 entrypoint 生成)
-- `openspec/prompt-eval/fixtures/agent_stub_project/` (fixture 代码与最小 stub CLI)
+- `agentdev/prompt-eval/fixtures/agent_stub_project/` (fixture 代码与最小 stub CLI)
 - `docs/doc/dev/prompt-eval-agent.md` (维护与排错说明)
 
 ## Requirements
@@ -35,4 +35,3 @@ workspace 初始化 MUST 避免通过 `uv pip install -e .` 安装 fixture(会�
 - **WHEN** 开发者在仓库中运行 prompt-eval 的 workspace 初始化流程
 - **THEN** 仓库 `.venv` 中不应出现 prompt-eval fixture 包
 - **AND** workspace 的本地 venv 的 `bin/` 下应存在 `scalim-fixture-cli` 与 `scalim-cli` 可执行入口
-

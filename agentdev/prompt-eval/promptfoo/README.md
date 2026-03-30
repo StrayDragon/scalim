@@ -4,7 +4,7 @@
 
 ## 版本 pin
 
-本仓库的 `promptfoo` 版本 pin 见 `openspec/prompt-eval/promptfoo/promptfoo-version.txt`。
+本仓库的 `promptfoo` 版本 pin 见 `agentdev/prompt-eval/promptfoo/promptfoo-version.txt`。
 
 本机需安装对应版本(推荐用全局包管理器,例如 `pnpm add -g promptfoo@<version>`),并确保 `promptfoo --version` 与 pin 一致。
 
@@ -62,7 +62,7 @@ PROMPT_EVAL_LLM_BASELINE_REF=<tag-or-sha> just prompt-eval-llm
 - `.tmp/artifacts/prompt-eval/llm/ab/candidate/`
 - `.tmp/artifacts/prompt-eval/llm/ab/compare.json`
 
-默认模型(可在 `openspec/prompt-eval/promptfoo/promptfooconfig.yaml` 修改):
+默认模型(可在 `agentdev/prompt-eval/promptfoo/promptfooconfig.yaml` 修改):
 
 - `openai:chat:gpt-5.1-codex-mini` (temperature=0, seed=0, max_tokens=700)
 
@@ -73,7 +73,7 @@ PROMPT_EVAL_LLM_BASELINE_REF=<tag-or-sha> just prompt-eval-llm
 
 ## T1: coding agent 套件(昂贵; 低频回归)
 
-本仓库的 T1 使用 `openai:codex-sdk` provider(见 `openspec/prompt-eval/promptfoo/promptfooconfig.agent.yaml`)。
+本仓库的 T1 使用 `openai:codex-sdk` provider(见 `agentdev/prompt-eval/promptfoo/promptfooconfig.agent.yaml`)。
 
 前置条件:
 

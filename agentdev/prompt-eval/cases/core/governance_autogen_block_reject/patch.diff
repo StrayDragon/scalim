@@ -1,0 +1,10 @@
+diff --git a/agentdev/prompt-eval/fixtures/doc_with_autogen.md b/agentdev/prompt-eval/fixtures/doc_with_autogen.md
+index 0000000..1111111 100644
+--- a/agentdev/prompt-eval/fixtures/doc_with_autogen.md
++++ b/agentdev/prompt-eval/fixtures/doc_with_autogen.md
+@@ -4,4 +4,4 @@ Intro line
+ <!-- BEGIN AUTOGEN:demo -->
+-generated line 1
++generated line 1 changed
+ generated line 2
+ <!-- END AUTOGEN:demo -->

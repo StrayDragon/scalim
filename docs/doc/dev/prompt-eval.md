@@ -20,7 +20,7 @@ just prompt-eval-check
 
 ## 用例与产物
 
-- 用例目录: `openspec/prompt-eval/cases/`
+- 用例目录: `agentdev/prompt-eval/cases/`
   - 每个用例子目录包含 `case.json` (必需)
   - 可选: `patch.diff` / fixtures 等(由用例定义决定)
 - 输出目录: `.tmp/artifacts/prompt-eval/` (每次运行会清理后重建)
@@ -34,7 +34,7 @@ LLM 套件已接入 `promptfoo`(仅本地运行; 不是 `just prompt-eval` 的�
 
 ### 前置条件
 
-- 本机安装 `promptfoo` 且版本与 pin 一致: `openspec/prompt-eval/promptfoo/promptfoo-version.txt`
+- 本机安装 `promptfoo` 且版本与 pin 一致: `agentdev/prompt-eval/promptfoo/promptfoo-version.txt`
 - 已设置 OpenAI 相关环境变量(例如 `OPENAI_API_KEY`)
 
 ### 运行
@@ -63,7 +63,7 @@ PROMPT_EVAL_LLM_BASELINE_REF=<tag-or-sha> just prompt-eval-llm
 - `.tmp/artifacts/prompt-eval/llm/ab/candidate/`
 - `.tmp/artifacts/prompt-eval/llm/ab/compare.json`
 
-更多本地使用说明与省钱开关见: `openspec/prompt-eval/promptfoo/README.md`
+更多本地使用说明与省钱开关见: `agentdev/prompt-eval/promptfoo/README.md`
 
 ### 仓库外临时目录(避免 uv/.venv 冲突)
 

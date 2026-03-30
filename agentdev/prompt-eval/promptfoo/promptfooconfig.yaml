@@ -160,7 +160,7 @@ tests:
     prompts:
       - "doc_governance_patch"
     vars:
-      file_path: "openspec/prompt-eval/fixtures/doc_with_autogen.md"
+      file_path: "agentdev/prompt-eval/fixtures/doc_with_autogen.md"
       file_content: |
         # Fixture: AUTOGEN block
 

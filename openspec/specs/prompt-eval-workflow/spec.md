@@ -7,7 +7,7 @@
 ## Related Code (as implemented)
 - `justfile` (`prompt-eval`, `prompt-eval-check`, `prompt-eval-llm*`, `prompt-eval-agent*`)
 - `scripts/prompt-eval.py` (确定性 core runner + 可选 promptfoo/agent 套件)
-- `openspec/prompt-eval/` (cases/fixtures/promptfoo SSOT)
+- `agentdev/prompt-eval/` (cases/fixtures/promptfoo SSOT)
 
 ## Requirements
 ### Requirement: Prompt evaluation workflow exists
@@ -26,4 +26,3 @@
 #### Scenario: Boundary rules are evaluated
 - **WHEN** 开发者运行 `just prompt-eval`
 - **THEN** 评测集 MUST 包含针对上述边界的回归用例
-

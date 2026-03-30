@@ -24,7 +24,7 @@ def _contains_any(haystack: str, needles: List[str]) -> bool:
 
 
 def _repo_root() -> Path:
-    # .../openspec/prompt-eval/promptfoo/assertions/<this_file>.py
+    # .../agentdev/prompt-eval/promptfoo/assertions/<this_file>.py
     return Path(__file__).resolve().parents[4]
 
 
