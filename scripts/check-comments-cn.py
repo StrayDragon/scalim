@@ -143,6 +143,7 @@ def _is_excluded_path(path: Path) -> bool:
         ".tmp",
         # 第三方 `vendor` 代码:保留上游语言/格式
         "dataclassesx",
+        "yamlx",
     }
     return any(part in excluded_dirs for part in path.parts)
 

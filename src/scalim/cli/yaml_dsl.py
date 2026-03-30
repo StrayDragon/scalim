@@ -2,21 +2,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
-
-from ..exceptions import safe_error_message, safe_error_type
-from ..vendor.compact.importlibx import import_module, require_optional_dependency
-from ..vendor.dataclassesx import dataclass, field
-from . import yaml_dsl_lsp
-
-if TYPE_CHECKING:
-    import yaml
-else:
-    yaml = require_optional_dependency(
-        "yaml",
-        context="scalim.cli.yaml_dsl",
-        install_name="pyyaml",
-    )
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
 from ..dsl.by_yaml.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from ..dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
@@ -33,6 +19,11 @@ from ..dsl.by_yaml.config_parsing.yaml_load import (
 from ..dsl.by_yaml.workflow_config import load_workflow_config_from_mapping
 from ..dsl.by_yaml.workflow_paths import resolve_workflow_demand_path
 from ..dsl.by_yaml.workflow_types import ScalimWorkflowConfigError
+from ..exceptions import safe_error_message, safe_error_type
+from ..vendor.compact.importlibx import import_module
+from ..vendor.dataclassesx import dataclass, field
+from ..vendor.yamlx import yaml
+from . import yaml_dsl_lsp
 
 try:
     jsonschema = import_module("jsonschema")

@@ -19,9 +19,7 @@ classifiers = [
 ]
 dependencies = [
     # Python 3.6 兼容依赖 (通过 PyPI API 确认的版本边界)
-    # pyyaml: 对 py3.6 扩大到5.4.1+, 这样老 pip(如 18.x) 也能拿到 manylinux1 wheel,避免回退源码构建
-    "pyyaml>=5.4.1,<6.0.2;python_version<'3.8'",
-    "pyyaml>=6.0.2;python_version>='3.8'",
+    # NOTE: YAML 解析实现通过 `src/scalim/vendor/yamlx/` vendors 化,运行时不依赖外部安装 `PyYAML`/`ruamel.yaml`。
     # typing-extensions: 4.1.1 是最后支持 3.6 的版本, 4.2.0+ 需要 >=3.7
     "typing-extensions>=4.1.1,<4.2;python_version<'3.7'",
     "typing-extensions>=4.1.1;python_version>='3.7'",
@@ -151,6 +149,7 @@ exclude = [
     "venv",
     "**/*.ipynb",
     "src/scalim/vendor/dataclassesx/_backport.py",
+    "src/scalim/vendor/yamlx/**",
 ]
 
 line-length = 140
@@ -248,6 +247,7 @@ ignore = [
     "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py",
     "src/scalim/vendor/dataclassesx/__init__.py",
     "src/scalim/vendor/dataclassesx/_backport.py",
+    "src/scalim/vendor/yamlx/**/*.py",
     ".devcontainer/**",
 ]
 defineConstant = { DEBUG = true }

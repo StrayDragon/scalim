@@ -1,17 +1,8 @@
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Union, cast
 
-from ....vendor.compact.importlibx import require_optional_dependency
-
 if TYPE_CHECKING:
     from .validator import ConfigValidator
-else:
-    # 说明: 在模块导入时显式检查可选依赖,当缺少 `pyyaml` 时让导入/重载快速失败并给出友好提示.
-    require_optional_dependency(
-        "yaml",
-        context="scalim.dsl.by_yaml.config_parsing.loader",
-        install_name="pyyaml",
-    )
 
 from ..init_var_nodes import parse_init_var_mapping_node
 from ..schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING

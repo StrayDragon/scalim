@@ -1,21 +1,13 @@
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from ...._internal.loggingx import format_kv, get_logger, prefix
-from ....vendor.compact.importlibx import import_module, require_optional_dependency
+from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import asdict, dataclass
 from ....vendor.dataclassesx import field as dataclass_field
-
-if TYPE_CHECKING:
-    import yaml
-else:
-    yaml = require_optional_dependency(
-        "yaml",
-        context="scalim.dsl.by_yaml.config_parsing.validator",
-        install_name="pyyaml",
-    )
+from ....vendor.yamlx import yaml
 from ..init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
 from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_CONTAINER_KEYS, OUTPUT_TARGET_KEYS

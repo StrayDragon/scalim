@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-import yaml
+from scalim.vendor.yamlx import yaml
 
 from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError

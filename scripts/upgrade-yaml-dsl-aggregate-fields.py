@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-import yaml
+from scalim.vendor.yamlx import yaml
 
 
 def _as_mapping(value: object) -> Optional[Dict[str, Any]]:

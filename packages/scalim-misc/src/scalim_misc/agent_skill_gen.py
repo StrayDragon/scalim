@@ -21,7 +21,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-import yaml
+from scalim.vendor.yamlx import yaml
 
 from scalim_misc.cli_docs import build_yaml_dsl_command_docs
 from scalim_misc.markdown_inject import InjectBlockError, InjectBlockSpec, replace_markdown_injected_block

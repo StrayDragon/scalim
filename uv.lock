@@ -3100,7 +3100,6 @@ name = "scalim"
 version = "0.5.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
 
@@ -3160,8 +3159,6 @@ requires-dist = [
     { name = "openpyxl", marker = "python_full_version < '3.8' and extra == 'excel'", specifier = ">=3.0.0,<3.1.4" },
     { name = "pandas", marker = "python_full_version >= '3.7' and extra == 'pandas'", specifier = ">=2.0.3" },
     { name = "pandas", marker = "python_full_version < '3.7' and extra == 'pandas'", specifier = ">=1.0.0,<1.2" },
-    { name = "pyyaml", marker = "python_full_version < '3.8'", specifier = ">=5.4.1,<6.0.2" },
-    { name = "pyyaml", marker = "python_full_version >= '3.8'", specifier = ">=6.0.2" },
     { name = "typing-extensions", marker = "python_full_version < '3.7'", specifier = ">=4.1.1,<4.2" },
     { name = "typing-extensions", marker = "python_full_version >= '3.7'", specifier = ">=4.1.1" },
 ]

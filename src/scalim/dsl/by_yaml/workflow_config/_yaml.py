@@ -1,15 +1,6 @@
-from typing import TYPE_CHECKING, Any, Dict, cast
+from typing import Any, Dict, cast
 
-from ....vendor.compact.importlibx import require_optional_dependency
-
-if TYPE_CHECKING:
-    import yaml
-else:
-    yaml = require_optional_dependency(
-        "yaml",
-        context="scalim.dsl.by_yaml.workflow",
-        install_name="pyyaml",
-    )
+from ....vendor.yamlx import yaml
 
 
 def safe_load_yaml_no_duplicates(text: str) -> object:

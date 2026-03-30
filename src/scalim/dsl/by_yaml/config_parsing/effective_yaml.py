@@ -1,18 +1,8 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
-from ....vendor.compact.importlibx import require_optional_dependency
 from ....vendor.compact.typing_extensionsx import override
-
-if TYPE_CHECKING:
-    import yaml
-else:
-    yaml = require_optional_dependency(
-        "yaml",
-        context="scalim.dsl.by_yaml.config_parsing.effective_yaml",
-        install_name="pyyaml",
-    )
-
+from ....vendor.yamlx import yaml
 from .imports import contains_import_syntax, load_and_expand_imports
 
 __all__ = [
@@ -64,7 +54,7 @@ def dump_effective_demand_yaml(mapping: Mapping[str, Any]) -> str:
         msg = "dump_effective_demand_yaml expects effective YAML (no imports/$import); call load_effective_demand_yaml first"
         raise ValueError(msg)
 
-    dumped: str = yaml.dump(  # type: ignore[no-any-return]
+    dumped: str = yaml.dump(
         data,
         allow_unicode=True,
         sort_keys=False,

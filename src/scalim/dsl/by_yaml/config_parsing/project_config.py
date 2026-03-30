@@ -1,18 +1,9 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
-from ....vendor.compact.importlibx import require_optional_dependency
 from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import dataclass
-
-if TYPE_CHECKING:
-    import yaml
-else:
-    yaml = require_optional_dependency(
-        "yaml",
-        context="scalim.dsl.by_yaml.config_parsing.project_config",
-        install_name="pyyaml",
-    )
+from ....vendor.yamlx import yaml
 
 __all__ = [
     "YamlDslProjectConfig",

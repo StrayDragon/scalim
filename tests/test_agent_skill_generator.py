@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
-import yaml
+from scalim.vendor.yamlx import yaml
 
 from scalim_misc import agent_skill_gen
 

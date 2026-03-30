@@ -1,28 +1,11 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
-from ....vendor.compact.importlibx import require_optional_dependency
+from ....vendor.yamlx import yaml
+from ....vendor.yamlx.yaml.nodes import MappingNode, SequenceNode
 from ..schema_dsl.constants import UTF8_ENCODING
 from .error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
 from .validators.issues import ValidationIssue
-
-if TYPE_CHECKING:
-    import yaml
-    from yaml.nodes import MappingNode, SequenceNode
-else:
-    yaml = require_optional_dependency(
-        "yaml",
-        context="scalim.dsl.by_yaml.config_parsing.yaml_load",
-        install_name="pyyaml",
-    )
-    _yaml_nodes = require_optional_dependency(
-        "yaml.nodes",
-        context="scalim.dsl.by_yaml.config_parsing.yaml_load",
-        install_name="pyyaml",
-    )
-    MappingNode = _yaml_nodes.MappingNode
-    SequenceNode = _yaml_nodes.SequenceNode
-
 
 YamlLocationIndex = Dict[str, Tuple[int, int]]
 
@@ -168,7 +151,7 @@ def _index_yaml_node(
 def _compose_yaml_node(yaml_text: str) -> Optional[object]:
     return cast(
         "Optional[object]",
-        yaml.compose(yaml_text, Loader=yaml.SafeLoader),  # pyright: ignore[reportUnknownMemberType]
+        yaml.compose(yaml_text, Loader=yaml.SafeLoader),
     )  # pragma: allow-cast pyyaml compose typed narrowing
 
 

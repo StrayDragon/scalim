@@ -284,3 +284,6 @@ docs/doc/notebooks/**/*.html
 
 # Local openspec sanitization rules
 openspec/sanitize_rules.local.yaml
+
+# vendors clib
+!src/scalim/vendor/yamlx/**/*.so
