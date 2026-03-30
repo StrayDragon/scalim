@@ -104,3 +104,112 @@ if failures:
 
 print("检查通过: py36 + typing-extensions 4.1.1 + import* smoke (modules={})".format(len(modules)))
 PY
+
+SCALIM_PY36_TMP_ROOT="$tmp_root" PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src:$repo_root/packages/scalim-misc/src" python - <<'PY'
+# 说明:
+# - 该检查用于覆盖更“真实”的运行路径: YAML 解析 + resolver + 执行 + CSV 输出.
+# - 选择 `ecommerce_rank_score_report.yaml` 是因为它不依赖 openpyxl/pandas 等可选依赖,且输出可用纯 Python 计算做确定性对拍.
+
+import csv
+import os
+from decimal import Decimal
+from pathlib import Path
+
+from scalim.dsl.by_yaml import run
+from scalim_misc.demo_big_data_report.loaders import load_orders
+
+repo_root = Path(".").resolve()
+yaml_path = repo_root / "notebooks" / "marimo" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_rank_score_report.yaml"
+tmp_root = Path(str(os.environ["SCALIM_PY36_TMP_ROOT"]))
+out_path = tmp_root / "ecommerce_rank_score_report.output.csv"
+
+_ = run(
+    str(yaml_path),
+    allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
+    init_vars={"out_path_rank": str(out_path)},
+)
+
+with out_path.open("r", encoding="utf-8", newline="") as handle:
+    reader = csv.DictReader(handle)
+    actual_rows = list(reader)
+
+# expected: pure python rebuild of `ecommerce_rank_score_report.yaml` semantics
+groups = {}
+for row in load_orders():
+    region_id = int(row.get("region_id") or 0)
+    category_id = int(row.get("product_category_id") or 0)
+    quantity = int(row.get("quantity") or 0)
+    unit_price = float(row.get("unit_price") or 0.0)
+    discount_rate = float(row.get("discount_rate") or 0.0)
+
+    final_amount = float(quantity) * float(unit_price) * float(discount_rate)
+    key = (region_id, category_id)
+    acc = groups.setdefault(
+        key,
+        {"region_id": region_id, "product_category_id": category_id, "order_cnt": 0, "sum_final_amount": Decimal(0)},
+    )
+    acc["order_cnt"] = int(acc["order_cnt"]) + 1
+    acc["sum_final_amount"] = Decimal(str(acc["sum_final_amount"])) + Decimal(str(final_amount))
+
+by_region = {}
+for acc in groups.values():
+    by_region.setdefault(int(acc["region_id"]), []).append(acc)
+
+expected_rows = []
+for region_id in sorted(by_region.keys()):
+    bucket = by_region[region_id]
+    bucket.sort(key=lambda r: (Decimal(str(r["sum_final_amount"])), int(r["product_category_id"])), reverse=True)
+
+    prev_sig = None
+    last_rank = 0
+    for idx, r in enumerate(bucket):
+        row_no = idx + 1
+        sum_amount = Decimal(str(r["sum_final_amount"]))
+        sig = "num:" + format(sum_amount, "f")
+        if idx == 0:
+            last_rank = 1
+        elif prev_sig is None or sig != prev_sig:
+            last_rank += 1
+        prev_sig = sig
+        r["rank"] = int(last_rank)
+        r["row_no"] = int(row_no)
+
+    for r in bucket:
+        if int(r.get("row_no") or 0) > 2:
+            continue
+        rank_val = int(r["rank"])
+        score = Decimal(100) - (Decimal(rank_val - 1) * Decimal(3))
+        expected_rows.append(
+            {
+                "region_id": str(int(r["region_id"])),
+                "product_category_id": str(int(r["product_category_id"])),
+                "order_cnt": str(int(r["order_cnt"])),
+                "sum_final_amount": str(Decimal(str(r["sum_final_amount"]))),
+                "rank": str(int(rank_val)),
+                "row_no": str(int(r["row_no"])),
+                "score": str(score),
+            }
+        )
+
+fields = ["region_id", "product_category_id", "order_cnt", "sum_final_amount", "rank", "row_no", "score"]
+
+
+def stable_sort(rows):
+    return sorted(rows, key=lambda r: (int(r["region_id"]), int(r["row_no"]), int(r["product_category_id"])))
+
+
+actual_sorted = stable_sort(actual_rows)
+expected_sorted = stable_sort(expected_rows)
+
+if len(actual_sorted) != len(expected_sorted):
+    raise SystemExit("py36 YAML demo failed: row count mismatch (actual={} expected={})".format(len(actual_sorted), len(expected_sorted)))
+
+for idx, (a, e) in enumerate(zip(actual_sorted, expected_sorted)):
+    for f in fields:
+        if str(a.get(f)) != str(e.get(f)):
+            raise SystemExit(
+                "py36 YAML demo failed: mismatch at row {} field {}: actual={!r} expected={!r}".format(idx, f, a.get(f), e.get(f))
+            )
+
+print("检查通过: py36 YAML DSL run + CSV 输出对拍 (rows={})".format(len(actual_sorted)))
+PY

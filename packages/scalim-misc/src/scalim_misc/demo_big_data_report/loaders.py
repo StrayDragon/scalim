@@ -24,10 +24,11 @@
 """
 
 import csv
-from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+
+from scalim.vendor.dataclassesx import dataclass
 
 # ============================================================================
 # 配置常量 - 增大默认数据量用于更有效的集成测试

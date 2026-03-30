@@ -38,7 +38,7 @@ except ImportError:
         # 最小化的运行时兜底,用于在 `Python 3.6` 上进行注解求值.
         class _Literal:
             def __getitem__(self, item: Any) -> Any:
-                return object()
+                return object
 
         Literal = _Literal()
 # endregion
