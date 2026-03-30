@@ -3,34 +3,39 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-定义一份机器可读的 public API manifest 作为“稳定公开入口”的单一事实来源(SSOT),并用于 public surface 回归门禁与用户材料导入治理.
+定义 public API 边界治理规则,并在不引入“符号级硬 manifest SSOT”的前提下,确保:
+- 稳定入口清晰(约定 + 文档)
+- `__all__` 显式治理(避免隐式暴露内部实现)
+- 用户材料不得引用内部导入路径(避免把内部实现写进教程/示例/skills)
 
 ## Requirements
 
-### Requirement: a machine-readable public API manifest MUST exist and MUST be the SSOT
+### Requirement: public entrypoints MUST be explicit via `__all__` + docs
 
-系统 MUST 维护一份机器可读的 public API manifest,作为“稳定公开入口”的单一事实来源（SSOT）.
+系统 MUST 通过 `__all__` 明确 public export,并在文档中明确推荐导入入口.
 
-manifest 至少 MUST 表达：
-- 稳定公开入口模块列表（module import path）
-- 每个模块允许导出的符号白名单（等价于该模块 `__all__`）
-- 允许被 docs/skills/examples 引用的导入路径集合（curated entrypoints）
+约束来源(约定优先):
+- `docs/doc/getting-started/public-api.md` 作为推荐入口的“人类可读 SSOT”
+- `scripts/check-api-surface-governance.py --check` 作为 `__all__` 治理门禁
+- `tests/test_example_public_api_suite.py` 作为稳定入口的最小可运行回归
 
-manifest MUST 具备以下性质：
-- 可被脚本/CI 解析（例如 JSON/YAML/TOML）
-- 内容按稳定排序输出（避免漂移）
-- 变更可审计（新增/删除/重命名导出必须显式修改 manifest）
+#### Scenario: `__all__` governance prevents accidental export
+- **WHEN** 贡献者在模块中引入内部实现(例如 `_name`/`_internal`/`_*.py`)
+- **THEN** `scripts/check-api-surface-governance.py --check` MUST 立即报错
 
-#### Scenario: manifest is used to validate __all__ exports
-- **WHEN** 维护者运行 public surface gate
-- **THEN** gate MUST 按 manifest 校验每个稳定公开入口模块的 `__all__`
-- **AND** 任意缺失/新增导出 MUST fail-fast
+### Requirement: user-facing materials MUST NOT import internal paths
 
-### Requirement: public-facing materials MUST import only from curated entrypoints
-
-系统 MUST 将 docs/skills/examples 视为“用户可见材料”,并要求其导入路径仅来自 manifest 的 curated entrypoints.
+系统 MUST 将 docs/skills/examples 视为“用户可见材料”,并禁止其导入内部实现路径(约定: `._internal` 或 `._foo` 均视为内部实现).
 
 #### Scenario: internal-path imports are rejected in user-facing materials
 - **WHEN** docs/skills/examples 中出现 `_internal` 或其它未编目的内部实现导入路径
-- **THEN** gate MUST fail-fast 并提示替代的稳定导入路径
+- **THEN** `scripts/check-user-material-import-boundaries.py --check` MUST 立即报错 并提示替代的稳定导入路径
 
+### Requirement: hard manifest SSOT MUST NOT be required
+
+系统 MUST NOT 要求维护者手工维护“符号级 manifest”才能通过 public API 治理门禁(维护成本高,且容易把简单约定复杂化).
+
+#### Scenario: public API gates do not rely on a symbol-level manifest
+- **WHEN** 贡献者为 public facade 模块调整 `__all__`(新增/删除/重命名符号)
+- **THEN** 治理门禁 MUST 仅依赖 `__all__` 治理脚本 + 示例回归通过
+- **AND** 不应要求同步更新某个符号级 manifest 文件才能通过 CI

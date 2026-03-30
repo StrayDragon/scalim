@@ -259,7 +259,7 @@ Sources:
 ### `public-api-manifest`
 - Title: public-api-manifest Specification
 - Source: [spec.md](#code=openspec/specs/public-api-manifest/spec.md)
-- Summary: **状态: ✅ 已实现** 定义一份机器可读的 public API manifest 作为“稳定公开入口”的单一事实来源(SSOT),并用于 public surface 回归门禁与用户材料导入治理.
+- Summary: **状态: ✅ 已实现** 定义 public API 边界治理规则,并在不引入“符号级硬 manifest SSOT”的前提下,确保: - 稳定入口清晰(约定 + 文档) - `__all__` 显式治理(避免隐式暴露内部实现) - 用户材料不得引用内部导入路径(避免把内部实现写进教程/示例/skills)
 
 ### `public-api-surface-governance`
 - Title: public-api-surface-governance Specification

@@ -4,12 +4,6 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, FrozenSet
 
-from scalim_misc.examples.public_api._coverage import (
-    check_public_all_coverage,
-    coverage_failure_summary,
-    coverage_to_details,
-)
-from scalim_misc.examples.public_api._manifest import load_public_api_manifest
 from scalim.dsl import by_yaml as api
 from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -17,16 +11,6 @@ from scalim_misc.examples.public_api._fixtures import get_preload_counter_calls,
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
-
-_MANIFEST = load_public_api_manifest(__file__)
-_STABLE = _MANIFEST.stable_modules
-
-_COVERED_PUBLIC_ALL = _STABLE["scalim.dsl.by_yaml"]
-_COVERED_WORKFLOW_ALL = _STABLE["scalim.dsl.by_yaml.workflow"]
-_COVERED_WORKFLOW_TYPES_ALL = _STABLE["scalim.dsl.by_yaml.workflow_types"]
-_COVERED_WORKFLOW_PATHS_ALL = _STABLE["scalim.dsl.by_yaml.workflow_paths"]
-_COVERED_SPEC_IR_ALL = _STABLE["scalim.spec.ir"]
-_COVERED_WORKFLOW_LOADERS_ALL = _STABLE["scalim.workflow.loaders"]
 
 _ALLOWED_MODULES: FrozenSet[str] = frozenset(["scalim_misc.examples.public_api._fixtures"])
 _EXPECTED_WORKFLOW_RUNS = 2
@@ -37,38 +21,36 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def run_public_api_dsl_by_yaml() -> ExampleResult:
-    coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
-    if not coverage.ok:
-        return ExampleResult(
-            example_id=_EXAMPLE_ID,
-            passed=False,
-            kind=EXAMPLE_KIND_ORACLE,
-            summary=coverage_failure_summary(coverage),
-            details=coverage_to_details(coverage),
-        )
+def _touch_public_all(module: Any) -> int:
+    declared_all = getattr(module, "__all__", ())
+    for name in declared_all:
+        getattr(module, name)
+    return len(declared_all)
 
+
+def run_public_api_dsl_by_yaml() -> ExampleResult:
+    from scalim.dsl.by_yaml import tools as tools_api
     from scalim.dsl.by_yaml import workflow as workflow_api
     from scalim.dsl.by_yaml import workflow_paths as workflow_paths_api
     from scalim.dsl.by_yaml import workflow_types as workflow_types_api
     from scalim.spec import ir as spec_ir_api
     from scalim.workflow import loaders as workflow_loaders_api
 
-    for mod, covered in (
-        (workflow_api, _COVERED_WORKFLOW_ALL),
-        (workflow_types_api, _COVERED_WORKFLOW_TYPES_ALL),
-        (workflow_paths_api, _COVERED_WORKFLOW_PATHS_ALL),
-        (spec_ir_api, _COVERED_SPEC_IR_ALL),
-        (workflow_loaders_api, _COVERED_WORKFLOW_LOADERS_ALL),
-    ):
-        mod_coverage = check_public_all_coverage(mod, covered=covered)
-        if not mod_coverage.ok:
+    all_touched: Dict[str, Any] = {}
+    for mod in (api, tools_api, workflow_api, workflow_paths_api, workflow_types_api, spec_ir_api, workflow_loaders_api):
+        try:
+            all_touched[str(getattr(mod, "__name__", type(mod).__name__))] = _touch_public_all(mod)
+        except Exception as exc:  # noqa: BLE001
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
                 passed=False,
                 kind=EXAMPLE_KIND_ORACLE,
-                summary=coverage_failure_summary(mod_coverage),
-                details=coverage_to_details(mod_coverage),
+                summary="public __all__ 解析失败: {}: {} {}".format(
+                    getattr(mod, "__name__", type(mod).__name__),
+                    type(exc).__name__,
+                    exc,
+                ),
+                details={"module": getattr(mod, "__name__", type(mod).__name__), "exc_type": type(exc).__name__, "message": str(exc)},
             )
 
     symbols = {name: getattr(api, name) for name in api.__all__}
@@ -117,6 +99,9 @@ workflow:
         _write_text(workflow_path, workflow_yaml)
 
         init_vars = {"order_ids": []}
+
+        tools_output_config = tools_api.load_output_config(str(demand_path))
+        base_module_path = tools_api.derive_base_module_path(str(demand_path), sys_path=[str(tmp)], cwd=str(tmp))
 
         compilation: api.Compilation = api.compile(str(demand_path), allowed_modules=_ALLOWED_MODULES, init_vars=init_vars)
         if not compilation.demand_ir.fields:
@@ -187,6 +172,8 @@ workflow:
             "workflow_outcomes": wf.outcomes,
             "preload_calls": preload_calls,
             "errors": errors,
+            "touched_public_all": all_touched,
+            "tools": {"base_module_path": base_module_path, "output_fields": tools_output_config.get("output_fields")},
         }
         return ExampleResult(
             example_id=_EXAMPLE_ID,
@@ -208,9 +195,8 @@ def _(mo):
         # example_public_api_suite / ch130_public_api_dsl_by_yaml
 
         本章目标:
-        - 覆盖 `scalim.dsl.by_yaml.__all__` 的最小可运行示例
-        - 演示 `compile/run/run_workflow` + overrides + allowlist
-        - 覆盖 curated public entrypoints: workflow helpers / `scalim.spec.ir` / `scalim.workflow.loaders`
+        - 最小可运行示例: `compile/run/run_workflow` + overrides + allowlist
+        - 覆盖稳定入口的基础可用性: 相关模块可 import 且其 `__all__` 可解析
 
         SSOT:
         - `notebooks/marimo/example_public_api_suite/chapters/ch130_public_api_dsl_by_yaml.py::run_public_api_dsl_by_yaml`

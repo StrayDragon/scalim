@@ -25,7 +25,7 @@
 
 - [ ] 5.1 将 `InMemoryRows`(及其必要配套类型)提升到稳定公开导入路径(优先 `src/scalim/sinks/__init__.py` 的显式 `__all__` 白名单)。
 - [ ] 5.2 替换 workflow/execution 对内部实现路径(`sinks._internal.*`)的直接依赖,保持行为等价。
-- [ ] 5.3 更新 SSOT: `openspec/ssot/public_api_manifest.json`(若导出面变化),并通过 `just check-public-api-manifest` 验收。
+- [ ] 5.3 更新 public API 约定(如入口变化):更新 `docs/doc/getting-started/public-api.md`,并通过 `scripts/check-api-surface-governance.py` + `scripts/check-user-material-import-boundaries.py` + `tests/test_example_public_api_suite.py` 验收。
 
 ## 6. Execution contracts split (reduce run_ir hotspot)
 
@@ -37,4 +37,3 @@
 - [ ] 7.1 运行 `just openspec-check`(sanitize + `openspec validate --all --strict --no-interactive`)确保工件结构与脱敏可发布。
 - [ ] 7.2 实现完成后运行 `openspec sync --change c0-reduce-runtime-entropy` 将本 change 的增量 specs 同步到 `openspec/specs/**/spec.md`(SSOT)。
 - [ ] 7.3 运行 `just quick-qa-only-py` 或 `just qa` 做全量回归,确保 lint/typecheck/tests 与 drift gates 全通过。
-

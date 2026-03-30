@@ -2,12 +2,6 @@ import marimo
 
 from typing import Any, Dict
 
-from scalim_misc.examples.public_api._coverage import (
-    check_public_all_coverage,
-    coverage_failure_summary,
-    coverage_to_details,
-)
-from scalim_misc.examples.public_api._manifest import load_public_api_manifest
 from scalim import execution as api
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryRowSink
@@ -18,21 +12,8 @@ __generated_with = "0.20.2"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "example_public_api_suite/ch160_public_api_execution"
 
-_MANIFEST = load_public_api_manifest(__file__)
-_COVERED_PUBLIC_ALL = _MANIFEST.stable_modules["scalim.execution"]
-
 
 def run_public_api_execution() -> ExampleResult:
-    coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
-    if not coverage.ok:
-        return ExampleResult(
-            example_id=_EXAMPLE_ID,
-            passed=False,
-            kind=EXAMPLE_KIND_ORACLE,
-            summary=coverage_failure_summary(coverage),
-            details=coverage_to_details(coverage),
-        )
-
     symbols = {name: getattr(api, name) for name in api.__all__}
     demand_ir = build_minimal_public_api_ir()
     plan = PlanBuilder(demand_ir).build()
@@ -65,8 +46,7 @@ def _(mo):
         # example_public_api_suite / ch160_public_api_execution
 
         本章目标:
-        - 覆盖 `scalim.execution.__all__` 的最小可运行示例
-        - 演示 `ScalimEngine` 创建/运行/内存 sink
+        - 最小可运行示例: `ScalimEngine` 创建/运行/内存 sink
 
         SSOT:
         - `notebooks/marimo/example_public_api_suite/chapters/ch160_public_api_execution.py::run_public_api_execution`

@@ -5,16 +5,15 @@
     - 贡献者:需要扩展/治理 public API,避免“看起来能 import 但其实是内部实现细节”
 
 本仓库将“public API”定义为:用户在 Python 侧可稳定导入、并被回归门禁覆盖的一组 `scalim.*` 模块与符号。
-核心约束来自三处(SSOT):
+核心约束来自三处(约定优先):
 
-- public API manifest(模块+符号 SSOT): `openspec/ssot/public_api_manifest.json`
 - `__all__` 治理规则(模块内符号级): [`scripts/check-api-surface-governance.py`](#code=scripts/check-api-surface-governance.py)
-- manifest 回归门禁(符号级): `scripts/check-public-api-manifest.py` + [`tests/test_public_api_surface_hardening.py`](#code=tests/test_public_api_surface_hardening.py)
+- 用户材料导入边界(文档/示例/skills): [`scripts/check-user-material-import-boundaries.py`](#code=scripts/check-user-material-import-boundaries.py)
 - 示例覆盖(可交互/可对拍): `notebooks/marimo/example_public_api_suite/`(见 [主线教程](demo-big-data-report.md))
 
 ## 1) 推荐导入（Tier 1:稳定入口）
 
-下表中的模块被 **明确白名单化**,并要求 `__all__` 与期望集合严格一致(失败即 gate)。
+下表中的模块是我们在文档中明确推荐的稳定入口(约定):优先从这些 facade 模块导入,避免引用内部实现细节。
 
 | 模块 | 说明 | 常见场景 |
 | --- | --- | --- |
@@ -101,8 +100,8 @@ from scalim.sinks import CSVSink, InMemoryRowSink
 
 ```bash
 python3 scripts/check-api-surface-governance.py --check
-python3 scripts/check-public-api-manifest.py --check
-pytest -q tests/test_public_api_surface_hardening.py --no-cov
+python3 scripts/check-user-material-import-boundaries.py --check
+pytest -q tests/test_example_public_api_suite.py --no-cov
 just qa
 ```
 
@@ -116,10 +115,7 @@ just qa
 - 优点:YAML DSL 运行入口(`scalim.dsl.by_yaml`)与 workflow/IR 的稳定导入路径已明确拆出
 - 代价:仍有部分 Tier 2 模块导出面偏大/偏“平铺”,但它们不在 curated 白名单内；若需依赖建议自行 pin 版本并维护回归
 
-导出规模与白名单以 SSOT 与门禁为准,不在文档里维护数值快照:
-
-- SSOT: `openspec/ssot/public_api_manifest.json`
-- Gate: `python3 scripts/check-public-api-manifest.py --check`
+导出规模不在文档里维护数值快照:以 `__all__` 治理规则 + 示例覆盖为准。
 
 ## 5) 代价与优化方向（Brainstorming）
 

@@ -503,10 +503,6 @@ check-no-print:
 check-api-surface-governance:
     uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check
 
-# 检查: public API manifest 与运行时 `__all__` 是否一致
-check-public-api-manifest:
-    uv {{ UV_OPTIONS }} run python scripts/check-public-api-manifest.py --check
-
 # 检查: user-facing materials 不得引用内部/不安全导入路径
 check-user-material-import-boundaries:
     uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check
@@ -520,7 +516,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-public-api-manifest check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

@@ -2,12 +2,6 @@ import marimo
 
 from typing import Any, Dict
 
-from scalim_misc.examples.public_api._coverage import (
-    check_public_all_coverage,
-    coverage_failure_summary,
-    coverage_to_details,
-)
-from scalim_misc.examples.public_api._manifest import load_public_api_manifest
 from scalim.events import EVENT_PIPELINE_END, EVENT_PIPELINE_START
 from scalim import ob as api
 from scalim_misc.examples._types import EXAMPLE_KIND_SMOKE, ExampleResult
@@ -16,21 +10,8 @@ __generated_with = "0.20.2"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "example_public_api_suite/ch170_public_api_ob"
 
-_MANIFEST = load_public_api_manifest(__file__)
-_COVERED_PUBLIC_ALL = _MANIFEST.stable_modules["scalim.ob"]
-
 
 def run_public_api_ob() -> ExampleResult:
-    coverage = check_public_all_coverage(api, covered=_COVERED_PUBLIC_ALL)
-    if not coverage.ok:
-        return ExampleResult(
-            example_id=_EXAMPLE_ID,
-            passed=False,
-            kind=EXAMPLE_KIND_SMOKE,
-            summary=coverage_failure_summary(coverage),
-            details=coverage_to_details(coverage),
-        )
-
     symbols = {name: getattr(api, name) for name in api.__all__}
     ob = api.Observability()
     manager = ob.build_manager(mode="capture")
@@ -61,8 +42,7 @@ def _(mo):
         # example_public_api_suite / ch170_public_api_ob
 
         本章目标:
-        - 覆盖 `scalim.ob.__all__` 的最小可运行示例
-        - 演示 capture manager + 事件序列断言
+        - 最小可运行示例: capture manager + 事件序列断言
 
         SSOT:
         - `notebooks/marimo/example_public_api_suite/chapters/ch170_public_api_ob.py::run_public_api_ob`

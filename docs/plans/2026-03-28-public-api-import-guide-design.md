@@ -12,8 +12,8 @@ This design captures the agreed direction to add a single, user-facing documenta
 
 The repo has explicit public API governance via:
 
-- curated Tier 1 whitelist + strict `__all__` assertions: `tests/test_public_api_surface_hardening.py`
 - module `__all__` governance rules (internal modules must not export): `scripts/check-api-surface-governance.py`
+- user-facing materials import boundaries (docs/notebooks/skills): `scripts/check-user-material-import-boundaries.py`
 - interactive + headless coverage suite: `notebooks/marimo/example_public_api_suite/`
 
 However, docs lacked a single “import guide” page, and advanced modules (`events`/`sinks`) have a relatively large, flat export surface that increases long-term governance cost.
@@ -55,4 +55,3 @@ The page should include:
 
 - `just qa`
 - `just openspec-check`
-
