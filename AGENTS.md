@@ -17,6 +17,9 @@
 - **Doc governance**:
   - Any file containing `.gen.` is generated; do not edit by hand. Edit SSOT and run `just gen-docs` (or the referenced generator).
   - Any `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->` block is injected; do not edit inside the block. Edit SSOT and run `just gen-docs`.
+- **Dev artifacts**:
+  - Rebuildable sample data / reports MUST be generated under `.tmp/` and MUST NOT be committed (e.g. viz examples under `.tmp/artifacts/scalim-viz/`).
+  - Known legacy exception (do not rename yet): `src/scalim/_project_constants.py` and `frontend/**/src/generated/project_constants.ts` are generated but not suffixed with `.gen.`.
 - **Skills extraction markers**: do not remove `# region SCALIM-SKILL:<tag>` / `# endregion` markers (used for automated skill example extraction).
 - **Privacy**: do not quote, enumerate, or summarize the contents of `.tmp/known-outer-paths-using-this-package.txt`; only reference the file path.
 

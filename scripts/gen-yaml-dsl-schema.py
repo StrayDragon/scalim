@@ -1,43 +1,80 @@
+import argparse
+import difflib
+import tempfile
 from pathlib import Path
+from typing import Iterable, List, Optional, Tuple
 
 from scalim.dsl.by_yaml.schema_dsl.builder import write_demand_schema, write_workflow_schema
-from scalim.dsl.by_yaml.schema_dsl.doc_texts import SOURCE_FIELD_EXTRACT_MD
-from scalim_misc.markdown_inject import InjectBlockSpec, replace_markdown_injected_block
 
 
-USER_GUIDE_SOURCE_FIELD_EXTRACT_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-source-field-extract -->"
-USER_GUIDE_SOURCE_FIELD_EXTRACT_END = "<!-- END AUTOGEN:yaml-dsl-source-field-extract -->"
+def _read_text(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")
 
 
-def sync_yaml_dsl_user_guide(repo_root: Path) -> None:
-    user_guide = repo_root / "docs" / "doc" / "yaml-dsl" / "user-guide.md"
-    if not user_guide.exists():
-        raise FileNotFoundError(str(user_guide))
-
-    original = user_guide.read_text(encoding="utf-8")
-    updated = replace_markdown_injected_block(
-        original,
-        spec=InjectBlockSpec(
-            begin_marker=USER_GUIDE_SOURCE_FIELD_EXTRACT_BEGIN,
-            end_marker=USER_GUIDE_SOURCE_FIELD_EXTRACT_END,
-            label=str(user_guide),
-        ),
-        content=SOURCE_FIELD_EXTRACT_MD,
+def _diff(a: str, b: str, a_name: str, b_name: str) -> str:
+    return "\n".join(
+        difflib.unified_diff(
+            a.splitlines(),
+            b.splitlines(),
+            fromfile=a_name,
+            tofile=b_name,
+            lineterm="",
+        )
     )
-    if updated != original:
-        user_guide.write_text(updated, encoding="utf-8")
 
 
-def main() -> int:
+def _check_exact(path: Path, expected: str) -> Tuple[bool, str]:
+    got = _read_text(path)
+    if got == expected:
+        return True, ""
+    return False, _diff(got, expected, str(path), str(path) + " (expected)")
+
+
+def main(argv: Optional[Iterable[str]] = None) -> int:
+    p = argparse.ArgumentParser(description="生成 YAML DSL schema (`*.gen.json`) 并提供漂移检查.")
+    p.add_argument("--check", action="store_true", help="仅检查漂移,不写入文件.")
+    args = p.parse_args(list(argv) if argv is not None else None)
+
     repo_root = Path(__file__).resolve().parents[1]
     schema_dir = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema"
     demand_path = schema_dir / "demand.gen.json"
     workflow_path = schema_dir / "workflow.gen.json"
 
-    write_demand_schema(demand_path)
-    write_workflow_schema(workflow_path)
-    sync_yaml_dsl_user_guide(repo_root)
+    if not args.check:
+        schema_dir.mkdir(parents=True, exist_ok=True)
+        write_demand_schema(demand_path)
+        write_workflow_schema(workflow_path)
+        return 0
 
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_schema_dir = Path(tmpdir)
+        tmp_demand = tmp_schema_dir / "demand.gen.json"
+        tmp_workflow = tmp_schema_dir / "workflow.gen.json"
+        write_demand_schema(tmp_demand)
+        write_workflow_schema(tmp_workflow)
+
+        expected = [
+            (demand_path, tmp_demand.read_text(encoding="utf-8")),
+            (workflow_path, tmp_workflow.read_text(encoding="utf-8")),
+        ]
+
+    failed: List[Tuple[Path, str]] = []
+    for path, expected_text in expected:
+        ok, diff = _check_exact(path, expected_text)
+        if not ok:
+            failed.append((path, diff or "(diff unavailable)"))
+
+    if failed:
+        print("检测到 YAML DSL `schema` 漂移:")
+        for path, diff in failed:
+            print("\n--- {}".format(str(path)))
+            print(diff)
+        print("\n修复: 运行 `just gen-yaml-dsl-schema`")
+        return 1
+
+    print("通过: YAML DSL `schema` 一致")
     return 0
 
 

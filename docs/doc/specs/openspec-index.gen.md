@@ -99,7 +99,7 @@ Sources:
 ### `generated-artifacts-manifest`
 - Title: generated-artifacts-manifest Specification
 - Source: [spec.md](#code=openspec/specs/generated-artifacts-manifest/spec.md)
-- Summary: TBD - created by archiving change c60-core-code-quality-maintainability. Update Purpose after archive.
+- Summary: 统一“生成物 / 注入区块”的约定与门禁,避免引入额外的 manifest SSOT 与重复维护成本.
 
 ### `hooks-events`
 - Title: hooks-events Specification

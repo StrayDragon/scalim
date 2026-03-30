@@ -100,15 +100,15 @@ gen-yaml-dsl-editor-schema: gen-yaml-dsl-schema
 
 # 检查: 项目常量生成物是否有 drift
 project-constants-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only project-constants
+    uv {{ UV_OPTIONS }} run python scripts/gen-project-constants.py --check
 
 # 检查: YAML DSL schema 生成物是否有 drift (含 canonical 文本形式)
 schema-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only yaml-dsl-schema
+    uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-schema.py --check
+    uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-editor-schema.py --check
 
-# 检查: 受控生成物漂移 (SSOT=`generated artifacts manifest`)
-generated-artifacts-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check
+# 检查: 受控生成物漂移 (约定: `*.gen.*` + injected blocks)
+generated-artifacts-drift-check: project-constants-drift-check schema-drift-check validate-agent-skill marimo-coverage-drift-check docs-drift-check
 
 # 检查: 文档治理一致性(SSOT 入口/漂移源头)
 doc-governance-check:
@@ -207,7 +207,7 @@ gen-viz-schedule-plan RUN_DIR="":
 
 # 检查 Agent Skill 数据是否合法
 validate-agent-skill:
-    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only agent-skill
+    uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
 
 # 检查: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认 dry-run; 需要 YES 才执行)
 openspec-sanitize CONFIRM="":
@@ -319,7 +319,7 @@ gen-marimo-coverage:
 
 # 检查: notebooks/marimo 覆盖报告是否有 drift
 marimo-coverage-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only marimo-coverage
+    uv {{ UV_OPTIONS }} run python scripts/gen-marimo-coverage.py --check
 
 # 生成: 文档站点受控生成物(含 injected blocks)
 gen-docs:
@@ -327,7 +327,7 @@ gen-docs:
 
 # 检查: docs 生成物是否有 drift
 docs-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only docs-site
+    uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
 
 # 生成: 所有需要生成的数据
 gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-agent-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
