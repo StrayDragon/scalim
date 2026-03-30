@@ -41,6 +41,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/dense-batch-context/spec.md)
 - Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
 
+### `dependency-free-console-reports`
+- Title: dependency-free-console-reports Specification
+- Source: [spec.md](#code=openspec/specs/dependency-free-console-reports/spec.md)
+- Summary: TBD - created by archiving change c2-remove-literich. Update Purpose after archive.
+
 ### `derived-outputs`
 - Title: derived-outputs Specification
 - Source: [spec.md](#code=openspec/specs/derived-outputs/spec.md)
@@ -310,6 +315,11 @@ Sources:
 - Title: testing-quality Specification
 - Source: [spec.md](#code=openspec/specs/testing-quality/spec.md)
 - Summary: **状态: ✅ 已实现** 定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现.
+
+### `tests-domain-suites`
+- Title: tests-domain-suites Specification
+- Source: [spec.md](#code=openspec/specs/tests-domain-suites/spec.md)
+- Summary: TBD - created by archiving change c2-tests-domain-suites. Update Purpose after archive.
 
 ### `workflow-cache-pool`
 - Title: workflow-cache-pool Specification

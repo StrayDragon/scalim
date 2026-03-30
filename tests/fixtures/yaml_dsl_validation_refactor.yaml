@@ -1,7 +1,7 @@
 name: 123
 main_source:
   source_id: 456
-  loader: tests.conftest.mock_loader
+  loader: tests.fixtures.mock_loaders.mock_loader
 sources: {}
 outputs:
   - name: detail

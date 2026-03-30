@@ -1,10 +1,6 @@
 import pytest
 
 
-def mock_loader(*_args, **_kwargs):
-    return {}
-
-
 @pytest.fixture(scope="module")
 def example_report_ir_module():
     from scalim_misc import example_report_ir

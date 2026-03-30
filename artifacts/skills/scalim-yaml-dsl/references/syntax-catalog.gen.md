@@ -274,6 +274,8 @@
   - Observability DSL 配置与独立开关
   - RelationObserver 统计与报告
   - adaptive 调度决策可观测性
+  - console reports in observability presets MUST follow dependency-free-console-reports
+  - changing console formatting MUST NOT change metrics semantics
 ### `output-mode-api`
 - Source: `openspec/specs/output-mode-api/spec.md`
 - Purpose: 定义运行时输出语义为“显式 sink 驱动”: 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配. 同时要求稳定的执行元数据(例如 `ExecutionResult.total_rows`)以及异常路径的 best-effort 资源清理.

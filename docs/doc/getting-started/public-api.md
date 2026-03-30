@@ -108,7 +108,7 @@ from scalim.sinks.rows import InMemoryRows, InMemoryRowsSink
 ```bash
 python3 scripts/check-api-surface-governance.py --check
 python3 scripts/check-user-material-import-boundaries.py --check
-pytest -q tests/test_example_public_api_suite.py --no-cov
+pytest -q tests/public_api/test_example_public_api_suite.py --no-cov
 just qa
 ```
 

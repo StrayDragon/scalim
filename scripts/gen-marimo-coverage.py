@@ -144,8 +144,8 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
 
     gate_label = "just examples"
     gate_ok = _justfile_has_examples_recipe(root)
-    pytest_demo_chapters = root / "tests" / "test_demo_big_data_report_chapters.py"
-    pytest_public_api = root / "tests" / "test_example_public_api_suite.py"
+    pytest_demo_chapters = root / "tests" / "integration" / "test_demo_big_data_report_chapters.py"
+    pytest_public_api = root / "tests" / "public_api" / "test_example_public_api_suite.py"
 
     # --- 入口页 ---
     hubs = [
