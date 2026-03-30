@@ -219,6 +219,9 @@ def _example_priority(change_id: str) -> int:
     cid = change_id.lower()
     if "normalize" in cid:
         return 1
+    # `resources.books` / workflow IO 收敛：属于 outputs/IO authoring surface 的核心变化。
+    if "books-resources" in cid or "io-books-resources" in cid:
+        return 5
     # 字段级：`extract` / `value_cast` / 显式 `decimal` 等都归为同一档（`field-level authoring surface`）。
     if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
         return 2
@@ -247,6 +250,19 @@ def _example_priority(change_id: str) -> int:
 
 def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
     cid = change_id.lower()
+    if "books-resources" in cid or "io-books-resources" in cid:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "resources:",
+            "  books:",
+            "    report: {kind: xlsx_file, path: {$init_var: out_xlsx}}",
+            "outputs_defaults:",
+            "  to: {book: report}",
+            "outputs:",
+            "  - id: orders",
+            "    to: {sheet: orders}",
+            "    fields: [order_id, amount]",
+        ]
     if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
         return [
             "# 示例为提案语义示意（不保证可直接运行）",
@@ -605,19 +621,22 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
                 continue
             toks = re.findall(r"`([^`]+)`", cleaned)
             tok = next((t for t in toks if _tok_is_surface(t)), None)
-            if tok and (
-                "不兼容" in cleaned
-                or "不再支持" in cleaned
-                or "已移除" in cleaned
-                or "直接失败" in cleaned
-                or "fail-fast" in cleaned.lower()
-                or "runtime" in cleaned.lower()
-                or "旧写法" in cleaned
-                or "旧语法" in cleaned
-                or "旧字段" in cleaned
-                or "write_to" in tok.lower()
-            ):
-                instructions.append("不要再用 `{}`（已移除/不兼容）。".format(tok))
+            if tok:
+                if (
+                    "不兼容" in cleaned
+                    or "不再支持" in cleaned
+                    or "已移除" in cleaned
+                    or "直接失败" in cleaned
+                    or "fail-fast" in cleaned.lower()
+                    or "runtime" in cleaned.lower()
+                    or "旧写法" in cleaned
+                    or "旧语法" in cleaned
+                    or "旧字段" in cleaned
+                    or "write_to" in tok.lower()
+                ):
+                    instructions.append("不要再用 `{}`（已移除/不兼容）。".format(tok))
+                else:
+                    instructions.append("不要再用 `{}`（已移除）。".format(tok))
                 continue
         instructions.append("按提案升级：{}。".format(cleaned.rstrip("。")))
 
@@ -765,11 +784,45 @@ def _render_notes(
         seen.add(item)
         breaking_uniq.append(item)
 
+    # 若同一迁移点同时出现“把 old 改为 new”与“不要再用 old”，保留前者即可。
+    replaced_old_tokens: Set[str] = set()
+    for item in breaking_uniq:
+        match = re.search(r"^把 `([^`]+)` 改为 `([^`]+)`", item)
+        if match:
+            replaced_old_tokens.add(match.group(1))
+    if replaced_old_tokens:
+        filtered: List[str] = []
+        for item in breaking_uniq:
+            match = re.search(r"^不要再用 `([^`]+)`", item)
+            if match and match.group(1) in replaced_old_tokens:
+                continue
+            filtered.append(item)
+        breaking_uniq = filtered
+
     if not breaking_uniq:
         if new_changes:
             breaking_uniq = ["无（本版本 archived 提案未声明不兼容/迁移点）。"]
         else:
             breaking_uniq = ["无（该 tag 未包含 archived OpenSpec 提案，无法从提案文本抽取迁移点）。"]
+
+    # 优先展示“你要改成什么”的迁移指令，其次再是“不要再用”的移除提示。
+    if len(breaking_uniq) > 1:
+        scored: List[Tuple[int, int, str]] = []
+        for idx, item in enumerate(breaking_uniq):
+            s = item.strip()
+            score = 0
+            if s.startswith("把 "):
+                score += 100
+            if any(k in s for k in ("改为", "改成", "替换为", "迁移为", "升级为")):
+                score += 80
+            if s.startswith("不要再用 "):
+                score += 60
+            if "fail-fast" in s.lower() or "直接失败" in s:
+                score += 20
+            if any(k in s for k in ("outputs", "workflow", "resources", "yaml")):
+                score += 10
+            scored.append((score, -idx, item))
+        breaking_uniq = [it for _score, _neg_idx, it in sorted(scored, reverse=True)]
 
     for item in breaking_uniq[:breaking_max]:
         normalized = item.strip().rstrip("。").rstrip(".")
@@ -908,8 +961,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         has_yaml = any(c.is_yaml for c in changes)
         include_example = has_yaml and any(c.example_priority < 99 for c in changes)
-        highlight_max = 2 if include_example else 3
-        breaking_max = 2 if include_example else 3
+        highlight_max = 3
+        breaking_max = 3
 
         commits = _git_log_oneline(previous_tag, tag, root=root)
         notes = _render_notes(
