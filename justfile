@@ -100,70 +100,15 @@ gen-yaml-dsl-editor-schema: gen-yaml-dsl-schema
 
 # 检查: 项目常量生成物是否有 drift
 project-constants-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/gen-project-constants.py --check
+    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only project-constants
 
 # 检查: YAML DSL schema 生成物是否有 drift (含 canonical 文本形式)
-schema-drift-check: gen-yaml-dsl-editor-schema
-    #!/usr/bin/env bash
-    set -e
-    if ! git diff --exit-code -- src/scalim/dsl/by_yaml/schema/demand.gen.json >/dev/null; then
-        echo ""
-        echo "YAML DSL schema drift detected:"
-        echo "  - src/scalim/dsl/by_yaml/schema/demand.gen.json has uncommitted changes"
-        echo ""
-        echo "Fix:"
-        echo "  - commit the updated generated schema file"
-        exit 1
-    fi
-    if ! git diff --exit-code -- src/scalim/dsl/by_yaml/schema/workflow.gen.json >/dev/null; then
-        echo ""
-        echo "YAML DSL schema drift detected:"
-        echo "  - src/scalim/dsl/by_yaml/schema/workflow.gen.json has uncommitted changes"
-        echo ""
-        echo "Fix:"
-        echo "  - commit the updated generated schema file"
-        exit 1
-    fi
-    if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json >/dev/null; then
-        echo ""
-        echo "YAML DSL editor schema drift detected:"
-        echo "  - frontend/scalim-yaml-dsl-editor/public/schema/demand.gen.json has uncommitted changes"
-        echo ""
-        echo "Fix:"
-        echo "  - run: just gen-yaml-dsl-editor-schema"
-        echo "  - commit the updated frontend schema file"
-        exit 1
-    fi
-    if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/src/schema/demand.gen.json >/dev/null; then
-        echo ""
-        echo "YAML DSL editor schema drift detected:"
-        echo "  - frontend/scalim-yaml-dsl-editor/src/schema/demand.gen.json has uncommitted changes"
-        echo ""
-        echo "Fix:"
-        echo "  - run: just gen-yaml-dsl-editor-schema"
-        echo "  - commit the updated frontend schema file"
-        exit 1
-    fi
-    if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/public/schema/workflow.gen.json >/dev/null; then
-        echo ""
-        echo "YAML DSL editor schema drift detected:"
-        echo "  - frontend/scalim-yaml-dsl-editor/public/schema/workflow.gen.json has uncommitted changes"
-        echo ""
-        echo "Fix:"
-        echo "  - run: just gen-yaml-dsl-editor-schema"
-        echo "  - commit the updated frontend schema file"
-        exit 1
-    fi
-    if ! git diff --exit-code -- frontend/scalim-yaml-dsl-editor/src/schema/workflow.gen.json >/dev/null; then
-        echo ""
-        echo "YAML DSL editor schema drift detected:"
-        echo "  - frontend/scalim-yaml-dsl-editor/src/schema/workflow.gen.json has uncommitted changes"
-        echo ""
-        echo "Fix:"
-        echo "  - run: just gen-yaml-dsl-editor-schema"
-        echo "  - commit the updated frontend schema file"
-        exit 1
-    fi
+schema-drift-check:
+    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only yaml-dsl-schema
+
+# 检查: 受控生成物漂移 (SSOT=`generated artifacts manifest`)
+generated-artifacts-drift-check:
+    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check
 
 # 检查: 文档治理一致性(SSOT 入口/漂移源头)
 doc-governance-check:
@@ -258,7 +203,7 @@ gen-viz-schedule-plan RUN_DIR="":
 
 # 检查 Agent Skill 数据是否合法
 validate-agent-skill:
-    uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
+    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only agent-skill
 
 # 检查: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认 dry-run; 需要 YES 才执行)
 openspec-sanitize CONFIRM="":
@@ -370,7 +315,7 @@ gen-marimo-coverage:
 
 # 检查: notebooks/marimo 覆盖报告是否有 drift
 marimo-coverage-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/gen-marimo-coverage.py --check
+    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only marimo-coverage
 
 # 生成: 文档站点受控生成物(含 injected blocks)
 gen-docs:
@@ -378,7 +323,7 @@ gen-docs:
 
 # 检查: docs 生成物是否有 drift
 docs-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
+    uv {{ UV_OPTIONS }} run python scripts/check-generated-artifacts.py --check --only docs-site
 
 # 生成: 所有需要生成的数据
 gen: gen-project-constants gen-yaml-dsl-schema gen-yaml-dsl-editor-schema gen-agent-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
@@ -526,6 +471,30 @@ report-dynattr:
 check-dynattr:
     uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py --check
 
+# 报告: hotspot module 体量基线
+report-module-size:
+    uv {{ UV_OPTIONS }} run python scripts/check-module-size.py
+
+# 检查: hotspot module 体量护栏(避免继续增长)
+check-module-size:
+    uv {{ UV_OPTIONS }} run python scripts/check-module-size.py --check
+
+# 报告: core event dispatch map 完整性基线
+report-dispatch-map-completeness:
+    uv {{ UV_OPTIONS }} run python scripts/check-dispatch-map-completeness.py
+
+# 检查: core event dispatch map 完整性(新增事件需显式加入/忽略)
+check-dispatch-map-completeness:
+    uv {{ UV_OPTIONS }} run python scripts/check-dispatch-map-completeness.py --check
+
+# 报告: print(...) 使用基线
+report-print-usage:
+    uv {{ UV_OPTIONS }} run python scripts/check-no-print.py
+
+# 检查: runtime 禁止 print(...)
+check-no-print:
+    uv {{ UV_OPTIONS }} run python scripts/check-no-print.py --check
+
 # 检查: public API surface governance (`__all__` 约束 + 内部模块封堵)
 check-api-surface-governance:
     uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check
@@ -547,7 +516,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-api-surface-governance check-public-api-manifest check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check project-constants-drift-check schema-drift-check docs-drift-check validate-agent-skill marimo-coverage-drift-check doc-governance-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-public-api-manifest check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

@@ -27,7 +27,7 @@ from ..events._events import (
     WorkflowNodeStartEvent,
     WorkflowResourceCommitEvent,
 )
-from ..exceptions import ScalimWorkflowError
+from ..exceptions import ScalimWorkflowError, safe_error_message, safe_error_type
 from ..execution.adaptive.capture import HookCaptureManager, HookRecordedEvent
 from ..execution.engine import ScalimEngine
 from ..execution.run_ir import ExecutionRequest, ExecutionResult, run_ir, run_ir_capture_events
@@ -1120,8 +1120,8 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
                 err = WorkflowRunError(
                     run_id=str(node_id),
                     demand_path=demand_path,
-                    exc_type=type(exc).__name__,
-                    message=str(exc),
+                    exc_type=safe_error_type(exc),
+                    message=str(safe_error_message(exc) or ""),
                     diff=_workflow_error_diff(exc),
                 )
                 outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=demand_path, result=None, error=err)
@@ -1234,8 +1234,8 @@ def _workflow_process_completed_future(  # noqa: C901, PLR0912, PLR0913, PLR0915
         err = WorkflowRunError(
             run_id=str(node_id),
             demand_path=str(demand_path or ""),
-            exc_type=type(exc).__name__,
-            message=str(exc),
+            exc_type=safe_error_type(exc),
+            message=str(safe_error_message(exc) or ""),
             diff=_workflow_error_diff(exc),
         )
         outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=str(demand_path or ""), result=None, error=err)
@@ -1350,8 +1350,8 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
         error_type = None
         error_message = None
         if status != WORKFLOW_NODE_END_STATUS_OK and exc is not None:
-            error_type = type(exc).__name__
-            error_message = str(exc)
+            error_type = safe_error_type(exc)
+            error_message = safe_error_message(exc)
         _ = workflow_instrumentation.emit(
             EVENT_WORKFLOW_NODE_END,
             WorkflowNodeEndEvent(

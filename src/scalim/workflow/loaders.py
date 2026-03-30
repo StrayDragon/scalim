@@ -2,8 +2,10 @@ import contextlib
 import threading
 from typing import Any, FrozenSet, Iterator, Mapping
 
+from ..exceptions import ScalimInternalError
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass
+from .errors import ScalimWorkflowConfigError
 from .resources import WorkflowResourceManager
 
 
@@ -60,10 +62,10 @@ def _require_context() -> _WorkflowLoaderContext:
         ctx = None
     if ctx is None:
         msg = "workflow loader requires workflow context (only valid inside run_workflow execution)"
-        raise ValueError(msg)
+        raise ScalimWorkflowConfigError(msg)
     if not isinstance(ctx, _WorkflowLoaderContext):
         msg = "workflow loader context is corrupted (expected _WorkflowLoaderContext, got {})".format(type(ctx).__name__)
-        raise TypeError(msg)
+        raise ScalimInternalError(msg)
     return ctx
 
 
@@ -77,7 +79,7 @@ def book_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
 
     if not _is_mapping(ref):
         msg = "book_sheet_rows requires params.ref as a mapping"
-        raise TypeError(msg)
+        raise ScalimWorkflowConfigError(msg)
     ref_dict = ref
 
     producer_node_id = str(ref_dict.get("node", "") or "").strip()
@@ -86,19 +88,19 @@ def book_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
 
     if not producer_node_id:
         msg = "book_sheet_rows ref.node must be a non-empty string"
-        raise ValueError(msg)
+        raise ScalimWorkflowConfigError(msg)
     if not book_id:
         msg = "book_sheet_rows ref.book must be a non-empty string"
-        raise ValueError(msg)
+        raise ScalimWorkflowConfigError(msg)
     if not sheet_name:
         msg = "book_sheet_rows ref.sheet must be a non-empty string"
-        raise ValueError(msg)
+        raise ScalimWorkflowConfigError(msg)
 
     consumer_node_id = str(ctx.workflow_node_id)
     visible = ctx.visible_producer_node_ids
     if producer_node_id != consumer_node_id and producer_node_id not in visible:
         msg = "Book ref node {!r} is not visible to node {!r} (declare depends_on)".format(producer_node_id, consumer_node_id)
-        raise ValueError(msg)
+        raise ScalimWorkflowConfigError(msg)
 
     return ctx.resource_manager.iter_book_sheet_rows(
         consumer_node_id=consumer_node_id,

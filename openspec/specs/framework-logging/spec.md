@@ -68,3 +68,12 @@
 #### Scenario: context 绑定可向下游暴露字段
 - **WHEN** 系统绑定上下文 `run_id="r1"`
 - **THEN** 绑定后的 logger MUST 为 `LoggerAdapter` 且其 `extra` MUST 包含 `run_id`
+
+### Requirement: runtime MUST NOT mix print with structured logging
+
+系统 MUST 将 runtime 的用户可见诊断输出统一为结构化 logger 输出（例如 `loggingx` 的 prefix + kv）,并禁止在 runtime 代码路径中直接使用 `print(...)`.
+
+#### Scenario: print usage in runtime fails fast
+- **WHEN** 在 `src/scalim/` 的 runtime 路径中出现 `print(...)`
+- **THEN** gate MUST fail-fast 并提示迁移到结构化 logger
+

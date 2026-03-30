@@ -4,9 +4,7 @@
 
 ## Purpose
 为 `scalim` 建立统一的异常体系规范:以 `ScalimError(Exception)` 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
-
 ## Requirements
-
 ### Requirement: scalim MUST 暴露单根异常类型
 系统 MUST 定义 `ScalimError(Exception)` 作为 scalim 内所有自定义异常的根。
 仓库内新增的 scalim 自定义异常 MUST 直接或间接继承 `ScalimError`，并 SHOULD 使用单继承以保持严格树形结构。
@@ -59,3 +57,20 @@ token/密钥、原始 SQL、URL query、绝对路径、用户数据明文、完�
 - **WHEN** workflow/execution 触发错误事件
 - **THEN** 事件 MUST 可提供可诊断的 `error_type`
 - **AND** `error_message` MUST 遵循敏感信息治理(不输出敏感值原文)
+
+### Requirement: public-facing error messages MUST be formatted by a single policy
+
+系统 MUST 提供单点“异常 → 对外消息”格式化策略（默认 redacted,显式 debug 才 full）,并要求所有对外出口统一使用该策略（CLI JSON、viz bundle、workflow report、events error payload 等）.
+
+#### Scenario: the same exception yields consistent external messaging
+- **WHEN** 同一异常在不同入口（CLI/Workflow/Viz）被呈现
+- **THEN** 对外消息 MUST 遵循同一 redaction 策略且保持一致结构
+
+### Requirement: duplicated error type names MUST be eliminated
+
+系统 MUST 禁止同名异常类型在多个模块重复定义（例如 workflow config error）,以避免语义混淆与捕获不一致.
+
+#### Scenario: a single canonical workflow config error type exists
+- **WHEN** 维护者检索 workflow config error 类型定义
+- **THEN** 全库 MUST 仅存在一个 canonical 定义,其余入口仅做包装补充上下文
+

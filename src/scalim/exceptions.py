@@ -1,6 +1,8 @@
+import os
 from typing import Optional
 
 REDACTED_ERROR_MESSAGE = "(redacted)"
+_DEBUG_ERRORS_ENV = "SCALIM_DEBUG_ERRORS"
 
 
 class ScalimError(Exception):
@@ -36,13 +38,31 @@ def safe_error_type(error: BaseException) -> str:
     return type(error).__name__
 
 
-def safe_error_message(error: BaseException) -> Optional[str]:
-    # 对于 `scalim` 自定义异常,默认认为其 `__str__` 已遵循敏感信息治理约束.
-    if isinstance(error, ScalimError):
-        return str(error)
+def _env_debug_errors_enabled() -> bool:
+    raw = str(os.environ.get(_DEBUG_ERRORS_ENV, "") or "").strip().lower()
+    return raw not in ("", "0", "false", "no", "off")
 
-    # 对于非 `scalim` 异常,无法保证 `str(error)` 不包含敏感信息;默认脱敏.
-    return REDACTED_ERROR_MESSAGE
+
+def safe_error_message(error: BaseException, *, debug: Optional[bool] = None) -> Optional[str]:
+    """返回适用于对外输出的错误消息.
+
+    默认策略:
+    - `ScalimError`: 认为其 `__str__` 已遵循敏感信息治理约束,可直接输出.
+    - 非 `ScalimError`: 默认脱敏为 `(redacted)`,仅在显式 `debug` 时输出 `str(error)`.
+
+    `debug` 开关:
+    - `debug=None`(默认): 由环境变量 `SCALIM_DEBUG_ERRORS` 决定.
+    - `debug=True/False`: 强制覆盖.
+    """
+
+    debug_enabled = _env_debug_errors_enabled() if debug is None else bool(debug)
+    if not isinstance(error, ScalimError) and not debug_enabled:
+        return REDACTED_ERROR_MESSAGE
+
+    try:
+        return str(error)
+    except Exception:  # noqa: BLE001
+        return REDACTED_ERROR_MESSAGE
 
 
 __all__ = [

@@ -8,6 +8,7 @@ import pytest
 from scalim.dsl.by_yaml import RunOverrides
 from scalim.dsl.by_yaml import run_workflow
 from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+from scalim.exceptions import ScalimInternalError
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.workflow import loaders as workflow_loaders_mod
 from scalim.workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
@@ -3555,7 +3556,7 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
 
 
 def test_book_sheet_rows_loader_requires_context() -> None:
-    with pytest.raises(ValueError, match="requires workflow context"):
+    with pytest.raises(WorkflowRuntimeConfigError, match="requires workflow context"):
         _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "book": "sb", "sheet": "S"})
 
 
@@ -3572,13 +3573,13 @@ def test_book_sheet_rows_loader_validates_ref_and_context_cleanup() -> None:
         visible_producer_node_ids=frozenset(),
         resource_manager=dummy,  # type: ignore[arg-type]
     ):
-        with pytest.raises(TypeError, match="params.ref"):
+        with pytest.raises(WorkflowRuntimeConfigError, match="params.ref"):
             _ = workflow_loaders_mod.book_sheet_rows(ref="nope")  # type: ignore[arg-type]
-        with pytest.raises(ValueError, match="ref.node"):
+        with pytest.raises(WorkflowRuntimeConfigError, match="ref.node"):
             _ = workflow_loaders_mod.book_sheet_rows(ref={"book": "sb", "sheet": "S"})
-        with pytest.raises(ValueError, match="ref.book"):
+        with pytest.raises(WorkflowRuntimeConfigError, match="ref.book"):
             _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "sheet": "S"})
-        with pytest.raises(ValueError, match="ref.sheet"):
+        with pytest.raises(WorkflowRuntimeConfigError, match="ref.sheet"):
             _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "book": "sb"})
 
     with workflow_loaders_mod.workflow_loader_context(
@@ -3593,7 +3594,7 @@ def test_book_sheet_rows_loader_validates_ref_and_context_cleanup() -> None:
 def test_book_sheet_rows_loader_rejects_corrupted_context() -> None:
     workflow_loaders_mod._TLS.ctx = object()
     try:
-        with pytest.raises(TypeError, match="context is corrupted"):
+        with pytest.raises(ScalimInternalError, match="context is corrupted"):
             _ = workflow_loaders_mod.book_sheet_rows(ref={"node": "a", "book": "sb", "sheet": "S"})
     finally:
         delattr(workflow_loaders_mod._TLS, "ctx")

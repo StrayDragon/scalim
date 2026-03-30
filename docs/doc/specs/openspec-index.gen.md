@@ -96,6 +96,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/framework-logging/spec.md)
 - Summary: **状态: ✅ 已实现** 为框架内部日志建立统一的 Python 标准库 `logging` 使用约定,以保证默认静默、命名空间稳定、输出前缀一致,并提供可扩展的诊断字段与 context 绑定机制。
 
+### `generated-artifacts-manifest`
+- Title: generated-artifacts-manifest Specification
+- Source: [spec.md](#code=openspec/specs/generated-artifacts-manifest/spec.md)
+- Summary: TBD - created by archiving change c60-core-code-quality-maintainability. Update Purpose after archive.
+
 ### `hooks-events`
 - Title: hooks-events Specification
 - Source: [spec.md](#code=openspec/specs/hooks-events/spec.md)

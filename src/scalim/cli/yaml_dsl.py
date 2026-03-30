@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
+from ..exceptions import safe_error_message, safe_error_type
 from ..vendor.compact.importlibx import import_module, require_optional_dependency
 from ..vendor.dataclassesx import dataclass, field
 from . import yaml_dsl_lsp
@@ -837,10 +838,12 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
                     )
                 )
             except Exception as exc:  # noqa: BLE001
+                safe_type = safe_error_type(exc)
+                safe_msg = safe_error_message(exc) or ""
                 workflow_errors.append(
                     ErrorEnvelope(
                         code="workflow_validate_error",
-                        message="Unexpected error: {}: {}".format(type(exc).__name__, exc),
+                        message="Unexpected error: {}: {}".format(safe_type, safe_msg),
                         source_path=str(yaml_path),
                         path="(root)",
                         loc=error_loc_for_yaml_path("(root)", workflow_locations),

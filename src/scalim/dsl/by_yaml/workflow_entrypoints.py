@@ -12,7 +12,6 @@ from ...execution.run_ir import ExecutionResult
 from ...typedefs import KeyNormalizationMode, ParallelMode
 from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import replace
-from ...workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
 from ...workflow.execute import ScalimWorkflowRunFailedError
 from ...workflow.execute import run_workflow_ir as _run_workflow_ir
 from ...workflow.report import WorkflowResult
@@ -62,7 +61,7 @@ def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Option
     return bundle_viz_base_config
 
 
-def run_workflow(  # noqa: PLR0913, C901
+def run_workflow(  # noqa: PLR0913
     workflow_yaml_path: str,
     *,
     allowed_modules: FrozenSet[str],
@@ -167,7 +166,7 @@ def run_workflow(  # noqa: PLR0913, C901
         if viz_config is not None:
             base_overrides = node_options.overrides
             if base_overrides is None:
-                raise WorkflowRuntimeConfigError(
+                raise ScalimWorkflowConfigError(
                     _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG,
                     path="run_workflow.overrides.viz_config",
                 )  # pragma: no cover  # pragma: allow-no-cover invariant: viz_config requires overrides
@@ -194,27 +193,17 @@ def run_workflow(  # noqa: PLR0913, C901
         return RunResult(core, config=compilation.config, yaml_path=str(demand_yaml_path), sink=None)
 
     # 5) 执行 `workflow` `IR`(框架层)
-    try:
-        return _run_workflow_ir(
-            workflow_path,
-            workflow_ir,
-            compile_demand_fn=_compile_demand_node,
-            build_demand_run_result_fn=_build_demand_run_result,
-            run_ir_fn=run_ir_fn,
-            components=components,
-            bundle_viz_base_config=bundle_viz_base_config,
-            cache_pool_logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
-            cache_pool_consumers_by_logical_key=cache_pool_consumers_by_logical_key,
-        )
-    except WorkflowRuntimeConfigError as exc:
-        # 将框架层 `ScalimWorkflowConfigError` 回写为 `DSL` 层错误类型(保持对外契约).
-        path = str(exc.path or "")
-        msg = str(exc)
-        if path:
-            suffix = " (path={})".format(path)
-            if msg.endswith(suffix):
-                msg = msg[: -len(suffix)]
-        raise ScalimWorkflowConfigError(msg, path=path) from exc
+    return _run_workflow_ir(
+        workflow_path,
+        workflow_ir,
+        compile_demand_fn=_compile_demand_node,
+        build_demand_run_result_fn=_build_demand_run_result,
+        run_ir_fn=run_ir_fn,
+        components=components,
+        bundle_viz_base_config=bundle_viz_base_config,
+        cache_pool_logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
+        cache_pool_consumers_by_logical_key=cache_pool_consumers_by_logical_key,
+    )
 
 
 __all__ = [

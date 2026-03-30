@@ -1,7 +1,7 @@
-# ruff: noqa: T201
 # region imports
 
 import logging
+import sys
 from typing import Any, Dict, List, Optional
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
@@ -26,6 +26,8 @@ from ..observer import EventDispatchObserver
 # endregion
 
 _LOGGER = get_logger("pipeline")
+_PRETTY_LOGGER = get_logger("pretty")
+_PRETTY_STDOUT_HANDLER_NAME = "scalim.pretty.stdout"
 
 LOGGING_OBSERVER_LOADER_SLIM_LOG = prefix("pipeline") + "加载器瘦身"
 LOGGING_OBSERVER_COLUMN_WRITE_LOG = prefix("pipeline") + "写入列"
@@ -129,20 +131,43 @@ class PrettyLoggingObserver(EventDispatchObserver):
     _total_rows: int
 
     def __init__(self) -> None:
+        self._ensure_pretty_logger_ready()
         self._loader_stats = []
         self._total_rows = 0
+
+    @staticmethod
+    def _ensure_pretty_logger_ready() -> None:
+        """确保 `pretty` 输出写入当前 `sys.stdout`.
+
+        说明:
+        - `pytest capsys` 会在每个测试用例中替换 `sys.stdout` 对象;若复用旧的 `StreamHandler.stream`,
+          会导致输出无法被当前用例捕获.
+        - 因此这里不做“一次性初始化”,而是每次实例化都重建 `StreamHandler`,确保其绑定当前 `sys.stdout`.
+        """
+
+        for handler in list(_PRETTY_LOGGER.handlers):
+            if handler.name == _PRETTY_STDOUT_HANDLER_NAME:
+                _PRETTY_LOGGER.removeHandler(handler)
+
+        handler = logging.StreamHandler(stream=sys.stdout)
+        handler.name = _PRETTY_STDOUT_HANDLER_NAME
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        _PRETTY_LOGGER.addHandler(handler)
+
+        _PRETTY_LOGGER.setLevel(logging.INFO)
+        _PRETTY_LOGGER.propagate = False
 
     def on_pipeline_start(self, event: PipelineStartEvent) -> None:
         batch_size_text = "all" if event.batch_size is None else str(event.batch_size)
         content = "目标字段: {:4d}    批大小: {:>6}".format(len(event.targets), batch_size_text)
         panel = Panel(content, title="Scalim Pipeline", width=50)
-        print("\n" + panel.render())
+        _PRETTY_LOGGER.info("\n%s", panel.render())
 
     def on_pipeline_end(self, event: PipelineEndEvent) -> None:
         _ = event
         content = "批次数: {:4d}    总耗时: {:7.2f}s".format(event.total_batches, event.total_duration)
         panel = Panel(content, title="执行完成", width=50)
-        print("\n" + panel.render())
+        _PRETTY_LOGGER.info("\n%s", panel.render())
 
         if self._loader_stats:
             table = Table("数据加载统计")
@@ -153,7 +178,7 @@ class PrettyLoggingObserver(EventDispatchObserver):
             for stat in self._loader_stats:
                 _ = table.add_row(stat["name"], stat["count"], "{:.3f}s".format(stat["duration"]))
 
-            print("\n" + table.render())
+            _PRETTY_LOGGER.info("\n%s", table.render())
 
     def on_batch_start(self, event: BatchStartEvent) -> None:
         self._total_rows += len(event.row_ids)
@@ -162,7 +187,7 @@ class PrettyLoggingObserver(EventDispatchObserver):
         elapsed = max(0.0, float(event.duration))
         bar_len = min(int(elapsed * 10), 20)
         bar = "█" * bar_len + "░" * (20 - bar_len)
-        print("  批次 {:3d} │{}│ {:.2f}s".format(event.batch_num, bar, elapsed))
+        _PRETTY_LOGGER.info("  批次 %3d │%s│ %.2fs", event.batch_num, bar, elapsed)
 
     def on_loader_call(self, event: LoaderCallEvent) -> None:
         result_count = 0
