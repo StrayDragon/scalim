@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
 from ...events._events import (
@@ -20,7 +20,7 @@ from ...events._events import (
     RowReleaseEvent,
     RowWriteEvent,
 )
-from ...vendor.literich import Panel, Table
+from .._internal.console_report import build_line, format_seconds
 from ..observer import EventDispatchObserver
 
 # endregion
@@ -139,12 +139,12 @@ class LoggingObserver(EventDispatchObserver):
 
 
 class PrettyLoggingObserver(EventDispatchObserver):
-    _loader_stats: List[Dict[str, Any]]
+    _loader_stats: Dict[str, Dict[str, Any]]
     _total_rows: int
 
     def __init__(self) -> None:
         self._ensure_pretty_logger_ready()
-        self._loader_stats = []
+        self._loader_stats = {}
         self._total_rows = 0
 
     @staticmethod
@@ -190,35 +190,60 @@ class PrettyLoggingObserver(EventDispatchObserver):
 
     def on_pipeline_start(self, event: PipelineStartEvent) -> None:
         batch_size_text = "all" if event.batch_size is None else str(event.batch_size)
-        content = "目标字段: {:4d}    批大小: {:>6}".format(len(event.targets), batch_size_text)
-        panel = Panel(content, title="Scalim Pipeline", width=50)
-        _PRETTY_LOGGER.info("\n%s", panel.render())
+        self._loader_stats = {}
+        self._total_rows = 0
+        _PRETTY_LOGGER.info(
+            "%s",
+            build_line("pretty", "pipeline_start", target_fields=len(event.targets), batch_size=str(batch_size_text)),
+        )
 
     def on_pipeline_end(self, event: PipelineEndEvent) -> None:
         _ = event
-        content = "批次数: {:4d}    总耗时: {:7.2f}s".format(event.total_batches, event.total_duration)
-        panel = Panel(content, title="执行完成", width=50)
-        _PRETTY_LOGGER.info("\n%s", panel.render())
+        _PRETTY_LOGGER.info(
+            "%s",
+            build_line(
+                "pretty",
+                "pipeline_end",
+                batches=int(event.total_batches),
+                total_duration_s=format_seconds(float(event.total_duration), digits=2),
+                total_rows=int(self._total_rows),
+            ),
+        )
 
         if self._loader_stats:
-            table = Table("数据加载统计")
-            _ = table.add_column("Loader", min_width=20)
-            _ = table.add_column("记录数", min_width=8, align="right")
-            _ = table.add_column("耗时", min_width=10, align="right")
-
-            for stat in self._loader_stats:
-                _ = table.add_row(stat["name"], stat["count"], "{:.3f}s".format(stat["duration"]))
-
-            _PRETTY_LOGGER.info("\n%s", table.render())
+            for name in sorted(self._loader_stats.keys()):
+                stats = self._loader_stats[name]
+                calls = int(stats.get("calls") or 0)
+                total_duration = float(stats.get("total_duration") or 0.0)
+                avg_time = (total_duration / calls) if calls else 0.0
+                _PRETTY_LOGGER.info(
+                    "%s",
+                    build_line(
+                        "pretty",
+                        "loader",
+                        loader=str(name),
+                        calls=int(calls),
+                        records=int(stats.get("records") or 0),
+                        total_duration_s=format_seconds(total_duration, digits=3),
+                        avg_time_s=format_seconds(avg_time, digits=4),
+                        cache_hit=int(stats.get("cache_hit") or 0) or None,
+                        cache_miss=int(stats.get("cache_miss") or 0) or None,
+                    ),
+                )
 
     def on_batch_start(self, event: BatchStartEvent) -> None:
         self._total_rows += len(event.row_ids)
 
     def on_batch_end(self, event: BatchEndEvent) -> None:
-        elapsed = max(0.0, float(event.duration))
-        bar_len = min(int(elapsed * 10), 20)
-        bar = "█" * bar_len + "░" * (20 - bar_len)
-        _PRETTY_LOGGER.info("  批次 %3d │%s│ %.2fs", event.batch_num, bar, elapsed)
+        _PRETTY_LOGGER.info(
+            "%s",
+            build_line(
+                "pretty",
+                "batch_end",
+                batch_num=int(event.batch_num),
+                duration_s=format_seconds(float(event.duration), digits=2),
+            ),
+        )
 
     def on_loader_call(self, event: LoaderCallEvent) -> None:
         result_count = 0
@@ -226,20 +251,22 @@ class PrettyLoggingObserver(EventDispatchObserver):
             result_count = len(event.result)  # type: ignore[arg-type]
         except TypeError:
             result_count = 0
-        name = event.loader_name
-        if event.cache_status:
-            fields = ",".join(event.field_keys or [])
-            if fields:
-                name = "{} [cache:{} fields:{}]".format(name, event.cache_status, fields)
-            else:
-                name = "{} [cache:{}]".format(name, event.cache_status)
-        self._loader_stats.append(
-            {
-                "name": name,
-                "count": result_count,
-                "duration": event.duration,
-            }
-        )
+        name = str(event.loader_name or "")
+        if not name:
+            name = "<unknown>"
+
+        entry = self._loader_stats.get(name)
+        if entry is None:
+            entry = {"calls": 0, "records": 0, "total_duration": 0.0, "cache_hit": 0, "cache_miss": 0}
+            self._loader_stats[name] = entry
+
+        entry["calls"] = int(entry.get("calls") or 0) + 1
+        entry["records"] = int(entry.get("records") or 0) + int(result_count)
+        entry["total_duration"] = float(entry.get("total_duration") or 0.0) + float(event.duration)
+        if event.cache_status == "hit":
+            entry["cache_hit"] = int(entry.get("cache_hit") or 0) + 1
+        elif event.cache_status == "miss":
+            entry["cache_miss"] = int(entry.get("cache_miss") or 0) + 1
 
 
 __all__ = [

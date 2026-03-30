@@ -5,7 +5,7 @@ from typing import List, Set
 
 from ...events._events import ColumnWriteEvent, FieldSlimEvent, LoaderSlimEvent, RowReleaseEvent, RowWriteEvent
 from ...vendor.compact.typing_extensionsx import override
-from ...vendor.literich import Table
+from .._internal.console_report import emit_info
 from ..observer import EventDispatchObserver
 
 # endregion
@@ -69,34 +69,46 @@ class MemoryOptimizationObserver(EventDispatchObserver):
     def print_summary(self, max_fields: int = 0) -> None:
         slimmed_fields = self.get_slimmed_fields()
         columns_written = self.get_columns_written()
+        limit = int(max_fields) if max_fields > 0 else (int(self.max_fields) if self.max_fields > 0 else 20)
 
-        summary = Table(title="内存优化统计 (FR022/FR023)", border_style="box")
-        _ = summary.add_column("指标", min_width=14)
-        _ = summary.add_column("数量", min_width=8, align="right")
-
-        _ = summary.add_row("字段瘦身", str(len(self.field_slim_events)))
-        _ = summary.add_row("行写入", str(len(self.row_write_events)))
-        _ = summary.add_row("行释放", str(len(self.row_release_events)))
-        _ = summary.add_row("列写入", str(len(self.column_write_events)))
-        _ = summary.add_row("Loader 瘦身", str(len(self.loader_slim_events)))
-
-        output_lines = ["\n" + summary.render()]
+        emit_info(
+            self._logger,
+            "memory",
+            "summary",
+            field_slims=len(self.field_slim_events),
+            row_writes=len(self.row_write_events),
+            row_releases=len(self.row_release_events),
+            column_writes=len(self.column_write_events),
+            loader_slims=len(self.loader_slim_events),
+        )
 
         if slimmed_fields:
             fields_list = sorted(slimmed_fields)
-            if max_fields > 0 and len(fields_list) > max_fields:
-                fields_list = fields_list[:max_fields]
-                fields_list.append("... (+{} more)".format(len(slimmed_fields) - max_fields))
-            output_lines.append("瘦身字段: " + ", ".join(fields_list))
+            showing_items = fields_list[:limit]
+            remaining = int(len(fields_list) - len(showing_items))
+            emit_info(
+                self._logger,
+                "memory",
+                "slimmed_fields",
+                total=len(fields_list),
+                showing=len(showing_items),
+                fields=",".join(showing_items),
+                more=remaining if remaining > 0 else None,
+            )
 
         if columns_written:
             cols_list = sorted(columns_written)
-            if max_fields > 0 and len(cols_list) > max_fields:
-                cols_list = cols_list[:max_fields]
-                cols_list.append("... (+{} more)".format(len(columns_written) - max_fields))
-            output_lines.append("已写入列: " + ", ".join(cols_list))
-
-        self._logger.info("\n".join(output_lines))
+            showing_items = cols_list[:limit]
+            remaining = int(len(cols_list) - len(showing_items))
+            emit_info(
+                self._logger,
+                "memory",
+                "columns_written",
+                total=len(cols_list),
+                showing=len(showing_items),
+                fields=",".join(showing_items),
+                more=remaining if remaining > 0 else None,
+            )
 
     def reset(self) -> None:
         self.field_slim_events.clear()

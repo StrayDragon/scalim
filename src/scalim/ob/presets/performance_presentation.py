@@ -1,10 +1,10 @@
 import csv
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from ..._internal.loggingx import prefix
-from ...vendor.literich import Table
+from .._internal.console_report import build_line, format_percent, format_seconds
 from ..perf_metrics import PerformanceMetrics
 
 
@@ -23,7 +23,8 @@ class PerformancePresentationLayer:
         if report_format == "none":
             return
         if report_format == "console":
-            logger.info(self.render_summary(metrics, include_details=include_details))
+            for line in self.iter_console_lines(metrics, include_details=include_details):
+                logger.info("%s", line)
             return
         if report_format == "json":
             self.write_json_report(metrics=metrics, output_path=output_path, logger=logger)
@@ -80,67 +81,65 @@ class PerformancePresentationLayer:
         except OSError as e:
             logger.warning("%s写入报告失败: %s", prefix("performance"), e)
 
-    def render_summary(self, metrics: PerformanceMetrics, *, include_details: bool) -> str:
-        summary_table = Table(title="Performance Summary", border_style="box")
-        _ = summary_table.add_column("Metric", min_width=20)
-        _ = summary_table.add_column("Value", min_width=15, align="right")
+    def iter_console_lines(self, metrics: PerformanceMetrics, *, include_details: bool) -> List[str]:
+        lines: List[str] = []
 
-        _ = summary_table.add_row("Total Duration", "{:.3f}s".format(metrics.total_duration))
-        _ = summary_table.add_row("Input Rows (row_ids)", str(metrics.total_rows))
-        _ = summary_table.add_row("Throughput (row_ids/s)", "{:.1f} rows/s".format(metrics.throughput))
-        _ = summary_table.add_row("Batch Count", str(metrics.batch_count))
-        _ = summary_table.add_row("Avg Batch Duration", "{:.4f}s".format(metrics.avg_batch_duration))
+        peak_memory_mb = metrics.peak_memory_mb
+        memory_increase_mb = metrics.memory_increase_mb
 
-        if metrics.peak_memory_mb is not None:
-            _ = summary_table.add_row("Peak Memory", "{:.1f} MB".format(metrics.peak_memory_mb))
-        if metrics.memory_increase_mb is not None:
-            _ = summary_table.add_row("Memory Increase", "{:.1f} MB".format(metrics.memory_increase_mb))
-
-        output_lines = ["\n" + summary_table.render()]
+        lines.append(
+            build_line(
+                "performance",
+                "summary",
+                total_duration_s=format_seconds(metrics.total_duration, digits=3),
+                total_rows=int(metrics.total_rows),
+                throughput_rows_s="{:.1f}".format(float(metrics.throughput)),
+                batch_count=int(metrics.batch_count),
+                avg_batch_duration_s=format_seconds(metrics.avg_batch_duration, digits=4),
+                peak_memory_mb="{:.1f}".format(float(peak_memory_mb)) if peak_memory_mb is not None else None,
+                memory_increase_mb="{:.1f}".format(float(memory_increase_mb)) if memory_increase_mb is not None else None,
+            )
+        )
 
         stages = metrics.stage_metrics
-        if stages.loader_duration > 0 or stages.compute_duration > 0 or stages.write_duration > 0:
-            stage_table = Table(title="Stage Breakdown", border_style="box")
-            _ = stage_table.add_column("Stage", min_width=12)
-            _ = stage_table.add_column("Duration", min_width=12, align="right")
-            _ = stage_table.add_column("Percent", min_width=10, align="right")
-
-            total = stages.loader_duration + stages.compute_duration + stages.write_duration
-            if total > 0:
-                _ = stage_table.add_row(
-                    "Loader",
-                    "{:.3f}s".format(stages.loader_duration),
-                    "{:.1f}%".format(100 * stages.loader_duration / total),
+        total_stage = float(stages.loader_duration) + float(stages.compute_duration) + float(stages.write_duration)
+        if total_stage > 0:
+            stage_items = [
+                ("loader", float(stages.loader_duration)),
+                ("compute", float(stages.compute_duration)),
+                ("write", float(stages.write_duration)),
+            ]
+            for stage, duration in stage_items:
+                if duration <= 0:
+                    continue
+                lines.append(
+                    build_line(
+                        "performance",
+                        "stage",
+                        stage=str(stage),
+                        duration_s=format_seconds(duration, digits=3),
+                        percent=format_percent(duration / total_stage, digits=1),
+                    )
                 )
-                _ = stage_table.add_row(
-                    "Compute",
-                    "{:.3f}s".format(stages.compute_duration),
-                    "{:.1f}%".format(100 * stages.compute_duration / total),
-                )
-                _ = stage_table.add_row(
-                    "Write",
-                    "{:.3f}s".format(stages.write_duration),
-                    "{:.1f}%".format(100 * stages.write_duration / total),
-                )
-                output_lines.append(stage_table.render())
 
         if metrics.loader_stats and include_details:
-            loader_table = Table(title="Loader Statistics", border_style="box")
-            _ = loader_table.add_column("Loader", min_width=20)
-            _ = loader_table.add_column("Calls", min_width=6, align="right")
-            _ = loader_table.add_column("Records", min_width=8, align="right")
-            _ = loader_table.add_column("Avg Time", min_width=10, align="right")
-
-            for name, stats in metrics.loader_stats.items():
-                _ = loader_table.add_row(
-                    name,
-                    str(stats.call_count),
-                    str(stats.total_records),
-                    "{:.4f}s".format(stats.avg_duration),
+            for name in sorted(metrics.loader_stats.keys()):
+                stats = metrics.loader_stats[name]
+                lines.append(
+                    build_line(
+                        "performance",
+                        "loader",
+                        loader=str(name),
+                        calls=int(stats.call_count),
+                        records=int(stats.total_records),
+                        avg_time_s=format_seconds(stats.avg_duration, digits=4),
+                    )
                 )
-            output_lines.append(loader_table.render())
 
-        return "\n".join(output_lines)
+        return lines
+
+    def render_summary(self, metrics: PerformanceMetrics, *, include_details: bool) -> str:
+        return "\n".join(self.iter_console_lines(metrics, include_details=include_details))
 
 
 __all__ = ["PerformancePresentationLayer"]

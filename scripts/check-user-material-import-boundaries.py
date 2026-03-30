@@ -46,6 +46,7 @@ _INTERNAL_TOKEN_SUGGESTIONS: Mapping[str, str] = {
     # “硬禁止”标记(不要求是 `import` 语句;出现在任何用户材料文本中都应立即报错)
     "TRUSTED_ALLOW_ALL_MODULES": "请移除该内部/不安全标记;用户材料不得放宽导入边界.",
     "trusted_allow_all_modules": "请移除该内部/不安全标记;用户材料不得放宽导入边界.",
+    "scalim.vendor.literich": "`scalim.vendor.literich` 已移除;请勿在 docs/skills/notebooks 中引用该模块.",
     "unsafe_entrypoints": "请勿在用户材料中引用内部/不安全入口;优先使用稳定的 facade 入口.",
     # 内部实现路径(常见误用)
     "scalim.dsl.by_yaml.config_parsing.": "请勿导入内部实现;优先使用 `scalim.dsl.by_yaml` 或其稳定子模块.",

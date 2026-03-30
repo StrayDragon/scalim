@@ -16,7 +16,7 @@ from ...events._events import (
     RowWriteEvent,
 )
 from ...vendor.dataclassesx import asdict, dataclass, field
-from ...vendor.literich import Panel, Table
+from .._internal.console_report import emit_info, format_seconds
 from ..observer import EventDispatchObserver
 
 # endregion
@@ -196,16 +196,15 @@ class ExecutionTraceObserver(EventDispatchObserver):
         return json.dumps(data, ensure_ascii=False, indent=indent, default=str)
 
     def print_summary(self) -> None:
-        summary_table = Table(title="Execution Trace Summary", border_style="box")
-        _ = summary_table.add_column("Metric", min_width=20)
-        _ = summary_table.add_column("Value", min_width=10, align="right")
-
-        _ = summary_table.add_row("Batches", str(len(self.batches)))
-        _ = summary_table.add_row("Loader Calls", str(self.total_loader_calls))
-        _ = summary_table.add_row("Field Slims", str(self.total_field_slims))
-        _ = summary_table.add_row("Row Writes", str(self.total_row_writes))
-
-        _LOGGER.info("\n%s", summary_table.render())
+        emit_info(
+            _LOGGER,
+            "execution_trace",
+            "summary",
+            total_batches=len(self.batches),
+            total_loader_calls=int(self.total_loader_calls),
+            total_field_slims=int(self.total_field_slims),
+            total_row_writes=int(self.total_row_writes),
+        )
 
         if not self.batches:
             return
@@ -214,35 +213,37 @@ class ExecutionTraceObserver(EventDispatchObserver):
         loader_steps = [s for s in last_batch.steps if isinstance(s, LoaderCallStep)]
         slim_count = sum(1 for s in last_batch.steps if isinstance(s, FieldSlimStep))
         write_count = sum(1 for s in last_batch.steps if isinstance(s, RowWriteStep))
+        row_ids = [str(k) for k in last_batch.row_ids]
+        row_id_samples = ",".join(row_ids[:3]) if row_ids else None
 
-        content_lines = [
-            "row_id: {}".format(str(last_batch.row_ids)),
-        ]
-        if last_batch.duration:
-            content_lines.append("耗时: {:.2f}s".format(last_batch.duration))
-        content_lines.append("步骤数: {}".format(len(last_batch.steps)))
+        emit_info(
+            _LOGGER,
+            "execution_trace",
+            "last_batch",
+            batch_num=int(last_batch.batch_num) if last_batch.batch_num is not None else None,
+            row_count=len(row_ids),
+            row_id_samples=row_id_samples,
+            duration_s=format_seconds(last_batch.duration, digits=2),
+            steps=len(last_batch.steps),
+            loader_calls=len(loader_steps),
+            field_slims=int(slim_count),
+            row_writes=int(write_count),
+        )
 
         if loader_steps:
-            table = Table(show_header=False, border_style="none")
-            _ = table.add_column("序号", min_width=3)
-            _ = table.add_column("操作", min_width=30)
-            _ = table.add_column("详情", min_width=20)
-            for idx, step in enumerate(loader_steps, 1):
-                _ = table.add_row(
-                    str(idx),
-                    "[加载] {}".format(step.loader_name),
-                    "返回 {} 条, {:.2f}s".format(step.result_count, step.duration),
+            total = len(loader_steps)
+            showing = min(5, total)
+            emit_info(_LOGGER, "execution_trace", "loader_call_samples", total=total, showing=int(showing))
+            for idx, step in enumerate(loader_steps[:showing], 1):
+                emit_info(
+                    _LOGGER,
+                    "execution_trace",
+                    "loader_call",
+                    idx=int(idx),
+                    loader=str(step.loader_name),
+                    records=int(step.result_count),
+                    duration_s=format_seconds(float(step.duration), digits=2),
                 )
-            content_lines.append("")
-            content_lines.append(table.render())
-
-        if slim_count > 0:
-            content_lines.append("[瘦身] 共 {} 次字段释放".format(slim_count))
-        if write_count > 0:
-            content_lines.append("[写入] 共 {} 行".format(write_count))
-
-        panel = Panel("\n".join(content_lines), title="批次 {} 详细信息".format(last_batch.batch_num), width=60)
-        _LOGGER.info("\n%s", panel.render())
 
 
 __all__ = [

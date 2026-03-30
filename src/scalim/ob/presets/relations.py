@@ -7,12 +7,12 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..._internal.loggingx import format_kv, get_logger, prefix
+from ..._internal.loggingx import get_logger, prefix
 from ...events._events import RelationLookupEvent
 from ...typedefs import RelationLookupResult, RelationReportFormat
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import asdict, dataclass, field
-from ...vendor.literich import Table
+from .._internal.console_report import emit_info, emit_warning, format_percent
 from ..observer import EventDispatchObserver
 
 # endregion
@@ -162,16 +162,14 @@ class RelationObserver(EventDispatchObserver):
 
         if event.result == "type_error":
             if self.config.log_type_mismatch:
-                kv = format_kv(
+                emit_warning(
+                    self.config.logger,
+                    "relations",
+                    "type_error",
                     row_id=event.row_id,
                     fk_raw=event.fk_raw,
                     target_source=event.target_source,
                     error=event.error_message,
-                )
-                self.config.logger.warning(
-                    "%s外键类型不匹配 %s",
-                    prefix("relations"),
-                    kv,
                 )
             if len(m.type_mismatch_samples) < self.config.max_samples:
                 m.type_mismatch_samples.append(sample)
@@ -215,52 +213,51 @@ class RelationObserver(EventDispatchObserver):
 
     def print_summary(self) -> None:
         m = self.metrics
+        logger = self.config.logger
 
-        summary_table = Table(title="Relation Summary", border_style="box")
-        _ = summary_table.add_column("Metric", min_width=20)
-        _ = summary_table.add_column("Value", min_width=15, align="right")
-
-        _ = summary_table.add_row("Total Lookups", str(m.total_lookups))
-        _ = summary_table.add_row("Hits", str(m.hit_count))
-        _ = summary_table.add_row("Misses", str(m.miss_count))
-        _ = summary_table.add_row("Hit Rate", "{:.2%}".format(m.hit_rate))
-        _ = summary_table.add_row("Null Keys", str(m.null_key_count))
-        _ = summary_table.add_row("Type Errors", str(m.type_mismatch_count))
-
-        output_lines = ["\n" + summary_table.render()]
+        emit_info(
+            logger,
+            "relations",
+            "summary",
+            total_lookups=int(m.total_lookups),
+            hits=int(m.hit_count),
+            misses=int(m.miss_count),
+            null_keys=int(m.null_key_count),
+            type_errors=int(m.type_mismatch_count),
+            hit_rate=format_percent(m.hit_rate, digits=2),
+        )
 
         if m.per_source_stats:
-            source_table = Table(title="Per Source", border_style="box")
-            _ = source_table.add_column("Source", min_width=20)
-            _ = source_table.add_column("Total", min_width=6, align="right")
-            _ = source_table.add_column("Hits", min_width=6, align="right")
-            _ = source_table.add_column("Misses", min_width=6, align="right")
-            _ = source_table.add_column("Hit Rate", min_width=10, align="right")
-
-            for source_id, stats in m.per_source_stats.items():
-                _ = source_table.add_row(
-                    source_id,
-                    str(stats.total_lookups),
-                    str(stats.hit_count),
-                    str(stats.miss_count),
-                    "{:.2%}".format(stats.hit_rate),
+            for source_id in sorted(m.per_source_stats.keys()):
+                stats = m.per_source_stats[source_id]
+                emit_info(
+                    logger,
+                    "relations",
+                    "per_source",
+                    source=str(source_id),
+                    total=int(stats.total_lookups),
+                    hits=int(stats.hit_count),
+                    misses=int(stats.miss_count),
+                    null_keys=int(stats.null_key_count),
+                    type_errors=int(stats.type_mismatch_count),
+                    hit_rate=format_percent(stats.hit_rate, digits=2),
                 )
-            output_lines.append(source_table.render())
 
         if m.type_mismatch_samples:
-            output_lines.append("\nType Mismatch Samples (first {}):".format(min(5, len(m.type_mismatch_samples))))
-            for sample in m.type_mismatch_samples[:5]:
-                output_lines.append(
-                    "  - row_id={}, fk_raw={} ({}), target={}, error={}".format(
-                        sample.row_id,
-                        sample.fk_raw,
-                        sample.fk_type or "unknown",
-                        sample.target_source,
-                        sample.error_message or "type mismatch",
-                    )
+            showing = min(5, len(m.type_mismatch_samples))
+            emit_info(logger, "relations", "type_mismatch_samples", total=len(m.type_mismatch_samples), showing=int(showing))
+            for sample in m.type_mismatch_samples[:showing]:
+                emit_info(
+                    logger,
+                    "relations",
+                    "type_mismatch_sample",
+                    row_id=sample.row_id,
+                    fk_raw=sample.fk_raw,
+                    fk_type=sample.fk_type,
+                    expected_type=sample.expected_type,
+                    target_source=sample.target_source,
+                    error=sample.error_message,
                 )
-
-        self.config.logger.info("\n".join(output_lines))
 
     def _write_json_report(self) -> None:
         output_path = self.config.output_path

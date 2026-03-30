@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List
 
 from ..vendor.dataclassesx import dataclass, field
-from ..vendor.literich import Table
+from ._internal.console_report import emit_info, format_seconds
 
 # endregion
 
@@ -69,23 +69,30 @@ class MetricsCollector:
     def print_summary(self) -> None:
         avg_batch = sum(self.batch_durations) / len(self.batch_durations) if self.batch_durations else 0.0
         total_loader_records = sum(m.total_records for m in self.loader_metrics.values())
+        emit_info(
+            _LOGGER,
+            "metrics",
+            "summary",
+            total_batches=int(self.total_batches),
+            avg_batch_duration_s=format_seconds(avg_batch, digits=2),
+            total_loader_records=int(total_loader_records),
+        )
 
-        summary_table = Table(title="性能统计摘要", border_style="box")
-        _ = summary_table.add_column("指标", min_width=12)
-        _ = summary_table.add_column("值", min_width=15, align="right")
-        _ = summary_table.add_row("批次数", str(self.total_batches))
-        _ = summary_table.add_row("平均批次耗时", "%.2fs" % avg_batch)
-        _ = summary_table.add_row("总加载记录", str(total_loader_records))
+        if not self.loader_metrics:
+            return
 
-        loader_table = Table(title="Loader 性能", border_style="box")
-        _ = loader_table.add_column("Loader", min_width=15)
-        _ = loader_table.add_column("调用次数", min_width=8, align="right")
-        _ = loader_table.add_column("平均耗时", min_width=10, align="right")
-
-        for name, metrics in self.loader_metrics.items():
-            _ = loader_table.add_row(name, str(metrics.call_count), "%.2fs" % metrics.avg_duration)
-
-        _LOGGER.info("\n%s\n%s", summary_table.render(), loader_table.render())
+        for name in sorted(self.loader_metrics.keys()):
+            metrics = self.loader_metrics[name]
+            emit_info(
+                _LOGGER,
+                "metrics",
+                "loader",
+                loader=str(name),
+                calls=int(metrics.call_count),
+                records=int(metrics.total_records),
+                total_duration_s=format_seconds(metrics.total_duration, digits=3),
+                avg_time_s=format_seconds(metrics.avg_duration, digits=4),
+            )
 
     def get_summary_dict(self) -> Dict[str, Any]:
         summary: Dict[str, Any] = {

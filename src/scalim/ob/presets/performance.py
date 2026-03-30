@@ -358,7 +358,8 @@ class PerformanceObserver(EventDispatchObserver):
         )
 
     def print_summary(self) -> None:
-        self.config.logger.info(self._presentation.render_summary(self.metrics, include_details=self.config.include_details))
+        for line in self._presentation.iter_console_lines(self.metrics, include_details=self.config.include_details):
+            self.config.logger.info("%s", line)
 
     def get_metrics(self) -> PerformanceMetrics:
         return self.metrics

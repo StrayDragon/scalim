@@ -189,7 +189,8 @@ def test_performance_observer_console_output(plan_builder, engine_factory, caplo
     with caplog.at_level(logging.INFO, logger=logger.name):
         engine.run(main_rows=main_rows)
 
-    assert any("Performance Summary" in record.getMessage() for record in caplog.records)
+    assert any("[scalim] performance:" in record.getMessage() and "summary" in record.getMessage() for record in caplog.records)
+    assert any("total_duration_s=" in record.getMessage() for record in caplog.records)
 
 
 def test_performance_observer_print_summary_details(caplog) -> None:
@@ -215,7 +216,9 @@ def test_performance_observer_print_summary_details(caplog) -> None:
     with caplog.at_level(logging.INFO, logger=logger.name):
         observer.print_summary()
 
-    assert any("Performance Summary" in record.getMessage() for record in caplog.records)
+    assert any("[scalim] performance:" in record.getMessage() and "summary" in record.getMessage() for record in caplog.records)
+    assert any("stage" in record.getMessage() for record in caplog.records)
+    assert any("loader" in record.getMessage() for record in caplog.records)
 
 
 def test_performance_observer_json_output(plan_builder, engine_factory) -> None:
@@ -540,7 +543,8 @@ def test_performance_observer_print_summary_memory(caplog) -> None:
     with caplog.at_level(logging.INFO, logger=logger.name):
         observer.print_summary()
 
-    assert any("Peak Memory" in record.getMessage() for record in caplog.records)
+    assert any("peak_memory_mb=" in record.getMessage() for record in caplog.records)
+    assert any("memory_increase_mb=" in record.getMessage() for record in caplog.records)
 
 
 def test_performance_observer_reset_initializes_samples() -> None:

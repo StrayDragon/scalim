@@ -284,8 +284,10 @@ def test_pretty_logging_observer_renders_stats(capsys) -> None:
     observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.02))
 
     output = capsys.readouterr().out
-    assert "Scalim Pipeline" in output
-    assert "Loader" in output
+    assert "[scalim] pretty:" in output
+    assert "pipeline_start" in output
+    assert "pipeline_end" in output
+    assert "loader=demo_loader" in output
 
 
 def test_pretty_logging_observer_renders_batch_duration_from_event(capsys) -> None:
@@ -296,7 +298,7 @@ def test_pretty_logging_observer_renders_batch_duration_from_event(capsys) -> No
     observer.on_batch_end(BatchEndEvent(batch_num=1, duration=1.23))
 
     output = capsys.readouterr().out
-    assert "1.23s" in output
+    assert "duration_s=1.23" in output
 
 
 def test_pretty_logging_observer_reuses_user_stdout_handler_by_name() -> None:
@@ -367,7 +369,17 @@ def test_pretty_logging_observer_handles_non_sized_result() -> None:
         )
     )
 
-    assert observer._loader_stats[-1]["count"] == 0
+    stats = observer._loader_stats["demo_loader"]
+    assert stats["calls"] == 1
+    assert stats["records"] == 0
+
+
+def test_pretty_logging_observer_uses_unknown_loader_name_when_empty() -> None:
+    observer = PrettyLoggingObserver()
+
+    observer.on_loader_call(LoaderCallEvent(loader_name="", params={}, result={}, duration=0.1))
+
+    assert "<unknown>" in observer._loader_stats
 
 
 def test_pretty_logging_observer_formats_cache_status() -> None:
@@ -394,8 +406,9 @@ def test_pretty_logging_observer_formats_cache_status() -> None:
         )
     )
 
-    names = [stat["name"] for stat in observer._loader_stats]
-    assert names == ["demo_loader [cache:hit fields:order_id]", "demo_loader [cache:miss]"]
+    stats = observer._loader_stats["demo_loader"]
+    assert stats["cache_hit"] == 1
+    assert stats["cache_miss"] == 1
 
 
 def test_compile_observability_spec_respects_logging_flags() -> None:
