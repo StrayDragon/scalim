@@ -182,7 +182,7 @@ gen-viz-schedule-plan RUN_DIR="":
         while IFS= read -r line; do
             run_dirs+=( "$line" )
         done < <(
-            find artifacts/scalim-viz/examples/demo_big_data_report -type f -name "viz_events.jsonl" -print \
+            find .tmp/artifacts/scalim-viz/examples/demo_big_data_report -type f -name "viz_events.jsonl" -print \
                 | sed 's#/viz_events.jsonl$##' \
                 | sort -u
         )

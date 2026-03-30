@@ -19,7 +19,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        default="artifacts/scalim-viz/examples/demo_big_data_report/workflow-bundle",
+        default=".tmp/artifacts/scalim-viz/examples/demo_big_data_report/workflow-bundle",
         help="Bundle output directory (run root). A 'scalim-viz/' folder will be created inside.",
     )
     parser.add_argument(

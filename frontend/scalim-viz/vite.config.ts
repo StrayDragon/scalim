@@ -10,7 +10,7 @@ import { VIZ_ARTIFACTS_ROOT, VIZ_REPLAY_ROUTE } from './src/generated/project_co
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../..');
-const REPLAY_ALLOWED_ROOT = resolve(REPO_ROOT, VIZ_ARTIFACTS_ROOT);
+const REPLAY_ALLOWED_ROOTS = [resolve(REPO_ROOT, VIZ_ARTIFACTS_ROOT), resolve(REPO_ROOT, '.tmp', VIZ_ARTIFACTS_ROOT)];
 
 const scalimVizReplayPlugin = (): Plugin => {
   return {
@@ -32,7 +32,7 @@ const scalimVizReplayPlugin = (): Plugin => {
 
           const cleaned = relPath.replace(/^\/+/, '');
           const abs = resolve(REPO_ROOT, cleaned);
-          const allowed = abs === REPLAY_ALLOWED_ROOT || abs.startsWith(REPLAY_ALLOWED_ROOT + sep);
+          const allowed = REPLAY_ALLOWED_ROOTS.some((root) => abs === root || abs.startsWith(root + sep));
           if (!allowed) {
             res.statusCode = 403;
             res.end('forbidden');

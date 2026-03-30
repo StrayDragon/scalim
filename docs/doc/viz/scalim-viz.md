@@ -197,14 +197,14 @@ _ = run(
 
 可视化前端(Scalim Viz)默认通过本地目录选择器读取 `scalim-viz/` 输出目录,无需 URL 配置或鉴权.
 
-### 示例数据(内置 artifacts)
+### 示例数据(本地生成,不提交)
 
-当前示例数据已放入:
+示例数据默认生成到(已被 `.gitignore` 忽略):
 
-- `artifacts/scalim-viz/examples/demo_big_data_report/events-only/`
-- `artifacts/scalim-viz/examples/demo_big_data_report/events+trace/`
+- `.tmp/artifacts/scalim-viz/examples/demo_big_data_report/events-only/`
+- `.tmp/artifacts/scalim-viz/examples/demo_big_data_report/events+trace/`
 
-在 UI 端使用“选择目录(回放)”即可加载,不再通过 public 目录或“加载样例”按钮.
+在 UI 端使用“选择目录(回放)”即可加载.
 
 如需从 YAML 示例重新生成一份输出,可执行:
 

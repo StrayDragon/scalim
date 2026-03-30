@@ -108,7 +108,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
 
 def _resolve_profile_root(mode: str) -> Tuple[str, Path]:
     profile = "events+trace" if mode == "events+trace" else "events-only"
-    root = Path("artifacts/scalim-viz/examples/demo_big_data_report") / profile / "scalim-viz"
+    root = Path(".tmp/artifacts/scalim-viz/examples/demo_big_data_report") / profile / "scalim-viz"
     return profile, root
 
 

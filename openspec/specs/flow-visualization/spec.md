@@ -87,7 +87,7 @@ VizEvent MUST 至少包含 `schema_version`、`run_id`、`event_type`、`timesta
 系统 SHALL 在每条 VizEvent 中写入 `schema_version`,且 MUST 为 `vizevent/v1`;事件体的 key/结构保持固定,`event_type` 等语义字段允许演进,但需在文档中维护映射说明.
 
 #### Scenario: 兼容现有示例回放
-- **GIVEN** 已存在的 `artifacts/scalim-viz/examples/**/viz_events.jsonl`
+- **GIVEN** 已存在的 `.tmp/artifacts/scalim-viz/examples/**/viz_events.jsonl`
 - **WHEN** 新版本产出 VizEventStream
 - **THEN** 输出事件的 key/结构应与示例口径兼容(同一层级结构与必需字段),UI 可继续回放
 
@@ -305,7 +305,7 @@ workflow bundle 支持 MUST 为增量扩展，不得破坏现有单 run replay �
 
 ## Notes
 - 前端实现位于 `frontend/scalim-viz/`(Svelte + Tailwind + XYFlow).
-- 示例数据位于 `artifacts/scalim-viz/examples/`.
+- 示例数据默认生成到 `.tmp/artifacts/scalim-viz/examples/`(不提交).
 
 ### Requirement: VizObserver 热点必须分离配置、事件建模、快照增强与文件输出职责
 系统 MUST 允许将 `ob/presets/viz.py` 按职责拆分为内部协作单元,至少包括配置/路径解析、执行事件到 VizEvent 的映射、快照与 meta 增强、文件输出/落盘.
