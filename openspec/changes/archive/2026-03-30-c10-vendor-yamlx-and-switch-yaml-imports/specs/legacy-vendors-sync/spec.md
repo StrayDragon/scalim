@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: vendors synced scalim MUST be able to parse YAML without external installs
-当 `src/scalim/` 通过 `scripts/vendor_sync.py` 被镜像到下游 `vendors/libs/scalim/` 导入链路后,系统 MUST 在 Python 3.6 环境中具备可用的 YAML 解析能力,且 MUST 不依赖下游额外安装 `PyYAML`/`ruamel.yaml`。
+当 `src/scalim/` 通过 `scripts/vendor-sync.py` 被镜像到下游 `vendors/libs/scalim/` 导入链路后,系统 MUST 在 Python 3.6 环境中具备可用的 YAML 解析能力,且 MUST 不依赖下游额外安装 `PyYAML`/`ruamel.yaml`。
 
 #### Scenario: downstream vendors runtime imports YAML DSL successfully
 - **GIVEN** 下游工程仅 vendors 化同步了 `src/scalim/` 源码,且运行环境为 Python 3.6

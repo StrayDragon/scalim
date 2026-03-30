@@ -1,10 +1,10 @@
 # ruff: noqa: INP001
 
-import importlib
 import json
-import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional
+
+from scalim_misc.prompt_eval.diff_validation import validate_patch_text
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -18,14 +18,6 @@ def _find_repo_root(start: Path) -> Path:
     return start
 
 
-def _import_validators(repo_root: Path) -> Tuple[Type[Any], Callable[..., Any]]:
-    scripts_dir = repo_root / "scripts"
-    sys.path.insert(0, str(scripts_dir))
-
-    module = importlib.import_module("prompt_eval.diff_validation")
-    return module.Issue, module.validate_patch_text
-
-
 def _grading_result(*, passed: bool, score: float, reason: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     payload: Dict[str, Any] = {"pass": passed, "score": score, "reason": reason}
     if details:
@@ -35,7 +27,6 @@ def _grading_result(*, passed: bool, score: float, reason: str, details: Optiona
 
 def get_assert(output: str, _context: Dict[str, Any]) -> Dict[str, Any]:
     repo_root = _find_repo_root(Path(__file__).resolve())
-    _, validate_patch_text = _import_validators(repo_root)
 
     patch_text = output or ""
     issues: List[Any] = validate_patch_text(patch_text, root=repo_root, allow_gen=False)

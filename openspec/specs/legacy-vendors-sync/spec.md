@@ -4,7 +4,7 @@
 ## Purpose
 为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。
 ## Related Code (as implemented)
-- `scripts/vendor_sync.py`（同步脚本: `python + rsync`）
+- `scripts/vendor-sync.py`（同步脚本: `python + rsync`）
 - `justfile`（`sync-project-vendors` recipe）
 ## Requirements
 ### Requirement: 提供 vendors 同步的 `just` 快捷入口
@@ -47,7 +47,7 @@
 - **THEN** 目标目录中的 `scalim/README.md` MUST 存在
 
 ### Requirement: vendors synced scalim MUST be able to parse YAML without external installs
-当 `src/scalim/` 通过 `scripts/vendor_sync.py` 被镜像到下游 `vendors/libs/scalim/` 导入链路后,系统 MUST 在 Python 3.6 环境中具备可用的 YAML 解析能力,且 MUST 不依赖下游额外安装 `PyYAML`/`ruamel.yaml`。
+当 `src/scalim/` 通过 `scripts/vendor-sync.py` 被镜像到下游 `vendors/libs/scalim/` 导入链路后,系统 MUST 在 Python 3.6 环境中具备可用的 YAML 解析能力,且 MUST 不依赖下游额外安装 `PyYAML`/`ruamel.yaml`。
 
 #### Scenario: downstream vendors runtime imports YAML DSL successfully
 - **GIVEN** 下游工程仅 vendors 化同步了 `src/scalim/` 源码,且运行环境为 Python 3.6

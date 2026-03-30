@@ -263,7 +263,7 @@ sync-project-vendors PATH="" CONFIRM="":
     else
         args+=( --apply )
     fi
-    uv {{ UV_OPTIONS }} run python scripts/vendor_sync.py "${args[@]}"
+    uv {{ UV_OPTIONS }} run python scripts/vendor-sync.py "${args[@]}"
 
 # 生成: Agent Skill 数据
 gen-agent-skill:

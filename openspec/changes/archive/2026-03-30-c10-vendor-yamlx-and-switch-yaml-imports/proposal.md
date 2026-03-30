@@ -1,6 +1,6 @@
 ## Why
 
-下游存在年老旧项目（Python 3.6、无法随意安装第三方依赖）通过 `scripts/vendor_sync.py` 将 `src/scalim/` vendors 化后直接运行。当前 `scalim` 的 YAML 解析依赖 `PyYAML`（以及可能的 `ruamel.yaml`），在下游“只同步源码、不装依赖”的使用方式下会直接导入失败。
+下游存在年老旧项目（Python 3.6、无法随意安装第三方依赖）通过 `scripts/vendor-sync.py` 将 `src/scalim/` vendors 化后直接运行。当前 `scalim` 的 YAML 解析依赖 `PyYAML`（以及可能的 `ruamel.yaml`），在下游“只同步源码、不装依赖”的使用方式下会直接导入失败。
 
 我们需要在 `src/scalim/vendor/yamlx/` 内 vendors 化 YAML 相关依赖，并提供一个对 Python 3.6 友好、可复用的导入入口，使得 `scalim` 在被 vendors 化后仍能稳定解析 YAML DSL。
 

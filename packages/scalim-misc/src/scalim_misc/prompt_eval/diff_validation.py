@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _AUTOGEN_BEGIN_RE = re.compile(r"<!--\s*BEGIN AUTOGEN:([A-Za-z0-9_.-]+)\s*-->")
 _AUTOGEN_END_RE = re.compile(r"<!--\s*END AUTOGEN:([A-Za-z0-9_.-]+)\s*-->")
@@ -173,7 +175,7 @@ def validate_generated_file_boundary(file_patches: Sequence[FilePatch], *, allow
     return issues
 
 
-def validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root: Path) -> List[Issue]:
+def validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root: Path) -> List[Issue]:  # noqa: C901
     issues: List[Issue] = []
     for fp in file_patches:
         base_path = _effective_existing_path(root, fp)

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from prompt_eval.diff_validation import (
+from scalim_misc.prompt_eval.diff_validation import (
     Issue,
     parse_patch,
     read_text,

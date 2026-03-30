@@ -1,6 +1,6 @@
 ## Context
 
-下游旧工程通过 `scripts/vendor_sync.py` 将 `src/scalim/` 镜像到其 `vendors/libs/scalim/` 导入链路后直接运行，运行环境常见约束为：
+下游旧工程通过 `scripts/vendor-sync.py` 将 `src/scalim/` 镜像到其 `vendors/libs/scalim/` 导入链路后直接运行，运行环境常见约束为：
 
 - Python 3.6（无法升级）
 - 无法/不允许在目标环境中 `pip install` 安装依赖
