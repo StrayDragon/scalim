@@ -47,22 +47,29 @@
 - 保持现状:依赖 compilation 是 dataclass 且允许 replace,但会持续放大耦合与语义回流。
 - 将注入逻辑下沉到 DSL compilation 阶段:会让 DSL adapter 反向依赖 workflow runtime 的运行期决策,违反分层。
 
-### 3) adaptive per-task 子 runtime 必须继承 run-level key_normalization
-**Decision:** 在 adaptive scheduler 创建 per-task `ExecutionRuntime` 时显式传入父 runtime 的 `key_normalization`.
+### 3) adaptive per-task 子 runtime 必须继承 run-level 配置(`key_normalization` + 诊断开关)
+**Decision:** 在 adaptive scheduler 创建 per-task `ExecutionRuntime` 时:
 
-**Why:** `key_normalization` 影响 lookup 命中与诊断,属于 run-level 配置.子 runtime 回退默认值会造成 `seq` 与 `adaptive` 的结果差异,属于不可接受的语义漂移。
+- MUST 显式传入父 runtime 的 `key_normalization`(不依赖默认值)。
+- MUST 从父 runtime 派生 `HookManager`/`ObserverManager` 的 capture manager(而不是新建默认 manager),以确保 `fallback_logger_enabled`/debugging/loader result 策略等诊断开关在 `seq` 与 `adaptive` 下语义等价。
+
+**Why:** `key_normalization` 影响 lookup 命中与诊断,属于 run-level 配置.子 runtime 回退默认值会造成 `seq` 与 `adaptive` 的结果差异,属于不可接受的语义漂移。与此同时,诊断开关与事件元信息(run_id 等)若在 per-task runtime 漂移,会让 adaptive 路径出现“看起来没开诊断/行为不同”的隐性差异,同样不可接受。
 
 **Alternatives considered:**
 - 让子 runtime 读取全局/模块级配置:隐式且不可测试,违反显式契约。
-- 在 normalize 函数里额外读取父 runtime:仍然隐式耦合,且容易遗漏其它需要继承的配置项。
+- 在 normalize/emit 函数里额外读取父 runtime:仍然隐式耦合,且容易遗漏其它需要继承的配置项。
+- 为子 runtime 新建 `HookManager`/`ObserverManager` 默认实例:实现快但会导致 fallback logger/诊断开关漂移,并破坏 capture+replay 的可推理性。
 
-### 4) typed artifact (`InMemoryRows`) 公开入口收敛到稳定 facade
-**Decision:** 为 `InMemoryRows` 提供稳定公开导入路径(优先落在 `IMPL_ROOT.sinks` 的 facade),并替换 workflow/execution 对 `_internal` 的直接依赖.
+### 4) typed artifact (`InMemoryRows`) 公开入口收敛到稳定 facade 子模块
+**Decision:** 为 `InMemoryRows` 提供稳定公开导入路径 `scalim.sinks.rows`,并替换 workflow/execution 对 `sinks._internal.*` 的直接依赖.
 
-**Why:** `_internal` 模块不作为契约,跨层依赖会把内部实现路径固化为事实 API,放大未来重构成本.
+同时 `scalim.sinks.rows` SHOULD 作为一组“成熟可用”的稳定入口,导出 `InMemoryRows` 的必要配套类型/工具(例如 `InMemoryRowsSink`/`in_memory_rows_to_in_memory_csv`/`iter_in_memory_rows_as_main_rows`)。
+
+**Why:** `_internal` 模块不作为契约,跨层依赖会把内部实现路径固化为事实 API,放大未来重构成本.另外,此前已做过 `scalim.sinks` 包根导出面收敛,本变更选择稳定子模块而不是把符号放回包根,以避免 public surface 反复膨胀。
 
 **Alternatives considered:**
 - 继续使用 `_internal` 导入:短期最省,长期会反噬(与 module-organization/specs 目标冲突)。
+- 将稳定入口放回 `scalim.sinks` 包根:迁移成本更低但会扩大包根导出面,与既有收敛方向冲突。
 - 将类型挪到 workflow 包:execution 也需要该类型,会导致 execution 依赖 workflow,破坏分层。
 
 ### 5) execution contracts 与 orchestration 可拆分但保持稳定入口
@@ -96,8 +103,4 @@
    - `just quick-qa-only-py` 或 `just qa` 做全量回归。
    - `just openspec-check` 确保工件可归档/可发布。
 
-## Open Questions
-
-- 除 `key_normalization` 外,adaptive per-task runtime 还需要继承哪些 run-level 配置才算“语义等价”(例如 fallback logger、其它诊断开关)？本变更先以 spec 明确 `key_normalization` 为底线,其余按需要增量补齐。
-- `InMemoryRows` 的稳定入口是否直接放入 `IMPL_ROOT.sinks` 包根,或采用更细的子模块以限制导出面？本变更优先选择最小迁移成本的稳定入口,并由 public api manifest gate 守护。
-
+<!-- Open Questions resolved in Decisions 3/4 -->

@@ -3,7 +3,8 @@
 - [ ] 1.1 新增回归测试: `parallel_mode=adaptive` 下 per-task 子 runtime 继承 `key_normalization`,并与 `seq` 命中/诊断语义等价。
 - [ ] 1.2 新增回归测试: workflow depends_on 传递可见性在 ctx refs 与 artifacts 可见性校验中一致(覆盖可见/不可见与错误 path)。
 - [ ] 1.3 新增回归测试: workflow main_rows wiring 与 typed rows capture/release 行为不回归(仅对被引用 producer 捕获,最后 consumer 结束后释放)。
-- [ ] 1.4 新增导入面回归测试: `InMemoryRows` 可从稳定 facade 导入,且 workflow/execution 不再直接 import `sinks._internal.rows`。
+- [ ] 1.4 新增导入面回归测试: `InMemoryRows` 可从稳定 facade `scalim.sinks.rows` 导入,且 workflow/execution 不再直接 import `sinks._internal.rows`。
+- [ ] 1.5 新增回归测试: adaptive per-task 子 runtime 的 hook/observer MUST 由父 runtime 派生 capture manager,并继承 `fallback_logger_enabled` 等诊断开关(避免 `seq`/`adaptive` 漂移)。
 
 ## 2. Adaptive runtime config propagation (key_normalization)
 
@@ -23,7 +24,7 @@
 
 ## 5. Typed intermediate store stable import path (`InMemoryRows`)
 
-- [ ] 5.1 将 `InMemoryRows`(及其必要配套类型)提升到稳定公开导入路径(优先 `src/scalim/sinks/__init__.py` 的显式 `__all__` 白名单)。
+- [ ] 5.1 将 `InMemoryRows`(及其必要配套类型)提升到稳定公开导入路径 `scalim.sinks.rows`(不放回 `scalim.sinks` 包根),并用显式 `__all__` 白名单治理。
 - [ ] 5.2 替换 workflow/execution 对内部实现路径(`sinks._internal.*`)的直接依赖,保持行为等价。
 - [ ] 5.3 更新 public API 约定(如入口变化):更新 `docs/doc/getting-started/public-api.md`,并通过 `scripts/check-api-surface-governance.py` + `scripts/check-user-material-import-boundaries.py` + `tests/test_example_public_api_suite.py` 验收。
 

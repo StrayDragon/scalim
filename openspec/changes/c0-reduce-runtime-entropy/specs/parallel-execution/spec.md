@@ -14,3 +14,16 @@
 - **THEN** adaptive worker 的 lookup 命中/缺失语义 MUST 与串行路径一致
 - **AND** 系统 MUST NOT 因子运行时回退到默认 `raw` 而产生额外的 miss
 
+### Requirement: adaptive per-task runtimes MUST inherit observability config via capture managers
+当 `parallel_mode=adaptive` 创建 per-task 子运行时(用于执行单个 `LoadRef(keys)` 任务并在提交点回放事件)时,系统 MUST 继承本次 run-level 的诊断/可观测性配置,避免并发路径与串行路径在“是否产生日志/事件/诊断”的语义上漂移。
+
+说明:
+- 子运行时 MUST 从父 runtime 派生 `HookManager`/`ObserverManager` 的 capture manager(而不是新建默认 manager)。
+- 继承范围至少包括 `fallback_logger_enabled`、debug 开关、loader result 策略以及同一 run 口径的元信息(例如 `run_id`)。
+
+#### Scenario: adaptive per-task runtime keeps the same observability toggles as the parent run
+- **GIVEN** 本次运行启用 `fallback_logger_enabled`
+- **AND** 本次运行存在特定的 hook/observer 订阅与 loader result 策略
+- **WHEN** 系统在 adaptive 下创建 per-task 子运行时并执行 `LoadRef(keys)`
+- **THEN** 子运行时 MUST 使用与父运行时一致的诊断开关与订阅发现口径
+- **AND** 子运行时产生的 hook/observer 事件 MUST 可在提交点被 capture+replay(与串行路径可比对)

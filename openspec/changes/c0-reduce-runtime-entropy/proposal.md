@@ -15,9 +15,9 @@
   - 将 workflow 对 demand compilation 的“运行期回写”改为显式 request overrides 合成:编译产物保持纯编译结果,运行期注入通过独立对象表达。
 - execution runtime 降熵:
   - 明确 execution 的 contracts 与 orchestration 的边界:允许将 `ExecutionRequest/ExecutionResult` 等 DSL-agnostic 契约抽离到独立模块,并保持 `run_ir` 稳定入口。
-  - 修复 adaptive worker 子 runtime 的关键运行期开关继承,保证 `seq` 与 `adaptive` 在同一 run-level 配置下语义一致(尤其是 `key_normalization`)。
+  - 修复 adaptive worker 子 runtime 的关键 run-level 配置继承,保证 `seq` 与 `adaptive` 在同一 run-level 配置下语义一致(尤其是 `key_normalization`,以及 fallback logger 等诊断开关口径)。
 - typed intermediate store 边界收敛:
-  - 将 workflow 中间态 `InMemoryRows` 的契约导入路径从 `_internal` 泄漏中收敛到稳定入口(避免跨层绑定内部实现路径),并保持现有行为与值域约束不变。
+  - 将 workflow 中间态 `InMemoryRows` 的契约导入路径从 `_internal` 泄漏中收敛到稳定入口 `scalim.sinks.rows`(避免跨层绑定内部实现路径),并保持现有行为与值域约束不变。
 
 ## Capabilities
 
@@ -44,4 +44,3 @@
   - SSOT 为 `openspec/specs/<capability>/spec.md`
   - 本 change 的增量规范写入 `openspec/changes/c0-reduce-runtime-entropy/specs/<capability>/spec.md`
   - 提交前运行 `just openspec-check` 做 sanitize + 结构校验。
-
