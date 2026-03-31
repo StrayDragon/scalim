@@ -51,9 +51,12 @@ main_source:
     amount:
       extract: amount
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [amount]
 """.lstrip(),
         encoding="utf-8",

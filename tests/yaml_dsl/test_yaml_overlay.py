@@ -66,7 +66,7 @@ sources: {}
     assert target.output.sheet_name == "Detail"
     assert target.output.include_header is True
     assert target.layout.field_ids == ("amount", "order_id")
-    assert target.layout.header_names is None
+    assert target.layout.header_names == ("Amount", "Order ID")
 
 
 def test_compile_overrides_outputs_empty_rejected(tmp_path: Path) -> None:
@@ -109,7 +109,7 @@ sources: {}
         outputs=[
             {
                 "name": "detail",
-                "container": {"type": "csv", "path": "./out.csv"},
+                "to": {"file": "detail_csv"},
                 "fields": ["order_id"],
                 "where": "order_id != ''",
             }
@@ -125,50 +125,9 @@ sources: {}
         ({"name": "detail"}, TypeError, r"overrides\.outputs must be a list"),
         (["detail"], TypeError, r"overrides\.outputs\.0 must be an object"),
         (
-            [{"name": "detail", "container": "csv", "fields": ["order_id"]}],
-            TypeError,
-            r"overrides\.outputs\.0\.container must be an object",
-        ),
-        (
-            [{"name": "detail", "container": {}, "fields": ["order_id"]}],
+            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]}],
             ValueError,
-            r"overrides\.outputs\.0\.container\.type is required",
-        ),
-        (
-            [{"name": "detail", "container": {"type": "json", "path": "./out.csv"}, "fields": ["order_id"]}],
-            ValueError,
-            r"overrides\.outputs\.0\.container\.type='json' is invalid",
-        ),
-        (
-            [{"name": "detail", "container": {"type": "csv"}, "fields": ["order_id"]}],
-            ValueError,
-            r"overrides\.outputs\.0\.container\.path is required",
-        ),
-        (
-            [{"name": "detail", "container": {"type": "csv", "path": 123}, "fields": ["order_id"]}],
-            TypeError,
-            r"overrides\.outputs\.0\.container\.path must be a non-empty string",
-        ),
-        (
-            [
-                {
-                    "name": "detail",
-                    "container": {"type": "csv", "path": "./out.csv", "header_fields_output_by": "bad"},
-                    "fields": ["order_id"],
-                }
-            ],
-            ValueError,
-            r"overrides\.outputs\.0\.container\.header_fields_output_by='bad' is invalid",
-        ),
-        (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv", "streaming": False}, "fields": ["order_id"]}],
-            ValueError,
-            r"overrides\.outputs\.0\.container\.streaming must be true",
-        ),
-        (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv", "sheet": "Detail"}, "fields": ["order_id"]}],
-            ValueError,
-            r"overrides\.outputs\.0\.container has unknown keys: sheet",
+            r"overrides\.outputs\.0\.container was removed",
         ),
         (
             [{"name": "detail", "to": "report", "fields": ["order_id"]}],
@@ -186,77 +145,80 @@ sources: {}
             r"overrides\.outputs\.0\.write\.mode must be a string",
         ),
         (
-            [{"container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]}],
+            [{"to": {"file": "detail_csv"}, "fields": ["order_id"]}],
             ValueError,
             r"overrides\.outputs\.0\.name is required",
         ),
         (
-            [{"name": "bad-name", "container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]}],
+            [{"name": "bad-name", "to": {"file": "detail_csv"}, "fields": ["order_id"]}],
             ValueError,
             r"overrides\.outputs\.0\.name='bad-name' is invalid",
         ),
         (
             [
-                {"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]},
-                {"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]},
+                {"name": "detail", "to": {"file": "detail_csv"}, "fields": ["order_id"]},
+                {"name": "detail", "to": {"file": "detail_csv"}, "fields": ["order_id"]},
             ],
             ValueError,
             r"overrides\.outputs has duplicate output name: detail",
         ),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": "order_id"}],
+            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": "order_id"}],
             TypeError,
             r"overrides\.outputs\.0\.fields must be a list",
         ),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": []}],
+            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": []}],
             ValueError,
             r"overrides\.outputs\.0\.fields must not be empty",
         ),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": [123]}],
+            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": [123]}],
             TypeError,
             r"overrides\.outputs\.0\.fields\.0 must be a field_id string",
         ),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": [""]}],
+            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": [""]}],
             ValueError,
             r"overrides\.outputs\.0\.fields\.0 must not be empty",
         ),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": ["unknown"]}],
+            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": ["unknown"]}],
             ValueError,
             r"overrides\.outputs\.0\.fields reference unknown fields: unknown",
         ),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "to": {"book": "report"}, "fields": ["order_id"]}],
+            [{"name": "detail", "to": {"file": "detail_csv", "book": "report"}, "fields": ["order_id"]}],
             ValueError,
-            r"overrides\.outputs\.0 cannot declare both container and to",
+            r"overrides\.outputs\.0\.to must declare exactly one of to\.file or to\.book",
         ),
         (
             [
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": "./out.csv"},
+                    "to": {"file": "detail_csv"},
                     "write": {"mode": "append"},
                     "fields": ["order_id"],
                 }
             ],
             ValueError,
-            r"overrides\.outputs\.0 cannot declare write for csv container outputs",
+            r"overrides\.outputs\.0\.write\.mode only apply to book outputs",
+        ),
+        (
+            [{"name": "detail", "to": {"sheet": "Detail"}, "fields": ["order_id"]}],
+            ValueError,
+            r"overrides\.outputs\.0\.to must declare exactly one of to\.file or to\.book",
+        ),
+        (
+            [{"name": "detail", "to": {"file": "detail_csv"}, "write": {"header_fields_output_by": "bad"}, "fields": ["order_id"]}],
+            ValueError,
+            r"overrides\.outputs\.0\.write\.header_fields_output_by='bad' is invalid",
         ),
     ],
     ids=[
         "outputs-not-list",
         "item-not-object",
-        "container-not-object",
-        "container-type-required",
-        "container-type-invalid",
-        "container-path-required",
-        "path-invalid-type",
-        "header-by-invalid",
-        "streaming-must-be-true",
-        "container-unknown-key",
+        "container-removed",
         "to-not-object",
         "write-not-object",
         "write-mode-not-string",
@@ -268,8 +230,10 @@ sources: {}
         "fields-item-not-string",
         "fields-item-empty",
         "fields-unknown",
-        "container-and-to-conflict",
-        "container-and-write-conflict",
+        "to-file-and-book-conflict",
+        "file-output-book-write-conflict",
+        "sheet-without-binding",
+        "write-header-by-invalid",
     ],
 )
 def test_compile_overrides_outputs_rejects_invalid_payloads(tmp_path: Path, outputs, exc_type, match: str) -> None:
@@ -314,10 +278,11 @@ sources: {}
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": {"$init_var": "out_path"}},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": {"$init_var": "out_path"}}}},
         ),
     )
 
@@ -347,10 +312,11 @@ sources: {}
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": output_path},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": output_path}}},
         ),
     )
 
@@ -380,10 +346,11 @@ sources: {}
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": "./out.csv"},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": "./out.csv"}}},
         ),
     )
 
@@ -414,29 +381,34 @@ sources: {}
                 outputs=[
                     {
                         "name": "detail",
-                        "container": {"type": "csv", "path": "./out.csv", "header_fields_output_by": "name"},
+                        "to": {"file": "detail_csv"},
+                        "write": {"header_fields_output_by": "name"},
                         "fields": ["order_id", "amount"],
                     }
-                ]
+                ],
+                resources={"files": {"detail_csv": {"kind": "csv_file", "path": "./out.csv"}}},
             ),
         )
 
 
-def test_should_validate_unique_field_names_skips_outputs_without_container() -> None:
+def test_should_validate_unique_field_names_skips_field_id_headers() -> None:
     from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
     from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
-    from scalim.dsl.by_yaml.schema_dsl.models import OutputContainerConfig, OutputTargetConfig
+    from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig, OutputToConfig, OutputWriteConfig
 
     loader = YamlDemandLoader()
     config = loader.load_string(
         """
-name: overlay_unique_names_skip_container
+name: overlay_unique_names_skip_field_id
 main_source:
   source_id: orders
   loader: tests.fixtures.mock_loaders.mock_loader
   fields:
     order_id: {extract: order_id}
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 """
     )
 
@@ -444,7 +416,8 @@ sources: {}
         OutputTargetConfig(
             name="base",
             from_=None,
-            container=OutputContainerConfig(type="csv", path="./out.csv", header_fields_output_by="field_id"),
+            to=OutputToConfig(file="detail_csv"),
+            write=OutputWriteConfig(header_fields_output_by="field_id"),
             fields=("order_id",),
             where=None,
             aggregate=None,
@@ -453,7 +426,6 @@ sources: {}
         OutputTargetConfig(
             name="derived",
             from_="base",
-            container=None,
             fields=("order_id",),
             where=None,
             aggregate=None,
@@ -462,6 +434,41 @@ sources: {}
     )
 
     assert compiler_mod._should_validate_unique_effective_field_display_names(config, outputs) is False  # noqa: SLF001
+
+
+def test_should_validate_unique_field_names_includes_books_outputs() -> None:
+    from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
+    from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig, OutputToConfig
+
+    loader = YamlDemandLoader()
+    config = loader.load_string(
+        """
+name: overlay_unique_names_books
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id: {extract: order_id}
+sources: {}
+resources:
+  books:
+    report: {kind: xlsx_file, path: ./out.xlsx}
+"""
+    )
+
+    outputs = (
+        OutputTargetConfig(
+            name="detail",
+            to=OutputToConfig(book="report", sheet="明细"),
+            fields=("order_id",),
+            where=None,
+            aggregate=None,
+            requires=(),
+        ),
+    )
+
+    assert compiler_mod._should_validate_unique_effective_field_display_names(config, outputs) is True  # noqa: SLF001
 
 
 def test_validate_unique_field_names_rejects_duplicates_by_default(tmp_path: Path) -> None:
@@ -482,8 +489,11 @@ main_source:
 sources: {}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id, amount]
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 """,
     )
 
@@ -493,6 +503,39 @@ outputs:
     assert any("'ID'" in env.message for env in excinfo.value.errors)
     assert any("main_source.fields.order_id" in env.message for env in excinfo.value.errors)
     assert any("main_source.fields.amount" in env.message for env in excinfo.value.errors)
+
+
+def test_validate_unique_field_names_rejects_duplicates_for_books_by_default(tmp_path: Path) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: overlay_unique_names_books_default
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+      name: ID
+    amount:
+      extract: amount
+      name: ID
+sources: {}
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./out.xlsx
+outputs:
+  - name: detail
+    to: {book: report, sheet: 明细}
+    fields: [order_id, amount]
+""",
+    )
+
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    assert any("Duplicate effective field display names" in env.message for env in excinfo.value.errors)
 
 
 def test_validate_unique_field_names_can_be_disabled(tmp_path: Path) -> None:
@@ -514,8 +557,11 @@ main_source:
 sources: {}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id, amount]
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 """,
     )
 

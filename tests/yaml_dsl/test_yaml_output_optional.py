@@ -45,10 +45,11 @@ sources: {}
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": str(out_path)},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(out_path)}}},
         ),
     )
 

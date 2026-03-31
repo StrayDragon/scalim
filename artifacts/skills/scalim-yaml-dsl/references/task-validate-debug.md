@@ -76,7 +76,7 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 ### `Legacy YAML syntax is not supported: top-level 'output'. ...`
 
 - 顶层 `output:` 已移除;必须升级为 `outputs:`(list)
-- 把输出参数移到 `outputs.*.container`,把输出字段移到 `outputs.*.fields`
+- 把输出参数移到 `resources.files.*` + `outputs.*.to/write`,把输出字段移到 `outputs.*.fields`
 - 参考: [task-upgrade-legacy.md](task-upgrade-legacy.md) / `references/upgrades/`(按批次阅读迁移说明)
 
 ### `Field 'xxx' is defined multiple times; field_id must be unique ...`

@@ -29,11 +29,19 @@ sources:
     key: id
     cache_mode: preload_forever
 
+resources:
+  files:
+    metrics_csv:
+      kind: csv_file
+      path: ./metrics.csv
+
 outputs:
   - name: metrics
     to:
       book: report
       sheet: Metrics
+    write:
+      header_fields_output_by: field_id
     aggregate: &metrics_agg
       group_by: [region_name_display]
       fields:
@@ -41,10 +49,9 @@ outputs:
         sum_order_amount: {sum: {field: order_amount}}
 
   - name: metrics_csv
-    container:
-      type: csv
-      path: ./metrics.csv
+    to:
+      file: metrics_csv
+    write:
       header_fields_output_by: field_id
       include_header: true
-      streaming: true
     aggregate: *metrics_agg

@@ -69,15 +69,15 @@ def test_find_unknown_fields_traverses_array_items_and_oneof_branch() -> None:
     schema = {
         "type": "object",
         "properties": {
-            "outputs": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "container": {
+            "resources": {
+                "type": "object",
+                "properties": {
+                    "files": {
+                        "type": "object",
+                        "additionalProperties": {
                             "type": "object",
                             "properties": {
-                                "type": {"type": "string"},
+                                "kind": {"type": "string"},
                                 "path": {
                                     "oneOf": [
                                         {"type": "string"},
@@ -90,31 +90,48 @@ def test_find_unknown_fields_traverses_array_items_and_oneof_branch() -> None:
                                 },
                             },
                             "additionalProperties": False,
+                        },
+                    }
+                },
+                "additionalProperties": False,
+            },
+            "outputs": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "to": {
+                            "type": "object",
+                            "properties": {
+                                "file": {"type": "string"},
+                            },
+                            "additionalProperties": False,
                         }
                     },
                     "additionalProperties": False,
                 },
-            }
+            },
         },
         "additionalProperties": False,
     }
 
     yaml_data = {
-        "outputs": [
-            {
-                "container": {
-                    "type": "workbook",
+        "resources": {
+            "files": {
+                "detail_csv": {
+                    "kind": "csv_file",
                     "path": {"$init_var": "out_path", "other": 1},
                     "unknown_field": 1,
                 }
             }
-        ]
+        },
+        "outputs": [{"to": {"file": "detail_csv"}}],
     }
 
     issues = find_unknown_fields(yaml_data, schema)
     paths = {issue.path for issue in issues}
-    assert "outputs.0.container.unknown_field" in paths
-    assert "outputs.0.container.path.other" in paths
+    assert "resources.files.detail_csv.unknown_field" in paths
+    assert "resources.files.detail_csv.path.other" in paths
 
 
 def test_find_unknown_fields_returns_empty_for_unknown_schema_shape() -> None:

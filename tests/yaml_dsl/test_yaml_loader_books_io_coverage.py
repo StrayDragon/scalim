@@ -9,7 +9,6 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     BOOK_WRITE_DEFAULTS_KEYS,
     DEMAND_KEYS,
     RESOURCES_KEYS,
-    OutputContainerConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -19,8 +18,8 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
 def test_outputs_parser_book_binding_requires_explicit_to_book() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"outputs\.0\.to\.book is required"):
-        loader._validate_book_binding_semantics(OutputTargetConfig(name="detail", fields=("a",)), idx=0)  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"outputs\.0\.to is required; declare exactly one of to\.file or to\.book"):
+        loader._validate_output_binding_semantics(OutputTargetConfig(name="detail", fields=("a",)), idx=0)  # noqa: SLF001
 
 
 def test_loader_parse_resources_book_mapping_errors_cover_branches() -> None:
@@ -182,26 +181,46 @@ def test_outputs_parser_write_enum_errors_cover_branches() -> None:
     with pytest.raises(ValueError, match=r"o\.on_conflict=.*expected one of"):
         _ = loader._parse_output_write({"on_conflict": "nope"}, base_path="o")  # noqa: SLF001
 
+    with pytest.raises(ValueError, match=r"o\.header_fields_output_by=.*expected one of"):
+        _ = loader._parse_output_write({"header_fields_output_by": "nope"}, base_path="o")  # noqa: SLF001
 
-def test_outputs_parser_container_semantics_errors_cover_branches() -> None:
+    cfg = loader._parse_output_write({"header_fields_output_by": "field_id"}, base_path="o")  # noqa: SLF001
+    assert cfg.header_fields_output_by == "field_id"
+
+
+def test_outputs_parser_binding_semantics_errors_cover_branches() -> None:
     loader = YamlDemandLoader()
 
-    base_container = OutputContainerConfig(type="csv", path="./out.csv", streaming=True)
-
-    with pytest.raises(ValueError, match=r"cannot declare both container and to"):
-        t = OutputTargetConfig(name="detail", container=base_container, to=OutputToConfig(book="report"), fields=("a",))
-        loader._validate_output_container_semantics(t, "detail")  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"cannot declare write for csv container outputs"):
+    with pytest.raises(ValueError, match=r"declare exactly one of to\.file or to\.book"):
         t = OutputTargetConfig(
             name="detail",
-            container=base_container,
+            to=OutputToConfig(file="detail_csv", book="report"),
+            fields=("a",),
+        )
+        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"to\.sheet requires outputs\.0\.to\.book"):
+        t = OutputTargetConfig(
+            name="detail",
+            to=OutputToConfig(file="detail_csv", sheet="Detail"),
+            fields=("a",),
+        )
+        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"outputs\.0\.write\.mode only apply to book outputs"):
+        t = OutputTargetConfig(
+            name="detail",
+            to=OutputToConfig(file="detail_csv"),
             write=OutputWriteConfig(mode="append"),
             fields=("a",),
         )
-        loader._validate_output_container_semantics(t, "detail")  # noqa: SLF001
+        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"expected 'csv'"):
-        bad_container = OutputContainerConfig(type="json", path="./out.json", streaming=True)
-        t = OutputTargetConfig(name="detail", container=bad_container, fields=("a",))
-        loader._validate_output_container_semantics(t, "detail")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"outputs\.0\.write\.include_header is not allowed for append-mode book outputs"):
+        t = OutputTargetConfig(
+            name="detail",
+            to=OutputToConfig(book="report", sheet="Detail"),
+            write=OutputWriteConfig(mode="append", include_header=True),
+            fields=("a",),
+        )
+        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001

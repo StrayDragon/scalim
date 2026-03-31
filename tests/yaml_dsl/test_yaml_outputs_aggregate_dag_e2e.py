@@ -34,11 +34,14 @@ fields:
     )
     yaml_content += dedent(
         f"""
+resources:
+  files:
+    summary_csv:
+      kind: csv_file
+      path: "{out_path}"
 outputs:
   - name: summary
-    container:
-      type: csv
-      path: "{out_path}"
+    to: {{file: summary_csv}}
     where: "channel == 'direct'"
     aggregate:
       group_by: [customer_id]

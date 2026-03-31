@@ -28,13 +28,13 @@ retry:
   jitter: false
 
 _templates:
-  csv_container_detail_all: &csv_container_detail_all
-    type: csv
+  detail_all_csv_file: &detail_all_csv_file
+    kind: csv_file
     path: {$init_var: out_path_detail_all}
+    encoding: utf-8
+  csv_write_field_id: &csv_write_field_id
     header_fields_output_by: field_id
     include_header: true
-    streaming: true
-    encoding: utf-8
 
 main_source:
   source_id: impressions
@@ -157,9 +157,21 @@ fields:
     name: Cost USD (Adjusted)
     compute: "cost_usd * cpm_multiplier if cpm_multiplier is not None else cost_usd"
 
+resources:
+  files:
+    detail_all_csv: *detail_all_csv_file
+    detail_clicks_csv:
+      <<: *detail_all_csv_file
+      path: {$init_var: out_path_detail_clicks}
+    metrics_by_campaign_csv:
+      kind: csv_file
+      path: {$init_var: out_path_metrics_by_campaign}
+      encoding: utf-8
+
 outputs:
   - name: detail_all
-    container: *csv_container_detail_all
+    to: {file: detail_all_csv}
+    write: *csv_write_field_id
     fields:
       - *impression_id
       - user_id
@@ -177,18 +189,12 @@ outputs:
   - name: detail_clicks
     from: detail_all
     where: "is_click"
-    container:
-      <<: *csv_container_detail_all
-      path: {$init_var: out_path_detail_clicks}
+    to: {file: detail_clicks_csv}
+    write: *csv_write_field_id
 
   - name: metrics_by_campaign
-    container:
-      type: csv
-      path: {$init_var: out_path_metrics_by_campaign}
-      header_fields_output_by: field_id
-      include_header: true
-      streaming: true
-      encoding: utf-8
+    to: {file: metrics_by_campaign_csv}
+    write: *csv_write_field_id
     aggregate:
       group_by:
         - *campaign_name

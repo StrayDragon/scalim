@@ -12,6 +12,7 @@ from ..schema_dsl.models import (
     BOOK_KEYS,
     BOOK_WRITE_DEFAULTS_KEYS,
     DEMAND_KEYS,
+    FILE_KEYS,
     OUTPUT_EXTRA_SHEET_KEYS,
     RESOURCES_KEYS,
     BookBudgetConfig,
@@ -19,6 +20,7 @@ from ..schema_dsl.models import (
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
     DemandConfig,
+    FileConfig,
     OutputExtraSheetConfig,
     ResourcesConfig,
 )
@@ -34,6 +36,7 @@ from ..schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
+    FILE_KINDS,
 )
 from .error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from .imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
@@ -340,34 +343,52 @@ class YamlDemandLoader(
             observability=observability,
         )
 
-    def _parse_resources(self, raw: RawDemand) -> Optional[ResourcesConfig]:
+    def _parse_resources(self, raw: RawDemand) -> Optional[ResourcesConfig]:  # noqa: C901, PLR0912
         resources_dict = raw.get_mapping(DEMAND_KEYS["resources"])
         if resources_dict is None:
             return None
 
+        books: Dict[str, BookConfig] = {}
         books_dict = mapping_or_none(resources_dict.get(RESOURCES_KEYS["books"]))
         if books_dict is None:
-            # `resources: {}` 允许(空映射).
-            if RESOURCES_KEYS["books"] not in resources_dict:
-                return ResourcesConfig()
-            msg = "resources.books must be an object"
-            raise TypeError(msg)
-
-        books: Dict[str, BookConfig] = {}
-        for raw_book_id, raw_book_cfg in books_dict.items():
-            book_id = str(raw_book_id or "").strip()
-            if not book_id:
-                msg = "resources.books key must be a non-empty string"
-                raise ValueError(msg)
-
-            book_cfg_dict = mapping_or_none(raw_book_cfg)
-            if book_cfg_dict is None:
-                msg = "resources.books.{} must be an object".format(book_id)
+            if RESOURCES_KEYS["books"] in resources_dict:
+                msg = "resources.books must be an object"
                 raise TypeError(msg)
+        else:
+            for raw_book_id, raw_book_cfg in books_dict.items():
+                book_id = str(raw_book_id or "").strip()
+                if not book_id:
+                    msg = "resources.books key must be a non-empty string"
+                    raise ValueError(msg)
 
-            books[book_id] = self._parse_book_config(book_cfg_dict, base_path="resources.books.{}".format(book_id))
+                book_cfg_dict = mapping_or_none(raw_book_cfg)
+                if book_cfg_dict is None:
+                    msg = "resources.books.{} must be an object".format(book_id)
+                    raise TypeError(msg)
 
-        return ResourcesConfig(books=books)
+                books[book_id] = self._parse_book_config(book_cfg_dict, base_path="resources.books.{}".format(book_id))
+
+        files: Dict[str, FileConfig] = {}
+        files_dict = mapping_or_none(resources_dict.get(RESOURCES_KEYS["files"]))
+        if files_dict is None:
+            if RESOURCES_KEYS["files"] in resources_dict:
+                msg = "resources.files must be an object"
+                raise TypeError(msg)
+        else:
+            for raw_file_id, raw_file_cfg in files_dict.items():
+                file_id = str(raw_file_id or "").strip()
+                if not file_id:
+                    msg = "resources.files key must be a non-empty string"
+                    raise ValueError(msg)
+
+                file_cfg_dict = mapping_or_none(raw_file_cfg)
+                if file_cfg_dict is None:
+                    msg = "resources.files.{} must be an object".format(file_id)
+                    raise TypeError(msg)
+
+                files[file_id] = self._parse_file_config(file_cfg_dict, base_path="resources.files.{}".format(file_id))
+
+        return ResourcesConfig(books=books, files=files)
 
     def _parse_book_config(self, raw: Dict[str, Any], *, base_path: str) -> BookConfig:  # noqa: C901
         kind = str(raw.get(BOOK_KEYS["kind"]) or "").strip()
@@ -426,6 +447,23 @@ class YamlDemandLoader(
             write_lock=write_lock,
             write_defaults=write_defaults_cfg,
         )
+
+    def _parse_file_config(self, raw: Dict[str, Any], *, base_path: str) -> FileConfig:
+        kind = str(raw.get(FILE_KEYS["kind"]) or "").strip()
+        if not kind:
+            msg = "{}.kind is required".format(base_path)
+            raise ValueError(msg)
+        if kind not in FILE_KINDS:
+            msg = "{}.kind={!r} is invalid; expected one of: {}".format(base_path, kind, ", ".join(FILE_KINDS))
+            raise ValueError(msg)
+
+        path = self._parse_path_or_init_var(raw.get(FILE_KEYS["path"]), path="{}.path".format(base_path))
+        if not path or (isinstance(path, str) and not path.strip()):
+            msg = "{}.path is required for kind=csv_file".format(base_path)
+            raise ValueError(msg)
+
+        encoding = str(raw.get(FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
+        return FileConfig(kind=kind, path=path, encoding=encoding)
 
     def _parse_path_or_init_var(self, raw: object, *, path: str) -> Any:
         if isinstance(raw, dict):

@@ -64,10 +64,11 @@ def _write_yaml_with_output_path(tmp_path: Path, source_path: Path, output_path:
     config = yaml.safe_load(source_path.read_text(encoding="utf-8"))
     if not isinstance(config, dict):
         raise TypeError("expected mapping")
+    config["resources"] = {"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}}
     config["outputs"] = [
         {
             "name": "detail",
-            "container": {"type": "csv", "path": str(output_path)},
+            "to": {"file": "detail_csv"},
             "fields": ["order_id"],
         }
     ]
@@ -131,10 +132,11 @@ def test_run_outputs_and_returns_data(
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": str(output_path)},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
         ),
         sink=sink,
     )
@@ -162,10 +164,12 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": str(output_path), "header_fields_output_by": "name"},
+                    "to": {"file": "detail_csv"},
+                    "write": {"header_fields_output_by": "name"},
                     "fields": fields,
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
         ),
     )
 
@@ -178,6 +182,52 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
     expected_headers = list(export_layout.header_names or export_layout.field_ids)
     assert header == expected_headers
     assert first_row[0] != ""
+
+
+@pytest.mark.parametrize(
+    ("write_cfg", "expected_header"),
+    [
+        ({}, ["订单ID", "金额"]),
+        ({"header_fields_output_by": "field_id"}, ["order_id", "amount"]),
+    ],
+    ids=["books-default-name", "books-explicit-field-id"],
+)
+def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
+    example_model,
+    tmp_path: Path,
+    write_cfg,
+    expected_header,
+) -> None:
+    openpyxl = pytest.importorskip("openpyxl")
+    output_path = tmp_path / "order_report_books.xlsx"
+
+    _ = run(
+        str(_demo_yaml_path()),
+        allowed_modules=_ALLOWED_MODULES,
+        overrides=RunOverrides(
+            outputs=[
+                {
+                    "name": "detail",
+                    "to": {"book": "report", "sheet": "明细"},
+                    "write": write_cfg,
+                    "fields": ["order_id", "amount"],
+                }
+            ],
+            resources={
+                "books": {
+                    "report": {
+                        "kind": "xlsx_file",
+                        "path": str(output_path),
+                    }
+                }
+            },
+        ),
+    )
+
+    wb = openpyxl.load_workbook(str(output_path))
+    ws = wb["明细"]
+    header = [cell for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=True))]
+    assert header == expected_header
 
 
 def test_run_in_memory_sink_without_output_path_returns_data(example_model, tmp_path: Path) -> None:
@@ -207,10 +257,11 @@ def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": str(output_path)},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
         ),
         components=[hook],
     )
@@ -242,10 +293,11 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": str(output_path)},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
         ),
     )
 

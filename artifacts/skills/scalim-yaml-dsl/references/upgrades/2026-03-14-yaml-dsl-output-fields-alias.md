@@ -34,10 +34,16 @@ main_source:
 
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields:
       - *quantity
       - "order_id"
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./out.csv
 ```
 
 其中 `*quantity` 展开后为 dict,解析器会基于 alias identity 优先匹配,并推导得到 `field_id="quantity"`.
@@ -50,14 +56,23 @@ _templates:
 
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: *detail_fields
 
   - name: detail_plus
-    container: {type: csv, path: ./out_plus.csv}
+    to: {file: detail_plus_csv}
     fields:
       - *detail_fields
       - extra_field
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./out.csv
+    detail_plus_csv:
+      kind: csv_file
+      path: ./out_plus.csv
 ```
 
 ## 注意事项

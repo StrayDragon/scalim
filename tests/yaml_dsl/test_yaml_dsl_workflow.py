@@ -164,6 +164,7 @@ def _write_table_demand_yaml_with_csv_output(
     output_path: Path,
     field_ids: List[str],
 ) -> Path:
+    file_id = "{}_{}_csv".format(str(name), str(output_name))
     field_lines = []
     for fid in field_ids:
         field_lines.append("    {}: {{extract: {}}}".format(str(fid), str(fid)))
@@ -180,11 +181,16 @@ main_source:
   fields:
 {fields}
 
+resources:
+  files:
+    {file_id}:
+      kind: csv_file
+      path: "{output_path}"
+
 outputs:
   - name: {output_name}
-    container:
-      type: csv
-      path: "{output_path}"
+    to:
+      file: {file_id}
     fields: {fields_list}
 """
         )
@@ -192,6 +198,7 @@ outputs:
             name=str(name),
             loader_ref=str(loader_ref),
             fields="\n".join(field_lines),
+            file_id=file_id,
             output_name=str(output_name),
             output_path=str(output_path),
             fields_list=json.dumps([str(x) for x in field_ids]),
@@ -214,6 +221,8 @@ def _write_table_demand_yaml_with_two_csv_outputs(
     output2_field_ids: List[str],
     main_field_ids: List[str],
 ) -> Path:
+    output1_file_id = "{}_{}_csv".format(str(name), str(output1_name))
+    output2_file_id = "{}_{}_csv".format(str(name), str(output2_name))
     field_lines = []
     for fid in main_field_ids:
         field_lines.append("    {}: {{extract: {}}}".format(str(fid), str(fid)))
@@ -230,16 +239,23 @@ main_source:
   fields:
 {fields}
 
+resources:
+  files:
+    {output1_file_id}:
+      kind: csv_file
+      path: "{output1_path}"
+    {output2_file_id}:
+      kind: csv_file
+      path: "{output2_path}"
+
 outputs:
   - name: {output1_name}
-    container:
-      type: csv
-      path: "{output1_path}"
+    to:
+      file: {output1_file_id}
     fields: {output1_fields_list}
   - name: {output2_name}
-    container:
-      type: csv
-      path: "{output2_path}"
+    to:
+      file: {output2_file_id}
     fields: {output2_fields_list}
 """
         )
@@ -248,9 +264,11 @@ outputs:
             loader_ref=str(loader_ref),
             fields="\n".join(field_lines),
             output1_name=str(output1_name),
+            output1_file_id=output1_file_id,
             output1_path=str(output1_path),
             output1_fields_list=json.dumps([str(x) for x in output1_field_ids]),
             output2_name=str(output2_name),
+            output2_file_id=output2_file_id,
             output2_path=str(output2_path),
             output2_fields_list=json.dumps([str(x) for x in output2_field_ids]),
         )
@@ -346,11 +364,16 @@ main_source:
   fields:
 {fields}
 
+resources:
+  books:
+    {output_name}_book:
+      kind: xlsx_file
+      path: "{output_path}"
+
 outputs:
   - name: {output_name}
-    container:
-      type: workbook
-      path: "{output_path}"
+    to:
+      book: {output_name}_book
       sheet: "{sheet}"
     fields: {fields_list}
 """
@@ -378,6 +401,7 @@ def _write_table_demand_yaml_from_sheetbook_loader(
     output_path: Path,
     field_ids: List[str],
 ) -> Path:
+    file_id = "{}_{}_csv".format(str(name), str(output_name))
     field_lines = []
     for fid in field_ids:
         field_lines.append("    {}: {{extract: {}}}".format(str(fid), str(fid)))
@@ -397,11 +421,16 @@ main_source:
   fields:
 {fields}
 
+resources:
+  files:
+    {file_id}:
+      kind: csv_file
+      path: "{output_path}"
+
 outputs:
   - name: {output_name}
-    container:
-      type: csv
-      path: "{output_path}"
+    to:
+      file: {file_id}
     fields: {fields_list}
 """
         )
@@ -409,6 +438,7 @@ outputs:
             name=str(name),
             init_var_name=str(init_var_name),
             fields="\n".join(field_lines),
+            file_id=file_id,
             output_name=str(output_name),
             output_path=str(output_path),
             fields_list=json.dumps([str(x) for x in field_ids]),
@@ -3998,9 +4028,13 @@ main_source:
     value: {extract: value}
 outputs:
   - name: detail
-    container:
-      type: csv
+    to:
+      file: detail_csv
     fields: [id, value]
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
 """
         ).lstrip(),
     )
@@ -4441,7 +4475,7 @@ outputs:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match=r"outputs\.0\.to\.book is required"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"outputs\.0\.to must declare exactly one of to\.file or to\.book"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 

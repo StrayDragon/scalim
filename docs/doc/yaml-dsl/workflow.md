@@ -211,8 +211,8 @@ workflow YAML 只负责两件事:
 
 约定:
 
-- `outputs[*].container` 存在时表示 CSV 输出(当前仅支持 `type: csv`)
-- `outputs[*].container` 缺省时表示 Excel 输出(依赖 `to.book/to.sheet` 绑定到某个 `book_id`)
+- CSV 输出使用 `resources.files.<file_id>` + `outputs[*].to.file`
+- Excel 输出使用 `resources.books.<book_id>` + `outputs[*].to.book/to.sheet`
 
 示例: workflow 统一声明一个共享 book(`xlsx_memory`),各 run 的 demand 只负责声明 outputs 绑定:
 

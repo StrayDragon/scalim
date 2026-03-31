@@ -77,9 +77,12 @@ main_source:
       extract: amount
       name: Amount
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id, amount]
 """,
         encoding="utf-8",
@@ -154,9 +157,12 @@ main_source:
     created_at:
       extract: created_at
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id]
 """,
         encoding="utf-8",
@@ -191,10 +197,11 @@ def test_run_writes_output(tmp_path: Path) -> None:
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": str(output_path)},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
         ),
         sink=sink,
     )
@@ -225,10 +232,11 @@ def test_run_with_performance_observability(tmp_path: Path) -> None:
             outputs=[
                 {
                     "name": "detail",
-                    "container": {"type": "csv", "path": str(output_path)},
+                    "to": {"file": "detail_csv"},
                     "fields": ["order_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
         ),
     )
 

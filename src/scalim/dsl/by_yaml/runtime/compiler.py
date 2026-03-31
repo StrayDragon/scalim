@@ -31,7 +31,6 @@ from ..schema_dsl.constants import (
     DEFAULT_OUTPUT_ENCODING,
     DEFAULT_OUTPUT_HEADER_BY,
     DEFAULT_OUTPUT_INCLUDE_HEADER,
-    DEFAULT_OUTPUT_STREAMING,
 )
 from ..schema_dsl.models import (
     BookBudgetConfig,
@@ -39,9 +38,9 @@ from ..schema_dsl.models import (
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
     DemandConfig,
+    FileConfig,
     GuardrailsConfig,
     LoaderRetryConfig,
-    OutputContainerConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -59,6 +58,7 @@ from ..schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
+    FILE_KINDS,
 )
 from .builtin_callables import parse_builtin_callable_id
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, UnsetType
@@ -90,9 +90,8 @@ def validate_allowlist(
 
 
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-_OVERRIDES_OUTPUT_ALLOWED_KEYS: FrozenSet[str] = frozenset(["name", "container", "to", "write", "fields"])
+_OVERRIDES_OUTPUT_ALLOWED_KEYS: FrozenSet[str] = frozenset(["name", "to", "write", "fields"])
 _OVERRIDES_OUTPUT_FORBIDDEN_KEYS: FrozenSet[str] = frozenset(["where", "from", "aggregate"])
-_OUTPUT_CONTAINER_TYPES: Tuple[str, ...] = ("csv",)
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
 
 
@@ -107,115 +106,26 @@ def _is_list(value: object) -> TypeGuard[List[object]]:
     return isinstance(value, list)
 
 
-def _parse_overrides_outputs_container_type(container: Dict[str, Any], *, path: str) -> str:
-    typ_raw = container.get("type")
-    typ = str(typ_raw or "").strip().lower()
-    if not typ:
-        msg = "{}.type is required".format(path)
-        raise ValueError(msg)
-    if typ not in _OUTPUT_CONTAINER_TYPES:
-        msg = "{}.type={!r} is invalid; expected one of: {}".format(path, typ, ", ".join(_OUTPUT_CONTAINER_TYPES))
-        raise ValueError(msg)
-    return typ
-
-
-def _parse_overrides_outputs_container_path(path_raw: Any, *, path: str) -> Any:
-    if isinstance(path_raw, dict):
-        return {
-            "$init_var": parse_init_var_mapping_node(
-                cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
-                path="{}.path".format(path),
-            )
-        }
-    if path_raw is None:
-        msg = "{}.path is required".format(path)
-        raise ValueError(msg)
-    if isinstance(path_raw, os.PathLike):
-        value = str(os.fspath(path_raw)).strip()
-        if not value:
-            msg = "{}.path is required".format(path)
-            raise ValueError(msg)
-        return value
-    if isinstance(path_raw, str):
-        value = path_raw.strip()
-        if not value:
-            msg = "{}.path is required".format(path)
-            raise ValueError(msg)
-        return value
-    msg = "{}.path must be a non-empty string or {{$init_var: <name>}}".format(path)
-    raise TypeError(msg)
-
-
-def _parse_overrides_outputs_container_header_by(header_by_raw: Any, *, path: str) -> str:
-    header_by = str(header_by_raw).strip() if isinstance(header_by_raw, str) else ""
-    header_by = (header_by or DEFAULT_OUTPUT_HEADER_BY).strip()
-    if header_by not in _OUTPUT_HEADER_BY_ENUM:
-        msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(path, header_by, ", ".join(_OUTPUT_HEADER_BY_ENUM))
-        raise ValueError(msg)
-    return header_by
-
-
-def _validate_overrides_outputs_container_semantics(
-    container_type: str,
-    *,
-    path: str,
-    streaming: bool,
-) -> None:
-    if container_type != "csv":
-        msg = "{}.type={!r} is invalid; expected one of: {}".format(path, container_type, ", ".join(_OUTPUT_CONTAINER_TYPES))
-        raise ValueError(msg)
-    if not streaming:
-        msg = "{}.streaming must be true (composed outputs only support streaming=true)".format(path)
-        raise ValueError(msg)
-
-
-def _parse_overrides_outputs_container(raw: object, *, path: str) -> OutputContainerConfig:
-    typed = _require_dict(raw, path=path)
-    allowed_keys = {"type", "path", "encoding", "streaming", "include_header", "header_fields_output_by"}
-    unknown = sorted({str(k) for k in typed} - allowed_keys)
-    if unknown:
-        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
-        raise ValueError(msg)
-    typ = _parse_overrides_outputs_container_type(typed, path=path)
-    path_value: Any = _parse_overrides_outputs_container_path(typed.get("path"), path=path)
-
-    encoding_raw = typed.get("encoding")
-    encoding = str(encoding_raw).strip() if isinstance(encoding_raw, str) else ""
-    encoding = encoding or DEFAULT_OUTPUT_ENCODING
-
-    streaming = bool(typed.get("streaming", DEFAULT_OUTPUT_STREAMING))
-    include_header = bool(typed.get("include_header", DEFAULT_OUTPUT_INCLUDE_HEADER))
-
-    header_by = _parse_overrides_outputs_container_header_by(typed.get("header_fields_output_by"), path=path)
-
-    _validate_overrides_outputs_container_semantics(
-        typ,
-        path=path,
-        streaming=streaming,
-    )
-
-    return OutputContainerConfig(
-        type=typ,
-        path=path_value,
-        encoding=encoding,
-        streaming=streaming,
-        include_header=include_header,
-        header_fields_output_by=header_by,
-    )
-
-
 def _parse_overrides_output_to(raw: object, *, path: str) -> Optional[OutputToConfig]:
     if raw is None:
         return None
     typed = _require_dict(raw, path=path)
-    allowed_keys = {"book", "sheet"}
+    allowed_keys = {"file", "book", "sheet"}
     unknown = sorted({str(k) for k in typed} - allowed_keys)
     if unknown:
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
         raise ValueError(msg)
 
+    file_raw = typed.get("file")
     book_raw = typed.get("book")
     sheet_raw = typed.get("sheet")
+
+    file_id = None
+    if file_raw is not None:
+        if not isinstance(file_raw, str):
+            msg = "{}.file must be a string".format(path)
+            raise TypeError(msg)
+        file_id = str(file_raw).strip() or None
 
     book = None
     if book_raw is not None:
@@ -231,16 +141,16 @@ def _parse_overrides_output_to(raw: object, *, path: str) -> Optional[OutputToCo
             raise TypeError(msg)
         sheet = str(sheet_raw).strip() or None
 
-    if book is None and sheet is None:
+    if file_id is None and book is None and sheet is None:
         return None
-    return OutputToConfig(book=book, sheet=sheet)
+    return OutputToConfig(file=file_id, book=book, sheet=sheet)
 
 
 def _parse_overrides_output_write(raw: object, *, path: str) -> Optional[OutputWriteConfig]:
     if raw is None:
         return None
     typed = _require_dict(raw, path=path)
-    allowed_keys = {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"}
+    allowed_keys = {"include_header", "mode", "align_by", "header_policy", "header_fields_output_by", "on_mismatch", "on_conflict"}
     unknown = sorted({str(k) for k in typed} - allowed_keys)
     if unknown:
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
@@ -256,22 +166,44 @@ def _parse_overrides_output_write(raw: object, *, path: str) -> Optional[OutputW
         raw_str = str(value).strip()
         return raw_str or None
 
+    include_header = None
+    if "include_header" in typed:
+        include_header_raw = typed.get("include_header")
+        if not isinstance(include_header_raw, bool):
+            msg = "{}.include_header must be a boolean".format(path)
+            raise TypeError(msg)
+        include_header = bool(include_header_raw)
+
+    header_fields_output_by = _as_opt_str("header_fields_output_by")
+    if header_fields_output_by is not None and header_fields_output_by not in _OUTPUT_HEADER_BY_ENUM:
+        msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(
+            path, header_fields_output_by, ", ".join(_OUTPUT_HEADER_BY_ENUM)
+        )
+        raise ValueError(msg)
+
     return OutputWriteConfig(
+        include_header=include_header,
         mode=_as_opt_str("mode"),
         align_by=_as_opt_str("align_by"),
         header_policy=_as_opt_str("header_policy"),
+        header_fields_output_by=header_fields_output_by,
         on_mismatch=_as_opt_str("on_mismatch"),
         on_conflict=_as_opt_str("on_conflict"),
     )
 
 
 def _validate_overrides_output_keys(typed: Dict[str, Any], *, idx: int, path: str) -> None:
+    if "container" in typed:
+        msg = (
+            "{}.{}.container was removed; migrate to overrides.resources.files + overrides.outputs[*].to.file + overrides.outputs[*].write"
+        ).format(path, idx)
+        raise ValueError(msg)
     extra_keys = sorted([str(k) for k in typed if str(k) not in _OVERRIDES_OUTPUT_ALLOWED_KEYS])
     if not extra_keys:
         return
     forbidden = sorted([k for k in extra_keys if k in _OVERRIDES_OUTPUT_FORBIDDEN_KEYS])
     unsupported = forbidden or extra_keys
-    msg = "{}.{} has unsupported keys: {} (only supports: name/to/write/container/fields)".format(path, idx, ", ".join(unsupported))
+    msg = "{}.{} has unsupported keys: {} (only supports: name/to/write/fields)".format(path, idx, ", ".join(unsupported))
     raise ValueError(msg)
 
 
@@ -319,7 +251,7 @@ def _parse_overrides_output_fields(typed: Dict[str, Any], *, idx: int, path: str
     return tuple(field_ids)
 
 
-def _parse_overrides_outputs_targets(
+def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912
     raw: object,
     demand_ir: DemandIr,
     *,
@@ -345,26 +277,46 @@ def _parse_overrides_outputs_targets(
 
         _validate_overrides_output_keys(typed, idx=idx, path=path)
         name = _parse_overrides_output_name(typed, idx=idx, path=path, seen_names=seen_names)
-        container_raw = typed.get("container")
-        container = (
-            None if container_raw is None else _parse_overrides_outputs_container(container_raw, path="{}.{}.container".format(path, idx))
-        )
         to_cfg = _parse_overrides_output_to(typed.get("to"), path="{}.{}.to".format(path, idx))
         write_cfg = _parse_overrides_output_write(typed.get("write"), path="{}.{}.write".format(path, idx))
         field_ids = _parse_overrides_output_fields(typed, idx=idx, path=path, known_field_ids=known_field_ids)
 
-        if container is not None and to_cfg is not None:
-            msg = "{}.{} cannot declare both container and to".format(path, idx)
+        if to_cfg is None:
+            msg = "{}.{}.to is required; declare exactly one of to.file or to.book".format(path, idx)
             raise ValueError(msg)
-        if container is not None and write_cfg is not None:
-            msg = "{}.{} cannot declare write for csv container outputs".format(path, idx)
+
+        file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
+        book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
+        if bool(file_id) == bool(book_id):
+            msg = "{}.{}.to must declare exactly one of to.file or to.book".format(path, idx)
+            raise ValueError(msg)
+        if to_cfg.sheet is not None and not book_id:
+            msg = "{}.{}.to.sheet requires {}.{}.to.book".format(path, idx, path, idx)
+            raise ValueError(msg)
+
+        if file_id and write_cfg is not None:
+            invalid_keys: List[str] = []
+            if write_cfg.mode is not None:
+                invalid_keys.append("mode")
+            if write_cfg.align_by is not None:
+                invalid_keys.append("align_by")
+            if write_cfg.header_policy is not None:
+                invalid_keys.append("header_policy")
+            if write_cfg.on_mismatch is not None:
+                invalid_keys.append("on_mismatch")
+            if write_cfg.on_conflict is not None:
+                invalid_keys.append("on_conflict")
+            if invalid_keys:
+                msg = "{}.{}.write.{} only apply to book outputs".format(path, idx, ", ".join(invalid_keys))
+                raise ValueError(msg)
+        if book_id and write_cfg is not None and str(write_cfg.mode or "").strip() == "append" and write_cfg.include_header is not None:
+            msg = "{}.{}.write.include_header is not allowed for append-mode book outputs; use write.header_policy".format(path, idx)
             raise ValueError(msg)
 
         parsed.append(
             OutputTargetConfig(
                 name=name,
                 from_=None,
-                container=container,
                 to=to_cfg,
                 write=write_cfg,
                 fields=field_ids,
@@ -377,16 +329,58 @@ def _parse_overrides_outputs_targets(
     return tuple(parsed)
 
 
+def _output_requires_unique_effective_field_display_names(  # noqa: C901
+    config: DemandConfig, output: OutputTargetConfig
+) -> bool:
+    to_cfg = output.to
+    if to_cfg is None:
+        return False
+
+    write_cfg = output.write
+    header_by = str(DEFAULT_OUTPUT_HEADER_BY)
+    if write_cfg is not None and write_cfg.header_fields_output_by is not None:
+        header_by = str(write_cfg.header_fields_output_by)
+    if header_by != "name":
+        return False
+
+    file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
+    if file_id:
+        include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
+        if write_cfg is not None and write_cfg.include_header is not None:
+            include_header = bool(write_cfg.include_header)
+        return bool(include_header)
+
+    book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
+    if not book_id:
+        return False
+
+    book = None
+    if config.resources is not None:
+        book = config.resources.books.get(book_id)
+
+    mode = DEFAULT_BOOK_WRITE_MODE
+    header_policy = DEFAULT_BOOK_WRITE_HEADER_POLICY
+    if book is not None and book.write_defaults is not None:
+        mode = str(book.write_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
+        header_policy = str(book.write_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY)
+    if write_cfg is not None and write_cfg.mode is not None:
+        mode = str(write_cfg.mode)
+    if write_cfg is not None and write_cfg.header_policy is not None:
+        header_policy = str(write_cfg.header_policy)
+
+    if mode == "append":
+        return header_policy != "never"
+
+    include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
+    if write_cfg is not None and write_cfg.include_header is not None:
+        include_header = bool(write_cfg.include_header)
+    return bool(include_header)
+
+
 def _should_validate_unique_effective_field_display_names(config: DemandConfig, outputs: Tuple[OutputTargetConfig, ...]) -> bool:
     if not bool(config.validate_unique_field_names):
         return False
-    for t in outputs:
-        container = t.container
-        if container is None:
-            continue
-        if container.include_header and str(container.header_fields_output_by) == "name":
-            return True
-    return False
+    return any(_output_requires_unique_effective_field_display_names(config, t) for t in outputs)
 
 
 def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
@@ -407,7 +401,7 @@ def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
     msg = "".join(
         [
             "Duplicate effective field display names detected (validate_unique_field_names=true). ",
-            "This is not allowed when outputs include header_fields_output_by=name and include_header=true. ",
+            "This is not allowed when outputs emit headers with header_fields_output_by=name. ",
             "Conflicts: {}".format(conflicts_str),
         ]
     )
@@ -1010,42 +1004,106 @@ def _apply_book_patch(base: Optional[BookConfig], patch: Mapping[str, object], *
     )
 
 
-def _apply_resources_io_override(config: DemandConfig, patch_raw: object) -> DemandConfig:
+def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *, path: str) -> FileConfig:
+    allowed_keys = {"kind", "path", "encoding"}
+    unknown = sorted({str(k) for k in patch} - allowed_keys)
+    if unknown:
+        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+        raise ValueError(msg)
+
+    kind = str(base.kind or "").strip() if base is not None else ""
+    file_path: Any = base.path if base is not None else None
+    encoding = str(base.encoding or DEFAULT_OUTPUT_ENCODING) if base is not None else DEFAULT_OUTPUT_ENCODING
+
+    if "kind" in patch:
+        raw_kind = patch.get("kind")
+        kind = str(raw_kind or "").strip() if isinstance(raw_kind, str) else ""
+        if not kind:
+            msg = "{}.kind must be a non-empty string".format(path)
+            raise ValueError(msg)
+    if kind not in FILE_KINDS:
+        msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(FILE_KINDS))
+        raise ValueError(msg)
+
+    if "path" in patch:
+        file_path = _parse_optional_path_or_init_var(patch.get("path"), path="{}.path".format(path))
+    if file_path is None:
+        msg = "{}.path is required for kind=csv_file".format(path)
+        raise ValueError(msg)
+
+    if "encoding" in patch:
+        raw_encoding = patch.get("encoding")
+        if raw_encoding is None:
+            encoding = DEFAULT_OUTPUT_ENCODING
+        elif not isinstance(raw_encoding, str):
+            msg = "{}.encoding must be a string".format(path)
+            raise TypeError(msg)
+        else:
+            encoding = str(raw_encoding).strip() or DEFAULT_OUTPUT_ENCODING
+
+    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
+
+
+def _apply_resources_io_override(config: DemandConfig, patch_raw: object) -> DemandConfig:  # noqa: C901, PLR0912
     if not isinstance(patch_raw, dict):
         msg = "overrides.resources must be an object"
         raise TypeError(msg)
     patch = cast("Dict[str, Any]", patch_raw)  # pragma: allow-cast runtime dict typed narrowing
-    unknown = sorted({str(k) for k in patch} - {"books"})
+    unknown = sorted({str(k) for k in patch} - {"books", "files"})
     if unknown:
         msg = "overrides.resources has unknown keys: {}".format(", ".join(unknown))
         raise ValueError(msg)
-
-    books_obj = patch.get("books")
-    if books_obj is None:
+    if patch.get("books") is None and patch.get("files") is None:
         return config
-    if not isinstance(books_obj, dict):
-        msg = "overrides.resources.books must be an object"
-        raise TypeError(msg)
-    books_patch = cast("Dict[str, Any]", books_obj)  # pragma: allow-cast runtime dict typed narrowing
+
     base_resources = config.resources
     merged_books: Dict[str, BookConfig] = dict(base_resources.books) if base_resources is not None else {}
+    merged_files: Dict[str, FileConfig] = dict(base_resources.files) if base_resources is not None else {}
 
-    for raw_book_id, raw_book_patch in books_patch.items():
-        if not isinstance(raw_book_id, str) or not str(raw_book_id).strip():
-            msg = "overrides.resources.books keys must be non-empty strings"
-            raise ValueError(msg)
-        book_id = str(raw_book_id).strip()
-        if not isinstance(raw_book_patch, dict):
-            msg = "overrides.resources.books.{} must be an object".format(book_id)
+    books_obj = patch.get("books")
+    if books_obj is not None:
+        if not isinstance(books_obj, dict):
+            msg = "overrides.resources.books must be an object"
             raise TypeError(msg)
-        base_book = merged_books.get(book_id)
-        merged_books[book_id] = _apply_book_patch(
-            base_book,
-            cast("Mapping[str, object]", raw_book_patch),  # pragma: allow-cast runtime dict typed narrowing
-            path="overrides.resources.books.{}".format(book_id),
-        )
+        books_patch = cast("Dict[str, Any]", books_obj)  # pragma: allow-cast runtime dict typed narrowing
 
-    return replace(config, resources=ResourcesConfig(books=merged_books))
+        for raw_book_id, raw_book_patch in books_patch.items():
+            if not isinstance(raw_book_id, str) or not str(raw_book_id).strip():
+                msg = "overrides.resources.books keys must be non-empty strings"
+                raise ValueError(msg)
+            book_id = str(raw_book_id).strip()
+            if not isinstance(raw_book_patch, dict):
+                msg = "overrides.resources.books.{} must be an object".format(book_id)
+                raise TypeError(msg)
+            base_book = merged_books.get(book_id)
+            merged_books[book_id] = _apply_book_patch(
+                base_book,
+                cast("Mapping[str, object]", raw_book_patch),  # pragma: allow-cast runtime dict typed narrowing
+                path="overrides.resources.books.{}".format(book_id),
+            )
+
+    files_obj = patch.get("files")
+    if files_obj is not None:
+        if not isinstance(files_obj, dict):
+            msg = "overrides.resources.files must be an object"
+            raise TypeError(msg)
+        files_patch = cast("Dict[str, Any]", files_obj)  # pragma: allow-cast runtime dict typed narrowing
+        for raw_file_id, raw_file_patch in files_patch.items():
+            if not isinstance(raw_file_id, str) or not str(raw_file_id).strip():
+                msg = "overrides.resources.files keys must be non-empty strings"
+                raise ValueError(msg)
+            file_id = str(raw_file_id).strip()
+            if not isinstance(raw_file_patch, dict):
+                msg = "overrides.resources.files.{} must be an object".format(file_id)
+                raise TypeError(msg)
+            base_file = merged_files.get(file_id)
+            merged_files[file_id] = _apply_file_patch(
+                base_file,
+                cast("Mapping[str, object]", raw_file_patch),  # pragma: allow-cast runtime dict typed narrowing
+                path="overrides.resources.files.{}".format(file_id),
+            )
+
+    return replace(config, resources=ResourcesConfig(books=merged_books, files=merged_files))
 
 
 def _apply_io_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:

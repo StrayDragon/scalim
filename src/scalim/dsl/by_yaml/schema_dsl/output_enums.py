@@ -7,8 +7,8 @@
 
 from typing import Tuple
 
-OUTPUT_CONTAINER_TYPES: Tuple[str, ...] = ("csv",)
-"""`outputs.*.container.type` 枚举."""
+FILE_KINDS: Tuple[str, ...] = ("csv_file",)
+"""`resources.files.*.kind` 枚举."""
 
 BOOK_KINDS: Tuple[str, ...] = (
     "xlsx_file",
@@ -69,7 +69,7 @@ OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM: Tuple[str, ...] = (
     "field_id",
     "name",
 )
-"""`outputs.*.container.header_fields_output_by` 枚举."""
+"""`outputs.*.write.header_fields_output_by` 枚举."""
 
 
 AGG_DISTINCT_ON_OVERFLOW_ENUM: Tuple[str, ...] = (
@@ -154,6 +154,6 @@ __all__ = [
     "DEFAULT_BOOK_WRITE_MODE",
     "DEFAULT_BOOK_WRITE_ON_CONFLICT",
     "DEFAULT_BOOK_WRITE_ON_MISMATCH",
-    "OUTPUT_CONTAINER_TYPES",
+    "FILE_KINDS",
     "OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM",
 ]

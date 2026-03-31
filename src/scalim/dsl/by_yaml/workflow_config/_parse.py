@@ -4,11 +4,13 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cas
 
 from ....workflow.errors import ScalimWorkflowConfigError
 from ..init_var_nodes import parse_init_var_mapping_node
+from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
+    FileConfig,
     ResourcesConfig,
 )
 from ..schema_dsl.output_enums import (
@@ -23,6 +25,7 @@ from ..schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
+    FILE_KINDS,
 )
 from ._models import (
     WorkflowCachePoolBudget,
@@ -386,7 +389,7 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
     )
 
 
-def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa: C901
+def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa: C901, PLR0912
     msg: str
     resources_raw = wf.get("resources", {})
     if resources_raw is None:
@@ -402,12 +405,12 @@ def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa:
             msg = "workflow.resources keys must be non-empty strings"
             raise ScalimWorkflowConfigError(msg, path="workflow.resources")
 
-    allowed_keys = {"books"}
+    allowed_keys = {"books", "files"}
     unknown = sorted({str(k) for k in resources} - allowed_keys)
     if unknown:
         legacy = [k for k in unknown if k in {"workbooks", "sheetbooks", "csvs"}]
         if legacy:
-            msg = "workflow.resources.{} was removed; migrate to workflow.resources.books with kind=xlsx_file|xlsx_memory".format(
+            msg = "workflow.resources.{} was removed; migrate to workflow.resources.books / workflow.resources.files".format(
                 ",".join(sorted(legacy))
             )
             raise ScalimWorkflowConfigError(msg, path="workflow.resources")
@@ -430,7 +433,50 @@ def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa:
         item_path = "workflow.resources.books.{}".format(book_id)
         books[book_id] = _parse_book_config(raw_book_cfg, path=item_path)
 
-    return ResourcesConfig(books=books)
+    files_raw = resources.get("files", {})
+    if files_raw is None:
+        files_raw = {}
+    if not isinstance(files_raw, dict):
+        msg = "workflow.resources.files must be a mapping"
+        raise ScalimWorkflowConfigError(msg, path="workflow.resources.files")
+
+    files: Dict[str, FileConfig] = {}
+    for raw_file_id, raw_file_cfg in cast("Dict[Any, Any]", files_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
+        file_id = str(raw_file_id or "").strip() if isinstance(raw_file_id, str) else ""
+        if not file_id:
+            msg = "workflow.resources.files keys must be non-empty strings"
+            raise ScalimWorkflowConfigError(msg, path="workflow.resources.files")
+        item_path = "workflow.resources.files.{}".format(file_id)
+        files[file_id] = _parse_file_config(raw_file_cfg, path=item_path)
+
+    return ResourcesConfig(books=books, files=files)
+
+
+def _parse_file_config(raw: object, *, path: str) -> FileConfig:
+    msg: str
+    if not isinstance(raw, dict):
+        msg = "{} must be a mapping".format(path)
+        raise ScalimWorkflowConfigError(msg, path=path)
+    typed = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+
+    kind_raw = typed.get("kind")
+    kind = str(kind_raw or "").strip() if isinstance(kind_raw, str) else ""
+    if not kind:
+        msg = "{}.kind is required".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+    if kind not in FILE_KINDS:
+        msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(FILE_KINDS))
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+    file_path = _parse_path_or_init_var(typed.get("path"), path="{}.path".format(path))
+    if file_path is None:
+        msg = "{}.path is required for kind=csv_file".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+
+    encoding_raw = typed.get("encoding")
+    encoding = str(encoding_raw or "").strip() if isinstance(encoding_raw, str) else ""
+    encoding = encoding or DEFAULT_OUTPUT_ENCODING
+    return FileConfig(kind=kind, path=file_path, encoding=encoding)
 
 
 def _load_workflow_ctx_options(ctx_raw: object) -> WorkflowCtxOptions:

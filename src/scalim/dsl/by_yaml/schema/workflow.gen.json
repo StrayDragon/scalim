@@ -250,7 +250,7 @@
           ],
           "default": {},
           "description": "workflow-scope shared IO resources",
-          "markdownDescription": "workflow-scope shared IO resources.\n\n- stable surface: `workflow.resources.books`"
+          "markdownDescription": "workflow-scope shared IO resources.\n\n- stable surface: `workflow.resources.books` / `workflow.resources.files`"
         }
       },
       "additionalProperties": false
@@ -684,6 +684,100 @@
         }
       ]
     },
+    "file": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "file kind(csv_file)",
+          "markdownDescription": "file kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件",
+          "enum": [
+            "csv_file"
+          ],
+          "examples": [
+            "csv_file"
+          ]
+        },
+        "path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "$init_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                }
+              },
+              "required": [
+                "$init_var"
+              ],
+              "additionalProperties": false,
+              "description": "运行时动态路径: {$init_var: <name>}"
+            }
+          ],
+          "description": "csv_file: 输出路径(字符串或 {$init_var: <name>})",
+          "examples": [
+            "./output/report.xlsx",
+            {
+              "$init_var": "output_path"
+            }
+          ],
+          "markdownDescription": "csv_file: 输出路径(字符串或 {$init_var: <name>})"
+        },
+        "encoding": {
+          "type": "string",
+          "description": "csv_file: 文件编码(默认 utf-8)",
+          "markdownDescription": "csv_file: 文件编码(默认 `utf-8`).",
+          "default": "utf-8",
+          "examples": [
+            "utf-8"
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "kind",
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
     "resources": {
       "type": "object",
       "properties": {
@@ -718,6 +812,40 @@
           "markdownDescription": "books 资源映射(Excel book; key 为 `book_id`).\n\n- 对外稳定术语: `book`\n- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs[*].to.book` 引用该 mapping 的 key",
           "additionalProperties": {
             "$ref": "#/definitions/book"
+          },
+          "minProperties": 0
+        },
+        "files": {
+          "type": "object",
+          "properties": {
+            "$import": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              ],
+              "description": "$import 引用(支持 string 或 string list)",
+              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+              "examples": [
+                "common.sources",
+                [
+                  "common.sources",
+                  "other.sources"
+                ]
+              ]
+            }
+          },
+          "description": "files 资源映射(文件输出资源; key 为 file_id)",
+          "markdownDescription": "files 资源映射(文件输出资源; key 为 `file_id`).\n\n- v1 稳定支持: `kind=csv_file`\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs[*].to.file` 引用该 mapping 的 key",
+          "additionalProperties": {
+            "$ref": "#/definitions/file"
           },
           "minProperties": 0
         },

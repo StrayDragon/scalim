@@ -168,9 +168,15 @@ output:
 新写法:
 
 ```yaml
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./output/report.csv
+
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/report.csv}
+    to: {file: detail_csv}
     fields: [order_id, customer_name]
 ```
 
@@ -216,7 +222,7 @@ uv run scalim-cli yaml-dsl validate <file.yaml>
 - `Derived field 'xxx' must declare compute/call_by`
   - 如果它是源字段,请移回 `main_source.fields`/`sources.*.fields`;如果它是派生字段,请补 `compute` 或 `call_by`
 - `Legacy YAML syntax is not supported: top-level 'output'. ...`
-  - 顶层 `output:` 已移除;按本页第 5 节升级为 `outputs:` 并把输出参数移到 `outputs.*.container`
+  - 顶层 `output:` 已移除;按本页第 5 节升级为 `outputs:` + `resources.files` + `outputs.*.to.file`
 - `Legacy \`$runtime.<name>\` placeholder is not supported; use \`{$init_var: <name>}\``
   - 把所有 `$runtime.xxx` 全量替换为 `{$init_var: xxx}`
 - `Field 'xxx' is defined multiple times; field_id must be unique ...`

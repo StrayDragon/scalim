@@ -3,10 +3,8 @@ from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, cast
 from .....vendor.dataclassesx import dataclass
 from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
-    DEFAULT_OUTPUT_ENCODING,
     DEFAULT_OUTPUT_HEADER_BY,
     DEFAULT_OUTPUT_INCLUDE_HEADER,
-    DEFAULT_OUTPUT_STREAMING,
     FIELD_ID_STRING_SCHEMA,
     schema_meta,
     schema_omit,
@@ -26,7 +24,6 @@ from ..output_enums import (
     DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
     DEFAULT_AGG_RANK_ORDER,
     DEFAULT_AGG_RANK_TOP_K_MODE,
-    OUTPUT_CONTAINER_TYPES,
     OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM,
 )
 
@@ -59,7 +56,7 @@ _AGG_OUT_FIELD_NAME_SCHEMA = {
         "markdownDescription": (
             "可选:表头显示名.\n\n"
             "- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n"
-            "- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n"
+            "- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n"
             "- 允许重复 name(用于复刻重复表头合同)\n"
             "- 缺省/为空时回退为 out_field_id"
         ),
@@ -69,130 +66,22 @@ _AGG_OUT_FIELD_NAME_SCHEMA = {
 
 
 @dataclass(frozen=True)
-class OutputContainerConfig:
-    SCHEMA_NAME: ClassVar[str] = "output_container"
-    """输出容器配置对象在 `YAML` 中的节点名称."""
-
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("type", "path")
-    """该配置对象在 `YAML` 中的必填字段列表."""
-
-    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-    """是否允许出现未声明的额外键."""
-
-    type: str = dataclass_field(
-        default="",
-        metadata=schema_meta(
-            desc="输出容器类型(csv)",
-            md="输出容器类型.\n\n- `csv`: CSV 文件",
-            choices=list(OUTPUT_CONTAINER_TYPES),
-            examples=["csv"],
-        ),
-    )
-    """输出容器类型."""
-
-    path: Any = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={
-                "oneOf": [
-                    {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "输出文件路径(相对路径以进程CWD为基准;自动 mkdir 父目录)",
-                    },
-                    {
-                        "type": "object",
-                        "properties": {
-                            "$init_var": {
-                                "type": "string",
-                                "minLength": 1,
-                                "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                            }
-                        },
-                        "required": ["$init_var"],
-                        "additionalProperties": False,
-                        "description": "运行时动态路径: {$init_var: <name>}",
-                    },
-                ],
-                "description": "输出文件路径(支持静态字符串 或 {$init_var: <name>} 动态注入)",
-                "markdownDescription": (
-                    "输出文件路径.\n\n"
-                    "- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n"
-                    "- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n"
-                    "- 可能覆盖同名文件\n"
-                    "- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\n"
-                    "动态注入:\n"
-                    "- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n"
-                    "- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n"
-                    "- 缺失 `init_vars[<name>]` 时会 fail-fast\n\n"
-                    "示例:\n"
-                    "```yaml\n"
-                    "path: ./output/report.xlsx\n"
-                    "path: {$init_var: output_path}\n"
-                    "```"
-                ),
-                "examples": [
-                    "./output/report.csv",
-                    {"$init_var": "output_path"},
-                ],
-            }
-        ),
-    )
-    """输出文件路径."""
-
-    encoding: str = dataclass_field(
-        default=DEFAULT_OUTPUT_ENCODING,
-        metadata=schema_meta(
-            desc="文件编码(CSV 输出使用)",
-            md="文件编码(CSV 输出使用).",
-            default=DEFAULT_OUTPUT_ENCODING,
-            examples=[DEFAULT_OUTPUT_ENCODING],
-        ),
-    )
-    """文件编码(CSV 输出使用)."""
-
-    streaming: bool = dataclass_field(
-        default=DEFAULT_OUTPUT_STREAMING,
-        metadata=schema_meta(
-            desc="启用流式输出(必须为 true)",
-            md=("启用流式输出(按行写入).\n\n- composed outputs 仅支持 `true`"),
-            default=DEFAULT_OUTPUT_STREAMING,
-            examples=[True],
-        ),
-    )
-    """是否启用流式写出(按行写入)."""
-
-    include_header: bool = dataclass_field(
-        default=DEFAULT_OUTPUT_INCLUDE_HEADER,
-        metadata=schema_meta(
-            desc="包含表头行",
-            md="包含表头行.",
-            default=DEFAULT_OUTPUT_INCLUDE_HEADER,
-            examples=[True],
-        ),
-    )
-    """是否包含表头行."""
-
-    header_fields_output_by: str = dataclass_field(
-        default=DEFAULT_OUTPUT_HEADER_BY,
-        metadata=schema_meta(
-            desc="表头字段名来源: field_id/name",
-            md=("表头字段名来源.\n\n- `field_id`: 使用字段 ID\n- `name`: 使用字段的 `name`(为空或等于 field_id 时回退为 field_id)"),
-            choices=list(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM),
-            default=DEFAULT_OUTPUT_HEADER_BY,
-            examples=["name"],
-        ),
-    )
-    """表头字段名来源."""
-
-
-@dataclass(frozen=True)
 class OutputToConfig:
     SCHEMA_NAME: ClassVar[str] = "output_to"
     """输出 `IO` 绑定(`to`)配置对象在 `YAML` 中的节点名称."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
+
+    file: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "minLength": 1, "description": "可选:目标 file_id"},
+            desc="可选:目标 file_id",
+            examples=["detail_csv"],
+        ),
+    )
+    """可选:目标 `file_id`."""
 
     book: Optional[str] = dataclass_field(
         default=None,
@@ -223,6 +112,22 @@ class OutputWriteConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
+    include_header: Optional[bool] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "boolean", "default": DEFAULT_OUTPUT_INCLUDE_HEADER},
+            desc="可选:是否输出表头(默认 true)",
+            md=(
+                "可选:是否输出表头.\n\n"
+                "- file 输出: 缺省等价 `true`\n"
+                "- book + `mode=sheet`: 缺省等价 `true`\n"
+                "- book + `mode=append`: 不允许显式声明; 请改用 `header_policy`"
+            ),
+            default=DEFAULT_OUTPUT_INCLUDE_HEADER,
+            examples=[True, False],
+        ),
+    )
+
     mode: Optional[str] = dataclass_field(
         default=None,
         metadata=schema_meta(
@@ -247,6 +152,16 @@ class OutputWriteConfig:
             schema={"type": "string", "enum": list(BOOK_WRITE_HEADER_POLICY_ENUM)},
             desc="可选:表头策略(once/always/never;仅 append 生效)",
             examples=["once"],
+        ),
+    )
+
+    header_fields_output_by: Optional[str] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={"type": "string", "enum": list(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM), "default": DEFAULT_OUTPUT_HEADER_BY},
+            desc="可选:表头字段名来源(field_id/name;默认 name)",
+            examples=["name"],
+            default=DEFAULT_OUTPUT_HEADER_BY,
         ),
     )
 
@@ -974,27 +889,22 @@ class OutputTargetConfig:
             schema=_OUTPUT_NAME_SCHEMA,
             schema_name="from",
             desc="可选:继承来源输出(name)",
-            md=("可选:继承来源输出(name).\n\n- 继承字段集合与容器配置\n- 不继承 where/aggregate"),
+            md=("可选:继承来源输出(name).\n\n- 继承字段集合与 `to/write` 配置\n- 不继承 where/aggregate"),
             examples=["detail"],
         ),
     )
     """可选:继承来源输出."""
 
-    container: Optional[OutputContainerConfig] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            ref="output_container",
-            desc="输出容器配置(csv)",
-        ),
-    )
-    """可选:输出容器配置(允许通过 `from` 继承)."""
-
     to: Optional[OutputToConfig] = dataclass_field(
         default=None,
         metadata=schema_meta(
             ref="output_to",
-            desc="可选:输出 IO 绑定(to: book/sheet)",
-            md="可选:输出 IO 绑定.\n\n- 用于将输出绑定到 `resources.books` 的某个 `book_id` + `sheet`",
+            desc="可选:输出目标绑定(to: file/book/sheet)",
+            md=(
+                "可选:输出目标绑定.\n\n"
+                "- `to.file`: 绑定到 `resources.files.<file_id>`\n"
+                "- `to.book` / `to.sheet`: 绑定到 `resources.books.<book_id>`"
+            ),
         ),
     )
     """可选:输出 `IO` 绑定."""
@@ -1004,7 +914,11 @@ class OutputTargetConfig:
         metadata=schema_meta(
             ref="output_write",
             desc="可选:写入策略覆盖(write)",
-            md="可选:写入策略覆盖.\n\n- 仅允许覆盖 `resources.books.*.write_defaults` 的字段集合",
+            md=(
+                "可选:写入策略覆盖.\n\n"
+                "- 通用字段: `include_header`, `header_fields_output_by`\n"
+                "- book 专属字段覆盖 `resources.books.*.write_defaults`"
+            ),
         ),
     )
     """可选:写入策略覆盖."""
@@ -1052,10 +966,15 @@ class OutputTargetConfig:
                 "    quantity: &quantity {extract: quantity}\n"
                 "outputs:\n"
                 "  - name: detail\n"
-                "    container: {type: csv, path: ./out.csv}\n"
+                "    to: {file: detail_csv}\n"
                 "    fields:\n"
                 "      - *quantity\n"
-                '      - "order_id"\n'
+                '      - "order_id"\n\n'
+                "resources:\n"
+                "  files:\n"
+                "    detail_csv:\n"
+                "      kind: csv_file\n"
+                "      path: ./out.csv\n"
                 "```\n\n"
                 "注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n"
                 "可通过 `from` 继承."

@@ -39,13 +39,13 @@ observability:
     sample_limit: 3
 
 _templates:
-  csv_container_detail: &csv_container_detail
-    type: csv
+  detail_csv_file: &detail_csv_file
+    kind: csv_file
     path: {$init_var: out_path_detail}
+    encoding: utf-8
+  csv_write_field_id: &csv_write_field_id
     header_fields_output_by: field_id
     include_header: true
-    streaming: true
-    encoding: utf-8
 
 main_source:
   source_id: tickets
@@ -89,6 +89,14 @@ sources:
     fields:
       agent_team: &agent_team {name: Agent Team, relation: tickets_to_agents}
 
+resources:
+  files:
+    detail_csv: *detail_csv_file
+    metrics_csv:
+      kind: csv_file
+      path: {$init_var: out_path_metrics}
+      encoding: utf-8
+
 fields:
   is_sla_breach:
     name: SLA Breach (>= 60m)
@@ -96,7 +104,8 @@ fields:
 
 outputs:
   - name: detail
-    container: *csv_container_detail
+    to: {file: detail_csv}
+    write: *csv_write_field_id
     fields:
       - *ticket_id
       - customer_id
@@ -112,13 +121,8 @@ outputs:
 
   - name: metrics_by_team
     where: "agent_team"
-    container:
-      type: csv
-      path: {$init_var: out_path_metrics}
-      header_fields_output_by: field_id
-      include_header: true
-      streaming: true
-      encoding: utf-8
+    to: {file: metrics_csv}
+    write: *csv_write_field_id
     aggregate:
       group_by:
         - *agent_team

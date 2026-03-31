@@ -67,9 +67,9 @@
 
 | YAML key | 编译到(主要影响) | 限制/边界 | 替代方案 |
 |---|---|---|---|
-| `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | `overrides.outputs` 可整体替换(仅承诺 `name/container/fields` 最小子集;不支持 `where/from/aggregate`) | 运行期动态输出: `run(..., overrides=RunOverrides(outputs=[...]))` |
-| `outputs.*.container` | `OutputTargetSpec.output` (`OutputSpec`) | 目前仅 `workbook/csv` 两类容器 | 其它 sink 用 `run(..., sink=...)` |
-| `outputs.*.container.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast | 用 Python 侧 `init_vars` 注入或改用固定路径 |
+| `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | `overrides.outputs` 可整体替换(仅承诺 `name/to/fields` 最小子集;不支持 `where/from/aggregate`) | 运行期动态输出: `run(..., overrides=RunOverrides(outputs=[...]))` |
+| `outputs.*.to` / `outputs.*.write` | `OutputTargetSpec.output` (`OutputSpec`) | `to` 必须二选一: `to.file` 或 `to.book`; `write` 承载 header / book 写入策略 | 其它 sink 用 `run(..., sink=...)` |
+| `resources.files.<id>.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast | 用 Python 侧 `init_vars` 注入或改用固定路径 |
 | `outputs.*.fields` | `ExportLayout.field_ids` | 支持 `field_id` string + YAML alias(object/list)并 flatten | 若 alias identity 丢失且内容匹配歧义,改用 string `field_id` |
 | `outputs.*.where` | `OutputTargetSpec.predicate` | 安全表达式;依赖字段静态提取注入 required fields | 复杂分发逻辑放到 loader/derived field 里生成路由字段 |
 | `outputs.*.aggregate` | `DerivedOutputTargetSpec.derived`(group_by) | 当前 YAML 只暴露 `group_by+metrics` 这一类派生汇总 | 更复杂派生输出装配走 Python-only `OutputCompositionSpec` |
@@ -103,7 +103,7 @@
 - `export_profile`/字段展示: `DemandIr.export_profile` + `FieldPresentationIr` (Excel number_format/列宽等)。
 - 主键/主字段语义: `FieldIr.is_primary` 目前在 YAML 编译链路中固定为 `False`。
 - source 级 fk/bindings: `SourceIr.fk_fields`/`SourceIr.bindings` 目前不暴露(仅保留 `bind` 由 params 推导)。
-- 更多 sink/output 类型: YAML `container.type` 目前仅 `workbook/csv`。
+- 更多 sink/output 类型: YAML 当前稳定 surface 仅覆盖 `resources.files(csv_file)` 与 `resources.books(xlsx_file/xlsx_memory)`。
 
 ## 8) 建议(用于下一轮评估)
 

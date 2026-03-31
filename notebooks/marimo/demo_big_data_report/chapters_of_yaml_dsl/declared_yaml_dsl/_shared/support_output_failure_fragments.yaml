@@ -15,6 +15,10 @@ base_main:
 
 base_outputs:
   resources:
+    files:
+      detail_csv:
+        kind: csv_file
+        path: {$init_var: out_path_detail}
     books:
       secondary_debug:
         kind: xlsx_file
@@ -24,12 +28,11 @@ base_outputs:
 
   outputs:
     - name: detail
-      container:
-        type: csv
-        path: {$init_var: out_path_detail}
+      to:
+        file: detail_csv
+      write:
         header_fields_output_by: field_id
         include_header: true
-        streaming: true
       fields: [ticket_id, priority, resolve_minutes]
 
     # 故意作为“非主输出”来演示 `failure_policy` + `include_full_error_message`.

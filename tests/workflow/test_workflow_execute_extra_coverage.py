@@ -59,9 +59,12 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id]
 """
         ).lstrip(),
@@ -539,10 +542,11 @@ main_source:
       extract: order_id
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: "{detail_path}"
+    to: {{file: detail_csv}}
     fields: [order_id]
+resources:
+  files:
+    detail_csv: {{kind: csv_file, path: "{detail_path}"}}
 """
         )
         .format(detail_path=str(tmp_path / "detail.csv"))
@@ -639,10 +643,11 @@ main_source:
       extract: order_id
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: "{detail_path}"
+    to: {{file: detail_csv}}
     fields: [order_id]
+resources:
+  files:
+    detail_csv: {{kind: csv_file, path: "{detail_path}"}}
 """
         )
         .format(detail_path=str(tmp_path / "detail.csv"))
@@ -741,10 +746,11 @@ main_source:
       extract: order_id
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: "{detail_path}"
+    to: {{file: detail_csv}}
     fields: [order_id]
+resources:
+  files:
+    detail_csv: {{kind: csv_file, path: "{detail_path}"}}
 """
         )
         .format(detail_path=str(tmp_path / "detail.csv"))

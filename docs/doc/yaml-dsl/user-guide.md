@@ -60,10 +60,15 @@ result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
     overrides=RunOverrides(
+        resources={
+            "files": {
+                "detail_csv": {"kind": "csv_file", "path": "./output/minimal_order_report.csv"},
+            }
+        },
         outputs=[
             {
                 "name": "detail",
-                "container": {"type": "csv", "path": "./output/minimal_order_report.csv"},
+                "to": {"file": "detail_csv"},
                 "fields": ["order_id"],
             }
         ]
@@ -128,8 +133,15 @@ fields:
 
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/order_report.csv, header_fields_output_by: name}
+    to: {file: detail_csv}
+    write: {header_fields_output_by: name}
     fields: [order_id, customer_name, amount, total_amount]
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./output/order_report.csv
 ```
 
 ### 1.3 运行配置的方法
@@ -165,10 +177,15 @@ result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
     overrides=RunOverrides(
+        resources={
+            "files": {
+                "detail_csv": {"kind": "csv_file", "path": "./output/order_report.csv"},
+            }
+        },
         outputs=[
             {
                 "name": "detail",
-                "container": {"type": "csv", "path": "./output/order_report.csv"},
+                "to": {"file": "detail_csv"},
                 "fields": ["order_id"],
             }
         ]
@@ -184,14 +201,18 @@ main_source:
     end_dt: {$init_var: end_dt}
 ```
 
-`outputs.*.container.path`(CSV 输出)也支持同样的注入语法:
+`resources.files.*.path`(CSV 输出)也支持同样的注入语法:
 
 ```yaml
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {$init_var: output_path}
+
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {$init_var: output_path}
+    to: {file: detail_csv}
     fields: [order_id]
 ```
 
@@ -224,7 +245,7 @@ result = run(
 |---|---|---|---|
 | `main_source.params` | ✅ | ❌ | ❌ |
 | `sources.<id>.params` | ✅ | ✅ | ✅ |
-| `outputs.*.container.path` | ✅ | ❌ | ❌ |
+| `resources.files.<id>.path` | ✅ | ❌ | ❌ |
 
 ---
 
@@ -871,20 +892,28 @@ relations:
 `outputs` 可省略;声明后进入 composed outputs 模式.常用字段:
 
 - `outputs`: 有序列表(顺序决定 primary 输出)
-- `outputs.*.container`: 输出容器(workbook/csv)与路径/工作表等
+- `outputs.*.to`: 输出目标绑定(`to.file` 或 `to.book/to.sheet`)
+- `outputs.*.write`: 输出写入策略(`include_header/header_fields_output_by` + book 专属写入字段)
 - `outputs.*.fields`: 明细输出的导出列顺序(field_id 列表)
 - `outputs.*.where`: 安全表达式过滤(用于分发多 sheet)
 - `outputs.*.aggregate`: 派生汇总输出(与 `fields` 互斥)
 
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `outputs` / `output_container` / `output_target` definitions.
+完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `outputs` / `output_to` / `output_write` definitions.
 
 **示例**:
 
 ```yaml
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/order_report.csv, header_fields_output_by: name}
+    to: {file: detail_csv}
+    write: {header_fields_output_by: name}
     fields: [order_id, customer_name, amount, profit]
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./output/order_report.csv
 ```
 
 ### 3.7 可观测性配置 (observability)
@@ -1170,7 +1199,7 @@ sources:
 - `outputs` 是有序列表;顺序决定 primary 输出
 - 当多个 outputs 绑定到同一 book 时,建议显式设置 `outputs[*].to.sheet`(或确保 `outputs[*].name` 本身是合法且唯一的 sheet 名)
 - Python 调用侧可通过 `overrides.outputs` **整体替换** YAML 的 `outputs`(replace).优先级: `overrides.outputs` > YAML `outputs` > 默认(不写文件;仅 sink 保留数据)
-- `overrides.outputs` 必须为非空 list;本版本仅承诺最小子集: `name/container/to/write/fields`(不支持 `where/from/aggregate`)
+- `overrides.outputs` 必须为非空 list;本版本仅承诺最小子集: `name/to/write/fields`(不支持 `where/from/aggregate`)
 - 若 `overrides.outputs` 使运行期不再存在可作为默认目标的 Excel 输出,则未显式设置 `path` 的 `meta/audit` 可能会被跳过;
   若仍需输出这些 extra sheets,请显式配置 `meta.path` / `audit.path`
 
@@ -1335,8 +1364,14 @@ fields:
 
 outputs:
   - name: detail
-    container: {type: csv, path: ./.tmp/output/order_report.csv}
+    to: {file: detail_csv}
     fields: [order_id, customer_name, amount, cost, profit]
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./.tmp/output/order_report.csv
 ```
 
 ### 5.2 示例2: 电商报表(多级关联、复合键、派生字段)
@@ -1480,7 +1515,8 @@ fields:
 
 outputs:
   - name: detail
-    container: {type: csv, path: ./.tmp/output/ecommerce_report.csv, header_fields_output_by: name}
+    to: {file: detail_csv}
+    write: {header_fields_output_by: name}
     fields:
       - order_id
       - customer_name
@@ -1495,6 +1531,12 @@ outputs:
       - profit
       - tax_amount
       - final_price
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./.tmp/output/ecommerce_report.csv
 
 observability:
   performance:
@@ -1611,12 +1653,18 @@ sources:
     cache_mode: none
 ```
 
-**3. 启用流式输出**:
+**3. CSV 默认流式写出**:
 
 ```yaml
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./output/report.csv
+
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/report.csv, streaming: true} # streaming=true(按行写出;减少内存占用)
+    to: {file: detail_csv}
     fields: [order_id]
 ```
 
@@ -1860,12 +1908,18 @@ sources:
 batch_size: 500    # 默认 1000
 ```
 
-2. **启用流式输出**:
+2. **使用文件资源绑定 CSV 输出**:
 
 ```yaml
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./output/report.csv
+
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/report.csv, streaming: true}
+    to: {file: detail_csv}
     fields: [order_id]
 ```
 
@@ -1926,7 +1980,7 @@ _ = compile("config.yaml", allowed_modules=frozenset(["myapp.loaders"]))
 
 **A**:
 
-- **CSV**: `outputs.*.container.type: csv`
+- **CSV**: `resources.files` + `outputs[*].to.file`
 - **Excel**: `resources.books` + `outputs[*].to` 绑定(需要 `openpyxl` 依赖)
 
 ```yaml

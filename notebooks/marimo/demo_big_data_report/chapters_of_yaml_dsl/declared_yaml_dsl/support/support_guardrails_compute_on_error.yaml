@@ -41,13 +41,17 @@ fields:
     # 这里用 `call_by` 触发一个明确的 `ZeroDivisionError`,避免把异常包成难读的表达式错误。
     call_by: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:calc_risky_score(ticket_id=ticket_id)"
 
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {$init_var: out_path_detail}
+      encoding: utf-8
+
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {$init_var: out_path_detail}
+    to: {file: detail_csv}
+    write:
       header_fields_output_by: field_id
       include_header: true
-      streaming: true
-      encoding: utf-8
     fields: [ticket_id, risky_score]

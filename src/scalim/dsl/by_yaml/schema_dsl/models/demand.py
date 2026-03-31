@@ -129,7 +129,7 @@ class DemandConfig:
         metadata=schema_meta(
             ref="resources",
             desc="可选:IO 资源声明(resources.*)",
-            md="可选:IO 资源声明.\n\n- 当前稳定入口: `resources.books`",
+            md="可选:IO 资源声明.\n\n- 稳定入口: `resources.books` / `resources.files`",
         ),
     )
     """可选:`IO` 资源声明."""
@@ -171,8 +171,9 @@ class DemandConfig:
                 "- 有效展示名定义:\n"
                 "  - 若 `field.name` 非空: 使用 `name`\n"
                 "  - 否则回退为 `field_id`\n"
-                "- 仅当 `effective outputs` 使用 `container.include_header: true`(显式或默认)\n"
-                "  且 `container.header_fields_output_by: name` 时触发\n"
+                "- 仅当 `effective outputs` 会输出表头且 `header_fields_output_by: name` 时触发\n"
+                "  - file: `write.include_header: true` 且 `write.header_fields_output_by: name`\n"
+                "  - book: 该 output 会输出表头,且 `write.header_fields_output_by: name`\n"
                 "- 显式设置为 `false` 可关闭该检查(不推荐长期使用)"
             ),
             default=True,

@@ -88,10 +88,10 @@ observability: {}       # 可选
 
 ### 3.3 一个容易踩的点: YAML merge(`<<`)
 
-`outputs.*.container` 等 mapping 节点非常适合用 YAML merge(`<<`)复用基础配置:
+`outputs.*.to` / `outputs.*.write` / `resources.files.*` 等 mapping 节点非常适合用 YAML merge(`<<`)复用基础配置:
 
 - YAML merge 会生成新对象,丢失 alias 身份
-- merge 产物必须仍然满足 schema 与语义校验(例如 `type/path` 必填; 多 sheet 共享 workbook 时每个 output 需显式 `sheet`)
+- merge 产物必须仍然满足 schema 与语义校验(例如 `resources.files.*.kind/path` 必填; 多 sheet 共享 workbook 时每个 output 需显式 `to.sheet`)
 
 ### 3.4 跨文件复用: `imports` / `$import` (V1: 同级文件)
 
@@ -210,7 +210,7 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 |---|---|---|---|
 | `main_source.params` | ✅ | ❌ | ❌ |
 | `sources.<id>.params` | ✅ | ✅ | ✅ |
-| `outputs.*.container.path` | ✅ | ❌ | ❌ |
+| `resources.files.<id>.path` | ✅ | ❌ | ❌ |
 
 补充:
 
@@ -226,13 +226,14 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 `outputs` 是 demand YAML 的“多输出编排”入口(有序列表):
 
 - 每个 output 必填唯一 `name`(供 `from` 引用)
-- `container` 描述 CSV 输出容器(当前仅支持 `type: csv`)
-  - `container.path` 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
-- Excel 输出不通过 `container` 表达: 声明 `resources.books` 并在每个 `outputs[*].to` 下显式绑定 `book_id + sheet`
+- `to` 描述输出目标绑定:
+  - `to.file` 绑定到 `resources.files.<file_id>`
+  - `to.book` / `to.sheet` 绑定到 `resources.books.<book_id>`
+- 输出路径写在 `resources.files.*.path` / `resources.books.*.(path|export_xlsx.path)`;支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
 - 明细输出使用 `fields: [field_id, ...]` 指定导出列顺序
 - `where` 是安全表达式,用于分发过滤;其依赖字段会在编译期注入 required fields
 - 派生汇总输出使用 `aggregate`(与 `fields` 互斥)
-- `from` 可复用另一个 output 的字段集合与容器配置(未声明则继承; `where/aggregate` 不继承)
+- `from` 可复用另一个 output 的字段集合与 `to/write` 编排(未声明则继承; `where/aggregate` 不继承)
 
 辅助配置:
 

@@ -39,9 +39,12 @@ relations:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id, customer_name]
 """
     config = _load_config(yaml_content)
@@ -67,9 +70,12 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [missing_field]
 """
     with pytest.raises(ValueError, match=r"outputs\.detail\.fields reference unknown fields: missing_field"):
@@ -126,9 +132,12 @@ relations:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [customer_name]
 """
     config = _load_config(yaml_content)

@@ -19,13 +19,12 @@ def _enum(schema: Dict[str, Any], *path: str) -> List[str]:
     return [str(x) for x in values]
 
 
-def test_schema_enums_match_runtime_validation_for_outputs_container() -> None:
+def test_schema_enums_match_runtime_validation_for_file_resources() -> None:
     schema = build_demand_schema()
-    container_types = _enum(schema, "definitions", "output_container", "properties", "type")
-    header_by_values = _enum(schema, "definitions", "output_container", "properties", "header_fields_output_by")
+    file_kinds = _enum(schema, "definitions", "file", "properties", "kind")
+    header_by_values = _enum(schema, "definitions", "output_write", "properties", "header_fields_output_by")
 
-    for typ in container_types:
-        path = "./out.xlsx" if typ == "workbook" else "./out.csv"
+    for kind in file_kinds:
         _load_ok(
             "\n".join(
                 [
@@ -36,9 +35,13 @@ def test_schema_enums_match_runtime_validation_for_outputs_container() -> None:
                     "  fields:",
                     "    order_id: {extract: order_id}",
                     "sources: {}",
+                    "resources:",
+                    "  files:",
+                    "    detail_csv: {kind: %s, path: ./out.csv}" % kind,
                     "outputs:",
                     "  - name: detail",
-                    "    container: {type: %s, path: %s, header_fields_output_by: field_id}" % (typ, path),
+                    "    to: {file: detail_csv}",
+                    "    write: {header_fields_output_by: field_id}",
                     "    fields: [order_id]",
                     "",
                 ]
@@ -56,9 +59,42 @@ def test_schema_enums_match_runtime_validation_for_outputs_container() -> None:
                     "  fields:",
                     "    order_id: {extract: order_id}",
                     "sources: {}",
+                    "resources:",
+                    "  files:",
+                    "    detail_csv: {kind: csv_file, path: ./out.csv}",
                     "outputs:",
                     "  - name: detail",
-                    "    container: {type: csv, path: ./out.csv, header_fields_output_by: %s}" % header_by,
+                    "    to: {file: detail_csv}",
+                    "    write: {header_fields_output_by: %s}" % header_by,
+                    "    fields: [order_id]",
+                    "",
+                ]
+            )
+        )
+
+
+def test_schema_enums_match_runtime_validation_for_books_header_fields_output_by() -> None:
+    schema = build_demand_schema()
+    output_write_header_by_values = _enum(schema, "definitions", "output_write", "properties", "header_fields_output_by")
+
+    for header_by in output_write_header_by_values:
+        _load_ok(
+            "\n".join(
+                [
+                    "name: demo",
+                    "main_source:",
+                    "  source_id: orders",
+                    "  loader: tests.fixtures.mock_loaders.mock_loader",
+                    "  fields:",
+                    "    order_id: {extract: order_id, name: 订单ID}",
+                    "sources: {}",
+                    "resources:",
+                    "  books:",
+                    "    report: {kind: xlsx_file, path: ./out.xlsx}",
+                    "outputs:",
+                    "  - name: detail",
+                    "    to: {book: report, sheet: Detail}",
+                    "    write: {header_fields_output_by: %s}" % header_by,
                     "    fields: [order_id]",
                     "",
                 ]
@@ -90,9 +126,12 @@ def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_ov
                     "  fields:",
                     "    order_id: {extract: order_id}",
                     "sources: {}",
+                    "resources:",
+                    "  files:",
+                    "    detail_csv: {kind: csv_file, path: ./out.csv}",
                     "outputs:",
                     "  - name: agg",
-                    "    container: {type: csv, path: ./out.csv}",
+                    "    to: {file: detail_csv}",
                     "    aggregate:",
                     "      group_by: [order_id]",
                     "      distinct_on_overflow: %s" % value,
@@ -114,9 +153,12 @@ def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_ov
                     "  fields:",
                     "    order_id: {extract: order_id}",
                     "sources: {}",
+                    "resources:",
+                    "  files:",
+                    "    detail_csv: {kind: csv_file, path: ./out.csv}",
                     "outputs:",
                     "  - name: agg",
-                    "    container: {type: csv, path: ./out.csv}",
+                    "    to: {file: detail_csv}",
                     "    aggregate:",
                     "      group_by: [order_id]",
                     "      fields:",
@@ -136,9 +178,12 @@ def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_ov
             "  fields:",
             "    order_id: {extract: order_id}",
             "sources: {}",
+            "resources:",
+            "  files:",
+            "    detail_csv: {kind: csv_file, path: ./out.csv}",
             "outputs:",
             "  - name: agg",
-            "    container: {type: csv, path: ./out.csv}",
+            "    to: {file: detail_csv}",
             "    aggregate:",
             "      group_by: [order_id]",
             "      fields:",

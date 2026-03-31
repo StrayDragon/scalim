@@ -49,9 +49,12 @@ fields:
   profit:
     name: Profit
     compute: "order_id"
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id, customer_name, region, profit]
 """,
     )
@@ -82,9 +85,12 @@ main_source:
     customer_id: {extract: customer_id}
     amount: {extract: amount}
 sources: {}
+resources:
+  files:
+    summary_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: summary
-    container: {type: csv, path: ./out.csv}
+    to: {file: summary_csv}
     aggregate:
       group_by: [customer_id]
       fields:
@@ -114,9 +120,12 @@ main_source:
   source_id: orders
   loader: tests.fixtures.mock_loaders.mock_loader
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [missing]
 """,
             "outputs.detail.fields reference unknown fields: missing",
@@ -137,9 +146,12 @@ sources:
       customer_id:
         extract: customer_id
         name: Customer
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [customer_id]
 """,
             "Source 'bad' must be a dictionary",

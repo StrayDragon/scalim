@@ -59,10 +59,15 @@ fields:
 
 outputs:
   - name: detail
-    # 输出路径也可以用 init_vars 注入(对象节点; 编译期解析一次):
-    #   path: {$init_var: output_path}
-    container: {type: csv, path: {$init_var: output_path}, header_fields_output_by: name}
+    to: {file: detail_csv}
+    write: {header_fields_output_by: name}
     fields: [order_id, customer_name, amount, profit]
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {$init_var: output_path}
 ```
 
 ## 关键规则
@@ -78,15 +83,15 @@ outputs:
   - `relation: {steps: [...]}` (内联)
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
 - 动态入参用 `sources.<id>.params` 模板内联指令节点表达(`$keys` / `$rows`)
-- 初始化变量用 `init_vars` 注入,并在 `main_source.params` / `sources.<id>.params` / `outputs.*.container.path` 中用 `{$init_var: <name>}` 指令节点引用(对象节点;编译期解析一次;不做子串插值)
-- `outputs` 是 **有序列表**(顺序决定 primary 输出); 每个 output 必填唯一 `name`,可用 `from` 复用字段集合与容器配置
+- 初始化变量用 `init_vars` 注入,并在 `main_source.params` / `sources.<id>.params` / `resources.files.*.path` / `resources.books.*.(path|export_xlsx.path)` 中用 `{$init_var: <name>}` 指令节点引用(对象节点;编译期解析一次;不做子串插值)
+- `outputs` 是 **有序列表**(顺序决定 primary 输出); 每个 output 必填唯一 `name`,可用 `from` 复用字段集合与 `to/write` 编排
 - `outputs.*.fields` 是字段选择列表;推荐优先用 `field_id` 字符串以保持稳定与可维护性(允许的形态以 schema 为准)
 - `field_id` 必须全局唯一(不再依赖输出层做消歧)
 - 分发过滤用 `outputs.*.where`(安全表达式); where 依赖字段会被注入到 required fields
 
 输出路径注入提示:
 
-- `outputs.*.container.path: {$init_var: ...}` 会将“输出路径决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
+- `resources.files.*.path: {$init_var: ...}` / `resources.books.*.(path|export_xlsx.path)` 会将“输出路径决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
 
 ## YAML 模板预编译(可选): `template_vars`
 
@@ -102,11 +107,16 @@ outputs:
 示例(渲染后仍需能通过 schema/语义校验):
 
 ```yaml
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {{ output_path | default("./output/report.csv") }}
+
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {{ output_path | default("./output/report.csv") }}
+    to: {file: detail_csv}
+    fields: [order_id]
 ```
 
 调用侧(Python):
@@ -144,7 +154,7 @@ retry:
 
 ## 设计偏好
 
-- CSV 输出路径在 `outputs.*.container.path` 显式声明; Excel 输出路径在 `resources.books.*.path` / `resources.books.*.export_xlsx.path` 声明
+- CSV 输出路径在 `resources.files.*.path` 显式声明; Excel 输出路径在 `resources.books.*.path` / `resources.books.*.export_xlsx.path` 声明
 - 多 outputs 共享同一 book 输出时,建议显式开启 `write_lock: true`(避免并发/多进程写入导致冲突)
 - 优先使用 string ref / string sugar;仅在需要大段复用/覆写时再用 anchor
 - 输出字段优先显式声明(避免隐式全量导出);简单场景可用 string sugar

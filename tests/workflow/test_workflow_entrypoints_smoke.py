@@ -16,9 +16,12 @@ main_source:
     order_id:
       extract: order_id
 sources: {{}}
+resources:
+  files:
+    detail_csv: {{kind: csv_file, path: {output_path}}}
 outputs:
   - name: detail
-    container: {{type: csv, path: {output_path}}}
+    to: {{file: detail_csv}}
     fields: [order_id]
 """.format(
         name=str(name),

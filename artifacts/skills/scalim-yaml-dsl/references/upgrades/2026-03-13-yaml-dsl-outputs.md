@@ -31,9 +31,9 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 ## 新语法要点
 
 - `outputs` 是 **有序列表**: 顺序决定 primary 输出,并影响默认写入顺序
-- `outputs.*.container`:
-  - `type: workbook` → Excel 工作簿输出(支持 `sheet`,建议多目标共享 workbook 时开启 `write_lock: true`)
-  - `type: csv` → CSV 文件输出
+- `resources.books` / `resources.files`:
+  - `resources.books.<book_id>` → Excel 工作簿资源(配合 `outputs.*.to.book/to.sheet`)
+  - `resources.files.<file_id>` → CSV 文件资源(配合 `outputs.*.to.file`)
 - 明细输出:
   - 使用 `fields: [field_id, ...]` 指定列顺序
 - 派生汇总输出:
@@ -61,21 +61,27 @@ output:
 新写法:
 
 ```yaml
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./output/report.csv
+
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/report.csv}
+    to: {file: detail_csv}
     fields: [order_id, customer_name]
 ```
 
 ## Migration Checklist
 
 1) 将所有顶层 `output:` 升级为 `outputs:`(list)
-2) 将旧 `output.*` 的输出策略迁移到 `outputs.*.container.*`
+2) 将旧 `output.*` 的输出策略迁移到 `resources.files.*` + `outputs.*.to/write`
 3) 将旧 `output.fields` 重写为 `outputs.*.fields: [field_id, ...]`
 4) 若存在重复 `field_id`,先在 YAML 中重命名(必要时用 `extract` 指向真实 data_key)
 5) 多 sheet 分发:
    - 增加多个 outputs
    - 用 `where` 表达式区分
-   - 共享 workbook 时为每个 output 显式设置 `container.sheet` 并建议开启 `write_lock: true`
+   - 共享 workbook 时为每个 output 显式设置 `to.book/to.sheet` 并建议开启 `write_lock: true`
 6) 需要汇总 sheet 时,新增一个带 `aggregate` 的 output
 7) (可选) 启用 `meta: true` / `audit: true` 以输出对拍信息

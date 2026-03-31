@@ -206,7 +206,7 @@
     },
     "resources": {
       "description": "可选:IO 资源声明(resources.*)",
-      "markdownDescription": "可选:IO 资源声明.\n\n- 当前稳定入口: `resources.books`",
+      "markdownDescription": "可选:IO 资源声明.\n\n- 稳定入口: `resources.books` / `resources.files`",
       "allOf": [
         {
           "$ref": "#/definitions/resources"
@@ -239,7 +239,7 @@
     "validate_unique_field_names": {
       "type": "boolean",
       "description": "预检查: 字段有效展示名全局唯一(默认 true)",
-      "markdownDescription": "预检查: 字段有效展示名(`effective display name`)全局唯一.\n\n- 默认启用: 未声明时等价 `true`\n- 有效展示名定义:\n  - 若 `field.name` 非空: 使用 `name`\n  - 否则回退为 `field_id`\n- 仅当 `effective outputs` 使用 `container.include_header: true`(显式或默认)\n  且 `container.header_fields_output_by: name` 时触发\n- 显式设置为 `false` 可关闭该检查(不推荐长期使用)",
+      "markdownDescription": "预检查: 字段有效展示名(`effective display name`)全局唯一.\n\n- 默认启用: 未声明时等价 `true`\n- 有效展示名定义:\n  - 若 `field.name` 非空: 使用 `name`\n  - 否则回退为 `field_id`\n- 仅当 `effective outputs` 会输出表头且 `header_fields_output_by: name` 时触发\n  - file: `write.include_header: true` 且 `write.header_fields_output_by: name`\n  - book: 该 output 会输出表头,且 `write.header_fields_output_by: name`\n- 显式设置为 `false` 可关闭该检查(不推荐长期使用)",
       "default": true,
       "examples": [
         true,
@@ -2144,6 +2144,100 @@
         }
       ]
     },
+    "file": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "file kind(csv_file)",
+          "markdownDescription": "file kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件",
+          "enum": [
+            "csv_file"
+          ],
+          "examples": [
+            "csv_file"
+          ]
+        },
+        "path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "$init_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                }
+              },
+              "required": [
+                "$init_var"
+              ],
+              "additionalProperties": false,
+              "description": "运行时动态路径: {$init_var: <name>}"
+            }
+          ],
+          "description": "csv_file: 输出路径(字符串或 {$init_var: <name>})",
+          "examples": [
+            "./output/report.xlsx",
+            {
+              "$init_var": "output_path"
+            }
+          ],
+          "markdownDescription": "csv_file: 输出路径(字符串或 {$init_var: <name>})"
+        },
+        "encoding": {
+          "type": "string",
+          "description": "csv_file: 文件编码(默认 utf-8)",
+          "markdownDescription": "csv_file: 文件编码(默认 `utf-8`).",
+          "default": "utf-8",
+          "examples": [
+            "utf-8"
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "kind",
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
     "resources": {
       "type": "object",
       "properties": {
@@ -2181,117 +2275,39 @@
           },
           "minProperties": 0
         },
-        "$import": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
-            }
-          ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
-          "examples": [
-            "common.sources",
-            [
-              "common.sources",
-              "other.sources"
-            ]
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "output_container": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "description": "输出容器类型(csv)",
-          "markdownDescription": "输出容器类型.\n\n- `csv`: CSV 文件",
-          "enum": [
-            "csv"
-          ],
-          "examples": [
-            "csv"
-          ]
-        },
-        "path": {
-          "oneOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "description": "输出文件路径(相对路径以进程CWD为基准;自动 mkdir 父目录)"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "$init_var": {
-                  "type": "string",
-                  "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+        "files": {
+          "type": "object",
+          "properties": {
+            "$import": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
                 }
-              },
-              "required": [
-                "$init_var"
               ],
-              "additionalProperties": false,
-              "description": "运行时动态路径: {$init_var: <name>}"
+              "description": "$import 引用(支持 string 或 string list)",
+              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- V1 仅支持同级文件导入(见顶层 `imports`)",
+              "examples": [
+                "common.sources",
+                [
+                  "common.sources",
+                  "other.sources"
+                ]
+              ]
             }
-          ],
-          "description": "输出文件路径(支持静态字符串 或 {$init_var: <name>} 动态注入)",
-          "markdownDescription": "输出文件路径.\n\n- 相对路径以运行时进程当前工作目录(CWD)为基准(不是 YAML 文件所在目录)\n- 会自动创建父目录: `mkdir(parents=True, exist_ok=True)`\n- 可能覆盖同名文件\n- 安全提示: 该路径完全由配置控制, 不要对不可信 YAML 开启文件输出\n\n动态注入:\n- 允许使用 `{$init_var: <name>}` 从调用方注入输出路径\n- 注意: 这是**对象节点**(不是字符串插值),并且仅在编译期解析一次\n- 缺失 `init_vars[<name>]` 时会 fail-fast\n\n示例:\n```yaml\npath: ./output/report.xlsx\npath: {$init_var: output_path}\n```",
-          "examples": [
-            "./output/report.csv",
-            {
-              "$init_var": "output_path"
-            }
-          ]
-        },
-        "encoding": {
-          "type": "string",
-          "description": "文件编码(CSV 输出使用)",
-          "markdownDescription": "文件编码(CSV 输出使用).",
-          "default": "utf-8",
-          "examples": [
-            "utf-8"
-          ]
-        },
-        "streaming": {
-          "type": "boolean",
-          "description": "启用流式输出(必须为 true)",
-          "markdownDescription": "启用流式输出(按行写入).\n\n- composed outputs 仅支持 `true`",
-          "default": true,
-          "examples": [
-            true
-          ]
-        },
-        "include_header": {
-          "type": "boolean",
-          "description": "包含表头行",
-          "markdownDescription": "包含表头行.",
-          "default": true,
-          "examples": [
-            true
-          ]
-        },
-        "header_fields_output_by": {
-          "type": "string",
-          "description": "表头字段名来源: field_id/name",
-          "markdownDescription": "表头字段名来源.\n\n- `field_id`: 使用字段 ID\n- `name`: 使用字段的 `name`(为空或等于 field_id 时回退为 field_id)",
-          "enum": [
-            "field_id",
-            "name"
-          ],
-          "default": "name",
-          "examples": [
-            "name"
-          ]
+          },
+          "description": "files 资源映射(文件输出资源; key 为 file_id)",
+          "markdownDescription": "files 资源映射(文件输出资源; key 为 `file_id`).\n\n- v1 稳定支持: `kind=csv_file`\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs[*].to.file` 引用该 mapping 的 key",
+          "additionalProperties": {
+            "$ref": "#/definitions/file"
+          },
+          "minProperties": 0
         },
         "$import": {
           "oneOf": [
@@ -2317,19 +2333,6 @@
           ]
         }
       },
-      "anyOf": [
-        {
-          "required": [
-            "type",
-            "path"
-          ]
-        },
-        {
-          "required": [
-            "$import"
-          ]
-        }
-      ],
       "additionalProperties": false
     },
     "output_aggregate": {
@@ -2399,7 +2402,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2451,7 +2454,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2505,7 +2508,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2559,7 +2562,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2613,7 +2616,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2667,7 +2670,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2732,7 +2735,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2853,7 +2856,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3028,7 +3031,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3203,7 +3206,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3378,7 +3381,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3445,7 +3448,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3474,7 +3477,7 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在 `outputs.*.container.header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3575,6 +3578,15 @@
     "output_to": {
       "type": "object",
       "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "可选:目标 file_id",
+          "examples": [
+            "detail_csv"
+          ],
+          "markdownDescription": "可选:目标 file_id"
+        },
         "book": {
           "type": "string",
           "minLength": 1,
@@ -3623,6 +3635,16 @@
     "output_write": {
       "type": "object",
       "properties": {
+        "include_header": {
+          "type": "boolean",
+          "default": true,
+          "description": "可选:是否输出表头(默认 true)",
+          "markdownDescription": "可选:是否输出表头.\n\n- file 输出: 缺省等价 `true`\n- book + `mode=sheet`: 缺省等价 `true`\n- book + `mode=append`: 不允许显式声明; 请改用 `header_policy`",
+          "examples": [
+            true,
+            false
+          ]
+        },
         "mode": {
           "type": "string",
           "enum": [
@@ -3659,6 +3681,19 @@
             "once"
           ],
           "markdownDescription": "可选:表头策略(once/always/never;仅 append 生效)"
+        },
+        "header_fields_output_by": {
+          "type": "string",
+          "enum": [
+            "field_id",
+            "name"
+          ],
+          "default": "name",
+          "description": "可选:表头字段名来源(field_id/name;默认 name)",
+          "examples": [
+            "name"
+          ],
+          "markdownDescription": "可选:表头字段名来源(field_id/name;默认 name)"
         },
         "on_mismatch": {
           "type": "string",
@@ -3730,23 +3765,14 @@
           "type": "string",
           "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
           "description": "可选:继承来源输出(name)",
-          "markdownDescription": "可选:继承来源输出(name).\n\n- 继承字段集合与容器配置\n- 不继承 where/aggregate",
+          "markdownDescription": "可选:继承来源输出(name).\n\n- 继承字段集合与 `to/write` 配置\n- 不继承 where/aggregate",
           "examples": [
             "detail"
           ]
         },
-        "container": {
-          "description": "输出容器配置(csv)",
-          "markdownDescription": "输出容器配置(csv)",
-          "allOf": [
-            {
-              "$ref": "#/definitions/output_container"
-            }
-          ]
-        },
         "to": {
-          "description": "可选:输出 IO 绑定(to: book/sheet)",
-          "markdownDescription": "可选:输出 IO 绑定.\n\n- 用于将输出绑定到 `resources.books` 的某个 `book_id` + `sheet`",
+          "description": "可选:输出目标绑定(to: file/book/sheet)",
+          "markdownDescription": "可选:输出目标绑定.\n\n- `to.file`: 绑定到 `resources.files.<file_id>`\n- `to.book` / `to.sheet`: 绑定到 `resources.books.<book_id>`",
           "allOf": [
             {
               "$ref": "#/definitions/output_to"
@@ -3755,7 +3781,7 @@
         },
         "write": {
           "description": "可选:写入策略覆盖(write)",
-          "markdownDescription": "可选:写入策略覆盖.\n\n- 仅允许覆盖 `resources.books.*.write_defaults` 的字段集合",
+          "markdownDescription": "可选:写入策略覆盖.\n\n- 通用字段: `include_header`, `header_fields_output_by`\n- book 专属字段覆盖 `resources.books.*.write_defaults`",
           "allOf": [
             {
               "$ref": "#/definitions/output_write"
@@ -3796,7 +3822,7 @@
           },
           "minItems": 1,
           "description": "输出字段顺序(field_id/out_field_id 列表; 支持 YAML alias)",
-          "markdownDescription": "输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    container: {type: csv, path: ./out.csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.",
+          "markdownDescription": "输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    to: {file: detail_csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n\nresources:\n  files:\n    detail_csv:\n      kind: csv_file\n      path: ./out.csv\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.",
           "examples": [
             [
               "order_id",

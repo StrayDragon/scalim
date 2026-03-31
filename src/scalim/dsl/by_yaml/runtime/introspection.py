@@ -174,6 +174,7 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
                     None
                     if t.to is None
                     else {
+                        "file": str(t.to.file) if t.to.file else None,
                         "book": str(t.to.book) if t.to.book else None,
                         "sheet": str(t.to.sheet) if t.to.sheet else None,
                     }
@@ -182,9 +183,11 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
                     None
                     if t.write is None
                     else {
+                        "include_header": bool(t.write.include_header) if t.write.include_header is not None else None,
                         "mode": str(t.write.mode) if t.write.mode else None,
                         "align_by": str(t.write.align_by) if t.write.align_by else None,
                         "header_policy": str(t.write.header_policy) if t.write.header_policy else None,
+                        "header_fields_output_by": str(t.write.header_fields_output_by) if t.write.header_fields_output_by else None,
                         "on_mismatch": str(t.write.on_mismatch) if t.write.on_mismatch else None,
                         "on_conflict": str(t.write.on_conflict) if t.write.on_conflict else None,
                     }
@@ -201,18 +204,6 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
                         "post_field_ids": sorted(
                             [fid for fid, cfg in t.aggregate.fields.items() if str(cfg.producer_key) in _POST_FUNC_KEYS]
                         ),
-                    }
-                ),
-                "container": (
-                    None
-                    if t.container is None
-                    else {
-                        "type": str(t.container.type),
-                        "path": str(t.container.path),
-                        "encoding": str(t.container.encoding),
-                        "streaming": bool(t.container.streaming),
-                        "include_header": bool(t.container.include_header),
-                        "header_fields_output_by": str(t.container.header_fields_output_by),
                     }
                 ),
             }

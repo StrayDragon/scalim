@@ -8,8 +8,8 @@ from scalim.dsl.by_yaml.init_var_nodes import ScalimInitVarNodeTypeError, Scalim
 from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputAggregateConfig,
     OutputAggregateFieldConfig,
-    OutputContainerConfig,
     OutputTargetConfig,
+    OutputToConfig,
 )
 
 
@@ -72,7 +72,7 @@ def test_parse_output_target_rejects_fields_non_list() -> None:
 
     raw_target = {
         "name": "detail",
-        "container": {"type": "csv", "path": "./out.csv"},
+        "to": {"file": "detail_csv"},
         "fields": "order_id",
     }
 
@@ -202,7 +202,7 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
     )
     out = OutputTargetConfig(
         name="by_a",
-        container=OutputContainerConfig(type="csv", path="./out.csv"),
+        to=OutputToConfig(file="detail_csv"),
         fields=(),
         aggregate=agg,
     )
@@ -211,94 +211,20 @@ def test_validate_outputs_semantics_rejects_empty_aggregate_output_fields() -> N
         loader._validate_outputs_semantics([out], known_field_ids={"a"})  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize(
-    "raw,base_path,exc_type,match,expected_path,expected_reason",
-    [
-        ({"path": "./out.csv"}, "outputs.0.container", ValueError, r"outputs\.0\.container\.type is required", None, None),
-        ({"type": "bad", "path": "./out.csv"}, "outputs.0.container", ValueError, r"type='bad' is invalid", None, None),
-        ({"type": "csv"}, "outputs.0.container", ValueError, r"outputs\.0\.container\.path is required for csv outputs", None, None),
-        (
-            {"type": "csv", "path": {"$init_var": "out_path", "other": 1}},
-            "outputs.0.container",
-            ScalimInitVarNodeValueError,
-            None,
-            "outputs.0.container.path",
-            "only supports {$init_var: <name>}; unexpected keys: other",
-        ),
-        (
-            {"type": "csv", "path": {}},
-            "outputs.0.container",
-            ScalimInitVarNodeValueError,
-            None,
-            "outputs.0.container.path",
-            "only supports {$init_var: <name>}; missing '$init_var'",
-        ),
-        (
-            {"type": "csv", "path": {"$init_var": None}},
-            "outputs.0.container",
-            ScalimInitVarNodeTypeError,
-            None,
-            "outputs.0.container.path.$init_var",
-            "must be a non-empty string",
-        ),
-        (
-            {"type": "csv", "path": {"$init_var": " "}},
-            "outputs.0.container",
-            ScalimInitVarNodeTypeError,
-            None,
-            "outputs.0.container.path.$init_var",
-            "must be a non-empty string",
-        ),
-        ({"type": "csv", "path": 1}, "outputs.0.container", TypeError, r"path must be a non-empty string", None, None),
-        (
-            {"type": "csv", "path": "./out.csv", "header_fields_output_by": "bad"},
-            "outputs.0.container",
-            ValueError,
-            r"header_fields_output_by='bad' is invalid",
-            None,
-            None,
-        ),
-    ],
-    ids=[
-        "missing-type",
-        "bad-type",
-        "missing-path",
-        "init-var-extra-keys",
-        "init-var-missing-key",
-        "init-var-null-name",
-        "init-var-empty-name",
-        "path-bad-type",
-        "bad-header-by",
-    ],
-)
-def test_parse_output_container_defensive_checks(raw, base_path, exc_type, match, expected_path, expected_reason) -> None:
+def test_parse_output_target_rejects_legacy_container_migration_hint() -> None:
     loader = YamlDemandLoader()
-    if match is None:
-        with pytest.raises(exc_type) as excinfo:
-            _ = loader._parse_output_container(raw, base_path=base_path)
-    else:
-        with pytest.raises(exc_type, match=match) as excinfo:
-            _ = loader._parse_output_container(raw, base_path=base_path)
+    engine = SecureComputeEngine()
+    field_index = _dummy_field_index()
 
-    if expected_path is not None:
-        assert excinfo.value.path == expected_path
-        assert excinfo.value.reason == expected_reason
-        assert str(excinfo.value) == "{} {}".format(expected_path, expected_reason)
-
-
-def test_parse_output_container_rejects_pathless_csv() -> None:
-    loader = YamlDemandLoader()
-    with pytest.raises(ValueError, match=r"outputs\.0\.container\.path is required for csv outputs"):
-        _ = loader._parse_output_container({"type": "csv"}, base_path="outputs.0.container")
-
-
-def test_parse_output_container_accepts_init_var_mapping_path() -> None:
-    loader = YamlDemandLoader()
-    container = loader._parse_output_container(
-        {"type": "csv", "path": {"$init_var": " output_path "}},
-        base_path="outputs.0.container",
-    )
-    assert container.path == {"$init_var": "output_path"}
+    with pytest.raises(ValueError, match=r"outputs\.0\.container was removed"):
+        loader._parse_output_target(
+            {"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]},
+            idx=0,
+            outputs_key="outputs",
+            field_def_index=field_index,
+            known_field_ids={"order_id"},
+            engine=engine,
+        )
 
 
 def test_parse_output_aggregate_defensive_checks() -> None:
@@ -754,34 +680,30 @@ def test_parse_where_requires_defensive_blank_and_errors() -> None:
 
 def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="csv", path="./out.csv")
+    to_cfg = OutputToConfig(file="detail_csv")
 
     def _detail() -> OutputTargetConfig:
-        return OutputTargetConfig(name="detail", container=container, fields=("order_id",))
+        return OutputTargetConfig(name="detail", to=to_cfg, fields=("order_id",))
 
     # aggregate.group_by empty
     agg = OutputAggregateConfig(group_by=(), fields={"cnt": OutputAggregateFieldConfig(producer_key="count", config={})})
     with pytest.raises(ValueError, match=r"aggregate\.group_by cannot be empty"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     # aggregate.fields empty
     agg = OutputAggregateConfig(group_by=("order_id",), fields={})
     with pytest.raises(ValueError, match=r"aggregate\.fields cannot be empty"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     # overlap between group_by and metric ids
     agg = OutputAggregateConfig(group_by=("dup",), fields={"dup": OutputAggregateFieldConfig(producer_key="count", config={})})
     with pytest.raises(ValueError, match=r"fields ids conflict with group_by"):
-        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"dup"})
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"dup"})
 
     # group_by unknown
     agg = OutputAggregateConfig(group_by=("missing",), fields={"cnt": OutputAggregateFieldConfig(producer_key="count", config={})})
     with pytest.raises(ValueError, match=r"group_by reference unknown fields"):
-        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids=set())
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids=set())
 
     # agg metric reference unknown input fields
     agg = OutputAggregateConfig(
@@ -791,9 +713,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"fields reference unknown input fields"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     # rank.by must be group_by field or agg metric id
     agg = OutputAggregateConfig(
@@ -814,9 +734,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"by='bad'"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     agg = OutputAggregateConfig(
         group_by=("order_id",),
@@ -836,9 +754,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"partition_by must be a subset of group_by"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     agg = OutputAggregateConfig(
         group_by=("order_id",),
@@ -858,9 +774,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"top_k_mode='rows' requires order_by"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     agg = OutputAggregateConfig(
         group_by=("order_id",),
@@ -884,9 +798,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"score_by_rank rank_field='missing'"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     agg = OutputAggregateConfig(
         group_by=("order_id",),
@@ -910,9 +822,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"call_by reference unknown fields"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     # workbook share loop: len(names) <= 1 path should short-circuit (covers `continue`)
     loader._validate_outputs_semantics([_detail()], known_field_ids={"order_id"})
@@ -934,9 +844,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"must include at least one aggregation function field"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     agg = OutputAggregateConfig(
         group_by=("order_id",),
@@ -956,9 +864,7 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"order_by reference unknown agg output fields"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     agg = OutputAggregateConfig(
         group_by=("order_id",),
@@ -989,14 +895,12 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
         },
     )
     with pytest.raises(ValueError, match=r"supports top_k on at most one rank field"):
-        loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)], known_field_ids={"order_id"}
-        )
+        loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
 
 def test_validate_outputs_semantics_allows_aggregate_dag_rank_by_compute_post_depends_on_post_and_rank_after_post() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="csv", path="./out.csv")
+    to_cfg = OutputToConfig(file="detail_csv")
 
     agg = OutputAggregateConfig(
         group_by=("g",),
@@ -1040,14 +944,14 @@ def test_validate_outputs_semantics_allows_aggregate_dag_rank_by_compute_post_de
     )
 
     loader._validate_outputs_semantics(
-        [OutputTargetConfig(name="agg", container=container, aggregate=agg)],
+        [OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)],
         known_field_ids={"g"},
     )
 
 
 def test_validate_outputs_semantics_rejects_compute_referencing_unknown_agg_fields() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="csv", path="./out.csv")
+    to_cfg = OutputToConfig(file="detail_csv")
 
     agg = OutputAggregateConfig(
         group_by=("g",),
@@ -1065,14 +969,14 @@ def test_validate_outputs_semantics_rejects_compute_referencing_unknown_agg_fiel
 
     with pytest.raises(ValueError, match=r"compute reference unknown fields"):
         loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)],
+            [OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)],
             known_field_ids={"g"},
         )
 
 
 def test_validate_outputs_semantics_aggregate_dag_cycle_detection_is_actionable() -> None:
     loader = YamlDemandLoader()
-    container = OutputContainerConfig(type="csv", path="./out.csv")
+    to_cfg = OutputToConfig(file="detail_csv")
 
     agg = OutputAggregateConfig(
         group_by=("g",),
@@ -1091,28 +995,28 @@ def test_validate_outputs_semantics_aggregate_dag_cycle_detection_is_actionable(
 
     with pytest.raises(ValueError, match=r"cyclic dependency"):
         loader._validate_outputs_semantics(
-            [OutputTargetConfig(name="agg", container=container, aggregate=agg)],
+            [OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)],
             known_field_ids={"g"},
         )
 
 
-def test_validate_outputs_semantics_shared_workbook_loop_skips_non_workbook_targets() -> None:
+def test_validate_outputs_semantics_allows_multiple_file_targets() -> None:
     loader = YamlDemandLoader()
 
     outputs = [
         OutputTargetConfig(
             name="a",
-            container=OutputContainerConfig(type="csv", path="./a.csv"),
+            to=OutputToConfig(file="a_csv"),
             fields=("order_id",),
         ),
         OutputTargetConfig(
             name="b",
-            container=OutputContainerConfig(type="csv", path="./b.csv"),
+            to=OutputToConfig(file="b_csv"),
             fields=("order_id",),
         ),
         OutputTargetConfig(
             name="c",
-            container=OutputContainerConfig(type="csv", path="./out.csv"),
+            to=OutputToConfig(file="c_csv"),
             fields=("order_id",),
         ),
     ]
@@ -1141,8 +1045,17 @@ def test_parse_outputs_from_inherits_fields_requires_base_fields() -> None:
         loader._parse_outputs(raw, field_def_index=field_index)
 
 
-def test_validate_outputs_semantics_rejects_container_type_workbook_migration_hint() -> None:
+def test_validate_outputs_semantics_rejects_legacy_container_migration_hint() -> None:
     loader = YamlDemandLoader()
+    engine = SecureComputeEngine()
+    field_index = _dummy_field_index()
 
-    with pytest.raises(ValueError, match=r"container\.type='workbook' was removed"):
-        _ = loader._parse_output_container({"type": "workbook", "path": "./out.xlsx"}, base_path="outputs.0.container")
+    with pytest.raises(ValueError, match=r"outputs\.0\.container was removed"):
+        loader._parse_output_target(
+            {"name": "detail", "container": {"type": "workbook", "path": "./out.xlsx"}, "fields": ["order_id"]},
+            idx=0,
+            outputs_key="outputs",
+            field_def_index=field_index,
+            known_field_ids={"order_id"},
+            engine=engine,
+        )

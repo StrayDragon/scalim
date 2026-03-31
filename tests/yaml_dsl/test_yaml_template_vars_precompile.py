@@ -18,11 +18,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {{ output_path }}
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {{ output_path }}
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),
@@ -34,7 +37,7 @@ outputs:
         allowed_modules=frozenset(["tests.fixtures"]),
         template_vars={"output_path": "./output/report.xlsx"},
     )
-    assert compilation.config.outputs[0].container.path == "./output/report.xlsx"
+    assert compilation.config.resources.files["detail_csv"].path == "./output/report.xlsx"
 
 
 def test_template_vars_opt_in_does_not_render_when_not_provided(tmp_path) -> None:
@@ -49,11 +52,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: "{{ output_path }}"
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: "{{ output_path }}"
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),
@@ -61,7 +67,7 @@ outputs:
     )
 
     compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures"]))
-    assert compilation.config.outputs[0].container.path == "{{ output_path }}"
+    assert compilation.config.resources.files["detail_csv"].path == "{{ output_path }}"
 
 
 def test_template_vars_precompile_applies_to_import_fragments(tmp_path) -> None:
@@ -109,11 +115,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {{ missing }}
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {{ missing }}
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),
@@ -176,11 +185,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: "__OUT_PATH__"
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: "__OUT_PATH__"
+    to: {file: detail_csv}
     fields:
       - order_id
 """
@@ -316,11 +328,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {{ output_path.strip() }}
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {{ output_path.strip() }}
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),
@@ -355,11 +370,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {{ output_path.strip() }}
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {{ output_path.strip() }}
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),
@@ -372,7 +390,7 @@ outputs:
         template_vars={"output_path": "  ./out.csv  "},
         template_sandbox="legacy",
     )
-    assert compilation.config.outputs[0].container.path == "./out.csv"
+    assert compilation.config.resources.files["detail_csv"].path == "./out.csv"
     assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
 
 
@@ -419,11 +437,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {{ output_path.strip() }}
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {{ output_path.strip() }}
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),

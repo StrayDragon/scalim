@@ -9,8 +9,8 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     BookConfig,
     BookWriteDefaultsConfig,
     DemandConfig,
+    FileConfig,
     OutputExtraSheetConfig,
-    OutputContainerConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -247,7 +247,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     wf_obj = WorkflowConfig(runs=(run_a, run_b), options=WorkflowOptions(), resources=ResourcesConfig())
 
     # missing cfg branch in demand collection loop
-    _resources, _effective, _base_dir = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+    _resources, _effective, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf_obj,
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id={"a": DemandConfig()},
@@ -280,7 +280,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="wf.xlsx")}),
     )
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="d.xlsx")}))
-    _resources, effective_books, _base_dir = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+    _resources, effective_books, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf_obj,
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id={"a": demand_cfg},
@@ -320,7 +320,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     # demand-only book is accepted and uses demand YAML base_dir semantics
     wf_obj = WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig())
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}))
-    _resources, effective_books, base_dir_by_book_id = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+    resources, effective_books, effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf_obj,
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id={"a": demand_cfg},
@@ -329,10 +329,11 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         overrides_resources=None,
     )
     assert "report" in effective_books
-    assert base_dir_by_book_id["report"] == str(tmp_path / "d")
+    assert effective_files == {}
+    assert [res.path for res in resources if res.resource_id == "report"] == [str((tmp_path / "d" / "out.xlsx").resolve())]
 
     # overrides.resources.books keys mismatch (non-str) triggers "continue" branch for unresolved book_id
-    resources, effective_books, _base_dir = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+    resources, effective_books, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig()),
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id={"a": DemandConfig()},
@@ -354,7 +355,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         )
 
     # overrides.resources.books can create a book definition from scratch (IO-only deep-merge)
-    _resources, effective_books, base_dir_by_book_id = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+    resources, effective_books, effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig()),
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id={"a": DemandConfig()},
@@ -363,7 +364,8 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         overrides_resources={"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx"}}},
     )
     assert effective_books["report"].kind == "xlsx_file"
-    assert base_dir_by_book_id["report"] == str(workflow_base_dir)
+    assert effective_files == {}
+    assert [res.path for res in resources if res.resource_id == "report"] == [str((workflow_base_dir / "a.xlsx").resolve())]
 
     # exception wrap branch when export options invalid (xlsx_memory missing budget)
     wf_obj = WorkflowConfig(
@@ -427,6 +429,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             nodes=nodes,
             edges=edges,
             effective_books={},
+            effective_files={},
             overrides_outputs=None,
         )
         == {}
@@ -441,6 +444,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             nodes=[],
             edges=[],
             effective_books={},
+            effective_files={},
             overrides_outputs=None,
         )
 
@@ -454,6 +458,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             nodes=[],
             edges=[],
             effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")},
+            effective_files={},
             overrides_outputs=None,
         )
 
@@ -471,6 +476,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             nodes=[],
             edges=[],
             effective_books={"report": cfg.resources.books["report"]},  # type: ignore[union-attr]
+            effective_files={},
             overrides_outputs=None,
         )
 
@@ -492,6 +498,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
         nodes=nodes,
         edges=edges,
         effective_books={"report": BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(max_sheets=1, max_total_cells=10))},
+        effective_files={},
         overrides_outputs=None,
     )
     assert out["a"]
@@ -499,7 +506,8 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
 
     # missing default binding error
     cfg = DemandConfig(
-        outputs=(OutputTargetConfig(name="detail", container=OutputContainerConfig(type="csv", path="out.csv"), fields=("a",)),),
+        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="out.csv")}),
+        outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(file="detail_csv"), fields=("a",)),),
         meta=OutputExtraSheetConfig(sheet="__meta__"),
     )
     with pytest.raises(ScalimWorkflowConfigError, match=r"meta/audit requires at least one Excel output with outputs\[\*\]\.to\.book"):
@@ -509,6 +517,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             nodes=[],
             edges=[],
             effective_books={},
+            effective_files={"detail_csv": FileConfig(kind="csv_file", path="out.csv")},
             overrides_outputs=None,
         )
 
@@ -524,6 +533,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             nodes=[],
             edges=[],
             effective_books={},
+            effective_files={},
             overrides_outputs=None,
         )
 
@@ -539,6 +549,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             nodes=[],
             edges=[],
             effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")},
+            effective_files={},
             overrides_outputs=None,
         )
 
@@ -561,6 +572,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             nodes=[],
             edges=[],
             effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="nope"))},
+            effective_files={},
             overrides_outputs=None,
         )
 

@@ -1,3 +1,4 @@
+# pragma: allow-cast-file yaml validation boundary typed narrowing
 import json
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
@@ -10,7 +11,16 @@ from ....vendor.dataclassesx import field as dataclass_field
 from ....vendor.yamlx import yaml
 from ..init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
-from ..schema_dsl.models import DEMAND_KEYS, OUTPUT_CONTAINER_KEYS, OUTPUT_TARGET_KEYS
+from ..schema_dsl.models import (
+    BOOK_KEYS,
+    BOOK_WRITE_DEFAULTS_KEYS,
+    DEMAND_KEYS,
+    OUTPUT_TARGET_KEYS,
+    OUTPUT_TO_KEYS,
+    OUTPUT_WRITE_KEYS,
+    RESOURCES_KEYS,
+)
+from ..schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
 from .errors import ScalimConfigValidationError
 from .imports import contains_import_syntax
 from .jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
@@ -68,29 +78,99 @@ def _field_def_path(field_def: FieldDef, *, main_source_id: str) -> str:
     return "main_source.fields.{}".format(field_def.field_id)
 
 
-def _output_item_requires_unique_effective_display_names(output_item: object) -> bool:
+def _normalized_opt_str(value: object) -> str:
+    return str(value).strip() if isinstance(value, str) else ""
+
+
+def _raw_output_book_write_value(config: Dict[str, Any], *, book_id: str, key: str, default: str) -> str:
+    resources_raw = config.get(DEMAND_KEYS["resources"])
+    if not isinstance(resources_raw, dict):
+        return default
+    books_raw = cast("Any", resources_raw).get(RESOURCES_KEYS["books"])
+    if not isinstance(books_raw, dict):
+        return default
+    book_raw = cast("Any", books_raw).get(book_id)
+    if not isinstance(book_raw, dict):
+        return default
+    write_defaults_raw = cast("Any", book_raw).get(BOOK_KEYS["write_defaults"])
+    if not isinstance(write_defaults_raw, dict):
+        return default
+    value = _normalized_opt_str(cast("Any", write_defaults_raw).get(key))
+    return value or default
+
+
+def _output_item_requires_unique_effective_display_names(  # noqa: C901, PLR0911, PLR0912
+    config: Dict[str, Any], output_item: object
+) -> bool:
     if not isinstance(output_item, dict):
         return False
     out_dict = cast("Dict[str, Any]", output_item)  # pragma: allow-cast yaml mapping typed narrowing
-    container_raw: Any = out_dict.get(OUTPUT_TARGET_KEYS["container"])
-    if not isinstance(container_raw, dict):
+    to_raw = out_dict.get(OUTPUT_TARGET_KEYS["to"])
+    if not isinstance(to_raw, dict):
+        return False
+    to_dict = cast("Dict[str, Any]", to_raw)  # pragma: allow-cast yaml mapping typed narrowing
+
+    file_id = _normalized_opt_str(to_dict.get(OUTPUT_TO_KEYS["file"]))
+    book_id = _normalized_opt_str(to_dict.get(OUTPUT_TO_KEYS["book"]))
+    if bool(file_id) == bool(book_id):
         return False
 
-    container_dict = cast("Dict[str, Any]", container_raw)  # pragma: allow-cast yaml mapping typed narrowing
-    include_header_raw: Any = container_dict.get(OUTPUT_CONTAINER_KEYS["include_header"])
-    include_header = include_header_raw if isinstance(include_header_raw, bool) else DEFAULT_OUTPUT_INCLUDE_HEADER
+    write_raw = out_dict.get(OUTPUT_TARGET_KEYS["write"])
+    write_dict = cast("Optional[Dict[str, Any]]", write_raw if isinstance(write_raw, dict) else None)
 
-    header_by_raw: Any = container_dict.get(OUTPUT_CONTAINER_KEYS["header_fields_output_by"])
-    if isinstance(header_by_raw, str):
-        header_by = header_by_raw.strip().lower()
-    else:
-        header_by = str(DEFAULT_OUTPUT_HEADER_BY).strip().lower()
+    header_by = str(DEFAULT_OUTPUT_HEADER_BY).strip().lower()
+    if write_dict is not None:
+        header_by_raw = write_dict.get(OUTPUT_WRITE_KEYS["header_fields_output_by"])
+        if isinstance(header_by_raw, str) and header_by_raw.strip():
+            header_by = header_by_raw.strip().lower()
+    if header_by != "name":
+        return False
 
-    return bool(include_header) and header_by == "name"
+    if file_id:
+        include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
+        if write_dict is not None:
+            include_header_raw = write_dict.get(OUTPUT_WRITE_KEYS["include_header"])
+            if isinstance(include_header_raw, bool):
+                include_header = bool(include_header_raw)
+        return bool(include_header)
+
+    if not book_id:
+        return False
+
+    effective_mode = _raw_output_book_write_value(
+        config,
+        book_id=book_id,
+        key=BOOK_WRITE_DEFAULTS_KEYS["mode"],
+        default=DEFAULT_BOOK_WRITE_MODE,
+    )
+    if write_dict is not None:
+        mode_raw = write_dict.get(OUTPUT_WRITE_KEYS["mode"])
+        if isinstance(mode_raw, str) and mode_raw.strip():
+            effective_mode = mode_raw.strip()
+
+    if effective_mode == "append":
+        header_policy = _raw_output_book_write_value(
+            config,
+            book_id=book_id,
+            key=BOOK_WRITE_DEFAULTS_KEYS["header_policy"],
+            default=DEFAULT_BOOK_WRITE_HEADER_POLICY,
+        )
+        if write_dict is not None:
+            header_policy_raw = write_dict.get(OUTPUT_WRITE_KEYS["header_policy"])
+            if isinstance(header_policy_raw, str) and header_policy_raw.strip():
+                header_policy = header_policy_raw.strip()
+        return header_policy != "never"
+
+    include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
+    if isinstance(write_raw, dict):
+        include_header_raw = cast("Dict[str, Any]", write_raw).get(OUTPUT_WRITE_KEYS["include_header"])
+        if isinstance(include_header_raw, bool):
+            include_header = bool(include_header_raw)
+    return bool(include_header)
 
 
-def _outputs_require_unique_effective_display_names(outputs: List[object]) -> bool:
-    return any(_output_item_requires_unique_effective_display_names(item) for item in outputs)
+def _outputs_require_unique_effective_display_names(config: Dict[str, Any], outputs: List[object]) -> bool:
+    return any(_output_item_requires_unique_effective_display_names(config, item) for item in outputs)
 
 
 def _collect_duplicate_effective_display_names(field_def_index: FieldDefIndex, *, main_source_id: str) -> Dict[str, List[str]]:
@@ -209,7 +289,8 @@ class ConfigValidator(ValidatorFieldsMixin):
         relation_paths = self._validate_relations(raw.data, errors, sources_info, main_source_id)
         self._validate_fields(raw, errors, sources_info, main_source_id, relation_paths)
         self._validate_outputs_fields_object_refs(raw, errors, main_source_id=main_source_id)
-        self._validate_outputs_container_paths(raw.data, errors)
+        self._validate_removed_output_container(raw.data, errors)
+        self._validate_resource_output_paths(raw.data, errors)
         self._validate_unique_effective_field_display_names(raw, errors, main_source_id=main_source_id)
 
         if enable_jsonschema_validation:
@@ -233,7 +314,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         if not _is_list(outputs_raw):
             return
         outputs = outputs_raw
-        if not _outputs_require_unique_effective_display_names(outputs):
+        if not _outputs_require_unique_effective_display_names(raw.data, outputs):
             return
 
         field_def_index = collect_field_defs(raw, main_source_id=main_source_id)
@@ -243,6 +324,22 @@ class ConfigValidator(ValidatorFieldsMixin):
 
         msg = _format_duplicate_effective_display_names_message(duplicates)
         self._add_error(errors, msg, path=DEMAND_KEYS["validate_unique_field_names"])
+
+    def _validate_removed_output_container(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+        outputs_raw = config.get(DEMAND_KEYS["outputs"])
+        if not _is_list(outputs_raw):
+            return
+        for idx, item in enumerate(outputs_raw):
+            if not isinstance(item, dict):
+                continue
+            out_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
+            if "container" not in out_dict:
+                continue
+            msg = (
+                "outputs.{}.container was removed; migrate CSV outputs to resources.files + outputs[*].to.file + outputs[*].write, "
+                "and .xlsx outputs to resources.books + outputs[*].to.book / outputs[*].to.sheet + outputs[*].write"
+            ).format(int(idx))
+            self._add_error(errors, msg, path="outputs.{}.container".format(int(idx)))
 
     def _build_aggregate_field_index(self, aggregate: Dict[str, Any]) -> Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]:
         fields_raw: object = aggregate.get("fields")
@@ -445,40 +542,57 @@ class ConfigValidator(ValidatorFieldsMixin):
                 )
             )
 
-    def _validate_outputs_container_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
-        outputs_raw: Any = config.get(DEMAND_KEYS["outputs"])
-        if not isinstance(outputs_raw, list):
+    def _validate_resource_output_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912
+        resources_raw = config.get(DEMAND_KEYS["resources"])
+        if not isinstance(resources_raw, dict):
             return
 
-        outputs = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
-        for output_idx, output_raw in enumerate(outputs):
-            output_dict = cast(  # pragma: allow-cast yaml mapping typed narrowing
-                "Optional[Dict[str, Any]]",
-                output_raw if isinstance(output_raw, dict) else None,
-            )
-            if output_dict is None:
-                continue
-            container_raw: Any = output_dict.get(OUTPUT_TARGET_KEYS["container"])
-            container_dict = cast(  # pragma: allow-cast yaml mapping typed narrowing
-                "Optional[Dict[str, Any]]",
-                container_raw if isinstance(container_raw, dict) else None,
-            )
-            if container_dict is None:
-                continue
+        files_raw = cast("Any", resources_raw).get(RESOURCES_KEYS["files"])
+        if isinstance(files_raw, dict):
+            for raw_file_id, raw_file_cfg in cast("Dict[Any, Any]", files_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
+                file_id = str(raw_file_id or "").strip()
+                if not file_id or not isinstance(raw_file_cfg, dict):
+                    continue
+                path_raw = cast("Any", raw_file_cfg).get("path")
+                if not isinstance(path_raw, dict):
+                    continue
+                try:
+                    _ = parse_init_var_mapping_node(
+                        cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
+                        path="resources.files.{}.path".format(file_id),
+                    )
+                except (ScalimInitVarNodeValueError, ScalimInitVarNodeTypeError) as exc:
+                    self._add_error(errors, exc.reason, path=exc.path)
 
-            path_raw: Any = container_dict.get(OUTPUT_CONTAINER_KEYS["path"])
-            if not isinstance(path_raw, dict):
+        books_raw = cast("Any", resources_raw).get(RESOURCES_KEYS["books"])
+        if not isinstance(books_raw, dict):
+            return
+        for raw_book_id, raw_book_cfg in cast("Dict[Any, Any]", books_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
+            book_id = str(raw_book_id or "").strip()
+            if not book_id or not isinstance(raw_book_cfg, dict):
                 continue
-            base_path = "{}.{}.{}.{}".format(
-                DEMAND_KEYS["outputs"],
-                output_idx,
-                OUTPUT_TARGET_KEYS["container"],
-                OUTPUT_CONTAINER_KEYS["path"],
-            )
+            book_cfg = cast("Dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+            for suffix in ("path",):
+                path_raw = book_cfg.get(suffix)
+                if not isinstance(path_raw, dict):
+                    continue
+                try:
+                    _ = parse_init_var_mapping_node(
+                        cast("Dict[str, Any]", path_raw),
+                        path="resources.books.{}.{}".format(book_id, suffix),
+                    )
+                except (ScalimInitVarNodeValueError, ScalimInitVarNodeTypeError) as exc:
+                    self._add_error(errors, exc.reason, path=exc.path)
+            export_raw = book_cfg.get(BOOK_KEYS["export_xlsx"])
+            if not isinstance(export_raw, dict):
+                continue
+            export_path_raw = cast("Dict[str, Any]", export_raw).get("path")
+            if not isinstance(export_path_raw, dict):
+                continue
             try:
                 _ = parse_init_var_mapping_node(
-                    cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
-                    path=base_path,
+                    cast("Dict[str, Any]", export_path_raw),
+                    path="resources.books.{}.export_xlsx.path".format(book_id),
                 )
             except (ScalimInitVarNodeValueError, ScalimInitVarNodeTypeError) as exc:
                 self._add_error(errors, exc.reason, path=exc.path)

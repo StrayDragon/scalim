@@ -27,12 +27,14 @@ from ...spec.ir._workflow import (
 from ...vendor.dataclassesx import replace
 from .config_parsing.loader import YamlDemandLoader
 from .runtime.output_path_resolve import resolve_yaml_relative_output_path
+from .schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from .schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
     DemandConfig,
+    FileConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -48,6 +50,7 @@ from .schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
+    FILE_KINDS,
 )
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig, resolve_workflow_demand_path
 
@@ -127,6 +130,21 @@ def _effective_book_binding_for_output(
             return book, _outputs_path_ref(outputs_path, int(idx), "to.book")
 
     return None, _outputs_path_ref(outputs_path, int(idx), "to.book")
+
+
+def _effective_file_binding_for_output(
+    out_cfg: OutputTargetConfig,
+    *,
+    idx: int,
+    outputs_path: str,
+) -> Tuple[Optional[str], str]:
+    to_cfg = out_cfg.to
+    if to_cfg is not None and to_cfg.file is not None:
+        file_id = str(to_cfg.file or "").strip()
+        if file_id:
+            return file_id, _outputs_path_ref(outputs_path, int(idx), "to.file")
+
+    return None, _outputs_path_ref(outputs_path, int(idx), "to.file")
 
 
 def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, outputs_path: str) -> Tuple[str, str]:
@@ -310,6 +328,7 @@ def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
                 mode=raw_dict.get("mode"),
                 align_by=raw_dict.get("align_by"),
                 header_policy=raw_dict.get("header_policy"),
+                header_fields_output_by=raw_dict.get("header_fields_output_by"),
                 on_mismatch=raw_dict.get("on_mismatch"),
                 on_conflict=raw_dict.get("on_conflict"),
             )
@@ -352,6 +371,46 @@ def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
         write_lock=bool(write_lock),
         write_defaults=write_defaults,
     )
+
+
+def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *, path: str) -> FileConfig:
+    allowed_keys = {"kind", "path", "encoding"}
+    unknown = sorted({str(k) for k in patch} - allowed_keys)
+    if unknown:
+        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+        raise ScalimWorkflowConfigError(msg, path=path)
+
+    kind = str(base.kind or "").strip() if base is not None else ""
+    file_path: Any = base.path if base is not None else None
+    encoding = str(base.encoding or DEFAULT_OUTPUT_ENCODING) if base is not None else DEFAULT_OUTPUT_ENCODING
+
+    if "kind" in patch:
+        raw_kind = patch.get("kind")
+        kind = str(raw_kind or "").strip() if isinstance(raw_kind, str) else ""
+        if not kind:
+            msg = "{}.kind must be a non-empty string".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+    if kind not in FILE_KINDS:
+        msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(FILE_KINDS))
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+    if "path" in patch:
+        file_path = patch.get("path")
+    if file_path is None:
+        msg = "{}.path is required for kind=csv_file".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+
+    if "encoding" in patch:
+        raw_encoding = patch.get("encoding")
+        if raw_encoding is None:
+            encoding = DEFAULT_OUTPUT_ENCODING
+        elif not isinstance(raw_encoding, str):
+            msg = "{}.encoding must be a string".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.encoding".format(path))
+        else:
+            encoding = str(raw_encoding).strip() or DEFAULT_OUTPUT_ENCODING
+
+    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
 
 
 def _book_export_path_and_options(
@@ -414,6 +473,30 @@ def _book_export_path_and_options(
     raise ValueError(err)
 
 
+def _file_export_path_and_options(
+    file_cfg: FileConfig,
+    *,
+    file_id: str,
+    base_dir: str,
+    init_vars: Optional[Dict[str, object]],
+    path_prefix: str,
+) -> Tuple[str, Dict[str, object]]:
+    kind = str(file_cfg.kind or "").strip()
+    if kind != "csv_file":
+        msg = "Unknown file kind {!r} for file_id={!r}".format(kind, str(file_id))
+        path_ref = "{}.kind".format(path_prefix)
+        err = "{} (path={})".format(msg, path_ref)
+        raise ValueError(err)
+
+    export_path = resolve_yaml_relative_output_path(
+        file_cfg.path,
+        base_dir=str(base_dir),
+        init_vars=init_vars,
+        path="{}.path".format(path_prefix),
+    )
+    return export_path, {"kind": "csv_file", "encoding": str(file_cfg.encoding or DEFAULT_OUTPUT_ENCODING)}
+
+
 def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
     wf_obj: WorkflowConfig,
     *,
@@ -422,19 +505,22 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
     demand_yaml_paths_by_run_id: Mapping[str, str],
     init_vars: Optional[Dict[str, object]],
     overrides_resources: Optional[Mapping[str, object]],
-) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, str]]:
+) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, FileConfig]]:
     """编译工作流的有效 `books` 资源并返回:
 
     - 资源列表(`IR`)
     - 有效 `BookConfig` 映射(`book_id` -> 配置)
-    - 每个 `book_id` 的 `base_dir`(用于路径解析语义)
+    - 有效 `FileConfig` 映射(`file_id` -> 配置)
     """
 
     msg: str
 
     workflow_books: Dict[str, BookConfig] = dict(wf_obj.resources.books or {})
+    workflow_files: Dict[str, FileConfig] = dict(wf_obj.resources.files or {})
     demand_books: Dict[str, BookConfig] = {}
+    demand_files: Dict[str, FileConfig] = {}
     demand_base_dir_by_book_id: Dict[str, str] = {}
+    demand_base_dir_by_file_id: Dict[str, str] = {}
 
     # 1) 收集需求侧声明的 `books`(用于与 `standalone` 行为对齐).
     for run in wf_obj.runs:
@@ -444,8 +530,9 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
             continue
         res = cfg.resources
         books = res.books if res is not None else {}
+        files = res.files if res is not None else {}
         if not books:
-            continue
+            pass
         base_dir = str(_demand_base_dir(demand_yaml_paths_by_run_id.get(run_id, "")))
 
         for book_id, book in books.items():
@@ -500,21 +587,54 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
                 ).format(bid, bid)
                 raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
 
+        for file_id, file_cfg in files.items():
+            fid = str(file_id)
+            if fid in workflow_files:
+                wf_kind = str(workflow_files[fid].kind or "").strip()
+                demand_kind = str(file_cfg.kind or "").strip()
+                if wf_kind and demand_kind and wf_kind != demand_kind:
+                    msg = "File kind mismatch between workflow and demand (file_id={!r}, workflow_kind={!r}, demand_kind={!r})".format(
+                        fid, wf_kind, demand_kind
+                    )
+                    raise ScalimWorkflowConfigError(msg, path="workflow.resources.files.{}".format(fid))
+                continue
+            existing_file = demand_files.get(fid)
+            if existing_file is None:
+                demand_files[fid] = file_cfg
+                demand_base_dir_by_file_id[fid] = base_dir
+                continue
+            if existing_file != file_cfg:
+                msg = "Conflicting demand file definitions for file_id={!r}; declare workflow.resources.files.{} to override".format(
+                    fid, fid
+                )
+                raise ScalimWorkflowConfigError(msg, path="workflow.resources.files")
+
     # 2) 计算有效配置,优先级: 需求 < 工作流 < `overrides`.
     effective_books: Dict[str, BookConfig] = {}
+    effective_files: Dict[str, FileConfig] = {}
     base_dir_by_book_id: Dict[str, str] = {}
+    base_dir_by_file_id: Dict[str, str] = {}
     path_prefix_by_book_id: Dict[str, str] = {}
+    path_prefix_by_file_id: Dict[str, str] = {}
 
     all_book_ids: Set[str] = set()
     all_book_ids.update(demand_books)
     all_book_ids.update(workflow_books)
+    all_file_ids: Set[str] = set()
+    all_file_ids.update(demand_files)
+    all_file_ids.update(workflow_files)
 
     overrides_books_raw: Optional[Mapping[str, object]] = None
+    overrides_files_raw: Optional[Mapping[str, object]] = None
     if overrides_resources is not None:
         books_obj = overrides_resources.get("books")
         if isinstance(books_obj, dict):
             overrides_books_raw = cast("Mapping[str, object]", books_obj)  # pragma: allow-cast yaml mapping typed narrowing
             all_book_ids.update(str(k) for k in overrides_books_raw)
+        files_obj = overrides_resources.get("files")
+        if isinstance(files_obj, dict):
+            overrides_files_raw = cast("Mapping[str, object]", files_obj)  # pragma: allow-cast yaml mapping typed narrowing
+            all_file_ids.update(str(k) for k in overrides_files_raw)
 
     for book_id in sorted(all_book_ids):
         bid = str(book_id)
@@ -552,6 +672,40 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
         base_dir_by_book_id[bid] = base_dir
         path_prefix_by_book_id[bid] = path_prefix
 
+    for file_id in sorted(all_file_ids):
+        fid = str(file_id)
+        file_cfg = None
+        base_dir = None
+        path_prefix = ""
+
+        if fid in workflow_files:
+            file_cfg = workflow_files[fid]
+            base_dir = str(workflow_base_dir)
+            path_prefix = "workflow.resources.files.{}".format(fid)
+        elif fid in demand_files:
+            file_cfg = demand_files[fid]
+            base_dir = str(demand_base_dir_by_file_id.get(fid, workflow_base_dir))
+            path_prefix = "resources.files.{}".format(fid)
+
+        if overrides_files_raw is not None and fid in overrides_files_raw:
+            patch_obj = overrides_files_raw.get(fid)
+            if not isinstance(patch_obj, dict):
+                msg = "overrides.resources.files.{} must be a mapping".format(fid)
+                raise ScalimWorkflowConfigError(msg, path="overrides.resources.files.{}".format(fid))
+            patch = cast("Mapping[str, object]", patch_obj)  # pragma: allow-cast runtime overrides dict narrowing
+            if file_cfg is None:
+                file_cfg = FileConfig(kind="")
+                if base_dir is None:
+                    base_dir = str(workflow_base_dir)
+            file_cfg = _apply_file_patch(file_cfg, patch, path="overrides.resources.files.{}".format(fid))
+            path_prefix = "overrides.resources.files.{}".format(fid)
+
+        if file_cfg is None or base_dir is None:
+            continue
+        effective_files[fid] = file_cfg
+        base_dir_by_file_id[fid] = base_dir
+        path_prefix_by_file_id[fid] = path_prefix
+
     resources: List[WorkflowResourceIr] = []
     for bid, book in sorted(effective_books.items(), key=lambda kv: str(kv[0])):
         base_dir = base_dir_by_book_id.get(str(bid), str(workflow_base_dir))
@@ -578,6 +732,31 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
             )
         )
 
+    for fid, file_cfg in sorted(effective_files.items(), key=lambda kv: str(kv[0])):
+        base_dir = base_dir_by_file_id.get(str(fid), str(workflow_base_dir))
+        prefix = path_prefix_by_file_id.get(str(fid)) or (
+            "workflow.resources.files.{}".format(str(fid)) if str(fid) in workflow_files else "resources.files.{}".format(str(fid))
+        )
+        try:
+            export_path, options = _file_export_path_and_options(
+                file_cfg,
+                file_id=str(fid),
+                base_dir=str(base_dir),
+                init_vars=init_vars,
+                path_prefix=prefix,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ScalimWorkflowConfigError(str(exc), path=prefix) from None
+
+        resources.append(
+            WorkflowResourceIr(
+                resource_id=str(fid),
+                resource_type="csv",
+                path=str(export_path or ""),
+                options=options,
+            )
+        )
+
     # 预检 `xlsx` 导出路径冲突(跨 `books`,且顺序确定).
     by_abs_path: Dict[str, List[str]] = {}
     for res in resources:
@@ -592,7 +771,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
         msg = "Excel output path collision across books: path={!r}, book_ids={}".format(str(path), ",".join(ids))
         raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
 
-    return resources, effective_books, base_dir_by_book_id
+    return resources, effective_books, effective_files
 
 
 def _build_demand_nodes_and_graph(
@@ -690,12 +869,17 @@ def _effective_outputs_for_workflow_compile(
     if overrides_outputs is None:
         return tuple(config.outputs or ())
 
-    # 最小解析器: 仅抽取 `name`/`to`/`write`/`container`;完整校验在需求编译阶段完成.
+    # 最小解析器: 仅抽取 `name`/`to`/`write`;完整校验在需求编译阶段完成.
     outputs: List[OutputTargetConfig] = []
     for idx, raw in enumerate(overrides_outputs):
         if not isinstance(raw, dict):
             msg = "overrides.outputs.{} must be a mapping".format(int(idx))
             raise ScalimWorkflowConfigError(msg, path="overrides.outputs")
+        if "container" in raw:
+            msg = "overrides.outputs.{}.container was removed; migrate to overrides.resources.files + overrides.outputs[*].to.file".format(
+                int(idx)
+            )
+            raise ScalimWorkflowConfigError(msg, path="overrides.outputs.{}.container".format(int(idx)))
         name_raw = raw.get("name")
         name = str(name_raw or "").strip() if isinstance(name_raw, str) else ""
         if not name:
@@ -706,21 +890,25 @@ def _effective_outputs_for_workflow_compile(
         to_cfg = None
         if isinstance(to_obj, dict):
             to_raw = cast("Mapping[str, object]", to_obj)  # pragma: allow-cast yaml mapping typed narrowing
+            file_raw = to_raw.get("file")
             book_raw = to_raw.get("book")
             sheet_raw = to_raw.get("sheet")
+            file_id = str(file_raw or "").strip() if isinstance(file_raw, str) else None
             book = str(book_raw or "").strip() if isinstance(book_raw, str) else None
             sheet = str(sheet_raw or "").strip() if isinstance(sheet_raw, str) else None
-            if book is not None or sheet is not None:
-                to_cfg = OutputToConfig(book=book, sheet=sheet)
+            if file_id is not None or book is not None or sheet is not None:
+                to_cfg = OutputToConfig(file=file_id, book=book, sheet=sheet)
 
         write_obj = raw.get("write")
         write_cfg = None
         if isinstance(write_obj, dict):
             write_raw = cast("Dict[str, Any]", write_obj)  # pragma: allow-cast yaml mapping typed narrowing
             write_cfg = OutputWriteConfig(
+                include_header=write_raw.get("include_header"),
                 mode=write_raw.get("mode"),
                 align_by=write_raw.get("align_by"),
                 header_policy=write_raw.get("header_policy"),
+                header_fields_output_by=write_raw.get("header_fields_output_by"),
                 on_mismatch=write_raw.get("on_mismatch"),
                 on_conflict=write_raw.get("on_conflict"),
             )
@@ -730,7 +918,6 @@ def _effective_outputs_for_workflow_compile(
                 name=str(name),
                 to=to_cfg,
                 write=write_cfg,
-                container=cast("Any", raw).get("container"),  # pragma: allow-cast yaml mapping typed narrowing
                 fields=None,
             )
         )
@@ -744,6 +931,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     nodes: List[WorkflowAnyNodeIr],
     edges: List[WorkflowEdgeIr],
     effective_books: Mapping[str, BookConfig],
+    effective_files: Mapping[str, FileConfig],
     overrides_outputs: Optional[Sequence[Mapping[str, object]]],
 ) -> Dict[str, List[str]]:
     last_write_node_id_by_book_id: Dict[str, str] = {}
@@ -762,8 +950,19 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
 
         next_write_idx = 0
         for out_idx, out_cfg in enumerate(outputs):
-            container = out_cfg.container
-            if container is not None:
+            file_id, file_ref_path = _effective_file_binding_for_output(
+                out_cfg,
+                idx=int(out_idx),
+                outputs_path=outputs_path,
+            )
+            if file_id is not None:
+                if effective_files.get(str(file_id)) is None:
+                    msg = (
+                        "Missing file resource id {!r} referenced by {}. "
+                        "Hint: declare resources.files.{} in the demand YAML, declare workflow.resources.files.{} in the workflow YAML, "
+                        "or provide overrides.resources.files.{} in Python."
+                    ).format(str(file_id), str(file_ref_path), str(file_id), str(file_id), str(file_id))
+                    raise ScalimWorkflowConfigError(msg, path=str(file_ref_path))
                 continue
 
             book_id, book_ref_path = _effective_book_binding_for_output(
@@ -858,7 +1057,12 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             default_book_id = None
             default_book_ref = "outputs[*].to.book"
             for scan_idx, scan_out in enumerate(outputs):
-                if scan_out.container is not None:
+                scan_file_id, _scan_file_ref = _effective_file_binding_for_output(
+                    scan_out,
+                    idx=int(scan_idx),
+                    outputs_path=outputs_path,
+                )
+                if scan_file_id is not None:
                     continue
                 candidate, cand_ref = _effective_book_binding_for_output(
                     scan_out,
@@ -1063,7 +1267,7 @@ def compile_workflow_ir(
         if isinstance(outs_obj, list):
             overrides_outputs = cast("Sequence[Mapping[str, object]]", outs_obj)  # pragma: allow-cast yaml list typed narrowing
 
-    resources, effective_books, _base_dir_by_book_id = _compile_workflow_resources(
+    resources, effective_books, effective_files = _compile_workflow_resources(
         wf_obj,
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id=demand_cfg_by_run_id,
@@ -1078,6 +1282,7 @@ def compile_workflow_ir(
         nodes=nodes,
         edges=edges,
         effective_books=effective_books,
+        effective_files=effective_files,
         overrides_outputs=overrides_outputs,
     )
 

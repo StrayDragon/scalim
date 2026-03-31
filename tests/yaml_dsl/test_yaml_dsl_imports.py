@@ -110,9 +110,12 @@ def test_imports_list_replace(tmp_path) -> None:
     frag.write_text(
         """
 base:
+  resources:
+    files:
+      detail_csv: {kind: csv_file, path: ./a.csv}
   outputs:
     - name: detail
-      container: {type: csv, path: ./a.csv}
+      to: {file: detail_csv}
       fields: [a]
 """.lstrip(),
         encoding="utf-8",
@@ -128,9 +131,12 @@ main_source:
   source_id: orders
   loader: tests.fixtures.mock_loaders.mock_loader
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./b.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./b.csv}
+    to: {file: detail_csv}
     fields: [b]
 """.lstrip(),
         encoding="utf-8",
@@ -145,9 +151,12 @@ def test_imports_type_mismatch_fails_fast(tmp_path) -> None:
     frag.write_text(
         """
 base:
+  resources:
+    files:
+      detail_csv: {kind: csv_file, path: ./a.csv}
   outputs:
     - name: detail
-      container: {type: csv, path: ./a.csv}
+      to: {file: detail_csv}
       fields: [a]
 """.lstrip(),
         encoding="utf-8",

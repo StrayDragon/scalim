@@ -181,11 +181,14 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 errors,
                 (
                     "Legacy YAML syntax is not supported: top-level 'output'. "
-                    "Upgrade to 'outputs' (list) and move output settings into 'outputs.*.container'.\n\n"
+                    "Upgrade to 'outputs' (list) and move output settings into 'outputs.*.to' / 'outputs.*.write'.\n\n"
                     "Minimal migration:\n"
+                    "  resources:\n"
+                    "    books:\n"
+                    "      report: {kind: xlsx_file, path: ./output/report.xlsx}\n"
                     "  outputs:\n"
                     "    - name: detail\n"
-                    "      container: {type: workbook, path: ./output/report.xlsx, sheet: Detail}\n"
+                    "      to: {book: report, sheet: Detail}\n"
                     "      fields: [field_id, ...]"
                 ),
                 path="output",

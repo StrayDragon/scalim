@@ -39,9 +39,12 @@ main_source:
     extra:
       extract: extra
 sources: {}
+resources:
+  files:
+    base_csv: {kind: csv_file, path: ./base.csv}
 outputs:
   - name: base
-    container: {type: csv, path: ./base.csv}
+    to: {file: base_csv}
     fields: [order_id]
     where: "channel == 'direct'"
   - name: child
@@ -58,8 +61,8 @@ outputs:
     assert config.outputs[1].fields == ("order_id",)
     assert config.outputs[1].where is None  # where is NOT inherited
     assert config.outputs[1].requires == ()
-    assert config.outputs[1].container is not None
-    assert config.outputs[1].container.path == "./base.csv"  # container IS inherited
+    assert config.outputs[1].to is not None
+    assert config.outputs[1].to.file == "base_csv"  # to IS inherited
 
     # required_field_ids comes from outputs fields + where.requires; only these are parsed into config fields
     assert set(config.source_fields.keys()) == {"order_id", "channel"}
@@ -76,12 +79,16 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    a_csv: {kind: csv_file, path: ./a.csv}
+    b_csv: {kind: csv_file, path: ./b.csv}
 outputs:
   - name: dup
-    container: {type: csv, path: ./a.csv}
+    to: {file: a_csv}
     fields: [order_id]
   - name: dup
-    container: {type: csv, path: ./b.csv}
+    to: {file: b_csv}
     fields: [order_id]
 """
     with pytest.raises(ValueError, match="Duplicate output name"):
@@ -98,10 +105,13 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: child
     from: missing
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id]
 """
     with pytest.raises(ValueError) as exc:
@@ -121,14 +131,17 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: a
     from: b
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id]
   - name: b
     from: a
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id]
 """
     with pytest.raises(ValueError, match=r"cycle at 'a'"):
@@ -145,22 +158,26 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    agg_csv: {kind: csv_file, path: ./out.csv}
+    child_csv: {kind: csv_file, path: ./child.csv}
 outputs:
   - name: base_agg
-    container: {type: csv, path: ./out.csv}
+    to: {file: agg_csv}
     aggregate:
       group_by: [order_id]
       fields:
         order_cnt: {count: {field: order_id}}
   - name: child_detail
     from: base_agg
-    container: {type: csv, path: ./child.csv}
+    to: {file: child_csv}
 """
     with pytest.raises(ValueError, match=r"inherits fields from 'base_agg'"):
         _ = _load(yaml_content)
 
 
-def test_loader_rejects_excel_output_missing_explicit_book_binding() -> None:
+def test_loader_rejects_output_missing_destination_binding() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -174,7 +191,7 @@ outputs:
   - name: detail
     fields: [order_id]
 """
-    with pytest.raises(ValueError, match=r"outputs\.0\.to\.book is required"):
+    with pytest.raises(ValueError, match=r"outputs\.0\.to is required; declare exactly one of to\.file or to\.book"):
         _ = _load(yaml_content)
 
 
@@ -188,9 +205,12 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
 """
     with pytest.raises(ValueError, match="requires fields for detail output"):
         _ = _load(yaml_content)
@@ -206,9 +226,12 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: by_id
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     aggregate:
       group_by: [order_id]
       fields:
@@ -221,7 +244,7 @@ outputs:
     assert config.outputs[0].fields == ("order_id", "order_cnt")
 
 
-def test_loader_rejects_workbook_output_container() -> None:
+def test_loader_rejects_legacy_output_container() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -233,15 +256,16 @@ main_source:
 sources: {}
 outputs:
   - name: a
-    container: {type: workbook, path: ./out.xlsx, sheet: A}
+    container: {type: csv, path: ./out.csv}
     fields: [order_id]
 """
     with pytest.raises(ScalimYamlValidationError) as exc:
         _ = _load(yaml_content)
-    assert any(env.path == "outputs.0.container.type" for env in exc.value.errors)
+    assert any(env.path == "outputs.0.container" for env in exc.value.errors)
+    assert any("container was removed" in env.message for env in exc.value.errors)
 
 
-def test_loader_rejects_container_streaming_false() -> None:
+def test_loader_rejects_file_output_book_only_write_keys() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -251,10 +275,14 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv, streaming: false}
+    to: {file: detail_csv}
+    write: {mode: append}
     fields: [order_id]
 """
-    with pytest.raises(ValueError, match="streaming must be true"):
+    with pytest.raises(ValueError, match=r"outputs\.0\.write\.mode only apply to book outputs"):
         _ = _load(yaml_content)

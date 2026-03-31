@@ -205,12 +205,15 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
-outputs:
-  - name: detail
-    container:
-      type: workbook
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
       path: {$init_var: output_path, other: 1}
       unknown_field: 1
+outputs:
+  - name: detail
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),
@@ -223,8 +226,8 @@ outputs:
     payload = json.loads(capsys.readouterr().out)
     errors = payload["errors"]
     paths = {item["path"] for item in errors}
-    assert "outputs.0.container.path" in paths
-    assert "outputs.0.container.unknown_field" in paths
+    assert "resources.files.detail_csv.path" in paths
+    assert "resources.files.detail_csv.unknown_field" in paths
 
 
 def test_yaml_dsl_validate_allows_missing_sources(tmp_path, capsys) -> None:

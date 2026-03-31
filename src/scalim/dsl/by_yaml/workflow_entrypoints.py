@@ -19,12 +19,113 @@ from ._public_template_sandbox import validate_public_template_sandbox
 from .config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import RunOptions, RunOverrides, RunResult, UnsetType
-from .schema_dsl.models import DemandConfig
-from .workflow import ScalimWorkflowConfigError
+from .schema_dsl.models import BookConfig, DemandConfig, FileConfig, ResourcesConfig
+from .workflow import ScalimWorkflowConfigError, WorkflowConfig
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
 from .workflow_load import load_workflow_config_from_path
 
 _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = "workflow bundle viz requires run_workflow(..., overrides=RunOverrides(viz_config=...))"
+
+
+def _deep_merge_dicts(left: Mapping[str, object], right: Mapping[str, object]) -> Dict[str, object]:
+    merged = dict(left)
+    for key, value in right.items():
+        existing = merged.get(str(key))
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[str(key)] = _deep_merge_dicts(existing, value)  # pyright: ignore[reportUnknownArgumentType]
+            continue
+        merged[str(key)] = value
+    return merged
+
+
+def _book_config_to_override_patch(book: BookConfig) -> Dict[str, object]:  # noqa: C901
+    kind = str(book.kind or "").strip()
+    payload: Dict[str, object] = {"kind": kind}
+    if kind == "xlsx_file":
+        path = book.path
+        if path is not None:
+            payload["path"] = path
+        if bool(book.allow_formulas):
+            payload["allow_formulas"] = True
+        if bool(book.write_lock):
+            payload["write_lock"] = True
+    elif kind == "xlsx_memory":
+        budget = book.budget
+        if budget is not None:
+            payload["budget"] = {
+                "max_sheets": int(budget.max_sheets or 0),
+                "max_total_cells": int(budget.max_total_cells or 0),
+            }
+        export_xlsx = book.export_xlsx
+        if export_xlsx is not None:
+            export_payload: Dict[str, object] = {"path": export_xlsx.path}
+            if bool(export_xlsx.write_lock):
+                export_payload["write_lock"] = True
+            if bool(export_xlsx.allow_formulas):
+                export_payload["allow_formulas"] = True
+            payload["export_xlsx"] = export_payload
+    write_defaults = book.write_defaults
+    if write_defaults is not None:
+        payload["write_defaults"] = {
+            "mode": str(write_defaults.mode or ""),
+            "align_by": str(write_defaults.align_by or ""),
+            "header_policy": str(write_defaults.header_policy or ""),
+            "on_mismatch": str(write_defaults.on_mismatch or ""),
+            "on_conflict": str(write_defaults.on_conflict or ""),
+        }
+    return payload
+
+
+def _file_config_to_override_patch(file_cfg: FileConfig) -> Dict[str, object]:
+    payload: Dict[str, object] = {"kind": str(file_cfg.kind or "")}
+    path = file_cfg.path
+    if path is not None:
+        payload["path"] = path
+    encoding = str(file_cfg.encoding or "").strip()
+    if encoding:
+        payload["encoding"] = encoding
+    return payload
+
+
+def _workflow_resources_override_patch(wf: WorkflowConfig) -> Optional[Dict[str, object]]:
+    resources = wf.resources
+    resources_cfg = resources if isinstance(resources, ResourcesConfig) else None
+    if resources_cfg is None:
+        return None
+    books = dict(resources_cfg.books or {})
+    files = dict(resources_cfg.files or {})
+    if not books and not files:
+        return None
+    payload: Dict[str, object] = {}
+    if books:
+        payload["books"] = {str(book_id): _book_config_to_override_patch(book) for book_id, book in books.items()}
+    if files:
+        payload["files"] = {str(file_id): _file_config_to_override_patch(file_cfg) for file_id, file_cfg in files.items()}
+    return payload
+
+
+def _merge_node_overrides(
+    base_overrides: Optional[RunOverrides],
+    *,
+    workflow_resources_patch: Optional[Dict[str, object]],
+) -> Optional[RunOverrides]:
+    merged_resources = None
+    base_resources = None if base_overrides is None else base_overrides.resources
+    if workflow_resources_patch is not None:
+        merged_resources = dict(workflow_resources_patch)
+    if base_resources is not None:
+        merged_resources = _deep_merge_dicts(merged_resources or {}, base_resources)
+
+    if base_overrides is None:
+        if merged_resources is None:
+            return None
+        return RunOverrides(resources=merged_resources)
+
+    if merged_resources == base_resources:
+        return base_overrides
+
+    return replace(base_overrides, resources=merged_resources)
+
 
 if TYPE_CHECKING:
     from ...execution.guardrails import GuardrailsPolicy
@@ -140,6 +241,7 @@ def run_workflow(  # noqa: PLR0913
         rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
     )
+    workflow_resources_patch = _workflow_resources_override_patch(wf)
 
     if compile_demand_yaml_fn is None:
         compile_demand_yaml_fn = _compile_demand_default
@@ -174,6 +276,13 @@ def run_workflow(  # noqa: PLR0913
                 viz_config=viz_config,
             )
             node_options = replace(node_options, overrides=base_overrides)
+
+        merged_overrides = _merge_node_overrides(
+            node_options.overrides,
+            workflow_resources_patch=workflow_resources_patch,
+        )
+        if merged_overrides is not node_options.overrides:
+            node_options = replace(node_options, overrides=merged_overrides)
 
         if managed_output_ids:
             node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)

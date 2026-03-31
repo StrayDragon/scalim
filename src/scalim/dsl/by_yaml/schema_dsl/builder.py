@@ -98,8 +98,8 @@ class SchemaBuilder:
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
             "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig),
             "book": self._build_definition(types_mod.BookConfig),
+            "file": self._build_definition(types_mod.FileConfig),
             "resources": self._build_definition(types_mod.ResourcesConfig),
-            "output_container": self._build_definition(types_mod.OutputContainerConfig),
             "output_aggregate": self._build_definition(types_mod.OutputAggregateConfig),
             "output_to": self._build_definition(types_mod.OutputToConfig),
             "output_write": self._build_definition(types_mod.OutputWriteConfig),
@@ -274,6 +274,7 @@ class SchemaBuilder:
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
             "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig),
             "book": self._build_definition(types_mod.BookConfig),
+            "file": self._build_definition(types_mod.FileConfig),
             "resources": self._build_definition(types_mod.ResourcesConfig),
         }
 
@@ -360,7 +361,9 @@ class SchemaBuilder:
                     "allOf": [{"$ref": "#/definitions/resources"}],
                     "default": {},
                     "description": "workflow-scope shared IO resources",
-                    "markdownDescription": "workflow-scope shared IO resources.\n\n- stable surface: `workflow.resources.books`",
+                    "markdownDescription": (
+                        "workflow-scope shared IO resources.\n\n- stable surface: `workflow.resources.books` / `workflow.resources.files`"
+                    ),
                 },
             },
             "additionalProperties": False,

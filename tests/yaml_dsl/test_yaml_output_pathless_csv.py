@@ -17,10 +17,13 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
 outputs:
   - name: detail
-    container:
-      type: csv
+    to: {file: detail_csv}
     fields:
       - order_id
 """.lstrip(),
@@ -29,7 +32,7 @@ outputs:
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures"]))
-    assert any(e.path == "outputs.0.container" for e in excinfo.value.errors)
+    assert any(e.path == "resources.files.detail_csv" for e in excinfo.value.errors)
 
 
 def test_resolve_output_container_path_branches() -> None:

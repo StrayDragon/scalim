@@ -29,9 +29,12 @@ fields:
   total: &total
     name: Total
     compute: "quantity * unit_price"
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields: [order_id, total]
   - name: direct_detail
     from: detail
@@ -84,9 +87,12 @@ sources:
 fields:
   total: &total
     compute: "quantity * unit_price"
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields:
       - *order_id
       - *user_name
@@ -113,9 +119,12 @@ main_source:
     channel:
       extract: channel
 sources: {}
+resources:
+  files:
+    summary_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: summary
-    container: {type: csv, path: ./out.csv}
+    to: {file: summary_csv}
     where: "channel == 'direct'"
     aggregate:
       group_by:
@@ -148,9 +157,12 @@ main_source:
     amount:
       extract: amount
 sources: {}
+resources:
+  files:
+    summary_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: summary
-    container: {type: csv, path: ./out.csv}
+    to: {file: summary_csv}
     aggregate:
       group_by: [customer_id]
       fields:
@@ -180,9 +192,12 @@ main_source:
     amount:
       extract: amount
 sources: {}
+resources:
+  files:
+    summary_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: summary
-    container: {type: csv, path: ./out.csv}
+    to: {file: summary_csv}
     aggregate:
       group_by: [customer_id]
       fields:
@@ -208,9 +223,12 @@ main_source:
     quantity: &quantity
       extract: quantity
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields:
       - {extract: quantity}
 """
@@ -233,9 +251,12 @@ main_source:
     b:
       extract: id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields:
       - {extract: id}
 """
@@ -258,9 +279,12 @@ main_source:
     quantity:
       extract: quantity
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields:
       - {extract: missing}
 """
@@ -282,9 +306,12 @@ main_source:
     order_id:
       extract: order_id
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out.csv}
 outputs:
   - name: detail
-    container: {type: csv, path: ./out.csv}
+    to: {file: detail_csv}
     fields:
       - 1
 """

@@ -33,13 +33,17 @@ main_source:
     customer_id: {extract: customer_id}
     amount: {extract: amount}
 sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: %s}
+    summary_csv: {kind: csv_file, path: %s}
 outputs:
   - name: detail_direct
-    container: {type: csv, path: %s}
+    to: {file: detail_csv}
     fields: [order_id, channel, customer_id, amount]
     where: "channel == 'direct'"
   - name: summary_direct
-    container: {type: csv, path: %s}
+    to: {file: summary_csv}
     where: "channel == 'direct'"
     aggregate:
       group_by: [customer_id]
@@ -88,9 +92,13 @@ main_source:
     customer_id: {extract: customer_id, name: 客户}
     amount: {extract: amount}
 sources: {}
+resources:
+  files:
+    summary_csv: {kind: csv_file, path: %s}
 outputs:
   - name: summary_direct
-    container: {type: csv, path: %s, header_fields_output_by: name}
+    to: {file: summary_csv}
+    write: {header_fields_output_by: name}
     where: "channel == 'direct'"
     aggregate:
       group_by: [customer_id]

@@ -4,23 +4,14 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
 from ....._internal.utils import graph as graph_utils
 from ....._internal.utils.iterables import ordered_unique_str
 from .....vendor.dataclassesx import dataclass, replace
-from ...init_var_nodes import parse_init_var_mapping_node
-from ...schema_dsl.constants import (
-    DEFAULT_OUTPUT_ENCODING,
-    DEFAULT_OUTPUT_HEADER_BY,
-    DEFAULT_OUTPUT_INCLUDE_HEADER,
-    DEFAULT_OUTPUT_STREAMING,
-)
 from ...schema_dsl.models import (
     DEMAND_KEYS,
     OUTPUT_AGGREGATE_KEYS,
-    OUTPUT_CONTAINER_KEYS,
     OUTPUT_TARGET_KEYS,
     OUTPUT_TO_KEYS,
     OUTPUT_WRITE_KEYS,
     OutputAggregateConfig,
     OutputAggregateFieldConfig,
-    OutputContainerConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -37,7 +28,6 @@ from ...schema_dsl.output_enums import (
     DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
     DEFAULT_AGG_RANK_ORDER,
     DEFAULT_AGG_RANK_TOP_K_MODE,
-    OUTPUT_CONTAINER_TYPES,
     OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM,
 )
 from ...schema_dsl.output_enums import (
@@ -132,7 +122,6 @@ class _OutputFromResolver:
         return merged
 
     def _merge_one(self, current: OutputTargetConfig, *, name: str) -> OutputTargetConfig:
-        container = current.container
         to = current.to
         write = current.write
         fields = current.fields
@@ -143,8 +132,6 @@ class _OutputFromResolver:
                 msg = "outputs.{}.from points to unknown output: {}".format(name, from_name)
                 raise ValueError(msg)
             base_resolved = self._resolve_one(from_name)
-            if container is None:
-                container = base_resolved.container
             if to is None:
                 to = base_resolved.to
             if write is None:
@@ -155,7 +142,7 @@ class _OutputFromResolver:
                     msg = "outputs.{} inherits fields from '{}', but base output has no fields".format(name, from_name)
                     raise ValueError(msg)
 
-        return replace(current, container=container, to=to, write=write, fields=fields)
+        return replace(current, to=to, write=write, fields=fields)
 
 
 class ParserOutputsMixin:
@@ -292,7 +279,7 @@ class ParserOutputsMixin:
         required_field_ids = self._collect_required_field_ids_from_outputs(resolved_outputs)
         return tuple(resolved_outputs), required_field_ids
 
-    def _parse_output_target(
+    def _parse_output_target(  # noqa: C901
         self,
         raw_target: Dict[str, Any],
         *,
@@ -309,10 +296,12 @@ class ParserOutputsMixin:
         if from_name:
             self._validate_output_name(from_name, path="{}.{}.from".format(outputs_key, idx))
 
-        container_raw = mapping_or_none(raw_target.get(OUTPUT_TARGET_KEYS["container"]))
-        container = (
-            self._parse_output_container(container_raw, base_path="{}.{}.container".format(outputs_key, idx)) if container_raw else None
-        )
+        if "container" in raw_target:
+            msg = (
+                "{}.{}.container was removed; migrate CSV outputs to resources.files + outputs[*].to.file + outputs[*].write, "
+                "and .xlsx outputs to resources.books + outputs[*].to.book / outputs[*].to.sheet + outputs[*].write"
+            ).format(outputs_key, idx)
+            raise ValueError(msg)
 
         to_raw = mapping_or_none(raw_target.get(OUTPUT_TARGET_KEYS["to"]))
         to_cfg = self._parse_output_to(to_raw) if to_raw else None
@@ -382,7 +371,6 @@ class ParserOutputsMixin:
         return OutputTargetConfig(
             name=name,
             from_=from_name,
-            container=container,
             to=to_cfg,
             write=write_cfg,
             fields=fields,
@@ -391,68 +379,24 @@ class ParserOutputsMixin:
             requires=requires,
         )
 
-    def _parse_output_container(self, raw: Dict[str, Any], *, base_path: str) -> OutputContainerConfig:
-        type_raw = raw.get(OUTPUT_CONTAINER_KEYS["type"])
-        typ = _non_empty_str(type_raw).lower()
-        path_raw = raw.get(OUTPUT_CONTAINER_KEYS["path"])
-        path: Any
-        if isinstance(path_raw, dict):
-            path = {
-                "$init_var": parse_init_var_mapping_node(
-                    cast("Dict[str, Any]", path_raw),  # pragma: allow-cast init_var mapping typed narrowing
-                    path="{}.path".format(base_path),
-                )
-            }
-        elif path_raw is None:
-            path = None
-        elif isinstance(path_raw, str):
-            path = path_raw.strip()
-        else:
-            msg = "{}.path must be a non-empty string or {{$init_var: <name>}}".format(base_path)
-            raise TypeError(msg)
-        encoding = _non_empty_str(raw.get(OUTPUT_CONTAINER_KEYS["encoding"])) or DEFAULT_OUTPUT_ENCODING
-        streaming = bool(raw.get(OUTPUT_CONTAINER_KEYS["streaming"], DEFAULT_OUTPUT_STREAMING))
-        include_header = bool(raw.get(OUTPUT_CONTAINER_KEYS["include_header"], DEFAULT_OUTPUT_INCLUDE_HEADER))
-        header_by = _non_empty_str(raw.get(OUTPUT_CONTAINER_KEYS["header_fields_output_by"])) or DEFAULT_OUTPUT_HEADER_BY
-
-        if not typ:
-            msg = "{}.type is required".format(base_path)
-            raise ValueError(msg)
-        if typ not in OUTPUT_CONTAINER_TYPES:
-            if typ == "workbook":
-                msg = (
-                    "{}.type='workbook' was removed; use resources.books + outputs[*].to.book / outputs[*].to.sheet for .xlsx outputs"
-                ).format(base_path)
-                raise ValueError(msg)
-
-            msg = "{}.type={!r} is invalid; expected one of: {}".format(base_path, typ, ", ".join(OUTPUT_CONTAINER_TYPES))
-            raise ValueError(msg)
-        if not path:
-            msg = "{}.path is required for csv outputs".format(base_path)
-            raise ValueError(msg)
-        if header_by not in OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM:
-            msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(
-                base_path, header_by, ", ".join(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM)
-            )
-            raise ValueError(msg)
-
-        return OutputContainerConfig(
-            type=typ,
-            path=path,
-            encoding=encoding,
-            streaming=streaming,
-            include_header=include_header,
-            header_fields_output_by=header_by,
-        )
-
     def _parse_output_to(self, raw: Dict[str, Any]) -> OutputToConfig:
+        file_id = str_or_none(raw.get(OUTPUT_TO_KEYS["file"]))
+        file_id = _non_empty_str(file_id) or None
         book = str_or_none(raw.get(OUTPUT_TO_KEYS["book"]))
         book = _non_empty_str(book) or None
         sheet = str_or_none(raw.get(OUTPUT_TO_KEYS["sheet"]))
         sheet = _non_empty_str(sheet) or None
-        return OutputToConfig(book=book, sheet=sheet)
+        return OutputToConfig(file=file_id, book=book, sheet=sheet)
 
     def _parse_output_write(self, raw: Dict[str, Any], *, base_path: str) -> OutputWriteConfig:
+        include_header_raw = raw.get(OUTPUT_WRITE_KEYS["include_header"])
+        include_header = None
+        if include_header_raw is not None:
+            if not isinstance(include_header_raw, bool):
+                msg = "{}.include_header must be a boolean".format(base_path)
+                raise TypeError(msg)
+            include_header = bool(include_header_raw)
+
         mode = str_or_none(raw.get(OUTPUT_WRITE_KEYS["mode"]))
         mode = _non_empty_str(mode) or None
         if mode is not None and mode not in BOOK_WRITE_MODE_ENUM:
@@ -473,6 +417,14 @@ class ParserOutputsMixin:
             )
             raise ValueError(msg)
 
+        header_fields_output_by = str_or_none(raw.get(OUTPUT_WRITE_KEYS["header_fields_output_by"]))
+        header_fields_output_by = _non_empty_str(header_fields_output_by) or None
+        if header_fields_output_by is not None and header_fields_output_by not in OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM:
+            msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(
+                base_path, header_fields_output_by, ", ".join(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM)
+            )
+            raise ValueError(msg)
+
         on_mismatch = str_or_none(raw.get(OUTPUT_WRITE_KEYS["on_mismatch"]))
         on_mismatch = _non_empty_str(on_mismatch) or None
         if on_mismatch is not None and on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
@@ -490,9 +442,11 @@ class ParserOutputsMixin:
             raise ValueError(msg)
 
         return OutputWriteConfig(
+            include_header=include_header,
             mode=mode,
             align_by=align_by,
             header_policy=header_policy,
+            header_fields_output_by=header_fields_output_by,
             on_mismatch=on_mismatch,
             on_conflict=on_conflict,
         )
@@ -959,30 +913,47 @@ class ParserOutputsMixin:
             raise ValueError(msg) from exc
         return deps
 
-    def _validate_output_container_semantics(
-        self,
-        t: OutputTargetConfig,
-        name: str,
-    ) -> None:
-        container = t.container
-        if container is None:
-            # `book` 绑定场景允许无 `container`(通过 `to`/`write` 表达).
+    def _validate_output_binding_semantics(self, t: OutputTargetConfig, *, idx: int) -> None:  # noqa: C901
+        to_cfg = t.to
+        if to_cfg is None:
+            msg = "outputs.{}.to is required; declare exactly one of to.file or to.book".format(int(idx))
+            raise ValueError(msg)
+
+        file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
+        book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
+        sheet_name = str(to_cfg.sheet or "").strip() if to_cfg.sheet is not None else ""
+
+        if bool(file_id) == bool(book_id):
+            msg = "outputs.{}.to must declare exactly one of to.file or to.book".format(int(idx))
+            raise ValueError(msg)
+
+        if sheet_name and not book_id:
+            msg = "outputs.{}.to.sheet requires outputs.{}.to.book".format(int(idx), int(idx))
+            raise ValueError(msg)
+
+        write_cfg = t.write
+        if write_cfg is None:
             return
 
-        # `csv` 文件输出场景.
-        if t.to is not None:
-            msg = "outputs.{} cannot declare both container and to".format(name)
-            raise ValueError(msg)
-        if t.write is not None:
-            msg = "outputs.{} cannot declare write for csv container outputs".format(name)
-            raise ValueError(msg)
+        if file_id:
+            invalid_keys: List[str] = []
+            if write_cfg.mode is not None:
+                invalid_keys.append("mode")
+            if write_cfg.align_by is not None:
+                invalid_keys.append("align_by")
+            if write_cfg.header_policy is not None:
+                invalid_keys.append("header_policy")
+            if write_cfg.on_mismatch is not None:
+                invalid_keys.append("on_mismatch")
+            if write_cfg.on_conflict is not None:
+                invalid_keys.append("on_conflict")
+            if invalid_keys:
+                msg = "outputs.{}.write.{} only apply to book outputs".format(int(idx), ", ".join(invalid_keys))
+                raise ValueError(msg)
 
-        if str(container.type or "").lower() != "csv":
-            msg = "outputs.{}.container.type={!r} is invalid; expected 'csv'".format(name, container.type)
-            raise ValueError(msg)
-
-        if not container.streaming:
-            msg = "outputs.{}.container.streaming must be true (composed outputs only support streaming=true)".format(name)
+        mode = str(write_cfg.mode or "").strip() if write_cfg.mode is not None else None
+        if book_id and mode == "append" and write_cfg.include_header is not None:
+            msg = "outputs.{}.write.include_header is not allowed for append-mode book outputs; use write.header_policy".format(int(idx))
             raise ValueError(msg)
 
     def _validate_detail_output_semantics(self, t: OutputTargetConfig, name: str, known_field_ids: Set[str]) -> None:
@@ -993,20 +964,6 @@ class ParserOutputsMixin:
         if unknown_fields:
             msg = "outputs.{}.fields reference unknown fields: {}".format(name, ", ".join(sorted(set(unknown_fields))))
             raise ValueError(msg)
-
-    def _validate_book_binding_semantics(self, t: OutputTargetConfig, *, idx: int) -> None:
-        if t.container is not None:
-            return
-        to_cfg = t.to
-        book = str(to_cfg.book or "").strip() if to_cfg is not None and to_cfg.book is not None else ""
-        if book:
-            return
-        path = "outputs.{}.to.book".format(int(idx))
-        msg = (
-            "{} is required for Excel outputs; set {} explicitly. "
-            "Reuse the binding with YAML anchors (`_templates`) or `$import` instead of relying on defaults."
-        ).format(path, path)
-        raise ValueError(msg)
 
     def _validate_aggregate_group_and_metrics(
         self,
@@ -1260,8 +1217,7 @@ class ParserOutputsMixin:
     ) -> None:
         for idx, t in enumerate(outputs):
             name = str(t.name or "").strip()
-            self._validate_output_container_semantics(t, name)
-            self._validate_book_binding_semantics(t, idx=int(idx))
+            self._validate_output_binding_semantics(t, idx=int(idx))
             if t.aggregate is None:
                 self._validate_detail_output_semantics(t, name, known_field_ids)
             else:

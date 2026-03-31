@@ -29,7 +29,6 @@ from .observability import (
 )
 from .outputs import (
     OutputAggregateConfig,
-    OutputContainerConfig,
     OutputExtraSheetConfig,
     OutputTargetConfig,
     OutputToConfig,
@@ -40,6 +39,7 @@ from .resources import (
     BookConfig,
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
+    FileConfig,
     ResourcesConfig,
 )
 from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, SourceConfig
@@ -91,7 +91,6 @@ SOURCE_KEYS = _build_key_map(SourceConfig)
 MAIN_SOURCE_KEYS = _build_key_map(MainSourceConfig)
 SOURCE_FIELD_KEYS = _build_key_map(SourceFieldConfig)
 DERIVED_FIELD_KEYS = _build_key_map(DerivedFieldConfig)
-OUTPUT_CONTAINER_KEYS = _build_key_map(OutputContainerConfig)
 OUTPUT_AGGREGATE_KEYS = _build_key_map(OutputAggregateConfig)
 OUTPUT_TARGET_KEYS = _build_key_map(OutputTargetConfig)
 OUTPUT_EXTRA_SHEET_KEYS = _build_key_map(OutputExtraSheetConfig)
@@ -101,6 +100,7 @@ BOOK_BUDGET_KEYS = _build_key_map(BookBudgetConfig)
 BOOK_EXPORT_XLSX_KEYS = _build_key_map(BookExportXlsxConfig)
 BOOK_WRITE_DEFAULTS_KEYS = _build_key_map(BookWriteDefaultsConfig)
 BOOK_KEYS = _build_key_map(BookConfig)
+FILE_KEYS = _build_key_map(FileConfig)
 RESOURCES_KEYS = _build_key_map(ResourcesConfig)
 PERFORMANCE_KEYS = _build_key_map(PerformanceConfig)
 PERFORMANCE_REPORT_KEYS = _build_key_map(PerformanceReportConfig)

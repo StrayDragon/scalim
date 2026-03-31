@@ -36,15 +36,19 @@ fields:
     name: 实付金额
     compute: "quantity * unit_price * discount_rate"
 
+resources:
+  files:
+    rank_csv:
+      kind: csv_file
+      path: {$init_var: out_path_rank}
+      encoding: utf-8
+
 outputs:
   - name: top2_by_region_category
-    container:
-      type: csv
-      path: {$init_var: out_path_rank}
+    to: {file: rank_csv}
+    write:
       header_fields_output_by: field_id
       include_header: true
-      streaming: true
-      encoding: utf-8
     aggregate:
       group_by: [region_id, product_category_id]
       fields:

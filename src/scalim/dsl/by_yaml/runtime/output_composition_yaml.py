@@ -20,11 +20,13 @@ from ....typedefs import FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
 from ..config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
 from ..config_parsing.security import ScalimComputeExpressionError, ScalimSecurityError, SecureComputeEngine
+from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER
 from ..schema_dsl.models import (
     BookConfig,
+    BookWriteDefaultsConfig,
     DemandConfig,
+    FileConfig,
     OutputAggregateConfig,
-    OutputContainerConfig,
     OutputExtraSheetConfig,
     OutputTargetConfig,
 )
@@ -37,7 +39,11 @@ from ..schema_dsl.output_enums import (
 from ..schema_dsl.output_enums import (
     AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
 )
-from .output_path_resolve import resolve_output_container_path, resolve_yaml_relative_output_path
+from ..schema_dsl.output_enums import (
+    DEFAULT_BOOK_WRITE_HEADER_POLICY,
+    DEFAULT_BOOK_WRITE_MODE,
+)
+from .output_path_resolve import resolve_yaml_relative_output_path
 from .references import SecurePythonReferenceResolver
 
 _EXCEL_SHEET_NAME_MAX_LEN = 31
@@ -287,13 +293,13 @@ def _export_layout_for_derived(
     return ExportLayout(field_ids=normalized, header_names=tuple(names))
 
 
-def _output_spec_from_container(container: OutputContainerConfig, *, path: Optional[str]) -> OutputSpec:
+def _output_spec_for_file_resource(file_cfg: FileConfig, *, path: Optional[str], include_header: bool) -> OutputSpec:
     return OutputSpec(
         format="csv",
         path=path,
-        encoding=str(container.encoding),
-        streaming=bool(container.streaming),
-        include_header=bool(container.include_header),
+        encoding=str(file_cfg.encoding),
+        streaming=True,
+        include_header=bool(include_header),
         sheet_name=None,
     )
 
@@ -482,6 +488,21 @@ def _validate_extra_sheet_target_names(config: DemandConfig, *, outputs_path: st
         raise ValueError(msg)
 
 
+def _effective_file_id_for_output(
+    out_cfg: OutputTargetConfig,
+    *,
+    idx: int,
+    outputs_path: str,
+) -> Tuple[Optional[str], str]:
+    file_ref_path = "{}.{}.to.file".format(outputs_path, int(idx))
+    to_cfg = out_cfg.to
+    if to_cfg is not None and to_cfg.file is not None:
+        candidate = str(to_cfg.file or "").strip()
+        if candidate:
+            return candidate, file_ref_path
+    return None, file_ref_path
+
+
 def _effective_book_id_for_output(
     out_cfg: OutputTargetConfig,
     *,
@@ -506,6 +527,21 @@ def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, o
     return str(out_cfg.name or ""), "{}.{}.name".format(outputs_path, int(idx)), True
 
 
+def _require_file_resource(config: DemandConfig, *, file_id: str, file_ref_path: str) -> FileConfig:
+    resources = config.resources
+    files = resources.files if resources is not None else {}
+    file_cfg = files.get(str(file_id))
+    if file_cfg is None:
+        msg = (
+            "Missing file resource id {!r} referenced by {}. "
+            "Hint: declare resources.files.{} in the demand YAML, declare workflow.resources.files.{} in the workflow YAML, "
+            "or provide overrides.resources.files.{} in Python."
+        ).format(str(file_id), str(file_ref_path), str(file_id), str(file_id), str(file_id))
+        err = "{} (path={})".format(msg, str(file_ref_path))
+        raise ValueError(err)
+    return file_cfg
+
+
 def _require_book_resource(config: DemandConfig, *, book_id: str, book_ref_path: str) -> BookConfig:
     resources = config.resources
     books = resources.books if resources is not None else {}
@@ -519,6 +555,24 @@ def _require_book_resource(config: DemandConfig, *, book_id: str, book_ref_path:
         err = "{} (path={})".format(msg, str(book_ref_path))
         raise ValueError(err)
     return book
+
+
+def _resolve_file_export_path(
+    config: DemandConfig,
+    *,
+    file_id: str,
+    file_ref_path: str,
+    yaml_base_dir: str,
+    init_vars: Optional[Dict[str, object]],
+) -> Tuple[str, FileConfig]:
+    file_cfg = _require_file_resource(config, file_id=str(file_id), file_ref_path=str(file_ref_path))
+    export_path = resolve_yaml_relative_output_path(
+        file_cfg.path,
+        base_dir=str(yaml_base_dir),
+        init_vars=init_vars,
+        path="resources.files.{}.path".format(str(file_id)),
+    )
+    return export_path, file_cfg
 
 
 def _resolve_book_export_path(
@@ -565,6 +619,57 @@ def _resolve_book_export_path(
     raise ValueError(err)
 
 
+def _effective_book_write_defaults(book: BookConfig, *, out_cfg: OutputTargetConfig) -> BookWriteDefaultsConfig:
+    base = book.write_defaults
+    if base is None:
+        base = BookWriteDefaultsConfig(
+            mode=str(DEFAULT_BOOK_WRITE_MODE),
+            header_policy=str(DEFAULT_BOOK_WRITE_HEADER_POLICY),
+        )
+
+    write_cfg = out_cfg.write
+    if write_cfg is None:
+        return base
+
+    return BookWriteDefaultsConfig(
+        mode=str(write_cfg.mode or base.mode or DEFAULT_BOOK_WRITE_MODE),
+        align_by=str(write_cfg.align_by or base.align_by),
+        header_policy=str(write_cfg.header_policy or base.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
+        on_mismatch=str(write_cfg.on_mismatch or base.on_mismatch),
+        on_conflict=str(write_cfg.on_conflict or base.on_conflict),
+    )
+
+
+def _effective_output_header_fields_output_by(
+    *,
+    out_cfg: OutputTargetConfig,
+) -> str:
+    write_cfg = out_cfg.write
+    if write_cfg is not None and write_cfg.header_fields_output_by is not None:
+        return str(write_cfg.header_fields_output_by)
+
+    return str(DEFAULT_OUTPUT_HEADER_BY)
+
+
+def _effective_output_include_header(
+    *,
+    out_cfg: OutputTargetConfig,
+    mode: Optional[str],
+    header_policy: Optional[str],
+    include_header_path: str,
+) -> bool:
+    write_cfg = out_cfg.write
+    if mode == "append":
+        if write_cfg is not None and write_cfg.include_header is not None:
+            msg = "{} is not allowed for append-mode book outputs; use write.header_policy".format(include_header_path)
+            raise ValueError(msg)
+        return str(header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY) != "never"
+
+    if write_cfg is not None and write_cfg.include_header is not None:
+        return bool(write_cfg.include_header)
+    return bool(DEFAULT_OUTPUT_INCLUDE_HEADER)
+
+
 def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     config: DemandConfig,
     demand_ir: DemandIr,
@@ -599,23 +704,36 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
         in_memory = False
         output_spec: OutputSpec
-        header_by = "field_id"
+        header_by = str(DEFAULT_OUTPUT_HEADER_BY)
 
-        container = out_cfg.container
-        if container is not None:
-            # CSV 文件输出.
-            container_path_key = "{}.{}.container.path".format(outputs_path, idx)
-            container_path = resolve_output_container_path(container.path, init_vars=init_vars, path=container_path_key)
-            output_spec = _output_spec_from_container(container, path=container_path)
-            header_by = str(container.header_fields_output_by)
+        file_id, file_ref_path = _effective_file_id_for_output(out_cfg, idx=int(idx), outputs_path=str(outputs_path))
+        file_id = str(file_id or "").strip()
+        if file_id:
+            if yaml_base_dir is None:
+                msg = "yaml_base_dir is required to resolve resources.files output paths"
+                raise ValueError(msg)
+            export_path, file_cfg = _resolve_file_export_path(
+                config,
+                file_id=str(file_id),
+                file_ref_path=str(file_ref_path),
+                yaml_base_dir=str(yaml_base_dir),
+                init_vars=init_vars,
+            )
+            include_header = _effective_output_include_header(
+                out_cfg=out_cfg,
+                mode=None,
+                header_policy=None,
+                include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
+            )
+            output_spec = _output_spec_for_file_resource(file_cfg, path=export_path, include_header=include_header)
+            header_by = _effective_output_header_fields_output_by(out_cfg=out_cfg)
         else:
-            # `books` 绑定输出.
             book_id, book_ref_path = _effective_book_id_for_output(out_cfg, idx=int(idx), outputs_path=str(outputs_path))
             if book_id is None:
                 msg = (
-                    "Missing outputs to.book binding for output {!r}; set {}.{}.to.book explicitly. "
+                    "Missing output destination for output {!r}; set {}.{}.to.file or {}.{}.to.book explicitly. "
                     "Reuse the binding with YAML anchors (`_templates`) or `$import` if needed."
-                ).format(str(out_cfg.name), str(outputs_path), int(idx))
+                ).format(str(out_cfg.name), str(outputs_path), int(idx), str(outputs_path), int(idx))
                 err = "{} (path={})".format(msg, book_ref_path)
                 raise ValueError(err)
 
@@ -635,11 +753,28 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
             if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:
                 in_memory = True
-                output_spec = OutputSpec(format="csv", path=None, streaming=True, include_header=True)
+                effective_defaults = _effective_book_write_defaults(
+                    _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path)), out_cfg=out_cfg
+                )
+                include_header = _effective_output_include_header(
+                    out_cfg=out_cfg,
+                    mode=str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE),
+                    header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
+                    include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
+                )
+                output_spec = OutputSpec(format="csv", path=None, streaming=True, include_header=bool(include_header))
             else:
                 if yaml_base_dir is None:
                     msg = "yaml_base_dir is required to resolve resources.books output paths"
                     raise ValueError(msg)
+                book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
+                effective_defaults = _effective_book_write_defaults(book, out_cfg=out_cfg)
+                include_header = _effective_output_include_header(
+                    out_cfg=out_cfg,
+                    mode=str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE),
+                    header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
+                    include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
+                )
                 export_path, allow_formulas, write_lock = _resolve_book_export_path(
                     config,
                     book_id=str(book_id),
@@ -651,7 +786,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     format="excel",
                     path=str(export_path),
                     streaming=True,
-                    include_header=True,
+                    include_header=bool(include_header),
                     sheet_name=str(sheet_name),
                     excel_allow_formulas=bool(allow_formulas),
                     write_lock=bool(write_lock),
@@ -660,6 +795,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     workbook_default_path = str(export_path)
                     workbook_default_allow_formulas = bool(allow_formulas)
                     workbook_default_write_lock = bool(write_lock)
+            header_by = _effective_output_header_fields_output_by(out_cfg=out_cfg)
 
         predicate = None
         if out_cfg.where:

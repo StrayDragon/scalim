@@ -2,7 +2,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 from .....vendor.dataclassesx import dataclass
 from .....vendor.dataclassesx import field as dataclass_field
-from ..constants import schema_meta, schema_ref
+from ..constants import DEFAULT_OUTPUT_ENCODING, schema_meta, schema_ref
 from ..output_enums import (
     BOOK_KINDS,
     BOOK_WRITE_ALIGN_BY_ENUM,
@@ -15,6 +15,7 @@ from ..output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
+    FILE_KINDS,
 )
 
 _PATH_OR_INIT_VAR_SCHEMA = {
@@ -257,6 +258,41 @@ class BookConfig:
 
 
 @dataclass(frozen=True)
+class FileConfig:
+    SCHEMA_NAME: ClassVar[str] = "file"
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind", "path")
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+
+    kind: str = dataclass_field(
+        default="",
+        metadata=schema_meta(
+            desc="file kind(csv_file)",
+            md="file kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件",
+            choices=list(FILE_KINDS),
+            examples=["csv_file"],
+        ),
+    )
+
+    path: Any = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema=_PATH_OR_INIT_VAR_SCHEMA,
+            desc="csv_file: 输出路径(字符串或 {$init_var: <name>})",
+        ),
+    )
+
+    encoding: str = dataclass_field(
+        default=DEFAULT_OUTPUT_ENCODING,
+        metadata=schema_meta(
+            desc="csv_file: 文件编码(默认 utf-8)",
+            md="csv_file: 文件编码(默认 `utf-8`).",
+            default=DEFAULT_OUTPUT_ENCODING,
+            examples=[DEFAULT_OUTPUT_ENCODING],
+        ),
+    )
+
+
+@dataclass(frozen=True)
 class ResourcesConfig:
     SCHEMA_NAME: ClassVar[str] = "resources"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -273,6 +309,21 @@ class ResourcesConfig:
                 "- `outputs[*].to.book` 引用该 mapping 的 key"
             ),
             additional_props=schema_ref("book"),
+            min_props=0,
+        ),
+    )
+
+    files: Dict[str, FileConfig] = dataclass_field(
+        default_factory=dict,
+        metadata=schema_meta(
+            desc="files 资源映射(文件输出资源; key 为 file_id)",
+            md=(
+                "files 资源映射(文件输出资源; key 为 `file_id`).\n\n"
+                "- v1 稳定支持: `kind=csv_file`\n"
+                "- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n"
+                "- `outputs[*].to.file` 引用该 mapping 的 key"
+            ),
+            additional_props=schema_ref("file"),
             min_props=0,
         ),
     )

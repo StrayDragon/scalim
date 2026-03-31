@@ -118,16 +118,15 @@ workflow:
             outputs=[
                 {
                     "name": "detail",
-                    "container": {
-                        "type": "csv",
-                        "path": str(tmp / "out.csv"),
+                    "to": {"file": "detail_csv"},
+                    "write": {
                         "include_header": True,
                         "header_fields_output_by": "name",
-                        "streaming": True,
                     },
                     "fields": ["item_id", "dim_id"],
                 }
-            ]
+            ],
+            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(tmp / "out.csv")}}},
         )
         run_result: api.RunResult = api.run(
             str(demand_path),

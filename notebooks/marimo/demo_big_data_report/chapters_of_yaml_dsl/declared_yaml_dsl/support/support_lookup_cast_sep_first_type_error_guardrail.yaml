@@ -51,13 +51,17 @@ sources:
     fields:
       agent_team: {extract: agent_team, name: Agent Team, relation: tickets_to_agents}
 
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {$init_var: out_path_detail}
+      encoding: utf-8
+
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {$init_var: out_path_detail}
+    to: {file: detail_csv}
+    write:
       header_fields_output_by: field_id
       include_header: true
-      streaming: true
-      encoding: utf-8
     fields: [ticket_id, agent_id, category, agent_team]

@@ -11,7 +11,7 @@ def resolve_output_container_path(
     init_vars: Optional[Dict[str, object]],
     path: str,
 ) -> str:
-    """解析 `OutputContainerConfig.path` 为非空字符串路径.
+    """解析输出资源路径节点为非空字符串路径.
 
     支持:
     - 静态字符串路径.

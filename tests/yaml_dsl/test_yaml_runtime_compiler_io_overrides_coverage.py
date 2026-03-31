@@ -10,6 +10,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
     DemandConfig,
+    FileConfig,
     ResourcesConfig,
 )
 
@@ -22,15 +23,25 @@ class _BlankPathLike(os.PathLike):
         return self._value
 
 
-def test_runtime_compiler_parse_overrides_container_path_and_semantics_cover_branches() -> None:
-    with pytest.raises(ValueError, match=r"p\.path is required"):
-        _ = compiler_mod._parse_overrides_outputs_container_path(_BlankPathLike("   "), path="p")  # noqa: SLF001
+def test_runtime_compiler_apply_file_patch_cover_branches() -> None:
+    with pytest.raises(ValueError, match=r"p contains unknown keys"):
+        _ = compiler_mod._apply_file_patch(None, {"nope": 1}, path="p")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"p\.path is required"):
-        _ = compiler_mod._parse_overrides_outputs_container_path("   ", path="p")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"p\.kind must be a non-empty string"):
+        _ = compiler_mod._apply_file_patch(None, {"kind": ""}, path="p")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"p\.type='json' is invalid"):
-        compiler_mod._validate_overrides_outputs_container_semantics("json", path="p", streaming=True)  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"p\.kind='json_file' is invalid"):
+        _ = compiler_mod._apply_file_patch(None, {"kind": "json_file"}, path="p")  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"p\.path is required for kind=csv_file"):
+        _ = compiler_mod._apply_file_patch(None, {"kind": "csv_file"}, path="p")  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"p\.encoding must be a string"):
+        _ = compiler_mod._apply_file_patch(FileConfig(kind="csv_file", path="a.csv"), {"encoding": 1}, path="p")  # noqa: SLF001
+
+    patched = compiler_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a.csv"}, path="p")  # noqa: SLF001
+    assert patched.kind == "csv_file"
+    assert patched.path == "a.csv"
 
 
 def test_runtime_compiler_parse_overrides_to_and_write_cover_branches() -> None:
@@ -40,6 +51,9 @@ def test_runtime_compiler_parse_overrides_to_and_write_cover_branches() -> None:
     with pytest.raises(TypeError, match=r"p\.book must be a string"):
         _ = compiler_mod._parse_overrides_output_to({"book": 1}, path="p")  # noqa: SLF001
 
+    with pytest.raises(TypeError, match=r"p\.file must be a string"):
+        _ = compiler_mod._parse_overrides_output_to({"file": 1}, path="p")  # noqa: SLF001
+
     with pytest.raises(TypeError, match=r"p\.sheet must be a string"):
         _ = compiler_mod._parse_overrides_output_to({"sheet": 1}, path="p")  # noqa: SLF001
 
@@ -47,6 +61,12 @@ def test_runtime_compiler_parse_overrides_to_and_write_cover_branches() -> None:
 
     with pytest.raises(ValueError, match=r"p has unknown keys"):
         _ = compiler_mod._parse_overrides_output_write({"mode": "sheet", "nope": 1}, path="p")  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"p\.header_fields_output_by='nope' is invalid"):
+        _ = compiler_mod._parse_overrides_output_write({"header_fields_output_by": "nope"}, path="p")  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"p\.include_header must be a boolean"):
+        _ = compiler_mod._parse_overrides_output_write({"include_header": "yes"}, path="p")  # noqa: SLF001
 
 
 def test_runtime_compiler_parse_non_empty_and_optional_path_or_init_var_cover_branches() -> None:
@@ -81,7 +101,13 @@ def test_runtime_compiler_parse_non_empty_and_optional_path_or_init_var_cover_br
 
 
 def test_runtime_compiler_overlay_write_defaults_and_field_overlay_cover_branches() -> None:
-    base = BookWriteDefaultsConfig(mode="sheet", align_by="field_id", header_policy="once", on_mismatch="error", on_conflict="error")
+    base = BookWriteDefaultsConfig(
+        mode="sheet",
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+        on_conflict="error",
+    )
 
     assert compiler_mod._overlay_optional_str_field({}, key="mode", value="x", path="p") == "x"  # noqa: SLF001
     assert compiler_mod._overlay_optional_str_field({"mode": None}, key="mode", value="x", path="p") == "x"  # noqa: SLF001
@@ -246,6 +272,7 @@ def test_runtime_compiler_apply_resources_overrides_cover_branches() -> None:
         _ = compiler_mod._apply_resources_io_override(base, {"nope": 1})  # noqa: SLF001
 
     assert compiler_mod._apply_resources_io_override(base, {"books": None}) == base  # noqa: SLF001
+    assert compiler_mod._apply_resources_io_override(base, {"files": None}) == base  # noqa: SLF001
 
     with pytest.raises(TypeError, match=r"overrides\.resources\.books must be an object"):
         _ = compiler_mod._apply_resources_io_override(base, {"books": "nope"})  # noqa: SLF001
@@ -255,6 +282,15 @@ def test_runtime_compiler_apply_resources_overrides_cover_branches() -> None:
 
     with pytest.raises(TypeError, match=r"overrides\.resources\.books\.report must be an object"):
         _ = compiler_mod._apply_resources_io_override(base, {"books": {"report": "nope"}})  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"overrides\.resources\.files must be an object"):
+        _ = compiler_mod._apply_resources_io_override(base, {"files": "nope"})  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"overrides\.resources\.files keys must be non-empty strings"):
+        _ = compiler_mod._apply_resources_io_override(base, {"files": {"": {}}})  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"overrides\.resources\.files\.detail must be an object"):
+        _ = compiler_mod._apply_resources_io_override(base, {"files": {"detail": "nope"}})  # noqa: SLF001
 
     merged = compiler_mod._apply_resources_io_override(base, {"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx"}}})  # noqa: SLF001
     assert merged.resources is not None
@@ -267,10 +303,16 @@ def test_runtime_compiler_apply_resources_overrides_cover_branches() -> None:
     assert updated.resources is not None
     assert updated.resources.books["report"].path == "b.xlsx"
 
+    merged_files = compiler_mod._apply_resources_io_override(base, {"files": {"detail": {"kind": "csv_file", "path": "a.csv"}}})  # noqa: SLF001
+    assert merged_files.resources is not None
+    assert merged_files.resources.files["detail"].kind == "csv_file"
+
 
 def test_runtime_compiler_apply_io_overrides_dispatch_covers_branches() -> None:
     cfg = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")}),
+        resources=ResourcesConfig(
+            books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")}, files={"detail": FileConfig(kind="csv_file", path="a.csv")}
+        ),
     )
     options = RunOptions(
         allowed_modules=frozenset(["tests.fixtures"]),
@@ -281,3 +323,13 @@ def test_runtime_compiler_apply_io_overrides_dispatch_covers_branches() -> None:
     out = compiler_mod._apply_io_overrides(cfg, options=options)  # noqa: SLF001
     assert out.resources is not None
     assert out.resources.books["report"].path == "b.xlsx"
+
+    options = RunOptions(
+        allowed_modules=frozenset(["tests.fixtures"]),
+        overrides=RunOverrides(
+            resources={"files": {"detail": {"path": "b.csv"}}},
+        ),
+    )
+    out = compiler_mod._apply_io_overrides(cfg, options=options)  # noqa: SLF001
+    assert out.resources is not None
+    assert out.resources.files["detail"].path == "b.csv"

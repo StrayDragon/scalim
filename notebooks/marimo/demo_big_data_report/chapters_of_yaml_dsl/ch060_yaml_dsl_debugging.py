@@ -32,14 +32,18 @@ main_source:
   fields:
     ticket_id: {name: Ticket ID}
 
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: {$init_var: out_path_detail}
+
 outputs:
   - name: detail
-    container:
-      type: csv
-      path: {$init_var: out_path_detail}
+    to: {file: detail_csv}
+    write:
       header_fields_output_by: field_id
       include_header: true
-      streaming: true
     where: "unknown_field > 0"
     fields: [ticket_id]
 """,
