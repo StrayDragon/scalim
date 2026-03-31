@@ -5,6 +5,7 @@ This package MUST NOT depend on `marimo` so it can be safely imported by:
 - pytest
 """
 
+from .chapters_registry import ChapterRegistry
 from .pathing import (
     demo_big_data_report_dir,
     demo_big_data_report_workflow_yaml_path,
@@ -16,6 +17,7 @@ from .results_view import details_to_rows
 from .yaml_excerpt import excerpt_by_regex, excerpt_head
 
 __all__ = [
+    "ChapterRegistry",
     "demo_big_data_report_dir",
     "demo_big_data_report_workflow_yaml_path",
     "demo_big_data_report_yaml_path",

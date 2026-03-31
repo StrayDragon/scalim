@@ -55,7 +55,7 @@
 - `sources.*.normalize`（whole-result normalize, 支持多种形态）
   - `index_by_key`: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`（payment_methods）
   - `map_values` + `steps`（take_first/project_fields）: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`（payment_methods_candidates）
-  - Oracle: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/01_yaml_dsl_ecommerce.py`（对拍由 `verify_scalim_output` 覆盖）
+  - Oracle: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch010_yaml_dsl_ecommerce.py`（对拍由 `verify_scalim_output` 覆盖）
 
 ### 3) 字段定义（source fields vs derived fields）
 
@@ -83,7 +83,7 @@
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ads/ads_campaign_report.yaml`（creative_id cast to int）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_lookup_cast_sep_first_type_error_guardrail.yaml`（sep_first + sep）
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/12_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch120_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py`
 
 ### 5) Retry（loader_retry）
 
@@ -121,7 +121,7 @@
   - `row_number` + `partition_by`: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml`
   - `score_by_rank`（rank_field/base/step）: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/10_yaml_dsl_row_number_score_by_rank.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch100_yaml_dsl_row_number_score_by_rank.py`
   - aggregate `compute`（DAG 派生）: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ads/ads_campaign_report.yaml`、`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_sla_report.yaml`
 
 ### 7) Guardrails（运行期护栏）
@@ -139,11 +139,11 @@
 - `guardrails.compute.on_error`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_guardrails_compute_on_error.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/11_yaml_dsl_guardrails_compute_on_error.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch110_yaml_dsl_guardrails_compute_on_error.py`
 - `guardrails.relations.type_error_max_rate`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_lookup_cast_sep_first_type_error_guardrail.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/12_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch120_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py`
 
 ### 8) Observability（可观测性）
 
@@ -154,19 +154,19 @@
 - `observability.logging`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/08_yaml_dsl_observability_full.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
 - `observability.trace`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/08_yaml_dsl_observability_full.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
 - `observability.viz`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/08_yaml_dsl_observability_full.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
 - `observability.viz.output_path` / `observability.viz.snapshot_path`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_viz_custom_paths.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/13_yaml_dsl_viz_custom_paths.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch130_yaml_dsl_viz_custom_paths.py`
 - `observability.row_gap`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_sla_report.yaml`
   - 断言点（oracle/章节）：
@@ -174,7 +174,7 @@
 - `observability.memory_opt`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/08_yaml_dsl_observability_full.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
 
 ### 9) Outputs failure policy（多输出失败策略）
 
@@ -182,12 +182,12 @@
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_all_fail.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/07_yaml_dsl_output_failure_policy.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch070_yaml_dsl_output_failure_policy.py`
 - `include_full_error_message`（错误信息是否包含全文）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_full.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/07_yaml_dsl_output_failure_policy.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch070_yaml_dsl_output_failure_policy.py`
 
 ---
 
@@ -211,7 +211,7 @@
 - 通过 demand outputs 绑定共享 book（`outputs_defaults.to.book` / `outputs[*].to.book` + `outputs[*].write`）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_shared_workbooks_demand.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/09_workflow_shared_workbooks.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch090_workflow_shared_workbooks.py`
 
 ### options
 
@@ -226,4 +226,4 @@
 - `cache_pool.pin`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_fixture_cache_pool_pin.yaml`
   - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/14_workflow_cache_pool_pin.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch140_workflow_cache_pool_pin.py`

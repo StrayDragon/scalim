@@ -235,7 +235,7 @@ def _(mo):
         - Gate：`just examples`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/05_workflow_demo_big_data_report.py::run_workflow_demo_big_data_report`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch050_workflow_demo_big_data_report.py::run_workflow_demo_big_data_report`
         """
     )
     return

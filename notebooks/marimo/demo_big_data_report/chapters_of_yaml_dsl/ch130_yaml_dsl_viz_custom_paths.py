@@ -141,7 +141,7 @@ def _(mo):
           - snapshot 的 `meta.viz.run_name/env` 与 YAML 一致
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/13_yaml_dsl_viz_custom_paths.py::run_yaml_dsl_viz_custom_paths`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch130_yaml_dsl_viz_custom_paths.py::run_yaml_dsl_viz_custom_paths`
         """
     )
     return

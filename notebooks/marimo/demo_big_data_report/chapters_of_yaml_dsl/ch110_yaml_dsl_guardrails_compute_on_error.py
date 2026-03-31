@@ -137,7 +137,7 @@ def _(mo):
           - guardrail codes 包含 `compute_error`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/11_yaml_dsl_guardrails_compute_on_error.py::run_yaml_dsl_guardrails_compute_on_error`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch110_yaml_dsl_guardrails_compute_on_error.py::run_yaml_dsl_guardrails_compute_on_error`
         """
     )
     return

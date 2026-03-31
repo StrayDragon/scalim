@@ -158,7 +158,7 @@ def _(mo):
         - 有 pin：workflow cache evict reason 只出现 `workflow_end`,且 release 事件 `is_pinned=True`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/14_workflow_cache_pool_pin.py::run_workflow_cache_pool_pin`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch140_workflow_cache_pool_pin.py::run_workflow_cache_pool_pin`
         """
     )
     return

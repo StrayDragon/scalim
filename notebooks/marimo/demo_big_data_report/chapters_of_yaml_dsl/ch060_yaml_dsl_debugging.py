@@ -110,7 +110,7 @@ def _(mo):
         - 断言：错误信息包含 “unknown fields/depends on unknown fields/Invalid where expression” 等可定位提示
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/06_yaml_dsl_debugging.py::run_yaml_dsl_debugging`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch060_yaml_dsl_debugging.py::run_yaml_dsl_debugging`
         """
     )
     return

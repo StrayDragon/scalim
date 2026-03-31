@@ -127,7 +127,7 @@ def _(mo):
           - guardrail codes 包含 `relation_type_error_rate_exceeded`
 
         SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/12_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py::run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail`
+        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch120_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py::run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail`
         """
     )
     return
