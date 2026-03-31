@@ -7,23 +7,15 @@
 
 比如订单表 left join 用户信息表时,对于每个分区都可以计算出一个 user_ids 去重集合.第一个区块 A 的用户 id 集合可能是 {1,2,3,4,5},第二个区块 B 可能是 {1,3,4,8}... 这里有重叠,需要优化处理.
 
-讨论后的方案:暂时不处理.当前实现尚未覆盖该优化,需要先固化规范以便后续实施.
+当前实现暂不处理该优化,而且现有运行时明确会在批次边界重置 `load_ref_cache`,因此“跨批次重叠复用”并不是一个已经存在但未打开的开关,而是一个需要重新确认收益和边界的方向.在某些高重叠 workload 下它可能带来明确的 CPU/IO/内存收益,因此需要保留一个 proposal 来约束未来的分析边界与优化前提.
 
 ## What Changes
-- 增补 overlap-optimization 规范增量,定义重叠键复用与缓存边界.
-- 添加最小设计说明以列出待决策项.
+- 未来若推进该方向,应聚焦“非 preload 的 load_ref 结果是否需要引入有界、可选、跨批次短期缓存”这一件事,而不是泛化为任意缓存优化.
+- 在进入实现前,需先确认真实收益场景、正确性边界与插入点: 特别是 `load_ref_cache` 的批次生命周期、`binding.mode == \"rows\"` 的内存约束、以及与 `PreloadCache` / `preload_forever` 的分层关系.
+- 在进入实现前,应先基于真实 workload 做一轮 profiling 与案例归类,确认瓶颈究竟来自重复加载、重复关联计算还是批次拆分策略本身,再决定是否值得引入跨批次缓存.
+- 该 proposal 不预设最终缓存粒度、窗口策略、淘汰策略或配置面；这些应在基于真实 workload 的调研后再收敛.
 
 ## Impact
 - 受影响的规范: `openspec/specs/overlap-optimization/spec.md`
 - 受影响的代码: `src/scalim/execution/*` (计划性变更)
-
-## Process Control
-- 变更进入调研阶段即视为开始实施
-- 完成调研后必须先停下来报告并请求 review 意见,未获确认不得继续实现
-
-## Calibration Notes (2026-03-25)
-
-- 主规范 `openspec/specs/overlap-optimization/spec.md` 已存在,标记"📋 待实现",明确记录"批次间不复用关联结果"为当前行为
-- `PreloadCache`（`src/scalim/execution/preload_cache.py`）已有完善的 inflight dedup/signature guardrail/wait diagnostics,但仅服务于 preload 场景,不涉及跨批次 load_ref 结果复用
-- `AdaptiveLoadRefScheduler`（`src/scalim/execution/adaptive/loadref_scheduler.py`）是实际调度 load_ref 的核心,如要实现重叠优化需要在此层引入跨批次缓存窗口
-- 已将 `PROJECT_DIST_NAME` 占位符替换为实际路径
+- 主要风险: 将 preload 与非 preload 缓存语义混淆、误把 `rows` 路径的大对象引入长生命周期缓存、以及为了局部重叠收益引入不可控的内存滞留.
