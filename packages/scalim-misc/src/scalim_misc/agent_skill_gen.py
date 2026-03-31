@@ -17,6 +17,7 @@
 
 import json
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -150,7 +151,7 @@ def build_skill(repo_root: Path, output_root: Path) -> List[str]:
 
     upgrades_root = repo_root / UPGRADES_SSOT_ROOT_REL
     generated_files = {
-        SYNTAX_CATALOG_REL: render_syntax_catalog(schema, workflow_schema, syntax_specs),
+        SYNTAX_CATALOG_REL: render_syntax_catalog(repo_root, schema, workflow_schema, syntax_specs),
         CLI_LSP_REFERENCE_REL: render_yaml_dsl_cli_reference_markdown(
             repo_root,
             command_docs,
@@ -313,7 +314,70 @@ def validate_canonical_example(repo_root: Path, yaml_text: str, *, fragments: Di
             raise GenerationError("唯一完整示例未通过 `schema` 校验: {}: {}".format(path, error.message))
 
 
+def _compact_ws(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "").strip())
+
+
+def _encode_toon(repo_root: Path, value: Any) -> str:
+    tool = repo_root / "scripts" / "tool-toon.py"
+    if not tool.exists():
+        raise GenerationError("缺少 TOON 工具脚本: {}".format(tool))
+
+    payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
+    cmd = [
+        "uv",
+        "--preview-features",
+        "extra-build-dependencies",
+        "run",
+        str(tool),
+        "encode",
+        "--delimiter",
+        "tab",
+        "--indent",
+        "2",
+    ]
+    proc = subprocess.run(
+        cmd,
+        input=payload,
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        stderr = (proc.stderr or proc.stdout or "").strip()
+        raise GenerationError("TOON 编码失败: {}\n{}".format(" ".join(cmd), stderr))
+    return proc.stdout
+
+
+def _wrap_toon_markdown(*, title: str, intro_lines: Sequence[str], toon_text: str) -> str:
+    lines = [title, ""]
+    lines.extend([line.rstrip() for line in intro_lines if str(line).strip()])
+    lines.extend(["", "```toon", toon_text.rstrip(), "```", ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _collect_schema_constraints(schema_value: Dict[str, Any]) -> str:
+    parts: List[str] = []
+    for key in ("pattern", "minimum", "maximum", "minItems", "maxItems", "minProperties", "maxProperties"):
+        if key in schema_value:
+            parts.append("{}={}".format(key, schema_value[key]))
+
+    additional_props = schema_value.get("additionalProperties")
+    if additional_props is not None:
+        parts.append("additionalProperties={}".format(_compact_ws(describe_inline_schema(additional_props)).replace("`", "")))
+
+    if "items" in schema_value:
+        parts.append("items={}".format(_compact_ws(describe_inline_schema(schema_value["items"])).replace("`", "")))
+
+    for variant_key in ("oneOf", "anyOf", "allOf"):
+        variants = schema_value.get(variant_key)
+        if variants:
+            parts.append("{}={}".format(variant_key, len(variants)))
+
+    return "; ".join(parts)
+
+
 def render_syntax_catalog(
+    repo_root: Path,
     schema: Dict[str, Any],
     workflow_schema: Dict[str, Any],
     spec_summaries: Sequence[Dict[str, Any]],
@@ -327,61 +391,205 @@ def render_syntax_catalog(
 
     definition_names = sorted(definitions.keys())
 
-    lines = [
-        "# Scalim YAML DSL Syntax Catalog",
-        "",
-        "此文档由 `scripts/gen-agent-skill.py` 自动生成.",
-        "",
-        "## Canonical Sources",
-        "- Demand schema: `{}`".format(path_to_posix(SCHEMA_REL)),
-        "- Workflow schema: `{}`".format(path_to_posix(WORKFLOW_SCHEMA_REL)),
-        "- Canonical example: `{}`".format(path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL)),
-        "- Runtime semantic validator: `src/scalim/dsl/by_yaml/config_parsing/validator.py`",
-        "",
-        "## Builtin Callable IDs (Public)",
-    ]
-    public_builtin_ids = list_public_builtin_callable_ids()
-    if public_builtin_ids:
-        for builtin_id in public_builtin_ids:
-            lines.append("- `^{}`".format(builtin_id))
-    else:
-        lines.append("- (none)")
+    def _compact_inline(schema_value: Any) -> str:
+        return _compact_ws(describe_inline_schema(schema_value)).replace("`", "")
 
-    lines.extend(
-        [
-            "",
-            "> 注: `^<id>` 由运行入口参数 `builtin_callables` 提供词表;此处仅列出默认公开子集(保守暴露).",
-            "",
-            "## Top-Level Fields",
-        ]
-    )
-    for field_name in top_level_fields:
-        is_required = field_name in schema.get("required", [])
-        lines.append("- `{}`{}".format(field_name, " (required)" if is_required else ""))
+    def _compact_type(schema_value: Dict[str, Any]) -> str:
+        return _compact_ws(summarize_schema_type(schema_value)).replace("`", "")
 
-    lines.extend(["", "## Definitions"])
-    for definition_name in definition_names:
-        lines.append("- `{}`".format(definition_name))
+    def _compact_desc(schema_value: Dict[str, Any]) -> Optional[str]:
+        desc = schema_value.get("markdownDescription") or schema_value.get("description")
+        if not desc:
+            return None
+        return _compact_ws(desc)
 
-    lines.extend(render_spec_requirement_map("## OpenSpec Requirement Map", spec_summaries))
+    def _value_or_json(value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, (str, int, float, bool)):
+            return value
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
-    lines.extend(["", "## Top-Level Field Details"])
-    for field_name in top_level_fields:
-        field_schema = properties.get(field_name, {})
-        lines.extend(
-            render_schema_entry("`{}`".format(field_name), field_schema, required=field_name in schema.get("required", []), level=3)
+    def _enum_string(schema_value: Dict[str, Any]) -> Optional[str]:
+        enum_values = schema_value.get("enum")
+        if not enum_values:
+            return None
+        return "|".join(str(item) for item in enum_values)
+
+    def _examples_string(schema_value: Dict[str, Any]) -> Optional[str]:
+        examples = schema_value.get("examples")
+        if not examples:
+            return None
+        return json.dumps(examples, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+    demand_required = set(schema.get("required", []) or [])
+    demand_top_fields = [{"name": name, "required": bool(name in demand_required)} for name in top_level_fields]
+
+    builtin_ids = list_public_builtin_callable_ids()
+    builtin_ids_rendered = ["^{}".format(item) for item in builtin_ids] if builtin_ids else []
+
+    spec_rows = []
+    for summary in spec_summaries:
+        spec_rows.append(
+            {
+                "slug": summary["slug"],
+                "path": summary["path"],
+                "purpose": _compact_ws(summary.get("purpose", "")),
+                "requirements": "\n".join(_compact_ws(item) for item in summary.get("requirements", []) if str(item).strip()),
+            }
         )
 
-    lines.extend(["", "## Definition Details"])
+    entry_rows: List[Dict[str, Any]] = []
+    prop_rows: List[Dict[str, Any]] = []
+
+    def _add_entry(*, scope: str, key: str, schema_path: str, schema_value: Dict[str, Any], required: bool) -> None:
+        entry_id = len(entry_rows) + 1
+        entry_rows.append(
+            {
+                "id": entry_id,
+                "scope": scope,
+                "key": key,
+                "schema_path": schema_path,
+                "required": bool(required),
+                "ref": schema_value.get("$ref"),
+                "type": _compact_type(schema_value) or None,
+                "desc": _compact_desc(schema_value),
+                "enum": _enum_string(schema_value),
+                "default": _value_or_json(schema_value.get("default")),
+                "const": _value_or_json(schema_value.get("const")),
+                "examples": _examples_string(schema_value),
+                "constraints": _compact_ws(_collect_schema_constraints(schema_value)) or None,
+            }
+        )
+
+        child_props = schema_value.get("properties")
+        if not isinstance(child_props, dict) or not child_props:
+            return
+        child_required = set(schema_value.get("required", []) or [])
+        for child_name in sort_schema_properties(child_props):
+            child_schema = child_props[child_name]
+            prop_rows.append(
+                {
+                    "entry_id": entry_id,
+                    "name": child_name,
+                    "required": bool(child_name in child_required),
+                    "summary": _compact_inline(child_schema),
+                }
+            )
+
+    for field_name in top_level_fields:
+        field_schema = properties.get(field_name, {})
+        if not isinstance(field_schema, dict):
+            field_schema = {}
+        _add_entry(
+            scope="demand.field",
+            key=field_name,
+            schema_path="properties.{}".format(field_name),
+            schema_value=field_schema,
+            required=field_name in demand_required,
+        )
+
     for definition_name in definition_names:
         definition_schema = definitions.get(definition_name, {})
-        entry_lines = render_schema_entry("`{}`".format(definition_name), definition_schema, required=False, level=3)
-        entry_lines.insert(1, "- Definition path: `definitions.{}`".format(definition_name))
-        lines.extend(entry_lines)
+        if not isinstance(definition_schema, dict):
+            definition_schema = {}
+        _add_entry(
+            scope="demand.definition",
+            key=definition_name,
+            schema_path="definitions.{}".format(definition_name),
+            schema_value=definition_schema,
+            required=False,
+        )
 
-    lines.extend(render_workflow_syntax_catalog(workflow_schema))
+    workflow_required = set(workflow_schema.get("required", []) or [])
+    workflow_entry = workflow_schema.get("properties", {}).get("workflow", {})
+    workflow_props = workflow_entry.get("properties", {}) if isinstance(workflow_entry, dict) else {}
+    runs_schema = workflow_props.get("runs", {}) if isinstance(workflow_props, dict) else {}
+    run_item_schema = runs_schema.get("items", {}) if isinstance(runs_schema, dict) else {}
+    options_schema = workflow_props.get("options", {}) if isinstance(workflow_props, dict) else {}
+    resources_schema = workflow_props.get("resources", {}) if isinstance(workflow_props, dict) else {}
+    resource_props = resources_schema.get("properties", {}) if isinstance(resources_schema, dict) else {}
+    books_schema = resource_props.get("books", {}) if isinstance(resource_props, dict) else {}
 
-    return "\n".join(lines).rstrip() + "\n"
+    if isinstance(workflow_entry, dict):
+        _add_entry(
+            scope="workflow",
+            key="workflow",
+            schema_path="properties.workflow",
+            schema_value=workflow_entry,
+            required="workflow" in workflow_required,
+        )
+    if isinstance(run_item_schema, dict) and run_item_schema:
+        _add_entry(
+            scope="workflow",
+            key="workflow.runs[*]",
+            schema_path="properties.workflow.properties.runs.items",
+            schema_value=run_item_schema,
+            required=False,
+        )
+    if isinstance(options_schema, dict) and options_schema:
+        _add_entry(
+            scope="workflow",
+            key="workflow.options",
+            schema_path="properties.workflow.properties.options",
+            schema_value=options_schema,
+            required=False,
+        )
+    if isinstance(resources_schema, dict) and resources_schema:
+        _add_entry(
+            scope="workflow",
+            key="workflow.resources",
+            schema_path="properties.workflow.properties.resources",
+            schema_value=resources_schema,
+            required=False,
+        )
+    if isinstance(books_schema, dict) and books_schema:
+        _add_entry(
+            scope="workflow",
+            key="workflow.resources.books",
+            schema_path="properties.workflow.properties.resources.properties.books",
+            schema_value=books_schema,
+            required=False,
+        )
+
+    toon_data = {
+        "generated_by": "scripts/gen-agent-skill.py",
+        "sources": {
+            "demand_schema": path_to_posix(SCHEMA_REL),
+            "workflow_schema": path_to_posix(WORKFLOW_SCHEMA_REL),
+            "canonical_example": path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL),
+            "validator": "src/scalim/dsl/by_yaml/config_parsing/validator.py",
+        },
+        "builtin_callables": builtin_ids_rendered,
+        "demand_top_fields": demand_top_fields,
+        "demand_definitions": definition_names,
+        "openspec_requirement_map": spec_rows,
+        "entries": entry_rows,
+        "properties": prop_rows,
+        "workflow_key_paths": [
+            "workflow.runs",
+            "workflow.runs[*].id",
+            "workflow.runs[*].demand",
+            "workflow.runs[*].depends_on",
+            "workflow.runs[*].init_vars",
+            "workflow.options",
+            "workflow.options.ctx",
+            "workflow.options.cache_pool",
+            "workflow.resources",
+            "workflow.resources.books",
+        ],
+        "workflow_validation": [
+            "Repo schema-only: uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>",
+            "LSP header: # yaml-language-server: $schema=.../workflow.gen.json OR # $schema: .../workflow.gen.json (use yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>)",
+        ],
+    }
+
+    intro = [
+        "此文档由 `scripts/gen-agent-skill.py` 自动生成.",
+        "为节省 token,主体数据以 TOON 格式给出;使用时建议直接复制下方 code block.",
+    ]
+    toon_text = _encode_toon(repo_root, toon_data)
+    return _wrap_toon_markdown(title="# Scalim YAML DSL Syntax Catalog", intro_lines=intro, toon_text=toon_text)
 
 
 def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]:
@@ -528,13 +736,32 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
             path_to_posix(upgrades_root.relative_to(repo_root))
         )
 
-    docs = []
+    def _split_upgrade_id(stem: str) -> Tuple[str, str]:
+        m = re.match(r"^(\d{4}-\d{2}-\d{2})-(.+)$", stem)
+        if not m:
+            return "", stem
+        return m.group(1), m.group(2)
+
+    def _clean_lines(lines: Sequence[str]) -> Optional[str]:
+        cleaned: List[str] = []
+        for raw in lines:
+            s = str(raw or "").strip()
+            s = re.sub(r"^[-*]\s+", "", s)
+            s = re.sub(r"^\d+[\.)]\s+", "", s)
+            s = _compact_ws(s)
+            if not s:
+                continue
+            cleaned.append(s)
+        return "\n".join(cleaned).strip() if cleaned else None
+
+    upgrades = []
     for path in sorted(upgrades_root.glob("*.md"), key=lambda item: item.name):
         if path.name == "index.md":
             continue
         content = read_text(path)
         title = extract_markdown_h1(content) or path.name
         doc_rel = path_to_posix(REFERENCES_ROOT_REL / "upgrades" / path.name)
+        date, slug = _split_upgrade_id(path.stem)
         openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/") or extract_backtick_path(
             content, prefix="openspec/changes/"
         )
@@ -545,54 +772,30 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
         if not migration_lines:
             migration_lines = extract_markdown_section_lines(content, heading_prefix="## 升级建议", max_lines=24)
 
-        docs.append(
+        upgrades.append(
             {
+                "date": date or None,
+                "slug": slug,
                 "title": title,
-                "doc_rel": doc_rel,
-                "openspec_archive": openspec_archive,
-                "spec_path": spec_path,
-                "summary_lines": summary_lines,
-                "migration_lines": migration_lines,
+                "ssot": doc_rel,
+                "openspec": openspec_archive,
+                "spec": spec_path,
+                "summary": _clean_lines(summary_lines or []),
+                "migration": _clean_lines(migration_lines or []),
             }
         )
 
-    lines = [
-        "# YAML DSL Upgrades (Generated)",
-        "",
+    toon_data = {
+        "generated_by": "scripts/gen-agent-skill.py",
+        "source_root": path_to_posix(REFERENCES_ROOT_REL / "upgrades"),
+        "upgrades": upgrades,
+    }
+    intro = [
         "此文档由 `scripts/gen-agent-skill.py` 自动生成,来源: `references/upgrades/`。",
-        "用于在使用 skill 时快速定位 breaking/migration,避免在多处重复维护易变规则。",
-        "",
+        "为节省 token,主体数据以 TOON 格式给出;使用时建议直接复制下方 code block.",
     ]
-
-    if not docs:
-        lines.append("- (未发现升级文档)")
-        return "\n".join(lines).rstrip() + "\n"
-
-    for item in docs:
-        lines.extend(
-            [
-                "## {}".format(item["title"]),
-                "- SSOT: `{}`".format(item["doc_rel"]),
-            ]
-        )
-        if item["openspec_archive"]:
-            lines.append("- OpenSpec: `{}`".format(item["openspec_archive"]))
-        if item["spec_path"]:
-            lines.append("- Spec: `{}`".format(item["spec_path"]))
-
-        summary = item["summary_lines"] or []
-        if summary:
-            lines.append("- Summary:")
-            lines.extend(["  {}".format(l.strip()) for l in summary])
-
-        migration = item["migration_lines"] or []
-        if migration:
-            lines.append("- Migration:")
-            lines.extend(["  {}".format(l.strip()) for l in migration])
-
-        lines.append("")
-
-    return "\n".join(lines).rstrip() + "\n"
+    toon_text = _encode_toon(repo_root, toon_data)
+    return _wrap_toon_markdown(title="# YAML DSL Upgrades (Generated)", intro_lines=intro, toon_text=toon_text)
 
 
 def extract_markdown_section_lines(text: str, *, heading_prefix: str, max_lines: int) -> List[str]:

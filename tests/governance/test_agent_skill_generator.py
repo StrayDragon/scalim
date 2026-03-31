@@ -193,13 +193,13 @@ def test_generated_syntax_catalog_covers_top_level_and_definitions(tmp_path: Pat
     agent_skill_gen.build_skill(repo_root, output_root)
     catalog = (output_root / agent_skill_gen.SKILL_NAME / "references" / "syntax-catalog.gen.md").read_text(encoding="utf-8")
 
-    assert "## Top-Level Fields" in catalog
-    assert "## Definitions" in catalog
-    assert "### `main_source`" in catalog
-    assert "### `outputs`" in catalog
-    assert "### `observability`" in catalog
-    assert "### `source`" in catalog
-    assert "## Workflow YAML (Generated)" in catalog
+    assert "```toon" in catalog
+    assert "demand_top_fields" in catalog
+    assert "demand_definitions" in catalog
+    assert "properties.main_source" in catalog
+    assert "properties.outputs" in catalog
+    assert "properties.observability" in catalog
+    assert "definitions.source" in catalog
     assert "workflow.runs[*].depends_on" in catalog
     assert "workflow.runs[*].init_vars" in catalog
     assert "workflow.runs[*].writes" not in catalog

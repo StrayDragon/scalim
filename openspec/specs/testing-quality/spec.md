@@ -373,8 +373,8 @@
 - **THEN** 派生聚合示例 MUST 被执行
 - **AND** 示例 MUST 通过对拍验证且结果确定(输出顺序/数值口径稳定)
 
-### Requirement: marimo_coverage.gen.md 作为可检查的 examples coverage 报告
-系统 MUST 提供 `notebooks/marimo/marimo_coverage.gen.md` 作为 SSOT,用于将 `notebooks/marimo/` 下的示例套件回归点映射到:
+### Requirement: marimo_coverage.gen.toon 作为可检查的 examples coverage 报告
+系统 MUST 提供 `notebooks/marimo/marimo_coverage.gen.toon` 作为 SSOT,用于将 `notebooks/marimo/` 下的示例套件回归点映射到:
 
 - Marimo notebooks(教学入口)
 - notebooks 侧 SSOT 入口/实现文件（执行真相）
@@ -385,7 +385,7 @@
 
 #### Scenario: coverage 报告存在且可再生
 - **WHEN** 维护者检查 `notebooks/marimo/` 目录
-- **THEN** MUST 存在 `notebooks/marimo/marimo_coverage.gen.md`
+- **THEN** MUST 存在 `notebooks/marimo/marimo_coverage.gen.toon`
 - **AND** 运行 `just gen-marimo-coverage` MUST 能稳定生成相同内容
 - **AND** 运行 `just marimo-coverage-drift-check` MUST 在无漂移时返回 0
 
@@ -428,4 +428,3 @@
 - **WHEN** 维护者运行 `just examples` 与默认 pytest 非 bench 套件
 - **THEN** 系统 MUST 检测到覆盖集合差异并 fail-fast
 - **AND** 错误信息 MUST 指出缺失/新增的模块集合（或导出集合）
-

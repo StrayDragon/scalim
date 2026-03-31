@@ -11,7 +11,7 @@
 ## Related Code (as implemented)
 - `justfile` (`just examples` gate 入口; runner 内联实现)
 - `notebooks/marimo/` (示例 suites: `demo_*`/`example_*` + `chapters*/registry.py` 契约)
-- `scripts/gen-marimo-coverage.py` + `notebooks/marimo/marimo_coverage.gen.md` (覆盖报告生成与 drift-check)
+- `scripts/gen-marimo-coverage.py` + `notebooks/marimo/marimo_coverage.gen.toon` (覆盖报告生成与 drift-check)
 - `packages/scalim-misc/src/scalim_misc/notebook_support/*` (notebook 复用 helper; 不依赖 marimo)
 ## Requirements
 ### Requirement: 示例 notebooks 以 Marimo 为唯一交互载体
@@ -76,8 +76,8 @@ runner MUST 输出可定位的 PASS/FAIL 与章节级 summary,并以非零退出
 - **WHEN** 维护者检查上述 canonical YAML 文件路径
 - **THEN** 文件 MUST 存在且路径未被移动或重命名
 
-### Requirement: marimo_coverage.gen.md 明确映射“notebooks → SSOT → gate”
-系统 MUST 维护 `notebooks/marimo/marimo_coverage.gen.md` 作为可检查的 SSOT 报告,用于将示例套件的回归点映射到:
+### Requirement: marimo_coverage.gen.toon 明确映射“notebooks → SSOT → gate”
+系统 MUST 维护 `notebooks/marimo/marimo_coverage.gen.toon` 作为可检查的 SSOT 报告,用于将示例套件的回归点映射到:
 
 - 对应的 Marimo notebook(教学入口)
 - 对应的 notebooks 侧 SSOT 入口/实现文件(执行真相来源)
@@ -87,5 +87,5 @@ runner MUST 输出可定位的 PASS/FAIL 与章节级 summary,并以非零退出
 
 #### Scenario: 新增示例时 coverage 报告同步
 - **WHEN** 维护者新增或调整一个示例/章节回归点
-- **THEN** 运行 `just gen-marimo-coverage` MUST 更新 `notebooks/marimo/marimo_coverage.gen.md`
+- **THEN** 运行 `just gen-marimo-coverage` MUST 更新 `notebooks/marimo/marimo_coverage.gen.toon`
 - **AND** `just marimo-coverage-drift-check` MUST 在 CI 中可用且能检测到 drift
