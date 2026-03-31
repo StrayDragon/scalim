@@ -77,6 +77,11 @@ def test_error_loc_for_yaml_path_normalizes_arrow_prefix_and_honors_default_none
     assert arrow.line == 2
     assert arrow.column == 3
 
+    bracket = error_loc_for_yaml_path("root.items[0].unknown", locations)
+    assert bracket is not None
+    assert bracket.line == 3
+    assert bracket.column == 7
+
     assert error_loc_for_yaml_path("missing.path", {}, default=None) is None
     fallback = error_loc_for_yaml_path("missing.path", {}, default=(7, 8))
     assert fallback is not None

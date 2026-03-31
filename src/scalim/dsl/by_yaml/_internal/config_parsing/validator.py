@@ -9,6 +9,7 @@ from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import asdict, dataclass
 from .....vendor.dataclassesx import field as dataclass_field
 from .....vendor.yamlx import yaml
+from ...diagnostics import format_duplicate_effective_field_display_names_message
 from ...init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ...schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
 from ...schema_dsl.models import (
@@ -35,7 +36,13 @@ from .validators.issues import (
     ValidationIssue,
     ValidationReport,
 )
-from .yaml_load import YamlLocationIndex, build_yaml_location_index, lookup_yaml_location, safe_yaml_parse_error_message
+from .yaml_load import (
+    YamlLocationIndex,
+    build_yaml_location_index,
+    lookup_yaml_location,
+    normalize_yaml_diagnostic_path,
+    safe_yaml_parse_error_message,
+)
 
 try:
     jsonschema = import_module("jsonschema")
@@ -166,20 +173,6 @@ def _collect_duplicate_effective_display_names(field_def_index: FieldDefIndex, *
     return {name: paths for name, paths in by_effective.items() if len(paths) > 1}
 
 
-def _format_duplicate_effective_display_names_message(duplicates: Dict[str, List[str]]) -> str:
-    parts: List[str] = []
-    for name in sorted(duplicates.keys()):
-        parts.append("{!r}: {}".format(name, ", ".join(sorted(duplicates[name]))))
-
-    conflicts = "; ".join(parts)
-    return "".join(
-        [
-            "Duplicate effective field display names detected while outputs include include_header=true and header_fields_output_by=name. ",
-            "Conflicts: {}. Set validate_unique_field_names: false to disable.".format(conflicts),
-        ]
-    )
-
-
 def _is_list(value: object) -> TypeGuard[List[object]]:
     return isinstance(value, list)
 
@@ -304,7 +297,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         if not duplicates:
             return
 
-        msg = _format_duplicate_effective_display_names_message(duplicates)
+        msg = format_duplicate_effective_field_display_names_message(duplicates)
         self._add_error(errors, msg, path=DEMAND_KEYS["validate_unique_field_names"])
 
     def _validate_outputs_detail_requires_fields_or_from(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
@@ -652,23 +645,12 @@ def _issues_to_rows(issues: Iterable[ValidationIssue]) -> List[YamlValidationIss
     for issue in issues:
         rows.append(
             YamlValidationIssue(
-                path=str(issue.path or ""),
+                path=normalize_yaml_diagnostic_path(str(issue.path or "")),
                 message=str(issue.message),
                 suggestions=list(issue.suggestions),
             )
         )
     return rows
-
-
-def _normalize_issue_path(path: str) -> str:
-    if not path:
-        return ""
-    cleaned = path.strip()
-    if cleaned.startswith("↳"):
-        cleaned = cleaned.lstrip("↳").strip()
-    if cleaned == "(root)":
-        return ""
-    return cleaned
 
 
 def attach_locations(
@@ -684,8 +666,7 @@ def attach_locations(
         if issue.line is not None:
             output.append(issue)
             continue
-        normalized = _normalize_issue_path(issue.path)
-        loc = lookup_yaml_location(normalized, locations)
+        loc = lookup_yaml_location(issue.path, locations)
         if loc is None:
             if default is None:
                 output.append(issue)

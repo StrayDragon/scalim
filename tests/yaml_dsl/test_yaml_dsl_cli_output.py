@@ -80,6 +80,38 @@ sources: {}
 
     out = capsys.readouterr().out
     assert "order_by" in out
+    assert "main_source.order_by.0" in out
+    assert "main_source.order_by[0]" not in out
+    pattern = r"{}:6(:\\d+)?".format(re.escape(str(yaml_path)))
+    assert re.search(pattern, out)
+
+
+def test_yaml_dsl_validate_order_by_error_json_path_is_canonical(tmp_path, capsys) -> None:
+    yaml_path = tmp_path / "order_by.json.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  order_by:
+    - missing_field
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    code = yaml_dsl._run_validate(_args(yaml_path, json_output=True))
+    assert code == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    errors = payload["errors"]
+    assert any(item["path"] == "main_source.order_by.0" for item in errors)
+    match = next(item for item in errors if item["path"] == "main_source.order_by.0")
+    assert match["loc"]["line"] == 6
 
 
 def test_yaml_dsl_validate_reports_call_by_error(tmp_path, capsys) -> None:

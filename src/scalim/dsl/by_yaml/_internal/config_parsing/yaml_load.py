@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 
@@ -8,6 +9,8 @@ from .error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
 from .validators.issues import ValidationIssue
 
 YamlLocationIndex = Dict[str, Tuple[int, int]]
+
+_BRACKET_INDEX_RE = re.compile(r"\[(\d+)\]")
 
 
 def safe_yaml_parse_error_message(exc: Exception) -> str:
@@ -167,12 +170,39 @@ def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:
     return locations
 
 
+def normalize_yaml_diagnostic_path(path: str) -> str:
+    """归一化用于诊断/定位的 `YAML` 逻辑路径.
+
+    说明: 该函数仅用于 `ValidationIssue.path` / `ErrorEnvelope.path` 等诊断路径与 `YAML` `AST` 位置索引的匹配与展示.
+
+    归一化规则:
+    - 去除嵌套诊断使用的前缀 `↳`(例如 `↳ outputs[0]` -> `outputs[0]`)
+    - 将根路径标记 `(root)` 映射为 ``(即位置索引的根键)
+    - 将数字索引的 `[]` 形态转换为点号段: `foo[0].bar[12]` -> `foo.0.bar.12`
+
+    注意:
+    - 仅处理形如 `[0]` 的数字索引段; 其他 `[]` 原样保留.
+    - 禁止用于 `DSL` 表达式字符串,例如 `extract: \"[1].x\"`.
+    """
+
+    cleaned = str(path or "").strip()
+    if not cleaned:
+        return ""
+    if cleaned.startswith("↳"):
+        cleaned = cleaned.lstrip("↳").strip()
+    if cleaned == "(root)":
+        return ""
+    cleaned = _BRACKET_INDEX_RE.sub(r".\1", cleaned)
+    return cleaned.lstrip(".")
+
+
 def lookup_yaml_location(path: str, locations: YamlLocationIndex) -> Optional[Tuple[int, int]]:
-    if path in locations:
-        return locations[path]
-    if not path:
+    normalized = normalize_yaml_diagnostic_path(path)
+    if normalized in locations:
+        return locations[normalized]
+    if not normalized:
         return locations.get("")
-    parts = path.split(".")
+    parts = normalized.split(".")
     while parts:
         _ = parts.pop()
         candidate = ".".join(parts)
@@ -181,23 +211,13 @@ def lookup_yaml_location(path: str, locations: YamlLocationIndex) -> Optional[Tu
     return locations.get("")
 
 
-def _normalize_yaml_path_for_location(path: str) -> str:
-    cleaned = str(path or "").strip()
-    if cleaned.startswith("↳"):
-        cleaned = cleaned.lstrip("↳").strip()
-    if cleaned == "(root)":
-        return ""
-    return cleaned
-
-
 def error_loc_for_yaml_path(
     path: str,
     locations: YamlLocationIndex,
     *,
     default: Optional[Tuple[int, int]] = (1, 1),
 ) -> Optional[ErrorLoc]:
-    normalized = _normalize_yaml_path_for_location(path)
-    loc_raw = lookup_yaml_location(normalized, locations)
+    loc_raw = lookup_yaml_location(path, locations)
     if loc_raw is None:
         if default is None:
             return None
@@ -214,7 +234,9 @@ def envelope_from_validation_issue(
     locations: YamlLocationIndex,
     default_code: str,
 ) -> ErrorEnvelope:
-    path = str(issue.path or "(root)")
+    raw_path = str(issue.path or "(root)")
+    normalized = normalize_yaml_diagnostic_path(raw_path)
+    path = normalized or "(root)"
     return ErrorEnvelope(
         code=str(issue.code) if issue.code else str(default_code),
         message=str(issue.message),

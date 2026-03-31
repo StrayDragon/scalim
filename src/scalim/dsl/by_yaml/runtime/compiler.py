@@ -24,6 +24,7 @@ from ....spec.ir import DemandIr
 from ....vendor.dataclassesx import replace
 from .._internal.config_parsing.loader import YamlDemandLoader
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from ..diagnostics import format_duplicate_effective_field_display_names_message
 from ..init_var_nodes import parse_init_var_mapping_node
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from ..schema_dsl.constants import (
@@ -388,17 +389,7 @@ def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
     if not duplicates:
         return
 
-    parts: List[str] = []
-    for name in sorted(duplicates.keys()):
-        parts.append("{!r}: {}".format(name, ", ".join(sorted(duplicates[name]))))
-    conflicts_str = "; ".join(parts)
-    msg = "".join(
-        [
-            "Duplicate effective field display names detected (validate_unique_field_names=true). ",
-            "This is not allowed when outputs emit headers with header_fields_output_by=name. ",
-            "Conflicts: {}".format(conflicts_str),
-        ]
-    )
+    msg = format_duplicate_effective_field_display_names_message(duplicates)
     raise ValueError(msg)
 
 
