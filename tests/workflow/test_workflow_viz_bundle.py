@@ -51,13 +51,10 @@ main_source:
     id: {{extract: id}}
     value: {{extract: value}}
 
-outputs_defaults:
-  to:
-    book: {book_id}
-
 outputs:
   - name: detail
     to:
+      book: {book_id}
       sheet: detail
     write:
       mode: sheet

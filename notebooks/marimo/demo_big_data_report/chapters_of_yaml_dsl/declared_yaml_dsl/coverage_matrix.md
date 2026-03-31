@@ -208,7 +208,7 @@
 - `workflow.resources.books`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_big_data_report.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_shared_workbooks.yaml`
-- 通过 demand outputs 绑定共享 book（`outputs_defaults.to.book` / `outputs[*].to.book` + `outputs[*].write`）
+- 通过 demand outputs 绑定共享 book（`outputs[*].to.book` + `outputs[*].write`）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_shared_workbooks_demand.yaml`
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch090_workflow_shared_workbooks.py`

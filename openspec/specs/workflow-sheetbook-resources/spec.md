@@ -11,7 +11,7 @@
 - workflow YAML MUST NOT 接受任何 legacy sheetbook resource group / write intents authoring surface
 - 系统 MUST 提示迁移到:
   - `workflow.resources.books.<book_id>.kind=xlsx_memory|xlsx_file`
-  - demand outputs 的 `outputs_defaults.to`/`outputs[*].to`/`outputs[*].write` 绑定(SSOT: `yaml-dsl-books-resources`)
+  - demand outputs 的 `outputs[*].to`/`outputs[*].write` 绑定(SSOT: `yaml-dsl-books-resources`)
 
 #### Scenario: legacy sheetbooks are rejected with migration hint
 - **WHEN** workflow YAML 包含任何 legacy sheetbook authoring surface

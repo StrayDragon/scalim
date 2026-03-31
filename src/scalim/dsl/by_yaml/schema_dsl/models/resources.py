@@ -270,7 +270,7 @@ class ResourcesConfig:
                 "- 对外稳定术语: `book`\n"
                 "- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)\n"
                 "- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n"
-                "- `outputs_defaults.to.book` / `outputs[*].to.book` 引用该 mapping 的 key"
+                "- `outputs[*].to.book` 引用该 mapping 的 key"
             ),
             additional_props=schema_ref("book"),
             min_props=0,

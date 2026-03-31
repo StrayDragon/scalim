@@ -103,8 +103,6 @@ class SchemaBuilder:
             "output_aggregate": self._build_definition(types_mod.OutputAggregateConfig),
             "output_to": self._build_definition(types_mod.OutputToConfig),
             "output_write": self._build_definition(types_mod.OutputWriteConfig),
-            "outputs_defaults_to": self._build_definition(types_mod.OutputsDefaultsToConfig),
-            "outputs_defaults": self._build_definition(types_mod.OutputsDefaultsConfig),
             "output_target": self._build_definition(types_mod.OutputTargetConfig),
             "output_extra_sheet": self._build_definition(types_mod.OutputExtraSheetConfig),
             "logging": self._build_definition(types_mod.LoggingConfig),

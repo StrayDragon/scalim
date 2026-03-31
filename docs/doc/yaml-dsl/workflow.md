@@ -206,7 +206,7 @@ workflow YAML 只负责两件事:
 - book 资源声明: `resources.books.<book_id>`
   - 既可以在 demand YAML 声明(standalone 也能跑),也可以在 workflow YAML 的 `workflow.resources.books` 统一声明/覆盖
   - `kind: xlsx_file|xlsx_memory`
-- 输出到 book 的绑定: `outputs_defaults.to.book` / `outputs[*].to.book` / `outputs[*].to.sheet`
+- 输出到 book 的绑定: `outputs[*].to.book` / `outputs[*].to.sheet`
 - 写入策略: `resources.books.*.write_defaults` + `outputs[*].write`(覆盖 mode/align/header/冲突策略)
 
 约定:
@@ -242,12 +242,9 @@ workflow:
 main.yaml(示意):
 
 ```yaml
-outputs_defaults:
-  to: {book: report}
-
 outputs:
   - name: detail
-    to: {sheet: 明细}
+    to: {book: report, sheet: 明细}
     fields: [order_id, amount_yuan]
 ```
 

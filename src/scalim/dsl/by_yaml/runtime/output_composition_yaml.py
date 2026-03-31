@@ -483,7 +483,6 @@ def _validate_extra_sheet_target_names(config: DemandConfig, *, outputs_path: st
 
 
 def _effective_book_id_for_output(
-    config: DemandConfig,
     out_cfg: OutputTargetConfig,
     *,
     idx: int,
@@ -495,12 +494,6 @@ def _effective_book_id_for_output(
         candidate = str(to_cfg.book or "").strip()
         if candidate:
             return candidate, book_ref_path
-
-    defaults = config.outputs_defaults
-    if defaults is not None:
-        default_book = str(defaults.to.book or "").strip()
-        if default_book:
-            return default_book, "outputs_defaults.to.book"
 
     return None, book_ref_path
 
@@ -617,11 +610,12 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
             header_by = str(container.header_fields_output_by)
         else:
             # `books` 绑定输出.
-            book_id, book_ref_path = _effective_book_id_for_output(config, out_cfg, idx=int(idx), outputs_path=str(outputs_path))
+            book_id, book_ref_path = _effective_book_id_for_output(out_cfg, idx=int(idx), outputs_path=str(outputs_path))
             if book_id is None:
-                msg = ("Missing outputs to.book binding for output {!r}; set outputs_defaults.to.book or {}.{}.to.book").format(
-                    str(out_cfg.name), str(outputs_path), int(idx)
-                )
+                msg = (
+                    "Missing outputs to.book binding for output {!r}; set {}.{}.to.book explicitly. "
+                    "Reuse the binding with YAML anchors (`_templates`) or `$import` if needed."
+                ).format(str(out_cfg.name), str(outputs_path), int(idx))
                 err = "{} (path={})".format(msg, book_ref_path)
                 raise ValueError(err)
 

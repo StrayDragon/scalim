@@ -208,13 +208,10 @@ fields:
     name: 最终价格
     call_by: "scalim_misc.demo_big_data_report.loaders:calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)"
 
-outputs_defaults:
-  to:
-    book: report
-
 outputs:
   - name: detail
     to:
+      book: report
       sheet: Detail
     fields: &detail_fields
       - order_id

@@ -114,34 +114,11 @@ def _outputs_path_ref(outputs_path: str, idx: int, suffix: str) -> str:
     return "{}.{}.{}".format(str(outputs_path), int(idx), suffix)
 
 
-def _effective_default_book_id(
-    config: DemandConfig, *, overrides_outputs_defaults: Optional[Mapping[str, object]]
-) -> Tuple[Optional[str], str]:
-    if overrides_outputs_defaults is not None:
-        to_obj = overrides_outputs_defaults.get("to")
-        if isinstance(to_obj, dict):
-            to_raw = cast("Mapping[str, object]", to_obj)  # pragma: allow-cast yaml mapping typed narrowing
-            raw = to_raw.get("book")
-            book = str(raw or "").strip() if isinstance(raw, str) else ""
-            if book:
-                return book, "overrides.outputs_defaults.to.book"
-
-    defaults = config.outputs_defaults
-    if defaults is not None:
-        book = str(defaults.to.book or "").strip()
-        if book:
-            return book, "outputs_defaults.to.book"
-
-    return None, "outputs_defaults.to.book"
-
-
 def _effective_book_binding_for_output(
-    config: DemandConfig,
     out_cfg: OutputTargetConfig,
     *,
     idx: int,
     outputs_path: str,
-    overrides_outputs_defaults: Optional[Mapping[str, object]],
 ) -> Tuple[Optional[str], str]:
     to_cfg = out_cfg.to
     if to_cfg is not None and to_cfg.book is not None:
@@ -149,9 +126,6 @@ def _effective_book_binding_for_output(
         if book:
             return book, _outputs_path_ref(outputs_path, int(idx), "to.book")
 
-    default_book, default_ref = _effective_default_book_id(config, overrides_outputs_defaults=overrides_outputs_defaults)
-    if default_book:
-        return default_book, default_ref
     return None, _outputs_path_ref(outputs_path, int(idx), "to.book")
 
 
@@ -771,7 +745,6 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     edges: List[WorkflowEdgeIr],
     effective_books: Mapping[str, BookConfig],
     overrides_outputs: Optional[Sequence[Mapping[str, object]]],
-    overrides_outputs_defaults: Optional[Mapping[str, object]],
 ) -> Dict[str, List[str]]:
     last_write_node_id_by_book_id: Dict[str, str] = {}
     xlsx_memory_write_node_ids_by_run_id: Dict[str, List[str]] = {}
@@ -794,16 +767,15 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 continue
 
             book_id, book_ref_path = _effective_book_binding_for_output(
-                cfg,
                 out_cfg,
                 idx=int(out_idx),
                 outputs_path=outputs_path,
-                overrides_outputs_defaults=overrides_outputs_defaults,
             )
             if book_id is None:
-                msg = ("Missing outputs to.book binding for output {!r}; set outputs_defaults.to.book or {}.{}.to.book").format(
-                    str(out_cfg.name), str(outputs_path), int(out_idx)
-                )
+                msg = (
+                    "Missing outputs to.book binding for output {!r}; set {}.{}.to.book explicitly. "
+                    "Reuse the binding with YAML anchors (`_templates`) or `$import` if needed."
+                ).format(str(out_cfg.name), str(outputs_path), int(out_idx))
                 raise ScalimWorkflowConfigError(msg, path=str(book_ref_path))
 
             book = effective_books.get(str(book_id))
@@ -883,30 +855,26 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
         if cfg.audit is not None:
             extras.append(("audit", cfg.audit, "__audit__"))
         if extras:
-            # 将 `meta`/`audit` 绑定到有效的默认 `book`.
-            default_book_id, default_book_ref = _effective_default_book_id(cfg, overrides_outputs_defaults=overrides_outputs_defaults)
-            if default_book_id is None:
-                # 回退到第一个绑定到 `book` 的输出(若存在).
-                for scan_idx, scan_out in enumerate(outputs):
-                    if scan_out.container is not None:
-                        continue
-                    candidate, cand_ref = _effective_book_binding_for_output(
-                        cfg,
-                        scan_out,
-                        idx=int(scan_idx),
-                        outputs_path=outputs_path,
-                        overrides_outputs_defaults=overrides_outputs_defaults,
-                    )
-                    if candidate:
-                        default_book_id, default_book_ref = candidate, cand_ref
-                        break
+            default_book_id = None
+            default_book_ref = "outputs[*].to.book"
+            for scan_idx, scan_out in enumerate(outputs):
+                if scan_out.container is not None:
+                    continue
+                candidate, cand_ref = _effective_book_binding_for_output(
+                    scan_out,
+                    idx=int(scan_idx),
+                    outputs_path=outputs_path,
+                )
+                if candidate:
+                    default_book_id, default_book_ref = candidate, cand_ref
+                    break
 
             if default_book_id is None:
-                msg = "meta/audit requires a default books binding; set outputs_defaults.to.book or outputs[*].to.book"
+                msg = "meta/audit requires at least one Excel output with outputs[*].to.book"
                 raise ScalimWorkflowConfigError(msg, path=str(default_book_ref))
 
             book = effective_books.get(str(default_book_id))
-            if book is None:
+            if book is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: first excel output binding already validated above
                 msg = (
                     "Missing book resource id {!r} referenced by {}. "
                     "Hint: declare resources.books.{} in the demand YAML, declare workflow.resources.books.{} in the workflow YAML, "
@@ -1054,7 +1022,7 @@ def compile_workflow_ir(
     """将工作流配置编译为工作流 `IR`.
 
     说明:
-    - `overrides` 为与 `YAML` 同形的 `mapping`(通常来自 `RunOverrides`),用于仅 `IO` 层的资源/默认绑定覆盖.
+    - `overrides` 为与 `YAML` 同形的 `mapping`(通常来自 `RunOverrides`),用于 `resources` 覆盖和 `outputs` 替换.
     """
     wf_obj = cast("WorkflowConfig", wf)  # pragma: allow-cast workflow config typed narrowing
 
@@ -1081,15 +1049,16 @@ def compile_workflow_ir(
     )
 
     overrides_resources = None
-    overrides_outputs_defaults = None
     overrides_outputs = None
     if overrides is not None:
+        if "outputs_defaults" in overrides:
+            msg = (
+                "overrides.outputs_defaults was removed; set overrides.outputs[*].to.book explicitly or override resources.books.* instead"
+            )
+            raise ScalimWorkflowConfigError(msg, path="overrides.outputs_defaults")
         res_obj = overrides.get("resources")
         if isinstance(res_obj, dict):
             overrides_resources = cast("Mapping[str, object]", res_obj)  # pragma: allow-cast yaml mapping typed narrowing
-        od_obj = overrides.get("outputs_defaults")
-        if isinstance(od_obj, dict):
-            overrides_outputs_defaults = cast("Mapping[str, object]", od_obj)  # pragma: allow-cast yaml mapping typed narrowing
         outs_obj = overrides.get("outputs")
         if isinstance(outs_obj, list):
             overrides_outputs = cast("Sequence[Mapping[str, object]]", outs_obj)  # pragma: allow-cast yaml list typed narrowing
@@ -1110,7 +1079,6 @@ def compile_workflow_ir(
         edges=edges,
         effective_books=effective_books,
         overrides_outputs=overrides_outputs,
-        overrides_outputs_defaults=overrides_outputs_defaults,
     )
 
     _inject_xlsx_memory_write_dependencies(

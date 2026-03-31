@@ -160,7 +160,7 @@ outputs:
         _ = _load(yaml_content)
 
 
-def test_loader_allows_output_missing_container_for_book_binding() -> None:
+def test_loader_rejects_excel_output_missing_explicit_book_binding() -> None:
     yaml_content = """
 name: demo
 main_source:
@@ -174,10 +174,8 @@ outputs:
   - name: detail
     fields: [order_id]
 """
-    config = _load(yaml_content)
-    assert len(config.outputs) == 1
-    assert config.outputs[0].name == "detail"
-    assert config.outputs[0].container is None
+    with pytest.raises(ValueError, match=r"outputs\.0\.to\.book is required"):
+        _ = _load(yaml_content)
 
 
 def test_loader_rejects_detail_output_missing_fields() -> None:

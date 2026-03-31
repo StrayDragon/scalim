@@ -29,13 +29,10 @@ sources:
     key: id
     cache_mode: preload_forever
 
-outputs_defaults:
-  to:
-    book: report
-
 outputs:
   - name: metrics
     to:
+      book: report
       sheet: Metrics
     aggregate: &metrics_agg
       group_by: [region_name_display]

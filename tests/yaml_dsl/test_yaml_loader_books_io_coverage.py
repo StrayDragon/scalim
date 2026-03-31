@@ -8,8 +8,6 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     BOOK_KEYS,
     BOOK_WRITE_DEFAULTS_KEYS,
     DEMAND_KEYS,
-    OUTPUTS_DEFAULTS_KEYS,
-    OUTPUTS_DEFAULTS_TO_KEYS,
     RESOURCES_KEYS,
     OutputContainerConfig,
     OutputTargetConfig,
@@ -18,16 +16,11 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
 )
 
 
-def test_loader_parse_outputs_defaults_errors_cover_branches() -> None:
+def test_outputs_parser_book_binding_requires_explicit_to_book() -> None:
     loader = YamlDemandLoader()
 
-    raw = RawDemand.from_raw({DEMAND_KEYS["outputs_defaults"]: {}})
-    with pytest.raises(TypeError, match=r"outputs_defaults\.to must be an object"):
-        _ = loader._parse_outputs_defaults(raw)  # noqa: SLF001
-
-    raw = RawDemand.from_raw({DEMAND_KEYS["outputs_defaults"]: {OUTPUTS_DEFAULTS_KEYS["to"]: {OUTPUTS_DEFAULTS_TO_KEYS["book"]: ""}}})
-    with pytest.raises(ValueError, match=r"outputs_defaults\.to\.book is required"):
-        _ = loader._parse_outputs_defaults(raw)  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"outputs\.0\.to\.book is required"):
+        loader._validate_book_binding_semantics(OutputTargetConfig(name="detail", fields=("a",)), idx=0)  # noqa: SLF001
 
 
 def test_loader_parse_resources_book_mapping_errors_cover_branches() -> None:

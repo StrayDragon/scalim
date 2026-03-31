@@ -141,11 +141,11 @@ run_workflow(
 
 症状:
 
-- workflow compile fail-fast: 缺少 `outputs_defaults.to.book` / `outputs[*].to.book`
+- workflow compile fail-fast: 缺少 `outputs[*].to.book`
 - 或提示 book_id 不存在/冲突(需要统一声明)
 
 修复:
 
 - 为 Excel outputs 显式声明 book 绑定:
-  - demand YAML: `outputs_defaults.to.book` / `outputs[*].to.book` + `outputs[*].to.sheet`
+  - demand YAML: `outputs[*].to.book` + `outputs[*].to.sheet`
   - workflow YAML: `workflow.resources.books.<book_id>`(用于统一/覆盖共享 book 资源)

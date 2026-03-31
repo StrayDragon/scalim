@@ -10,7 +10,7 @@ TBD - created by archiving change c30-workflow-shared-output-containers. Update 
   - `workflow.resources.books.<book_id>` MUST 为 mapping 且 MUST 满足 `yaml-dsl-books-resources` 对 book 的约束
 - 写入意图:
   - workflow YAML MUST NOT 再暴露已移除的 workflow-level 写入 intents authoring surface
-  - 系统 MUST 从每个 run 引用的 demand YAML 中读取 `outputs_defaults`/`outputs[*].to`/`outputs[*].write` 推导等价的写入节点集合
+  - 系统 MUST 从每个 run 引用的 demand YAML 中读取 `outputs[*].to` / `outputs[*].write` 推导等价的写入节点集合
 
 迁移约束(破坏性变更):
 

@@ -416,7 +416,7 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
         _ = oc_yaml._resolve_book_export_path(  # noqa: SLF001
             config,
             book_id="mem",
-            book_ref_path="outputs_defaults.to.book",
+            book_ref_path="outputs.0.to.book",
             yaml_base_dir=".",
             init_vars=None,
         )
@@ -435,7 +435,7 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
     export_path, allow_formulas, write_lock = oc_yaml._resolve_book_export_path(  # noqa: SLF001
         config,
         book_id="mem",
-        book_ref_path="outputs_defaults.to.book",
+        book_ref_path="outputs.0.to.book",
         yaml_base_dir=".",
         init_vars=None,
     )
@@ -448,7 +448,7 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
         _ = oc_yaml._resolve_book_export_path(  # noqa: SLF001
             config,
             book_id="bad",
-            book_ref_path="outputs_defaults.to.book",
+            book_ref_path="outputs.0.to.book",
             yaml_base_dir=".",
             init_vars=None,
         )

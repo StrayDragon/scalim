@@ -228,7 +228,7 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 - 每个 output 必填唯一 `name`(供 `from` 引用)
 - `container` 描述 CSV 输出容器(当前仅支持 `type: csv`)
   - `container.path` 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
-- Excel 输出不通过 `container` 表达: 声明 `resources.books` 并用 `outputs_defaults.to` / `outputs[*].to` 绑定到 `book_id + sheet`
+- Excel 输出不通过 `container` 表达: 声明 `resources.books` 并在每个 `outputs[*].to` 下显式绑定 `book_id + sheet`
 - 明细输出使用 `fields: [field_id, ...]` 指定导出列顺序
 - `where` 是安全表达式,用于分发过滤;其依赖字段会在编译期注入 required fields
 - 派生汇总输出使用 `aggregate`(与 `fields` 互斥)
@@ -253,21 +253,21 @@ resources:
       path: ./out.xlsx
       write_lock: true
 
-outputs_defaults:
-  to: {book: report}
+_templates:
+  report_to: &report_to {book: report}
 
 outputs:
   - name: detail
-    to: {sheet: 明细}
+    to: {<<: *report_to, sheet: 明细}
     fields: [order_id, customer_name, amount_yuan]
 
   - name: direct
     from: detail
-    to: {sheet: 直客明细}
+    to: {<<: *report_to, sheet: 直客明细}
     where: "channel == 'direct'"
 
   - name: by_channel
-    to: {sheet: 渠道汇总}
+    to: {<<: *report_to, sheet: 渠道汇总}
     aggregate:
       group_by: [channel]
       fields:

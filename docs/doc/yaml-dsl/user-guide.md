@@ -81,12 +81,9 @@ resources:
       path: ./output/minimal_order_report.xlsx
       write_lock: true
 
-outputs_defaults:
-  to: {book: report}
-
 outputs:
   - name: detail
-    to: {sheet: 明细}
+    to: {book: report, sheet: 明细}
     fields: [order_id]
 ```
 
@@ -315,21 +312,21 @@ resources:
       path: ./output/report.xlsx
       write_lock: true
 
-outputs_defaults:
-  to: {book: report}
+_templates:
+  report_to: &report_to {book: report}
 
 outputs:
   - name: detail
-    to: {sheet: 明细}
+    to: {<<: *report_to, sheet: 明细}
     fields: [order_id, customer_name, amount]
 
   - name: direct
     from: detail
-    to: {sheet: 直客}
+    to: {<<: *report_to, sheet: 直客}
     where: "channel == 'direct'"
 
   - name: by_channel
-    to: {sheet: 渠道汇总}
+    to: {<<: *report_to, sheet: 渠道汇总}
     aggregate:
       group_by: [channel]
       fields:
@@ -1187,15 +1184,15 @@ resources:
       path: ./output/report.xlsx
       write_lock: true
 
-outputs_defaults:
-  to: {book: report}
+_templates:
+  report_to: &report_to {book: report}
 
 outputs:
   - name: detail
-    to: {sheet: 明细}
+    to: {<<: *report_to, sheet: 明细}
     fields: [order_id, order_source, amount, cost, profit]
   - name: summary
-    to: {sheet: 汇总}
+    to: {<<: *report_to, sheet: 汇总}
     aggregate:
       group_by: [order_source]
       fields:
@@ -1224,11 +1221,10 @@ result = run(
                 }
             }
         },
-        outputs_defaults={"to": {"book": "report"}},
         outputs=[
             {
                 "name": "detail",
-                "to": {"sheet": "明细"},
+                "to": {"book": "report", "sheet": "明细"},
                 "fields": ["order_id", "amount", "profit"],
             }
         ]
@@ -1931,7 +1927,7 @@ _ = compile("config.yaml", allowed_modules=frozenset(["myapp.loaders"]))
 **A**:
 
 - **CSV**: `outputs.*.container.type: csv`
-- **Excel**: `resources.books` + `outputs_defaults.to` / `outputs[*].to` 绑定(需要 `openpyxl` 依赖)
+- **Excel**: `resources.books` + `outputs[*].to` 绑定(需要 `openpyxl` 依赖)
 
 ```yaml
 resources:
@@ -1941,12 +1937,9 @@ resources:
       path: ./output/report.xlsx
       write_lock: true
 
-outputs_defaults:
-  to: {book: report}
-
 outputs:
   - name: detail
-    to: {sheet: 明细}
+    to: {book: report, sheet: 明细}
     fields: [order_id]
 ```
 

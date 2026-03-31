@@ -42,8 +42,6 @@ from ..schema_dsl.models import (
     GuardrailsConfig,
     LoaderRetryConfig,
     OutputContainerConfig,
-    OutputsDefaultsConfig,
-    OutputsDefaultsToConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -1012,41 +1010,6 @@ def _apply_book_patch(base: Optional[BookConfig], patch: Mapping[str, object], *
     )
 
 
-def _apply_outputs_defaults_io_override(config: DemandConfig, patch_raw: object) -> DemandConfig:
-    if not isinstance(patch_raw, dict):
-        msg = "overrides.outputs_defaults must be an object"
-        raise TypeError(msg)
-    patch = cast("Dict[str, Any]", patch_raw)  # pragma: allow-cast runtime dict typed narrowing
-    unknown = sorted({str(k) for k in patch} - {"to"})
-    if unknown:
-        msg = "overrides.outputs_defaults has unknown keys: {}".format(", ".join(unknown))
-        raise ValueError(msg)
-
-    to_obj = patch.get("to")
-    if to_obj is None:
-        return config
-    if not isinstance(to_obj, dict):
-        msg = "overrides.outputs_defaults.to must be an object"
-        raise TypeError(msg)
-    to_dict = cast("Dict[str, Any]", to_obj)  # pragma: allow-cast runtime dict typed narrowing
-    unknown_to = sorted({str(k) for k in to_dict} - {"book"})
-    if unknown_to:
-        msg = "overrides.outputs_defaults.to has unknown keys: {}".format(", ".join(unknown_to))
-        raise ValueError(msg)
-    book_raw = to_dict.get("book")
-    if not isinstance(book_raw, str) or not str(book_raw).strip():
-        msg = "overrides.outputs_defaults.to.book must be a non-empty string"
-        raise ValueError(msg)
-    book_id = str(book_raw).strip()
-
-    base = config.outputs_defaults
-    if base is None:
-        base = OutputsDefaultsConfig(to=OutputsDefaultsToConfig(book=str(book_id)))
-    else:
-        base = replace(base, to=replace(base.to, book=str(book_id)))
-    return replace(config, outputs_defaults=base)
-
-
 def _apply_resources_io_override(config: DemandConfig, patch_raw: object) -> DemandConfig:
     if not isinstance(patch_raw, dict):
         msg = "overrides.resources must be an object"
@@ -1091,10 +1054,6 @@ def _apply_io_overrides(config: DemandConfig, *, options: RunOptions) -> DemandC
         return config
 
     next_config = config
-
-    outputs_defaults_patch = overrides.outputs_defaults
-    if outputs_defaults_patch is not None:
-        next_config = _apply_outputs_defaults_io_override(next_config, outputs_defaults_patch)
 
     resources_patch = overrides.resources
     if resources_patch is not None:

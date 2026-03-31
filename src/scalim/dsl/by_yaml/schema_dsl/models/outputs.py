@@ -270,49 +270,6 @@ class OutputWriteConfig:
 
 
 @dataclass(frozen=True)
-class OutputsDefaultsToConfig:
-    SCHEMA_NAME: ClassVar[str] = "outputs_defaults_to"
-    """`outputs_defaults.to` 配置对象在 `YAML` 中的节点名称."""
-
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("book",)
-    """该配置对象在 `YAML` 中的必填字段列表."""
-
-    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-    """是否允许出现未声明的额外键."""
-
-    book: str = dataclass_field(
-        default="",
-        metadata=schema_meta(
-            schema={"type": "string", "minLength": 1, "description": "默认输出目标 book_id"},
-            desc="默认输出目标 book_id",
-            examples=["report"],
-        ),
-    )
-    """默认输出目标 `book_id`."""
-
-
-@dataclass(frozen=True)
-class OutputsDefaultsConfig:
-    SCHEMA_NAME: ClassVar[str] = "outputs_defaults"
-    """`outputs_defaults` 配置对象在 `YAML` 中的节点名称."""
-
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("to",)
-    """该配置对象在 `YAML` 中的必填字段列表."""
-
-    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-    """是否允许出现未声明的额外键."""
-
-    to: OutputsDefaultsToConfig = dataclass_field(
-        default_factory=OutputsDefaultsToConfig,
-        metadata=schema_meta(
-            ref="outputs_defaults_to",
-            desc="默认 IO 绑定(to.* defaults)",
-        ),
-    )
-    """默认 `IO` 绑定配置."""
-
-
-@dataclass(frozen=True)
 class OutputAggregateFieldConfig:
     """`aggregate.fields.<out_field_id>` 的单字段配置(已解析).
 

@@ -421,7 +421,7 @@ class ParserOutputsMixin:
         if typ not in OUTPUT_CONTAINER_TYPES:
             if typ == "workbook":
                 msg = (
-                    "{}.type='workbook' was removed; use resources.books + outputs_defaults.to.book / outputs[*].to for .xlsx outputs"
+                    "{}.type='workbook' was removed; use resources.books + outputs[*].to.book / outputs[*].to.sheet for .xlsx outputs"
                 ).format(base_path)
                 raise ValueError(msg)
 
@@ -966,7 +966,7 @@ class ParserOutputsMixin:
     ) -> None:
         container = t.container
         if container is None:
-            # `book` 绑定场景允许无 `container`(通过 `outputs_defaults`/`to`/`write` 表达).
+            # `book` 绑定场景允许无 `container`(通过 `to`/`write` 表达).
             return
 
         # `csv` 文件输出场景.
@@ -993,6 +993,20 @@ class ParserOutputsMixin:
         if unknown_fields:
             msg = "outputs.{}.fields reference unknown fields: {}".format(name, ", ".join(sorted(set(unknown_fields))))
             raise ValueError(msg)
+
+    def _validate_book_binding_semantics(self, t: OutputTargetConfig, *, idx: int) -> None:
+        if t.container is not None:
+            return
+        to_cfg = t.to
+        book = str(to_cfg.book or "").strip() if to_cfg is not None and to_cfg.book is not None else ""
+        if book:
+            return
+        path = "outputs.{}.to.book".format(int(idx))
+        msg = (
+            "{} is required for Excel outputs; set {} explicitly. "
+            "Reuse the binding with YAML anchors (`_templates`) or `$import` instead of relying on defaults."
+        ).format(path, path)
+        raise ValueError(msg)
 
     def _validate_aggregate_group_and_metrics(
         self,
@@ -1244,9 +1258,10 @@ class ParserOutputsMixin:
         *,
         known_field_ids: Set[str],
     ) -> None:
-        for t in outputs:
+        for idx, t in enumerate(outputs):
             name = str(t.name or "").strip()
             self._validate_output_container_semantics(t, name)
+            self._validate_book_binding_semantics(t, idx=int(idx))
             if t.aggregate is None:
                 self._validate_detail_output_semantics(t, name, known_field_ids)
             else:

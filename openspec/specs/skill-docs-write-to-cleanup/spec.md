@@ -7,7 +7,7 @@
 系统 MUST 保证作者面对的 skill references / OpenSpec 文档不再把已移除的旧 workflow 写入字段作为当前 workflow 写入 surface；旧字段仅允许出现在“迁移/历史”说明中,并必须明确其已被移除以及替代写法为:
 
 - `workflow.resources.books`
-- demand outputs 的 `outputs_defaults.to.book` / `outputs[*].to` / `outputs[*].write`
+- demand outputs 的 `outputs[*].to` / `outputs[*].write`
 
 #### Scenario: skill docs no longer advertise legacy workflow write fields
 - **WHEN** 维护者运行 `just gen-agent-skill`

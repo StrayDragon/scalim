@@ -25,11 +25,10 @@ resources:
     report:
       kind: xlsx_memory
       budget: {max_sheets: 10, max_total_cells: 1000}
-outputs_defaults:
-  to:
-    book: report
 outputs:
   - name: detail
+    to:
+      book: report
     fields: [id, value]
 """
         ).lstrip(),

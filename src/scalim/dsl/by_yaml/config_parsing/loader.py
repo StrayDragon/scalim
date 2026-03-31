@@ -13,8 +13,6 @@ from ..schema_dsl.models import (
     BOOK_WRITE_DEFAULTS_KEYS,
     DEMAND_KEYS,
     OUTPUT_EXTRA_SHEET_KEYS,
-    OUTPUTS_DEFAULTS_KEYS,
-    OUTPUTS_DEFAULTS_TO_KEYS,
     RESOURCES_KEYS,
     BookBudgetConfig,
     BookConfig,
@@ -22,8 +20,6 @@ from ..schema_dsl.models import (
     BookWriteDefaultsConfig,
     DemandConfig,
     OutputExtraSheetConfig,
-    OutputsDefaultsConfig,
-    OutputsDefaultsToConfig,
     ResourcesConfig,
 )
 from ..schema_dsl.output_enums import (
@@ -289,7 +285,6 @@ class YamlDemandLoader(
         relations = self._parse_relations(raw)
         field_def_index = self._collect_field_defs(raw, main_source.source_id)
         resources = self._parse_resources(raw)
-        outputs_defaults = self._parse_outputs_defaults(raw)
         outputs, required_field_ids = self._parse_outputs(raw, field_def_index=field_def_index)
 
         parsed_fields = self._parse_fields(
@@ -336,7 +331,6 @@ class YamlDemandLoader(
             relations=relations,
             guardrails=guardrails,
             resources=resources,
-            outputs_defaults=outputs_defaults,
             outputs=outputs,
             validate_unique_field_names=validate_unique_field_names,
             failure_policy=failure_policy,
@@ -345,23 +339,6 @@ class YamlDemandLoader(
             audit=audit,
             observability=observability,
         )
-
-    def _parse_outputs_defaults(self, raw: RawDemand) -> Optional[OutputsDefaultsConfig]:
-        defaults_dict = raw.get_mapping(DEMAND_KEYS["outputs_defaults"])
-        if defaults_dict is None:
-            return None
-
-        to_dict = mapping_or_none(defaults_dict.get(OUTPUTS_DEFAULTS_KEYS["to"]))
-        if to_dict is None:
-            msg = "outputs_defaults.to must be an object"
-            raise TypeError(msg)
-
-        book_id = str(to_dict.get(OUTPUTS_DEFAULTS_TO_KEYS["book"]) or "").strip()
-        if not book_id:
-            msg = "outputs_defaults.to.book is required"
-            raise ValueError(msg)
-
-        return OutputsDefaultsConfig(to=OutputsDefaultsToConfig(book=book_id))
 
     def _parse_resources(self, raw: RawDemand) -> Optional[ResourcesConfig]:
         resources_dict = raw.get_mapping(DEMAND_KEYS["resources"])

@@ -389,7 +389,7 @@ Sources:
 ### `yaml-dsl-books-resources`
 - Title: yaml-dsl-books-resources Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-books-resources/spec.md)
-- Summary: 定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs_defaults.to.book` / `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.
+- Summary: 定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.
 
 ### `yaml-dsl-builtin-callables`
 - Title: yaml-dsl-builtin-callables Specification

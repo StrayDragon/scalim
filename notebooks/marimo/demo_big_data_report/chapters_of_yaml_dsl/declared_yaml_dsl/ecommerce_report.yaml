@@ -481,28 +481,27 @@ resources:
       allow_formulas: true
       write_lock: true
 
-outputs_defaults:
-  to:
-    book: report
-
 meta: true
 audit: true
 
 outputs:
   - name: detail
-    to:
+    to: &report_to
+      book: report
       sheet: 订单明细
     fields:
       - *detail_fields
 
   - name: no_promo
     to:
+      <<: *report_to
       sheet: 无促销明细
     fields: *detail_fields
     where: "no_promotion"
 
   - name: by_region
     to:
+      <<: *report_to
       sheet: 区域汇总
     aggregate:
       group_by: [region_name_display]
@@ -517,6 +516,7 @@ outputs:
 
   - name: by_region_no_promo
     to:
+      <<: *report_to
       sheet: 区域汇总-无促销
     where: "no_promotion"
     aggregate:
@@ -528,6 +528,7 @@ outputs:
 
   - name: by_region_ops
     to:
+      <<: *report_to
       sheet: 区域汇总-算子
     aggregate:
       group_by: [region_name_display]
@@ -548,6 +549,7 @@ outputs:
 
   - name: by_region_import
     to:
+      <<: *report_to
       sheet: 区域汇总-$import
     aggregate:
       $import: fragments.agg_by_region_guardrails
@@ -558,6 +560,7 @@ outputs:
 
   - name: by_region_top_amount
     to:
+      <<: *report_to
       sheet: 区域Top-金额
     aggregate:
       group_by: [region_name_display]
@@ -573,6 +576,7 @@ outputs:
 
   - name: by_region_category
     to:
+      <<: *report_to
       sheet: 区域x分类
     aggregate:
       group_by: [region_name_display, category_name]

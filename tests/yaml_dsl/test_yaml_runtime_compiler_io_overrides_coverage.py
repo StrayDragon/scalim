@@ -10,8 +10,6 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
     DemandConfig,
-    OutputsDefaultsConfig,
-    OutputsDefaultsToConfig,
     ResourcesConfig,
 )
 
@@ -233,33 +231,13 @@ def test_runtime_compiler_apply_book_patch_cover_budget_export_and_semantic_bran
         _ = compiler_mod._apply_book_patch(base, {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}}, path="p")  # noqa: SLF001
 
 
-def test_runtime_compiler_apply_outputs_defaults_and_resources_overrides_cover_branches() -> None:
+def test_runtime_compiler_rejects_removed_outputs_defaults_override() -> None:
+    with pytest.raises(TypeError, match=r"unexpected keyword argument 'outputs_defaults'"):
+        _ = RunOverrides(outputs_defaults={"to": {"book": "report"}})  # type: ignore[call-arg]
+
+
+def test_runtime_compiler_apply_resources_overrides_cover_branches() -> None:
     base = DemandConfig()
-
-    with pytest.raises(TypeError, match=r"overrides\.outputs_defaults must be an object"):
-        _ = compiler_mod._apply_outputs_defaults_io_override(base, "nope")  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"overrides\.outputs_defaults has unknown keys"):
-        _ = compiler_mod._apply_outputs_defaults_io_override(base, {"nope": 1})  # noqa: SLF001
-
-    assert compiler_mod._apply_outputs_defaults_io_override(base, {"to": None}) == base  # noqa: SLF001
-
-    with pytest.raises(TypeError, match=r"overrides\.outputs_defaults\.to must be an object"):
-        _ = compiler_mod._apply_outputs_defaults_io_override(base, {"to": "nope"})  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"overrides\.outputs_defaults\.to has unknown keys"):
-        _ = compiler_mod._apply_outputs_defaults_io_override(base, {"to": {"nope": 1}})  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"overrides\.outputs_defaults\.to\.book must be a non-empty string"):
-        _ = compiler_mod._apply_outputs_defaults_io_override(base, {"to": {"book": ""}})  # noqa: SLF001
-
-    out = compiler_mod._apply_outputs_defaults_io_override(base, {"to": {"book": "report"}})  # noqa: SLF001
-    assert out.outputs_defaults is not None
-    assert out.outputs_defaults.to.book == "report"
-
-    out2 = compiler_mod._apply_outputs_defaults_io_override(out, {"to": {"book": "other"}})  # noqa: SLF001
-    assert out2.outputs_defaults is not None
-    assert out2.outputs_defaults.to.book == "other"
 
     with pytest.raises(TypeError, match=r"overrides\.resources must be an object"):
         _ = compiler_mod._apply_resources_io_override(base, "nope")  # noqa: SLF001
@@ -292,18 +270,14 @@ def test_runtime_compiler_apply_outputs_defaults_and_resources_overrides_cover_b
 
 def test_runtime_compiler_apply_io_overrides_dispatch_covers_branches() -> None:
     cfg = DemandConfig(
-        outputs_defaults=OutputsDefaultsConfig(to=OutputsDefaultsToConfig(book="base")),
         resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")}),
     )
     options = RunOptions(
         allowed_modules=frozenset(["tests.fixtures"]),
         overrides=RunOverrides(
-            outputs_defaults={"to": {"book": "other"}},
             resources={"books": {"report": {"path": "b.xlsx"}}},
         ),
     )
     out = compiler_mod._apply_io_overrides(cfg, options=options)  # noqa: SLF001
-    assert out.outputs_defaults is not None
-    assert out.outputs_defaults.to.book == "other"
     assert out.resources is not None
     assert out.resources.books["report"].path == "b.xlsx"

@@ -44,14 +44,12 @@ class RunOverrides:
       - 本变更仅承诺明细输出(`detail`)的最小子集: `name` / `to` / `fields`
       - 提供则整体替换 `YAML` 的 `outputs`(不做 `deep-merge`)
 
-    - `resources` / `outputs_defaults`: 仅 `IO` 层的补丁覆盖,语义为 `overlay` / `deep-merge`.
+    - `resources`: 仅 `IO` 层的补丁覆盖,语义为 `overlay` / `deep-merge`.
       - `resources`: `YAML-shaped patch`; 至少支持 `resources.books`
-      - `outputs_defaults`: `YAML-shaped patch`; 至少支持 `outputs_defaults.to.book`
     """
 
     outputs: Optional[List[Dict[str, Any]]] = None
     resources: Optional[Dict[str, Any]] = None
-    outputs_defaults: Optional[Dict[str, Any]] = None
     viz_config: Union[Optional["VizObserverConfig"], _UnsetType] = UNSET
 
 

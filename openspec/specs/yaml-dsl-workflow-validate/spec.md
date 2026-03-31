@@ -17,11 +17,11 @@ TBD - created by archiving change c12-yaml-dsl-workflow-validate-cli. Update Pur
 - workflow ↔ demand 的交叉一致性校验（例如 demand outputs 绑定到的 `to.book` 必须能解析到某个有效的 `resources.books.<id>`）
 
 #### Scenario: validate fails when a demand binds to an unknown book id
-- **GIVEN** workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 声明 `outputs_defaults.to.book: "report"`
+- **GIVEN** workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 声明 `outputs[0].to.book: "report"`
 - **AND** 该 demand YAML 与 workflow YAML 均未声明 `resources.books.report` / `workflow.resources.books.report`
 - **WHEN** 调用方执行 `scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
 - **THEN** 校验 MUST 失败（非零退出码）
-- **AND** 输出 MUST 提供可定位的诊断信息，指出缺失的 book id 与来源路径(例如 `outputs_defaults.to.book`)
+- **AND** 输出 MUST 提供可定位的诊断信息，指出缺失的 book id 与来源路径(例如 `outputs[0].to.book`)
 
 ### Requirement: workflow validate MUST share YAML load and error envelope with demand compile
 
@@ -34,4 +34,3 @@ TBD - created by archiving change c12-yaml-dsl-workflow-validate-cli. Update Pur
 - **GIVEN** 某份 workflow YAML 包含 duplicate keys 或语法错误
 - **WHEN** 维护者分别运行 workflow validate 与相同 loader 入口
 - **THEN** 两者 MUST 产生一致的错误结构与定位口径
-

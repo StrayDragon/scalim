@@ -645,7 +645,6 @@ DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "relations",
     "guardrails",
     "resources",
-    "outputs_defaults",
     "outputs",
     "validate_unique_field_names",
     "failure_policy",

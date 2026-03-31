@@ -1,7 +1,7 @@
 # yaml-dsl-books-resources Specification
 
 ## Purpose
-定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs_defaults.to.book` / `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.
+定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.
 ## Requirements
 ### Requirement: demand/workflow YAML MUST support `resources.books` as the unified Excel IO resource surface
 
@@ -79,31 +79,29 @@
 - **WHEN** 调用方提供 `init_vars={"out_path": "./out/report.xlsx"}`
 - **THEN** 编译期解析 MUST 成功
 
-### Requirement: demand MUST bind outputs to books via `outputs_defaults.to.book` and `outputs[*].to`
+### Requirement: demand MUST bind outputs to books via `outputs[*].to.book` and `outputs[*].to.sheet`
 
-系统 MUST 支持在 demand YAML 中将 outputs 绑定到 book 资源:
+系统 MUST 支持在 demand YAML 中将 Excel outputs 绑定到 book 资源,且绑定入口仅允许位于 output 局部:
 
-- `outputs_defaults.to.book` MAY 存在且 MUST 为非空字符串
-- `outputs[*].to` MAY 存在且 MUST 为 mapping
-  - `outputs[*].to.book` MAY 存在且 MUST 为非空字符串
-  - `outputs[*].to.sheet` MAY 存在且 MUST 为非空字符串
+- 对于 **未声明 `container`** 的 output(表示 Excel 输出),`outputs[*].to` MUST 存在且 MUST 为 mapping:
+  - `outputs[*].to.book` MUST 为非空字符串
+  - `outputs[*].to.sheet` MAY 为非空字符串
 
 默认/继承规则:
 
-- 若 `outputs[*].to.book` 缺省,则从 `outputs_defaults.to.book` 继承
 - 若 `outputs[*].to.sheet` 缺省,则 `sheet` MUST 默认等于 `outputs[*].name`
 - `sheet` MUST 通过 Excel sheet 名校验(非空、长度 `<=31`、且不得包含 `\\ / ? * [ ] :`)
-- 若某 output 的 effective `to.book` 缺失,系统 MUST fail-fast 并给出可复制迁移提示(例如提示设置 `outputs_defaults.to.book`)
+- 若某 output 的 effective `to.book` 缺失,系统 MUST fail-fast 并给出可复制迁移提示(例如提示设置 `outputs[*].to.book`)
 
 #### Scenario: sheet defaults to output.name and is validated
-- **GIVEN** `outputs_defaults.to.book: report`
-- **AND** `outputs[0].name: metrics`
-- **AND** `outputs[0].to` 缺省
+- **GIVEN** `outputs[0].name: metrics`
+- **AND** `outputs[0].to.book: report`
+- **AND** `outputs[0].to.sheet` 缺省
 - **WHEN** 系统计算 effective IO binding
 - **THEN** `outputs[0]` MUST 绑定到 book=`report`, sheet=`metrics`
 
 #### Scenario: invalid default sheet name fails fast
-- **GIVEN** `outputs_defaults.to.book: report`
+- **GIVEN** `outputs[0].to.book: report`
 - **AND** `outputs[0].name` 长度大于 31
 - **WHEN** 系统计算 effective IO binding
 - **THEN** MUST fail-fast
@@ -111,17 +109,17 @@
 
 ### Requirement: standalone demand MUST fail-fast when a referenced book resource is missing
 
-系统 MUST 在 standalone `compile/run` 执行 demand 时,对所有 outputs 的 effective `to.book`(来自 `outputs_defaults.to.book` 或 `outputs[*].to.book`)执行资源存在性校验,并在缺失时 fail-fast:
+系统 MUST 在 standalone `compile/run` 执行 demand 时,对所有 outputs 的 effective `to.book`(来自 `outputs[*].to.book`)执行资源存在性校验,并在缺失时 fail-fast:
 
 - 系统 MUST 确保该 `book_id` 在 effective `resources.books` 中存在
 - 若缺失,系统 MUST fail-fast(不得静默降级为“无输出”或“写到临时路径”)
 - 错误信息 MUST 同时包含:
   - 缺失的 `book_id`
-  - 发生位置(例如 `outputs_defaults.to.book` 或 `outputs[0].to.book`)
+  - 发生位置(例如 `outputs[0].to.book`)
   - 可复制迁移提示(例如: “在 demand 中声明 `resources.books.<id>` 或在 Python overrides 的 `overrides.resources.books` 提供该资源”)
 
 #### Scenario: missing book id fails fast with actionable hint
-- **GIVEN** demand 声明 `outputs_defaults.to.book: report`
+- **GIVEN** demand 声明 `outputs[0].to.book: report`
 - **AND** demand 未声明 `resources.books.report`
 - **WHEN** 调用方执行 standalone `compile/run` 且未提供 `overrides.resources.books.report`
 - **THEN** MUST fail-fast
@@ -225,4 +223,4 @@ loader MUST 接收 `params.ref` 映射对象,并满足以下结构:
 #### Scenario: schema rejects legacy workbook container surface deterministically
 - **WHEN** demand YAML 仍采用旧 workbook container 输出写法
 - **THEN** schema-only 校验 MUST 失败
-- **AND** 错误信息 MUST 提示迁移到 `resources.books` + `outputs_defaults.to.book` / `outputs[*].to`
+- **AND** 错误信息 MUST 提示迁移到 `resources.books` + `outputs[*].to`

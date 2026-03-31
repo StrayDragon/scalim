@@ -296,13 +296,10 @@ main_source:
   fields:
 {fields}
 
-outputs_defaults:
-  to:
-    book: {book_id}
-
 outputs:
   - name: {output_name}
     to:
+      book: {book_id}
       sheet: {sheet}
 {write_block}
     fields: {fields_list}
@@ -2984,17 +2981,13 @@ main_source:
     id: {extract: id}
     value: {extract: value}
 
-outputs_defaults:
-  to:
-    book: report
-
 outputs:
   - name: metrics
-    to: {sheet: Metrics}
+    to: {book: report, sheet: Metrics}
     write: {mode: sheet}
     fields: ["id"]
   - name: detail
-    to: {sheet: Detail}
+    to: {book: report, sheet: Detail}
     write: {mode: sheet}
     fields: ["id", "value"]
 """
@@ -3455,13 +3448,9 @@ main_source:
     id: {{extract: id}}
     value: {{extract: value}}
 
-outputs_defaults:
-  to:
-    book: report
-
 outputs:
   - name: detail
-    to: {{sheet: S}}
+    to: {{book: report, sheet: S}}
     write: {{mode: sheet}}
     fields: [id, value]
 
@@ -4452,7 +4441,7 @@ outputs:
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match=r"Missing outputs to\.book binding"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"outputs\.0\.to\.book is required"):
         _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
 
 

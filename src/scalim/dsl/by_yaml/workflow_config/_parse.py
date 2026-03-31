@@ -134,10 +134,10 @@ def _load_workflow_runs(wf: Mapping[str, Any]) -> Tuple[List[WorkflowRun], Dict[
             msg = "run.deps was removed; use run.depends_on"
             raise ScalimWorkflowConfigError(msg, path="{}.deps".format(item_path))
         if "write_to" in run_dict:
-            msg = "run.write_to was removed; migrate IO bindings to demand outputs (outputs_defaults/to/write)"
+            msg = "run.write_to was removed; migrate IO bindings to demand outputs (outputs[*].to / outputs[*].write)"
             raise ScalimWorkflowConfigError(msg, path="{}.write_to".format(item_path))
         if "writes" in run_dict:
-            msg = "run.writes was removed; migrate IO bindings to demand outputs (outputs_defaults/to/write)"
+            msg = "run.writes was removed; migrate IO bindings to demand outputs (outputs[*].to / outputs[*].write)"
             raise ScalimWorkflowConfigError(msg, path="{}.writes".format(item_path))
 
         run_id_raw = run_dict.get("id")

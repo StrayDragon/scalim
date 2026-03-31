@@ -104,7 +104,6 @@ def run_workflow(  # noqa: PLR0913
             else {
                 "outputs": overrides.outputs,
                 "resources": overrides.resources,
-                "outputs_defaults": overrides.outputs_defaults,
             }
         ),
     )
