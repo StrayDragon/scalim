@@ -269,6 +269,37 @@ def test_compile_output_composition_validates_init_var_value_types_and_normalize
         )
 
 
+def test_compile_output_composition_requires_yaml_base_dir_for_file_outputs() -> None:
+    config = _csv_config("./out.csv")
+    with pytest.raises(ValueError, match=r"yaml_base_dir is required to resolve resources\.files output paths"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+
+
+def test_compile_output_composition_missing_file_resource_raises_helpful_error() -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(files={}),
+        outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(file="missing_csv"), fields=("a",)),),
+    )
+    with pytest.raises(ValueError, match=r"Missing file resource id 'missing_csv'"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+
+
+def test_compile_output_composition_append_mode_rejects_include_header() -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}),
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="report", sheet="Detail"),
+                write=OutputWriteConfig(mode="append", include_header=True),
+                fields=("a",),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match=r"outputs\.0\.write\.include_header is not allowed for append-mode book outputs"):
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+
+
 def test_compile_output_composition_rejects_empty_or_missing_file_resource_path_values() -> None:
     config = _csv_config(None)
     with pytest.raises(ValueError, match=r"is required"):

@@ -411,6 +411,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-docs-skills-autogen-sync/spec.md)
 - Summary: TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update Purpose after archive.
 
+### `yaml-dsl-file-resources`
+- Title: yaml-dsl-file-resources Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-file-resources/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 demand/workflow 统一的 `resources.files` 文件输出资源入口,并约束 CSV 输出通过 `outputs[*].to.file` + `outputs[*].write` 绑定,取代 legacy `outputs[*].container`.
+
 ### `yaml-dsl-import-aliases-and-presets`
 - Title: yaml-dsl-import-aliases-and-presets Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-import-aliases-and-presets/spec.md)

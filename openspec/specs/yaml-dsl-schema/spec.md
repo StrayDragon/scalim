@@ -90,12 +90,34 @@
 - **THEN** `properties.outputs.markdownDescription` MUST 提及 `outputs` 可选
 - **AND** `properties.outputs.markdownDescription` MUST 提及 `overrides.outputs` 的推荐用法
 
+### Requirement: schema MUST expose the unified output target surface and reject legacy `container`
+系统 MUST 生成反映统一输出模型的 YAML DSL schema:
+
+- MUST 暴露 `resources.files`
+- MUST 暴露 `outputs[*].to.file`
+- MUST 在 `outputs[*].write` 中暴露通用 header 字段
+- MUST NOT 再接受 `outputs[*].container`
+
+#### Scenario: schema exposes resources.files and to.file
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **THEN** schema MUST 暴露 `definitions.file` / `definitions.output_to.properties.file`
+- **AND** 顶层 `resources` MUST 支持 `files`
+
+#### Scenario: schema rejects legacy container surface
+- **WHEN** 用户使用 `outputs[*].container`
+- **THEN** schema-only 校验 MUST 失败
+
 ### Requirement: `header_fields_output_by` default is `name`
-系统 MUST 将 `outputs[*].container.header_fields_output_by` 的 schema 默认值设为 `name`(破坏性变更).
+系统 MUST 将统一写入模型下的 `header_fields_output_by` schema 默认值设为 `name`(破坏性变更).
+
+约束:
+
+- `outputs[*].write.header_fields_output_by.default` MUST 等于 `name`
+- `resources.books.write_defaults` MUST NOT 暴露 `header_fields_output_by`
 
 #### Scenario: schema default for header_fields_output_by is name
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
-- **THEN** `definitions.output_container.properties.header_fields_output_by.default` MUST 等于 `name`
+- **THEN** `definitions.output_write.properties.header_fields_output_by.default` MUST 等于 `name`
 
 ### Requirement: schema exposes a switch for unique effective field display names
 系统 MUST 在 schema 中暴露一个 YAML authoring 侧开关,用于控制“字段有效展示名(effective display name)全局唯一”的预检查策略。
@@ -105,11 +127,18 @@
 - 名称为 `validate_unique_field_names`(boolean);
 - 默认语义为启用(未声明时等价 `true`);
 - hover 文案 MUST 解释“有效展示名”的定义: `field.name` 非空则取 `name`,否则回退为 `field_id`。
-- hover 文案 MUST 说明该预检查仅在 effective outputs 使用 `container.include_header: true`(显式或默认) 且 `container.header_fields_output_by: name` 时触发。
+- hover 文案 MUST 说明该预检查在统一 target model 下的触发条件:
+  - file: `write.include_header: true` 且 `write.header_fields_output_by: name`
+  - book: 该 output 会输出表头且 `write.header_fields_output_by: name`
 
 #### Scenario: schema 生成结果包含顶层校验开关
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
 - **THEN** schema MUST 暴露 `properties.validate_unique_field_names`
+
+#### Scenario: schema hover reflects unified header trigger rules
+- **WHEN** 生成 `demand.gen.json`
+- **THEN** `properties.validate_unique_field_names.markdownDescription` MUST 不再引用 `container`
+- **AND** MUST 说明统一 `write.header_fields_output_by` 触发规则
 
 ### Requirement: schema hover 提供常见错误与迁移提示
 系统 MUST 在 YAML DSL JSON Schema 的关键字段上提供可读且简短的常见错误/迁移提示,以提升编辑器 LSP 体验并减少试错成本:
@@ -430,22 +459,20 @@ Schema MUST 为 retry policy 字段提供:
 - **WHEN** 执行 schema-only 校验
 - **THEN** 校验 MUST NOT 因 `outputs[0].fields[*]` 的类型为 object 而失败
 
-### Requirement: schema 覆盖 `outputs.*.container.path` 的 `{$init_var: <name>}` 语法
+### Requirement: schema MUST support `{$init_var: <name>}` for file resource paths
+系统 MUST 在 YAML DSL JSON Schema 中对 `resources.files.*.path` 支持 `{$init_var: <name>}` 指令节点注入输出路径(对象节点,不是字符串插值):
 
-系统 MUST 在 YAML DSL JSON Schema 中继续支持 `outputs[*].container.path` 使用 `{$init_var: <name>}` 指令节点注入输出路径,但该能力仅作为 **CSV 文件输出** 的最小子集保留:
-
-- 仅当 `outputs[*].container.type: csv` 时允许
-- `outputs[*].container.path` MUST 支持:
+- `resources.files.*.path` MUST 支持:
   - 非空静态字符串路径
-  - 或 `{$init_var: <name>}` 指令节点(对象节点,不是字符串插值)
-- `outputs[*].container.path: \"\"`(空字符串) MUST 被拒绝(见本变更对 pathless CSV 的移除)
+  - 或 `{$init_var: <name>}` 指令节点
+- `resources.files.*.path: \"\"`(空字符串) MUST 被拒绝
 
 说明:
 
-- `.xlsx` 输出路径注入 MUST 迁移为 `resources.books.*.path` / `export_xlsx.path`(见本变更新增 requirements)。
+- `.xlsx` 输出路径注入通过 `resources.books.*.path` / `export_xlsx.path`(见下方 requirements)。
 
-#### Scenario: schema validate accepts string or init_var object for csv output paths
-- **WHEN** 执行 demand schema-only 校验且 `outputs[0].container.type=csv` 且 `outputs[0].container.path={$init_var: output_path}`
+#### Scenario: schema validate accepts string or init_var object for file paths
+- **WHEN** 执行 demand schema-only 校验且 `resources.files.detail.kind=csv_file` 且 `resources.files.detail.path={$init_var: output_path}`
 - **THEN** 校验 MUST 通过
 
 ### Requirement: schema MUST support `{$init_var: <name>}` for book export paths
@@ -465,19 +492,19 @@ Schema MUST 为 retry policy 字段提供:
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` 与 `workflow.gen.json`
 - **THEN** book 的 `path`/`export_xlsx.path` 字段 MUST 通过 `oneOf` 接受 string 或 `{$init_var: <name>}` object
 
-### Requirement: demand schema MUST reject legacy output container types and shapes (legacy workbook container surface, pathless `csv`)
+### Requirement: demand schema MUST reject legacy output container surface and invalid file paths
 
 系统 MUST 在 demand schema-only 校验阶段拒绝以下已移除/不再作为主路径的形态:
 
-- `.xlsx` 输出的旧 workbook container authoring surface(迁移到 `resources.books` + outputs→book 绑定)
-- `outputs[*].container.type: csv` 且 `outputs[*].container.path: ""`
+- legacy `outputs[*].container` 输出绑定 authoring surface
+- `resources.files.*.path: \"\"`(空字符串)
 
-#### Scenario: workbook container type is rejected by schema
-- **WHEN** 执行 demand schema-only 校验且 demand outputs 使用旧 workbook container authoring surface
+#### Scenario: legacy container output is rejected by schema
+- **WHEN** 执行 demand schema-only 校验且 demand outputs 使用 legacy `outputs[*].container`
 - **THEN** 校验 MUST 失败
 
-#### Scenario: pathless csv is rejected by schema
-- **WHEN** 执行 demand schema-only 校验且 `outputs[0].container.type=csv` 且 `outputs[0].container.path=\"\"`
+#### Scenario: empty file path is rejected by schema
+- **WHEN** 执行 demand schema-only 校验且 `resources.files.detail.kind=csv_file` 且 `resources.files.detail.path=\"\"`
 - **THEN** 校验 MUST 失败
 
 ### Requirement: workflow schema MUST reject legacy workflow IO fields (`writes`, `workbooks`, `csvs`, `sheetbooks`)

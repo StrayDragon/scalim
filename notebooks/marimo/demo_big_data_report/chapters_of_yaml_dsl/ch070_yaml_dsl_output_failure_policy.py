@@ -124,7 +124,9 @@ def run_yaml_dsl_output_failure_policy(
             redacted_ok = True
             if len(redacted_rows) != 5:
                 redacted_ok = False
-            if str(redacted_result.output_path or "") != str(out_detail_redacted):
+            if redacted_result.output_path is None:
+                redacted_ok = False
+            elif Path(str(redacted_result.output_path)).resolve() != out_detail_redacted.resolve():
                 redacted_ok = False
 
             primary = redacted_stats.get("detail")
@@ -172,7 +174,9 @@ def run_yaml_dsl_output_failure_policy(
             full_ok = True
             if len(full_rows) != 5:
                 full_ok = False
-            if str(full_result.output_path or "") != str(out_detail_full):
+            if full_result.output_path is None:
+                full_ok = False
+            elif Path(str(full_result.output_path)).resolve() != out_detail_full.resolve():
                 full_ok = False
 
             full_secondary = full_stats.get("secondary_debug_workbook")

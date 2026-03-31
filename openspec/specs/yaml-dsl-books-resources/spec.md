@@ -83,7 +83,7 @@
 
 系统 MUST 支持在 demand YAML 中将 Excel outputs 绑定到 book 资源,且绑定入口仅允许位于 output 局部:
 
-- 对于 **未声明 `container`** 的 output(表示 Excel 输出),`outputs[*].to` MUST 存在且 MUST 为 mapping:
+- 对于绑定到 book 的 output,`outputs[*].to` MUST 存在且 MUST 为 mapping:
   - `outputs[*].to.book` MUST 为非空字符串
   - `outputs[*].to.sheet` MAY 为非空字符串
 
@@ -106,6 +106,18 @@
 - **WHEN** 系统计算 effective IO binding
 - **THEN** MUST fail-fast
 - **AND** 错误信息 MUST 指向 `outputs[0].name` 并提示显式提供 `outputs[0].to.sheet`
+
+#### Scenario: books output can override header source at output-local write
+- **WHEN** output 声明 `to.book=report`
+- **AND** `write.header_fields_output_by=field_id`
+- **THEN** 该 output 的表头来源 MUST 使用 `field_id`
+
+#### Scenario: include_header is rejected for append-mode books output
+- **GIVEN** output 绑定到某个 book
+- **AND** effective `mode=append`
+- **WHEN** 用户显式声明 `write.include_header`
+- **THEN** 系统 MUST fail-fast
+- **AND** 错误信息 MUST 提示 `append` 模式应使用 `header_policy`
 
 ### Requirement: standalone demand MUST fail-fast when a referenced book resource is missing
 
@@ -154,11 +166,16 @@
   - `header_policy` MUST 为 `once|always|never` 之一(默认 `once`; 仅 `append` 生效)
   - `on_mismatch` MUST 为 `error|warn|skip` 之一(默认 `error`; 仅 `append` 生效)
   - `on_conflict` MUST 为 `error|overwrite|skip` 之一(默认 `error`; 仅 `sheet` 生效)
+- `resources.books.<id>.write_defaults` MUST NOT 暴露通用 header 字段(`include_header`/`header_fields_output_by`)
 
 outputs 级覆盖:
 
 - `outputs[*].write` MAY 存在且 MUST 为 mapping
-- `outputs[*].write` 仅允许覆盖 write_defaults 的上述字段集合,不得包含输出定义层字段(`fields/where/from/aggregate`)
+- `outputs[*].write` MAY 覆盖 `write_defaults` 的 book 专属字段集合,并 MAY 提供通用 header 字段:
+  - `include_header`
+  - `header_fields_output_by`
+- effective `mode=append` 时,`outputs[*].write.include_header` MUST NOT 显式声明(避免与 `header_policy` 重叠)
+- `outputs[*].write` 不得包含输出定义层字段(`fields/where/from/aggregate`)
 
 #### Scenario: book write_defaults are schema-valid
 - **WHEN** `resources.books.report.write_defaults.mode=append`
@@ -212,15 +229,17 @@ loader MUST 接收 `params.ref` 映射对象,并满足以下结构:
 
 ### Requirement: `.xlsx` outputs MUST use books binding; legacy workbook container surface MUST be rejected (BREAKING)
 
-系统 MUST 将 `.xlsx` 输出的用户侧 authoring surface 收敛到 `resources.books` + outputs→book 绑定,并拒绝旧 workbook container 输出写法(避免双路径导致心智负担与实现漂移).
+系统 MUST 将输出 authoring surface 收敛到 `resources + outputs[*].to + outputs[*].write`,并移除 `outputs[*].container` 这条并行路径。
 
 约束:
 
-- `outputs[*].container.type=workbook` MUST 在 schema-only 与 runtime semantic 校验阶段被拒绝
-- `outputs[*].container.sheet/allow_formulas/write_lock` MUST 不再作为输出层 authoring surface(其语义移动到 `outputs[*].to.sheet` 与 `resources.books.*` 中)
-- 若用户仍需要 CSV 文件输出,仍可继续使用 `outputs[*].container.type=csv` + 非空 `path`
+- `.xlsx` 输出 MUST 使用 `resources.books` + `outputs[*].to.book`
+- CSV 输出 MUST 使用 `resources.files` + `outputs[*].to.file`
+- `outputs[*].container` MUST 在 schema-only 与 runtime semantic 校验阶段被拒绝
+- `outputs[*].to` MUST 成为唯一目标绑定入口
+- `outputs[*].write` MUST 成为唯一写入策略入口
 
-#### Scenario: schema rejects legacy workbook container surface deterministically
-- **WHEN** demand YAML 仍采用旧 workbook container 输出写法
-- **THEN** schema-only 校验 MUST 失败
-- **AND** 错误信息 MUST 提示迁移到 `resources.books` + `outputs[*].to`
+#### Scenario: legacy container output is rejected with migration hint
+- **WHEN** demand YAML 仍声明 `outputs[*].container`
+- **THEN** schema-only 与 runtime 校验 MUST fail-fast
+- **AND** 错误信息 MUST 提示迁移到 `resources.files/resources.books` + `outputs[*].to` + `outputs[*].write`

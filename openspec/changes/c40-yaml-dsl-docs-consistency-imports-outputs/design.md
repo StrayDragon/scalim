@@ -14,7 +14,7 @@
 - docs 中关于 imports/$import 与 outputs.container 的表述与实现保持一致。
 - validator 的迁移提示不得包含已无效语法示例(例如 workbook container),避免误导。
 - capability matrix 对“支持/不支持”给出可执行口径(对应到 parser/validator 的真实边界)。
-- skills 参考材料中出现的“已移除语法示例”(例如 `container.type: workbook` / `container.sheet`)必须被修正或明确标注为历史语法,避免持续误导。
+- skills 参考材料中出现的“已移除语法示例”(例如 workbook container 片段与 sheet 绑定字段)必须被修正或明确标注为历史语法,避免持续误导。
 
 **Non-Goals:**
 

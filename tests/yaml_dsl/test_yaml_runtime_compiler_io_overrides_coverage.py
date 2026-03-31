@@ -13,6 +13,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     FileConfig,
     ResourcesConfig,
 )
+from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr
 
 
 class _BlankPathLike(os.PathLike):
@@ -21,6 +22,20 @@ class _BlankPathLike(os.PathLike):
 
     def __fspath__(self) -> str:
         return self._value
+
+
+def _dummy_main_loader(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+    return []
+
+
+def _make_demand_ir() -> DemandIr:
+    main = MainSourceIr(source_id="orders", loader=_dummy_main_loader)
+    return DemandIr.from_irs(
+        sources=[],
+        fields=[FieldIr(field_id="order_id", name="order_id", source=main)],
+        main_source=main,
+        name="demo",
+    )
 
 
 def test_runtime_compiler_apply_file_patch_cover_branches() -> None:
@@ -38,6 +53,12 @@ def test_runtime_compiler_apply_file_patch_cover_branches() -> None:
 
     with pytest.raises(TypeError, match=r"p\.encoding must be a string"):
         _ = compiler_mod._apply_file_patch(FileConfig(kind="csv_file", path="a.csv"), {"encoding": 1}, path="p")  # noqa: SLF001
+
+    patched = compiler_mod._apply_file_patch(FileConfig(kind="csv_file", path="a.csv"), {"encoding": None}, path="p")  # noqa: SLF001
+    assert patched.encoding
+
+    patched = compiler_mod._apply_file_patch(FileConfig(kind="csv_file", path="a.csv"), {"encoding": " latin1 "}, path="p")  # noqa: SLF001
+    assert patched.encoding == "latin1"
 
     patched = compiler_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a.csv"}, path="p")  # noqa: SLF001
     assert patched.kind == "csv_file"
@@ -333,3 +354,68 @@ def test_runtime_compiler_apply_io_overrides_dispatch_covers_branches() -> None:
     out = compiler_mod._apply_io_overrides(cfg, options=options)  # noqa: SLF001
     assert out.resources is not None
     assert out.resources.files["detail"].path == "b.csv"
+
+
+def test_runtime_compiler_parse_overrides_outputs_targets_semantics_cover_branches() -> None:
+    demand_ir = _make_demand_ir()
+
+    with pytest.raises(ValueError, match=r"overrides\.outputs\.0\.to is required; declare exactly one of to\.file or to\.book"):
+        _ = compiler_mod._parse_overrides_outputs_targets(  # noqa: SLF001
+            [{"name": "detail", "to": {}, "fields": ["order_id"]}],
+            demand_ir,
+            path="overrides.outputs",
+        )
+
+    with pytest.raises(ValueError, match=r"overrides\.outputs\.0\.to\.sheet requires overrides\.outputs\.0\.to\.book"):
+        _ = compiler_mod._parse_overrides_outputs_targets(  # noqa: SLF001
+            [{"name": "detail", "to": {"file": "detail_csv", "sheet": "Detail"}, "fields": ["order_id"]}],
+            demand_ir,
+            path="overrides.outputs",
+        )
+
+    with pytest.raises(ValueError, match=r"align_by, header_policy, on_mismatch, on_conflict"):
+        _ = compiler_mod._parse_overrides_outputs_targets(  # noqa: SLF001
+            [
+                {
+                    "name": "detail",
+                    "to": {"file": "detail_csv"},
+                    "write": {"align_by": "field_id", "header_policy": "once", "on_mismatch": "warn", "on_conflict": "error"},
+                    "fields": ["order_id"],
+                }
+            ],
+            demand_ir,
+            path="overrides.outputs",
+        )
+
+    with pytest.raises(ValueError, match=r"write\.include_header is not allowed for append-mode book outputs"):
+        _ = compiler_mod._parse_overrides_outputs_targets(  # noqa: SLF001
+            [{"name": "detail", "to": {"book": "report"}, "write": {"mode": "append", "include_header": True}, "fields": ["order_id"]}],
+            demand_ir,
+            path="overrides.outputs",
+        )
+
+
+def test_runtime_compiler_output_requires_unique_effective_names_cover_branches() -> None:
+    from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig, OutputToConfig, OutputWriteConfig
+
+    cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")}))
+    assert (
+        compiler_mod._output_requires_unique_effective_field_display_names(  # noqa: SLF001
+            cfg,
+            OutputTargetConfig(name="detail", to=OutputToConfig(sheet="Detail"), fields=("order_id",)),
+        )
+        is False
+    )
+
+    assert (
+        compiler_mod._output_requires_unique_effective_field_display_names(  # noqa: SLF001
+            cfg,
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="report", sheet="Detail"),
+                write=OutputWriteConfig(mode="sheet", include_header=False),
+                fields=("order_id",),
+            ),
+        )
+        is False
+    )

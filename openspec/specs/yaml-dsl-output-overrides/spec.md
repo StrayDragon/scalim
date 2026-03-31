@@ -10,8 +10,15 @@
 `overrides.outputs` 的结构 MUST 与 YAML 顶层 `outputs` 的元素结构一致(YAML-shaped `list[dict]`),但本 change **仅承诺明细输出(detail)**的最小子集,至少包含:
 
 - `name`
-- `to`(例如 `{book,sheet}` 绑定或等价结构)
+- `to` (`to.file` 或 `to.book` / `to.sheet`)
+- `write`
 - `fields`(有序 field_id list)
+
+约束:
+
+- `overrides.outputs[*]` MUST NOT 接受 `container`
+- `overrides.outputs[*].to` MUST 与 YAML `outputs[*].to` 共享相同语义与校验规则
+- `overrides.outputs[*].write` MUST 与 YAML `outputs[*].write` 共享相同语义与校验规则
 
 `overrides.outputs[*]` MUST NOT 支持以下 keys(未来如需支持应另开 change 增量扩展):
 
@@ -24,6 +31,16 @@
 - **WHEN** 调用方在 `run/compile` 中提供 `overrides.outputs` 且其包含一个输出 `to.book` 与 `fields` 列表
 - **THEN** 本次运行 MUST 以该 `overrides.outputs` 作为 effective outputs
 - **AND** 导出字段顺序 MUST 与 `fields` 一致
+
+#### Scenario: overrides provides a csv output through to.file
+- **GIVEN** demand YAML 未声明 `outputs`
+- **WHEN** 调用方提供 `overrides.outputs` 且其中某个 output 使用 `to.file`
+- **THEN** 本次运行 MUST 使用该 output 作为 effective output
+
+#### Scenario: overrides rejects legacy container
+- **WHEN** 调用方在 `overrides.outputs[*]` 中声明 `container`
+- **THEN** 编译 MUST fail-fast
+- **AND** 错误信息 MUST 指向 `overrides.outputs[*].container`
 
 ### Requirement: `overrides.outputs` MUST take precedence over YAML `outputs`
 系统 MUST 将 `overrides.outputs` 视为最高优先级的输出编排来源。
@@ -49,16 +66,23 @@
 最小集合:
 
 - `overrides.resources`(YAML-shaped patch; 至少支持 `resources.books`)
+- 该 patch SHOULD 支持 `resources.files`
 
 语义:
 
 - `overrides.resources` MUST 以 patch/overlay 方式应用到 YAML(不做整体 replace)
-- 该 patch MUST 仅允许覆盖 IO 层字段(例如 `books.*.path/budget/export_xlsx/write_defaults/allow_formulas/write_lock`),不得覆盖 `outputs[*].fields/where/from/aggregate` 等输出定义层字段
+- 该 patch MUST 仅允许覆盖 IO 层字段(例如 `books.*.path/budget/export_xlsx/write_defaults/allow_formulas/write_lock` 或 `files.*.path/encoding`),不得覆盖 `outputs[*].fields/where/from/aggregate` 等输出定义层字段
 
 #### Scenario: overriding book path does not require editing YAML
 - **GIVEN** demand YAML 声明 `resources.books.report.kind=xlsx_file` 且 `path=./out/report.xlsx`
 - **WHEN** 调用方提供 `overrides.resources.books.report.path=./out/report_dev.xlsx`
 - **THEN** effective 运行 MUST 将输出写入 `./out/report_dev.xlsx`
+
+#### Scenario: overriding file path does not require editing YAML
+- **GIVEN** demand YAML 声明 `resources.files.detail.kind=csv_file`
+- **AND** `resources.files.detail.path=./out/a.csv`
+- **WHEN** 调用方提供 `overrides.resources.files.detail.path=./out/b.csv`
+- **THEN** effective 运行 MUST 将输出写入 `./out/b.csv`
 
 ### Requirement: by_yaml runtime MUST reject `overrides.outputs_defaults`
 系统 MUST 不再接受任何运行期 `outputs_defaults` 覆盖入口:

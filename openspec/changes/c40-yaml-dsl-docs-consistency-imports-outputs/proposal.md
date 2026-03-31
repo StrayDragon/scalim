@@ -4,8 +4,8 @@
 
 - 文档仍描述旧的 imports/$import 限制与路径语义,与当前实现的相对路径 + allow-roots + alias/presets 机制不一致
 - 文档仍把 `outputs.*.container` 描述为 `workbook/csv` 双形态,但实际 parser 仅接受 `csv`(Excel 输出路径已迁移到 `resources.books` + `outputs.*.to`)
-- 部分校验错误信息/迁移提示仍给出已无效的示例(例如 `container.type: workbook`),容易误导作者
-- 相关“技能参考材料/升级文档”中仍残留 `container.type: workbook` / `container.sheet` 等已移除语法,会持续误导新配置与迁移路径(需要显式修正或标记为历史文档)
+- 部分校验错误信息/迁移提示仍给出已移除的 workbook container 示例,容易误导作者
+- 相关“技能参考材料/升级文档”中仍残留已移除的 workbook container 语法片段(含 sheet 绑定字段),会持续误导新配置与迁移路径(需要显式修正或标记为历史文档)
 
 这会直接降低 YAML authoring 的可预期性: 用户按文档写出的 YAML 可能在 validate/compile 阶段被拒绝,或在排障时走错迁移路径。
 
@@ -17,7 +17,7 @@
 - 更新 capability matrix 与 user guide 中相关段落/示例,避免出现 `workbook` container 示例或过期表述。
 - 更新 validator 中遗留的迁移提示文案,避免给出已无效的示例 YAML。
 - 更新技能参考材料(非 docs-site)中明确错误的 DSL 示例,避免继续传播已移除语法(仅修正“示例/迁移提示”,不重写历史叙述)。
-- 保留现有“负例 fixture”(例如 `container.type: workbook`)作为明确的拒绝测试,但不得在用户文档中作为示例出现。
+- 保留现有“负例 fixture”(例如 legacy workbook container fixtures)作为明确的拒绝测试,但不得在用户文档中作为示例出现。
 
 > 文档治理边界: 不手改任何 `*.gen.*` 与 injected blocks. 修改 `docs/doc/**/*.md` 的 SSOT 后运行 `just gen-docs` 刷新生成物,并通过 `just docs-drift-check`/`just qa` 验收。
 

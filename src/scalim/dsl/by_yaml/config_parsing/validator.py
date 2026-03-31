@@ -134,9 +134,6 @@ def _output_item_requires_unique_effective_display_names(  # noqa: C901, PLR0911
                 include_header = bool(include_header_raw)
         return bool(include_header)
 
-    if not book_id:
-        return False
-
     effective_mode = _raw_output_book_write_value(
         config,
         book_id=book_id,

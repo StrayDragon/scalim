@@ -11,10 +11,10 @@
 
 ## 3. Diagnostics / Migration Messages
 
-- [ ] 3.1 更新 validator 迁移提示: 移除 `container.type: workbook` 示例,替换为当前有效的最小迁移示例
+- [ ] 3.1 更新 validator 迁移提示: 移除 workbook container 示例,替换为当前有效的最小迁移示例
 - [ ] 3.2 确保负例 fixtures 仅作为 rejection tests 存在,不被文档/提示引用为正例
 - [ ] 3.3 更新 skills 参考材料中错误示例(仅示例/迁移提示层面): `artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-dsl-outputs.md`(移除 workbook container 示例,改为 books+to 写法)
-- [ ] 3.4 更新 skills 参考材料中错误示例(仅示例/迁移提示层面): `artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`(替换 `container.sheet` 为 `outputs.*.to.sheet` 与 `resources.books.*.write_lock`)
+- [ ] 3.4 更新 skills 参考材料中错误示例(仅示例/迁移提示层面): `artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`(替换 legacy container 的 sheet 绑定字段为 `outputs.*.to.sheet` 与 `resources.books.*.write_lock`)
 
 ## 4. Generated Artifacts & Drift Gates
 

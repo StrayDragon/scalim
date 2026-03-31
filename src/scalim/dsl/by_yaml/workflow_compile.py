@@ -701,7 +701,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
             path_prefix = "overrides.resources.files.{}".format(fid)
 
         if file_cfg is None or base_dir is None:
-            continue
+            continue  # pragma: no cover  # pragma: allow-no-cover unreachable: all_file_ids derived from workflow/demand/overrides
         effective_files[fid] = file_cfg
         base_dir_by_file_id[fid] = base_dir
         path_prefix_by_file_id[fid] = path_prefix
