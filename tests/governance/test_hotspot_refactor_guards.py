@@ -1,5 +1,6 @@
-from scalim.dsl.by_yaml import RunOverrides, run
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+import textwrap
+
+from scalim.dsl.by_yaml import RunOverrides, compile, run
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
@@ -11,7 +12,6 @@ from scalim.ob.presets.viz import VizObserver, VizObserverConfig
 def test_hotspot_public_imports_remain_available() -> None:
     assert RunOverrides is not None
     assert run is not None
-    assert YamlDemandLoader is not None
     assert ConfigToIRConverter is not None
     assert LookupCastRegistry is not None
     assert load_output_config is not None
@@ -24,10 +24,22 @@ def test_hotspot_public_imports_remain_available() -> None:
     assert AdaptiveLoadRefScheduler is not None
 
 
-def test_external_consumer_style_yaml_imports_stay_supported() -> None:
-    loader = YamlDemandLoader()
-    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+def test_external_consumer_style_yaml_compile_stays_supported(tmp_path) -> None:
+    demand = tmp_path / "demand.yaml"
+    demand.write_text(
+        textwrap.dedent(
+            """
+            name: demo
+            main_source:
+              source_id: demo
+              loader: tests.fixtures.mock_loaders.mock_loader
+              fields:
+                order_id: {extract: order_id}
+            sources: {}
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
 
-    assert loader is not None
-    assert converter is not None
-    assert callable(load_output_config)
+    compilation = compile(str(demand), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    assert compilation is not None

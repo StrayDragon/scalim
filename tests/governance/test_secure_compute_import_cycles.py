@@ -30,8 +30,8 @@ def test_compute_executor_import_does_not_pull_yaml_dsl_modules() -> None:
 
 
 def test_import_orders_do_not_trigger_cycles() -> None:
-    _ = _run("import scalim.execution.executor.operators.compute.executor\nimport scalim.dsl.by_yaml.config_parsing.security\n")
-    _ = _run("import scalim.dsl.by_yaml.config_parsing.security\nimport scalim.execution.executor.operators.compute.executor\n")
+    _ = _run("import scalim.execution.executor.operators.compute.executor\nimport scalim.dsl.by_yaml._internal.config_parsing.security\n")
+    _ = _run("import scalim.dsl.by_yaml._internal.config_parsing.security\nimport scalim.execution.executor.operators.compute.executor\n")
 
 
 def test_secure_compute_contract_default_call_is_not_implemented() -> None:

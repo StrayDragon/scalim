@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
+from scalim.dsl.by_yaml._internal.config_parsing.security import SecureComputeEngine
 from scalim.execution.context import BatchContext
 from scalim.execution.guardrails import ScalimGuardrailViolationError as GuardrailViolation, GuardrailsComputePolicy, GuardrailsPolicy
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor

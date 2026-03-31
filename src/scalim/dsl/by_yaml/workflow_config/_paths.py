@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence, Union
 
 from ....workflow.errors import ScalimWorkflowConfigError
-from ..config_parsing.allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
+from .._internal.config_parsing.allowed_paths import normalize_allowed_yaml_roots, validate_resolved_yaml_path_within_roots
 
 _ALIAS_DEMAND_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):/(.+)$")
 

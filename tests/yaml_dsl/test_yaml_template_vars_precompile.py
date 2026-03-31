@@ -1,8 +1,8 @@
 import pytest
 
 from scalim.dsl.by_yaml import compile, run_workflow
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml.config_parsing.template_precompile import maybe_precompile_yaml_text
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.template_precompile import maybe_precompile_yaml_text
 from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config
 
 

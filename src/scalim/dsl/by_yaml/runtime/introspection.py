@@ -3,9 +3,9 @@ from typing import Any, Dict, FrozenSet, List, Optional, Set
 from ....ob.presets.viz import VizObserver, VizObserverConfig
 from ....planning.builder import PlanBuilder
 from ....vendor.compact.typing_extensionsx import TypedDict
-from ..config_parsing.error_envelope import ScalimYamlValidationError
-from ..config_parsing.errors import ScalimConfigValidationError
-from ..config_parsing.loader import YamlDemandLoader
+from .._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from .._internal.config_parsing.errors import ScalimConfigValidationError
+from .._internal.config_parsing.loader import YamlDemandLoader
 from ..schema_dsl.models import DemandConfig
 from ..schema_dsl.output_enums import (
     AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,

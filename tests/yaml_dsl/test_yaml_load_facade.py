@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml.config_parsing.yaml_load import (
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.yaml_load import (
     build_yaml_location_index,
     error_loc_for_yaml_path,
     load_yaml_mapping_file,
@@ -49,7 +49,7 @@ def test_load_yaml_mapping_text_reports_yaml_parse_error_with_loc() -> None:
 
 
 def test_load_yaml_mapping_text_wraps_unknown_exceptions(monkeypatch) -> None:
-    import scalim.dsl.by_yaml.config_parsing.yaml_load as yaml_load_mod
+    import scalim.dsl.by_yaml._internal.config_parsing.yaml_load as yaml_load_mod
 
     def _boom(*_args: object, **_kwargs: object) -> object:
         raise RuntimeError("boom")

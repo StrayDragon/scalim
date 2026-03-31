@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.parsers.output import ScalimVizEventModeRemovedError
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.parsers.output import ScalimVizEventModeRemovedError
 from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
 from scalim.dsl.by_yaml.runtime import observability as runtime_observability
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError

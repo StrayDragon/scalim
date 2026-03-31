@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, cast
 
 from ....workflow.errors import ScalimWorkflowConfigError
+from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 from .._public_template_sandbox import validate_public_template_sandbox
-from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 from ._models import WorkflowConfig
 from ._parse import load_workflow_config_from_mapping
 from ._yaml import safe_load_yaml_no_duplicates

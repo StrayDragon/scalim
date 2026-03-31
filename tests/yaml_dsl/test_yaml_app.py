@@ -3,10 +3,10 @@ from pathlib import Path
 import pytest
 from scalim.vendor.yamlx import yaml
 
-from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.dsl.by_yaml import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride, RunOverrides, run
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config, resolve_required_field_ids
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.sinks import InMemoryRowSink
 from tests.support.pathing import fixtures_dir
 
@@ -194,14 +194,14 @@ def test_run_writes_output(tmp_path: Path) -> None:
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
+            outputs=(
+                OutputOverride(
+                    name="detail",
+                    fields=("order_id",),
+                    to=OutputToOverride(file="detail_csv"),
+                ),
+            ),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
         sink=sink,
     )
@@ -229,14 +229,14 @@ def test_run_with_performance_observability(tmp_path: Path) -> None:
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
+            outputs=(
+                OutputOverride(
+                    name="detail",
+                    fields=("order_id",),
+                    to=OutputToOverride(file="detail_csv"),
+                ),
+            ),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
     )
 

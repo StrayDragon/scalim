@@ -2,11 +2,11 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.security import SecureComputeEngine
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.security import SecureComputeEngine
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
 from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_str
 from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_decimal

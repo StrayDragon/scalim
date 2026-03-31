@@ -7,7 +7,7 @@ import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
 from scalim.dsl.by_yaml import compile as compile_yaml
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 
 
 def _demand_args(path: Path) -> argparse.Namespace:

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from scalim.dsl.by_yaml import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride
 from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
 from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowOptions, WorkflowRun
 from scalim.dsl.by_yaml.schema_dsl.models import (
@@ -85,7 +86,7 @@ def test_workflow_compile_resources_files_override_can_create_new_file_resource(
         demand_cfg_by_run_id={},
         demand_yaml_paths_by_run_id={},
         init_vars=None,
-        overrides_resources={"files": {"detail_csv": {"kind": "csv_file", "path": "./out.csv"}}},
+        overrides_resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
     )
     assert files["detail_csv"].kind == "csv_file"
     assert resources
@@ -115,14 +116,14 @@ def test_workflow_compile_resources_files_same_kind_between_workflow_and_demand_
 
 def test_workflow_compile_resources_files_override_patch_must_be_mapping(tmp_path: Path) -> None:
     wf = WorkflowConfig(runs=(), options=WorkflowOptions())
-    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.resources\.files\.detail_csv must be a mapping"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.resources\.files\.detail_csv must be a FileResourceOverride"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
             wf,
             workflow_base_dir=tmp_path,
             demand_cfg_by_run_id={},
             demand_yaml_paths_by_run_id={},
             init_vars=None,
-            overrides_resources={"files": {"detail_csv": "nope"}},
+            overrides_resources=ResourcesOverride(files={"detail_csv": "nope"}),  # type: ignore[arg-type]
         )
 
 
@@ -143,11 +144,18 @@ def test_workflow_compile_resources_files_invalid_kind_is_wrapped(tmp_path: Path
         )
 
 
-def test_workflow_compile_effective_outputs_rejects_removed_container_override() -> None:
-    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs\.0\.container was removed"):
+def test_workflow_compile_effective_outputs_rejects_file_and_book_destination() -> None:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"declare only one destination"):
         _ = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
             DemandConfig(),
-            overrides_outputs=[{"name": "detail", "container": {"type": "csv"}}],
+            overrides_outputs=[
+                OutputOverride(
+                    name="detail",
+                    fields=("a",),
+                    to=OutputToOverride(file="detail_csv", book="report"),
+                )
+            ],
+            default_book_id=None,
         )
 
 
@@ -164,4 +172,5 @@ def test_workflow_compile_append_write_nodes_requires_file_resource_id() -> None
             effective_books={},
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )

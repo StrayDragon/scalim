@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.call_by import parse_call_by
+from scalim.dsl.by_yaml._internal.config_parsing.call_by import parse_call_by
 from scalim.dsl.by_yaml.reference_syntax import is_valid_callable_reference
 from scalim.dsl.by_yaml.runtime.builtin_callables import is_builtin_callable_reference, list_builtin_callable_ids, parse_builtin_callable_id
 from scalim.dsl.by_yaml.runtime.compiler import create_reference_resolver

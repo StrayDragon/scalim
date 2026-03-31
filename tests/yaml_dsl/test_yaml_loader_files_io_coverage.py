@@ -1,7 +1,7 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.models import RawDemand
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.models import RawDemand
 from scalim.dsl.by_yaml.schema_dsl.models import (
     DEMAND_KEYS,
     FILE_KEYS,

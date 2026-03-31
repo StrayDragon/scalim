@@ -1,7 +1,7 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.models import RawDemand
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.models import RawDemand
 
 
 def test_loader_parse_config_rejects_invalid_failure_policy() -> None:

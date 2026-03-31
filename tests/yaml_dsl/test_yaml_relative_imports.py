@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import compile as compile_yaml
-from scalim.dsl.by_yaml.config_parsing.call_by import ScalimCallByParseError, parse_call_by
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
+from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.contracts import RunOptions
 from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.dsl.by_yaml.runtime import compiler as compiler_module

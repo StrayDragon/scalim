@@ -1,7 +1,7 @@
 from typing import Dict, FrozenSet, List, Mapping, Optional, Union
 
 from ....spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, SourceIr
-from ..config_parsing.security import SecureComputeEngine
+from .._internal.config_parsing.security import SecureComputeEngine
 from ..schema_dsl.models import DemandConfig
 from ._internal.conversion_lookup import LookupCastRegistry, validate_source_id
 from ._internal.conversion_relations import StepInfo

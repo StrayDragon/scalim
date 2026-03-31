@@ -1,95 +1,123 @@
 # yaml-dsl-output-overrides Specification
 
 **状态: ✅ 已实现**
+
 ## Purpose
-为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过与 YAML 同形的 `overrides.outputs` 显式指定输出。
+
+为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。
+
 ## Requirements
-### Requirement: by_yaml runtime MUST accept YAML-shaped `overrides.outputs`
+
+### Requirement: by_yaml runtime MUST accept typed `RunOverrides.outputs` (dataclasses)
+
 系统 MUST 在 by_yaml runtime 的 `RunOverrides` 中提供 `outputs` 覆盖字段,用于在不修改 demand YAML 的前提下运行期指定输出编排。
 
-`overrides.outputs` 的结构 MUST 与 YAML 顶层 `outputs` 的元素结构一致(YAML-shaped `list[dict]`),但本 change **仅承诺明细输出(detail)**的最小子集,至少包含:
+与旧的 YAML-shaped `list[dict]` 不同,`RunOverrides.outputs` MUST 为 typed dataclasses 序列,并且 MUST 可从 `scalim.dsl.by_yaml` 稳定导入。
+
+本 spec 仅承诺明细输出(detail)的最小子集,至少包含:
 
 - `name`
-- `to` (`to.file` 或 `to.book` / `to.sheet`)
-- `write`
 - `fields`(有序 field_id list)
+- `to`(book/sheet 绑定) 或 `to.file`(csv 文件输出) 二选一
+- `write`(可选;仅在 book 绑定输出时允许)
 
-约束:
-
-- `overrides.outputs[*]` MUST NOT 接受 `container`
-- `overrides.outputs[*].to` MUST 与 YAML `outputs[*].to` 共享相同语义与校验规则
-- `overrides.outputs[*].write` MUST 与 YAML `outputs[*].write` 共享相同语义与校验规则
-
-`overrides.outputs[*]` MUST NOT 支持以下 keys(未来如需支持应另开 change 增量扩展):
+`RunOverrides.outputs[*]` MUST NOT 支持以下 keys/语义(未来如需支持应另开 change 增量扩展):
 
 - `where`
 - `from`
 - `aggregate`
 
 #### Scenario: overrides provides a single book output
+
 - **GIVEN** demand YAML 未声明 `outputs`
-- **WHEN** 调用方在 `run/compile` 中提供 `overrides.outputs` 且其包含一个输出 `to.book` 与 `fields` 列表
-- **THEN** 本次运行 MUST 以该 `overrides.outputs` 作为 effective outputs
+- **WHEN** 调用方在 `run/compile` 中提供 `RunOverrides(outputs=(OutputOverride(...),))`,且该 output 包含 `to.sheet` 与 `fields`
+- **THEN** 本次运行 MUST 以该 `RunOverrides.outputs` 作为 effective outputs
 - **AND** 导出字段顺序 MUST 与 `fields` 一致
 
-#### Scenario: overrides provides a csv output through to.file
+#### Scenario: overrides provides a single csv output
+
 - **GIVEN** demand YAML 未声明 `outputs`
-- **WHEN** 调用方提供 `overrides.outputs` 且其中某个 output 使用 `to.file`
-- **THEN** 本次运行 MUST 使用该 output 作为 effective output
+- **WHEN** 调用方在 `run/compile` 中提供 `RunOverrides.outputs` 且该 output 使用 `to.file` 与 `fields`
+- **THEN** 本次运行 MUST 写出 CSV 输出
 
-#### Scenario: overrides rejects legacy container
-- **WHEN** 调用方在 `overrides.outputs[*]` 中声明 `container`
+### Requirement: `RunOverrides` MUST provide factory methods for the common “single-sheet dynamic fields export” scenario
+
+系统 MUST 在 `RunOverrides` 上提供标准 `@classmethod` 工厂方法,以覆盖最常见的下游集成场景:
+
+- 单表
+- 单 sheet
+- 字段动态(由调用方指定 field_id 列表)
+- 输出路径动态(由调用方指定)
+
+该工厂方法 MUST:
+
+- 只构造 detail output 的最小子集
+- 同时覆盖 `resources.books` 与 `outputs_defaults.to.book` 与 `outputs[*].to.sheet` 的必要拼装(避免调用方重复拼结构)
+
+#### Scenario: factory builds a runnable overrides bundle
+
+- **WHEN** 调用方使用 `RunOverrides.<factory>(output_path=..., fields=[...], sheet=...)`
+- **THEN** 返回的 overrides MUST 可直接用于 `run/compile` 并产生预期输出
+
+### Requirement: legacy YAML-shaped overrides inputs MUST be rejected with actionable migration hints
+
+系统 MUST 将以下旧形态视为不再支持的 legacy 输入,并在编译期 fail-fast:
+
+- `RunOverrides.outputs` 为 `list[dict]`
+- `RunOverrides.resources` / `RunOverrides.outputs_defaults` 为 `dict`
+
+错误信息 MUST:
+
+- 明确指出 legacy 形态已移除
+- 指向稳定逻辑路径(例如 `RunOverrides.outputs`)
+- 提供可复制的迁移示例(typed dataclasses / 工厂方法)
+
+#### Scenario: legacy dict overrides fail fast
+
+- **WHEN** 调用方传入 legacy YAML-shaped overrides
 - **THEN** 编译 MUST fail-fast
-- **AND** 错误信息 MUST 指向 `overrides.outputs[*].container`
+- **AND** 错误信息 MUST 包含迁移提示
 
-### Requirement: `overrides.outputs` MUST take precedence over YAML `outputs`
-系统 MUST 将 `overrides.outputs` 视为最高优先级的输出编排来源。
+### Requirement: `RunOverrides.outputs` MUST take precedence over YAML `outputs`
 
-`overrides.outputs` 提供时 MUST 为非空列表; `overrides.outputs=[]` MUST fail-fast(避免静默“不导出任何东西”)。
+系统 MUST 将 `RunOverrides.outputs` 视为最高优先级的输出编排来源。
+
+`RunOverrides.outputs` 提供时 MUST 为非空序列; 空序列 MUST fail-fast(避免静默“不导出任何东西”)。
 
 #### Scenario: overrides outputs wins over yaml outputs
+
 - **GIVEN** demand YAML 声明了 `outputs` 且包含字段列表 `["a"]`
-- **WHEN** 调用方提供 `overrides.outputs` 且包含字段列表 `["b"]`
+- **WHEN** 调用方提供 `RunOverrides.outputs` 且包含字段列表 `["b"]`
 - **THEN** effective outputs MUST 使用 `["b"]` 而不是 `["a"]`
 
-### Requirement: `overrides.outputs` MUST compile through the same outputs pipeline
-系统 MUST 使用与 YAML `outputs` 相同的解析/校验/编译链路来处理 `overrides.outputs`,以避免维护两套输出语义并保证错误信息一致性。
+### Requirement: `RunOverrides.outputs` MUST compile through the same outputs pipeline
 
-#### Scenario: invalid overrides outputs fails fast with a diagnosable error
-- **WHEN** 调用方提供的 `overrides.outputs` 结构非法(例如缺少 `name`/`fields`,或 `to` 结构非法,或包含不支持的 key)
+系统 MUST 使用与 YAML `outputs` 相同的解析/校验/编译链路来处理 `RunOverrides.outputs`,以避免维护两套输出语义并保证错误信息一致性。
+
+#### Scenario: invalid typed overrides outputs fails fast with a diagnosable error
+
+- **WHEN** 调用方提供的 typed `RunOverrides.outputs` 结构非法(例如缺少 `name/fields`,或 `to` 互斥关系非法)
 - **THEN** 编译 MUST fail-fast
-- **AND** 错误信息 MUST 指向可定位的逻辑路径(例如 `overrides.outputs[0].name`)
+- **AND** 错误信息 MUST 指向可定位的逻辑路径(例如 `RunOverrides.outputs[0].name`)
 
-### Requirement: by_yaml runtime MUST accept IO-only overrides for `resources.books`
-系统 MUST 在 `RunOverrides` 中提供 IO-only 覆盖能力,用于在不修改 demand/workflow YAML 的前提下覆盖 books 资源路径/预算/导出配置(仅 IO 层,不触及输出定义层)。
+### Requirement: by_yaml runtime MUST accept IO-only overrides for `resources` and `outputs_defaults`
+
+系统 MUST 在 `RunOverrides` 中提供 IO-only 覆盖能力,用于在不修改 demand/workflow YAML 的前提下,覆盖 resources 与默认输出绑定(仅 IO 层,不触及输出定义层)。
 
 最小集合:
 
-- `overrides.resources`(YAML-shaped patch; 至少支持 `resources.books`)
-- 该 patch SHOULD 支持 `resources.files`
+- `RunOverrides.resources`(typed dataclasses;至少支持 `resources.books` 与 `resources.files`)
+- `RunOverrides.outputs_defaults`(typed dataclasses;至少支持 `outputs_defaults.to.book`)
 
 语义:
 
-- `overrides.resources` MUST 以 patch/overlay 方式应用到 YAML(不做整体 replace)
-- 该 patch MUST 仅允许覆盖 IO 层字段(例如 `books.*.path/budget/export_xlsx/write_defaults/allow_formulas/write_lock` 或 `files.*.path/encoding`),不得覆盖 `outputs[*].fields/where/from/aggregate` 等输出定义层字段
+- `RunOverrides.resources` 与 `RunOverrides.outputs_defaults` MUST 以 patch/overlay 方式应用到 YAML(不做整体 replace)
+- overlay MUST 仅允许覆盖 IO 层字段(例如 `books.*.path/budget/export_xlsx/write_defaults/allow_formulas/write_lock` 或 `files.*.path/encoding`)
+- overlay MUST NOT 允许覆盖输出定义层字段(例如 `outputs[*].where/from/aggregate`)
 
 #### Scenario: overriding book path does not require editing YAML
+
 - **GIVEN** demand YAML 声明 `resources.books.report.kind=xlsx_file` 且 `path=./out/report.xlsx`
-- **WHEN** 调用方提供 `overrides.resources.books.report.path=./out/report_dev.xlsx`
+- **WHEN** 调用方提供 `RunOverrides.resources.books["report"].path=./out/report_dev.xlsx`
 - **THEN** effective 运行 MUST 将输出写入 `./out/report_dev.xlsx`
 
-#### Scenario: overriding file path does not require editing YAML
-- **GIVEN** demand YAML 声明 `resources.files.detail.kind=csv_file`
-- **AND** `resources.files.detail.path=./out/a.csv`
-- **WHEN** 调用方提供 `overrides.resources.files.detail.path=./out/b.csv`
-- **THEN** effective 运行 MUST 将输出写入 `./out/b.csv`
-
-### Requirement: by_yaml runtime MUST reject `overrides.outputs_defaults`
-系统 MUST 不再接受任何运行期 `outputs_defaults` 覆盖入口:
-
-- `RunOverrides` MUST NOT 暴露 `outputs_defaults` 字段
-- 若调用方仍尝试传入 `outputs_defaults`(例如通过旧调用代码),系统 MUST fail-fast(不得静默忽略)
-
-#### Scenario: constructing RunOverrides with outputs_defaults fails fast
-- **WHEN** 调用方尝试构造 `RunOverrides(outputs_defaults={"to": {"book": "report"}})`
-- **THEN** 构造 MUST 失败(例如抛出 `TypeError`)

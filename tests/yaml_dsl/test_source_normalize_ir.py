@@ -102,7 +102,7 @@ def test_source_normalize_take_first_rejects_list_result() -> None:
 
 
 def test_source_normalize_project_fields_supports_int_key_extract_and_from_key() -> None:
-    from scalim.dsl.by_yaml.config_parsing.field_extract import compile_field_extract
+    from scalim.dsl.by_yaml._internal.config_parsing.field_extract import compile_field_extract
     from scalim.spec.ir import SourceNormalizeProjectFieldRuleIr
 
     fields = (
@@ -141,7 +141,7 @@ def test_source_normalize_project_fields_supports_int_key_extract_and_from_key()
 
 
 def test_source_normalize_map_values_pipeline_take_first_then_project_fields() -> None:
-    from scalim.dsl.by_yaml.config_parsing.field_extract import compile_field_extract
+    from scalim.dsl.by_yaml._internal.config_parsing.field_extract import compile_field_extract
     from scalim.spec.ir import SourceNormalizeProjectFieldRuleIr, SourceNormalizeStepIr
 
     project_fields = (
@@ -350,7 +350,7 @@ def test_source_normalize_project_fields_rejects_non_mapping_row() -> None:
 
 
 def test_source_normalize_project_fields_on_missing_variants() -> None:
-    from scalim.dsl.by_yaml.config_parsing.field_extract import compile_field_extract
+    from scalim.dsl.by_yaml._internal.config_parsing.field_extract import compile_field_extract
     from scalim.spec.ir import SourceNormalizeProjectFieldRuleIr
 
     fields = (

@@ -3,13 +3,13 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.by_yaml import run
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml.config_parsing.field_extract import (
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.field_extract import (
     ScalimFieldExtractCompileError,
     compile_field_extract,
     derive_source_field_data_key,
 )
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.execution.executor.helpers.field_access import extract_field_segments
 from scalim.sinks import InMemoryRowSink
 
@@ -78,7 +78,7 @@ def test_derive_source_field_data_key_only_for_flat_single_string_segment() -> N
 
 
 def test_internal_extract_parsers_guard_out_of_bounds_inputs() -> None:
-    from scalim.dsl.by_yaml.config_parsing import field_extract as field_extract_module
+    from scalim.dsl.by_yaml._internal.config_parsing import field_extract as field_extract_module
 
     with pytest.raises(ScalimFieldExtractCompileError):
         field_extract_module._parse_identifier("a", 1)

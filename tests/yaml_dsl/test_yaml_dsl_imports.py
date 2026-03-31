@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml.config_parsing import imports as imports_mod
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError, load_and_expand_imports
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.validator import validate_yaml_text
+from scalim.dsl.by_yaml._internal.config_parsing import imports as imports_mod
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.imports import ScalimYamlImportExpansionError, load_and_expand_imports
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.validator import validate_yaml_text
 
 
 def _args(path: Path, *, json_output: bool) -> argparse.Namespace:

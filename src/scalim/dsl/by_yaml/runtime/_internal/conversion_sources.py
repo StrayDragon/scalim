@@ -15,9 +15,9 @@ from .....spec.ir import (
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....typedefs import FieldValue, LoaderCallKwargs, RuntimeValue, SourceSpecIrCacheMode
-from ...config_parsing.call_by import CallByValue, ScalimCallByParseError, parse_call_by
-from ...config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
-from ...config_parsing.security import SecureComputeEngine, is_constant_compute_expression
+from ..._internal.config_parsing.call_by import CallByValue, ScalimCallByParseError, parse_call_by
+from ..._internal.config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
+from ..._internal.config_parsing.security import SecureComputeEngine, is_constant_compute_expression
 from ...params_template import CompiledParamsTemplate, ScalimParamsTemplateCompileError, compile_params_template
 from ...schema_dsl.models import (
     DemandConfig,

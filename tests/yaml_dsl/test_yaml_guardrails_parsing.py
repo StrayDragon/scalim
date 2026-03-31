@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.runtime import compiler as compiler_module
 from scalim.dsl.by_yaml.schema_dsl.models import (
     GuardrailsComputeConfig,

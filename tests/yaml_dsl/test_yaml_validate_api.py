@@ -4,7 +4,7 @@ from fractions import Fraction
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.validator import (
+from scalim.dsl.by_yaml._internal.config_parsing.validator import (
     ConfigValidator,
     YamlValidationIssue,
     YamlValidationResult,
@@ -112,7 +112,7 @@ def test_validate_yaml_text_reports_parse_error_with_location() -> None:
 
 
 def test_validate_yaml_text_parse_error_without_mark_has_no_loc(monkeypatch) -> None:
-    import scalim.dsl.by_yaml.config_parsing.validator as validator_mod
+    import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_mod
 
     class _NoMarkError(validator_mod.yaml.YAMLError):  # pyright: ignore[reportUnknownMemberType]
         pass
@@ -130,7 +130,7 @@ def test_validate_yaml_text_parse_error_without_mark_has_no_loc(monkeypatch) -> 
 
 
 def test_validate_yaml_text_parse_error_with_non_int_mark_has_no_loc(monkeypatch) -> None:
-    import scalim.dsl.by_yaml.config_parsing.validator as validator_mod
+    import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_mod
 
     class _BadMark:
         line = "x"
@@ -348,7 +348,7 @@ def test_validate_yaml_text_rejects_reserved_field_id_builtin_conflict() -> None
 
 
 def test_config_validator_reports_jsonschema_missing_as_warning_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.dsl.by_yaml.config_parsing import validator as validator_module  # noqa: PLC0415
+    from scalim.dsl.by_yaml._internal.config_parsing import validator as validator_module  # noqa: PLC0415
 
     monkeypatch.setattr(validator_module, "HAS_JSONSCHEMA", False, raising=True)
     monkeypatch.setattr(validator_module, "jsonschema", None, raising=True)
@@ -368,7 +368,7 @@ def test_config_validator_reports_jsonschema_missing_as_warning_when_enabled(mon
 
 
 def test_config_validator_reports_jsonschema_internal_error_as_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.dsl.by_yaml.config_parsing import validator as validator_module  # noqa: PLC0415
+    from scalim.dsl.by_yaml._internal.config_parsing import validator as validator_module  # noqa: PLC0415
 
     class DummyJsonSchema:
         class ValidationError(Exception):
@@ -427,7 +427,7 @@ def test_validate_yaml_text_json_roundtrip() -> None:
 
 
 def test_private_helpers_location_and_error_paths() -> None:
-    from scalim.dsl.by_yaml.config_parsing import yaml_load as yaml_load_module  # noqa: PLC0415
+    from scalim.dsl.by_yaml._internal.config_parsing import yaml_load as yaml_load_module  # noqa: PLC0415
 
     locations = {"a": (9, 9)}
     yaml_load_module._record_location(locations, ["a"], None)
@@ -453,7 +453,7 @@ def test_private_helpers_location_and_error_paths() -> None:
 
 
 def test_ensure_mapping_rejects_non_mapping() -> None:
-    from scalim.dsl.by_yaml.config_parsing.models import ensure_mapping
+    from scalim.dsl.by_yaml._internal.config_parsing.models import ensure_mapping
 
     with pytest.raises(TypeError, match="mapping"):
         _ = ensure_mapping([])

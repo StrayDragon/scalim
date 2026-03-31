@@ -2,8 +2,8 @@ import importlib
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
 from tests.support.testing_utils import missing_optional_dependency
 
 
@@ -237,7 +237,7 @@ def test_validator_derived_field_compute_allows_not() -> None:
 
 
 def test_validator_import_error_path(monkeypatch) -> None:
-    import scalim.dsl.by_yaml.config_parsing.validator as validator_mod
+    import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_mod
 
     with missing_optional_dependency(monkeypatch, "jsonschema"):
         reloaded = importlib.reload(validator_mod)

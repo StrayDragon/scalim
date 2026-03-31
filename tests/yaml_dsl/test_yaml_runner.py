@@ -3,7 +3,17 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOverrides, RunResult, run
+from scalim.dsl.by_yaml import (
+    BookResourceOverride,
+    FileResourceOverride,
+    OutputOverride,
+    OutputToOverride,
+    OutputWriteOverride,
+    ResourcesOverride,
+    RunOverrides,
+    RunResult,
+    run,
+)
 from scalim.dsl.by_yaml.runtime.observability import (
     _create_performance_observer_from_config,
     _create_relation_observer_from_config,
@@ -129,14 +139,8 @@ def test_run_outputs_and_returns_data(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
+            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
         sink=sink,
     )
@@ -161,15 +165,15 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "write": {"header_fields_output_by": "name"},
-                    "fields": fields,
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
+            outputs=(
+                OutputOverride(
+                    name="detail",
+                    fields=tuple(fields),
+                    to=OutputToOverride(file="detail_csv"),
+                    write=OutputWriteOverride(header_fields_output_by="name"),
+                ),
+            ),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
     )
 
@@ -185,17 +189,17 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
 
 
 @pytest.mark.parametrize(
-    ("write_cfg", "expected_header"),
+    ("write_override", "expected_header"),
     [
-        ({}, ["订单ID", "金额"]),
-        ({"header_fields_output_by": "field_id"}, ["order_id", "amount"]),
+        (None, ["订单ID", "金额"]),
+        (OutputWriteOverride(header_fields_output_by="field_id"), ["order_id", "amount"]),
     ],
     ids=["books-default-name", "books-explicit-field-id"],
 )
 def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
     example_model,
     tmp_path: Path,
-    write_cfg,
+    write_override,
     expected_header,
 ) -> None:
     openpyxl = pytest.importorskip("openpyxl")
@@ -205,22 +209,15 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
         str(_demo_yaml_path()),
         allowed_modules=_ALLOWED_MODULES,
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"book": "report", "sheet": "明细"},
-                    "write": write_cfg,
-                    "fields": ["order_id", "amount"],
-                }
-            ],
-            resources={
-                "books": {
-                    "report": {
-                        "kind": "xlsx_file",
-                        "path": str(output_path),
-                    }
-                }
-            },
+            outputs=(
+                OutputOverride(
+                    name="detail",
+                    fields=("order_id", "amount"),
+                    to=OutputToOverride(book="report", sheet="明细"),
+                    write=write_override,
+                ),
+            ),
+            resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path=str(output_path))}),
         ),
     )
 
@@ -254,14 +251,8 @@ def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
+            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
         components=[hook],
     )
@@ -290,14 +281,8 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
         allowed_modules=_ALLOWED_MODULES,
         components=[observer],
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}},
+            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
     )
 

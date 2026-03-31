@@ -114,19 +114,10 @@ workflow:
             )
 
         sink = InMemoryRowSink()
-        overrides = api.RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "write": {
-                        "include_header": True,
-                        "header_fields_output_by": "name",
-                    },
-                    "fields": ["item_id", "dim_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(tmp / "out.csv")}}},
+        overrides = api.RunOverrides.csv_file(
+            output_path=str(tmp / "out.csv"),
+            fields=["item_id", "dim_id"],
+            header_fields_output_by="name",
         )
         run_result: api.RunResult = api.run(
             str(demand_path),

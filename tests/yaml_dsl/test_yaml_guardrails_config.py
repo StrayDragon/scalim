@@ -1,9 +1,9 @@
 import pytest
 
-import scalim.dsl.by_yaml.config_parsing.validator as validator_module
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
+import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
+from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
 
 
 def _require_jsonschema() -> None:

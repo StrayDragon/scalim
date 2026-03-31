@@ -21,10 +21,9 @@ from ....execution.guardrails import (
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
 from ....spec.ir import DemandIr
-from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import replace
-from ..config_parsing.loader import YamlDemandLoader
-from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from .._internal.config_parsing.loader import YamlDemandLoader
+from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from ..init_var_nodes import parse_init_var_mapping_node
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from ..schema_dsl.constants import (
@@ -61,7 +60,22 @@ from ..schema_dsl.output_enums import (
     FILE_KINDS,
 )
 from .builtin_callables import parse_builtin_callable_id
-from .contracts import Compilation, ResolverTrustedMode, RunOptions, UnsetType
+from .contracts import (
+    BookBudgetOverride,
+    BookExportXlsxOverride,
+    BookResourceOverride,
+    BookWriteDefaultsOverride,
+    Compilation,
+    FileResourceOverride,
+    OutputOverride,
+    OutputsDefaultsOverride,
+    OutputToOverride,
+    OutputWriteOverride,
+    ResolverTrustedMode,
+    ResourcesOverride,
+    RunOptions,
+    UnsetType,
+)
 from .conversion import ConfigToIRConverter
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimResolverError
 from .observability import compile_observability_spec
@@ -90,91 +104,77 @@ def validate_allowlist(
 
 
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-_OVERRIDES_OUTPUT_ALLOWED_KEYS: FrozenSet[str] = frozenset(["name", "to", "write", "fields"])
-_OVERRIDES_OUTPUT_FORBIDDEN_KEYS: FrozenSet[str] = frozenset(["where", "from", "aggregate"])
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
 
 
-def _require_dict(raw: object, *, path: str) -> Dict[str, Any]:
-    if not isinstance(raw, dict):
-        msg = "{} must be an object".format(path)
+def _parse_overrides_outputs_defaults_book_id(defaults: Optional[object], *, path: str) -> Optional[str]:
+    if defaults is None:
+        return None
+    if not isinstance(defaults, OutputsDefaultsOverride):
+        msg = "{} must be an OutputsDefaultsOverride".format(path)
         raise TypeError(msg)
-    return cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
-
-
-def _is_list(value: object) -> TypeGuard[List[object]]:
-    return isinstance(value, list)
-
-
-def _parse_overrides_output_to(raw: object, *, path: str) -> Optional[OutputToConfig]:
-    if raw is None:
-        return None
-    typed = _require_dict(raw, path=path)
-    allowed_keys = {"file", "book", "sheet"}
-    unknown = sorted({str(k) for k in typed} - allowed_keys)
-    if unknown:
-        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
+    book_id = str(defaults.to.book or "").strip()
+    if not book_id:
+        msg = "{}.to.book is required".format(path)
         raise ValueError(msg)
-
-    file_raw = typed.get("file")
-    book_raw = typed.get("book")
-    sheet_raw = typed.get("sheet")
-
-    file_id = None
-    if file_raw is not None:
-        if not isinstance(file_raw, str):
-            msg = "{}.file must be a string".format(path)
-            raise TypeError(msg)
-        file_id = str(file_raw).strip() or None
-
-    book = None
-    if book_raw is not None:
-        if not isinstance(book_raw, str):
-            msg = "{}.book must be a string".format(path)
-            raise TypeError(msg)
-        book = str(book_raw).strip() or None
-
-    sheet = None
-    if sheet_raw is not None:
-        if not isinstance(sheet_raw, str):
-            msg = "{}.sheet must be a string".format(path)
-            raise TypeError(msg)
-        sheet = str(sheet_raw).strip() or None
-
-    if file_id is None and book is None and sheet is None:
-        return None
-    return OutputToConfig(file=file_id, book=book, sheet=sheet)
+    return book_id
 
 
-def _parse_overrides_output_write(raw: object, *, path: str) -> Optional[OutputWriteConfig]:
-    if raw is None:
-        return None
-    typed = _require_dict(raw, path=path)
-    allowed_keys = {"include_header", "mode", "align_by", "header_policy", "header_fields_output_by", "on_mismatch", "on_conflict"}
-    unknown = sorted({str(k) for k in typed} - allowed_keys)
-    if unknown:
-        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
-        raise ValueError(msg)
+def _apply_default_book_binding_to_outputs(
+    outputs: Tuple[OutputTargetConfig, ...],
+    *,
+    default_book_id: str,
+) -> Tuple[OutputTargetConfig, ...]:
+    if not outputs:
+        return outputs
+    if not default_book_id:
+        return outputs
 
-    def _as_opt_str(key: str) -> Optional[str]:
-        value = typed.get(key)
+    updated: List[OutputTargetConfig] = []
+    for out_cfg in outputs:
+        to_cfg = out_cfg.to
+        if to_cfg is None:
+            updated.append(replace(out_cfg, to=OutputToConfig(book=str(default_book_id))))
+            continue
+
+        file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
+        book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
+        if file_id or book_id:
+            updated.append(out_cfg)
+            continue
+
+        updated.append(replace(out_cfg, to=replace(to_cfg, book=str(default_book_id))))
+
+    return tuple(updated)
+
+
+def _parse_typed_overrides_output_to(raw: OutputToOverride) -> OutputToConfig:
+    file_id = str(raw.file or "").strip() if raw.file is not None else None
+    book_id = str(raw.book or "").strip() if raw.book is not None else None
+    sheet = str(raw.sheet or "").strip() if raw.sheet is not None else None
+    if file_id == "":
+        file_id = None
+    if book_id == "":
+        book_id = None
+    if sheet == "":
+        sheet = None
+
+    return OutputToConfig(file=file_id, book=book_id, sheet=sheet)
+
+
+def _parse_typed_overrides_output_write(raw: OutputWriteOverride, *, path: str) -> OutputWriteConfig:
+    def _as_opt_str(value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
-        if not isinstance(value, str):
-            msg = "{}.{} must be a string".format(path, key)
-            raise TypeError(msg)
-        raw_str = str(value).strip()
-        return raw_str or None
+        v = str(value).strip()
+        return v or None
 
-    include_header = None
-    if "include_header" in typed:
-        include_header_raw = typed.get("include_header")
-        if not isinstance(include_header_raw, bool):
-            msg = "{}.include_header must be a boolean".format(path)
-            raise TypeError(msg)
-        include_header = bool(include_header_raw)
+    include_header = raw.include_header
+    if include_header is not None and not isinstance(include_header, bool):
+        msg = "{}.include_header must be a boolean".format(path)
+        raise TypeError(msg)
 
-    header_fields_output_by = _as_opt_str("header_fields_output_by")
+    header_fields_output_by = _as_opt_str(raw.header_fields_output_by)
     if header_fields_output_by is not None and header_fields_output_by not in _OUTPUT_HEADER_BY_ENUM:
         msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(
             path, header_fields_output_by, ", ".join(_OUTPUT_HEADER_BY_ENUM)
@@ -183,85 +183,27 @@ def _parse_overrides_output_write(raw: object, *, path: str) -> Optional[OutputW
 
     return OutputWriteConfig(
         include_header=include_header,
-        mode=_as_opt_str("mode"),
-        align_by=_as_opt_str("align_by"),
-        header_policy=_as_opt_str("header_policy"),
+        mode=_as_opt_str(raw.mode),
+        align_by=_as_opt_str(raw.align_by),
+        header_policy=_as_opt_str(raw.header_policy),
         header_fields_output_by=header_fields_output_by,
-        on_mismatch=_as_opt_str("on_mismatch"),
-        on_conflict=_as_opt_str("on_conflict"),
+        on_mismatch=_as_opt_str(raw.on_mismatch),
+        on_conflict=_as_opt_str(raw.on_conflict),
     )
 
 
-def _validate_overrides_output_keys(typed: Dict[str, Any], *, idx: int, path: str) -> None:
-    if "container" in typed:
-        msg = (
-            "{}.{}.container was removed; migrate to overrides.resources.files + overrides.outputs[*].to.file + overrides.outputs[*].write"
-        ).format(path, idx)
-        raise ValueError(msg)
-    extra_keys = sorted([str(k) for k in typed if str(k) not in _OVERRIDES_OUTPUT_ALLOWED_KEYS])
-    if not extra_keys:
-        return
-    forbidden = sorted([k for k in extra_keys if k in _OVERRIDES_OUTPUT_FORBIDDEN_KEYS])
-    unsupported = forbidden or extra_keys
-    msg = "{}.{} has unsupported keys: {} (only supports: name/to/write/fields)".format(path, idx, ", ".join(unsupported))
-    raise ValueError(msg)
-
-
-def _parse_overrides_output_name(typed: Dict[str, Any], *, idx: int, path: str, seen_names: Set[str]) -> str:
-    name = str(typed.get("name") or "").strip()
-    if not name:
-        msg = "{}.{}.name is required".format(path, idx)
-        raise ValueError(msg)
-    if not _OUTPUT_NAME_PATTERN.match(name):
-        msg = "{}.{}.name={!r} is invalid; expected identifier like [a-zA-Z_][a-zA-Z0-9_]*".format(path, idx, name)
-        raise ValueError(msg)
-    if name in seen_names:
-        msg = "{} has duplicate output name: {}".format(path, name)
-        raise ValueError(msg)
-    seen_names.add(name)
-    return name
-
-
-def _parse_overrides_output_fields(typed: Dict[str, Any], *, idx: int, path: str, known_field_ids: Set[str]) -> Tuple[str, ...]:
-    fields_raw: object = typed.get("fields")
-    if not _is_list(fields_raw):
-        msg = "{}.{}.fields must be a list".format(path, idx)
-        raise TypeError(msg)
-    fields_list = fields_raw
-    if not fields_list:
-        msg = "{}.{}.fields must not be empty".format(path, idx)
-        raise ValueError(msg)
-
-    field_ids: List[str] = []
-    for field_idx, field_id_raw in enumerate(fields_list):
-        if not isinstance(field_id_raw, str):
-            msg = "{}.{}.fields.{} must be a field_id string".format(path, idx, field_idx)
-            raise TypeError(msg)
-        field_id = field_id_raw.strip()
-        if not field_id:
-            msg = "{}.{}.fields.{} must not be empty".format(path, idx, field_idx)
-            raise ValueError(msg)
-        field_ids.append(field_id)
-
-    unknown_fields = [fid for fid in field_ids if fid not in known_field_ids]
-    if unknown_fields:
-        msg = "{}.{}.fields reference unknown fields: {}".format(path, idx, ", ".join(sorted(set(unknown_fields))))
-        raise ValueError(msg)
-
-    return tuple(field_ids)
-
-
-def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912
-    raw: object,
+def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915
+    overrides: Sequence[OutputOverride],
     demand_ir: DemandIr,
     *,
     path: str,
+    default_book_id: Optional[str],
+    default_book_ref: str,
 ) -> Tuple[OutputTargetConfig, ...]:
-    if not _is_list(raw):
-        msg = "{} must be a list".format(path)
+    if not isinstance(overrides, tuple) and not isinstance(overrides, list):
+        msg = "{} must be a sequence of OutputOverride".format(path)
         raise TypeError(msg)
-    outputs = raw
-    if not outputs:
+    if not overrides:
         msg = "{} cannot be empty".format(path)
         raise ValueError(msg)
 
@@ -269,30 +211,82 @@ def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912
     seen_names: Set[str] = set()
     parsed: List[OutputTargetConfig] = []
 
-    for idx, item in enumerate(outputs):
-        if not isinstance(item, dict):
-            msg = "{}.{} must be an object".format(path, idx)
+    for idx, item in enumerate(overrides):
+        if not isinstance(item, OutputOverride):
+            msg = "{}.{} must be an OutputOverride".format(path, idx)
             raise TypeError(msg)
-        typed = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
 
-        _validate_overrides_output_keys(typed, idx=idx, path=path)
-        name = _parse_overrides_output_name(typed, idx=idx, path=path, seen_names=seen_names)
-        to_cfg = _parse_overrides_output_to(typed.get("to"), path="{}.{}.to".format(path, idx))
-        write_cfg = _parse_overrides_output_write(typed.get("write"), path="{}.{}.write".format(path, idx))
-        field_ids = _parse_overrides_output_fields(typed, idx=idx, path=path, known_field_ids=known_field_ids)
-
-        if to_cfg is None:
-            msg = "{}.{}.to is required; declare exactly one of to.file or to.book".format(path, idx)
+        name = str(item.name or "").strip()
+        if not name:
+            msg = "{}.{}.name is required".format(path, idx)
             raise ValueError(msg)
+        if not _OUTPUT_NAME_PATTERN.match(name):
+            msg = "{}.{}.name={!r} is invalid; expected identifier like [a-zA-Z_][a-zA-Z0-9_]*".format(path, idx, name)
+            raise ValueError(msg)
+        if name in seen_names:
+            msg = "{} has duplicate output name: {}".format(path, name)
+            raise ValueError(msg)
+        seen_names.add(name)
+
+        fields = item.fields
+        if not isinstance(fields, tuple):
+            msg = "{}.{}.fields must be a tuple[str, ...]".format(path, idx)
+            raise TypeError(msg)
+        if not fields:
+            msg = "{}.{}.fields must not be empty".format(path, idx)
+            raise ValueError(msg)
+
+        field_ids: List[str] = []
+        for field_idx, field_id_raw in enumerate(fields):
+            if not isinstance(field_id_raw, str):
+                msg = "{}.{}.fields.{} must be a field_id string".format(path, idx, field_idx)
+                raise TypeError(msg)
+            field_id = field_id_raw.strip()
+            if not field_id:
+                msg = "{}.{}.fields.{} must not be empty".format(path, idx, field_idx)
+                raise ValueError(msg)
+            field_ids.append(field_id)
+
+        unknown_fields = [fid for fid in field_ids if fid not in known_field_ids]
+        if unknown_fields:
+            msg = "{}.{}.fields reference unknown fields: {}".format(path, idx, ", ".join(sorted(set(unknown_fields))))
+            raise ValueError(msg)
+
+        to_override = item.to
+        if not isinstance(to_override, OutputToOverride):
+            msg = "{}.{}.to must be an OutputToOverride".format(path, idx)
+            raise TypeError(msg)
+        to_cfg = _parse_typed_overrides_output_to(to_override)
+
+        write_cfg = None
+        if item.write is not None:
+            write_override = item.write
+            if not isinstance(write_override, OutputWriteOverride):
+                msg = "{}.{}.write must be an OutputWriteOverride".format(path, idx)
+                raise TypeError(msg)
+            write_cfg = _parse_typed_overrides_output_write(write_override, path="{}.{}.write".format(path, idx))
 
         file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
         book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
-        if bool(file_id) == bool(book_id):
-            msg = "{}.{}.to must declare exactly one of to.file or to.book".format(path, idx)
-            raise ValueError(msg)
-        if to_cfg.sheet is not None and not book_id:
-            msg = "{}.{}.to.sheet requires {}.{}.to.book".format(path, idx, path, idx)
-            raise ValueError(msg)
+        sheet = str(to_cfg.sheet or "").strip() if to_cfg.sheet is not None else ""
+
+        if file_id:
+            if book_id:
+                msg = "{}.{}.to must declare exactly one of to.file or to.book".format(path, idx)
+                raise ValueError(msg)
+            if sheet:
+                msg = "{}.{}.to.sheet is not allowed with to.file".format(path, idx)
+                raise ValueError(msg)
+        else:
+            effective_book_id = book_id or str(default_book_id or "").strip()
+            if not effective_book_id:
+                msg = ("Missing output destination for {}.{}.to; set {}.{}.to.book explicitly or provide {}.").format(
+                    path, idx, path, idx, default_book_ref
+                )
+                raise ValueError(msg)
+            if book_id != effective_book_id:
+                to_cfg = replace(to_cfg, book=str(effective_book_id))
+                book_id = effective_book_id
 
         if file_id and write_cfg is not None:
             invalid_keys: List[str] = []
@@ -315,11 +309,11 @@ def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912
 
         parsed.append(
             OutputTargetConfig(
-                name=name,
+                name=str(name),
                 from_=None,
                 to=to_cfg,
                 write=write_cfg,
-                fields=field_ids,
+                fields=tuple(field_ids),
                 where=None,
                 aggregate=None,
                 requires=(),
@@ -693,12 +687,46 @@ def _resolve_effective_outputs_and_path(
     *,
     options: RunOptions,
 ) -> Tuple[Tuple[OutputTargetConfig, ...], str]:
-    overrides_outputs = options.overrides.outputs if options.overrides is not None else None
+    overrides = options.overrides
+    overrides_outputs = overrides.outputs if overrides is not None else None
+    default_book_id = _parse_overrides_outputs_defaults_book_id(
+        None if overrides is None else overrides.outputs_defaults,
+        path="overrides.outputs_defaults",
+    )
     if overrides_outputs is not None:
-        return _parse_overrides_outputs_targets(overrides_outputs, demand_ir, path="overrides.outputs"), "overrides.outputs"
+        return (
+            _parse_overrides_outputs_targets(
+                overrides_outputs,
+                demand_ir,
+                path="overrides.outputs",
+                default_book_id=default_book_id,
+                default_book_ref="overrides.outputs_defaults.to.book",
+            ),
+            "overrides.outputs",
+        )
     if config.outputs:
-        return tuple(config.outputs), "outputs"
+        outputs = tuple(config.outputs)
+        if default_book_id is not None:
+            outputs = _apply_default_book_binding_to_outputs(outputs, default_book_id=str(default_book_id))
+        return outputs, "outputs"
     return (), "outputs"
+
+
+def _normalize_non_empty_pathlike_value(raw: object, *, path: str) -> str:
+    if raw is None:
+        msg = "{} is required".format(path)
+        raise ValueError(msg)
+    if isinstance(raw, os.PathLike):
+        value = str(os.fspath(raw)).strip()
+    elif isinstance(raw, str):
+        value = str(raw).strip()
+    else:
+        msg = "{} must be a string or os.PathLike".format(path)
+        raise TypeError(msg)
+    if not value:
+        msg = "{} is required".format(path)
+        raise ValueError(msg)
+    return value
 
 
 def _parse_non_empty_path_or_init_var(raw: object, *, path: str) -> Any:
@@ -707,20 +735,10 @@ def _parse_non_empty_path_or_init_var(raw: object, *, path: str) -> Any:
     if raw is None:
         msg = "{} is required".format(path)
         raise ValueError(msg)
-    if isinstance(raw, os.PathLike):
-        value = str(os.fspath(raw)).strip()
-        if not value:
-            msg = "{} is required".format(path)
-            raise ValueError(msg)
-        return value
-    if isinstance(raw, str):
-        value = raw.strip()
-        if not value:
-            msg = "{} is required".format(path)
-            raise ValueError(msg)
-        return value
-    msg = "{} must be a non-empty string or {{$init_var: <name>}}".format(path)
-    raise TypeError(msg)
+    if not isinstance(raw, os.PathLike) and not isinstance(raw, str):
+        msg = "{} must be a non-empty string or {{$init_var: <name>}}".format(path)
+        raise TypeError(msg)
+    return _normalize_non_empty_pathlike_value(raw, path=path)
 
 
 def _parse_optional_path_or_init_var(raw: object, *, path: str) -> Any:
@@ -744,36 +762,44 @@ def _parse_optional_path_or_init_var(raw: object, *, path: str) -> Any:
     raise TypeError(msg)
 
 
-def _overlay_optional_str_field(patch: Mapping[str, object], *, key: str, value: str, path: str) -> str:
-    if key not in patch:
-        return value
-    raw = patch.get(key)
-    if raw is None:
-        return value
-    if not isinstance(raw, str):
-        msg = "{}.{} must be a string".format(path, str(key))
-        raise TypeError(msg)
-    return str(raw).strip()
-
-
-def _overlay_book_write_defaults(base: BookWriteDefaultsConfig, patch: Mapping[str, object], *, path: str) -> BookWriteDefaultsConfig:
-    allowed_keys = {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"}
-    unknown = sorted({str(k) for k in patch} - allowed_keys)
-    if unknown:
-        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+def _normalize_override_mapping_key(raw_id: object, *, path: str) -> str:
+    if not isinstance(raw_id, str) or not str(raw_id).strip():
+        msg = "{} keys must be non-empty strings".format(path)
         raise ValueError(msg)
+    return str(raw_id).strip()
 
-    mode = str(base.mode or DEFAULT_BOOK_WRITE_MODE)
-    align_by = str(base.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY)
-    header_policy = str(base.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY)
-    on_mismatch = str(base.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH)
-    on_conflict = str(base.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT)
 
-    mode = _overlay_optional_str_field(patch, key="mode", value=mode, path=path)
-    align_by = _overlay_optional_str_field(patch, key="align_by", value=align_by, path=path)
-    header_policy = _overlay_optional_str_field(patch, key="header_policy", value=header_policy, path=path)
-    on_mismatch = _overlay_optional_str_field(patch, key="on_mismatch", value=on_mismatch, path=path)
-    on_conflict = _overlay_optional_str_field(patch, key="on_conflict", value=on_conflict, path=path)
+def _overlay_book_write_defaults_override(
+    base: Optional[BookWriteDefaultsConfig],
+    override: BookWriteDefaultsOverride,
+    *,
+    path: str,
+) -> BookWriteDefaultsConfig:
+    base_defaults = base or BookWriteDefaultsConfig(
+        mode=str(DEFAULT_BOOK_WRITE_MODE),
+        align_by=str(DEFAULT_BOOK_WRITE_ALIGN_BY),
+        header_policy=str(DEFAULT_BOOK_WRITE_HEADER_POLICY),
+        on_mismatch=str(DEFAULT_BOOK_WRITE_ON_MISMATCH),
+        on_conflict=str(DEFAULT_BOOK_WRITE_ON_CONFLICT),
+    )
+
+    mode = str(base_defaults.mode or DEFAULT_BOOK_WRITE_MODE) if override.mode is None else str(override.mode).strip()
+    align_by = str(base_defaults.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY) if override.align_by is None else str(override.align_by).strip()
+    header_policy = (
+        str(base_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY)
+        if override.header_policy is None
+        else str(override.header_policy).strip()
+    )
+    on_mismatch = (
+        str(base_defaults.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH)
+        if override.on_mismatch is None
+        else str(override.on_mismatch).strip()
+    )
+    on_conflict = (
+        str(base_defaults.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT)
+        if override.on_conflict is None
+        else str(override.on_conflict).strip()
+    )
 
     validations = (
         ("mode", mode, BOOK_WRITE_MODE_ENUM),
@@ -797,13 +823,74 @@ def _overlay_book_write_defaults(base: BookWriteDefaultsConfig, patch: Mapping[s
     )
 
 
-def _apply_book_patch(base: Optional[BookConfig], patch: Mapping[str, object], *, path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
-    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_lock", "write_defaults"}
-    unknown = sorted({str(k) for k in patch} - allowed_keys)
-    if unknown:
-        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+def _overlay_book_budget_override(
+    base: Optional[BookBudgetConfig],
+    override: BookBudgetOverride,
+    *,
+    path: str,
+) -> BookBudgetConfig:
+    if base is None:
+        if override.max_sheets is None or override.max_total_cells is None:
+            msg = "{} requires max_sheets and max_total_cells when creating a new xlsx_memory book".format(path)
+            raise ValueError(msg)
+        max_sheets = override.max_sheets
+        max_total_cells = override.max_total_cells
+    else:
+        max_sheets = base.max_sheets if override.max_sheets is None else override.max_sheets
+        max_total_cells = base.max_total_cells if override.max_total_cells is None else override.max_total_cells
+
+    if isinstance(max_sheets, bool) or not isinstance(max_sheets, int):
+        msg = "{}.max_sheets must be an integer".format(path)
+        raise TypeError(msg)
+    if isinstance(max_total_cells, bool) or not isinstance(max_total_cells, int):
+        msg = "{}.max_total_cells must be an integer".format(path)
+        raise TypeError(msg)
+    if int(max_sheets) < 1:
+        msg = "{}.max_sheets must be >= 1".format(path)
+        raise ValueError(msg)
+    if int(max_total_cells) < 1:
+        msg = "{}.max_total_cells must be >= 1".format(path)
         raise ValueError(msg)
 
+    return BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
+
+
+def _overlay_book_export_xlsx_override(
+    base: Optional[BookExportXlsxConfig],
+    override: BookExportXlsxOverride,
+    *,
+    path: str,
+) -> BookExportXlsxConfig:
+    if base is None:
+        if override.path is None:
+            msg = "{}.path is required when creating export_xlsx".format(path)
+            raise ValueError(msg)
+        export_path = _parse_non_empty_path_or_init_var(override.path, path="{}.path".format(path))
+        return BookExportXlsxConfig(
+            path=export_path,
+            write_lock=bool(override.write_lock) if override.write_lock is not None else False,
+            allow_formulas=bool(override.allow_formulas) if override.allow_formulas is not None else False,
+        )
+
+    export_path_any: Any = base.path
+    if override.path is not None:
+        export_path_any = _parse_non_empty_path_or_init_var(override.path, path="{}.path".format(path))
+
+    write_lock = base.write_lock if override.write_lock is None else bool(override.write_lock)
+    allow_formulas = base.allow_formulas if override.allow_formulas is None else bool(override.allow_formulas)
+    return BookExportXlsxConfig(
+        path=export_path_any,
+        write_lock=bool(write_lock),
+        allow_formulas=bool(allow_formulas),
+    )
+
+
+def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
+    base: Optional[BookConfig],
+    override: BookResourceOverride,
+    *,
+    path: str,
+) -> BookConfig:
     kind = str(base.kind or "").strip() if base is not None else ""
     book_path: Any = base.path if base is not None else None
     budget = base.budget if base is not None else None
@@ -812,158 +899,39 @@ def _apply_book_patch(base: Optional[BookConfig], patch: Mapping[str, object], *
     write_lock = bool(base.write_lock) if base is not None else False
     write_defaults = base.write_defaults if base is not None else None
 
-    has_path_key = "path" in patch
-    has_allow_formulas_key = "allow_formulas" in patch
-    has_write_lock_key = "write_lock" in patch
-    has_budget_key = "budget" in patch
-    has_export_key = "export_xlsx" in patch
-
-    if "kind" in patch:
-        raw = patch.get("kind")
-        kind = str(raw or "").strip() if isinstance(raw, str) else ""
+    if override.kind is not None:
+        kind = str(override.kind or "").strip()
         if not kind:
             msg = "{}.kind must be a non-empty string".format(path)
             raise ValueError(msg)
-
-    if has_path_key:
-        book_path = _parse_optional_path_or_init_var(patch.get("path"), path="{}.path".format(path))
-
-    if has_allow_formulas_key:
-        raw = patch.get("allow_formulas")
-        if not isinstance(raw, bool):
-            msg = "{}.allow_formulas must be a bool".format(path)
-            raise TypeError(msg)
-        allow_formulas = bool(raw)
-
-    if has_write_lock_key:
-        raw = patch.get("write_lock")
-        if not isinstance(raw, bool):
-            msg = "{}.write_lock must be a bool".format(path)
-            raise TypeError(msg)
-        write_lock = bool(raw)
-
-    if has_budget_key:
-        raw = patch.get("budget")
-        if raw is None:
-            budget = None
-        elif not isinstance(raw, dict):
-            msg = "{}.budget must be a mapping".format(path)
-            raise TypeError(msg)
-        else:
-            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
-            max_sheets_raw = raw_dict.get("max_sheets")
-            max_total_cells_raw = raw_dict.get("max_total_cells")
-            if budget is None:
-                if max_sheets_raw is None or max_total_cells_raw is None:
-                    msg = "{}.budget requires max_sheets and max_total_cells when creating a new xlsx_memory book".format(path)
-                    raise ValueError(msg)
-                try:
-                    max_sheets = int(max_sheets_raw)
-                except (TypeError, ValueError):
-                    msg = "{}.budget.max_sheets must be an integer >= 1".format(path)
-                    raise ValueError(msg) from None
-                try:
-                    max_total_cells = int(max_total_cells_raw)
-                except (TypeError, ValueError):
-                    msg = "{}.budget.max_total_cells must be an integer >= 1".format(path)
-                    raise ValueError(msg) from None
-                if int(max_sheets) < 1:
-                    msg = "{}.budget.max_sheets must be >= 1".format(path)
-                    raise ValueError(msg)
-                if int(max_total_cells) < 1:
-                    msg = "{}.budget.max_total_cells must be >= 1".format(path)
-                    raise ValueError(msg)
-                budget = BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
-            else:
-                max_sheets = int(budget.max_sheets)
-                max_total_cells = int(budget.max_total_cells)
-                if max_sheets_raw is not None:
-                    try:
-                        max_sheets = int(max_sheets_raw)
-                    except (TypeError, ValueError):
-                        msg = "{}.budget.max_sheets must be an integer >= 1".format(path)
-                        raise ValueError(msg) from None
-                if max_total_cells_raw is not None:
-                    try:
-                        max_total_cells = int(max_total_cells_raw)
-                    except (TypeError, ValueError):
-                        msg = "{}.budget.max_total_cells must be an integer >= 1".format(path)
-                        raise ValueError(msg) from None
-                if int(max_sheets) < 1:
-                    msg = "{}.budget.max_sheets must be >= 1".format(path)
-                    raise ValueError(msg)
-                if int(max_total_cells) < 1:
-                    msg = "{}.budget.max_total_cells must be >= 1".format(path)
-                    raise ValueError(msg)
-                budget = BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
-
-    if has_export_key:
-        raw = patch.get("export_xlsx")
-        if raw is None:
-            export_xlsx = None
-        elif not isinstance(raw, dict):
-            msg = "{}.export_xlsx must be a mapping".format(path)
-            raise TypeError(msg)
-        else:
-            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
-            path_raw = raw_dict.get("path")
-            write_lock_raw = raw_dict.get("write_lock")
-            allow_formulas_raw = raw_dict.get("allow_formulas")
-            if write_lock_raw is not None and not isinstance(write_lock_raw, bool):
-                msg = "{}.export_xlsx.write_lock must be a bool".format(path)
-                raise TypeError(msg)
-            if allow_formulas_raw is not None and not isinstance(allow_formulas_raw, bool):
-                msg = "{}.export_xlsx.allow_formulas must be a bool".format(path)
-                raise TypeError(msg)
-            if export_xlsx is None:
-                if path_raw is None:
-                    msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
-                    raise ValueError(msg)
-                export_xlsx = BookExportXlsxConfig(
-                    path=_parse_non_empty_path_or_init_var(path_raw, path="{}.export_xlsx.path".format(path)),
-                    write_lock=bool(write_lock_raw) if write_lock_raw is not None else False,
-                    allow_formulas=bool(allow_formulas_raw) if allow_formulas_raw is not None else False,
-                )
-            else:
-                next_path = (
-                    export_xlsx.path
-                    if path_raw is None
-                    else _parse_non_empty_path_or_init_var(path_raw, path="{}.export_xlsx.path".format(path))
-                )
-                next_write_lock = export_xlsx.write_lock if write_lock_raw is None else bool(write_lock_raw)
-                next_allow_formulas = export_xlsx.allow_formulas if allow_formulas_raw is None else bool(allow_formulas_raw)
-                export_xlsx = BookExportXlsxConfig(
-                    path=next_path,
-                    write_lock=bool(next_write_lock),
-                    allow_formulas=bool(next_allow_formulas),
-                )
-
-    if "write_defaults" in patch:
-        raw = patch.get("write_defaults")
-        if raw is None:
-            write_defaults = None
-        elif not isinstance(raw, dict):
-            msg = "{}.write_defaults must be a mapping".format(path)
-            raise TypeError(msg)
-        else:
-            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime dict typed narrowing
-            base_defaults = write_defaults
-            if base_defaults is None:
-                base_defaults = BookWriteDefaultsConfig(
-                    mode=str(DEFAULT_BOOK_WRITE_MODE),
-                    align_by=str(DEFAULT_BOOK_WRITE_ALIGN_BY),
-                    header_policy=str(DEFAULT_BOOK_WRITE_HEADER_POLICY),
-                    on_mismatch=str(DEFAULT_BOOK_WRITE_ON_MISMATCH),
-                    on_conflict=str(DEFAULT_BOOK_WRITE_ON_CONFLICT),
-                )
-            write_defaults = _overlay_book_write_defaults(base_defaults, raw_dict, path="{}.write_defaults".format(path))
-
     if kind not in BOOK_KINDS:
         msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(BOOK_KINDS))
         raise ValueError(msg)
 
+    if override.path is not None:
+        book_path = _parse_optional_path_or_init_var(override.path, path="{}.path".format(path))
+    if override.allow_formulas is not None:
+        if not isinstance(override.allow_formulas, bool):
+            msg = "{}.allow_formulas must be a bool".format(path)
+            raise TypeError(msg)
+        allow_formulas = bool(override.allow_formulas)
+    if override.write_lock is not None:
+        if not isinstance(override.write_lock, bool):
+            msg = "{}.write_lock must be a bool".format(path)
+            raise TypeError(msg)
+        write_lock = bool(override.write_lock)
+
+    if override.budget is not None:
+        budget = _overlay_book_budget_override(budget, override.budget, path="{}.budget".format(path))
+    if override.export_xlsx is not None:
+        export_xlsx = _overlay_book_export_xlsx_override(export_xlsx, override.export_xlsx, path="{}.export_xlsx".format(path))
+    if override.write_defaults is not None:
+        write_defaults = _overlay_book_write_defaults_override(
+            write_defaults, override.write_defaults, path="{}.write_defaults".format(path)
+        )
+
     if kind == "xlsx_file":
-        if has_budget_key or has_export_key:
+        if override.budget is not None or override.export_xlsx is not None:
             msg = "{}.budget/export_xlsx are not allowed for kind=xlsx_file".format(path)
             raise ValueError(msg)
         if book_path is None:
@@ -977,7 +945,7 @@ def _apply_book_patch(base: Optional[BookConfig], patch: Mapping[str, object], *
             raise ValueError(msg)
 
     if kind == "xlsx_memory":
-        if has_path_key or has_allow_formulas_key or has_write_lock_key:
+        if override.path is not None or override.allow_formulas is not None or override.write_lock is not None:
             msg = "{}.path/allow_formulas/write_lock are not allowed for kind=xlsx_memory (use export_xlsx.*)".format(path)
             raise ValueError(msg)
         if budget is None:
@@ -1004,20 +972,13 @@ def _apply_book_patch(base: Optional[BookConfig], patch: Mapping[str, object], *
     )
 
 
-def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *, path: str) -> FileConfig:
-    allowed_keys = {"kind", "path", "encoding"}
-    unknown = sorted({str(k) for k in patch} - allowed_keys)
-    if unknown:
-        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
-        raise ValueError(msg)
-
+def _apply_file_override(base: Optional[FileConfig], override: FileResourceOverride, *, path: str) -> FileConfig:
     kind = str(base.kind or "").strip() if base is not None else ""
     file_path: Any = base.path if base is not None else None
     encoding = str(base.encoding or DEFAULT_OUTPUT_ENCODING) if base is not None else DEFAULT_OUTPUT_ENCODING
 
-    if "kind" in patch:
-        raw_kind = patch.get("kind")
-        kind = str(raw_kind or "").strip() if isinstance(raw_kind, str) else ""
+    if override.kind is not None:
+        kind = str(override.kind or "").strip()
         if not kind:
             msg = "{}.kind must be a non-empty string".format(path)
             raise ValueError(msg)
@@ -1025,81 +986,50 @@ def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *
         msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(FILE_KINDS))
         raise ValueError(msg)
 
-    if "path" in patch:
-        file_path = _parse_optional_path_or_init_var(patch.get("path"), path="{}.path".format(path))
+    if override.path is not None:
+        file_path = _parse_optional_path_or_init_var(override.path, path="{}.path".format(path))
     if file_path is None:
         msg = "{}.path is required for kind=csv_file".format(path)
         raise ValueError(msg)
 
-    if "encoding" in patch:
-        raw_encoding = patch.get("encoding")
-        if raw_encoding is None:
-            encoding = DEFAULT_OUTPUT_ENCODING
-        elif not isinstance(raw_encoding, str):
+    if override.encoding is not None:
+        if not isinstance(override.encoding, str):
             msg = "{}.encoding must be a string".format(path)
             raise TypeError(msg)
-        else:
-            encoding = str(raw_encoding).strip() or DEFAULT_OUTPUT_ENCODING
+        encoding = str(override.encoding).strip() or DEFAULT_OUTPUT_ENCODING
 
     return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
 
 
-def _apply_resources_io_override(config: DemandConfig, patch_raw: object) -> DemandConfig:  # noqa: C901, PLR0912
-    if not isinstance(patch_raw, dict):
-        msg = "overrides.resources must be an object"
-        raise TypeError(msg)
-    patch = cast("Dict[str, Any]", patch_raw)  # pragma: allow-cast runtime dict typed narrowing
-    unknown = sorted({str(k) for k in patch} - {"books", "files"})
-    if unknown:
-        msg = "overrides.resources has unknown keys: {}".format(", ".join(unknown))
-        raise ValueError(msg)
-    if patch.get("books") is None and patch.get("files") is None:
+def _apply_resources_override(config: DemandConfig, override: ResourcesOverride) -> DemandConfig:
+    if not override.books and not override.files:
         return config
 
     base_resources = config.resources
     merged_books: Dict[str, BookConfig] = dict(base_resources.books) if base_resources is not None else {}
     merged_files: Dict[str, FileConfig] = dict(base_resources.files) if base_resources is not None else {}
 
-    books_obj = patch.get("books")
-    if books_obj is not None:
-        if not isinstance(books_obj, dict):
-            msg = "overrides.resources.books must be an object"
-            raise TypeError(msg)
-        books_patch = cast("Dict[str, Any]", books_obj)  # pragma: allow-cast runtime dict typed narrowing
-
-        for raw_book_id, raw_book_patch in books_patch.items():
-            if not isinstance(raw_book_id, str) or not str(raw_book_id).strip():
-                msg = "overrides.resources.books keys must be non-empty strings"
-                raise ValueError(msg)
-            book_id = str(raw_book_id).strip()
-            if not isinstance(raw_book_patch, dict):
-                msg = "overrides.resources.books.{} must be an object".format(book_id)
+    if override.books:
+        for raw_book_id, book_override in override.books.items():
+            book_id = _normalize_override_mapping_key(raw_book_id, path="overrides.resources.books")
+            if not isinstance(book_override, BookResourceOverride):
+                msg = "overrides.resources.books.{} must be a BookResourceOverride".format(book_id)
                 raise TypeError(msg)
-            base_book = merged_books.get(book_id)
-            merged_books[book_id] = _apply_book_patch(
-                base_book,
-                cast("Mapping[str, object]", raw_book_patch),  # pragma: allow-cast runtime dict typed narrowing
+            merged_books[book_id] = _apply_book_override(
+                merged_books.get(book_id),
+                book_override,
                 path="overrides.resources.books.{}".format(book_id),
             )
 
-    files_obj = patch.get("files")
-    if files_obj is not None:
-        if not isinstance(files_obj, dict):
-            msg = "overrides.resources.files must be an object"
-            raise TypeError(msg)
-        files_patch = cast("Dict[str, Any]", files_obj)  # pragma: allow-cast runtime dict typed narrowing
-        for raw_file_id, raw_file_patch in files_patch.items():
-            if not isinstance(raw_file_id, str) or not str(raw_file_id).strip():
-                msg = "overrides.resources.files keys must be non-empty strings"
-                raise ValueError(msg)
-            file_id = str(raw_file_id).strip()
-            if not isinstance(raw_file_patch, dict):
-                msg = "overrides.resources.files.{} must be an object".format(file_id)
+    if override.files:
+        for raw_file_id, file_override in override.files.items():
+            file_id = _normalize_override_mapping_key(raw_file_id, path="overrides.resources.files")
+            if not isinstance(file_override, FileResourceOverride):
+                msg = "overrides.resources.files.{} must be a FileResourceOverride".format(file_id)
                 raise TypeError(msg)
-            base_file = merged_files.get(file_id)
-            merged_files[file_id] = _apply_file_patch(
-                base_file,
-                cast("Mapping[str, object]", raw_file_patch),  # pragma: allow-cast runtime dict typed narrowing
+            merged_files[file_id] = _apply_file_override(
+                merged_files.get(file_id),
+                file_override,
                 path="overrides.resources.files.{}".format(file_id),
             )
 
@@ -1113,9 +1043,9 @@ def _apply_io_overrides(config: DemandConfig, *, options: RunOptions) -> DemandC
 
     next_config = config
 
-    resources_patch = overrides.resources
-    if resources_patch is not None:
-        next_config = _apply_resources_io_override(next_config, resources_patch)
+    resources_override = overrides.resources
+    if resources_override is not None:
+        next_config = _apply_resources_override(next_config, resources_override)
 
     return next_config
 

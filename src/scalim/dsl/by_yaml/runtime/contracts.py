@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
@@ -10,11 +10,13 @@ from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
 from ....vendor.dataclassesx import dataclass
-from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
 
 if TYPE_CHECKING:
+    import os
+
     import pandas as pd
 
     from ....execution.run_ir import ExecutionRequest
@@ -39,18 +41,240 @@ UnsetType = _UnsetType
 class RunOverrides:
     """运行期覆盖项.
 
-    - `outputs`: 与需求 `YAML` 顶层 `outputs` 同形的输出覆盖片段,语义为整体 `replace`.
-      - `outputs: list[dict]` (非空)
-      - 本变更仅承诺明细输出(`detail`)的最小子集: `name` / `to` / `fields`
-      - 提供则整体替换 `YAML` 的 `outputs`(不做 `deep-merge`)
+    说明:
+    - 本类型属于稳定的公开契约;推荐从 `scalim.dsl.by_yaml` 导入.
+    - 本变更移除旧的 YAML 同形 `dict/list[dict]` `overrides` 输入;改为强类型 `dataclasses`.
 
-    - `resources`: 仅 `IO` 层的补丁覆盖,语义为 `overlay` / `deep-merge`.
-      - `resources`: `YAML-shaped patch`; 至少支持 `resources.books`
+    语义:
+    - `outputs`: 非空序列时表示整体替换(最高优先级),覆盖 YAML `outputs`.
+    - `resources`: 仅 `IO` 层覆盖,语义为叠加/深合并(`overlay`/`deep-merge`),覆盖 YAML `resources.*`.
     """
 
-    outputs: Optional[List[Dict[str, Any]]] = None
-    resources: Optional[Dict[str, Any]] = None
+    outputs: Optional[Sequence["OutputOverride"]] = None
+    resources: Optional["ResourcesOverride"] = None
+    outputs_defaults: Optional["OutputsDefaultsOverride"] = None
     viz_config: Union[Optional["VizObserverConfig"], _UnsetType] = UNSET
+
+    def __post_init__(self) -> None:  # noqa: C901
+        if self.outputs is not None:
+            outputs = tuple(self.outputs)
+            if not outputs:
+                msg = "RunOverrides.outputs cannot be empty (pass None to use YAML outputs)"
+                raise ValueError(msg)
+            if any(isinstance(item, dict) for item in outputs):
+                msg = (
+                    "Legacy YAML-shaped overrides are no longer supported: RunOverrides.outputs=list[dict]. "
+                    "Migrate to typed dataclasses: RunOverrides(outputs=(OutputOverride(...),), resources=ResourcesOverride(...))."
+                )
+                raise TypeError(msg)
+            if any(not isinstance(item, OutputOverride) for item in outputs):
+                msg = "RunOverrides.outputs must be a sequence of OutputOverride"
+                raise TypeError(msg)
+            object.__setattr__(self, "outputs", outputs)
+
+        if self.resources is not None:
+            if isinstance(self.resources, dict):
+                msg = (
+                    "Legacy YAML-shaped overrides are no longer supported: RunOverrides.resources=dict. "
+                    "Migrate to typed dataclasses: RunOverrides(resources=ResourcesOverride(...))."
+                )
+                raise TypeError(msg)
+            if not isinstance(self.resources, ResourcesOverride):
+                msg = "RunOverrides.resources must be a ResourcesOverride"
+                raise TypeError(msg)
+
+        if self.outputs_defaults is not None:
+            if isinstance(self.outputs_defaults, dict):
+                msg = (
+                    "Legacy YAML-shaped overrides are no longer supported: RunOverrides.outputs_defaults=dict. "
+                    "Migrate to typed dataclasses: RunOverrides(outputs_defaults=OutputsDefaultsOverride("
+                    "to=OutputDefaultsToOverride(book=...)))."
+                )
+                raise TypeError(msg)
+            if not isinstance(self.outputs_defaults, OutputsDefaultsOverride):
+                msg = "RunOverrides.outputs_defaults must be an OutputsDefaultsOverride"
+                raise TypeError(msg)
+
+    @classmethod
+    def csv_file(
+        cls,
+        *,
+        output_path: Union[str, "os.PathLike[str]"],
+        fields: Sequence[str],
+        output_name: str = "detail",
+        file_id: str = "detail_csv",
+        encoding: str = "utf-8",
+        include_header: bool = True,
+        header_fields_output_by: str = "field_id",
+    ) -> "RunOverrides":
+        resources = ResourcesOverride(files={str(file_id): FileResourceOverride(kind="csv_file", path=output_path, encoding=str(encoding))})
+        output = OutputOverride(
+            name=str(output_name),
+            fields=tuple(str(x) for x in fields),
+            to=OutputToOverride(file=str(file_id)),
+            write=OutputWriteOverride(include_header=bool(include_header), header_fields_output_by=str(header_fields_output_by)),
+        )
+        return cls(outputs=(output,), resources=resources)
+
+    @classmethod
+    def xlsx_file_single_sheet(
+        cls,
+        *,
+        output_path: Union[str, "os.PathLike[str]"],
+        fields: Sequence[str],
+        sheet: str,
+        output_name: str = "detail",
+        book_id: str = "report",
+        allow_formulas: bool = False,
+        write_lock: bool = False,
+        include_header: bool = True,
+        header_fields_output_by: str = "field_id",
+    ) -> "RunOverrides":
+        defaults = OutputsDefaultsOverride(to=OutputDefaultsToOverride(book=str(book_id)))
+        resources = ResourcesOverride(
+            books={
+                str(book_id): BookResourceOverride(
+                    kind="xlsx_file",
+                    path=output_path,
+                    allow_formulas=bool(allow_formulas),
+                    write_lock=bool(write_lock),
+                )
+            }
+        )
+        output = OutputOverride(
+            name=str(output_name),
+            fields=tuple(str(x) for x in fields),
+            to=OutputToOverride(sheet=str(sheet)),
+            write=OutputWriteOverride(
+                mode="sheet",
+                include_header=bool(include_header),
+                header_fields_output_by=str(header_fields_output_by),
+            ),
+        )
+        return cls(outputs=(output,), resources=resources, outputs_defaults=defaults)
+
+
+@dataclass(frozen=True)
+class OutputToOverride:
+    file: Optional[str] = None
+    book: Optional[str] = None
+    sheet: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        file_id = str(self.file).strip() if self.file is not None else None
+        book_id = str(self.book).strip() if self.book is not None else None
+        sheet = str(self.sheet).strip() if self.sheet is not None else None
+        object.__setattr__(self, "file", file_id or None)
+        object.__setattr__(self, "book", book_id or None)
+        object.__setattr__(self, "sheet", sheet or None)
+
+
+@dataclass(frozen=True)
+class OutputWriteOverride:
+    include_header: Optional[bool] = None
+    header_fields_output_by: Optional[str] = None
+
+    mode: Optional[str] = None
+    align_by: Optional[str] = None
+    header_policy: Optional[str] = None
+    on_mismatch: Optional[str] = None
+    on_conflict: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        header_by = str(self.header_fields_output_by).strip() if self.header_fields_output_by is not None else None
+        object.__setattr__(self, "header_fields_output_by", header_by or None)
+
+
+@dataclass(frozen=True)
+class OutputOverride:
+    name: str
+    fields: Tuple[str, ...]
+    to: OutputToOverride
+    write: Optional[OutputWriteOverride] = None
+
+    def __post_init__(self) -> None:
+        name = str(self.name or "").strip()
+        object.__setattr__(self, "name", name)
+
+        fields_raw_any: Any = self.fields  # pragma: allow-any typed contract input normalization boundary
+        if not isinstance(fields_raw_any, tuple):
+            fields_raw_any = tuple(fields_raw_any)
+        fields_raw = cast("Tuple[object, ...]", fields_raw_any)  # pragma: allow-cast contract input normalization boundary
+        normalized: List[str] = []
+        for item in fields_raw:
+            normalized.append(str(item).strip())
+        object.__setattr__(self, "fields", tuple(normalized))
+
+
+@dataclass(frozen=True)
+class BookWriteDefaultsOverride:
+    mode: Optional[str] = None
+    align_by: Optional[str] = None
+    header_policy: Optional[str] = None
+    on_mismatch: Optional[str] = None
+    on_conflict: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class BookBudgetOverride:
+    max_sheets: Optional[int] = None
+    max_total_cells: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class BookExportXlsxOverride:
+    path: Optional[Union[str, "os.PathLike[str]"]] = None
+    write_lock: Optional[bool] = None
+    allow_formulas: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class BookResourceOverride:
+    kind: Optional[str] = None
+    path: Optional[Union[str, "os.PathLike[str]"]] = None
+    budget: Optional[BookBudgetOverride] = None
+    export_xlsx: Optional[BookExportXlsxOverride] = None
+    allow_formulas: Optional[bool] = None
+    write_lock: Optional[bool] = None
+    write_defaults: Optional[BookWriteDefaultsOverride] = None
+
+
+@dataclass(frozen=True)
+class FileResourceOverride:
+    kind: Optional[str] = None
+    path: Optional[Union[str, "os.PathLike[str]"]] = None
+    encoding: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class ResourcesOverride:
+    books: Optional[Mapping[str, BookResourceOverride]] = None
+    files: Optional[Mapping[str, FileResourceOverride]] = None
+
+    def __post_init__(self) -> None:
+        books = dict(self.books or {})
+        files = dict(self.files or {})
+        object.__setattr__(self, "books", books or None)
+        object.__setattr__(self, "files", files or None)
+
+
+@dataclass(frozen=True)
+class OutputDefaultsToOverride:
+    book: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        book_id = str(self.book).strip() if self.book is not None else None
+        object.__setattr__(self, "book", book_id or None)
+
+
+@dataclass(frozen=True)
+class OutputsDefaultsOverride:
+    to: OutputDefaultsToOverride
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.to, OutputDefaultsToOverride):
+            msg = "OutputsDefaultsOverride.to must be an OutputDefaultsToOverride"
+            raise TypeError(msg)
 
 
 @dataclass(frozen=True)

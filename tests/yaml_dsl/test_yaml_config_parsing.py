@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.models import (
+from scalim.dsl.by_yaml._internal.config_parsing.models import (
     AliasIndex,
     FieldDef,
     RawDemand,
@@ -9,7 +9,7 @@ from scalim.dsl.by_yaml.config_parsing.models import (
     _collect_main_source_fields,
     _collect_source_fields,
 )
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.schema_dsl.constants import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_PERF_SAMPLING_INTERVAL,
@@ -211,7 +211,7 @@ def test_infer_derived_dependencies_rejects_depends_on() -> None:
 
 
 def test_constant_compute_expression_syntax_error_returns_false() -> None:
-    from scalim.dsl.by_yaml.config_parsing.security import is_constant_compute_expression
+    from scalim.dsl.by_yaml._internal.config_parsing.security import is_constant_compute_expression
 
     assert is_constant_compute_expression("1 +") is False
 

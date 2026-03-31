@@ -1,7 +1,7 @@
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.config_parsing.models import FieldDef
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.models import FieldDef
 
 
 def test_select_field_defs_rejects_missing_required_field() -> None:

@@ -1,4 +1,4 @@
-from scalim.dsl.by_yaml.config_parsing.validator import ValidationReport
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ValidationReport
 
 
 def test_validation_report_warnings_and_ok() -> None:

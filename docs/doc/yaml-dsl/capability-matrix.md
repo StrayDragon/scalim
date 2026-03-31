@@ -67,14 +67,14 @@
 
 | YAML key | 编译到(主要影响) | 限制/边界 | 替代方案 |
 |---|---|---|---|
-| `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | `overrides.outputs` 可整体替换(仅承诺 `name/to/fields` 最小子集;不支持 `where/from/aggregate`) | 运行期动态输出: `run(..., overrides=RunOverrides(outputs=[...]))` |
+| `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | `RunOverrides.outputs` 可整体替换(仅承诺 `name/to/fields` 最小子集;不支持 `where/from/aggregate`) | 运行期动态输出: `run(..., overrides=RunOverrides(outputs=(OutputOverride(...),)))` 或 `RunOverrides.<factory>(...)` |
 | `outputs.*.to` / `outputs.*.write` | `OutputTargetSpec.output` (`OutputSpec`) | `to` 必须二选一: `to.file` 或 `to.book`; `write` 承载 header / book 写入策略 | 其它 sink 用 `run(..., sink=...)` |
 | `resources.files.<id>.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast | 用 Python 侧 `init_vars` 注入或改用固定路径 |
 | `outputs.*.fields` | `ExportLayout.field_ids` | 支持 `field_id` string + YAML alias(object/list)并 flatten | 若 alias identity 丢失且内容匹配歧义,改用 string `field_id` |
 | `outputs.*.where` | `OutputTargetSpec.predicate` | 安全表达式;依赖字段静态提取注入 required fields | 复杂分发逻辑放到 loader/derived field 里生成路由字段 |
 | `outputs.*.aggregate` | `DerivedOutputTargetSpec.derived`(group_by) | 当前 YAML 只暴露 `group_by+metrics` 这一类派生汇总 | 更复杂派生输出装配走 Python-only `OutputCompositionSpec` |
 | `outputs.*.from` | 输出继承(字段/容器) | 不继承 where/aggregate | - |
-| `meta` / `audit` | `OutputCompositionSpec.meta_sheet/audit_sheet` | 需要至少一个 workbook 输出(或显式提供 path);若 `overrides.outputs` 整体替换为非 workbook 输出,未显式 `path` 时会被跳过 | 需要非 Excel 审计输出时走 observers/hooks |
+| `meta` / `audit` | `OutputCompositionSpec.meta_sheet/audit_sheet` | 需要至少一个 workbook 输出(或显式提供 path);若 `RunOverrides.outputs` 整体替换为非 workbook 输出,未显式 `path` 时会被跳过 | 需要非 Excel 审计输出时走 observers/hooks |
 | `failure_policy` | `OutputCompositionSpec.failure_policy` | `all_fail/primary_only` | - |
 | `include_full_error_message` | `OutputCompositionSpec.include_full_error_message` | 可能包含敏感信息;默认 false | 在 CI/公开环境保持 false |
 

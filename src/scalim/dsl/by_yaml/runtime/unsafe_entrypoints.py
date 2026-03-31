@@ -19,7 +19,7 @@ from ....hooks import IExecutionHook
 from ....ob.observer import Observer
 from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
-from ..config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .compiler import compile as _compile
 from .contracts import Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult
 

@@ -1,4 +1,4 @@
-from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml import RunOverrides, compile
 
 
@@ -41,16 +41,7 @@ sources: {}
     compilation = compile(
         str(yaml_path),
         allowed_modules=frozenset(["tests.fixtures"]),
-        overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": str(out_path)}}},
-        ),
+        overrides=RunOverrides.csv_file(output_path=out_path, fields=("order_id",), output_name="detail", file_id="detail_csv"),
     )
 
     assert compilation.config.outputs == ()

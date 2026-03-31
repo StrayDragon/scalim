@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-import scalim.dsl.by_yaml.config_parsing.validator as validator_module
+import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
 from scalim.dsl.by_yaml import run
-from scalim.dsl.by_yaml.config_parsing.parsers.sources import ParserSourcesMixin
-from scalim.dsl.by_yaml.config_parsing.validators.sources import ValidatorSourcesMixin
+from scalim.dsl.by_yaml._internal.config_parsing.parsers.sources import ParserSourcesMixin
+from scalim.dsl.by_yaml._internal.config_parsing.validators.sources import ValidatorSourcesMixin
 from scalim.sinks import InMemoryRowSink
 
 import tests.fixtures.source_normalize_loaders as loaders

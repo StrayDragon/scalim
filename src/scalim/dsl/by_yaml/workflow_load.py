@@ -7,7 +7,7 @@
 
 from typing import Mapping, Optional, Tuple
 
-from .config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig, load_workflow_config
 
 

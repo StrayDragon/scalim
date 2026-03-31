@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Tuple
 
 import pytest
 
-import scalim.dsl.by_yaml.config_parsing.security as security
+import scalim.dsl.by_yaml._internal.config_parsing.security as security
 from scalim.secure_compute_contracts import is_secure_compute_calculator
-from scalim.dsl.by_yaml.config_parsing.security import (
+from scalim.dsl.by_yaml._internal.config_parsing.security import (
     ScalimComputeExpressionError,
     SecureComputeEngine,
     SecureComputeCalculator,

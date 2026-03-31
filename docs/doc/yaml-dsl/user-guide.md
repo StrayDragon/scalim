@@ -51,7 +51,8 @@ main_source:
       name: 订单ID
 ```
 
-如果希望写文件输出,推荐在 Python 调用侧使用与 YAML `outputs` 同形的 `overrides.outputs` 指定输出编排(字段/路径/表头策略等),而不是把路径写死在 YAML 里(更易复用/更易对拍):
+如果希望写文件输出,推荐在 Python 调用侧使用 `RunOverrides` 的 typed overrides(工厂方法/数据类)指定输出编排(字段/路径/表头策略等),
+而不是把路径写死在 YAML 里(更易复用/更易对拍):
 
 ```python
 from scalim.dsl.by_yaml import RunOverrides, run
@@ -59,19 +60,9 @@ from scalim.dsl.by_yaml import RunOverrides, run
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(
-        resources={
-            "files": {
-                "detail_csv": {"kind": "csv_file", "path": "./output/minimal_order_report.csv"},
-            }
-        },
-        outputs=[
-            {
-                "name": "detail",
-                "to": {"file": "detail_csv"},
-                "fields": ["order_id"],
-            }
-        ]
+    overrides=RunOverrides.csv_file(
+        output_path="./output/minimal_order_report.csv",
+        fields=["order_id"],
     ),
 )
 ```
@@ -172,23 +163,13 @@ result = run(
     allowed_modules=frozenset(["myapp.loaders"]),
 )
 
-# 常见用法: YAML 不声明 outputs,由 Python overrides.outputs 指定单输出编排(推荐)
+# 常见用法: YAML 不声明 outputs,由 Python 调用侧 RunOverrides 指定单输出编排(推荐)
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(
-        resources={
-            "files": {
-                "detail_csv": {"kind": "csv_file", "path": "./output/order_report.csv"},
-            }
-        },
-        outputs=[
-            {
-                "name": "detail",
-                "to": {"file": "detail_csv"},
-                "fields": ["order_id"],
-            }
-        ]
+    overrides=RunOverrides.csv_file(
+        output_path="./output/order_report.csv",
+        fields=["order_id"],
     ),
 )
 ```
@@ -1198,9 +1179,9 @@ sources:
 
 - `outputs` 是有序列表;顺序决定 primary 输出
 - 当多个 outputs 绑定到同一 book 时,建议显式设置 `outputs[*].to.sheet`(或确保 `outputs[*].name` 本身是合法且唯一的 sheet 名)
-- Python 调用侧可通过 `overrides.outputs` **整体替换** YAML 的 `outputs`(replace).优先级: `overrides.outputs` > YAML `outputs` > 默认(不写文件;仅 sink 保留数据)
-- `overrides.outputs` 必须为非空 list;本版本仅承诺最小子集: `name/to/write/fields`(不支持 `where/from/aggregate`)
-- 若 `overrides.outputs` 使运行期不再存在可作为默认目标的 Excel 输出,则未显式设置 `path` 的 `meta/audit` 可能会被跳过;
+- Python 调用侧可通过 `RunOverrides.outputs` **整体替换** YAML 的 `outputs`(replace).优先级: `RunOverrides.outputs` > YAML `outputs` > 默认(不写文件;仅 sink 保留数据)
+- `RunOverrides.outputs` 必须为非空序列,且元素为 `OutputOverride`;本版本仅承诺最小子集: `name/to/write/fields`(不支持 `where/from/aggregate`)
+- 若 `RunOverrides.outputs` 使运行期不再存在可作为默认目标的 Excel 输出,则未显式设置 `path` 的 `meta/audit` 可能会被跳过;
   若仍需输出这些 extra sheets,请显式配置 `meta.path` / `audit.path`
 
 #### 4.5.1 示例: YAML 声明多 sheet(明细 + 汇总 + meta + audit)
@@ -1240,23 +1221,12 @@ from scalim.dsl.by_yaml import RunOverrides, run
 result = run(
     "path/to/config.yaml",
     allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(
-        resources={
-            "books": {
-                "report": {
-                    "kind": "xlsx_file",
-                    "path": "./output/report.xlsx",
-                    "write_lock": True,
-                }
-            }
-        },
-        outputs=[
-            {
-                "name": "detail",
-                "to": {"book": "report", "sheet": "明细"},
-                "fields": ["order_id", "amount", "profit"],
-            }
-        ]
+    overrides=RunOverrides.xlsx_file_single_sheet(
+        output_path="./output/report.xlsx",
+        fields=["order_id", "amount", "profit"],
+        sheet="明细",
+        book_id="report",
+        write_lock=True,
     ),
 )
 ```

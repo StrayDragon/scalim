@@ -18,8 +18,8 @@ from ....execution.run_ir import export_layout_from_demand_ir
 from ....spec.ir import DemandIr
 from ....typedefs import FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
-from ..config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
-from ..config_parsing.security import ScalimComputeExpressionError, ScalimSecurityError, SecureComputeEngine
+from .._internal.config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
+from .._internal.config_parsing.security import ScalimComputeExpressionError, ScalimSecurityError, SecureComputeEngine
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER
 from ..schema_dsl.models import (
     BookConfig,

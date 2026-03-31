@@ -1,9 +1,9 @@
 import pytest
 
-import scalim.dsl.by_yaml.config_parsing.call_by as call_by_module
-from scalim.dsl.by_yaml.config_parsing.call_by import ScalimCallByParseError, parse_call_by
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+import scalim.dsl.by_yaml._internal.config_parsing.call_by as call_by_module
+from scalim.dsl.by_yaml._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
+from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver

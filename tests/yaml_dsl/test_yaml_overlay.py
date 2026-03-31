@@ -2,8 +2,17 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import UNSET, RunOverrides, compile
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml import (
+    FileResourceOverride,
+    OutputOverride,
+    OutputToOverride,
+    OutputWriteOverride,
+    ResourcesOverride,
+    UNSET,
+    RunOverrides,
+    compile,
+)
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -33,26 +42,17 @@ main_source:
       extract: amount
       name: Amount
 sources: {}
-""",
+    """,
     )
 
-    out_path = str(tmp_path / "out.xlsx")
-    overrides = RunOverrides(
-        outputs=[
-            {
-                "name": "detail",
-                "to": {"book": "report", "sheet": "Detail"},
-                "fields": ["amount", "order_id"],
-            }
-        ],
-        resources={
-            "books": {
-                "report": {
-                    "kind": "xlsx_file",
-                    "path": out_path,
-                }
-            }
-        },
+    out_path = tmp_path / "out.xlsx"
+    overrides = RunOverrides.xlsx_file_single_sheet(
+        output_path=out_path,
+        fields=("amount", "order_id"),
+        sheet="Detail",
+        output_name="detail",
+        book_id="report",
+        header_fields_output_by="name",
     )
 
     compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
@@ -62,181 +62,140 @@ sources: {}
 
     target = request.output_composition.targets[0]
     assert target.output.format == "excel"
-    assert target.output.path == out_path
+    assert target.output.path == str(out_path)
     assert target.output.sheet_name == "Detail"
     assert target.output.include_header is True
     assert target.layout.field_ids == ("amount", "order_id")
     assert target.layout.header_names == ("Amount", "Order ID")
 
 
-def test_compile_overrides_outputs_empty_rejected(tmp_path: Path) -> None:
-    yaml_path = _write_yaml(
-        tmp_path,
-        """
-name: overlay_overrides_outputs_empty
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    order_id:
-      extract: order_id
-    amount:
-      extract: amount
-sources: {}
-""",
-    )
-
-    overrides = RunOverrides(outputs=[])
-    with pytest.raises(ValueError, match=r"overrides\.outputs cannot be empty"):
-        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
+def test_compile_overrides_outputs_empty_rejected() -> None:
+    with pytest.raises(ValueError, match=r"RunOverrides\.outputs cannot be empty"):
+        _ = RunOverrides(outputs=[])
 
 
-def test_compile_overrides_outputs_rejects_unsupported_keys(tmp_path: Path) -> None:
-    yaml_path = _write_yaml(
-        tmp_path,
-        """
-name: overlay_overrides_outputs_unsupported_keys
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    order_id: {extract: order_id}
-sources: {}
-""",
-    )
-
-    overrides = RunOverrides(
-        outputs=[
-            {
-                "name": "detail",
-                "to": {"file": "detail_csv"},
-                "fields": ["order_id"],
-                "where": "order_id != ''",
-            }
-        ]
-    )
-    with pytest.raises(ValueError, match=r"unsupported keys: where"):
-        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
+def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
+    with pytest.raises(
+        TypeError,
+        match=r"Legacy YAML-shaped overrides are no longer supported: RunOverrides\.outputs=list\[dict\].*Migrate to typed dataclasses",
+    ):
+        _ = RunOverrides(outputs=[{"name": "detail"}])  # type: ignore[list-item]
 
 
 @pytest.mark.parametrize(
-    "outputs,exc_type,match",
+    "make_overrides,exc_type,match",
     [
-        ({"name": "detail"}, TypeError, r"overrides\.outputs must be a list"),
-        (["detail"], TypeError, r"overrides\.outputs\.0 must be an object"),
+        (lambda: RunOverrides(outputs={"detail": 1}), TypeError, r"RunOverrides\.outputs must be a sequence of OutputOverride"),
+        (lambda: RunOverrides(outputs=["detail"]), TypeError, r"RunOverrides\.outputs must be a sequence of OutputOverride"),
         (
-            [{"name": "detail", "container": {"type": "csv", "path": "./out.csv"}, "fields": ["order_id"]}],
-            ValueError,
-            r"overrides\.outputs\.0\.container was removed",
-        ),
-        (
-            [{"name": "detail", "to": "report", "fields": ["order_id"]}],
-            TypeError,
-            r"overrides\.outputs\.0\.to must be an object",
-        ),
-        (
-            [{"name": "detail", "write": "append", "fields": ["order_id"]}],
-            TypeError,
-            r"overrides\.outputs\.0\.write must be an object",
-        ),
-        (
-            [{"name": "detail", "write": {"mode": 123}, "fields": ["order_id"]}],
-            TypeError,
-            r"overrides\.outputs\.0\.write\.mode must be a string",
-        ),
-        (
-            [{"to": {"file": "detail_csv"}, "fields": ["order_id"]}],
+            lambda: RunOverrides(outputs=(OutputOverride(name="", fields=("order_id",), to=OutputToOverride(file="detail_csv")),)),
             ValueError,
             r"overrides\.outputs\.0\.name is required",
         ),
         (
-            [{"name": "bad-name", "to": {"file": "detail_csv"}, "fields": ["order_id"]}],
+            lambda: RunOverrides(outputs=(OutputOverride(name="bad-name", fields=("order_id",), to=OutputToOverride(file="detail_csv")),)),
             ValueError,
             r"overrides\.outputs\.0\.name='bad-name' is invalid",
         ),
         (
-            [
-                {"name": "detail", "to": {"file": "detail_csv"}, "fields": ["order_id"]},
-                {"name": "detail", "to": {"file": "detail_csv"}, "fields": ["order_id"]},
-            ],
+            lambda: RunOverrides(
+                outputs=(
+                    OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),
+                    OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),
+                )
+            ),
             ValueError,
             r"overrides\.outputs has duplicate output name: detail",
         ),
         (
-            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": "order_id"}],
-            TypeError,
-            r"overrides\.outputs\.0\.fields must be a list",
-        ),
-        (
-            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": []}],
+            lambda: RunOverrides(outputs=(OutputOverride(name="detail", fields=(), to=OutputToOverride(file="detail_csv")),)),
             ValueError,
             r"overrides\.outputs\.0\.fields must not be empty",
         ),
         (
-            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": [123]}],
-            TypeError,
-            r"overrides\.outputs\.0\.fields\.0 must be a field_id string",
-        ),
-        (
-            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": [""]}],
-            ValueError,
-            r"overrides\.outputs\.0\.fields\.0 must not be empty",
-        ),
-        (
-            [{"name": "detail", "to": {"file": "detail_csv"}, "fields": ["unknown"]}],
+            lambda: RunOverrides(outputs=(OutputOverride(name="detail", fields=("unknown",), to=OutputToOverride(file="detail_csv")),)),
             ValueError,
             r"overrides\.outputs\.0\.fields reference unknown fields: unknown",
         ),
         (
-            [{"name": "detail", "to": {"file": "detail_csv", "book": "report"}, "fields": ["order_id"]}],
+            lambda: RunOverrides(
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv", sheet="Detail")),)
+            ),
+            ValueError,
+            r"overrides\.outputs\.0\.to\.sheet is not allowed with to\.file",
+        ),
+        (
+            lambda: RunOverrides(
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv", book="report")),)
+            ),
             ValueError,
             r"overrides\.outputs\.0\.to must declare exactly one of to\.file or to\.book",
         ),
         (
-            [
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "write": {"mode": "append"},
-                    "fields": ["order_id"],
-                }
-            ],
+            lambda: RunOverrides(outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(sheet="Detail")),)),
+            ValueError,
+            r"Missing output destination for overrides\.outputs\.0\.to",
+        ),
+        (
+            lambda: RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("order_id",),
+                        to=OutputToOverride(file="detail_csv"),
+                        write=OutputWriteOverride(mode="append"),
+                    ),
+                )
+            ),
             ValueError,
             r"overrides\.outputs\.0\.write\.mode only apply to book outputs",
         ),
         (
-            [{"name": "detail", "to": {"sheet": "Detail"}, "fields": ["order_id"]}],
-            ValueError,
-            r"overrides\.outputs\.0\.to must declare exactly one of to\.file or to\.book",
-        ),
-        (
-            [{"name": "detail", "to": {"file": "detail_csv"}, "write": {"header_fields_output_by": "bad"}, "fields": ["order_id"]}],
+            lambda: RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("order_id",),
+                        to=OutputToOverride(file="detail_csv"),
+                        write=OutputWriteOverride(header_fields_output_by="bad"),
+                    ),
+                )
+            ),
             ValueError,
             r"overrides\.outputs\.0\.write\.header_fields_output_by='bad' is invalid",
         ),
+        (
+            lambda: RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("order_id",),
+                        to=OutputToOverride(book="report", sheet="Detail"),
+                        write=OutputWriteOverride(mode="append", include_header=True),
+                    ),
+                )
+            ),
+            ValueError,
+            r"write\.include_header is not allowed for append-mode book outputs",
+        ),
     ],
     ids=[
-        "outputs-not-list",
-        "item-not-object",
-        "container-removed",
-        "to-not-object",
-        "write-not-object",
-        "write-mode-not-string",
+        "outputs-not-seq",
+        "outputs-item-not-output-override",
         "name-required",
         "name-invalid-pattern",
         "duplicate-name",
-        "fields-not-list",
         "fields-empty",
-        "fields-item-not-string",
-        "fields-item-empty",
         "fields-unknown",
+        "to-sheet-not-allowed-with-file",
         "to-file-and-book-conflict",
+        "missing-destination",
         "file-output-book-write-conflict",
-        "sheet-without-binding",
         "write-header-by-invalid",
+        "append-book-output-include-header-not-allowed",
     ],
 )
-def test_compile_overrides_outputs_rejects_invalid_payloads(tmp_path: Path, outputs, exc_type, match: str) -> None:
+def test_compile_overrides_outputs_rejects_invalid_payloads(tmp_path: Path, make_overrides, exc_type, match: str) -> None:
     yaml_path = _write_yaml(
         tmp_path,
         """
@@ -250,8 +209,8 @@ sources: {}
 """,
     )
 
-    overrides = RunOverrides(outputs=outputs)
     with pytest.raises(exc_type, match=match):
+        overrides = make_overrides()
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
 
 
@@ -275,14 +234,8 @@ sources: {}
         allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
         init_vars={"out_path": output_path},
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": {"$init_var": "out_path"}}}},
+            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path={"$init_var": "out_path"})}),
         ),
     )
 
@@ -309,14 +262,8 @@ sources: {}
         str(yaml_path),
         allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": output_path}}},
+            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=output_path)}),
         ),
     )
 
@@ -343,14 +290,8 @@ sources: {}
         str(yaml_path),
         allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
         overrides=RunOverrides(
-            outputs=[
-                {
-                    "name": "detail",
-                    "to": {"file": "detail_csv"},
-                    "fields": ["order_id"],
-                }
-            ],
-            resources={"files": {"detail_csv": {"kind": "csv_file", "path": "./out.csv"}}},
+            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
         ),
     )
 
@@ -378,21 +319,21 @@ sources: {}
             str(yaml_path),
             allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
             overrides=RunOverrides(
-                outputs=[
-                    {
-                        "name": "detail",
-                        "to": {"file": "detail_csv"},
-                        "write": {"header_fields_output_by": "name"},
-                        "fields": ["order_id", "amount"],
-                    }
-                ],
-                resources={"files": {"detail_csv": {"kind": "csv_file", "path": "./out.csv"}}},
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("order_id", "amount"),
+                        to=OutputToOverride(file="detail_csv"),
+                        write=OutputWriteOverride(header_fields_output_by="name"),
+                    ),
+                ),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
             ),
         )
 
 
 def test_should_validate_unique_field_names_skips_field_id_headers() -> None:
-    from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
     from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
     from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig, OutputToConfig, OutputWriteConfig
 
@@ -437,7 +378,7 @@ resources:
 
 
 def test_should_validate_unique_field_names_includes_books_outputs() -> None:
-    from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
     from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
     from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig, OutputToConfig
 
@@ -705,8 +646,8 @@ sources: {}
 
 
 def test_loader_parse_config_rejects_invalid_validate_unique_field_names_type() -> None:
-    from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
-    from scalim.dsl.by_yaml.config_parsing.models import RawDemand
+    from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.by_yaml._internal.config_parsing.models import RawDemand
 
     loader = YamlDemandLoader()
     raw = RawDemand.from_raw(

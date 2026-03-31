@@ -4,13 +4,13 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
-from ..dsl.by_yaml.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
-from ..dsl.by_yaml.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
-from ..dsl.by_yaml.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
-from ..dsl.by_yaml.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
-from ..dsl.by_yaml.config_parsing.validator import ConfigValidator
-from ..dsl.by_yaml.config_parsing.validators.issues import ValidationIssue
-from ..dsl.by_yaml.config_parsing.yaml_load import (
+from ..dsl.by_yaml._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
+from ..dsl.by_yaml._internal.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
+from ..dsl.by_yaml._internal.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
+from ..dsl.by_yaml._internal.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
+from ..dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
+from ..dsl.by_yaml._internal.config_parsing.validators.issues import ValidationIssue
+from ..dsl.by_yaml._internal.config_parsing.yaml_load import (
     YamlLocationIndex,
     envelope_from_validation_issue,
     error_loc_for_yaml_path,

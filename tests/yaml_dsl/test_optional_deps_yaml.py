@@ -8,8 +8,8 @@ from tests.support.testing_utils import missing_optional_dependency
 @pytest.mark.parametrize(
     "module_path",
     [
-        "scalim.dsl.by_yaml.config_parsing.loader",
-        "scalim.dsl.by_yaml.config_parsing.validator",
+        "scalim.dsl.by_yaml._internal.config_parsing.loader",
+        "scalim.dsl.by_yaml._internal.config_parsing.validator",
         "scalim.cli.yaml_dsl",
     ],
     ids=["loader", "validator", "cli"],

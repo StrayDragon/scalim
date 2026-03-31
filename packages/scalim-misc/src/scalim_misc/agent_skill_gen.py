@@ -35,12 +35,12 @@ from scalim_misc.yaml_dsl_cli_reference_md import (
 
 from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml.config_parsing.imports import (
+from scalim.dsl.by_yaml._internal.config_parsing.imports import (
     ScalimYamlImportExpansionError,
     contains_import_syntax,
     expand_imports_inplace,
 )
-from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.runtime.builtin_callables import list_public_builtin_callable_ids
 from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
 

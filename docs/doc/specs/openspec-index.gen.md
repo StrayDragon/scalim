@@ -434,7 +434,7 @@ Sources:
 ### `yaml-dsl-output-overrides`
 - Title: yaml-dsl-output-overrides Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-output-overrides/spec.md)
-- Summary: **状态: ✅ 已实现** 为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过与 YAML 同形的 `overrides.outputs` 显式指定输出。
+- Summary: **状态: ✅ 已实现** 为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。
 
 ### `yaml-dsl-public-tools`
 - Title: yaml-dsl-public-tools Specification

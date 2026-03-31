@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config
 
 
@@ -70,7 +70,7 @@ outputs:
 
 
 def test_load_output_config_default_aggregate_output_fields_includes_compute_and_matches_runtime_default(tmp_path: Path) -> None:
-    from scalim.dsl.by_yaml.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
     from scalim.dsl.by_yaml.runtime import output_composition_yaml as oc_yaml
 
     yaml_path = _write_yaml(

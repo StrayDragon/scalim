@@ -25,7 +25,17 @@ from ...spec.ir._workflow import (
     WriteSheetNodeIr,
 )
 from ...vendor.dataclassesx import replace
-from .config_parsing.loader import YamlDemandLoader
+from ._internal.config_parsing.loader import YamlDemandLoader
+from .runtime.contracts import (
+    BookResourceOverride,
+    FileResourceOverride,
+    OutputOverride,
+    OutputsDefaultsOverride,
+    OutputToOverride,
+    OutputWriteOverride,
+    ResourcesOverride,
+    RunOverrides,
+)
 from .runtime.output_path_resolve import resolve_yaml_relative_output_path
 from .schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from .schema_dsl.models import (
@@ -497,6 +507,59 @@ def _file_export_path_and_options(
     return export_path, {"kind": "csv_file", "encoding": str(file_cfg.encoding or DEFAULT_OUTPUT_ENCODING)}
 
 
+def _book_override_to_patch(override: BookResourceOverride) -> Dict[str, object]:  # noqa: C901, PLR0912
+    patch: Dict[str, object] = {}
+    if override.kind is not None:
+        patch["kind"] = override.kind
+    if override.path is not None:
+        patch["path"] = override.path
+    if override.allow_formulas is not None:
+        patch["allow_formulas"] = override.allow_formulas
+    if override.write_lock is not None:
+        patch["write_lock"] = override.write_lock
+    if override.budget is not None:
+        budget_patch: Dict[str, object] = {}
+        if override.budget.max_sheets is not None:
+            budget_patch["max_sheets"] = override.budget.max_sheets
+        if override.budget.max_total_cells is not None:
+            budget_patch["max_total_cells"] = override.budget.max_total_cells
+        patch["budget"] = budget_patch
+    if override.export_xlsx is not None:
+        export_patch: Dict[str, object] = {}
+        if override.export_xlsx.path is not None:
+            export_patch["path"] = override.export_xlsx.path
+        if override.export_xlsx.write_lock is not None:
+            export_patch["write_lock"] = override.export_xlsx.write_lock
+        if override.export_xlsx.allow_formulas is not None:
+            export_patch["allow_formulas"] = override.export_xlsx.allow_formulas
+        patch["export_xlsx"] = export_patch
+    if override.write_defaults is not None:
+        defaults_patch: Dict[str, object] = {}
+        if override.write_defaults.mode is not None:
+            defaults_patch["mode"] = override.write_defaults.mode
+        if override.write_defaults.align_by is not None:
+            defaults_patch["align_by"] = override.write_defaults.align_by
+        if override.write_defaults.header_policy is not None:
+            defaults_patch["header_policy"] = override.write_defaults.header_policy
+        if override.write_defaults.on_mismatch is not None:
+            defaults_patch["on_mismatch"] = override.write_defaults.on_mismatch
+        if override.write_defaults.on_conflict is not None:
+            defaults_patch["on_conflict"] = override.write_defaults.on_conflict
+        patch["write_defaults"] = defaults_patch
+    return patch
+
+
+def _file_override_to_patch(override: FileResourceOverride) -> Dict[str, object]:
+    patch: Dict[str, object] = {}
+    if override.kind is not None:
+        patch["kind"] = override.kind
+    if override.path is not None:
+        patch["path"] = override.path
+    if override.encoding is not None:
+        patch["encoding"] = override.encoding
+    return patch
+
+
 def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
     wf_obj: WorkflowConfig,
     *,
@@ -504,7 +567,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
     demand_cfg_by_run_id: Mapping[str, DemandConfig],
     demand_yaml_paths_by_run_id: Mapping[str, str],
     init_vars: Optional[Dict[str, object]],
-    overrides_resources: Optional[Mapping[str, object]],
+    overrides_resources: Optional[ResourcesOverride],
 ) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, FileConfig]]:
     """编译工作流的有效 `books` 资源并返回:
 
@@ -624,17 +687,12 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
     all_file_ids.update(demand_files)
     all_file_ids.update(workflow_files)
 
-    overrides_books_raw: Optional[Mapping[str, object]] = None
-    overrides_files_raw: Optional[Mapping[str, object]] = None
-    if overrides_resources is not None:
-        books_obj = overrides_resources.get("books")
-        if isinstance(books_obj, dict):
-            overrides_books_raw = cast("Mapping[str, object]", books_obj)  # pragma: allow-cast yaml mapping typed narrowing
-            all_book_ids.update(str(k) for k in overrides_books_raw)
-        files_obj = overrides_resources.get("files")
-        if isinstance(files_obj, dict):
-            overrides_files_raw = cast("Mapping[str, object]", files_obj)  # pragma: allow-cast yaml mapping typed narrowing
-            all_file_ids.update(str(k) for k in overrides_files_raw)
+    overrides_books_raw = None if overrides_resources is None else overrides_resources.books
+    overrides_files_raw = None if overrides_resources is None else overrides_resources.files
+    if overrides_books_raw:
+        all_book_ids.update(str(k) for k in overrides_books_raw)
+    if overrides_files_raw:
+        all_file_ids.update(str(k) for k in overrides_files_raw)
 
     for book_id in sorted(all_book_ids):
         bid = str(book_id)
@@ -653,12 +711,11 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
 
         # 应用仅 `IO` 的 `overrides.resources.books.<id>` 补丁覆盖(按 `deep-merge` 语义).
         if overrides_books_raw is not None and bid in overrides_books_raw:
-            patch_obj = overrides_books_raw.get(bid)
-            if not isinstance(patch_obj, dict):
-                msg = "overrides.resources.books.{} must be a mapping".format(bid)
+            book_override = overrides_books_raw[bid]
+            if not isinstance(book_override, BookResourceOverride):
+                msg = "overrides.resources.books.{} must be a BookResourceOverride".format(bid)
                 raise ScalimWorkflowConfigError(msg, path="overrides.resources.books.{}".format(bid))
-            patch = cast("Mapping[str, object]", patch_obj)  # pragma: allow-cast runtime overrides dict narrowing
-
+            patch = _book_override_to_patch(book_override)
             if book is None:
                 book = BookConfig(kind="")
                 if base_dir is None:
@@ -688,11 +745,11 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
             path_prefix = "resources.files.{}".format(fid)
 
         if overrides_files_raw is not None and fid in overrides_files_raw:
-            patch_obj = overrides_files_raw.get(fid)
-            if not isinstance(patch_obj, dict):
-                msg = "overrides.resources.files.{} must be a mapping".format(fid)
+            file_override = overrides_files_raw[fid]
+            if not isinstance(file_override, FileResourceOverride):
+                msg = "overrides.resources.files.{} must be a FileResourceOverride".format(fid)
                 raise ScalimWorkflowConfigError(msg, path="overrides.resources.files.{}".format(fid))
-            patch = cast("Mapping[str, object]", patch_obj)  # pragma: allow-cast runtime overrides dict narrowing
+            patch = _file_override_to_patch(file_override)
             if file_cfg is None:
                 file_cfg = FileConfig(kind="")
                 if base_dir is None:
@@ -861,56 +918,109 @@ def _load_demands(
     return demand_cfg_by_run_id
 
 
-def _effective_outputs_for_workflow_compile(
+def _parse_overrides_outputs_defaults_book_id(defaults: Optional[OutputsDefaultsOverride]) -> Optional[str]:
+    if defaults is None:
+        return None
+    book_id = str(defaults.to.book or "").strip()
+    if not book_id:
+        msg = "overrides.outputs_defaults.to.book is required"
+        raise ScalimWorkflowConfigError(msg, path="overrides.outputs_defaults.to.book")
+    return book_id
+
+
+def _apply_default_book_binding_to_outputs(
+    outputs: Tuple[OutputTargetConfig, ...],
+    *,
+    default_book_id: str,
+) -> Tuple[OutputTargetConfig, ...]:
+    if not outputs or not default_book_id:
+        return outputs
+
+    updated: List[OutputTargetConfig] = []
+    for out_cfg in outputs:
+        to_cfg = out_cfg.to
+        if to_cfg is None:
+            updated.append(replace(out_cfg, to=OutputToConfig(book=str(default_book_id))))
+            continue
+
+        file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
+        book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
+        if file_id or book_id:
+            updated.append(out_cfg)
+            continue
+
+        updated.append(replace(out_cfg, to=replace(to_cfg, book=str(default_book_id))))
+
+    return tuple(updated)
+
+
+def _effective_outputs_for_workflow_compile(  # noqa: C901
     config: DemandConfig,
     *,
-    overrides_outputs: Optional[Sequence[Mapping[str, object]]],
+    overrides_outputs: Optional[Sequence[OutputOverride]],
+    default_book_id: Optional[str],
 ) -> Tuple[OutputTargetConfig, ...]:
     if overrides_outputs is None:
-        return tuple(config.outputs or ())
+        yaml_outputs = tuple(config.outputs or ())
+        if default_book_id is not None:
+            yaml_outputs = _apply_default_book_binding_to_outputs(yaml_outputs, default_book_id=str(default_book_id))
+        return yaml_outputs
 
     # 最小解析器: 仅抽取 `name`/`to`/`write`;完整校验在需求编译阶段完成.
     outputs: List[OutputTargetConfig] = []
     for idx, raw in enumerate(overrides_outputs):
-        if not isinstance(raw, dict):
-            msg = "overrides.outputs.{} must be a mapping".format(int(idx))
+        if not isinstance(raw, OutputOverride):
+            msg = "overrides.outputs.{} must be an OutputOverride".format(int(idx))
             raise ScalimWorkflowConfigError(msg, path="overrides.outputs")
-        if "container" in raw:
-            msg = "overrides.outputs.{}.container was removed; migrate to overrides.resources.files + overrides.outputs[*].to.file".format(
-                int(idx)
-            )
-            raise ScalimWorkflowConfigError(msg, path="overrides.outputs.{}.container".format(int(idx)))
-        name_raw = raw.get("name")
-        name = str(name_raw or "").strip() if isinstance(name_raw, str) else ""
+
+        name = str(raw.name or "").strip()
         if not name:
             msg = "overrides.outputs.{}.name is required".format(int(idx))
             raise ScalimWorkflowConfigError(msg, path="overrides.outputs")
 
-        to_obj = raw.get("to")
-        to_cfg = None
-        if isinstance(to_obj, dict):
-            to_raw = cast("Mapping[str, object]", to_obj)  # pragma: allow-cast yaml mapping typed narrowing
-            file_raw = to_raw.get("file")
-            book_raw = to_raw.get("book")
-            sheet_raw = to_raw.get("sheet")
-            file_id = str(file_raw or "").strip() if isinstance(file_raw, str) else None
-            book = str(book_raw or "").strip() if isinstance(book_raw, str) else None
-            sheet = str(sheet_raw or "").strip() if isinstance(sheet_raw, str) else None
-            if file_id is not None or book is not None or sheet is not None:
-                to_cfg = OutputToConfig(file=file_id, book=book, sheet=sheet)
+        to_override = raw.to
+        if not isinstance(to_override, OutputToOverride):
+            msg = "overrides.outputs.{}.to must be an OutputToOverride".format(int(idx))
+            raise ScalimWorkflowConfigError(msg, path="overrides.outputs.{}.to".format(int(idx)))
+        file_id = str(to_override.file or "").strip() if to_override.file is not None else ""
+        book_id = str(to_override.book or "").strip() if to_override.book is not None else ""
+        sheet = str(to_override.sheet or "").strip() if to_override.sheet is not None else ""
 
-        write_obj = raw.get("write")
+        if file_id and (book_id or sheet):
+            msg = "overrides.outputs.{}.to declares to.file and to.book/to.sheet; declare only one destination".format(int(idx))
+            raise ScalimWorkflowConfigError(msg, path="overrides.outputs.{}.to".format(int(idx)))
+
+        if not file_id:
+            book_id = book_id or str(default_book_id or "").strip()
+            if not book_id:
+                msg = (
+                    "Missing outputs to.book binding for output {!r}; set overrides.outputs.{}.to.book explicitly "
+                    "or provide overrides.outputs_defaults.to.book"
+                ).format(str(name), int(idx))
+                raise ScalimWorkflowConfigError(msg, path="overrides.outputs.{}.to.book".format(int(idx)))
+
+        to_cfg = OutputToConfig(
+            file=str(file_id).strip() or None,
+            book=str(book_id).strip() or None,
+            sheet=str(sheet).strip() or None,
+        )
+
+        write_obj = raw.write
         write_cfg = None
-        if isinstance(write_obj, dict):
-            write_raw = cast("Dict[str, Any]", write_obj)  # pragma: allow-cast yaml mapping typed narrowing
+        if write_obj is not None:
+            if not isinstance(write_obj, OutputWriteOverride):
+                msg = "overrides.outputs.{}.write must be an OutputWriteOverride".format(int(idx))
+                raise ScalimWorkflowConfigError(msg, path="overrides.outputs.{}.write".format(int(idx)))
+
+            write_raw = cast("Any", write_obj)  # pragma: allow-cast typed override field access boundary
             write_cfg = OutputWriteConfig(
-                include_header=write_raw.get("include_header"),
-                mode=write_raw.get("mode"),
-                align_by=write_raw.get("align_by"),
-                header_policy=write_raw.get("header_policy"),
-                header_fields_output_by=write_raw.get("header_fields_output_by"),
-                on_mismatch=write_raw.get("on_mismatch"),
-                on_conflict=write_raw.get("on_conflict"),
+                include_header=write_raw.include_header,
+                mode=write_raw.mode,
+                align_by=write_raw.align_by,
+                header_policy=write_raw.header_policy,
+                header_fields_output_by=write_raw.header_fields_output_by,
+                on_mismatch=write_raw.on_mismatch,
+                on_conflict=write_raw.on_conflict,
             )
 
         outputs.append(
@@ -932,7 +1042,8 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     edges: List[WorkflowEdgeIr],
     effective_books: Mapping[str, BookConfig],
     effective_files: Mapping[str, FileConfig],
-    overrides_outputs: Optional[Sequence[Mapping[str, object]]],
+    overrides_outputs: Optional[Sequence[OutputOverride]],
+    default_book_id: Optional[str],
 ) -> Dict[str, List[str]]:
     last_write_node_id_by_book_id: Dict[str, str] = {}
     xlsx_memory_write_node_ids_by_run_id: Dict[str, List[str]] = {}
@@ -942,7 +1053,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
         if cfg is None:
             continue
 
-        outputs = _effective_outputs_for_workflow_compile(cfg, overrides_outputs=overrides_outputs)
+        outputs = _effective_outputs_for_workflow_compile(cfg, overrides_outputs=overrides_outputs, default_book_id=default_book_id)
         if not outputs:
             continue
 
@@ -1221,13 +1332,21 @@ def compile_workflow_ir(
     template_vars: Optional[Mapping[str, object]] = None,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     init_vars: Optional[Dict[str, object]] = None,
-    overrides: Optional[Mapping[str, object]] = None,
+    overrides: Optional[object] = None,
 ) -> WorkflowIr:
     """将工作流配置编译为工作流 `IR`.
 
     说明:
-    - `overrides` 为与 `YAML` 同形的 `mapping`(通常来自 `RunOverrides`),用于 `resources` 覆盖和 `outputs` 替换.
+    - `overrides` 为 `RunOverrides` 强类型覆盖项,用于 `resources` 覆盖、`outputs_defaults` 与 `outputs` 替换.
     """
+    if overrides is not None and not isinstance(overrides, RunOverrides):
+        msg = (
+            "overrides must be a RunOverrides (typed dataclasses); legacy YAML-shaped overrides mappings were removed. "
+            "Migrate to RunOverrides(outputs=(OutputOverride(...),), "
+            "resources=ResourcesOverride(...), outputs_defaults=OutputsDefaultsOverride(...))."
+        )
+        raise ScalimWorkflowConfigError(msg, path="overrides")
+    overrides_typed = overrides
     wf_obj = cast("WorkflowConfig", wf)  # pragma: allow-cast workflow config typed narrowing
 
     workflow_base_dir = _workflow_base_dir(workflow_yaml_path)
@@ -1252,20 +1371,9 @@ def compile_workflow_ir(
         allowed_yaml_roots=allowed_yaml_roots,
     )
 
-    overrides_resources = None
-    overrides_outputs = None
-    if overrides is not None:
-        if "outputs_defaults" in overrides:
-            msg = (
-                "overrides.outputs_defaults was removed; set overrides.outputs[*].to.book explicitly or override resources.books.* instead"
-            )
-            raise ScalimWorkflowConfigError(msg, path="overrides.outputs_defaults")
-        res_obj = overrides.get("resources")
-        if isinstance(res_obj, dict):
-            overrides_resources = cast("Mapping[str, object]", res_obj)  # pragma: allow-cast yaml mapping typed narrowing
-        outs_obj = overrides.get("outputs")
-        if isinstance(outs_obj, list):
-            overrides_outputs = cast("Sequence[Mapping[str, object]]", outs_obj)  # pragma: allow-cast yaml list typed narrowing
+    overrides_resources = None if overrides_typed is None else overrides_typed.resources
+    overrides_outputs = None if overrides_typed is None else overrides_typed.outputs
+    default_book_id = _parse_overrides_outputs_defaults_book_id(None if overrides_typed is None else overrides_typed.outputs_defaults)
 
     resources, effective_books, effective_files = _compile_workflow_resources(
         wf_obj,
@@ -1284,6 +1392,7 @@ def compile_workflow_ir(
         effective_books=effective_books,
         effective_files=effective_files,
         overrides_outputs=overrides_outputs,
+        default_book_id=default_book_id,
     )
 
     _inject_xlsx_memory_write_dependencies(

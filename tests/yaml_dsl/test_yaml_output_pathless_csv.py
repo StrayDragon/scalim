@@ -1,7 +1,7 @@
 import pytest
 
 from scalim.dsl.by_yaml import compile
-from scalim.dsl.by_yaml.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml.runtime.output_path_resolve import resolve_output_container_path
 
 

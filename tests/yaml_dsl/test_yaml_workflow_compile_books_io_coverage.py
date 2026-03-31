@@ -2,6 +2,20 @@ from pathlib import Path
 
 import pytest
 
+from scalim.dsl.by_yaml import (
+    BookBudgetOverride,
+    BookExportXlsxOverride,
+    BookResourceOverride,
+    BookWriteDefaultsOverride,
+    FileResourceOverride,
+    OutputDefaultsToOverride,
+    OutputsDefaultsOverride,
+    OutputOverride,
+    OutputToOverride,
+    OutputWriteOverride,
+    ResourcesOverride,
+    RunOverrides,
+)
 from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
 from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowOptions, WorkflowRun
 from scalim.dsl.by_yaml.schema_dsl.models import (
@@ -339,19 +353,19 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         demand_cfg_by_run_id={"a": DemandConfig()},
         demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
         init_vars=None,
-        overrides_resources={"books": {1: {"kind": "xlsx_file", "path": "a.xlsx"}}},
+        overrides_resources=ResourcesOverride(books={1: BookResourceOverride(kind="xlsx_file", path="a.xlsx")}),  # type: ignore[dict-item]
     )
     assert resources == []
     assert effective_books == {}
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.resources\.books\.report must be a mapping"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.resources\.books\.report must be a BookResourceOverride"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
             WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig()),
             workflow_base_dir=workflow_base_dir,
             demand_cfg_by_run_id={"a": DemandConfig()},
             demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
             init_vars=None,
-            overrides_resources={"books": {"report": "nope"}},
+            overrides_resources=ResourcesOverride(books={"report": "nope"}),  # type: ignore[dict-item]
         )
 
     # overrides.resources.books can create a book definition from scratch (IO-only deep-merge)
@@ -361,7 +375,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         demand_cfg_by_run_id={"a": DemandConfig()},
         demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
         init_vars=None,
-        overrides_resources={"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx"}}},
+        overrides_resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path="a.xlsx")}),
     )
     assert effective_books["report"].kind == "xlsx_file"
     assert effective_files == {}
@@ -403,18 +417,153 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         )
 
 
+def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields(tmp_path: Path) -> None:
+    wf_obj = WorkflowConfig(runs=(), options=WorkflowOptions(), resources=ResourcesConfig())
+    overrides_resources = ResourcesOverride(
+        books={
+            "report": BookResourceOverride(
+                kind="xlsx_file",
+                path="./report.xlsx",
+                allow_formulas=True,
+                write_lock=True,
+                write_defaults=BookWriteDefaultsOverride(
+                    mode="append",
+                    align_by="header",
+                    header_policy="always",
+                    on_mismatch="error",
+                    on_conflict="error",
+                ),
+            ),
+            "mem": BookResourceOverride(
+                kind="xlsx_memory",
+                budget=BookBudgetOverride(max_sheets=1, max_total_cells=2),
+                export_xlsx=BookExportXlsxOverride(path="./mem.xlsx", write_lock=True, allow_formulas=True),
+                write_defaults=BookWriteDefaultsOverride(mode="append"),
+            ),
+        },
+        files={
+            "detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv", encoding="latin1"),
+        },
+    )
+
+    resources, books, files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+        wf_obj,
+        workflow_base_dir=tmp_path,
+        demand_cfg_by_run_id={},
+        demand_yaml_paths_by_run_id={},
+        init_vars=None,
+        overrides_resources=overrides_resources,
+    )
+    assert resources
+    assert books["report"].allow_formulas is True
+    assert books["report"].write_lock is True
+    assert books["report"].write_defaults is not None
+    assert books["mem"].budget is not None
+    assert books["mem"].export_xlsx is not None
+    assert files["detail_csv"].encoding == "latin1"
+
+
+def test_workflow_compile_outputs_defaults_book_id_and_default_binding_cover_branches() -> None:
+    assert workflow_compile_mod._parse_overrides_outputs_defaults_book_id(None) is None  # noqa: SLF001
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs_defaults\.to\.book is required"):
+        _ = workflow_compile_mod._parse_overrides_outputs_defaults_book_id(  # noqa: SLF001
+            OutputsDefaultsOverride(to=OutputDefaultsToOverride(book="  "))
+        )
+
+    assert (
+        workflow_compile_mod._parse_overrides_outputs_defaults_book_id(  # noqa: SLF001
+            OutputsDefaultsOverride(to=OutputDefaultsToOverride(book="report"))
+        )
+        == "report"
+    )
+
+    outputs = (
+        OutputTargetConfig(name="detail", to=None, fields=("a",)),
+        OutputTargetConfig(name="sheet_only", to=OutputToConfig(sheet="S"), fields=("a",)),
+        OutputTargetConfig(name="bound", to=OutputToConfig(book="report"), fields=("a",)),
+    )
+    assert workflow_compile_mod._apply_default_book_binding_to_outputs((), default_book_id="report") == ()  # noqa: SLF001
+    assert workflow_compile_mod._apply_default_book_binding_to_outputs(outputs, default_book_id="") is outputs  # noqa: SLF001
+
+    bound = workflow_compile_mod._apply_default_book_binding_to_outputs(outputs, default_book_id="report")  # noqa: SLF001
+    assert bound[0].to is not None
+    assert bound[0].to.book == "report"
+    assert bound[1].to is not None
+    assert bound[1].to.book == "report"
+    assert bound[1].to.sheet == "S"
+    assert bound[2].to is not None
+    assert bound[2].to.book == "report"
+
+    effective = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
+        DemandConfig(outputs=(OutputTargetConfig(name="detail", to=None, fields=("a",)),)),
+        overrides_outputs=None,
+        default_book_id="report",
+    )
+    assert effective[0].to is not None
+    assert effective[0].to.book == "report"
+
+
+def test_workflow_compile_effective_outputs_rejects_bad_typed_overrides_shapes_cover_branches() -> None:
+    cfg = DemandConfig()
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs\.0\.to must be an OutputToOverride"):
+        _ = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
+            cfg,
+            overrides_outputs=[OutputOverride(name="detail", fields=("a",), to=object())],  # type: ignore[arg-type]
+            default_book_id=None,
+        )
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Missing outputs to\.book binding"):
+        _ = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
+            cfg,
+            overrides_outputs=[OutputOverride(name="detail", fields=("a",), to=OutputToOverride(sheet="S"))],
+            default_book_id=None,
+        )
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs\.0\.write must be an OutputWriteOverride"):
+        _ = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
+            cfg,
+            overrides_outputs=[
+                OutputOverride(
+                    name="detail",
+                    fields=("a",),
+                    to=OutputToOverride(book="report", sheet="S"),
+                    write=object(),  # type: ignore[arg-type]
+                )
+            ],
+            default_book_id=None,
+        )
+
+
 def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_branches() -> None:
     cfg = DemandConfig()
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs\.0 must be a mapping"):
-        _ = workflow_compile_mod._effective_outputs_for_workflow_compile(cfg, overrides_outputs=["nope"])  # type: ignore[arg-type]  # noqa: SLF001
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs\.0 must be an OutputOverride"):
+        _ = workflow_compile_mod._effective_outputs_for_workflow_compile(  # type: ignore[arg-type]  # noqa: SLF001
+            cfg,
+            overrides_outputs=["nope"],
+            default_book_id=None,
+        )
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"name is required"):
-        _ = workflow_compile_mod._effective_outputs_for_workflow_compile(cfg, overrides_outputs=[{}])  # noqa: SLF001
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs\.0\.name is required"):
+        _ = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
+            cfg,
+            overrides_outputs=[OutputOverride(name="", fields=(), to=OutputToOverride(book="report", sheet="S"))],
+            default_book_id=None,
+        )
 
     outs = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
         cfg,
-        overrides_outputs=[{"name": "detail", "to": {"book": "report", "sheet": "S"}, "write": {"mode": "append"}}],
+        overrides_outputs=[
+            OutputOverride(
+                name="detail",
+                fields=("a",),
+                to=OutputToOverride(book="report", sheet="S"),
+                write=OutputWriteOverride(mode="append"),
+            )
+        ],
+        default_book_id=None,
     )
     assert outs[0].name == "detail"
 
@@ -431,6 +580,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             effective_books={},
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )
         == {}
     )
@@ -446,6 +596,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             effective_books={},
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )
 
     # sheet name validation error path
@@ -460,6 +611,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")},
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )
 
     # unsupported mode error path
@@ -478,6 +630,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             effective_books={"report": cfg.resources.books["report"]},  # type: ignore[union-attr]
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )
 
 
@@ -500,6 +653,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
         effective_books={"report": BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(max_sheets=1, max_total_cells=10))},
         effective_files={},
         overrides_outputs=None,
+        default_book_id=None,
     )
     assert out["a"]
     assert any(isinstance(n, (WriteSheetNodeIr, AppendSheetNodeIr)) for n in nodes)
@@ -519,6 +673,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             effective_books={},
             effective_files={"detail_csv": FileConfig(kind="csv_file", path="out.csv")},
             overrides_outputs=None,
+            default_book_id=None,
         )
 
     # default book missing in effective_books
@@ -535,6 +690,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             effective_books={},
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )
 
     # invalid extra sheet name error path
@@ -551,6 +707,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")},
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )
 
     # unsupported mode branch for extra sheets
@@ -574,6 +731,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="nope"))},
             effective_files={},
             overrides_outputs=None,
+            default_book_id=None,
         )
 
     # inject deps: pos None and wrong node type branches
@@ -591,7 +749,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
 
 def test_workflow_compile_compile_workflow_ir_overrides_mapping_parsing_cover_branches(tmp_path: Path) -> None:
     wf_obj = WorkflowConfig(runs=(), options=WorkflowOptions(), resources=ResourcesConfig())
-    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.outputs_defaults was removed"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides must be a RunOverrides"):
         _ = workflow_compile_mod.compile_workflow_ir(  # noqa: SLF001
             wf_obj,
             workflow_yaml_path=str(tmp_path / "wf.yaml"),
@@ -599,7 +757,7 @@ def test_workflow_compile_compile_workflow_ir_overrides_mapping_parsing_cover_br
             template_vars=None,
             allowed_yaml_roots=None,
             init_vars=None,
-            overrides={"resources": {}, "outputs_defaults": {}, "outputs": []},
+            overrides={"resources": {}, "outputs_defaults": {}, "outputs": []},  # type: ignore[arg-type]
         )
 
     workflow_ir = workflow_compile_mod.compile_workflow_ir(  # noqa: SLF001
@@ -609,6 +767,6 @@ def test_workflow_compile_compile_workflow_ir_overrides_mapping_parsing_cover_br
         template_vars=None,
         allowed_yaml_roots=None,
         init_vars=None,
-        overrides={"resources": {}, "outputs": []},
+        overrides=RunOverrides(),
     )
     assert workflow_ir.resources == ()

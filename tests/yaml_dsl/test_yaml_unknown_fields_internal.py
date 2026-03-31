@@ -1,4 +1,4 @@
-from scalim.dsl.by_yaml.config_parsing import unknown_fields as uf
+from scalim.dsl.by_yaml._internal.config_parsing import unknown_fields as uf
 
 
 def test_unknown_fields_private_helpers_cover_edge_branches() -> None:

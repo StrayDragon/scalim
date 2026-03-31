@@ -1,5 +1,5 @@
-from scalim.dsl.by_yaml.config_parsing import validator as validator_mod
-from scalim.dsl.by_yaml.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml._internal.config_parsing import validator as validator_mod
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.by_yaml.schema_dsl.models import BOOK_WRITE_DEFAULTS_KEYS
 
 
