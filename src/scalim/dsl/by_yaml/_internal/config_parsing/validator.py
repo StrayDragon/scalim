@@ -270,6 +270,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         relation_paths = self._validate_relations(raw.data, errors, sources_info, main_source_id)
         self._validate_fields(raw, errors, sources_info, main_source_id, relation_paths)
         self._validate_outputs_fields_object_refs(raw, errors, main_source_id=main_source_id)
+        self._validate_outputs_detail_requires_fields_or_from(raw.data, errors)
         self._validate_removed_output_container(raw.data, errors)
         self._validate_resource_output_paths(raw.data, errors)
         self._validate_unique_effective_field_display_names(raw, errors, main_source_id=main_source_id)
@@ -305,6 +306,42 @@ class ConfigValidator(ValidatorFieldsMixin):
 
         msg = _format_duplicate_effective_display_names_message(duplicates)
         self._add_error(errors, msg, path=DEMAND_KEYS["validate_unique_field_names"])
+
+    def _validate_outputs_detail_requires_fields_or_from(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+        outputs_raw: object = config.get(DEMAND_KEYS["outputs"])
+        if not _is_list(outputs_raw):
+            return
+        outputs = outputs_raw
+
+        fields_key = OUTPUT_TARGET_KEYS["fields"]
+        from_key = OUTPUT_TARGET_KEYS["from_"]
+        aggregate_key = OUTPUT_TARGET_KEYS["aggregate"]
+        name_key = OUTPUT_TARGET_KEYS["name"]
+
+        for idx, item in enumerate(outputs):
+            if not isinstance(item, dict):
+                continue
+            out_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
+
+            # `$import` 会在编译期展开; 允许仅声明 `$import` 的形态绕过结构性约束.
+            if "$import" in out_dict and set(out_dict.keys()) == {"$import"}:
+                continue
+
+            if out_dict.get(aggregate_key) is not None:
+                continue
+
+            fields_raw = out_dict.get(fields_key)
+            from_raw = out_dict.get(from_key)
+            has_fields = isinstance(fields_raw, list) and bool(cast("List[Any]", fields_raw))
+            has_from = isinstance(from_raw, str) and bool(from_raw.strip())
+            if has_fields or has_from:
+                continue
+
+            name_raw = out_dict.get(name_key)
+            output_name = name_raw.strip() if isinstance(name_raw, str) else ""
+            label = output_name or str(int(idx))
+            msg = "outputs.{} requires fields for detail output (or set from to inherit fields)".format(label)
+            self._add_error(errors, msg, path="outputs.{}.{}".format(int(idx), fields_key))
 
     def _validate_removed_output_container(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
         outputs_raw = config.get(DEMAND_KEYS["outputs"])

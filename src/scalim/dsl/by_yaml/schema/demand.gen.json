@@ -149,6 +149,19 @@
       },
       "description": "数据源配置映射, key 为 source_id",
       "markdownDescription": "数据源配置映射, key 为 `source_id`.\n\n- 每个 source 必填: `loader`, `key`\n- 不允许包含 `main_source.source_id`\n- `fields` 仅允许源字段(禁止 `compute`)",
+      "propertyNames": {
+        "anyOf": [
+          {
+            "const": "$import"
+          },
+          {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "description": "格式: source_id (字母/数字/下划线, 首字符为字母或下划线)",
+            "markdownDescription": "格式: `source_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+          }
+        ]
+      },
       "additionalProperties": {
         "$ref": "#/definitions/source"
       },
@@ -320,6 +333,7 @@
       "properties": {
         "source_id": {
           "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
           "description": "主数据源的 source_id",
           "markdownDescription": "主数据源的 `source_id`.\n\n- 必填\n- 不能与 `sources` 的 key 重复"
         },
@@ -327,6 +341,7 @@
           "type": "string",
           "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
           "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`",
+          "minLength": 1,
           "examples": [
             "myapp.loaders:load_orders",
             "^workflow/book_sheet_rows"
@@ -460,6 +475,7 @@
           "type": "string",
           "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
           "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`",
+          "minLength": 1,
           "examples": [
             "myapp.loaders:load_orders",
             "^workflow/book_sheet_rows"
@@ -468,12 +484,18 @@
         "key": {
           "oneOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+              "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+              "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
             },
             {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
               },
               "minItems": 1
             }
@@ -3883,7 +3905,39 @@
           ]
         }
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "$import"
+            ]
+          },
+          "then": {},
+          "else": {
+            "if": {
+              "required": [
+                "aggregate"
+              ]
+            },
+            "then": {},
+            "else": {
+              "anyOf": [
+                {
+                  "required": [
+                    "fields"
+                  ]
+                },
+                {
+                  "required": [
+                    "from"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     "output_extra_sheet": {
       "type": "object",
@@ -4805,6 +4859,7 @@
           "type": "string",
           "description": "重试判定回调引用(安全引用,由 allowlist 约束)",
           "markdownDescription": "重试判定回调引用.\n\n- 形式与 `loader` 引用一致:\n  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- 签名: `should_retry(exc, ctx) -> bool`",
+          "minLength": 1,
           "examples": [
             "myapp.retry:should_retry_db",
             ".retry:should_retry_db"

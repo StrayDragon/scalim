@@ -10,6 +10,7 @@ from ..constants import (
     DESC_MAIN_SOURCE_MD,
     DESC_OBSERVABILITY,
     DESC_OBSERVABILITY_MD,
+    SOURCE_ID_STRING_SCHEMA,
     schema_meta,
     schema_omit,
     schema_ref,
@@ -83,6 +84,7 @@ class DemandConfig:
                 "- 不允许包含 `main_source.source_id`\n"
                 "- `fields` 仅允许源字段(禁止 `compute`)"
             ),
+            propertyNames={"anyOf": [{"const": "$import"}, SOURCE_ID_STRING_SCHEMA]},
             additional_props=schema_ref("source"),
             min_props=0,
         ),

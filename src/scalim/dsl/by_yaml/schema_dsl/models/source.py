@@ -24,6 +24,7 @@ from ..constants import (
     DESC_PARAMS_MD,
     DESC_SOURCE_NORMALIZE,
     DESC_SOURCE_NORMALIZE_MD,
+    FIELD_ID_STRING_SCHEMA,
     HARD_CAP_LOADER_RETRY_MAX_ATTEMPTS,
     HARD_CAP_LOADER_RETRY_MAX_DELAY_SECONDS,
     HARD_CAP_LOADER_RETRY_MAX_ELAPSED_SECONDS,
@@ -31,6 +32,7 @@ from ..constants import (
     LOOKUP_CAST_SCHEMA,
     LOOKUP_CHUNK_SIZE_SCHEMA,
     NORMALIZE_SCHEMA,
+    SOURCE_ID_STRING_SCHEMA,
     schema_meta,
     schema_omit,
     schema_ref,
@@ -75,6 +77,7 @@ class LoaderRetryConfig:
                 "- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n"
                 "- 签名: `should_retry(exc, ctx) -> bool`"
             ),
+            minLength=1,
             examples=["myapp.retry:should_retry_db", ".retry:should_retry_db"],
         ),
     )
@@ -252,6 +255,7 @@ class SourceConfig:
         metadata=schema_meta(
             desc=DESC_LOADER,
             md=DESC_LOADER_MD,
+            minLength=1,
             examples=["myapp.loaders:load_orders", "^workflow/book_sheet_rows"],
         ),
     )
@@ -261,8 +265,8 @@ class SourceConfig:
         default="",
         metadata=schema_meta(
             one_of=[
-                {"type": "string"},
-                {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                FIELD_ID_STRING_SCHEMA,
+                {"type": "array", "items": FIELD_ID_STRING_SCHEMA, "minItems": 1},
             ],
             desc="该 source loader 返回映射的 key 字段(支持复合键 tuple)",
             md=("该 source loader 返回映射的 key 字段.\n\n- 单字段: `key: order_id`\n- 复合键: `key: [region_id, institution_id]`"),
@@ -350,6 +354,7 @@ class MainSourceConfig:
     source_id: str = dataclass_field(
         default="",
         metadata=schema_meta(
+            schema=SOURCE_ID_STRING_SCHEMA,
             desc="主数据源的 source_id",
             md="主数据源的 `source_id`.\n\n- 必填\n- 不能与 `sources` 的 key 重复",
         ),
@@ -361,6 +366,7 @@ class MainSourceConfig:
         metadata=schema_meta(
             desc=DESC_LOADER,
             md=DESC_LOADER_MD,
+            minLength=1,
             examples=["myapp.loaders:load_orders", "^workflow/book_sheet_rows"],
         ),
     )

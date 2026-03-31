@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List, Optional, Set
 
 from ....params_template import ScalimParamsTemplateCompileError, compile_params_template
@@ -9,6 +10,7 @@ from ....schema_dsl.constants import (
     NORMALIZE_ON_CONFLICT_ENUM,
     NORMALIZE_ON_EMPTY_ENUM,
     NORMALIZE_ON_MISSING_ENUM,
+    SOURCE_ID_STRING_SCHEMA,
 )
 from ....schema_dsl.models import LOADER_RETRY_KEYS
 from ..field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
@@ -18,6 +20,9 @@ from .constants import LEGACY_FIELDS, F
 from .issues import ValidationIssue
 
 _F = F
+_SOURCE_ID_PATTERN_TEXT = str(SOURCE_ID_STRING_SCHEMA.get("pattern") or r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+_SOURCE_ID_PATTERN = re.compile(_SOURCE_ID_PATTERN_TEXT)
+_IMPORT_KEY = "$import"
 
 
 class ValidatorSourcesMixin(ValidatorMixinBase):
@@ -60,6 +65,11 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             return
         should_retry_raw = retry_dict.get(should_retry_key)
         if should_retry_raw is None:
+            self._add_error(
+                errors,
+                "'{}.{}' must be a non-empty string when provided".format(path_prefix, should_retry_key),
+                path="{}.{}".format(path_prefix, should_retry_key),
+            )
             return
         if not isinstance(should_retry_raw, str):
             self._add_error(
@@ -69,7 +79,14 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             )
             return
         should_retry_ref = should_retry_raw.strip()
-        if should_retry_ref and not self._is_valid_loader_ref(should_retry_ref):
+        if not should_retry_ref:
+            self._add_error(
+                errors,
+                "'{}.{}' must not be empty when provided".format(path_prefix, should_retry_key),
+                path="{}.{}".format(path_prefix, should_retry_key),
+            )
+            return
+        if not self._is_valid_loader_ref(should_retry_ref):
             msg = "'{}.{}' 的引用 '{}' 非法. 期望格式: {}".format(
                 path_prefix, should_retry_key, should_retry_raw, REFERENCE_FORMAT_EXAMPLES
             )
@@ -222,7 +239,9 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                         path = "fields.{}.{}".format(field_id, key)
                         self._add_error(errors, "Legacy field '{}' is not allowed".format(path), path=path)
 
-    def _validate_sources(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> Dict[str, Dict[str, bool]]:  # noqa: C901
+    def _validate_sources(  # noqa: C901, PLR0912, PLR0915
+        self, config: Dict[str, Any], errors: List[ValidationIssue]
+    ) -> Dict[str, Dict[str, bool]]:
         sources_info: Dict[str, Dict[str, bool]] = {}
         sources_raw = mapping_or_none(config.get(_F.SOURCES))
         if sources_raw is None:
@@ -230,6 +249,15 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
         for source_id_raw, source_data_raw in sources_raw.items():
             source_id = str(source_id_raw)
+            if source_id == _IMPORT_KEY:
+                continue
+            if not _SOURCE_ID_PATTERN.match(source_id):
+                self._add_error(
+                    errors,
+                    "sources key '{}' must match identifier pattern: {}".format(source_id, _SOURCE_ID_PATTERN_TEXT),
+                    path="sources.{}".format(source_id),
+                )
+                continue
             source_dict = mapping_or_none(source_data_raw)
             if source_dict is None:
                 self._add_error(errors, "Source '{}' must be a dictionary".format(source_id), path="sources.{}".format(source_id))
@@ -249,10 +277,54 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                     path="sources.{}.{}".format(source_id, _F.KEY),
                 )
 
-            loader = source_dict.get(_F.LOADER, "")
-            if loader and not self._is_valid_loader_ref(str(loader)):
-                msg = "数据源 '{}' 的 loader 引用 '{}' 非法. 期望格式: {}".format(source_id, loader, REFERENCE_FORMAT_EXAMPLES)
+            loader_raw = source_dict.get(_F.LOADER)
+            loader_ref = str(loader_raw or "").strip()
+            if _F.LOADER in source_dict and not loader_ref:
+                self._add_error(
+                    errors,
+                    "sources.{}.{} must not be empty".format(source_id, _F.LOADER),
+                    path="sources.{}.{}".format(source_id, _F.LOADER),
+                )
+            elif loader_ref and not self._is_valid_loader_ref(loader_ref):
+                msg = "数据源 '{}' 的 loader 引用 '{}' 非法. 期望格式: {}".format(source_id, loader_raw, REFERENCE_FORMAT_EXAMPLES)
                 self._add_error(errors, msg, path="sources.{}.{}".format(source_id, _F.LOADER))
+
+            key_raw = source_dict.get(_F.KEY)
+            key_path = "sources.{}.{}".format(source_id, _F.KEY)
+            if _F.KEY in source_dict and key_raw is None:
+                self._add_error(errors, "{} must be a non-empty field_id or field_id list".format(key_path), path=key_path)
+            key_items = list_or_none(key_raw)
+            if key_items is not None:
+                if not key_items:
+                    self._add_error(errors, "{} must not be empty".format(key_path), path=key_path)
+                for idx, item in enumerate(key_items):
+                    if not isinstance(item, str):
+                        self._add_error(
+                            errors, "{}.{} must be a string".format(key_path, int(idx)), path="{}.{}".format(key_path, int(idx))
+                        )
+                        continue
+                    key_field = item.strip()
+                    if not key_field:
+                        self._add_error(
+                            errors, "{}.{} must not be empty".format(key_path, int(idx)), path="{}.{}".format(key_path, int(idx))
+                        )
+                        continue
+                    if not _SOURCE_ID_PATTERN.match(key_field):
+                        self._add_error(
+                            errors,
+                            "{}.{} must match field_id pattern: {}".format(key_path, int(idx), _SOURCE_ID_PATTERN_TEXT),
+                            path="{}.{}".format(key_path, int(idx)),
+                        )
+            elif isinstance(key_raw, str):
+                key_field = key_raw.strip()
+                if not key_field:
+                    self._add_error(errors, "{} must not be empty".format(key_path), path=key_path)
+                elif not _SOURCE_ID_PATTERN.match(key_field):
+                    self._add_error(
+                        errors,
+                        "{} must match field_id pattern: {}".format(key_path, _SOURCE_ID_PATTERN_TEXT),
+                        path=key_path,
+                    )
 
             self._validate_loader_retry_should_retry(
                 source_dict.get("retry"),
@@ -324,8 +396,10 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 path="{}.{}".format(_F.MAIN_SOURCE, _F.NORMALIZE),
             )
 
-        source_id = str(main_source_data.get(_F.SOURCE_ID, ""))
-        loader = main_source_data.get(_F.LOADER)
+        source_id_raw = main_source_data.get(_F.SOURCE_ID, "")
+        source_id = str(source_id_raw or "")
+        loader_raw = main_source_data.get(_F.LOADER)
+        loader_ref = str(loader_raw or "").strip()
         sources_raw = mapping_or_none(config.get(_F.SOURCES, {}))
 
         if not source_id:
@@ -334,14 +408,21 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 "Main source missing required field '{}'".format(_F.SOURCE_ID),
                 path="{}.{}".format(_F.MAIN_SOURCE, _F.SOURCE_ID),
             )
-        if not loader:
+        if source_id and not _SOURCE_ID_PATTERN.match(source_id):
+            msg = "main_source.source_id '{}' must match identifier pattern: {}".format(source_id, _SOURCE_ID_PATTERN_TEXT)
+            self._add_error(errors, msg, path="{}.{}".format(_F.MAIN_SOURCE, _F.SOURCE_ID))
+            source_id = ""
+
+        if loader_raw is None:
             self._add_error(
                 errors,
                 "Main source missing required field '{}'".format(_F.LOADER),
                 path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER),
             )
-        if loader and not self._is_valid_loader_ref(str(loader)):
-            msg = "主数据源的 loader 引用 '{}' 非法. 期望格式: {}".format(loader, REFERENCE_FORMAT_EXAMPLES)
+        elif not loader_ref:
+            self._add_error(errors, "main_source.{} must not be empty".format(_F.LOADER), path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER))
+        elif not self._is_valid_loader_ref(loader_ref):
+            msg = "主数据源的 loader 引用 '{}' 非法. 期望格式: {}".format(loader_raw, REFERENCE_FORMAT_EXAMPLES)
             self._add_error(errors, msg, path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER))
 
         self._validate_loader_retry_should_retry(

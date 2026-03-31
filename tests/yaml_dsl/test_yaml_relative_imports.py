@@ -303,7 +303,7 @@ def test_validator_retry_block_must_be_mapping() -> None:
     assert any("retry: 'retry' must be a dictionary" in item for item in excinfo.value.errors)
 
 
-def test_validator_retry_should_retry_allows_null() -> None:
+def test_validator_retry_should_retry_rejects_null() -> None:
     validator = ConfigValidator()
     config = {
         "name": "demo",
@@ -316,8 +316,9 @@ def test_validator_retry_should_retry_allows_null() -> None:
         "sources": {},
         "fields": {},
     }
-    report = validator.validate_report(config, enable_jsonschema_validation=False)
-    assert report.errors() == []
+    with pytest.raises(ScalimConfigValidationError) as excinfo:
+        validator.validate(config)
+    assert any("retry.should_retry" in item and "non-empty" in item for item in excinfo.value.errors)
 
 
 def test_validator_retry_should_retry_must_be_string() -> None:

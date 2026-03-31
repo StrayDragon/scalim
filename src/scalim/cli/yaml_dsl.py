@@ -406,6 +406,63 @@ def _find_demand_book_binding_errors(
     return errors
 
 
+def _retry_enabled_missing_should_retry(retry_raw: object) -> bool:
+    if not isinstance(retry_raw, dict):
+        return False
+    retry_dict = cast("Dict[str, Any]", retry_raw)  # pragma: allow-cast yaml retry mapping typed narrowing
+    if retry_dict.get("enabled") is not True:
+        return False
+    should_retry_raw = retry_dict.get("should_retry")
+    if not isinstance(should_retry_raw, str):
+        return True
+    return not bool(should_retry_raw.strip())
+
+
+def _find_retry_enabled_missing_should_retry_errors(
+    yaml_data: Optional[Dict[str, Any]],
+    *,
+    source_path: str,
+    locations: Optional[YamlLocationIndex],
+    default_code: str,
+) -> List[ErrorEnvelope]:
+    if not isinstance(yaml_data, dict):
+        return []
+
+    def _add_error(path: str) -> ErrorEnvelope:
+        loc = None if locations is None else error_loc_for_yaml_path(path, locations)
+        return ErrorEnvelope(
+            code=default_code,
+            message=(
+                "retry.enabled=true requires non-empty should_retry "
+                "(provide it in YAML, or rely on runtime driver injection to supply it during compile/run)"
+            ),
+            source_path=source_path,
+            path=path,
+            loc=loc,
+        )
+
+    errors: List[ErrorEnvelope] = []
+    if _retry_enabled_missing_should_retry(yaml_data.get("retry")):
+        errors.append(_add_error("retry.should_retry"))
+
+    main_source_raw = yaml_data.get("main_source")
+    if isinstance(main_source_raw, dict):
+        main_source_dict = cast("Dict[str, Any]", main_source_raw)  # pragma: allow-cast yaml main_source mapping typed narrowing
+        if _retry_enabled_missing_should_retry(main_source_dict.get("retry")):
+            errors.append(_add_error("main_source.retry.should_retry"))
+
+    sources_raw = yaml_data.get("sources")
+    if isinstance(sources_raw, dict):
+        for source_id, source_cfg_raw in cast("Dict[str, Any]", sources_raw).items():  # pragma: allow-cast yaml sources typed narrowing
+            if not isinstance(source_cfg_raw, dict):
+                continue
+            source_cfg_dict = cast("Dict[str, Any]", source_cfg_raw)  # pragma: allow-cast yaml source config mapping typed narrowing
+            if _retry_enabled_missing_should_retry(source_cfg_dict.get("retry")):
+                errors.append(_add_error("sources.{}.retry.should_retry".format(source_id)))
+
+    return errors
+
+
 def _write_line(text: str) -> None:
     _ = sys.stdout.write(text + "\n")
 
@@ -729,6 +786,14 @@ def _validate_demand_yaml_text(
             source_path=str(yaml_path),
             locations=locations,
             available_book_ids=effective_book_ids,
+            default_code="yaml_validate_error",
+        )
+    )
+    errors.extend(
+        _find_retry_enabled_missing_should_retry_errors(
+            yaml_data_dict,
+            source_path=str(yaml_path),
+            locations=locations,
             default_code="yaml_validate_error",
         )
     )
@@ -1247,6 +1312,14 @@ def _collect_schema_issues(
             source_path=source_path,
             locations=locations,
             available_book_ids=demand_book_ids,
+            default_code="yaml_schema_validate_error",
+        )
+    )
+    errors.extend(
+        _find_retry_enabled_missing_should_retry_errors(
+            yaml_data,
+            source_path=source_path,
+            locations=locations,
             default_code="yaml_schema_validate_error",
         )
     )

@@ -1,0 +1,15 @@
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id: {}
+sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./out.csv
+outputs:
+  - name: detail
+    to: {file: detail_csv}

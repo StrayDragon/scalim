@@ -1,0 +1,12 @@
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id: {}
+sources: {}
+outputs:
+  - name: detail
+    container:
+      streaming: false
+    fields: [order_id]

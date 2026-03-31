@@ -1,0 +1,5 @@
+name: demo
+main_source:
+  source_id: 123-invalid
+  loader: tests.fixtures.mock_loaders.mock_loader
+sources: {}

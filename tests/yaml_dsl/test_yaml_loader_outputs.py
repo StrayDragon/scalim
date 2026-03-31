@@ -2,11 +2,17 @@ import pytest
 
 from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml._internal.config_parsing.parsers.outputs import ParserOutputsMixin
+from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig
 
 
 def _load(yaml_content: str):
     loader = YamlDemandLoader()
     return loader.load_string(yaml_content)
+
+
+class _OutputsParser(ParserOutputsMixin):
+    pass
 
 
 def test_loader_rejects_legacy_output_key() -> None:
@@ -212,8 +218,18 @@ outputs:
   - name: detail
     to: {file: detail_csv}
 """
-    with pytest.raises(ValueError, match="requires fields for detail output"):
+    with pytest.raises(ScalimYamlValidationError) as exc:
         _ = _load(yaml_content)
+
+    assert any("requires fields for detail output" in env.message for env in exc.value.errors)
+
+    parser = _OutputsParser()
+    with pytest.raises(ValueError, match="requires fields for detail output"):
+        parser._validate_detail_output_semantics(
+            OutputTargetConfig(name="detail"),
+            name="detail",
+            known_field_ids={"order_id"},
+        )
 
 
 def test_loader_allows_aggregate_output_with_fields_for_layout() -> None:

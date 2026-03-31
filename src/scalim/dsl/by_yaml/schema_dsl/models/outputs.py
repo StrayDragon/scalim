@@ -877,6 +877,20 @@ class OutputTargetConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
+    # 注意: `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
+    # 这里的结构性约束仅作用于非 `$import` 的 `output_target` 形态.
+    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
+        {
+            "if": {"required": ["$import"]},
+            "then": {},
+            "else": {
+                "if": {"required": ["aggregate"]},
+                "then": {},
+                "else": {"anyOf": [{"required": ["fields"]}, {"required": ["from"]}]},
+            },
+        }
+    ]
+
     name: str = dataclass_field(
         default="",
         metadata=schema_meta(schema=_OUTPUT_NAME_SCHEMA, desc="输出名称(name)"),

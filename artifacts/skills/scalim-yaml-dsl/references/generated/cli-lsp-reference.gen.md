@@ -59,6 +59,7 @@
 - Requirements:
   - CLI validation MUST reuse the unified YAML load facade
   - CLI validate 与 schema validate 职责边界(避免重复诊断)
+  - validate and schema validate MUST catch known fail-late cases consistently
   - CLI Schema-Only Validation
   - JSONSchema 错误收集(完整 + 稳定 + 去噪)
   - CLI Schema Discovery
