@@ -67,6 +67,7 @@
   - 运行时 validator 错误列表包含 issue path
   - 校验命令输出与 schema 一致性
   - CLI 校验输出包含源码位置
+  - `ValidationIssue.path` MUST 使用单一 canonical 口径以稳定映射到源码位置
   - Linter/编译器风格输出
   - validate 对 `outputs.*.fields` object 条目给出可行动诊断
   - CLI can upsert schema modeline in YAML files (IntelliJ compatible)

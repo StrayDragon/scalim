@@ -336,6 +336,10 @@ outputs:
         sum_amount: {sum: {field: amount}}
 ```
 
+提示:
+
+- 旧写法 `outputs[*].container` 已移除;请改用 `resources.files` + `outputs.*.to.file`(CSV) 与 `resources.books` + `outputs.*.to.book/to.sheet`(Excel)
+
 ---
 
 ## 3. 配置详解 (Configuration Reference)

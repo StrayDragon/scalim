@@ -27,7 +27,7 @@
 | `description` | `DemandConfig.description` | 当前不进入 IR/执行(用于文档/阅读) | - |
 | `batch_size` | `DemandConfig.batch_size` → `ExecutionRequest.batch_size` | 仅影响分批;不影响 `DemandIr.batch_size_hint` | 用 `scalim.dsl.by_yaml.run(..., batch_size=...)` 覆盖 |
 | `_templates` | 仅作为 YAML anchors 容器(不直接编译) | 只用于 YAML 复用;不会被运行时读取 | 使用 `&anchor/*alias` 复用 `retry/fields/relations/...` |
-| `imports` | 编译期展开(片段导入) | 受路径规则限制(同级文件、禁止子目录/父目录等;以 schema hover 为准) | 仅靠 YAML anchors 复用(单文件)或显式复制片段 |
+| `imports` | 编译期展开(片段导入) | 仅支持相对 `.yaml/.yml` 文件路径或 `scalim://<preset_id>`;默认相对入口 YAML 目录解析且受 `allow-roots` 限制(可用 CLI `--allowed-yaml-root` 或 `scalim.yaml yaml_dsl.import_allowed_roots/import_aliases` 扩展) | 仅靠 YAML anchors 复用(单文件)或显式复制片段 |
 | `$import` | 编译期展开(在 mapping 内引用 imports alias) | 仅在“文件路径入口”可用;纯文本入口无法解析文件 | 使用 workflow 或 Python 驱动自行拼装 YAML |
 
 ## 2) Demand YAML:数据源(main_source/sources)
@@ -69,6 +69,7 @@
 |---|---|---|---|
 | `outputs[]` | `ExecutionRequest.output_composition` (`OutputCompositionSpec`) | `RunOverrides.outputs` 可整体替换(仅承诺 `name/to/fields` 最小子集;不支持 `where/from/aggregate`) | 运行期动态输出: `run(..., overrides=RunOverrides(outputs=(OutputOverride(...),)))` 或 `RunOverrides.<factory>(...)` |
 | `outputs.*.to` / `outputs.*.write` | `OutputTargetSpec.output` (`OutputSpec`) | `to` 必须二选一: `to.file` 或 `to.book`; `write` 承载 header / book 写入策略 | 其它 sink 用 `run(..., sink=...)` |
+| `outputs.*.container`（已移除） | - | 已移除;`validate/compile` 会 `fail-fast` | CSV: `resources.files` + `outputs.*.to.file`; Excel: `resources.books` + `outputs.*.to.book/to.sheet` |
 | `resources.files.<id>.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast | 用 Python 侧 `init_vars` 注入或改用固定路径 |
 | `outputs.*.fields` | `ExportLayout.field_ids` | 支持 `field_id` string + YAML alias(object/list)并 flatten | 若 alias identity 丢失且内容匹配歧义,改用 string `field_id` |
 | `outputs.*.where` | `OutputTargetSpec.predicate` | 安全表达式;依赖字段静态提取注入 required fields | 复杂分发逻辑放到 loader/derived field 里生成路由字段 |

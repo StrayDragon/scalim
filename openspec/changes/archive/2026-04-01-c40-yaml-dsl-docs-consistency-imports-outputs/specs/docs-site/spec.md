@@ -12,15 +12,15 @@
 并且手册页 MUST 满足:
 
 - 不得把已移除的 workbook container 输出写法作为可用示例或推荐写法
-- 必须将 `outputs.*.container` 明确为 CSV 文件输出 authoring surface
-- 必须将 Excel 输出 authoring surface 指向 `resources.books` + `outputs.*.to`
+- 必须明确 legacy `outputs.*.container` 已移除,CSV 输出通过 `resources.files` + `outputs.*.to.file` 绑定
+- 必须将 Excel 输出 authoring surface 指向 `resources.books` + `outputs.*.to.book/to.sheet`
 - imports/$import 的路径解析与限制描述不得与当前实现/规范冲突(例如错误地声称“仅同级文件”)
 
 #### Scenario: docs do not recommend workbook container
 - **WHEN** 读者按 `docs/doc/yaml-dsl/user-guide.md` 的 outputs 示例编写 YAML
 - **THEN** 该示例不得包含已移除的 workbook container 输出写法
 
-#### Scenario: docs describe csv-only container surface and books binding for xlsx
+#### Scenario: docs describe legacy container removal and books binding for xlsx
 - **WHEN** 读者查看 outputs 相关章节
-- **THEN** 文档 MUST 描述 `outputs.*.container` 为 CSV-only
-- **AND** 文档 MUST 描述 Excel 输出通过 `resources.books` + `outputs.*.to` 绑定实现
+- **THEN** 文档 MUST 描述 legacy `outputs.*.container` 已移除,并给出 CSV 输出的当前写法: `resources.files` + `outputs.*.to.file`
+- **AND** 文档 MUST 描述 Excel 输出通过 `resources.books` + `outputs.*.to.book/to.sheet` 绑定实现

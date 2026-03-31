@@ -93,20 +93,27 @@ observability: {}       # 可选
 - YAML merge 会生成新对象,丢失 alias 身份
 - merge 产物必须仍然满足 schema 与语义校验(例如 `resources.files.*.kind/path` 必填; 多 sheet 共享 workbook 时每个 output 需显式 `to.sheet`)
 
-### 3.4 跨文件复用: `imports` / `$import` (V1: 同级文件)
+### 3.4 跨文件复用: `imports` / `$import` (相对路径 + `allow-roots` + `alias/preset`)
 
 当一个 demand 配置变大后,常见做法是把 `sources/relations/fields` 等片段拆分成多个文件复用.为此 Scalim 提供编译期 `imports/$import` 展开能力:
 
-- 顶层新增 `imports: {<alias>: <fragment.yaml>}` 映射
+- 顶层新增 `imports: {<alias>: <source>}` 映射
+  - `<source>` 支持两类:
+    - 相对 `.yaml/.yml` 文件路径(默认相对当前 YAML 文件所在目录解析),例如 `common.yaml` / `fragments/common.yaml`
+    - `scalim://<preset_id>` preset URI
 - 在任意 mapping 节点内允许 `$import`(string 或 string list):
   - `$import: common.sources`
   - `$import: [common.sources, other.sources]`
-- `$import` 引用格式: `<alias>(.<segment>)*`(点路径下钻)
+- `$import` 引用格式: `<imports_alias>(.<segment>)*`(点路径下钻; segments 仅允许标识符)
 - 合并规则(确定性):
   - mapping: deep-merge
   - list: replace(本地覆盖导入)
   - 类型不匹配: fail-fast
-- **V1 路径限制**: `imports.*` 仅允许同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`(禁止绝对路径/父目录/子目录/alias 前缀)
+- 路径解析与安全边界(读文件的允许范围):
+  - 默认仅允许读取“入口 YAML 所在目录”下的片段文件
+  - CLI 可通过 `--allowed-yaml-root <dir>` 扩展允许根目录(可重复)
+  - 也可在入口 YAML 所在目录向上查找最近的 `scalim.yaml`,并使用其中的 `yaml_dsl.import_allowed_roots` / `yaml_dsl.import_aliases` 扩展允许范围
+    - `import_aliases` 提供“目录别名”,允许在 `imports.*` 中写 `<dir_alias>:/path/to/fragment.yaml` 指定解析基准目录
 - **仅文件路径入口支持**: `scalim.dsl.by_yaml.run/compile(yaml_path)` / `scalim-cli yaml-dsl validate <file.yaml>` 等会先展开再校验;纯文本入口会 fail-fast 并提示改用文件路径入口
 
 一个最小示例:
@@ -114,6 +121,27 @@ observability: {}       # 可选
 ```yaml
 imports:
   common: common.yaml
+
+sources:
+  $import: common.sources
+  my_source:
+    loader: "myapp.loaders:load_x"
+    key: id
+```
+
+一个带 `scalim.yaml` 目录别名的示例:
+
+```yaml
+# scalim.yaml
+yaml_dsl:
+  import_aliases:
+    shared: ./shared_yaml
+  import_allowed_roots:
+    - ./shared_yaml
+
+# demand.yaml
+imports:
+  common: shared:/common.yaml
 
 sources:
   $import: common.sources
