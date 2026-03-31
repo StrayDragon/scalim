@@ -28,7 +28,7 @@ def run_workflow_yaml(
         cfg = build_test_config_small()
     if workflow_yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        workflow_yaml_path = demo_dir / "by_yaml_dsl" / "workflow_fixture.yaml"
+        workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_fixture.yaml"
     prev = get_config()
     set_config(cfg)
     try:
@@ -105,7 +105,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_fixture.yaml`
+        - YAML fixture：`chapters_of_yaml_dsl/declared_yaml_dsl/workflow_fixture.yaml`
         - 断言：共享 cache_pool 下 `preload_forever` loader 仅调用 1 次
         - Gate：`just examples`
 
@@ -129,7 +129,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    workflow_yaml_path = demo_dir / "by_yaml_dsl" / "workflow_fixture.yaml"
+    workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_fixture.yaml"
     return demo_dir, workflow_yaml_path
 
 

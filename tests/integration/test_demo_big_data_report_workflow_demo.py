@@ -11,12 +11,13 @@ from scalim_misc.demo_big_data_report.loaders import (
 )
 from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL
 from scalim_misc.demo_big_data_report.verification import verify_scalim_output_csv
+from scalim_misc.notebook_support.pathing import demo_big_data_report_workflow_demo_yaml_path
 from tests.support.pathing import repo_root as _repo_root
 
 
 def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    workflow_yaml_path = repo_root / "notebooks" / "marimo" / "demo_big_data_report" / "by_yaml_dsl" / "workflow_demo_big_data_report.yaml"
+    workflow_yaml_path = demo_big_data_report_workflow_demo_yaml_path(__file__)
 
     cfg = build_test_config_small()
     prev = get_config()
@@ -25,6 +26,14 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path) -> None:
         reset_workflow_preload_counter_calls()
         wf_copy = tmp_path / "workflow.yaml"
         wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
+        for demand_filename in (
+            "workflow_demo_big_data_report_detail_demand.yaml",
+            "workflow_demo_big_data_report_metrics_demand.yaml",
+        ):
+            (tmp_path / demand_filename).write_text(
+                (workflow_yaml_path.parent / demand_filename).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
 
         prev_cwd = os.getcwd()
         os.chdir(str(tmp_path))

@@ -6,6 +6,7 @@ from typing import List, Optional, Sequence, Tuple
 
 from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
+from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
 
 def _ensure_repo_root_on_syspath() -> None:
@@ -53,7 +54,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate Scalim Viz artifacts from YAML DSL demo.")
     parser.add_argument(
         "--yaml-path",
-        default="notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
+        default=str(demo_big_data_report_yaml_path(__file__)),
         help="YAML DSL path for the demo run.",
     )
     parser.add_argument(

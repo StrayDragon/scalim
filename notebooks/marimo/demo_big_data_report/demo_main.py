@@ -19,7 +19,7 @@ def _(mo):
         - `chapters_of_ir/*.py`: IR 主线章节(含 `run_chapter()`/`run_*()` SSOT 入口)
         - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/`: fixtures/oracle/工具函数(不承载教学主流程)
         - `just examples`: 唯一 gate 入口(快速对拍,justfile 内联 runner)
-        - `by_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
+        - `chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
         """
     )
     return
@@ -48,11 +48,12 @@ def _():
 @app.cell
 def _(Path, repo_root):
     demo_dir = Path(__file__).parent
-    yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
     chapters_of_yaml_dsl_dir = demo_dir / "chapters_of_yaml_dsl"
+    declared_yaml_dsl_dir = chapters_of_yaml_dsl_dir / "declared_yaml_dsl"
+    yaml_path = declared_yaml_dsl_dir / "ecommerce_report.yaml"
     chapters_of_ir_dir = demo_dir / "chapters_of_ir"
     _ = repo_root
-    return chapters_of_ir_dir, chapters_of_yaml_dsl_dir, demo_dir, yaml_path
+    return chapters_of_ir_dir, chapters_of_yaml_dsl_dir, declared_yaml_dsl_dir, demo_dir, yaml_path
 
 
 @app.cell(hide_code=True)

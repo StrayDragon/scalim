@@ -113,7 +113,7 @@ build-dist:
 dist-check: build-dist
     uv {{ UV_OPTIONS }} run python scripts/check-build-artifacts.py
 
-# 生成: Viz 数据 (默认为 notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml)
+# 生成: Viz 数据 (默认使用 demo_big_data_report 的 canonical YAML fixtures)
 gen-viz-data PARAM="":
     uv {{ UV_OPTIONS }} run python scripts/gen-viz-data.py --mode events-only {{ PARAM }}
     # uv {{ UV_OPTIONS }} run python scripts/gen-viz-data.py --mode events+trace {{ PARAM }}

@@ -46,7 +46,7 @@ def run_workflow_shared_workbooks(
         cfg = build_test_config_small()
     if workflow_yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        workflow_yaml_path = demo_dir / "by_yaml_dsl" / "workflow_demo_shared_workbooks.yaml"
+        workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_demo_shared_workbooks.yaml"
 
     prev = get_config()
     set_config(cfg)
@@ -58,6 +58,11 @@ def run_workflow_shared_workbooks(
             out_dir = Path(temp_dir).resolve()
             wf_copy = out_dir / "workflow.yaml"
             wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
+            demand_dir = workflow_yaml_path.parent
+            (out_dir / "workflow_demo_shared_workbooks_demand.yaml").write_text(
+                (demand_dir / "workflow_demo_shared_workbooks_demand.yaml").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
 
             try:
                 wf_result = run_workflow(
@@ -219,7 +224,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    workflow_yaml_path = demo_dir / "by_yaml_dsl" / "workflow_demo_shared_workbooks.yaml"
+    workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_demo_shared_workbooks.yaml"
     return demo_dir, workflow_yaml_path
 
 

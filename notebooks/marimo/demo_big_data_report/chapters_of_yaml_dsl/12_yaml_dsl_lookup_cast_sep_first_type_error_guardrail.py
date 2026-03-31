@@ -31,7 +31,9 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
 def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Optional[Path] = None) -> ExampleResult:
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_lookup_cast_sep_first_type_error_guardrail.yaml"
+        yaml_path = (
+            demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_lookup_cast_sep_first_type_error_guardrail.yaml"
+        )
 
     guardrail_capture = GuardrailCaptureObserver()
     with tempfile.TemporaryDirectory(prefix="scalim-lookup-cast-") as tmpdir:
@@ -118,7 +120,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_lookup_cast_sep_first_type_error_guardrail.yaml`
+        - YAML fixture：`chapters_of_yaml_dsl/declared_yaml_dsl/support/support_lookup_cast_sep_first_type_error_guardrail.yaml`
         - 断言:
           - ticket_id=2001 关联到 `team-a`
           - ticket_id=2002 为空字符串触发 type_error -> agent_team 为空
@@ -144,7 +146,9 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_lookup_cast_sep_first_type_error_guardrail.yaml"
+    yaml_path = (
+        demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_lookup_cast_sep_first_type_error_guardrail.yaml"
+    )
     return demo_dir, yaml_path
 
 

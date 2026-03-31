@@ -69,12 +69,12 @@
 系统 MUST 仅导出一个 canonical full example,目标路径固定为 `artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`.
 
 该 canonical example MUST:
-- 仅通过静态读取 `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 获得,不得执行 notebook
+- 仅通过静态读取 `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml` 获得,不得执行 notebook
 - 在导出后通过 `PROJECT_CLI_NAME yaml-dsl schema validate` 与 `PROJECT_CLI_NAME yaml-dsl validate` 校验
 - 不得在导出结果中固化机器相关的 YAML LSP `$schema` 头; LSP header 指引应通过 CLI/LSP reference 另行提供
 
 #### Scenario: canonical source 缺失
-- **WHEN** `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml` 不存在
+- **WHEN** `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml` 不存在
 - **THEN** 生成器退出非零并提示 canonical example 来源缺失
 
 #### Scenario: 不执行 notebooks

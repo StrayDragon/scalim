@@ -13,6 +13,7 @@ from scalim_misc.demo_big_data_report.shared import (
     TARGET_FIELDS_RELATIONS,
     build_ecommerce_model,
 )
+from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
 from scalim.dsl.by_yaml import RunOverrides, run
 from scalim.execution import ScalimEngine
@@ -261,7 +262,7 @@ def test_bench_pipeline_trace(benchmark) -> None:
 @pytest.mark.benchmark(group="dsl")
 def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
     cfg = _build_model()
-    yaml_path = Path("notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml")
+    yaml_path = demo_big_data_report_yaml_path(__file__)
     output_path = tmp_path / "ecommerce_report.csv"
     allowed_modules = frozenset(["scalim_misc.demo_big_data_report.loaders"])
 

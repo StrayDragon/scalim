@@ -31,7 +31,7 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
 def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> ExampleResult:
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_viz_custom_paths.yaml"
+        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_viz_custom_paths.yaml"
 
     with tempfile.TemporaryDirectory(prefix="scalim-viz-custom-") as tmpdir:
         tmp = Path(tmpdir)
@@ -135,7 +135,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_viz_custom_paths.yaml`
+        - YAML fixture：`chapters_of_yaml_dsl/declared_yaml_dsl/support/support_viz_custom_paths.yaml`
         - 断言:
           - events/snapshot/trace 三个文件都存在且非空
           - snapshot 的 `meta.viz.run_name/env` 与 YAML 一致
@@ -160,7 +160,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_viz_custom_paths.yaml"
+    yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_viz_custom_paths.yaml"
     return demo_dir, yaml_path
 
 

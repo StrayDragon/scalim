@@ -8,6 +8,7 @@ from typing import Dict, FrozenSet, List
 from scalim.dsl.by_yaml import RunOverrides, run_workflow
 from scalim.ob.presets._internal.viz_config import normalize_output_dir
 from scalim.ob.presets.viz import VizObserverConfig
+from scalim_misc.notebook_support.pathing import demo_big_data_report_workflow_demo_yaml_path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +18,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate demo_big_data_report workflow replay bundle + committed baselines.")
     parser.add_argument(
         "--workflow-yaml-ssot",
-        default="notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml",
+        default=str(demo_big_data_report_workflow_demo_yaml_path(__file__)),
         help="SSOT workflow YAML (will be copied to <output-dir>/workflow.yaml).",
     )
     parser.add_argument(
@@ -117,6 +118,11 @@ def main(argv: List[str]) -> int:
 
     workflow_yaml_path = out_root / "workflow.yaml"
     workflow_yaml_path.write_text(ssot.read_text(encoding="utf-8"), encoding="utf-8")
+    for demand_filename in (
+        "workflow_demo_big_data_report_detail_demand.yaml",
+        "workflow_demo_big_data_report_metrics_demand.yaml",
+    ):
+        (out_root / demand_filename).write_text((ssot.parent / demand_filename).read_text(encoding="utf-8"), encoding="utf-8")
 
     allowed_modules = _normalize_allowed_modules(str(args.allowed_modules))
 

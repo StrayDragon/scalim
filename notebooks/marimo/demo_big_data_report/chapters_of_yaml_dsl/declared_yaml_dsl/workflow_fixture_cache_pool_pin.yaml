@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/workflow.gen.json
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/workflow.gen.json
 
 workflow:
   runs:
@@ -15,3 +15,6 @@ workflow:
       budget:
         max_entries: 16
         over_budget_policy: fail_fast
+      pin:
+        - kind: preload_forever
+          source_id: preload_counter

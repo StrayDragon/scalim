@@ -12,7 +12,7 @@ def test_demo_directory_contains_unified_examples() -> None:
     assert _NOTEBOOK_DEMO_CHAPTERS_OF_YAML_DSL_DIR.is_dir()
     assert _NOTEBOOK_DEMO_CHAPTERS_OF_IR_DIR.is_dir()
     assert not (_NOTEBOOK_ROOT_DIR / "run_examples.py").exists()
-    assert (_NOTEBOOK_DEMO_DIR / "by_yaml_dsl" / "ecommerce_report.yaml").exists()
+    assert (_NOTEBOOK_DEMO_CHAPTERS_OF_YAML_DSL_DIR / "declared_yaml_dsl" / "ecommerce_report.yaml").exists()
     assert not (_NOTEBOOK_ROOT_DIR / "example_public_api").exists()
     assert (_NOTEBOOK_ROOT_DIR / "example_public_api_suite").is_dir()
 

@@ -48,7 +48,7 @@ def run_yaml_dsl_support(
 ) -> ExampleResult:
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_sla_report.yaml"
+        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_sla_report.yaml"
 
     guardrail_capture = GuardrailCaptureObserver()
 
@@ -162,7 +162,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_sla_report.yaml`
+        - YAML fixture：`chapters_of_yaml_dsl/declared_yaml_dsl/support/support_sla_report.yaml`
         - CSV oracle：`scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:verify_support_outputs_csv_rows`
         - row_gap 断言：`expected_support_row_gap_totals`
         - guardrail code 断言：`expected_support_guardrail_codes`
@@ -188,7 +188,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_sla_report.yaml"
+    yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_sla_report.yaml"
     return demo_dir, yaml_path
 
 

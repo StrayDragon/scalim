@@ -132,7 +132,15 @@ from scalim.dsl.by_yaml import run
 from scalim_misc.demo_big_data_report.loaders import load_orders
 
 repo_root = Path(".").resolve()
-yaml_path = repo_root / "notebooks" / "marimo" / "demo_big_data_report" / "by_yaml_dsl" / "ecommerce_rank_score_report.yaml"
+yaml_path = (
+    repo_root
+    / "notebooks"
+    / "marimo"
+    / "demo_big_data_report"
+    / "chapters_of_yaml_dsl"
+    / "declared_yaml_dsl"
+    / "ecommerce_rank_score_report.yaml"
+)
 tmp_root = Path(str(os.environ["SCALIM_PY36_TMP_ROOT"]))
 out_path = tmp_root / "ecommerce_rank_score_report.output.csv"
 

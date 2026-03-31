@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
 
 name: demo_big_data_report_support_observability_full
 description: |
@@ -50,4 +50,3 @@ observability:
     enabled: true
     auto_report: false
     max_fields: 10
-

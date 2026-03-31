@@ -62,8 +62,8 @@ public API 覆盖章节（`__all__` 覆盖断言 + hooks/ob 扩展点）不再�
 
 ### Requirement: canonical YAML SSOT 路径不变
 系统 MUST 保持 canonical YAML SSOT 文件路径不变,至少包括:
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml`
+- `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
+- `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report_fragments.yaml`
 
 #### Scenario: canonical YAML 路径稳定
 - **WHEN** 维护者检查上述 canonical YAML 文件路径

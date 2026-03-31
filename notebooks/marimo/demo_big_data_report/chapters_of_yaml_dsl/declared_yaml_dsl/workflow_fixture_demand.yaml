@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
 
 name: demo_big_data_report_workflow_fixture_demand
 description: 小规模 deterministic workflow fixture demand (for `just examples`)
@@ -18,4 +18,3 @@ sources:
     loader: "scalim_misc.demo_big_data_report.loaders:load_workflow_preload_counter_table"
     key: id
     cache_mode: preload_forever
-

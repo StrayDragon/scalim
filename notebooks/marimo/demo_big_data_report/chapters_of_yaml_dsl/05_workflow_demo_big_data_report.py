@@ -72,7 +72,7 @@ def run_workflow_demo_big_data_report(
         cfg = build_test_config_small()
     if workflow_yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        workflow_yaml_path = demo_dir / "by_yaml_dsl" / "workflow_demo_big_data_report.yaml"
+        workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_demo_big_data_report.yaml"
 
     prev = get_config()
     set_config(cfg)
@@ -93,6 +93,13 @@ def run_workflow_demo_big_data_report(
 
             wf_copy = out_dir / "workflow.yaml"
             wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+            demand_dir = workflow_yaml_path.parent
+            for demand_filename in (
+                "workflow_demo_big_data_report_detail_demand.yaml",
+                "workflow_demo_big_data_report_metrics_demand.yaml",
+            ):
+                (out_dir / demand_filename).write_text((demand_dir / demand_filename).read_text(encoding="utf-8"), encoding="utf-8")
 
             try:
                 prev_cwd = os.getcwd()
@@ -219,7 +226,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - workflow YAML：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report.yaml`
+        - workflow YAML：`chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_big_data_report.yaml`
         - 断言：
           - `depends_on` + `scalim.workflow.loaders.sheetbook_sheet_rows` 链路可跑通（detail → metrics）
           - 产物存在：`detail.csv` / `metrics.csv` / `report.xlsx`
@@ -247,7 +254,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    workflow_yaml_path = demo_dir / "by_yaml_dsl" / "workflow_demo_big_data_report.yaml"
+    workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_demo_big_data_report.yaml"
     return demo_dir, workflow_yaml_path
 
 

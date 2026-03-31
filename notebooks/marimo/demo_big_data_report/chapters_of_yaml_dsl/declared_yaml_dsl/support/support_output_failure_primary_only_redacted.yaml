@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
 
 imports:
   frag: ../_shared/support_output_failure_fragments.yaml

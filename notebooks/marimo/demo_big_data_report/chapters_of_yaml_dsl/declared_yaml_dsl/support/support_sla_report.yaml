@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
 
 name: support_sla_report
 description: |
@@ -132,4 +132,3 @@ outputs:
       - ticket_cnt
       - sla_breach_cnt
       - avg_resolve_minutes
-

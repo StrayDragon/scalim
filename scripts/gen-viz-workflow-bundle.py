@@ -8,13 +8,14 @@ from typing import FrozenSet, List
 from scalim.dsl.by_yaml import RunOverrides, run_workflow
 from scalim.ob.presets._internal.viz_config import normalize_output_dir
 from scalim.ob.presets.viz import VizObserverConfig
+from scalim_misc.notebook_support.pathing import demo_big_data_report_workflow_yaml_path
 
 
 def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a workflow replay bundle (scalim-viz/workflow + child runs).")
     parser.add_argument(
         "--workflow-yaml-path",
-        default="notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_fixture.yaml",
+        default=str(demo_big_data_report_workflow_yaml_path(__file__)),
         help="Workflow YAML path.",
     )
     parser.add_argument(

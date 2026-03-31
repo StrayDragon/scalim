@@ -38,7 +38,7 @@ def run_yaml_dsl_ads(
 ) -> ExampleResult:
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "ads" / "ads_campaign_report.yaml"
+        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ads" / "ads_campaign_report.yaml"
 
     reset_ads_creatives_retry_counter_calls()
     with tempfile.TemporaryDirectory(prefix="scalim-ads-") as tmpdir:
@@ -137,7 +137,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/ads/ads_campaign_report.yaml`
+        - YAML fixture：`chapters_of_yaml_dsl/declared_yaml_dsl/ads/ads_campaign_report.yaml`
         - oracle：`scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:verify_ads_outputs_csv_rows`
         - retry 断言：`load_ads_creatives` 首次抛 transient error，重试后成功（calls=2）
         - Gate：`just examples`
@@ -162,7 +162,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "ads" / "ads_campaign_report.yaml"
+    yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ads" / "ads_campaign_report.yaml"
     return demo_dir, yaml_path
 
 

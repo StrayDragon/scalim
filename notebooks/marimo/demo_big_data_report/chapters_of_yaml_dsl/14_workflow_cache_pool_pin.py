@@ -66,9 +66,9 @@ def run_workflow_cache_pool_pin(
         cfg = build_test_config_small()
     demo_dir = Path(__file__).resolve().parents[1]
     if workflow_yaml_no_pin is None:
-        workflow_yaml_no_pin = demo_dir / "by_yaml_dsl" / "workflow_fixture.yaml"
+        workflow_yaml_no_pin = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_fixture.yaml"
     if workflow_yaml_pin is None:
-        workflow_yaml_pin = demo_dir / "by_yaml_dsl" / "workflow_fixture_cache_pool_pin.yaml"
+        workflow_yaml_pin = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_fixture_cache_pool_pin.yaml"
 
     prev = get_config()
     set_config(cfg)
@@ -177,8 +177,8 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    workflow_yaml_no_pin = demo_dir / "by_yaml_dsl" / "workflow_fixture.yaml"
-    workflow_yaml_pin = demo_dir / "by_yaml_dsl" / "workflow_fixture_cache_pool_pin.yaml"
+    workflow_yaml_no_pin = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_fixture.yaml"
+    workflow_yaml_pin = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_fixture_cache_pool_pin.yaml"
     return demo_dir, workflow_yaml_no_pin, workflow_yaml_pin
 
 

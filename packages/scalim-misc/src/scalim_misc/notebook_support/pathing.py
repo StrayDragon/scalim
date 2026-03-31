@@ -33,9 +33,17 @@ def demo_big_data_report_dir(start: Union[str, Path], *, repo_root: Optional[Pat
     return root / "notebooks" / "marimo" / "demo_big_data_report"
 
 
+def demo_big_data_report_declared_yaml_dsl_dir(start: Union[str, Path], *, repo_root: Optional[Path] = None) -> Path:
+    return demo_big_data_report_dir(start, repo_root=repo_root) / "chapters_of_yaml_dsl" / "declared_yaml_dsl"
+
+
 def demo_big_data_report_yaml_path(start: Union[str, Path], *, repo_root: Optional[Path] = None) -> Path:
-    return demo_big_data_report_dir(start, repo_root=repo_root) / "by_yaml_dsl" / "ecommerce_report.yaml"
+    return demo_big_data_report_declared_yaml_dsl_dir(start, repo_root=repo_root) / "ecommerce_report.yaml"
 
 
 def demo_big_data_report_workflow_yaml_path(start: Union[str, Path], *, repo_root: Optional[Path] = None) -> Path:
-    return demo_big_data_report_dir(start, repo_root=repo_root) / "by_yaml_dsl" / "workflow_fixture.yaml"
+    return demo_big_data_report_declared_yaml_dsl_dir(start, repo_root=repo_root) / "workflow_fixture.yaml"
+
+
+def demo_big_data_report_workflow_demo_yaml_path(start: Union[str, Path], *, repo_root: Optional[Path] = None) -> Path:
+    return demo_big_data_report_declared_yaml_dsl_dir(start, repo_root=repo_root) / "workflow_demo_big_data_report.yaml"

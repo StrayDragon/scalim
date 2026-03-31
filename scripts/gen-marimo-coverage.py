@@ -7,7 +7,7 @@
 用于替代手工维护的 `notebooks/marimo/coverage_matrix.md`。
 该报告从以下来源推导并生成:
 - `notebooks/marimo/**` 的 `notebooks` 文件树(教学入口 + `SSOT` 执行入口)
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/**` 的 `YAML` 固定示例(真值)
+- `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/**` 的 `YAML` 固定示例(真值)
 - `notebooks/marimo/example_public_api_suite/**` 的 `public API` 覆盖套件
 """
 
@@ -168,9 +168,10 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
         )
 
     # --- YAML 固定示例 ---
-    demand_yaml = demo_root / "by_yaml_dsl" / "ecommerce_report.yaml"
-    fragments_yaml = demo_root / "by_yaml_dsl" / "ecommerce_report_fragments.yaml"
-    workflow_yaml = demo_root / "by_yaml_dsl" / "workflow_fixture.yaml"
+    declared_yaml_dsl_root = demo_root / "chapters_of_yaml_dsl" / "declared_yaml_dsl"
+    demand_yaml = declared_yaml_dsl_root / "ecommerce_report.yaml"
+    fragments_yaml = declared_yaml_dsl_root / "ecommerce_report_fragments.yaml"
+    workflow_yaml = declared_yaml_dsl_root / "workflow_fixture.yaml"
 
     for item_id, path in [
         ("canonical_yaml/demand", demand_yaml),

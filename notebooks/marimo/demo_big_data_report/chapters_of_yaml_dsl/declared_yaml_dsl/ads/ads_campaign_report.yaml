@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
 
 name: ads_campaign_report
 description: |
@@ -201,4 +201,3 @@ outputs:
         ctr: {compute: "Decimal(click_cnt) / Decimal(impression_cnt) if impression_cnt else Decimal('0')"}
         cvr: {compute: "Decimal(conversion_cnt) / Decimal(click_cnt) if click_cnt else Decimal('0')"}
         roas: {compute: "Decimal(revenue_usd) / Decimal(spend_usd) if spend_usd else Decimal('0')"}
-

@@ -2,13 +2,13 @@ from pathlib import Path
 
 from scalim.dsl.by_yaml import compile as compile_yaml
 from scalim.spec.ir import FieldIr
-from tests.support.pathing import repo_root as _repo_root
+from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
 
 def test_ecommerce_yaml_relation_steps_support_field_id_alias(ecommerce_config_small, tmp_path: Path) -> None:
     _ = ecommerce_config_small
-    repo_root = _repo_root()
-    yaml_path = repo_root / "notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml"
+    _ = tmp_path
+    yaml_path = demo_big_data_report_yaml_path(__file__)
 
     compilation = compile_yaml(
         str(yaml_path),

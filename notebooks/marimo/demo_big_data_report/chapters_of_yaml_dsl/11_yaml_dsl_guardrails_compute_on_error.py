@@ -39,7 +39,7 @@ def _guardrail_codes(components: Optional[Sequence[object]]) -> List[str]:
 def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None) -> ExampleResult:
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_guardrails_compute_on_error.yaml"
+        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_guardrails_compute_on_error.yaml"
 
     guardrail_capture = GuardrailCaptureObserver()
     with tempfile.TemporaryDirectory(prefix="scalim-guardrails-compute-") as tmpdir:
@@ -130,7 +130,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/support/support_guardrails_compute_on_error.yaml`
+        - YAML fixture：`chapters_of_yaml_dsl/declared_yaml_dsl/support/support_guardrails_compute_on_error.yaml`
         - 断言:
           - 输出行数仍为 5
           - ticket_id=1001 的 risky_score 为空(除零触发)
@@ -156,7 +156,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "support" / "support_guardrails_compute_on_error.yaml"
+    yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_guardrails_compute_on_error.yaml"
     return demo_dir, yaml_path
 
 

@@ -36,7 +36,7 @@ def run_yaml_dsl_ecommerce(
         cfg = build_test_config_small()
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
+        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_report.yaml"
     prev = get_config()
     set_config(cfg)
     try:
@@ -151,7 +151,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML SSOT：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
+        - YAML SSOT：`chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
         - oracle：`scalim_misc.demo_big_data_report.verification.verify_scalim_output`
         - Gate：`just examples`
 
@@ -175,7 +175,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_report.yaml"
+    yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_report.yaml"
     return demo_dir, yaml_path
 
 

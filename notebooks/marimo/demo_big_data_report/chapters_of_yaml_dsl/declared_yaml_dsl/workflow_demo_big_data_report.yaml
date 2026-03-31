@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../src/scalim/dsl/by_yaml/schema/workflow.gen.json
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/workflow.gen.json
 
 workflow:
   resources:
@@ -17,10 +17,10 @@ workflow:
 
   runs:
     - id: detail
-      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_detail_demand.yaml"
+      demand: workflow_demo_big_data_report_detail_demand.yaml
 
     - id: metrics
-      demand: "@/notebooks/marimo/demo_big_data_report/by_yaml_dsl/workflow_demo_big_data_report_metrics_demand.yaml"
+      demand: workflow_demo_big_data_report_metrics_demand.yaml
       depends_on: [detail]
 
   options:

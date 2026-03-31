@@ -6,6 +6,7 @@ from typing import FrozenSet, List, Optional
 
 from scalim.dsl.by_yaml.runtime.entrypoints import compile as compile_yaml
 from scalim.planning.builder import PlanBuilder
+from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
 
 def _parse_args(argv: List[str]) -> argparse.Namespace:
@@ -17,7 +18,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--yaml-path",
-        default="notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml",
+        default=str(demo_big_data_report_yaml_path(__file__)),
         help="YAML DSL path.",
     )
     parser.add_argument(

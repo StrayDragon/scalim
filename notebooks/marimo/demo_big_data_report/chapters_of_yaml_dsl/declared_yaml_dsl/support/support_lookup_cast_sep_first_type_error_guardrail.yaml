@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
 
 name: support_lookup_cast_sep_first_type_error_guardrail
 description: |
@@ -61,4 +61,3 @@ outputs:
       streaming: true
       encoding: utf-8
     fields: [ticket_id, agent_id, category, agent_team]
-

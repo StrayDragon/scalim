@@ -73,7 +73,7 @@ def run_yaml_dsl_output_failure_policy(
     yaml_all_fail_path: Optional[Path] = None,
 ) -> ExampleResult:
     demo_dir = Path(__file__).resolve().parents[1]
-    support_dir = demo_dir / "by_yaml_dsl" / "support"
+    support_dir = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support"
     allowed_yaml_roots = (str(support_dir.parent),)
 
     if yaml_redacted_path is None:
@@ -292,7 +292,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    support_dir = demo_dir / "by_yaml_dsl" / "support"
+    support_dir = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support"
     yaml_redacted_path = support_dir / "support_output_failure_primary_only_redacted.yaml"
     yaml_full_path = support_dir / "support_output_failure_primary_only_full.yaml"
     yaml_all_fail_path = support_dir / "support_output_failure_all_fail.yaml"

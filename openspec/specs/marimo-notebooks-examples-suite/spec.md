@@ -69,8 +69,8 @@ runner MUST 输出可定位的 PASS/FAIL 与章节级 summary,并以非零退出
 
 ### Requirement: canonical YAML SSOT 路径保持不变
 系统 MUST 保持 canonical YAML SSOT 文件路径不变,至少包括:
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`
-- `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report_fragments.yaml`
+- `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
+- `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report_fragments.yaml`
 
 #### Scenario: canonical YAML 路径稳定
 - **WHEN** 维护者检查上述 canonical YAML 文件路径

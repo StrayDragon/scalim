@@ -13,7 +13,7 @@
 - CLI/LSP 参考来自 `src/scalim/cli/yaml_dsl.py`.
 - 部分需求索引摘要来自 `openspec/specs/`.
 - 唯一完整示例仅来自
-  `notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_report.yaml`.
+  `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`.
 """
 
 from __future__ import annotations

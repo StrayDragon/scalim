@@ -39,7 +39,7 @@ def run_yaml_dsl_row_number_score_by_rank(
         cfg = build_test_config_small()
     if yaml_path is None:
         demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_rank_score_report.yaml"
+        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_rank_score_report.yaml"
 
     prev = get_config()
     set_config(cfg)
@@ -121,7 +121,7 @@ def _(mo):
 
         ## 对拍点（deterministic）
 
-        - YAML fixture：`notebooks/marimo/demo_big_data_report/by_yaml_dsl/ecommerce_rank_score_report.yaml`
+        - YAML fixture：`chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml`
         - 纯 Python 真值：`scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle:build_expected_rows_top2_by_region`
         - Gate：`just examples`
 
@@ -145,7 +145,7 @@ def _():
 
     _ = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
-    yaml_path = demo_dir / "by_yaml_dsl" / "ecommerce_rank_score_report.yaml"
+    yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_rank_score_report.yaml"
     return demo_dir, yaml_path
 
 
