@@ -102,7 +102,7 @@ def test_normalize_schema_tuple_and_refs() -> None:
     builder = SchemaBuilder()
     assert builder.normalize_schema((1, 2)) == [1, 2]
     assert builder._expand_additional_props("dummy") == {"$ref": "#/definitions/dummy"}
-    assert builder._schema_for_type(_Dummy) == {"$ref": "#/definitions/dummy"}
+    assert builder._schema_for_type(_Dummy, allow_import=True) == {"$ref": "#/definitions/dummy"}
 
 
 def test_key_map_helpers() -> None:
@@ -120,12 +120,38 @@ def test_normalize_schema_wrapper_matches_builder() -> None:
 
 def test_schema_for_type_tuples() -> None:
     builder = SchemaBuilder()
-    tuple_schema = builder._schema_for_type(tuple)
+    tuple_schema = builder._schema_for_type(tuple, allow_import=True)
     assert tuple_schema == {"type": "array"}
 
-    typed_schema = builder._schema_for_type(Tuple[int, str])
+    typed_schema = builder._schema_for_type(Tuple[int, str], allow_import=True)
     assert typed_schema["minItems"] == 2
     assert typed_schema["maxItems"] == 2
+
+
+def test_schema_builder_numeric_constraints_type_list_is_accepted() -> None:
+    builder = SchemaBuilder()
+    builder._assert_numeric_constraints_typed(  # noqa: SLF001
+        {"type": ["integer", "null"], "minimum": 0},
+        context="demo",
+    )
+
+
+def test_schema_builder_numeric_constraints_reject_non_numeric_type() -> None:
+    builder = SchemaBuilder()
+    with pytest.raises(ValueError, match=r"numeric constraints"):
+        builder._assert_numeric_constraints_typed(  # noqa: SLF001
+            {"type": "string", "minimum": 0},
+            context="demo",
+        )
+
+
+def test_workflow_schema_import_key_assertion_fails() -> None:
+    builder = SchemaBuilder()
+    with pytest.raises(ValueError, match=r"MUST NOT expose"):
+        builder._assert_schema_does_not_expose_import_key(  # noqa: SLF001
+            {"$import": {"type": "string"}},
+            path="$",
+        )
 
 
 def test_schema_omit_with_meta() -> None:

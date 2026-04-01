@@ -264,6 +264,11 @@ workflow YAML 只负责两件事:
 - CSV 输出使用 `resources.files.<file_id>` + `outputs[*].to.file`
 - Excel 输出使用 `resources.books.<book_id>` + `outputs[*].to.book/to.sheet`
 
+注意:
+
+- workflow YAML **不支持** `imports` / `$import` 片段导入(不做 imports expansion)。
+- 若需要复用资源声明,优先使用 YAML anchors(`_templates`)或在 demand YAML 中使用 `$import` 生成最终 `resources.*`,workflow 侧仅做声明/覆盖。
+
 示例: workflow 统一声明一个共享 book(`xlsx_memory`),各 run 的 demand 只负责声明 outputs 绑定:
 
 workflow YAML:

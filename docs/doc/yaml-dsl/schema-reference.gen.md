@@ -98,18 +98,18 @@ Sources:
 
 ### `guardrails_relations`
 - `$import`: $import 引用(支持 string 或 string list)
-- `null_key_max_rate`: 关联 null_key 最大比例(0.0-1.0;未设置则不启用)
-- `type_error_max_rate`: 关联 type_error 最大比例(0.0-1.0;未设置则不启用)
+- `null_key_max_rate`: type=number; 关联 null_key 最大比例(0.0-1.0;未设置则不启用)
+- `type_error_max_rate`: type=number; 关联 type_error 最大比例(0.0-1.0;未设置则不启用)
 
 ### `loader_retry`
 - `$import`: $import 引用(支持 string 或 string list)
 - `backoff`: type=string; default=exponential; enum=fixed|exponential; 退避策略(fixed/exponential)
-- `base_delay_seconds`: default=0.2; 基础等待时间(秒)
+- `base_delay_seconds`: type=number; default=0.2; 基础等待时间(秒)
 - `enabled`: type=boolean; default=false; Loader retry 策略(可选;默认关闭)
 - `jitter`: type=boolean; default=true; 启用 jitter(随机扰动)
 - `max_attempts`: type=integer; default=3; 最大尝试次数(含首次)
-- `max_delay_seconds`: default=2.0; 最大单次等待时间(秒)
-- `max_elapsed_seconds`: default=10.0; 最大累计耗时(秒,包含 sleep)
+- `max_delay_seconds`: type=number; default=2.0; 最大单次等待时间(秒)
+- `max_elapsed_seconds`: type=number; default=10.0; 最大累计耗时(秒,包含 sleep)
 - `should_retry`: type=string; 重试判定回调引用(安全引用,由 allowlist 约束)
 
 ### `logging`
@@ -199,8 +199,8 @@ Sources:
 
 ### `performance_thresholds`
 - `$import`: $import 引用(支持 string 或 string list)
-- `batch_duration_warn`: 批次耗时告警阈值(秒)
-- `memory_increase_warn`: 内存增长告警阈值(MB)
+- `batch_duration_warn`: type=number; 批次耗时告警阈值(秒)
+- `memory_increase_warn`: type=number; 内存增长告警阈值(MB)
 
 ### `relation`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -217,7 +217,7 @@ Sources:
 - `log_type_mismatch`: type=boolean; default=true; 记录类型不匹配日志
 - `max_samples`: type=integer; default=1000; 最大采样数量
 - `report`: ref=relation_report
-- `sampling_rate`: default=0.01; 采样率(0.0-1.0)
+- `sampling_rate`: type=number; default=0.01; 采样率(0.0-1.0)
 
 ### `resources`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -277,28 +277,30 @@ Sources:
 ### Definitions
 
 #### `book`
-- `$import`: $import 引用(支持 string 或 string list)
+
+- Required: `kind`
 - `allow_formulas`: type=boolean; default=false; xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)
 - `budget`: ref=book_budget; xlsx_memory: 预算配置(必填)
 - `export_xlsx`: ref=book_export_xlsx; xlsx_memory: 可选导出配置
-- `kind`: type=string; enum=xlsx_file|xlsx_memory; book kind(xlsx_file/xlsx_memory)
+- `kind` (required): type=string; enum=xlsx_file|xlsx_memory; book kind(xlsx_file/xlsx_memory)
 - `path`: xlsx_file: 输出路径(字符串或 {$init_var: <name>})
 - `write_defaults`: ref=book_write_defaults; 可选:默认写入语义与冲突策略
 - `write_lock`: type=boolean; default=false; xlsx_file: 写锁(默认 false)
 
 #### `book_budget`
-- `$import`: $import 引用(支持 string 或 string list)
-- `max_sheets`: type=integer; sheet 数量预算(>=1)
-- `max_total_cells`: type=integer; 总 cell 数预算(>=1)
+
+- Required: `max_sheets`, `max_total_cells`
+- `max_sheets` (required): type=integer; sheet 数量预算(>=1)
+- `max_total_cells` (required): type=integer; 总 cell 数预算(>=1)
 
 #### `book_export_xlsx`
-- `$import`: $import 引用(支持 string 或 string list)
+
+- Required: `path`
 - `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(可信输入显式 opt-out;默认 false)
-- `path`: 导出 xlsx 的输出路径(字符串或 {$init_var: <name>})
+- `path` (required): 导出 xlsx 的输出路径(字符串或 {$init_var: <name>})
 - `write_lock`: type=boolean; default=false; 写锁(导出时;默认 false)
 
 #### `book_write_defaults`
-- `$import`: $import 引用(支持 string 或 string list)
 - `align_by`: type=string; default=field_id; enum=field_id|header; 字段对齐策略(field_id/header;仅 append 生效)
 - `header_policy`: type=string; default=once; enum=once|always|never; 表头策略(once/always/never;仅 append 生效)
 - `mode`: type=string; default=append; enum=sheet|append; 写入语义(sheet/append)
@@ -306,13 +308,13 @@ Sources:
 - `on_mismatch`: type=string; default=error; enum=error|warn|skip; 字段不匹配策略(error/warn/skip;仅 append 生效)
 
 #### `file`
-- `$import`: $import 引用(支持 string 或 string list)
+
+- Required: `kind`, `path`
 - `encoding`: type=string; default=utf-8; csv_file: 文件编码(默认 utf-8)
-- `kind`: type=string; enum=csv_file; file kind(csv_file)
-- `path`: csv_file: 输出路径(字符串或 {$init_var: <name>})
+- `kind` (required): type=string; enum=csv_file; file kind(csv_file)
+- `path` (required): csv_file: 输出路径(字符串或 {$init_var: <name>})
 
 #### `resources`
-- `$import`: $import 引用(支持 string 或 string list)
 - `books`: type=object; books 资源映射(Excel book; key 为 book_id)
 - `files`: type=object; files 资源映射(文件输出资源; key 为 file_id)
 

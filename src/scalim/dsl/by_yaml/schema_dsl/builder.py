@@ -77,8 +77,11 @@ class SchemaBuilder:
     PRIMITIVE_TYPE_MAP: ClassVar[Dict[Type[Any], str]] = {
         bool: "boolean",
         int: "integer",
+        float: "number",
         str: "string",
     }
+    NUMERIC_CONSTRAINT_KEYS: ClassVar[Set[str]] = {"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"}
+    NUMERIC_SCHEMA_TYPES: ClassVar[Set[str]] = {"number", "integer"}
     _types: Any
 
     def __init__(self, types_module: Optional[Any] = None) -> None:
@@ -364,12 +367,12 @@ class SchemaBuilder:
         }
 
         definitions: Dict[str, Any] = {
-            "book_budget": self._build_definition(types_mod.BookBudgetConfig),
-            "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
-            "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig),
-            "book": self._build_definition(types_mod.BookConfig),
-            "file": self._build_definition(types_mod.FileConfig),
-            "resources": self._build_definition(types_mod.ResourcesConfig),
+            "book_budget": self._build_definition(types_mod.BookBudgetConfig, allow_import=False),
+            "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig, allow_import=False),
+            "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig, allow_import=False),
+            "book": self._build_definition(types_mod.BookConfig, allow_import=False),
+            "file": self._build_definition(types_mod.FileConfig, allow_import=False),
+            "resources": self._build_definition(types_mod.ResourcesConfig, allow_import=False),
         }
 
         run_item: Dict[str, Any] = {
@@ -475,6 +478,7 @@ class SchemaBuilder:
             "definitions": definitions,
             "additionalProperties": False,
         }
+        self._assert_schema_does_not_expose_import_key(schema, path="$")
         return schema
 
     def _import_ref_schema(self) -> Dict[str, Any]:
@@ -527,9 +531,10 @@ class SchemaBuilder:
             },
         }
 
-    def _build_definition(self, cls: type) -> Dict[str, Any]:
-        properties = self._build_class_properties(cls)
-        properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
+    def _build_definition(self, cls: type, *, allow_import: bool = True) -> Dict[str, Any]:
+        properties = self._build_class_properties(cls, allow_import=allow_import)
+        if allow_import:
+            properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
         schema: Dict[str, Any] = {
             "type": "object",
             "properties": properties,
@@ -537,8 +542,11 @@ class SchemaBuilder:
 
         required = getattr(cls, "SCHEMA_REQUIRED", ())  # pragma: allow-dynattr metadata: schema meta
         if required:
-            # `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
-            schema["anyOf"] = [{"required": list(required)}, {"required": [_IMPORT_KEY]}]
+            if allow_import:
+                # `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
+                schema["anyOf"] = [{"required": list(required)}, {"required": [_IMPORT_KEY]}]
+            else:
+                schema["required"] = list(required)
 
         additional_props = getattr(cls, "SCHEMA_ADDITIONAL_PROPERTIES", None)  # pragma: allow-dynattr metadata: schema meta
         if additional_props is not None:
@@ -552,7 +560,7 @@ class SchemaBuilder:
 
     def _build_demand_properties(self) -> Dict[str, Any]:
         types_mod = self._types
-        base_properties = self._build_class_properties(types_mod.DemandConfig)
+        base_properties = self._build_class_properties(types_mod.DemandConfig, allow_import=True)
         base_properties.setdefault(_IMPORTS_KEY, self._imports_schema())
         base_properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
         ordered: Dict[str, Any] = {}
@@ -593,8 +601,8 @@ class SchemaBuilder:
 
     def _build_field_definition(self) -> Dict[str, Any]:
         types_mod = self._types
-        source_props = self._build_class_properties(types_mod.SourceFieldConfig)
-        derived_props = self._build_class_properties(types_mod.DerivedFieldConfig)
+        source_props = self._build_class_properties(types_mod.SourceFieldConfig, allow_import=True)
+        derived_props = self._build_class_properties(types_mod.DerivedFieldConfig, allow_import=True)
 
         properties = dict(source_props)
         for name, schema in derived_props.items():
@@ -614,7 +622,7 @@ class SchemaBuilder:
             "allOf": copy.deepcopy(types_mod.FIELD_DERIVED_CONDITIONS),
         }
 
-    def _build_class_properties(self, cls: type) -> Dict[str, Any]:
+    def _build_class_properties(self, cls: type, *, allow_import: bool) -> Dict[str, Any]:
         types_mod = self._types
         properties: Dict[str, Any] = {}
         for dc_field in dataclass_fields(cls):
@@ -622,10 +630,11 @@ class SchemaBuilder:
                 continue
             meta = SchemaMeta.from_field(dc_field)
             prop_name = meta.schema_name or dc_field.name
-            properties[prop_name] = self._build_field_schema(dc_field, meta)
+            properties[prop_name] = self._build_field_schema(cls, dc_field, meta, allow_import=allow_import)
         return properties
 
-    def _build_field_schema(self, dc_field: "Field[Any]", meta: SchemaMeta) -> Dict[str, Any]:
+    def _build_field_schema(self, owner_cls: type, dc_field: "Field[Any]", meta: SchemaMeta, *, allow_import: bool) -> Dict[str, Any]:
+        context = "{}.{}".format(owner_cls.__name__, meta.schema_name or dc_field.name)
         meta_payload = dict(meta.meta)
         if "ref" in meta_payload:
             ref_name = meta_payload.pop("ref")
@@ -633,15 +642,57 @@ class SchemaBuilder:
                 return {"$ref": "#/definitions/{}".format(ref_name)}
             expanded = self._expand_meta(meta_payload)
             expanded["allOf"] = [{"$ref": "#/definitions/{}".format(ref_name)}]
+            self._assert_numeric_constraints_typed(expanded, context=context)
             return expanded
         if "schema" in meta_payload:
             schema = cast("Dict[str, Any]", copy.deepcopy(meta_payload.pop("schema")))  # pragma: allow-cast meta schema typed narrowing
             schema.update(self._expand_meta(meta_payload))
+            self._assert_numeric_constraints_typed(schema, context=context)
             return schema
 
-        schema = self._schema_for_type(dc_field.type)
+        schema = self._schema_for_type(dc_field.type, allow_import=allow_import)
         schema.update(self._expand_meta(meta_payload))
+        self._assert_numeric_constraints_typed(schema, context=context)
         return schema
+
+    def _assert_numeric_constraints_typed(self, schema: Dict[str, Any], *, context: str) -> None:
+        constraint_keys = self.NUMERIC_CONSTRAINT_KEYS.intersection(schema)
+        if not constraint_keys:
+            return
+
+        raw_type = cast("object", schema.get("type"))  # pragma: allow-cast jsonschema `type` can be scalar/list
+        types: List[str] = []
+        if isinstance(raw_type, str):
+            types = [raw_type]
+        elif isinstance(raw_type, list):
+            for item in cast("List[Any]", raw_type):  # pragma: allow-cast jsonschema list typed narrowing
+                if isinstance(item, str):
+                    types.append(item)
+
+        if any(item in self.NUMERIC_SCHEMA_TYPES for item in types):
+            return
+
+        msg = "Invalid schema: numeric constraints {} require explicit numeric type for {}; got type={}".format(
+            ",".join(sorted(constraint_keys)),
+            context,
+            repr(cast("object", raw_type)),  # pragma: allow-cast repr accepts any object
+        )
+        raise ValueError(msg)
+
+    def _assert_schema_does_not_expose_import_key(self, value: Any, *, path: str) -> None:
+        if isinstance(value, dict):
+            typed = cast("Dict[str, Any]", value)  # pragma: allow-cast schema traversal typed narrowing
+            if _IMPORT_KEY in typed:
+                msg = "Workflow schema MUST NOT expose {!r} (found at {})".format(_IMPORT_KEY, path)
+                raise ValueError(msg)
+            for key, item in typed.items():
+                self._assert_schema_does_not_expose_import_key(item, path="{}.{}".format(path, key))
+            return
+        if isinstance(value, list):
+            items = cast("List[Any]", value)  # pragma: allow-cast schema traversal typed narrowing
+            for idx, item in enumerate(items):
+                self._assert_schema_does_not_expose_import_key(item, path="{}[{}]".format(path, idx))
+            return
 
     def schemas_equivalent(self, left: Any, right: Any) -> bool:
         return self.normalize_schema(left) == self.normalize_schema(right)
@@ -695,14 +746,14 @@ class SchemaBuilder:
             return {"$ref": "#/definitions/{}".format(value)}
         return copy.deepcopy(value)
 
-    def _schema_for_type(self, tp: Any) -> Dict[str, Any]:
+    def _schema_for_type(self, tp: Any, *, allow_import: bool) -> Dict[str, Any]:
         tp = self._strip_optional(tp)
         origin = getattr(tp, "__origin__", None)  # pragma: allow-dynattr introspection: __origin__
         primitive = self._primitive_schema(tp)
         if primitive:
             return primitive
 
-        container = self._container_schema(tp, origin)
+        container = self._container_schema(tp, origin, allow_import=allow_import)
         if container:
             return container
 
@@ -725,28 +776,30 @@ class SchemaBuilder:
             return {"type": self.PRIMITIVE_TYPE_MAP[tp]}
         return {}
 
-    def _container_schema(self, tp: Any, origin: Any) -> Dict[str, Any]:
+    def _container_schema(self, tp: Any, origin: Any, *, allow_import: bool) -> Dict[str, Any]:
         if origin is list or tp is list:
             args = getattr(tp, "__args__", ())  # pragma: allow-dynattr introspection: __args__
             item_type = args[0] if args else object
-            return {"type": "array", "items": self._schema_for_type(item_type)}
+            return {"type": "array", "items": self._schema_for_type(item_type, allow_import=allow_import)}
 
         if origin is dict or tp is dict:
-            return {"type": "object", "properties": {_IMPORT_KEY: self._import_ref_schema()}}
+            if allow_import:
+                return {"type": "object", "properties": {_IMPORT_KEY: self._import_ref_schema()}}
+            return {"type": "object"}
 
         if origin is tuple or tp is tuple:
-            return self._tuple_schema(tp)
+            return self._tuple_schema(tp, allow_import=allow_import)
 
         return {}
 
-    def _tuple_schema(self, tp: Any) -> Dict[str, Any]:
+    def _tuple_schema(self, tp: Any, *, allow_import: bool) -> Dict[str, Any]:
         raw_args = getattr(tp, "__args__", ())  # pragma: allow-dynattr introspection: __args__
         args = cast("Tuple[Any, ...]", raw_args)  # pragma: allow-cast typing args typed narrowing
         if len(args) == self.ELLIPSIS_TUPLE_LEN and args[1] is Ellipsis:
-            return {"type": "array", "items": self._schema_for_type(args[0])}
+            return {"type": "array", "items": self._schema_for_type(args[0], allow_import=allow_import)}
 
         if args:
-            items = [self._schema_for_type(arg) for arg in args]
+            items = [self._schema_for_type(arg, allow_import=allow_import) for arg in args]
             return {
                 "type": "array",
                 "items": items,

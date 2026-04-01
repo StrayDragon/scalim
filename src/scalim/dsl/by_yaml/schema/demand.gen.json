@@ -4054,10 +4054,12 @@
       "type": "object",
       "properties": {
         "batch_duration_warn": {
+          "type": "number",
           "description": "批次耗时告警阈值(秒)",
           "markdownDescription": "批次耗时告警阈值(秒)"
         },
         "memory_increase_warn": {
+          "type": "number",
           "description": "内存增长告警阈值(MB)",
           "markdownDescription": "内存增长告警阈值(MB)"
         },
@@ -4260,6 +4262,7 @@
           "default": false
         },
         "sampling_rate": {
+          "type": "number",
           "description": "采样率(0.0-1.0)",
           "markdownDescription": "采样率(0.0-1.0).",
           "minimum": 0.0,
@@ -4711,12 +4714,14 @@
       "type": "object",
       "properties": {
         "null_key_max_rate": {
+          "type": "number",
           "description": "关联 null_key 最大比例(0.0-1.0;未设置则不启用)",
           "markdownDescription": "关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
           "minimum": 0.0,
           "maximum": 1.0
         },
         "type_error_max_rate": {
+          "type": "number",
           "description": "关联 type_error 最大比例(0.0-1.0;未设置则不启用)",
           "markdownDescription": "关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
           "minimum": 0.0,
@@ -4877,6 +4882,7 @@
           ]
         },
         "max_elapsed_seconds": {
+          "type": "number",
           "description": "最大累计耗时(秒,包含 sleep)",
           "markdownDescription": "最大累计耗时(秒,包含 sleep).\n\n- 受硬上限保护: <= 20",
           "minimum": 1e-06,
@@ -4900,6 +4906,7 @@
           ]
         },
         "base_delay_seconds": {
+          "type": "number",
           "description": "基础等待时间(秒)",
           "markdownDescription": "基础等待时间(秒).\n\n- fixed: 每次等待 base_delay\n- exponential: base_delay * 2**(attempt-1)",
           "minimum": 0.0,
@@ -4909,6 +4916,7 @@
           ]
         },
         "max_delay_seconds": {
+          "type": "number",
           "description": "最大单次等待时间(秒)",
           "markdownDescription": "最大单次等待时间(秒).\n\n- 受硬上限保护: <= 5",
           "minimum": 0.0,

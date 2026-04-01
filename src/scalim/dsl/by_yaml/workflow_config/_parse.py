@@ -48,6 +48,17 @@ _CACHE_POOL_OVER_BUDGET_POLICIES = ("fail_fast", "evict_lru")
 _CACHE_POOL_PIN_KINDS = ("preload_forever",)
 
 _INTERNAL_NODE_ID_PREFIX = "__wf__"
+_IMPORT_KEY = "$import"
+
+
+def _raise_if_import_present(data: Mapping[str, Any], *, path: str) -> None:
+    if _IMPORT_KEY not in data:
+        return
+    msg = (
+        "workflow YAML does not support `$import` (no imports expansion). "
+        "Hint: inline the config under `workflow.resources.*`, or move the reuse to demand YAML via YAML anchors (`_templates`)."
+    )
+    raise ScalimWorkflowConfigError(msg, path="{}.{}".format(path, _IMPORT_KEY))
 
 
 def _parse_bool(raw: object, *, path: str, msg: str) -> bool:
@@ -246,6 +257,7 @@ def _parse_book_budget(raw: object, *, path: str) -> BookBudgetConfig:
         raise ScalimWorkflowConfigError(msg, path=path)
 
     data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(data, path=path)
     unknown = sorted({str(k) for k in data} - {"max_sheets", "max_total_cells"})
     if unknown:
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
@@ -286,6 +298,7 @@ def _parse_book_export_xlsx(raw: object, *, path: str) -> BookExportXlsxConfig:
         raise ScalimWorkflowConfigError(msg, path=path)
 
     data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(data, path=path)
     unknown = sorted({str(k) for k in data} - {"path", "write_lock", "allow_formulas"})
     if unknown:
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
@@ -316,6 +329,7 @@ def _parse_book_write_defaults(raw: object, *, path: str) -> BookWriteDefaultsCo
         raise ScalimWorkflowConfigError(msg, path=path)
 
     data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(data, path=path)
     unknown = sorted({str(k) for k in data} - {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"})
     if unknown:
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
@@ -362,6 +376,7 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
         raise ScalimWorkflowConfigError(msg, path=path)
 
     cfg = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(cfg, path=path)
 
     allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_lock", "write_defaults"}
     unknown = sorted({str(k) for k in cfg} - allowed_keys)
@@ -434,7 +449,7 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
     )
 
 
-def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa: C901, PLR0912
+def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa: C901, PLR0912, PLR0915
     msg: str
     resources_raw = wf.get("resources", {})
     if resources_raw is None:
@@ -445,6 +460,7 @@ def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa:
         raise ScalimWorkflowConfigError(msg, path="workflow.resources")
 
     resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(resources, path="workflow.resources")
     for raw_key in resources:
         if not isinstance(raw_key, str) or not raw_key.strip():
             msg = "workflow.resources keys must be non-empty strings"
@@ -469,6 +485,8 @@ def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa:
         msg = "workflow.resources.books must be a mapping"
         raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
 
+    books_dict = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(books_dict, path="workflow.resources.books")
     books: Dict[str, BookConfig] = {}
     for raw_book_id, raw_book_cfg in cast("Dict[Any, Any]", books_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         book_id = str(raw_book_id or "").strip() if isinstance(raw_book_id, str) else ""
@@ -485,6 +503,8 @@ def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa:
         msg = "workflow.resources.files must be a mapping"
         raise ScalimWorkflowConfigError(msg, path="workflow.resources.files")
 
+    files_dict = cast("Dict[str, Any]", files_raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(files_dict, path="workflow.resources.files")
     files: Dict[str, FileConfig] = {}
     for raw_file_id, raw_file_cfg in cast("Dict[Any, Any]", files_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
         file_id = str(raw_file_id or "").strip() if isinstance(raw_file_id, str) else ""
@@ -503,6 +523,12 @@ def _parse_file_config(raw: object, *, path: str) -> FileConfig:
         msg = "{} must be a mapping".format(path)
         raise ScalimWorkflowConfigError(msg, path=path)
     typed = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(typed, path=path)
+    allowed_keys = {"kind", "path", "encoding"}
+    unknown = sorted({str(k) for k in typed} - allowed_keys)
+    if unknown:
+        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
+        raise ScalimWorkflowConfigError(msg, path=path)
 
     kind_raw = typed.get("kind")
     kind = str(kind_raw or "").strip() if isinstance(kind_raw, str) else ""

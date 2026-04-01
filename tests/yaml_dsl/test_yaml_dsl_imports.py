@@ -1,5 +1,6 @@
 import io
 import argparse
+import json
 from pathlib import Path
 
 import pytest
@@ -625,6 +626,51 @@ sources:
 
     assert yaml_dsl_cli._run_validate(_args(demand, json_output=True)) == 0
     assert yaml_dsl_cli._run_schema_validate(_args(demand, json_output=True)) == 0
+
+
+def test_cli_schema_validate_does_not_expand_imports_for_workflow_schema(tmp_path, capsys) -> None:
+    demand_path = tmp_path / "demand.yaml"
+    demand_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    workflow_path = tmp_path / "workflow.yaml"
+    workflow_path.write_text(
+        """
+workflow:
+  resources:
+    books:
+      report:
+        kind: xlsx_file
+        path: ./out.xlsx
+        $import: common.books.report
+
+  runs:
+    - id: r1
+      demand: ./demand.yaml
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    repo_root = Path(__file__).resolve().parents[2]
+    workflow_schema = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
+    args = _args(workflow_path, json_output=True)
+    args.schema = workflow_schema
+
+    assert yaml_dsl_cli._run_schema_validate(args) == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["mode"] == "schema-validate"
+    assert payload["ok"] is False
+    assert any(
+        item["code"] == "yaml_unknown_field" and item["path"] == "workflow.resources.books.report.$import" for item in payload["errors"]
+    )
 
 
 def test_imports_format_trace_empty_returns_empty_string() -> None:

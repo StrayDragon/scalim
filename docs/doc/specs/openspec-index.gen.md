@@ -456,6 +456,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-schema/spec.md)
 - Summary: **状态: ✅ 已实现** 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 
+### `yaml-dsl-schema-workflow-alignment`
+- Title: yaml-dsl-schema-workflow-alignment Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-schema-workflow-alignment/spec.md)
+- Summary: 对齐 workflow `workflow.resources` 的 schema/runtime 契约(禁止 `$import` 暴露并提供迁移提示),并为 schema numeric constraints 引入生成期 fail-fast 与仓库级 drift gate.
+
 ### `yaml-dsl-unified-loader`
 - Title: yaml-dsl-unified-loader Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-unified-loader/spec.md)

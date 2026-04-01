@@ -156,16 +156,16 @@ properties[189	]{entry_id	name	required	summary}:
   29	required_fields	false	array, items string | object, anyOf(2)
   29	validate_result	false	boolean
   30	$import	false	string | array, oneOf(2)
-  30	null_key_max_rate	false	关联 null_key 最大比例(0.0-1.0;未设置则不启用)
-  30	type_error_max_rate	false	关联 type_error 最大比例(0.0-1.0;未设置则不启用)
+  30	null_key_max_rate	false	number
+  30	type_error_max_rate	false	number
   31	$import	false	string | array, oneOf(2)
   31	backoff	false	string, enum fixed, exponential
-  31	base_delay_seconds	false	基础等待时间(秒)
+  31	base_delay_seconds	false	number
   31	enabled	false	boolean
   31	jitter	false	boolean
   31	max_attempts	false	integer
-  31	max_delay_seconds	false	最大单次等待时间(秒)
-  31	max_elapsed_seconds	false	最大累计耗时(秒,包含 sleep)
+  31	max_delay_seconds	false	number
+  31	max_elapsed_seconds	false	number
   31	should_retry	false	string
   32	$import	false	string | array, oneOf(2)
   32	enabled	false	boolean
@@ -231,8 +231,8 @@ properties[189	]{entry_id	name	required	summary}:
   42	include_details	false	boolean
   42	output	false	string
   43	$import	false	string | array, oneOf(2)
-  43	batch_duration_warn	false	批次耗时告警阈值(秒)
-  43	memory_increase_warn	false	内存增长告警阈值(MB)
+  43	batch_duration_warn	false	number
+  43	memory_increase_warn	false	number
   44	$import	false	string | array, oneOf(2)
   44	steps	false	array, items object, properties from, lookup_cast, to
   45	$import	false	string | array, oneOf(2)
@@ -243,7 +243,7 @@ properties[189	]{entry_id	name	required	summary}:
   46	log_type_mismatch	false	boolean
   46	max_samples	false	integer
   46	report	false	ref #/definitions/relation_report
-  46	sampling_rate	false	采样率(0.0-1.0)
+  46	sampling_rate	false	number
   47	$import	false	string | array, oneOf(2)
   47	books	false	object, properties $import
   47	files	false	object, properties $import

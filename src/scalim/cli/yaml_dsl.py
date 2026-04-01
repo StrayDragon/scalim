@@ -1164,7 +1164,7 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        if contains_import_syntax(yaml_data_dict):
+        if contains_import_syntax(yaml_data_dict) and contains_import_syntax(schema):
             _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
     except ScalimYamlImportExpansionError as exc:
         logical_path = str(exc.logical_path or "(root)")
