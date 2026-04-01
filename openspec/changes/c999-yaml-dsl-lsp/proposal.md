@@ -6,7 +6,7 @@
 
 历史上仓库内曾有 `frontend/scalim-yaml-dsl-editor/` Web 编辑器实现，现已移除；后续以 LSP/IDE 集成为主路径。
 
-与此同时,当前仓库内部虽然已经有 validator、schema 与部分路径解析能力,但还没有一套稳定的“编辑器静态语义 API”: demand validator、workflow 校验、导入展开、位置索引与 Python 引用解析分散在不同模块中,其中一些运行时解析逻辑仍带有动态导入假设,不能直接拿来做 LSP 端的静态导航.
+与此同时,当前仓库内部虽然已经有 validator、schema 与部分路径解析能力,但还没有一套稳定的“编辑器静态语义边界”: demand validator、workflow 校验、导入展开、位置索引与 Python 引用解析分散在不同模块中,其中一些运行时解析逻辑仍带有动态导入假设,不能直接拿来做 LSP 端的静态导航.
 
 我们希望把 DSL 的语义能力带到 VSCode（以及未来可扩展到其他编辑器），并且：
 
@@ -26,11 +26,13 @@
   - Diagnostics：demand 复用内部 validator + 定位；workflow v1 仅做 schema-only 校验（与当前边界对齐）
   - Go to Definition：仅对 `loader`/`call_by` 等引用字段提供跳转
   - Completion / Hover：仅在引用字符串内提供补全与解释，避免与 YAML 扩展冲突
-- LSP 侧静态解析应以 library 复用为主,但不能直接照搬当前运行时路径解析实现；需要先拆出不依赖动态导入、副作用与 CLI 输出格式的静态语义层.
+- LSP 侧静态解析应以 library 复用为主,但不能直接照搬当前运行时路径解析实现；需要先收敛出一组不依赖动态导入、副作用与 CLI 输出格式的静态语义接口.
+  - 这组接口可以作为 **内部导出但稳定可依赖** 的特例,主要服务于 LSP / editor / tooling,不必承诺为面向普通用户的 public API
 - **New**: 定义 VSCode 扩展 v1 行为
   - 作为 `redhat.vscode-yaml` 的协同扩展：schema 绑定 + LSP server 启动与管理
   - 读取并同步所选的项目发现/配置方案（默认零配置可用，自定义时可同步到工作区 `yaml.schemas`）
   - 负责 Python 环境管理（在 `globalStorageUri` 下维护 venv，并以 pinned 版本安装 LSP server）
+  - 后续实现可优先考虑在 `packages/` 下落独立 server（例如 Python 3.10），未来再评估 Pyodide / WASM 等技术形态
 
 ## Capabilities
 
@@ -46,6 +48,7 @@
 
 - 影响范围（规范层面）：
   - 本仓库：需要保证 `src/scalim/dsl/by_yaml/**` 的关键语义能力可被外部 LSP server 以 library 方式复用（不依赖 CLI 输出格式）。
+  - 这些能力默认视为 editor/tooling 特例接口,目标是“稳定可依赖”,而不是扩大普通用户 public API 面。
   - schema 产出：LSP/扩展需要稳定获取 `demand.gen.json` / `workflow.gen.json`（可通过资源读取或发布包携带）。
   - 架构分层：通用 YAML 能力继续由现有 YAML 扩展提供；`scalim` 侧仅沉淀 DSL 语义 API 与静态引用导航能力。
 - 兼容性与边界：
