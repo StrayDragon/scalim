@@ -270,15 +270,7 @@ def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
         run(
             str(yaml_path),
             allowed_modules=allowed_modules,
-            overrides=RunOverrides(
-                outputs=[
-                    {
-                        "name": "detail",
-                        "container": {"type": "csv", "path": str(output_path)},
-                        "fields": list(TARGET_FIELDS_BASIC),
-                    }
-                ]
-            ),
+            overrides=RunOverrides.csv_file(output_path=output_path, fields=TARGET_FIELDS_BASIC, output_name="detail"),
             init_vars={"order_ids": []},
         )
 
