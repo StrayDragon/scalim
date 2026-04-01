@@ -426,6 +426,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-imports/spec.md)
 - Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + 任意 mapping 内 `$import`(编译期展开),并在 schema/语义校验前完成展开.
 
+### `yaml-dsl-mainline-principles`
+- Title: yaml-dsl-mainline-principles Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-mainline-principles/spec.md)
+- Summary: 定义 YAML DSL 的上位主线原则与设计护栏,用于约束后续变更的方向与评审口径: 单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式(拒绝 imports expansion)。
+
 ### `yaml-dsl-micro-tunes`
 - Title: yaml-dsl-micro-tunes Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-micro-tunes/spec.md)

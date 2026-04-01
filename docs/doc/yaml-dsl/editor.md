@@ -39,5 +39,5 @@ scalim-cli yaml-dsl validate /path/to/config.yaml
 
 后续方向会以 LSP/IDE 插件替代仓库内 Web 编辑器; 设计讨论见:
 
-- `openspec/notplan-changes/c999-yaml-dsl-lsp/proposal.md`
-- `openspec/notplan-changes/c999-yaml-dsl-lsp/design.md`
+- `openspec/changes/c999-yaml-dsl-lsp/proposal.md`
+- `openspec/changes/c999-yaml-dsl-lsp/design.md`

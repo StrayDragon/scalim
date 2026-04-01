@@ -122,6 +122,7 @@ analyze_args_prefix = "SCALIM_ANALYZE_ARGS_"
 [tool.ruff]
 exclude = [
     ".bzr",
+    ".codex",
     ".direnv",
     ".eggs",
     ".git",
