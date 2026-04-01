@@ -183,6 +183,12 @@ def test_cast_decimal_variants_and_errors() -> None:
     assert cast_decimal(3) == Decimal(3)
     assert cast_decimal("   ") is None
 
+    with pytest.raises(ValueError, match="Invalid decimal float literal"):
+        _ = cast_decimal(float("nan"))
+
+    with pytest.raises(ValueError, match="Invalid decimal float literal"):
+        _ = cast_decimal(float("inf"))
+
     with pytest.raises(ValueError, match="Invalid decimal string literal"):
         _ = cast_decimal("bad-decimal")
 

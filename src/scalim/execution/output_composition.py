@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import hashlib
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from .._internal.loggingx import format_kv, get_logger, prefix
 from .._internal.utils.iterables import ordered_unique_str
@@ -12,10 +12,11 @@ from ..events import EVENT_OUTPUT_TARGET_END
 from ..events._events import OutputTargetEndEvent
 from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
-from ..sinks import BaseRowSink, CSVSink, InMemoryCsvSink, IRowSink
+from ..sinks import BaseRowSink, CSVSink, ExcelWorkbookSink, IRowSink
 from ..typedefs import KeyNormalizationMode, RowData
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
+from . import managed_artifacts as ma
 from .derived_outputs import (
     AggMetricSpec,
     AggregatingRowSink,
@@ -32,20 +33,16 @@ from .derived_outputs import (
 from .output_contracts import ExportLayout, OutputSpec
 
 OutputRowPredicate = Callable[[RowData], bool]
-
 _logger = get_logger("derived_outputs")
-
-if TYPE_CHECKING:
-    from ..sinks import ExcelWorkbookSink
+MANAGED_ARTIFACT_KIND_CSV = ma.MANAGED_ARTIFACT_KIND_CSV
+MANAGED_ARTIFACT_KIND_ROWS = ma.MANAGED_ARTIFACT_KIND_ROWS
+ManagedArtifactPlan = ma.ManagedArtifactPlan
+create_managed_artifact_sink = ma.create_managed_artifact_sink
 
 
 @dataclass(frozen=True)
 class OutputTargetSpec:
-    """输出目标(`IR/Python-only`).
-
-    - `layout.field_ids` 表示该目标写出的字段顺序(来自输入行 `dict` 取值).
-    - `output.sheet_name` 仅在 `excel` 且写入同一工作簿容器时使用.
-    """
+    """输出目标(`IR/Python-only`); `layout.field_ids` 控制取值顺序, `output.sheet_name` 仅用于同工作簿 `excel` 写入."""
 
     target_id: str
     layout: ExportLayout
@@ -54,6 +51,8 @@ class OutputTargetSpec:
     predicate: Optional[OutputRowPredicate] = None
     is_primary: bool = False
     requires: Optional[Tuple[str, ...]] = None
+    workflow_export_header: Optional[Tuple[str, ...]] = None
+    managed_artifact_kind: Optional[str] = None
 
 
 class IDerivedAggregationSpec(ABC):
@@ -325,6 +324,8 @@ class DerivedOutputTargetSpec:
     predicate: Optional[OutputRowPredicate] = None
     is_primary: bool = False
     requires: Optional[Tuple[str, ...]] = None
+    workflow_export_header: Optional[Tuple[str, ...]] = None
+    managed_artifact_kind: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -438,12 +439,6 @@ def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
         include_header=bool(output.include_header),
         flush_policy="every_n_rows",
     )
-
-
-def _create_in_memory_csv_sink(layout: ExportLayout) -> InMemoryCsvSink:
-    field_names = list(layout.field_ids)
-    header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
-    return InMemoryCsvSink(field_names=field_names, header_names=header_names)
 
 
 def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink:
@@ -902,7 +897,7 @@ class RouterRowSink(BaseRowSink):
 class OutputCompositionPlan:
     sink: RouterRowSink
     output_paths: Dict[str, str]
-    in_memory_csv_sinks: Dict[str, InMemoryCsvSink]
+    managed_artifact_plans: Dict[str, ManagedArtifactPlan]
 
 
 def _normalize_failure_policy(failure_policy: str) -> str:
@@ -966,23 +961,24 @@ def _create_row_sink_for_composed_output(
     layout: ExportLayout,
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
     in_memory: bool = False,
-) -> Tuple[IRowSink, _RowCounter, Optional[InMemoryCsvSink]]:
+    managed_artifact_kind: Optional[str] = None,
+) -> Tuple[IRowSink, _RowCounter, Optional[ManagedArtifactPlan]]:
     fmt = (output.format or "csv").lower()
     if not output.path and not in_memory:
         msg = "OutputSpec.path is required for composed outputs (target_id={}, format={})".format(target_id, fmt)
         raise ValueError(msg)
 
     if in_memory:
-        if fmt != "csv":
-            msg = "In-memory composed output only supports format=csv (target_id={}, format={})".format(target_id, fmt)
-            raise ValueError(msg)
-        if not output.streaming:
-            msg = "Composed outputs only support streaming row sinks for csv (streaming=true)"
-            raise ValueError(msg)
         counter = _RowCounter()
-        mem_sink = _create_in_memory_csv_sink(layout)
-        sink = _CountingOutputRowSink(mem_sink, counter)
-        return sink, counter, mem_sink
+        managed_sink, managed_plan = create_managed_artifact_sink(
+            target_id=str(target_id),
+            fmt=str(fmt),
+            layout=layout,
+            output=output,
+            managed_artifact_kind=managed_artifact_kind,
+        )
+        sink = _CountingOutputRowSink(managed_sink, counter)
+        return sink, counter, managed_plan
 
     if fmt == "csv":
         if not output.streaming:
@@ -1051,20 +1047,21 @@ def _append_direct_target_routes(
     *,
     routes: List[_RouteState],
     output_paths: Dict[str, str],
-    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
+    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
     targets: Sequence[OutputTargetSpec],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> None:
     for t in targets:
-        sink, counter, mem_sink = _create_row_sink_for_composed_output(
+        sink, counter, managed_plan = _create_row_sink_for_composed_output(
             target_id=str(t.target_id),
             output=t.output,
             layout=t.layout,
             workbook_by_path=workbook_by_path,
             in_memory=bool(t.in_memory),
+            managed_artifact_kind=t.managed_artifact_kind,
         )
-        if mem_sink is not None:
-            in_memory_csv_sinks[str(t.target_id)] = mem_sink
+        if managed_plan is not None:
+            managed_artifact_plans[str(t.target_id)] = managed_plan
         _append_route_state(
             routes=routes,
             output_paths=output_paths,
@@ -1127,7 +1124,7 @@ def _append_derived_target_routes(
     *,
     routes: List[_RouteState],
     output_paths: Dict[str, str],
-    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
+    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
     targets: Sequence[DerivedOutputTargetSpec],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
     run_parallel_mode: str,
@@ -1140,15 +1137,16 @@ def _append_derived_target_routes(
         group_specs, dedup_specs = _collect_specs_for_derived_warnings(t.derived)
         _warn_derived_guardrails(target_id=str(t.target_id), group_specs=group_specs, dedup_specs=dedup_specs)
 
-        out_sink, out_counter, mem_sink = _create_row_sink_for_composed_output(
+        out_sink, out_counter, managed_plan = _create_row_sink_for_composed_output(
             target_id=str(t.target_id),
             output=t.output,
             layout=t.output_layout,
             workbook_by_path=workbook_by_path,
             in_memory=bool(t.in_memory),
+            managed_artifact_kind=t.managed_artifact_kind,
         )
-        if mem_sink is not None:
-            in_memory_csv_sinks[str(t.target_id)] = mem_sink
+        if managed_plan is not None:
+            managed_artifact_plans[str(t.target_id)] = managed_plan
         agg = t.derived.build_aggregator(key_normalization=run_key_normalization)
 
         sink = AggregatingRowSink(aggregator=agg, out_sink=out_sink)
@@ -1175,7 +1173,7 @@ def _maybe_create_meta_target(
     meta_sheet: Optional[MetaSheetSpec],
     output_paths: Dict[str, str],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
-    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
+    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
 ) -> Optional[_FinalTargetState]:
     if meta_sheet is None:
         return None
@@ -1191,15 +1189,16 @@ def _maybe_create_meta_target(
         excel_allow_formulas=bool(meta_sheet.output.excel_allow_formulas),
         write_lock=bool(meta_sheet.output.write_lock),
     )
-    sink, counter, mem_sink = _create_row_sink_for_composed_output(
+    sink, counter, managed_plan = _create_row_sink_for_composed_output(
         target_id=str(meta_sheet.target_id),
         output=meta_output,
         layout=layout,
         workbook_by_path=workbook_by_path,
         in_memory=bool(meta_sheet.in_memory),
+        managed_artifact_kind=MANAGED_ARTIFACT_KIND_CSV,
     )
-    if mem_sink is not None:
-        in_memory_csv_sinks[str(meta_sheet.target_id)] = mem_sink
+    if managed_plan is not None:
+        managed_artifact_plans[str(meta_sheet.target_id)] = managed_plan
     output_paths[str(meta_sheet.target_id)] = str(meta_output.path) if meta_output.path else ""
     return _FinalTargetState(
         target_id=str(meta_sheet.target_id),
@@ -1215,7 +1214,7 @@ def _maybe_create_audit_target(
     audit_sheet: Optional[AuditSheetSpec],
     output_paths: Dict[str, str],
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
-    in_memory_csv_sinks: Dict[str, InMemoryCsvSink],
+    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
 ) -> Optional[_FinalTargetState]:
     if audit_sheet is None:
         return None
@@ -1252,15 +1251,16 @@ def _maybe_create_audit_target(
         excel_allow_formulas=bool(audit_sheet.output.excel_allow_formulas),
         write_lock=bool(audit_sheet.output.write_lock),
     )
-    sink, counter, mem_sink = _create_row_sink_for_composed_output(
+    sink, counter, managed_plan = _create_row_sink_for_composed_output(
         target_id=str(audit_sheet.target_id),
         output=audit_output,
         layout=layout,
         workbook_by_path=workbook_by_path,
         in_memory=bool(audit_sheet.in_memory),
+        managed_artifact_kind=MANAGED_ARTIFACT_KIND_CSV,
     )
-    if mem_sink is not None:
-        in_memory_csv_sinks[str(audit_sheet.target_id)] = mem_sink
+    if managed_plan is not None:
+        managed_artifact_plans[str(audit_sheet.target_id)] = managed_plan
     output_paths[str(audit_sheet.target_id)] = str(audit_output.path) if audit_output.path else ""
     return _FinalTargetState(
         target_id=str(audit_sheet.target_id),
@@ -1294,21 +1294,21 @@ def build_output_composition(
 
     workbook_by_path: Dict[str, "ExcelWorkbookSink"] = {}
     output_paths: Dict[str, str] = {}
-    in_memory_csv_sinks: Dict[str, InMemoryCsvSink] = {}
+    managed_artifact_plans: Dict[str, ManagedArtifactPlan] = {}
 
     routes: List[_RouteState] = []
 
     _append_direct_target_routes(
         routes=routes,
         output_paths=output_paths,
-        in_memory_csv_sinks=in_memory_csv_sinks,
+        managed_artifact_plans=managed_artifact_plans,
         targets=spec.targets,
         workbook_by_path=workbook_by_path,
     )
     _append_derived_target_routes(
         routes=routes,
         output_paths=output_paths,
-        in_memory_csv_sinks=in_memory_csv_sinks,
+        managed_artifact_plans=managed_artifact_plans,
         targets=spec.derived_targets,
         workbook_by_path=workbook_by_path,
         run_parallel_mode=str(run_parallel_mode or ""),
@@ -1320,13 +1320,13 @@ def build_output_composition(
         meta_sheet=spec.meta_sheet,
         output_paths=output_paths,
         workbook_by_path=workbook_by_path,
-        in_memory_csv_sinks=in_memory_csv_sinks,
+        managed_artifact_plans=managed_artifact_plans,
     )
     audit_target = _maybe_create_audit_target(
         audit_sheet=spec.audit_sheet,
         output_paths=output_paths,
         workbook_by_path=workbook_by_path,
-        in_memory_csv_sinks=in_memory_csv_sinks,
+        managed_artifact_plans=managed_artifact_plans,
     )
 
     # 构建路由器
@@ -1353,7 +1353,7 @@ def build_output_composition(
     return OutputCompositionPlan(
         sink=router,
         output_paths={k: v for k, v in output_paths.items() if v},
-        in_memory_csv_sinks=in_memory_csv_sinks,
+        managed_artifact_plans=managed_artifact_plans,
     )
 
 

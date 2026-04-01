@@ -26,7 +26,7 @@ workflow:
           allow_formulas: false
         write_defaults:
           mode: append
-          align_by: header
+          align_by: field_id
           header_policy: once
           on_mismatch: error
           on_conflict: overwrite

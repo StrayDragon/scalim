@@ -12,6 +12,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
+    BookWriteDefaultsConfig,
     DemandConfig,
     FileConfig,
     OutputAggregateConfig,
@@ -142,6 +143,42 @@ def test_compile_output_composition_meta_audit_requires_outputs() -> None:
 
 def test_compile_output_composition_returns_none_when_no_outputs() -> None:
     assert oc_yaml.compile_output_composition_from_yaml(DemandConfig(), _make_demand_ir(), resolver=_resolver()) is None
+
+
+def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical() -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "mem": BookConfig(
+                    kind="xlsx_memory",
+                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
+                    export_xlsx=BookExportXlsxConfig(path="./report.xlsx"),
+                )
+            }
+        ),
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="mem", sheet="S"),
+                write=OutputWriteConfig(header_fields_output_by="name"),
+                fields=("order_id", "amount"),
+            ),
+        ),
+    )
+
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(field_name_by_id={"order_id": "Order ID", "amount": "Amount"}),
+        resolver=_resolver(),
+        workflow_managed_output_ids=frozenset(["detail"]),
+    )
+
+    assert spec is not None
+    target = spec.targets[0]
+    assert target.layout.field_ids == ("order_id", "amount")
+    assert target.layout.header_names is None
+    assert target.workflow_export_header == ("Order ID", "Amount")
+    assert target.managed_artifact_kind == "rows"
 
 
 def test_compile_output_composition_can_skip_extra_sheet_without_workbook() -> None:
@@ -505,6 +542,44 @@ def test_compile_output_composition_books_write_override_changes_header_source()
     )
     assert spec is not None
     assert spec.targets[0].layout.header_names is None
+
+
+def test_validate_xlsx_memory_write_contract_reports_output_local_align_by_path() -> None:
+    book = BookConfig(kind="xlsx_memory")
+    out_cfg = OutputTargetConfig(
+        name="detail",
+        to=OutputToConfig(book="report", sheet="明细"),
+        write=OutputWriteConfig(align_by="header"),
+    )
+
+    with pytest.raises(ValueError, match=r"outputs\.0\.write\.align_by"):
+        oc_yaml._validate_xlsx_memory_write_contract(  # noqa: SLF001
+            book=book,
+            book_id="report",
+            out_cfg=out_cfg,
+            idx=0,
+            outputs_path="outputs",
+        )
+
+
+def test_validate_xlsx_memory_write_contract_reports_book_default_align_by_path() -> None:
+    book = BookConfig(
+        kind="xlsx_memory",
+        write_defaults=BookWriteDefaultsConfig(mode="append", align_by="header"),
+    )
+    out_cfg = OutputTargetConfig(
+        name="detail",
+        to=OutputToConfig(book="report", sheet="明细"),
+    )
+
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.write_defaults\.align_by"):
+        oc_yaml._validate_xlsx_memory_write_contract(  # noqa: SLF001
+            book=book,
+            book_id="report",
+            out_cfg=out_cfg,
+            idx=0,
+            outputs_path="outputs",
+        )
 
 
 def test_to_decimal_handles_common_types_and_error_branches() -> None:

@@ -3141,6 +3141,201 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
     assert "declare depends_on" in errs["c"].message
 
 
+def test_workflow_xlsx_memory_keeps_loader_keys_canonical_while_exporting_display_headers(tmp_path: Path) -> None:
+    _ = _write_text(
+        tmp_path / "producer.yaml",
+        (
+            """
+name: producer
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id:
+      extract: id
+      name: Order ID
+    value:
+      extract: value
+      name: Display Value
+
+outputs:
+  - name: detail
+    to:
+      book: report
+      sheet: Orders
+    write:
+      mode: append
+      header_fields_output_by: name
+    fields: ["id", "value"]
+"""
+        ).lstrip(),
+    )
+
+    consume_out = tmp_path / "consume.csv"
+    _ = _write_table_demand_yaml_from_sheetbook_loader(
+        tmp_path,
+        file_name="consume_named.yaml",
+        name="consume_named",
+        init_var_name="orders_sheet_ref",
+        output_name="detail",
+        output_path=consume_out,
+        field_ids=["id", "value"],
+    )
+
+    export_path = tmp_path / "report.xlsx"
+    wf = _write_workflow_yaml(
+        tmp_path,
+        resources={
+            "books": {
+                "report": {
+                    "kind": "xlsx_memory",
+                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                    "export_xlsx": {"path": str(export_path), "write_lock": True},
+                }
+            }
+        },
+        runs=[
+            {"id": "producer", "demand": "producer.yaml"},
+            {
+                "id": "consume_named",
+                "demand": "consume_named.yaml",
+                "depends_on": ["producer"],
+                "init_vars": {"orders_sheet_ref": {"node": "producer", "book": "report", "sheet": "Orders"}},
+            },
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK)
+    assert not result.errors()
+    assert _read_csv_rows(consume_out) == [
+        ["id", "value"],
+        ["a1", "A1"],
+        ["a2", "A2"],
+    ]
+    assert _read_xlsx_rows(export_path, "Orders") == [
+        ["Order ID", "Display Value"],
+        ["a1", "A1"],
+        ["a2", "A2"],
+    ]
+
+
+def test_workflow_xlsx_memory_preserves_typed_values_and_export_boundary(tmp_path: Path) -> None:
+    _ = _write_text(
+        tmp_path / "producer_typed.yaml",
+        (
+            """
+name: producer_typed
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_typed_values"
+  fields:
+    order_count: {extract: order_count}
+    amount: {extract: amount}
+    paid: {extract: paid}
+    code: {extract: code}
+    raw_text: {extract: raw_text}
+
+outputs:
+  - name: detail
+    to:
+      book: report
+      sheet: Orders
+    fields: ["order_count", "amount", "paid", "code", "raw_text"]
+"""
+        ).lstrip(),
+    )
+
+    consume_out = tmp_path / "typed_consume.csv"
+    _ = _write_text(
+        tmp_path / "consume_typed.yaml",
+        (
+            """
+name: consume_typed
+
+main_source:
+  source_id: main
+  loader: "scalim.workflow.loaders:book_sheet_rows"
+  params:
+    ref:
+      $init_var: orders_sheet_ref
+  fields:
+    order_count: {extract: order_count}
+    amount: {extract: amount}
+    paid: {extract: paid}
+    code: {extract: code}
+    raw_text: {extract: raw_text}
+
+fields:
+  order_count_type:
+    call_by: "tests.fixtures.call_by_fns:type_name(order_count)"
+  amount_type:
+    call_by: "tests.fixtures.call_by_fns:type_name(amount)"
+  paid_type:
+    call_by: "tests.fixtures.call_by_fns:type_name(paid)"
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: "__OUT__"
+
+outputs:
+  - name: detail
+    to:
+      file: detail_csv
+    fields: ["order_count_type", "amount_type", "paid_type", "code", "raw_text"]
+"""
+        )
+        .replace("__OUT__", str(consume_out))
+        .lstrip(),
+    )
+
+    export_path = tmp_path / "typed_report.xlsx"
+    wf = _write_workflow_yaml(
+        tmp_path,
+        resources={
+            "books": {
+                "report": {
+                    "kind": "xlsx_memory",
+                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                    "export_xlsx": {"path": str(export_path), "write_lock": True},
+                }
+            }
+        },
+        runs=[
+            {"id": "producer_typed", "demand": "producer_typed.yaml"},
+            {
+                "id": "consume_typed",
+                "demand": "consume_typed.yaml",
+                "depends_on": ["producer_typed"],
+                "init_vars": {"orders_sheet_ref": {"node": "producer_typed", "book": "report", "sheet": "Orders"}},
+            },
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    allowed_modules = frozenset(["tests.fixtures.workflow_loaders", "tests.fixtures.call_by_fns", "scalim.workflow.loaders"])
+    result = run_workflow(str(wf), allowed_modules=allowed_modules)
+    assert not result.errors()
+    assert _read_csv_rows(consume_out) == [
+        ["order_count_type", "amount_type", "paid_type", "code", "raw_text"],
+        ["int", "Decimal", "bool", "007", ""],
+    ]
+
+    exported = _read_xlsx_rows(export_path, "Orders")
+    assert exported[0] == ["order_count", "amount", "paid", "code", "raw_text"]
+    assert exported[1][0] == 5
+    assert exported[1][1] == 1.2
+    assert exported[1][2] is True
+    assert exported[1][3] == "007"
+    assert exported[1][4] == ""
+
+
 def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path) -> None:
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
@@ -4300,6 +4495,8 @@ def test_workflow_execute_release_main_rows_artifact_returns_when_missing_count_
         duration = 0.0
         outputs = None
         in_memory_csv_outputs = {}
+        in_memory_rows_outputs = {}
+        workflow_managed_output_export_headers = None
         in_memory_rows = None
 
     def _compile_demand_node(demand_path: str, **kwargs: Any) -> object:
@@ -4388,6 +4585,7 @@ def test_workflow_execute_release_main_rows_artifact_raises_on_negative_count(tm
         duration = 0.0
         outputs = None
         in_memory_csv_outputs = {}
+        in_memory_rows_outputs = {}
         in_memory_rows = None
 
     def _compile_demand_node(demand_path: str, **kwargs: Any) -> object:

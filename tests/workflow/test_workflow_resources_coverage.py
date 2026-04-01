@@ -660,7 +660,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         input_node_id="b",
         input_output_id="detail",
         input_csv=str(mismatch),
-        align_by="header",
+        align_by="field_id",
         header_policy="once",
         on_mismatch="warn",
     )
@@ -703,7 +703,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         input_node_id="b",
         input_output_id="detail",
         input_csv=str(mismatch),
-        align_by="header",
+        align_by="field_id",
         header_policy="once",
         on_mismatch="skip",
     )
@@ -799,6 +799,131 @@ def test_resource_manager_sheetbook_append_duplicate_producer_is_rejected(tmp_pa
             header_policy="once",
             on_mismatch="error",
         )
+
+
+def test_resource_manager_sheetbook_export_header_metadata_controls_xlsx_header(tmp_path: Path) -> None:
+    openpyxl = pytest.importorskip("openpyxl")
+
+    export_path = tmp_path / "report.xlsx"
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=str(export_path),
+                export_write_lock=False,
+            )
+        },
+    )
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id", "value"], ["b1", "B1"]])
+
+    manager.apply_sheetbook_append(
+        workflow_node_id="n0",
+        decl_order=0,
+        sheetbook_id="sb",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+        export_header=("Order ID", "Display Value"),
+    )
+    manager.apply_sheetbook_append(
+        workflow_node_id="n1",
+        decl_order=1,
+        sheetbook_id="sb",
+        sheet="S",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(second),
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+        export_header=("Order ID", "Display Value"),
+    )
+
+    manager.commit_all()
+
+    wb = openpyxl.load_workbook(str(export_path))
+    ws = wb["S"]
+    rows = list(ws.iter_rows(values_only=True))
+    assert list(rows[0]) == ["Order ID", "Display Value"]
+    assert list(rows[1]) == ["a1", "A1"]
+    assert list(rows[2]) == ["b1", "B1"]
+
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="export header baseline mismatch"):
+        manager.apply_sheetbook_append(
+            workflow_node_id="n2",
+            decl_order=2,
+            sheetbook_id="sb",
+            sheet="S",
+            input_node_id="c",
+            input_output_id="detail",
+            input_csv=str(second),
+            align_by="field_id",
+            header_policy="once",
+            on_mismatch="error",
+            export_header=("Order ID", "Other Display"),
+        )
+
+
+def test_resource_manager_sheetbook_rejects_header_alignment(tmp_path: Path) -> None:
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=None,
+                export_write_lock=False,
+            )
+        },
+    )
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="align_by=header"):
+        manager.apply_sheetbook_append(
+            workflow_node_id="n0",
+            decl_order=0,
+            sheetbook_id="sb",
+            sheet="S",
+            input_node_id="a",
+            input_output_id="detail",
+            input_csv=str(first),
+            align_by="header",
+            header_policy="once",
+            on_mismatch="error",
+        )
+
+
+def test_sheetbook_export_header_helper_rejects_width_mismatch() -> None:
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="width mismatch"):
+        resources_mod.WorkflowSheetBookResourceMixin._normalize_sheetbook_export_header(  # noqa: SLF001
+            ["id", "value"],
+            ("仅一列",),
+        )
+
+
+def test_sheetbook_alignment_mismatch_helper_covers_header_mode() -> None:
+    assert resources_mod.WorkflowSheetBookResourceMixin._sheetbook_has_alignment_mismatch(  # noqa: SLF001
+        ["id", "value"],
+        ["id", "other"],
+        align_by="header",
+    )
 
 
 def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: Path) -> None:

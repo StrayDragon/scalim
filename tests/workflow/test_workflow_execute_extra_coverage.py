@@ -101,6 +101,7 @@ outputs:
 
 def test_workflow_artifacts_directory_discard_variants() -> None:
     from scalim.sinks import InMemoryCsv
+    from scalim.sinks.rows import InMemoryRows
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
 
@@ -136,6 +137,16 @@ def test_workflow_artifacts_directory_discard_variants() -> None:
     artifacts_dir.discard_all_in_memory_csv_outputs()
     with pytest.raises(KeyError):
         _ = artifacts_dir.get("p3", "p3", "in_memory_csv_outputs")
+
+    artifacts_dir.publish("p4", "in_memory_rows_outputs", {"detail": InMemoryRows(header=["id"], rows=[[1]])})
+    artifacts_dir.discard_in_memory_rows_output("p4", "detail")
+    with pytest.raises(KeyError):
+        _ = artifacts_dir.get("p4", "p4", "in_memory_rows_outputs")
+
+    artifacts_dir.publish("p5", "in_memory_rows_outputs", {"detail": InMemoryRows(header=["id"], rows=[[1]])})
+    artifacts_dir.discard_all_in_memory_rows_outputs()
+    with pytest.raises(KeyError):
+        _ = artifacts_dir.get("p5", "p5", "in_memory_rows_outputs")
 
 
 def test_resolve_workflow_input_csv_missing_in_memory_artifact_raises() -> None:
@@ -219,6 +230,39 @@ def test_resolve_workflow_input_csv_in_memory_map_visibility_error_path_is_wrapp
             input_node_id="a",
             input_output_id="detail",
             error_prefix="write node",
+        )
+
+    assert excinfo.value.path == "workflow.runs.0.input_node_id"
+
+
+def test_resolve_workflow_output_export_header_visibility_error_path_is_wrapped(monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
+
+    def _fake_get_optional(consumer_node_id: str, producer_node_id: str, artifact_id: str) -> object:
+        _ = consumer_node_id, producer_node_id
+        if artifact_id == "in_memory_csv_export_headers":
+            raise ValueError("boom")
+        raise AssertionError("unexpected artifact_id={!r}".format(artifact_id))
+
+    monkeypatch.setattr(artifacts_dir, "get_optional", _fake_get_optional)
+
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError) as excinfo:
+        _ = workflow_execute_mod._resolve_workflow_output_export_header(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id="a",
+            consumer_decl_order=0,
+            input_node_id="a",
+            input_output_id="detail",
         )
 
     assert excinfo.value.path == "workflow.runs.0.input_node_id"

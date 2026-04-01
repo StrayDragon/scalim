@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
 from .....spec.ir import (
@@ -40,13 +41,13 @@ if TYPE_CHECKING:
     from .....spec.ir.aliases import LoaderResultMapCallable, MainSourceRowIterableCallable
 
 
-_SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, str)
+_SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, Decimal, str)
 
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
     if value is None or isinstance(value, _SUPPORTED_FIELD_VALUE_TYPES):
         return value
-    msg = "Derived field '{}' {} returned unsupported type '{}'; expected int/float/str/bool/None".format(
+    msg = "Derived field '{}' {} returned unsupported type '{}'; expected int/float/Decimal/str/bool/None".format(
         field_id,
         producer,
         type(value).__name__,

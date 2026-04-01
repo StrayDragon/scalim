@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any, Dict, Optional
 
 NOT_CALLABLE = 1
@@ -32,3 +33,11 @@ def needs_ctx_attr(row_id: Any) -> Any:
 
 def maybe_ctx(ctx: Optional[Any] = None) -> str:
     return "has" if ctx is not None else "none"
+
+
+def type_name(value: Any) -> str:
+    return type(value).__name__
+
+
+def decimal_from_value(value: Any) -> Decimal:
+    return Decimal(str(value))

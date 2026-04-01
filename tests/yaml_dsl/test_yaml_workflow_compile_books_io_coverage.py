@@ -634,6 +634,32 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
         )
 
 
+def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
+    cfg = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="report", sheet="S"),
+                write=OutputWriteConfig(mode="append", align_by="header"),
+                fields=("a",),
+            ),
+        ),
+    )
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"canonical field keys"):
+        _ = workflow_compile_mod._append_write_nodes_from_runs(  # noqa: SLF001
+            wf_obj,
+            demand_cfg_by_run_id={"a": cfg},
+            nodes=[],
+            edges=[],
+            effective_books={"report": BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(max_sheets=1, max_total_cells=10))},
+            effective_files={},
+            overrides_outputs=None,
+            default_book_id=None,
+        )
+
+
 def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_branches() -> None:
     wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
 

@@ -43,6 +43,9 @@ outputs:
     result = run_ir(compilation.demand_ir, compilation.request)
 
     assert result.outputs == {}
+    assert result.in_memory_rows_outputs is not None
+    assert result.in_memory_rows_outputs["detail"].header == ["id", "value"]
+    assert result.in_memory_rows_outputs["detail"].rows[-1] == ["a2", "A2"]
     assert result.in_memory_csv_outputs is not None
     assert result.in_memory_csv_outputs["detail"].header == ["id", "value"]
     assert result.in_memory_csv_outputs["detail"].rows[-1] == ["a2", "A2"]

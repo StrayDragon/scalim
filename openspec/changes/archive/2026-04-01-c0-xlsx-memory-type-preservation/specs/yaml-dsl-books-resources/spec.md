@@ -11,6 +11,7 @@
 - internal rows MUST 使用 canonical field key + preserved `FieldValue` values 作为 SSOT
 - workflow 内部非结束节点若经由 `xlsx_memory` 传递数据,系统 MUST 保留基础类型,而不是强制走字符串化路径
 - 若上游内部值为 `Decimal`,系统 MUST 在 `xlsx_memory` internal path 中保持该 `Decimal`,不得隐式降级为 `float`
+- 本要求只约束 internal preservation,不定义 `compute/call_by` 如何产生 `Decimal`
 
 可选导出:
 

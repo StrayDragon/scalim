@@ -157,6 +157,12 @@ def redacted_audit_callback(expression: str, field_values: Dict[str, Any], resul
     )
 
 
+def _safe_decimal_helper(value: Any) -> Optional[Decimal]:
+    from ...runtime._internal.conversion_lookup import cast_decimal  # noqa: PLC0415
+
+    return cast_decimal(value)
+
+
 class ExpressionValidator:
     _allowed_names: Set[str]
     _allowed_functions: FrozenSet[str]
@@ -343,6 +349,7 @@ class SecureComputeEngine:
         "bool": bool,
         # 金融场景常用: 允许在表达式中使用 `Decimal("0.1")`,避免 `float` 精度问题
         "Decimal": Decimal,
+        "dec": _safe_decimal_helper,
         "list": list,
         "tuple": tuple,
         "set": set,

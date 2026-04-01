@@ -148,6 +148,24 @@ def test_secure_compute_supports_decimal_constructor() -> None:
     assert result == Decimal("0.3")
 
 
+def test_secure_compute_supports_dec_helper_and_rejects_invalid_values() -> None:
+    engine = SecureComputeEngine()
+    calc = engine.compile("dec(value)", ("value",))
+
+    assert calc(value=None) is None
+    assert calc(value=True) == Decimal("1")
+    assert calc(value=2) == Decimal("2")
+    assert calc(value=0.1) == Decimal("0.1")
+    assert calc(value=" 1.50 ") == Decimal("1.50")
+    assert calc(value=Decimal("2.5")) == Decimal("2.5")
+
+    with pytest.raises(ScalimComputeExpressionError, match="ValueError"):
+        calc(value="bad-decimal")
+
+    with pytest.raises(ScalimComputeExpressionError, match="ValueError"):
+        calc(value=float("inf"))
+
+
 def test_allowed_function_map_executes_custom_callable() -> None:
     def double(x: int) -> int:
         return x * 2

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
@@ -99,6 +101,23 @@ def test_converter_collects_nested_derived_dependencies() -> None:
     assert "amount" in demand_ir.fields
     assert "net" in demand_ir.fields
     assert "total" in demand_ir.fields
+
+
+def test_converter_compute_accepts_decimal_result_from_dec_helper() -> None:
+    source_fields = {
+        "amount": _make_source_field("amount", extract="amount"),
+        "tax": _make_source_field("tax", extract="tax"),
+    }
+    derived_fields = {
+        "total": DerivedFieldConfig(field_id="total", name="total", compute="dec(amount) + dec(tax)", depends_on=("amount", "tax")),
+    }
+    config = _make_config(source_fields=source_fields, derived_fields=derived_fields)
+    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+
+    demand_ir = converter.convert(config)
+
+    total = demand_ir.fields["total"]
+    assert total.compute(amount=0.1, tax="0.2") == Decimal("0.3")
 
 
 def test_converter_step_to_field_tuple() -> None:

@@ -22,7 +22,6 @@ from ..sinks import (
     CSVSink,
     IColumnSink,
     InMemoryCsv,
-    InMemoryCsvSink,
     IRowSink,
     ISink,
 )
@@ -39,7 +38,7 @@ from .output_contracts import ExportLayout, OutputSpec
 
 if TYPE_CHECKING:
     from ..ob.manager import ObserverManager
-    from .output_composition import OutputCompositionSpec, OutputTargetStats, RouterRowSink
+    from .output_composition import ManagedArtifactPlan, OutputCompositionSpec, OutputTargetStats, RouterRowSink
 
 
 class _TeeRowSink(BaseRowSink):
@@ -410,8 +409,26 @@ class _OutputAssembly:
     counting_sink: ISink
     output_path: Optional[str]
     outputs: Optional[Dict[str, str]]
-    in_memory_csv_sinks: Optional[Dict[str, InMemoryCsvSink]]
+    managed_artifact_plans: Optional[Dict[str, "ManagedArtifactPlan"]]
     composition_router: Optional["RouterRowSink"]
+
+
+def _collect_workflow_managed_output_export_headers(
+    spec: Optional["OutputCompositionSpec"],
+) -> Optional[Dict[str, Tuple[str, ...]]]:
+    if spec is None:
+        return None
+
+    headers: Dict[str, Tuple[str, ...]] = {}
+    for target in spec.targets:
+        if not target.in_memory or target.workflow_export_header is None:
+            continue
+        headers[str(target.target_id)] = tuple(str(x) for x in target.workflow_export_header)
+    for target in spec.derived_targets:
+        if not target.in_memory or target.workflow_export_header is None:
+            continue
+        headers[str(target.target_id)] = tuple(str(x) for x in target.workflow_export_header)
+    return headers or None
 
 
 def _build_execution_plan(demand_ir: DemandIr, request: ExecutionRequest) -> ExecutionPlan:
@@ -467,6 +484,90 @@ def _build_field_fingerprints_for_meta(demand_ir: DemandIr) -> List[Tuple[str, s
     return field_fingerprints
 
 
+def _emit_key_normalization_warning_if_needed(
+    *,
+    request: ExecutionRequest,
+    hook_manager: HookManager,
+    observer_manager: "ObserverManager",
+) -> None:
+    if request.key_normalization == "raw":
+        return
+    msg = "EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(request.key_normalization)
+
+    hooks_want = hook_manager.wants_typed(EVENT_DIAGNOSTIC_WARNING)
+    event_want = observer_manager.wants(EVENT_DIAGNOSTIC_WARNING) or hook_manager.wants_on_event(EVENT_DIAGNOSTIC_WARNING)
+    has_visible_channel = hooks_want or event_want or hook_manager.fallback_logger_enabled or observer_manager.fallback_logger_enabled
+
+    if has_visible_channel:
+        instrumentation = InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)
+        instrumentation.emit_diagnostic_warning(
+            message=msg,
+            source_id="(run)",
+            field_id="(run)",
+            lookup_key=None,
+            row_id="(run)",
+            sample_once=True,
+        )
+        return
+
+    py_warnings.warn(
+        msg,
+        category=ScalimExperimentalWarning,
+        stacklevel=2,
+    )
+
+
+def _collect_managed_artifact_outputs(
+    managed_artifact_plans: Optional[Dict[str, "ManagedArtifactPlan"]],
+) -> Tuple[Optional[Dict[str, InMemoryRows]], Optional[Dict[str, InMemoryCsv]]]:
+    if managed_artifact_plans is None:
+        return None, None
+
+    rows_map: Dict[str, InMemoryRows] = {}
+    csv_map: Dict[str, InMemoryCsv] = {}
+    for target_id, plan_obj in managed_artifact_plans.items():
+        rows_artifact = plan_obj.to_rows_artifact()
+        if rows_artifact is not None:
+            rows_map[str(target_id)] = rows_artifact
+        csv_artifact = plan_obj.to_csv_artifact()
+        if csv_artifact is not None:
+            csv_map[str(target_id)] = csv_artifact
+    return rows_map or None, csv_map or None
+
+
+def _build_execution_result(
+    *,
+    demand_ir: DemandIr,
+    plan: ExecutionPlan,
+    request: ExecutionRequest,
+    output_assembly: _OutputAssembly,
+    stats: InternalStatsCollector,
+    start_time: float,
+    in_memory_rows_sink: Optional[InMemoryRowsSink],
+) -> ExecutionResult:
+    output_target_stats: Optional[List["OutputTargetStats"]] = None
+    if output_assembly.composition_router is not None:
+        output_target_stats = output_assembly.composition_router.get_target_stats()
+
+    in_memory_rows_outputs, in_memory_csv_outputs = _collect_managed_artifact_outputs(output_assembly.managed_artifact_plans)
+    workflow_managed_output_export_headers = _collect_workflow_managed_output_export_headers(request.output_composition)
+    in_memory_rows = in_memory_rows_sink.to_artifact() if in_memory_rows_sink is not None else None
+
+    return ExecutionResult(
+        output_path=output_assembly.output_path,
+        total_rows=stats.total_rows,
+        duration=time.perf_counter() - start_time,
+        demand_ir=demand_ir,
+        plan=plan,
+        outputs=output_assembly.outputs,
+        output_target_stats=output_target_stats,
+        in_memory_csv_outputs=in_memory_csv_outputs,
+        in_memory_rows_outputs=in_memory_rows_outputs,
+        workflow_managed_output_export_headers=workflow_managed_output_export_headers,
+        in_memory_rows=in_memory_rows,
+    )
+
+
 def _select_primary_output_path(outputs: Dict[str, str], spec: "OutputCompositionSpec") -> Optional[str]:
     primary_id: Optional[str] = None
     for t in spec.targets:
@@ -508,7 +609,7 @@ def _assemble_outputs(
             counting_sink=counting_sink,
             output_path=output_plan.output_path,
             outputs=None,
-            in_memory_csv_sinks=None,
+            managed_artifact_plans=None,
             composition_router=None,
         )
 
@@ -557,7 +658,7 @@ def _assemble_outputs(
         counting_sink=counting_sink,
         output_path=output_path,
         outputs=outputs,
-        in_memory_csv_sinks=composition_plan.in_memory_csv_sinks or None,
+        managed_artifact_plans=composition_plan.managed_artifact_plans or None,
         composition_router=router_sink,
     )
 
@@ -606,29 +707,11 @@ def _run_ir_with_plan_and_managers(
     start_time: float,
     engine_factory: Optional[Callable[..., ScalimEngine]] = None,
 ) -> ExecutionResult:
-    if request.key_normalization != "raw":
-        msg = "EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(request.key_normalization)
-
-        hooks_want = hook_manager.wants_typed(EVENT_DIAGNOSTIC_WARNING)
-        event_want = observer_manager.wants(EVENT_DIAGNOSTIC_WARNING) or hook_manager.wants_on_event(EVENT_DIAGNOSTIC_WARNING)
-        has_visible_channel = hooks_want or event_want or hook_manager.fallback_logger_enabled or observer_manager.fallback_logger_enabled
-
-        if has_visible_channel:
-            instrumentation = InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)
-            instrumentation.emit_diagnostic_warning(
-                message=msg,
-                source_id="(run)",
-                field_id="(run)",
-                lookup_key=None,
-                row_id="(run)",
-                sample_once=True,
-            )
-        else:
-            py_warnings.warn(
-                msg,
-                category=ScalimExperimentalWarning,
-                stacklevel=2,
-            )
+    _emit_key_normalization_warning_if_needed(
+        request=request,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+    )
 
     stats = InternalStatsCollector()
     batch_size = request.batch_size if request.batch_size is not None else demand_ir.batch_size_hint
@@ -684,29 +767,14 @@ def _run_ir_with_plan_and_managers(
             with contextlib.suppress(Exception):
                 observer_manager.close()
 
-    output_target_stats: Optional[List["OutputTargetStats"]] = None
-    if output_assembly.composition_router is not None:
-        # 注意: `counting_sink.close()` 在 `finally` 中执行;此处读取的是关闭后的最终统计快照.
-        output_target_stats = output_assembly.composition_router.get_target_stats()
-
-    in_memory_csv_outputs: Optional[Dict[str, InMemoryCsv]] = None
-    if output_assembly.in_memory_csv_sinks is not None:
-        in_memory_csv_outputs = {target_id: sink.to_artifact() for target_id, sink in output_assembly.in_memory_csv_sinks.items()}
-
-    in_memory_rows: Optional[InMemoryRows] = None
-    if in_memory_rows_sink is not None:
-        in_memory_rows = in_memory_rows_sink.to_artifact()
-
-    return ExecutionResult(
-        output_path=output_assembly.output_path,
-        total_rows=stats.total_rows,
-        duration=time.perf_counter() - start_time,
+    return _build_execution_result(
         demand_ir=demand_ir,
         plan=plan,
-        outputs=output_assembly.outputs,
-        output_target_stats=output_target_stats,
-        in_memory_csv_outputs=in_memory_csv_outputs,
-        in_memory_rows=in_memory_rows,
+        request=request,
+        output_assembly=output_assembly,
+        stats=stats,
+        start_time=start_time,
+        in_memory_rows_sink=in_memory_rows_sink,
     )
 
 

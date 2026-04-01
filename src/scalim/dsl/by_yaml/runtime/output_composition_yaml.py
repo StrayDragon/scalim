@@ -2,6 +2,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
 from ....execution.output_composition import (
+    MANAGED_ARTIFACT_KIND_CSV,
+    MANAGED_ARTIFACT_KIND_ROWS,
     AggMetricSpec,
     AuditSheetSpec,
     DerivedGroupBySpec,
@@ -30,19 +32,10 @@ from ..schema_dsl.models import (
     OutputExtraSheetConfig,
     OutputTargetConfig,
 )
-from ..schema_dsl.output_enums import (
-    AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,
-)
-from ..schema_dsl.output_enums import (
-    AGG_POST_PRODUCER_KEYS as _POST_FUNC_KEYS,
-)
-from ..schema_dsl.output_enums import (
-    AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
-)
-from ..schema_dsl.output_enums import (
-    DEFAULT_BOOK_WRITE_HEADER_POLICY,
-    DEFAULT_BOOK_WRITE_MODE,
-)
+from ..schema_dsl.output_enums import AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS
+from ..schema_dsl.output_enums import AGG_POST_PRODUCER_KEYS as _POST_FUNC_KEYS
+from ..schema_dsl.output_enums import AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS
+from ..schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
 from .output_path_resolve import resolve_yaml_relative_output_path
 from .references import SecurePythonReferenceResolver
 
@@ -104,6 +97,11 @@ def _to_decimal(value: object) -> Optional[Decimal]:
     if not dec.is_finite():
         return None
     return dec
+
+
+def _rendered_header_row(layout: ExportLayout) -> Tuple[str, ...]:
+    header = layout.header_names if layout.header_names is not None else layout.field_ids
+    return tuple(str(x) for x in header)
 
 
 @dataclass(frozen=True)
@@ -670,6 +668,37 @@ def _effective_output_include_header(
     return bool(DEFAULT_OUTPUT_INCLUDE_HEADER)
 
 
+def _validate_xlsx_memory_write_contract(
+    *,
+    book: BookConfig,
+    book_id: str,
+    out_cfg: OutputTargetConfig,
+    idx: int,
+    outputs_path: str,
+) -> None:
+    if str(book.kind or "").strip() != "xlsx_memory":
+        return
+
+    effective_defaults = _effective_book_write_defaults(book, out_cfg=out_cfg)
+    if str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE) != "append":
+        return
+    if str(effective_defaults.align_by or "") != "header":
+        return
+
+    align_by_path = (
+        "{}.{}.write.align_by".format(str(outputs_path), int(idx))
+        if out_cfg.write is not None and out_cfg.write.align_by is not None
+        else "resources.books.{}.write_defaults.align_by".format(str(book_id))
+    )
+    msg = (
+        "books.kind=xlsx_memory does not support write.align_by=header; "
+        "internal rows only use canonical field keys. Migrate to write.align_by=field_id "
+        "and keep write.header_fields_output_by for export display (book_id={!r})"
+    ).format(str(book_id))
+    err = "{} (path={})".format(msg, str(align_by_path))
+    raise ValueError(err)
+
+
 def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     config: DemandConfig,
     demand_ir: DemandIr,
@@ -703,6 +732,10 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         requires_opt = requires or None
 
         in_memory = False
+        book: Optional[BookConfig] = None
+        book_id: Optional[str] = None
+        workflow_export_header: Optional[Tuple[str, ...]] = None
+        managed_artifact_kind: Optional[str] = None
         output_spec: OutputSpec
         header_by = str(DEFAULT_OUTPUT_HEADER_BY)
 
@@ -736,6 +769,14 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 ).format(str(out_cfg.name), str(outputs_path), int(idx), str(outputs_path), int(idx))
                 err = "{} (path={})".format(msg, book_ref_path)
                 raise ValueError(err)
+            book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
+            _validate_xlsx_memory_write_contract(
+                book=book,
+                book_id=str(book_id),
+                out_cfg=out_cfg,
+                idx=int(idx),
+                outputs_path=str(outputs_path),
+            )
 
             sheet_name, sheet_ref_path, defaulted_from_name = _effective_sheet_name_for_output(
                 out_cfg, idx=int(idx), outputs_path=str(outputs_path)
@@ -753,21 +794,23 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
             if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:
                 in_memory = True
-                effective_defaults = _effective_book_write_defaults(
-                    _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path)), out_cfg=out_cfg
-                )
+                effective_defaults = _effective_book_write_defaults(book, out_cfg=out_cfg)
                 include_header = _effective_output_include_header(
                     out_cfg=out_cfg,
                     mode=str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE),
                     header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
                     include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
                 )
-                output_spec = OutputSpec(format="csv", path=None, streaming=True, include_header=bool(include_header))
+                if str(book.kind or "").strip() == "xlsx_memory":
+                    managed_artifact_kind = MANAGED_ARTIFACT_KIND_ROWS
+                    output_spec = OutputSpec(format="excel", path=None, streaming=True, include_header=bool(include_header))
+                else:
+                    managed_artifact_kind = MANAGED_ARTIFACT_KIND_CSV
+                    output_spec = OutputSpec(format="csv", path=None, streaming=True, include_header=bool(include_header))
             else:
                 if yaml_base_dir is None:
                     msg = "yaml_base_dir is required to resolve resources.books output paths"
                     raise ValueError(msg)
-                book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
                 effective_defaults = _effective_book_write_defaults(book, out_cfg=out_cfg)
                 include_header = _effective_output_include_header(
                     out_cfg=out_cfg,
@@ -803,10 +846,19 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
         if out_cfg.aggregate is None:
             fields = out_cfg.fields or ()
+            layout_header_by = str(header_by)
+            if in_memory and book is not None and str(book.kind or "").strip() == "xlsx_memory":
+                export_layout = export_layout_from_demand_ir(
+                    demand_ir,
+                    list(fields),
+                    header_fields_output_by=str(header_by),
+                )
+                workflow_export_header = _rendered_header_row(export_layout)
+                layout_header_by = "field_id"
             layout = export_layout_from_demand_ir(
                 demand_ir,
                 list(fields),
-                header_fields_output_by=str(header_by),
+                header_fields_output_by=str(layout_header_by),
             )
             direct_targets.append(
                 OutputTargetSpec(
@@ -817,6 +869,8 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     predicate=predicate,
                     is_primary=bool(is_primary),
                     requires=requires_opt,
+                    workflow_export_header=workflow_export_header,
+                    managed_artifact_kind=managed_artifact_kind if in_memory else None,
                 )
             )
             continue
@@ -824,11 +878,21 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         agg = out_cfg.aggregate
         derived = _derived_group_by_spec_from_yaml(agg, resolver=resolver, compute_engine=engine)
         out_layout_fields = tuple(str(x) for x in out_cfg.fields) if out_cfg.fields is not None else _derived_output_layout_fields(agg)
+        out_layout_header_by = str(header_by)
+        if in_memory and book is not None and str(book.kind or "").strip() == "xlsx_memory":
+            export_layout = _export_layout_for_derived(
+                demand_ir=demand_ir,
+                agg=agg,
+                field_ids=out_layout_fields,
+                header_fields_output_by=str(header_by),
+            )
+            workflow_export_header = _rendered_header_row(export_layout)
+            out_layout_header_by = "field_id"
         out_layout = _export_layout_for_derived(
             demand_ir=demand_ir,
             agg=agg,
             field_ids=out_layout_fields,
-            header_fields_output_by=str(header_by),
+            header_fields_output_by=str(out_layout_header_by),
         )
         derived_targets.append(
             DerivedOutputTargetSpec(
@@ -840,6 +904,8 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 predicate=predicate,
                 is_primary=bool(is_primary),
                 requires=requires_opt,
+                workflow_export_header=workflow_export_header,
+                managed_artifact_kind=managed_artifact_kind if in_memory else None,
             )
         )
 

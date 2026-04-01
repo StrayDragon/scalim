@@ -29,6 +29,7 @@
 - `export_xlsx` 在最终写 workbook 时,MUST 仅对 `str` 应用 spreadsheet formula escaping 规则
 - 对 `int` / `bool` / `Decimal` / `float` / `None`,系统 MUST 保持 typed cell value 语义,不得先统一 `str(...)`
 - 若上游 internal row 已经是 `Decimal`,系统 MUST NOT 在内部路径将其隐式降级为 `float`
+- 该要求仅约束 runtime/internal path 的保真传输,不承诺 `.xlsx` 文件格式的 Python 类型 round-trip
 
 #### Scenario: final export preserves exact numeric internal values
 - **GIVEN** 某 `xlsx_memory` sheet 内部 row 包含 `Decimal("12.30")`

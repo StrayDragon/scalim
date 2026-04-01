@@ -4,6 +4,8 @@ import scalim.dsl.by_yaml._internal.config_parsing.call_by as call_by_module
 from scalim.dsl.by_yaml._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
 from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
+from decimal import Decimal
+
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
@@ -302,6 +304,18 @@ def test_converter_compiles_call_by_and_ctx() -> None:
     # Use a minimal duck-typed ctx in this unit test.
     result = derived.compute(status=True, **{"$ctx": type("Ctx", (), ctx)()})
     assert result == "ok:1:2"
+
+
+def test_converter_call_by_accepts_decimal_result() -> None:
+    config = _make_call_by_config("tests.fixtures.call_by_fns:decimal_from_value(status)", depends_on=("status",))
+    converter = ConfigToIRConverter(
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+
+    demand_ir = converter.convert(config)
+    derived = demand_ir.fields["text"]
+    assert isinstance(derived, DerivedFieldIr)
+    assert derived.compute(status="0.3", **{"$ctx": object()}) == Decimal("0.3")
 
 
 def test_converter_rejects_missing_compute_and_call_by() -> None:

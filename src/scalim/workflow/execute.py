@@ -59,12 +59,21 @@ from ..spec.ir._workflow import (
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
 from ._internal.request_overrides import WorkflowNodeRequestOverrides, merge_workflow_node_request
+from .artifacts import WorkflowArtifactsDirectory
 from .errors import ScalimWorkflowConfigError
+from .input_artifacts import (
+    resolve_workflow_input_csv as _resolve_workflow_input_csv,
+)
+from .input_artifacts import (
+    resolve_workflow_input_tabular as _resolve_workflow_input_tabular,
+)
+from .input_artifacts import (
+    resolve_workflow_output_export_header as _resolve_workflow_output_export_header,
+)
 from .loaders import workflow_loader_context
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
 from .resources import ScalimWorkflowWriteError, SheetBookDef, WorkflowResourceManager
 from .resources_base import WorkflowResourceWaitDiagnostics
-from .resources_csv import WorkflowCsvInput
 from .visibility_index import WorkflowVisibilityIndex
 
 
@@ -73,101 +82,6 @@ class _CompilationLike(ABC):
     @abstractmethod
     def request(self) -> object:
         raise NotImplementedError  # pragma: no cover  # pragma: allow-no-cover abstract property
-
-
-class WorkflowArtifactsDirectory:
-    _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
-    _values_by_producer_node_id: Dict[str, Dict[str, object]]
-    _lock: threading.Lock
-
-    def __init__(self, workflow_ir: WorkflowIr) -> None:
-        visibility = WorkflowVisibilityIndex.from_workflow_ir(workflow_ir)
-        self._visible_by_consumer_node_id = visibility.visible_by_consumer_node_id
-        self._values_by_producer_node_id = {}
-        self._lock = threading.Lock()
-
-    def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
-        return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
-
-    def publish(self, producer_node_id: str, artifact_id: str, value: object) -> None:
-        with self._lock:
-            by_artifact = self._values_by_producer_node_id.setdefault(str(producer_node_id), {})
-            by_artifact[str(artifact_id)] = value
-
-    def get(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> object:
-        consumer = str(consumer_node_id)
-        producer = str(producer_node_id)
-        artifact_key = str(artifact_id)
-
-        if producer != consumer and producer not in self.visible_producer_node_ids(consumer):
-            msg = "Artifact '{}' from node '{}' is not visible to node '{}' (declare deps)".format(artifact_key, producer, consumer)
-            raise ValueError(msg)
-
-        with self._lock:
-            by_artifact = self._values_by_producer_node_id.get(producer)
-            if by_artifact is None or artifact_key not in by_artifact:
-                msg = "Unknown artifact '{}' for node '{}'".format(artifact_key, producer)
-                raise KeyError(msg)
-            return by_artifact[artifact_key]
-
-    def get_optional(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> Optional[object]:
-        consumer = str(consumer_node_id)
-        producer = str(producer_node_id)
-        artifact_key = str(artifact_id)
-
-        if producer != consumer and producer not in self.visible_producer_node_ids(consumer):
-            msg = "Artifact '{}' from node '{}' is not visible to node '{}' (declare deps)".format(artifact_key, producer, consumer)
-            raise ValueError(msg)
-
-        with self._lock:
-            by_artifact = self._values_by_producer_node_id.get(producer)
-            if by_artifact is None:
-                return None
-            if artifact_key not in by_artifact:
-                return None
-            return by_artifact[artifact_key]
-
-    def discard(self, producer_node_id: str, artifact_id: str) -> None:
-        producer = str(producer_node_id)
-        artifact_key = str(artifact_id)
-        with self._lock:
-            by_artifact = self._values_by_producer_node_id.get(producer)
-            if not by_artifact:
-                return
-            _ = by_artifact.pop(artifact_key, None)
-            if not by_artifact:
-                _ = self._values_by_producer_node_id.pop(producer, None)
-
-    def discard_in_memory_csv_output(self, producer_node_id: str, output_id: str) -> None:
-        producer = str(producer_node_id)
-        out_id = str(output_id)
-        with self._lock:
-            by_artifact = self._values_by_producer_node_id.get(producer)
-            if not by_artifact:
-                return
-            mem = by_artifact.get("in_memory_csv_outputs")
-            if not isinstance(mem, dict):
-                return
-            mem_outputs = cast("Dict[str, WorkflowCsvInput]", mem)  # pragma: allow-cast artifacts dict typed narrowing
-            _ = mem_outputs.pop(out_id, None)
-            if not mem_outputs:
-                _ = by_artifact.pop("in_memory_csv_outputs", None)
-            if not by_artifact:
-                _ = self._values_by_producer_node_id.pop(producer, None)
-
-    def discard_all_in_memory_csv_outputs(self) -> None:
-        with self._lock:
-            for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
-                _ = by_artifact.pop("in_memory_csv_outputs", None)
-                if not by_artifact:
-                    _ = self._values_by_producer_node_id.pop(producer_node_id, None)
-
-    def discard_all_in_memory_rows(self) -> None:
-        with self._lock:
-            for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
-                _ = by_artifact.pop("in_memory_rows", None)
-                if not by_artifact:
-                    _ = self._values_by_producer_node_id.pop(producer_node_id, None)
 
 
 def _workflow_error_diff(exc: BaseException) -> Optional[List[str]]:
@@ -412,68 +326,32 @@ class ScalimWorkflowRunFailedError(ScalimWorkflowError):
         self.demand_path = str(demand_path)
 
 
-def _resolve_workflow_input_csv(
-    *,
-    artifacts_dir: WorkflowArtifactsDirectory,
-    consumer_node_id: str,
-    consumer_decl_order: int,
-    input_node_id: str,
-    input_output_id: str,
-    error_prefix: str,
-) -> WorkflowCsvInput:
-    path_prefix = "workflow.runs.{}".format(int(consumer_decl_order))
-    try:
-        outputs_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "outputs")
-    except ValueError as exc:
-        raise ScalimWorkflowConfigError(str(exc), path="{}.input_node_id".format(path_prefix)) from exc
-    outputs = cast("Optional[Dict[str, str]]", outputs_obj)  # pragma: allow-cast workflow output mapping typed narrowing
-    if outputs_obj is None:
-        msg = "{} requires demand outputs mapping: input_node_id={!r}".format(str(error_prefix), str(input_node_id))
-        raise ScalimWorkflowWriteError(msg)
-
-    output_id = str(input_output_id)
-    output_in_mapping = False
-    output_path = ""
-    if outputs is not None and output_id in outputs:
-        output_in_mapping = True
-        output_path = str(outputs.get(output_id) or "")
-    if output_path:
-        if not str(output_path).lower().endswith(".csv"):
-            msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
-            raise ScalimWorkflowWriteError(msg)
-        return output_path
-
-    try:
-        mem_map_obj = artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), "in_memory_csv_outputs")
-    except ValueError as exc:
-        raise ScalimWorkflowConfigError(str(exc), path="{}.input_node_id".format(path_prefix)) from exc
-    mem_map = cast("Optional[Dict[str, WorkflowCsvInput]]", mem_map_obj)  # pragma: allow-cast workflow csv mapping typed narrowing
-    csv_artifact = mem_map.get(output_id) if mem_map is not None else None
-    if csv_artifact is not None:
-        return csv_artifact
-    if output_in_mapping:
-        msg = "Missing workflow-managed in-memory CSV artifact: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
-        raise ScalimWorkflowWriteError(msg)
-    msg = "Unknown demand output id: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
-    raise ScalimWorkflowWriteError(msg)
-
-
 def _run_workflow_write_sheet_node(
     node: WriteSheetNodeIr,
     *,
     artifacts_dir: WorkflowArtifactsDirectory,
     resource_manager: WorkflowResourceManager,
 ) -> None:
-    input_csv = _resolve_workflow_input_csv(
-        artifacts_dir=artifacts_dir,
-        consumer_node_id=str(node.node_id),
-        consumer_decl_order=int(node.decl_order),
-        input_node_id=str(node.input_node_id),
-        input_output_id=str(node.input_output_id),
-        error_prefix="write node",
-    )
-
     if str(node.resource_type) == "book":
+        book_kind = resource_manager.get_book_kind(str(node.resource_id))
+        if book_kind == "xlsx_memory":
+            input_csv = _resolve_workflow_input_tabular(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+                error_prefix="write node",
+            )
+        else:
+            input_csv = _resolve_workflow_input_csv(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+                error_prefix="write node",
+            )
         resource_manager.apply_book_sheet(
             workflow_node_id=str(node.node_id),
             decl_order=int(node.decl_order),
@@ -482,11 +360,26 @@ def _run_workflow_write_sheet_node(
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
             input_csv=input_csv,
+            export_header=_resolve_workflow_output_export_header(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+            ),
             on_conflict=str(node.on_conflict or "error"),
         )
         return
 
     if str(node.resource_type) == "workbook":
+        input_csv = _resolve_workflow_input_csv(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id=str(node.node_id),
+            consumer_decl_order=int(node.decl_order),
+            input_node_id=str(node.input_node_id),
+            input_output_id=str(node.input_output_id),
+            error_prefix="write node",
+        )
         resource_manager.apply_workbook_sheet(
             workflow_node_id=str(node.node_id),
             decl_order=int(node.decl_order),
@@ -500,6 +393,14 @@ def _run_workflow_write_sheet_node(
         return
 
     if str(node.resource_type) == "sheetbook":
+        input_tabular = _resolve_workflow_input_tabular(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id=str(node.node_id),
+            consumer_decl_order=int(node.decl_order),
+            input_node_id=str(node.input_node_id),
+            input_output_id=str(node.input_output_id),
+            error_prefix="write node",
+        )
         resource_manager.apply_sheetbook_sheet(
             workflow_node_id=str(node.node_id),
             decl_order=int(node.decl_order),
@@ -507,7 +408,14 @@ def _run_workflow_write_sheet_node(
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
-            input_csv=input_csv,
+            input_csv=input_tabular,
+            export_header=_resolve_workflow_output_export_header(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+            ),
             on_conflict=str(node.on_conflict or "error"),
         )
         return
@@ -524,16 +432,26 @@ def _run_workflow_append_sheet_node(
     artifacts_dir: WorkflowArtifactsDirectory,
     resource_manager: WorkflowResourceManager,
 ) -> None:
-    input_csv = _resolve_workflow_input_csv(
-        artifacts_dir=artifacts_dir,
-        consumer_node_id=str(node.node_id),
-        consumer_decl_order=int(node.decl_order),
-        input_node_id=str(node.input_node_id),
-        input_output_id=str(node.input_output_id),
-        error_prefix="append node",
-    )
-
     if str(node.resource_type) == "book":
+        book_kind = resource_manager.get_book_kind(str(node.resource_id))
+        if book_kind == "xlsx_memory":
+            input_csv = _resolve_workflow_input_tabular(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+                error_prefix="append node",
+            )
+        else:
+            input_csv = _resolve_workflow_input_csv(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+                error_prefix="append node",
+            )
         if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
             msg = "append_sheet requires sheet for book resource (resource_id={!r})".format(
                 str(node.resource_id)
@@ -547,6 +465,13 @@ def _run_workflow_append_sheet_node(
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
             input_csv=input_csv,
+            export_header=_resolve_workflow_output_export_header(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+            ),
             align_by=str(node.align_by or "field_id"),
             header_policy=str(node.header_policy or "once"),
             on_mismatch=str(node.on_mismatch or "error"),
@@ -554,6 +479,14 @@ def _run_workflow_append_sheet_node(
         return
 
     if str(node.resource_type) == "workbook":
+        input_csv = _resolve_workflow_input_csv(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id=str(node.node_id),
+            consumer_decl_order=int(node.decl_order),
+            input_node_id=str(node.input_node_id),
+            input_output_id=str(node.input_output_id),
+            error_prefix="append node",
+        )
         if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
             msg = "append_sheet requires sheet for workbook resource (resource_id={!r})".format(
                 str(node.resource_id)
@@ -574,6 +507,14 @@ def _run_workflow_append_sheet_node(
         return
 
     if str(node.resource_type) == "csv":
+        input_csv = _resolve_workflow_input_csv(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id=str(node.node_id),
+            consumer_decl_order=int(node.decl_order),
+            input_node_id=str(node.input_node_id),
+            input_output_id=str(node.input_output_id),
+            error_prefix="append node",
+        )
         resource_manager.apply_csv_append(
             workflow_node_id=str(node.node_id),
             decl_order=int(node.decl_order),
@@ -587,6 +528,14 @@ def _run_workflow_append_sheet_node(
         return
 
     if str(node.resource_type) == "sheetbook":
+        input_tabular = _resolve_workflow_input_tabular(
+            artifacts_dir=artifacts_dir,
+            consumer_node_id=str(node.node_id),
+            consumer_decl_order=int(node.decl_order),
+            input_node_id=str(node.input_node_id),
+            input_output_id=str(node.input_output_id),
+            error_prefix="append node",
+        )
         if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
             msg = "append_sheet requires sheet for sheetbook resource (resource_id={!r})".format(
                 str(node.resource_id)
@@ -599,7 +548,14 @@ def _run_workflow_append_sheet_node(
             sheet=str(node.sheet),
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
-            input_csv=input_csv,
+            input_csv=input_tabular,
+            export_header=_resolve_workflow_output_export_header(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+            ),
             align_by=str(node.align_by or "field_id"),
             header_policy=str(node.header_policy or "once"),
             on_mismatch=str(node.on_mismatch or "error"),
@@ -1196,6 +1152,8 @@ def _workflow_process_completed_future(  # noqa: C901, PLR0912, PLR0913, PLR0915
             artifacts_dir.publish(str(node_id), "output_path", core.output_path)
             artifacts_dir.publish(str(node_id), "outputs", core.outputs)
             artifacts_dir.publish(str(node_id), "in_memory_csv_outputs", core.in_memory_csv_outputs or {})
+            artifacts_dir.publish(str(node_id), "in_memory_rows_outputs", core.in_memory_rows_outputs or {})
+            artifacts_dir.publish(str(node_id), "in_memory_csv_export_headers", core.workflow_managed_output_export_headers or {})
             if core.in_memory_rows is not None:
                 artifacts_dir.publish(str(node_id), "in_memory_rows", core.in_memory_rows)
             ctx_store.publish_default_summary(str(node_id), core)
@@ -1293,6 +1251,7 @@ def _execute_workflow_run(  # noqa: C901, PLR0915
         if next_remaining == 0:
             _ = write_consumers_remaining_by_output_key.pop(key, None)
             artifacts_dir.discard_in_memory_csv_output(producer_node_id, output_id)
+            artifacts_dir.discard_in_memory_rows_output(producer_node_id, output_id)
         else:
             write_consumers_remaining_by_output_key[key] = int(next_remaining)
 
@@ -1845,6 +1804,8 @@ def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_final
             prepared.resource_manager.discard_all(workflow_node_id="__wf__discard", reason="workflow_finally")
     with contextlib.suppress(Exception):
         prepared.artifacts_dir.discard_all_in_memory_csv_outputs()
+    with contextlib.suppress(Exception):
+        prepared.artifacts_dir.discard_all_in_memory_rows_outputs()
     with contextlib.suppress(Exception):
         prepared.artifacts_dir.discard_all_in_memory_rows()
     if prepared.workflow_cache_pool is not None:

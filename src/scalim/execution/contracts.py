@@ -5,7 +5,7 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData
 from ..vendor.dataclassesx import dataclass
@@ -108,7 +108,13 @@ class ExecutionResult:
     """可选:每个输出目标的统计(行数/耗时/错误/禁用)(多输出组合时提供)."""
 
     in_memory_csv_outputs: Optional[Dict[str, "InMemoryCsv"]] = None
-    """可选: `workflow-managed` 无路径 CSV 输出的内存中间态(多输出组合时提供)."""
+    """可选: `workflow-managed` 输出的 CSV 工件映射(多输出组合时提供)."""
+
+    in_memory_rows_outputs: Optional[Dict[str, "InMemoryRows"]] = None
+    """可选: `workflow-managed` 输出的类型化行工件映射(多输出组合时提供)."""
+
+    workflow_managed_output_export_headers: Optional[Dict[str, Tuple[str, ...]]] = None
+    """可选: `xlsx_memory` 工作流托管输出的结果侧导出表头元数据."""
 
     in_memory_rows: Optional["InMemoryRows"] = None
     """可选: `workflow-intermediate-store` 的 `InMemoryRows` 中间态(显式启用时提供)."""

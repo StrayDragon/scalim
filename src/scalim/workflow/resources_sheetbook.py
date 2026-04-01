@@ -14,30 +14,19 @@ from .._internal.utils.excel import escape_excel_formula
 from ..events import EVENT_DIAGNOSTIC_WARNING
 from ..events._events import DiagnosticWarningEvent
 from ..sinks._internal.base import create_temp_path
+from ..typedefs import FieldValue
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
-from .resources_csv import WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
+from .resources_csv import build_alignment_mapping, describe_header_diff
 from .resources_workbook import best_effort_close_write_only_workbook_worksheets, get_openpyxl_workbook_class
+from .tabular_artifacts import WorkflowTabularInput, materialize_aligned_tabular_rows, read_tabular_header
 
 # 内部实现仍沿用原有局部命名,减少重构噪音.
 _build_alignment_mapping = build_alignment_mapping
 _describe_header_diff = describe_header_diff
-_iter_csv_rows = iter_csv_rows
-_read_csv_header = read_csv_header
 _best_effort_close_write_only_workbook_worksheets = best_effort_close_write_only_workbook_worksheets
 _get_openpyxl_workbook_class = get_openpyxl_workbook_class
-
-
-def _materialize_aligned_csv_rows(expected: List[str], mapping: List[int], *, input_csv: WorkflowCsvInput) -> List[List[str]]:
-    _ = list(expected)
-    rows: List[List[str]] = []
-    for row in _iter_csv_rows(input_csv):
-        out_row: List[str] = []
-        for src_idx in mapping:
-            out_row.append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
-        rows.append(out_row)
-    return rows
 
 
 def _sorted_sheetbook_segments(segments: List["_SheetBookSegment"]) -> List["_SheetBookSegment"]:
@@ -52,7 +41,7 @@ def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBo
             continue  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
         ws = wb.create_sheet(str(sheet_name))
         header_written = False
-        fields = list(sheet_plan.baseline_header)
+        fields = list(sheet_plan.export_header if sheet_plan.export_header is not None else sheet_plan.baseline_header)
         escaped_fields = [escape_excel_formula(x, allow_formulas=bool(plan.export_allow_formulas)) for x in fields]
         for seg in _sorted_sheetbook_segments(sheet_plan.segments):
             if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
@@ -93,7 +82,7 @@ class SheetBookDef:
 class _SheetBookSegment:
     producer_node_id: str
     decl_order: int
-    rows: List[List[str]]
+    rows: List[List[FieldValue]]
     header_policy: str
 
 
@@ -101,6 +90,7 @@ class _SheetBookSegment:
 class _SheetBookSheetPlan:
     sheet: str
     baseline_header: List[str]
+    export_header: Optional[List[str]]
     segments: List[_SheetBookSegment]
     cell_count: int = 0
 
@@ -121,6 +111,40 @@ class _SheetBookPlan:
 
 
 class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
+    @staticmethod
+    def _normalize_sheetbook_export_header(expected: List[str], export_header: Optional[Tuple[str, ...]]) -> List[str]:
+        if export_header is None:
+            return list(expected)
+
+        resolved = [str(x) for x in export_header]
+        if len(resolved) != len(expected):
+            msg = "Sheetbook export header width mismatch: expected={}, actual={}".format(len(expected), len(resolved))
+            raise ScalimWorkflowWriteError(msg)
+        return resolved
+
+    @classmethod
+    def _resolve_sheetbook_export_header(
+        cls,
+        expected: List[str],
+        *,
+        export_header: Optional[Tuple[str, ...]],
+        existing_export_header: Optional[List[str]] = None,
+        sheetbook_id: Optional[str] = None,
+        sheet_name: Optional[str] = None,
+    ) -> List[str]:
+        resolved = cls._normalize_sheetbook_export_header(expected, export_header)
+        if existing_export_header is not None and list(existing_export_header) != list(resolved):
+            msg = "Sheetbook export header baseline mismatch: sheetbook={!r}, sheet={!r}".format(
+                str(sheetbook_id),
+                str(sheet_name),
+            )
+            diff = [
+                "existing_export_header={!r}".format(list(existing_export_header)),
+                "new_export_header={!r}".format(list(resolved)),
+            ]
+            raise ScalimWorkflowWriteError(msg, diff=diff)
+        return resolved
+
     @staticmethod
     def _sheetbook_has_alignment_mismatch(expected: List[str], input_header: List[str], *, align_by: str) -> bool:
         if str(align_by) == "field_id":
@@ -179,7 +203,8 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         decl_order: int,
         input_node_id: str,
         expected: List[str],
-        rows: List[List[str]],
+        export_header: Optional[Tuple[str, ...]],
+        rows: List[List[FieldValue]],
         new_sheet_cells: int,
     ) -> None:
         with self._lock:
@@ -200,6 +225,12 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             sheet_plan = _SheetBookSheetPlan(
                 sheet=sheet_name,
                 baseline_header=list(expected),
+                export_header=self._resolve_sheetbook_export_header(
+                    list(expected),
+                    export_header=export_header,
+                    sheetbook_id=plan.resource_id,
+                    sheet_name=sheet_name,
+                ),
                 segments=[],
                 cell_count=int(new_sheet_cells),
             )
@@ -225,6 +256,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         decl_order: int,
         input_node_id: str,
         input_header: List[str],
+        export_header: Optional[Tuple[str, ...]],
         align_by: str,
         on_mismatch: str,
     ) -> Tuple[List[str], List[int], Optional[DiagnosticWarningEvent], Optional[Dict[str, object]], bool]:
@@ -249,6 +281,12 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 sheet_plan = _SheetBookSheetPlan(
                     sheet=sheet_name,
                     baseline_header=list(input_header),
+                    export_header=self._resolve_sheetbook_export_header(
+                        list(input_header),
+                        export_header=export_header,
+                        sheetbook_id=plan.resource_id,
+                        sheet_name=sheet_name,
+                    ),
                     segments=[],
                     cell_count=0,
                 )
@@ -262,6 +300,13 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                         plan.sheet_decl_order.keys(),
                         key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)),
                     )
+                _ = self._resolve_sheetbook_export_header(
+                    list(sheet_plan.baseline_header),
+                    export_header=export_header,
+                    existing_export_header=sheet_plan.export_header,
+                    sheetbook_id=plan.resource_id,
+                    sheet_name=sheet_name,
+                )
 
             expected = list(sheet_plan.baseline_header)
             mapping = _build_alignment_mapping(expected, input_header)
@@ -306,7 +351,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         workflow_node_id: str,
         input_node_id: str,
         decl_order: int,
-        rows: List[List[str]],
+        rows: List[List[FieldValue]],
         header_policy: str,
     ) -> None:
         with self._lock:
@@ -392,12 +437,13 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv: WorkflowCsvInput,
+        input_csv: WorkflowTabularInput,
         on_conflict: str,
+        export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
-        input_header = _read_csv_header(input_csv)
+        input_header = read_tabular_header(input_csv)
         action, pending_skip = self._sheetbook_sheet_prepare_action(
             plan,
             workflow_node_id=str(workflow_node_id),
@@ -424,7 +470,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         expected = list(input_header)
         mapping = _build_alignment_mapping(expected, input_header)
 
-        rows = _materialize_aligned_csv_rows(expected, mapping, input_csv=input_csv)
+        rows = materialize_aligned_tabular_rows(expected, mapping, input_tabular=input_csv)
         row_count = len(rows)
         new_sheet_cells = int(row_count) * len(expected)
 
@@ -435,6 +481,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             decl_order=int(decl_order),
             input_node_id=str(input_node_id),
             expected=expected,
+            export_header=export_header,
             rows=rows,
             new_sheet_cells=int(new_sheet_cells),
         )
@@ -461,14 +508,23 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv: WorkflowCsvInput,
+        input_csv: WorkflowTabularInput,
         align_by: str,
         header_policy: str,
         on_mismatch: str,
+        export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
+        if str(align_by or "field_id") == "header":
+            msg = (
+                "xlsx_memory/sheetbook does not support align_by=header; "
+                "internal rows only use canonical field keys. Migrate to align_by=field_id "
+                "and keep header_fields_output_by for export display"
+            )
+            raise ScalimWorkflowWriteError(msg, diff=["align_by='header'"])
+
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
-        input_header = _read_csv_header(input_csv)
+        input_header = read_tabular_header(input_csv)
         expected, mapping, pending_warning, pending_warning_meta, pending_skip = self._sheetbook_append_prepare(
             plan,
             workflow_node_id=str(workflow_node_id),
@@ -477,6 +533,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             decl_order=int(decl_order),
             input_node_id=str(input_node_id),
             input_header=list(input_header),
+            export_header=export_header,
             align_by=str(align_by),
             on_mismatch=str(on_mismatch),
         )
@@ -499,7 +556,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             )
             return
 
-        rows = _materialize_aligned_csv_rows(expected, mapping, input_csv=input_csv)
+        rows = materialize_aligned_tabular_rows(expected, mapping, input_tabular=input_csv)
 
         append_rows = len(rows)
         append_cells = int(append_rows) * len(expected)
@@ -537,10 +594,10 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         producer_node_id: str,
         sheetbook_id: str,
         sheet: str,
-    ) -> Iterator[Dict[str, object]]:
+    ) -> Iterator[Dict[str, FieldValue]]:
         """读取 `sheetbook` 的行快照(按 `ref.node` 截断;按依赖可见性过滤).
 
-        返回: `Iterator[Dict[str, object]]`, 每行必须为 `JSON-like mapping`.
+        返回: `Iterator[Dict[str, FieldValue]]`.
         """
         _ = str(consumer_node_id)
         producer = str(producer_node_id)
@@ -569,17 +626,17 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 raise ValueError(msg)
 
             baseline_header = list(sheet_plan.baseline_header)
-            segments: List[Tuple[str, List[List[str]]]] = []
+            segments: List[Tuple[str, List[List[FieldValue]]]] = []
             for seg in ordered_segments[: cutoff_idx + 1]:
                 seg_producer = str(seg.producer_node_id)
                 if seg_producer != producer and seg_producer not in visible:
                     continue
                 segments.append((seg_producer, list(seg.rows)))
 
-        def _iter() -> Iterator[Dict[str, object]]:
+        def _iter() -> Iterator[Dict[str, FieldValue]]:
             for _seg_producer, seg_rows in segments:
                 for row_values in seg_rows:
-                    row: Dict[str, object] = {}
+                    row: Dict[str, FieldValue] = {}
                     for idx, key in enumerate(baseline_header):
                         row[str(key)] = row_values[idx] if idx >= 0 and idx < len(row_values) else ""
                     yield row

@@ -1,5 +1,6 @@
 import threading
 import time
+from decimal import Decimal
 from typing import Dict, Iterable, Mapping
 
 
@@ -77,3 +78,15 @@ def load_table_mismatch() -> Iterable[Mapping[str, object]]:
 
 def load_table_raises() -> Iterable[Mapping[str, object]]:
     raise ValueError("boom")
+
+
+def load_table_typed_values() -> Iterable[Mapping[str, object]]:
+    return [
+        {
+            "order_count": 5,
+            "amount": Decimal("1.20"),
+            "paid": True,
+            "code": "007",
+            "raw_text": "",
+        }
+    ]

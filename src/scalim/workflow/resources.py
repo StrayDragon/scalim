@@ -5,12 +5,13 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from typing import FrozenSet, Iterator, Mapping
+from typing import FrozenSet, Iterator, Mapping, Optional, Tuple
 
 from .resources_base import ScalimWorkflowWriteError
 from .resources_csv import WorkflowCsvInput, WorkflowCsvResourceMixin
 from .resources_sheetbook import SheetBookDef, WorkflowSheetBookResourceMixin
 from .resources_workbook import WorkflowWorkbookResourceMixin
+from .tabular_artifacts import WorkflowTabularInput
 
 
 class WorkflowResourceManager(
@@ -28,6 +29,18 @@ class WorkflowResourceManager(
             return "xlsx_memory"
         return ""
 
+    def get_book_kind(self, book_id: str) -> str:
+        return self._book_kind(book_id)
+
+    @staticmethod
+    def _require_csv_input(input_tabular: WorkflowTabularInput) -> WorkflowCsvInput:
+        from ..sinks.rows import InMemoryRows  # noqa: PLC0415
+
+        if isinstance(input_tabular, InMemoryRows):
+            msg = "xlsx_file books only accept CSV-equivalent artifacts"
+            raise ScalimWorkflowWriteError(msg)
+        return input_tabular
+
     def apply_book_sheet(
         self,
         *,
@@ -37,11 +50,13 @@ class WorkflowResourceManager(
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv: WorkflowCsvInput,
+        input_csv: WorkflowTabularInput,
         on_conflict: str,
+        export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
         kind = self._book_kind(book_id)
         if kind == "xlsx_file":
+            csv_input = self._require_csv_input(input_csv)
             return self.apply_workbook_sheet(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
@@ -49,7 +64,7 @@ class WorkflowResourceManager(
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
-                input_csv=input_csv,
+                input_csv=csv_input,
                 on_conflict=str(on_conflict or "error"),
             )
         if kind == "xlsx_memory":
@@ -61,6 +76,7 @@ class WorkflowResourceManager(
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
                 input_csv=input_csv,
+                export_header=export_header,
                 on_conflict=str(on_conflict or "error"),
             )
         msg = "Unknown book resource id: {!r}".format(str(book_id))
@@ -75,13 +91,15 @@ class WorkflowResourceManager(
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv: WorkflowCsvInput,
+        input_csv: WorkflowTabularInput,
         align_by: str,
         header_policy: str,
         on_mismatch: str,
+        export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
         kind = self._book_kind(book_id)
         if kind == "xlsx_file":
+            csv_input = self._require_csv_input(input_csv)
             return self.apply_workbook_append(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
@@ -89,7 +107,7 @@ class WorkflowResourceManager(
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
-                input_csv=input_csv,
+                input_csv=csv_input,
                 align_by=str(align_by or "field_id"),
                 header_policy=str(header_policy or "once"),
                 on_mismatch=str(on_mismatch or "error"),
@@ -103,6 +121,7 @@ class WorkflowResourceManager(
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
                 input_csv=input_csv,
+                export_header=export_header,
                 align_by=str(align_by or "field_id"),
                 header_policy=str(header_policy or "once"),
                 on_mismatch=str(on_mismatch or "error"),

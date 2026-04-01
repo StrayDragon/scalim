@@ -215,6 +215,36 @@ def _overlay_write_defaults(base: BookWriteDefaultsConfig, override: Optional[Ou
     )
 
 
+def _validate_xlsx_memory_align_by(
+    *,
+    book: BookConfig,
+    book_id: str,
+    out_cfg: OutputTargetConfig,
+    idx: int,
+    outputs_path: str,
+) -> None:
+    if str(book.kind or "").strip() != "xlsx_memory":
+        return
+
+    effective_defaults = _overlay_write_defaults(_effective_write_defaults(book), out_cfg.write)
+    if str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE) != "append":
+        return
+    if str(effective_defaults.align_by or "") != "header":
+        return
+
+    align_by_path = (
+        "{}.{}.write.align_by".format(str(outputs_path), int(idx))
+        if out_cfg.write is not None and out_cfg.write.align_by is not None
+        else "resources.books.{}.write_defaults.align_by".format(str(book_id))
+    )
+    msg = (
+        "books.kind=xlsx_memory does not support write.align_by=header; "
+        "internal rows only use canonical field keys. Migrate to write.align_by=field_id "
+        "and keep write.header_fields_output_by for export display (book_id={!r})"
+    ).format(str(book_id))
+    raise ScalimWorkflowConfigError(msg, path=str(align_by_path))
+
+
 def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
     base: Optional[BookConfig],
     patch: Mapping[str, object],
@@ -1099,6 +1129,13 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                     "or provide overrides.resources.books.{} in Python."
                 ).format(str(book_id), str(book_ref_path), str(book_id), str(book_id), str(book_id))
                 raise ScalimWorkflowConfigError(msg, path=str(book_ref_path))
+            _validate_xlsx_memory_align_by(
+                book=book,
+                book_id=str(book_id),
+                out_cfg=out_cfg,
+                idx=int(out_idx),
+                outputs_path=outputs_path,
+            )
 
             sheet_name, sheet_ref_path = _effective_sheet_name_for_output(out_cfg, idx=int(out_idx), outputs_path=outputs_path)
             try:
@@ -1209,6 +1246,13 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             base_defaults = _effective_write_defaults(book)
             effective_defaults = _overlay_write_defaults(base_defaults, None)
             mode = str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
+            _validate_xlsx_memory_align_by(
+                book=book,
+                book_id=str(default_book_id),
+                out_cfg=OutputTargetConfig(name="__extra__", write=None),
+                idx=0,
+                outputs_path="resources.books.{}".format(str(default_book_id)),
+            )
 
             for extra_id, extra_cfg_obj, default_sheet in extras:
                 extra_cfg = cast("Any", extra_cfg_obj)  # pragma: allow-cast output extra sheet cfg typed narrowing

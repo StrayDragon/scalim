@@ -60,7 +60,7 @@ outputs:
       sheet: DetailAppend
     write:
       mode: append
-      align_by: header
+      align_by: field_id
       header_policy: once
       on_mismatch: error
     fields: *detail_fields
