@@ -5,10 +5,9 @@ description: |
   客服报表: 可观测性全家桶示例(为工程同学定位“慢/缺/错/飙内存”准备).
 
   目标:
-  - `logging`: 控制是否输出运行日志(默认不启用;避免噪音)
-  - `trace`: 记录批次级执行轨迹(用于定位慢点)
-  - `viz`: 输出可回放的事件/快照(用于 GUI 调试)
-  - `memory_opt`: 记录字段瘦身/行释放等事件(用于定位内存问题)
+  - YAML 只承载业务建模;可观测性通过 runtime entrypoints 装配
+    - `components=[LoggingObserver(), ExecutionTraceObserver(), MemoryOptimizationObserver(...)]`
+    - `overrides=RunOverrides(viz_config=VizObserverConfig(...))`
 
 batch_size: 2
 
@@ -33,24 +32,3 @@ outputs:
       header_fields_output_by: field_id
       include_header: true
     fields: [ticket_id, priority, resolve_minutes]
-
-observability:
-  logging:
-    enabled: true
-    renderer: logger
-  trace:
-    enabled: true
-  viz:
-    enabled: true
-    output_dir: "{{ viz_output_dir }}"
-    trace_enabled: true
-    payload_policy: sample
-    sample_size: 3
-    append: false
-    run_name: support-observability
-    env: ci
-    use_default_output_dir: false
-  memory_opt:
-    enabled: true
-    auto_report: false
-    max_fields: 10

@@ -79,12 +79,11 @@
 | `failure_policy` | `OutputCompositionSpec.failure_policy` | `all_fail/primary_only` | - |
 | `include_full_error_message` | `OutputCompositionSpec.include_full_error_message` | 可能包含敏感信息;默认 false | 在 CI/公开环境保持 false |
 
-## 5) Demand YAML:护栏与可观测性(guardrails/observability)
+## 5) Demand YAML:护栏(guardrails)
 
 | YAML key | 编译到(主要影响) | 限制/边界 | 替代方案 |
 |---|---|---|---|
 | `guardrails` | `ExecutionRequest.guardrails` (`GuardrailsPolicy`) | 仅暴露受控策略面(quiet/fast_fail + 子项) | 用 `run(..., guardrails=...)` 传入完整策略 |
-| `observability.*` | `ExecutionRequest.observability` + `ExecutionRequest.components` | 仅暴露 presets;细粒度 hook/observer 需 Python 挂载 | 用 `run(..., components=[...])` 挂载自定义 observer/hook |
 
 ## 6) 当前“不在 YAML 里”的常用能力(需要 Python/CLI 参数)
 
@@ -96,6 +95,7 @@
 | 自定义 sink | `ExecutionRequest.sink` | sink 往往是运行环境能力(文件系统/内存/对象存储) | `run(..., sink=InMemoryRowSink())` 等 |
 | 完全自定义 outputs | `ExecutionRequest.output_composition` | 组合输出属于执行装配层,复杂度高 | 使用 execution 层入口 `scalim.execution.run_ir(...)` 自行构造 `ExecutionRequest(output_composition=...)` |
 | 自定义 hooks/observers | `ExecutionRequest.components` | 运行期组件需要 Python 对象 | `run(..., components=[Observer(), Hook()])` |
+| 内置可观测 presets + Viz | `ExecutionRequest.components` + `ExecutionRequest.observability.viz_config` | 可观测性属于 runtime integration surface,不作为 YAML authoring surface | `components=[PerformanceObserver(), RelationObserver(), ...]` + `overrides=RunOverrides(viz_config=VizObserverConfig(...))` |
 
 ## 7) IR 已存在但 YAML 未暴露的典型缺口(候选清单)
 

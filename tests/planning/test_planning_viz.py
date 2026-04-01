@@ -5,13 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.parsers.output import ScalimVizEventModeRemovedError
 from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
-from scalim.dsl.by_yaml.runtime import observability as runtime_observability
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
-from scalim.dsl.by_yaml.schema_dsl.models import ObservabilityConfig, VIZ_KEYS, VizConfig
 from scalim.events._events import DiagnosticWarningEvent, ErrorEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.ob.observability import Observability
 from scalim.ob.presets.viz import VizObserver, VizObserverConfig
@@ -221,83 +216,24 @@ def test_viz_observer_emits_error_and_warning_node_refs(tmp_path: Path) -> None:
 
 
 def test_parse_viz_config_enabled_and_infer() -> None:
-    loader = YamlDemandLoader()
-    viz_raw = {
-        VIZ_KEYS["output_dir"]: "/tmp/run",
-        VIZ_KEYS["trace_enabled"]: True,
-        VIZ_KEYS["append"]: False,
-        VIZ_KEYS["payload_policy"]: "sample",
-        VIZ_KEYS["sample_size"]: "bad",
-        VIZ_KEYS["run_name"]: "demo",
-        VIZ_KEYS["env"]: "dev",
-        VIZ_KEYS["use_default_output_dir"]: True,
-    }
-    config = loader._parse_viz(viz_raw)
-    assert config.enabled is True
-    assert config.trace_enabled is True
-    assert config.append is False
-    assert config.payload_policy == "sample"
-    assert config.sample_size == 5
-    assert config.run_name == "demo"
-    assert config.env == "dev"
-    assert config.use_default_output_dir is True
+    plan = _build_simple_plan()
+    viz_config = VizObserverConfig(use_default_output_dir=True, payload_policy="summary", sample_size=3, run_name="demo", env="test")
+    assert viz_config.is_enabled() is True
 
-    with pytest.raises(ScalimYamlValidationError) as exc_info:
-        loader.load_string(
-            """
-name: viz_event_mode_removed
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    order_id:
-      extract: order_id
-sources: {}
-observability:
-  viz:
-    enabled: true
-    output_dir: /tmp/run
-    event_mode: full
-"""
-        )
-    assert any("observability.viz.event_mode" in err.path for err in exc_info.value.errors)
-    with pytest.raises(ScalimVizEventModeRemovedError):
-        loader._parse_viz({VIZ_KEYS["output_dir"]: "/tmp/run", "event_mode": "full"})
-
-    config = loader._parse_viz({VIZ_KEYS["enabled"]: False, VIZ_KEYS["output_dir"]: "/tmp/run"})
-    assert config.enabled is False
+    observer_with_plan = VizObserver.from_plan(plan, viz_config)
+    assert observer_with_plan.snapshot is not None
 
 
 def test_runtime_viz_hook_creation_and_registration() -> None:
     plan = _build_simple_plan()
-    viz_config = VizConfig(
-        enabled=True,
-        output_dir=None,
-        output_path=None,
-        snapshot_path=None,
-        payload_policy="summary",
-        sample_size=3,
-        run_name="demo",
-        env="test",
-        use_default_output_dir=False,
-    )
-    observability = ObservabilityConfig(viz=viz_config)
-
-    spec, observers = runtime_observability.compile_observability_spec(observability)
-    assert spec.viz_config is not None
-    assert spec.viz_config.use_default_output_dir is True
-
-    observer_with_plan = VizObserver.from_plan(plan, spec.viz_config)
+    viz_config = VizObserverConfig(use_default_output_dir=True)
+    observer_with_plan = VizObserver.from_plan(plan, viz_config)
     assert observer_with_plan.snapshot is not None
 
-    observability_facade = Observability(observers=list(observers), fallback_logger_enabled=spec.fallback_logger_enabled)
+    observability_facade = Observability(observers=[])
     observability_facade.register(observer_with_plan)
     manager = observability_facade.build_manager()
     assert any(isinstance(obs, VizObserver) for obs in manager.observers)
-
-    disabled_observability = ObservabilityConfig(viz=VizConfig(enabled=False))
-    spec, _observers = runtime_observability.compile_observability_spec(disabled_observability)
-    assert spec.viz_config is None
 
 
 def test_build_viz_observer_allowlist_and_targets(tmp_path: Path) -> None:

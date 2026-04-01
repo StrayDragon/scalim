@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -536,7 +537,9 @@ sources: {}
     assert compilation.request.observability.viz_config is viz_config
 
 
-def test_compile_viz_config_override_none_disables_viz(tmp_path: Path) -> None:
+def test_compile_legacy_yaml_observability_is_ignored_and_emits_migration_warning(tmp_path: Path, caplog: Any) -> None:
+    import logging
+
     yaml_path = _write_yaml(
         tmp_path,
         """
@@ -555,11 +558,10 @@ observability:
 """,
     )
 
-    overrides = RunOverrides(viz_config=None)
-
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
-    assert compilation.request.observability is not None
-    assert compilation.request.observability.viz_config is None
+    caplog.set_level(logging.WARNING)
+    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    assert compilation.request.observability is None
+    assert any("Legacy YAML key 'observability' is no longer supported" in str(r.message) for r in caplog.records)
 
 
 def test_compile_viz_config_override_overrides_yaml_observability(tmp_path: Path) -> None:
@@ -575,12 +577,9 @@ main_source:
       extract: order_id
 sources: {}
 observability:
-  performance:
+  logging:
     enabled: true
-    metrics: [duration]
-    sampling_interval: 1
-    report:
-      format: none
+    renderer: logger
 """,
     )
 

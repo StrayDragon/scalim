@@ -29,7 +29,6 @@ Sources:
 - `include_full_error_message`: type=boolean; 包含完整错误信息(可能包含敏感信息;默认 false).
 - `meta`: ref=output_extra_sheet; 可选:启用 meta sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径
 - `audit`: ref=output_extra_sheet; 可选:启用 audit sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径
-- `observability`: ref=observability; 可观测性配置. 包含 `logging`、`performance`、`relations`、`viz`、`trace`、`row_gap` 与 `memory_opt` 子配置.
 
 ## Definitions
 
@@ -112,11 +111,6 @@ Sources:
 - `max_elapsed_seconds`: type=number; default=10.0; 最大累计耗时(秒,包含 sleep)
 - `should_retry`: type=string; 重试判定回调引用(安全引用,由 allowlist 约束)
 
-### `logging`
-- `$import`: $import 引用(支持 string 或 string list)
-- `enabled`: type=boolean; default=true; 启用日志观测
-- `renderer`: type=string; default=pretty; enum=pretty|logger; 日志渲染器(pretty/logger)
-
 ### `main_source`
 - `$import`: $import 引用(支持 string 或 string list)
 - `fields`: type=object; 主数据源字段配置映射, key 为 field_id
@@ -125,22 +119,6 @@ Sources:
 - `params`: type=object; 调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)
 - `retry`: ref=loader_retry; Loader retry 策略(可选;默认关闭)
 - `source_id`: type=string; 主数据源的 source_id
-
-### `memory_opt`
-- `$import`: $import 引用(支持 string 或 string list)
-- `auto_report`: type=boolean; default=false; 自动输出摘要
-- `enabled`: type=boolean; default=false; 启用内存优化统计
-- `max_fields`: type=integer; default=0; 摘要字段上限
-
-### `observability`
-- `$import`: $import 引用(支持 string 或 string list)
-- `logging`: ref=logging; 日志观测配置
-- `memory_opt`: ref=memory_opt; 内存优化统计配置
-- `performance`: ref=performance; 性能可观测性配置
-- `relations`: ref=relations; 关联可观测性配置
-- `row_gap`: ref=row_gap; 行缺口统计配置
-- `trace`: ref=trace; 执行追踪配置
-- `viz`: ref=viz; Scalim Viz 可视化输出配置
 
 ### `output_aggregate`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -183,53 +161,14 @@ Sources:
 - `on_conflict`: type=string; enum=error|overwrite|skip; 可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)
 - `on_mismatch`: type=string; enum=error|warn|skip; 可选:字段不匹配策略(error/warn/skip;仅 append 生效)
 
-### `performance`
-- `$import`: $import 引用(支持 string 或 string list)
-- `enabled`: type=boolean; default=false; 启用性能监控
-- `metrics`: type=array[enum]; 要收集的指标类型 (duration/memory/cpu)
-- `report`: ref=performance_report
-- `sampling_interval`: type=integer; default=1; 资源采样间隔(批次数)
-- `thresholds`: ref=performance_thresholds
-
-### `performance_report`
-- `$import`: $import 引用(支持 string 或 string list)
-- `format`: type=string; default=console; enum=console|json|csv|none; 报告输出格式
-- `include_details`: type=boolean; default=false; 包含详细统计
-- `output`: type=string; 报告输出路径
-
-### `performance_thresholds`
-- `$import`: $import 引用(支持 string 或 string list)
-- `batch_duration_warn`: type=number; 批次耗时告警阈值(秒)
-- `memory_increase_warn`: type=number; 内存增长告警阈值(MB)
-
 ### `relation`
 - `$import`: $import 引用(支持 string 或 string list)
 - `steps`: type=array[object]; 按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])
-
-### `relation_report`
-- `$import`: $import 引用(支持 string 或 string list)
-- `format`: type=string; default=console; enum=console|json|none; 报告输出格式
-- `output`: type=string; 报告输出路径
-
-### `relations`
-- `$import`: $import 引用(支持 string 或 string list)
-- `enabled`: type=boolean; default=false; 启用关联可观测性
-- `log_type_mismatch`: type=boolean; default=true; 记录类型不匹配日志
-- `max_samples`: type=integer; default=1000; 最大采样数量
-- `report`: ref=relation_report
-- `sampling_rate`: type=number; default=0.01; 采样率(0.0-1.0)
 
 ### `resources`
 - `$import`: $import 引用(支持 string 或 string list)
 - `books`: type=object; books 资源映射(Excel book; key 为 book_id)
 - `files`: type=object; files 资源映射(文件输出资源; key 为 file_id)
-
-### `row_gap`
-- `$import`: $import 引用(支持 string 或 string list)
-- `data_loader_names`: type=array[string]; 参与统计的 loader 列表
-- `enabled`: type=boolean; default=false; 启用行缺口统计
-- `primary_loader_name`: type=string; default=primary_keys; 主数据 loader 名称
-- `sample_limit`: type=integer; default=5; 缺口采样数量
 
 ### `source`
 - `$import`: $import 引用(支持 string 或 string list)
@@ -250,24 +189,6 @@ Sources:
 - `relation`: 关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)
 - `source`: type=string; 字段来源的 source_id (例: source: orders)
 - `value_cast`: type=string; enum=auto|int|str|decimal; 字段值转换(仅源字段),用于写入上下文/输出前的类型调整
-
-### `trace`
-- `$import`: $import 引用(支持 string 或 string list)
-- `enabled`: type=boolean; default=false; 启用执行追踪
-
-### `viz`
-- `$import`: $import 引用(支持 string 或 string list)
-- `append`: type=boolean; default=false; 事件文件追加写入
-- `enabled`: type=boolean; default=false; 启用 Scalim Viz 输出
-- `env`: type=string; 运行环境标签
-- `output_dir`: type=string; 输出目录(自动追加 scalim-viz)
-- `output_path`: type=string; 事件输出文件路径(可选)
-- `payload_policy`: type=string; default=summary; enum=none|summary|sample|full; 事件 payload 策略
-- `run_name`: type=string; 运行名称
-- `sample_size`: type=integer; default=5; sample 策略下的样本数量
-- `snapshot_path`: type=string; 快照输出文件路径(可选)
-- `trace_enabled`: type=boolean; default=false; 启用高频 trace 输出
-- `use_default_output_dir`: type=boolean; default=false; 使用默认输出目录
 
 ## Workflow Schema
 

@@ -6,6 +6,7 @@ from scalim.execution import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
+from scalim.ob.presets.relations import RelationConfig, RelationObserver
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryColumnSink
@@ -39,10 +40,12 @@ def run_observability(
         perf_observer = PerformanceObserver(
             config=PerformanceConfig(metrics={"duration", "memory"}, sampling_interval=1, report_format="none")
         )
+        relation_observer = RelationObserver(config=RelationConfig(sampling_rate=1.0, report_format="none"))
         trace_observer = ExecutionTraceObserver()
         row_gap_observer = RowGapObserver(primary_loader_name="orders", data_loader_names={"customers", "products"}, sample_limit=3)
 
         observer_manager.register(perf_observer)
+        observer_manager.register(relation_observer)
         observer_manager.register(trace_observer)
         observer_manager.register(row_gap_observer)
 
@@ -53,13 +56,20 @@ def run_observability(
 
         verification: VerificationResult = verify_scalim_output(rows, fields_to_check=targets_list)
         metrics = perf_observer.get_metrics()
+        relation_metrics = relation_observer.get_metrics()
 
-        passed = bool(verification.passed and len(trace_observer.batches) > 0 and len(metrics.loader_stats) > 0)
-        summary = "rows={} verify={} trace_batches={} loader_metrics={} row_gap_expected={}".format(
+        passed = bool(
+            verification.passed
+            and len(trace_observer.batches) > 0
+            and len(metrics.loader_stats) > 0
+            and int(relation_metrics.total_lookups) > 0
+        )
+        summary = "rows={} verify={} trace_batches={} loader_metrics={} relation_lookups={} row_gap_expected={}".format(
             len(rows),
             verification.passed,
             len(trace_observer.batches),
             len(metrics.loader_stats),
+            int(relation_metrics.total_lookups),
             row_gap_observer.total_expected,
         )
         if not verification.passed:
@@ -70,6 +80,9 @@ def run_observability(
             "verification": verification,
             "trace_batches": len(trace_observer.batches),
             "loader_metrics_count": len(metrics.loader_stats),
+            "relation_total_lookups": int(relation_metrics.total_lookups),
+            "relation_hit_count": int(relation_metrics.hit_count),
+            "relation_miss_count": int(relation_metrics.miss_count),
             "row_gap_total_expected": row_gap_observer.total_expected,
             "row_gap_total_actual": row_gap_observer.total_actual,
             "row_gap_total_missing": row_gap_observer.total_missing,

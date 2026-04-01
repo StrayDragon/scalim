@@ -198,7 +198,7 @@ def test_generated_syntax_catalog_covers_top_level_and_definitions(tmp_path: Pat
     assert "demand_definitions" in catalog
     assert "properties.main_source" in catalog
     assert "properties.outputs" in catalog
-    assert "properties.observability" in catalog
+    assert "properties.observability" not in catalog
     assert "definitions.source" in catalog
     assert "workflow.runs[*].depends_on" in catalog
     assert "workflow.runs[*].init_vars" in catalog

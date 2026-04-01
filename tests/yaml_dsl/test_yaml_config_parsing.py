@@ -12,23 +12,12 @@ from scalim.dsl.by_yaml._internal.config_parsing.models import (
 from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml.schema_dsl.constants import (
     DEFAULT_BATCH_SIZE,
-    DEFAULT_PERF_SAMPLING_INTERVAL,
-    DEFAULT_RELATION_MAX_SAMPLES,
-    DEFAULT_RELATION_SAMPLING_RATE,
     FIELD_KIND_DERIVED,
     FIELD_KIND_SOURCE,
 )
 from scalim.dsl.by_yaml.schema_dsl.models import (
     DERIVED_FIELD_KEYS,
-    LOGGING_KEYS,
-    LoggingConfig,
     MAIN_SOURCE_KEYS,
-    MEMORY_OPTIMIZATION_KEYS,
-    PERFORMANCE_KEYS,
-    RELATIONS_CONFIG_KEYS,
-    ROW_GAP_KEYS,
-    TRACE_KEYS,
-    RowGapConfig,
 )
 
 
@@ -266,32 +255,6 @@ def test_parse_steps_handles_invalid_inputs() -> None:
     assert loader._parse_steps(["bad"]) == ()
 
 
-def test_parse_relations_observability_defaults_on_invalid_values() -> None:
-    loader = YamlDemandLoader()
-    relations = loader._parse_relations_observability(
-        {
-            RELATIONS_CONFIG_KEYS["sampling_rate"]: "bad",
-            RELATIONS_CONFIG_KEYS["max_samples"]: "bad",
-        }
-    )
-
-    assert relations.sampling_rate == DEFAULT_RELATION_SAMPLING_RATE
-    assert relations.max_samples == DEFAULT_RELATION_MAX_SAMPLES
-
-
-def test_parse_performance_handles_string_metrics_and_sampling_default() -> None:
-    loader = YamlDemandLoader()
-    performance = loader._parse_performance(
-        {
-            PERFORMANCE_KEYS["metrics"]: "duration",
-            PERFORMANCE_KEYS["sampling_interval"]: "bad",
-        }
-    )
-
-    assert performance.metrics == ("duration",)
-    assert performance.sampling_interval == DEFAULT_PERF_SAMPLING_INTERVAL
-
-
 def test_parse_lookup_chunk_size_guardrails() -> None:
     loader = YamlDemandLoader()
 
@@ -304,60 +267,3 @@ def test_parse_lookup_chunk_size_guardrails() -> None:
     assert loader._parse_lookup_chunk_size("3") == 3
     assert loader._parse_lookup_chunk_size(2.8) == 2
     assert loader._parse_lookup_chunk_size(4) == 4
-
-
-def test_parse_logging_trace_row_gap_and_memory_opt_observability() -> None:
-    loader = YamlDemandLoader()
-
-    logging_cfg = loader._parse_logging_observability({LOGGING_KEYS["enabled"]: False})
-    assert logging_cfg.enabled is False
-    assert logging_cfg.renderer == LoggingConfig().renderer
-
-    logging_cfg = loader._parse_logging_observability({LOGGING_KEYS["renderer"]: "logger"})
-    assert logging_cfg.renderer == "logger"
-
-    logging_cfg = loader._parse_logging_observability({LOGGING_KEYS["renderer"]: "not-a-renderer"})
-    assert logging_cfg.renderer == LoggingConfig().renderer
-
-    trace_cfg = loader._parse_trace_observability({TRACE_KEYS["enabled"]: True})
-    assert trace_cfg.enabled is True
-
-    row_gap_cfg = loader._parse_row_gap_observability(
-        {
-            ROW_GAP_KEYS["enabled"]: True,
-            ROW_GAP_KEYS["primary_loader_name"]: "primary",
-            ROW_GAP_KEYS["data_loader_names"]: ["a", "b"],
-            ROW_GAP_KEYS["sample_limit"]: 3,
-        }
-    )
-    assert row_gap_cfg.enabled is True
-    assert row_gap_cfg.primary_loader_name == "primary"
-    assert row_gap_cfg.data_loader_names == ("a", "b")
-    assert row_gap_cfg.sample_limit == 3
-
-    row_gap_cfg = loader._parse_row_gap_observability(
-        {
-            ROW_GAP_KEYS["data_loader_names"]: "solo",
-            ROW_GAP_KEYS["sample_limit"]: "bad",
-        }
-    )
-    assert row_gap_cfg.data_loader_names == ("solo",)
-    assert row_gap_cfg.sample_limit == 5
-
-    row_gap_cfg = loader._parse_row_gap_observability(
-        {
-            ROW_GAP_KEYS["data_loader_names"]: 123,
-        }
-    )
-    assert row_gap_cfg.data_loader_names == RowGapConfig().data_loader_names
-
-    memory_cfg = loader._parse_memory_opt_observability(
-        {
-            MEMORY_OPTIMIZATION_KEYS["enabled"]: True,
-            MEMORY_OPTIMIZATION_KEYS["auto_report"]: True,
-            MEMORY_OPTIMIZATION_KEYS["max_fields"]: "bad",
-        }
-    )
-    assert memory_cfg.enabled is True
-    assert memory_cfg.auto_report is True
-    assert memory_cfg.max_fields == 0

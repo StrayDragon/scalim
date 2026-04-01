@@ -210,18 +210,21 @@ class ConfigValidator(ValidatorFieldsMixin):
             msg = "max_validation_error_lines must be >= 1"
             raise ValueError(msg)
 
-    def _validate_deprecated_observability_fields(self, config: Dict[str, Any], errors: List["ValidationIssue"]) -> None:
-        obs_raw: Any = config.get("observability")
-        if not isinstance(obs_raw, dict):
-            return
-        obs_dict = cast("Dict[str, Any]", obs_raw)  # pragma: allow-cast yaml mapping typed narrowing
-        viz_raw: Any = obs_dict.get("viz")
-        if isinstance(viz_raw, dict) and "event_mode" in viz_raw:
-            self._add_error(
-                errors,
-                "Legacy field 'observability.viz.event_mode' is not allowed. Use 'observability.viz.trace_enabled'.",
-                path="observability.viz.event_mode",
-            )
+    def _warn_and_strip_legacy_observability(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
+        if "observability" not in config:
+            return config
+
+        msg = (
+            "Legacy YAML key 'observability' is no longer supported and will be ignored. "
+            "Hint: configure observability via Python runtime entrypoints: "
+            "scalim.dsl.by_yaml.run/compile(..., components=[Observer()/Hook()], "
+            "overrides=RunOverrides(viz_config=VizObserverConfig(...)))."
+        )
+        issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="observability"))
+
+        cleaned = dict(config)
+        cleaned.pop("observability", None)
+        return cleaned
 
     def validate(self, config: Dict[str, Any]) -> None:
         report = self.validate_report(config, enable_jsonschema_validation=True)
@@ -249,12 +252,12 @@ class ConfigValidator(ValidatorFieldsMixin):
         enable_jsonschema_validation: bool = False,
     ) -> ValidationReport:
         errors: List[ValidationIssue] = []
+        config = self._warn_and_strip_legacy_observability(config, errors)
         raw = RawDemand.from_raw(config)
 
         self._validate_required_fields(raw.data, errors)
         self._validate_batch_size(raw.data, errors)
         self._validate_legacy_fields(raw.data, errors)
-        self._validate_deprecated_observability_fields(raw.data, errors)
         self._validate_loader_retry_should_retry(raw.data.get("retry"), errors, path_prefix="retry")
 
         sources_info = self._validate_sources(raw.data, errors)

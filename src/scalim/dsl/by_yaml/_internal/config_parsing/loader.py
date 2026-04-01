@@ -4,6 +4,7 @@ from typing import IO, TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Un
 if TYPE_CHECKING:
     from .validator import ConfigValidator
 
+from ....._internal.loggingx import get_logger, prefix
 from ...init_var_nodes import parse_init_var_mapping_node
 from ...schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ...schema_dsl.models import (
@@ -43,13 +44,14 @@ from .imports import ScalimYamlImportExpansionError, contains_import_syntax, exp
 from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
 from .parsers.guardrails import ParserGuardrailsMixin
-from .parsers.output import ParserOutputMixin
 from .parsers.outputs import ParserOutputsMixin
 from .parsers.utils import mapping_or_none, str_or_none
 from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 from .yaml_load import envelope_from_validation_issue, error_loc_for_yaml_path, load_yaml_mapping_text
 
 __all__ = ()
+
+_LOADER_LOGGER = get_logger("yaml_dsl")
 
 
 def _create_validator() -> "ConfigValidator":
@@ -61,7 +63,6 @@ def _create_validator() -> "ConfigValidator":
 class YamlDemandLoader(
     ParserFieldsMixin,
     ParserOutputsMixin,
-    ParserOutputMixin,
     ParserGuardrailsMixin,
 ):
     _validator: Optional["ConfigValidator"]
@@ -190,6 +191,12 @@ class YamlDemandLoader(
                     errors=errors,
                     warnings=warnings,
                 )
+            if warnings:
+                for item in warnings:
+                    msg = "{}{}".format(prefix("yaml_dsl"), item.message)
+                    if item.path and item.path != "(root)":
+                        msg = "{} (path={})".format(msg, item.path)
+                    _LOADER_LOGGER.warning(msg)
 
         return self._parse_config(raw_demand)
 
@@ -264,6 +271,12 @@ class YamlDemandLoader(
                     errors=errors,
                     warnings=warnings,
                 )
+            if warnings:
+                for item in warnings:
+                    msg = "{}{}".format(prefix("yaml_dsl"), item.message)
+                    if item.path and item.path != "(root)":
+                        msg = "{} (path={})".format(msg, item.path)
+                    _LOADER_LOGGER.warning(msg)
 
         return self._parse_config(raw_demand)
 
@@ -313,8 +326,6 @@ class YamlDemandLoader(
         include_full_error_message = bool(raw.data.get(DEMAND_KEYS["include_full_error_message"], False))
         meta = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["meta"]), key="meta")
         audit = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["audit"]), key="audit")
-
-        observability = self._parse_observability(raw.data)
         guardrails = self._parse_guardrails(raw.data, parsed_fields.field_def_index)
 
         return DemandConfig(
@@ -336,7 +347,6 @@ class YamlDemandLoader(
             include_full_error_message=include_full_error_message,
             meta=meta,
             audit=audit,
-            observability=observability,
         )
 
     def _parse_resources(self, raw: RawDemand) -> Optional[ResourcesConfig]:  # noqa: C901, PLR0912

@@ -6,10 +6,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOverrides
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.ob.presets.logs import LoggingObserver
 from scalim.ob.presets.memory import MemoryOptimizationObserver
+from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -63,15 +65,31 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
         out_detail = tmp / "detail.csv"
         viz_base_dir = tmp / "viz_out"
 
-        template_vars: Dict[str, object] = {"viz_output_dir": str(viz_base_dir)}
         init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        overrides = RunOverrides(
+            viz_config=VizObserverConfig(
+                output_dir=str(viz_base_dir),
+                trace_enabled=True,
+                payload_policy="sample",
+                sample_size=3,
+                append=False,
+                run_name="support-observability",
+                env="ci",
+            )
+        )
+        components = [
+            LoggingObserver(),
+            ExecutionTraceObserver(),
+            MemoryOptimizationObserver(auto_report=False, max_fields=10),
+        ]
 
         try:
             compilation = compile_yaml(
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
+                components=components,
                 init_vars=init_vars,
-                template_vars=template_vars,
+                overrides=overrides,
             )
             trace_observer = _find_first_instance(compilation.request.components, ExecutionTraceObserver)
             memory_opt_observer = _find_first_instance(compilation.request.components, MemoryOptimizationObserver)
@@ -160,15 +178,13 @@ def _(mo):
 
         ## 需求方提问（自然语言）
 
-        维护者：我能不能只改 YAML 就打开/关闭这些观测能力,并且在 CI 里确定性验证它真的生效？
+        维护者：我能不能在运行入口侧打开/关闭这些观测能力,并且在 CI 里确定性验证它真的生效？
 
-        ## 本章覆盖的 YAML DSL 能力
+        ## 本章覆盖的 runtime entrypoints 能力
 
-        - `observability.logging`：启用/关闭日志观测(本章用 `renderer: logger` 以保持安静)
-        - `observability.trace`：执行追踪(批次级步骤)
-        - `observability.viz`：可回放的事件/快照(`viz_snapshot.json` + `viz_events.jsonl` + `viz_trace.jsonl`)
-        - `observability.memory_opt`：内存优化事件观测(字段瘦身/行释放等)
-        - `template_vars`：用 `LiteJinja2` 在编译期注入 `viz.output_dir`(隔离输出路径)
+        - YAML 只承载业务建模;`observability.*` legacy key 会 warning + ignore
+        - `components=[...]`：挂接 hooks/observers(Logging/Trace/MemoryOpt 等)
+        - `overrides=RunOverrides(viz_config=...)`：启用/配置 Viz 输出(事件/快照/trace)
 
         ## 对拍点（deterministic）
 
@@ -204,7 +220,7 @@ def _():
 def _(mo, yaml_path):
     from scalim_misc.notebook_support.yaml_excerpt import excerpt_head
 
-    mo.md("## Observability demand YAML (head)")
+    mo.md("## Demand YAML (head)")
     mo.md("```yaml\n{}\n```".format(excerpt_head(yaml_path, max_lines=140)))
     return (excerpt_head,)
 

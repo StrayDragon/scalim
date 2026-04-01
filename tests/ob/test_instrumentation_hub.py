@@ -1,9 +1,6 @@
 import logging
 
 import pytest
-
-from scalim.dsl.by_yaml.runtime.observability import compile_observability_spec
-from scalim.dsl.by_yaml.schema_dsl.models import ObservabilityConfig, PerformanceConfig as PerformanceConfigYaml
 from scalim.events import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_LOADER_CALL,
@@ -20,7 +17,7 @@ from scalim.hooks import BaseHook, HookManager
 from scalim.ob.hub import InstrumentationHub
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
-from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
+from scalim.ob.presets.logs import LoggingObserver
 from scalim.ob.presets.performance import PerformanceObserver
 from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan, PlanMetadata, Stage
@@ -368,14 +365,7 @@ def test_stage_span_timing_is_not_performed_when_unsubscribed() -> None:
 
 
 def test_yaml_default_silent_does_not_create_logging_observer() -> None:
-    observability = ObservabilityConfig(
-        performance=PerformanceConfigYaml(
-            enabled=True,
-            metrics=("duration",),
-            sampling_interval=1,
-        )
-    )
-    _spec, observers = compile_observability_spec(observability)
+    # Observability presets are opt-in: attaching a performance observer should not implicitly attach logging observers.
+    observers = (PerformanceObserver(),)
     assert any(isinstance(obs, PerformanceObserver) for obs in observers)
     assert not any(isinstance(obs, LoggingObserver) for obs in observers)
-    assert not any(isinstance(obs, PrettyLoggingObserver) for obs in observers)

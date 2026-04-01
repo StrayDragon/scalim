@@ -8,8 +8,6 @@ from ..constants import (
     DESC_LOADER_RETRY_MD,
     DESC_MAIN_SOURCE,
     DESC_MAIN_SOURCE_MD,
-    DESC_OBSERVABILITY,
-    DESC_OBSERVABILITY_MD,
     SOURCE_ID_STRING_SCHEMA,
     schema_meta,
     schema_omit,
@@ -18,7 +16,6 @@ from ..constants import (
 from .field import DerivedFieldConfig, SourceFieldConfig
 from .guardrails import GuardrailsConfig
 from .lookup_bind_relation import RelationConfig
-from .observability import ObservabilityConfig
 from .outputs import OutputExtraSheetConfig, OutputTargetConfig
 from .resources import ResourcesConfig
 from .source import LoaderRetryConfig, MainSourceConfig, SourceConfig
@@ -238,16 +235,6 @@ class DemandConfig:
         ),
     )
     """可选:启用 `audit` 工作表."""
-
-    observability: Optional[ObservabilityConfig] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            desc=DESC_OBSERVABILITY,
-            md=DESC_OBSERVABILITY_MD,
-            ref="observability",
-        ),
-    )
-    """可观测性配置(可选)."""
 
 
 __all__ = ()

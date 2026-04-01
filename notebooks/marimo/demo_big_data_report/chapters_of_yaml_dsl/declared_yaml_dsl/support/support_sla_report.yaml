@@ -8,7 +8,7 @@ description: |
 
   方案: 用 Scalim YAML DSL 描述 “tickets 主表 + customers/agents 维表” 的关联与指标：
   - guardrails: 开启运行期护栏（quiet 模式），让“缺字段/空 key”以可观测错误事件形式出现，但不阻断主流程
-  - observability.row_gap: 统计维表加载的缺口（预期 keys vs 实际返回）
+  - row_gap: 通过 runtime entrypoints 装配 `RowGapObserver` 统计维表加载的缺口（预期 keys vs 实际返回）
   - outputs: 明细 + 聚合指标（where 过滤掉 agent_team 为空的行参与聚合）
 
   对拍(oracle):
@@ -30,13 +30,6 @@ guardrails:
       - agent_id
   relations:
     null_key_max_rate: 0
-
-observability:
-  row_gap:
-    enabled: true
-    primary_loader_name: tickets
-    data_loader_names: [customers, agents]
-    sample_limit: 3
 
 _templates:
   detail_csv_file: &detail_csv_file

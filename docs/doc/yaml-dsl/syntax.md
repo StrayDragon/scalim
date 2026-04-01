@@ -54,7 +54,6 @@ audit: false            # 可选: true 或对象(写入 audit sheet)
 outputs: []             # 可选: 多输出编排(有序列表)
 failure_policy: all_fail             # 可选: all_fail/primary_only
 include_full_error_message: false    # 可选
-observability: {}       # 可选
 ```
 
 提示:
@@ -62,6 +61,7 @@ observability: {}       # 可选
 - 顶层已不再支持旧写法 `output:`(会 fail-fast).请使用 `outputs:`(有序列表)描述输出编排.
 - `outputs` 可省略.省略时默认不写文件;如需写文件,请在 YAML 中声明 `outputs` 或在 Python 调用侧使用 `overrides.outputs` 显式指定(整体替换,replace).
 - `field_id` 必须全局唯一(不再支持 `source.field_id` 消歧).
+- YAML 主线已不再支持 `observability.*`(legacy key 会 warning + ignore);请在 runtime entrypoints 使用 `components=[...]` / `overrides=RunOverrides(viz_config=...)` 配置观测.
 
 ## 3. YAML 复用: anchors、alias、`_templates`
 

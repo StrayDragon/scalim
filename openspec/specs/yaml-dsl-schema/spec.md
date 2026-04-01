@@ -70,7 +70,7 @@
 
 #### Scenario: enum hover 说明与示例
 - **WHEN** 执行 schema 生成脚本
-- **THEN** `output.format`/`output.header_fields_output_by`/`value_cast`/`lookup_cast.name`/`performance.report.format`/`relations.report.format`/`observability.viz.payload_policy` 的 `markdownDescription` 均包含选项语义说明且具备示例值
+- **THEN** `output.format`/`output.header_fields_output_by`/`value_cast`/`lookup_cast.name` 的 `markdownDescription` 均包含选项语义说明且具备示例值
 - **AND** `output.path` 的 `markdownDescription` MUST 说明相对路径以进程 CWD 为基准、会自动创建父目录且可能覆盖同名文件(并提示不要对不可信 YAML 开启文件输出)
 
 ### Requirement: demand JSON Schema MUST validate source identifiers and reject empty loader/key
@@ -223,18 +223,6 @@ Schema 生成器 MUST 在 `main_source.params` 与 `sources.*.params` 的 hover/
 #### Scenario: guardrails 非法枚举
 - **WHEN** `guardrails.mode: panic`
 - **THEN** schema 校验失败并指出非法枚举值
-
-### Requirement: observability.logging 支持 renderer/preset 字段
-系统 MUST 在 YAML DSL 的 `observability.logging` 配置中提供可扩展的 renderer/preset(字符串枚举)字段,用于选择 logging 组件的输出实现,以替代对外运行入口中的 `pretty_logging: bool` 开关.
-schema MUST 对该字段提供 hover 说明与示例值.
-
-#### Scenario: schema 包含 renderer 字段
-- **WHEN** 执行 schema 生成脚本
-- **THEN** `demand.gen.json` 中 `observability.logging` MUST 包含 renderer/preset 字段且具备 enum 值与说明
-
-#### Scenario: renderer=pretty 通过校验
-- **WHEN** 用户配置 `observability.logging.renderer: pretty`
-- **THEN** schema-only 与运行时校验均应通过
 
 ### Requirement: schema hover 说明 loader 引用支持相对模块语法
 系统 MUST 在 YAML DSL JSON Schema 中为 `main_source.loader` / `sources.*.loader` / `*.retry.should_retry` 的 hover 文案说明 loader 引用格式,并明确:

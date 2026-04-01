@@ -90,19 +90,27 @@ engine = ScalimEngine(demand=demand_ir, plan=plan, observer_manager=observer_man
 engine.run()
 ```
 
-### YAML DSL 内配置(推荐)
+### YAML DSL: runtime overrides(推荐)
 
-```yaml
-observability:
-  viz:
-    enabled: true
-    output_dir: /path/to/run-root
-    trace_enabled: false
-    append: false
-    payload_policy: summary
-    sample_size: 5
-    run_name: wf:run-003   # 推荐: workflow 场景使用 workflow run id
-    env: prod              # 可选: 用于 UI 展示/对拍
+YAML 主线不再承载 `observability.*`(legacy key 会 warning + ignore).如需为 demand/workflow 输出 viz,请在运行入口侧显式启用:
+
+```python
+from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.ob.presets.viz import VizObserverConfig
+
+run(
+    "path/to/demand.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    overrides=RunOverrides(
+        viz_config=VizObserverConfig(
+            output_dir="/path/to/run-root",
+            trace_enabled=False,
+            payload_policy="summary",
+            run_name="wf:run-003",
+            env="prod",
+        ),
+    ),
+)
 ```
 
 ### 事件体量建议
@@ -110,14 +118,14 @@ observability:
 - `viz_events.jsonl` 始终输出编排级/低频事件,适合默认回放与理解执行流程
 - `trace_enabled=true` 时会额外输出 `viz_trace.jsonl` 的高频 trace(字段/行级/lookup 等),建议在 UI 中按需加载并配合过滤/步进使用
 
-如果仅配置 `output_dir` / `output_path` / `snapshot_path` / `use_default_output_dir`,可省略 `enabled`,系统会自动开启.
+当 `VizObserverConfig` 提供 `output_dir`/`output_path`/`snapshot_path`/`use_default_output_dir=True` 等有效输出路径时,viz 会被启用并落盘对应产物.
 
 ### workflow 多 runs 建议
 
 - workflow 会产生多次独立运行,每次运行默认落到独立的 `<run_id>` 子目录.
 - 为了在 UI 中更可读、更稳定地对拍 runs,建议显式设置:
-  - `observability.viz.run_name`: 语义化且稳定的 run 标识(例如 workflow run id)
-  - `observability.viz.env`: 环境标识(如 `dev`/`staging`/`prod`)
+  - `VizObserverConfig.run_name`: 语义化且稳定的 run 标识(例如 workflow run id)
+  - `VizObserverConfig.env`: 环境标识(如 `dev`/`staging`/`prod`)
 - UI 展示优先级: `run_name` > `run_id`(fallback).
 
 ### workflow replay bundle (MVP)

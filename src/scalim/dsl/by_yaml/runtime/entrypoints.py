@@ -45,7 +45,9 @@ def run(  # noqa: PLR0913
     - 执行默认值
 
     注意:
-    - `overrides.viz_config` 可启用/禁用 `viz`,不受 `YAML` 的 `observability.viz.*` 影响.
+    - YAML 主线不再支持 `observability.*`(旧字段会发出迁移告警并被忽略);可观测性通过 `components=[Observer()/Hook()]` 与
+      `RunOverrides(viz_config=VizObserverConfig(...))` 装配.
+    - `overrides.viz_config` 可启用/禁用 `viz` 并控制落盘路径、`trace` 输出与 `payload_policy` 策略等.
     - 当 `overrides.outputs` 把 `YAML` 中的 `workbook` 输出整体替换为非 `workbook` 输出时,未显式设置 `path` 的 `meta/audit`
       会被跳过;若仍需保留,请为 `meta.path` / `audit.path` 提供独立 `workbook` 路径.
     - 输出数据的保留完全由 `sink=...`(例如 `InMemoryRowSink`)决定,而不是由布尔开关控制.

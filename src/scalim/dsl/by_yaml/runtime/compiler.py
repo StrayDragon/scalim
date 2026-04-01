@@ -79,7 +79,6 @@ from .contracts import (
 )
 from .conversion import ConfigToIRConverter
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimResolverError
-from .observability import compile_observability_spec
 from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
 
@@ -1106,21 +1105,11 @@ def build_request(
 
     observability: Optional[ObservabilitySpec] = None
     components = list(options.components or [])
-    if effective_config.observability is not None:
-        observability, observers = compile_observability_spec(effective_config.observability)
-        components.extend(observers)
 
     if options.overrides is not None:
         viz_config = options.overrides.viz_config
-        if not isinstance(viz_config, UnsetType):
-            viz_override = viz_config
-            if viz_override is None:
-                if observability is not None:
-                    observability = replace(observability, viz_config=None)
-            elif observability is None:
-                observability = ObservabilitySpec(viz_config=viz_override)
-            else:
-                observability = replace(observability, viz_config=viz_override)
+        if not isinstance(viz_config, UnsetType) and viz_config is not None:
+            observability = ObservabilitySpec(viz_config=viz_config)
     if not components:
         components = None
 

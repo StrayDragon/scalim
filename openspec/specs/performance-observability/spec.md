@@ -64,11 +64,14 @@ PROJECT_DIST_NAME 框架需要完备的性能监控能力来帮助用户:
 - **WHEN** 配置 `thresholds.batch_duration_warn: 10.0` 且某批次耗时超过 10 秒
 - **THEN** 系统应记录警告日志
 
-### Requirement: Observability DSL 配置与独立开关
-系统 SHALL 支持在 YAML DSL 中通过 `observability.performance` 与 `observability.relations` 配置性能/关联监控,并允许两者独立启用/禁用.
+### Requirement: runtime entrypoints 装配与独立开关
+系统 SHALL 支持通过 runtime entrypoints 装配 `PerformanceObserver` 与 `RelationObserver`(Observer presets),并允许两者独立启用/禁用:
+
+- 运行入口通过 `components=[...]` 接受 observers
+- YAML DSL MUST NOT 将 `observability.*` 作为稳定 authoring surface(legacy key 可 warning + ignore 作为迁移过渡)
 
 #### Scenario: 仅启用关联可观测性
-- **WHEN** 仅配置 `observability.relations.enabled: true`
+- **WHEN** 用户仅装配 `RelationObserver(...)` 且未装配 `PerformanceObserver(...)`
 - **THEN** 系统仅启用关联观测
 
 ### Requirement: RelationObserver 统计与报告

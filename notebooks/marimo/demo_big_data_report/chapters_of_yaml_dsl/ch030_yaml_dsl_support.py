@@ -51,6 +51,11 @@ def run_yaml_dsl_support(
         yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_sla_report.yaml"
 
     guardrail_capture = GuardrailCaptureObserver()
+    row_gap_observer = RowGapObserver(
+        primary_loader_name="tickets",
+        data_loader_names=["customers", "agents"],
+        sample_limit=3,
+    )
 
     with tempfile.TemporaryDirectory(prefix="scalim-support-") as tmpdir:
         tmp = Path(tmpdir)
@@ -69,7 +74,7 @@ def run_yaml_dsl_support(
             compilation = compile_yaml(
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
-                components=[guardrail_capture],
+                components=[guardrail_capture, row_gap_observer],
                 init_vars=init_vars,
             )
             core = run_ir(compilation.demand_ir, compilation.request)
@@ -158,7 +163,7 @@ def _(mo):
         ## 方案选择（取舍）
 
         - 纯 Python：可做，但难以形成“配置即回归”
-        - **YAML DSL（本章）**：用 guardrails + observability.row_gap 把问题变成确定性信号
+        - **YAML DSL（本章）**：用 `guardrails` + runtime `components=[RowGapObserver(...), ...]` 把问题变成确定性信号
 
         ## 对拍点（deterministic）
 

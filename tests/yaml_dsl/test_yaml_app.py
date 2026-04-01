@@ -7,6 +7,7 @@ from scalim.dsl.by_yaml import FileResourceOverride, OutputOverride, OutputToOve
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config, resolve_required_field_ids
 from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.sinks import InMemoryRowSink
 from tests.support.pathing import fixtures_dir
 
@@ -22,23 +23,6 @@ def _write_yaml_without_output(tmp_path: Path, source_path: Path) -> Path:
     if isinstance(config, dict):
         config.pop("output", None)
     output_path = tmp_path / "order_report_no_output.yaml"
-    output_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
-    return output_path
-
-
-def _write_yaml_with_observability(tmp_path: Path, source_path: Path) -> Path:
-    config = yaml.safe_load(source_path.read_text(encoding="utf-8"))
-    if not isinstance(config, dict):
-        raise TypeError("expected mapping")
-    config["observability"] = {
-        "performance": {
-            "enabled": True,
-            "metrics": ["duration"],
-            "sampling_interval": 1,
-            "report": {"format": "none"},
-        }
-    }
-    output_path = tmp_path / "order_report_observability.yaml"
     output_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
     return output_path
 
@@ -222,12 +206,14 @@ def test_resolve_required_field_ids_defaults_to_all_fields(tmp_path: Path) -> No
 
 @pytest.mark.slow
 def test_run_with_performance_observability(tmp_path: Path) -> None:
-    yaml_path = _write_yaml_with_observability(tmp_path, _demo_yaml_path())
+    yaml_path = _demo_yaml_path()
     output_path = tmp_path / "perf.csv"
+    perf_observer = PerformanceObserver(config=PerformanceConfig(report_format="none"))
 
     result = run(
         str(yaml_path),
         allowed_modules=_ALLOWED_MODULES,
+        components=[perf_observer],
         overrides=RunOverrides(
             outputs=(
                 OutputOverride(
@@ -242,3 +228,4 @@ def test_run_with_performance_observability(tmp_path: Path) -> None:
 
     assert output_path.exists()
     assert result.total_rows > 0
+    assert perf_observer.metrics.total_rows > 0

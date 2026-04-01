@@ -14,19 +14,6 @@ from .lookup_bind_relation import (
     RelationConfig,
     RelationStepConfig,
 )
-from .observability import (
-    LoggingConfig,
-    MemoryOptimizationConfig,
-    ObservabilityConfig,
-    PerformanceConfig,
-    PerformanceReportConfig,
-    PerformanceThresholdsConfig,
-    RelationReportConfig,
-    RelationsConfig,
-    RowGapConfig,
-    TraceConfig,
-    VizConfig,
-)
 from .outputs import (
     OutputAggregateConfig,
     OutputExtraSheetConfig,
@@ -102,17 +89,6 @@ BOOK_WRITE_DEFAULTS_KEYS = _build_key_map(BookWriteDefaultsConfig)
 BOOK_KEYS = _build_key_map(BookConfig)
 FILE_KEYS = _build_key_map(FileConfig)
 RESOURCES_KEYS = _build_key_map(ResourcesConfig)
-PERFORMANCE_KEYS = _build_key_map(PerformanceConfig)
-PERFORMANCE_REPORT_KEYS = _build_key_map(PerformanceReportConfig)
-PERFORMANCE_THRESHOLDS_KEYS = _build_key_map(PerformanceThresholdsConfig)
-RELATIONS_CONFIG_KEYS = _build_key_map(RelationsConfig)
-RELATION_REPORT_KEYS = _build_key_map(RelationReportConfig)
-VIZ_KEYS = _build_key_map(VizConfig)
-LOGGING_KEYS = _build_key_map(LoggingConfig)
-TRACE_KEYS = _build_key_map(TraceConfig)
-ROW_GAP_KEYS = _build_key_map(RowGapConfig)
-MEMORY_OPTIMIZATION_KEYS = _build_key_map(MemoryOptimizationConfig)
-OBSERVABILITY_KEYS = _build_key_map(ObservabilityConfig)
 GUARDRAILS_LOADER_KEYS = _build_key_map(GuardrailsLoaderConfig)
 GUARDRAILS_RELATIONS_KEYS = _build_key_map(GuardrailsRelationsConfig)
 GUARDRAILS_COMPUTE_KEYS = _build_key_map(GuardrailsComputeConfig)

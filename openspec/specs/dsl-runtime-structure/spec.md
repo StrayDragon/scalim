@@ -260,21 +260,27 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 - **WHEN** 执行 Config→IR 转换流程
 - **THEN** 不依赖字符串拼接或 `getattr/hasattr/setattr` 访问
 
-### Requirement: 可观测配置为唯一 DSL 入口
-系统 SHALL 将 YAML DSL 的 `observability:` 作为启用内置可观测能力的唯一配置入口,并避免出现与其并列的额外开关(例如单独的 `use_memory_hook`).
+### Requirement: 可观测集成由 runtime entrypoints 承载
+系统 SHALL 将可观测性视为 runtime integration surface:
 
-#### Scenario: 无额外开关
+- YAML DSL MUST NOT 将 `observability:` 作为稳定 authoring surface(legacy key 可 warning + ignore 作为迁移过渡)
+- 运行入口 SHOULD 通过 typed runtime entrypoints 承载装配:
+  - `components=[Observer()/Hook()]`
+  - `RunOverrides(viz_config=VizObserverConfig(...))`
+- 不得引入与上述装配面并列的零散 bool 开关(例如单独的 `use_memory_hook`)
+
+#### Scenario: 通过 runtime entrypoints 启用可观测性
 - **WHEN** 用户希望启用内存/CPU/性能/可视化等观测能力
-- **THEN** 用户应仅通过 `observability` 完成配置,无需再通过额外的 Python 参数开关启用
+- **THEN** 用户应通过 `components`/`RunOverrides.viz_config` 完成装配,无需额外 bool 开关
 
 ### Requirement: 运行入口不暴露 pretty_logging bool
 系统 MUST 从对外运行入口(`run`/`RunOptions`)移除 `pretty_logging: bool` 这类用于选择实现的参数,并改为:
-- 通过 YAML `observability.logging.renderer/preset` 选择内置 logging 实现
-- 通过统一组件列表装配自定义 `Observer`/`IExecutionHook`
+- 通过统一 `components` 列表装配内置 logging observer(如 `PrettyLoggingObserver`/`LoggingObserver`)
+- 通过统一 `components` 列表装配自定义 `Observer`/`IExecutionHook`
 
-#### Scenario: 通过 YAML 选择 logging renderer
-- **WHEN** 用户在 YAML 中配置 logging renderer/preset
-- **THEN** 系统按该配置启用对应 logging 实现
+#### Scenario: 通过 components 选择 logging 实现
+- **WHEN** 用户在 `components` 中传入 `PrettyLoggingObserver` 或 `LoggingObserver`
+- **THEN** 系统按对应组件启用 logging 观测
 
 #### Scenario: 通过组件列表追加自定义观测
 - **WHEN** 用户在运行入口提供组件列表并包含自定义 observer

@@ -286,13 +286,11 @@ class TestExcelIncludeHeader:
         assert rows == expected_rows
 
 
-class TestSchemaItemsChoicesEnum:
-    def test_schema_performance_metrics_has_items_enum(self) -> None:
+class TestSchemaObservabilityRemoved:
+    def test_schema_has_no_observability_definitions(self) -> None:
         schema = build_demand_schema()
         definitions = schema["definitions"]
-        performance_def = definitions["performance"]
-        metrics_schema = performance_def["properties"]["metrics"]
 
-        assert "items" in metrics_schema
-        assert "enum" in metrics_schema["items"]
-        assert set(metrics_schema["items"]["enum"]) == {"duration", "memory", "cpu"}
+        assert "observability" not in schema["properties"]
+        for legacy in ("logging", "performance", "relations", "viz", "trace", "row_gap", "memory_opt", "observability"):
+            assert legacy not in definitions

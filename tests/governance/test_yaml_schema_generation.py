@@ -167,13 +167,11 @@ def test_expand_meta_wraps_scalar_examples() -> None:
     assert expanded["examples"] == ["demo"]
 
 
-def test_observability_logging_schema_has_renderer_enum() -> None:
-    schema = build_demand_schema()
-    logging_schema = schema["definitions"]["logging"]
-    renderer = logging_schema["properties"]["renderer"]
+def test_expand_meta_items_choices_populates_items_enum() -> None:
+    builder = SchemaBuilder()
+    expanded = builder._expand_meta({"items_choices": ["duration", "memory", "cpu"]})
 
-    assert renderer["type"] == "string"
-    assert set(renderer["enum"]) == {"logger", "pretty"}
+    assert expanded["items"]["enum"] == ["duration", "memory", "cpu"]
 
 
 def test_generated_schema_main_source_order_by_has_hover_meta() -> None:

@@ -78,7 +78,7 @@ workflow scope 的 demand 节点若携带:
 ## 示例
 - `viz_snapshot.json` 可由 `ExecutionPlan.to_viz_graph_snapshot()` 生成并保存
 - `viz_events.jsonl` 为编排级事件流(默认输出)
-- `viz_trace.jsonl` 为高频 trace(需 `observability.viz.trace_enabled=true`)
+- `viz_trace.jsonl` 为高频 trace(需在运行入口侧启用,例如 `VizObserverConfig(trace_enabled=True)` / `RunOverrides(viz_config=...)`)
   - UI 默认仅加载 `viz_events.jsonl`;在“加载”面板切换到 `events+trace` 后才会按需加载 trace
 - `viz_schedule_plan.json` 为计划视角产物(fanout/fanin/屏障),可由 `ExecutionPlan.to_viz_schedule_plan()` 生成并保存
 - 默认输出目录示例:`~/.config/scalim-viz/<run_id>/viz_*.json`

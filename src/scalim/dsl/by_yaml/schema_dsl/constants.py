@@ -169,9 +169,6 @@ DESC_RELATION_STEPS_MD = (
 OUTPUT_FIELD_ID_KEY = "field_id"
 OUTPUT_FIELD_SOURCE_KEY = "source"
 OUTPUT_FIELD_DATA_KEY_KEY = "field"
-
-DESC_OBSERVABILITY = "可观测性配置"
-DESC_OBSERVABILITY_MD = "可观测性配置.\n\n包含 `logging`、`performance`、`relations`、`viz`、`trace`、`row_gap` 与 `memory_opt` 子配置."
 LOOKUP_CAST_NAME_ENUM = ["auto", "int", "str", "sep_first"]
 BIND_AS_ENUM = ["set", "list"]
 BIND_CACHE_MODE_ENUM = ["none", "batch"]
@@ -651,7 +648,6 @@ DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "include_full_error_message",
     "meta",
     "audit",
-    "observability",
 ]
 FIELD_DERIVED_CONDITIONS = [
     {

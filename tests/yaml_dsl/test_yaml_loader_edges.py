@@ -117,25 +117,9 @@ relations:
     assert first_step.to == ("mapping.mapping_region_id", "mapping.mapping_institution_id")
 
 
-def test_loader_parses_observability_with_defaults() -> None:
-    yaml_content = """
-name: demo
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-sources: {}
-observability:
-  performance:
-    enabled: true
-    metrics: duration
-    sampling_interval: bad
-    report: invalid
-    thresholds: invalid
-"""
-    _assert_load_string_errors(yaml_content, "Schema validation error")
+def test_loader_ignores_legacy_observability_and_emits_migration_warning(caplog: object) -> None:
+    import logging
 
-
-def test_loader_parses_relations_observability_config() -> None:
     loader = YamlDemandLoader()
 
     yaml_content = """
@@ -145,99 +129,21 @@ main_source:
   loader: tests.fixtures.mock_loaders.mock_loader
 sources: {}
 observability:
-  relations:
+  performance:
     enabled: true
-    sampling_rate: 0.05
-    log_type_mismatch: false
-    max_samples: 50
-    report:
-      format: json
-      output: ./relations.json
-"""
-    config = loader.load_string(yaml_content)
-
-    relations = config.observability.relations if config.observability else None
-    assert relations is not None
-    assert relations.enabled is True
-    assert relations.sampling_rate == 0.05
-    assert relations.log_type_mismatch is False
-    assert relations.max_samples == 50
-    assert relations.report is not None
-    assert relations.report.format == "json"
-    assert relations.report.output == "./relations.json"
-
-
-def test_loader_parses_relations_observability_invalid_values() -> None:
-    yaml_content = """
-name: demo
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-sources: {}
-observability:
+    sampling_interval: bad
   relations:
     enabled: true
     sampling_rate: bad
-    max_samples: bad
-    report: invalid
-"""
-    _assert_load_string_errors(yaml_content, "Schema validation error")
-
-
-def test_loader_parses_performance_thresholds() -> None:
-    loader = YamlDemandLoader()
-
-    yaml_content = """
-name: demo
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-sources: {}
-observability:
-  performance:
+  viz:
     enabled: true
-    thresholds:
-      batch_duration_warn: 0.5
-      memory_increase_warn: 1.0
+    output_dir: ./tmp
 """
+
+    caplog.set_level(logging.WARNING)
     config = loader.load_string(yaml_content)
-
-    perf = config.observability.performance if config.observability else None
-    assert perf is not None
-    assert perf.thresholds is not None
-    assert perf.thresholds.batch_duration_warn == 0.5
-    assert perf.thresholds.memory_increase_warn == 1.0
-
-
-def test_loader_parses_metrics_list_and_report() -> None:
-    loader = YamlDemandLoader()
-
-    yaml_content = """
-name: demo
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-sources: {}
-observability:
-  performance:
-    enabled: true
-    metrics:
-      - duration
-      - memory
-    report:
-      format: json
-      output: ./perf.json
-      include_details: true
-"""
-    config = loader.load_string(yaml_content)
-
-    perf = config.observability.performance if config.observability else None
-    assert perf is not None
-    assert perf.metrics == ("duration", "memory")
-    assert perf.report is not None
-    assert perf.report.format == "json"
-    assert perf.report.output == "./perf.json"
-    assert perf.report.include_details is True
+    assert config.name == "demo"
+    assert any("Legacy YAML key 'observability' is no longer supported" in str(r.message) for r in caplog.records)
 
 
 def test_loader_skips_invalid_relation_entries() -> None:

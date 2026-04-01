@@ -145,35 +145,38 @@
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch120_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py`
 
-### 8) Observability（可观测性）
+### 8) Observability（可观测性：runtime entrypoints）
 
-- `observability.performance` + report（csv）+ thresholds
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
-- `observability.relations` + report（json）
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
-- `observability.logging`
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
+说明:
+- YAML 主线已不再支持 `observability.*`(legacy key 会 warning + ignore)
+- 观测能力通过运行入口侧装配:
+  - `components=[Observer()/Hook()]`
+  - `overrides=RunOverrides(viz_config=VizObserverConfig(...))`
+
+- performance（`PerformanceObserver`）
+  - 断言点（章节）：
+    - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch060_observability.py`
+- relations（`RelationObserver`）
+  - 断言点（章节）：
+    - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch060_observability.py`
+- logging（`PrettyLoggingObserver` / `LoggingObserver`）
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
-- `observability.trace`
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
+- trace（`ExecutionTraceObserver`）
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
-- `observability.viz`
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
-  - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
-- `observability.viz.output_path` / `observability.viz.snapshot_path`
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_viz_custom_paths.yaml`
-  - 断言点（章节）：
-    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch130_yaml_dsl_viz_custom_paths.py`
-- `observability.row_gap`
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_sla_report.yaml`
+- viz（`VizObserverConfig` via `RunOverrides.viz_config`）
+  - `output_dir` 模式：
+    - 断言点（章节）：`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
+  - `output_path`/`snapshot_path` 显式路径模式：
+    - 断言点（章节）：`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch130_yaml_dsl_viz_custom_paths.py`
+- row_gap（`RowGapObserver`）
   - 断言点（oracle/章节）：
     - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support_scenario.py:expected_support_row_gap_totals`
-- `observability.memory_opt`
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_observability_full.yaml`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch030_yaml_dsl_support.py`
+- memory_opt（`MemoryOptimizationObserver`）
   - 断言点（章节）：
+    - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch050_memory_opt.py`
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py`
 
 ### 9) Outputs failure policy（多输出失败策略）

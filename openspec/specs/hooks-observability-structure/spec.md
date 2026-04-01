@@ -12,7 +12,8 @@
 - `src/IMPL_ROOT/ob/manager.py` (`ObserverManager`)
 - `src/IMPL_ROOT/ob/hub.py` (`InstrumentationHub`)
 - `src/IMPL_ROOT/ob/components.py` (`split_components`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/observability.py` (`compile_observability_spec`)
+- `src/IMPL_ROOT/dsl/by_yaml/runtime/compiler.py` (`build_request` 处理 `components`/`RunOverrides.viz_config`)
+- `src/IMPL_ROOT/execution/run_ir.py` (由 `ExecutionRequest.observability.viz_config` 物化 `VizObserver`)
 ## Requirements
 ### Requirement: 观测事件契约集中
 系统 MUST 以 `IMPL_ROOT.events` 作为事件定义中心,执行层、hooks、observers 通过统一 `Event` envelope 与稳定的 `event_type` + payload 字段语义交互,不得跨层依赖实现细节.
@@ -217,4 +218,3 @@ Hook capture 当前实现为任务内事件列表记录(无全局硬上限);调�
 #### Scenario: relation lookup diagnostics still work when wanted
 - **WHEN** `InstrumentationHub.wants("relation_lookup")=true` 且执行一次包含关联加载的批次
 - **THEN** 系统 MUST 继续发出 `relation_lookup` 事件并保持既有 payload 结构
-

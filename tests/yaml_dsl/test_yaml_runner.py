@@ -14,34 +14,14 @@ from scalim.dsl.by_yaml import (
     RunResult,
     run,
 )
-from scalim.dsl.by_yaml.runtime.observability import (
-    _create_performance_observer_from_config,
-    _create_relation_observer_from_config,
-    compile_observability_spec,
-)
 from scalim.execution.run_ir import ExecutionResult, export_layout_from_demand_ir
 from scalim.planning import PlanBuilder
-from scalim.dsl.by_yaml.schema_dsl.models import (
-    DemandConfig,
-    LoggingConfig,
-    ObservabilityConfig,
-    PerformanceConfig,
-    PerformanceReportConfig,
-    PerformanceThresholdsConfig,
-    RelationReportConfig,
-    RelationsConfig,
-    RowGapConfig,
-    TraceConfig,
-    MemoryOptimizationConfig,
-)
+from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig
 from scalim.events import EVENT_PIPELINE_START
 from scalim.events._events import BatchEndEvent, BatchStartEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
-from scalim.ob.presets.memory import MemoryOptimizationObserver
-from scalim.ob.presets.row_gap import RowGapObserver
-from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.sinks import InMemoryRowSink
 from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr
 from tests.support.pathing import fixtures_dir
@@ -449,54 +429,6 @@ def test_pretty_logging_observer_formats_cache_status() -> None:
     assert stats["cache_miss"] == 1
 
 
-def test_compile_observability_spec_respects_logging_flags() -> None:
-    observability = ObservabilityConfig(logging=LoggingConfig(enabled=True, renderer="pretty"))
-    spec, observers = compile_observability_spec(observability)
-    assert any(isinstance(obs, PrettyLoggingObserver) for obs in observers)
-    assert spec.fallback_logger_enabled is True
-
-    observability = ObservabilityConfig(logging=LoggingConfig(enabled=True, renderer="logger"))
-    spec, observers = compile_observability_spec(observability)
-    assert any(isinstance(obs, LoggingObserver) for obs in observers)
-    assert spec.fallback_logger_enabled is True
-
-    spec, observers = compile_observability_spec(ObservabilityConfig(logging=LoggingConfig(enabled=False)))
-    assert not any(isinstance(obs, LoggingObserver) for obs in observers)
-    assert not any(isinstance(obs, PrettyLoggingObserver) for obs in observers)
-    assert spec.fallback_logger_enabled is False
-
-    spec, observers = compile_observability_spec(ObservabilityConfig(logging=LoggingConfig(enabled=True, renderer="unknown")))
-    assert any(isinstance(obs, PrettyLoggingObserver) for obs in observers)
-
-
-def test_compile_observability_spec_includes_optional_observers() -> None:
-    observability = ObservabilityConfig(
-        logging=LoggingConfig(enabled=False),
-        trace=TraceConfig(enabled=True),
-        row_gap=RowGapConfig(enabled=True, primary_loader_name="primary", data_loader_names=("a",), sample_limit=2),
-        memory_opt=MemoryOptimizationConfig(enabled=True, auto_report=True, max_fields=3),
-    )
-
-    _spec, observers = compile_observability_spec(observability)
-    assert any(isinstance(obs, ExecutionTraceObserver) for obs in observers)
-    assert any(isinstance(obs, RowGapObserver) for obs in observers)
-    assert any(isinstance(obs, MemoryOptimizationObserver) for obs in observers)
-    assert not any(isinstance(obs, LoggingObserver) for obs in observers)
-
-
-def test_compile_observability_spec_disables_optional_observers() -> None:
-    observability = ObservabilityConfig(
-        trace=TraceConfig(enabled=False),
-        row_gap=RowGapConfig(enabled=False),
-        memory_opt=MemoryOptimizationConfig(enabled=False),
-    )
-
-    _spec, observers = compile_observability_spec(observability)
-    assert not any(isinstance(obs, ExecutionTraceObserver) for obs in observers)
-    assert not any(isinstance(obs, RowGapObserver) for obs in observers)
-    assert not any(isinstance(obs, MemoryOptimizationObserver) for obs in observers)
-
-
 def test_yaml_run_result_to_dataframe_requires_pandas(monkeypatch) -> None:
     main_source = MainSourceIr(source_id="demo", loader=lambda: [])
     demand_ir = DemandIr.from_irs([], [], main_source)
@@ -559,82 +491,6 @@ def test_yaml_run_result_to_dataframe_ok() -> None:
     df = result.to_dataframe()
     assert not df.empty
     assert list(df.columns) == ["id"]
-
-
-@pytest.mark.parametrize(
-    "perf,expected",
-    [
-        (
-            PerformanceConfig(
-                enabled=True,
-                metrics=("duration",),
-                sampling_interval=2,
-                report=PerformanceReportConfig(format="json", output="report.json", include_details=True),
-                thresholds=PerformanceThresholdsConfig(batch_duration_warn=0.1, memory_increase_warn=1.0),
-            ),
-            {"format": "json", "include_details": True, "batch_duration_warn": 0.1},
-        ),
-        (PerformanceConfig(enabled=False, metrics=("duration",), sampling_interval=1), None),
-    ],
-    ids=["enabled", "disabled"],
-)
-def test_create_performance_observer_variants(perf, expected) -> None:
-    observability = ObservabilityConfig(performance=perf)
-    observer = _create_performance_observer_from_config(observability)
-    if expected is None:
-        assert observer is None
-        return
-    assert observer is not None
-    assert observer.config.report_format == expected["format"]
-    assert observer.config.include_details is expected["include_details"]
-    assert observer.config.thresholds.batch_duration_warn == expected["batch_duration_warn"]
-
-
-@pytest.mark.parametrize(
-    "relations,expected",
-    [
-        (
-            RelationsConfig(
-                enabled=True,
-                sampling_rate=0.2,
-                log_type_mismatch=False,
-                max_samples=10,
-                report=RelationReportConfig(format="json", output="rel.json"),
-            ),
-            {"format": "json", "output_path": "rel.json", "sampling_rate": 0.2, "log_type_mismatch": False},
-        ),
-        (RelationsConfig(enabled=True, report=RelationReportConfig(format="text", output="rel.json")), {"format": "console"}),
-        (RelationsConfig(enabled=False), None),
-    ],
-    ids=["enabled", "invalid-format", "disabled"],
-)
-def test_create_relation_observer_variants(relations, expected) -> None:
-    observability = ObservabilityConfig(relations=relations)
-    observer = _create_relation_observer_from_config(observability)
-    if expected is None:
-        assert observer is None
-        return
-    assert observer is not None
-    assert observer.config.report_format == expected["format"]
-    if "output_path" in expected:
-        assert observer.config.output_path == expected["output_path"]
-    if "sampling_rate" in expected:
-        assert observer.config.sampling_rate == expected["sampling_rate"]
-    if "log_type_mismatch" in expected:
-        assert observer.config.log_type_mismatch is expected["log_type_mismatch"]
-
-
-@pytest.mark.parametrize(
-    "observability",
-    [
-        ObservabilityConfig(performance=PerformanceConfig(enabled=True, metrics=("duration",), sampling_interval=1)),
-        ObservabilityConfig(relations=RelationsConfig(enabled=True)),
-    ],
-    ids=["performance", "relations"],
-)
-def test_compile_observability_spec_registers_observers(observability) -> None:
-    _spec, observers = compile_observability_spec(observability)
-    assert len(observers) == 1
 
 
 def test_export_layout_uses_field_ids_when_header_by_field_id() -> None:

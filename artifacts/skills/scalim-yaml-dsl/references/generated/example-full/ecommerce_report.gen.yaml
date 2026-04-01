@@ -583,26 +583,11 @@ outputs:
         customer_cnt: {count_distinct: {field: customer_id}}
 
 # ==============================================================================
-# 可观测性配置
+# 可观测性(Observability)
 # ==============================================================================
 
-observability:
-  performance:
-    enabled: true
-    metrics: *perf_metrics_all
-    sampling_interval: 2
-    report:
-      format: csv
-      output: ./.tmp/output/ecommerce_perf_report.csv
-      include_details: true
-    thresholds:
-      batch_duration_warn: 1.5
-      memory_increase_warn: 256
-  relations:
-    enabled: true
-    sampling_rate: 0.05
-    log_type_mismatch: true
-    max_samples: 500
-    report:
-      format: json
-      output: ./.tmp/output/ecommerce_relations_report.json
+# 注意:
+# - YAML 主线已不再支持 `observability.*`(legacy key 会 warning + ignore).
+# - 请在 Python/CLI runtime entrypoints 配置观测:
+#   - `components=[PerformanceObserver(...), RelationObserver(...), ...]`
+#   - `overrides=RunOverrides(viz_config=VizObserverConfig(...))`

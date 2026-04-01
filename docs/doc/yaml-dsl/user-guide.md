@@ -901,106 +901,153 @@ resources:
       path: ./output/order_report.csv
 ```
 
-### 3.7 可观测性配置 (observability)
+### 3.7 可观测性(Observability)（runtime entrypoints）
 
-#### 3.7.1 日志配置 (logging)
+`observability.*` 已从 YAML 主线 authoring surface 迁出: YAML 只负责业务建模,可观测性属于运行入口的集成面。
 
-```yaml
-observability:
-  logging:
-    enabled: true            # 启用日志观测(当 logging 块存在时默认 true)
-    renderer: pretty         # pretty/logger (默认 pretty)
+迁移期内,如果 YAML 仍包含顶层 key `observability`,系统会:
+
+- 发出 migration warning(该 key 将被忽略)
+- 继续对其它未知字段保持 strict unknown-field 行为(避免把普通拼写错误吞掉)
+
+推荐用法: 在 Python runtime entrypoints 显式装配 observability:
+
+- `components=[Observer()/Hook()]`: 挂接内置 presets 或自定义 hook/observer
+- `overrides=RunOverrides(viz_config=VizObserverConfig(...))`: 启用/配置 Viz 产物导出
+
+CLI 校验入口 `scalim-cli yaml-dsl validate ...` 会在 validate 阶段发出上述 warning(不阻断),便于在 CI/本地尽早发现 legacy keys。
+
+#### 3.7.1 日志(logging)
+
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
+
+run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[PrettyLoggingObserver()],  # 或 LoggingObserver()
+)
 ```
 
-注意: Scalim 默认不会注册 logging observer(默认静默).只有当你在 YAML 中声明 `observability.logging` 时才会输出执行进度日志.
+#### 3.7.2 性能(performance)
 
-- `renderer: pretty`: 输出到 pretty console(如 panel/table)
-- `renderer: logger`: 输出到标准 logger
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver, PerformanceThresholds
 
-#### 3.7.2 性能监控 (performance)
+perf = PerformanceObserver(
+    PerformanceConfig(
+        metrics={"duration", "memory", "cpu"},
+        sampling_interval=2,
+        report_format="csv",
+        output_path="./output/perf_report.csv",
+        include_details=True,
+        thresholds=PerformanceThresholds(batch_duration_warn=1.5, memory_increase_warn=256),
+    )
+)
 
-```yaml
-observability:
-  performance:
-    enabled: true
-    metrics: [duration, memory, cpu]    # 指标类型
-    sampling_interval: 1                 # 采样间隔(批次数)
-    report:
-      format: csv                       # 报告格式:console/json/csv/none
-      output: ./output/perf_report.csv
-      include_details: true
-    thresholds:
-      batch_duration_warn: 1.5          # 批次耗时告警阈值(秒)
-      memory_increase_warn: 256         # 内存增长告警阈值(MB)
+run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[perf],
+)
 ```
 
-**指标类型**:
+#### 3.7.3 关联(relations)
 
-- `duration`: 耗时统计
-- `memory`: 内存使用
-- `cpu`: CPU 使用
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.relations import RelationConfig, RelationObserver
 
-#### 3.7.3 关联可观测性 (relations)
+relations = RelationObserver(
+    RelationConfig(
+        sampling_rate=0.05,
+        log_type_mismatch=True,
+        report_format="json",
+        output_path="./output/relations_report.json",
+        include_details=True,
+    )
+)
 
-```yaml
-observability:
-  relations:
-    enabled: true
-    sampling_rate: 0.05          # 采样率(0.0-1.0)
-    log_type_mismatch: true      # 记录类型不匹配日志
-    max_samples: 500             # 最大采样数量
-    report:
-      format: json               # 报告格式:console/json/none
-      output: ./output/relations_report.json
+run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[relations],
+)
 ```
 
-#### 3.7.4 可视化输出 (viz)
+#### 3.7.4 可视化(viz)
 
-```yaml
-observability:
-  viz:
-    enabled: true
-    output_dir: ./output         # 输出目录(自动追加 scalim-viz)
-    trace_enabled: false         # 是否输出 viz_trace.jsonl(高频 trace)
-    append: false                # 显式 output_path/snapshot_path 时是否追加(默认覆盖避免跨 run 混写)
-    payload_policy: summary      # payload 策略:none/summary/sample/full
-    sample_size: 5               # sample 策略下的样本数量
-    run_name: order_report       # 运行名称
-    env: production              # 环境标签
+```python
+from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.ob.presets.viz import VizObserverConfig
+
+run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    overrides=RunOverrides(
+        viz_config=VizObserverConfig(
+            output_dir="./output",
+            trace_enabled=False,
+            payload_policy="summary",
+            run_name="order_report",
+            env="production",
+        )
+    ),
+)
 ```
 
-#### 3.7.5 执行追踪 (trace)
+提示:
 
-```yaml
-observability:
-  trace:
-    enabled: true    # 启用执行追踪(记录批次级执行步骤)
+- 如需显式禁用 viz(例如 workflow/bundle 场景统一下发了 viz),可传 `RunOverrides(viz_config=None)`.
+- `trace_enabled=True` 时会额外输出 `viz_trace.jsonl`.
+
+#### 3.7.5 执行追踪(trace)
+
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.execution_trace import ExecutionTraceObserver
+
+trace = ExecutionTraceObserver()
+_ = run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[trace],
+)
 ```
 
-#### 3.7.6 行缺口统计 (row_gap)
+#### 3.7.6 行缺口统计(row_gap)
 
-```yaml
-observability:
-  row_gap:
-    enabled: true
-    primary_loader_name: primary_keys
-    data_loader_names: [base_info, detail_info]
-    sample_limit: 5               # 缺口采样数量
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.row_gap import RowGapObserver
+
+row_gap = RowGapObserver(primary_loader_name="tickets", data_loader_names=["customers", "agents"], sample_limit=3)
+_ = run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[row_gap],
+)
 ```
 
-#### 3.7.7 内存优化统计 (memory_opt)
+#### 3.7.7 内存优化统计(memory_opt)
 
-```yaml
-observability:
-  memory_opt:
-    enabled: true
-    auto_report: true
-    max_fields: 0                 # 摘要字段上限(0 表示不限制)
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.memory import MemoryOptimizationObserver
+
+mem = MemoryOptimizationObserver(auto_report=True, max_fields=20)
+_ = run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[mem],
+)
 ```
 
-#### 3.7.8 静默与性能建议 (fastpath)
+#### 3.7.8 静默与性能建议(fastpath)
 
-Scalim 默认**静默**:不会自动注册 logging observer,也不会输出执行进度日志.需要日志时请显式启用 `observability.logging.enabled: true`.
+Scalim 默认**静默**:不会自动注册任何 hook/observer,也不会输出执行进度日志.需要观测时请在运行入口侧显式装配 `components=[...]` / `overrides=...`.
 
 - 未启用任何 hook/observer 时,事件分发会走 wants=false 的 fastpath 直接短路,避免构建事件对象/进入锁区/准备高成本 payload.
 - 仅启用你需要的观测插件(例如仅在排障时开启 `trace`/`viz`/`performance`),并避免订阅高频事件(如 `field_compute`/`loader_call`).
@@ -1511,27 +1558,23 @@ resources:
     detail_csv:
       kind: csv_file
       path: ./.tmp/output/ecommerce_report.csv
+```
 
-observability:
-  performance:
-    enabled: true
-    metrics: [duration, memory, cpu]
-    sampling_interval: 2
-    report:
-      format: csv
-      output: ./.tmp/output/ecommerce_perf_report.csv
-      include_details: true
-    thresholds:
-      batch_duration_warn: 1.5
-      memory_increase_warn: 256
-  relations:
-    enabled: true
-    sampling_rate: 0.05
-    log_type_mismatch: true
-    max_samples: 500
-    report:
-      format: json
-      output: ./.tmp/output/ecommerce_relations_report.json
+可观测性(可选)请通过 runtime entrypoints 装配(示例):
+
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
+from scalim.ob.presets.relations import RelationConfig, RelationObserver
+
+_ = run(
+    "path/to/ecommerce_report.yaml",
+    allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
+    components=[
+        PerformanceObserver(PerformanceConfig(metrics={"duration", "memory", "cpu"})),
+        RelationObserver(RelationConfig(sampling_rate=0.05, report_format="json", output_path="./output/relations_report.json")),
+    ],
+)
 ```
 
 ---
@@ -1781,17 +1824,27 @@ compute limits 等更细粒度安全配置属于内部实现细节;如确需自�
 
 ### Q1: 如何调试关联关系？
 
-**A**: 启用关联可观测性:
+**A**: 通过 runtime entrypoints 装配 `RelationObserver`:
 
-```yaml
-observability:
-  relations:
-    enabled: true
-    sampling_rate: 1.0          # 采样率 100%
-    log_type_mismatch: true
-    report:
-      format: json
-      output: ./debug_relations.json
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.relations import RelationConfig, RelationObserver
+
+relations = RelationObserver(
+    RelationConfig(
+        sampling_rate=1.0,  # 采样率 100%
+        log_type_mismatch=True,
+        report_format="json",
+        output_path="./debug_relations.json",
+        include_details=True,
+    )
+)
+
+_ = run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[relations],
+)
 ```
 
 ### Q2: 派生字段依赖其他派生字段怎么办？
@@ -1908,11 +1961,16 @@ sources:
 
 4. **启用内存优化统计**:
 
-```yaml
-observability:
-  memory_opt:
-    enabled: true
-    auto_report: true
+```python
+from scalim.dsl.by_yaml import run
+from scalim.ob.presets.memory import MemoryOptimizationObserver
+
+mem = MemoryOptimizationObserver(auto_report=True)
+_ = run(
+    "path/to/report.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[mem],
+)
 ```
 
 ### Q7: 如何生成 JSON Schema？

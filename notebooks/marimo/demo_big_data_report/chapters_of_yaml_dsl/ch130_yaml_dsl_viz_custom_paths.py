@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOverrides
 from scalim.execution.run_ir import run_ir
+from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -41,17 +43,25 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
         viz_trace = tmp / "viz_trace.jsonl"
 
         init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
-        template_vars: Dict[str, object] = {
-            "viz_events_path": str(viz_events),
-            "viz_snapshot_path": str(viz_snapshot),
-        }
+        overrides = RunOverrides(
+            viz_config=VizObserverConfig(
+                output_path=str(viz_events),
+                snapshot_path=str(viz_snapshot),
+                trace_enabled=True,
+                payload_policy="sample",
+                sample_size=2,
+                append=False,
+                run_name="support-viz-custom-paths",
+                env="ci",
+            )
+        )
 
         try:
             compilation = compile_yaml(
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
                 init_vars=init_vars,
-                template_vars=template_vars,
+                overrides=overrides,
             )
             core = run_ir(compilation.demand_ir, compilation.request)
         except Exception as exc:  # noqa: BLE001
@@ -125,13 +135,13 @@ def _(mo):
 
         ## 需求方提问（自然语言）
 
-        平台同学：我能不能在 YAML 里显式指定 `viz` 的输出文件路径,不依赖 run 目录推导？
+        平台同学：我能不能显式指定 `viz` 的输出文件路径,不依赖 run 目录推导？
 
-        ## 本章覆盖的 YAML DSL 能力
+        ## 本章覆盖的 runtime entrypoints 能力
 
-        - `observability.viz.output_path`：事件 `JSONL` 的显式输出路径
-        - `observability.viz.snapshot_path`：快照 `JSON` 的显式输出路径
-        - `template_vars`：在编译期注入路径(隔离测试临时目录)
+        - `overrides=RunOverrides(viz_config=...)`
+          - `VizObserverConfig.output_path`：事件 `JSONL` 的显式输出路径
+          - `VizObserverConfig.snapshot_path`：快照 `JSON` 的显式输出路径
 
         ## 对拍点（deterministic）
 
