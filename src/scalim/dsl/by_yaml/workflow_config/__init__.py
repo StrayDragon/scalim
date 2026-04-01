@@ -14,6 +14,9 @@ from ._models import (
     WorkflowCachePoolPin,
     WorkflowConfig,
     WorkflowOptions,
+    WorkflowOutputStagingOptions,
+    WorkflowResourcesWaitDiagnosticsOptions,
+    WorkflowResourcesWaitOptions,
     WorkflowRun,
 )
 from ._parse import load_workflow_config_from_mapping
@@ -26,6 +29,9 @@ __all__ = (
     "WorkflowCachePoolPin",
     "WorkflowConfig",
     "WorkflowOptions",
+    "WorkflowOutputStagingOptions",
+    "WorkflowResourcesWaitDiagnosticsOptions",
+    "WorkflowResourcesWaitOptions",
     "WorkflowRun",
     "load_workflow_config",
     "load_workflow_config_from_mapping",

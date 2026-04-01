@@ -1,5 +1,6 @@
 import pytest
 
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml._internal.config_parsing.models import (
     AliasIndex,
     FieldDef,
@@ -87,10 +88,11 @@ def test_parse_main_source_missing_returns_default() -> None:
     assert main_source.loader == ""
 
 
-def test_load_string_preserves_explicit_null_batch_size() -> None:
+def test_load_string_rejects_batch_size_runtime_policy_key() -> None:
     loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _ = loader.load_string(
+            """
 name: demo
 batch_size: null
 main_source:
@@ -98,9 +100,9 @@ main_source:
   loader: tests.fixtures.mock_loaders.mock_loader
 sources: {}
 """.lstrip()
-    )
+        )
 
-    assert config.batch_size is None
+    assert any(env.path == "batch_size" for env in excinfo.value.errors)
 
 
 def test_load_string_uses_default_batch_size_when_missing() -> None:

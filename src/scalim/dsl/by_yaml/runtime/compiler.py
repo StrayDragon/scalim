@@ -11,13 +11,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
-from ....execution.guardrails import (
-    GuardrailMode,
-    GuardrailsComputePolicy,
-    GuardrailsLoaderPolicy,
-    GuardrailsPolicy,
-    GuardrailsRelationsPolicy,
-)
+from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
 from ....spec.ir import DemandIr
@@ -39,8 +33,6 @@ from ..schema_dsl.models import (
     BookWriteDefaultsConfig,
     DemandConfig,
     FileConfig,
-    GuardrailsConfig,
-    LoaderRetryConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -105,6 +97,8 @@ def validate_allowlist(
 
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
+
+_DEMAND_FAILURE_POLICIES: Tuple[str, ...] = ("all_fail", "primary_only")
 
 
 def _parse_overrides_outputs_defaults_book_id(defaults: Optional[object], *, path: str) -> Optional[str]:
@@ -190,6 +184,32 @@ def _parse_typed_overrides_output_write(raw: OutputWriteOverride, *, path: str) 
         on_mismatch=_as_opt_str(raw.on_mismatch),
         on_conflict=_as_opt_str(raw.on_conflict),
     )
+
+
+def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:
+    next_config = config
+
+    if not isinstance(options.batch_size, UnsetType):
+        raw = options.batch_size
+        if raw is None:
+            next_config = replace(next_config, batch_size=None)
+        else:
+            if isinstance(raw, bool) or not isinstance(raw, int):
+                msg = "batch_size must be an integer >= 1 or None"
+                raise TypeError(msg)
+            if int(raw) < 1:
+                msg = "batch_size must be >= 1 when provided"
+                raise ValueError(msg)
+            next_config = replace(next_config, batch_size=int(raw))
+
+    if options.demand_failure_policy is not None:
+        normalized = str(options.demand_failure_policy or "").strip()
+        if normalized not in _DEMAND_FAILURE_POLICIES:
+            msg = "demand_failure_policy={!r} is invalid; expected one of: {}".format(normalized, ", ".join(_DEMAND_FAILURE_POLICIES))
+            raise ValueError(msg)
+        next_config = replace(next_config, failure_policy=str(normalized))
+
+    return next_config
 
 
 def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915
@@ -392,65 +412,6 @@ def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
     raise ValueError(msg)
 
 
-def _as_guardrail_mode(value: str) -> GuardrailMode:
-    if value == "quiet":
-        return "quiet"
-    if value == "fast_fail":
-        return "fast_fail"
-    msg = "Invalid guardrail mode: '{}'".format(value)
-    raise ValueError(msg)
-
-
-def _compile_guardrails_policy(config: Optional[GuardrailsConfig]) -> GuardrailsPolicy:
-    if config is None:
-        return GuardrailsPolicy.disabled()
-
-    loader = config.loader
-    relations = config.relations
-    compute = config.compute
-
-    return GuardrailsPolicy(
-        enabled=bool(config.enabled),
-        mode=_as_guardrail_mode(str(config.mode)),
-        loader=GuardrailsLoaderPolicy(
-            validate_result=bool(loader.validate_result) if loader is not None else False,
-            required_fields=tuple(str(item) for item in (loader.required_fields or ())) if loader is not None else (),
-            on_transform_error=_as_guardrail_mode(str(loader.on_transform_error))
-            if (loader is not None and loader.on_transform_error)
-            else None,
-        ),
-        relations=GuardrailsRelationsPolicy(
-            null_key_max_rate=relations.null_key_max_rate if relations is not None else None,
-            type_error_max_rate=relations.type_error_max_rate if relations is not None else None,
-        ),
-        compute=GuardrailsComputePolicy(
-            on_error=_as_guardrail_mode(str(compute.on_error)) if (compute is not None and compute.on_error) else None,
-        ),
-    )
-
-
-def _retry_spec_from_yaml(
-    config: Optional[LoaderRetryConfig],
-    *,
-    resolver: SecurePythonReferenceResolver,
-) -> LoaderRetryPolicySpec:
-    if config is None:
-        return LoaderRetryPolicySpec()
-    should_retry = None
-    if config.should_retry:
-        should_retry = cast("Any", resolver.resolve(str(config.should_retry)))  # pragma: allow-cast resolver callable signature boundary
-    return LoaderRetryPolicySpec(
-        enabled=bool(config.enabled) if config.enabled is not None else None,
-        should_retry=should_retry,
-        max_attempts=int(config.max_attempts) if config.max_attempts is not None else None,
-        max_elapsed_seconds=float(config.max_elapsed_seconds) if config.max_elapsed_seconds is not None else None,
-        backoff=str(config.backoff) if config.backoff is not None else None,
-        base_delay_seconds=float(config.base_delay_seconds) if config.base_delay_seconds is not None else None,
-        max_delay_seconds=float(config.max_delay_seconds) if config.max_delay_seconds is not None else None,
-        jitter=bool(config.jitter) if config.jitter is not None else None,
-    )
-
-
 def _merge_retry_specs(base: LoaderRetryPolicySpec, override: Optional[LoaderRetryPolicySpec]) -> LoaderRetryPolicySpec:
     if override is None:
         return base
@@ -478,7 +439,7 @@ def _finalize_retry_policy(spec: LoaderRetryPolicySpec, *, base: Optional[Loader
     jitter = spec.jitter if spec.jitter is not None else base_policy.jitter
 
     if enabled and should_retry is None:
-        msg = "loader_retry.enabled=true requires should_retry (provide in YAML or via driver injection)"
+        msg = "loader_retry.enabled=true requires should_retry (provide via runtime injection)"
         raise ValueError(msg)
 
     return LoaderRetryPolicy(
@@ -496,19 +457,17 @@ def _finalize_retry_policy(spec: LoaderRetryPolicySpec, *, base: Optional[Loader
 def _compile_loader_retry_policies(
     config: DemandConfig,
     *,
-    resolver: SecurePythonReferenceResolver,
     overrides: Optional[LoaderRetryPoliciesSpec],
 ) -> Optional[LoaderRetryPolicies]:
-    yaml_global = _retry_spec_from_yaml(config.retry, resolver=resolver)
-    driver_global = overrides.default if overrides is not None else None
-    global_spec = _merge_retry_specs(yaml_global, driver_global)
-
+    if overrides is None:
+        return None
     base_policy = LoaderRetryPolicy.disabled()
+    global_spec = overrides.default or LoaderRetryPolicySpec()
     global_policy = _finalize_retry_policy(global_spec, base=base_policy)
 
     known_loaders = set(config.sources.keys())
     known_loaders.add(config.main_source.source_id)
-    if overrides is not None and overrides.by_loader:
+    if overrides.by_loader:
         unknown = set(overrides.by_loader.keys()) - known_loaders
         if unknown:
             msg = "Unknown loader_retry.by_loader keys: {}".format(", ".join(sorted(unknown)))
@@ -517,17 +476,15 @@ def _compile_loader_retry_policies(
     by_loader: Dict[str, LoaderRetryPolicy] = {}
 
     main_source_id = config.main_source.source_id
-    main_yaml = _retry_spec_from_yaml(config.main_source.retry, resolver=resolver)
-    main_driver = overrides.by_loader.get(main_source_id) if overrides is not None else None
-    main_spec = _merge_retry_specs(_merge_retry_specs(global_spec, main_yaml), main_driver)
+    main_driver = overrides.by_loader.get(main_source_id)
+    main_spec = _merge_retry_specs(global_spec, main_driver)
     main_policy = _finalize_retry_policy(main_spec, base=base_policy)
     if main_policy != global_policy:
         by_loader[main_source_id] = main_policy
 
-    for source_id, source_config in config.sources.items():
-        src_yaml = _retry_spec_from_yaml(source_config.retry, resolver=resolver)
-        src_driver = overrides.by_loader.get(source_id) if overrides is not None else None
-        src_spec = _merge_retry_specs(_merge_retry_specs(global_spec, src_yaml), src_driver)
+    for source_id in config.sources:
+        src_driver = overrides.by_loader.get(source_id)
+        src_spec = _merge_retry_specs(global_spec, src_driver)
         src_policy = _finalize_retry_policy(src_spec, base=base_policy)
         if src_policy != global_policy:
             by_loader[source_id] = src_policy
@@ -1081,6 +1038,7 @@ def build_request(
     resolver: SecurePythonReferenceResolver,
 ) -> ExecutionRequest:
     effective_config = _apply_io_overrides(config, options=options)
+    effective_config = _apply_demand_runtime_policy_overrides(effective_config, options=options)
     effective_outputs, outputs_path = _resolve_effective_outputs_and_path(effective_config, demand_ir, options=options)
     output_composition = _compile_output_composition_for_outputs(
         effective_config,
@@ -1113,9 +1071,9 @@ def build_request(
     if not components:
         components = None
 
-    guardrails = options.guardrails or _compile_guardrails_policy(effective_config.guardrails)
-    loader_retry = _compile_loader_retry_policies(effective_config, resolver=resolver, overrides=options.loader_retry)
-    batch_size = options.batch_size if options.batch_size is not None else effective_config.batch_size
+    guardrails = options.guardrails or GuardrailsPolicy.disabled()
+    loader_retry = _compile_loader_retry_policies(effective_config, overrides=options.loader_retry)
+    batch_size = effective_config.batch_size if isinstance(options.batch_size, UnsetType) else options.batch_size
 
     return ExecutionRequest(
         export_layout=export_layout,
@@ -1146,6 +1104,7 @@ def compile(  # noqa: A001
         rendered_yaml_max_len=options.rendered_yaml_max_len,
         allowed_yaml_roots=options.allowed_yaml_roots,
     )
+    config = _apply_demand_runtime_policy_overrides(config, options=options)
     base_module_path = None
     if _config_uses_relative_references(config):
         base_module_path = derive_base_module_path(yaml_path)

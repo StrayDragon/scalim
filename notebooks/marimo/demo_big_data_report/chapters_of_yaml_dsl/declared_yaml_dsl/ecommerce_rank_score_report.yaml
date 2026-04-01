@@ -18,7 +18,8 @@ description: |
   - 纯 Python 真值: `scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle:build_expected_rows_top2_by_region`
   - 断言: CSV 输出逐行对拍(稳定排序后比较)
 
-batch_size: 10
+# NOTE: `batch_size` moved out of YAML runtime policy boundary.
+# Pass via runtime entrypoints, e.g. `run(..., batch_size=10)`.
 
 main_source:
   source_id: orders

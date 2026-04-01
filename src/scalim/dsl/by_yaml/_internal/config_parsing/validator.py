@@ -226,6 +226,140 @@ class ConfigValidator(ValidatorFieldsMixin):
         cleaned.pop("observability", None)
         return cleaned
 
+    @staticmethod
+    def _append_removed_runtime_policy_error(issues: List["ValidationIssue"], *, path: str, msg: str) -> None:
+        issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_ERROR, message=msg, path=path))
+
+    def _error_and_strip_removed_demand_runtime_policy_fields(
+        self,
+        config: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        cleaned = dict(config)
+        cleaned = self._strip_removed_demand_runtime_policy_top_level(cleaned, issues)
+        cleaned = self._strip_removed_demand_runtime_policy_main_source_retry(cleaned, issues)
+        return self._strip_removed_demand_runtime_policy_sources_retry(cleaned, issues)
+
+    @staticmethod
+    def _strip_removed_demand_runtime_policy_top_level(
+        cleaned: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        guardrails_msg = "YAML key 'guardrails' was moved out of YAML mainline (runtime policy boundary). "
+        guardrails_msg = (
+            guardrails_msg
+            + "Hint: configure guardrails via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., guardrails=GuardrailsPolicy(...))."
+        )
+
+        batch_size_msg = "YAML key 'batch_size' was moved out of YAML mainline (runtime policy boundary). "
+        batch_size_msg = (
+            batch_size_msg
+            + "Hint: configure batch size via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., batch_size=<int|None>)."
+        )
+
+        demand_failure_policy_msg = "YAML key 'failure_policy' was moved out of demand YAML mainline (runtime policy boundary). "
+        demand_failure_policy_msg = (
+            demand_failure_policy_msg
+            + "Hint: configure demand output failure policy via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., demand_failure_policy='all_fail'|'primary_only')."
+        )
+
+        retry_msg = "YAML key 'retry' was moved out of YAML mainline (runtime policy boundary). "
+        retry_msg = (
+            retry_msg
+            + "Hint: configure loader retry via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., loader_retry=LoaderRetryPoliciesSpec(...))."
+        )
+
+        removed: Tuple[Tuple[str, str], ...] = (
+            (
+                "guardrails",
+                guardrails_msg,
+            ),
+            (
+                "batch_size",
+                batch_size_msg,
+            ),
+            (
+                "failure_policy",
+                demand_failure_policy_msg,
+            ),
+            (
+                "retry",
+                retry_msg,
+            ),
+        )
+
+        for key, msg in removed:
+            if key not in cleaned:
+                continue
+            ConfigValidator._append_removed_runtime_policy_error(issues, path=str(key), msg=msg)
+            cleaned.pop(key, None)
+
+        return cleaned
+
+    @staticmethod
+    def _strip_removed_demand_runtime_policy_main_source_retry(
+        cleaned: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        main_source_raw = cleaned.get("main_source")
+        main_source = cast("Optional[Dict[str, Any]]", main_source_raw if isinstance(main_source_raw, dict) else None)
+        if main_source is None or "retry" not in main_source:
+            return cleaned
+
+        ConfigValidator._append_removed_runtime_policy_error(
+            issues,
+            path="main_source.retry",
+            msg=(
+                "YAML key 'main_source.retry' was moved out of YAML mainline (runtime policy boundary). "
+                "Hint: configure loader retry via runtime entrypoints: "
+                "scalim.dsl.by_yaml.run/compile(..., loader_retry=LoaderRetryPoliciesSpec(by_loader={...}))."
+            ),
+        )
+        next_main: Dict[str, Any] = dict(main_source)
+        next_main.pop("retry", None)
+        cleaned["main_source"] = next_main
+        return cleaned
+
+    @staticmethod
+    def _strip_removed_demand_runtime_policy_sources_retry(
+        cleaned: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        sources_raw = cleaned.get("sources")
+        sources = cast("Optional[Dict[str, Any]]", sources_raw if isinstance(sources_raw, dict) else None)
+        if sources is None:
+            return cleaned
+
+        next_sources: Optional[Dict[str, Any]] = None
+        for source_id, source_cfg_raw in sources.items():
+            source_cfg = cast("Optional[Dict[str, Any]]", source_cfg_raw if isinstance(source_cfg_raw, dict) else None)
+            if source_cfg is None or "retry" not in source_cfg:
+                continue
+
+            if next_sources is None:
+                next_sources = dict(sources)
+
+            ConfigValidator._append_removed_runtime_policy_error(
+                issues,
+                path="sources.{}.retry".format(str(source_id)),
+                msg=(
+                    "YAML key 'sources.*.retry' was moved out of YAML mainline (runtime policy boundary). "
+                    "Hint: configure loader retry via runtime entrypoints: "
+                    "scalim.dsl.by_yaml.run/compile(..., loader_retry=LoaderRetryPoliciesSpec(by_loader={...}))."
+                ),
+            )
+            next_cfg: Dict[str, Any] = dict(source_cfg)
+            next_cfg.pop("retry", None)
+            next_sources[str(source_id)] = next_cfg
+
+        if next_sources is not None:
+            cleaned["sources"] = next_sources
+        return cleaned
+
     def validate(self, config: Dict[str, Any]) -> None:
         report = self.validate_report(config, enable_jsonschema_validation=True)
         issues = report.errors()
@@ -253,12 +387,11 @@ class ConfigValidator(ValidatorFieldsMixin):
     ) -> ValidationReport:
         errors: List[ValidationIssue] = []
         config = self._warn_and_strip_legacy_observability(config, errors)
+        config = self._error_and_strip_removed_demand_runtime_policy_fields(config, errors)
         raw = RawDemand.from_raw(config)
 
         self._validate_required_fields(raw.data, errors)
-        self._validate_batch_size(raw.data, errors)
         self._validate_legacy_fields(raw.data, errors)
-        self._validate_loader_retry_should_retry(raw.data.get("retry"), errors, path_prefix="retry")
 
         sources_info = self._validate_sources(raw.data, errors)
         main_source_id = self._validate_main_source(raw.data, errors)

@@ -57,7 +57,7 @@ def _assert_has_any_path(payload: dict, prefixes: Iterable[str]) -> None:
         ("yaml_dsl_invalid_sources_key.yaml", ["sources.123-invalid"], ["sources"]),
         ("yaml_dsl_empty_source_loader.yaml", ["sources.customers.loader"], ["sources.customers.loader"]),
         ("yaml_dsl_empty_source_key.yaml", ["sources.customers.key"], ["sources.customers.key"]),
-        ("yaml_dsl_retry_enabled_missing_should_retry.yaml", ["retry.should_retry"], ["retry.should_retry"]),
+        ("yaml_dsl_retry_enabled_missing_should_retry.yaml", ["retry"], ["retry"]),
         ("yaml_dsl_outputs_container_streaming_false.yaml", ["outputs.0.container"], ["outputs.0.container"]),
         ("yaml_dsl_detail_output_missing_fields.yaml", ["outputs.0.fields"], ["outputs.0"]),
     ],

@@ -16,37 +16,9 @@ app = marimo.App(width="full")
 
 
 def run_loader_retry() -> ExampleResult:
-    yaml_no_retry = textwrap.dedent(
+    demand_yaml = textwrap.dedent(
         """
         name: loader_retry_demo
-
-        main_source:
-          source_id: orders
-          loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod:load_orders"
-          fields:
-            order_id:
-              {}
-        """
-    ).lstrip()
-
-    yaml_with_retry = textwrap.dedent(
-        """
-        name: loader_retry_demo
-
-        _templates:
-          retry:
-            transient_default: &transient_default
-              enabled: true
-              max_attempts: 5
-              max_elapsed_seconds: 5.0
-              backoff: fixed
-              base_delay_seconds: 0.0
-              max_delay_seconds: 0.0
-              jitter: false
-
-        retry:
-          <<: *transient_default
-          max_attempts: 2
 
         main_source:
           source_id: orders
@@ -60,26 +32,35 @@ def run_loader_retry() -> ExampleResult:
     allowed_modules = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod"])
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        yaml_no_retry_path = Path(tmpdir) / "no_retry.yaml"
-        yaml_with_retry_path = Path(tmpdir) / "with_retry.yaml"
-        yaml_no_retry_path.write_text(yaml_no_retry, encoding="utf-8")
-        yaml_with_retry_path.write_text(yaml_with_retry, encoding="utf-8")
+        demand_path = Path(tmpdir) / "demand.yaml"
+        demand_path.write_text(demand_yaml, encoding="utf-8")
 
         # 1) 不启用 `retry`: 第一次失败直接抛错
         demo_mod.reset()
         sink_no_retry = InMemoryRowSink()
         no_retry_ok = False
         try:
-            _ = run(str(yaml_no_retry_path), allowed_modules=allowed_modules, sink=sink_no_retry)
+            _ = run(str(demand_path), allowed_modules=allowed_modules, sink=sink_no_retry)
         except demo_mod.TransientError:
             no_retry_ok = True
 
-        # 2) 启用 `retry`: 自动重试后成功
+        # 2) 启用 `retry`: 通过运行时注入(`loader_retry=...`)自动重试后成功
         demo_mod.reset()
         sink_with_retry = InMemoryRowSink()
-        injected_retry = LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(should_retry=demo_mod.should_retry))
+        injected_retry = LoaderRetryPoliciesSpec(
+            default=LoaderRetryPolicySpec(
+                enabled=True,
+                should_retry=demo_mod.should_retry,
+                max_attempts=2,
+                max_elapsed_seconds=5.0,
+                backoff="fixed",
+                base_delay_seconds=0.0,
+                max_delay_seconds=0.0,
+                jitter=False,
+            )
+        )
         _ = run(
-            str(yaml_with_retry_path),
+            str(demand_path),
             allowed_modules=allowed_modules,
             sink=sink_with_retry,
             loader_retry=injected_retry,

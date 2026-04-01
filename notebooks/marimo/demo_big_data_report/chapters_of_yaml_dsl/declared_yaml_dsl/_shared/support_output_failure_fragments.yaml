@@ -3,8 +3,6 @@
 # Imports v2 resolves paths relative to the current YAML file's directory.
 
 base_main:
-  batch_size: 2
-
   main_source:
     source_id: tickets
     loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:load_support_tickets"

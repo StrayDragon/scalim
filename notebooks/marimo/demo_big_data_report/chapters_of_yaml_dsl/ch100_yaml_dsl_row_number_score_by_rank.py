@@ -54,6 +54,7 @@ def run_yaml_dsl_row_number_score_by_rank(
                 compilation = compile_yaml(
                     str(yaml_path),
                     allowed_modules=_ALLOWED_MODULES,
+                    batch_size=10,
                     init_vars=init_vars,
                 )
                 core = run_ir(compilation.demand_ir, compilation.request)

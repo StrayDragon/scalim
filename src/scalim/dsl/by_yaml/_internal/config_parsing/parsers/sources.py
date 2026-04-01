@@ -5,12 +5,10 @@ from ....schema_dsl.constants import (
 )
 from ....schema_dsl.models import (
     DEMAND_KEYS,
-    LOADER_RETRY_KEYS,
     LOOKUP_CAST_KEYS,
     MAIN_SOURCE_KEYS,
     NORMALIZE_KEYS,
     SOURCE_KEYS,
-    LoaderRetryConfig,
     LookupCastConfig,
     MainSourceConfig,
     NormalizeConfig,
@@ -78,54 +76,6 @@ class ParserSourcesMixin:
             )
         return tuple(steps_converted)
 
-    def _parse_loader_retry(self, raw_retry: object) -> Optional[LoaderRetryConfig]:
-        retry_dict = mapping_or_none(raw_retry)
-        if retry_dict is None:
-            return None
-
-        def _as_int(value: object) -> Optional[int]:
-            if isinstance(value, bool) or not isinstance(value, (int, float, str)):
-                return None
-            try:
-                return int(value)
-            except (TypeError, ValueError):
-                return None
-
-        def _as_float(value: object) -> Optional[float]:
-            if isinstance(value, bool) or not isinstance(value, (int, float, str)):
-                return None
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return None
-
-        enabled = None
-        if LOADER_RETRY_KEYS["enabled"] in retry_dict:
-            enabled = bool(retry_dict.get(LOADER_RETRY_KEYS["enabled"]))
-
-        should_retry = None
-        if LOADER_RETRY_KEYS["should_retry"] in retry_dict:
-            should_retry = str_or_none(retry_dict.get(LOADER_RETRY_KEYS["should_retry"]))
-
-        return LoaderRetryConfig(
-            enabled=enabled,
-            should_retry=should_retry,
-            max_attempts=_as_int(retry_dict.get(LOADER_RETRY_KEYS["max_attempts"]))
-            if LOADER_RETRY_KEYS["max_attempts"] in retry_dict
-            else None,
-            max_elapsed_seconds=_as_float(retry_dict.get(LOADER_RETRY_KEYS["max_elapsed_seconds"]))
-            if LOADER_RETRY_KEYS["max_elapsed_seconds"] in retry_dict
-            else None,
-            backoff=str(retry_dict.get(LOADER_RETRY_KEYS["backoff"])) if LOADER_RETRY_KEYS["backoff"] in retry_dict else None,
-            base_delay_seconds=_as_float(retry_dict.get(LOADER_RETRY_KEYS["base_delay_seconds"]))
-            if LOADER_RETRY_KEYS["base_delay_seconds"] in retry_dict
-            else None,
-            max_delay_seconds=_as_float(retry_dict.get(LOADER_RETRY_KEYS["max_delay_seconds"]))
-            if LOADER_RETRY_KEYS["max_delay_seconds"] in retry_dict
-            else None,
-            jitter=bool(retry_dict.get(LOADER_RETRY_KEYS["jitter"])) if LOADER_RETRY_KEYS["jitter"] in retry_dict else None,
-        )
-
     def _parse_main_source(self, raw: RawDemand) -> MainSourceConfig:
         raw_main_source = raw.get_mapping(DEMAND_KEYS["main_source"])
         if raw_main_source is None:
@@ -135,13 +85,11 @@ class ParserSourcesMixin:
         loader = str(raw_main_source.get(MAIN_SOURCE_KEYS["loader"], ""))
         params = self._parse_params(raw_main_source)
         order_by = self._parse_order_by(raw_main_source)
-        retry = self._parse_loader_retry(raw_main_source.get(MAIN_SOURCE_KEYS["retry"]))
 
         return MainSourceConfig(
             source_id=source_id,
             loader=loader,
             params=params,
-            retry=retry,
             order_by=order_by,
         )
 
@@ -162,7 +110,6 @@ class ParserSourcesMixin:
             lookup_chunk_size = self._parse_lookup_chunk_size(source_data.get(SOURCE_KEYS["lookup_chunk_size"]))
             normalize = self._parse_normalize(source_data.get(SOURCE_KEYS["normalize"]))
             params = self._parse_params(source_data)
-            retry = self._parse_loader_retry(source_data.get(SOURCE_KEYS["retry"]))
 
             sources[source_id] = SourceConfig(
                 source_id=source_id,
@@ -172,7 +119,6 @@ class ParserSourcesMixin:
                 lookup_chunk_size=lookup_chunk_size,
                 normalize=normalize,
                 cache_mode=str(source_data.get(SOURCE_KEYS["cache_mode"], DEFAULT_CACHE_MODE)),
-                retry=retry,
                 params=params,
             )
 
@@ -188,7 +134,6 @@ class ParserSourcesMixin:
             loader=main_source.loader,
             fields=fields,
             params=main_source.params,
-            retry=main_source.retry,
             order_by=main_source.order_by,
         )
 
@@ -207,7 +152,6 @@ class ParserSourcesMixin:
                 lookup_chunk_size=source_config.lookup_chunk_size,
                 normalize=source_config.normalize,
                 cache_mode=source_config.cache_mode,
-                retry=source_config.retry,
                 fields=fields_by_source.get(source_id, {}),
                 params=source_config.params,
             )

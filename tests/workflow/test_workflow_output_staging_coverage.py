@@ -41,49 +41,89 @@ def test_load_workflow_config_from_mapping_output_staging_defaults_are_present()
     assert cfg.options.output_staging.keep_on_failure is True
 
 
-@pytest.mark.parametrize(
-    ("output_staging", "path", "match"),
-    [
-        (0, "workflow.options.output_staging", "must be a mapping"),
-        ({"dir_name": 0}, "workflow.options.output_staging.dir_name", "non-empty string"),
-        ({"dir_name": ""}, "workflow.options.output_staging.dir_name", "simple directory name"),
-        ({"dir_name": "a/b"}, "workflow.options.output_staging.dir_name", "simple directory name"),
-        ({"dir_name": "a\\\\b"}, "workflow.options.output_staging.dir_name", "simple directory name"),
-        ({"keep_on_success": "x"}, "workflow.options.output_staging.keep_on_success", "must be a bool"),
-        ({"keep_on_failure": "x"}, "workflow.options.output_staging.keep_on_failure", "must be a bool"),
-    ],
-)
-def test_load_workflow_config_from_mapping_output_staging_rejects_invalid_values(
-    output_staging: object,
-    path: str,
-    match: str,
-) -> None:
+def test_load_workflow_config_from_mapping_rejects_output_staging_key() -> None:
     from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config_from_mapping
 
     root = _base_root()
-    root.setdefault("workflow", {}).setdefault("options", {})["output_staging"] = output_staging
+    root.setdefault("workflow", {}).setdefault("options", {})["output_staging"] = {"dir_name": ".staging"}
 
-    with pytest.raises(ScalimWorkflowConfigError, match=match) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError, match="moved out of workflow YAML") as excinfo:
         _ = load_workflow_config_from_mapping(root)
-    assert excinfo.value.path == path
+    assert excinfo.value.path == "workflow.options.output_staging"
 
 
-def test_output_staging_flows_from_yaml_to_ir_to_runtime(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("raw", "exc_type", "match"),
+    [
+        ({}, TypeError, r"workflow_output_staging must be a WorkflowOutputStagingOptions"),
+        ("x", TypeError, r"workflow_output_staging must be a WorkflowOutputStagingOptions"),
+        (None, TypeError, r"workflow_output_staging must be a WorkflowOutputStagingOptions"),
+    ],
+)
+def test_normalize_workflow_output_staging_override_rejects_wrong_type(raw: object, exc_type: type[Exception], match: str) -> None:
+    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+
+    with pytest.raises(exc_type, match=match):
+        _ = workflow_compile_mod._normalize_workflow_output_staging_override(raw)  # noqa: SLF001
+
+
+def test_normalize_workflow_output_staging_override_rejects_empty_dir_name() -> None:
+    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+
+    with pytest.raises(ValueError, match=r"workflow_output_staging\.dir_name must be a non-empty string"):
+        _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
+            WorkflowOutputStagingOptions(dir_name="")
+        )
+
+
+@pytest.mark.parametrize("dir_name", [".", "..", "a/b", "a\\\\b"])
+def test_normalize_workflow_output_staging_override_rejects_unsafe_dir_name(dir_name: str) -> None:
+    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+
+    with pytest.raises(ValueError, match=r"workflow_output_staging\.dir_name must be a simple directory name"):
+        _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
+            WorkflowOutputStagingOptions(dir_name=dir_name)
+        )
+
+
+def test_normalize_workflow_output_staging_override_rejects_non_bool_keep_on_success() -> None:
+    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+
+    with pytest.raises(TypeError, match=r"workflow_output_staging\.keep_on_success must be a bool"):
+        _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
+            WorkflowOutputStagingOptions(
+                dir_name=".staging",
+                keep_on_success="x",  # type: ignore[arg-type] intentional runtime boundary test
+            )
+        )
+
+
+def test_normalize_workflow_output_staging_override_rejects_non_bool_keep_on_failure() -> None:
+    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+
+    with pytest.raises(TypeError, match=r"workflow_output_staging\.keep_on_failure must be a bool"):
+        _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
+            WorkflowOutputStagingOptions(
+                dir_name=".staging",
+                keep_on_failure="x",  # type: ignore[arg-type] intentional runtime boundary test
+            )
+        )
+
+
+def test_output_staging_flows_from_runtime_to_ir_to_runtime(tmp_path: Path) -> None:
     from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
     from scalim.dsl.by_yaml.workflow import load_workflow_config_from_mapping
+    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr
     from scalim.workflow import execute as workflow_execute_mod
 
-    root = _base_root()
-    root["workflow"]["options"] = {
-        "output_staging": {
-            "dir_name": ".staging",
-            "keep_on_success": True,
-            "keep_on_failure": False,
-        }
-    }
-    wf_obj = load_workflow_config_from_mapping(root)
-    options_ir = workflow_compile_mod._build_workflow_options_ir(wf_obj)  # noqa: SLF001
+    wf_obj = load_workflow_config_from_mapping(_base_root())
+    output_staging = WorkflowOutputStagingOptions(dir_name=".staging", keep_on_success=True, keep_on_failure=False)
+    options_ir = workflow_compile_mod._build_workflow_options_ir(wf_obj, workflow_output_staging=output_staging)  # noqa: SLF001
     assert options_ir.output_staging.dir_name == ".staging"
     assert options_ir.output_staging.keep_on_success is True
     assert options_ir.output_staging.keep_on_failure is False

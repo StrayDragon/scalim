@@ -24,7 +24,6 @@ def run_yaml_dsl_debugging() -> ExampleResult:
         bad_yaml.write_text(
             """\
 name: yaml_dsl_debugging_bad_where
-batch_size: 2
 
 main_source:
   source_id: tickets
@@ -55,6 +54,7 @@ outputs:
                 str(bad_yaml),
                 allowed_modules=_ALLOWED_MODULES,
                 init_vars={"out_path_detail": str(out_csv)},
+                batch_size=2,
             )
         except Exception as exc:  # noqa: BLE001
             msg = str(exc)

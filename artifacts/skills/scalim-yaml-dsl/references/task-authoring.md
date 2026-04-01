@@ -19,8 +19,6 @@
 name: my_report
 description: 简短描述
 
-batch_size: 1000
-
 main_source:
   source_id: orders
   loader: "myapp.loaders:load_orders"
@@ -69,6 +67,11 @@ resources:
       kind: csv_file
       path: {$init_var: output_path}
 ```
+
+运行期策略提示:
+
+- `batch_size`/`loader_retry`/`guardrails`/demand `failure_policy` 已迁出 YAML 主线(运行期策略边界);请在 runtime entrypoints 中配置:
+  - `scalim.dsl.by_yaml.run/compile(..., batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)`
 
 ## 关键规则
 
@@ -133,7 +136,7 @@ run(
 
 ## 相对模块引用(可选)
 
-如果 YAML 文件与 loaders / `call_by` / retry 回调放在同一个 Python 包内,可以用以 `.` / `..` 开头的相对 module 引用来减少 `myapp.xxx` 这种前缀重复:
+如果 YAML 文件与 loaders / `call_by` 放在同一个 Python 包内,可以用以 `.` / `..` 开头的相对 module 引用来减少 `myapp.xxx` 这种前缀重复:
 
 ```yaml
 main_source:
@@ -142,15 +145,27 @@ main_source:
 fields:
   status_text:
     call_by: ".helpers:to_text(status)"
-
-retry:
-  should_retry: ".retry:should_retry"
 ```
 
 注意:
 
 - 相对引用以 **YAML 文件所在目录** 为基准,运行期会先归一化为绝对引用,再做 allowlist 校验
 - allowlist 仍需要覆盖归一化后的模块前缀(例如 YAML 在 `myapp/reports/` 下, `.loaders:load_orders` 会归一化为 `myapp.reports.loaders:load_orders`)
+
+`loader_retry`/`guardrails` 等运行期策略已迁出 YAML,调用侧可直接在 Python 中导入回调/策略对象并注入:
+
+```py
+from scalim.dsl.by_yaml import compile
+from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
+
+from myapp.reports import retry as retry_mod
+
+compile(
+    "report.yaml",
+    allowed_modules=frozenset(["myapp"]),
+    loader_retry=LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(should_retry=retry_mod.should_retry)),
+)
+```
 
 ## 设计偏好
 

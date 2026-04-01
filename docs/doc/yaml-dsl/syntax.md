@@ -40,19 +40,16 @@ name: my_report
 
 _templates: {}          # 可选: YAML anchor 模板集合(只为复用服务)
 description: ""         # 可选
-batch_size: 1000        # 可选: null 或 >=1
-retry: {}               # 可选: 全局 loader retry 默认策略
+imports: {}             # 可选: imports/$import 跨文件复用
 
 main_source: {}         # 必填
 sources: {}             # 可选: 不包含 main_source.source_id
 relations: {}           # 可选: 命名 relation 模板(供 YAML alias 复用)
 fields: {}              # 可选: 仅派生字段(必须 compute/call_by 二选一)
 
-guardrails: {}          # 可选
 meta: false             # 可选: true 或对象(写入 meta sheet)
 audit: false            # 可选: true 或对象(写入 audit sheet)
 outputs: []             # 可选: 多输出编排(有序列表)
-failure_policy: all_fail             # 可选: all_fail/primary_only
 include_full_error_message: false    # 可选
 ```
 
@@ -62,6 +59,8 @@ include_full_error_message: false    # 可选
 - `outputs` 可省略.省略时默认不写文件;如需写文件,请在 YAML 中声明 `outputs` 或在 Python 调用侧使用 `overrides.outputs` 显式指定(整体替换,replace).
 - `field_id` 必须全局唯一(不再支持 `source.field_id` 消歧).
 - YAML 主线已不再支持 `observability.*`(legacy key 会 warning + ignore);请在 runtime entrypoints 使用 `components=[...]` / `overrides=RunOverrides(viz_config=...)` 配置观测.
+- `batch_size`/`retry`/`guardrails`/demand `failure_policy` 属于 runtime policy boundary,不再允许出现在 YAML 主线;请在 runtime entrypoints 配置:
+  - `scalim.dsl.by_yaml.run/compile(..., batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)`
 
 ## 3. YAML 复用: anchors、alias、`_templates`
 
@@ -78,13 +77,9 @@ include_full_error_message: false    # 可选
 
 `_templates` 是 schema 里专门留给“模板/锚点集合”的顶层节点,用途是把常用片段集中放置,避免散落在业务配置里.
 
-目前 `_templates` 只对少数 key 赋予明确语义,其余内容主要用于 anchors/alias 复用:
+目前 `_templates` 不承载稳定语义,其内容主要用于 anchors/alias 复用(例如集中放置 fields/relations/outputs 的复用片段).
 
-目前 `_templates` 明确支持:
-
-- `_templates.retry.<name>`: 可复用的 retry policy 对象集合
-
-除此之外 `_templates` 允许出现额外 key(用于 YAML anchors),但这些 key 不会被框架当成“有语义的字段”读取.
+`_templates` 允许出现额外 key(用于 YAML anchors),但这些 key 不会被框架当成“有语义的字段”读取.
 
 ### 3.3 一个容易踩的点: YAML merge(`<<`)
 

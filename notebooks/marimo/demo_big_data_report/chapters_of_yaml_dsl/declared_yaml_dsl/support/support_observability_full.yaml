@@ -9,7 +9,8 @@ description: |
     - `components=[LoggingObserver(), ExecutionTraceObserver(), MemoryOptimizationObserver(...)]`
     - `overrides=RunOverrides(viz_config=VizObserverConfig(...))`
 
-batch_size: 2
+# NOTE: `batch_size` moved out of YAML runtime policy boundary.
+# Pass via runtime entrypoints, e.g. `compile(..., batch_size=2)`.
 
 main_source:
   source_id: tickets

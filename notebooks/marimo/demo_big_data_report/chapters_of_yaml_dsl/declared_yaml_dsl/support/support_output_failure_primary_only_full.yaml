@@ -13,5 +13,6 @@ description: |
   - 内部 CI/集成环境: 我们希望把完整错误信息留在 meta/audit/统计中,方便快速定位
   - 生产环境: 通常保持默认脱敏,避免敏感信息落盘
 
-failure_policy: primary_only
+# NOTE: demand `failure_policy` moved out of YAML runtime policy boundary.
+# Pass via runtime entrypoints, e.g. `run(..., demand_failure_policy="primary_only")`.
 include_full_error_message: true

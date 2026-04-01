@@ -6,9 +6,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from scalim.dsl.by_yaml import run as run_yaml
+from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario import (
     get_ads_creatives_retry_counter_calls,
     reset_ads_creatives_retry_counter_calls,
+    should_retry_ads_transient,
     verify_ads_outputs_csv_rows,
 )
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -61,6 +63,19 @@ def run_yaml_dsl_ads(
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
                 init_vars=init_vars,
+                batch_size=10,
+                loader_retry=LoaderRetryPoliciesSpec(
+                    default=LoaderRetryPolicySpec(
+                        enabled=True,
+                        should_retry=should_retry_ads_transient,
+                        max_attempts=2,
+                        max_elapsed_seconds=2,
+                        backoff="fixed",
+                        base_delay_seconds=0,
+                        max_delay_seconds=0,
+                        jitter=False,
+                    )
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             return ExampleResult(

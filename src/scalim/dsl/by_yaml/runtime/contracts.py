@@ -304,8 +304,16 @@ class RunOptions:
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None
     """可选:加载重试策略规范."""
 
-    batch_size: Optional[int] = None
-    """可选:覆盖批大小(`None` 表示不覆盖)."""
+    batch_size: Union[Optional[int], UnsetType] = UNSET
+    """可选:覆盖批大小.
+
+    - `UNSET`(默认): 不覆盖,使用配置/默认值
+    - `None`: 显式关闭分批处理
+    - `int`: 显式覆盖为批大小(>= 1)
+    """
+
+    demand_failure_policy: Optional[str] = None
+    """可选:覆盖 `demand` 多输出失败策略(`None` 表示不覆盖)."""
 
     parallel_mode: ParallelMode = "seq"
     """并行模式(`seq` 或 `adaptive`)."""

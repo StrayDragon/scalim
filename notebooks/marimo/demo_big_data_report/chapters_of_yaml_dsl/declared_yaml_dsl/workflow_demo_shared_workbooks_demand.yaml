@@ -8,7 +8,8 @@ description: |
   - workflow manages the book resources (paths/budgets/export)
   - demand defines stable output contracts: `outputs[*].to` + `outputs[*].write`
 
-batch_size: 30
+# NOTE: `batch_size` moved out of YAML runtime policy boundary.
+# Pass via workflow runtime entrypoints, e.g. `run_workflow(..., batch_size=30)`.
 
 main_source:
   source_id: orders

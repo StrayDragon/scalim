@@ -109,6 +109,7 @@ def run_workflow_demo_big_data_report(
                         str(wf_copy),
                         allowed_modules=allowed_modules,
                         init_vars={"order_ids": []},
+                        batch_size=30,
                         path_aliases={"@": str(repo_root)},
                         allowed_yaml_roots=(str(repo_root),),
                     )

@@ -224,7 +224,8 @@ def test_validate_yaml_text_allows_null_batch_size() -> None:
         ]
     )
     result = validate_yaml_text(yaml_text)
-    assert result.ok is True
+    assert result.ok is False
+    assert any(issue.path == "batch_size" for issue in result.errors)
 
 
 def test_validate_yaml_text_allows_null_batch_size_with_jsonschema_enabled() -> None:
@@ -240,7 +241,8 @@ def test_validate_yaml_text_allows_null_batch_size_with_jsonschema_enabled() -> 
         ]
     )
     result = validate_yaml_text(yaml_text, enable_jsonschema_validation=True)
-    assert result.ok is True
+    assert result.ok is False
+    assert any(issue.path == "batch_size" for issue in result.errors)
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,7 @@ from ....typedefs import KeyNormalizationMode, ParallelMode
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .._public_template_sandbox import validate_public_template_sandbox
 from .compiler import compile as _compile
-from .contracts import Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult
+from .contracts import UNSET, Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult, UnsetType
 
 
 def run(  # noqa: PLR0913
@@ -25,7 +25,8 @@ def run(  # noqa: PLR0913
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
-    batch_size: Optional[int] = None,
+    batch_size: Union[Optional[int], UnsetType] = UNSET,
+    demand_failure_policy: Optional[str] = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     key_normalization: KeyNormalizationMode = "raw",
@@ -63,6 +64,7 @@ def run(  # noqa: PLR0913
         guardrails=guardrails,
         loader_retry=loader_retry,
         batch_size=batch_size,
+        demand_failure_policy=demand_failure_policy,
         parallel_mode=parallel_mode,
         max_workers=max_workers,
         key_normalization=normalize_key_normalization(key_normalization),
@@ -90,7 +92,8 @@ def compile(  # noqa: A001, PLR0913
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
-    batch_size: Optional[int] = None,
+    batch_size: Union[Optional[int], UnsetType] = UNSET,
+    demand_failure_policy: Optional[str] = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     key_normalization: KeyNormalizationMode = "raw",
@@ -113,6 +116,7 @@ def compile(  # noqa: A001, PLR0913
         guardrails=guardrails,
         loader_retry=loader_retry,
         batch_size=batch_size,
+        demand_failure_policy=demand_failure_policy,
         parallel_mode=parallel_mode,
         max_workers=max_workers,
         key_normalization=normalize_key_normalization(key_normalization),

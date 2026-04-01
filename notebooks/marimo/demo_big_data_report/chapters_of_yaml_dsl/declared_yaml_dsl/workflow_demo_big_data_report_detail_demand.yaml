@@ -9,8 +9,6 @@ description: |
   - 作为 workflow `writes` 的上游输入(仅 CSV output)
   - 同时携带一个 `preload_forever` source,用于 cache_pool 命中/释放/淘汰可观测验证
 
-batch_size: 30
-
 main_source:
   source_id: orders
   loader: "scalim_misc.demo_big_data_report.loaders:load_orders"

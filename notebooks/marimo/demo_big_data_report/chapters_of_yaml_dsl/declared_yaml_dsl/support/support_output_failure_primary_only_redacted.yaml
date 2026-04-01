@@ -17,5 +17,6 @@ description: |
   - debug workbook 偶尔写失败时,主输出依然要落盘
   - 默认不要把完整错误信息写到产物中(可能包含敏感路径/参数)
 
-failure_policy: primary_only
+# NOTE: demand `failure_policy` moved out of YAML runtime policy boundary.
+# Pass via runtime entrypoints, e.g. `run(..., demand_failure_policy="primary_only")`.
 include_full_error_message: false

@@ -71,12 +71,13 @@ workflow:
 - `workflow.runs[*].demand` 必须为非空字符串
 - `workflow.options.max_concurrency` 必须为整数且 >= 1(默认 `1`)
 - `workflow.options.failure_policy` 为 `all_fail` 或 `primary_only`(默认 `all_fail`)
-- `workflow.options.resources_wait` MAY 缺省(缺省时: 默认 `max_wait_s=600`,且 diagnostics 默认禁用)
+- `workflow.options.resources_wait` 与 `workflow.options.output_staging` 已迁出 workflow YAML(运行期策略边界);请通过 runtime entrypoints 配置:
+  - `run_workflow(..., workflow_resources_wait=..., workflow_output_staging=...)`
 - `workflow.options.cache_pool` MAY 缺省(表示不启用 workflow-scope cache pool)
   - 当存在时,其 `conflict_policy/release_policy/budget` 为必填
   - `budget.max_entries` 必须为整数且 >= 1
 
-### 1.1) `resources_wait`: 共享资源 join/wait 超时与诊断
+### 1.1) `workflow_resources_wait`: 共享资源 join/wait 超时与诊断(runtime entrypoint)
 
 workflow 的共享输出资源(book/csv/sheetbook)在并发模式下会用 joinable inflight 去重 owner 创建；当 owner 卡死/外部 IO 阻塞时,waiter 可能会被挂起。
 为避免生产 hang,workflow 默认对 inflight join/wait 启用超时 fail-fast：
@@ -84,21 +85,32 @@ workflow 的共享输出资源(book/csv/sheetbook)在并发模式下会用 joina
 - `max_wait_s` 缺省等价于 `600` 秒
 - diagnostics 默认禁用(仅当显式开启时才告警)
 
-示例:
+注意:
 
-```yaml
-workflow:
-  options:
-    resources_wait:
-      max_wait_s: 600
-      diagnostics:
-        enabled: true
-        warn_after_s: 30
-        repeat_every_s: 60
-        capture_owner_callsite: true
+- `workflow.options.resources_wait` 已从 workflow YAML 迁出;若继续在 YAML 中声明会 fail-fast.
+
+示例(Python):
+
+```python
+from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml.workflow_types import WorkflowResourcesWaitDiagnosticsOptions, WorkflowResourcesWaitOptions
+
+run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp"]),
+    workflow_resources_wait=WorkflowResourcesWaitOptions(
+        max_wait_s=600.0,
+        diagnostics=WorkflowResourcesWaitDiagnosticsOptions(
+            enabled=True,
+            warn_after_s=30.0,
+            repeat_every_s=60.0,
+            capture_owner_callsite=True,
+        ),
+    ),
+)
 ```
 
-### 1.2) `output_staging`: workflow 输出 staging + 最终发布
+### 1.2) `workflow_output_staging`: workflow 输出 staging + 最终发布(runtime entrypoint)
 
 workflow 的共享输出(例如 `workflow.resources.books` 导出的 `.xlsx` / 合并的 `.csv`)默认采用 **staging → publish** 两阶段:
 
@@ -114,15 +126,25 @@ workflow 的共享输出(例如 `workflow.resources.books` 导出的 `.xlsx` / �
 - success 默认清理 staging(`keep_on_success=false`)
 - failure 默认保留 staging(`keep_on_failure=true`,便于排障)
 
-示例:
+注意:
 
-```yaml
-workflow:
-  options:
-    output_staging:
-      dir_name: .scalim-staging
-      keep_on_success: false
-      keep_on_failure: true
+- `workflow.options.output_staging` 已从 workflow YAML 迁出;若继续在 YAML 中声明会 fail-fast.
+
+示例(Python):
+
+```python
+from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+
+run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp"]),
+    workflow_output_staging=WorkflowOutputStagingOptions(
+        dir_name=".scalim-staging",
+        keep_on_success=False,
+        keep_on_failure=True,
+    ),
+)
 ```
 
 ## 2) demand 路径解析与 `path_aliases`

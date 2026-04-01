@@ -19,6 +19,7 @@ from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_
 from ._public_template_sandbox import validate_public_template_sandbox
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import (
+    UNSET,
     BookBudgetOverride,
     BookExportXlsxOverride,
     BookResourceOverride,
@@ -216,6 +217,7 @@ if TYPE_CHECKING:
     from ...hooks import IExecutionHook
     from ...ob.observer import Observer
     from ...ob.presets.viz import VizObserverConfig
+    from .workflow_config._models import WorkflowOutputStagingOptions, WorkflowResourcesWaitOptions
 
 
 class _CompilationLike(Protocol):
@@ -254,7 +256,10 @@ def run_workflow(  # noqa: PLR0913
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional["GuardrailsPolicy"] = None,
     loader_retry: Optional["LoaderRetryPoliciesSpec"] = None,
-    batch_size: Optional[int] = None,
+    batch_size: Union[Optional[int], UnsetType] = UNSET,
+    demand_failure_policy: Optional[str] = None,
+    workflow_resources_wait: Optional["WorkflowResourcesWaitOptions"] = None,
+    workflow_output_staging: Optional["WorkflowOutputStagingOptions"] = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     key_normalization: KeyNormalizationMode = "raw",
@@ -283,6 +288,8 @@ def run_workflow(  # noqa: PLR0913
         allowed_yaml_roots=allowed_yaml_roots,
         init_vars=init_vars,
         overrides=overrides,
+        workflow_resources_wait=workflow_resources_wait,
+        workflow_output_staging=workflow_output_staging,
     )
 
     # 2) 推导 `workflow` 缓存池消费关系上界(`DSL` 层;依赖 `demand` `YAML`)
@@ -308,6 +315,7 @@ def run_workflow(  # noqa: PLR0913
         guardrails=guardrails,
         loader_retry=loader_retry,
         batch_size=batch_size,
+        demand_failure_policy=demand_failure_policy,
         parallel_mode=parallel_mode,
         max_workers=int(max_workers),
         key_normalization=key_normalization,

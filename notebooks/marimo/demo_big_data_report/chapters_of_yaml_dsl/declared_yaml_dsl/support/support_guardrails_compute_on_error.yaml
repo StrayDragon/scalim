@@ -12,21 +12,16 @@ description: |
   - 我能不能在不改 Python 的情况下,把 compute 的异常变成 **可回归信号**,同时主流程不中断？
 
   方案:
-  - 开启 `guardrails.enabled`
-  - 全局 `guardrails.mode=fast_fail` 保持严格
-  - 单独把 `guardrails.compute.on_error=quiet` 放宽: compute 失败时写 `None` 并记录 guardrail 事件
+  - runtime guardrails:
+    - `GuardrailsPolicy(enabled=True, mode='fast_fail', compute=GuardrailsComputePolicy(on_error='quiet'))`
+    - compute 失败时写 `None` 并记录 guardrail 事件
 
   对拍(oracle):
   - 断言: 输出行数仍为 5; 且 ticket_id=1001 的 risky_score 为空(除零触发 compute_error)
   - 断言: guardrail codes 包含 `compute_error`
 
-batch_size: 2
-
-guardrails:
-  enabled: true
-  mode: fast_fail
-  compute:
-    on_error: quiet
+# NOTE: runtime policies (`batch_size`, `guardrails`) moved out of YAML boundary.
+# Pass via runtime entrypoints, e.g. `compile(..., batch_size=2, guardrails=GuardrailsPolicy(...))`.
 
 main_source:
   source_id: tickets

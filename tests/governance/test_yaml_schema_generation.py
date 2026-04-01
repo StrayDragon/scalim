@@ -183,11 +183,7 @@ def test_generated_schema_main_source_order_by_has_hover_meta() -> None:
 
 def test_generated_schema_batch_size_supports_null_or_positive_integer() -> None:
     schema = build_demand_schema()
-    batch_size = schema["properties"]["batch_size"]
-
-    one_of = batch_size["oneOf"]
-    assert {"type": "null"} in one_of
-    assert {"type": "integer", "minimum": 1} in one_of
+    assert "batch_size" not in (schema.get("properties") or {})
 
 
 def test_doc_texts_first_non_empty_line_blank_returns_empty() -> None:

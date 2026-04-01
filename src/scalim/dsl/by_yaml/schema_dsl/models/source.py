@@ -313,9 +313,9 @@ class SourceConfig:
 
     retry: Optional[LoaderRetryConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
+        metadata=schema_omit(),
     )
-    """该数据源的重试配置(可选;用于覆盖默认重试策略)."""
+    """运行期加载重试配置;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
     fields: Dict[str, SourceFieldConfig] = dataclass_field(
         default_factory=dict,
@@ -396,9 +396,9 @@ class MainSourceConfig:
 
     retry: Optional[LoaderRetryConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
+        metadata=schema_omit(),
     )
-    """主数据源的重试配置(可选)."""
+    """运行期加载重试配置;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
     order_by: Tuple[str, ...] = dataclass_field(
         default_factory=tuple,

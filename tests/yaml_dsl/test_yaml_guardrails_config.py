@@ -1,14 +1,9 @@
 import pytest
 
-import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
 from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
-
-
-def _require_jsonschema() -> None:
-    if not HAS_JSONSCHEMA or validator_module.jsonschema is None:
-        pytest.skip("jsonschema not available")
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
 
 
 def _base_config() -> dict:
@@ -26,8 +21,7 @@ def _base_config() -> dict:
     }
 
 
-def test_yaml_schema_accepts_guardrails_config() -> None:
-    _require_jsonschema()
+def test_yaml_guardrails_key_is_rejected_by_validator() -> None:
     validator = ConfigValidator()
     config = _base_config()
     config["guardrails"] = {
@@ -38,34 +32,13 @@ def test_yaml_schema_accepts_guardrails_config() -> None:
         "compute": {"on_error": "fast_fail"},
     }
 
-    validator.validate(config)
-
-
-def test_yaml_schema_rejects_invalid_guardrails_mode() -> None:
-    _require_jsonschema()
-    validator = ConfigValidator()
-    config = _base_config()
-    config["guardrails"] = {"enabled": True, "mode": "panic"}
-
-    with pytest.raises(ScalimConfigValidationError):
+    with pytest.raises(ScalimConfigValidationError) as excinfo:
         validator.validate(config)
 
-
-def test_yaml_schema_rejects_guardrails_relations_fields_in_v1() -> None:
-    _require_jsonschema()
-    validator = ConfigValidator()
-    config = _base_config()
-    config["guardrails"] = {
-        "enabled": True,
-        "mode": "fast_fail",
-        "relations": {"null_key_max_rate": 0.0, "fields": ["__ALL__"]},
-    }
-
-    with pytest.raises(ScalimConfigValidationError):
-        validator.validate(config)
+    assert any(issue.path == "guardrails" for issue in excinfo.value.issues)
 
 
-def test_yaml_parser_resolves_guardrails_required_fields_alias() -> None:
+def test_yaml_guardrails_key_is_rejected_by_loader_load_string() -> None:
     loader = YamlDemandLoader()
     yaml_text = """
 name: demo
@@ -83,7 +56,7 @@ guardrails:
     required_fields:
       - *order_id
 """
-    config = loader.load_string(yaml_text)
-    assert config.guardrails is not None
-    assert config.guardrails.loader is not None
-    assert config.guardrails.loader.required_fields == ("order_id",)
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _ = loader.load_string(yaml_text)
+
+    assert any(env.path == "guardrails" for env in excinfo.value.errors)

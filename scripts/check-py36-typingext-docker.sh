@@ -147,6 +147,7 @@ out_path = tmp_root / "ecommerce_rank_score_report.output.csv"
 _ = run(
     str(yaml_path),
     allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
+    batch_size=10,
     init_vars={"out_path_rank": str(out_path)},
 )
 

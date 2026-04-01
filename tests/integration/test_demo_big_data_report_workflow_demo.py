@@ -42,6 +42,7 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path) -> None:
                 str(wf_copy),
                 allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"]),
                 init_vars={"order_ids": []},
+                batch_size=30,
                 path_aliases={"@": str(repo_root)},
                 allowed_yaml_roots=(str(repo_root),),
             )

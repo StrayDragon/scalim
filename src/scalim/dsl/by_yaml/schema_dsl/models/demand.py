@@ -4,8 +4,6 @@ from .....vendor.dataclassesx import dataclass
 from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     DEFAULT_BATCH_SIZE,
-    DESC_LOADER_RETRY,
-    DESC_LOADER_RETRY_MD,
     DESC_MAIN_SOURCE,
     DESC_MAIN_SOURCE_MD,
     SOURCE_ID_STRING_SCHEMA,
@@ -44,26 +42,15 @@ class DemandConfig:
 
     batch_size: Optional[int] = dataclass_field(
         default=DEFAULT_BATCH_SIZE,
-        metadata=schema_meta(
-            desc="批处理大小(null 或 >=1 的整数)",
-            md=("批处理大小.\n\n- 未声明时使用默认值\n- `null` 表示禁用分批(单批执行)\n- `>=1` 的整数表示固定分批大小"),
-            schema={
-                "oneOf": [
-                    {"type": "null"},
-                    {"type": "integer", "minimum": 1},
-                ]
-            },
-            default=DEFAULT_BATCH_SIZE,
-            examples=[None, DEFAULT_BATCH_SIZE],
-        ),
+        metadata=schema_omit(),
     )
-    """批处理大小;`None` 表示禁用分批(单批执行)."""
+    """运行期批处理大小;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
     retry: Optional[LoaderRetryConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(desc=DESC_LOADER_RETRY, md=DESC_LOADER_RETRY_MD, ref="loader_retry"),
+        metadata=schema_omit(),
     )
-    """全局加载重试配置(可选),作为默认重试策略."""
+    """运行期加载重试配置;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
     main_source: MainSourceConfig = dataclass_field(
         default_factory=MainSourceConfig,
@@ -115,13 +102,9 @@ class DemandConfig:
 
     guardrails: Optional[GuardrailsConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(
-            desc="运行时护栏配置(可选;默认关闭)",
-            md="运行时护栏配置.\n\n- 默认关闭\n- 用于控制 loader/relations/compute 等运行期护栏策略",
-            ref="guardrails",
-        ),
+        metadata=schema_omit(),
     )
-    """运行时护栏配置(可选)."""
+    """运行期护栏配置;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
     resources: Optional[ResourcesConfig] = dataclass_field(
         default=None,
@@ -183,15 +166,9 @@ class DemandConfig:
 
     failure_policy: str = dataclass_field(
         default="all_fail",
-        metadata=schema_meta(
-            desc="多输出失败策略(all_fail/primary_only)",
-            md=("多输出失败策略.\n\n- `all_fail`: 任一目标失败即失败\n- `primary_only`: 非主输出失败将被禁用但不阻断主输出"),
-            choices=["all_fail", "primary_only"],
-            default="all_fail",
-            examples=["all_fail"],
-        ),
+        metadata=schema_omit(),
     )
-    """多输出失败策略."""
+    """运行期多输出失败策略;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
     include_full_error_message: bool = dataclass_field(
         default=False,

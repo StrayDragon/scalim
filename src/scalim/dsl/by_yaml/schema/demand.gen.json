@@ -66,50 +66,13 @@
     "_templates": {
       "type": "object",
       "description": "YAML anchor 模板集合(_templates), 供 fields/relations 复用",
-      "markdownDescription": "YAML anchor 模板集合.\n\n- 仅用于 YAML 复用(anchors)\n- 常用于 `fields` / `relations` / `retry`",
-      "properties": {
-        "retry": {
-          "type": "object",
-          "description": "可复用的 retry 策略模板集合",
-          "markdownDescription": "可复用的 retry 策略模板集合.\n\n- key 为模板名\n- value 为 retry policy 对象",
-          "additionalProperties": {
-            "$ref": "#/definitions/loader_retry"
-          }
-        }
-      },
+      "markdownDescription": "YAML anchor 模板集合.\n\n- 仅用于 YAML 复用(anchors)\n- 常用于 `fields` / `relations`",
       "additionalProperties": true
     },
     "description": {
       "type": "string",
       "description": "配置描述",
       "markdownDescription": "配置描述(可选)."
-    },
-    "batch_size": {
-      "oneOf": [
-        {
-          "type": "null"
-        },
-        {
-          "type": "integer",
-          "minimum": 1
-        }
-      ],
-      "description": "批处理大小(null 或 >=1 的整数)",
-      "markdownDescription": "批处理大小.\n\n- 未声明时使用默认值\n- `null` 表示禁用分批(单批执行)\n- `>=1` 的整数表示固定分批大小",
-      "default": 1000,
-      "examples": [
-        null,
-        1000
-      ]
-    },
-    "retry": {
-      "description": "Loader retry 策略(可选;默认关闭)",
-      "markdownDescription": "Loader retry 策略.\n\n- 默认关闭: `enabled: false`\n- 启用后会对 loader 调用的瞬态错误做有限重试\n- 需要提供 `should_retry` 回调(安全引用),用于决定是否重试\n- 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5\n",
-      "allOf": [
-        {
-          "$ref": "#/definitions/loader_retry"
-        }
-      ]
     },
     "main_source": {
       "description": "主数据源配置(必填: source_id/loader, 可选 params/order_by)",
@@ -208,15 +171,6 @@
         "$ref": "#/definitions/relation"
       }
     },
-    "guardrails": {
-      "description": "运行时护栏配置(可选;默认关闭)",
-      "markdownDescription": "运行时护栏配置.\n\n- 默认关闭\n- 用于控制 loader/relations/compute 等运行期护栏策略",
-      "allOf": [
-        {
-          "$ref": "#/definitions/guardrails"
-        }
-      ]
-    },
     "resources": {
       "description": "可选:IO 资源声明(resources.*)",
       "markdownDescription": "可选:IO 资源声明.\n\n- 稳定入口: `resources.books` / `resources.files`",
@@ -257,19 +211,6 @@
       "examples": [
         true,
         false
-      ]
-    },
-    "failure_policy": {
-      "type": "string",
-      "description": "多输出失败策略(all_fail/primary_only)",
-      "markdownDescription": "多输出失败策略.\n\n- `all_fail`: 任一目标失败即失败\n- `primary_only`: 非主输出失败将被禁用但不阻断主输出",
-      "enum": [
-        "all_fail",
-        "primary_only"
-      ],
-      "default": "all_fail",
-      "examples": [
-        "all_fail"
       ]
     },
     "include_full_error_message": {
@@ -402,15 +343,6 @@
           "description": "调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)",
           "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$init_var: <name>}` 指令节点(编译期解析为调用方提供的 `init_vars[<name>]`)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$init_var: <name>}` 指令节点(单键映射;inline/block 等价;编译期解析为 `init_vars[<name>]`)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 预加载阶段会复用同一份编译后的 `sources.<id>.params` 模板并透传 kwargs\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `{$runtime: <name>}` 指令节点已不支持,请改用 `{$init_var: <name>}`\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$init_var: <name>}`",
           "additionalProperties": {}
-        },
-        "retry": {
-          "description": "Loader retry 策略(可选;默认关闭)",
-          "markdownDescription": "Loader retry 策略.\n\n- 默认关闭: `enabled: false`\n- 启用后会对 loader 调用的瞬态错误做有限重试\n- 需要提供 `should_retry` 回调(安全引用),用于决定是否重试\n- 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5\n",
-          "allOf": [
-            {
-              "$ref": "#/definitions/loader_retry"
-            }
-          ]
         },
         "order_by": {
           "type": "array",
@@ -1028,15 +960,6 @@
             "preload_forever"
           ],
           "default": "none"
-        },
-        "retry": {
-          "description": "Loader retry 策略(可选;默认关闭)",
-          "markdownDescription": "Loader retry 策略.\n\n- 默认关闭: `enabled: false`\n- 启用后会对 loader 调用的瞬态错误做有限重试\n- 需要提供 `should_retry` 回调(安全引用),用于决定是否重试\n- 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5\n",
-          "allOf": [
-            {
-              "$ref": "#/definitions/loader_retry"
-            }
-          ]
         },
         "fields": {
           "type": "object",

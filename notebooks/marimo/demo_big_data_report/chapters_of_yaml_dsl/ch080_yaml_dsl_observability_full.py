@@ -88,6 +88,7 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
                 components=components,
+                batch_size=2,
                 init_vars=init_vars,
                 overrides=overrides,
             )

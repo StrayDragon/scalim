@@ -3,8 +3,6 @@
 name: order_report
 description: 订单报表 - 展示客户、支付、国家等关联信息
 
-batch_size: 3
-
 main_source:
   source_id: orders
   loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"

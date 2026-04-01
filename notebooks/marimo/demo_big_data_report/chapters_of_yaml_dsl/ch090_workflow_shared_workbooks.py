@@ -68,6 +68,7 @@ def run_workflow_shared_workbooks(
                 wf_result = run_workflow(
                     str(wf_copy),
                     allowed_modules=allowed_modules,
+                    batch_size=30,
                     init_vars={"order_ids": []},
                     path_aliases={"@": str(repo_root)},
                     allowed_yaml_roots=(str(repo_root),),

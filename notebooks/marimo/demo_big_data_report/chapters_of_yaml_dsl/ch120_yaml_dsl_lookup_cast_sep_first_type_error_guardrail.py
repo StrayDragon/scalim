@@ -41,11 +41,20 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
         out_detail = tmp / "detail.csv"
 
         init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        from scalim.execution.guardrails import GuardrailsPolicy, GuardrailsRelationsPolicy
+
+        guardrails = GuardrailsPolicy(
+            enabled=True,
+            mode="quiet",
+            relations=GuardrailsRelationsPolicy(type_error_max_rate=0),
+        )
         try:
             compilation = compile_yaml(
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
                 components=[guardrail_capture],
+                batch_size=2,
+                guardrails=guardrails,
                 init_vars=init_vars,
             )
             core = run_ir(compilation.demand_ir, compilation.request)
@@ -116,7 +125,7 @@ def _(mo):
         ## 本章覆盖的 YAML DSL 能力
 
         - relation step `lookup_cast.sep_first` + `sep`：按分隔符取首段后做 key normalize
-        - `guardrails.relations.type_error_max_rate`：把 key 清洗失败(type_error)变成可回归 guardrail
+        - runtime guardrails(`GuardrailsPolicy(...type_error_max_rate=0)`)：把 key 清洗失败(type_error)变成可回归 guardrail
 
         ## 对拍点（deterministic）
 

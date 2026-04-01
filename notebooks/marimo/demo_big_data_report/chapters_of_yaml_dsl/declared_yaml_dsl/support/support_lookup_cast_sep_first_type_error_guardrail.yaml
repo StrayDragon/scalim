@@ -12,20 +12,16 @@ description: |
   方案:
   - relation step 上使用 `lookup_cast: {name: sep_first, sep: ','}`:
     - 先按分隔符取第一段,再做 `auto_normalize_key`
-  - guardrails.relations.type_error_max_rate=0:
+  - runtime guardrails:
+    - `GuardrailsPolicy(enabled=True, mode='quiet', relations=GuardrailsRelationsPolicy(type_error_max_rate=0))`
     - 一旦出现 type_error(lookup_cast 返回 None 或抛异常)就立刻记录 guardrail(quiet 模式)
 
   对拍(oracle):
   - 断言: ticket_id=2001 能正确关联到 team-a; ticket_id=2002 为空字符串会触发 type_error 并让 agent_team 为空
   - 断言: guardrail codes 包含 `relation_type_error_rate_exceeded`
 
-batch_size: 2
-
-guardrails:
-  enabled: true
-  mode: quiet
-  relations:
-    type_error_max_rate: 0
+# NOTE: runtime policies (`batch_size`, `guardrails`) moved out of YAML boundary.
+# Pass via runtime entrypoints, e.g. `compile(..., batch_size=2, guardrails=GuardrailsPolicy(...))`.
 
 main_source:
   source_id: tickets

@@ -12,7 +12,6 @@ from ....schema_dsl.constants import (
     NORMALIZE_ON_MISSING_ENUM,
     SOURCE_ID_STRING_SCHEMA,
 )
-from ....schema_dsl.models import LOADER_RETRY_KEYS
 from ..field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
 from ..parsers.utils import list_or_none, mapping_or_none
 from .base import ValidatorMixinBase
@@ -45,52 +44,6 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             data_key = derive_source_field_data_key(field_id=field_id, extract=extract_expr)
             data_key_map.setdefault(data_key, set()).add(field_id)
         return data_key_map
-
-    def _validate_loader_retry_should_retry(
-        self,
-        retry_raw: object,
-        errors: List[ValidationIssue],
-        *,
-        path_prefix: str,
-    ) -> None:
-        retry_dict = mapping_or_none(retry_raw)
-        if retry_raw is not None and retry_dict is None:
-            self._add_error(errors, "'{}' must be a dictionary".format(path_prefix), path=path_prefix)
-            return
-        if retry_dict is None:
-            return
-
-        should_retry_key = LOADER_RETRY_KEYS["should_retry"]
-        if should_retry_key not in retry_dict:
-            return
-        should_retry_raw = retry_dict.get(should_retry_key)
-        if should_retry_raw is None:
-            self._add_error(
-                errors,
-                "'{}.{}' must be a non-empty string when provided".format(path_prefix, should_retry_key),
-                path="{}.{}".format(path_prefix, should_retry_key),
-            )
-            return
-        if not isinstance(should_retry_raw, str):
-            self._add_error(
-                errors,
-                "'{}.{}' must be a string".format(path_prefix, should_retry_key),
-                path="{}.{}".format(path_prefix, should_retry_key),
-            )
-            return
-        should_retry_ref = should_retry_raw.strip()
-        if not should_retry_ref:
-            self._add_error(
-                errors,
-                "'{}.{}' must not be empty when provided".format(path_prefix, should_retry_key),
-                path="{}.{}".format(path_prefix, should_retry_key),
-            )
-            return
-        if not self._is_valid_loader_ref(should_retry_ref):
-            msg = "'{}.{}' 的引用 '{}' 非法. 期望格式: {}".format(
-                path_prefix, should_retry_key, should_retry_raw, REFERENCE_FORMAT_EXAMPLES
-            )
-            self._add_error(errors, msg, path="{}.{}".format(path_prefix, should_retry_key))
 
     def _validate_params_template_semantics(
         self,
@@ -179,18 +132,6 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         for field_name in required_fields:
             if field_name not in config:
                 self._add_error(errors, "Missing required field: '{}'".format(field_name), path=field_name)
-
-    def _validate_batch_size(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
-        if _F.BATCH_SIZE not in config:
-            return
-        raw = config.get(_F.BATCH_SIZE)
-        if raw is None:
-            return
-        if isinstance(raw, bool) or not isinstance(raw, int):
-            self._add_error(errors, "'{}' must be null or an integer >= 1".format(_F.BATCH_SIZE), path=_F.BATCH_SIZE)
-            return
-        if raw < 1:
-            self._add_error(errors, "'{}' must be >= 1 when provided".format(_F.BATCH_SIZE), path=_F.BATCH_SIZE)
 
     def _validate_legacy_fields(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912
         if "output" in config:
@@ -326,12 +267,6 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                         path=key_path,
                     )
 
-            self._validate_loader_retry_should_retry(
-                source_dict.get("retry"),
-                errors,
-                path_prefix="sources.{}.retry".format(source_id),
-            )
-
             bind_raw = source_dict.get(_F.BIND)
             if bind_raw is not None:
                 self._add_error(
@@ -424,12 +359,6 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         elif not self._is_valid_loader_ref(loader_ref):
             msg = "主数据源的 loader 引用 '{}' 非法. 期望格式: {}".format(loader_raw, REFERENCE_FORMAT_EXAMPLES)
             self._add_error(errors, msg, path="{}.{}".format(_F.MAIN_SOURCE, _F.LOADER))
-
-        self._validate_loader_retry_should_retry(
-            main_source_data.get("retry"),
-            errors,
-            path_prefix="{}.retry".format(_F.MAIN_SOURCE),
-        )
 
         if source_id and sources_raw is not None and source_id in sources_raw:
             self._add_error(

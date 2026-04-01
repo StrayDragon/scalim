@@ -594,7 +594,7 @@ observability:
     assert compilation.request.observability.viz_config is viz_config
 
 
-def test_compile_keeps_null_batch_size_from_yaml(tmp_path: Path) -> None:
+def test_compile_rejects_yaml_batch_size(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,
         """
@@ -610,20 +610,17 @@ sources: {}
 """,
     )
 
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
-    config = compilation.config
-    request = compilation.request
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
 
-    assert config.batch_size is None
-    assert request.batch_size is None
+    assert any(env.path == "batch_size" for env in excinfo.value.errors)
 
 
-def test_compile_batch_size_option_overrides_yaml_null(tmp_path: Path) -> None:
+def test_compile_batch_size_option_applies(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,
         """
 name: overlay_batch_size_override
-batch_size: null
 main_source:
   source_id: orders
   loader: tests.fixtures.mock_loaders.mock_loader
@@ -639,9 +636,57 @@ sources: {}
         allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
         batch_size=256,
     )
+    config = compilation.config
     request = compilation.request
 
+    assert config.batch_size == 256
     assert request.batch_size == 256
+
+
+def test_compile_batch_size_option_rejects_invalid_type(tmp_path: Path) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: overlay_batch_size_invalid_type
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+""",
+    )
+
+    with pytest.raises(TypeError, match=r"batch_size must be an integer >= 1 or None"):
+        _ = compile(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            batch_size=True,  # type: ignore[arg-type] intentional runtime boundary test
+        )
+
+
+def test_compile_batch_size_option_rejects_non_positive_int(tmp_path: Path) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: overlay_batch_size_invalid_value
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+""",
+    )
+
+    with pytest.raises(ValueError, match=r"batch_size must be >= 1"):
+        _ = compile(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            batch_size=0,
+        )
 
 
 def test_loader_parse_config_rejects_invalid_validate_unique_field_names_type() -> None:

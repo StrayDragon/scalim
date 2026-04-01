@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, GuardrailsRelationsPolicy
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import (
@@ -56,6 +57,16 @@ def run_yaml_dsl_support(
         data_loader_names=["customers", "agents"],
         sample_limit=3,
     )
+    guardrails_policy = GuardrailsPolicy(
+        enabled=True,
+        mode="quiet",
+        loader=GuardrailsLoaderPolicy(
+            validate_result=True,
+            required_fields=("ticket_id", "customer_id", "agent_id"),
+            on_transform_error="quiet",
+        ),
+        relations=GuardrailsRelationsPolicy(null_key_max_rate=0.0),
+    )
 
     with tempfile.TemporaryDirectory(prefix="scalim-support-") as tmpdir:
         tmp = Path(tmpdir)
@@ -76,6 +87,8 @@ def run_yaml_dsl_support(
                 allowed_modules=_ALLOWED_MODULES,
                 components=[guardrail_capture, row_gap_observer],
                 init_vars=init_vars,
+                guardrails=guardrails_policy,
+                batch_size=None,
             )
             core = run_ir(compilation.demand_ir, compilation.request)
         except Exception as exc:  # noqa: BLE001
@@ -163,7 +176,7 @@ def _(mo):
         ## 方案选择（取舍）
 
         - 纯 Python：可做，但难以形成“配置即回归”
-        - **YAML DSL（本章）**：用 `guardrails` + runtime `components=[RowGapObserver(...), ...]` 把问题变成确定性信号
+        - **YAML DSL（本章）**：用 runtime guardrails + runtime `components=[RowGapObserver(...), ...]` 把问题变成确定性信号
 
         ## 对拍点（deterministic）
 

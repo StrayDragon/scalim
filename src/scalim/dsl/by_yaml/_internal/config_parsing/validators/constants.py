@@ -20,7 +20,8 @@ _VALIDATOR_LOGGER = logging.getLogger("scalim.dsl.by_yaml.validator")
 
 class _FieldNames:
     NAME: str = DEMAND_KEYS["name"]
-    BATCH_SIZE: str = DEMAND_KEYS["batch_size"]
+    # `batch_size` 从 `demand` `YAML` 主线迁出;这里保留常量仅用于错误信息路径与内部工具复用.
+    BATCH_SIZE: str = "batch_size"
     MAIN_SOURCE: str = DEMAND_KEYS["main_source"]
     SOURCES: str = DEMAND_KEYS["sources"]
     FIELDS: str = DEMAND_FIELDS_KEY

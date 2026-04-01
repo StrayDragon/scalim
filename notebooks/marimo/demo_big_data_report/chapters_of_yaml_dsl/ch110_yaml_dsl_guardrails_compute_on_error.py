@@ -47,11 +47,20 @@ def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None
         out_detail = tmp / "detail.csv"
 
         init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        from scalim.execution.guardrails import GuardrailsComputePolicy, GuardrailsPolicy
+
+        guardrails = GuardrailsPolicy(
+            enabled=True,
+            mode="fast_fail",
+            compute=GuardrailsComputePolicy(on_error="quiet"),
+        )
         try:
             compilation = compile_yaml(
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
                 components=[guardrail_capture],
+                batch_size=2,
+                guardrails=guardrails,
                 init_vars=init_vars,
             )
             core = run_ir(compilation.demand_ir, compilation.request)
@@ -124,9 +133,9 @@ def _(mo):
 
         ## 方案选择（取舍）
 
-        - 全局 `guardrails.mode=quiet`：简单,但会把其他错误也放过(不够严格)
+        - 全局 `GuardrailsPolicy(mode='quiet')`：简单,但会把其他错误也放过(不够严格)
         - **本章**：全局保持 `fast_fail`,仅对 `compute` 这一类错误放宽:
-          - `guardrails.compute.on_error=quiet` -> compute 失败写 `None` 并记录 `compute_error` guardrail
+          - `GuardrailsComputePolicy(on_error='quiet')` -> compute 失败写 `None` 并记录 `compute_error` guardrail
 
         ## 对拍点（deterministic）
 

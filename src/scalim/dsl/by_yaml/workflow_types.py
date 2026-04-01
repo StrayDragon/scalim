@@ -13,6 +13,9 @@ from .workflow_config import (
     WorkflowCachePoolPin,
     WorkflowConfig,
     WorkflowOptions,
+    WorkflowOutputStagingOptions,
+    WorkflowResourcesWaitDiagnosticsOptions,
+    WorkflowResourcesWaitOptions,
     WorkflowRun,
 )
 
@@ -23,5 +26,8 @@ __all__ = (
     "WorkflowCachePoolPin",
     "WorkflowConfig",
     "WorkflowOptions",
+    "WorkflowOutputStagingOptions",
+    "WorkflowResourcesWaitDiagnosticsOptions",
+    "WorkflowResourcesWaitOptions",
     "WorkflowRun",
 )

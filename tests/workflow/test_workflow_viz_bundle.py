@@ -23,8 +23,6 @@ def _write_minimal_demand_yaml(tmp_path: Path, *, file_name: str, name: str) -> 
             """
 name: {name}
 
-batch_size: 1
-
 main_source:
   source_id: main
   loader: "tests.fixtures.workflow_loaders:load_main_fast"
@@ -41,8 +39,6 @@ def _write_table_demand_yaml_with_book_output(tmp_path: Path, *, file_name: str,
         (
             f"""
 name: {name}
-
-batch_size: 1
 
 main_source:
   source_id: main
@@ -71,8 +67,6 @@ def _write_bad_demand_yaml(tmp_path: Path, *, file_name: str, name: str) -> Path
         (
             """
 name: {name}
-
-batch_size: 1
 
 main_source:
   source_id: main

@@ -106,6 +106,8 @@ def run_yaml_dsl_output_failure_policy(
                 redacted_result = run_yaml(
                     str(yaml_redacted_path),
                     allowed_modules=_ALLOWED_MODULES,
+                    demand_failure_policy="primary_only",
+                    batch_size=2,
                     init_vars=init_vars_redacted,
                     allowed_yaml_roots=allowed_yaml_roots,
                 )
@@ -156,6 +158,8 @@ def run_yaml_dsl_output_failure_policy(
                 full_result = run_yaml(
                     str(yaml_full_path),
                     allowed_modules=_ALLOWED_MODULES,
+                    demand_failure_policy="primary_only",
+                    batch_size=2,
                     init_vars=init_vars_full,
                     allowed_yaml_roots=allowed_yaml_roots,
                 )
@@ -204,6 +208,8 @@ def run_yaml_dsl_output_failure_policy(
                 _ = run_yaml(
                     str(yaml_all_fail_path),
                     allowed_modules=_ALLOWED_MODULES,
+                    demand_failure_policy="all_fail",
+                    batch_size=2,
                     init_vars=init_vars_all_fail,
                     allowed_yaml_roots=allowed_yaml_roots,
                 )
@@ -261,11 +267,11 @@ def _(mo):
 
         ## 需求方提问（自然语言）
 
-        平台同学：能不能在 YAML 里声明“失败策略”和“错误信息是否脱敏”,并且在 CI 里确定性对拍？
+        平台同学：能不能在运行入口侧声明“失败策略”,并在 YAML 里声明“错误信息是否脱敏”,并且在 CI 里确定性对拍？
 
-        ## 本章覆盖的 YAML DSL 能力
+        ## 本章覆盖的能力
 
-        - `failure_policy`: `all_fail` / `primary_only`
+        - runtime `demand_failure_policy`: `all_fail` / `primary_only`
         - `include_full_error_message`: `false`(默认脱敏) / `true`(包含全文)
         - 顶层 `$import`(list) + `imports`：用 fragments 复用 base 配置
 

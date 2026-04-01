@@ -43,7 +43,6 @@ from .error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from .imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
-from .parsers.guardrails import ParserGuardrailsMixin
 from .parsers.outputs import ParserOutputsMixin
 from .parsers.utils import mapping_or_none, str_or_none
 from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
@@ -63,7 +62,6 @@ def _create_validator() -> "ConfigValidator":
 class YamlDemandLoader(
     ParserFieldsMixin,
     ParserOutputsMixin,
-    ParserGuardrailsMixin,
 ):
     _validator: Optional["ConfigValidator"]
 
@@ -287,11 +285,8 @@ class YamlDemandLoader(
     def _parse_config(self, raw: RawDemand) -> DemandConfig:
         name = str(raw.data.get(DEMAND_KEYS["name"], ""))
         description = str(raw.data.get(DEMAND_KEYS["description"], ""))
-        if DEMAND_KEYS["batch_size"] in raw.data:
-            batch_size = raw.data.get(DEMAND_KEYS["batch_size"])
-        else:
-            batch_size = DEFAULT_BATCH_SIZE
-        retry = self._parse_loader_retry(raw.data.get(DEMAND_KEYS["retry"]))
+        batch_size = DEFAULT_BATCH_SIZE
+        retry = None
         main_source = self._parse_main_source(raw)
         sources = self._parse_sources(raw)
         relations = self._parse_relations(raw)
@@ -318,15 +313,12 @@ class YamlDemandLoader(
             msg = "validate_unique_field_names must be a boolean"
             raise TypeError(msg)
 
-        failure_policy = str(raw.data.get(DEMAND_KEYS["failure_policy"], "all_fail") or "all_fail")
-        if failure_policy not in ("all_fail", "primary_only"):
-            msg = "failure_policy must be 'all_fail' or 'primary_only'"
-            raise ValueError(msg)
+        failure_policy = "all_fail"
 
         include_full_error_message = bool(raw.data.get(DEMAND_KEYS["include_full_error_message"], False))
         meta = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["meta"]), key="meta")
         audit = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["audit"]), key="audit")
-        guardrails = self._parse_guardrails(raw.data, parsed_fields.field_def_index)
+        guardrails = None
 
         return DemandConfig(
             name=name,

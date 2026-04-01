@@ -42,7 +42,6 @@ def run_public_api_key_normalization() -> ExampleResult:
 
         demand_yaml = """\
 name: public_api_key_normalization_demo
-batch_size: 10
 
 main_source:
   source_id: items
@@ -75,6 +74,7 @@ sources:
             allowed_modules=_ALLOWED_MODULES,
             sink=sink_raw,
             key_normalization="raw",
+            batch_size=10,
         )
         raw_rows = sink_raw.get_data()
 
@@ -84,6 +84,7 @@ sources:
             allowed_modules=_ALLOWED_MODULES,
             sink=sink_norm,
             key_normalization="auto_str",
+            batch_size=10,
         )
         norm_rows = sink_norm.get_data()
 

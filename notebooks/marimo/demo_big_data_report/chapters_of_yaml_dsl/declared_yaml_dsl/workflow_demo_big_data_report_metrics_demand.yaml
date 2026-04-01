@@ -9,8 +9,6 @@ description: |
   - 演示 workflow `writes` 的 CSV aggregate 输出
   - 复用 `preload_counter` source,验证 workflow cache_pool 的 hit/release/evict 事件
 
-batch_size: 30
-
 main_source:
   source_id: detail_rows
   loader: "scalim.workflow.loaders:book_sheet_rows"

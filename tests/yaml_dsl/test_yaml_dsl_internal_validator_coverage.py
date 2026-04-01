@@ -56,7 +56,8 @@ def test_validator_sources_skip_import_and_cover_key_edge_cases() -> None:
 
     assert all(not str(path).startswith("sources.$import") for path in paths)
     assert any("main_source.loader must not be empty" in msg for msg in messages)
-    assert any("main_source.retry.should_retry" in msg and "must not be empty when provided" in msg for msg in messages)
+    assert any(path == "main_source.retry" for path in paths)
+    assert any("moved out of YAML mainline" in msg and "loader_retry=LoaderRetryPoliciesSpec" in msg for msg in messages)
     assert any("sources.s_key_none.key must be a non-empty field_id or field_id list" in msg for msg in messages)
     assert any("sources.s_key_empty_list.key must not be empty" in msg for msg in messages)
     assert any("sources.s_key_non_str.key.0 must be a string" in msg for msg in messages)

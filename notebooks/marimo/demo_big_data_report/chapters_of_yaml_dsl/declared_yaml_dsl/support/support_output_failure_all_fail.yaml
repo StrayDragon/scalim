@@ -12,5 +12,6 @@ description: |
   用途:
   - 在强一致场景(例如财务对账/监管报送)中,任何输出失败都必须阻断.
 
-failure_policy: all_fail
+# NOTE: demand `failure_policy` moved out of YAML runtime policy boundary.
+# Pass via runtime entrypoints, e.g. `run(..., demand_failure_policy="all_fail")`.
 include_full_error_message: false

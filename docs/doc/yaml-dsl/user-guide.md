@@ -361,13 +361,17 @@ outputs:
 ```yaml
 name: order_report
 description: 订单报表配置
-batch_size: 500
 
 _templates:
   # 定义可复用的 YAML 锚点
   common_params_keys: &common_params_keys
     ids: {$keys: {as: set}}
 ```
+
+注意:
+
+- `batch_size`/`retry`/`guardrails`/demand `failure_policy` 已迁出 YAML 主线(运行期策略边界);请在 Python runtime entrypoints 中配置:
+  - `scalim.dsl.by_yaml.run/compile(..., batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)`
 
 ### 3.2 主数据源配置 (main_source)
 
@@ -1318,8 +1322,6 @@ base_module_path = derive_base_module_path("path/to/config.yaml")
 name: order_report
 description: 订单报表 - 展示客户、支付、国家等关联信息
 
-batch_size: 3
-
 main_source:
   source_id: orders
   loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
@@ -1395,6 +1397,10 @@ resources:
       path: ./.tmp/output/order_report.csv
 ```
 
+运行提示:
+
+- `batch_size` 已迁出 YAML 主线;调用侧通过 `run/compile(..., batch_size=3)` 设置.
+
 ### 5.2 示例2: 电商报表(多级关联、复合键、派生字段)
 
 **场景**:生成包含多级关联、复合键关联、派生字段的电商订单报表.
@@ -1404,8 +1410,6 @@ resources:
 ```yaml
 name: ecommerce_order_report
 description: 电商订单报表
-
-batch_size: 100
 
 _templates:
   step_orders_to_customers: &step_orders_to_customers
@@ -1647,14 +1651,16 @@ sources:
 
 ### 6.3 性能优化建议
 
-**1. 合理设置 batch_size**:
+**1. 合理设置 batch_size(运行期策略,通过 runtime entrypoint 配置)**:
 
-```yaml
+```python
+from scalim.dsl.by_yaml import run
+
 # 小数据集或低内存环境
-batch_size: 500
+run("path/to/report.yaml", allowed_modules=frozenset(["myapp"]), batch_size=500)
 
 # 大数据集或高内存环境
-batch_size: 2000
+run("path/to/report.yaml", allowed_modules=frozenset(["myapp"]), batch_size=2000)
 ```
 
 **2. 使用缓存**:
@@ -1931,8 +1937,10 @@ sources:
 
 1. **减小 batch_size**:
 
-```yaml
-batch_size: 500    # 默认 1000
+```python
+from scalim.dsl.by_yaml import run
+
+run("path/to/report.yaml", allowed_modules=frozenset(["myapp"]), batch_size=500)  # 默认 1000
 ```
 
 2. **使用文件资源绑定 CSV 输出**:

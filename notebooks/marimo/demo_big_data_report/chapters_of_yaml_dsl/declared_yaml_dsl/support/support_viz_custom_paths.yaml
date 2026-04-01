@@ -16,7 +16,8 @@ description: |
   对拍(oracle):
   - 断言: 三个文件都存在,且快照里包含 `meta.viz.run_name/env/payload_policy/...` 等元信息
 
-batch_size: 2
+# NOTE: `batch_size` moved out of YAML runtime policy boundary.
+# Pass via runtime entrypoints, e.g. `compile(..., batch_size=2)`.
 
 main_source:
   source_id: tickets

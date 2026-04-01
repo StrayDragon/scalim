@@ -224,7 +224,6 @@ def test_config_validator_and_call_by_parser_accept_relative_references() -> Non
     validator = ConfigValidator()
     config = {
         "name": "demo",
-        "retry": {"should_retry": ".retry:should_retry"},
         "main_source": {
             "source_id": "orders",
             "loader": ".loaders:load_orders",
@@ -270,16 +269,6 @@ def test_config_validator_and_call_by_parser_reject_invalid_relative_references(
     with pytest.raises(ScalimConfigValidationError):
         validator.validate(bad_dotted)
 
-    bad_retry = {
-        "name": "demo",
-        "main_source": {"source_id": "orders", "loader": "abs.mod:load_orders"},
-        "sources": {},
-        "fields": {},
-        "retry": {"should_retry": ".:should_retry"},
-    }
-    with pytest.raises(ScalimConfigValidationError):
-        validator.validate(bad_retry)
-
     with pytest.raises(ScalimCallByParseError, match="`call_by` 引用 .* 非法"):
         parse_call_by(".:echo(status)")
 
@@ -300,7 +289,7 @@ def test_validator_retry_block_must_be_mapping() -> None:
 
     with pytest.raises(ScalimConfigValidationError) as excinfo:
         validator.validate(config)
-    assert any("retry: 'retry' must be a dictionary" in item for item in excinfo.value.errors)
+    assert any("retry: YAML key 'retry' was moved out of YAML mainline" in item for item in excinfo.value.errors)
 
 
 def test_validator_retry_should_retry_rejects_null() -> None:
@@ -318,7 +307,7 @@ def test_validator_retry_should_retry_rejects_null() -> None:
     }
     with pytest.raises(ScalimConfigValidationError) as excinfo:
         validator.validate(config)
-    assert any("retry.should_retry" in item and "non-empty" in item for item in excinfo.value.errors)
+    assert any("retry: YAML key 'retry' was moved out of YAML mainline" in item for item in excinfo.value.errors)
 
 
 def test_validator_retry_should_retry_must_be_string() -> None:
@@ -337,7 +326,7 @@ def test_validator_retry_should_retry_must_be_string() -> None:
 
     with pytest.raises(ScalimConfigValidationError) as excinfo:
         validator.validate(config)
-    assert any("retry.should_retry" in item and "must be a string" in item for item in excinfo.value.errors)
+    assert any("retry: YAML key 'retry' was moved out of YAML mainline" in item for item in excinfo.value.errors)
 
 
 def test_run_options_accepts_allowed_modules_for_relative_loader_smoke() -> None:

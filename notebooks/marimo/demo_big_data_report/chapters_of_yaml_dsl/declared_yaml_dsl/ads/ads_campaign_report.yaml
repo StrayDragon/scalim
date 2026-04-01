@@ -10,22 +10,10 @@ description: |
   - main_source: impressions（曝光日志）
   - sources: adgroups/campaigns/creatives/clicks/conversions/pricing（维表/事件表）
   - outputs: 多输出（明细 + 点击明细 + 聚合指标），并用 `where`/`from` 复用
-  - retry: 对瞬态 loader 错误做确定性重试（示例: creatives loader 首次调用抛 transient error）
+  - runtime loader_retry: 对瞬态 loader 错误做确定性重试（示例: creatives loader 首次调用抛 transient error）
 
   对拍(oracle):
   - `scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:verify_ads_outputs_csv_rows`
-
-batch_size: 10
-
-retry:
-  enabled: true
-  should_retry: "scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:should_retry_ads_transient"
-  max_attempts: 2
-  max_elapsed_seconds: 2
-  backoff: fixed
-  base_delay_seconds: 0
-  max_delay_seconds: 0
-  jitter: false
 
 _templates:
   detail_all_csv_file: &detail_all_csv_file

@@ -11,23 +11,19 @@ sources:
   canonical_example: references/generated/example-full/ecommerce_report.gen.yaml
   validator: src/scalim/dsl/by_yaml/config_parsing/validator.py
 builtin_callables[1	]: ^workflow/book_sheet_rows
-demand_top_fields[19	]{name	required}:
+demand_top_fields[15	]{name	required}:
   name	false
   imports	false
   $import	false
   _templates	false
   description	false
-  batch_size	false
-  retry	false
   main_source	false
   sources	false
   fields	false
   relations	false
-  guardrails	false
   resources	false
   outputs	false
   validate_unique_field_names	false
-  failure_policy	false
   include_full_error_message	false
   meta	false
   audit	false
@@ -48,185 +44,176 @@ openspec_requirement_map[15	]{slug	path	purpose	requirements}:
   runtime-guardrails	openspec/specs/runtime-guardrails/spec.md	定义运行期 guardrails 配置与执行契约,用于对 loader/relations/compute 等环节的契约违规、数据质量问题与异常处理提供可配置的 quiet/fast_fail 行为,并通过现有错误事件通道进行可观测记录.	"Guardrails 配置与默认行为\nquiet 模式违规记录\nLoader 结果结构护栏\nRowLike 字段提取语义(无歧义优先级)\n关键字段缺失护栏\n字段 extractor/value_cast/transform 异常护栏\n关联 null_key/type_error 阈值护栏\ncompute 异常护栏\nGuardrailViolation payload 包含稳定的 guardrail 元字段\nquiet 模式下的 guardrail once_key 去重约定"
   performance-observability	openspec/specs/performance-observability/spec.md	PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断.	"性能指标采集与结构化输出\nduration 统计使用单调时钟\n资源采样与报告输出\nruntime entrypoints 装配与独立开关\nRelationObserver 统计与报告\nadaptive 调度决策可观测性\nconsole reports in observability presets MUST follow dependency-free-console-reports\nchanging console formatting MUST NOT change metrics semantics"
   output-mode-api	openspec/specs/output-mode-api/spec.md	"定义运行时输出语义为“显式 sink 驱动”: 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配. 同时要求稳定的执行元数据(例如 `ExecutionResult.total_rows`)以及异常路径的 best-effort 资源清理."	"输出是否保留内存数据由 sink 表达\n无输出时避免构造返回列表\n允许 tee 同时写文件与显式 sink\ntotal_rows 为稳定元数据\n成功路径 sink.close 失败必须使 run 失败\n异常路径 close 不得覆盖原异常\n异常路径 best-effort 关闭 sink"
-entries[44	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	examples	constraints}:
+entries[40	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	examples	constraints}:
   1	demand.field	name	properties.name	false	null	string	需求配置名称. - 必填, 用于标识当前配置	null	null	null	"[\"order_report\"]"	null
   2	demand.field	imports	properties.imports	false	null	object	"片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录): - `./x.yaml` / `x.yaml` - `x/y.yaml`(子目录) - `../x.yaml`(父目录) - 支持(编辑器侧放宽,运行时校验为准): - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置) - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单) - 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等"	null	null	null	null	additionalProperties=string
   3	demand.field	$import	properties.$import	false	null	string | array	"$import 引用. - string: `<alias>(.<segment>)*` - list: 按顺序合并,后者覆盖前者,最终再被本地覆盖 - 仅支持 mapping 片段 - 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset - 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准"	null	null	null	"[\"common.sources\",[\"common.sources\",\"other.sources\"]]"	oneOf=2
-  4	demand.field	_templates	properties._templates	false	null	object	YAML anchor 模板集合. - 仅用于 YAML 复用(anchors) - 常用于 `fields` / `relations` / `retry`	null	null	null	null	additionalProperties=true
+  4	demand.field	_templates	properties._templates	false	null	object	YAML anchor 模板集合. - 仅用于 YAML 复用(anchors) - 常用于 `fields` / `relations`	null	null	null	null	additionalProperties=true
   5	demand.field	description	properties.description	false	null	string	配置描述(可选).	null	null	null	null	null
-  6	demand.field	batch_size	properties.batch_size	false	null	null | integer	批处理大小. - 未声明时使用默认值 - `null` 表示禁用分批(单批执行) - `>=1` 的整数表示固定分批大小	null	1000	null	[null,1000]	oneOf=2
-  7	demand.field	retry	properties.retry	false	null	null	"Loader retry 策略. - 默认关闭: `enabled: false` - 启用后会对 loader 调用的瞬态错误做有限重试 - 需要提供 `should_retry` 回调(安全引用),用于决定是否重试 - 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5"	null	null	null	null	allOf=1
-  8	demand.field	main_source	properties.main_source	false	null	null	"主数据源配置. - 必填: `source_id`, `loader` - `source_id` 不能出现在 `sources` 中 - `fields` 仅允许源字段(禁止 `compute`) - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)"	null	null	null	null	allOf=1
-  9	demand.field	sources	properties.sources	false	null	object	"数据源配置映射, key 为 `source_id`. - 每个 source 必填: `loader`, `key` - 不允许包含 `main_source.source_id` - `fields` 仅允许源字段(禁止 `compute`)"	null	null	null	null	minProperties=0; additionalProperties=ref #/definitions/source
-  10	demand.field	fields	properties.fields	false	null	object	字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用	null	null	null	null	additionalProperties=ref #/definitions/field
-  11	demand.field	relations	properties.relations	false	null	object	"命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`"	null	null	null	null	additionalProperties=ref #/definitions/relation
-  12	demand.field	guardrails	properties.guardrails	false	null	null	运行时护栏配置. - 默认关闭 - 用于控制 loader/relations/compute 等运行期护栏策略	null	null	null	null	allOf=1
-  13	demand.field	resources	properties.resources	false	null	null	"可选:IO 资源声明. - 稳定入口: `resources.books` / `resources.files`"	null	null	null	null	allOf=1
-  14	demand.field	outputs	properties.outputs	false	null	array	"输出目标列表(有序; 可选). - 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体) - 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs` - 通过 `where` 分发到不同 sheet - 通过 `aggregate` 声明派生汇总输出 - 通过 `from` 复用字段集合与容器配置 - 不再支持旧写法: 顶层 `output:`"	null	null	null	"[[{\"fields\":[\"order_id\",\"user_id\"],\"name\":\"detail\",\"to\":{\"sheet\":\"明细\"}}]]"	minItems=0; items=ref #/definitions/output_target
-  15	demand.field	validate_unique_field_names	properties.validate_unique_field_names	false	null	boolean	"预检查: 字段有效展示名(`effective display name`)全局唯一. - 默认启用: 未声明时等价 `true` - 有效展示名定义: - 若 `field.name` 非空: 使用 `name` - 否则回退为 `field_id` - 仅当 `effective outputs` 会输出表头且 `header_fields_output_by: name` 时触发 - file: `write.include_header: true` 且 `write.header_fields_output_by: name` - book: 该 output 会输出表头,且 `write.header_fields_output_by: name` - 显式设置为 `false` 可关闭该检查(不推荐长期使用)"	null	true	null	[true,false]	null
-  16	demand.field	failure_policy	properties.failure_policy	false	null	string	"多输出失败策略. - `all_fail`: 任一目标失败即失败 - `primary_only`: 非主输出失败将被禁用但不阻断主输出"	all_fail|primary_only	all_fail	null	"[\"all_fail\"]"	null
-  17	demand.field	include_full_error_message	properties.include_full_error_message	false	null	boolean	包含完整错误信息(可能包含敏感信息;默认 false).	null	false	null	[false]	null
-  18	demand.field	meta	properties.meta	false	null	boolean | ref #/definitions/output_extra_sheet	"可选:启用 meta sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径"	null	null	null	"[true,{\"sheet\":\"__meta__\"}]"	oneOf=2
-  19	demand.field	audit	properties.audit	false	null	boolean | ref #/definitions/output_extra_sheet	"可选:启用 audit sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径"	null	null	null	"[true,{\"sheet\":\"__audit__\"}]"	oneOf=2
-  20	demand.definition	book	definitions.book	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2; allOf=2
-  21	demand.definition	book_budget	definitions.book_budget	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  22	demand.definition	book_export_xlsx	definitions.book_export_xlsx	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  23	demand.definition	book_write_defaults	definitions.book_write_defaults	false	null	object	null	null	null	null	null	additionalProperties=false
-  24	demand.definition	field	definitions.field	false	null	object	null	null	null	null	null	additionalProperties=true; allOf=1
-  25	demand.definition	file	definitions.file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  26	demand.definition	guardrails	definitions.guardrails	false	null	object	null	null	null	null	null	additionalProperties=false
-  27	demand.definition	guardrails_compute	definitions.guardrails_compute	false	null	object	null	null	null	null	null	additionalProperties=false
-  28	demand.definition	guardrails_loader	definitions.guardrails_loader	false	null	object	null	null	null	null	null	additionalProperties=false
-  29	demand.definition	guardrails_relations	definitions.guardrails_relations	false	null	object	null	null	null	null	null	additionalProperties=false
-  30	demand.definition	loader_retry	definitions.loader_retry	false	null	object	null	null	null	null	null	additionalProperties=false
-  31	demand.definition	main_source	definitions.main_source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  32	demand.definition	output_aggregate	definitions.output_aggregate	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  33	demand.definition	output_extra_sheet	definitions.output_extra_sheet	false	null	object	null	null	null	null	null	additionalProperties=false
-  34	demand.definition	output_target	definitions.output_target	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2; allOf=1
-  35	demand.definition	output_to	definitions.output_to	false	null	object	null	null	null	null	null	additionalProperties=false
-  36	demand.definition	output_write	definitions.output_write	false	null	object	null	null	null	null	null	additionalProperties=false
-  37	demand.definition	relation	definitions.relation	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  38	demand.definition	resources	definitions.resources	false	null	object	null	null	null	null	null	additionalProperties=false
-  39	demand.definition	source	definitions.source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  40	demand.definition	source_field_inline	definitions.source_field_inline	false	null	object	null	null	null	null	null	allOf=2
-  41	workflow	workflow	properties.workflow	true	null	object	null	null	null	null	null	additionalProperties=false
-  42	workflow	workflow.runs[*]	properties.workflow.properties.runs.items	false	null	object	null	null	null	null	null	additionalProperties=false
-  43	workflow	workflow.options	properties.workflow.properties.options	false	null	object	null	null	null	null	null	additionalProperties=false
-  44	workflow	workflow.resources	properties.workflow.properties.resources	false	null	null	"workflow-scope shared IO resources. - stable surface: `workflow.resources.books` / `workflow.resources.files`"	null	{}	null	null	allOf=1
-properties[133	]{entry_id	name	required	summary}:
-  4	retry	false	object
+  6	demand.field	main_source	properties.main_source	false	null	null	"主数据源配置. - 必填: `source_id`, `loader` - `source_id` 不能出现在 `sources` 中 - `fields` 仅允许源字段(禁止 `compute`) - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)"	null	null	null	null	allOf=1
+  7	demand.field	sources	properties.sources	false	null	object	"数据源配置映射, key 为 `source_id`. - 每个 source 必填: `loader`, `key` - 不允许包含 `main_source.source_id` - `fields` 仅允许源字段(禁止 `compute`)"	null	null	null	null	minProperties=0; additionalProperties=ref #/definitions/source
+  8	demand.field	fields	properties.fields	false	null	object	字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用	null	null	null	null	additionalProperties=ref #/definitions/field
+  9	demand.field	relations	properties.relations	false	null	object	"命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`"	null	null	null	null	additionalProperties=ref #/definitions/relation
+  10	demand.field	resources	properties.resources	false	null	null	"可选:IO 资源声明. - 稳定入口: `resources.books` / `resources.files`"	null	null	null	null	allOf=1
+  11	demand.field	outputs	properties.outputs	false	null	array	"输出目标列表(有序; 可选). - 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体) - 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs` - 通过 `where` 分发到不同 sheet - 通过 `aggregate` 声明派生汇总输出 - 通过 `from` 复用字段集合与容器配置 - 不再支持旧写法: 顶层 `output:`"	null	null	null	"[[{\"fields\":[\"order_id\",\"user_id\"],\"name\":\"detail\",\"to\":{\"sheet\":\"明细\"}}]]"	minItems=0; items=ref #/definitions/output_target
+  12	demand.field	validate_unique_field_names	properties.validate_unique_field_names	false	null	boolean	"预检查: 字段有效展示名(`effective display name`)全局唯一. - 默认启用: 未声明时等价 `true` - 有效展示名定义: - 若 `field.name` 非空: 使用 `name` - 否则回退为 `field_id` - 仅当 `effective outputs` 会输出表头且 `header_fields_output_by: name` 时触发 - file: `write.include_header: true` 且 `write.header_fields_output_by: name` - book: 该 output 会输出表头,且 `write.header_fields_output_by: name` - 显式设置为 `false` 可关闭该检查(不推荐长期使用)"	null	true	null	[true,false]	null
+  13	demand.field	include_full_error_message	properties.include_full_error_message	false	null	boolean	包含完整错误信息(可能包含敏感信息;默认 false).	null	false	null	[false]	null
+  14	demand.field	meta	properties.meta	false	null	boolean | ref #/definitions/output_extra_sheet	"可选:启用 meta sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径"	null	null	null	"[true,{\"sheet\":\"__meta__\"}]"	oneOf=2
+  15	demand.field	audit	properties.audit	false	null	boolean | ref #/definitions/output_extra_sheet	"可选:启用 audit sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径"	null	null	null	"[true,{\"sheet\":\"__audit__\"}]"	oneOf=2
+  16	demand.definition	book	definitions.book	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2; allOf=2
+  17	demand.definition	book_budget	definitions.book_budget	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  18	demand.definition	book_export_xlsx	definitions.book_export_xlsx	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  19	demand.definition	book_write_defaults	definitions.book_write_defaults	false	null	object	null	null	null	null	null	additionalProperties=false
+  20	demand.definition	field	definitions.field	false	null	object	null	null	null	null	null	additionalProperties=true; allOf=1
+  21	demand.definition	file	definitions.file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  22	demand.definition	guardrails	definitions.guardrails	false	null	object	null	null	null	null	null	additionalProperties=false
+  23	demand.definition	guardrails_compute	definitions.guardrails_compute	false	null	object	null	null	null	null	null	additionalProperties=false
+  24	demand.definition	guardrails_loader	definitions.guardrails_loader	false	null	object	null	null	null	null	null	additionalProperties=false
+  25	demand.definition	guardrails_relations	definitions.guardrails_relations	false	null	object	null	null	null	null	null	additionalProperties=false
+  26	demand.definition	loader_retry	definitions.loader_retry	false	null	object	null	null	null	null	null	additionalProperties=false
+  27	demand.definition	main_source	definitions.main_source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  28	demand.definition	output_aggregate	definitions.output_aggregate	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  29	demand.definition	output_extra_sheet	definitions.output_extra_sheet	false	null	object	null	null	null	null	null	additionalProperties=false
+  30	demand.definition	output_target	definitions.output_target	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2; allOf=1
+  31	demand.definition	output_to	definitions.output_to	false	null	object	null	null	null	null	null	additionalProperties=false
+  32	demand.definition	output_write	definitions.output_write	false	null	object	null	null	null	null	null	additionalProperties=false
+  33	demand.definition	relation	definitions.relation	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  34	demand.definition	resources	definitions.resources	false	null	object	null	null	null	null	null	additionalProperties=false
+  35	demand.definition	source	definitions.source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  36	demand.definition	source_field_inline	definitions.source_field_inline	false	null	object	null	null	null	null	null	allOf=2
+  37	workflow	workflow	properties.workflow	true	null	object	null	null	null	null	null	additionalProperties=false
+  38	workflow	workflow.runs[*]	properties.workflow.properties.runs.items	false	null	object	null	null	null	null	null	additionalProperties=false
+  39	workflow	workflow.options	properties.workflow.properties.options	false	null	object	null	null	null	null	null	additionalProperties=false
+  40	workflow	workflow.resources	properties.workflow.properties.resources	false	null	null	"workflow-scope shared IO resources. - stable surface: `workflow.resources.books` / `workflow.resources.files`"	null	{}	null	null	allOf=1
+properties[128	]{entry_id	name	required	summary}:
+  7	$import	false	string | array, oneOf(2)
   9	$import	false	string | array, oneOf(2)
-  11	$import	false	string | array, oneOf(2)
+  16	$import	false	string | array, oneOf(2)
+  16	allow_formulas	false	boolean
+  16	budget	false	allOf(1)
+  16	export_xlsx	false	allOf(1)
+  16	kind	false	string, enum xlsx_file, xlsx_memory
+  16	path	false	string | object, oneOf(2)
+  16	write_defaults	false	allOf(1)
+  16	write_lock	false	boolean
+  17	$import	false	string | array, oneOf(2)
+  17	max_sheets	false	integer
+  17	max_total_cells	false	integer
+  18	$import	false	string | array, oneOf(2)
+  18	allow_formulas	false	boolean
+  18	path	false	string | object, oneOf(2)
+  18	write_lock	false	boolean
+  19	$import	false	string | array, oneOf(2)
+  19	align_by	false	string, enum field_id, header
+  19	header_policy	false	string, enum once, always, never
+  19	mode	false	string, enum sheet, append
+  19	on_conflict	false	string, enum error, overwrite, skip
+  19	on_mismatch	false	string, enum error, warn, skip
+  20	name	false	string
   20	$import	false	string | array, oneOf(2)
-  20	allow_formulas	false	boolean
-  20	budget	false	allOf(1)
-  20	export_xlsx	false	allOf(1)
-  20	kind	false	string, enum xlsx_file, xlsx_memory
-  20	path	false	string | object, oneOf(2)
-  20	write_defaults	false	allOf(1)
-  20	write_lock	false	boolean
+  20	call_by	false	string
+  20	compute	false	string
+  20	extract	false	string
+  20	relation	false	string | object, oneOf(2)
+  20	source	false	string
+  20	value_cast	false	string, enum auto, int, str, decimal
   21	$import	false	string | array, oneOf(2)
-  21	max_sheets	false	integer
-  21	max_total_cells	false	integer
+  21	encoding	false	string
+  21	kind	false	string, enum csv_file
+  21	path	false	string | object, oneOf(2)
   22	$import	false	string | array, oneOf(2)
-  22	allow_formulas	false	boolean
-  22	path	false	string | object, oneOf(2)
-  22	write_lock	false	boolean
+  22	relations	false	ref #/definitions/guardrails_relations
+  22	compute	false	ref #/definitions/guardrails_compute
+  22	enabled	false	boolean
+  22	loader	false	ref #/definitions/guardrails_loader
+  22	mode	false	string, enum quiet, fast_fail
   23	$import	false	string | array, oneOf(2)
-  23	align_by	false	string, enum field_id, header
-  23	header_policy	false	string, enum once, always, never
-  23	mode	false	string, enum sheet, append
-  23	on_conflict	false	string, enum error, overwrite, skip
-  23	on_mismatch	false	string, enum error, warn, skip
-  24	name	false	string
+  23	on_error	false	string, enum quiet, fast_fail
   24	$import	false	string | array, oneOf(2)
-  24	call_by	false	string
-  24	compute	false	string
-  24	extract	false	string
-  24	relation	false	string | object, oneOf(2)
-  24	source	false	string
-  24	value_cast	false	string, enum auto, int, str, decimal
+  24	on_transform_error	false	string, enum quiet, fast_fail
+  24	required_fields	false	array, items string | object, anyOf(2)
+  24	validate_result	false	boolean
   25	$import	false	string | array, oneOf(2)
-  25	encoding	false	string
-  25	kind	false	string, enum csv_file
-  25	path	false	string | object, oneOf(2)
+  25	null_key_max_rate	false	number
+  25	type_error_max_rate	false	number
   26	$import	false	string | array, oneOf(2)
-  26	relations	false	ref #/definitions/guardrails_relations
-  26	compute	false	ref #/definitions/guardrails_compute
+  26	backoff	false	string, enum fixed, exponential
+  26	base_delay_seconds	false	number
   26	enabled	false	boolean
-  26	loader	false	ref #/definitions/guardrails_loader
-  26	mode	false	string, enum quiet, fast_fail
+  26	jitter	false	boolean
+  26	max_attempts	false	integer
+  26	max_delay_seconds	false	number
+  26	max_elapsed_seconds	false	number
+  26	should_retry	false	string
   27	$import	false	string | array, oneOf(2)
-  27	on_error	false	string, enum quiet, fast_fail
+  27	fields	false	object, properties $import
+  27	loader	false	string
+  27	order_by	false	array, items string
+  27	params	false	object, properties $import
+  27	source_id	false	string
   28	$import	false	string | array, oneOf(2)
-  28	on_transform_error	false	string, enum quiet, fast_fail
-  28	required_fields	false	array, items string | object, anyOf(2)
-  28	validate_result	false	boolean
+  28	fields	false	object
+  28	distinct_on_overflow	false	string, enum error, truncate
+  28	group_by	false	array, items string | object | array, anyOf(3)
+  28	max_distinct	false	integer
+  28	max_groups	false	integer
   29	$import	false	string | array, oneOf(2)
-  29	null_key_max_rate	false	number
-  29	type_error_max_rate	false	number
+  29	allow_formulas	false	boolean
+  29	path	false	string
+  29	sheet	false	string
+  29	write_lock	false	boolean
+  30	name	false	string
   30	$import	false	string | array, oneOf(2)
-  30	backoff	false	string, enum fixed, exponential
-  30	base_delay_seconds	false	number
-  30	enabled	false	boolean
-  30	jitter	false	boolean
-  30	max_attempts	false	integer
-  30	max_delay_seconds	false	number
-  30	max_elapsed_seconds	false	number
-  30	should_retry	false	string
+  30	fields	false	array, items string | object | array, anyOf(3)
+  30	aggregate	false	allOf(1)
+  30	from	false	string
+  30	to	false	allOf(1)
+  30	where	false	string
+  30	write	false	allOf(1)
   31	$import	false	string | array, oneOf(2)
-  31	retry	false	allOf(1)
-  31	fields	false	object, properties $import
-  31	loader	false	string
-  31	order_by	false	array, items string
-  31	params	false	object, properties $import
-  31	source_id	false	string
+  31	book	false	string
+  31	file	false	string
+  31	sheet	false	string
   32	$import	false	string | array, oneOf(2)
-  32	fields	false	object
-  32	distinct_on_overflow	false	string, enum error, truncate
-  32	group_by	false	array, items string | object | array, anyOf(3)
-  32	max_distinct	false	integer
-  32	max_groups	false	integer
+  32	align_by	false	string, enum field_id, header
+  32	header_fields_output_by	false	string, enum field_id, name
+  32	header_policy	false	string, enum once, always, never
+  32	include_header	false	boolean
+  32	mode	false	string, enum sheet, append
+  32	on_conflict	false	string, enum error, overwrite, skip
+  32	on_mismatch	false	string, enum error, warn, skip
   33	$import	false	string | array, oneOf(2)
-  33	allow_formulas	false	boolean
-  33	path	false	string
-  33	sheet	false	string
-  33	write_lock	false	boolean
-  34	name	false	string
+  33	steps	false	array, items object, properties from, lookup_cast, to
   34	$import	false	string | array, oneOf(2)
-  34	fields	false	array, items string | object | array, anyOf(3)
-  34	aggregate	false	allOf(1)
-  34	from	false	string
-  34	to	false	allOf(1)
-  34	where	false	string
-  34	write	false	allOf(1)
+  34	books	false	object, properties $import
+  34	files	false	object, properties $import
   35	$import	false	string | array, oneOf(2)
-  35	book	false	string
-  35	file	false	string
-  35	sheet	false	string
+  35	fields	false	object, properties $import
+  35	cache_mode	false	string, enum none, preload_forever
+  35	key	false	string | array, oneOf(2)
+  35	loader	false	string
+  35	lookup_cast	false	object, properties name, sep
+  35	lookup_chunk_size	false	integer | null, oneOf(2)
+  35	normalize	false	object, properties fields, call_by, key_field, kind, on_conflict, on_empty, on_missing, steps, allOf(1)
+  35	params	false	object, properties $import
+  36	name	false	string
   36	$import	false	string | array, oneOf(2)
-  36	align_by	false	string, enum field_id, header
-  36	header_fields_output_by	false	string, enum field_id, name
-  36	header_policy	false	string, enum once, always, never
-  36	include_header	false	boolean
-  36	mode	false	string, enum sheet, append
-  36	on_conflict	false	string, enum error, overwrite, skip
-  36	on_mismatch	false	string, enum error, warn, skip
-  37	$import	false	string | array, oneOf(2)
-  37	steps	false	array, items object, properties from, lookup_cast, to
-  38	$import	false	string | array, oneOf(2)
-  38	books	false	object, properties $import
-  38	files	false	object, properties $import
-  39	$import	false	string | array, oneOf(2)
-  39	retry	false	allOf(1)
-  39	fields	false	object, properties $import
-  39	cache_mode	false	string, enum none, preload_forever
-  39	key	false	string | array, oneOf(2)
-  39	loader	false	string
-  39	lookup_cast	false	object, properties name, sep
-  39	lookup_chunk_size	false	integer | null, oneOf(2)
-  39	normalize	false	object, properties fields, call_by, key_field, kind, on_conflict, on_empty, on_missing, steps, allOf(1)
-  39	params	false	object, properties $import
-  40	name	false	string
-  40	$import	false	string | array, oneOf(2)
-  40	extract	false	string
-  40	relation	false	string | object, oneOf(2)
-  40	source	false	string
-  40	value_cast	false	string, enum auto, int, str, decimal
-  41	resources	false	allOf(1)
-  41	options	false	object, properties failure_policy, cache_pool, ctx, max_concurrency, output_staging, resources_wait
-  41	runs	true	array, items object, properties demand, depends_on, id, init_vars, main_rows_from
-  42	demand	true	string
-  42	depends_on	false	array, items string
-  42	id	true	string
-  42	init_vars	false	object | null, oneOf(2)
-  42	main_rows_from	false	object | null, oneOf(2)
-  43	failure_policy	false	string, enum all_fail, primary_only
-  43	cache_pool	false	object | null, oneOf(2)
-  43	ctx	false	object | null, oneOf(2)
-  43	max_concurrency	false	integer
-  43	output_staging	false	object | null, oneOf(2)
-  43	resources_wait	false	object | null, oneOf(2)
+  36	extract	false	string
+  36	relation	false	string | object, oneOf(2)
+  36	source	false	string
+  36	value_cast	false	string, enum auto, int, str, decimal
+  37	resources	false	allOf(1)
+  37	options	false	object, properties cache_pool, ctx, failure_policy, max_concurrency
+  37	runs	true	array, items object, properties demand, depends_on, id, init_vars, main_rows_from
+  38	demand	true	string
+  38	depends_on	false	array, items string
+  38	id	true	string
+  38	init_vars	false	object | null, oneOf(2)
+  38	main_rows_from	false	object | null, oneOf(2)
+  39	cache_pool	false	object | null, oneOf(2)
+  39	ctx	false	object | null, oneOf(2)
+  39	failure_policy	false	string, enum all_fail, primary_only
+  39	max_concurrency	false	integer
 workflow_key_paths[10	]: workflow.runs	workflow.runs[*].id	workflow.runs[*].demand	workflow.runs[*].depends_on	workflow.runs[*].init_vars	workflow.options	workflow.options.ctx	workflow.options.cache_pool	workflow.resources	workflow.resources.books
 workflow_validation[2	]: "Repo schema-only: uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>"	"LSP header: # yaml-language-server: $schema=.../workflow.gen.json OR # $schema: .../workflow.gen.json (use yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>)"
 ```

@@ -63,7 +63,6 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
 
         demand_yaml = """\
 name: public_api_minimal_demand
-batch_size: 2
 
 main_source:
   source_id: items
@@ -103,7 +102,7 @@ workflow:
         tools_output_config = tools_api.load_output_config(str(demand_path))
         base_module_path = tools_api.derive_base_module_path(str(demand_path), sys_path=[str(tmp)], cwd=str(tmp))
 
-        compilation: api.Compilation = api.compile(str(demand_path), allowed_modules=_ALLOWED_MODULES, init_vars=init_vars)
+        compilation: api.Compilation = api.compile(str(demand_path), allowed_modules=_ALLOWED_MODULES, init_vars=init_vars, batch_size=2)
         if not compilation.demand_ir.fields:
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -125,6 +124,7 @@ workflow:
             sink=sink,
             overrides=overrides,
             init_vars=init_vars,
+            batch_size=2,
         )
         rows = sink.get_data()
         if not rows:
@@ -142,6 +142,7 @@ workflow:
             allowed_modules=_ALLOWED_MODULES,
             max_workers=0,
             init_vars=init_vars,
+            batch_size=2,
         )
         preload_calls = get_preload_counter_calls()
         errors = wf.errors()

@@ -4,7 +4,7 @@ from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml._internal.config_parsing.models import RawDemand
 
 
-def test_loader_parse_config_rejects_invalid_failure_policy() -> None:
+def test_loader_parse_config_ignores_failure_policy_key() -> None:
     loader = YamlDemandLoader()
 
     raw = RawDemand.from_raw(
@@ -12,11 +12,12 @@ def test_loader_parse_config_rejects_invalid_failure_policy() -> None:
             "name": "demo",
             "main_source": {"source_id": "orders", "loader": "tests.fixtures.mock_loaders.mock_loader"},
             "failure_policy": "bad",
+            "sources": {},
         }
     )
 
-    with pytest.raises(ValueError, match=r"failure_policy must be 'all_fail' or 'primary_only'"):
-        loader._parse_config(raw)
+    config = loader._parse_config(raw)  # type: ignore[attr-defined]
+    assert config.failure_policy == "all_fail"
 
 
 def test_loader_parse_extra_sheet_rejects_non_bool_non_object() -> None:

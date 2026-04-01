@@ -60,6 +60,7 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
             compilation = compile_yaml(
                 str(yaml_path),
                 allowed_modules=_ALLOWED_MODULES,
+                batch_size=2,
                 init_vars=init_vars,
                 overrides=overrides,
             )
