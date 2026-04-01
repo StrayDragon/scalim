@@ -70,7 +70,7 @@ def test_read_lock_owner_info_handles_stat_oserror_and_empty_keys() -> None:
             raise OSError("boom")
 
         def read_text(self, encoding: str = "utf-8") -> str:  # noqa: ARG002
-            return "=x\nk=v\n"
+            return "noeq\n=x\nk=v\n"
 
     info, mtime_s = resources_base_mod._read_lock_owner_info(_FakePath())  # type: ignore[arg-type]  # noqa: SLF001
     assert info == {"k": "v"}

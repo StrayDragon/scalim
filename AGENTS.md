@@ -15,7 +15,8 @@
   - When one mixin/class depends on methods provided by another mixin/class, express that dependency as an explicit runtime contract (prefer `ABC` + `@abstractmethod`, Python 3.6 compatible).
 - **typing_extensions**: keep runtime compatible with older `typing_extensions`; use `src/scalim/vendor/compact/typing_extensionsx.py` shims when needed.
 - **Doc governance**:
-  - Any file containing `.gen.` is generated; do not edit by hand. Edit SSOT and run `just gen-docs` (or the referenced generator).
+  - Any file containing `.gen.` is generated; do not edit by hand. Edit SSOT and run the referenced generator.
+  - **禁止**直接手工编辑任何 `*.gen.*` 文件(例如 `src/scalim/dsl/by_yaml/schema/*.gen.json`、`artifacts/**/syntax-catalog.gen.md`). 如果需要拆分提交,使用“回滚/暂存 + 重新生成”的方式拆分,不要在生成物里手改。
   - Any `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->` block is injected; do not edit inside the block. Edit SSOT and run `just gen-docs`.
 - **Dev artifacts**:
   - Rebuildable sample data / reports MUST be generated under `.tmp/` and MUST NOT be committed (e.g. viz examples under `.tmp/artifacts/scalim-viz/`).

@@ -21,7 +21,10 @@ from ...spec.ir._workflow import (
     WorkflowNodeIr,
     WorkflowNodeType,
     WorkflowOptionsIr,
+    WorkflowOutputStagingOptionsIr,
     WorkflowResourceIr,
+    WorkflowResourcesWaitDiagnosticsIr,
+    WorkflowResourcesWaitOptionsIr,
     WriteSheetNodeIr,
 )
 from ...vendor.dataclassesx import replace
@@ -1316,11 +1319,32 @@ def _build_workflow_options_ir(wf_obj: WorkflowConfig) -> WorkflowOptionsIr:
         max_bytes=int(raw_ctx.max_bytes),
     )
 
+    raw_resources_wait = wf_obj.options.resources_wait
+    raw_diagnostics = raw_resources_wait.diagnostics
+    resources_wait = WorkflowResourcesWaitOptionsIr(
+        max_wait_s=float(raw_resources_wait.max_wait_s),
+        diagnostics=WorkflowResourcesWaitDiagnosticsIr(
+            enabled=bool(raw_diagnostics.enabled),
+            warn_after_s=float(raw_diagnostics.warn_after_s),
+            repeat_every_s=float(raw_diagnostics.repeat_every_s) if raw_diagnostics.repeat_every_s is not None else None,
+            capture_owner_callsite=bool(raw_diagnostics.capture_owner_callsite),
+        ),
+    )
+
+    raw_output_staging = wf_obj.options.output_staging
+    output_staging = WorkflowOutputStagingOptionsIr(
+        dir_name=str(raw_output_staging.dir_name),
+        keep_on_success=bool(raw_output_staging.keep_on_success),
+        keep_on_failure=bool(raw_output_staging.keep_on_failure),
+    )
+
     return WorkflowOptionsIr(
         max_concurrency=int(wf_obj.options.max_concurrency),
         failure_policy=str(wf_obj.options.failure_policy or "all_fail"),
         cache_pool=cache_pool,
         ctx=ctx,
+        resources_wait=resources_wait,
+        output_staging=output_staging,
     )
 
 

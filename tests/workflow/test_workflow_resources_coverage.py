@@ -1371,24 +1371,8 @@ def test_commit_all_and_discard_all_drain_inflight_workbook_and_csv() -> None:
     assert "csv" in manager.discards
 
 
-def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_acquires_lock_once(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resource_manager_concurrent_first_workbook_write_creates_single_plan(tmp_path: Path) -> None:
     from openpyxl import load_workbook
-
-    lock_started = threading.Event()
-    lock_continue = threading.Event()
-    lock_calls: List[str] = []
-    orig_acquire_write_lock = resources_workbook_mod.acquire_write_lock
-
-    def _delayed_acquire_write_lock(output_path: str, **kwargs: object) -> Path:
-        lock_calls.append(str(output_path))
-        lock_started.set()
-        if not lock_continue.wait(timeout=5.0):
-            raise RuntimeError("test timeout waiting to continue acquire_write_lock")
-        return orig_acquire_write_lock(output_path, **kwargs)
-
-    monkeypatch.setattr(resources_workbook_mod, "acquire_write_lock", _delayed_acquire_write_lock)
 
     instrumentation = _Instrumentation()
     workbook_path = tmp_path / "report.xlsx"
@@ -1396,7 +1380,6 @@ def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         workbook_defs={"report": str(workbook_path)},
-        workbook_write_lock={"report": True},
         csv_defs={},
         sheetbook_defs={},
     )
@@ -1422,19 +1405,16 @@ def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_
             errors.append(exc)
 
     t1 = threading.Thread(target=lambda: _worker(workflow_node_id="n1", sheet="S1", csv_path=first))
-    t1.start()
-    assert lock_started.wait(timeout=5.0)
-
     t2 = threading.Thread(target=lambda: _worker(workflow_node_id="n2", sheet="S2", csv_path=second))
+    t1.start()
     t2.start()
-    lock_continue.set()
 
     t1.join(timeout=5.0)
     t2.join(timeout=5.0)
     assert not t1.is_alive()
     assert not t2.is_alive()
     assert errors == []
-    assert len(lock_calls) == 1
+    assert len(manager._workbooks) == 1  # noqa: SLF001
 
     manager.commit_all()
 
@@ -1449,23 +1429,7 @@ def test_resource_manager_concurrent_first_workbook_write_joins_single_plan_and_
             wb.close()
 
 
-def test_resource_manager_concurrent_first_csv_write_joins_single_plan_and_acquires_lock_once(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    lock_started = threading.Event()
-    lock_continue = threading.Event()
-    lock_calls: List[str] = []
-    orig_acquire_write_lock = resources_csv_mod.acquire_write_lock
-
-    def _delayed_acquire_write_lock(output_path: str, **kwargs: object) -> Path:
-        lock_calls.append(str(output_path))
-        lock_started.set()
-        if not lock_continue.wait(timeout=5.0):
-            raise RuntimeError("test timeout waiting to continue acquire_write_lock")
-        return orig_acquire_write_lock(output_path, **kwargs)
-
-    monkeypatch.setattr(resources_csv_mod, "acquire_write_lock", _delayed_acquire_write_lock)
-
+def test_resource_manager_concurrent_first_csv_write_creates_single_plan(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
     output_path = tmp_path / "merged.csv"
     manager = resources_mod.WorkflowResourceManager(
@@ -1497,19 +1461,16 @@ def test_resource_manager_concurrent_first_csv_write_joins_single_plan_and_acqui
             errors.append(exc)
 
     t1 = threading.Thread(target=lambda: _worker(workflow_node_id="n1", csv_path=first))
-    t1.start()
-    assert lock_started.wait(timeout=5.0)
-
     t2 = threading.Thread(target=lambda: _worker(workflow_node_id="n2", csv_path=second))
+    t1.start()
     t2.start()
-    lock_continue.set()
 
     t1.join(timeout=5.0)
     t2.join(timeout=5.0)
     assert not t1.is_alive()
     assert not t2.is_alive()
     assert errors == []
-    assert len(lock_calls) == 1
+    assert len(manager._csvs) == 1  # noqa: SLF001
 
     manager.commit_all()
 
@@ -1518,69 +1479,6 @@ def test_resource_manager_concurrent_first_csv_write_joins_single_plan_and_acqui
         rows = list(reader)
     assert rows[0] == ["id", "value"]
     assert {tuple(row) for row in rows[1:]} == {("a1", "A1"), ("b1", "B1")}
-
-
-def test_resource_manager_concurrent_first_csv_write_lock_failure_wakes_waiters_and_acquires_lock_once(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    lock_started = threading.Event()
-    lock_continue = threading.Event()
-    lock_calls: List[str] = []
-
-    def _fail_acquire_write_lock(output_path: str, **kwargs: object) -> Path:
-        lock_calls.append(str(output_path))
-        lock_started.set()
-        if not lock_continue.wait(timeout=5.0):
-            raise RuntimeError("test timeout waiting to continue acquire_write_lock")
-        raise resources_mod.ScalimWorkflowWriteError("boom")
-
-    monkeypatch.setattr(resources_csv_mod, "acquire_write_lock", _fail_acquire_write_lock)
-
-    instrumentation = _Instrumentation()
-    manager = resources_mod.WorkflowResourceManager(
-        workflow_exec_id="wf",
-        instrumentation=instrumentation,
-        workbook_defs={},
-        csv_defs={"merged": str(tmp_path / "merged.csv")},
-        sheetbook_defs={},
-    )
-
-    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
-    second = _write_csv(tmp_path / "b.csv", [["id", "value"], ["b1", "B1"]])
-
-    errors: List[BaseException] = []
-
-    def _worker(*, workflow_node_id: str, csv_path: Path) -> None:
-        try:
-            manager.apply_csv_append(
-                workflow_node_id=str(workflow_node_id),
-                decl_order=int(str(workflow_node_id).lstrip("n") or 0),
-                csv_id="merged",
-                input_node_id=str(workflow_node_id),
-                input_output_id="detail",
-                input_csv=str(csv_path),
-                header_policy="once",
-                on_mismatch="error",
-            )
-        except BaseException as exc:
-            errors.append(exc)
-
-    t1 = threading.Thread(target=lambda: _worker(workflow_node_id="n1", csv_path=first))
-    t1.start()
-    assert lock_started.wait(timeout=5.0)
-
-    t2 = threading.Thread(target=lambda: _worker(workflow_node_id="n2", csv_path=second))
-    t2.start()
-    lock_continue.set()
-
-    t1.join(timeout=5.0)
-    t2.join(timeout=5.0)
-    assert not t1.is_alive()
-    assert not t2.is_alive()
-    assert len(lock_calls) == 1
-    assert len(errors) == 2
-    assert all(isinstance(err, resources_mod.ScalimWorkflowWriteError) for err in errors)
-    assert all("boom" in str(err) for err in errors)
 
 
 def test_resource_manager_concurrent_first_sheetbook_write_creates_single_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1845,8 +1743,9 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
     assert not temp_path.exists()
 
 
-def test_resource_manager_sheetbook_discard_releases_lock_if_present(tmp_path: Path) -> None:
+def test_resource_manager_sheetbook_discard_does_not_remove_external_lock_path(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
+    export_path = tmp_path / "report.xlsx"
     manager = resources_mod.WorkflowResourceManager(
         workflow_exec_id="wf",
         instrumentation=instrumentation,
@@ -1857,7 +1756,7 @@ def test_resource_manager_sheetbook_discard_releases_lock_if_present(tmp_path: P
                 resource_id="sb",
                 budget_max_sheets=4,
                 budget_max_total_cells=1000,
-                export_path=str(tmp_path / "report.xlsx"),
+                export_path=str(export_path),
                 export_write_lock=True,
             )
         },
@@ -1876,17 +1775,15 @@ def test_resource_manager_sheetbook_discard_releases_lock_if_present(tmp_path: P
         on_mismatch="error",
     )
 
-    plan = manager._sheetbooks["sb"]
-    lock_path = tmp_path / "forced.lock"
+    lock_path = Path(str(export_path) + resources_base_mod._WRITE_LOCK_SUFFIX)
     lock_path.write_text("lock", encoding="utf-8")
-    plan.lock_path = lock_path
 
     manager.discard_all(workflow_node_id="n_discard", reason="test")
-    assert not lock_path.exists()
+    assert lock_path.exists()
     assert [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_DISCARD]
 
 
-def test_resource_manager_commit_all_releases_locks_when_no_segments(tmp_path: Path) -> None:
+def test_resource_manager_commit_all_skips_empty_plans(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
 
     workbook_path = tmp_path / "empty.xlsx"
@@ -1894,14 +1791,11 @@ def test_resource_manager_commit_all_releases_locks_when_no_segments(tmp_path: P
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         workbook_defs={"report": str(workbook_path)},
-        workbook_write_lock={"report": True},
         csv_defs={},
         sheetbook_defs={},
     )
     _ = manager._get_or_create_workbook("report", workflow_node_id="n")  # noqa: SLF001
-    assert Path(str(workbook_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
     manager.commit_all()
-    assert not Path(str(workbook_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
     assert not workbook_path.exists()
 
     csv_output_path = tmp_path / "empty.csv"
@@ -1913,9 +1807,7 @@ def test_resource_manager_commit_all_releases_locks_when_no_segments(tmp_path: P
         sheetbook_defs={},
     )
     _ = manager._get_or_create_csv("merged", workflow_node_id="n")  # noqa: SLF001
-    assert Path(str(csv_output_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
     manager.commit_all()
-    assert not Path(str(csv_output_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
     assert not csv_output_path.exists()
 
 
@@ -2193,7 +2085,7 @@ def test_resource_manager_commit_workbook_commit_failure_raises(tmp_path: Path) 
         on_conflict="error",
     )
 
-    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Workbook commit failed"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Publish staged output failed"):
         manager.commit_all()
     assert not Path(str(output_dir) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
@@ -2222,19 +2114,18 @@ def test_resource_manager_commit_csv_commit_failure_raises(tmp_path: Path) -> No
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="CSV commit failed"):
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Publish staged output failed"):
         manager.commit_all()
     assert not Path(str(output_dir) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
 
-def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resource_manager_commit_workbook_missing_openpyxl_does_not_write_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     instrumentation = _Instrumentation()
     workbook_path = tmp_path / "report.xlsx"
     manager = resources_mod.WorkflowResourceManager(
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         workbook_defs={"report": str(workbook_path)},
-        workbook_write_lock={"report": True},
         csv_defs={},
         sheetbook_defs={},
     )
@@ -2250,7 +2141,6 @@ def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_pat
         input_csv=str(csv_path),
         on_conflict="error",
     )
-    assert Path(str(workbook_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
     def _raise_import_error(*args: object, **kwargs: object) -> object:
         raise ImportError("missing openpyxl")
@@ -2258,5 +2148,83 @@ def test_resource_manager_commit_workbook_missing_openpyxl_releases_lock(tmp_pat
     monkeypatch.setattr(resources_workbook_mod, "require_optional_dependency", _raise_import_error)
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="missing openpyxl"):
         manager.commit_all()
-    assert not Path(str(workbook_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
     assert not workbook_path.exists()
+
+
+def test_csv_commit_replace_failure_raises_workflow_write_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.sinks import InMemoryCsv
+
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    final_path = str(tmp_path / "out.csv")
+    staging_path = manager._staging_path_for_final_output(final_path)  # noqa: SLF001
+
+    original_replace = Path.replace
+
+    def _replace(self: Path, target: object) -> Path:  # noqa: ANN001
+        if str(target) == str(staging_path):
+            raise OSError("boom")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", _replace)
+
+    seg = resources_csv_mod.AppendSegment(
+        decl_order=0,
+        input_csv=InMemoryCsv(header=["id"], rows=[["a1"]]),
+        header_policy="once",
+        mapping=[0],
+        on_mismatch="error",
+        align_by="header",
+        input_header=["id"],
+    )
+    plan = resources_csv_mod.CsvPlan(resource_id="r", path=str(final_path), baseline_header=["id"], segments=[seg])
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match=r"CSV commit failed: OSError: boom"):
+        manager._commit_csv(plan)  # noqa: SLF001
+
+
+def test_workbook_commit_save_failure_raises_workflow_write_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.sinks import InMemoryCsv
+
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    workbook_cls = resources_workbook_mod.get_openpyxl_workbook_class()
+
+    def _boom_save(self: object, *args: object, **kwargs: object) -> object:  # noqa: ARG001
+        raise OSError("boom")
+
+    monkeypatch.setattr(workbook_cls, "save", _boom_save)
+
+    seg = resources_csv_mod.AppendSegment(
+        decl_order=0,
+        input_csv=InMemoryCsv(header=["id"], rows=[["a1"]]),
+        header_policy="once",
+        mapping=[0],
+        on_mismatch="error",
+        align_by="header",
+        input_header=["id"],
+    )
+    sheet_plan = resources_workbook_mod.SheetPlan(sheet="S", baseline_header=["id"], segments=[seg])
+    plan = resources_workbook_mod.WorkbookPlan(
+        resource_id="report",
+        path=str(tmp_path / "out.xlsx"),
+        allow_formulas=False,
+        sheet_decl_order={"S": 0},
+        sheet_order=["S"],
+        sheets={"S": sheet_plan},
+    )
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match=r"Workbook commit failed: OSError: boom"):
+        manager._commit_workbook(plan)  # noqa: SLF001

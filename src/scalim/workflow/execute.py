@@ -63,6 +63,7 @@ from .errors import ScalimWorkflowConfigError
 from .loaders import workflow_loader_context
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
 from .resources import ScalimWorkflowWriteError, SheetBookDef, WorkflowResourceManager
+from .resources_base import WorkflowResourceWaitDiagnostics
 from .resources_csv import WorkflowCsvInput
 from .visibility_index import WorkflowVisibilityIndex
 
@@ -924,7 +925,6 @@ def _prepare_workflow_run_ir(
                     "max_concurrency": int(max_concurrency),
                 },
             )
-
         workflow_cache_pool = _maybe_build_workflow_cache_pool(
             workflow_exec_id=workflow_exec_id,
             workflow_ir=workflow_ir,
@@ -932,7 +932,6 @@ def _prepare_workflow_run_ir(
             logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
             consumers_by_logical_key=cache_pool_consumers_by_logical_key,
         )
-
         (
             workbook_defs,
             workbook_allow_formulas_by_id,
@@ -940,6 +939,13 @@ def _prepare_workflow_run_ir(
             csv_defs,
             sheetbook_defs,
         ) = _build_workflow_resource_defs(workflow_ir)
+        diagnostics_ir = workflow_ir.options.resources_wait.diagnostics
+        wait_diagnostics = WorkflowResourceWaitDiagnostics(
+            enabled=bool(diagnostics_ir.enabled),
+            warn_after_s=float(diagnostics_ir.warn_after_s),
+            repeat_every_s=float(diagnostics_ir.repeat_every_s) if diagnostics_ir.repeat_every_s is not None else None,
+            capture_owner_callsite=bool(diagnostics_ir.capture_owner_callsite),
+        )
         resource_manager = WorkflowResourceManager(
             workflow_exec_id=workflow_exec_id,
             instrumentation=workflow_instrumentation,
@@ -948,8 +954,12 @@ def _prepare_workflow_run_ir(
             workbook_write_lock=workbook_write_lock_by_id,
             csv_defs=csv_defs,
             sheetbook_defs=sheetbook_defs,
+            wait_diagnostics=wait_diagnostics,
+            max_wait_s=float(workflow_ir.options.resources_wait.max_wait_s),
+            output_staging_dir_name=str(workflow_ir.options.output_staging.dir_name),
+            output_staging_keep_on_success=bool(workflow_ir.options.output_staging.keep_on_success),
+            output_staging_keep_on_failure=bool(workflow_ir.options.output_staging.keep_on_failure),
         )
-
         write_output_ids_by_run_id = _build_write_output_ids_by_run_id(workflow_ir)
         write_consumers_remaining_by_output_key = _build_write_consumers_remaining_by_output_key(workflow_ir)
         main_rows_consumers_remaining_by_run_id = _build_main_rows_consumers_remaining_by_run_id(workflow_ir)

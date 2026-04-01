@@ -265,6 +265,100 @@ class SchemaBuilder:
                     "description": "workflow-level ctx 护栏配置(可选)",
                     "markdownDescription": "workflow-level ctx 护栏配置(可选).",
                 },
+                "resources_wait": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "max_wait_s": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0,
+                                    "default": 600,
+                                    "description": "共享资源 inflight join/wait 的最大等待秒数(>0;默认 600)",
+                                    "markdownDescription": "共享资源 inflight join/wait 的最大等待秒数(>0;默认 600).",
+                                },
+                                "diagnostics": {
+                                    "oneOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "enabled": {
+                                                    "type": "boolean",
+                                                    "default": False,
+                                                    "description": "是否启用 inflight wait 告警诊断(默认 false)",
+                                                    "markdownDescription": "是否启用 inflight wait 告警诊断(默认 false).",
+                                                },
+                                                "warn_after_s": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "default": 30,
+                                                    "description": "首次告警阈值秒数(>=0;默认 30)",
+                                                    "markdownDescription": "首次告警阈值秒数(>=0;默认 30).",
+                                                },
+                                                "repeat_every_s": {
+                                                    "oneOf": [{"type": "number", "exclusiveMinimum": 0}, {"type": "null"}],
+                                                    "default": None,
+                                                    "description": "重复告警间隔(>0;可选)",
+                                                    "markdownDescription": "重复告警间隔(>0;可选).",
+                                                },
+                                                "capture_owner_callsite": {
+                                                    "type": "boolean",
+                                                    "default": False,
+                                                    "description": "是否捕获 owner callsite(诊断;默认 false)",
+                                                    "markdownDescription": "是否捕获 owner callsite(诊断;默认 false).",
+                                                },
+                                            },
+                                            "additionalProperties": False,
+                                        },
+                                        {"type": "null"},
+                                    ],
+                                    "default": None,
+                                    "description": "可选: wait 告警诊断配置",
+                                    "markdownDescription": "可选: wait 告警诊断配置.",
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                    "description": "共享资源 inflight join/wait 的超时与诊断配置(可选)",
+                    "markdownDescription": "共享资源 inflight join/wait 的超时与诊断配置(可选).",
+                },
+                "output_staging": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "dir_name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "pattern": "^[^/\\\\]+$",
+                                    "default": ".scalim-staging",
+                                    "description": "staging 目录名(默认 .scalim-staging;不允许包含路径分隔符)",
+                                    "markdownDescription": "staging 目录名(默认 `.scalim-staging`;不允许包含路径分隔符).",
+                                },
+                                "keep_on_success": {
+                                    "type": "boolean",
+                                    "default": False,
+                                    "description": "成功时是否保留 staging 目录(默认 false)",
+                                    "markdownDescription": "成功时是否保留 staging 目录(默认 false).",
+                                },
+                                "keep_on_failure": {
+                                    "type": "boolean",
+                                    "default": True,
+                                    "description": "失败时是否保留 staging 目录(默认 true)",
+                                    "markdownDescription": "失败时是否保留 staging 目录(默认 true).",
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                    "description": "workflow 输出 staging 与清理策略(可选)",
+                    "markdownDescription": "workflow 输出 staging 与清理策略(可选).",
+                },
             },
             "additionalProperties": False,
         }

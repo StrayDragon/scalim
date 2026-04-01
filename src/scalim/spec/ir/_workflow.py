@@ -100,11 +100,34 @@ class WorkflowCtxOptionsIr:
 
 
 @dataclass(frozen=True)
+class WorkflowResourcesWaitDiagnosticsIr:
+    enabled: bool = False
+    warn_after_s: float = 30.0
+    repeat_every_s: Optional[float] = None
+    capture_owner_callsite: bool = False
+
+
+@dataclass(frozen=True)
+class WorkflowResourcesWaitOptionsIr:
+    max_wait_s: float = 600.0
+    diagnostics: WorkflowResourcesWaitDiagnosticsIr = field(default_factory=WorkflowResourcesWaitDiagnosticsIr)
+
+
+@dataclass(frozen=True)
+class WorkflowOutputStagingOptionsIr:
+    dir_name: str = ".scalim-staging"
+    keep_on_success: bool = False
+    keep_on_failure: bool = True
+
+
+@dataclass(frozen=True)
 class WorkflowOptionsIr:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
     cache_pool: Optional[WorkflowCachePoolIr] = None
     ctx: WorkflowCtxOptionsIr = field(default_factory=WorkflowCtxOptionsIr)
+    resources_wait: WorkflowResourcesWaitOptionsIr = field(default_factory=WorkflowResourcesWaitOptionsIr)
+    output_staging: WorkflowOutputStagingOptionsIr = field(default_factory=WorkflowOutputStagingOptionsIr)
 
 
 @dataclass(frozen=True)

@@ -10,6 +10,7 @@ import copy
 import math
 import os
 import socket
+import tempfile
 import threading
 import time
 import traceback
@@ -108,6 +109,15 @@ class _InFlightCreate:
         self.owner_callsite: Optional[str] = owner_callsite
         self.done: threading.Event = threading.Event()
         self.error: Optional[BaseException] = None
+
+
+@dataclass(frozen=True)
+class _StagedOutput:
+    resource_type: str
+    resource_id: str
+    workflow_node_id: str
+    staged_path: str
+    final_path: str
 
 
 def _capture_owner_callsite() -> str:
@@ -252,6 +262,10 @@ class _WorkflowResourceManagerBase(ABC):
     _lock: threading.Lock
     _wait_diagnostics: WorkflowResourceWaitDiagnostics
     _max_wait_s: Optional[float]
+    _output_staging_dir_name: str
+    _output_staging_keep_on_success: bool
+    _output_staging_keep_on_failure: bool
+    _staged_outputs: List[_StagedOutput]
 
     def __init__(
         self,
@@ -265,6 +279,9 @@ class _WorkflowResourceManagerBase(ABC):
         sheetbook_defs: Mapping[str, object],
         wait_diagnostics: Optional[WorkflowResourceWaitDiagnostics] = None,
         max_wait_s: Optional[float] = None,
+        output_staging_dir_name: str = ".scalim-staging",
+        output_staging_keep_on_success: bool = False,
+        output_staging_keep_on_failure: bool = True,
     ) -> None:
         self._workflow_exec_id = str(workflow_exec_id)
         self._instrumentation = instrumentation
@@ -281,15 +298,151 @@ class _WorkflowResourceManagerBase(ABC):
         self._lock = threading.Lock()
         self._wait_diagnostics = wait_diagnostics or WorkflowResourceWaitDiagnostics.disabled()
         self._max_wait_s = self._normalize_max_wait_s(max_wait_s)
+        self._output_staging_dir_name = self._normalize_output_staging_dir_name(output_staging_dir_name)
+        self._output_staging_keep_on_success = bool(output_staging_keep_on_success)
+        self._output_staging_keep_on_failure = bool(output_staging_keep_on_failure)
+        self._staged_outputs = []
 
     def _normalize_max_wait_s(self, value: Optional[float]) -> Optional[float]:
         if value is None:
             return None
         max_wait = float(value)
-        if not math.isfinite(max_wait) or max_wait < 0:
-            msg = "max_wait_s must be a finite non-negative float"
+        if not math.isfinite(max_wait) or max_wait <= 0:
+            msg = "max_wait_s must be a finite positive float"
             raise ValueError(msg)
         return float(max_wait)
+
+    def _normalize_output_staging_dir_name(self, value: str) -> str:
+        dir_name = str(value or "").strip()
+        if not dir_name:
+            msg = "output_staging_dir_name must be a non-empty string"
+            raise ValueError(msg)
+        if dir_name in (".", "..") or "/" in dir_name or "\\" in dir_name:
+            msg = "output_staging_dir_name must be a simple directory name (no separators)"
+            raise ValueError(msg)
+        return str(dir_name)
+
+    def _staging_path_for_final_output(self, final_path: str) -> str:
+        fp = str(final_path or "").strip()
+        if not fp:
+            msg = "final_path must be a non-empty string"
+            raise ValueError(msg)
+        out = Path(fp)
+        return str(out.parent / str(self._output_staging_dir_name) / str(self._workflow_exec_id) / str(out.name))
+
+    def _register_staged_output(
+        self,
+        *,
+        resource_type: str,
+        resource_id: str,
+        workflow_node_id: str,
+        staged_path: str,
+        final_path: str,
+    ) -> None:
+        self._staged_outputs.append(
+            _StagedOutput(
+                resource_type=str(resource_type),
+                resource_id=str(resource_id),
+                workflow_node_id=str(workflow_node_id),
+                staged_path=str(staged_path),
+                final_path=str(final_path),
+            )
+        )
+
+    def _cleanup_output_staging_exec_dir_for_final_path(self, final_path: str) -> None:
+        # 尝试清理空的暂存目录(尽力而为): `<final_dir>/<dir_name>/<workflow_exec_id>` (即 `staging` 目录)
+        p = Path(str(final_path)).parent / str(self._output_staging_dir_name) / str(self._workflow_exec_id)
+        with suppress(Exception):
+            p.rmdir()
+
+    def _create_publish_temp_path(self, final_path: str) -> str:
+        output_dir = Path(str(final_path)).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+        fd, temp_path = tempfile.mkstemp(suffix=".publish.tmp", dir=str(output_dir))
+        os.close(fd)
+        return str(temp_path)
+
+    def _copy_file_atomic(self, src_path: str, *, final_path: str) -> None:
+        src = Path(str(src_path))
+        dst = str(final_path)
+        temp_path = self._create_publish_temp_path(dst)
+        temp_obj = Path(temp_path)
+        try:
+            with src.open("rb") as r, temp_obj.open("wb") as w:
+                while True:
+                    chunk = r.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    _ = w.write(chunk)
+            _ = temp_obj.replace(dst)
+        except Exception:
+            with suppress(Exception):
+                temp_obj.unlink()
+            raise
+
+    def _publish_staged_outputs(self) -> None:
+        if not self._staged_outputs:
+            return
+
+        def _sort_key(item: _StagedOutput) -> Tuple[str, str, str]:
+            return (str(item.resource_type), str(item.resource_id), str(item.final_path))
+
+        staged = sorted(self._staged_outputs, key=_sort_key)
+        for item in staged:
+            staged_path = str(item.staged_path)
+            final_path = str(item.final_path)
+            node_id = str(item.workflow_node_id)
+
+            if not Path(staged_path).exists():
+                msg = "Missing staged output for publish: {}".format(
+                    loggingx.format_kv(
+                        resource_type=item.resource_type, resource_id=item.resource_id, staged_path=staged_path, final_path=final_path
+                    )
+                )
+                raise ScalimWorkflowWriteError(msg)
+
+            Path(final_path).parent.mkdir(parents=True, exist_ok=True)
+            try:
+                if self._output_staging_keep_on_success:
+                    self._copy_file_atomic(staged_path, final_path=final_path)
+                else:
+                    _ = Path(staged_path).replace(final_path)
+            except Exception as exc:
+                msg = "Publish staged output failed: {}: {}".format(type(exc).__name__, exc)
+                raise ScalimWorkflowWriteError(
+                    msg,
+                    diff=[
+                        "resource_type={!r}".format(str(item.resource_type)),
+                        "resource_id={!r}".format(str(item.resource_id)),
+                        "staged_path={!r}".format(str(staged_path)),
+                        "final_path={!r}".format(str(final_path)),
+                        "keep_on_success={!r}".format(bool(self._output_staging_keep_on_success)),
+                        "hint=check_permissions_and_disk_space_or_set_workflow.options.output_staging.keep_on_success=true",
+                    ],
+                ) from exc
+
+            self._emit_resource_commit(
+                workflow_node_id=str(node_id),
+                resource_type=str(item.resource_type),
+                resource_id=str(item.resource_id),
+                path=str(final_path),
+            )
+            if not self._output_staging_keep_on_success:
+                self._cleanup_output_staging_exec_dir_for_final_path(final_path)
+
+        self._staged_outputs = []
+
+    def _cleanup_staged_outputs_on_failure(self) -> None:
+        if self._output_staging_keep_on_failure:
+            return
+        for item in list(self._staged_outputs):
+            staged_path = str(item.staged_path)
+            final_path = str(item.final_path)
+            with suppress(Exception):
+                Path(staged_path).unlink()
+            with suppress(Exception):
+                self._cleanup_output_staging_exec_dir_for_final_path(final_path)
+        self._staged_outputs = []
 
     def _emit_inflight_wait_slow_warning(
         self,
@@ -366,6 +519,7 @@ class _WorkflowResourceManagerBase(ABC):
                         owner_thread_ident=inflight_state.owner_thread_ident,
                         waiter_thread_ident=threading.get_ident(),
                         owner_callsite=inflight_state.owner_callsite,
+                        hint="check_owner_thread_hang_or_adjust_workflow.options.resources_wait",
                     )
                 )
                 raise ScalimWorkflowWriteError(msg)
@@ -617,6 +771,7 @@ class _WorkflowResourceManagerBase(ABC):
             self._commit_csv(plan)
         for plan in list(self._sheetbooks.values()):
             self._commit_sheetbook(plan)
+        self._publish_staged_outputs()
 
     def discard_all(self, *, workflow_node_id: str, reason: str) -> None:
         self._drain_inflight(wait_kind="discard_all")
@@ -626,6 +781,7 @@ class _WorkflowResourceManagerBase(ABC):
             self._discard_csv(plan, workflow_node_id=str(workflow_node_id), reason=str(reason))
         for plan in list(self._sheetbooks.values()):
             self._discard_sheetbook(plan, workflow_node_id=str(workflow_node_id), reason=str(reason))
+        self._cleanup_staged_outputs_on_failure()
 
     @abstractmethod
     def _commit_workbook(self, plan: object) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method

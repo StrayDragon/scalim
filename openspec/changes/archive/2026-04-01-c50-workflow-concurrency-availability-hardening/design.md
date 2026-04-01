@@ -7,10 +7,11 @@ workflow 并发执行（`ThreadPoolExecutor` / `max_concurrency`）下,共享输
 - joinable inflight 机制（owner 创建,waiter join）
 - 可选 wait diagnostics（warn-after / repeat）
 - 可选 max_wait_s（超时 fail-fast）,但默认 `max_wait_s=None` 且 diagnostics 关闭时走单次 `Event.wait()` 的无限等待快路径
-- 基于 lock file 的写锁 owner/stale/force reclaim 能力,但仍停留在资源层参数,缺少 workflow 级 SSOT 与可测试的默认策略
 
 在 Dagster worker/容器场景,无限等待会表现为 run 永久挂起,难定位难回收,最终成为平台稳定性问题。
-因此需要把“资源等待上限 + 写锁后端/治理”提升到 workflow 的显式配置面,并给出安全默认值与可诊断输出。
+因此需要把“资源等待上限 + 等待诊断”提升到 workflow 的显式配置面,并给出安全默认值与可诊断输出。
+
+NOTE: 写锁/输出 staging 的策略收敛在另一个变更中处理,本 change 仅聚焦 inflight join/wait 的可用性硬化。
 
 约束:
 
@@ -23,9 +24,8 @@ workflow 并发执行（`ThreadPoolExecutor` / `max_concurrency`）下,共享输
 **Goals:**
 
 - BREAKING: 默认不再允许无限等待; joinable waiter 默认 `max_wait_s=600` 超时 fail-fast,错误包含 owner/waiter 诊断信息。
-- 新增 workflow YAML 配置 `workflow.options.resources_wait` 与 `workflow.options.write_locks`,并纳入 schema-only 校验与 IR 编译边界。
-- 新增写锁后端 `mkdir`（原子目录锁,更适合 NFS/共享盘），并支持 `backend=none`（外部已协调互斥的场景）。
-- 补齐并发/等待/锁冲突的回归测试与 docs 最佳实践（本地盘/NFS/容器）。
+- 新增 workflow YAML 配置 `workflow.options.resources_wait`,并纳入 schema-only 校验与 IR 编译边界。
+- 补齐并发/等待/超时的回归测试与 docs 最佳实践。
 
 **Non-Goals:**
 
@@ -45,17 +45,11 @@ workflow 并发执行（`ThreadPoolExecutor` / `max_concurrency`）下,共享输
 2) **Wait diagnostics as workflow-level SSOT**
 
 - wait diagnostics 与 timeout 都由 `workflow.options.resources_wait` 统一配置,并从 YAML → IR → runtime 贯穿:
-  - `warn_after_s` / `repeat_every_s`
-  - 可选 `capture_owner_callsite`（仅诊断用途）
+  - `diagnostics.enabled`
+  - `diagnostics.warn_after_s` / `diagnostics.repeat_every_s`
+  - 可选 `diagnostics.capture_owner_callsite`（仅诊断用途）
 
-3) **Write lock policy SSOT**
-
-- 写锁后端与治理由 `workflow.options.write_locks` 统一控制:
-  - `backend`: `file|mkdir|none`
-  - `stale_after_s` + `force`（治理 stale lock）
-- 资源层不得再隐式决定锁策略；需要在 runtime manager 构造时注入统一 policy。
-
-4) **Docs / Generated boundaries & drift gates**
+3) **Docs / Generated boundaries & drift gates**
 
 - workflow YAML 文档 SSOT：`docs/doc/yaml-dsl/workflow.md`（若涉及 injected blocks,用 `just gen-docs`）
 - workflow schema SSOT：`src/scalim/dsl/by_yaml/schema_dsl/**`；生成物：`src/scalim/dsl/by_yaml/schema/workflow.gen.json`（用 `just gen-yaml-dsl-schema`/`just gen`）
@@ -66,9 +60,6 @@ workflow 并发执行（`ThreadPoolExecutor` / `max_concurrency`）下,共享输
 - [破坏性默认变更] 生产上可能从“挂起”变为“超时失败” → 缓解:
   - 错误消息必须包含 resource_id/owner/wait_s/max_wait_s 以及治理 hint
   - docs 提供推荐配置与排障路径
-- [NFS file lock 不可靠] `O_EXCL`/unlink 语义可能异常 → 缓解:
-  - 提供 `mkdir` 后端作为更稳的原子锁
-  - 明确 `backend=none` 的风险与适用场景
 - [诊断/轮询开销] 由单次 wait 转为轮询等待 → 缓解:
   - 轮询间隔基于 warn/timeout 自动取最小;保持默认 1s 级别
   - 仅在 inflight wait 路径引入,不影响无并发场景
@@ -77,11 +68,7 @@ workflow 并发执行（`ThreadPoolExecutor` / `max_concurrency`）下,共享输
 
 - 先在 schema + config parsing + IR 层引入新的 options,并确保 runtime manager 能消费。
 - 再调整默认 timeout 并补齐回归测试,确保 hang 变为可诊断的 fail-fast。
-- 对 legacy `resources.*.write_lock` 入口进行调研后,收敛为单一路径:
-  - 若保留,必须有明确冲突规则与 fail-fast
-  - 若移除,必须给出迁移提示与 docs 更新
 
 ## Open Questions
 
-- legacy `write_lock` 的最终迁移策略: 直接移除还是保留但要求与 workflow.options 一致?
 - 默认 `warn_after_s`/repeat 策略是否需要在没有显式开启 diagnostics 时仍对超时场景输出一次性提示?

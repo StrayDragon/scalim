@@ -71,9 +71,59 @@ workflow:
 - `workflow.runs[*].demand` 必须为非空字符串
 - `workflow.options.max_concurrency` 必须为整数且 >= 1(默认 `1`)
 - `workflow.options.failure_policy` 为 `all_fail` 或 `primary_only`(默认 `all_fail`)
+- `workflow.options.resources_wait` MAY 缺省(缺省时: 默认 `max_wait_s=600`,且 diagnostics 默认禁用)
 - `workflow.options.cache_pool` MAY 缺省(表示不启用 workflow-scope cache pool)
   - 当存在时,其 `conflict_policy/release_policy/budget` 为必填
   - `budget.max_entries` 必须为整数且 >= 1
+
+### 1.1) `resources_wait`: 共享资源 join/wait 超时与诊断
+
+workflow 的共享输出资源(book/csv/sheetbook)在并发模式下会用 joinable inflight 去重 owner 创建；当 owner 卡死/外部 IO 阻塞时,waiter 可能会被挂起。
+为避免生产 hang,workflow 默认对 inflight join/wait 启用超时 fail-fast：
+
+- `max_wait_s` 缺省等价于 `600` 秒
+- diagnostics 默认禁用(仅当显式开启时才告警)
+
+示例:
+
+```yaml
+workflow:
+  options:
+    resources_wait:
+      max_wait_s: 600
+      diagnostics:
+        enabled: true
+        warn_after_s: 30
+        repeat_every_s: 60
+        capture_owner_callsite: true
+```
+
+### 1.2) `output_staging`: workflow 输出 staging + 最终发布
+
+workflow 的共享输出(例如 `workflow.resources.books` 导出的 `.xlsx` / 合并的 `.csv`)默认采用 **staging → publish** 两阶段:
+
+1. commit 阶段先写入 staging 目录(避免在运行中污染最终路径)
+2. workflow 成功结束后再覆盖发布到最终导出路径
+
+默认 staging 目录布局:
+
+- `<final_dir>/.scalim-staging/<workflow_exec_id>/<filename>`
+
+清理策略:
+
+- success 默认清理 staging(`keep_on_success=false`)
+- failure 默认保留 staging(`keep_on_failure=true`,便于排障)
+
+示例:
+
+```yaml
+workflow:
+  options:
+    output_staging:
+      dir_name: .scalim-staging
+      keep_on_success: false
+      keep_on_failure: true
+```
 
 ## 2) demand 路径解析与 `path_aliases`
 
@@ -229,7 +279,6 @@ workflow:
           max_total_cells: 2000000
         export_xlsx:
           path: ./out/report.xlsx
-          write_lock: true
 
   runs:
     - id: main

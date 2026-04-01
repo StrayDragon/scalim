@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
@@ -34,6 +35,9 @@ from ._models import (
     WorkflowConfig,
     WorkflowCtxOptions,
     WorkflowOptions,
+    WorkflowOutputStagingOptions,
+    WorkflowResourcesWaitDiagnosticsOptions,
+    WorkflowResourcesWaitOptions,
     WorkflowRun,
 )
 
@@ -44,6 +48,47 @@ _CACHE_POOL_OVER_BUDGET_POLICIES = ("fail_fast", "evict_lru")
 _CACHE_POOL_PIN_KINDS = ("preload_forever",)
 
 _INTERNAL_NODE_ID_PREFIX = "__wf__"
+
+
+def _parse_bool(raw: object, *, path: str, msg: str) -> bool:
+    if not isinstance(raw, bool):
+        raise ScalimWorkflowConfigError(msg, path=path)
+    return bool(raw)
+
+
+def _parse_finite_number(raw: object, *, path: str, msg: str) -> float:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        raise ScalimWorkflowConfigError(msg, path=path)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ScalimWorkflowConfigError(msg, path=path) from exc
+    if not math.isfinite(value):
+        raise ScalimWorkflowConfigError(msg, path=path)
+    return float(value)
+
+
+def _parse_finite_non_negative_number(raw: object, *, path: str, msg: str) -> float:
+    value = _parse_finite_number(raw, path=path, msg=msg)
+    if value < 0:
+        raise ScalimWorkflowConfigError(msg, path=path)
+    return float(value)
+
+
+def _parse_finite_positive_number(raw: object, *, path: str, msg: str) -> float:
+    value = _parse_finite_number(raw, path=path, msg=msg)
+    if value <= 0:
+        raise ScalimWorkflowConfigError(msg, path=path)
+    return float(value)
+
+
+def _load_optional_finite_positive_number(data: Mapping[str, Any], *, key: str, path: str, msg: str) -> Optional[float]:
+    if key not in data:
+        return None
+    raw = data.get(key)
+    if raw is None:
+        return None
+    return _parse_finite_positive_number(raw, path=path, msg=msg)
 
 
 def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[str, ...]:
@@ -521,6 +566,108 @@ def _load_workflow_ctx_options(ctx_raw: object) -> WorkflowCtxOptions:
     )
 
 
+def _load_workflow_resources_wait_diagnostics_options(raw: object) -> WorkflowResourcesWaitDiagnosticsOptions:
+    msg: str
+    diagnostics = WorkflowResourcesWaitDiagnosticsOptions()
+    if raw is None:
+        return diagnostics
+    if not isinstance(raw, dict):
+        msg = "workflow.options.resources_wait.diagnostics must be a mapping"
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.resources_wait.diagnostics")
+    data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+
+    enabled = _parse_bool(
+        data.get("enabled", diagnostics.enabled),
+        path="workflow.options.resources_wait.diagnostics.enabled",
+        msg="workflow.options.resources_wait.diagnostics.enabled must be a bool",
+    )
+
+    warn_after_s = _parse_finite_non_negative_number(
+        data.get("warn_after_s", diagnostics.warn_after_s),
+        path="workflow.options.resources_wait.diagnostics.warn_after_s",
+        msg="workflow.options.resources_wait.diagnostics.warn_after_s must be a finite non-negative number",
+    )
+
+    repeat_every_s = _load_optional_finite_positive_number(
+        data,
+        key="repeat_every_s",
+        path="workflow.options.resources_wait.diagnostics.repeat_every_s",
+        msg="workflow.options.resources_wait.diagnostics.repeat_every_s must be a finite positive number",
+    )
+
+    capture_owner_callsite = _parse_bool(
+        data.get("capture_owner_callsite", diagnostics.capture_owner_callsite),
+        path="workflow.options.resources_wait.diagnostics.capture_owner_callsite",
+        msg="workflow.options.resources_wait.diagnostics.capture_owner_callsite must be a bool",
+    )
+
+    return WorkflowResourcesWaitDiagnosticsOptions(
+        enabled=enabled,
+        warn_after_s=float(warn_after_s),
+        repeat_every_s=repeat_every_s,
+        capture_owner_callsite=capture_owner_callsite,
+    )
+
+
+def _load_workflow_resources_wait_options(raw: object) -> WorkflowResourcesWaitOptions:
+    msg: str
+    opts = WorkflowResourcesWaitOptions()
+    if raw is None:
+        return opts
+    if not isinstance(raw, dict):
+        msg = "workflow.options.resources_wait must be a mapping"
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.resources_wait")
+    data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+
+    max_wait_s = _parse_finite_positive_number(
+        data.get("max_wait_s", opts.max_wait_s),
+        path="workflow.options.resources_wait.max_wait_s",
+        msg="workflow.options.resources_wait.max_wait_s must be a finite positive number",
+    )
+
+    diagnostics = _load_workflow_resources_wait_diagnostics_options(data.get("diagnostics"))
+    return WorkflowResourcesWaitOptions(
+        max_wait_s=float(max_wait_s),
+        diagnostics=diagnostics,
+    )
+
+
+def _load_workflow_output_staging_options(raw: object) -> WorkflowOutputStagingOptions:
+    msg: str
+    opts = WorkflowOutputStagingOptions()
+    if raw is None:
+        return opts
+    if not isinstance(raw, dict):
+        msg = "workflow.options.output_staging must be a mapping"
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.output_staging")
+    data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
+
+    dir_name_raw = data.get("dir_name", opts.dir_name)
+    if not isinstance(dir_name_raw, str):
+        msg = "workflow.options.output_staging.dir_name must be a non-empty string"
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.output_staging.dir_name")
+    dir_name = str(dir_name_raw or "").strip()
+    if not dir_name or dir_name in (".", "..") or "/" in dir_name or "\\" in dir_name:
+        msg = "workflow.options.output_staging.dir_name must be a simple directory name (no separators)"
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.output_staging.dir_name")
+
+    keep_on_success_raw = data.get("keep_on_success", opts.keep_on_success)
+    if not isinstance(keep_on_success_raw, bool):
+        msg = "workflow.options.output_staging.keep_on_success must be a bool"
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.output_staging.keep_on_success")
+
+    keep_on_failure_raw = data.get("keep_on_failure", opts.keep_on_failure)
+    if not isinstance(keep_on_failure_raw, bool):
+        msg = "workflow.options.output_staging.keep_on_failure must be a bool"
+        raise ScalimWorkflowConfigError(msg, path="workflow.options.output_staging.keep_on_failure")
+
+    return WorkflowOutputStagingOptions(
+        dir_name=str(dir_name),
+        keep_on_success=bool(keep_on_success_raw),
+        keep_on_failure=bool(keep_on_failure_raw),
+    )
+
+
 def _parse_workflow_cache_pool_budget(budget_raw: object) -> WorkflowCachePoolBudget:
     msg: str
     if not isinstance(budget_raw, dict):
@@ -646,12 +793,16 @@ def _load_workflow_options(wf: Mapping[str, Any]) -> WorkflowOptions:
         raise ScalimWorkflowConfigError(msg, path="workflow.options.share_preload_cache")
 
     cache_pool = _load_workflow_cache_pool_options(options_dict.get("cache_pool"))
+    resources_wait = _load_workflow_resources_wait_options(options_dict.get("resources_wait"))
+    output_staging = _load_workflow_output_staging_options(options_dict.get("output_staging"))
 
     return WorkflowOptions(
         max_concurrency=max_concurrency,
         failure_policy=failure_policy,
         cache_pool=cache_pool,
         ctx=ctx,
+        resources_wait=resources_wait,
+        output_staging=output_staging,
     )
 
 

@@ -18,7 +18,7 @@ from ..sinks import InMemoryCsv
 from ..sinks._internal.base import create_temp_path
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock
+from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 
 WorkflowCsvInput = Union[str, InMemoryCsv]
 
@@ -104,7 +104,6 @@ class _AppendSegment:
 class _CsvPlan:
     resource_id: str
     path: str
-    lock_path: Optional[Path]
     baseline_header: Optional[List[str]] = None
     segments: Optional[List[_AppendSegment]] = None
     last_workflow_node_id: Optional[str] = None
@@ -119,15 +118,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             if raw_path is None:
                 msg = "Unknown csv resource id: {!r}".format(key)
                 raise ScalimWorkflowWriteError(msg)
-            lock_path = acquire_write_lock(
-                raw_path,
-                owner={
-                    "workflow_exec_id": self._workflow_exec_id,
-                    "resource_type": "csv",
-                    "resource_id": key,
-                },
-            )
-            return _CsvPlan(resource_id=key, path=str(raw_path), lock_path=lock_path)
+            return _CsvPlan(resource_id=key, path=str(raw_path))
 
         def _on_create(plan: object) -> None:
             p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
@@ -238,16 +229,12 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
     def _commit_csv(self, plan: object) -> None:
         p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
         if p.segments is None or p.baseline_header is None:
-            if p.lock_path is not None:
-                release_write_lock(p.lock_path)
-                p.lock_path = None
             return
 
-        output_path = str(p.path)
-        output_dir = Path(output_path).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
+        final_path = str(p.path)
+        staging_path = self._staging_path_for_final_output(final_path)
 
-        temp_path = create_temp_path(output_path, ".csv.tmp")
+        temp_path = create_temp_path(staging_path, ".csv.tmp")
         temp_obj = Path(temp_path)
 
         try:
@@ -266,26 +253,25 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                             out_row.append(row[idx] if idx >= 0 and idx < len(row) else "")
                         writer.writerow(out_row)
 
-            _ = temp_obj.replace(output_path)
+            _ = temp_obj.replace(staging_path)
         except Exception as exc:
             with suppress(Exception):
                 temp_obj.unlink()
             msg = "CSV commit failed: {}: {}".format(type(exc).__name__, exc)
             raise ScalimWorkflowWriteError(msg) from exc
-        finally:
-            if p.lock_path is not None:
-                release_write_lock(p.lock_path)
-                p.lock_path = None
 
         node_id = p.last_workflow_node_id or "__wf__commit"
-        self._emit_resource_commit(workflow_node_id=node_id, resource_type="csv", resource_id=p.resource_id, path=str(p.path))
+        self._register_staged_output(
+            resource_type="csv",
+            resource_id=p.resource_id,
+            workflow_node_id=str(node_id),
+            staged_path=str(staging_path),
+            final_path=str(final_path),
+        )
 
     @override
     def _discard_csv(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
         p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
-        if p.lock_path is not None:
-            release_write_lock(p.lock_path)
-            p.lock_path = None
         node_id = p.last_workflow_node_id or str(workflow_node_id)
         self._emit_resource_discard(
             workflow_node_id=node_id,

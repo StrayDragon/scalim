@@ -16,7 +16,7 @@ from ..events._events import DiagnosticWarningEvent
 from ..sinks._internal.base import create_temp_path
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock
+from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 from .resources_csv import WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 from .resources_workbook import best_effort_close_write_only_workbook_worksheets, get_openpyxl_workbook_class
 
@@ -116,7 +116,6 @@ class _SheetBookPlan:
     sheet_decl_order: Dict[str, int]
     sheet_order: List[str]
     sheets: Dict[str, _SheetBookSheetPlan]
-    lock_path: Optional[Path] = None
     total_cells: int = 0
     last_workflow_node_id: Optional[str] = None
 
@@ -137,25 +136,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         self._emit_resource_commit(
             workflow_node_id=node_id, resource_type="sheetbook", resource_id=plan.resource_id, path=str(display_path)
         )
-
-    def _maybe_acquire_sheetbook_write_lock(self, plan: _SheetBookPlan, *, output_path: str) -> None:
-        if not bool(plan.export_write_lock):
-            return
-        lock_path = acquire_write_lock(
-            output_path,
-            owner={
-                "workflow_exec_id": self._workflow_exec_id,
-                "resource_type": "sheetbook",
-                "resource_id": str(plan.resource_id),
-            },
-        )
-        plan.lock_path = lock_path
-
-    def _release_sheetbook_write_lock(self, plan: _SheetBookPlan) -> None:
-        if plan.lock_path is None:
-            return
-        release_write_lock(plan.lock_path)
-        plan.lock_path = None
 
     def _sheetbook_sheet_prepare_action(
         self,
@@ -615,39 +595,37 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             self._emit_sheetbook_commit(p, display_path=str(display_path))
             return
 
-        output_path = str(export_path)
-        output_dir = Path(output_path).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        self._maybe_acquire_sheetbook_write_lock(p, output_path=output_path)
+        final_path = str(export_path)
+        staging_path = self._staging_path_for_final_output(final_path)
 
         try:
             workbook_cls = _get_openpyxl_workbook_class()
         except ImportError as exc:
-            with suppress(Exception):
-                self._release_sheetbook_write_lock(p)
             raise ScalimWorkflowWriteError(str(exc)) from exc
 
         wb = workbook_cls(write_only=True)
         try:
             _write_sheetbook_plan_to_openpyxl_workbook(wb, p)
-            _save_openpyxl_workbook_atomic(wb, output_path=output_path)
+            _save_openpyxl_workbook_atomic(wb, output_path=staging_path)
         except Exception:
             _best_effort_close_write_only_workbook_worksheets(wb)
             raise
         finally:
             with suppress(Exception):
                 wb.close()
-            with suppress(Exception):
-                self._release_sheetbook_write_lock(p)
 
-        self._emit_sheetbook_commit(p, display_path=str(display_path))
+        node_id = p.last_workflow_node_id or "__wf__commit"
+        self._register_staged_output(
+            resource_type="sheetbook",
+            resource_id=p.resource_id,
+            workflow_node_id=str(node_id),
+            staged_path=str(staging_path),
+            final_path=str(final_path),
+        )
 
     @override
     def _discard_sheetbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
         p = cast("_SheetBookPlan", plan)  # pragma: allow-cast sheetbook plan typed narrowing
-        with suppress(Exception):
-            self._release_sheetbook_write_lock(p)
         node_id = p.last_workflow_node_id or str(workflow_node_id)
         display_path = p.export_path if p.export_path is not None else "<memory>"
         self._emit_resource_discard(

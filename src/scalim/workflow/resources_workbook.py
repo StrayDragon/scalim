@@ -17,7 +17,7 @@ from ..sinks._internal.base import create_temp_path
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase, acquire_write_lock, release_write_lock
+from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 from .resources_csv import AppendSegment, WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 
 # 内部实现仍沿用原有局部命名,减少重构噪音.
@@ -67,7 +67,6 @@ class _SheetPlan:
 class _WorkbookPlan:
     resource_id: str
     path: str
-    lock_path: Optional[Path]
     allow_formulas: bool
     sheet_decl_order: Dict[str, int]
     sheet_order: List[str]
@@ -84,20 +83,9 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             if raw_path is None:
                 msg = "Unknown workbook resource id: {!r}".format(key)
                 raise ScalimWorkflowWriteError(msg)
-            lock_path = None
-            if bool(self._workbook_write_lock.get(key, False)):
-                lock_path = acquire_write_lock(
-                    raw_path,
-                    owner={
-                        "workflow_exec_id": self._workflow_exec_id,
-                        "resource_type": "workbook",
-                        "resource_id": key,
-                    },
-                )
             return _WorkbookPlan(
                 resource_id=key,
                 path=str(raw_path),
-                lock_path=lock_path,
                 allow_formulas=bool(self._workbook_allow_formulas.get(key, False)),
                 sheet_decl_order={},
                 sheet_order=[],
@@ -305,24 +293,17 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         )
 
     @override
-    def _commit_workbook(self, plan: object) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _commit_workbook(self, plan: object) -> None:  # noqa: C901
         p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
         if not p.sheets:
-            if p.lock_path is not None:
-                release_write_lock(p.lock_path)
-                p.lock_path = None
             return
 
-        output_path = str(p.path)
-        output_dir = Path(output_path).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
+        final_path = str(p.path)
+        staging_path = self._staging_path_for_final_output(final_path)
 
         try:
             workbook_cls = _get_openpyxl_workbook_class()
         except ImportError as exc:
-            if p.lock_path is not None:
-                release_write_lock(p.lock_path)
-                p.lock_path = None
             raise ScalimWorkflowWriteError(str(exc)) from exc
 
         wb = workbook_cls(write_only=True)
@@ -348,11 +329,11 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                             out_row.append(escape_excel_formula(value, allow_formulas=bool(p.allow_formulas)))
                         _ = ws.append(out_row)
 
-            temp_path = create_temp_path(output_path, ".xlsx.tmp")
+            temp_path = create_temp_path(staging_path, ".xlsx.tmp")
             temp_obj = Path(temp_path)
             try:
                 wb.save(temp_obj)
-                _ = temp_obj.replace(output_path)
+                _ = temp_obj.replace(staging_path)
             except Exception as exc:
                 with suppress(Exception):
                     temp_obj.unlink()
@@ -364,19 +345,19 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         finally:
             with suppress(Exception):
                 wb.close()
-            if p.lock_path is not None:
-                release_write_lock(p.lock_path)
-                p.lock_path = None
 
         node_id = p.last_workflow_node_id or "__wf__commit"
-        self._emit_resource_commit(workflow_node_id=node_id, resource_type="workbook", resource_id=p.resource_id, path=str(p.path))
+        self._register_staged_output(
+            resource_type="workbook",
+            resource_id=p.resource_id,
+            workflow_node_id=str(node_id),
+            staged_path=str(staging_path),
+            final_path=str(final_path),
+        )
 
     @override
     def _discard_workbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
         p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
-        if p.lock_path is not None:
-            release_write_lock(p.lock_path)
-            p.lock_path = None
         node_id = p.last_workflow_node_id or str(workflow_node_id)
         self._emit_resource_discard(
             workflow_node_id=node_id,

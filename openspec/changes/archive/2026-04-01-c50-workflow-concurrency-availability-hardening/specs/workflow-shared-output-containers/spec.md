@@ -6,11 +6,12 @@
 
 约束:
 
-- 诊断配置 MUST 包含 `warn_after_s`(首次告警阈值)和可选的 `repeat_every_s`(重复告警间隔)
+- 诊断配置 MUST 包含 `diagnostics.enabled`(默认 false)
+- 当 `diagnostics.enabled=true` 时,诊断配置 MUST 包含 `warn_after_s`(首次告警阈值)和可选的 `repeat_every_s`(重复告警间隔)
 - 告警 MUST 包含: `resource_id`、owner 线程标识、waiter 线程标识、已等待时长
 - 当启用 `capture_owner_callsite=true` 时,告警 SHOULD 额外包含 owner callsite(用于定位卡住的创建点)
 - 告警 MUST 走 instrumentation event 或 warning logger,不得污染正常输出
-- 默认行为 MUST 为禁用(仅在显式开启时输出告警)
+- 默认行为 MUST 为禁用(仅在 `diagnostics.enabled=true` 时输出告警)
 
 #### Scenario: waiter 等待超过阈值时产生诊断告警
 - **GIVEN** wait diagnostics 启用且 `warn_after_s=5.0`

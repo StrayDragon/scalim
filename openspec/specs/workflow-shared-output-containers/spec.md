@@ -125,13 +125,16 @@ TBD - created by archiving change c30-workflow-shared-output-containers. Update 
 
 ### Requirement: joinable get-or-create 的等待诊断
 系统 SHALL 为共享资源的 joinable get-or-create 提供可选的 wait diagnostics,使 waiter 等待过程可观测且可定位.
+该诊断配置 MUST 作为 workflow-level SSOT 暴露(例如 `workflow.options.resources_wait`),并贯穿 YAML→IR→runtime.
 
 约束:
 
-- 诊断配置 MUST 包含 `warn_after_s`(首次告警阈值)和可选的 `repeat_every_s`(重复告警间隔)
+- 诊断配置 MUST 包含 `diagnostics.enabled`(默认 false)
+- 当 `diagnostics.enabled=true` 时,诊断配置 MUST 包含 `warn_after_s`(首次告警阈值)和可选的 `repeat_every_s`(重复告警间隔)
 - 告警 MUST 包含: `resource_id`、owner 线程标识、waiter 线程标识、已等待时长
+- 当启用 `capture_owner_callsite=true` 时,告警 SHOULD 额外包含 owner callsite(用于定位卡住的创建点)
 - 告警 MUST 走 instrumentation event 或 warning logger,不得污染正常输出
-- 默认行为 MUST 为禁用(避免行为变化)
+- 默认行为 MUST 为禁用(仅在 `diagnostics.enabled=true` 时输出告警)
 
 #### Scenario: waiter 等待超过阈值时产生诊断告警
 - **GIVEN** wait diagnostics 启用且 `warn_after_s=5.0`
@@ -139,18 +142,24 @@ TBD - created by archiving change c30-workflow-shared-output-containers. Update 
 - **THEN** 系统 MUST 发出包含 resource_id/owner_thread/waiter_thread/wait_s 的告警
 
 ### Requirement: joinable get-or-create 的可选超时
-系统 SHALL 为共享资源的 joinable get-or-create 提供可选的 max wait / fail-fast 能力.
+系统 MUST 为共享资源的 joinable get-or-create 提供 max wait / fail-fast 能力,以避免并发场景无限等待导致 workflow hang.
 
 约束:
 
-- 超时后 MUST 以 `WorkflowWriteError` 失败,错误消息包含 resource_id、owner 线程标识、已等待时长
-- 默认策略 MUST 为"仅告警不超时"(避免行为变化)
-- 超时值 MUST 可配置(建议通过 workflow-level 配置或环境变量)
+- 超时后 MUST 以 `WorkflowWriteError` 失败,错误消息包含 resource_id、owner 线程标识、已等待时长与 max_wait_s
+- 默认策略 MUST 为启用超时且 `max_wait_s=600`(BREAKING: 不再允许无限等待作为默认)
+- 超时值 MUST 可配置(优先通过 workflow-level 配置 `workflow.options.resources_wait.max_wait_s`)
+- 若显式将 `max_wait_s` 配置为 `0` 或负数,MUST 被拒绝并给出配置错误
 
 #### Scenario: owner 卡死导致 waiter 超时
 - **GIVEN** max_wait_s 配置为 60 秒
 - **WHEN** owner 线程创建资源超过 60 秒未完成
 - **THEN** waiter MUST 以包含诊断信息的 `WorkflowWriteError` 失败
+
+#### Scenario: default timeout is enforced
+- **GIVEN** 未显式配置 max_wait_s
+- **WHEN** owner 线程创建资源超过默认超时
+- **THEN** waiter MUST fail-fast,而不是无限等待
 
 ### Requirement: commit_all/discard_all 与 inflight 并发交错语义
 系统 MUST 在 `commit_all()`/`discard_all()` 执行时显式处理与 inflight 创建的并发交错,并采用 **drain** 策略:
@@ -226,3 +235,23 @@ TBD - created by archiving change c30-workflow-shared-output-containers. Update 
 #### Scenario: sheet order is stable across concurrent runs
 - **WHEN** 并发执行多个写入不同 sheets 的 write intents
 - **THEN** 导出的 workbook/sheetbook 内 sheet 顺序 MUST 可复现
+
+### Requirement: shared outputs MUST commit into staging and publish on success
+系统 MUST 将 workflow 共享输出容器（csv/workbook/sheetbook）的落盘语义收敛为 staging → publish:
+
+- commit 阶段 MUST 写入 staging 唯一路径（不得直接写入最终导出路径）
+- workflow 成功结束后 MUST 覆盖发布到最终导出路径（原子 replace）
+- 默认清理策略 MUST 为:
+  - success: 清理 staging exec dir
+  - failure: 保留 staging（便于排障）
+
+staging 路径布局约束:
+
+- 对最终路径 `final_path`,staging MUST 为 `<final_dir>/<dir_name>/<workflow_exec_id>/<filename>`
+- `dir_name` 由 `workflow.options.output_staging.dir_name` 提供或缺省为 `.scalim-staging`
+
+#### Scenario: publish overwrites final path on success
+- **GIVEN** workflow 成功结束且存在 staged output
+- **WHEN** 执行 publish
+- **THEN** 最终导出路径 MUST 被原子覆盖为 staged output 的内容
+
