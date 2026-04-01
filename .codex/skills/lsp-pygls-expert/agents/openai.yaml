@@ -1,0 +1,7 @@
+interface:
+  display_name: "Pygls LSP 专家"
+  short_description: "pygls 2.x LSP 实现与排障（docs 快照 2.1.1）"
+  default_prompt: "使用 $lsp-pygls-expert：以官方 docs 为主，必要时用用户环境 pygls 源码验证；skill 内置 pygls 2.1.1 docs 快照索引用于快速定位。"
+
+policy:
+  allow_implicit_invocation: true

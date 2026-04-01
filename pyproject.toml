@@ -86,6 +86,7 @@ dev = [
     "pytest-memray>=1.8.0",
     "zensical>=0.0.23",
     "tomli>=2.0.0",
+    "pygls>=2.1.1",
 ]
 
 [build-system]
