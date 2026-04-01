@@ -59,4 +59,4 @@ def build_task_specs(
     return task_order, task_specs, op_task_key
 
 
-__all__ = ["TaskSpec", "build_task_specs", "collect_layer_executable_ops"]
+__all__ = ("TaskSpec", "build_task_specs", "collect_layer_executable_ops")

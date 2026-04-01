@@ -244,4 +244,4 @@ class DerivedFieldIr:
 
 SupportedFieldIr = Union[FieldIr, DerivedFieldIr]
 
-__all__ = []
+__all__ = ()

@@ -373,8 +373,8 @@ class PerformanceObserver(EventDispatchObserver):
         self._batch_stage_durations.clear()
 
 
-__all__ = [
+__all__ = (
     "PerformanceConfig",
     "PerformanceObserver",
     "PerformanceThresholds",
-]
+)

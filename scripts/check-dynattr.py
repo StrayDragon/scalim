@@ -298,7 +298,7 @@ def _count_by_file(*, repo_root: Path, hits: Iterable[_Hit], status: Optional[st
     return sorted(counts.items(), key=lambda item: (-item[1], item[0]))
 
 
-def _render_text_report(*, repo_root: Path, hits: Sequence[_Hit]) -> str:
+def _render_text_report(*, repo_root: Path, hits: Sequence[_Hit], show_allow_details: bool = False) -> str:
     total = len(hits)
     blocked = sum(1 for hit in hits if hit.status == "block")
     allowed = total - blocked
@@ -330,22 +330,27 @@ def _render_text_report(*, repo_root: Path, hits: Sequence[_Hit]) -> str:
     lines.append("  6. allow pragma 属于治理标记;未完成替代前不要直接删除.")
 
     if hits:
-        lines.append("")
-        lines.append("明细:")
-        for hit in hits:
-            rel = hit.path.relative_to(repo_root).as_posix()
-            suffix = " reason={}".format(hit.allow_reason) if hit.allow_reason else ""
-            lines.append(
-                "  [{}] {}:{}:{} {}{} attr={}".format(
-                    hit.status.upper(),
-                    rel,
-                    hit.line,
-                    hit.col,
-                    hit.call_name,
-                    suffix,
-                    hit.attr_expr,
+        detail_hits = [hit for hit in hits if hit.status != "allow" or show_allow_details]
+        if detail_hits:
+            lines.append("")
+            lines.append("明细:")
+            for hit in detail_hits:
+                rel = hit.path.relative_to(repo_root).as_posix()
+                suffix = " reason={}".format(hit.allow_reason) if hit.allow_reason else ""
+                lines.append(
+                    "  [{}] {}:{}:{} {}{} attr={}".format(
+                        hit.status.upper(),
+                        rel,
+                        hit.line,
+                        hit.col,
+                        hit.call_name,
+                        suffix,
+                        hit.attr_expr,
+                    )
                 )
-            )
+        if allowed and not show_allow_details:
+            lines.append("")
+            lines.append("allow 明细默认省略; 如需展开,运行 `uv run scripts/check-dynattr.py --show-allow-details`.")
     else:
         lines.append("")
         lines.append("未发现 dynattr 调用.")
@@ -387,6 +392,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--report", default="", help="覆盖默认文本报告路径.")
     parser.add_argument("--no-artifacts", action="store_true", help="不自动写入 `.tmp/artifacts/dynattr.report.{txt,json}`.")
     parser.add_argument("--check", action="store_true", help="若存在未 allow 的命中则返回非零退出码.")
+    parser.add_argument("--show-allow-details", action="store_true", help="文本报告中展开 `allow` 明细.")
     return parser.parse_args(argv)
 
 
@@ -396,7 +402,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     rel_roots = tuple(Path(path) for path in args.paths) if args.paths else _DEFAULT_REL_ROOTS
     hits = scan_repo(repo_root=repo_root, rel_roots=rel_roots)
 
-    text_report = _render_text_report(repo_root=repo_root, hits=hits)
+    text_report = _render_text_report(repo_root=repo_root, hits=hits, show_allow_details=args.show_allow_details)
     json_report = _render_json(repo_root=repo_root, hits=hits)
     output = json_report if args.json else text_report
 

@@ -339,4 +339,4 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         return paths_found
 
 
-__all__ = []
+__all__ = ()

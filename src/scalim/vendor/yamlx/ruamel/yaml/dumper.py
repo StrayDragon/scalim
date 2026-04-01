@@ -13,7 +13,7 @@ from ruamel.yaml.resolver import Resolver, BaseResolver, VersionedResolver
 from typing import Any, Dict, List, Union, Optional  # NOQA
 from ruamel.yaml.compat import StreamType, VersionType  # NOQA
 
-__all__ = ['BaseDumper', 'SafeDumper', 'Dumper', 'RoundTripDumper']
+__all__ = ('BaseDumper', 'SafeDumper', 'Dumper', 'RoundTripDumper')
 
 
 class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):

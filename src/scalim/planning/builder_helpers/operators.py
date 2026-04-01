@@ -221,7 +221,7 @@ def _append_compute_operators(
     return op_id
 
 
-__all__ = [
+__all__ = (
     "LoaderSequence",
     "LoaderSequenceItem",
     "RefLoaderField",
@@ -231,4 +231,4 @@ __all__ = [
     "build_plan_operators",
     "derive_pre_ref_available_field_keys",
     "derive_pre_ref_derived_field_keys",
-]
+)

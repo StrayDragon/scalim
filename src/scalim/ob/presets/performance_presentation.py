@@ -142,4 +142,4 @@ class PerformancePresentationLayer:
         return "\n".join(self.iter_console_lines(metrics, include_details=include_details))
 
 
-__all__ = ["PerformancePresentationLayer"]
+__all__ = ("PerformancePresentationLayer",)

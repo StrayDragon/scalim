@@ -21,12 +21,12 @@ from collections.abc import MutableSet, Sized, Set, Mapping
 from typing import Any, Dict, Optional, List, Union, Optional, Iterator  # NOQA
 
 # fmt: off
-__all__ = ['CommentedSeq', 'CommentedKeySeq',
+__all__ = ('CommentedSeq', 'CommentedKeySeq',
            'CommentedMap', 'CommentedOrderedMap',
            'CommentedSet', 'comment_attrib', 'merge_attrib',
            'TaggedScalar',
            'C_POST', 'C_PRE', 'C_SPLIT_ON_FIRST_BLANK', 'C_BLANK_LINE_PRESERVE_SPACE',
-           ]
+           )
 # fmt: on
 
 # splitting of comments by the scanner

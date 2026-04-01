@@ -47,9 +47,9 @@ def require_optional_dependency(
         raise ImportError(msg) from exc
 
 
-__all__ = [
+__all__ = (
     "IMPORT_MODULE",
     "ImportModuleFn",
     "import_module",
     "require_optional_dependency",
-]
+)

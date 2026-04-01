@@ -321,8 +321,8 @@ def write_final_step(
         )
 
 
-__all__ = [
+__all__ = (
     "build_next_mapping",
     "init_first_fk_mapping",
     "write_final_step",
-]
+)

@@ -1,5 +1,5 @@
 
-__all__ = ['BaseLoader', 'FullLoader', 'SafeLoader', 'Loader', 'UnsafeLoader']
+__all__ = ('BaseLoader', 'FullLoader', 'SafeLoader', 'Loader', 'UnsafeLoader')
 
 from .reader import *
 from .scanner import *

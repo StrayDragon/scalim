@@ -135,4 +135,4 @@ def iter_in_memory_rows_as_main_rows(artifact: InMemoryRows) -> Iterable[RowData
     return _Iterable(header=list(artifact.header), rows=artifact.rows)
 
 
-__all__ = []
+__all__ = ()

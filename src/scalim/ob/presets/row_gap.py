@@ -140,6 +140,4 @@ class RowGapObserver(EventDispatchObserver):
         return None
 
 
-__all__ = [
-    "RowGapObserver",
-]
+__all__ = ("RowGapObserver",)

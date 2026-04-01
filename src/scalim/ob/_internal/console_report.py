@@ -43,4 +43,4 @@ def emit_warning(logger: logging.Logger, subsystem: str, kind: str, mapping: Opt
     emit(logger, level=logging.WARNING, subsystem=subsystem, kind=kind, mapping=mapping, **kwargs)
 
 
-__all__ = []
+__all__ = ()

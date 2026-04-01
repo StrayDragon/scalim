@@ -921,4 +921,4 @@ def _validate_workflow_deps_no_cycles(  # noqa: C901
             raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].depends_on")
 
 
-__all__ = []
+__all__ = ()

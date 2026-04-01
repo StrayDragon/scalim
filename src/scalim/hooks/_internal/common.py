@@ -111,4 +111,4 @@ def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
     return validated
 
 
-__all__ = []
+__all__ = ()

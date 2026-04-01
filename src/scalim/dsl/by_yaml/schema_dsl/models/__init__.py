@@ -107,7 +107,7 @@ from .source import (
     SourceConfig,
 )
 
-__all__ = [
+__all__ = (
     "BIND_KEYS",
     "BIND_KEY_CONFIG_KEYS",
     "BIND_ROWS_KEYS",
@@ -206,4 +206,4 @@ __all__ = [
     "TraceRaw",
     "VizConfig",
     "VizRaw",
-]
+)

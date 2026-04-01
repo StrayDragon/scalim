@@ -298,4 +298,4 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         self._dispatch(handler_pairs, ColumnWriteEvent(field_key, row_count, batch_num))
 
 
-__all__ = []
+__all__ = ()

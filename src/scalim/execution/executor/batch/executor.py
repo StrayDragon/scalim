@@ -263,4 +263,4 @@ class BatchExecutor:
         return results
 
 
-__all__ = ["BatchExecutor"]
+__all__ = ("BatchExecutor",)

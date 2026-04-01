@@ -110,4 +110,4 @@ class HookManagerSubscriptionMixin(HookManagerBase, ABC):
         return self.wants_typed(event_type) or self.wants_on_event(event_type)
 
 
-__all__ = []
+__all__ = ()

@@ -11,7 +11,7 @@ from ruamel.yaml.error import *  # NOQA
 from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode  # NOQA
 from ruamel.yaml.util import RegExp  # NOQA
 
-__all__ = ['BaseResolver', 'Resolver', 'VersionedResolver']
+__all__ = ('BaseResolver', 'Resolver', 'VersionedResolver')
 
 
 # fmt: off

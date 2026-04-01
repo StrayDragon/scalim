@@ -122,4 +122,4 @@ class ObserverManagerStateMixin(ABC):
         return self._sample_result(result)
 
 
-__all__ = []
+__all__ = ()

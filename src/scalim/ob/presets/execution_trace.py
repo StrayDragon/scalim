@@ -246,9 +246,9 @@ class ExecutionTraceObserver(EventDispatchObserver):
                 )
 
 
-__all__ = [
+__all__ = (
     "ExecutionTraceObserver",
     "FieldSlimStep",
     "LoaderCallStep",
     "RowWriteStep",
-]
+)

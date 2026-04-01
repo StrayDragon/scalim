@@ -269,7 +269,7 @@ class PrettyLoggingObserver(EventDispatchObserver):
             entry["cache_miss"] = int(entry.get("cache_miss") or 0) + 1
 
 
-__all__ = [
+__all__ = (
     "LoggingObserver",
     "PrettyLoggingObserver",
-]
+)

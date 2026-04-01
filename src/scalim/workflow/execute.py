@@ -1871,10 +1871,10 @@ def run_workflow_ir(
             _cleanup_workflow_finally(prepared, resources_finalized=resources_finalized)
 
 
-__all__ = [
+__all__ = (
     "ScalimWorkflowRunFailedError",
     "WorkflowResult",
     "WorkflowRunError",
     "WorkflowRunOutcome",
     "run_workflow_ir",
-]
+)

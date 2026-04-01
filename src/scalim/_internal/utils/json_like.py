@@ -74,4 +74,4 @@ def ensure_json_like(
     raise error_cls(msg, path=str(path))
 
 
-__all__ = []
+__all__ = ()

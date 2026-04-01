@@ -509,7 +509,7 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
         )
 
 
-__all__ = [
+__all__ = (
     "WorkflowVizObserver",
     "build_workflow_viz_graph_snapshot",
-]
+)

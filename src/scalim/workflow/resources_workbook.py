@@ -368,13 +368,13 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         )
 
 
-__all__ = [
+__all__ = (
     "SheetPlan",
     "WorkbookPlan",
     "WorkflowWorkbookResourceMixin",
     "best_effort_close_write_only_workbook_worksheets",
     "get_openpyxl_workbook_class",
-]
+)
 
 SheetPlan = _SheetPlan
 WorkbookPlan = _WorkbookPlan

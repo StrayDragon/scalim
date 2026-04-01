@@ -959,6 +959,4 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     )
 
 
-__all__ = [
-    "compile_output_composition_from_yaml",
-]
+__all__ = ("compile_output_composition_from_yaml",)

@@ -99,4 +99,4 @@ def bind(logger: logging.Logger, **context: Any) -> "logging.LoggerAdapter[loggi
     return logging.LoggerAdapter(logger, context)
 
 
-__all__ = []
+__all__ = ()

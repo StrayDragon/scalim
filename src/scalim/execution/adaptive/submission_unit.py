@@ -101,4 +101,4 @@ def run_tasks_in_pool(  # noqa: C901, PLR0912, PLR0915
     return results_by_key, layer_stats
 
 
-__all__ = ["LayerScheduleStats", "PoolWaitStats", "run_tasks_in_pool"]
+__all__ = ("LayerScheduleStats", "PoolWaitStats", "run_tasks_in_pool")

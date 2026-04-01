@@ -308,4 +308,4 @@ class DependencyGraph(Generic[T]):
         return group_by_level(self._adjacency.keys(), self.get_deps)
 
 
-__all__ = []
+__all__ = ()

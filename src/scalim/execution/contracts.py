@@ -120,8 +120,8 @@ class ExecutionResult:
     """可选: `workflow-intermediate-store` 的 `InMemoryRows` 中间态(显式启用时提供)."""
 
 
-__all__ = [
+__all__ = (
     "ExecutionRequest",
     "ExecutionResult",
     "ObservabilitySpec",
-]
+)

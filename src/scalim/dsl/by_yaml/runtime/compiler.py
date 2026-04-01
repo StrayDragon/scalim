@@ -1178,14 +1178,14 @@ def compile(  # noqa: A001
     )
 
 
-__all__ = [
+__all__ = (
     "build_request",
     "compile",
     "compile_ir",
     "create_reference_resolver",
     "load_config",
     "validate_allowlist",
-]
+)
 
 
 def _is_relative_reference(value: Optional[str]) -> bool:

@@ -814,14 +814,14 @@ class _WorkflowResourceManagerBase(ABC):
         raise NotImplementedError
 
 
-__all__ = [
+__all__ = (
     "WRITE_LOCK_SUFFIX",
     "ScalimWorkflowWriteError",
     "WorkflowResourceManagerBase",
     "WorkflowResourceWaitDiagnostics",
     "acquire_write_lock",
     "release_write_lock",
-]
+)
 
 # 对外提供非私有别名,避免类型检查对跨模块私有符号的告警.
 WorkflowResourceManagerBase = _WorkflowResourceManagerBase

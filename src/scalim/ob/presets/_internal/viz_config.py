@@ -156,4 +156,4 @@ class VizObserverConfig:
         return cls(output_dir=default_viz_dir(), **kwargs)
 
 
-__all__ = []
+__all__ = ()

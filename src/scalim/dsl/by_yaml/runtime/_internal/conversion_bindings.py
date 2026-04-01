@@ -24,4 +24,4 @@ class ConfigToIRConversionBindingMixin:
         return self._lookup_casts.build(lookup_cast, is_multi=is_multi)
 
 
-__all__ = []
+__all__ = ()

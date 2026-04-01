@@ -417,7 +417,7 @@ class RunResult:
             raise ImportError(msg) from e
 
 
-__all__ = [
+__all__ = (
     "UNSET",
     "Compilation",
     "ResolverTrustedMode",
@@ -425,4 +425,4 @@ __all__ = [
     "RunOverrides",
     "RunResult",
     "UnsetType",
-]
+)

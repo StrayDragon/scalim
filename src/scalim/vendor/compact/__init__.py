@@ -47,7 +47,7 @@ else:
             return name.lower()
 
 
-__all__ = [
+__all__ = (
     "Self",
     "StrEnum",
-]
+)

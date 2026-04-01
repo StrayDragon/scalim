@@ -21,6 +21,4 @@ class ScalimWorkflowConfigError(ScalimWorkflowError):
         return "{} (path={})".format(message, self.path)
 
 
-__all__ = [
-    "ScalimWorkflowConfigError",
-]
+__all__ = ("ScalimWorkflowConfigError",)

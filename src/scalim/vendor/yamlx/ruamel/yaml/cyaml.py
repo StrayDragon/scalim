@@ -10,7 +10,7 @@ from ruamel.yaml.resolver import Resolver, BaseResolver
 from typing import Any, Union, Optional  # NOQA
 from ruamel.yaml.compat import StreamTextType, StreamType, VersionType  # NOQA
 
-__all__ = ['CBaseLoader', 'CSafeLoader', 'CLoader', 'CBaseDumper', 'CSafeDumper', 'CDumper']
+__all__ = ('CBaseLoader', 'CSafeLoader', 'CLoader', 'CBaseDumper', 'CSafeDumper', 'CDumper')
 
 
 # this includes some hacks to solve the  usage of resolver by lower level

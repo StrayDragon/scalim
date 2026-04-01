@@ -13,4 +13,4 @@ class ScalimConfigValidationError(ScalimYamlError):
         self.issues = issues or []
 
 
-__all__ = []
+__all__ = ()

@@ -78,4 +78,4 @@ class WorkflowConfig:
     resources: ResourcesConfig = dataclass_field(default_factory=ResourcesConfig)
 
 
-__all__ = []
+__all__ = ()

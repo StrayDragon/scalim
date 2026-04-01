@@ -51,4 +51,4 @@ class ValidationReport:
         return not self.errors()
 
 
-__all__ = []
+__all__ = ()

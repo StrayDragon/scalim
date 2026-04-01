@@ -31,4 +31,4 @@ def safe_load_yaml_no_duplicates(text: str) -> object:
     return cast("Any", yaml).load(text, Loader=_Loader)  # pragma: allow-cast pyyaml loader typed narrowing
 
 
-__all__ = []
+__all__ = ()

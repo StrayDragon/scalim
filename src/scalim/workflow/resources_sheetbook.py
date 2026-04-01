@@ -694,13 +694,13 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         )
 
 
-__all__ = [
+__all__ = (
     "SheetBookDef",
     "SheetBookPlan",
     "SheetBookSegment",
     "SheetBookSheetPlan",
     "WorkflowSheetBookResourceMixin",
-]
+)
 
 SheetBookPlan = _SheetBookPlan
 SheetBookSegment = _SheetBookSegment

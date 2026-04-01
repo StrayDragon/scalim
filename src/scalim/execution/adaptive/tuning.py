@@ -90,7 +90,7 @@ class AdaptiveTuning:
         return max(2, int(self.min_parallel_tasks_per_layer or 2))
 
 
-__all__ = [
+__all__ = (
     "DEFAULT_ADAPTIVE_POOL",
     "AdaptiveTuning",
-]
+)

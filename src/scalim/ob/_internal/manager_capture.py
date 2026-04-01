@@ -93,4 +93,4 @@ class ObserverManagerCaptureMixin:
         return capture
 
 
-__all__ = []
+__all__ = ()

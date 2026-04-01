@@ -123,6 +123,4 @@ class MemoryOptimizationObserver(EventDispatchObserver):
             self.print_summary(max_fields=self.max_fields)
 
 
-__all__ = [
-    "MemoryOptimizationObserver",
-]
+__all__ = ("MemoryOptimizationObserver",)

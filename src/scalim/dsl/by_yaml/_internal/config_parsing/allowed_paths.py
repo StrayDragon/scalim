@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Sequence, Tuple, Union
 
-__all__ = []
+__all__ = ()
 
 
 def normalize_allowed_yaml_roots(

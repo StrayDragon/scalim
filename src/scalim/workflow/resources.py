@@ -151,8 +151,8 @@ class WorkflowResourceManager(
         )
 
 
-__all__ = [
+__all__ = (
     "ScalimWorkflowWriteError",
     "SheetBookDef",
     "WorkflowResourceManager",
-]
+)

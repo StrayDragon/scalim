@@ -16,7 +16,7 @@ def is_secure_compute_calculator(value: object) -> bool:
     return isinstance(value, SecureComputeCalculatorContract)
 
 
-__all__ = [
+__all__ = (
     "SecureComputeCalculatorContract",
     "is_secure_compute_calculator",
-]
+)

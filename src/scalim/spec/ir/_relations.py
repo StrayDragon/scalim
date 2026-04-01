@@ -309,4 +309,4 @@ class LookupStepIr:
         return self.to_source.key.key
 
 
-__all__ = []
+__all__ = ()

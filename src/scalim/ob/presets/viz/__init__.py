@@ -15,11 +15,11 @@ from .api import (
     build_workflow_viz_graph_snapshot,
 )
 
-__all__ = [
+__all__ = (
     "VizEventEmitter",
     "VizObserver",
     "VizObserverConfig",
     "WorkflowVizObserver",
     "augment_viz_graph_snapshot_for_output_composition",
     "build_workflow_viz_graph_snapshot",
-]
+)

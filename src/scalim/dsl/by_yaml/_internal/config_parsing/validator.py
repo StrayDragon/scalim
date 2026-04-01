@@ -58,7 +58,7 @@ HAS_JSONSCHEMA: bool = _has_jsonschema
 
 _VALIDATOR_LOGGER = get_logger("schema")
 
-__all__ = []
+__all__ = ()
 
 
 def _field_def_path(field_def: FieldDef, *, main_source_id: str) -> str:

@@ -1,5 +1,5 @@
 
-__all__ = ['Composer', 'ComposerError']
+__all__ = ('Composer', 'ComposerError')
 
 from .error import MarkedYAMLError
 from .events import *

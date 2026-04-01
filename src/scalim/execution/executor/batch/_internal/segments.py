@@ -25,4 +25,4 @@ def iter_operator_segments(
         idx += 1
 
 
-__all__ = []
+__all__ = ()

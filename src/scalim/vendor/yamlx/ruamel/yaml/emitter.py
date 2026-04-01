@@ -20,7 +20,7 @@ from ruamel.yaml.compat import nprint, dbg, DBG_EVENT, \
 from typing import Any, Dict, List, Union, Text, Tuple, Optional  # NOQA
 from ruamel.yaml.compat import StreamType  # NOQA
 
-__all__ = ['Emitter', 'EmitterError']
+__all__ = ('Emitter', 'EmitterError')
 
 
 class EmitterError(YAMLError):

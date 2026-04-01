@@ -58,4 +58,4 @@ class MainSourceRefIrBase(SourceRefIrBase, Protocol):
     def loader(self) -> object: ...
 
 
-__all__ = []
+__all__ = ()

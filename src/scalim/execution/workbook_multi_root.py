@@ -80,7 +80,7 @@ def run_multi_root_workbook(
     return results
 
 
-__all__ = [
+__all__ = (
     "ScalimMultiRootWorkbookRunError",
     "run_multi_root_workbook",
-]
+)

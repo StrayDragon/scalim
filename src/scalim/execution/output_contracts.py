@@ -44,7 +44,7 @@ class OutputSpec:
     write_lock: bool = False
 
 
-__all__ = [
+__all__ = (
     "ExportLayout",
     "OutputSpec",
-]
+)

@@ -5,7 +5,7 @@ from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import dataclass
 from .....vendor.yamlx import yaml
 
-__all__ = []
+__all__ = ()
 
 
 @dataclass(frozen=True)

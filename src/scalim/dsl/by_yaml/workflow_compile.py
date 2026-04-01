@@ -1519,7 +1519,7 @@ def derive_cache_pool_consumers(
     return logical_keys_by_node_id, consumers_frozen
 
 
-__all__ = [
+__all__ = (
     "compile_workflow_ir",
     "derive_cache_pool_consumers",
-]
+)

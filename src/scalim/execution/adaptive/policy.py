@@ -96,7 +96,7 @@ class DefaultAdaptivePolicy(AdaptivePolicy):
     """默认策略:使用线程后端,并采用基于调优参数的阈值."""
 
 
-__all__ = [
+__all__ = (
     "ADAPTIVE_BACKEND_ASYNC",
     "ADAPTIVE_BACKEND_PROCESS",
     "ADAPTIVE_BACKEND_THREAD",
@@ -105,4 +105,4 @@ __all__ = [
     "AdaptiveLayerDecision",
     "AdaptivePolicy",
     "DefaultAdaptivePolicy",
-]
+)

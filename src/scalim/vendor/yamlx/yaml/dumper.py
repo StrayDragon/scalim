@@ -1,5 +1,5 @@
 
-__all__ = ['BaseDumper', 'SafeDumper', 'Dumper']
+__all__ = ('BaseDumper', 'SafeDumper', 'Dumper')
 
 from .emitter import *
 from .serializer import *

@@ -15,7 +15,7 @@ from ruamel.yaml.resolver import VersionedResolver
 from typing import Any, Dict, List, Union, Optional  # NOQA
 from ruamel.yaml.compat import StreamTextType, VersionType  # NOQA
 
-__all__ = ['BaseLoader', 'SafeLoader', 'Loader', 'RoundTripLoader']
+__all__ = ('BaseLoader', 'SafeLoader', 'Loader', 'RoundTripLoader')
 
 
 class BaseLoader(Reader, Scanner, Parser, Composer, BaseConstructor, VersionedResolver):

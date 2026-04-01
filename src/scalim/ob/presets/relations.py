@@ -294,10 +294,10 @@ class RelationObserver(EventDispatchObserver):
         self.metrics = RelationMetrics()
 
 
-__all__ = [
+__all__ = (
     "RelationConfig",
     "RelationMetrics",
     "RelationObserver",
     "RelationSample",
     "RelationSourceStats",
-]
+)

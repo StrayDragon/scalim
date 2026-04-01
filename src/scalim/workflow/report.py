@@ -40,8 +40,8 @@ class WorkflowResult:
         return rows
 
 
-__all__ = [
+__all__ = (
     "WorkflowResult",
     "WorkflowRunError",
     "WorkflowRunOutcome",
-]
+)

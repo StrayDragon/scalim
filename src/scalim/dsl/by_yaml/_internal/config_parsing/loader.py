@@ -49,7 +49,7 @@ from .parsers.utils import mapping_or_none, str_or_none
 from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 from .yaml_load import envelope_from_validation_issue, error_loc_for_yaml_path, load_yaml_mapping_text
 
-__all__ = []
+__all__ = ()
 
 
 def _create_validator() -> "ConfigValidator":

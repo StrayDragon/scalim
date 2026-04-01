@@ -125,7 +125,7 @@ def compile(  # noqa: A001, PLR0913
     return _compile(yaml_path, options=options)
 
 
-__all__ = [
+__all__ = (
     "compile",
     "run",
-]
+)

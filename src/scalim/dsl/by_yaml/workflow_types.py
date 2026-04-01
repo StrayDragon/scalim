@@ -16,7 +16,7 @@ from .workflow_config import (
     WorkflowRun,
 )
 
-__all__ = [
+__all__ = (
     "ScalimWorkflowConfigError",
     "WorkflowCachePoolBudget",
     "WorkflowCachePoolOptions",
@@ -24,4 +24,4 @@ __all__ = [
     "WorkflowConfig",
     "WorkflowOptions",
     "WorkflowRun",
-]
+)

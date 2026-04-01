@@ -21,4 +21,4 @@ VIZ_ARTIFACTS_ROOT = "artifacts/scalim-viz"
 VIZ_DIR_NAME = "scalim-viz"
 VIZ_REPLAY_ROUTE = "/__scalim_viz__/replay"
 
-__all__ = []
+__all__ = ()

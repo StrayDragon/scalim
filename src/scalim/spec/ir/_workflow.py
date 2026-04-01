@@ -147,4 +147,4 @@ class WorkflowIr:
     artifacts: WorkflowArtifactsIr
 
 
-__all__ = []
+__all__ = ()

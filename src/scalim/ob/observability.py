@@ -54,6 +54,4 @@ class Observability:
         )
 
 
-__all__ = [
-    "Observability",
-]
+__all__ = ("Observability",)

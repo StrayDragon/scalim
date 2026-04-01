@@ -61,4 +61,4 @@ class OverlayBatchContext(BatchContext):
         return data
 
 
-__all__ = ["OverlayBatchContext"]
+__all__ = ("OverlayBatchContext",)

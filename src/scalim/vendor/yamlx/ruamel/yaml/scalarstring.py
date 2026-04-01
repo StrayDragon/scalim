@@ -5,7 +5,7 @@ from ruamel.yaml.anchor import Anchor
 from typing import Text, Any, Dict, List  # NOQA
 from ruamel.yaml.compat import SupportsIndex
 
-__all__ = [
+__all__ = (
     'ScalarString',
     'LiteralScalarString',
     'FoldedScalarString',
@@ -15,7 +15,7 @@ __all__ = [
     # PreservedScalarString is the old name, as it was the first to be preserved on rt,
     # use LiteralScalarString instead
     'PreservedScalarString',
-]
+)
 
 
 class ScalarString(str):

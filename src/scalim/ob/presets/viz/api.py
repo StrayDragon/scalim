@@ -11,11 +11,11 @@ from .observer import VizObserver
 from .output_composition import augment_viz_graph_snapshot_for_output_composition
 from .workflow import WorkflowVizObserver, build_workflow_viz_graph_snapshot
 
-__all__ = [
+__all__ = (
     "VizEventEmitter",
     "VizObserver",
     "VizObserverConfig",
     "WorkflowVizObserver",
     "augment_viz_graph_snapshot_for_output_composition",
     "build_workflow_viz_graph_snapshot",
-]
+)

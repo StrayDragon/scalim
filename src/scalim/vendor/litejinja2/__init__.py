@@ -1039,7 +1039,7 @@ def clear_cache() -> None:
     _default_env.clear_cache()
 
 
-__all__ = [
+__all__ = (
     "Environment",
     "StrictUndefined",
     "Template",
@@ -1047,4 +1047,4 @@ __all__ = [
     "Undefined",
     "clear_cache",
     "from_string",
-]
+)

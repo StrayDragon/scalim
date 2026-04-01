@@ -745,4 +745,4 @@ def contains_import_syntax(raw: Any) -> bool:
     return False
 
 
-__all__ = []
+__all__ = ()

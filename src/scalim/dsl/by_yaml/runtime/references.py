@@ -501,11 +501,11 @@ def _validate_module_parts(*, parts: Sequence[str], raw_yaml_path: str, yaml_dir
         raise ScalimResolverError(msg)
 
 
-__all__ = [
+__all__ = (
     "ParsedReference",
     "PythonReferenceResolver",
     "ReferenceParser",
     "ResolverPolicy",
     "SecurePythonReferenceResolver",
     "derive_base_module_path",
-]
+)

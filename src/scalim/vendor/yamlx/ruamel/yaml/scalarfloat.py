@@ -5,7 +5,7 @@ from ruamel.yaml.anchor import Anchor
 
 from typing import Text, Any, Dict, List  # NOQA
 
-__all__ = ['ScalarFloat', 'ExponentialFloat', 'ExponentialCapsFloat']
+__all__ = ('ScalarFloat', 'ExponentialFloat', 'ExponentialCapsFloat')
 
 
 class ScalarFloat(float):

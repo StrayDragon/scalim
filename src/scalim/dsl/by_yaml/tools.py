@@ -18,8 +18,8 @@ def derive_base_module_path(
     return _derive_base_module_path(yaml_path, sys_path=sys_path, cwd=cwd)
 
 
-__all__ = [
+__all__ = (
     "OutputConfigDict",
     "derive_base_module_path",
     "load_output_config",
-]
+)

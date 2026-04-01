@@ -110,4 +110,4 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
         )
 
 
-__all__ = ["ConfigToIRConverter", "LookupCastRegistry"]
+__all__ = ("ConfigToIRConverter", "LookupCastRegistry")

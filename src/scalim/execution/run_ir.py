@@ -848,7 +848,7 @@ def run_ir(
     )
 
 
-__all__ = [
+__all__ = (
     "ExecutionRequest",
     "ExecutionResult",
     "ExportLayout",
@@ -856,4 +856,4 @@ __all__ = [
     "OutputSpec",
     "export_layout_from_demand_ir",
     "run_ir",
-]
+)

@@ -51,8 +51,8 @@ class PipelineOverrides:
     """可选:`warnings` 模块注入点(用于测试或兼容性处理)."""
 
 
-__all__ = [
+__all__ = (
     "ChunkIterableFn",
     "PipelineOverrides",
     "chunk_iterable",
-]
+)

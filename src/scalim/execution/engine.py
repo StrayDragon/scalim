@@ -144,4 +144,4 @@ class ScalimEngine:
             return self._pipeline.run(main_rows, sink)
 
 
-__all__ = []
+__all__ = ()

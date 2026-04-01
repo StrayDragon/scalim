@@ -276,4 +276,4 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
         self._base_hook_typed_handlers = value
 
 
-__all__ = []
+__all__ = ()

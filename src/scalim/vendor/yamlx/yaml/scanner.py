@@ -24,7 +24,7 @@
 # Read comments in the Scanner code for more details.
 #
 
-__all__ = ['Scanner', 'ScannerError']
+__all__ = ('Scanner', 'ScannerError')
 
 from .error import MarkedYAMLError
 from .tokens import *

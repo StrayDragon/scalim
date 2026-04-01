@@ -42,7 +42,7 @@ NormalizedLookupKeySpec = Union[str, Tuple[str, ...]]
 """归一化后的字段键类型: 单字段 `str` 或复合字段元组."""
 
 
-__all__ = [
+__all__ = (
     "LoaderExtractor",
     "LoaderParamsBuilder",
     "LoaderResultMapCallable",
@@ -50,4 +50,4 @@ __all__ = [
     "LookupKeySpec",
     "MainSourceRowIterableCallable",
     "NormalizedLookupKeySpec",
-]
+)

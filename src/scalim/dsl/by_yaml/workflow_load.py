@@ -31,6 +31,4 @@ def load_workflow_config_from_path(
     return workflow_path, wf
 
 
-__all__ = [
-    "load_workflow_config_from_path",
-]
+__all__ = ("load_workflow_config_from_path",)

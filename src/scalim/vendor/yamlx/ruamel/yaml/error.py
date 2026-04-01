@@ -6,7 +6,7 @@ import textwrap
 from typing import Any, Dict, Optional, List, Text  # NOQA
 
 
-__all__ = [
+__all__ = (
     'FileMark',
     'StringMark',
     'CommentMark',
@@ -16,7 +16,7 @@ __all__ = [
     'UnsafeLoaderWarning',
     'MarkedYAMLWarning',
     'MarkedYAMLFutureWarning',
-]
+)
 
 
 class StreamMark:

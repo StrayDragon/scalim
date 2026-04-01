@@ -210,4 +210,4 @@ class InlineRelationConfig:
     """关系路径的步骤列表."""
 
 
-__all__ = []
+__all__ = ()

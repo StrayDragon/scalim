@@ -19,7 +19,7 @@ from .workflow_config import (
     validate_workflow_yaml_text_json,
 )
 
-__all__ = [
+__all__ = (
     "ScalimWorkflowConfigError",
     "WorkflowCachePoolBudget",
     "WorkflowCachePoolOptions",
@@ -31,4 +31,4 @@ __all__ = [
     "load_workflow_config_from_mapping",
     "resolve_workflow_demand_path",
     "validate_workflow_yaml_text_json",
-]
+)

@@ -175,8 +175,8 @@ class ExecutionPlan:
         return build_viz_schedule_plan(self)
 
 
-__all__ = [
+__all__ = (
     "ExecutionPlan",
     "PlanMetadata",
     "Stage",
-]
+)

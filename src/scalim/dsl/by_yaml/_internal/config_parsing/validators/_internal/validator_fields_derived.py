@@ -226,4 +226,4 @@ class ValidatorFieldDerivedMixin(ValidatorFieldBaseMixin):
         return [], "fields.{}".format(field_id)
 
 
-__all__ = []
+__all__ = ()

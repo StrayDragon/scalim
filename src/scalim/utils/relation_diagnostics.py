@@ -317,7 +317,7 @@ class RelationDiagnostics:
         return "\n".join(lines)
 
 
-__all__ = [
+__all__ = (
     "RelationDiagnostics",
     "TypeMismatchWarning",
-]
+)

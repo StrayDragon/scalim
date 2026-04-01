@@ -197,4 +197,4 @@ class InMemoryColumnSink(IColumnSink):
         self.close()
 
 
-__all__ = []
+__all__ = ()

@@ -213,9 +213,9 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
     return out
 
 
-__all__ = [
+__all__ = (
     "OutputConfigDict",
     "build_viz_observer",
     "load_output_config",
     "resolve_required_field_ids",
-]
+)

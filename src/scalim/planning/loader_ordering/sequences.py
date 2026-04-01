@@ -47,6 +47,4 @@ if TYPE_CHECKING:
     from ...spec.ir import DemandIr
 
 
-__all__ = [
-    "build_loader_sequences",
-]
+__all__ = ("build_loader_sequences",)

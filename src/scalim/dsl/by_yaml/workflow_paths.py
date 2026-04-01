@@ -8,6 +8,4 @@
 
 from .workflow_config import resolve_workflow_demand_path
 
-__all__ = [
-    "resolve_workflow_demand_path",
-]
+__all__ = ("resolve_workflow_demand_path",)

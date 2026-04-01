@@ -31,6 +31,4 @@ def resolve_adaptive_policy_tuning_and_workers(
     return policy, tuning, resolved_workers
 
 
-__all__ = [
-    "resolve_adaptive_policy_tuning_and_workers",
-]
+__all__ = ("resolve_adaptive_policy_tuning_and_workers",)

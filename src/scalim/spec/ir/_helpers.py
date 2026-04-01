@@ -97,4 +97,4 @@ def coerce_loader_result_mapping(result: object) -> LoaderResultMapping:
     return cast("LoaderResultMapping", result)  # pragma: allow-cast loader result boundary typed narrowing
 
 
-__all__ = []
+__all__ = ()

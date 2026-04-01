@@ -152,4 +152,4 @@ def _collect_derived_fields(
             _add_field_def(field_defs, defs_by_id, alias_index, field_id_raw, FIELD_KIND_DERIVED, field_dict, None)
 
 
-__all__ = []
+__all__ = ()

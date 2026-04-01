@@ -19,9 +19,9 @@ ALLOWLIST_REQUIRED_MSG = (
     "Example: allowed_modules=frozenset(['myapp.loaders'])"
 )
 
-__all__ = [
+__all__ = (
     "ALLOWLIST_REQUIRED_MSG",
     "ScalimAllowlistRequiredError",
     "ScalimConversionError",
     "ScalimResolverError",
-]
+)

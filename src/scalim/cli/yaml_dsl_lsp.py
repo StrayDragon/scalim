@@ -151,4 +151,4 @@ def upsert_schema_modelines_file(
     return UpsertResult(path=path, changed=True)
 
 
-__all__ = []
+__all__ = ()

@@ -102,4 +102,4 @@ class WorkflowVisibilityIndex:
         return self.visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
 
 
-__all__ = []
+__all__ = ()

@@ -254,4 +254,4 @@ class PlanBuilder:
         return graph.collect_dependencies(targets, get_deps_with_fk)
 
 
-__all__ = []
+__all__ = ()

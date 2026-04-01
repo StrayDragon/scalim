@@ -1,8 +1,8 @@
 
-__all__ = [
+__all__ = (
     'CBaseLoader', 'CSafeLoader', 'CFullLoader', 'CUnsafeLoader', 'CLoader',
     'CBaseDumper', 'CSafeDumper', 'CDumper'
-]
+)
 
 from ._yaml import CParser, CEmitter
 

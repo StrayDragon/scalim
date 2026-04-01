@@ -116,4 +116,4 @@ class DemandIr:
         return None
 
 
-__all__ = []
+__all__ = ()

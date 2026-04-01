@@ -282,7 +282,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         )
 
 
-__all__ = [
+__all__ = (
     "AppendSegment",
     "CsvPlan",
     "WorkflowCsvResourceMixin",
@@ -290,7 +290,7 @@ __all__ = [
     "describe_header_diff",
     "iter_csv_rows",
     "read_csv_header",
-]
+)
 
 AppendSegment = _AppendSegment
 CsvPlan = _CsvPlan

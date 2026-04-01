@@ -218,9 +218,9 @@ class LoaderIr:
         return self.bindings.get(key_field)
 
 
-__all__ = [
+__all__ = (
     "BindingIr",
     "LoaderCallContextIr",
     "LoaderIr",
     "build_stable_lookup_key_list",
-]
+)

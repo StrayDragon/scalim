@@ -1,5 +1,5 @@
 
-__all__ = ['Serializer', 'SerializerError']
+__all__ = ('Serializer', 'SerializerError')
 
 from .error import YAMLError
 from .events import *

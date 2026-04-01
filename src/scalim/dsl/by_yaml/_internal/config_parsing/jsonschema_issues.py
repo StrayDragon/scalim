@@ -158,4 +158,4 @@ def collect_jsonschema_validation_issues(
     return issues
 
 
-__all__ = []
+__all__ = ()

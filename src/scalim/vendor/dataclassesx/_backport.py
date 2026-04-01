@@ -11,7 +11,7 @@ import types
 import inspect
 import keyword
 
-__all__ = []
+__all__ = ()
 
 # Conditions for adding methods.  The boxes indicate what action the
 # dataclass decorator takes.  For all of these tables, when I talk

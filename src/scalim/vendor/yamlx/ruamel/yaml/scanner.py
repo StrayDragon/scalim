@@ -36,7 +36,7 @@ from ruamel.yaml.compat import check_anchorname_char, nprint, nprintf  # NOQA
 from typing import Any, Dict, Optional, List, Union, Text  # NOQA
 from ruamel.yaml.compat import VersionType  # NOQA
 
-__all__ = ['Scanner', 'RoundTripScanner', 'ScannerError']
+__all__ = ('Scanner', 'RoundTripScanner', 'ScannerError')
 
 
 _THE_END = '\n\0\r\x85\u2028\u2029'

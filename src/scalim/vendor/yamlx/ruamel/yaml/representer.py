@@ -38,8 +38,8 @@ import base64
 from typing import Dict, List, Any, Union, Text, Optional  # NOQA
 
 # fmt: off
-__all__ = ['BaseRepresenter', 'SafeRepresenter', 'Representer',
-           'RepresenterError', 'RoundTripRepresenter']
+__all__ = ('BaseRepresenter', 'SafeRepresenter', 'Representer',
+           'RepresenterError', 'RoundTripRepresenter')
 # fmt: on
 
 

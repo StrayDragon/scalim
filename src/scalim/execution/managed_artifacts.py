@@ -69,9 +69,9 @@ def create_managed_artifact_sink(
     raise ValueError(msg)
 
 
-__all__ = [
+__all__ = (
     "MANAGED_ARTIFACT_KIND_CSV",
     "MANAGED_ARTIFACT_KIND_ROWS",
     "ManagedArtifactPlan",
     "create_managed_artifact_sink",
-]
+)

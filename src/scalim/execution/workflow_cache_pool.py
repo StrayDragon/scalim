@@ -521,10 +521,10 @@ class WorkflowCachePool:
         )
 
 
-__all__ = [
+__all__ = (
     "ScalimWorkflowCachePoolError",
     "WorkflowCacheEntrySignature",
     "WorkflowCachePool",
     "build_preload_forever_signature",
     "diff_signature_fields",
-]
+)

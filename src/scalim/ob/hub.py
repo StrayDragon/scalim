@@ -432,6 +432,4 @@ class InstrumentationHub:
         _ = self._emit_assume_wanted(EVENT_STAGE_SPAN, StageSpanEvent(stage=stage, batch_num=batch_num, duration=duration), meta=meta)
 
 
-__all__ = [
-    "InstrumentationHub",
-]
+__all__ = ("InstrumentationHub",)

@@ -131,4 +131,4 @@ class HookManagerBase(HookManagerLike, ABC):
         raise NotImplementedError
 
 
-__all__ = []
+__all__ = ()

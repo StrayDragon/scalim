@@ -74,8 +74,8 @@ def extract_relation_dependency_keys(
     return list(extract_from_fields(steps))
 
 
-__all__ = [
+__all__ = (
     "InferLookupStepsFn",
     "LookupStepsResolver",
     "extract_relation_dependency_keys",
-]
+)

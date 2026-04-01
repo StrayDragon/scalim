@@ -419,8 +419,8 @@ def _emit_inflight_wait_slow_warning(
     logger.warning(msg)
 
 
-__all__ = [
+__all__ = (
     "PreloadCache",
     "PreloadCacheSignatureGuardrail",
     "PreloadCacheWaitDiagnostics",
-]
+)

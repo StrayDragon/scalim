@@ -166,4 +166,4 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         _ = runtime.instrumentation.emit_lazy(EVENT_ADAPTIVE_SCHEDULER_DECISION, _build_payload)
 
 
-__all__ = []
+__all__ = ()

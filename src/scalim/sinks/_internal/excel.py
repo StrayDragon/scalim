@@ -593,4 +593,4 @@ class ColumnExcelSink(IColumnSink):
         self.close()
 
 
-__all__ = []
+__all__ = ()

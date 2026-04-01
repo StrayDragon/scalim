@@ -84,4 +84,4 @@ class VizObserverNodeMixin:
         return node_ref
 
 
-__all__ = []
+__all__ = ()

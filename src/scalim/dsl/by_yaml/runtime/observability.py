@@ -241,6 +241,4 @@ def compile_observability_spec(
     )
 
 
-__all__ = [
-    "compile_observability_spec",
-]
+__all__ = ("compile_observability_spec",)

@@ -171,4 +171,4 @@ class DerivedFieldConfig:
     """依赖字段标识列表(内部字段;解析后填充)."""
 
 
-__all__ = []
+__all__ = ()

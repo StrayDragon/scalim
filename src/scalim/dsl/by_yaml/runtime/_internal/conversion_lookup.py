@@ -144,4 +144,4 @@ def validate_source_id(source_id: str, context: str) -> None:
         raise ScalimConversionError(msg)
 
 
-__all__ = []
+__all__ = ()

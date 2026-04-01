@@ -365,7 +365,7 @@ def load_step_data(
     )
 
 
-__all__ = [
+__all__ = (
     "build_ref_loader_context",
     "load_step_data",
-]
+)

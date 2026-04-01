@@ -1357,7 +1357,7 @@ def build_output_composition(
     )
 
 
-__all__ = [
+__all__ = (
     "AuditSheetSpec",
     "DedupBySpec",
     "DerivedDedupByGroupBySpec",
@@ -1374,4 +1374,4 @@ __all__ = [
     "TwoStageGroupBySpec",
     "build_output_composition",
     "required_demand_fields",
-]
+)

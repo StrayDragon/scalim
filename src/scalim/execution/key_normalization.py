@@ -33,8 +33,8 @@ def is_experimental_key_normalization(mode: Optional[object]) -> bool:
     return resolved != "raw"
 
 
-__all__ = [
+__all__ = (
     "is_experimental_key_normalization",
     "normalize_key_normalization",
     "should_apply_str_key_normalization",
-]
+)

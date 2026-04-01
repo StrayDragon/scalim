@@ -81,7 +81,7 @@ def resolve_yaml_relative_output_path(
     return str(p.resolve(strict=False))
 
 
-__all__ = [
+__all__ = (
     "resolve_output_container_path",
     "resolve_yaml_relative_output_path",
-]
+)

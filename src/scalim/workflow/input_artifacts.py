@@ -174,8 +174,8 @@ def resolve_workflow_output_export_header(
     return tuple(str(x) for x in header)
 
 
-__all__ = [
+__all__ = (
     "resolve_workflow_input_csv",
     "resolve_workflow_input_tabular",
     "resolve_workflow_output_export_header",
-]
+)

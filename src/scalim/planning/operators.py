@@ -111,7 +111,7 @@ PlanOperatorIr = Union[
     ComputeOperatorIr,
 ]
 
-__all__ = [
+__all__ = (
     "ComputeOperatorIr",
     "LoadOperatorIr",
     "LoadRefOperatorIr",
@@ -121,4 +121,4 @@ __all__ = [
     "SupportedOperatorIr",
     "WriteColumnOperatorIr",
     "WriteRowOperatorIr",
-]
+)

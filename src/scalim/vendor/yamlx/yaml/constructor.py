@@ -1,12 +1,12 @@
 
-__all__ = [
+__all__ = (
     'BaseConstructor',
     'SafeConstructor',
     'FullConstructor',
     'UnsafeConstructor',
     'Constructor',
     'ConstructorError'
-]
+)
 
 from .error import *
 from .nodes import *

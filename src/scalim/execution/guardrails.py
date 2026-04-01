@@ -66,4 +66,4 @@ class GuardrailsPolicy:
         return self.relations.null_key_max_rate is not None or self.relations.type_error_max_rate is not None
 
 
-__all__ = []
+__all__ = ()

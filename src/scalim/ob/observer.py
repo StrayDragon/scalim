@@ -101,7 +101,7 @@ class EventDispatchObserver(Observer):
         _ = handler(event.payload)
 
 
-__all__ = [
+__all__ = (
     "EventDispatchObserver",
     "Observer",
-]
+)

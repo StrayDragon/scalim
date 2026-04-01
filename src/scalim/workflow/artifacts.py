@@ -137,4 +137,4 @@ class WorkflowArtifactsDirectory:
                     _ = self._values_by_producer_node_id.pop(producer_node_id, None)
 
 
-__all__ = ["WorkflowArtifactsDirectory"]
+__all__ = ("WorkflowArtifactsDirectory",)

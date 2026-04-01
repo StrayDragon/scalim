@@ -1,6 +1,6 @@
 
-__all__ = ['BaseRepresenter', 'SafeRepresenter', 'Representer',
-    'RepresenterError']
+__all__ = ('BaseRepresenter', 'SafeRepresenter', 'Representer',
+    'RepresenterError')
 
 from .error import *
 from .nodes import *

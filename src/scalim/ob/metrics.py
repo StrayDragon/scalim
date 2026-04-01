@@ -115,7 +115,7 @@ class MetricsCollector:
         return summary
 
 
-__all__ = [
+__all__ = (
     "LoaderMetrics",
     "MetricsCollector",
-]
+)

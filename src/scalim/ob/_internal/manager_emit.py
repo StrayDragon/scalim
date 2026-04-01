@@ -423,4 +423,4 @@ class ObserverManagerEmitMixin(ABC):
         _ = self.emit_event(EVENT_STAGE_SPAN, payload)
 
 
-__all__ = []
+__all__ = ()

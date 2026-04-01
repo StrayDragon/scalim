@@ -85,6 +85,4 @@ def sort_ref_loaders(  # noqa: C901, PLR0912
     return [loader_map[name] for name in sorted_loaders if name in loader_map]
 
 
-__all__ = [
-    "sort_ref_loaders",
-]
+__all__ = ("sort_ref_loaders",)

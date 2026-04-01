@@ -91,7 +91,7 @@ def build_relation_signature(steps: Tuple[LookupStepIr, ...]) -> RelationSignatu
     return tuple(build_step_signature(step) for step in steps)
 
 
-__all__ = [
+__all__ = (
     "LoadRefCacheKey",
     "LookupCastSignature",
     "RelationSignature",
@@ -105,4 +105,4 @@ __all__ = [
     "lookup_cast_signature",
     "normalize_key_field",
     "resolve_step_binding",
-]
+)

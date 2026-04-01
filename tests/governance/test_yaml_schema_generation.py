@@ -55,7 +55,7 @@ def test_generated_workflow_schema_has_comment() -> None:
 def test_by_yaml_schema_package_is_importable() -> None:
     from scalim.dsl.by_yaml import schema as schema_pkg
 
-    assert getattr(schema_pkg, "__all__", None) == []
+    assert getattr(schema_pkg, "__all__", None) == ()
 
 
 def test_write_demand_schema_creates_file(tmp_path: Path) -> None:

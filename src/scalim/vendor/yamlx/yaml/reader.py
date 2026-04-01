@@ -15,7 +15,7 @@
 #   reader.index - the number of the current character.
 #   reader.line, stream.column - the line and the column of the current character.
 
-__all__ = ['Reader', 'ReaderError']
+__all__ = ('Reader', 'ReaderError')
 
 from .error import YAMLError, Mark
 

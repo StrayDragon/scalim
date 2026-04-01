@@ -156,7 +156,7 @@ def unsafe_compile(  # noqa: PLR0913
     return _compile(yaml_path, options=options)
 
 
-__all__ = [
+__all__ = (
     "unsafe_compile",
     "unsafe_run",
-]
+)

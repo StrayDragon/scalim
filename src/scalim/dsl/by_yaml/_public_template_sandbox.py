@@ -26,4 +26,4 @@ def validate_public_template_sandbox(template_sandbox: str) -> str:
     raise ValueError(msg)
 
 
-__all__ = []
+__all__ = ()

@@ -318,6 +318,4 @@ def augment_viz_graph_snapshot_for_output_composition(
     return snapshot
 
 
-__all__ = [
-    "augment_viz_graph_snapshot_for_output_composition",
-]
+__all__ = ("augment_viz_graph_snapshot_for_output_composition",)

@@ -5,7 +5,7 @@ from .....vendor.compact.typing_extensionsx import override
 from .....vendor.yamlx import yaml
 from .imports import contains_import_syntax, load_and_expand_imports
 
-__all__ = []
+__all__ = ()
 
 
 def load_effective_demand_yaml(

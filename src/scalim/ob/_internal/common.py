@@ -96,4 +96,4 @@ def validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:
     return normalized
 
 
-__all__ = []
+__all__ = ()

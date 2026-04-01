@@ -70,10 +70,10 @@ def resolve_builtin_callable_reference(
     raise ScalimResolverError(msg)
 
 
-__all__ = [
+__all__ = (
     "is_builtin_callable_reference",
     "list_builtin_callable_ids",
     "list_public_builtin_callable_ids",
     "parse_builtin_callable_id",
     "resolve_builtin_callable_reference",
-]
+)

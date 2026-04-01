@@ -85,7 +85,7 @@ from ruamel.yaml.tag import Tag
 
 from typing import Any, Dict, Optional, List, Optional  # NOQA
 
-__all__ = ['Parser', 'RoundTripParser', 'ParserError']
+__all__ = ('Parser', 'RoundTripParser', 'ParserError')
 
 
 def xprintf(*args: Any, **kw: Any) -> Any:

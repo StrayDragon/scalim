@@ -5,7 +5,7 @@ from ....._internal.loggingx import format_kv, get_logger, prefix
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.litejinja2 import TemplateError, from_string
 
-__all__ = []
+__all__ = ()
 
 _logger = get_logger("dsl.by_yaml.template_vars")
 

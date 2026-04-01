@@ -13,9 +13,9 @@ from ._internal.rows import (
     iter_in_memory_rows_as_main_rows,
 )
 
-__all__ = [
+__all__ = (
     "InMemoryRows",
     "InMemoryRowsSink",
     "in_memory_rows_to_in_memory_csv",
     "iter_in_memory_rows_as_main_rows",
-]
+)

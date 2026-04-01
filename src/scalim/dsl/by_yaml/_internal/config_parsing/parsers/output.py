@@ -266,4 +266,4 @@ class ParserOutputMixin:
         )
 
 
-__all__ = []
+__all__ = ()

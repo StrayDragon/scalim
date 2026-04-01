@@ -87,9 +87,9 @@ def materialize_aligned_tabular_rows(
     return rows
 
 
-__all__ = [
+__all__ = (
     "WorkflowTabularInput",
     "iter_tabular_rows",
     "materialize_aligned_tabular_rows",
     "read_tabular_header",
-]
+)

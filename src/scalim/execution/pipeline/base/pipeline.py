@@ -691,4 +691,4 @@ class SeqPipeline(Pipeline):
         return []
 
 
-__all__ = ["Pipeline", "SeqPipeline"]
+__all__ = ("Pipeline", "SeqPipeline")

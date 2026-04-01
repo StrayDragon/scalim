@@ -183,4 +183,4 @@ def _is_ident_char(ch: str) -> bool:
     return _is_ident_start(ch) or ("0" <= ch <= "9")
 
 
-__all__ = []
+__all__ = ()

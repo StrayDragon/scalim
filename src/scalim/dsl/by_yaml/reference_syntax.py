@@ -105,7 +105,7 @@ def _parse_dotted_style(reference: str) -> ParsedReference:
     return ParsedReference(reference=reference, module_path=module_path, attr_path=(func_name,), style="dotted")
 
 
-__all__ = [
+__all__ = (
     "BUILTIN_CALLABLE_REFERENCE_PREFIX",
     "REFERENCE_FORMAT_EXAMPLES",
     "ParsedReference",
@@ -114,4 +114,4 @@ __all__ = [
     "is_valid_callable_reference",
     "is_valid_python_reference",
     "parse_python_reference",
-]
+)

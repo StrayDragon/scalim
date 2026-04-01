@@ -250,4 +250,4 @@ class DemandConfig:
     """可观测性配置(可选)."""
 
 
-__all__ = []
+__all__ = ()

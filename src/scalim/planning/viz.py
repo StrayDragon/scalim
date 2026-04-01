@@ -258,4 +258,4 @@ def build_viz_graph_snapshot(
     }
 
 
-__all__ = ["build_viz_graph_snapshot"]
+__all__ = ("build_viz_graph_snapshot",)

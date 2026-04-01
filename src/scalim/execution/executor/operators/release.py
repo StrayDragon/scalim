@@ -30,4 +30,4 @@ class ReleaseOperatorExecutor(OperatorExecutor):
         )
 
 
-__all__ = []
+__all__ = ()

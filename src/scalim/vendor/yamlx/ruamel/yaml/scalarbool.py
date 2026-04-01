@@ -13,7 +13,7 @@ from ruamel.yaml.anchor import Anchor
 
 from typing import Text, Any, Dict, List  # NOQA
 
-__all__ = ['ScalarBoolean']
+__all__ = ('ScalarBoolean',)
 
 
 class ScalarBoolean(int):

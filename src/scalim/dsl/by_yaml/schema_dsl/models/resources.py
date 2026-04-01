@@ -329,4 +329,4 @@ class ResourcesConfig:
     )
 
 
-__all__ = []
+__all__ = ()

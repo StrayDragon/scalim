@@ -16,4 +16,4 @@ class ParsedFieldsResult:
     field_def_index: FieldDefIndex
 
 
-__all__ = []
+__all__ = ()

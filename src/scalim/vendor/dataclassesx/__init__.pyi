@@ -13,7 +13,7 @@ from dataclasses import (
     replace,
 )
 
-__all__ = [
+__all__ = (
     "MISSING",
     "Field",
     "FrozenInstanceError",
@@ -26,4 +26,4 @@ __all__ = [
     "is_dataclass",
     "make_dataclass",
     "replace",
-]
+)

@@ -47,6 +47,4 @@ if TYPE_CHECKING:
     from ...spec.ir import DemandIr
 
 
-__all__ = [
-    "build_ref_field_ordering_deps",
-]
+__all__ = ("build_ref_field_ordering_deps",)

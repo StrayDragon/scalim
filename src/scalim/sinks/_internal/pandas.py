@@ -165,4 +165,4 @@ class PandasColumnSink(IColumnSink):
         self.close()
 
 
-__all__ = []
+__all__ = ()

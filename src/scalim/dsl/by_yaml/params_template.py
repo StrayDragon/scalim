@@ -544,10 +544,10 @@ def _parse_rows_options(options_raw: object, *, path: str) -> str:
     return raw_cache
 
 
-__all__ = [
+__all__ = (
     "CompiledParamsTemplate",
     "ScalimParamsTemplateCompileError",
     "ScalimParamsTemplateError",
     "ScalimParamsTemplateRenderError",
     "compile_params_template",
-]
+)

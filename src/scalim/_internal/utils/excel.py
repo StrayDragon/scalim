@@ -25,4 +25,4 @@ def escape_excel_formula(value: Any, *, allow_formulas: bool) -> Any:
     return value
 
 
-__all__ = []
+__all__ = ()

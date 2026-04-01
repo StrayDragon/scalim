@@ -275,4 +275,4 @@ class ConfigToIRConversionRelationMixin:
         return mapped
 
 
-__all__ = []
+__all__ = ()

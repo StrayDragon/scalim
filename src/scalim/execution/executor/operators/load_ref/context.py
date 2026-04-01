@@ -95,6 +95,4 @@ class LoadRefExecutionContext:
         return [build_row(self.context, row_id, field_keys) for row_id in self.batch_row_nth]
 
 
-__all__ = [
-    "LoadRefExecutionContext",
-]
+__all__ = ("LoadRefExecutionContext",)

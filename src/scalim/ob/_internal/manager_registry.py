@@ -168,4 +168,4 @@ class ObserverManagerRegistryMixin:
         return bool(self._observers_for_unknown_event_type)
 
 
-__all__ = []
+__all__ = ()

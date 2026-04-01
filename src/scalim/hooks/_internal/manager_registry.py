@@ -32,4 +32,4 @@ class HookManagerRegistryMixin(HookManagerBase, ABC):
             self._rebuild_subscription_cache()
 
 
-__all__ = []
+__all__ = ()

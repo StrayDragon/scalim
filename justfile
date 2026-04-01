@@ -659,6 +659,10 @@ check-no-print:
 check-api-surface-governance:
     uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check
 
+# 检查: export API(`__all__`) 必须使用 tuple 字面量
+check-export-api-must-tuple:
+    uv {{ UV_OPTIONS }} run scripts/check-export-api-must-tuple.py --check
+
 # 检查: user-facing materials 不得引用内部/不安全导入路径
 check-user-material-import-boundaries:
     uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check
@@ -672,7 +676,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

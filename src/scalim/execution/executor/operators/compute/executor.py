@@ -256,6 +256,4 @@ class ComputeOperatorExecutor(OperatorExecutor):
         )
 
 
-__all__ = [
-    "ComputeOperatorExecutor",
-]
+__all__ = ("ComputeOperatorExecutor",)

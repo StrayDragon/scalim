@@ -111,7 +111,7 @@ def book_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
     )
 
 
-__all__ = [
+__all__ = (
     "book_sheet_rows",
     "workflow_loader_context",
-]
+)

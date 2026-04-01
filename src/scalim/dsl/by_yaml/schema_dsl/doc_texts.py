@@ -98,4 +98,4 @@ def build_generated_doc_block(lines: List[str]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-__all__ = []
+__all__ = ()

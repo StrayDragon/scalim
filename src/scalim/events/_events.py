@@ -595,4 +595,4 @@ class WorkflowResourceDiscardEvent:
     reason: str
 
 
-__all__ = []
+__all__ = ()

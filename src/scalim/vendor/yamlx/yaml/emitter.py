@@ -6,7 +6,7 @@
 # sequence ::= SEQUENCE-START node* SEQUENCE-END
 # mapping ::= MAPPING-START (node node)* MAPPING-END
 
-__all__ = ['Emitter', 'EmitterError']
+__all__ = ('Emitter', 'EmitterError')
 
 from .error import YAMLError
 from .events import *

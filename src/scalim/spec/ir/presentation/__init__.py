@@ -144,10 +144,10 @@ class ExportProfileIr:
     """
 
 
-__all__ = [
+__all__ = (
     "CsvFieldPresentationIr",
     "ExportProfileIr",
     "FieldPresentationIr",
     "PandasFieldPresentationIr",
     "SpreadsheetFieldPresentationIr",
-]
+)

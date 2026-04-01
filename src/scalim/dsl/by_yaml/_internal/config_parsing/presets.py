@@ -1,6 +1,6 @@
 from typing import Dict
 
-__all__ = []
+__all__ = ()
 
 
 _YAML_PRESET_REGISTRY: Dict[str, str] = {

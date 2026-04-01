@@ -56,4 +56,4 @@ def commit_layer_results(
             after_operator(op)
 
 
-__all__ = ["commit_layer_results", "commit_task_result"]
+__all__ = ("commit_layer_results", "commit_task_result")

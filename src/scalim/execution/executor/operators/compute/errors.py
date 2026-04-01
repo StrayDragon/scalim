@@ -64,6 +64,4 @@ def handle_compute_error(
     )
 
 
-__all__ = [
-    "handle_compute_error",
-]
+__all__ = ("handle_compute_error",)

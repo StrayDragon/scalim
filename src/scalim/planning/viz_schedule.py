@@ -137,6 +137,4 @@ def build_viz_schedule_plan(
     }
 
 
-__all__ = [
-    "build_viz_schedule_plan",
-]
+__all__ = ("build_viz_schedule_plan",)

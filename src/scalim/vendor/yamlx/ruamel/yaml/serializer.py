@@ -21,7 +21,7 @@ from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 from typing import Any, Dict, Union, Text, Optional  # NOQA
 from ruamel.yaml.compat import VersionType  # NOQA
 
-__all__ = ['Serializer', 'SerializerError']
+__all__ = ('Serializer', 'SerializerError')
 
 
 class SerializerError(YAMLError):

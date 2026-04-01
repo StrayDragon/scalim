@@ -42,7 +42,7 @@ def build_field_dependencies(
     return field_dependencies
 
 
-__all__ = [
+__all__ = (
     "build_dependency_graph",
     "build_field_dependencies",
-]
+)

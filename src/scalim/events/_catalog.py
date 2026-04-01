@@ -342,4 +342,4 @@ def get_event_catalog_map() -> Dict[str, EventDescriptor]:
     return {item.name: item for item in _EVENT_CATALOG}
 
 
-__all__ = []
+__all__ = ()

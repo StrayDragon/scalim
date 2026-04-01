@@ -244,4 +244,4 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
             )
 
 
-__all__ = ["AdaptiveLoadRefScheduler", "build_relation_signature", "resolve_adaptive_max_workers"]
+__all__ = ("AdaptiveLoadRefScheduler", "build_relation_signature", "resolve_adaptive_max_workers")

@@ -65,4 +65,4 @@ class ScalimYamlValidationError(ScalimYamlError):
         self.warnings = tuple(warnings or ())
 
 
-__all__ = []
+__all__ = ()

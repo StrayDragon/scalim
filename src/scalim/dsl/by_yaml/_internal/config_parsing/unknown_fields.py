@@ -400,4 +400,4 @@ def _collect_unknown_fields_node(
     return []
 
 
-__all__ = []
+__all__ = ()

@@ -46,4 +46,4 @@ def maybe_create_adaptive_pool(
     return stack.enter_context(executor_cls(max_workers=resolved_workers))
 
 
-__all__ = []
+__all__ = ()

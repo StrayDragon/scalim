@@ -91,4 +91,4 @@ class HookCaptureManager(HookManager):
         self._recorded_events.append(HookRecordedEvent(event_type=EVENT_LOADER_CALL, payload=event))
 
 
-__all__ = ["HookCaptureManager", "HookRecordedEvent"]
+__all__ = ("HookCaptureManager", "HookRecordedEvent")

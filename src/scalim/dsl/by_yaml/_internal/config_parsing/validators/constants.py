@@ -74,4 +74,4 @@ LEGACY_FIELDS = {
     "derived",
 }
 
-__all__ = []
+__all__ = ()

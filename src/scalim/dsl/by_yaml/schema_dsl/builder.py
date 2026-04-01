@@ -805,4 +805,4 @@ def normalize_schema(value: Any, key: str = "") -> Any:
     return _DEFAULT_BUILDER.normalize_schema(value, key)
 
 
-__all__ = []
+__all__ = ()

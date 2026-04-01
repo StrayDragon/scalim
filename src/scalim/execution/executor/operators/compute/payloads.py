@@ -10,6 +10,4 @@ def build_field_compute_dependencies_payload(dep_keys: Tuple[str, ...], dep_valu
     return payload
 
 
-__all__ = [
-    "build_field_compute_dependencies_payload",
-]
+__all__ = ("build_field_compute_dependencies_payload",)

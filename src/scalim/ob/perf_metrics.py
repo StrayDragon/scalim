@@ -345,11 +345,11 @@ class PerformanceMetrics:
         return rows
 
 
-__all__ = [
+__all__ = (
     "AdaptiveSchedulerMetrics",
     "CpuSample",
     "LoaderStats",
     "MemorySample",
     "PerformanceMetrics",
     "StageMetrics",
-]
+)

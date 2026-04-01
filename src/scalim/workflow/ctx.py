@@ -12,9 +12,9 @@ from .execute import (
     render_ctx_directives,
 )
 
-__all__ = [
+__all__ = (
     "WorkflowCtxStore",
     "ensure_json_like",
     "iter_ctx_directives",
     "render_ctx_directives",
-]
+)

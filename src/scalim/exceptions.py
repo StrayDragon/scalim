@@ -65,7 +65,7 @@ def safe_error_message(error: BaseException, *, debug: Optional[bool] = None) ->
         return REDACTED_ERROR_MESSAGE
 
 
-__all__ = [
+__all__ = (
     "REDACTED_ERROR_MESSAGE",
     "ScalimError",
     "ScalimExecutionError",
@@ -75,4 +75,4 @@ __all__ = [
     "ScalimYamlError",
     "safe_error_message",
     "safe_error_type",
-]
+)

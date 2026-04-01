@@ -26,6 +26,4 @@ def compute_key_fields(
     return frozenset(key_fields)
 
 
-__all__ = [
-    "compute_key_fields",
-]
+__all__ = ("compute_key_fields",)

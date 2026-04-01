@@ -30,6 +30,4 @@ def split_components(
     return tuple(observers), tuple(hooks)
 
 
-__all__ = [
-    "split_components",
-]
+__all__ = ("split_components",)

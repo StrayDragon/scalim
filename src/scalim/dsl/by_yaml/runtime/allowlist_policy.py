@@ -6,6 +6,4 @@ class ResolverTrustedMode(StrEnum):
     TRUSTED_ALLOW_ALL_MODULES = "trusted_allow_all_modules"
 
 
-__all__ = [
-    "ResolverTrustedMode",
-]
+__all__ = ("ResolverTrustedMode",)

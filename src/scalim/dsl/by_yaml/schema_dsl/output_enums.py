@@ -133,7 +133,7 @@ AGG_POST_PRODUCER_KEYS: Tuple[str, ...] = (
 """`aggregate` 聚合后派生字段 `producer_key` 枚举(后置派生字段)."""
 
 
-__all__ = [
+__all__ = (
     "AGG_DISTINCT_ON_OVERFLOW_ENUM",
     "AGG_METRIC_PRODUCER_KEYS",
     "AGG_POST_PRODUCER_KEYS",
@@ -156,4 +156,4 @@ __all__ = [
     "DEFAULT_BOOK_WRITE_ON_MISMATCH",
     "FILE_KINDS",
     "OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM",
-]
+)

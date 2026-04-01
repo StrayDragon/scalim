@@ -1122,4 +1122,4 @@ def _validate_output_aggregate_producer_keys_schema() -> None:
 
 _validate_output_aggregate_producer_keys_schema()
 
-__all__ = []
+__all__ = ()

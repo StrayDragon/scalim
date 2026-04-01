@@ -96,4 +96,4 @@ class HookManagerStateMixin(HookManagerBase, ABC):
         return sample
 
 
-__all__ = []
+__all__ = ()

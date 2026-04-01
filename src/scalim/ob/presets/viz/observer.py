@@ -51,6 +51,4 @@ class VizObserver(VizObserverNodeMixin, VizObserverOutputMixin, VizObserverHandl
         return cls(config=config, snapshot=snapshot)
 
 
-__all__ = [
-    "VizObserver",
-]
+__all__ = ("VizObserver",)

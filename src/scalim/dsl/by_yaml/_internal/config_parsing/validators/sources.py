@@ -951,4 +951,4 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         return is_valid_callable_reference(loader_ref)
 
 
-__all__ = []
+__all__ = ()

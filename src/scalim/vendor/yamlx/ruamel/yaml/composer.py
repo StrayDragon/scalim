@@ -19,7 +19,7 @@ from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from typing import Any, Dict, Optional, List  # NOQA
 
-__all__ = ['Composer', 'ComposerError']
+__all__ = ('Composer', 'ComposerError')
 
 
 class ComposerError(MarkedYAMLError):

@@ -77,7 +77,7 @@ def stage_build_execution_request(
     return build_request(config, demand_ir, yaml_base_dir=str(yaml_base_dir), options=options, resolver=context.resolver)
 
 
-__all__ = [
+__all__ = (
     "ScalimStageAllowlistMismatchError",
     "YamlDslStageContext",
     "stage_build_execution_request",
@@ -85,4 +85,4 @@ __all__ = [
     "stage_create_context",
     "stage_load_yaml_config",
     "stage_validate_allowlist",
-]
+)

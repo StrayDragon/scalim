@@ -63,8 +63,8 @@ def parse_init_var_mapping_node(raw: Dict[str, Any], *, path: str) -> str:
     return init_var_raw.strip()
 
 
-__all__ = [
+__all__ = (
     "ScalimInitVarNodeTypeError",
     "ScalimInitVarNodeValueError",
     "parse_init_var_mapping_node",
-]
+)

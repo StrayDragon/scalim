@@ -37,8 +37,8 @@ from ruamel.yaml.util import timestamp_regexp, create_timestamp
 from typing import Any, Dict, List, Set, Iterator, Union, Optional  # NOQA
 
 
-__all__ = ['BaseConstructor', 'SafeConstructor', 'Constructor',
-           'ConstructorError', 'RoundTripConstructor']
+__all__ = ('BaseConstructor', 'SafeConstructor', 'Constructor',
+           'ConstructorError', 'RoundTripConstructor')
 # fmt: on
 
 

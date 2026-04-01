@@ -20,4 +20,4 @@ class OperatorExecutor(ABC):
         """执行算子"""
 
 
-__all__ = []
+__all__ = ()

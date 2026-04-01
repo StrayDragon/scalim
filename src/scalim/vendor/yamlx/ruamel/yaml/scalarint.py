@@ -4,7 +4,7 @@ from ruamel.yaml.anchor import Anchor
 
 from typing import Text, Any, Dict, List  # NOQA
 
-__all__ = ['ScalarInt', 'BinaryInt', 'OctalInt', 'HexInt', 'HexCapsInt', 'DecimalInt']
+__all__ = ('ScalarInt', 'BinaryInt', 'OctalInt', 'HexInt', 'HexCapsInt', 'DecimalInt')
 
 
 class ScalarInt(int):
