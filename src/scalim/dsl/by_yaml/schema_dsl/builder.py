@@ -395,7 +395,8 @@ class SchemaBuilder:
                 "- string: `<alias>(.<segment>)*`\n"
                 "- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n"
                 "- 仅支持 mapping 片段\n"
-                "- V1 仅支持同级文件导入(见顶层 `imports`)"
+                "- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n"
+                "- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准"
             ),
             "examples": ["common.sources", ["common.sources", "other.sources"]],
         }
