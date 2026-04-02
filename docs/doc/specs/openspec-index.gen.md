@@ -451,6 +451,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-imports/spec.md)
 - Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开),并在 schema/语义校验前完成展开. 说明: - `$import` 的允许范围以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`.
 
+### `yaml-dsl-lsp-notebooks-regression`
+- Title: yaml-dsl-lsp-notebooks-regression Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-notebooks-regression/spec.md)
+- Summary: 复用仓库 `notebooks` 下的 YAML DSL fixtures 作为 editor semantics core 的静态回归输入， 用于持续回归 diagnostics 与 Python 引用相关的 editor/LSP 操作，避免仅基于合成 YAML 导致的行为漂移。
+
 ### `yaml-dsl-lsp-server`
 - Title: yaml-dsl-lsp-server Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-server/spec.md)

@@ -1,0 +1,4 @@
+yaml_dsl:
+  import_allowed_roots:
+    - .
+
