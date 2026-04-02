@@ -74,6 +74,8 @@ def _cmd_dump_discovery(yaml_path: str, *, as_json: bool) -> int:
         return 2
 
     payload = discovery.as_dict()
+    if "scalim_yaml_path" not in payload:
+        payload["scalim_yaml_path"] = None
     if not as_json:
         sys.stdout.write("{}\n".format(payload))
         return 0

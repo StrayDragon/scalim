@@ -451,6 +451,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-imports/spec.md)
 - Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开),并在 schema/语义校验前完成展开. 说明: - `$import` 的允许范围以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`.
 
+### `yaml-dsl-lsp-code-actions`
+- Title: yaml-dsl-lsp-code-actions Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-code-actions/spec.md)
+- Summary: 定义 YAML DSL LSP 的 Quick Fix（`textDocument/codeAction` + `workspace/executeCommand`）能力集合与安全约束，确保： - actions 由 shared core 的 diagnostics/discovery 驱动（避免在 server 层复制 DSL 语义） - edits 可撤销、可审计（通过 `WorkspaceEdit`） - 纯静态无副作用（不得执行用户代码） - edits 仅作用于 workspace 内文件（越界/不可写时降级为 explain-only）
+
 ### `yaml-dsl-lsp-notebooks-regression`
 - Title: yaml-dsl-lsp-notebooks-regression Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-notebooks-regression/spec.md)
