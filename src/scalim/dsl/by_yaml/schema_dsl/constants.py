@@ -617,7 +617,7 @@ RELATION_STEPS_SCHEMA = {
 
 DEMAND_SCHEMA_META = {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://scalim.example.com/schemas/demand.json",
+    "$id": "https://scalim.invalid/schemas/demand.json",
     "title": "Scalim 需求配置",
     "description": "Scalim 框架 YAML 需求配置定义 Schema",
     "markdownDescription": (
@@ -651,5 +651,18 @@ FIELD_DERIVED_CONDITIONS = [
     }
 ]
 DEMAND_FIELDS_KEY = "fields"
+
+SCALIM_YAML_SCHEMA_META = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://scalim.invalid/schemas/scalim_yaml.json",
+    "title": "Scalim 项目配置(scalim.yaml)",
+    "description": "Scalim 项目级配置文件 `scalim.yaml` 定义 Schema",
+    "markdownDescription": (
+        "Scalim 项目级配置文件 `scalim.yaml` 定义 Schema.\n\n"
+        "- `scalim.yaml` 本身是可选配置(支持 zero-config fallback)\n"
+        "- schema 仅描述单个文件的结构,不改变 nearest-wins project discovery 语义\n"
+        "- v1 聚焦 `yaml_dsl.*` 配置面(imports/editor/LSP project discovery)"
+    ),
+}
 
 __all__ = ()

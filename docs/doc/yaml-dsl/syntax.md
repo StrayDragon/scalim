@@ -118,6 +118,9 @@ include_full_error_message: false    # 可选
   - CLI 可通过 `--allowed-yaml-root <dir>` 扩展允许根目录(可重复)
   - 也可在入口 YAML 所在目录向上查找最近的 `scalim.yaml`,并使用其中的 `yaml_dsl.import_allowed_roots` / `yaml_dsl.import_aliases` 扩展允许范围
     - `import_aliases` 提供“目录别名”,允许在 `imports.*` 中写 `<dir_alias>:/path/to/fragment.yaml` 指定解析基准目录
+- `scalim.yaml` 是可选配置:
+  - 未提供时仍可使用 YAML DSL(仅缺少 imports 目录别名/allowed roots/editor overrides 等“项目级增强”)
+  - 大型仓库允许存在多层 `scalim.yaml` 作为子项目隔离: nearest-wins(从入口 YAML 所在目录向上找最近的那份)
 - **仅文件路径入口支持**: `scalim.dsl.by_yaml.run/compile(yaml_path)` / `scalim-cli yaml-dsl validate <file.yaml>` 等会先展开再校验;纯文本入口会 fail-fast 并提示改用文件路径入口
 
 一个最小示例:

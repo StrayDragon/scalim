@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
@@ -118,9 +119,23 @@ def register(subparsers: Any) -> None:
     schema_validate_parser.set_defaults(func=_run_schema_validate)
 
     schema_show_parser = schema_subparsers.add_parser("show", help="Print JSON Schema")
+    _ = schema_show_parser.add_argument(
+        "--type",
+        dest="schema_type",
+        type=str,
+        default=yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE,
+        help="Schema 类型(例如 demand/workflow/scalim_yaml)",
+    )
     schema_show_parser.set_defaults(func=_run_schema_show)
 
     schema_path_parser = schema_subparsers.add_parser("path", help="Print JSON Schema path")
+    _ = schema_path_parser.add_argument(
+        "--type",
+        dest="schema_type",
+        type=str,
+        default=yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE,
+        help="Schema 类型(例如 demand/workflow/scalim_yaml)",
+    )
     schema_path_parser.set_defaults(func=_run_schema_path)
 
     upsert_parser = yaml_subparsers.add_parser(
@@ -214,6 +229,17 @@ def _default_schema_path() -> Path:
 
 def _resolve_schema_path(arg: Optional[Path]) -> Path:
     return arg.resolve() if arg is not None else _default_schema_path()
+
+
+_SCHEMA_TYPE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$")
+
+
+def _schema_path_for_schema_type(schema_type: str) -> Path:
+    schema_type = (schema_type or "").strip() or yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE
+    if not _SCHEMA_TYPE_PATTERN.match(schema_type):
+        msg = "Invalid schema type: {}".format(schema_type)
+        raise ValueError(msg)
+    return Path(__file__).resolve().parents[1] / "dsl" / "by_yaml" / "schema" / "{}.gen.json".format(schema_type)
 
 
 def _load_json_schema(schema_path: Path) -> Dict[str, Any]:
@@ -1357,8 +1383,14 @@ def _emit_schema_result(
     return 0 if ok else 1
 
 
-def _run_schema_show(_args: argparse.Namespace) -> int:
-    schema_path = _default_schema_path()
+def _run_schema_show(args: argparse.Namespace) -> int:
+    args_dict = vars(args)
+    schema_type = str(args_dict.get("schema_type", yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE) or yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE)
+    try:
+        schema_path = _schema_path_for_schema_type(schema_type)
+    except ValueError as exc:
+        _emit_error(str(exc), json_output=False)
+        return 1
     if not schema_path.exists():
         _emit_error("Schema 文件不存在: {}".format(schema_path), json_output=False)
         return 1
@@ -1366,8 +1398,14 @@ def _run_schema_show(_args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_schema_path(_args: argparse.Namespace) -> int:
-    schema_path = _default_schema_path()
+def _run_schema_path(args: argparse.Namespace) -> int:
+    args_dict = vars(args)
+    schema_type = str(args_dict.get("schema_type", yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE) or yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE)
+    try:
+        schema_path = _schema_path_for_schema_type(schema_type)
+    except ValueError as exc:
+        _emit_error(str(exc), json_output=False)
+        return 1
     if not schema_path.exists():
         _emit_error("Schema 文件不存在: {}".format(schema_path), json_output=False)
         return 1

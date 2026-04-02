@@ -124,24 +124,26 @@ options:
 
 ### `yaml-dsl schema show`
 - Help: Print JSON Schema
-- Usage: `scalim-cli yaml-dsl schema show [-h]`
+- Usage: `scalim-cli yaml-dsl schema show [-h] [--type SCHEMA_TYPE]`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl schema show [-h]
+usage: scalim-cli yaml-dsl schema show [-h] [--type SCHEMA_TYPE]
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help          show this help message and exit
+  --type SCHEMA_TYPE  Schema 类型(例如 demand/workflow/scalim_yaml)
 ```
 
 ### `yaml-dsl schema path`
 - Help: Print JSON Schema path
-- Usage: `scalim-cli yaml-dsl schema path [-h]`
+- Usage: `scalim-cli yaml-dsl schema path [-h] [--type SCHEMA_TYPE]`
 - Full help:
 ```text
-usage: scalim-cli yaml-dsl schema path [-h]
+usage: scalim-cli yaml-dsl schema path [-h] [--type SCHEMA_TYPE]
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help          show this help message and exit
+  --type SCHEMA_TYPE  Schema 类型(例如 demand/workflow/scalim_yaml)
 ```
 
 ### `yaml-dsl upsert-lsp-comment`

@@ -9,11 +9,13 @@ from scalim.dsl.by_yaml.schema_dsl import constants as yaml_constants
 from scalim.dsl.by_yaml.schema_dsl.builder import (
     SchemaBuilder,
     build_demand_schema,
+    build_scalim_yaml_schema,
     build_workflow_schema,
     load_schema,
     normalize_schema,
     schemas_equivalent,
     write_demand_schema,
+    write_scalim_yaml_schema,
     write_workflow_schema,
 )
 from scalim.dsl.by_yaml.schema_dsl.models import LOOKUP_CAST_KEYS
@@ -40,6 +42,13 @@ def test_workflow_generator_matches_generated_file() -> None:
     assert schemas_equivalent(generated, file_schema)
 
 
+def test_scalim_yaml_generator_matches_generated_file() -> None:
+    generated = build_scalim_yaml_schema()
+    file_schema = load_schema(_schema_path("scalim_yaml.gen.json"))
+
+    assert schemas_equivalent(generated, file_schema)
+
+
 def test_generated_schema_has_comment() -> None:
     generated = load_schema(_schema_path("demand.gen.json"))
 
@@ -48,6 +57,12 @@ def test_generated_schema_has_comment() -> None:
 
 def test_generated_workflow_schema_has_comment() -> None:
     generated = load_schema(_schema_path("workflow.gen.json"))
+
+    assert "$comment" in generated
+
+
+def test_generated_scalim_yaml_schema_has_comment() -> None:
+    generated = load_schema(_schema_path("scalim_yaml.gen.json"))
 
     assert "$comment" in generated
 
@@ -69,6 +84,14 @@ def test_write_demand_schema_creates_file(tmp_path: Path) -> None:
 def test_write_workflow_schema_creates_file(tmp_path: Path) -> None:
     output_path = tmp_path / "schema.json"
     write_workflow_schema(output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert content.endswith("\n")
+
+
+def test_write_scalim_yaml_schema_creates_file(tmp_path: Path) -> None:
+    output_path = tmp_path / "schema.json"
+    write_scalim_yaml_schema(output_path)
 
     content = output_path.read_text(encoding="utf-8")
     assert content.endswith("\n")

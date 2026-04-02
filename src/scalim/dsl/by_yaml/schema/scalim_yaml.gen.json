@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://scalim.invalid/schemas/scalim_yaml.json",
+  "title": "Scalim 项目配置(scalim.yaml)",
+  "description": "Scalim 项目级配置文件 `scalim.yaml` 定义 Schema",
+  "$comment": "自动生成, 请勿手动修改. 生成脚本: scripts/gen-yaml-dsl-schema.py",
+  "oneOf": [
+    {
+      "type": "null"
+    },
+    {
+      "$ref": "#/definitions/scalim_yaml"
+    }
+  ],
+  "definitions": {
+    "scalim_yaml_editor_kind_override": {
+      "type": "object",
+      "properties": {
+        "glob": {
+          "type": "string",
+          "description": "按文件路径覆盖 YAML 类型(demand/workflow), glob 相对 project root",
+          "markdownDescription": "按文件路径覆盖 YAML 类型(demand/workflow), glob 相对 `project root`.",
+          "minLength": 1,
+          "examples": [
+            "workflow/*.yaml"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "description": "YAML 类型覆盖(demand/workflow)",
+          "markdownDescription": "YAML 类型覆盖.\n\n- 允许值: `demand` / `workflow`",
+          "enum": [
+            "demand",
+            "workflow"
+          ],
+          "examples": [
+            "workflow"
+          ]
+        }
+      },
+      "required": [
+        "glob",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "scalim_yaml_editor": {
+      "type": "object",
+      "properties": {
+        "python_roots": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "可选: 用于静态解析 Python 引用的搜索根(相对 scalim.yaml 所在目录)",
+          "markdownDescription": "用于静态解析 Python 引用的搜索根(相对 `scalim.yaml` 所在目录).",
+          "default": [],
+          "examples": [
+            [
+              ".",
+              "./src"
+            ]
+          ]
+        },
+        "kind_overrides": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/scalim_yaml_editor_kind_override"
+          },
+          "description": "可选: 按文件路径覆盖 YAML 类型(demand/workflow), glob 相对 project root",
+          "markdownDescription": "按文件路径覆盖 YAML 类型(demand/workflow), glob 相对 `project root`.",
+          "default": [],
+          "examples": [
+            [
+              {
+                "glob": "workflow/*.yaml",
+                "kind": "workflow"
+              }
+            ]
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "scalim_yaml_yaml_dsl": {
+      "type": "object",
+      "properties": {
+        "import_aliases": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "可选: imports 目录别名映射(用于 fragments 路径解析与 allow roots 扩展)",
+          "markdownDescription": "imports 目录别名映射.\n\n- key: alias\n- value: directory path(相对 `scalim.yaml` 所在目录)\n- 会同时用于扩展 allow roots(允许读取 YAML fragments 的范围)",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": {},
+          "examples": [
+            {
+              "shared": "./shared_yaml"
+            }
+          ]
+        },
+        "import_allowed_roots": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "可选: 允许读取 YAML fragments 的根目录列表(相对 scalim.yaml 所在目录)",
+          "markdownDescription": "允许读取 YAML fragments 的根目录列表(相对 `scalim.yaml` 所在目录).",
+          "default": [],
+          "examples": [
+            [
+              "./shared_yaml"
+            ]
+          ]
+        },
+        "editor": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/scalim_yaml_editor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "可选: editor/LSP project discovery 配置",
+          "markdownDescription": "editor/LSP project discovery 配置(可选).",
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "scalim_yaml": {
+      "type": "object",
+      "properties": {
+        "yaml_dsl": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/scalim_yaml_yaml_dsl"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "YAML DSL 相关配置(可选)",
+          "markdownDescription": "YAML DSL 相关配置(可选).",
+          "default": null
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "markdownDescription": "Scalim 项目级配置文件 `scalim.yaml` 定义 Schema.\n\n- `scalim.yaml` 本身是可选配置(支持 zero-config fallback)\n- schema 仅描述单个文件的结构,不改变 nearest-wins project discovery 语义\n- v1 聚焦 `yaml_dsl.*` 配置面(imports/editor/LSP project discovery)"
+}

@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-from scalim.dsl.by_yaml.schema_dsl.builder import write_demand_schema, write_workflow_schema
+from scalim.dsl.by_yaml.schema_dsl.builder import write_demand_schema, write_scalim_yaml_schema, write_workflow_schema
 
 
 def _read_text(path: Path) -> str:
@@ -41,23 +41,28 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     schema_dir = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema"
     demand_path = schema_dir / "demand.gen.json"
     workflow_path = schema_dir / "workflow.gen.json"
+    scalim_yaml_path = schema_dir / "scalim_yaml.gen.json"
 
     if not args.check:
         schema_dir.mkdir(parents=True, exist_ok=True)
         write_demand_schema(demand_path)
         write_workflow_schema(workflow_path)
+        write_scalim_yaml_schema(scalim_yaml_path)
         return 0
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_schema_dir = Path(tmpdir)
         tmp_demand = tmp_schema_dir / "demand.gen.json"
         tmp_workflow = tmp_schema_dir / "workflow.gen.json"
+        tmp_scalim_yaml = tmp_schema_dir / "scalim_yaml.gen.json"
         write_demand_schema(tmp_demand)
         write_workflow_schema(tmp_workflow)
+        write_scalim_yaml_schema(tmp_scalim_yaml)
 
         expected = [
             (demand_path, tmp_demand.read_text(encoding="utf-8")),
             (workflow_path, tmp_workflow.read_text(encoding="utf-8")),
+            (scalim_yaml_path, tmp_scalim_yaml.read_text(encoding="utf-8")),
         ]
 
     failed: List[Tuple[Path, str]] = []

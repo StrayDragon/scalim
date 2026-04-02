@@ -46,8 +46,9 @@ yaml_dsl:
 
 ## Schema 补全/校验
 
-YAML DSL 的 canonical schema 生成物在:
+YAML DSL / `scalim.yaml` 的 canonical schema 生成物在:
 
+- `src/scalim/dsl/by_yaml/schema/scalim_yaml.gen.json` (`scalim.yaml`)
 - `src/scalim/dsl/by_yaml/schema/demand.gen.json`
 - `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
 
@@ -57,10 +58,34 @@ YAML DSL 的 canonical schema 生成物在:
 just gen-yaml-dsl-schema
 ```
 
+打印 schema 绝对路径(便于复制到 `$schema` header):
+
+```bash
+scalim-cli yaml-dsl schema path --type scalim_yaml
+```
+
 在 YAML 文件头使用 IntelliJ 兼容的 schema header(推荐):
 
 ```yaml
+# scalim.yaml
+# $schema: /ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/scalim_yaml.gen.json
+```
+
+```yaml
+# demand/workflow YAML
 # $schema: /ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/workflow.gen.json
+```
+
+在 VSCode / `redhat.vscode-yaml` 中通过 settings 绑定 schema(示例):
+
+```json
+{
+  "yaml.schemas": {
+    "/ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/scalim_yaml.gen.json": "scalim.yaml",
+    "/ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/demand.gen.json": "demand/**/*.y*ml",
+    "/ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/workflow.gen.json": "workflow/**/*.y*ml"
+  }
+}
 ```
 
 ## 语义校验(命令行)

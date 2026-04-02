@@ -54,6 +54,7 @@ def test_yaml_dsl_schema_numeric_constraints_are_typed() -> None:
     schemas = [
         schema_dir / "demand.gen.json",
         schema_dir / "workflow.gen.json",
+        schema_dir / "scalim_yaml.gen.json",
     ]
 
     issues = []

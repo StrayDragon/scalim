@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://scalim.example.com/schemas/workflow.json",
+  "$id": "https://scalim.invalid/schemas/workflow.json",
   "title": "Scalim Workflow 配置",
   "description": "Scalim 框架 workflow YAML 配置定义 Schema",
   "$comment": "自动生成, 请勿手动修改. 生成脚本: scripts/gen-yaml-dsl-schema.py",

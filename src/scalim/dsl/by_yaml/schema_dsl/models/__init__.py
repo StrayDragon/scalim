@@ -63,6 +63,7 @@ from .resources import (
     FileConfig,
     ResourcesConfig,
 )
+from .scalim_yaml import ScalimYamlConfig, ScalimYamlEditorConfig, ScalimYamlEditorKindOverrideConfig, ScalimYamlYamlDslConfig
 from .source import (
     LoaderRetryConfig,
     MainSourceConfig,
@@ -136,6 +137,10 @@ __all__ = (
     "RelationConfig",
     "RelationStepConfig",
     "ResourcesConfig",
+    "ScalimYamlConfig",
+    "ScalimYamlEditorConfig",
+    "ScalimYamlEditorKindOverrideConfig",
+    "ScalimYamlYamlDslConfig",
     "SourceConfig",
     "SourceFieldConfig",
 )

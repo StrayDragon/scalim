@@ -363,7 +363,7 @@ class SchemaBuilder:
 
         schema: Dict[str, Any] = {
             "$schema": types_mod.DEMAND_SCHEMA_META["$schema"],
-            "$id": "https://scalim.example.com/schemas/workflow.json",
+            "$id": "https://scalim.invalid/schemas/workflow.json",
             "title": "Scalim Workflow 配置",
             "description": "Scalim 框架 workflow YAML 配置定义 Schema",
             "$comment": self.GENERATED_SCHEMA_COMMENT,
@@ -374,6 +374,44 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
         self._assert_schema_does_not_expose_import_key(schema, path="$")
+        return schema
+
+    def build_scalim_yaml_schema(self) -> Dict[str, Any]:
+        types_mod = self._types
+
+        definitions: Dict[str, Any] = {
+            "scalim_yaml_editor_kind_override": self._build_definition(
+                types_mod.ScalimYamlEditorKindOverrideConfig,
+                allow_import=False,
+            ),
+            "scalim_yaml_editor": self._build_definition(
+                types_mod.ScalimYamlEditorConfig,
+                allow_import=False,
+            ),
+            "scalim_yaml_yaml_dsl": self._build_definition(
+                types_mod.ScalimYamlYamlDslConfig,
+                allow_import=False,
+            ),
+            "scalim_yaml": self._build_definition(
+                types_mod.ScalimYamlConfig,
+                allow_import=False,
+            ),
+        }
+
+        schema: Dict[str, Any] = {
+            "$schema": types_mod.SCALIM_YAML_SCHEMA_META["$schema"],
+            "$id": types_mod.SCALIM_YAML_SCHEMA_META["$id"],
+            "title": types_mod.SCALIM_YAML_SCHEMA_META["title"],
+            "description": types_mod.SCALIM_YAML_SCHEMA_META["description"],
+            "$comment": self.GENERATED_SCHEMA_COMMENT,
+            "oneOf": [
+                {"type": "null"},
+                {"$ref": "#/definitions/scalim_yaml"},
+            ],
+            "definitions": definitions,
+        }
+        if "markdownDescription" in types_mod.SCALIM_YAML_SCHEMA_META:
+            schema["markdownDescription"] = types_mod.SCALIM_YAML_SCHEMA_META["markdownDescription"]
         return schema
 
     def _import_ref_schema(self) -> Dict[str, Any]:
@@ -716,6 +754,10 @@ def build_workflow_schema() -> Dict[str, Any]:
     return _DEFAULT_BUILDER.build_workflow_schema()
 
 
+def build_scalim_yaml_schema() -> Dict[str, Any]:
+    return _DEFAULT_BUILDER.build_scalim_yaml_schema()
+
+
 def load_schema(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -731,6 +773,14 @@ def write_demand_schema(output_path: Path) -> None:
 
 def write_workflow_schema(output_path: Path) -> None:
     schema = build_workflow_schema()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(schema, handle, ensure_ascii=False, indent=2, sort_keys=False)
+        _ = handle.write("\n")
+
+
+def write_scalim_yaml_schema(output_path: Path) -> None:
+    schema = build_scalim_yaml_schema()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as handle:
         json.dump(schema, handle, ensure_ascii=False, indent=2, sort_keys=False)
