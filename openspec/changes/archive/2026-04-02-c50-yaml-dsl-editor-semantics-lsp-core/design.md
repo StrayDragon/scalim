@@ -10,7 +10,7 @@
 **Goals:**
 - 抽离 editor 语义为独立包（`requires-python >= 3.10`），并定义稳定的公共 API（discovery/diagnostics/definition/hover/completion）。
 - 明确安全边界：静态解析、禁止执行用户代码、禁止污染进程级全局状态（例如 `sys.path`）。
-- 提供主包侧 shim，保证在未安装新包时给出可执行的提示；安装后可无缝复用 editor API。
+- 主包不再提供旧 import 路径；仓库内统一迁移到新导入路径，并提供 `scalim[yaml-dsl-lsp]` extra 便于安装依赖。
 - 为后续加入 LSP server 预留结构（同一 distribution 内的 `core`/`server` 模块，或同名包的可选 extra）。
 
 **Non-Goals:**
@@ -30,30 +30,28 @@
 - core 仅依赖主包 `scalim`（复用 schema、YAML 解析与 validator 逻辑），并保持对 editor 侧的依赖最小化。
 - `pygls/lsprotocol` 等依赖放入可选 extra 或 server 子模块，避免把 editor core 与 IO 层强绑定。
 
-3) **主包 shim 行为**
-- 保留 `src/scalim/dsl/by_yaml/editor_semantics.py` 作为薄 shim：
-  - 若 `scalim_yaml_dsl_lsp` 可导入，则从新包 re-export 公共 API；
-  - 否则抛出带迁移/安装指令的错误（或返回结构化 warnings），避免 silent failure。
-- shim 只包含少量运行时代码，保持 `Python 3.6` 兼容。
+3) **主包迁移策略**
+- 删除 `src/scalim/dsl/by_yaml/editor_semantics.py`，统一从 `scalim_yaml_dsl_lsp.core` 导入 editor API。
+- 主包仅提供可选 extra：`scalim[yaml-dsl-lsp]`（安装 `scalim-yaml-dsl-lsp`）。
 
 4) **公共 API 约束**
 - editor core MUST：
   - 不执行用户代码；
   - 不修改进程级全局状态（例如 `sys.path`、`sys.meta_path`）；
   - 输出结构化、可 JSON 序列化的诊断/位置/补全结果。
-- 兼容性策略：以 spec 文件定义的 API 作为 SSOT；主包 shim 只保证“可用性/错误提示”，不承诺完全兼容所有内部实现细节。
+- 兼容性策略：以 spec 文件定义的 API 作为 SSOT；不提供旧导入路径的反向兼容。
 
 ## Risks / Trade-offs
 
 - **[Risk] 依赖与版本漂移（主包 vs core 包）** → 通过 `scalim-yaml-dsl-lsp` 依赖 `scalim` 的版本范围 + CI 集成测试保证协同升级。
-- **[Risk] BREAKING：旧 import 路径不再直接可用** → 通过 shim + 清晰的错误信息/安装提示降低迁移成本。
+- **[Risk] BREAKING：旧 import 路径不再可用** → 通过清晰的迁移说明（proposal/spec/tasks）与仓库内批量迁移降低成本。
 - **[Risk] core 仍然引用主包内部实现细节** → 在 specs 中明确哪些符号是稳定 API，逐步收敛到公开边界。
 
 ## Migration Plan
 
 1. 新建 `packages/scalim-yaml-dsl-lsp`（`pyproject.toml` + `src/scalim_yaml_dsl_lsp/`）。
 2. 将现有 `editor_semantics.py` 的实现迁移到 core，并补齐测试覆盖。
-3. 在主包保留 shim（可选提供 `scalim[yaml-dsl-lsp]` extra）。
+3. 删除主包旧模块，并提供 `scalim[yaml-dsl-lsp]` extra。
 4. 将 LSP server（后续变更）统一改为依赖 core（避免重复实现）。
 5. 更新 docs/specs：新增/修改对应 OpenSpec spec，并确保 `just openspec-check` 通过。
 

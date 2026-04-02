@@ -51,3 +51,11 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 - **WHEN** 用户触发 go-to-definition
 - **THEN** 系统 MUST 返回 `func` 定义所在文件与范围
 
+### Requirement: LSP server MUST delegate editor semantics to shared core library
+系统 MUST 在 LSP server 内统一复用抽离后的 editor semantics core（`scalim-yaml-dsl-lsp`），作为 diagnostics/definition/completion 的语义 SSOT，避免在 server 层复制实现细节。
+
+#### Scenario: server uses shared core for diagnostics
+- **WHEN** LSP server 收到 diagnostics 请求
+- **THEN** server MUST 调用 shared core 的 diagnostics API 产生结果
+- **AND** MUST NOT 在 server 层重复实现 validator/schema 规则
+

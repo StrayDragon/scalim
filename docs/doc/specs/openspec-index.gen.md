@@ -421,6 +421,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-project-discovery/spec.md)
 - Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
 
+### `yaml-dsl-editor-semantics-core`
+- Title: yaml-dsl-editor-semantics-core Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-semantics-core/spec.md)
+- Summary: TBD - created by archiving change c50-yaml-dsl-editor-semantics-lsp-core. Update Purpose after archive.
+
 ### `yaml-dsl-file-resources`
 - Title: yaml-dsl-file-resources Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-file-resources/spec.md)

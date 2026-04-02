@@ -1,4 +1,5 @@
 import ast
+import importlib
 import importlib.machinery
 import json
 import textwrap
@@ -6,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import scalim.dsl.by_yaml.editor_semantics as editor_semantics
-from scalim.dsl.by_yaml.editor_semantics import (
+import scalim_yaml_dsl_lsp.core as editor_semantics
+from scalim_yaml_dsl_lsp.core import (
     PythonDefinitionLocation,
     PythonDefinitionResult,
     YamlDslEditorProjectDiscovery,
@@ -28,6 +29,11 @@ def test_discovery_zero_config_falls_back_to_entry_dir(tmp_path: Path) -> None:
     assert discovery.project_root == tmp_path
     assert discovery.python_roots == (tmp_path,)
     assert discovery.allowed_yaml_roots == (tmp_path,)
+
+
+def test_legacy_editor_semantics_import_path_is_removed() -> None:
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("scalim.dsl.by_yaml.editor_semantics")
 
 
 def test_discovery_nearest_wins_scalim_yaml_and_editor_python_roots(tmp_path: Path) -> None:

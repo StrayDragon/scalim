@@ -16,12 +16,10 @@
   - project discovery（nearest-wins `scalim.yaml`、roots 策略输出）；
   - diagnostics（demand/workflow 诊断与 schema 校验入口）；
   - Python 引用的 definition/hover/completion（静态解析，不执行用户代码）。
-- 主包 `scalim` 中的 `scalim.dsl.by_yaml.editor_semantics` 改为 **薄 shim**：
-  - 在安装了 `scalim-yaml-dsl-lsp` 时，转发/重导出 editor API；
-  - 未安装时，给出可执行的安装/启用提示（例如 `pip install scalim-yaml-dsl-lsp` 或 `scalim[yaml-dsl-lsp]`）。
+- 主包 `scalim` 不再提供 `scalim.dsl.by_yaml.editor_semantics`；仓库内统一迁移为从 `scalim_yaml_dsl_lsp.core` 导入。
 - 后续 LSP server（以及 VSCode extension）统一依赖该 core，避免复制粘贴实现与规则漂移。
 
-**BREAKING（受控）**：如果下游直接 import `scalim.dsl.by_yaml.editor_semantics` 并在未安装新包的环境使用，将需要补装新依赖或迁移到新导入路径。
+**BREAKING**：如果下游直接 import `scalim.dsl.by_yaml.editor_semantics`，需要迁移到 `scalim_yaml_dsl_lsp.core`（并安装 `scalim-yaml-dsl-lsp` 或 `scalim[yaml-dsl-lsp]`）。
 
 ## Capabilities
 
@@ -37,5 +35,5 @@
 
 - 新增一个独立发布包与其 `pyproject.toml`/lockfile 变更；
 - LSP/编辑器相关实现从 `src/scalim/` 抽离，主包运行时边界更清晰；
-- 测试需要拆分：主包保留轻量 proxy 测试；core 包补足行为/边界测试；
+- 测试迁移到 core 包导入路径，补足行为/边界测试；
 - 若涉及 docs/specs：`openspec/specs/*/spec.md` 为 SSOT；文档站点相关生成物需通过 `just gen-docs` 刷新（禁止手改 `*.gen.*` / AUTOGEN 区块）。

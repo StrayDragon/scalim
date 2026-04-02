@@ -1,5 +1,6 @@
 import ast
 import json
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from importlib.machinery import PathFinder
 from pathlib import Path
@@ -10,27 +11,34 @@ try:
 except ImportError:  # pragma: no cover  # pragma: allow-no-cover optional dependency
     _jsonschema = None  # type: ignore[assignment]
 
-from ...vendor.dataclassesx import dataclass
-from ...vendor.yamlx import yaml
-from ._internal.config_parsing.allowed_paths import normalize_allowed_yaml_roots
-from ._internal.config_parsing.error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
-from ._internal.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
-from ._internal.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
-from ._internal.config_parsing.project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
-from ._internal.config_parsing.unknown_fields import find_unknown_fields
-from ._internal.config_parsing.validator import ConfigValidator
-from ._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
-from ._internal.config_parsing.yaml_load import (
+from scalim.dsl import by_yaml
+from scalim.dsl.by_yaml._internal.config_parsing.allowed_paths import normalize_allowed_yaml_roots
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.imports import (
+    ScalimYamlImportExpansionError,
+    contains_import_syntax,
+    expand_imports_inplace,
+)
+from scalim.dsl.by_yaml._internal.config_parsing.jsonschema_issues import (
+    ScalimJsonSchemaCollectorError,
+    collect_jsonschema_validation_issues,
+)
+from scalim.dsl.by_yaml._internal.config_parsing.project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
+from scalim.dsl.by_yaml._internal.config_parsing.unknown_fields import find_unknown_fields
+from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
+from scalim.dsl.by_yaml._internal.config_parsing.yaml_load import (
     envelope_from_validation_issue,
     error_loc_for_yaml_path,
     load_yaml_mapping_text,
 )
-from .reference_syntax import (
+from scalim.dsl.by_yaml.reference_syntax import (
     ParsedReference,
     ScalimReferenceSyntaxError,
     is_valid_builtin_callable_reference,
     parse_python_reference,
 )
+from scalim.vendor.yamlx import yaml
 
 YAML_DSL_KIND_DEMAND = "demand"
 YAML_DSL_KIND_WORKFLOW = "workflow"
@@ -495,7 +503,7 @@ def _classify_yaml_kind_by_heuristic(yaml_text: str) -> str:
 
 
 def _schema_dir() -> Path:
-    return Path(__file__).resolve().parent / "schema"
+    return Path(by_yaml.__file__).resolve().parent / "schema"
 
 
 def _load_json_schema(path: Path) -> Dict[str, Any]:
