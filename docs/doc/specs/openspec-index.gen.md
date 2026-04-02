@@ -456,10 +456,15 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-notebooks-regression/spec.md)
 - Summary: 复用仓库 `notebooks` 下的 YAML DSL fixtures 作为 editor semantics core 的静态回归输入， 用于持续回归 diagnostics 与 Python 引用相关的 editor/LSP 操作，避免仅基于合成 YAML 导致的行为漂移。
 
+### `yaml-dsl-lsp-serve`
+- Title: yaml-dsl-lsp-serve Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-serve/spec.md)
+- Summary: 提供一个跨编辑器可复用的 YAML DSL LSP server 启动入口（默认 stdio），并约束其日志/降级行为， 以保证编辑器集成稳定且可排障。
+
 ### `yaml-dsl-lsp-server`
 - Title: yaml-dsl-lsp-server Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-server/spec.md)
-- Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
+- Summary: 定义 YAML DSL LSP server 的语义 contract：诊断（diagnostics）与 Python 引用的 definition/hover/completion，并要求 server 侧复用 shared core， 以保证跨编辑器一致、静态无副作用且可诊断降级（不 crash、不退出、不依赖 shell-out CLI）。
 
 ### `yaml-dsl-mainline-principles`
 - Title: yaml-dsl-mainline-principles Specification

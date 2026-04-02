@@ -13,6 +13,9 @@ dependencies = [
     "scalim",
 ]
 
+[project.scripts]
+scalim-yaml-dsl-lsp = "scalim_yaml_dsl_lsp.cli:main"
+
 [project.optional-dependencies]
 server = [
     "pygls>=2.1.1",
@@ -24,4 +27,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 sources = ["src"]
-

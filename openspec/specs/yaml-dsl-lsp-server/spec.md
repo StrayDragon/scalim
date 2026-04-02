@@ -1,7 +1,8 @@
 # yaml-dsl-lsp-server Specification
 
 ## Purpose
-TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
+定义 YAML DSL LSP server 的语义 contract：诊断（diagnostics）与 Python 引用的 definition/hover/completion，并要求 server 侧复用 shared core，
+以保证跨编辑器一致、静态无副作用且可诊断降级（不 crash、不退出、不依赖 shell-out CLI）。
 ## Requirements
 ### Requirement: YAML DSL LSP server MUST NOT shell out to CLI and MUST reuse scalim library semantics
 系统 MUST 定义并支持一个 YAML DSL 语义 LSP server,其实现约束如下:
@@ -43,6 +44,7 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 系统 MUST 为 `loader`/`call_by` 等 Python 引用字段提供 go-to-definition,且解析 MUST 为静态解析(不执行用户代码):
 
 - 引用格式 MUST 支持 `module:attr` 与 `module.attr`
+- 对 `call_by: "pkg.mod:fn(arg=...)"` 形态,definition 至少 MUST 能解析并处理 `pkg.mod:fn`（参数段忽略）
 - 定义定位 MUST 基于 project discovery 的 `python_roots` 与文件系统/AST 分析
 - 解析失败时 MUST 返回空结果且给出可诊断信息(不得 crash)
 
@@ -51,6 +53,28 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 - **WHEN** 用户触发 go-to-definition
 - **THEN** 系统 MUST 返回 `func` 定义所在文件与范围
 
+### Requirement: Hover MUST provide docstring for resolvable Python references and degrade gracefully
+系统 MUST 为 Python 引用字段提供 hover（docstring），且失败时 MUST 降级为“空结果 + warnings”（不得 crash）：
+
+- hover MUST 在可解析时返回 docstring（PlainText 即可）
+- 解析失败 MUST 返回空 hover，并包含可诊断 warnings
+
+#### Scenario: hover returns docstring
+- **GIVEN** YAML 中某字段引用 `pkg.mod:func`
+- **WHEN** 用户触发 hover
+- **THEN** 若可解析,系统 MUST 返回 `func` 的 docstring
+
+### Requirement: Completion MUST provide minimal symbol completions within Python reference strings
+系统 MUST 为 Python 引用字段提供最小 completion,并满足：
+
+- completion MUST 仅在光标位于引用字符串范围内触发（避免误触发）
+- 失败 MUST 降级为“空结果 + warnings”（不得 crash）
+
+#### Scenario: completion suggests symbols in module
+- **GIVEN** YAML 中某字段引用 `pkg.mod:`
+- **WHEN** 用户在引用字符串内触发 completion
+- **THEN** 系统 SHOULD 返回 `pkg.mod` 下的可用符号候选
+
 ### Requirement: LSP server MUST delegate editor semantics to shared core library
 系统 MUST 在 LSP server 内统一复用抽离后的 editor semantics core（`scalim-yaml-dsl-lsp`），作为 diagnostics/definition/completion 的语义 SSOT，避免在 server 层复制实现细节。
 
@@ -58,4 +82,3 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 - **WHEN** LSP server 收到 diagnostics 请求
 - **THEN** server MUST 调用 shared core 的 diagnostics API 产生结果
 - **AND** MUST NOT 在 server 层重复实现 validator/schema 规则
-
