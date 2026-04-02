@@ -416,6 +416,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-docs-skills-autogen-sync/spec.md)
 - Summary: TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update Purpose after archive.
 
+### `yaml-dsl-editor-project-discovery`
+- Title: yaml-dsl-editor-project-discovery Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-project-discovery/spec.md)
+- Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
+
 ### `yaml-dsl-file-resources`
 - Title: yaml-dsl-file-resources Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-file-resources/spec.md)
@@ -430,6 +435,11 @@ Sources:
 - Title: yaml-dsl-imports Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-imports/spec.md)
 - Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开),并在 schema/语义校验前完成展开. 说明: - `$import` 的允许范围以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`.
+
+### `yaml-dsl-lsp-server`
+- Title: yaml-dsl-lsp-server Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-server/spec.md)
+- Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
 
 ### `yaml-dsl-mainline-principles`
 - Title: yaml-dsl-mainline-principles Specification
@@ -480,6 +490,11 @@ Sources:
 - Title: yaml-dsl-unified-loader Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-unified-loader/spec.md)
 - Summary: TBD - created by archiving change c30-yaml-dsl-rigor-ssot. Update Purpose after archive.
+
+### `yaml-dsl-vscode-extension`
+- Title: yaml-dsl-vscode-extension Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-vscode-extension/spec.md)
+- Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
 
 ### `yaml-dsl-workflow`
 - Title: yaml-dsl-workflow Specification

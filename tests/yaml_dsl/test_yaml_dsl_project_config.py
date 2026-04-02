@@ -205,3 +205,102 @@ def test_project_config_project_root_override_must_contain_scalim_yaml(tmp_path:
     with pytest.raises(ValueError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand, project_root_override=other_root)
     assert "does not contain scalim.yaml" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_must_be_mapping(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor: 1\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "yaml_dsl.editor must be a mapping" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_allows_empty_mapping(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor: {}\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert cfg is not None
+    assert cfg.editor is not None
+    assert cfg.editor.python_roots == ()
+    assert cfg.editor.kind_overrides == ()
+
+
+def test_project_config_yaml_dsl_editor_python_roots_must_be_list(tmp_path: Path) -> None:
+    (tmp_path / "py").mkdir(parents=True)
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    python_roots: ./py\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "yaml_dsl.editor.python_roots must be a list" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_kind_overrides_must_be_list(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    kind_overrides: {}\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "yaml_dsl.editor.kind_overrides must be a list" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_kind_overrides_item_must_be_mapping(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    kind_overrides: [1]\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "yaml_dsl.editor.kind_overrides[0] must be a mapping" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_kind_overrides_rejects_unknown_keys(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n        extra: 1\n",
+        encoding="utf-8",
+    )
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "has unknown keys" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_kind_overrides_glob_must_be_non_empty(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text(
+        'yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: ""\n        kind: workflow\n',
+        encoding="utf-8",
+    )
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert ".glob must be a non-empty string" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_kind_overrides_rejects_invalid_kind(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: nope\n",
+        encoding="utf-8",
+    )
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(ValueError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "must be one of demand, workflow" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_editor_parses_python_roots_and_kind_overrides(tmp_path: Path) -> None:
+    (tmp_path / "py").mkdir(parents=True)
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  editor:\n    python_roots:\n      - ./py\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        encoding="utf-8",
+    )
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert cfg is not None
+    assert cfg.editor is not None
+    assert cfg.editor.python_roots == (tmp_path / "py",)
+    assert [(o.glob, o.kind) for o in cfg.editor.kind_overrides] == [("wf/*.yaml", "workflow")]

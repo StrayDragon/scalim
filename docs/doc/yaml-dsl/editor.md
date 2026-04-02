@@ -8,6 +8,42 @@
     - 仓库内的 Web 编辑器 `frontend/scalim-yaml-dsl-editor/` 已移除(后续计划以 LSP/IDE 集成为主)
     - 当前推荐路径: JSON Schema 补全/校验 + `scalim-cli` 做语义校验
 
+## 项目发现与文件识别
+
+编辑器/LSP 要想提供稳定的跳转与诊断,需要先确定:
+
+- `project root`(项目根)
+- `python_roots`(用于静态解析 `loader`/`call_by` 等 Python 引用的搜索根)
+- `allowed_yaml_roots`(用于限制 YAML imports 读取范围,避免越界)
+- 当前 YAML 属于 `demand` 还是 `workflow`(决定 schema/diagnostics 边界)
+
+当前 SSOT 是项目配置文件 `scalim.yaml`(nearest-wins):
+
+- 从入口 YAML 所在目录向上查找最近的 `scalim.yaml`
+- 若未找到,则以入口 YAML 所在目录作为默认 `project root`
+
+### `scalim.yaml` 的 editor 配置
+
+```yaml
+# scalim.yaml
+yaml_dsl:
+  editor:
+    # 可选: 用于静态解析 Python 引用的搜索根(相对 scalim.yaml 所在目录)
+    python_roots:
+      - .
+      - ./src
+
+    # 可选: 按文件路径覆盖 YAML 类型(demand/workflow),glob 相对 project root
+    kind_overrides:
+      - glob: "workflow/*.yaml"
+        kind: workflow
+```
+
+### 默认启发式(无覆盖时)
+
+- 当 YAML 根 mapping 包含键 `workflow` 且其值为 mapping 时,判定为 `workflow`
+- 否则判定为 `demand`
+
 ## Schema 补全/校验
 
 YAML DSL 的 canonical schema 生成物在:
@@ -35,9 +71,16 @@ just gen-yaml-dsl-schema
 scalim-cli yaml-dsl validate /path/to/config.yaml
 ```
 
-## LSP/IDE 集成(规划)
+## LSP/IDE 集成
 
-后续方向会以 LSP/IDE 插件替代仓库内 Web 编辑器; 设计讨论见:
+本仓库不交付 VSCode 扩展或 LSP server 的发行产物,但会提供:
 
-- `openspec/changes/c999-yaml-dsl-lsp/proposal.md`
-- `openspec/changes/c999-yaml-dsl-lsp/design.md`
+- `scalim.dsl.by_yaml.editor_semantics` 作为可复用的 editor/tooling 语义层 API(不调用 CLI)
+- `scalim.yaml` 的 project discovery/kind override 配置口径
+- `demand.gen.json` / `workflow.gen.json` schema 资源(供 `redhat.vscode-yaml` 绑定)
+
+相关规范(SSOT):
+
+- `openspec/specs/yaml-dsl-editor-project-discovery/spec.md`
+- `openspec/specs/yaml-dsl-lsp-server/spec.md`
+- `openspec/specs/yaml-dsl-vscode-extension/spec.md`

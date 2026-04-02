@@ -1,0 +1,494 @@
+import ast
+import importlib.abc
+import importlib.machinery
+import importlib.util
+import json
+import sys
+import textwrap
+from pathlib import Path
+
+import pytest
+
+import scalim.dsl.by_yaml.editor_semantics as editor_semantics
+from scalim.dsl.by_yaml.editor_semantics import (
+    PythonDefinitionLocation,
+    PythonDefinitionResult,
+    YamlDslEditorProjectDiscovery,
+)
+
+
+def _write(path: Path, text: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_discovery_zero_config_falls_back_to_entry_dir(tmp_path: Path) -> None:
+    yaml_path = _write(tmp_path / "demand.yaml", "name: demo\nsources: {}\n")
+    discovery = editor_semantics.discover_yaml_dsl_editor_project(yaml_path)
+    assert isinstance(discovery, YamlDslEditorProjectDiscovery)
+    assert discovery.scalim_yaml_path is None
+    assert discovery.project_root == tmp_path
+    assert discovery.python_roots == (tmp_path,)
+    assert discovery.allowed_yaml_roots == (tmp_path,)
+
+
+def test_discovery_nearest_wins_scalim_yaml_and_editor_python_roots(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    sub = repo / "sub"
+    entry_dir = sub / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    python_roots: [./py]\n",
+    )
+
+    (sub / "py").mkdir(parents=True)
+    (sub / "allowed").mkdir(parents=True)
+    _ = _write(
+        sub / "scalim.yaml",
+        "yaml_dsl:\n  import_allowed_roots: [./allowed]\n  editor:\n    python_roots: [./py]\n",
+    )
+
+    yaml_path = _write(entry_dir / "demand.yaml", "name: demo\nsources: {}\n")
+    discovery = editor_semantics.discover_yaml_dsl_editor_project(yaml_path)
+    assert discovery.scalim_yaml_path == sub / "scalim.yaml"
+    assert discovery.project_root == sub
+    assert discovery.python_roots == (sub / "py",)
+    assert set(discovery.allowed_yaml_roots) == {entry_dir, sub / "allowed"}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("workflow: {}\n", editor_semantics.YAML_DSL_KIND_WORKFLOW),
+        ("workflow: 1\n", editor_semantics.YAML_DSL_KIND_DEMAND),
+        ("workflow: [\n", editor_semantics.YAML_DSL_KIND_DEMAND),
+    ],
+)
+def test_classify_yaml_kind_heuristic(text: str, expected: str, tmp_path: Path) -> None:
+    yaml_path = tmp_path / "x.yaml"
+    assert editor_semantics.classify_yaml_dsl_kind(yaml_path, text) == expected
+
+
+def test_classify_yaml_kind_override_wins(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    wf_dir = repo / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_path = _write(wf_dir / "x.yaml", "name: demo\nsources: {}\n")
+    assert (
+        editor_semantics.classify_yaml_dsl_kind(
+            yaml_path,
+            yaml_path.read_text(encoding="utf-8"),
+        )
+        == editor_semantics.YAML_DSL_KIND_WORKFLOW
+    )
+
+
+def test_collect_demand_diagnostics_has_error_warning_and_range(tmp_path: Path) -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        observability: {}
+        main_source:
+          source_id: orders
+          loader: tests.fixtures.mock_loaders.mock_loader
+          unknown_field: 1
+        sources: {}
+        """
+    )
+    yaml_path = _write(tmp_path / "demand.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_DEMAND
+    assert result.errors
+    assert result.warnings
+
+    unknown = [d for d in result.errors if d.path == "main_source.unknown_field"]
+    assert unknown and unknown[0].range is not None
+    assert unknown[0].range.start.line == 6
+    assert unknown[0].range.start.column == 3
+
+    warn_paths = {w.path for w in result.warnings}
+    assert "observability" in warn_paths
+
+
+def test_collect_demand_diagnostics_import_expansion_error_is_reported(tmp_path: Path) -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source:
+          source_id: orders
+          loader: tests.fixtures.mock_loaders.mock_loader
+        sources: {}
+        $import: x.yaml
+        """
+    )
+    yaml_path = _write(tmp_path / "demand.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert any(d.code == "yaml_import_expansion_error" for d in result.errors)
+
+
+def test_collect_demand_diagnostics_reports_yaml_root_not_mapping(tmp_path: Path) -> None:
+    yaml_text = "[]\n"
+    yaml_path = _write(tmp_path / "demand.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert any(d.code == "yaml_root_not_mapping" for d in result.errors)
+
+
+def test_workflow_diagnostics_reports_schema_issue_and_unknown_fields(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    wf_dir = repo / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_text = "workflow: []\nbad: 1\n"
+    yaml_path = _write(wf_dir / "x.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_WORKFLOW
+    assert any("Schema validation error" in d.message for d in result.errors)
+    assert any("Unknown field" in d.message for d in result.errors)
+
+
+def test_workflow_diagnostics_warns_when_jsonschema_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = tmp_path / "repo"
+    wf_dir = repo / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_text = "workflow: []\nbad: 1\n"
+    yaml_path = _write(wf_dir / "x.yaml", yaml_text)
+    monkeypatch.setattr(editor_semantics, "import_jsonschema_module", lambda: None)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert any("jsonschema 不可用" in w.message for w in result.warnings)
+
+
+def test_workflow_diagnostics_parse_error_is_captured(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    wf_dir = repo / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_text = "workflow: [\n"
+    yaml_path = _write(wf_dir / "x.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert any(d.code == "yaml_parse_error" for d in result.errors)
+
+
+def test_workflow_diagnostics_handles_jsonschema_collector_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = tmp_path / "repo"
+    wf_dir = repo / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_text = "workflow: {}\nbad: 1\n"
+    yaml_path = _write(wf_dir / "x.yaml", yaml_text)
+
+    def _raise_collector(*_args, **_kwargs):
+        raise editor_semantics.ScalimJsonSchemaCollectorError("boom")
+
+    monkeypatch.setattr(editor_semantics, "collect_jsonschema_validation_issues", _raise_collector)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert any("boom" in w.message for w in result.warnings)
+
+    def _raise_unexpected(*_args, **_kwargs):
+        raise RuntimeError("nope")
+
+    monkeypatch.setattr(editor_semantics, "collect_jsonschema_validation_issues", _raise_unexpected)
+    result2 = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert any("Schema validation failed unexpectedly" in w.message for w in result2.warnings)
+
+
+def test_resolve_python_definition_and_hover_and_completion(tmp_path: Path) -> None:
+    pkg = tmp_path / "pkg"
+    _write(pkg / "__init__.py", "")
+    _write(
+        pkg / "mod.py",
+        textwrap.dedent(
+            """\
+            X = 1
+            Y: int = 2
+
+            def foo():
+                \"\"\"foo doc\"\"\"
+                return 1
+
+            class C:
+                \"\"\"C doc\"\"\"
+                Z = 1
+                W: int = 2
+
+                def m(self):
+                    \"\"\"m doc\"\"\"
+                    return 2
+            """
+        ),
+    )
+
+    definition = editor_semantics.resolve_python_definition("pkg.mod:foo", python_roots=[tmp_path])
+    assert definition.locations and definition.locations[0].file_path.endswith("pkg/mod.py")
+    assert definition.locations[0].range is not None
+
+    nested = editor_semantics.resolve_python_definition("pkg.mod:C.m", python_roots=[tmp_path])
+    assert nested.locations and nested.locations[0].symbol_path == "C.m"
+
+    hover = editor_semantics.hover_python_reference("pkg.mod:foo", python_roots=[tmp_path])
+    assert hover.text.strip() == "foo doc"
+
+    comp = editor_semantics.complete_python_reference("pkg.mod:", python_roots=[tmp_path])
+    assert "pkg.mod:foo" in comp.items
+    assert "pkg.mod:C" in comp.items
+
+    comp2 = editor_semantics.complete_python_reference("pkg.mod.f", python_roots=[tmp_path])
+    assert "pkg.mod.foo" in comp2.items
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "",
+        "^builtin/id",
+        "not-a-reference",
+        ".rel.mod:foo",
+    ],
+)
+def test_resolve_python_definition_failure_modes(reference: str, tmp_path: Path) -> None:
+    result = editor_semantics.resolve_python_definition(reference, python_roots=[tmp_path])
+    assert result.locations == ()
+    assert result.warnings
+
+
+def test_resolve_python_definition_module_origin_missing_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    missing_origin = str(tmp_path / "missing.py")
+    module_name = "missing_mod_for_test"
+
+    class _Finder(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname: str, path, target=None):  # noqa: ANN001
+            if fullname != module_name:
+                return None
+            spec = importlib.machinery.ModuleSpec(fullname, loader=None)
+            spec.origin = missing_origin  # type: ignore[assignment]
+            return spec
+
+    finder = _Finder()
+    monkeypatch.setattr(sys, "meta_path", [finder] + list(sys.meta_path))
+
+    result = editor_semantics.resolve_python_definition("{}:foo".format(module_name), python_roots=[tmp_path])
+    assert result.locations == ()
+    assert any("模块文件不存在" in w for w in result.warnings)
+
+
+def test_resolve_attr_path_node_read_and_syntax_error_branches(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    bad = _write(tmp_path / "bad.py", "def x(:\n")
+    parsed = editor_semantics.parse_python_reference("bad:x")
+    node, warn = editor_semantics._resolve_attr_path_node(bad, parsed)  # type: ignore[attr-defined]
+    assert node is None
+    assert "模块语法解析失败" in warn
+
+    def _boom(*_a, **_k):
+        raise OSError("boom")
+
+    monkeypatch.setattr(Path, "read_text", _boom)
+    node2, warn2 = editor_semantics._resolve_attr_path_node(bad, parsed)  # type: ignore[attr-defined]
+    assert node2 is None
+    assert "读取模块文件失败" in warn2
+
+
+def test_node_range_branches(tmp_path: Path) -> None:
+    assert editor_semantics._node_range(ast.AST()) is None  # type: ignore[attr-defined]
+
+    class _BadPos:
+        lineno = "x"
+        col_offset = 0
+        end_lineno = 1
+        end_col_offset = 0
+
+    assert editor_semantics._node_range(_BadPos()) is None  # type: ignore[arg-type]
+
+    node = ast.parse("x = 1").body[0]
+    rng = editor_semantics._node_range(node)  # type: ignore[attr-defined]
+    assert rng is not None
+    assert rng.end.column >= rng.start.column
+
+    class _NoEndPos:
+        lineno = 1
+        col_offset = 0
+
+    rng2 = editor_semantics._node_range(_NoEndPos())  # type: ignore[arg-type]
+    assert rng2 is not None
+    assert rng2.end.column >= rng2.start.column
+
+
+def test_list_module_symbols_error_branch(tmp_path: Path) -> None:
+    symbols, warn = editor_semantics._list_module_symbols(tmp_path / "missing.py")  # type: ignore[attr-defined]
+    assert symbols == ()
+    assert warn
+
+
+def test_hover_handles_parse_errors(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = PythonDefinitionResult(
+        locations=(PythonDefinitionLocation(file_path=str(tmp_path / "missing.py"), range=None, module_path="m", symbol_path="s"),),
+        warnings=(),
+    )
+    monkeypatch.setattr(editor_semantics, "resolve_python_definition", lambda *_a, **_k: fake)
+    result = editor_semantics.hover_python_reference("pkg.mod:foo", python_roots=[tmp_path])
+    assert result.text == ""
+    assert any("hover 解析失败" in w for w in result.warnings)
+
+
+def test_complete_python_reference_reports_missing_module_path(tmp_path: Path) -> None:
+    result = editor_semantics.complete_python_reference("nope", python_roots=[tmp_path])
+    assert result.items == ()
+    assert result.warnings
+
+
+def test_editor_semantics_as_dict_payloads_are_json_serializable(tmp_path: Path) -> None:
+    pos = editor_semantics.EditorPosition(line=1, column=2)
+    rng = editor_semantics.EditorRange(start=pos, end=editor_semantics.EditorPosition(line=1, column=3))
+    diag = editor_semantics.EditorDiagnostic(
+        severity="error",
+        message="m",
+        path="a.b",
+        source_path="x.yaml",
+        code="E1",
+        range=rng,
+        suggestions=("s1", "s2"),
+    )
+    discovery = editor_semantics.YamlDslEditorProjectDiscovery(
+        project_root=tmp_path,
+        scalim_yaml_path=tmp_path / "scalim.yaml",
+        python_roots=(tmp_path,),
+        allowed_yaml_roots=(tmp_path,),
+    )
+    result = editor_semantics.YamlDslEditorDiagnosticsResult(
+        yaml_kind=editor_semantics.YAML_DSL_KIND_DEMAND,
+        discovery=discovery,
+        errors=(diag,),
+        warnings=(),
+    )
+    loc = PythonDefinitionLocation(file_path=str(tmp_path / "m.py"), range=rng, module_path="m", symbol_path="s")
+    definition = PythonDefinitionResult(locations=(loc,), warnings=("warn",))
+    hover = editor_semantics.PythonHoverResult(text="t", warnings=("warn",))
+    completion = editor_semantics.PythonCompletionResult(items=("a",), warnings=("warn",))
+
+    payloads = [
+        pos.as_dict(),
+        rng.as_dict(),
+        diag.as_dict(),
+        discovery.as_dict(),
+        result.as_dict(),
+        loc.as_dict(),
+        definition.as_dict(),
+        hover.as_dict(),
+        completion.as_dict(),
+    ]
+    _ = json.dumps(payloads, ensure_ascii=False)
+
+
+def test_collect_yaml_dsl_editor_diagnostics_reads_file_when_yaml_text_missing(tmp_path: Path) -> None:
+    yaml_path = _write(tmp_path / "demand.yaml", "name: demo\nsources: {}\n")
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path)
+    assert result.discovery.project_root == tmp_path
+
+
+def test_classify_yaml_kind_override_outside_project_root_falls_back_to_heuristic(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    scalim_yaml = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: demand\n",
+    )
+    outside = _write(tmp_path / "outside.yaml", "workflow: {}\n")
+    kind = editor_semantics.classify_yaml_dsl_kind(outside, outside.read_text(encoding="utf-8"), scalim_yaml_override=scalim_yaml)
+    assert kind == editor_semantics.YAML_DSL_KIND_WORKFLOW
+
+
+def test_classify_yaml_kind_override_no_match_falls_back_to_heuristic(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    scalim_yaml = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_path = _write(repo / "demand.yaml", "name: demo\nsources: {}\n")
+    kind = editor_semantics.classify_yaml_dsl_kind(yaml_path, yaml_path.read_text(encoding="utf-8"), scalim_yaml_override=scalim_yaml)
+    assert kind == editor_semantics.YAML_DSL_KIND_DEMAND
+
+
+def test_resolve_python_definition_reports_builtin_module_origin(tmp_path: Path) -> None:
+    result = editor_semantics.resolve_python_definition("sys:path", python_roots=[tmp_path])
+    assert result.locations == ()
+    assert any("无法定位模块文件" in w for w in result.warnings)
+
+
+def test_resolve_python_definition_propagates_ast_parse_warning(tmp_path: Path) -> None:
+    _ = _write(tmp_path / "bad_mod.py", "def x(:\n")
+    result = editor_semantics.resolve_python_definition("bad_mod:foo", python_roots=[tmp_path])
+    assert result.locations == ()
+    assert any("模块语法解析失败" in w for w in result.warnings)
+    assert any("无法解析符号定义" in w for w in result.warnings)
+
+
+def test_hover_returns_warnings_when_definition_has_no_locations(tmp_path: Path) -> None:
+    result = editor_semantics.hover_python_reference("", python_roots=[tmp_path])
+    assert result.text == ""
+    assert any("引用不能为空" in w for w in result.warnings)
+
+
+def test_hover_reports_reference_syntax_error_after_forced_location(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    mod = _write(tmp_path / "m.py", "x = 1\n")
+    fake = PythonDefinitionResult(
+        locations=(PythonDefinitionLocation(file_path=str(mod), range=None, module_path="m", symbol_path="x"),),
+        warnings=("from-resolve",),
+    )
+    monkeypatch.setattr(editor_semantics, "resolve_python_definition", lambda *_a, **_k: fake)
+    result = editor_semantics.hover_python_reference("not-a-reference", python_roots=[tmp_path])
+    assert result.text == ""
+    assert result.warnings
+
+
+def test_hover_returns_empty_text_when_symbol_missing_after_forced_location(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    mod = _write(tmp_path / "m.py", "def foo():\n    return 1\n")
+    fake = PythonDefinitionResult(
+        locations=(PythonDefinitionLocation(file_path=str(mod), range=None, module_path="m", symbol_path="foo"),),
+        warnings=(),
+    )
+    monkeypatch.setattr(editor_semantics, "resolve_python_definition", lambda *_a, **_k: fake)
+    result = editor_semantics.hover_python_reference("m:missing", python_roots=[tmp_path])
+    assert result.text == ""
+
+
+def test_complete_python_reference_reports_builtin_module_origin(tmp_path: Path) -> None:
+    result = editor_semantics.complete_python_reference("sys:", python_roots=[tmp_path])
+    assert result.items == ()
+    assert any("无法定位模块文件" in w for w in result.warnings)
+
+
+def test_complete_python_reference_reports_module_ast_parse_failure(tmp_path: Path) -> None:
+    _ = _write(tmp_path / "bad_comp.py", "def x(:\n")
+    result = editor_semantics.complete_python_reference("bad_comp:", python_roots=[tmp_path])
+    assert result.items == ()
+    assert any("completion 解析失败" in w for w in result.warnings)
+
+
+def test_find_spec_returns_none_on_exception(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def _boom(*_a, **_k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(importlib.util, "find_spec", _boom)
+    spec = editor_semantics._find_spec("x", roots=(tmp_path,))  # type: ignore[attr-defined]
+    assert spec is None
+
+
+def test_find_symbol_in_module_branches() -> None:
+    tree = ast.parse("def foo():\n    return 1\n\nclass C:\n    def m(self):\n        return 2\n")
+    assert editor_semantics._find_symbol_in_module(tree, ()) is None  # type: ignore[attr-defined]
+    assert editor_semantics._find_symbol_in_module(tree, ("nope",)) is None  # type: ignore[attr-defined]
+
+    node = editor_semantics._find_symbol_in_module(tree, ("foo", "bar"))  # type: ignore[attr-defined]
+    assert isinstance(node, ast.FunctionDef)
+
+    assert editor_semantics._find_symbol_in_module(tree, ("C", "missing")) is None  # type: ignore[attr-defined]
