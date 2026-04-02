@@ -1158,6 +1158,55 @@ def _effective_outputs_for_workflow_compile(  # noqa: C901
     return tuple(outputs)
 
 
+def _build_write_node_for_book(
+    *,
+    node_id: str,
+    decl_order: int,
+    deps: Sequence[str],
+    book_id: str,
+    sheet_name: str,
+    input_node_id: str,
+    input_output_id: str,
+    mode: str,
+    write_defaults: object,
+    write_defaults_mode_path: str,
+) -> WorkflowAnyNodeIr:
+    effective_defaults = cast("Any", write_defaults)  # pragma: allow-cast write defaults typed boundary
+
+    if mode == "sheet":
+        return WriteSheetNodeIr(
+            node_id=str(node_id),
+            node_type=WorkflowNodeType.WRITE_SHEET,
+            decl_order=int(decl_order),
+            deps=tuple(deps),
+            resource_type="book",
+            resource_id=str(book_id),
+            sheet=str(sheet_name),
+            input_node_id=str(input_node_id),
+            input_output_id=str(input_output_id),
+            on_conflict=str(effective_defaults.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT),
+        )
+
+    if mode == "append":
+        return AppendSheetNodeIr(
+            node_id=str(node_id),
+            node_type=WorkflowNodeType.APPEND_SHEET,
+            decl_order=int(decl_order),
+            deps=tuple(deps),
+            resource_type="book",
+            resource_id=str(book_id),
+            sheet=str(sheet_name),
+            input_node_id=str(input_node_id),
+            input_output_id=str(input_output_id),
+            align_by=str(effective_defaults.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY),
+            header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
+            on_mismatch=str(effective_defaults.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH),
+        )
+
+    msg = "Unsupported books.write_defaults.mode={!r} (book_id={!r})".format(str(mode), str(book_id))
+    raise ScalimWorkflowConfigError(msg, path=str(write_defaults_mode_path))
+
+
 def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     wf_obj: WorkflowConfig,
     *,
@@ -1245,38 +1294,18 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 write_deps.append(str(prev_write_id))
             last_write_node_id_by_book_id[str(book_id)] = str(node_id)
 
-            node: WorkflowAnyNodeIr
-            if mode == "sheet":
-                node = WriteSheetNodeIr(
-                    node_id=str(node_id),
-                    node_type=WorkflowNodeType.WRITE_SHEET,
-                    decl_order=int(decl_order),
-                    deps=tuple(write_deps),
-                    resource_type="book",
-                    resource_id=str(book_id),
-                    sheet=str(sheet_name),
-                    input_node_id=str(run.id),
-                    input_output_id=str(out_cfg.name),
-                    on_conflict=str(effective_defaults.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT),
-                )
-            elif mode == "append":
-                node = AppendSheetNodeIr(
-                    node_id=str(node_id),
-                    node_type=WorkflowNodeType.APPEND_SHEET,
-                    decl_order=int(decl_order),
-                    deps=tuple(write_deps),
-                    resource_type="book",
-                    resource_id=str(book_id),
-                    sheet=str(sheet_name),
-                    input_node_id=str(run.id),
-                    input_output_id=str(out_cfg.name),
-                    align_by=str(effective_defaults.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY),
-                    header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
-                    on_mismatch=str(effective_defaults.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH),
-                )
-            else:
-                msg = "Unsupported books.write_defaults.mode={!r} (book_id={!r})".format(mode, str(book_id))
-                raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}.write_defaults.mode".format(str(book_id)))
+            node = _build_write_node_for_book(
+                node_id=str(node_id),
+                decl_order=int(decl_order),
+                deps=tuple(write_deps),
+                book_id=str(book_id),
+                sheet_name=str(sheet_name),
+                input_node_id=str(run.id),
+                input_output_id=str(out_cfg.name),
+                mode=str(mode),
+                write_defaults=effective_defaults,
+                write_defaults_mode_path="workflow.resources.books.{}.write_defaults.mode".format(str(book_id)),
+            )
 
             nodes.append(node)
             for dep_id in write_deps:
@@ -1357,39 +1386,18 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                     write_deps.append(str(prev_write_id))
                 last_write_node_id_by_book_id[str(default_book_id)] = str(node_id)
 
-                if mode == "sheet":
-                    node = WriteSheetNodeIr(
-                        node_id=str(node_id),
-                        node_type=WorkflowNodeType.WRITE_SHEET,
-                        decl_order=int(decl_order),
-                        deps=tuple(write_deps),
-                        resource_type="book",
-                        resource_id=str(default_book_id),
-                        sheet=str(sheet_name),
-                        input_node_id=str(run.id),
-                        input_output_id=str(extra_id),
-                        on_conflict=str(effective_defaults.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT),
-                    )
-                elif mode == "append":
-                    node = AppendSheetNodeIr(
-                        node_id=str(node_id),
-                        node_type=WorkflowNodeType.APPEND_SHEET,
-                        decl_order=int(decl_order),
-                        deps=tuple(write_deps),
-                        resource_type="book",
-                        resource_id=str(default_book_id),
-                        sheet=str(sheet_name),
-                        input_node_id=str(run.id),
-                        input_output_id=str(extra_id),
-                        align_by=str(effective_defaults.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY),
-                        header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
-                        on_mismatch=str(effective_defaults.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH),
-                    )
-                else:
-                    msg = "Unsupported books.write_defaults.mode={!r} (book_id={!r})".format(mode, str(default_book_id))
-                    raise ScalimWorkflowConfigError(
-                        msg, path="workflow.resources.books.{}.write_defaults.mode".format(str(default_book_id))
-                    )
+                node = _build_write_node_for_book(
+                    node_id=str(node_id),
+                    decl_order=int(decl_order),
+                    deps=tuple(write_deps),
+                    book_id=str(default_book_id),
+                    sheet_name=str(sheet_name),
+                    input_node_id=str(run.id),
+                    input_output_id=str(extra_id),
+                    mode=str(mode),
+                    write_defaults=effective_defaults,
+                    write_defaults_mode_path="workflow.resources.books.{}.write_defaults.mode".format(str(default_book_id)),
+                )
 
                 nodes.append(node)
                 for dep_id in write_deps:
