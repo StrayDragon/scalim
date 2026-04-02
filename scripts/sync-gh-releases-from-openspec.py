@@ -443,15 +443,15 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     def _tok_is_surface(tok: str) -> bool:
         t = tok.strip()
         lower = t.lower()
-        # 过滤文件路径/源码文件/生成物路径等非 YAML authoring surface token。
+        # 过滤文件路径/源码文件/生成物路径等非 `YAML` 编写面 `token`。
         if "/" in t or "\\" in t:
             return False
         if re.search(r"\.(py|ts|md|json|yaml|yml)$", lower):
             return False
-        # `RunOverrides.outputs_defaults` / `Decimal` 这类更像 API/类型名，不是 YAML key path。
+        # `RunOverrides.outputs_defaults` / `Decimal` 这类更像 `API`/类型名，不是 `YAML` 键路径。
         if t and t[0].isupper() and "[*]" not in t and "$" not in t:
             return False
-        # `overrides.*` 是运行期 Python entrypoints 的覆写入口，不是作者写在 YAML 里的主线 surface。
+        # `overrides.*` 是运行期 `Python` 入口的覆写，不是作者写在 `YAML` 里的主线编写面。
         if lower.startswith("overrides.") or lower.startswith("runoverrides"):
             return False
         if "[*]" in t or "$" in t:
@@ -534,7 +534,9 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             return True
         if "schema" in lower and ("变更" in text or "更名" in text or "移除" in text or "删除" in text):
             return True
-        if "authoring surface" in lower and ("变更" in text or "更名" in text or "移除" in text or "移出" in text or "迁出" in text or "删除" in text):
+        if "authoring surface" in lower and (
+            "变更" in text or "更名" in text or "移除" in text or "移出" in text or "迁出" in text or "删除" in text
+        ):
             return True
         if "旧写法" in text and ("失败" in text or "fail-fast" in lower):
             return True
@@ -560,22 +562,24 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
 
-        # workflow waiter 默认超时策略：优先抽成可执行的升级指令（避免落到“按提案升级”的低信息量兜底）。
+        # 工作流等待器默认超时策略：优先抽成可执行的升级指令（避免落到“按提案升级”的低信息量兜底）。
         if "max_wait_s" in cleaned and "`workflow.options.resources_wait`" in proposal_text:
             match = re.search(r"max_wait_s\s*=\s*(\d+)", cleaned)
             if match:
                 secs = match.group(1)
-                instructions.append("把 `workflow.options.resources_wait.max_wait_s` 配成你需要的值（默认 {}s，超时会 fail-fast）。".format(secs))
+                instructions.append(
+                    "把 `workflow.options.resources_wait.max_wait_s` 配成你需要的值（默认 {}s，超时会 fail-fast）。".format(secs)
+                )
             else:
                 instructions.append("把 `workflow.options.resources_wait.max_wait_s` 配成你需要的值（超时会 fail-fast）。")
             continue
 
-        # xlsx_memory + align_by=header（破坏性语义收紧）
+        # `xlsx_memory` + `align_by=header`（破坏性语义收紧）
         if "xlsx_memory" in cleaned and ("align_by=header" in cleaned or "align_by: header" in cleaned):
             instructions.append("不要再用 `xlsx_memory + align_by=header`；改为按 canonical field key 对齐（旧写法会 fail-fast）。")
             continue
 
-        # outputs_defaults -> outputs[*].to.book（带迁移方向的一句）
+        # `outputs_defaults` -> `outputs[*].to.book`（带迁移方向的一句）
         if "`outputs_defaults.to.book`" in cleaned and "`outputs[*].to.book`" in cleaned:
             reuse_hint = ""
             if "anchors" in proposal_text or "`$import`" in proposal_text or "$import" in proposal_text:
@@ -583,15 +587,17 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             instructions.append("把 `outputs_defaults.to.book` 迁移为每个输出显式写 `outputs[*].to.book`{}。".format(reuse_hint))
             continue
 
-        # CSV container -> resources.files + to.file + write（旧写法 fail-fast）
+        # `CSV` 容器 -> `resources.files` + `to.file` + `write`（旧写法会 `fail-fast`）
         if "`outputs[*].container`" in cleaned:
             instructions.append(
                 "把 CSV 的 `outputs[*].container` 迁移为 `resources.files` + `outputs[*].to.file` + `outputs[*].write`（旧写法会 fail-fast）。"
             )
             continue
 
-        # observability.* 迁出 YAML：直接给出迁移方向。
-        if "`observability.*`" in cleaned and ("移出" in cleaned or "迁到" in cleaned or "迁出" in cleaned or "migration" in cleaned.lower()):
+        # `observability.*` 迁出 `YAML`：直接给出迁移方向。
+        if "`observability.*`" in cleaned and (
+            "移出" in cleaned or "迁到" in cleaned or "迁出" in cleaned or "migration" in cleaned.lower()
+        ):
             instructions.append("不要再用 `observability.*`；迁移到 Python / CLI 的运行入口配置。")
             continue
 
@@ -731,7 +737,7 @@ def _score_change(change: _Change) -> int:
         score += 50
     if "imports" in cid or "relative-import" in cid:
         score += 40
-    # `output`/`outputs`/`aggregate` 都算“输出 authoring surface”一类。
+    # `output`/`outputs`/`aggregate` 都算“输出编写面”一类。
     if "outputs" in cid or "output" in cid or "aggregate" in cid or "derived-outputs" in cid:
         score += 30
     if "workflow" in cid:
@@ -750,7 +756,7 @@ def _score_change(change: _Change) -> int:
         score -= 50
     if "frontend" in cid:
         score += 30
-    # docs drift/hygiene 在多数 release 中不应盖过“写法/行为”变更：仅在缺少其它变化时才上榜。
+    # 文档漂移/卫生在多数发布中不应盖过“写法/行为”变更：仅在缺少其它变化时才上榜。
     if "docs-consistency" in cid or "docs" in cid:
         score -= 80
     if "marimo" in cid:
