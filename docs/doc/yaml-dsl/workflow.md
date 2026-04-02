@@ -344,6 +344,77 @@ for outcome in result.outcomes:
         print("OK:", outcome.run_id, outcome.result.total_rows)
 ```
 
+### 7.1) `run_patches_by_id`: per-run runtime policy(按 run id 注入差异化运行策略)
+
+当 workflow DAG 中存在多个 runs 时,真实生产场景往往需要“不同 run 使用不同运行策略”:
+
+- `batch_size`: 有的 run 更适合小批降低内存峰值,有的 run 更适合大批提升吞吐
+- `components`: 仅对某个 run 追加调试 observer/hook(不污染整张图)
+- `guardrails/loader_retry/overrides`: 对特定 run 单独加强或关闭
+
+使用方式:在 Python 入口 `run_workflow(..., run_patches_by_id=...)` 中按 `workflow.runs[*].id` 提供 patch:
+
+- key: `workflow.runs[*].id`(字符串)
+- value: **typed** 的 `WorkflowRunPatch`(不支持 dict 形状 patch)
+- patch 优先级高于 `run_workflow(...)` 的全局参数
+- omission / `UNSET` 表示继承;`None` 在支持的字段上表示显式禁用
+
+示例 1: per-run `batch_size` 覆盖全局默认
+
+```python
+from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+
+run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    batch_size=2000,  # 全局默认
+    run_patches_by_id={
+        "d10_paid_orders": WorkflowRunPatch(batch_size=5000),  # 仅该 run 用更大 batch
+    },
+)
+```
+
+示例 2: 仅对某个 run 追加一个调试组件(append,保序)
+
+```python
+from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml.workflow_types import ComponentsExtend, WorkflowRunPatch
+
+run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    components=[my_prod_observer],
+    run_patches_by_id={
+        "d70_summary_ranking": WorkflowRunPatch(
+            components=ComponentsExtend([my_debug_observer]),
+        ),
+    },
+)
+```
+
+示例 3: 对单个 run 显式禁用全局 `batch_size`(该 run 不分批)
+
+```python
+from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+
+run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    batch_size=2000,
+    run_patches_by_id={
+        "d20_registered_users": WorkflowRunPatch(batch_size=None),
+    },
+)
+```
+
+常见错误与诊断:
+
+- unknown run id: fail-fast 并列出当前 workflow 的合法 ids
+- dict patch payload: `run_patches_by_id={"A": {"batch_size": 5000}}` 会报错;请改为 `WorkflowRunPatch(batch_size=5000)`
+- 安全边界(`allowed_modules/allowed_functions/resolver_trusted_mode`)不允许在 per-run patch 中覆盖;只能通过 `run_workflow(...)` 全局参数提供
+
 失败策略:
 
 - `all_fail`: 任一 run 失败会抛出异常(包装为 `WorkflowRunFailedError`,并通过 `__cause__` 关联原异常)

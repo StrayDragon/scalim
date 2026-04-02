@@ -11,6 +11,7 @@ description: |
 
 # NOTE: `batch_size` moved out of YAML runtime policy boundary.
 # Pass via workflow runtime entrypoints, e.g. `run_workflow(..., batch_size=30)`.
+# If different runs need different runtime policies, use `run_workflow(..., run_patches_by_id={"<run_id>": WorkflowRunPatch(batch_size=...)})`.
 
 main_source:
   source_id: orders

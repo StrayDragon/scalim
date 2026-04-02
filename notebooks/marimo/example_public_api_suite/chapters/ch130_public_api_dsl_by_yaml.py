@@ -2,7 +2,7 @@ import marimo
 
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, FrozenSet
+from typing import Any, Dict, FrozenSet, Optional, Set
 
 from scalim.dsl import by_yaml as api
 from scalim.sinks import InMemoryRowSink
@@ -33,6 +33,8 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
     from scalim.dsl.by_yaml import workflow as workflow_api
     from scalim.dsl.by_yaml import workflow_paths as workflow_paths_api
     from scalim.dsl.by_yaml import workflow_types as workflow_types_api
+    from scalim.events import EVENT_PIPELINE_START, WORKFLOW_NODE_ID_META_KEY
+    from scalim.ob.observer import Observer
     from scalim.spec import ir as spec_ir_api
     from scalim.workflow import loaders as workflow_loaders_api
 
@@ -55,6 +57,22 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
 
     symbols = {name: getattr(api, name) for name in api.__all__}
     _ = symbols.get("UNSET")
+
+    class _WorkflowBatchSizeObserver(Observer):
+        def __init__(self) -> None:
+            self.event_types: Optional[Set[str]] = {EVENT_PIPELINE_START}
+            self.batch_size_by_workflow_node_id: Dict[str, Optional[int]] = {}
+
+        def on_event(self, event: Any) -> None:
+            if getattr(event, "event_type", None) != EVENT_PIPELINE_START:
+                return
+            meta = getattr(event, "meta", None) or {}
+            raw_node_id = meta.get(WORKFLOW_NODE_ID_META_KEY)
+            if not raw_node_id:
+                return
+            payload = getattr(event, "payload", None)
+            batch_size = getattr(payload, "batch_size", None)
+            self.batch_size_by_workflow_node_id[str(raw_node_id)] = None if batch_size is None else int(batch_size)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
@@ -137,13 +155,19 @@ workflow:
             )
 
         reset_preload_counter_calls()
+        workflow_batch_size_observer = _WorkflowBatchSizeObserver()
         wf = api.run_workflow(
             str(workflow_path),
             allowed_modules=_ALLOWED_MODULES,
+            components=[workflow_batch_size_observer],
             max_workers=0,
             init_vars=init_vars,
             batch_size=2,
+            run_patches_by_id={
+                "r1": workflow_types_api.WorkflowRunPatch(batch_size=5),
+            },
         )
+        workflow_batch_sizes = dict(workflow_batch_size_observer.batch_size_by_workflow_node_id)
         preload_calls = get_preload_counter_calls()
         errors = wf.errors()
         passed = bool(
@@ -151,9 +175,17 @@ workflow:
             and preload_calls == 1
             and len(wf.outcomes) == _EXPECTED_WORKFLOW_RUNS
             and [o.run_id for o in wf.outcomes] == ["r1", "r2"]
+            and workflow_batch_sizes.get("r1") == 5
+            and workflow_batch_sizes.get("r2") == 2
             and rows[0].get("item_id") == 1
         )
-        summary = "rows={} workflow_outcomes={} preload_calls={} errors={}".format(len(rows), len(wf.outcomes), preload_calls, len(errors))
+        summary = "rows={} workflow_outcomes={} preload_calls={} batch_sizes={} errors={}".format(
+            len(rows),
+            len(wf.outcomes),
+            preload_calls,
+            workflow_batch_sizes,
+            len(errors),
+        )
         if errors:
             summary = summary + "\nfirst_error: {} {}".format(errors[0].exc_type, errors[0].message)
 
@@ -161,6 +193,7 @@ workflow:
             "rows": len(rows),
             "run_total_rows": int(run_result.total_rows),
             "workflow_outcomes": wf.outcomes,
+            "workflow_batch_sizes": workflow_batch_sizes,
             "preload_calls": preload_calls,
             "errors": errors,
             "touched_public_all": all_touched,

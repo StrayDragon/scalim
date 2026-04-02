@@ -35,6 +35,7 @@ from .schema_dsl.models import BookConfig, DemandConfig, FileConfig, ResourcesCo
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
 from .workflow_load import load_workflow_config_from_path
+from .workflow_types import ComponentsExtend, ComponentsInherit, ComponentsReplace, WorkflowRunPatch
 
 _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = "workflow bundle viz requires run_workflow(..., overrides=RunOverrides(viz_config=...))"
 
@@ -211,6 +212,82 @@ def _merge_node_overrides(
     return replace(base_overrides, resources=merged_resources)
 
 
+def _validate_run_patches_by_id(
+    patches: Optional[Mapping[str, object]],
+    *,
+    known_run_ids: FrozenSet[str],
+) -> Optional[Mapping[str, WorkflowRunPatch]]:
+    if patches is None:
+        return None
+    items = patches.items()
+
+    unknown: List[str] = []
+    typed: Dict[str, WorkflowRunPatch] = {}
+    for raw_run_id, raw_patch in items:
+        if not isinstance(raw_run_id, str):
+            msg = "run_patches_by_id keys must be workflow run ids (str)"
+            raise TypeError(msg)
+        run_id = raw_run_id
+        if run_id not in known_run_ids:
+            unknown.append(run_id)
+            continue
+
+        if isinstance(raw_patch, dict):
+            msg = (
+                "run_patches_by_id['{}'] must be a typed WorkflowRunPatch (dict patches are not supported). "
+                "Example: run_patches_by_id={{'{}': WorkflowRunPatch(batch_size=5000)}}".format(run_id, run_id)
+            )
+            raise TypeError(msg)
+        if not isinstance(raw_patch, WorkflowRunPatch):
+            msg = "run_patches_by_id['{}'] must be a WorkflowRunPatch".format(run_id)
+            raise TypeError(msg)
+        typed[run_id] = raw_patch
+
+    if unknown:
+        known_ids_text = ", ".join(sorted(known_run_ids))
+        msg = "Unknown workflow run id(s) in run_patches_by_id: {}. Known run ids: {}".format(", ".join(sorted(unknown)), known_ids_text)
+        raise ScalimWorkflowConfigError(msg, path="run_workflow.run_patches_by_id")
+
+    return typed
+
+
+def _apply_workflow_run_patch(base: RunOptions, patch: WorkflowRunPatch) -> RunOptions:
+    next_options = base
+
+    batch_size = patch.batch_size
+    if not isinstance(batch_size, UnsetType):
+        next_options = replace(next_options, batch_size=batch_size)
+
+    demand_failure_policy = patch.demand_failure_policy
+    if not isinstance(demand_failure_policy, UnsetType):
+        next_options = replace(next_options, demand_failure_policy=demand_failure_policy)
+
+    guardrails = patch.guardrails
+    if not isinstance(guardrails, UnsetType):
+        next_options = replace(next_options, guardrails=guardrails)
+
+    loader_retry = patch.loader_retry
+    if not isinstance(loader_retry, UnsetType):
+        next_options = replace(next_options, loader_retry=loader_retry)
+
+    overrides = patch.overrides
+    if not isinstance(overrides, UnsetType):
+        next_options = replace(next_options, overrides=overrides)
+
+    components_patch = patch.components
+    if isinstance(components_patch, ComponentsInherit):
+        return next_options
+    if isinstance(components_patch, ComponentsReplace):
+        return replace(next_options, components=list(components_patch.items))
+    if isinstance(components_patch, ComponentsExtend):
+        merged = list(next_options.components or [])
+        merged.extend(list(components_patch.items))
+        return replace(next_options, components=merged)
+
+    msg = "WorkflowRunPatch.components must be one of ComponentsInherit/ComponentsReplace/ComponentsExtend"
+    raise TypeError(msg)
+
+
 if TYPE_CHECKING:
     from ...execution.guardrails import GuardrailsPolicy
     from ...execution.loader_retry import LoaderRetryPoliciesSpec
@@ -257,6 +334,7 @@ def run_workflow(  # noqa: PLR0913
     guardrails: Optional["GuardrailsPolicy"] = None,
     loader_retry: Optional["LoaderRetryPoliciesSpec"] = None,
     batch_size: Union[Optional[int], UnsetType] = UNSET,
+    run_patches_by_id: Optional[Mapping[str, WorkflowRunPatch]] = None,
     demand_failure_policy: Optional[str] = None,
     workflow_resources_wait: Optional["WorkflowResourcesWaitOptions"] = None,
     workflow_output_staging: Optional["WorkflowOutputStagingOptions"] = None,
@@ -326,6 +404,8 @@ def run_workflow(  # noqa: PLR0913
         allowed_yaml_roots=allowed_yaml_roots,
     )
     workflow_resources_override = _workflow_resources_override(wf)
+    run_ids = frozenset(run.id for run in wf.runs)
+    run_patches_by_id = _validate_run_patches_by_id(run_patches_by_id, known_run_ids=run_ids)
 
     if compile_demand_yaml_fn is None:
         compile_demand_yaml_fn = _compile_demand_default
@@ -360,6 +440,11 @@ def run_workflow(  # noqa: PLR0913
                 viz_config=viz_config,
             )
             node_options = replace(node_options, overrides=base_overrides)
+
+        if run_patches_by_id is not None:
+            patch = run_patches_by_id.get(str(workflow_node_id))
+            if patch is not None:
+                node_options = _apply_workflow_run_patch(node_options, patch)
 
         merged_overrides = _merge_node_overrides(
             node_options.overrides,

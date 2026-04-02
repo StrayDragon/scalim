@@ -351,6 +351,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-replay-bundle/spec.md)
 - Summary: TBD - created by archiving change c10-workflow-viz-linked-replay. Update Purpose after archive.
 
+### `workflow-run-patches`
+- Title: workflow-run-patches Specification
+- Source: [spec.md](#code=openspec/specs/workflow-run-patches/spec.md)
+- Summary: TBD - created by archiving change c61-workflow-run-patches-by-id. Update Purpose after archive.
+
 ### `workflow-runtime-module-organization`
 - Title: workflow-runtime-module-organization Specification
 - Source: [spec.md](#code=openspec/specs/workflow-runtime-module-organization/spec.md)
@@ -465,6 +470,11 @@ Sources:
 - Title: yaml-dsl-output-overrides Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-output-overrides/spec.md)
 - Summary: **状态: ✅ 已实现** 为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。
+
+### `yaml-dsl-project-config-schema`
+- Title: yaml-dsl-project-config-schema Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-project-config-schema/spec.md)
+- Summary: 为项目级配置文件 `scalim.yaml` 提供自动生成的 JSON Schema，以获得与 demand/workflow 类似的编辑器补全与 schema-only 校验体验，并将其纳入同一条“SSOT → 生成物 → drift gate”的治理链路。 该 schema 仅描述 **单个** `scalim.yaml` 文件的结构，不改变 `scalim.yaml` 的可选性与 nearest-wins discovery 语义。
 
 ### `yaml-dsl-public-tools`
 - Title: yaml-dsl-public-tools Specification

@@ -92,6 +92,7 @@ run_workflow(
 
 - 确保 `depends_on` 里每个 id 都存在于 `workflow.runs[*].id`
 - 如果有环,按业务语义拆开或改写依赖方向
+- 如果你在 Python 入口使用了 `run_workflow(..., run_patches_by_id=...)`,也必须保证 `run_patches_by_id` 的 keys 都是合法的 `workflow.runs[*].id`(否则同样会 fail-fast 并列出已知 ids)。
 
 ### 4) `$ctx` 引用越界(不在 deps 可见范围)
 

@@ -6,8 +6,12 @@ from typing import Any, Dict, List, Optional, cast
 import pytest
 
 from scalim.dsl.by_yaml import RunOverrides
+from scalim.dsl.by_yaml import FileResourceOverride
 from scalim.dsl.by_yaml import OutputExtrasOverride
+from scalim.dsl.by_yaml import ResourcesOverride
 from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml.runtime import compiler as by_yaml_compiler_mod
+from scalim.dsl.by_yaml.workflow_types import ComponentsExtend, ComponentsReplace, WorkflowRunPatch
 from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
 from scalim.exceptions import ScalimInternalError
 from scalim.workflow import execute as workflow_execute_mod
@@ -873,6 +877,242 @@ def test_run_workflow_accepts_overrides_default_unset(tmp_path: Path) -> None:
 
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, overrides=RunOverrides())
     assert [o.run_id for o in result.outcomes] == ["ok"]
+
+
+def test_run_workflow_run_patches_by_id_batch_size_overrides_global(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    seen_batch_size_by_name: Dict[str, object] = {}
+
+    def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
+        seen_batch_size_by_name[Path(str(yaml_path)).name] = options.batch_size
+        return by_yaml_compiler_mod.compile(yaml_path, options=options)
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        batch_size=2000,
+        run_patches_by_id={"a": WorkflowRunPatch(batch_size=5000)},
+        compile_demand_yaml_fn=_compile_with_capture,
+    )
+    assert not result.errors()
+    assert seen_batch_size_by_name["a.yaml"] == 5000
+    assert seen_batch_size_by_name["b.yaml"] == 2000
+
+
+def test_run_workflow_run_patches_by_id_rejects_unknown_id(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            run_patches_by_id={"nope": WorkflowRunPatch(batch_size=5000)},
+        )
+    assert "nope" in str(excinfo.value)
+    assert "ok" in str(excinfo.value)
+
+
+def test_run_workflow_run_patches_by_id_rejects_dict_patch_payload(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    with pytest.raises(TypeError, match=r"dict patches are not supported"):
+        _ = run_workflow(  # type: ignore[arg-type] intentional runtime boundary test
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            run_patches_by_id={"ok": {"batch_size": 5000}},
+        )
+
+
+def test_run_workflow_run_patches_by_id_components_extend_and_replace(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    base = _WorkflowEventRecorder()
+    extra = _WorkflowEventRecorder()
+
+    seen_components_by_name: Dict[str, object] = {}
+
+    def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
+        seen_components_by_name[Path(str(yaml_path)).name] = list(options.components or [])
+        return by_yaml_compiler_mod.compile(yaml_path, options=options)
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        components=[base],
+        run_patches_by_id={
+            "a": WorkflowRunPatch(components=ComponentsExtend([extra])),
+            "b": WorkflowRunPatch(components=ComponentsReplace(())),
+        },
+        compile_demand_yaml_fn=_compile_with_capture,
+    )
+    assert not result.errors()
+    assert seen_components_by_name["a.yaml"] == [base, extra]
+    assert seen_components_by_name["b.yaml"] == []
+
+
+def test_run_workflow_run_patches_by_id_overrides_precedence_over_workflow_resources_and_global_overrides(tmp_path: Path) -> None:
+    _ = _write_text(
+        tmp_path / "a.yaml",
+        (
+            """
+name: a
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id:
+      extract: id
+    value:
+      extract: value
+
+outputs:
+  - name: detail
+    to:
+      file: detail_a
+    fields: ["id", "value"]
+"""
+        ).lstrip(),
+    )
+    _ = _write_text(
+        tmp_path / "b.yaml",
+        (
+            """
+name: b
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_b_fast"
+  fields:
+    id:
+      extract: id
+    value:
+      extract: value
+
+outputs:
+  - name: detail
+    to:
+      file: detail_b
+    fields: ["id", "value"]
+"""
+        ).lstrip(),
+    )
+
+    wf_detail_a_path = tmp_path / "wf_detail_a.csv"
+    wf_detail_b_path = tmp_path / "wf_detail_b.csv"
+    wf = _write_workflow_yaml(
+        tmp_path,
+        resources={
+            "files": {
+                "detail_a": {"kind": "csv_file", "path": str(wf_detail_a_path)},
+                "detail_b": {"kind": "csv_file", "path": str(wf_detail_b_path)},
+            }
+        },
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    global_detail_a_path = tmp_path / "global_detail_a.csv"
+    global_detail_b_path = tmp_path / "global_detail_b.csv"
+    overrides = RunOverrides(
+        resources=ResourcesOverride(
+            files={
+                "detail_a": FileResourceOverride(path=str(global_detail_a_path)),
+                "detail_b": FileResourceOverride(path=str(global_detail_b_path)),
+            }
+        )
+    )
+
+    patch_detail_a_path = tmp_path / "patch_detail_a.csv"
+    run_patches_by_id = {
+        "a": WorkflowRunPatch(
+            overrides=RunOverrides(
+                resources=ResourcesOverride(
+                    files={
+                        "detail_a": FileResourceOverride(path=str(patch_detail_a_path)),
+                    }
+                )
+            )
+        )
+    }
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        overrides=overrides,
+        run_patches_by_id=run_patches_by_id,
+    )
+    assert not result.errors()
+
+    assert patch_detail_a_path.exists()
+    assert global_detail_b_path.exists()
+    assert not global_detail_a_path.exists()
+    assert not wf_detail_a_path.exists()
+    assert not wf_detail_b_path.exists()
 
 
 def test_run_workflow_all_fail_raises(tmp_path: Path) -> None:
