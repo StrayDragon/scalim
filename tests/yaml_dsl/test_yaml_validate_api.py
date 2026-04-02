@@ -9,11 +9,11 @@ from scalim.dsl.by_yaml._internal.config_parsing.validator import (
     YamlValidationIssue,
     YamlValidationResult,
     attach_locations,
-    build_yaml_location_index,
-    lookup_yaml_location,
     validate_yaml_text,
     validate_yaml_text_json,
 )
+from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
+from scalim.dsl.by_yaml._internal.config_parsing.yaml_load import build_yaml_location_index, lookup_yaml_location
 
 
 def test_yaml_validation_issue_as_dict_omits_none_locations() -> None:
@@ -114,13 +114,21 @@ def test_validate_yaml_text_reports_parse_error_with_location() -> None:
 def test_validate_yaml_text_parse_error_without_mark_has_no_loc(monkeypatch) -> None:
     import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_mod
 
-    class _NoMarkError(validator_mod.yaml.YAMLError):  # pyright: ignore[reportUnknownMemberType]
-        pass
+    def _raise(*_args: object, **_kwargs: object) -> object:
+        raise ScalimYamlValidationError(
+            "YAML parse error",
+            errors=[
+                ErrorEnvelope(
+                    code="yaml_parse_error",
+                    message="YAML parse error: boom",
+                    source_path="(memory)",
+                    path="(root)",
+                    loc=None,
+                )
+            ],
+        )
 
-    def _raise(_text: str) -> object:
-        raise _NoMarkError("boom")
-
-    monkeypatch.setattr(validator_mod.yaml, "safe_load", _raise)
+    monkeypatch.setattr(validator_mod, "load_yaml_mapping_text", _raise)
     result = validator_mod.validate_yaml_text("name: demo\n")
 
     assert result.ok is False
@@ -129,22 +137,60 @@ def test_validate_yaml_text_parse_error_without_mark_has_no_loc(monkeypatch) -> 
     assert issue.column is None
 
 
+def test_validate_yaml_text_parse_error_includes_warnings(monkeypatch) -> None:
+    import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_mod
+
+    def _raise(*_args: object, **_kwargs: object) -> object:
+        raise ScalimYamlValidationError(
+            "YAML parse error",
+            errors=[
+                ErrorEnvelope(
+                    code="yaml_parse_error",
+                    message="YAML parse error: boom",
+                    source_path="(memory)",
+                    path="(root)",
+                    loc=None,
+                )
+            ],
+            warnings=[
+                ErrorEnvelope(
+                    code="yaml_parse_warning",
+                    message="warning: boom",
+                    source_path="(memory)",
+                    path="(root)",
+                    loc=ErrorLoc(7, 8),
+                )
+            ],
+        )
+
+    monkeypatch.setattr(validator_mod, "load_yaml_mapping_text", _raise)
+    result = validator_mod.validate_yaml_text("name: demo\n")
+
+    assert result.ok is False
+    assert len(result.warnings) == 1
+    issue = result.warnings[0]
+    assert issue.line == 7
+    assert issue.column == 8
+
+
 def test_validate_yaml_text_parse_error_with_non_int_mark_has_no_loc(monkeypatch) -> None:
     import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_mod
 
-    class _BadMark:
-        line = "x"
-        column = 1
+    def _raise(*_args: object, **_kwargs: object) -> object:
+        raise ScalimYamlValidationError(
+            "YAML parse error",
+            errors=[
+                ErrorEnvelope(
+                    code="yaml_parse_error",
+                    message="YAML parse error: boom",
+                    source_path="(memory)",
+                    path="(root)",
+                    loc=None,
+                )
+            ],
+        )
 
-    class _BadMarkError(validator_mod.yaml.YAMLError):  # pyright: ignore[reportUnknownMemberType]
-        def __init__(self, message: str) -> None:
-            super(_BadMarkError, self).__init__(message)
-            self.problem_mark = _BadMark()
-
-    def _raise(_text: str) -> object:
-        raise _BadMarkError("boom")
-
-    monkeypatch.setattr(validator_mod.yaml, "safe_load", _raise)
+    monkeypatch.setattr(validator_mod, "load_yaml_mapping_text", _raise)
     result = validator_mod.validate_yaml_text("name: demo\n")
 
     assert result.ok is False

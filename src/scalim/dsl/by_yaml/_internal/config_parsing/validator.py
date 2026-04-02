@@ -8,7 +8,6 @@ from .....vendor.compact.importlibx import import_module
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import asdict, dataclass
 from .....vendor.dataclassesx import field as dataclass_field
-from .....vendor.yamlx import yaml
 from ...diagnostics import format_duplicate_effective_field_display_names_message
 from ...init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ...schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
@@ -22,6 +21,7 @@ from ...schema_dsl.models import (
     RESOURCES_KEYS,
 )
 from ...schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
+from .error_envelope import ScalimYamlValidationError
 from .errors import ScalimConfigValidationError
 from .imports import contains_import_syntax
 from .jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
@@ -38,10 +38,9 @@ from .validators.issues import (
 )
 from .yaml_load import (
     YamlLocationIndex,
-    build_yaml_location_index,
+    load_yaml_mapping_text,
     lookup_yaml_location,
     normalize_yaml_diagnostic_path,
-    safe_yaml_parse_error_message,
 )
 
 try:
@@ -913,19 +912,6 @@ def attach_locations(
     return output
 
 
-def _extract_yaml_error_location(exc: Exception) -> Optional[Tuple[int, int]]:
-    problem_mark = getattr(exc, "problem_mark", None)  # pragma: allow-dynattr third-party: pyyaml YAMLError mark
-    context_mark = getattr(exc, "context_mark", None)  # pragma: allow-dynattr third-party: pyyaml YAMLError mark
-    mark = problem_mark or context_mark
-    if mark is None:
-        return None
-    line = getattr(mark, "line", None)  # pragma: allow-dynattr third-party: pyyaml Mark
-    column = getattr(mark, "column", None)  # pragma: allow-dynattr third-party: pyyaml Mark
-    if not isinstance(line, int) or not isinstance(column, int):
-        return None
-    return line + 1, column + 1
-
-
 def validate_yaml_text(
     yaml_text: str,
     strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
@@ -937,29 +923,37 @@ def validate_yaml_text(
     此函数会做语义校验(`ConfigValidator`),并基于 `YAML` 语法树(`AST`)位置索引尽力补充行/列定位信息.
     """
     try:
-        yaml_data = yaml.safe_load(yaml_text)
-    except yaml.YAMLError as exc:
-        loc = _extract_yaml_error_location(exc)
-        line = loc[0] if loc is not None else None
-        column = loc[1] if loc is not None else None
-        return YamlValidationResult(
-            ok=False,
-            errors=[
+        yaml_data, locations, _lines = load_yaml_mapping_text(
+            yaml_text,
+            source_path="(memory)",
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
+        errors: List[YamlValidationIssue] = []
+        for envelope in exc.errors:
+            loc = envelope.loc
+            errors.append(
                 YamlValidationIssue(
-                    path="(root)",
-                    message="YAML parse error: {}".format(safe_yaml_parse_error_message(exc)),
-                    line=line,
-                    column=column,
+                    path=str(envelope.path or "(root)"),
+                    message=str(envelope.message),
+                    suggestions=list(envelope.suggestions),
+                    line=loc.line if loc is not None else None,
+                    column=loc.column if loc is not None else None,
                 )
-            ],
-            warnings=[],
-        )
-    if yaml_data is None:
-        return YamlValidationResult(
-            ok=False,
-            errors=[YamlValidationIssue(path="(root)", message="YAML document is empty", line=1, column=1)],
-            warnings=[],
-        )
+            )
+        warnings: List[YamlValidationIssue] = []
+        for envelope in exc.warnings:
+            loc = envelope.loc
+            warnings.append(
+                YamlValidationIssue(
+                    path=str(envelope.path or "(root)"),
+                    message=str(envelope.message),
+                    suggestions=list(envelope.suggestions),
+                    line=loc.line if loc is not None else None,
+                    column=loc.column if loc is not None else None,
+                )
+            )
+        return YamlValidationResult(ok=False, errors=errors, warnings=warnings)
 
     if contains_import_syntax(yaml_data):
         msg = "imports/$import is only supported for file path entrypoints; use scalim-cli yaml-dsl validate <file.yaml>"
@@ -970,7 +964,7 @@ def validate_yaml_text(
         )
 
     validator = ConfigValidator(schema_path=schema_path)
-    config_data = ensure_mapping(yaml_data) if isinstance(yaml_data, dict) else {}
+    config_data = ensure_mapping(yaml_data)
     report = validator.validate_report(
         config_data,
         strict_unknown_fields=bool(strict_unknown_fields),
@@ -980,7 +974,6 @@ def validate_yaml_text(
     errors = _issues_to_rows(report.errors())
     warnings = _issues_to_rows(report.warnings())
 
-    locations = build_yaml_location_index(yaml_text)
     errors = attach_locations(errors, locations)
     warnings = attach_locations(warnings, locations)
 

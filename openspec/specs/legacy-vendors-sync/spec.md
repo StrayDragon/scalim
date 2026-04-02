@@ -55,7 +55,9 @@
 - **WHEN** 下游导入并执行 YAML DSL 的解析入口(例如 `scalim.cli.yaml_dsl` 或 `scalim.dsl.by_yaml.config_parsing.yaml_load`)
 - **THEN** 导入与 YAML 解析 MUST 成功
 
-#### Scenario: scalim YAML parsing uses vendored yamlx implementation
+#### Scenario: scalim YAML parsing uses vendored `ruamel.yaml` without external installs
 - **GIVEN** `src/scalim/vendor/yamlx/` 内包含 vendors 化的 YAML 实现
 - **WHEN** `scalim` 在运行时解析 YAML 文本
-- **THEN** 系统 MUST 使用 `yamlx.yaml` 作为 YAML 解析实现入口,不得依赖 `require_optional_dependency("yaml")` 走外部安装包
+- **THEN** 系统 MUST 使用 vendored `ruamel.yaml` 作为默认 YAML 解析实现
+- **AND** MUST NOT 依赖 `require_optional_dependency("yaml")` 或任何外部安装包
+- **AND** MUST NOT 要求下游额外安装 `PyYAML`/`ruamel.yaml`

@@ -135,6 +135,20 @@ def test_project_config_scalim_yaml_must_be_mapping(tmp_path: Path) -> None:
     assert "must be a mapping" in str(excinfo.value)
 
 
+def test_project_config_read_yaml_mapping_rejects_non_mapping_loader_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scalim_yaml = tmp_path / "scalim.yaml"
+    scalim_yaml.write_text("name: demo\n", encoding="utf-8")
+
+    def _fake_loader(*_args: object, **_kwargs: object) -> object:
+        return [], {}, []
+
+    monkeypatch.setattr(project_config_mod, "load_yaml_mapping_text", _fake_loader)
+
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod._read_yaml_mapping(scalim_yaml)  # noqa: SLF001
+    assert "must be a mapping" in str(excinfo.value)
+
+
 def test_project_config_yaml_dsl_must_be_mapping(tmp_path: Path) -> None:
     (tmp_path / "scalim.yaml").write_text("yaml_dsl: 1\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"

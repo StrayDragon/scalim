@@ -54,7 +54,7 @@ def test_load_yaml_mapping_text_wraps_unknown_exceptions(monkeypatch) -> None:
     def _boom(*_args: object, **_kwargs: object) -> object:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(yaml_load_mod.yaml, "safe_load", _boom)
+    monkeypatch.setattr(yaml_load_mod.YAML, "load", _boom)
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
         _data, _locations, _lines = yaml_load_mod.load_yaml_mapping_text(
@@ -109,3 +109,36 @@ def test_load_yaml_mapping_file_loads_mapping(tmp_path: Path) -> None:
     assert data["a"] == 1
     assert locations[""] == (1, 1)
     assert lines == ["a: 1"]
+
+
+def test_load_yaml_mapping_text_normalizes_sequence_key_to_tuple() -> None:
+    yaml_text = "? [a, b]\n: 1\n"
+    data, _locations, _lines = load_yaml_mapping_text(yaml_text, source_path="demo.yaml", detect_duplicate_keys=True)
+    assert data[("a", "b")] == 1
+
+
+def test_load_yaml_mapping_text_rejects_unhashable_mapping_key() -> None:
+    yaml_text = "? {a: b}\n: 1\n"
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _data, _locations, _lines = load_yaml_mapping_text(yaml_text, source_path="demo.yaml", detect_duplicate_keys=True)
+
+    env = excinfo.value.errors[0]
+    assert env.code == "yaml_parse_error"
+    assert "TypeError" in env.message
+
+
+def test_construct_ruamel_mapping_rejects_non_mapping_node() -> None:
+    import scalim.dsl.by_yaml._internal.config_parsing.yaml_load as yaml_load_mod
+
+    class _DummyNode:
+        id = "sequence"
+
+    with pytest.raises(TypeError) as excinfo:
+        _ = yaml_load_mod._construct_ruamel_mapping(  # noqa: SLF001
+            object(),
+            _DummyNode(),
+            deep=True,
+            detect_duplicate_keys=True,
+            source_path="demo.yaml",
+        )
+    assert "expected a mapping node" in str(excinfo.value)

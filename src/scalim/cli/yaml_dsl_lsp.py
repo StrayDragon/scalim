@@ -1,8 +1,10 @@
 import re
+from io import StringIO
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 from ..vendor.dataclassesx import dataclass
+from ..vendor.yamlx.ruamel.yaml import YAML
 
 DEFAULT_SCHEMA_TYPE = "demand"
 DEFAULT_MAX_SCAN_LINES = 10
@@ -80,6 +82,67 @@ def _is_schema_modeline(line: str) -> bool:
     return bool(_INTELLIJ_SCHEMA_PATTERN.match(line) or _YAML_LANGUAGE_SERVER_SCHEMA_PATTERN.match(line))
 
 
+def _roundtrip_noop_text(text: str) -> str:
+    """使用仓库内置的 `ruamel.yaml` `rt` `round-trip`,对文本执行 `load`→`dump` 的 `no-op` 字节级幂等门禁。"""
+    newline = "\r\n" if "\r\n" in text else "\n"
+
+    yaml_rt = YAML(typ="rt")
+    yaml_rt.line_break = newline  # pyright: ignore[reportAttributeAccessIssue]  # pragma: allow-dynattr third-party: ruamel YAML config
+    yaml_rt.preserve_quotes = True
+    yaml_rt.width = 4096
+    yaml_rt.indent(mapping=2, sequence=4, offset=2)
+
+    first_nonempty = ""
+    for line in text.splitlines():
+        if line.strip():
+            first_nonempty = line
+            break
+    yaml_rt.explicit_start = first_nonempty.strip() == "---"
+
+    data = yaml_rt.load(text)
+    buf = StringIO()
+    yaml_rt.dump(data, buf)
+    return buf.getvalue()
+
+
+def _strip_schema_modelines(lines: Sequence[str], *, max_scan_lines: int) -> List[str]:
+    scan_limit = min(len(lines), int(max_scan_lines))
+    indices = [idx for idx in range(scan_limit) if _is_schema_modeline(lines[idx])]
+    if not indices:
+        return list(lines)
+
+    start = min(indices)
+    end = max(indices)
+    if end + 1 < len(lines) and not str(lines[end + 1]).strip():
+        end += 1
+    return [*lines[:start], *lines[end + 1 :]]
+
+
+def _roundtrip_noop_gate_error(
+    text: str,
+    *,
+    failure_prefix: str,
+    mismatch_message: str,
+) -> Optional[str]:
+    try:
+        dumped = _roundtrip_noop_text(text)
+    except Exception as exc:  # noqa: BLE001
+        return "{}: {}: {}".format(failure_prefix, type(exc).__name__, exc)
+    if dumped != text:
+        return mismatch_message
+    return None
+
+
+def _minimal_edit_gate_error(old_text: str, new_text: str, *, max_scan_lines: int) -> Optional[str]:
+    old_lines = old_text.splitlines()
+    new_lines = new_text.splitlines()
+    if _strip_schema_modelines(old_lines, max_scan_lines=max_scan_lines) != _strip_schema_modelines(
+        new_lines, max_scan_lines=max_scan_lines
+    ):
+        return "Refusing to edit: upsert would modify YAML body beyond modeline header"
+    return None
+
+
 def upsert_schema_modelines_text(
     text: str,
     *,
@@ -90,29 +153,32 @@ def upsert_schema_modelines_text(
     ends_with_newline = text.endswith("\n")
 
     lines = text.splitlines()
-    scan_limit = min(len(lines), max_scan_lines)
+    scan_limit = min(len(lines), int(max_scan_lines))
 
-    header_end = scan_limit
-    for idx in range(scan_limit):
-        stripped = lines[idx].strip()
-
-        if not stripped:
+    cleaned_lines: List[str] = []
+    for idx, line in enumerate(lines):
+        if idx < scan_limit and _is_schema_modeline(line):
             continue
+        cleaned_lines.append(line)
 
-        if stripped.startswith("#"):
+    insert_at = 0
+    cleaned_scan_limit = min(len(cleaned_lines), int(max_scan_lines))
+    for idx in range(cleaned_scan_limit):
+        if cleaned_lines[idx].strip() != "---":
             continue
-
-        header_end = idx
+        prefix = cleaned_lines[:idx]
+        prefix_nonempty = [line for line in prefix if str(line).strip()]
+        prefix_noncomment = [line for line in prefix_nonempty if not str(line).lstrip().startswith("#")]
+        if not prefix_noncomment:
+            insert_at = idx + 1
         break
 
-    header_lines = [line for line in lines[:header_end] if not _is_schema_modeline(line)]
-    while header_lines and not header_lines[0].strip():
-        _ = header_lines.pop(0)
+    new_lines: List[str] = list(cleaned_lines)
+    new_lines[insert_at:insert_at] = list(schema_modelines)
 
-    new_lines: List[str] = list(schema_modelines)
-    new_lines.append("")
-    new_lines.extend(header_lines)
-    new_lines.extend(lines[header_end:])
+    sep_idx = insert_at + len(schema_modelines)
+    if sep_idx < len(new_lines) and str(new_lines[sep_idx]).strip():
+        new_lines.insert(sep_idx, "")
 
     new_text = newline.join(new_lines)
     if ends_with_newline and not new_text.endswith(newline):
@@ -139,16 +205,34 @@ def upsert_schema_modelines_file(
     except Exception as exc:  # noqa: BLE001
         return UpsertResult(path=path, changed=False, error="Failed to read: {}".format(exc))
 
+    error = _roundtrip_noop_gate_error(
+        text,
+        failure_prefix="Round-trip no-op failed",
+        mismatch_message="Refusing to edit: YAML round-trip no-op is not byte-idempotent for this file",
+    )
+    if error is not None:
+        return UpsertResult(path=path, changed=False, error=error)
+
     new_text, changed = upsert_schema_modelines_text(text, schema_modelines=schema_modelines, max_scan_lines=max_scan_lines)
-    if not changed:
-        return UpsertResult(path=path, changed=False)
+    if changed:
+        error = _minimal_edit_gate_error(text, new_text, max_scan_lines=max_scan_lines)
+        if error is not None:
+            return UpsertResult(path=path, changed=False, error=error)
 
-    try:
-        _ = path.write_text(new_text, encoding="utf-8")
-    except Exception as exc:  # noqa: BLE001
-        return UpsertResult(path=path, changed=False, error="Failed to write: {}".format(exc))
+        error = _roundtrip_noop_gate_error(
+            new_text,
+            failure_prefix="Round-trip no-op failed after upsert",
+            mismatch_message="Refusing to edit: post-upsert YAML round-trip no-op is not byte-idempotent",
+        )
+        if error is not None:
+            return UpsertResult(path=path, changed=False, error=error)
 
-    return UpsertResult(path=path, changed=True)
+        try:
+            _ = path.write_text(new_text, encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            return UpsertResult(path=path, changed=False, error="Failed to write: {}".format(exc))
+
+    return UpsertResult(path=path, changed=changed)
 
 
 __all__ = ()

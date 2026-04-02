@@ -1,13 +1,14 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, cast
+from typing import Any, Dict, Mapping, Optional
 
 from ....workflow.errors import ScalimWorkflowConfigError
+from .._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
+from .._internal.config_parsing.yaml_load import load_yaml_mapping_text
 from .._public_template_sandbox import validate_public_template_sandbox
 from ._models import WorkflowConfig
 from ._parse import load_workflow_config_from_mapping
-from ._yaml import safe_load_yaml_no_duplicates
 
 
 def load_workflow_config(
@@ -39,16 +40,17 @@ def load_workflow_config(
         raise ScalimWorkflowConfigError(str(exc), path="(file)") from exc
 
     try:
-        loaded = safe_load_yaml_no_duplicates(text)
-    except Exception as exc:
-        msg = "YAML parse error: {}: {}".format(type(exc).__name__, exc)
-        raise ScalimWorkflowConfigError(msg, path="(root)") from exc
+        loaded, _locations, _lines = load_yaml_mapping_text(
+            text,
+            source_path=str(yaml_path),
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
+        first = exc.errors[0] if exc.errors else None
+        msg = first.message if first is not None else str(exc)
+        raise ScalimWorkflowConfigError(msg, path=str(first.path if first is not None else "(root)")) from None
 
-    if not isinstance(loaded, dict):
-        msg = "workflow YAML root must be a mapping"
-        raise ScalimWorkflowConfigError(msg, path="(root)")
-
-    return load_workflow_config_from_mapping(cast("Dict[str, Any]", loaded))  # pragma: allow-cast yaml mapping typed narrowing
+    return load_workflow_config_from_mapping(loaded)
 
 
 def validate_workflow_yaml_text_json(
@@ -69,30 +71,18 @@ def validate_workflow_yaml_text_json(
 
 def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
     try:
-        yaml_data = safe_load_yaml_no_duplicates(yaml_text)
-    except Exception as exc:  # noqa: BLE001
-        return {
-            "ok": False,
-            "errors": [{"path": "(root)", "message": "YAML parse error: {}".format(exc)}],
-            "warnings": [],
-        }
-
-    if yaml_data is None:
-        return {
-            "ok": False,
-            "errors": [{"path": "(root)", "message": "YAML document is empty"}],
-            "warnings": [],
-        }
-
-    if not isinstance(yaml_data, dict):
-        return {
-            "ok": False,
-            "errors": [{"path": "(root)", "message": "workflow YAML root must be a mapping"}],
-            "warnings": [],
-        }
+        yaml_data, _locations, _lines = load_yaml_mapping_text(
+            yaml_text,
+            source_path="(memory)",
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
+        first = exc.errors[0] if exc.errors else None
+        message = first.message if first is not None else str(exc)
+        return {"ok": False, "errors": [{"path": "(root)", "message": message}], "warnings": []}
 
     try:
-        _ = load_workflow_config_from_mapping(cast("Dict[str, Any]", yaml_data))  # pragma: allow-cast yaml mapping typed narrowing
+        _ = load_workflow_config_from_mapping(yaml_data)
     except ScalimWorkflowConfigError as exc:
         return {
             "ok": False,

@@ -1,9 +1,11 @@
+# pragma: allow-cast-file yaml parsing boundary typed narrowing
 import re
+from collections.abc import Hashable
 from pathlib import Path
+from types import MethodType
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-from .....vendor.yamlx import yaml
-from .....vendor.yamlx.yaml.nodes import MappingNode, SequenceNode
+from .....vendor.yamlx.ruamel.yaml import YAML
 from ...schema_dsl.constants import UTF8_ENCODING
 from .error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
 from .validators.issues import ValidationIssue
@@ -41,68 +43,121 @@ def _extract_yaml_error_location(exc: Exception) -> Optional[Tuple[int, int]]:
     return line + 1, column + 1
 
 
-def _safe_load_yaml_no_duplicates(text: str, *, source_path: str) -> object:
-    """对 `yaml.safe_load` 增加重复 `key` 检测(默认启用)."""
+def _normalize_yaml_mapping_key(key: object) -> object:
+    if isinstance(key, list):
+        return cast("Any", tuple(cast("Any", key)))
+    return key
 
-    class _Loader(yaml.SafeLoader):  # type: ignore[name-defined]
-        pass
 
-    def _construct_mapping(loader: object, node: object, deep: bool = False) -> Dict[object, object]:  # noqa: FBT001, FBT002
-        # 说明: `YAML` 合并键(`<<`) 会在 `PyYAML` 的 `construct_mapping` 阶段被展开.
-        # 我们希望对“显式声明的键”做重复检测,同时允许合并语义:
-        # 1) 扫描显式键是否重复(跳过合并标签键)
-        # 2) 委托给 `PyYAML` 做合并展开
-        # 3) 采用“后写覆盖前写”的映射构造语义
+def _raise_yaml_duplicate_key(
+    key: object,
+    *,
+    key_node: object,
+    source_path: str,
+) -> None:
+    mark = getattr(key_node, "start_mark", None)  # pragma: allow-dynattr third-party: ruamel node.start_mark
+    line_raw = getattr(mark, "line", None)  # pragma: allow-dynattr third-party: ruamel Mark
+    column_raw = getattr(mark, "column", None)  # pragma: allow-dynattr third-party: ruamel Mark
+    loc: Optional[ErrorLoc] = None
+    if isinstance(line_raw, int) and isinstance(column_raw, int):
+        loc = ErrorLoc(line=int(line_raw) + 1, column=int(column_raw) + 1)
 
-        explicit_seen: Dict[object, bool] = {}
-        pairs = cast("Any", node).value  # pragma: allow-cast pyyaml loader typed narrowing
-        for key_node, _value_node in pairs:
-            tag = getattr(key_node, "tag", None)  # pragma: allow-dynattr third-party: pyyaml node.tag
-            if str(tag) == "tag:yaml.org,2002:merge":
-                continue
-            key = cast("Any", loader).construct_object(key_node, deep=deep)  # pragma: allow-cast pyyaml loader typed narrowing
-            if key in explicit_seen:
-                mark = getattr(key_node, "start_mark", None)  # pragma: allow-dynattr third-party: pyyaml node.start_mark
-                line_raw = getattr(mark, "line", None)  # pragma: allow-dynattr third-party: pyyaml Mark
-                column_raw = getattr(mark, "column", None)  # pragma: allow-dynattr third-party: pyyaml Mark
-                loc: Optional[ErrorLoc] = None
-                if isinstance(line_raw, int) and isinstance(column_raw, int):
-                    loc = ErrorLoc(line=int(line_raw) + 1, column=int(column_raw) + 1)
-                error_message = "YAML duplicate key detected"
-                raise ScalimYamlValidationError(
-                    error_message,
-                    errors=[
-                        ErrorEnvelope(
-                            code="yaml_duplicate_key",
-                            message="Duplicate key in YAML mapping: {!r}".format(key),
-                            source_path=source_path,
-                            path="(root)",
-                            loc=loc,
-                        )
-                    ],
-                )
-            explicit_seen[key] = True
-
-        cast("Any", loader).flatten_mapping(node)  # pragma: allow-cast pyyaml loader typed narrowing
-
-        mapping: Dict[object, object] = {}
-        for key_node, value_node in cast("Any", node).value:  # pragma: allow-cast pyyaml loader typed narrowing
-            key = cast("Any", loader).construct_object(key_node, deep=deep)  # pragma: allow-cast pyyaml loader typed narrowing
-            value = cast("Any", loader).construct_object(value_node, deep=deep)  # pragma: allow-cast pyyaml loader typed narrowing
-            mapping[key] = value
-        return mapping
-
-    _Loader.add_constructor(  # type: ignore[attr-defined]
-        cast("Any", yaml).resolver.BaseResolver.DEFAULT_MAPPING_TAG,  # pragma: allow-cast pyyaml resolver typed narrowing
-        _construct_mapping,
+    error_message = "YAML duplicate key detected"
+    raise ScalimYamlValidationError(
+        error_message,
+        errors=[
+            ErrorEnvelope(
+                code="yaml_duplicate_key",
+                message="Duplicate key in YAML mapping: {!r}".format(key),
+                source_path=source_path,
+                path="(root)",
+                loc=loc,
+            )
+        ],
     )
-    return cast("Any", yaml).load(text, Loader=_Loader)  # pragma: allow-cast pyyaml loader typed narrowing
+
+
+def _validate_no_duplicate_yaml_keys(
+    pairs: object,
+    *,
+    constructor: object,
+    source_path: str,
+) -> None:
+    explicit_seen: Dict[object, bool] = {}
+    for key_node, _value_node in cast("Any", pairs):
+        tag = getattr(key_node, "tag", None)  # pragma: allow-dynattr third-party: ruamel node.tag
+        if str(tag) == "tag:yaml.org,2002:merge":
+            continue
+        key = cast("Any", constructor).construct_object(key_node, deep=True)  # pragma: allow-cast ruamel typed narrowing
+        key = _normalize_yaml_mapping_key(key)
+        if not isinstance(key, Hashable):
+            msg = "found unhashable key"
+            raise TypeError(msg)
+        if key in explicit_seen:
+            _raise_yaml_duplicate_key(key, key_node=key_node, source_path=source_path)
+        explicit_seen[key] = True
+
+
+def _construct_ruamel_mapping(
+    constructor: object,
+    node: object,
+    *,
+    deep: bool,
+    detect_duplicate_keys: bool,
+    source_path: str,
+) -> Dict[object, object]:
+    node_id = getattr(node, "id", None)  # pragma: allow-dynattr third-party: ruamel node.id
+    if str(node_id) != "mapping":
+        msg = "expected a mapping node, but found {}".format(str(node_id) if node_id is not None else "(unknown)")
+        raise TypeError(msg)
+
+    pairs = cast("Any", node).value  # pragma: allow-cast third-party: ruamel MappingNode.value
+    if detect_duplicate_keys:
+        _validate_no_duplicate_yaml_keys(pairs, constructor=constructor, source_path=source_path)
+
+    cast("Any", constructor).flatten_mapping(node)  # pragma: allow-cast ruamel constructor typed narrowing
+
+    mapping: Dict[object, object] = cast("Any", constructor).yaml_base_dict_type()  # pragma: allow-cast ruamel typed narrowing
+    for key_node, value_node in cast("Any", node).value:
+        key = cast("Any", constructor).construct_object(key_node, deep=True)  # pragma: allow-cast ruamel typed narrowing
+        key = _normalize_yaml_mapping_key(key)
+        value = cast("Any", constructor).construct_object(value_node, deep=deep)  # pragma: allow-cast ruamel typed narrowing
+        mapping[key] = value
+    return mapping
+
+
+def _safe_load_yaml_ruamel(text: str, *, source_path: str, detect_duplicate_keys: bool) -> object:
+    """统一 `YAML` 解析入口(仓库内置 `ruamel.yaml` 的 `safe loader`, `YAML 1.2` 语义).
+
+    约束:
+    - `YAML 1.2` 语义
+    - 默认 `detect_duplicate_keys=True` 时,重复键 `fail-fast` 并产出结构化错误(含 `loc`)
+    - `detect_duplicate_keys=False` 时,允许重复键且采用 `last-wins` 语义
+    - 允许 `merge key`(`<<`) 语义;仅对“显式声明的键”做重复检测(不包含合并展开得到的键)
+    """
+
+    yaml_rt = YAML(typ="safe")
+    cast("Any", yaml_rt).version = (1, 2)
+
+    def _construct_mapping(self: object, node: object, deep: bool = False) -> Dict[object, object]:  # noqa: FBT001, FBT002
+        return _construct_ruamel_mapping(
+            self,
+            node,
+            deep=bool(deep),
+            detect_duplicate_keys=bool(detect_duplicate_keys),
+            source_path=str(source_path),
+        )
+
+    cast("Any", yaml_rt).constructor.construct_mapping = MethodType(  # pragma: allow-cast ruamel typed narrowing
+        _construct_mapping,
+        cast("Any", yaml_rt).constructor,  # pragma: allow-cast ruamel typed narrowing
+    )
+
+    return cast("Any", yaml_rt).load(text)  # pragma: allow-cast ruamel YAML.load typed narrowing
 
 
 def _safe_load_yaml(text: str, *, source_path: str, detect_duplicate_keys: bool) -> object:
-    if detect_duplicate_keys:
-        return _safe_load_yaml_no_duplicates(text, source_path=source_path)
-    return yaml.safe_load(text)
+    return _safe_load_yaml_ruamel(text, source_path=source_path, detect_duplicate_keys=bool(detect_duplicate_keys))
 
 
 def _record_location(locations: YamlLocationIndex, path: List[str], mark: Any) -> None:
@@ -126,7 +181,8 @@ def _index_yaml_node(
     if record_current:
         _record_location(locations, path, getattr(node, "start_mark", None))  # pragma: allow-dynattr third-party: pyyaml node.start_mark
 
-    if isinstance(node, MappingNode):
+    node_id = getattr(node, "id", None)  # pragma: allow-dynattr third-party: ruamel node.id
+    if str(node_id) == "mapping":
         for key_node, value_node in node.value:
             key = str(getattr(key_node, "value", ""))  # pragma: allow-dynattr third-party: pyyaml node.value
             key_path = [*path, key]
@@ -139,7 +195,7 @@ def _index_yaml_node(
             _index_yaml_node(value_node, key_path, locations, record_current=False)
         return
 
-    if isinstance(node, SequenceNode):
+    if str(node_id) == "sequence":
         for idx, item_node in enumerate(node.value):
             idx_path = [*path, str(idx)]
             item_mark = getattr(item_node, "start_mark", None)  # pragma: allow-dynattr third-party: pyyaml node.start_mark
@@ -152,10 +208,9 @@ def _index_yaml_node(
 
 
 def _compose_yaml_node(yaml_text: str) -> Optional[object]:
-    return cast(
-        "Optional[object]",
-        yaml.compose(yaml_text, Loader=yaml.SafeLoader),
-    )  # pragma: allow-cast pyyaml compose typed narrowing
+    yaml_safe = YAML(typ="safe")
+    cast("Any", yaml_safe).version = (1, 2)
+    return cast("Optional[object]", yaml_safe.compose(yaml_text))  # pragma: allow-cast ruamel compose typed narrowing
 
 
 def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:
@@ -259,7 +314,7 @@ def load_yaml_mapping_text(
         loaded = _safe_load_yaml(yaml_text, source_path=source_path, detect_duplicate_keys=bool(detect_duplicate_keys))
     except ScalimYamlValidationError:
         raise
-    except yaml.YAMLError as exc:
+    except Exception as exc:  # noqa: BLE001
         loc_raw = _extract_yaml_error_location(exc)
         loc = ErrorLoc(*loc_raw) if loc_raw is not None else None
         error_message = "YAML parse error"
@@ -272,20 +327,6 @@ def load_yaml_mapping_text(
                     source_path=source_path,
                     path="(root)",
                     loc=loc,
-                )
-            ],
-        ) from None
-    except Exception as exc:  # noqa: BLE001
-        error_message = "YAML parse error"
-        raise ScalimYamlValidationError(
-            error_message,
-            errors=[
-                ErrorEnvelope(
-                    code="yaml_parse_error",
-                    message="YAML parse error: {}".format(type(exc).__name__),
-                    source_path=source_path,
-                    path="(root)",
-                    loc=None,
                 )
             ],
         ) from None

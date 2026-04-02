@@ -3,7 +3,8 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import dataclass
-from .....vendor.yamlx import yaml
+from .error_envelope import ScalimYamlValidationError
+from .yaml_load import load_yaml_mapping_text
 
 __all__ = ()
 
@@ -47,13 +48,25 @@ def _is_list(value: object) -> TypeGuard[List[object]]:
 
 
 def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if loaded is None:
-        return {}
+    try:
+        loaded, _locations, _lines = load_yaml_mapping_text(
+            path.read_text(encoding="utf-8"),
+            source_path=str(path),
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
+        for envelope in exc.errors:
+            if str(envelope.code) == "yaml_empty_document":
+                return {}
+        msg = "scalim.yaml parse error: path='{}'".format(str(path))
+        if exc.errors:
+            msg = "{}: {}".format(msg, exc.errors[0].message)
+        raise TypeError(msg) from None
+
     if not isinstance(loaded, dict):
         msg = "scalim.yaml must be a mapping: path='{}'".format(str(path))
         raise TypeError(msg)
-    return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml.safe_load mapping typed narrowing
+    return loaded
 
 
 def _resolve_dir(value: object, *, base_dir: Path, context_label: str) -> Path:

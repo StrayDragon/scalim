@@ -376,6 +376,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-sheetbook-resources/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 workflow YAML 的共享 `.xlsx` book 资源(以 `workflow.resources.books` 表达)的迁移约束与运行期契约: 预算护栏、确定性写入、冲突安全、可观测且可原子导出为最终 xlsx,并提供可稳定引用的内置 loader 供下游节点读取 sheet rows.
 
+### `yaml-backend-migration`
+- Title: yaml-backend-migration Specification
+- Source: [spec.md](#code=openspec/specs/yaml-backend-migration/spec.md)
+- Summary: 定义 `scalim` 默认 YAML backend 迁移到 vendored `ruamel.yaml`(YAML 1.2) 的运行时契约, 并为 CLI 的 YAML round-trip 编辑能力建立稳定性门禁(no-op 字节级幂等 + minimal edit)。
+
 ### `yaml-dsl-agent-guidance`
 - Title: yaml-dsl-agent-guidance Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-agent-guidance/spec.md)

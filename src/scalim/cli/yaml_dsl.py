@@ -23,7 +23,6 @@ from ..dsl.by_yaml.workflow_types import ScalimWorkflowConfigError
 from ..exceptions import safe_error_message, safe_error_type
 from ..vendor.compact.importlibx import import_module
 from ..vendor.dataclassesx import dataclass, field
-from ..vendor.yamlx import yaml
 from . import yaml_dsl_lsp
 
 try:
@@ -629,10 +628,14 @@ def _emit_error(
 
 def _infer_yaml_type(yaml_text: str) -> str:
     try:
-        yaml_data = yaml.safe_load(yaml_text)
+        yaml_data, _locations, _lines = load_yaml_mapping_text(
+            yaml_text,
+            source_path="(memory)",
+            detect_duplicate_keys=False,
+        )
     except Exception:  # noqa: BLE001
         return "demand"
-    if isinstance(yaml_data, dict) and "workflow" in yaml_data:
+    if "workflow" in yaml_data:
         return "workflow"
     return "demand"
 

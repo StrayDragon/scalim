@@ -96,7 +96,7 @@ def test_upsert_lsp_comment_comment_style_redhat_removes_intellij_modeline_and_i
     assert yaml_path.read_text(encoding="utf-8") == content
 
 
-def test_upsert_lsp_comment_inserts_before_document_start_marker(tmp_path) -> None:
+def test_upsert_lsp_comment_inserts_after_document_start_marker(tmp_path) -> None:
     yaml_path = tmp_path / "doc.yaml"
     yaml_path.write_text("---\nname: demo\n", encoding="utf-8")
 
@@ -104,9 +104,9 @@ def test_upsert_lsp_comment_inserts_before_document_start_marker(tmp_path) -> No
     assert code == 0
 
     lines = yaml_path.read_text(encoding="utf-8").splitlines()
-    assert lines[0].startswith("# yaml-language-server: $schema=")
-    assert lines[1].startswith("# $schema: ")
-    assert lines[3] == "---"
+    assert lines[0] == "---"
+    assert lines[1].startswith("# yaml-language-server: $schema=")
+    assert lines[2].startswith("# $schema: ")
 
 
 def test_resolve_schema_ref_supports_url_base_dir_base_and_full_json(tmp_path) -> None:

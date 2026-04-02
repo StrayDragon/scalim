@@ -1,0 +1,40 @@
+---
+# yaml-language-server: $schema=/wrong/path/demand.gen.json
+# $schema: /wrong/path/demand.gen.json
+
+name: demo_roundtrip
+
+main_source: &main_source
+  key: id
+  loader: "tests.fixtures.mock_loaders.fake_loader"
+  fields:
+    id:
+      extract: "row.id"
+    tags:
+      extract: "row.tags"
+      transform: &tags_transform
+        call_by: 'utils:split_tags(sep=",")'
+    tags2:
+      extract: "row.tags2"
+      transform: *tags_transform
+
+sources:
+  orders:
+    <<: *main_source
+    key: id
+
+relations:
+  orders_to_tags:
+    steps:
+      - from: orders.tags
+        to: tags.tag_id
+        lookup_cast:
+          name: sep_first
+          sep: ","
+
+outputs:
+  - id: out
+    to:
+      file: "./out.csv"
+    write:
+      include_header: true

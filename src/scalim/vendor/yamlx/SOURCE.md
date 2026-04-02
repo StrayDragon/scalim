@@ -25,9 +25,11 @@
 ## Vendored files & local modifications
 
 - `yaml/` (PyYAML)
+  - 不作为 `scalim` 主线运行时 YAML backend(仅保留源码/审计/对拍用途)。
   - 修复 vendors 场景下的导入正确性,避免误导入系统 `site-packages/yaml`。
   - 为 C-extension 初始化提供 `sys.modules["yaml"]` alias,保证下游未安装 `PyYAML` 时可加载 `_yaml`。
 - `ruamel/yaml/` (ruamel.yaml)
+  - 作为 `scalim` 主线运行时 YAML backend(默认 YAML 1.2 语义)。
   - 增加导入期 bootstrap,将 vendors 化包注册为 `ruamel`/`ruamel.yaml`,以稳定解析上游大量的绝对导入(`ruamel.yaml.*`)。
   - 在可加载时将 `scalim.vendor.yamlx._ruamel_yaml*.so` 映射为顶层 `_ruamel_yaml`,便于启用 clib;失败则自然回退 pure-python。
 - Native extensions
@@ -40,4 +42,3 @@
 2. 用上游版本替换 vendors 源码,并重新准备对应 `CPython 3.6` 的二进制扩展(如需).
 3. 从上游 `sdist` 更新许可证文件(保持原样),并更新本文件与 `src/scalim/vendor/README.md` 的版本信息。
 4. 运行 `just qa` 与 `just py36-compat-check`(或下游 vendors 模拟导入)确保导入链路与解析能力稳定。
-

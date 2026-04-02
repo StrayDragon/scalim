@@ -1,8 +1,8 @@
+from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
-from .....vendor.compact.typing_extensionsx import override
-from .....vendor.yamlx import yaml
+from .....vendor.yamlx.ruamel.yaml import YAML
 from .imports import contains_import_syntax, load_and_expand_imports
 
 __all__ = ()
@@ -35,12 +35,6 @@ def load_effective_demand_yaml(
     )
 
 
-class _NoAliasSafeDumper(yaml.SafeDumper):  # type: ignore[name-defined]
-    @override
-    def ignore_aliases(self, data: object) -> bool:
-        return True
-
-
 def dump_effective_demand_yaml(mapping: Mapping[str, Any]) -> str:
     """把 `effective YAML` 映射序列化为 `YAML` 文本.
 
@@ -51,10 +45,15 @@ def dump_effective_demand_yaml(mapping: Mapping[str, Any]) -> str:
         msg = "dump_effective_demand_yaml expects effective YAML (no imports/$import); call load_effective_demand_yaml first"
         raise ValueError(msg)
 
-    dumped: str = yaml.dump(
-        data,
-        allow_unicode=True,
-        sort_keys=False,
-        Dumper=_NoAliasSafeDumper,
-    )
-    return dumped
+    yaml_safe = YAML(typ="safe")
+    yaml_safe.default_flow_style = False
+    yaml_safe.sort_base_mapping_type_on_output = False  # pyright: ignore[reportAttributeAccessIssue]  # pragma: allow-dynattr third-party: ruamel YAML config
+
+    def _ignore_aliases(_data: object) -> bool:
+        return True
+
+    yaml_safe.representer.ignore_aliases = _ignore_aliases  # type: ignore[assignment]  # pragma: allow-dynattr ruamel config
+
+    buf = StringIO()
+    yaml_safe.dump(data, buf)
+    return buf.getvalue()
