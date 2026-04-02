@@ -221,42 +221,6 @@
       "examples": [
         false
       ]
-    },
-    "meta": {
-      "oneOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/definitions/output_extra_sheet"
-        }
-      ],
-      "description": "可选:启用 meta sheet(写入运行信息与统计)",
-      "markdownDescription": "可选:启用 meta sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径",
-      "examples": [
-        true,
-        {
-          "sheet": "__meta__"
-        }
-      ]
-    },
-    "audit": {
-      "oneOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/definitions/output_extra_sheet"
-        }
-      ],
-      "description": "可选:启用 audit sheet(写入目标失败等审计信息)",
-      "markdownDescription": "可选:启用 audit sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径",
-      "examples": [
-        true,
-        {
-          "sheet": "__audit__"
-        }
-      ]
     }
   },
   "definitions": {
@@ -3575,48 +3539,11 @@
           "type": "boolean",
           "default": true,
           "description": "可选:是否输出表头(默认 true)",
-          "markdownDescription": "可选:是否输出表头.\n\n- file 输出: 缺省等价 `true`\n- book + `mode=sheet`: 缺省等价 `true`\n- book + `mode=append`: 不允许显式声明; 请改用 `header_policy`",
+          "markdownDescription": "可选:是否输出表头.\n\n- file 输出: 缺省等价 `true`\n- book + `resources.books.*.write_defaults.mode=sheet`: 缺省等价 `true`\n- book + `resources.books.*.write_defaults.mode=append`: 不允许显式声明;请改用 `resources.books.*.write_defaults.header_policy`",
           "examples": [
             true,
             false
           ]
-        },
-        "mode": {
-          "type": "string",
-          "enum": [
-            "sheet",
-            "append"
-          ],
-          "description": "可选:写入语义(sheet/append)",
-          "examples": [
-            "append"
-          ],
-          "markdownDescription": "可选:写入语义(sheet/append)"
-        },
-        "align_by": {
-          "type": "string",
-          "enum": [
-            "field_id",
-            "header"
-          ],
-          "description": "可选:字段对齐策略(field_id/header;仅 append 生效)",
-          "examples": [
-            "field_id"
-          ],
-          "markdownDescription": "可选:字段对齐策略(field_id/header;仅 append 生效)"
-        },
-        "header_policy": {
-          "type": "string",
-          "enum": [
-            "once",
-            "always",
-            "never"
-          ],
-          "description": "可选:表头策略(once/always/never;仅 append 生效)",
-          "examples": [
-            "once"
-          ],
-          "markdownDescription": "可选:表头策略(once/always/never;仅 append 生效)"
         },
         "header_fields_output_by": {
           "type": "string",
@@ -3630,32 +3557,6 @@
             "name"
           ],
           "markdownDescription": "可选:表头字段名来源(field_id/name;默认 name)"
-        },
-        "on_mismatch": {
-          "type": "string",
-          "enum": [
-            "error",
-            "warn",
-            "skip"
-          ],
-          "description": "可选:字段不匹配策略(error/warn/skip;仅 append 生效)",
-          "examples": [
-            "error"
-          ],
-          "markdownDescription": "可选:字段不匹配策略(error/warn/skip;仅 append 生效)"
-        },
-        "on_conflict": {
-          "type": "string",
-          "enum": [
-            "error",
-            "overwrite",
-            "skip"
-          ],
-          "description": "可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)",
-          "examples": [
-            "error"
-          ],
-          "markdownDescription": "可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)"
         },
         "$import": {
           "oneOf": [

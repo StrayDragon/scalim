@@ -33,6 +33,7 @@ from ..schema_dsl.models import (
     BookWriteDefaultsConfig,
     DemandConfig,
     FileConfig,
+    OutputExtraSheetConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -60,6 +61,8 @@ from .contracts import (
     BookWriteDefaultsOverride,
     Compilation,
     FileResourceOverride,
+    OutputExtraSheetOverride,
+    OutputExtrasOverride,
     OutputOverride,
     OutputsDefaultsOverride,
     OutputToOverride,
@@ -175,15 +178,7 @@ def _parse_typed_overrides_output_write(raw: OutputWriteOverride, *, path: str) 
         )
         raise ValueError(msg)
 
-    return OutputWriteConfig(
-        include_header=include_header,
-        mode=_as_opt_str(raw.mode),
-        align_by=_as_opt_str(raw.align_by),
-        header_policy=_as_opt_str(raw.header_policy),
-        header_fields_output_by=header_fields_output_by,
-        on_mismatch=_as_opt_str(raw.on_mismatch),
-        on_conflict=_as_opt_str(raw.on_conflict),
-    )
+    return OutputWriteConfig(include_header=include_header, header_fields_output_by=header_fields_output_by)
 
 
 def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:
@@ -210,6 +205,61 @@ def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: Run
         next_config = replace(next_config, failure_policy=str(normalized))
 
     return next_config
+
+
+def _parse_output_extra_sheet_override(
+    raw: object,
+    *,
+    path: str,
+) -> Optional[OutputExtraSheetConfig]:
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        if not raw:
+            return None
+        return OutputExtraSheetConfig()
+    if not isinstance(raw, OutputExtraSheetOverride):
+        msg = "{} must be a boolean or an OutputExtraSheetOverride".format(path)
+        raise TypeError(msg)
+
+    sheet = str(raw.sheet).strip() if raw.sheet is not None else None
+
+    raw_path = raw.path
+    if raw_path is not None and not isinstance(raw_path, (str, os.PathLike)):
+        msg = "{}.path must be a string or PathLike".format(path)
+        raise TypeError(msg)
+    resolved_path = str(raw_path) if raw_path is not None else None
+
+    allow_formulas = raw.allow_formulas
+    if allow_formulas is not None and not isinstance(allow_formulas, bool):
+        msg = "{}.allow_formulas must be a bool".format(path)
+        raise TypeError(msg)
+
+    write_lock = raw.write_lock
+    if write_lock is not None and not isinstance(write_lock, bool):
+        msg = "{}.write_lock must be a bool".format(path)
+        raise TypeError(msg)
+
+    return OutputExtraSheetConfig(
+        path=resolved_path,
+        sheet=sheet,
+        allow_formulas=allow_formulas,
+        write_lock=write_lock,
+    )
+
+
+def _apply_output_extras_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:
+    overrides = options.overrides
+    if overrides is None or overrides.output_extras is None:
+        return config
+    extras = overrides.output_extras
+    if not isinstance(extras, OutputExtrasOverride):
+        msg = "overrides.output_extras must be an OutputExtrasOverride"
+        raise TypeError(msg)
+
+    meta = _parse_output_extra_sheet_override(extras.meta, path="overrides.output_extras.meta")
+    audit = _parse_output_extra_sheet_override(extras.audit, path="overrides.output_extras.audit")
+    return replace(config, meta=meta, audit=audit)
 
 
 def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915
@@ -308,25 +358,6 @@ def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915
                 to_cfg = replace(to_cfg, book=str(effective_book_id))
                 book_id = effective_book_id
 
-        if file_id and write_cfg is not None:
-            invalid_keys: List[str] = []
-            if write_cfg.mode is not None:
-                invalid_keys.append("mode")
-            if write_cfg.align_by is not None:
-                invalid_keys.append("align_by")
-            if write_cfg.header_policy is not None:
-                invalid_keys.append("header_policy")
-            if write_cfg.on_mismatch is not None:
-                invalid_keys.append("on_mismatch")
-            if write_cfg.on_conflict is not None:
-                invalid_keys.append("on_conflict")
-            if invalid_keys:
-                msg = "{}.{}.write.{} only apply to book outputs".format(path, idx, ", ".join(invalid_keys))
-                raise ValueError(msg)
-        if book_id and write_cfg is not None and str(write_cfg.mode or "").strip() == "append" and write_cfg.include_header is not None:
-            msg = "{}.{}.write.include_header is not allowed for append-mode book outputs; use write.header_policy".format(path, idx)
-            raise ValueError(msg)
-
         parsed.append(
             OutputTargetConfig(
                 name=str(name),
@@ -377,10 +408,6 @@ def _output_requires_unique_effective_field_display_names(  # noqa: C901
     if book is not None and book.write_defaults is not None:
         mode = str(book.write_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
         header_policy = str(book.write_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY)
-    if write_cfg is not None and write_cfg.mode is not None:
-        mode = str(write_cfg.mode)
-    if write_cfg is not None and write_cfg.header_policy is not None:
-        header_policy = str(write_cfg.header_policy)
 
     if mode == "append":
         return header_policy != "never"
@@ -1039,6 +1066,7 @@ def build_request(
 ) -> ExecutionRequest:
     effective_config = _apply_io_overrides(config, options=options)
     effective_config = _apply_demand_runtime_policy_overrides(effective_config, options=options)
+    effective_config = _apply_output_extras_overrides(effective_config, options=options)
     effective_outputs, outputs_path = _resolve_effective_outputs_and_path(effective_config, demand_ir, options=options)
     output_composition = _compile_output_composition_for_outputs(
         effective_config,

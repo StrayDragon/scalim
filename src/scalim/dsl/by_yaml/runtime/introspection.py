@@ -184,12 +184,7 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
                     if t.write is None
                     else {
                         "include_header": bool(t.write.include_header) if t.write.include_header is not None else None,
-                        "mode": str(t.write.mode) if t.write.mode else None,
-                        "align_by": str(t.write.align_by) if t.write.align_by else None,
-                        "header_policy": str(t.write.header_policy) if t.write.header_policy else None,
                         "header_fields_output_by": str(t.write.header_fields_output_by) if t.write.header_fields_output_by else None,
-                        "on_mismatch": str(t.write.on_mismatch) if t.write.on_mismatch else None,
-                        "on_conflict": str(t.write.on_conflict) if t.write.on_conflict else None,
                     }
                 ),
                 "aggregate": (

@@ -84,25 +84,37 @@ def run_workflow_shared_workbooks(
                 )
 
             errors = wf_result.errors()
-            shared_report_xlsx = out_dir / "shared_report.xlsx"
-            sheetbook_report_xlsx = out_dir / "sheetbook_report.xlsx"
+            shared_report_sheet_xlsx = out_dir / "shared_report_sheet.xlsx"
+            shared_report_append_xlsx = out_dir / "shared_report_append.xlsx"
+            sheetbook_report_sheet_xlsx = out_dir / "sheetbook_report_sheet.xlsx"
+            sheetbook_report_append_xlsx = out_dir / "sheetbook_report_append.xlsx"
 
-            artifacts_ok = bool(shared_report_xlsx.exists() and sheetbook_report_xlsx.exists())
+            artifacts_ok = bool(
+                shared_report_sheet_xlsx.exists()
+                and shared_report_append_xlsx.exists()
+                and sheetbook_report_sheet_xlsx.exists()
+                and sheetbook_report_append_xlsx.exists()
+            )
 
             wb_ok = False
             sb_ok = False
             wb_checks: Dict[str, Any] = {}
             sb_checks: Dict[str, Any] = {}
 
-            if shared_report_xlsx.exists() and sheetbook_report_xlsx.exists():
+            if artifacts_ok:
                 from openpyxl import load_workbook
 
-                wb = load_workbook(shared_report_xlsx, read_only=True, data_only=True)
+                wb_sheet = load_workbook(shared_report_sheet_xlsx, read_only=True, data_only=True)
                 try:
-                    wb_detail_header, wb_detail_rows = _count_sheet_rows_and_header(wb, "Detail")
-                    wb_append_header, wb_append_rows = _count_sheet_rows_and_header(wb, "DetailAppend")
+                    wb_detail_header, wb_detail_rows = _count_sheet_rows_and_header(wb_sheet, "Detail")
                 finally:
-                    wb.close()
+                    wb_sheet.close()
+
+                wb_append = load_workbook(shared_report_append_xlsx, read_only=True, data_only=True)
+                try:
+                    wb_append_header, wb_append_rows = _count_sheet_rows_and_header(wb_append, "DetailAppend")
+                finally:
+                    wb_append.close()
 
                 single_run_rows = int(wb_detail_rows) - 1 if wb_detail_rows else 0
                 expected_append_rows = 1 + (2 * single_run_rows) if single_run_rows >= 0 else 0
@@ -120,12 +132,17 @@ def run_workflow_shared_workbooks(
                     "detail_append": {"rows_total": wb_append_rows, "expected": expected_append_rows},
                 }
 
-                sb = load_workbook(sheetbook_report_xlsx, read_only=True, data_only=True)
+                sb_sheet = load_workbook(sheetbook_report_sheet_xlsx, read_only=True, data_only=True)
                 try:
-                    sb_detail_header, sb_detail_rows = _count_sheet_rows_and_header(sb, "Detail")
-                    sb_append_header, sb_append_rows = _count_sheet_rows_and_header(sb, "DetailAppend")
+                    sb_detail_header, sb_detail_rows = _count_sheet_rows_and_header(sb_sheet, "Detail")
                 finally:
-                    sb.close()
+                    sb_sheet.close()
+
+                sb_append = load_workbook(sheetbook_report_append_xlsx, read_only=True, data_only=True)
+                try:
+                    sb_append_header, sb_append_rows = _count_sheet_rows_and_header(sb_append, "DetailAppend")
+                finally:
+                    sb_append.close()
 
                 sb_ok = bool(
                     wb_ok
@@ -153,8 +170,10 @@ def run_workflow_shared_workbooks(
             details: Dict[str, Any] = {
                 "output_dir": str(out_dir),
                 "workflow_yaml_path": str(workflow_yaml_path),
-                "shared_report_xlsx": str(shared_report_xlsx),
-                "sheetbook_report_xlsx": str(sheetbook_report_xlsx),
+                "shared_report_sheet_xlsx": str(shared_report_sheet_xlsx),
+                "shared_report_append_xlsx": str(shared_report_append_xlsx),
+                "sheetbook_report_sheet_xlsx": str(sheetbook_report_sheet_xlsx),
+                "sheetbook_report_append_xlsx": str(sheetbook_report_append_xlsx),
                 "workbook": wb_checks,
                 "sheetbook": sb_checks,
                 "errors": errors,
@@ -188,12 +207,11 @@ def _(mo):
         - 多个节点把输出写入同一个 `xlsx`(不同 sheet)
         - 需要明确 append/overwrite 语义,并且可回归验证
 
-        这就是 workflow YAML 的 `resources` + `writes`:
+        这就是 workflow YAML 的 `workflow.resources.books` + book-level 写策略(`write_defaults`) + demand outputs 绑定:
 
-        - `workflow.resources.workbooks`: 声明共享 workbook(最终落盘)
-        - `workflow.resources.sheetbooks`: 声明共享 sheetbook(内存表格,工作流结束原子导出)
-        - `writes.workbook_sheet/workbook_append`: 写入 workbook 的覆盖/追加意图
-        - `writes.sheetbook_append`: 写入 sheetbook 的追加意图
+        - `workflow.resources.books`: 声明 workflow-scope 的共享 book 资源(`xlsx_file|xlsx_memory`)
+        - `resources.books.*.write_defaults`: 声明该 book 的写入语义(sheet/append + 冲突策略等)
+        - demand YAML 通过 `outputs[*].to.book/to.sheet` 绑定到共享 book; workflow 编译期推导 write nodes 并保证写入顺序确定性
 
         ## 需求方提问（自然语言）
 
@@ -202,7 +220,7 @@ def _(mo):
         ## 对拍点（deterministic）
 
         - 两次相同的明细输出 append 到同一个 sheet,行数应为 2 倍
-        - `workbook_sheet` 写入一次,行数应为 1 倍
+        - sheet mode(overwrite) 写入一次,行数应为 1 倍
         - workbook 与 sheetbook 导出的 header 与 CSV header 必须一致
 
         SSOT:

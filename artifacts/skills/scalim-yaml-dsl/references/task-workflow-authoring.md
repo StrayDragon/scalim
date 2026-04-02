@@ -69,7 +69,7 @@ workflow:
 - `workflow.resources.books`:
   - workflow-scope 的共享 book 资源入口(Excel 输出的目标/中间态)
   - `kind: xlsx_file|xlsx_memory`；`xlsx_memory` 必须声明 `budget.max_sheets/max_total_cells`
-  - Excel 输出通过 demand 的 `outputs[*].to`/`outputs[*].write` 绑定到 book+sheet(不通过 workflow 字段声明写入意图)
+  - Excel 输出通过 demand 的 `outputs[*].to` 绑定到 book+sheet；workbook 写入策略以 `resources.books.*.write_defaults` 为 SSOT,`outputs[*].write` 仅用于 output-local header 行为
 
 demand YAML(示意): 绑定输出到 workflow 声明的 book:
 
@@ -77,7 +77,6 @@ demand YAML(示意): 绑定输出到 workflow 声明的 book:
 outputs:
   - name: summary
     to: {book: report, sheet: Summary}
-    write: {mode: sheet, on_conflict: overwrite}
     fields: [order_id, amount_yuan]
 ```
 

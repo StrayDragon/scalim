@@ -183,35 +183,15 @@ class DemandConfig:
 
     meta: Optional[OutputExtraSheetConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(
-            schema={
-                "oneOf": [
-                    {"type": "boolean"},
-                    {"$ref": "#/definitions/output_extra_sheet"},
-                ]
-            },
-            desc="可选:启用 meta sheet(写入运行信息与统计)",
-            md=("可选:启用 meta sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径"),
-            examples=[True, {"sheet": "__meta__"}],
-        ),
+        metadata=schema_omit(),
     )
-    """可选:启用 `meta` 工作表."""
+    """运行期输出附加工作表:`meta`;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
     audit: Optional[OutputExtraSheetConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(
-            schema={
-                "oneOf": [
-                    {"type": "boolean"},
-                    {"$ref": "#/definitions/output_extra_sheet"},
-                ]
-            },
-            desc="可选:启用 audit sheet(写入目标失败等审计信息)",
-            md=("可选:启用 audit sheet.\n\n- `true` 表示启用并使用默认配置\n- 对象形式可覆盖 sheet 名称与 workbook 路径"),
-            examples=[True, {"sheet": "__audit__"}],
-        ),
+        metadata=schema_omit(),
     )
-    """可选:启用 `audit` 工作表."""
+    """运行期输出附加工作表:`audit`;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
 
 __all__ = ()

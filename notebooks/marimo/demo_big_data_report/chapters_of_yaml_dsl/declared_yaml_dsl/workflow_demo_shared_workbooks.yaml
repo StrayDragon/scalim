@@ -3,9 +3,18 @@
 workflow:
   resources:
     books:
-      shared_report:
+      shared_report_sheet:
         kind: xlsx_file
-        path: ./shared_report.xlsx
+        path: ./shared_report_sheet.xlsx
+        write_lock: true
+        allow_formulas: false
+        write_defaults:
+          mode: sheet
+          on_conflict: overwrite
+
+      shared_report_append:
+        kind: xlsx_file
+        path: ./shared_report_append.xlsx
         write_lock: true
         allow_formulas: false
         write_defaults:
@@ -13,15 +22,27 @@ workflow:
           align_by: header
           header_policy: once
           on_mismatch: error
-          on_conflict: overwrite
 
-      sheetbook_report:
+      sheetbook_report_sheet:
         kind: xlsx_memory
         budget:
           max_sheets: 6
           max_total_cells: 200000
         export_xlsx:
-          path: ./sheetbook_report.xlsx
+          path: ./sheetbook_report_sheet.xlsx
+          write_lock: true
+          allow_formulas: false
+        write_defaults:
+          mode: sheet
+          on_conflict: overwrite
+
+      sheetbook_report_append:
+        kind: xlsx_memory
+        budget:
+          max_sheets: 6
+          max_total_cells: 200000
+        export_xlsx:
+          path: ./sheetbook_report_append.xlsx
           write_lock: true
           allow_formulas: false
         write_defaults:
@@ -29,7 +50,6 @@ workflow:
           align_by: field_id
           header_policy: once
           on_mismatch: error
-          on_conflict: overwrite
 
   runs:
     - id: detail_a

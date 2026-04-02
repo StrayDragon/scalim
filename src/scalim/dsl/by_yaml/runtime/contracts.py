@@ -53,9 +53,10 @@ class RunOverrides:
     outputs: Optional[Sequence["OutputOverride"]] = None
     resources: Optional["ResourcesOverride"] = None
     outputs_defaults: Optional["OutputsDefaultsOverride"] = None
+    output_extras: Optional["OutputExtrasOverride"] = None
     viz_config: Union[Optional["VizObserverConfig"], _UnsetType] = UNSET
 
-    def __post_init__(self) -> None:  # noqa: C901
+    def __post_init__(self) -> None:  # noqa: C901, PLR0912
         if self.outputs is not None:
             outputs = tuple(self.outputs)
             if not outputs:
@@ -93,6 +94,17 @@ class RunOverrides:
                 raise TypeError(msg)
             if not isinstance(self.outputs_defaults, OutputsDefaultsOverride):
                 msg = "RunOverrides.outputs_defaults must be an OutputsDefaultsOverride"
+                raise TypeError(msg)
+
+        if self.output_extras is not None:
+            if isinstance(self.output_extras, dict):
+                msg = (
+                    "Legacy YAML-shaped overrides are no longer supported: RunOverrides.output_extras=dict. "
+                    "Migrate to typed dataclasses: RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True))."
+                )
+                raise TypeError(msg)
+            if not isinstance(self.output_extras, OutputExtrasOverride):
+                msg = "RunOverrides.output_extras must be an OutputExtrasOverride"
                 raise TypeError(msg)
 
     @classmethod
@@ -138,6 +150,7 @@ class RunOverrides:
                     path=output_path,
                     allow_formulas=bool(allow_formulas),
                     write_lock=bool(write_lock),
+                    write_defaults=BookWriteDefaultsOverride(mode="sheet"),
                 )
             }
         )
@@ -146,7 +159,6 @@ class RunOverrides:
             fields=tuple(str(x) for x in fields),
             to=OutputToOverride(sheet=str(sheet)),
             write=OutputWriteOverride(
-                mode="sheet",
                 include_header=bool(include_header),
                 header_fields_output_by=str(header_fields_output_by),
             ),
@@ -174,15 +186,47 @@ class OutputWriteOverride:
     include_header: Optional[bool] = None
     header_fields_output_by: Optional[str] = None
 
-    mode: Optional[str] = None
-    align_by: Optional[str] = None
-    header_policy: Optional[str] = None
-    on_mismatch: Optional[str] = None
-    on_conflict: Optional[str] = None
-
     def __post_init__(self) -> None:
         header_by = str(self.header_fields_output_by).strip() if self.header_fields_output_by is not None else None
         object.__setattr__(self, "header_fields_output_by", header_by or None)
+
+
+@dataclass(frozen=True)
+class OutputExtraSheetOverride:
+    path: Optional[Union[str, "os.PathLike[str]"]] = None
+    sheet: Optional[str] = None
+    allow_formulas: Optional[bool] = None
+    write_lock: Optional[bool] = None
+
+    def __post_init__(self) -> None:
+        sheet = str(self.sheet).strip() if self.sheet is not None else None
+        object.__setattr__(self, "sheet", sheet or None)
+
+
+@dataclass(frozen=True)
+class OutputExtrasOverride:
+    """运行期输出附加工作表(例如 `meta`/`audit`).
+
+    注意:
+    - 该能力从 `YAML` 主线迁出,仅能通过运行入口参数(例如 `RunOverrides.output_extras`)配置.
+    """
+
+    meta: Optional[Union[bool, OutputExtraSheetOverride]] = None
+    audit: Optional[Union[bool, OutputExtraSheetOverride]] = None
+
+    def __post_init__(self) -> None:
+        def _validate(item: object, *, key: str) -> None:
+            if item is None:
+                return
+            if item is True or item is False:
+                return
+            if isinstance(item, OutputExtraSheetOverride):
+                return
+            msg = "{} must be a boolean or an OutputExtraSheetOverride".format(key)
+            raise TypeError(msg)
+
+        _validate(self.meta, key="meta")
+        _validate(self.audit, key="audit")
 
 
 @dataclass(frozen=True)

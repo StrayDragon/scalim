@@ -8,6 +8,7 @@ from scalim.dsl.by_yaml import (
     BookResourceOverride,
     BookWriteDefaultsOverride,
     FileResourceOverride,
+    OutputExtraSheetOverride,
     OutputDefaultsToOverride,
     OutputsDefaultsOverride,
     OutputOverride,
@@ -27,7 +28,6 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     OutputExtraSheetConfig,
     OutputTargetConfig,
     OutputToConfig,
-    OutputWriteConfig,
     ResourcesConfig,
 )
 from scalim.spec.ir._workflow import AppendSheetNodeIr, WorkflowAnyNodeIr, WorkflowEdgeIr, WorkflowNodeType, WriteSheetNodeIr
@@ -104,20 +104,112 @@ def test_workflow_compile_effective_book_binding_and_sheet_name_cover_branches()
     assert ref == "outputs.0.name"
 
 
+def test_workflow_compile_parse_output_extra_sheet_override_branches_cover_errors_and_success() -> None:
+    assert workflow_compile_mod._parse_output_extra_sheet_override(None, path="p") is None  # noqa: SLF001
+    assert workflow_compile_mod._parse_output_extra_sheet_override(False, path="p") is None  # noqa: SLF001
+
+    cfg = workflow_compile_mod._parse_output_extra_sheet_override(True, path="p")  # noqa: SLF001
+    assert cfg == OutputExtraSheetConfig()
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p must be a boolean or an OutputExtraSheetOverride"):
+        _ = workflow_compile_mod._parse_output_extra_sheet_override(1, path="p")  # noqa: SLF001
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p\.path must be a string or PathLike"):
+        _ = workflow_compile_mod._parse_output_extra_sheet_override(OutputExtraSheetOverride(path=1), path="p")  # noqa: SLF001
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p\.allow_formulas must be a bool"):
+        _ = workflow_compile_mod._parse_output_extra_sheet_override(
+            OutputExtraSheetOverride(allow_formulas="nope"),
+            path="p",
+        )  # noqa: SLF001
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p\.write_lock must be a bool"):
+        _ = workflow_compile_mod._parse_output_extra_sheet_override(
+            OutputExtraSheetOverride(write_lock="nope"),
+            path="p",
+        )  # noqa: SLF001
+
+    cfg = workflow_compile_mod._parse_output_extra_sheet_override(
+        OutputExtraSheetOverride(path="./a.xlsx", sheet=" S ", allow_formulas=True, write_lock=True),
+        path="p",
+    )  # noqa: SLF001
+    assert cfg is not None
+    assert cfg.path == "./a.xlsx"
+    assert cfg.sheet == "S"
+    assert cfg.allow_formulas is True
+    assert cfg.write_lock is True
+
+
 @pytest.mark.parametrize(
-    ("override", "match"),
+    ("patch", "match"),
     [
-        (OutputWriteConfig(mode="nope"), r"Invalid write\.mode"),
-        (OutputWriteConfig(align_by="nope"), r"Invalid write\.align_by"),
-        (OutputWriteConfig(header_policy="nope"), r"Invalid write\.header_policy"),
-        (OutputWriteConfig(on_mismatch="nope"), r"Invalid write\.on_mismatch"),
-        (OutputWriteConfig(on_conflict="nope"), r"Invalid write\.on_conflict"),
+        ({"nope": "x"}, r"contains unknown keys"),
+        ({"mode": 1}, r"p\.mode must be a string"),
+        ({"mode": "nope"}, r"Invalid write_defaults\.mode"),
+        ({"align_by": "nope"}, r"Invalid write_defaults\.align_by"),
+        ({"header_policy": "nope"}, r"Invalid write_defaults\.header_policy"),
+        ({"on_mismatch": "nope"}, r"Invalid write_defaults\.on_mismatch"),
+        ({"on_conflict": "nope"}, r"Invalid write_defaults\.on_conflict"),
     ],
 )
-def test_workflow_compile_overlay_write_defaults_invalid_enums_cover_branches(override: OutputWriteConfig, match: str) -> None:
+def test_workflow_compile_overlay_book_write_defaults_patch_error_branches_cover_paths(patch: dict, match: str) -> None:
     base = workflow_compile_mod._effective_write_defaults(BookConfig(kind="xlsx_file", path="a.xlsx"))  # noqa: SLF001
-    with pytest.raises(ValueError, match=match):
-        _ = workflow_compile_mod._overlay_write_defaults(base, override)  # noqa: SLF001
+    with pytest.raises(ScalimWorkflowConfigError, match=match):
+        _ = workflow_compile_mod._overlay_book_write_defaults_patch(base, patch, path="p")  # noqa: SLF001
+
+
+def test_workflow_compile_overlay_book_write_defaults_patch_allows_none_values_as_noop() -> None:
+    base = workflow_compile_mod._effective_write_defaults(BookConfig(kind="xlsx_file", path="a.xlsx"))  # noqa: SLF001
+    out = workflow_compile_mod._overlay_book_write_defaults_patch(base, {"mode": None}, path="p")  # noqa: SLF001
+    assert out == base
+
+
+def test_workflow_compile_apply_overrides_output_extras_rejects_invalid_type_cover_branches() -> None:
+    overrides = RunOverrides()
+    object.__setattr__(overrides, "output_extras", object())
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.output_extras must be an OutputExtrasOverride"):
+        _ = workflow_compile_mod._apply_overrides_output_extras(  # noqa: SLF001
+            {"a": DemandConfig()},
+            overrides=overrides,
+        )
+
+
+def test_workflow_compile_extra_sheets_unsupported_mode_branch_is_defensive_and_covered() -> None:
+    class _FlakyBooks:
+        def __init__(self, items: list) -> None:
+            self._items = list(items)
+
+        def get(self, _key: str, default=None):  # type: ignore[no-untyped-def]
+            if self._items:
+                return self._items.pop(0)
+            return default
+
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
+    cfg = DemandConfig(
+        outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(book="report", sheet="S"), fields=("a",)),),
+        meta=OutputExtraSheetConfig(sheet="__meta__"),
+    )
+
+    nodes: list[WorkflowAnyNodeIr] = []
+    edges: list[WorkflowEdgeIr] = []
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Unsupported books\.write_defaults\.mode"):
+        _ = workflow_compile_mod._append_write_nodes_from_runs(  # noqa: SLF001
+            wf_obj,
+            demand_cfg_by_run_id={"a": cfg},
+            nodes=nodes,
+            edges=edges,
+            effective_books=_FlakyBooks(
+                [
+                    BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="append")),
+                    BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="nope")),
+                ]
+            ),
+            effective_files={},
+            overrides_outputs=None,
+            default_book_id=None,
+        )
+    assert nodes
 
 
 def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
@@ -560,7 +652,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
                 name="detail",
                 fields=("a",),
                 to=OutputToOverride(book="report", sheet="S"),
-                write=OutputWriteOverride(mode="append"),
+                write=OutputWriteOverride(include_header=True),
             )
         ],
         default_book_id=None,
@@ -641,7 +733,6 @@ def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
             OutputTargetConfig(
                 name="detail",
                 to=OutputToConfig(book="report", sheet="S"),
-                write=OutputWriteConfig(mode="append", align_by="header"),
                 fields=("a",),
             ),
         ),
@@ -653,7 +744,13 @@ def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
             demand_cfg_by_run_id={"a": cfg},
             nodes=[],
             edges=[],
-            effective_books={"report": BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(max_sheets=1, max_total_cells=10))},
+            effective_books={
+                "report": BookConfig(
+                    kind="xlsx_memory",
+                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
+                    write_defaults=BookWriteDefaultsConfig(mode="append", align_by="header"),
+                )
+            },
             effective_files={},
             overrides_outputs=None,
             default_book_id=None,
@@ -742,7 +839,6 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             OutputTargetConfig(
                 name="detail",
                 to=OutputToConfig(book="report", sheet="S"),
-                write=OutputWriteConfig(mode="sheet"),
                 fields=("a",),
             ),
         ),

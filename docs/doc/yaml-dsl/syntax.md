@@ -47,8 +47,6 @@ sources: {}             # 可选: 不包含 main_source.source_id
 relations: {}           # 可选: 命名 relation 模板(供 YAML alias 复用)
 fields: {}              # 可选: 仅派生字段(必须 compute/call_by 二选一)
 
-meta: false             # 可选: true 或对象(写入 meta sheet)
-audit: false            # 可选: true 或对象(写入 audit sheet)
 outputs: []             # 可选: 多输出编排(有序列表)
 include_full_error_message: false    # 可选
 ```
@@ -57,6 +55,7 @@ include_full_error_message: false    # 可选
 
 - 顶层已不再支持旧写法 `output:`(会 fail-fast).请使用 `outputs:`(有序列表)描述输出编排.
 - `outputs` 可省略.省略时默认不写文件;如需写文件,请在 YAML 中声明 `outputs` 或在 Python 调用侧使用 `overrides.outputs` 显式指定(整体替换,replace).
+- `meta`/`audit` 已从 YAML 主线迁出(属于 runtime output extras);请在运行入口通过 `overrides.output_extras` 配置.
 - `field_id` 必须全局唯一(不再支持 `source.field_id` 消歧).
 - YAML 主线已不再支持 `observability.*`(legacy key 会 warning + ignore);请在 runtime entrypoints 使用 `components=[...]` / `overrides=RunOverrides(viz_config=...)` 配置观测.
 - `batch_size`/`retry`/`guardrails`/demand `failure_policy` 属于 runtime policy boundary,不再允许出现在 YAML 主线;请在 runtime entrypoints 配置:
@@ -261,15 +260,11 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 辅助配置:
 
 - 顶层 `failure_policy` / `include_full_error_message` 控制 composed outputs 的失败策略与错误信息脱敏
-- 顶层 `meta` / `audit` 可开启额外 sheet(默认写入 primary Excel 输出的 book)
-- 若运行时没有任何 Excel 输出可作为默认 book,则 `meta/audit` 可能被跳过；如需强制输出,请显式设置 `meta.path` / `audit.path`
+- `meta/audit` 属于 runtime output extras,已从 YAML 主线迁出;请在运行入口通过 `RunOverrides.output_extras` 启用
 
 一个最小示例:
 
 ```yaml
-meta: true
-audit: true
-
 resources:
   books:
     report:
@@ -297,6 +292,18 @@ outputs:
       fields:
         order_cnt: {count: {}}
         sum_amount: {sum: {field: amount_yuan}}
+```
+
+如需输出 meta/audit extra sheets,请在 Python 运行入口配置:
+
+```python
+from scalim.dsl.by_yaml import OutputExtrasOverride, RunOverrides, run
+
+result = run(
+    "path/to/config.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)),
+)
 ```
 
 ## 8. 校验与排错: 先用什么命令

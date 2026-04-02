@@ -23,8 +23,6 @@ Sources:
 - `outputs`: type=array[ref=output_target]; 输出目标列表(有序; 可选). - 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体) - 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs` - 通过 `where` 分发到不同 sheet - 通过 `aggregate` 声明派生汇总输出 - 通过 `from` 复用字段集合与容器配置 - 不再支持旧写法: 顶层 `output:`
 - `validate_unique_field_names`: type=boolean; 预检查: 字段有效展示名(`effective display name`)全局唯一. - 默认启用: 未声明时等价 `true` - 有效展示名定义: - 若 `field.name` 非空: 使用 `name` - 否则回退为 `field_id` - 仅当 `effective outputs` 会输出表头且 `header_fields_output_by: name` 时触发 - file: `write.include_header: true` 且 `write.header_fields_output_by: name` - book: 该 output 会输出表头,且 `write.header_fields_output_by: name` - 显式设置为 `false` 可关闭该检查(不推荐长期使用)
 - `include_full_error_message`: type=boolean; 包含完整错误信息(可能包含敏感信息;默认 false).
-- `meta`: ref=output_extra_sheet; 可选:启用 meta sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径
-- `audit`: ref=output_extra_sheet; 可选:启用 audit sheet. - `true` 表示启用并使用默认配置 - 对象形式可覆盖 sheet 名称与 workbook 路径
 
 ## Definitions
 
@@ -148,13 +146,8 @@ Sources:
 
 ### `output_write`
 - `$import`: $import 引用(支持 string 或 string list)
-- `align_by`: type=string; enum=field_id|header; 可选:字段对齐策略(field_id/header;仅 append 生效)
 - `header_fields_output_by`: type=string; default=name; enum=field_id|name; 可选:表头字段名来源(field_id/name;默认 name)
-- `header_policy`: type=string; enum=once|always|never; 可选:表头策略(once/always/never;仅 append 生效)
 - `include_header`: type=boolean; default=true; 可选:是否输出表头(默认 true)
-- `mode`: type=string; enum=sheet|append; 可选:写入语义(sheet/append)
-- `on_conflict`: type=string; enum=error|overwrite|skip; 可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)
-- `on_mismatch`: type=string; enum=error|warn|skip; 可选:字段不匹配策略(error/warn/skip;仅 append 生效)
 
 ### `relation`
 - `$import`: $import 引用(支持 string 或 string list)

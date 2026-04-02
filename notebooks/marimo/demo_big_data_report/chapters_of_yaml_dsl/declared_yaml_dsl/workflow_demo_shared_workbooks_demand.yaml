@@ -6,7 +6,8 @@ description: |
 
   Notes:
   - workflow manages the book resources (paths/budgets/export)
-  - demand defines stable output contracts: `outputs[*].to` + `outputs[*].write`
+  - demand defines stable output contracts: `outputs[*].to` (+ optional output-local header behavior via `outputs[*].write`)
+  - workbook write policy is controlled by `resources.books.*.write_defaults` (in this demo, declared in workflow YAML)
 
 # NOTE: `batch_size` moved out of YAML runtime policy boundary.
 # Pass via workflow runtime entrypoints, e.g. `run_workflow(..., batch_size=30)`.
@@ -27,41 +28,25 @@ outputs:
   # overwrite each run (final rows == single run)
   - name: detail_workbook
     to:
-      book: shared_report
+      book: shared_report_sheet
       sheet: Detail
-    write:
-      mode: sheet
-      on_conflict: overwrite
     fields: &detail_fields [order_id, order_date, quantity, unit_price]
 
   # append across runs (final rows == 2x single run)
   - name: detail_workbook_append
     to:
-      book: shared_report
+      book: shared_report_append
       sheet: DetailAppend
-    write:
-      mode: append
-      align_by: header
-      header_policy: once
-      on_mismatch: error
     fields: *detail_fields
 
   - name: detail_sheetbook
     to:
-      book: sheetbook_report
+      book: sheetbook_report_sheet
       sheet: Detail
-    write:
-      mode: sheet
-      on_conflict: overwrite
     fields: *detail_fields
 
   - name: detail_sheetbook_append
     to:
-      book: sheetbook_report
+      book: sheetbook_report_append
       sheet: DetailAppend
-    write:
-      mode: append
-      align_by: field_id
-      header_policy: once
-      on_mismatch: error
     fields: *detail_fields

@@ -90,7 +90,7 @@ def _raw_output_book_write_value(config: Dict[str, Any], *, book_id: str, key: s
     return value or default
 
 
-def _output_item_requires_unique_effective_display_names(  # noqa: C901, PLR0911, PLR0912
+def _output_item_requires_unique_effective_display_names(  # noqa: C901, PLR0911
     config: Dict[str, Any], output_item: object
 ) -> bool:
     if not isinstance(output_item, dict):
@@ -131,10 +131,7 @@ def _output_item_requires_unique_effective_display_names(  # noqa: C901, PLR0911
         key=BOOK_WRITE_DEFAULTS_KEYS["mode"],
         default=DEFAULT_BOOK_WRITE_MODE,
     )
-    if write_dict is not None:
-        mode_raw = write_dict.get(OUTPUT_WRITE_KEYS["mode"])
-        if isinstance(mode_raw, str) and mode_raw.strip():
-            effective_mode = mode_raw.strip()
+    effective_mode = effective_mode.strip().lower()
 
     if effective_mode == "append":
         header_policy = _raw_output_book_write_value(
@@ -143,11 +140,7 @@ def _output_item_requires_unique_effective_display_names(  # noqa: C901, PLR0911
             key=BOOK_WRITE_DEFAULTS_KEYS["header_policy"],
             default=DEFAULT_BOOK_WRITE_HEADER_POLICY,
         )
-        if write_dict is not None:
-            header_policy_raw = write_dict.get(OUTPUT_WRITE_KEYS["header_policy"])
-            if isinstance(header_policy_raw, str) and header_policy_raw.strip():
-                header_policy = header_policy_raw.strip()
-        return header_policy != "never"
+        return header_policy.strip().lower() != "never"
 
     include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
     if isinstance(write_raw, dict):
@@ -239,6 +232,102 @@ class ConfigValidator(ValidatorFieldsMixin):
         cleaned = self._strip_removed_demand_runtime_policy_top_level(cleaned, issues)
         cleaned = self._strip_removed_demand_runtime_policy_main_source_retry(cleaned, issues)
         return self._strip_removed_demand_runtime_policy_sources_retry(cleaned, issues)
+
+    def _error_and_strip_removed_output_extras_fields(
+        self,
+        config: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        cleaned = dict(config)
+
+        meta_msg = "YAML key 'meta' was moved out of YAML mainline (output extras boundary). "
+        meta_msg = (
+            meta_msg
+            + "Hint: configure meta sheet via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True)))."
+        )
+
+        audit_msg = "YAML key 'audit' was moved out of YAML mainline (output extras boundary). "
+        audit_msg = (
+            audit_msg
+            + "Hint: configure audit sheet via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., overrides=RunOverrides(output_extras=OutputExtrasOverride(audit=True)))."
+        )
+
+        removed: Tuple[Tuple[str, str], ...] = (
+            ("meta", meta_msg),
+            ("audit", audit_msg),
+        )
+
+        for key, msg in removed:
+            if key not in cleaned:
+                continue
+            ConfigValidator._append_removed_runtime_policy_error(issues, path=str(key), msg=msg)
+            cleaned.pop(key, None)
+
+        return cleaned
+
+    def _error_and_strip_removed_output_write_workbook_fields(
+        self,
+        config: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        outputs_raw = config.get("outputs")
+        outputs = cast("Optional[List[object]]", outputs_raw if isinstance(outputs_raw, list) else None)
+        if not outputs:
+            return config
+
+        next_config: Optional[Dict[str, Any]] = None
+        for idx, out_raw in enumerate(outputs):
+            out = cast("Optional[Dict[str, Any]]", out_raw if isinstance(out_raw, dict) else None)
+            if out is None:
+                continue
+
+            write_raw = out.get("write")
+            write_cfg = cast("Optional[Dict[str, Any]]", write_raw if isinstance(write_raw, dict) else None)
+            if write_cfg is None:
+                continue
+
+            removed: Tuple[str, ...] = (
+                "mode",
+                "align_by",
+                "header_policy",
+                "on_mismatch",
+                "on_conflict",
+            )
+
+            removed_any = False
+            next_write = dict(write_cfg)
+            for key in removed:
+                if key not in write_cfg:
+                    continue
+                removed_any = True
+                ConfigValidator._append_removed_runtime_policy_error(
+                    issues,
+                    path="outputs.{}.write.{}".format(int(idx), str(key)),
+                    msg=(
+                        "YAML key 'outputs[*].write.{}' was moved out of output-local write config. "
+                        "Hint: configure workbook write policy via resources.books.*.write_defaults.{}."
+                    ).format(str(key), str(key)),
+                )
+                next_write.pop(key, None)
+
+            if not removed_any:
+                continue
+
+            if next_config is None:
+                next_config = dict(config)
+
+            next_outputs = list(cast("List[object]", next_config.get("outputs") or []))
+            next_out = dict(out)
+            if next_write:
+                next_out["write"] = next_write
+            else:
+                next_out.pop("write", None)
+            next_outputs[int(idx)] = next_out
+            next_config["outputs"] = next_outputs
+
+        return config if next_config is None else next_config
 
     @staticmethod
     def _strip_removed_demand_runtime_policy_top_level(
@@ -388,6 +477,8 @@ class ConfigValidator(ValidatorFieldsMixin):
         errors: List[ValidationIssue] = []
         config = self._warn_and_strip_legacy_observability(config, errors)
         config = self._error_and_strip_removed_demand_runtime_policy_fields(config, errors)
+        config = self._error_and_strip_removed_output_extras_fields(config, errors)
+        config = self._error_and_strip_removed_output_write_workbook_fields(config, errors)
         raw = RawDemand.from_raw(config)
 
         self._validate_required_fields(raw.data, errors)

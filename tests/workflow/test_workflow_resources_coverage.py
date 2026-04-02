@@ -576,6 +576,50 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
     assert rows == [{"id": "b1", "value": "B1"}]
 
 
+def test_resource_manager_sheetbook_sheet_budget_max_sheets_is_enforced(tmp_path: Path) -> None:
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=1,
+                budget_max_total_cells=1000,
+                export_path=None,
+                export_write_lock=False,
+            )
+        },
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+
+    manager.apply_sheetbook_sheet(
+        workflow_node_id="n0",
+        decl_order=0,
+        sheetbook_id="sb",
+        sheet="S1",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        on_conflict="error",
+    )
+
+    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="max_sheets"):
+        manager.apply_sheetbook_sheet(
+            workflow_node_id="n1",
+            decl_order=1,
+            sheetbook_id="sb",
+            sheet="S2",
+            input_node_id="b",
+            input_output_id="detail",
+            input_csv=str(first),
+            on_conflict="error",
+        )
+
+
 def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
     manager = resources_mod.WorkflowResourceManager(

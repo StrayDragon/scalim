@@ -4,8 +4,11 @@ from typing import Any
 import pytest
 
 from scalim.dsl.by_yaml import (
+    BookResourceOverride,
+    BookWriteDefaultsOverride,
     FileResourceOverride,
     OutputOverride,
+    OutputExtrasOverride,
     OutputToOverride,
     OutputWriteOverride,
     ResourcesOverride,
@@ -144,20 +147,6 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                         name="detail",
                         fields=("order_id",),
                         to=OutputToOverride(file="detail_csv"),
-                        write=OutputWriteOverride(mode="append"),
-                    ),
-                )
-            ),
-            ValueError,
-            r"overrides\.outputs\.0\.write\.mode only apply to book outputs",
-        ),
-        (
-            lambda: RunOverrides(
-                outputs=(
-                    OutputOverride(
-                        name="detail",
-                        fields=("order_id",),
-                        to=OutputToOverride(file="detail_csv"),
                         write=OutputWriteOverride(header_fields_output_by="bad"),
                     ),
                 )
@@ -172,9 +161,18 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                         name="detail",
                         fields=("order_id",),
                         to=OutputToOverride(book="report", sheet="Detail"),
-                        write=OutputWriteOverride(mode="append", include_header=True),
+                        write=OutputWriteOverride(include_header=True),
                     ),
-                )
+                ),
+                resources=ResourcesOverride(
+                    books={
+                        "report": BookResourceOverride(
+                            kind="xlsx_file",
+                            path="./out.xlsx",
+                            write_defaults=BookWriteDefaultsOverride(mode="append"),
+                        )
+                    }
+                ),
             ),
             ValueError,
             r"write\.include_header is not allowed for append-mode book outputs",
@@ -191,7 +189,6 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
         "to-sheet-not-allowed-with-file",
         "to-file-and-book-conflict",
         "missing-destination",
-        "file-output-book-write-conflict",
         "write-header-by-invalid",
         "append-book-output-include-header-not-allowed",
     ],
@@ -282,7 +279,6 @@ main_source:
   loader: tests.fixtures.mock_loaders.mock_loader
   fields:
     order_id: {extract: order_id}
-meta: true
 sources: {}
 """,
     )
@@ -291,6 +287,7 @@ sources: {}
         str(yaml_path),
         allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
         overrides=RunOverrides(
+            output_extras=OutputExtrasOverride(meta=True),
             outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
             resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
         ),

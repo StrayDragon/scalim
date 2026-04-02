@@ -6,6 +6,7 @@
 """
 
 import math
+import os
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
@@ -33,6 +34,8 @@ from ._internal.config_parsing.loader import YamlDemandLoader
 from .runtime.contracts import (
     BookResourceOverride,
     FileResourceOverride,
+    OutputExtraSheetOverride,
+    OutputExtrasOverride,
     OutputOverride,
     OutputsDefaultsOverride,
     OutputToOverride,
@@ -49,6 +52,7 @@ from .schema_dsl.models import (
     BookWriteDefaultsConfig,
     DemandConfig,
     FileConfig,
+    OutputExtraSheetConfig,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
@@ -188,31 +192,70 @@ def _effective_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
     )
 
 
-def _overlay_write_defaults(base: BookWriteDefaultsConfig, override: Optional[OutputWriteConfig]) -> BookWriteDefaultsConfig:
-    if override is None:
-        return base
+def _overlay_book_write_defaults_patch(  # noqa: C901
+    base: BookWriteDefaultsConfig,
+    patch: Dict[str, Any],
+    *,
+    path: str,
+) -> BookWriteDefaultsConfig:
+    allowed_keys = {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"}
+    unknown = sorted({str(k) for k in patch} - allowed_keys)
+    if unknown:
+        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
+        raise ScalimWorkflowConfigError(msg, path=path)
 
-    mode = base.mode if override.mode is None else str(override.mode)
-    align_by = base.align_by if override.align_by is None else str(override.align_by)
-    header_policy = base.header_policy if override.header_policy is None else str(override.header_policy)
-    on_mismatch = base.on_mismatch if override.on_mismatch is None else str(override.on_mismatch)
-    on_conflict = base.on_conflict if override.on_conflict is None else str(override.on_conflict)
+    def _as_opt_str(key: str) -> Optional[str]:
+        if key not in patch:
+            return None
+        raw = patch.get(key)
+        if raw is None:
+            return None
+        if not isinstance(raw, str):
+            msg = "{}.{} must be a string".format(path, key)
+            raise ScalimWorkflowConfigError(msg, path="{}.{}".format(path, key))
+        v = str(raw).strip()
+        return v or None
+
+    mode = str(base.mode or DEFAULT_BOOK_WRITE_MODE)
+    align_by = str(base.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY)
+    header_policy = str(base.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY)
+    on_mismatch = str(base.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH)
+    on_conflict = str(base.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT)
+
+    raw_mode = _as_opt_str("mode")
+    raw_align_by = _as_opt_str("align_by")
+    raw_header_policy = _as_opt_str("header_policy")
+    raw_on_mismatch = _as_opt_str("on_mismatch")
+    raw_on_conflict = _as_opt_str("on_conflict")
+
+    if raw_mode is not None:
+        mode = raw_mode
+    if raw_align_by is not None:
+        align_by = raw_align_by
+    if raw_header_policy is not None:
+        header_policy = raw_header_policy
+    if raw_on_mismatch is not None:
+        on_mismatch = raw_on_mismatch
+    if raw_on_conflict is not None:
+        on_conflict = raw_on_conflict
 
     if mode not in BOOK_WRITE_MODE_ENUM:
-        msg = "Invalid write.mode={!r}; expected one of: {}".format(mode, ", ".join(BOOK_WRITE_MODE_ENUM))
-        raise ValueError(msg)
+        msg = "Invalid write_defaults.mode={!r}; expected one of: {}".format(mode, ", ".join(BOOK_WRITE_MODE_ENUM))
+        raise ScalimWorkflowConfigError(msg, path="{}.mode".format(path))
     if align_by not in BOOK_WRITE_ALIGN_BY_ENUM:
-        msg = "Invalid write.align_by={!r}; expected one of: {}".format(align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
-        raise ValueError(msg)
+        msg = "Invalid write_defaults.align_by={!r}; expected one of: {}".format(align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
+        raise ScalimWorkflowConfigError(msg, path="{}.align_by".format(path))
     if header_policy not in BOOK_WRITE_HEADER_POLICY_ENUM:
-        msg = "Invalid write.header_policy={!r}; expected one of: {}".format(header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM))
-        raise ValueError(msg)
+        msg = "Invalid write_defaults.header_policy={!r}; expected one of: {}".format(
+            header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM)
+        )
+        raise ScalimWorkflowConfigError(msg, path="{}.header_policy".format(path))
     if on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
-        msg = "Invalid write.on_mismatch={!r}; expected one of: {}".format(on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM))
-        raise ValueError(msg)
+        msg = "Invalid write_defaults.on_mismatch={!r}; expected one of: {}".format(on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM))
+        raise ScalimWorkflowConfigError(msg, path="{}.on_mismatch".format(path))
     if on_conflict not in BOOK_WRITE_ON_CONFLICT_ENUM:
-        msg = "Invalid write.on_conflict={!r}; expected one of: {}".format(on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM))
-        raise ValueError(msg)
+        msg = "Invalid write_defaults.on_conflict={!r}; expected one of: {}".format(on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM))
+        raise ScalimWorkflowConfigError(msg, path="{}.on_conflict".format(path))
 
     return BookWriteDefaultsConfig(
         mode=str(mode),
@@ -227,27 +270,20 @@ def _validate_xlsx_memory_align_by(
     *,
     book: BookConfig,
     book_id: str,
-    out_cfg: OutputTargetConfig,
-    idx: int,
-    outputs_path: str,
 ) -> None:
     if str(book.kind or "").strip() != "xlsx_memory":
         return
 
-    effective_defaults = _overlay_write_defaults(_effective_write_defaults(book), out_cfg.write)
+    effective_defaults = _effective_write_defaults(book)
     if str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE) != "append":
         return
     if str(effective_defaults.align_by or "") != "header":
         return
 
-    align_by_path = (
-        "{}.{}.write.align_by".format(str(outputs_path), int(idx))
-        if out_cfg.write is not None and out_cfg.write.align_by is not None
-        else "resources.books.{}.write_defaults.align_by".format(str(book_id))
-    )
+    align_by_path = "resources.books.{}.write_defaults.align_by".format(str(book_id))
     msg = (
-        "books.kind=xlsx_memory does not support write.align_by=header; "
-        "internal rows only use canonical field keys. Migrate to write.align_by=field_id "
+        "books.kind=xlsx_memory does not support write_defaults.align_by=header; "
+        "internal rows only use canonical field keys. Migrate to resources.books.<book_id>.write_defaults.align_by=field_id "
         "and keep write.header_fields_output_by for export display (book_id={!r})"
     ).format(str(book_id))
     raise ScalimWorkflowConfigError(msg, path=str(align_by_path))
@@ -375,15 +411,7 @@ def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
                     write_defaults=write_defaults,
                 )
             )
-            override_cfg = OutputWriteConfig(
-                mode=raw_dict.get("mode"),
-                align_by=raw_dict.get("align_by"),
-                header_policy=raw_dict.get("header_policy"),
-                header_fields_output_by=raw_dict.get("header_fields_output_by"),
-                on_mismatch=raw_dict.get("on_mismatch"),
-                on_conflict=raw_dict.get("on_conflict"),
-            )
-            write_defaults = _overlay_write_defaults(base_defaults, override_cfg)
+            write_defaults = _overlay_book_write_defaults_patch(base_defaults, raw_dict, path="{}.write_defaults".format(path))
 
     # 校验 `kind` 分支约束(与 `YAML` 解析器语义保持一致).
     if kind == "xlsx_file":
@@ -959,6 +987,66 @@ def _load_demands(
     return demand_cfg_by_run_id
 
 
+def _parse_output_extra_sheet_override(
+    raw: object,
+    *,
+    path: str,
+) -> Optional[OutputExtraSheetConfig]:
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        if not raw:
+            return None
+        return OutputExtraSheetConfig()
+    if not isinstance(raw, OutputExtraSheetOverride):
+        msg = "{} must be a boolean or an OutputExtraSheetOverride".format(path)
+        raise ScalimWorkflowConfigError(msg, path=str(path))
+
+    sheet = str(raw.sheet).strip() if raw.sheet is not None else None
+
+    raw_path = raw.path
+    if raw_path is not None and not isinstance(raw_path, (str, os.PathLike)):
+        msg = "{}.path must be a string or PathLike".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+    resolved_path = str(raw_path) if raw_path is not None else None
+
+    allow_formulas = raw.allow_formulas
+    if allow_formulas is not None and not isinstance(allow_formulas, bool):
+        msg = "{}.allow_formulas must be a bool".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
+
+    write_lock = raw.write_lock
+    if write_lock is not None and not isinstance(write_lock, bool):
+        msg = "{}.write_lock must be a bool".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+
+    return OutputExtraSheetConfig(
+        path=resolved_path,
+        sheet=sheet,
+        allow_formulas=allow_formulas,
+        write_lock=write_lock,
+    )
+
+
+def _apply_overrides_output_extras(
+    demand_cfg_by_run_id: Dict[str, DemandConfig], *, overrides: Optional[RunOverrides]
+) -> Dict[str, DemandConfig]:
+    if overrides is None or overrides.output_extras is None:
+        return demand_cfg_by_run_id
+    extras = overrides.output_extras
+    if not isinstance(extras, OutputExtrasOverride):
+        msg = "overrides.output_extras must be an OutputExtrasOverride"
+        raise ScalimWorkflowConfigError(msg, path="overrides.output_extras")
+
+    meta = _parse_output_extra_sheet_override(extras.meta, path="overrides.output_extras.meta")
+    audit = _parse_output_extra_sheet_override(extras.audit, path="overrides.output_extras.audit")
+
+    next_cfg: Dict[str, DemandConfig] = {}
+    for run_id, cfg in demand_cfg_by_run_id.items():
+        next_cfg[str(run_id)] = replace(cfg, meta=meta, audit=audit)
+    return next_cfg
+
+
 def _parse_overrides_outputs_defaults_book_id(defaults: Optional[OutputsDefaultsOverride]) -> Optional[str]:
     if defaults is None:
         return None
@@ -1056,12 +1144,7 @@ def _effective_outputs_for_workflow_compile(  # noqa: C901
             write_raw = cast("Any", write_obj)  # pragma: allow-cast typed override field access boundary
             write_cfg = OutputWriteConfig(
                 include_header=write_raw.include_header,
-                mode=write_raw.mode,
-                align_by=write_raw.align_by,
-                header_policy=write_raw.header_policy,
                 header_fields_output_by=write_raw.header_fields_output_by,
-                on_mismatch=write_raw.on_mismatch,
-                on_conflict=write_raw.on_conflict,
             )
 
         outputs.append(
@@ -1140,9 +1223,6 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             _validate_xlsx_memory_align_by(
                 book=book,
                 book_id=str(book_id),
-                out_cfg=out_cfg,
-                idx=int(out_idx),
-                outputs_path=outputs_path,
             )
 
             sheet_name, sheet_ref_path = _effective_sheet_name_for_output(out_cfg, idx=int(out_idx), outputs_path=outputs_path)
@@ -1152,7 +1232,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from None
 
             base_defaults = _effective_write_defaults(book)
-            effective_defaults = _overlay_write_defaults(base_defaults, out_cfg.write)
+            effective_defaults = base_defaults
             mode = str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
 
             node_id = "{}write.{}.{}".format(_INTERNAL_NODE_ID_PREFIX, str(run.id), int(next_write_idx))
@@ -1252,14 +1332,11 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 raise ScalimWorkflowConfigError(msg, path=str(default_book_ref))
 
             base_defaults = _effective_write_defaults(book)
-            effective_defaults = _overlay_write_defaults(base_defaults, None)
+            effective_defaults = base_defaults
             mode = str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
             _validate_xlsx_memory_align_by(
                 book=book,
                 book_id=str(default_book_id),
-                out_cfg=OutputTargetConfig(name="__extra__", write=None),
-                idx=0,
-                outputs_path="resources.books.{}".format(str(default_book_id)),
             )
 
             for extra_id, extra_cfg_obj, default_sheet in extras:
@@ -1542,6 +1619,7 @@ def compile_workflow_ir(
         template_vars=template_vars,
         allowed_yaml_roots=allowed_yaml_roots,
     )
+    demand_cfg_by_run_id = _apply_overrides_output_extras(demand_cfg_by_run_id, overrides=overrides_typed)
 
     overrides_resources = None if overrides_typed is None else overrides_typed.resources
     overrides_outputs = None if overrides_typed is None else overrides_typed.outputs

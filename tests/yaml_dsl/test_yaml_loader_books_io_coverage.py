@@ -166,19 +166,19 @@ def test_loader_parse_book_write_defaults_branches_cover_invalid_enums_and_succe
 def test_outputs_parser_write_enum_errors_cover_branches() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"o\.mode=.*expected one of"):
+    with pytest.raises(ValueError, match=r"o\.mode was moved out of outputs\[\*\]\.write"):
         _ = loader._parse_output_write({"mode": "nope"}, base_path="o")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"o\.align_by=.*expected one of"):
+    with pytest.raises(ValueError, match=r"o\.align_by was moved out of outputs\[\*\]\.write"):
         _ = loader._parse_output_write({"align_by": "nope"}, base_path="o")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"o\.header_policy=.*expected one of"):
+    with pytest.raises(ValueError, match=r"o\.header_policy was moved out of outputs\[\*\]\.write"):
         _ = loader._parse_output_write({"header_policy": "nope"}, base_path="o")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"o\.on_mismatch=.*expected one of"):
+    with pytest.raises(ValueError, match=r"o\.on_mismatch was moved out of outputs\[\*\]\.write"):
         _ = loader._parse_output_write({"on_mismatch": "nope"}, base_path="o")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"o\.on_conflict=.*expected one of"):
+    with pytest.raises(ValueError, match=r"o\.on_conflict was moved out of outputs\[\*\]\.write"):
         _ = loader._parse_output_write({"on_conflict": "nope"}, base_path="o")  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"o\.header_fields_output_by=.*expected one of"):
@@ -190,6 +190,10 @@ def test_outputs_parser_write_enum_errors_cover_branches() -> None:
 
 def test_outputs_parser_binding_semantics_errors_cover_branches() -> None:
     loader = YamlDemandLoader()
+
+    with pytest.raises(ValueError, match=r"outputs\.0\.to is required"):
+        t = OutputTargetConfig(name="detail", fields=("a",))
+        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"declare exactly one of to\.file or to\.book"):
         t = OutputTargetConfig(
@@ -203,24 +207,6 @@ def test_outputs_parser_binding_semantics_errors_cover_branches() -> None:
         t = OutputTargetConfig(
             name="detail",
             to=OutputToConfig(file="detail_csv", sheet="Detail"),
-            fields=("a",),
-        )
-        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"outputs\.0\.write\.mode only apply to book outputs"):
-        t = OutputTargetConfig(
-            name="detail",
-            to=OutputToConfig(file="detail_csv"),
-            write=OutputWriteConfig(mode="append"),
-            fields=("a",),
-        )
-        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"outputs\.0\.write\.include_header is not allowed for append-mode book outputs"):
-        t = OutputTargetConfig(
-            name="detail",
-            to=OutputToConfig(book="report", sheet="Detail"),
-            write=OutputWriteConfig(mode="append", include_header=True),
             fields=("a",),
         )
         loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001

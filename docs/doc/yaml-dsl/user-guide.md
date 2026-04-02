@@ -304,9 +304,6 @@ relations:
 定义报表的多输出编排(有序列表),支持 Excel 多 sheet 分发(where)与派生汇总(aggregate):
 
 ```yaml
-meta: true
-audit: true
-
 resources:
   books:
     report:
@@ -339,6 +336,8 @@ outputs:
 提示:
 
 - 旧写法 `outputs[*].container` 已移除;请改用 `resources.files` + `outputs.*.to.file`(CSV) 与 `resources.books` + `outputs.*.to.book/to.sheet`(Excel)
+- `meta`/`audit` 已从 YAML 主线迁出(属于 runtime output extras);如需输出这些 extra sheets,请在 Python 运行入口通过
+  `overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True))` 配置(见 4.5)
 
 ---
 
@@ -1227,7 +1226,7 @@ sources:
 
 ### 4.5 多输出编排与派生汇总 (outputs / output_composition)
 
-`YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 Excel 多 sheet / where 分发 / aggregate 派生汇总 / meta/audit),
+`YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 Excel 多 sheet / where 分发 / aggregate 派生汇总),
 运行时会将其编译为执行层的 `ExecutionRequest.output_composition`.
 
 关键点:
@@ -1236,10 +1235,10 @@ sources:
 - 当多个 outputs 绑定到同一 book 时,建议显式设置 `outputs[*].to.sheet`(或确保 `outputs[*].name` 本身是合法且唯一的 sheet 名)
 - Python 调用侧可通过 `RunOverrides.outputs` **整体替换** YAML 的 `outputs`(replace).优先级: `RunOverrides.outputs` > YAML `outputs` > 默认(不写文件;仅 sink 保留数据)
 - `RunOverrides.outputs` 必须为非空序列,且元素为 `OutputOverride`;本版本仅承诺最小子集: `name/to/write/fields`(不支持 `where/from/aggregate`)
-- 若 `RunOverrides.outputs` 使运行期不再存在可作为默认目标的 Excel 输出,则未显式设置 `path` 的 `meta/audit` 可能会被跳过;
-  若仍需输出这些 extra sheets,请显式配置 `meta.path` / `audit.path`
+- `meta/audit` 等 Excel extra sheets 不再属于 YAML authoring surface,请在运行入口通过 `RunOverrides.output_extras` 配置
+  (例如 `RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True))`)
 
-#### 4.5.1 示例: YAML 声明多 sheet(明细 + 汇总 + meta + audit)
+#### 4.5.1 示例: YAML 声明多 sheet(明细 + 汇总) + runtime output extras(meta/audit)
 
 ```yaml
 resources:
@@ -1264,8 +1263,18 @@ outputs:
         order_cnt: {count: {field: order_id}}
         sum_amount: {sum: {field: amount}}
         sum_profit: {sum: {field: profit}}
-meta: true
-audit: true
+```
+
+如需输出 meta/audit extra sheets,请在 Python 运行入口配置 runtime output extras:
+
+```python
+from scalim.dsl.by_yaml import OutputExtrasOverride, RunOverrides, run
+
+result = run(
+    "path/to/config.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
+    overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)),
+)
 ```
 
 #### 4.5.2 示例: Python 运行期覆盖 outputs(动态选字段/路径/sheet)

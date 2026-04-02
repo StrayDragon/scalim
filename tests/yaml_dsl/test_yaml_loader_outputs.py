@@ -300,5 +300,7 @@ outputs:
     write: {mode: append}
     fields: [order_id]
 """
-    with pytest.raises(ValueError, match=r"outputs\.0\.write\.mode only apply to book outputs"):
+    with pytest.raises(ScalimYamlValidationError) as exc:
         _ = _load(yaml_content)
+    assert any(env.path == "outputs.0.write.mode" for env in exc.value.errors)
+    assert any("moved out of output-local write config" in env.message for env in exc.value.errors)

@@ -328,7 +328,7 @@ def test_compile_output_composition_append_mode_rejects_include_header() -> None
             OutputTargetConfig(
                 name="detail",
                 to=OutputToConfig(book="report", sheet="Detail"),
-                write=OutputWriteConfig(mode="append", include_header=True),
+                write=OutputWriteConfig(include_header=True),
                 fields=("a",),
             ),
         ),
@@ -544,41 +544,16 @@ def test_compile_output_composition_books_write_override_changes_header_source()
     assert spec.targets[0].layout.header_names is None
 
 
-def test_validate_xlsx_memory_write_contract_reports_output_local_align_by_path() -> None:
-    book = BookConfig(kind="xlsx_memory")
-    out_cfg = OutputTargetConfig(
-        name="detail",
-        to=OutputToConfig(book="report", sheet="明细"),
-        write=OutputWriteConfig(align_by="header"),
-    )
-
-    with pytest.raises(ValueError, match=r"outputs\.0\.write\.align_by"):
-        oc_yaml._validate_xlsx_memory_write_contract(  # noqa: SLF001
-            book=book,
-            book_id="report",
-            out_cfg=out_cfg,
-            idx=0,
-            outputs_path="outputs",
-        )
-
-
 def test_validate_xlsx_memory_write_contract_reports_book_default_align_by_path() -> None:
     book = BookConfig(
         kind="xlsx_memory",
         write_defaults=BookWriteDefaultsConfig(mode="append", align_by="header"),
-    )
-    out_cfg = OutputTargetConfig(
-        name="detail",
-        to=OutputToConfig(book="report", sheet="明细"),
     )
 
     with pytest.raises(ValueError, match=r"resources\.books\.report\.write_defaults\.align_by"):
         oc_yaml._validate_xlsx_memory_write_contract(  # noqa: SLF001
             book=book,
             book_id="report",
-            out_cfg=out_cfg,
-            idx=0,
-            outputs_path="outputs",
         )
 
 

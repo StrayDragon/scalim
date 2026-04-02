@@ -617,25 +617,14 @@ def _resolve_book_export_path(
     raise ValueError(err)
 
 
-def _effective_book_write_defaults(book: BookConfig, *, out_cfg: OutputTargetConfig) -> BookWriteDefaultsConfig:
+def _effective_book_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
     base = book.write_defaults
     if base is None:
         base = BookWriteDefaultsConfig(
             mode=str(DEFAULT_BOOK_WRITE_MODE),
             header_policy=str(DEFAULT_BOOK_WRITE_HEADER_POLICY),
         )
-
-    write_cfg = out_cfg.write
-    if write_cfg is None:
-        return base
-
-    return BookWriteDefaultsConfig(
-        mode=str(write_cfg.mode or base.mode or DEFAULT_BOOK_WRITE_MODE),
-        align_by=str(write_cfg.align_by or base.align_by),
-        header_policy=str(write_cfg.header_policy or base.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
-        on_mismatch=str(write_cfg.on_mismatch or base.on_mismatch),
-        on_conflict=str(write_cfg.on_conflict or base.on_conflict),
-    )
+    return base
 
 
 def _effective_output_header_fields_output_by(
@@ -655,11 +644,13 @@ def _effective_output_include_header(
     mode: Optional[str],
     header_policy: Optional[str],
     include_header_path: str,
+    header_policy_path: Optional[str] = None,
 ) -> bool:
     write_cfg = out_cfg.write
     if mode == "append":
         if write_cfg is not None and write_cfg.include_header is not None:
-            msg = "{} is not allowed for append-mode book outputs; use write.header_policy".format(include_header_path)
+            hint_path = str(header_policy_path or "resources.books.*.write_defaults.header_policy")
+            msg = "{} is not allowed for append-mode book outputs; use {}".format(include_header_path, hint_path)
             raise ValueError(msg)
         return str(header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY) != "never"
 
@@ -672,27 +663,20 @@ def _validate_xlsx_memory_write_contract(
     *,
     book: BookConfig,
     book_id: str,
-    out_cfg: OutputTargetConfig,
-    idx: int,
-    outputs_path: str,
 ) -> None:
     if str(book.kind or "").strip() != "xlsx_memory":
         return
 
-    effective_defaults = _effective_book_write_defaults(book, out_cfg=out_cfg)
+    effective_defaults = _effective_book_write_defaults(book)
     if str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE) != "append":
         return
     if str(effective_defaults.align_by or "") != "header":
         return
 
-    align_by_path = (
-        "{}.{}.write.align_by".format(str(outputs_path), int(idx))
-        if out_cfg.write is not None and out_cfg.write.align_by is not None
-        else "resources.books.{}.write_defaults.align_by".format(str(book_id))
-    )
+    align_by_path = "resources.books.{}.write_defaults.align_by".format(str(book_id))
     msg = (
-        "books.kind=xlsx_memory does not support write.align_by=header; "
-        "internal rows only use canonical field keys. Migrate to write.align_by=field_id "
+        "books.kind=xlsx_memory does not support write_defaults.align_by=header; "
+        "internal rows only use canonical field keys. Migrate to resources.books.<book_id>.write_defaults.align_by=field_id "
         "and keep write.header_fields_output_by for export display (book_id={!r})"
     ).format(str(book_id))
     err = "{} (path={})".format(msg, str(align_by_path))
@@ -773,9 +757,6 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
             _validate_xlsx_memory_write_contract(
                 book=book,
                 book_id=str(book_id),
-                out_cfg=out_cfg,
-                idx=int(idx),
-                outputs_path=str(outputs_path),
             )
 
             sheet_name, sheet_ref_path, defaulted_from_name = _effective_sheet_name_for_output(
@@ -794,12 +775,13 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
             if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:
                 in_memory = True
-                effective_defaults = _effective_book_write_defaults(book, out_cfg=out_cfg)
+                effective_defaults = _effective_book_write_defaults(book)
                 include_header = _effective_output_include_header(
                     out_cfg=out_cfg,
                     mode=str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE),
                     header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
                     include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
+                    header_policy_path="resources.books.{}.write_defaults.header_policy".format(str(book_id)),
                 )
                 if str(book.kind or "").strip() == "xlsx_memory":
                     managed_artifact_kind = MANAGED_ARTIFACT_KIND_ROWS
@@ -811,12 +793,13 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 if yaml_base_dir is None:
                     msg = "yaml_base_dir is required to resolve resources.books output paths"
                     raise ValueError(msg)
-                effective_defaults = _effective_book_write_defaults(book, out_cfg=out_cfg)
+                effective_defaults = _effective_book_write_defaults(book)
                 include_header = _effective_output_include_header(
                     out_cfg=out_cfg,
                     mode=str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE),
                     header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
                     include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
+                    header_policy_path="resources.books.{}.write_defaults.header_policy".format(str(book_id)),
                 )
                 export_path, allow_formulas, write_lock = _resolve_book_export_path(
                     config,

@@ -476,8 +476,9 @@ resources:
       allow_formulas: true
       write_lock: true
 
-meta: true
-audit: true
+# NOTE: meta/audit extra sheets were moved out of YAML mainline (output extras boundary).
+# Configure via runtime entrypoints, e.g.:
+#   overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True))
 
 outputs:
   - name: detail

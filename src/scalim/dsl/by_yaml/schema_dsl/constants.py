@@ -642,8 +642,6 @@ DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "outputs",
     "validate_unique_field_names",
     "include_full_error_message",
-    "meta",
-    "audit",
 ]
 FIELD_DERIVED_CONDITIONS = [
     {

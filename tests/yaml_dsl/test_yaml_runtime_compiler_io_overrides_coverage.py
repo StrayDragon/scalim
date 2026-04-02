@@ -206,21 +206,14 @@ def test_runtime_compiler_parse_overrides_outputs_targets_cover_error_branches()
             default_book_ref="ref",
         )
 
-    out_file_with_book_only_keys = OutputOverride(
+    out_file_with_sheet = OutputOverride(
         name="detail",
         fields=("order_id",),
-        to=OutputToOverride(file="detail_csv"),
-        write=OutputWriteOverride(
-            mode="append",
-            align_by="name",
-            header_policy="always",
-            on_mismatch="error",
-            on_conflict="error",
-        ),
+        to=OutputToOverride(file="detail_csv", sheet="S"),
     )
-    with pytest.raises(ValueError, match=r"only apply to book outputs"):
+    with pytest.raises(ValueError, match=r"p\.0\.to\.sheet is not allowed with to\.file"):
         _ = compiler_mod._parse_overrides_outputs_targets(  # noqa: SLF001
-            [out_file_with_book_only_keys],
+            [out_file_with_sheet],
             demand_ir,  # type: ignore[arg-type]
             path="p",
             default_book_id=None,

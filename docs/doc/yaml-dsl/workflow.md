@@ -279,7 +279,7 @@ workflow YAML 只负责两件事:
   - 既可以在 demand YAML 声明(standalone 也能跑),也可以在 workflow YAML 的 `workflow.resources.books` 统一声明/覆盖
   - `kind: xlsx_file|xlsx_memory`
 - 输出到 book 的绑定: `outputs[*].to.book` / `outputs[*].to.sheet`
-- 写入策略: `resources.books.*.write_defaults` + `outputs[*].write`(覆盖 mode/align/header/冲突策略)
+- 写入策略: `resources.books.*.write_defaults`(workbook SSOT) + `outputs[*].write`(仅 output-local header 行为: `include_header` / `header_fields_output_by`)
 
 约定:
 

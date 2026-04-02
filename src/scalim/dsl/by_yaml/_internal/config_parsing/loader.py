@@ -14,7 +14,6 @@ from ...schema_dsl.models import (
     BOOK_WRITE_DEFAULTS_KEYS,
     DEMAND_KEYS,
     FILE_KEYS,
-    OUTPUT_EXTRA_SHEET_KEYS,
     RESOURCES_KEYS,
     BookBudgetConfig,
     BookConfig,
@@ -22,7 +21,6 @@ from ...schema_dsl.models import (
     BookWriteDefaultsConfig,
     DemandConfig,
     FileConfig,
-    OutputExtraSheetConfig,
     ResourcesConfig,
 )
 from ...schema_dsl.output_enums import (
@@ -44,7 +42,7 @@ from .imports import ScalimYamlImportExpansionError, contains_import_syntax, exp
 from .models import RawDemand
 from .parsers.fields import ParserFieldsMixin
 from .parsers.outputs import ParserOutputsMixin
-from .parsers.utils import mapping_or_none, str_or_none
+from .parsers.utils import mapping_or_none
 from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
 from .yaml_load import envelope_from_validation_issue, error_loc_for_yaml_path, load_yaml_mapping_text
 
@@ -316,8 +314,8 @@ class YamlDemandLoader(
         failure_policy = "all_fail"
 
         include_full_error_message = bool(raw.data.get(DEMAND_KEYS["include_full_error_message"], False))
-        meta = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["meta"]), key="meta")
-        audit = self._parse_extra_sheet(raw.data.get(DEMAND_KEYS["audit"]), key="audit")
+        meta = None
+        audit = None
         guardrails = None
 
         return DemandConfig(
@@ -561,22 +559,4 @@ class YamlDemandLoader(
             header_policy=header_policy,
             on_mismatch=on_mismatch,
             on_conflict=on_conflict,
-        )
-
-    def _parse_extra_sheet(self, raw_value: object, *, key: str) -> Optional[OutputExtraSheetConfig]:
-        if raw_value is None or raw_value is False:
-            return None
-        if raw_value is True:
-            return OutputExtraSheetConfig()
-
-        sheet_dict = mapping_or_none(raw_value)
-        if sheet_dict is None:
-            msg = "{} must be a boolean or an object".format(key)
-            raise TypeError(msg)
-
-        return OutputExtraSheetConfig(
-            path=str_or_none(sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["path"])),
-            sheet=str_or_none(sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["sheet"])),
-            allow_formulas=sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["allow_formulas"]),
-            write_lock=sheet_dict.get(OUTPUT_EXTRA_SHEET_KEYS["write_lock"]),
         )

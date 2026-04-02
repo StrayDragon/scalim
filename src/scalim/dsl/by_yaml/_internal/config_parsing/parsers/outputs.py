@@ -20,11 +20,6 @@ from ....schema_dsl.output_enums import (
     AGG_DISTINCT_ON_OVERFLOW_ENUM,
     AGG_RANK_ORDER_ENUM,
     AGG_RANK_TOP_K_MODE_ENUM,
-    BOOK_WRITE_ALIGN_BY_ENUM,
-    BOOK_WRITE_HEADER_POLICY_ENUM,
-    BOOK_WRITE_MODE_ENUM,
-    BOOK_WRITE_ON_CONFLICT_ENUM,
-    BOOK_WRITE_ON_MISMATCH_ENUM,
     DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
     DEFAULT_AGG_RANK_ORDER,
     DEFAULT_AGG_RANK_TOP_K_MODE,
@@ -397,26 +392,6 @@ class ParserOutputsMixin:
                 raise TypeError(msg)
             include_header = bool(include_header_raw)
 
-        mode = str_or_none(raw.get(OUTPUT_WRITE_KEYS["mode"]))
-        mode = _non_empty_str(mode) or None
-        if mode is not None and mode not in BOOK_WRITE_MODE_ENUM:
-            msg = "{}.mode={!r} is invalid; expected one of: {}".format(base_path, mode, ", ".join(BOOK_WRITE_MODE_ENUM))
-            raise ValueError(msg)
-
-        align_by = str_or_none(raw.get(OUTPUT_WRITE_KEYS["align_by"]))
-        align_by = _non_empty_str(align_by) or None
-        if align_by is not None and align_by not in BOOK_WRITE_ALIGN_BY_ENUM:
-            msg = "{}.align_by={!r} is invalid; expected one of: {}".format(base_path, align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
-            raise ValueError(msg)
-
-        header_policy = str_or_none(raw.get(OUTPUT_WRITE_KEYS["header_policy"]))
-        header_policy = _non_empty_str(header_policy) or None
-        if header_policy is not None and header_policy not in BOOK_WRITE_HEADER_POLICY_ENUM:
-            msg = "{}.header_policy={!r} is invalid; expected one of: {}".format(
-                base_path, header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM)
-            )
-            raise ValueError(msg)
-
         header_fields_output_by = str_or_none(raw.get(OUTPUT_WRITE_KEYS["header_fields_output_by"]))
         header_fields_output_by = _non_empty_str(header_fields_output_by) or None
         if header_fields_output_by is not None and header_fields_output_by not in OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM:
@@ -425,31 +400,20 @@ class ParserOutputsMixin:
             )
             raise ValueError(msg)
 
-        on_mismatch = str_or_none(raw.get(OUTPUT_WRITE_KEYS["on_mismatch"]))
-        on_mismatch = _non_empty_str(on_mismatch) or None
-        if on_mismatch is not None and on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
-            msg = "{}.on_mismatch={!r} is invalid; expected one of: {}".format(
-                base_path, on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM)
-            )
-            raise ValueError(msg)
-
-        on_conflict = str_or_none(raw.get(OUTPUT_WRITE_KEYS["on_conflict"]))
-        on_conflict = _non_empty_str(on_conflict) or None
-        if on_conflict is not None and on_conflict not in BOOK_WRITE_ON_CONFLICT_ENUM:
-            msg = "{}.on_conflict={!r} is invalid; expected one of: {}".format(
-                base_path, on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM)
-            )
-            raise ValueError(msg)
-
-        return OutputWriteConfig(
-            include_header=include_header,
-            mode=mode,
-            align_by=align_by,
-            header_policy=header_policy,
-            header_fields_output_by=header_fields_output_by,
-            on_mismatch=on_mismatch,
-            on_conflict=on_conflict,
+        removed: Tuple[Tuple[str, str], ...] = (
+            ("mode", "resources.books.*.write_defaults.mode"),
+            ("align_by", "resources.books.*.write_defaults.align_by"),
+            ("header_policy", "resources.books.*.write_defaults.header_policy"),
+            ("on_mismatch", "resources.books.*.write_defaults.on_mismatch"),
+            ("on_conflict", "resources.books.*.write_defaults.on_conflict"),
         )
+        for key, hint in removed:
+            if key not in raw:
+                continue
+            msg = "{}.{} was moved out of outputs[*].write. Hint: configure it via {}.".format(base_path, key, hint)
+            raise ValueError(msg)
+
+        return OutputWriteConfig(include_header=include_header, header_fields_output_by=header_fields_output_by)
 
     def _parse_output_aggregate(  # noqa: C901, PLR0912
         self,
@@ -913,7 +877,7 @@ class ParserOutputsMixin:
             raise ValueError(msg) from exc
         return deps
 
-    def _validate_output_binding_semantics(self, t: OutputTargetConfig, *, idx: int) -> None:  # noqa: C901
+    def _validate_output_binding_semantics(self, t: OutputTargetConfig, *, idx: int) -> None:
         to_cfg = t.to
         if to_cfg is None:
             msg = "outputs.{}.to is required; declare exactly one of to.file or to.book".format(int(idx))
@@ -934,27 +898,6 @@ class ParserOutputsMixin:
         write_cfg = t.write
         if write_cfg is None:
             return
-
-        if file_id:
-            invalid_keys: List[str] = []
-            if write_cfg.mode is not None:
-                invalid_keys.append("mode")
-            if write_cfg.align_by is not None:
-                invalid_keys.append("align_by")
-            if write_cfg.header_policy is not None:
-                invalid_keys.append("header_policy")
-            if write_cfg.on_mismatch is not None:
-                invalid_keys.append("on_mismatch")
-            if write_cfg.on_conflict is not None:
-                invalid_keys.append("on_conflict")
-            if invalid_keys:
-                msg = "outputs.{}.write.{} only apply to book outputs".format(int(idx), ", ".join(invalid_keys))
-                raise ValueError(msg)
-
-        mode = str(write_cfg.mode or "").strip() if write_cfg.mode is not None else None
-        if book_id and mode == "append" and write_cfg.include_header is not None:
-            msg = "outputs.{}.write.include_header is not allowed for append-mode book outputs; use write.header_policy".format(int(idx))
-            raise ValueError(msg)
 
     def _validate_detail_output_semantics(self, t: OutputTargetConfig, name: str, known_field_ids: Set[str]) -> None:
         if t.fields is None or not t.fields:

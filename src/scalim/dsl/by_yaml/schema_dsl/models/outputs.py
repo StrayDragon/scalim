@@ -16,11 +16,6 @@ from ..output_enums import (
     AGG_RANK_ORDER_ENUM,
     AGG_RANK_PRODUCER_KEYS,
     AGG_RANK_TOP_K_MODE_ENUM,
-    BOOK_WRITE_ALIGN_BY_ENUM,
-    BOOK_WRITE_HEADER_POLICY_ENUM,
-    BOOK_WRITE_MODE_ENUM,
-    BOOK_WRITE_ON_CONFLICT_ENUM,
-    BOOK_WRITE_ON_MISMATCH_ENUM,
     DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
     DEFAULT_AGG_RANK_ORDER,
     DEFAULT_AGG_RANK_TOP_K_MODE,
@@ -120,38 +115,12 @@ class OutputWriteConfig:
             md=(
                 "可选:是否输出表头.\n\n"
                 "- file 输出: 缺省等价 `true`\n"
-                "- book + `mode=sheet`: 缺省等价 `true`\n"
-                "- book + `mode=append`: 不允许显式声明; 请改用 `header_policy`"
+                "- book + `resources.books.*.write_defaults.mode=sheet`: 缺省等价 `true`\n"
+                "- book + `resources.books.*.write_defaults.mode=append`: 不允许显式声明;请改用 "
+                "`resources.books.*.write_defaults.header_policy`"
             ),
             default=DEFAULT_OUTPUT_INCLUDE_HEADER,
             examples=[True, False],
-        ),
-    )
-
-    mode: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={"type": "string", "enum": list(BOOK_WRITE_MODE_ENUM)},
-            desc="可选:写入语义(sheet/append)",
-            examples=["append"],
-        ),
-    )
-
-    align_by: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={"type": "string", "enum": list(BOOK_WRITE_ALIGN_BY_ENUM)},
-            desc="可选:字段对齐策略(field_id/header;仅 append 生效)",
-            examples=["field_id"],
-        ),
-    )
-
-    header_policy: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={"type": "string", "enum": list(BOOK_WRITE_HEADER_POLICY_ENUM)},
-            desc="可选:表头策略(once/always/never;仅 append 生效)",
-            examples=["once"],
         ),
     )
 
@@ -162,24 +131,6 @@ class OutputWriteConfig:
             desc="可选:表头字段名来源(field_id/name;默认 name)",
             examples=["name"],
             default=DEFAULT_OUTPUT_HEADER_BY,
-        ),
-    )
-
-    on_mismatch: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={"type": "string", "enum": list(BOOK_WRITE_ON_MISMATCH_ENUM)},
-            desc="可选:字段不匹配策略(error/warn/skip;仅 append 生效)",
-            examples=["error"],
-        ),
-    )
-
-    on_conflict: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={"type": "string", "enum": list(BOOK_WRITE_ON_CONFLICT_ENUM)},
-            desc="可选:sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)",
-            examples=["error"],
         ),
     )
 

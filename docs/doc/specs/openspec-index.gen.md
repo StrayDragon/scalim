@@ -486,6 +486,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow-validate/spec.md)
 - Summary: TBD - created by archiving change c12-yaml-dsl-workflow-validate-cli. Update Purpose after archive.
 
+### `yaml-dsl-write-policy-and-output-extras`
+- Title: yaml-dsl-write-policy-and-output-extras Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-write-policy-and-output-extras/spec.md)
+- Summary: TBD - created by archiving change c14-yaml-dsl-write-policy-and-output-extras. Update Purpose after archive.
+
 ### `yaml-field-extract`
 - Title: yaml-field-extract Specification
 - Source: [spec.md](#code=openspec/specs/yaml-field-extract/spec.md)

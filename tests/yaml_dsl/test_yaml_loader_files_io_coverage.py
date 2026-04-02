@@ -6,9 +6,6 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     DEMAND_KEYS,
     FILE_KEYS,
     RESOURCES_KEYS,
-    OutputTargetConfig,
-    OutputToConfig,
-    OutputWriteConfig,
 )
 
 
@@ -53,14 +50,8 @@ def test_outputs_parser_write_include_header_type_error_cover_branches() -> None
         _ = loader._parse_output_write({"include_header": "yes"}, base_path="o")  # noqa: SLF001
 
 
-def test_outputs_parser_binding_semantics_file_book_only_write_keys_cover_branches() -> None:
+def test_outputs_parser_write_rejects_removed_workbook_keys_cover_branches() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"align_by, header_policy, on_mismatch, on_conflict"):
-        t = OutputTargetConfig(
-            name="detail",
-            to=OutputToConfig(file="detail_csv"),
-            write=OutputWriteConfig(align_by="field_id", header_policy="once", on_mismatch="warn", on_conflict="error"),
-            fields=("a",),
-        )
-        loader._validate_output_binding_semantics(t, idx=0)  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"o\.on_conflict was moved out of outputs\[\*\]\.write"):
+        _ = loader._parse_output_write({"on_conflict": "error"}, base_path="o")  # noqa: SLF001

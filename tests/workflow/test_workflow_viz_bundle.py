@@ -52,8 +52,6 @@ outputs:
     to:
       book: {book_id}
       sheet: detail
-    write:
-      mode: sheet
     fields: ["id", "value"]
 """
         ).lstrip(),
