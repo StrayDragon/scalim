@@ -1,5 +1,6 @@
-import os
 from pathlib import Path
+
+import pytest
 
 from scalim.dsl.by_yaml import run_workflow
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -15,7 +16,7 @@ from scalim_misc.notebook_support.pathing import demo_big_data_report_workflow_d
 from tests.support.pathing import repo_root as _repo_root
 
 
-def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path) -> None:
+def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo_root = _repo_root()
     workflow_yaml_path = demo_big_data_report_workflow_demo_yaml_path(__file__)
 
@@ -35,19 +36,15 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path) -> None:
                 encoding="utf-8",
             )
 
-        prev_cwd = os.getcwd()
-        os.chdir(str(tmp_path))
-        try:
-            result = run_workflow(
-                str(wf_copy),
-                allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"]),
-                init_vars={"order_ids": []},
-                batch_size=30,
-                path_aliases={"@": str(repo_root)},
-                allowed_yaml_roots=(str(repo_root),),
-            )
-        finally:
-            os.chdir(prev_cwd)
+        monkeypatch.chdir(tmp_path)
+        result = run_workflow(
+            str(wf_copy),
+            allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"]),
+            init_vars={"order_ids": []},
+            batch_size=30,
+            path_aliases={"@": str(repo_root)},
+            allowed_yaml_roots=(str(repo_root),),
+        )
 
         assert not result.errors()
         assert get_workflow_preload_counter_calls() == 1

@@ -962,8 +962,6 @@ def test_workflow_dag_respects_depends_on_under_concurrency(tmp_path: Path) -> N
 
 
 def test_workflow_concurrency_does_not_call_components_concurrently_by_default(tmp_path: Path) -> None:
-    import time
-
     for idx in range(4):
         _ = _write_demand_yaml(
             tmp_path,
@@ -991,25 +989,33 @@ def test_workflow_concurrency_does_not_call_components_concurrently_by_default(t
 
         def __init__(self) -> None:
             self._guard = threading.Lock()
-            self._active = 0
-            self.max_active = 0
+            self._in_call = threading.Lock()
             self.seen = 0
+            self.concurrent_calls = 0
 
         def on_event(self, event) -> None:  # type: ignore[override]
             _ = event
             with self._guard:
-                self._active += 1
-                self.max_active = max(int(self.max_active), int(self._active))
                 self.seen += 1
-            time.sleep(0.001)
-            with self._guard:
-                self._active -= 1
+
+            if not self._in_call.acquire(False):
+                with self._guard:
+                    self.concurrent_calls += 1
+                return
+            try:
+                # Deterministic busy work to widen the overlap window without time-based sleeps.
+                x = 0
+                for _idx in range(10_000):
+                    x = (x + 1) ^ 0x1234
+                _ = x
+            finally:
+                self._in_call.release()
 
     probe = _ConcurrentCallProbe()
     result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[probe])
     assert not result.errors()
     assert int(probe.seen) > 0
-    assert int(probe.max_active) == 1
+    assert int(probe.concurrent_calls) == 0
 
 
 def test_workflow_ctx_init_vars_are_resolved_after_prereq_completion(tmp_path: Path) -> None:
