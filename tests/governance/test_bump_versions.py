@@ -23,6 +23,10 @@ def _repo_fixture(root: Path) -> None:
         root / "packages" / "scalim-misc" / "pyproject.toml",
         '[project]\nname = "scalim-misc"\nversion = "0.1.0"\n',
     )
+    _write(
+        root / "packages" / "scalim-yaml-dsl-lsp" / "pyproject.toml",
+        '[project]\nname = "scalim-yaml-dsl-lsp"\nversion = "0.1.0"\n',
+    )
     _write(root / "frontend" / "scalim-viz" / "package.json", '{\n  "name": "scalim-viz",\n  "version": "0.0.1",\n  "private": true\n}\n')
 
 
@@ -41,6 +45,7 @@ def test_bump_versions_dry_run_does_not_modify_files(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "dry-run" in proc.stdout
     assert 'version = "0.1.0"' in (tmp_path / "packages" / "scalim-benchlib" / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "0.1.0"' in (tmp_path / "packages" / "scalim-yaml-dsl-lsp" / "pyproject.toml").read_text(encoding="utf-8")
     assert '"version": "0.0.1"' in (tmp_path / "frontend" / "scalim-viz" / "package.json").read_text(encoding="utf-8")
 
 
@@ -60,6 +65,7 @@ def test_bump_versions_apply_updates_whitelisted_files(tmp_path: Path) -> None:
     assert 'version = "0.3.0"' in (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
     assert 'version = "0.3.0"' in (tmp_path / "packages" / "scalim-benchlib" / "pyproject.toml").read_text(encoding="utf-8")
     assert 'version = "0.3.0"' in (tmp_path / "packages" / "scalim-misc" / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "0.3.0"' in (tmp_path / "packages" / "scalim-yaml-dsl-lsp" / "pyproject.toml").read_text(encoding="utf-8")
     assert '"version": "0.3.0"' in (tmp_path / "frontend" / "scalim-viz" / "package.json").read_text(encoding="utf-8")
 
 

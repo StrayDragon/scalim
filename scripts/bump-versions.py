@@ -29,6 +29,7 @@ _TARGETS: Tuple[_Target, ...] = (
     _Target("pyproject.toml", "toml"),
     _Target("packages/scalim-benchlib/pyproject.toml", "toml"),
     _Target("packages/scalim-misc/pyproject.toml", "toml"),
+    _Target("packages/scalim-yaml-dsl-lsp/pyproject.toml", "toml"),
     _Target("frontend/scalim-viz/package.json", "json"),
 )
 
