@@ -85,13 +85,12 @@ dev = [
     "psutil>=5.9.0",
     "scalim-benchlib",
     "scalim-misc",
-    "scalim-yaml-dsl-lsp",
+    "scalim-yaml-dsl-lsp[server]",
     "pandas>=2.0.3",
     "openpyxl>=3.1.5",
     "pytest-memray>=1.8.0",
     "zensical>=0.0.23",
     "tomli>=2.0.0",
-    "pygls>=2.1.1",
 ]
 
 [build-system]
