@@ -52,7 +52,7 @@ def test_validator_rejects_main_source_normalize() -> None:
     _assert_validation_errors(config, "main_source.normalize")
 
 
-def test_validator_requires_normalize_key_field() -> None:
+def test_validator_allows_omitting_normalize_key_field_defaults_to_key() -> None:
     config = {
         "name": "demo",
         "main_source": {
@@ -68,7 +68,8 @@ def test_validator_requires_normalize_key_field() -> None:
             }
         },
     }
-    _assert_validation_errors(config, "normalize.key_field")
+    validator = validator_module.ConfigValidator()
+    validator.validate(config)
 
 
 def test_validator_requires_normalize_to_be_mapping() -> None:
@@ -131,6 +132,11 @@ def test_validator_rejects_normalize_key_field_mismatch() -> None:
     _assert_validation_errors(config, "normalize.key_field must equal sources")
 
 
+def test_validator_rejects_non_string_normalize_key_field() -> None:
+    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": 123}, key_raw="id")
+    assert any("normalize.key_field must be a string" in issue.message for issue in errors)
+
+
 def test_validator_rejects_normalize_on_conflict_invalid() -> None:
     config = {
         "name": "demo",
@@ -165,7 +171,6 @@ sources:
     key: order_id
     normalize:
       kind: index_by_key
-      key_field: order_id
     fields:
       recommend_score:
         extract: payload.score
@@ -206,7 +211,6 @@ sources:
     cache_mode: preload_forever
     normalize:
       kind: index_by_key
-      key_field: order_id
     fields:
       recommend_score:
         extract: payload.score
@@ -319,9 +323,8 @@ def test_converter_rejects_unknown_normalize_kind() -> None:
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
-def test_converter_rejects_missing_normalize_key_field() -> None:
+def test_converter_defaults_normalize_key_field_to_source_key() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
     from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
 
     converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
@@ -331,7 +334,24 @@ def test_converter_rejects_missing_normalize_key_field() -> None:
         key="id",
         normalize=NormalizeConfig(kind="index_by_key", key_field=""),
     )
-    with pytest.raises(ScalimConversionError, match="normalize\\.key_field is required"):
+    ir = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+    assert ir is not None
+    assert ir.key_field == "id"
+
+
+def test_converter_rejects_empty_source_key_for_index_by_key_normalize() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.fixtures.mock_loaders.mock_loader",
+        key="",
+        normalize=NormalizeConfig(kind="index_by_key", key_field=""),
+    )
+    with pytest.raises(ScalimConversionError, match=r"sources\.s1\.key must be a non-empty string"):
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 

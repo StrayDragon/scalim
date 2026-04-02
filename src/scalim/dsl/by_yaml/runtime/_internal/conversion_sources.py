@@ -261,11 +261,6 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
     ) -> SourceNormalizeIr:
         source_id = source_config.source_id
 
-        key_field = str(norm.key_field or "").strip()
-        if not key_field:
-            msg = "sources.{}.normalize.key_field is required".format(source_id)
-            raise ScalimConversionError(msg)
-
         on_conflict = str(norm.on_conflict or "error").strip() or "error"
         if on_conflict not in {"error", "first", "last"}:
             msg = "sources.{}.normalize.on_conflict must be one of: error/first/last".format(source_id)
@@ -276,9 +271,17 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             raise ScalimConversionError(msg)
 
         declared_key = str(source_config.key or "").strip()
-        if declared_key and declared_key != key_field:
-            msg = "sources.{}.normalize.key_field must equal sources.{}.key".format(source_id, source_id)
+        if not declared_key:
+            msg = "sources.{}.key must be a non-empty string".format(source_id)
             raise ScalimConversionError(msg)
+
+        key_field = str(norm.key_field or "").strip()
+        if key_field:
+            if declared_key != key_field:
+                msg = "sources.{}.normalize.key_field must equal sources.{}.key".format(source_id, source_id)
+                raise ScalimConversionError(msg)
+        else:
+            key_field = declared_key
 
         return SourceNormalizeIr(kind="index_by_key", key_field=key_field, on_conflict=on_conflict, call_by=call_by_fn)
 

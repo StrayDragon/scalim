@@ -402,7 +402,6 @@ sources:
     cache_mode: preload_forever
     normalize:
       kind: index_by_key
-      key_field: payment_method_id
       on_conflict: error
     fields:
       # 单级关联 - 支付方式

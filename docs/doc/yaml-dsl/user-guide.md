@@ -506,7 +506,8 @@ lookup_cast:
 支持的写法(按复杂度由低到高):
 
 - `kind: index_by_key`: 将 `list[row]` 归一化为 `lookup_key -> row` 映射
-  - `key_field`: 从每个 row 中读取 lookup key 的字段名(必填)
+  - `key_field`: 从每个 row 中读取 lookup key 的字段名(可选;缺省取 `sources.<id>.key`)
+    - 若显式填写,仍要求其与 `sources.<id>.key` 一致
   - `on_conflict`: duplicate key 策略,可选 `error|first|last`(默认 `error`)
 - `kind: take_first`: 将 `mapping[key -> list[row]]` 归一化为 `mapping[key -> row]`
   - `on_empty`: 空列表策略,可选 `miss|null|error`(默认 `miss`)
@@ -530,7 +531,6 @@ sources:
     key: payment_method_id
     normalize:
       kind: index_by_key
-      key_field: payment_method_id
       on_conflict: error
 ```
 

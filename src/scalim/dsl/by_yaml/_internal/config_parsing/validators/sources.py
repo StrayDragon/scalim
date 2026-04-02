@@ -513,13 +513,19 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         source_id: str,
         key_raw: Any,
     ) -> None:
-        key_field = str(norm_dict.get(_F.NORMALIZE_KEY_FIELD, "")).strip()
-        if not key_field:
+        key_field_raw = norm_dict.get(_F.NORMALIZE_KEY_FIELD)
+        key_field = ""
+        if key_field_raw is None:
+            key_field = ""
+        elif isinstance(key_field_raw, str):
+            key_field = key_field_raw.strip()
+        else:
             self._add_error(
                 errors,
-                "sources.{} normalize.key_field is required".format(source_id),
+                "sources.{} normalize.key_field must be a string".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
             )
+            key_field = str(key_field_raw).strip()
 
         key_items = list_or_none(key_raw)
         if key_items is not None:

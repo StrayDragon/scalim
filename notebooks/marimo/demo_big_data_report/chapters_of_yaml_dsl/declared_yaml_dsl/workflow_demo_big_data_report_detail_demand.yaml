@@ -168,7 +168,6 @@ sources:
     cache_mode: preload_forever
     normalize:
       kind: index_by_key
-      key_field: payment_method_id
       on_conflict: error
     fields:
       payment_method_name: {name: 支付方式, relation: orders_to_payment_methods}

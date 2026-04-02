@@ -139,11 +139,13 @@ DESC_SOURCE_NORMALIZE_MD = (
     "- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n"
     "- 执行时机: 在字段级 `extract` 之前\n"
     "- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n"
+    "`index_by_key` 默认行为:\n"
+    "- `key_field` 可省略/为空字符串,缺省时取 `sources.<id>.key`(仅单字段 key)\n"
+    "- 若显式填写 `key_field`,仍要求其与 `sources.<id>.key` 一致\n\n"
     "示例:\n"
     "```yaml\n"
     "normalize:\n"
     "  kind: index_by_key\n"
-    "  key_field: order_id\n"
     "  on_conflict: error\n"
     "```\n\n"
     "输入/输出形状:\n"
@@ -432,8 +434,13 @@ NORMALIZE_SCHEMA = {
         },
         "key_field": {
             "type": "string",
-            "description": "用于建立索引的 row 字段名(index_by_key)",
-            "markdownDescription": "用于建立索引的 row 字段名.\n\n- 仅 `kind: index_by_key` 使用\n- 对应 `sources.<id>.key`",
+            "description": "用于建立索引的 row 字段名(index_by_key, 可选)",
+            "markdownDescription": (
+                "用于建立索引的 row 字段名.\n\n"
+                "- 仅 `kind: index_by_key` 使用\n"
+                "- 可选: 省略/空字符串时默认取 `sources.<id>.key`\n"
+                "- 若显式填写,必须等于 `sources.<id>.key`"
+            ),
             "examples": ["order_id"],
         },
         "on_conflict": {
@@ -476,7 +483,7 @@ NORMALIZE_SCHEMA = {
         {
             "oneOf": [
                 {
-                    "required": ["kind", "key_field"],
+                    "required": ["kind"],
                     "properties": {"kind": {"enum": ["index_by_key"]}},
                     "not": {
                         "anyOf": [
