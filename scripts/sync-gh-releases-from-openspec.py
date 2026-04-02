@@ -131,6 +131,7 @@ def _parse_top_level_bullet_blocks(lines: Iterable[str]) -> List[List[str]]:
 def _clean_inline_markers(s: str) -> str:
     out = s.strip()
     out = re.sub(r"\s+", " ", out)
+    out = re.sub(r"^-\s+", "", out)
     out = re.sub(r"^\*\*BREAKING\*\*:\s*", "", out, flags=re.I)
     out = re.sub(r"^\*\*NON-BREAKING\*\*:\s*", "", out, flags=re.I)
     out = re.sub(r"^BREAKING:\s*", "", out, flags=re.I)
@@ -144,10 +145,23 @@ def _score_highlight(text: str) -> int:
     score = 0
     if "non-goals" in lower or "non goals" in lower or "non-goal" in lower or "非目标" in s or "不做" in s or "明确不做" in s:
         score -= 50
-    if "新增" in s or "引入" in s or "支持" in s or "扩展" in s or "增加" in s or "new" in lower:
+    if "新增" in s or "引入" in s or "扩展" in s or "增加" in s or "new" in lower:
         score += 3
+    if "支持" in s:
+        score += 1
     if "BREAKING" in s or "breaking" in lower or "破坏性" in s:
         score += 2
+    # 更偏向“作者/用户可感知”的说明，而不是内部实现口径。
+    if "yaml" in lower or "YAML" in s:
+        score += 1
+    if "runtime" in lower or "编译" in s or "compile" in lower:
+        score -= 1
+    if "dataclass" in lower or "dataclasses" in lower or "数据类" in s:
+        score += 2
+    if "导入路径" in s or "_internal" in s or "modulenotfounderror" in lower or "内部实现" in s:
+        score -= 3
+    if "runoverrides" in lower or "overrides." in lower or "by_yaml runtime" in lower:
+        score -= 2
     if "重构" in s or "refactor" in lower:
         score += 2
     if "工作流" in s or "workflow" in lower or "质量" in s or "qa" in lower:
@@ -429,6 +443,17 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     def _tok_is_surface(tok: str) -> bool:
         t = tok.strip()
         lower = t.lower()
+        # 过滤文件路径/源码文件/生成物路径等非 YAML authoring surface token。
+        if "/" in t or "\\" in t:
+            return False
+        if re.search(r"\.(py|ts|md|json|yaml|yml)$", lower):
+            return False
+        # `RunOverrides.outputs_defaults` / `Decimal` 这类更像 API/类型名，不是 YAML key path。
+        if t and t[0].isupper() and "[*]" not in t and "$" not in t:
+            return False
+        # `overrides.*` 是运行期 Python entrypoints 的覆写入口，不是作者写在 YAML 里的主线 surface。
+        if lower.startswith("overrides.") or lower.startswith("runoverrides"):
+            return False
         if "[*]" in t or "$" in t:
             return True
         if any(
@@ -448,6 +473,9 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
                 "dedup_by",
                 "value_cast",
                 "value-cast",
+                "observability",
+                "guardrails",
+                "retry",
                 "template_vars",
                 "template-vars",
                 "yaml-dsl validate",
@@ -489,7 +517,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             return True
         if "删除旧写法" in text:
             return True
-        if ("移除" in text or "删除" in text or "废弃" in text or "弃用" in text) and (
+        if ("移除" in text or "移出" in text or "迁出" in text or "删除" in text or "废弃" in text or "弃用" in text) and (
             "旧写法" in text
             or "旧语法" in text
             or "旧字段" in text
@@ -502,11 +530,11 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             or "write_to" in lower
         ):
             return True
-        if "升级" in text or "迁移" in text:
+        if "升级" in text or "迁移" in text or "migration" in lower or "migrate" in lower:
             return True
         if "schema" in lower and ("变更" in text or "更名" in text or "移除" in text or "删除" in text):
             return True
-        if "authoring surface" in lower and ("变更" in text or "更名" in text or "移除" in text or "删除" in text):
+        if "authoring surface" in lower and ("变更" in text or "更名" in text or "移除" in text or "移出" in text or "迁出" in text or "删除" in text):
             return True
         if "旧写法" in text and ("失败" in text or "fail-fast" in lower):
             return True
@@ -531,6 +559,41 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     instructions: List[str] = []
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
+
+        # workflow waiter 默认超时策略：优先抽成可执行的升级指令（避免落到“按提案升级”的低信息量兜底）。
+        if "max_wait_s" in cleaned and "`workflow.options.resources_wait`" in proposal_text:
+            match = re.search(r"max_wait_s\s*=\s*(\d+)", cleaned)
+            if match:
+                secs = match.group(1)
+                instructions.append("把 `workflow.options.resources_wait.max_wait_s` 配成你需要的值（默认 {}s，超时会 fail-fast）。".format(secs))
+            else:
+                instructions.append("把 `workflow.options.resources_wait.max_wait_s` 配成你需要的值（超时会 fail-fast）。")
+            continue
+
+        # xlsx_memory + align_by=header（破坏性语义收紧）
+        if "xlsx_memory" in cleaned and ("align_by=header" in cleaned or "align_by: header" in cleaned):
+            instructions.append("不要再用 `xlsx_memory + align_by=header`；改为按 canonical field key 对齐（旧写法会 fail-fast）。")
+            continue
+
+        # outputs_defaults -> outputs[*].to.book（带迁移方向的一句）
+        if "`outputs_defaults.to.book`" in cleaned and "`outputs[*].to.book`" in cleaned:
+            reuse_hint = ""
+            if "anchors" in proposal_text or "`$import`" in proposal_text or "$import" in proposal_text:
+                reuse_hint = "（需要复用可用 YAML anchors / `$import`）"
+            instructions.append("把 `outputs_defaults.to.book` 迁移为每个输出显式写 `outputs[*].to.book`{}。".format(reuse_hint))
+            continue
+
+        # CSV container -> resources.files + to.file + write（旧写法 fail-fast）
+        if "`outputs[*].container`" in cleaned:
+            instructions.append(
+                "把 CSV 的 `outputs[*].container` 迁移为 `resources.files` + `outputs[*].to.file` + `outputs[*].write`（旧写法会 fail-fast）。"
+            )
+            continue
+
+        # observability.* 迁出 YAML：直接给出迁移方向。
+        if "`observability.*`" in cleaned and ("移出" in cleaned or "迁到" in cleaned or "迁出" in cleaned or "migration" in cleaned.lower()):
+            instructions.append("不要再用 `observability.*`；迁移到 Python / CLI 的运行入口配置。")
+            continue
 
         if "write_to" in cleaned and "writes" in cleaned:
             if "`workflow.runs[*].write_to`" in cleaned and "`workflow.runs[*].writes`" in cleaned:
@@ -616,7 +679,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if cleaned.startswith("把 ") or cleaned.startswith("不要") or cleaned.startswith("将 ") or cleaned.startswith("按 "):
             instructions.append(cleaned.rstrip("。") + "。")
             continue
-        if ("移除" in cleaned or "删除" in cleaned) and "`" in cleaned:
+        if ("移除" in cleaned or "移出" in cleaned or "迁出" in cleaned or "删除" in cleaned) and "`" in cleaned:
             if "输出约束" in cleaned or ("输出" in cleaned and "effective" in cleaned.lower()):
                 continue
             toks = re.findall(r"`([^`]+)`", cleaned)
@@ -668,12 +731,15 @@ def _score_change(change: _Change) -> int:
         score += 50
     if "imports" in cid or "relative-import" in cid:
         score += 40
-    if "outputs" in cid or "aggregate" in cid or "derived-outputs" in cid:
+    # `output`/`outputs`/`aggregate` 都算“输出 authoring surface”一类。
+    if "outputs" in cid or "output" in cid or "aggregate" in cid or "derived-outputs" in cid:
         score += 30
     if "workflow" in cid:
         score += 80
     if "qa" in cid or "hardening" in cid:
         score += 60
+    if "lsp" in cid or "vscode" in cid or "editor" in cid:
+        score += 90
     if "refactor" in cid or "core" in cid:
         score += 50
     if "breaking" in change.proposal_text.lower() or change.has_breaking:
@@ -684,8 +750,9 @@ def _score_change(change: _Change) -> int:
         score -= 50
     if "frontend" in cid:
         score += 30
-    if "doc" in cid:
-        score += 20
+    # docs drift/hygiene 在多数 release 中不应盖过“写法/行为”变更：仅在缺少其它变化时才上榜。
+    if "docs-consistency" in cid or "docs" in cid:
+        score -= 80
     if "marimo" in cid:
         score += 10
     if "demo" in cid or "example" in cid:
