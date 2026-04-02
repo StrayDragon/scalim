@@ -3,7 +3,10 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-为 demand YAML 提供跨文件复用能力: 顶层 `imports` + 任意 mapping 内 `$import`(编译期展开),并在 schema/语义校验前完成展开.
+为 demand YAML 提供跨文件复用能力: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开),并在 schema/语义校验前完成展开.
+
+说明:
+- `$import` 的允许范围以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`.
 
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/dsl/by_yaml/config_parsing/imports.py` (imports/$import 展开与合并)
@@ -62,7 +65,8 @@
 - **THEN** 校验 MUST 失败并提示仅支持相对文件路径(`.yaml/.yml`)
 
 ### Requirement: $import merges mapping fragments deterministically
-系统 MUST 支持在任意 mapping 节点内声明特殊键 `$import`,用于把片段文件中的某个 mapping 片段合并到当前 mapping。
+系统 MUST 支持在允许的 mapping 节点内声明特殊键 `$import`,用于把片段文件中的某个 mapping 片段合并到当前 mapping。
+允许范围 MUST 以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`。
 系统 MUST 将 `$import` 引用字符串解析为 `<alias>(.<segment>)*`,其中每个 `<segment>` 必须匹配正则 `^[a-zA-Z_][a-zA-Z0-9_]*$`(不提供转义机制)。
 系统 MUST 按以下确定性顺序合并:
 1. 先合并 `$import` 列表中的所有片段(按顺序,后者覆盖前者)

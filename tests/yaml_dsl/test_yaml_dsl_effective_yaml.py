@@ -7,7 +7,9 @@ def test_effective_yaml_renders_and_dumps_without_import_syntax(tmp_path) -> Non
     frag.write_text(
         """
 base:
-  a: 1
+  main_source:
+    params:
+      a: 1
 """.lstrip(),
         encoding="utf-8",
     )
@@ -15,11 +17,16 @@ base:
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
+name: demo
 imports:
   f: ./frag.yaml
-demo:
-  $import: f.base
-  out_path: {$init_var: out_path}
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  params:
+    $import: f.base.main_source.params
+    out_path: {$init_var: out_path}
+sources: {}
 """.lstrip(),
         encoding="utf-8",
     )
@@ -27,8 +34,8 @@ demo:
     mapping = load_effective_demand_yaml(demand)
     assert "imports" not in mapping
     assert "$import" not in mapping
-    assert mapping["demo"]["a"] == 1
-    assert mapping["demo"]["out_path"]["$init_var"] == "out_path"
+    assert mapping["main_source"]["params"]["a"] == 1
+    assert mapping["main_source"]["params"]["out_path"]["$init_var"] == "out_path"
 
     dumped = dump_effective_demand_yaml(mapping)
     assert "imports:" not in dumped
@@ -40,8 +47,9 @@ def test_effective_yaml_fails_fast_on_import_expansion_error_with_diagnostics(tm
     frag = tmp_path / "frag.yaml"
     frag.write_text(
         """
-demo:
-  x: 1
+main_source:
+  params:
+    x: 1
 """.lstrip(),
         encoding="utf-8",
     )
@@ -51,8 +59,10 @@ demo:
         """
 imports:
   f: ./frag.yaml
-$import: f
-demo: "oops"
+main_source:
+  params:
+    $import: f.main_source.params
+    x: {a: 1}
 """.lstrip(),
         encoding="utf-8",
     )
@@ -63,7 +73,7 @@ demo: "oops"
         msg = str(exc)
         assert "import trace:" in msg
         assert "logical path:" in msg
-        assert exc.logical_path == "demo"
+        assert exc.logical_path == "main_source.params.x"
     else:
         raise AssertionError("Expected ScalimYamlImportExpansionError")
 

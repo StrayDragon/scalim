@@ -273,7 +273,7 @@ def _(mo):
 
         - runtime `demand_failure_policy`: `all_fail` / `primary_only`
         - `include_full_error_message`: `false`(默认脱敏) / `true`(包含全文)
-        - 顶层 `$import`(list) + `imports`：用 fragments 复用 base 配置
+        - `imports` + **scoped** `$import`：在 `main_source.*` / `resources.*` 复用 base 片段(输出 `outputs.*` 不支持 `$import`)
 
         ## 对拍点（deterministic）
 
@@ -313,7 +313,7 @@ def _():
 def _(mo, yaml_redacted_path):
     from scalim_misc.notebook_support.yaml_excerpt import excerpt_head
 
-    mo.md("## YAML 片段：顶层 `imports/$import` + 输出配置(head)")
+    mo.md("## YAML 片段：`imports` + `main_source/resources.$import` + 输出配置(head)")
     mo.md("```yaml\n{}\n```".format(excerpt_head(yaml_redacted_path, max_lines=80)))
     return (excerpt_head,)
 

@@ -19,7 +19,7 @@ def _validator() -> ConfigValidator:
     return ConfigValidator(schema_path=str(schema_path))
 
 
-def test_config_validator_allows_import_only_output_target_shape() -> None:
+def test_config_validator_rejects_import_only_output_target_shape() -> None:
     report = _validator().validate_report(
         {
             "name": "demo",
@@ -34,7 +34,9 @@ def test_config_validator_allows_import_only_output_target_shape() -> None:
         enable_jsonschema_validation=True,
     )
 
-    assert report.errors() == []
+    errors = report.errors()
+    assert errors != []
+    assert any(issue.path == "outputs.0" and "Schema validation error" in issue.message for issue in errors)
 
 
 def test_validator_sources_skip_import_and_cover_key_edge_cases() -> None:

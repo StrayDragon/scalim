@@ -95,7 +95,17 @@ include_full_error_message: false    # 可选
   - `<source>` 支持两类:
     - 相对 `.yaml/.yml` 文件路径(默认相对当前 YAML 文件所在目录解析),例如 `common.yaml` / `fragments/common.yaml`
     - `scalim://<preset_id>` preset URI
-- 在任意 mapping 节点内允许 `$import`(string 或 string list):
+- `$import` **仅允许**出现在 demand 的稳定 authoring surfaces(Imports scope boundary):
+  - `main_source.*`
+  - `sources.*`
+  - `fields.*`
+  - `relations.*`
+  - `resources.*`(仅资源声明;例如 `resources.books.*` / `resources.files.*`)
+- `$import` **不允许**:
+  - 顶层 `(root)` `$import`(避免把 imports 误用成“全局 overlay/模板拼装”)
+  - `outputs.*` 等输出编排区域(若需要复用 output 片段,优先用 YAML anchors(`_templates`) 或 YAML merge(`<<`))
+  - runtime policy / output extras / workflow YAML(这些是运行期控制面,不属于跨文件 authoring 复用)
+- `$import` 语法(string 或 string list):
   - `$import: common.sources`
   - `$import: [common.sources, other.sources]`
 - `$import` 引用格式: `<imports_alias>(.<segment>)*`(点路径下钻; segments 仅允许标识符)
@@ -121,6 +131,19 @@ sources:
   my_source:
     loader: "myapp.loaders:load_x"
     key: id
+```
+
+一个资源声明复用示例(推荐用于跨报表共享 IO 声明模板):
+
+```yaml
+imports:
+  io: fragments/resources.yaml
+
+resources:
+  books:
+    report:
+      $import: io.report_book
+      path: ./output/report.xlsx
 ```
 
 一个带 `scalim.yaml` 目录别名的示例:

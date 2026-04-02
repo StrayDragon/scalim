@@ -401,6 +401,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-validation/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `PROJECT_CLI_NAME yaml-dsl ...` 的校验分层、严格模式、JSON 输出与诊断输出格式(含源码位置),以确保 CLI 校验结果可用于 IDE 跳转、CI 报告与脚本化消费,并避免与 schema 生成规范耦合.
 
+### `yaml-dsl-demand-imports-scope`
+- Title: yaml-dsl-demand-imports-scope Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-demand-imports-scope/spec.md)
+- Summary: TBD - created by archiving change c15-yaml-dsl-demand-imports-scope. Update Purpose after archive.
+
 ### `yaml-dsl-demo-scenarios-suite`
 - Title: yaml-dsl-demo-scenarios-suite Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-demo-scenarios-suite/spec.md)
@@ -424,7 +429,7 @@ Sources:
 ### `yaml-dsl-imports`
 - Title: yaml-dsl-imports Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-imports/spec.md)
-- Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + 任意 mapping 内 `$import`(编译期展开),并在 schema/语义校验前完成展开.
+- Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开),并在 schema/语义校验前完成展开. 说明: - `$import` 的允许范围以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`.
 
 ### `yaml-dsl-mainline-principles`
 - Title: yaml-dsl-mainline-principles Specification

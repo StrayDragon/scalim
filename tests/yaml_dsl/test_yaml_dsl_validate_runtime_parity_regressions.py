@@ -80,7 +80,7 @@ def test_cli_validate_and_schema_validate_fail_fast_on_known_runtime_only_shapes
     _assert_has_any_path(schema_payload, schema_prefixes)
 
 
-def test_schema_allows_import_only_output_target_shape() -> None:
+def test_schema_rejects_import_only_output_target_shape() -> None:
     schema = build_demand_schema()
 
     data = {
@@ -96,4 +96,5 @@ def test_schema_allows_import_only_output_target_shape() -> None:
         ],
     }
 
-    _ = jsonschema.Draft7Validator(schema).validate(data)
+    with pytest.raises(jsonschema.exceptions.ValidationError):
+        jsonschema.Draft7Validator(schema).validate(data)

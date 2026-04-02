@@ -11,7 +11,7 @@ base_main:
       priority: {extract: priority, name: 优先级}
       resolve_minutes: {extract: resolve_minutes, name: 解决耗时(分钟)}
 
-base_outputs:
+base_resources:
   resources:
     files:
       detail_csv:
@@ -23,20 +23,3 @@ base_outputs:
         path: {$init_var: out_path_secondary_workbook}
         allow_formulas: false
         write_lock: false
-
-  outputs:
-    - name: detail
-      to:
-        file: detail_csv
-      write:
-        header_fields_output_by: field_id
-        include_header: true
-      fields: [ticket_id, priority, resolve_minutes]
-
-    # 故意作为“非主输出”来演示 `failure_policy` + `include_full_error_message`.
-    # 运行时,我们会把 `out_path_secondary_workbook` 传成一个 *目录* 来触发可预期失败.
-    - name: secondary_debug_workbook
-      to:
-        book: secondary_debug
-        sheet: Debug
-      fields: [ticket_id, priority, resolve_minutes]

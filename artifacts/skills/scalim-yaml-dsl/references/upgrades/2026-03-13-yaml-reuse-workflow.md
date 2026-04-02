@@ -4,7 +4,7 @@
 
 本批次聚焦 YAML DSL 的“复用与编排”能力:
 
-- demand YAML 新增跨文件复用: 顶层 `imports` + 任意 mapping 内 `$import`(编译期展开)
+- demand YAML 新增跨文件复用: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开;仅稳定 authoring surfaces)
 - 新增 workflow YAML + Python 入口 `scalim.dsl.by_yaml.run_workflow(...)` 编排多个 demand
 - workflow 可选启用 `cache_pool`: 跨 nodes 共享 `cache_mode: preload_forever` 的预加载结果,并通过 signature + 冲突策略治理复用边界（`share_preload_cache` 已移除）
 
@@ -27,7 +27,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 ### 语法要点
 
 - 顶层新增 `imports: {<alias>: <fragment.yaml>}`
-- 任意 mapping 节点内允许 `$import`(string 或 string list):
+- `$import` 仅允许出现在 demand 的稳定 authoring surfaces(例如 `main_source/sources/fields/relations/resources`;不允许顶层 `(root)` 与 `outputs.*`):
   - `$import: common.sources`
   - `$import: [common.sources, other.sources]`
 - V1 路径限制: `imports.*` 仅允许同级文件名: `x.yaml|x.yml` 或 `./x.yaml|./x.yml`
@@ -36,7 +36,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 
 ### BREAKING: 保留字冲突
 
-- `$import` 是保留字: 任意 mapping 内出现 `$import` 都会触发 import 语义,不提供转义/兼容模式
+- `$import` 是保留字: 出现在 mapping 内会触发 import 语义(若越界则 fail-fast),不提供转义/兼容模式
 - `imports` 是保留字: 顶层 `imports` 仅用于 import alias 映射
 
 若业务配置曾把 `$import`/`imports` 当作普通 key,需要改名后再升级.

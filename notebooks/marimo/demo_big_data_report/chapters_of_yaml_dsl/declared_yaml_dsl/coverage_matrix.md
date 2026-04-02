@@ -32,10 +32,16 @@
 - `batch_size`（含 `null` 禁用分批）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_sla_report.yaml`（`null`）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`（整数）
-- `imports` + 顶层 `$import`（跨文件 fragments, V1 同目录约束; 支持 string 或 list 合并）
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`（imports + `$import`）
+- `imports` + `$import`（跨文件 fragments; scope 仅限稳定 authoring surfaces）
+  - NOTE: demand `$import` **不允许**出现在顶层 `(root)` 或 `outputs.*` 等非 authoring 片段区域;仅允许出现在:
+    - `main_source.*`
+    - `sources.*`
+    - `fields.*`
+    - `relations.*`
+    - `resources.*`
+  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`（`main_source.params.$import`）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report_fragments.yaml`
-  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`（顶层 `$import: [..]`）
+  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`（`main_source.$import` + `resources.$import`）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/_shared/support_output_failure_fragments.yaml`
 - `_templates`（用于 anchors/merge 复用；`_templates.retry.*` 受 schema 校验）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`

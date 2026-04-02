@@ -1,10 +1,5 @@
 # yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
 
-imports:
-  frag: ../_shared/support_output_failure_fragments.yaml
-
-$import: [frag.base_main, frag.base_outputs]
-
 name: demo_big_data_report_support_output_failure_primary_only_full
 description: |
   客服报表: “主输出必须成功,其它输出失败不阻断”(primary_only) + 错误信息包含全文.
@@ -15,4 +10,29 @@ description: |
 
 # NOTE: demand `failure_policy` moved out of YAML runtime policy boundary.
 # Pass via runtime entrypoints, e.g. `run(..., demand_failure_policy="primary_only")`.
+imports:
+  frag: ../_shared/support_output_failure_fragments.yaml
+
+main_source:
+  $import: frag.base_main.main_source
+
+resources:
+  $import: frag.base_resources.resources
+
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    write:
+      header_fields_output_by: field_id
+      include_header: true
+    fields: [ticket_id, priority, resolve_minutes]
+
+  # 故意作为“非主输出”来演示 `failure_policy` + `include_full_error_message`.
+  # 运行时,我们会把 `out_path_secondary_workbook` 传成一个 *目录* 来触发可预期失败.
+  - name: secondary_debug_workbook
+    to:
+      book: secondary_debug
+      sheet: Debug
+    fields: [ticket_id, priority, resolve_minutes]
+
 include_full_error_message: true

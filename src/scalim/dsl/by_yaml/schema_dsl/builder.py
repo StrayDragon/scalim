@@ -103,11 +103,12 @@ class SchemaBuilder:
             "book": self._build_definition(types_mod.BookConfig),
             "file": self._build_definition(types_mod.FileConfig),
             "resources": self._build_definition(types_mod.ResourcesConfig),
-            "output_aggregate": self._build_definition(types_mod.OutputAggregateConfig),
-            "output_to": self._build_definition(types_mod.OutputToConfig),
-            "output_write": self._build_definition(types_mod.OutputWriteConfig),
-            "output_target": self._build_definition(types_mod.OutputTargetConfig),
-            "output_extra_sheet": self._build_definition(types_mod.OutputExtraSheetConfig),
+            # `c15-yaml-dsl-demand-imports-scope`: 输出相关配置不支持 `$import` (仅允许在稳定编写入口使用)。
+            "output_aggregate": self._build_definition(types_mod.OutputAggregateConfig, allow_import=False),
+            "output_to": self._build_definition(types_mod.OutputToConfig, allow_import=False),
+            "output_write": self._build_definition(types_mod.OutputWriteConfig, allow_import=False),
+            "output_target": self._build_definition(types_mod.OutputTargetConfig, allow_import=False),
+            "output_extra_sheet": self._build_definition(types_mod.OutputExtraSheetConfig, allow_import=False),
             "guardrails_loader": self._build_definition(types_mod.GuardrailsLoaderConfig),
             "guardrails_relations": self._build_definition(types_mod.GuardrailsRelationsConfig),
             "guardrails_compute": self._build_definition(types_mod.GuardrailsComputeConfig),
@@ -122,8 +123,7 @@ class SchemaBuilder:
             "description": types_mod.DEMAND_SCHEMA_META["description"],
             "$comment": self.GENERATED_SCHEMA_COMMENT,
             "type": "object",
-            # `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
-            "anyOf": [{"required": list(types_mod.DEMAND_SCHEMA_REQUIRED)}, {"required": [_IMPORT_KEY]}],
+            "required": list(types_mod.DEMAND_SCHEMA_REQUIRED),
             "properties": self._build_demand_properties(),
             "definitions": definitions,
         }
@@ -457,7 +457,6 @@ class SchemaBuilder:
         types_mod = self._types
         base_properties = self._build_class_properties(types_mod.DemandConfig, allow_import=True)
         base_properties.setdefault(_IMPORTS_KEY, self._imports_schema())
-        base_properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
         ordered: Dict[str, Any] = {}
         for name in types_mod.DEMAND_SCHEMA_PROPERTIES_ORDER:
             if name == "_templates":
@@ -478,6 +477,9 @@ class SchemaBuilder:
                         "- 不能与源字段同名(避免 source/derived 重名)\n"
                         "- 支持 YAML anchor 复用"
                     ),
+                    # `c15-yaml-dsl-demand-imports-scope`: `fields` 属于稳定编写入口之一, 允许 `$import`。
+                    "properties": {_IMPORT_KEY: self._import_ref_schema()},
+                    "propertyNames": {"anyOf": [{"const": _IMPORT_KEY}, schema_constants.FIELD_ID_STRING_SCHEMA]},
                     "additionalProperties": {"$ref": "#/definitions/field"},
                 }
                 continue

@@ -828,16 +828,14 @@ class OutputTargetConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    # 注意: `$import` 会在编译期展开;为提升 `LSP`/`schema` 体验,允许仅声明 `$import` 的用法通过校验.
-    # 这里的结构性约束仅作用于非 `$import` 的 `output_target` 形态.
     SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
         {
-            "if": {"required": ["$import"]},
+            # 当声明了 `aggregate`,明细输出的 `fields/from` 约束不再适用.
+            # 注意: 输出编排区不支持 `$import` (见 `OpenSpec`: `yaml-dsl-demand-imports-scope`)。
+            "if": {"required": ["aggregate"]},
             "then": {},
             "else": {
-                "if": {"required": ["aggregate"]},
-                "then": {},
-                "else": {"anyOf": [{"required": ["fields"]}, {"required": ["from"]}]},
+                "anyOf": [{"required": ["fields"]}, {"required": ["from"]}],
             },
         }
     ]

@@ -631,7 +631,6 @@ DEMAND_SCHEMA_REQUIRED = ["name", "main_source"]
 DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "name",
     "imports",
-    "$import",
     "_templates",
     "description",
     "main_source",

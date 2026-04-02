@@ -45,16 +45,20 @@ _CACHE_POOL_PIN_KINDS = ("preload_forever",)
 
 _INTERNAL_NODE_ID_PREFIX = "__wf__"
 _IMPORT_KEY = "$import"
+_IMPORTS_KEY = "imports"
 
 
 def _raise_if_import_present(data: Mapping[str, Any], *, path: str) -> None:
-    if _IMPORT_KEY not in data:
+    found_import_key = _IMPORT_KEY in data
+    found_imports_key = _IMPORTS_KEY in data
+    if not (found_import_key or found_imports_key):
         return
+    bad_key = _IMPORT_KEY if found_import_key else _IMPORTS_KEY
     msg = (
-        "workflow YAML does not support `$import` (no imports expansion). "
+        "workflow YAML does not support `imports`/`$import` (no imports expansion). "
         "Hint: inline the config under `workflow.resources.*`, or move the reuse to demand YAML via YAML anchors (`_templates`)."
     )
-    raise ScalimWorkflowConfigError(msg, path="{}.{}".format(path, _IMPORT_KEY))
+    raise ScalimWorkflowConfigError(msg, path="{}.{}".format(path, bad_key))
 
 
 def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[str, ...]:
@@ -702,6 +706,7 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:
         msg = "Missing required mapping 'workflow'"
         raise ScalimWorkflowConfigError(msg, path="workflow")
     wf = cast("Dict[str, Any]", wf_raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(wf, path="workflow")
 
     runs, seen_ids = _load_workflow_runs(wf)
     _validate_workflow_deps(runs, seen_ids=seen_ids)

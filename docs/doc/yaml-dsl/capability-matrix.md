@@ -28,7 +28,7 @@
 | `batch_size` | `DemandConfig.batch_size` → `ExecutionRequest.batch_size` | 仅影响分批;不影响 `DemandIr.batch_size_hint` | 用 `scalim.dsl.by_yaml.run(..., batch_size=...)` 覆盖 |
 | `_templates` | 仅作为 YAML anchors 容器(不直接编译) | 只用于 YAML 复用;不会被运行时读取 | 使用 `&anchor/*alias` 复用 `retry/fields/relations/...` |
 | `imports` | 编译期展开(片段导入) | 仅支持相对 `.yaml/.yml` 文件路径或 `scalim://<preset_id>`;默认相对入口 YAML 目录解析且受 `allow-roots` 限制(可用 CLI `--allowed-yaml-root` 或 `scalim.yaml yaml_dsl.import_allowed_roots/import_aliases` 扩展) | 仅靠 YAML anchors 复用(单文件)或显式复制片段 |
-| `$import` | 编译期展开(在 mapping 内引用 imports alias) | 仅在“文件路径入口”可用;纯文本入口无法解析文件 | 使用 workflow 或 Python 驱动自行拼装 YAML |
+| `$import` | 编译期展开(在 mapping 内引用 imports alias) | 仅在“文件路径入口”可用;纯文本入口无法解析文件; **scope 仅限稳定 authoring surfaces**(`main_source/sources/fields/relations/resources`),不允许顶层 `(root)` 与 `outputs.*`/workflow/runtime policy/output extras | 使用 YAML anchors/merge(单文件)或 workflow/Python 拼装 |
 
 ## 2) Demand YAML:数据源(main_source/sources)
 

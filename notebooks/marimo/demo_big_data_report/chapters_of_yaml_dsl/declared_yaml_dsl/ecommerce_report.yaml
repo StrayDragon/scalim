@@ -64,6 +64,16 @@ _templates:
     - tax_amount
     - final_price
 
+  # aggregate 片段复用示例: outputs 不支持 `$import`(imports scope boundary),使用 YAML anchors/merge 复用.
+  agg_by_region_guardrails: &agg_by_region_guardrails
+    group_by: [region_name_display]
+    max_groups: 1000
+    max_distinct: 10000
+    distinct_on_overflow: truncate
+
+  metric_order_cnt: &metric_order_cnt {count: {}}
+  metric_sum_order_amount: &metric_sum_order_amount {sum: {field: order_amount}}
+
   # 关系步骤模板: 复用/merge 展示
   step_orders_to_customers: &step_orders_to_customers
     from: orders.customer_id
@@ -474,10 +484,8 @@ fields:
 resources:
   books:
     report:
-      kind: xlsx_file
+      $import: fragments.report_book
       path: ./.tmp/output/ecommerce_report.xlsx
-      allow_formulas: true
-      write_lock: true
 
 # NOTE: meta/audit extra sheets were moved out of YAML mainline (output extras boundary).
 # Configure via runtime entrypoints, e.g.:
@@ -549,12 +557,12 @@ outputs:
   - name: by_region_import
     to:
       <<: *report_to
-      sheet: 区域汇总-$import
+      sheet: 区域汇总-模板
     aggregate:
-      $import: fragments.agg_by_region_guardrails
+      <<: *agg_by_region_guardrails
       fields:
-        order_cnt: {$import: fragments.metric_order_cnt}
-        sum_order_amount: {$import: fragments.metric_sum_order_amount}
+        order_cnt: *metric_order_cnt
+        sum_order_amount: *metric_sum_order_amount
         customer_cnt: {count_distinct: {field: customer_id}}
 
   - name: by_region_top_amount

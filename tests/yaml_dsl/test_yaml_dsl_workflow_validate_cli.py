@@ -137,6 +137,41 @@ workflow:
     assert "does not support" in match["message"]
 
 
+def test_yaml_dsl_validate_workflow_rejects_imports_mapping(tmp_path: Path, capsys) -> None:
+    demand_path = tmp_path / "demand.yaml"
+    demand_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    workflow_path = tmp_path / "workflow.yaml"
+    workflow_path.write_text(
+        """
+workflow:
+  imports:
+    common: ./common.yaml
+  runs:
+    - id: r1
+      demand: ./demand.yaml
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    code = yaml_dsl_cli._run_validate(_workflow_args(workflow_path, json_output=True))
+    assert code == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    workflow_result = payload["results"][0]
+    match = next(item for item in workflow_result["errors"] if item["path"] == "workflow.imports")
+    assert "imports" in match["message"]
+    assert "does not support" in match["message"]
+
+
 def test_yaml_dsl_validate_workflow_rejects_unknown_keys_in_file_resource(tmp_path: Path, capsys) -> None:
     demand_path = tmp_path / "demand.yaml"
     demand_path.write_text(

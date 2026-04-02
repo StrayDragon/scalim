@@ -111,40 +111,27 @@ def test_imports_list_replace(tmp_path) -> None:
     frag.write_text(
         """
 base:
-  resources:
-    files:
-      detail_csv: {kind: csv_file, path: ./a.csv}
-  outputs:
-    - name: detail
-      to: {file: detail_csv}
-      fields: [a]
+  main_source:
+    params:
+      items: [a]
 """.lstrip(),
         encoding="utf-8",
     )
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
-name: demo
 imports:
   f: ./frag.yaml
-$import: f.base
 main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-sources: {}
-resources:
-  files:
-    detail_csv: {kind: csv_file, path: ./b.csv}
-outputs:
-  - name: detail
-    to: {file: detail_csv}
-    fields: [b]
+  params:
+    $import: f.base.main_source.params
+    items: [b]
 """.lstrip(),
         encoding="utf-8",
     )
 
     expanded = load_and_expand_imports(demand)
-    assert expanded["outputs"][0]["fields"] == ["b"]
+    assert expanded["main_source"]["params"]["items"] == ["b"]
 
 
 def test_imports_type_mismatch_fails_fast(tmp_path) -> None:
@@ -152,28 +139,21 @@ def test_imports_type_mismatch_fails_fast(tmp_path) -> None:
     frag.write_text(
         """
 base:
-  resources:
-    files:
-      detail_csv: {kind: csv_file, path: ./a.csv}
-  outputs:
-    - name: detail
-      to: {file: detail_csv}
-      fields: [a]
+  main_source:
+    params:
+      items: {}
 """.lstrip(),
         encoding="utf-8",
     )
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
-name: demo
 imports:
   f: ./frag.yaml
-$import: f.base
 main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-sources: {}
-outputs: "oops"
+  params:
+    $import: f.base.main_source.params
+    items: []
 """.lstrip(),
         encoding="utf-8",
     )
@@ -181,7 +161,7 @@ outputs: "oops"
     with pytest.raises(ScalimYamlImportExpansionError) as exc:
         _ = load_and_expand_imports(demand)
     assert "Type mismatch" in str(exc.value)
-    assert exc.value.logical_path == "outputs"
+    assert exc.value.logical_path == "main_source.params.items"
 
 
 @pytest.mark.parametrize(
@@ -223,17 +203,22 @@ def test_imports_scalim_preset_can_be_imported_and_expanded(tmp_path: Path) -> N
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
+name: demo
 imports:
   std: "scalim://yaml-dsl/presets/common.yaml"
-demo:
-  $import: std.demo
-  y: 2
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  params:
+    $import: std.demo
+    y: 2
+sources: {}
 """.lstrip(),
         encoding="utf-8",
     )
     expanded = load_and_expand_imports(demand)
-    assert expanded["demo"]["x"] == 1
-    assert expanded["demo"]["y"] == 2
+    assert expanded["main_source"]["params"]["x"] == 1
+    assert expanded["main_source"]["params"]["y"] == 2
 
 
 def test_imports_scalim_yaml_alias_allows_reserved_prefix(tmp_path: Path) -> None:
@@ -264,15 +249,16 @@ demo:
         """
 imports:
   f: "@/fragments/common.yaml"
-demo:
-  $import: f.demo
-  y: 2
+main_source:
+  params:
+    $import: f.demo
+    y: 2
 """.lstrip(),
         encoding="utf-8",
     )
     expanded = load_and_expand_imports(demand)
-    assert expanded["demo"]["x"] == 1
-    assert expanded["demo"]["y"] == 2
+    assert expanded["main_source"]["params"]["x"] == 1
+    assert expanded["main_source"]["params"]["y"] == 2
 
 
 def test_imports_scalim_yaml_import_allowed_roots_rejects_outside(tmp_path: Path) -> None:
@@ -303,8 +289,9 @@ yaml_dsl:
         """
 imports:
   f: ./outside/common.yaml
-demo:
-  $import: f.demo
+main_source:
+  params:
+    $import: f.demo
 """.lstrip(),
         encoding="utf-8",
     )
@@ -356,20 +343,21 @@ yaml_dsl:
         """
 imports:
   f: "@/fragments/common.yaml"
-demo:
-  $import: f.demo
+main_source:
+  params:
+    $import: f.demo
 """.lstrip(),
         encoding="utf-8",
     )
 
     expanded = load_and_expand_imports(demand)
-    assert expanded["demo"]["x"] == 2
+    assert expanded["main_source"]["params"]["x"] == 2
 
     expanded = load_and_expand_imports(demand, scalim_yaml_override=outer_scalim_yaml)
-    assert expanded["demo"]["x"] == 1
+    assert expanded["main_source"]["params"]["x"] == 1
 
     expanded = load_and_expand_imports(demand, project_root_override=tmp_path)
-    assert expanded["demo"]["x"] == 1
+    assert expanded["main_source"]["params"]["x"] == 1
 
 
 def test_imports_mapping_resolve_hint_failures_are_handled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -419,15 +407,16 @@ demo:
         """
 imports:
   f: ./_shared/common.yaml
-demo:
-  $import: f.demo
-  y: 2
+main_source:
+  params:
+    $import: f.demo
+    y: 2
 """.lstrip(),
         encoding="utf-8",
     )
     expanded = load_and_expand_imports(demand)
-    assert expanded["demo"]["x"] == 1
-    assert expanded["demo"]["y"] == 2
+    assert expanded["main_source"]["params"]["x"] == 1
+    assert expanded["main_source"]["params"]["y"] == 2
 
 
 def test_imports_path_constraints_support_parent_dir(tmp_path) -> None:
@@ -449,8 +438,9 @@ demo:
         """
 imports:
   f: ../_shared/common.yaml
-demo:
-  $import: f.demo
+main_source:
+  params:
+    $import: f.demo
 """.lstrip(),
         encoding="utf-8",
     )
@@ -460,7 +450,7 @@ demo:
     assert "allowed_yaml_roots" in str(excinfo.value)
 
     expanded = load_and_expand_imports(demand, allowed_yaml_roots=[tmp_path])
-    assert expanded["demo"]["x"] == 1
+    assert expanded["main_source"]["params"]["x"] == 1
 
 
 def test_imports_symlink_escape_is_rejected_by_default(tmp_path: Path) -> None:
@@ -488,8 +478,9 @@ demo:
         """
 imports:
   f: ./link.yaml
-demo:
-  $import: f.demo
+main_source:
+  params:
+    $import: f.demo
 """.lstrip(),
         encoding="utf-8",
     )
@@ -516,12 +507,9 @@ def test_imports_cycle_detection(tmp_path) -> None:
         """
 imports:
   b: ./b.yaml
-$import: b
-name: demo
 main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-sources: {}
+  params:
+    $import: b.main_source.params
 """.lstrip(),
         encoding="utf-8",
     )
@@ -529,7 +517,9 @@ sources: {}
         """
 imports:
   a: ./a.yaml
-$import: a
+main_source:
+  params:
+    $import: a.main_source.params
 """.lstrip(),
         encoding="utf-8",
     )
@@ -545,13 +535,15 @@ def test_imports_max_depth(tmp_path) -> None:
         current = tmp_path / "f{}.yaml".format(idx)
         next_name = "f{}.yaml".format(idx + 1)
         if idx == chain_len - 1:
-            current.write_text("x: {}\n", encoding="utf-8")
+            current.write_text("main_source:\n  params: {x: {}}\n", encoding="utf-8")
         else:
             current.write_text(
                 """
 imports:
   n: ./{next_name}
-$import: n
+main_source:
+  params:
+    $import: n.main_source.params
 """.format(next_name=next_name).lstrip(),
                 encoding="utf-8",
             )
@@ -753,6 +745,56 @@ def test_imports_contains_import_syntax_returns_false_for_plain_data() -> None:
     assert imports_mod.contains_import_syntax({"ok": 1}) is False
 
 
+def test_imports_scope_rejects_top_level_import_usage(tmp_path: Path) -> None:
+    demand = tmp_path / "demand.yaml"
+    demand.write_text(
+        """
+imports: {}
+$import: missing
+""".lstrip(),
+        encoding="utf-8",
+    )
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
+        _ = load_and_expand_imports(demand)
+    assert excinfo.value.logical_path == "$import"
+    assert "Out-of-scope $import" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ("yaml_text", "expected_path"),
+    [
+        (
+            """
+outputs:
+  - $import: missing
+""",
+            "outputs.0.$import",
+        ),
+        (
+            """
+audit:
+  $import: missing
+""",
+            "audit.$import",
+        ),
+        (
+            """
+retry:
+  $import: missing
+""",
+            "retry.$import",
+        ),
+    ],
+)
+def test_imports_scope_rejects_out_of_scope_paths(tmp_path: Path, yaml_text: str, expected_path: str) -> None:
+    demand = tmp_path / "demand.yaml"
+    demand.write_text(yaml_text.lstrip(), encoding="utf-8")
+    with pytest.raises(ScalimYamlImportExpansionError) as excinfo:
+        _ = load_and_expand_imports(demand)
+    assert excinfo.value.logical_path == expected_path
+    assert "Out-of-scope $import" in str(excinfo.value)
+
+
 @pytest.mark.parametrize(
     "bad_ref",
     [
@@ -769,7 +811,9 @@ def test_imports_invalid_import_ref_is_wrapped(tmp_path, bad_ref: str) -> None:
         """
 imports:
   f: ./frag.yaml
-$import: "{bad_ref}"
+main_source:
+  params:
+    $import: "{bad_ref}"
 """.format(bad_ref=bad_ref).lstrip(),
         encoding="utf-8",
     )
@@ -783,7 +827,9 @@ def test_imports_unknown_alias_fails_fast(tmp_path) -> None:
     demand.write_text(
         """
 imports: {}
-$import: missing
+main_source:
+  params:
+    $import: missing
 """.lstrip(),
         encoding="utf-8",
     )
@@ -800,7 +846,9 @@ def test_imports_select_fragment_non_mapping_during_drill_fails(tmp_path) -> Non
         """
 imports:
   f: ./frag.yaml
-$import: f.a.b
+main_source:
+  params:
+    $import: f.a.b
 """.lstrip(),
         encoding="utf-8",
     )
@@ -817,7 +865,9 @@ def test_imports_select_fragment_missing_key_fails(tmp_path) -> None:
         """
 imports:
   f: ./frag.yaml
-$import: f.a.b
+main_source:
+  params:
+    $import: f.a.b
 """.lstrip(),
         encoding="utf-8",
     )
@@ -834,7 +884,9 @@ def test_imports_select_fragment_final_value_must_be_mapping(tmp_path) -> None:
         """
 imports:
   f: ./frag.yaml
-$import: f.a
+main_source:
+  params:
+    $import: f.a
 """.lstrip(),
         encoding="utf-8",
     )
@@ -847,18 +899,18 @@ def test_imports_deep_merge_override_list_replaces_prior_list(tmp_path) -> None:
     a = tmp_path / "a.yaml"
     a.write_text(
         """
-demo:
-  items:
-    - a
+main_source:
+  params:
+    items: [a]
 """.lstrip(),
         encoding="utf-8",
     )
     b = tmp_path / "b.yaml"
     b.write_text(
         """
-demo:
-  items:
-    - b
+main_source:
+  params:
+    items: [b]
 """.lstrip(),
         encoding="utf-8",
     )
@@ -868,27 +920,30 @@ demo:
 imports:
   a: ./a.yaml
   b: ./b.yaml
-demo:
-  $import: [a.demo, b.demo]
+main_source:
+  params:
+    $import: [a.main_source.params, b.main_source.params]
 """.lstrip(),
         encoding="utf-8",
     )
     expanded = load_and_expand_imports(demand)
-    assert expanded["demo"]["items"] == ["b"]
+    assert expanded["main_source"]["params"]["items"] == ["b"]
 
 
 def test_imports_deep_merge_override_type_mismatch_fails_fast(tmp_path) -> None:
     a = tmp_path / "a.yaml"
-    a.write_text("x: {a: 1}\n", encoding="utf-8")
+    a.write_text("main_source:\n  params:\n    x: {a: 1}\n", encoding="utf-8")
     b = tmp_path / "b.yaml"
-    b.write_text("x: 1\n", encoding="utf-8")
+    b.write_text("main_source:\n  params:\n    x: 1\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
 imports:
   a: ./a.yaml
   b: ./b.yaml
-$import: [a, b]
+main_source:
+  params:
+    $import: [a.main_source.params, b.main_source.params]
 """.lstrip(),
         encoding="utf-8",
     )
@@ -899,19 +954,21 @@ $import: [a, b]
 
 def test_imports_deep_merge_fill_scalar_keeps_local_value(tmp_path) -> None:
     frag = tmp_path / "frag.yaml"
-    frag.write_text("x: 1\n", encoding="utf-8")
+    frag.write_text("main_source:\n  params:\n    x: 1\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
 imports:
   f: ./frag.yaml
-$import: f
-x: 2
+main_source:
+  params:
+    $import: f.main_source.params
+    x: 2
 """.lstrip(),
         encoding="utf-8",
     )
     expanded = load_and_expand_imports(demand)
-    assert expanded["x"] == 2
+    assert expanded["main_source"]["params"]["x"] == 2
 
 
 def test_imports_fragment_yaml_must_be_mapping(tmp_path) -> None:
@@ -922,7 +979,9 @@ def test_imports_fragment_yaml_must_be_mapping(tmp_path) -> None:
         """
 imports:
   f: ./frag.yaml
-$import: f
+main_source:
+  params:
+    $import: f
 """.lstrip(),
         encoding="utf-8",
     )
@@ -933,18 +992,20 @@ $import: f
 
 def test_imports_cache_shortcuts_repeat_import_of_same_fragment(tmp_path) -> None:
     frag = tmp_path / "frag.yaml"
-    frag.write_text("x: {}\n", encoding="utf-8")
+    frag.write_text("main_source:\n  params:\n    x: {}\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text(
         """
 imports:
   f: ./frag.yaml
-$import: [f, f]
+main_source:
+  params:
+    $import: [f.main_source.params, f.main_source.params]
 """.lstrip(),
         encoding="utf-8",
     )
     expanded = load_and_expand_imports(demand)
-    assert expanded["x"] == {}
+    assert expanded["main_source"]["params"]["x"] == {}
 
 
 def test_imports_import_must_be_str_or_list_of_str(tmp_path) -> None:
@@ -955,8 +1016,9 @@ def test_imports_import_must_be_str_or_list_of_str(tmp_path) -> None:
         """
 imports:
   f: ./frag.yaml
-demo:
-  $import: 1
+main_source:
+  params:
+    $import: 1
 """.lstrip(),
         encoding="utf-8",
     )
@@ -973,8 +1035,9 @@ def test_imports_import_list_entries_must_be_strings(tmp_path) -> None:
         """
 imports:
   f: ./frag.yaml
-demo:
-  $import: [f, 1]
+main_source:
+  params:
+    $import: [f, 1]
 """.lstrip(),
         encoding="utf-8",
     )

@@ -10,12 +10,11 @@ Sources:
 此页用于快速对齐 YAML DSL 的字段集合与 `required` 边界.
 
 ## Top-Level Fields
-- `name`: type=string; 需求配置名称. - 必填, 用于标识当前配置
+- `name` (required): type=string; 需求配置名称. - 必填, 用于标识当前配置
 - `imports`: type=object; 片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录): - `./x.yaml` / `x.yaml` - `x/y.yaml`(子目录) - `../x.yaml`(父目录) - 支持(编辑器侧放宽,运行时校验为准): - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置) - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单) - 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等
-- `$import`: $import 引用. - string: `<alias>(.<segment>)*` - list: 按顺序合并,后者覆盖前者,最终再被本地覆盖 - 仅支持 mapping 片段 - 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset - 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准
 - `_templates`: type=object; YAML anchor 模板集合. - 仅用于 YAML 复用(anchors) - 常用于 `fields` / `relations`
 - `description`: type=string; 配置描述(可选).
-- `main_source`: ref=main_source; 主数据源配置. - 必填: `source_id`, `loader` - `source_id` 不能出现在 `sources` 中 - `fields` 仅允许源字段(禁止 `compute`) - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)
+- `main_source` (required): ref=main_source; 主数据源配置. - 必填: `source_id`, `loader` - `source_id` 不能出现在 `sources` 中 - `fields` 仅允许源字段(禁止 `compute`) - `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)
 - `sources`: type=object; 数据源配置映射, key 为 `source_id`. - 每个 source 必填: `loader`, `key` - 不允许包含 `main_source.source_id` - `fields` 仅允许源字段(禁止 `compute`)
 - `fields`: type=object; 字段配置映射(仅用于派生字段). - 必须包含 `compute` 或 `call_by` - 不能与源字段同名(避免 source/derived 重名) - 支持 YAML anchor 复用
 - `relations`: type=object; 命名关联关系映射(steps 模板). - 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用 - string ref: `relation: <relation_id>` 引用 `relations.<relation_id>` - alias 复用: `relation: *<anchor>` (YAML anchor) - steps 必须是等值关联链, 参考 `relation.steps`
@@ -114,38 +113,37 @@ Sources:
 - `source_id`: type=string; 主数据源的 source_id
 
 ### `output_aggregate`
-- `$import`: $import 引用(支持 string 或 string list)
+
+- Required: `fields`, `group_by`
 - `distinct_on_overflow`: type=string; default=error; enum=error|truncate; distinct 护栏溢出策略(error/truncate)
-- `fields`: type=object; 聚合输出字段映射(key 为 out_field_id)
-- `group_by`: type=array; 分组字段列表
+- `fields` (required): type=object; 聚合输出字段映射(key 为 out_field_id)
+- `group_by` (required): type=array; 分组字段列表
 - `max_distinct`: type=integer; default=0; max_distinct 护栏(0 表示不限制)
 - `max_groups`: type=integer; default=0; max_groups 护栏(0 表示不限制)
 
 ### `output_extra_sheet`
-- `$import`: $import 引用(支持 string 或 string list)
 - `allow_formulas`: type=boolean; 可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置)
 - `path`: type=string; 可选:工作簿路径(缺省使用 primary workbook)
 - `sheet`: type=string; sheet 名称
 - `write_lock`: type=boolean; 可选:写锁(缺省使用 primary workbook 的容器配置)
 
 ### `output_target`
-- `$import`: $import 引用(支持 string 或 string list)
+
+- Required: `name`
 - `aggregate`: ref=output_aggregate; 可选:派生汇总配置(声明后视为 derived output)
 - `fields`: type=array; 输出字段顺序(field_id/out_field_id 列表; 支持 YAML alias)
 - `from`: type=string; 可选:继承来源输出(name)
-- `name`: type=string; 输出名称(name)
+- `name` (required): type=string; 输出名称(name)
 - `to`: ref=output_to; 可选:输出目标绑定(to: file/book/sheet)
 - `where`: type=string; 可选:过滤表达式(安全表达式)
 - `write`: ref=output_write; 可选:写入策略覆盖(write)
 
 ### `output_to`
-- `$import`: $import 引用(支持 string 或 string list)
 - `book`: type=string; 可选:目标 book_id
 - `file`: type=string; 可选:目标 file_id
 - `sheet`: type=string; 可选:目标 sheet 名称
 
 ### `output_write`
-- `$import`: $import 引用(支持 string 或 string list)
 - `header_fields_output_by`: type=string; default=name; enum=field_id|name; 可选:表头字段名来源(field_id/name;默认 name)
 - `include_header`: type=boolean; default=true; 可选:是否输出表头(默认 true)
 

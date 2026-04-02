@@ -5,18 +5,9 @@
   "description": "Scalim 框架 YAML 需求配置定义 Schema",
   "$comment": "自动生成, 请勿手动修改. 生成脚本: scripts/gen-yaml-dsl-schema.py",
   "type": "object",
-  "anyOf": [
-    {
-      "required": [
-        "name",
-        "main_source"
-      ]
-    },
-    {
-      "required": [
-        "$import"
-      ]
-    }
+  "required": [
+    "name",
+    "main_source"
   ],
   "properties": {
     "name": {
@@ -39,29 +30,6 @@
         "type": "string",
         "pattern": "^((\\./|\\.\\./)*([^/\\\\:]+/)*[^/\\\\:]+\\.ya?ml|@/([^/\\\\:]+/)*[^/\\\\:]+\\.ya?ml|[a-zA-Z_][a-zA-Z0-9_]*:/([^/\\\\:]+/)*[^/\\\\:]+\\.ya?ml|scalim://[^\\\\s\\\\\\\\]+\\.ya?ml)$"
       }
-    },
-    "$import": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "minItems": 1
-        }
-      ],
-      "description": "$import 引用(支持 string 或 string list)",
-      "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
-      "examples": [
-        "common.sources",
-        [
-          "common.sources",
-          "other.sources"
-        ]
-      ]
     },
     "_templates": {
       "type": "object",
@@ -134,6 +102,44 @@
       "type": "object",
       "description": "字段配置映射, key 为 field_id; 仅用于派生字段",
       "markdownDescription": "字段配置映射(仅用于派生字段).\n\n- 必须包含 `compute` 或 `call_by`\n- 不能与源字段同名(避免 source/derived 重名)\n- 支持 YAML anchor 复用",
+      "properties": {
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用(支持 string 或 string list)",
+          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "propertyNames": {
+        "anyOf": [
+          {
+            "const": "$import"
+          },
+          {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+          }
+        ]
+      },
       "additionalProperties": {
         "$ref": "#/definitions/field"
       }
@@ -3435,43 +3441,11 @@
           "examples": [
             "error"
           ]
-        },
-        "$import": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
-            }
-          ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
-          "examples": [
-            "common.sources",
-            [
-              "common.sources",
-              "other.sources"
-            ]
-          ]
         }
       },
-      "anyOf": [
-        {
-          "required": [
-            "group_by",
-            "fields"
-          ]
-        },
-        {
-          "required": [
-            "$import"
-          ]
-        }
+      "required": [
+        "group_by",
+        "fields"
       ],
       "additionalProperties": false
     },
@@ -3505,29 +3479,6 @@
             "Summary"
           ],
           "markdownDescription": "可选:目标 sheet 名称"
-        },
-        "$import": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
-            }
-          ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
-          "examples": [
-            "common.sources",
-            [
-              "common.sources",
-              "other.sources"
-            ]
-          ]
         }
       },
       "additionalProperties": false
@@ -3557,29 +3508,6 @@
             "name"
           ],
           "markdownDescription": "可选:表头字段名来源(field_id/name;默认 name)"
-        },
-        "$import": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
-            }
-          ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
-          "examples": [
-            "common.sources",
-            [
-              "common.sources",
-              "other.sources"
-            ]
-          ]
         }
       },
       "additionalProperties": false
@@ -3683,73 +3611,33 @@
               "$ref": "#/definitions/output_aggregate"
             }
           ]
-        },
-        "$import": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
-            }
-          ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
-          "examples": [
-            "common.sources",
-            [
-              "common.sources",
-              "other.sources"
-            ]
-          ]
         }
       },
-      "anyOf": [
-        {
-          "required": [
-            "name"
-          ]
-        },
-        {
-          "required": [
-            "$import"
-          ]
-        }
+      "required": [
+        "name"
       ],
       "additionalProperties": false,
       "allOf": [
         {
           "if": {
             "required": [
-              "$import"
+              "aggregate"
             ]
           },
           "then": {},
           "else": {
-            "if": {
-              "required": [
-                "aggregate"
-              ]
-            },
-            "then": {},
-            "else": {
-              "anyOf": [
-                {
-                  "required": [
-                    "fields"
-                  ]
-                },
-                {
-                  "required": [
-                    "from"
-                  ]
-                }
-              ]
-            }
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "from"
+                ]
+              }
+            ]
           }
         }
       ]
@@ -3789,29 +3677,6 @@
           "markdownDescription": "可选:写锁(缺省使用 primary workbook 的容器配置).",
           "examples": [
             true
-          ]
-        },
-        "$import": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
-            }
-          ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
-          "examples": [
-            "common.sources",
-            [
-              "common.sources",
-              "other.sources"
-            ]
           ]
         }
       },

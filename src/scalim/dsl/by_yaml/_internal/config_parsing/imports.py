@@ -16,6 +16,15 @@ IMPORT_KEY = "$import"
 
 MAX_IMPORT_EXPANSION_DEPTH = 20
 
+# `demand` 的 `$import` 作用域边界 (唯一事实来源: `OpenSpec` 变更 `c15-yaml-dsl-demand-imports-scope`)
+_ALLOWED_DEMAND_IMPORT_ROOT_KEYS: Tuple[str, ...] = (
+    "main_source",
+    "sources",
+    "fields",
+    "relations",
+    "resources",
+)
+
 _SEGMENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _URI_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 _WINDOWS_DRIVE_RE = re.compile(r"^[a-zA-Z]:")
@@ -70,6 +79,31 @@ def _format_trace(trace: Tuple[ImportTraceItem, ...]) -> str:
         via = str(item.via) if item.via else "import"
         parts.append("--{}--> {}".format(via, item.source))
     return " ".join(parts)
+
+
+def _is_import_allowed_at_logical_path(logical_path: str) -> bool:
+    """判断在给定的映射逻辑路径上是否允许 `$import`。
+
+    说明:
+    - 作用域刻意保持严格: `$import` 仅用于稳定的 `demand` 编写入口。
+    - 这里在"导入展开"阶段就做检查, 以便在 `schema`/语义校验之前给出稳定诊断。
+    """
+    path = str(logical_path or "").strip()
+    if not path:
+        return False
+    head = path.split(".", 1)[0]
+    return head in _ALLOWED_DEMAND_IMPORT_ROOT_KEYS
+
+
+def _imports_scope_error_message(*, logical_path: str) -> str:
+    allowed = ", ".join(_ALLOWED_DEMAND_IMPORT_ROOT_KEYS)
+    where = str(logical_path or "").strip() or "(root)"
+    return (
+        "Out-of-scope $import: demand `$import` is only allowed under: {}. "
+        "Found at: {}. "
+        "Hint: use YAML anchors (`_templates`) or local YAML merge (`<<`) for in-file reuse; "
+        "do not use imports to reintroduce runtime policy / output extras / workflow fragment expansion."
+    ).format(allowed, where)
 
 
 def _normalize_import_path(raw: str) -> str:
@@ -682,6 +716,10 @@ def _expand_mapping_inplace(
 ) -> None:
     if IMPORT_KEY not in mapping:
         return
+    if not _is_import_allowed_at_logical_path(logical_path):
+        err_path = "{}.{}".format(logical_path, IMPORT_KEY) if logical_path else str(IMPORT_KEY)
+        msg = _imports_scope_error_message(logical_path=logical_path)
+        raise ScalimYamlImportExpansionError(msg, trace=trace, logical_path=err_path)
 
     import_raw = mapping.get(IMPORT_KEY)
     import_refs: List[str] = []
