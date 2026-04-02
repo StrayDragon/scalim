@@ -71,4 +71,7 @@
 ## Open Questions
 
 - 生成物命名最终采用 `scalim_yaml.gen.json` 还是 `project_config.gen.json`？
+> 用 `scalim_yaml.gen.json`
+
 - schema 对未知字段的策略：是否在 `yaml_dsl` 子树内启用严格 `additionalProperties: false`（更强约束）？
+> 尽可能严格 避免用户瞎写 但是解析时仅解析需要的 , yaml的json schema 严格 但是解析不严格

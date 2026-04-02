@@ -220,7 +220,14 @@ def run_yaml_dsl_output_failure_policy(
                 all_fail_summary = "{}: {}".format(type(exc).__name__, msg)
 
             passed = bool(redacted_ok and full_ok and all_fail_ok)
-            summary = "redacted_ok={} full_ok={} all_fail_ok={} | {}".format(redacted_ok, full_ok, all_fail_ok, all_fail_summary)
+            if passed:
+                summary = "expected failure captured: {}\nredacted_ok={} full_ok={} all_fail_ok={}".format(
+                    all_fail_summary, redacted_ok, full_ok, all_fail_ok
+                )
+            else:
+                summary = "unexpected: redacted_ok={} full_ok={} all_fail_ok={} | {}".format(
+                    redacted_ok, full_ok, all_fail_ok, all_fail_summary
+                )
 
             details: Dict[str, Any] = {
                 "yaml_redacted": str(yaml_redacted_path),

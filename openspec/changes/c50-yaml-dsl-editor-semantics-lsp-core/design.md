@@ -60,4 +60,7 @@
 ## Open Questions
 
 - core API 的命名与分层（`core` 单文件 vs 分模块）是否需要在第一版就定死？
+> 都可以
+
 - `scalim` 是否需要提供一个更明确的“editor 内部依赖”稳定层（例如 `scalim.dsl.by_yaml.editor_api`）以减少 core 对私有模块的耦合？
+> 可能需要 而且我建议模块为 scalim.dsl.by_yaml.lsp_api 明确是提供给lsp的内部导出工具库 不是给用户的
