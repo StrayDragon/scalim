@@ -189,6 +189,39 @@ def test_project_config_import_allowed_roots_must_be_list(tmp_path: Path) -> Non
     assert "import_allowed_roots must be a list" in str(excinfo.value)
 
 
+def test_project_config_import_allowed_roots_rejects_outside_project_root(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside"
+    outside.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_allowed_roots: ['../outside']\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(ValueError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "must stay within project_root" in str(excinfo.value)
+
+
+def test_project_config_import_aliases_rejects_outside_project_root(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside2"
+    outside.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_aliases: {'@': '../outside2'}\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(ValueError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "must stay within project_root" in str(excinfo.value)
+
+
+def test_project_config_editor_python_roots_rejects_outside_project_root(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside_py"
+    outside.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    python_roots: ['../outside_py']\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(ValueError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "must stay within project_root" in str(excinfo.value)
+
+
 def test_project_config_scalim_yaml_override_must_exist_and_be_file(tmp_path: Path) -> None:
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")

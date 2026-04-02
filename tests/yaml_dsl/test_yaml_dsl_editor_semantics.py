@@ -1,9 +1,6 @@
 import ast
-import importlib.abc
 import importlib.machinery
-import importlib.util
 import json
-import sys
 import textwrap
 from pathlib import Path
 
@@ -267,16 +264,16 @@ def test_resolve_python_definition_module_origin_missing_file(monkeypatch: pytes
     missing_origin = str(tmp_path / "missing.py")
     module_name = "missing_mod_for_test"
 
-    class _Finder(importlib.abc.MetaPathFinder):
-        def find_spec(self, fullname: str, path, target=None):  # noqa: ANN001
-            if fullname != module_name:
-                return None
-            spec = importlib.machinery.ModuleSpec(fullname, loader=None)
-            spec.origin = missing_origin  # type: ignore[assignment]
-            return spec
+    original = editor_semantics.PathFinder.find_spec
 
-    finder = _Finder()
-    monkeypatch.setattr(sys, "meta_path", [finder] + list(sys.meta_path))
+    def _patched_find_spec(fullname: str, path=None, target=None):  # noqa: ANN001
+        if fullname != module_name:
+            return original(fullname, path, target)
+        spec = importlib.machinery.ModuleSpec(fullname, loader=None)
+        spec.origin = missing_origin  # type: ignore[assignment]
+        return spec
+
+    monkeypatch.setattr(editor_semantics.PathFinder, "find_spec", _patched_find_spec)
 
     result = editor_semantics.resolve_python_definition("{}:foo".format(module_name), python_roots=[tmp_path])
     assert result.locations == ()
@@ -478,8 +475,32 @@ def test_find_spec_returns_none_on_exception(monkeypatch: pytest.MonkeyPatch, tm
     def _boom(*_a, **_k):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(importlib.util, "find_spec", _boom)
+    monkeypatch.setattr(editor_semantics.PathFinder, "find_spec", _boom)
     spec = editor_semantics._find_spec("x", roots=(tmp_path,))  # type: ignore[attr-defined]
+    assert spec is None
+
+
+def test_normalize_python_roots_dedups_and_preserves_order(tmp_path: Path) -> None:
+    roots = editor_semantics._normalize_python_roots(  # type: ignore[attr-defined]
+        [tmp_path, tmp_path],
+        default_root=tmp_path,
+    )
+    assert roots == (tmp_path,)
+
+
+def test_find_spec_returns_none_for_empty_module_path(tmp_path: Path) -> None:
+    spec = editor_semantics._find_spec("", roots=(tmp_path,))  # type: ignore[attr-defined]
+    assert spec is None
+
+
+def test_find_spec_breaks_when_top_level_spec_missing(tmp_path: Path) -> None:
+    spec = editor_semantics._find_spec("missing_pkg.mod", roots=(tmp_path,))  # type: ignore[attr-defined]
+    assert spec is None
+
+
+def test_find_spec_returns_none_when_parent_is_not_package(tmp_path: Path) -> None:
+    _write(tmp_path / "m.py", "x = 1\n")
+    spec = editor_semantics._find_spec("m.sub", roots=(tmp_path,))  # type: ignore[attr-defined]
     assert spec is None
 
 

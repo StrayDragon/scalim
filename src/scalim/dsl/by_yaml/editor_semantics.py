@@ -1,8 +1,7 @@
 import ast
-import importlib.util
 import json
-import sys
 from fnmatch import fnmatch
+from importlib.machinery import PathFinder
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
@@ -203,13 +202,19 @@ def discover_yaml_dsl_editor_project(
     - `allowed_yaml_roots`
     """
     entry_path = Path(str(yaml_path)).expanduser().resolve(strict=False)
-    entry_dir = entry_path.parent
     cfg = load_yaml_dsl_project_config(
         entry_path,
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
     )
+    return _discover_yaml_dsl_editor_project_from_project_config(entry_path, cfg)
 
+
+def _discover_yaml_dsl_editor_project_from_project_config(
+    entry_path: Path,
+    cfg: Optional[YamlDslProjectConfig],
+) -> YamlDslEditorProjectDiscovery:
+    entry_dir = entry_path.parent
     project_root = entry_dir
     scalim_yaml_path: Optional[Path] = None
     raw_allowed_roots: Optional[Iterable[Union[str, Path]]] = None
@@ -265,18 +270,14 @@ def collect_yaml_dsl_editor_diagnostics(
     if yaml_text is None:
         yaml_text = path.read_text(encoding="utf-8")
 
-    discovery = discover_yaml_dsl_editor_project(
+    cfg = load_yaml_dsl_project_config(
         path,
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
     )
+    discovery = _discover_yaml_dsl_editor_project_from_project_config(path, cfg)
 
-    yaml_kind = classify_yaml_dsl_kind(
-        path,
-        yaml_text,
-        scalim_yaml_override=scalim_yaml_override,
-        project_root_override=project_root_override,
-    )
+    yaml_kind = _classify_yaml_kind_from_overrides(path, cfg) or _classify_yaml_kind_by_heuristic(yaml_text)
 
     if yaml_kind == YAML_DSL_KIND_WORKFLOW:
         errors, warnings = _collect_workflow_diagnostics(yaml_text, yaml_path=path)
@@ -454,10 +455,15 @@ def _normalize_python_roots(
     if not roots:
         roots.append(default_root)
 
-    seen: Dict[str, Path] = {}
+    seen: Dict[str, None] = {}
+    unique: List[Path] = []
     for p in roots:
-        seen[str(p)] = p
-    return tuple(seen[key] for key in sorted(seen.keys()))
+        key = str(p)
+        if key in seen:
+            continue
+        seen[key] = None
+        unique.append(p)
+    return tuple(unique)
 
 
 def _classify_yaml_kind_from_overrides(path: Path, cfg: Optional[YamlDslProjectConfig]) -> str:
@@ -672,16 +678,30 @@ def import_jsonschema_module() -> Optional[Any]:
 
 
 def _find_spec(module_path: str, *, roots: Sequence[Path]) -> Optional[Any]:
-    # `importlib.util.find_spec` 需要 `sys.path`; 这里用短时覆盖避免污染进程态.
     roots_str = [str(r) for r in roots]
-    original = list(sys.path)
+    spec: Optional[Any] = None
     try:
-        sys.path[:] = roots_str + original
-        return importlib.util.find_spec(module_path)
+        parts = [p for p in str(module_path or "").split(".") if p]
+        if not parts:
+            spec = None
+        elif len(parts) == 1:
+            spec = PathFinder.find_spec(parts[0], roots_str)
+        else:
+            prefix = parts[0]
+            spec = PathFinder.find_spec(prefix, roots_str)
+            for part in parts[1:]:
+                if spec is None:
+                    break
+                search_locations = spec.submodule_search_locations
+                if not search_locations:
+                    spec = None
+                    break
+                prefix = "{}.{}".format(prefix, part)
+                spec = PathFinder.find_spec(prefix, list(search_locations))
     except Exception:  # noqa: BLE001
-        return None
-    finally:
-        sys.path[:] = original
+        spec = None
+
+    return spec
 
 
 def _resolve_attr_path_node(file_path: Path, parsed: ParsedReference) -> Tuple[Optional[ast.AST], str]:
