@@ -1,4 +1,4 @@
-"""`workflow` types(稳定导入路径).
+"""`workflow` 类型(稳定导入路径).
 
 说明:
 - 该模块提供更稳定、更明确的类型导入路径
@@ -6,10 +6,9 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from typing import TYPE_CHECKING, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union, cast
 
 from ...vendor.dataclassesx import dataclass
-
 from .runtime.contracts import UNSET, RunOverrides, UnsetType
 from .workflow_config import (
     ScalimWorkflowConfigError,
@@ -27,36 +26,41 @@ from .workflow_config import (
 if TYPE_CHECKING:
     from ...execution.guardrails import GuardrailsPolicy
     from ...execution.loader_retry import LoaderRetryPoliciesSpec
+    from ...hooks import IExecutionHook
+    from ...ob.observer import Observer
+
+
+WorkflowComponent = Union["Observer", "IExecutionHook"]
 
 
 @dataclass(frozen=True)
 class ComponentsInherit:
-    """Inherit `run_workflow(..., components=...)` global components for this run."""
+    """继承 `run_workflow(..., components=...)` 的全局 `components` 列表用于本次运行."""
 
 
 @dataclass(frozen=True)
 class ComponentsReplace:
-    """Replace global components for this run (use `items=()` to explicitly disable)."""
+    """替换全局 `components` 列表(用 `items=()` 可显式禁用)."""
 
-    items: Tuple[object, ...] = ()
+    items: Tuple[WorkflowComponent, ...] = ()
 
     def __post_init__(self) -> None:
         items_raw = self.items
         if not isinstance(items_raw, tuple):
-            items_raw = tuple(items_raw)
+            items_raw = tuple(cast("Iterable[WorkflowComponent]", items_raw))  # pragma: allow-cast components items normalization
         object.__setattr__(self, "items", items_raw)
 
 
 @dataclass(frozen=True)
 class ComponentsExtend:
-    """Append per-run components after global components (order-preserving, no implicit de-dup)."""
+    """在全局 `components` 列表后追加(保持顺序,不做隐式去重)."""
 
-    items: Tuple[object, ...] = ()
+    items: Tuple[WorkflowComponent, ...] = ()
 
     def __post_init__(self) -> None:
         items_raw = self.items
         if not isinstance(items_raw, tuple):
-            items_raw = tuple(items_raw)
+            items_raw = tuple(cast("Iterable[WorkflowComponent]", items_raw))  # pragma: allow-cast components items normalization
         object.__setattr__(self, "items", items_raw)
 
 
@@ -65,12 +69,12 @@ ComponentsPatch = Union[ComponentsInherit, ComponentsReplace, ComponentsExtend]
 
 @dataclass(frozen=True)
 class WorkflowRunPatch:
-    """Per-run runtime patch for `run_workflow(..., run_patches_by_id=...)`.
+    """用于 `run_workflow(..., run_patches_by_id=...)` 的单节点运行期补丁.
 
-    Tri-state conventions:
-    - `UNSET`: inherit the corresponding `run_workflow(...)` global value
-    - `None`: explicit disable/clear (when supported)
-    - non-`None`: explicit override
+    三态约定:
+    - `UNSET`: 继承 `run_workflow(...)` 的全局值
+    - `None`: 显式禁用/清空(当字段支持时)
+    - 非 `None`: 显式覆盖
     """
 
     batch_size: Union[Optional[int], UnsetType] = UNSET
@@ -82,12 +86,12 @@ class WorkflowRunPatch:
 
 
 __all__ = (
+    "UNSET",
     "ComponentsExtend",
     "ComponentsInherit",
     "ComponentsPatch",
     "ComponentsReplace",
     "ScalimWorkflowConfigError",
-    "UNSET",
     "WorkflowCachePoolBudget",
     "WorkflowCachePoolOptions",
     "WorkflowCachePoolPin",
@@ -96,6 +100,6 @@ __all__ = (
     "WorkflowOutputStagingOptions",
     "WorkflowResourcesWaitDiagnosticsOptions",
     "WorkflowResourcesWaitOptions",
-    "WorkflowRunPatch",
     "WorkflowRun",
+    "WorkflowRunPatch",
 )

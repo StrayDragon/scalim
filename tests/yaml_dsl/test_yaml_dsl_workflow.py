@@ -34,6 +34,8 @@ from scalim.events import (
 from scalim.hooks import BaseHook
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
+from scalim.execution.guardrails import GuardrailsPolicy
+from scalim.execution.loader_retry import LoaderRetryPoliciesSpec
 from scalim.dsl.by_yaml.workflow import (
     ScalimWorkflowConfigError,
     load_workflow_config,
@@ -1011,6 +1013,62 @@ def test_run_workflow_run_patches_by_id_components_extend_and_replace(tmp_path: 
     assert not result.errors()
     assert seen_components_by_name["a.yaml"] == [base, extra]
     assert seen_components_by_name["b.yaml"] == []
+
+
+def test_components_replace_normalizes_iterable_items_to_tuple() -> None:
+    r = _WorkflowEventRecorder()
+    patch = ComponentsReplace([r])
+    assert isinstance(patch.items, tuple)
+    assert patch.items == (r,)
+
+
+def test_validate_run_patches_by_id_rejects_non_str_key() -> None:
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+
+    with pytest.raises(TypeError, match=r"keys must be workflow run ids"):
+        _ = workflow_entrypoints_mod._validate_run_patches_by_id(  # type: ignore[arg-type] intentional runtime boundary test
+            {1: WorkflowRunPatch(batch_size=5000)},
+            known_run_ids=frozenset(["ok"]),
+        )
+
+
+def test_validate_run_patches_by_id_rejects_non_patch_payload() -> None:
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+
+    with pytest.raises(TypeError, match=r"must be a WorkflowRunPatch"):
+        _ = workflow_entrypoints_mod._validate_run_patches_by_id(
+            {"ok": object()},  # type: ignore[arg-type] intentional runtime boundary test
+            known_run_ids=frozenset(["ok"]),
+        )
+
+
+def test_apply_workflow_run_patch_applies_demand_failure_policy_guardrails_loader_retry() -> None:
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+
+    base = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES, demand_failure_policy="global")
+    guardrails = GuardrailsPolicy(enabled=True)
+    loader_retry = LoaderRetryPoliciesSpec()
+    patch = WorkflowRunPatch(
+        demand_failure_policy="patch",
+        guardrails=guardrails,
+        loader_retry=loader_retry,
+    )
+
+    next_options = workflow_entrypoints_mod._apply_workflow_run_patch(base, patch)
+    assert next_options.demand_failure_policy == "patch"
+    assert next_options.guardrails == guardrails
+    assert next_options.loader_retry == loader_retry
+
+
+def test_apply_workflow_run_patch_rejects_unknown_components_patch() -> None:
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+
+    base = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES)
+    with pytest.raises(TypeError, match=r"WorkflowRunPatch\.components must be"):
+        _ = workflow_entrypoints_mod._apply_workflow_run_patch(
+            base,
+            WorkflowRunPatch(components=object()),  # type: ignore[arg-type] intentional runtime boundary test
+        )
 
 
 def test_run_workflow_run_patches_by_id_overrides_precedence_over_workflow_resources_and_global_overrides(tmp_path: Path) -> None:

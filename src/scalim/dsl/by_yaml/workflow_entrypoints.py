@@ -233,10 +233,9 @@ def _validate_run_patches_by_id(
             continue
 
         if isinstance(raw_patch, dict):
-            msg = (
-                "run_patches_by_id['{}'] must be a typed WorkflowRunPatch (dict patches are not supported). "
-                "Example: run_patches_by_id={{'{}': WorkflowRunPatch(batch_size=5000)}}".format(run_id, run_id)
-            )
+            msg = "run_patches_by_id['{}'] must be a typed WorkflowRunPatch (dict patches are not supported). ".format(
+                run_id,
+            ) + "Example: run_patches_by_id={{'{}': WorkflowRunPatch(batch_size=5000)}}".format(run_id)
             raise TypeError(msg)
         if not isinstance(raw_patch, WorkflowRunPatch):
             msg = "run_patches_by_id['{}'] must be a WorkflowRunPatch".format(run_id)
@@ -322,6 +321,70 @@ def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Option
         msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`, 或设置 `use_default_output_dir=True`."
         raise ScalimWorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
     return bundle_viz_base_config
+
+
+def _compile_demand_node_impl(
+    demand_path: str,
+    *,
+    workflow_exec_id: str,
+    workflow_node_id: str,
+    workflow_node_decl_order: int,
+    node_init_vars: Dict[str, object],
+    managed_output_ids: Optional[FrozenSet[str]],
+    viz_config: Optional["VizObserverConfig"],
+    base_options: RunOptions,
+    workflow_resources_override: Optional[ResourcesOverride],
+    run_patches_by_id: Optional[Mapping[str, WorkflowRunPatch]],
+    compile_demand: Callable[..., _CompilationLike],
+) -> _CompilationLike:
+    _ = workflow_exec_id, workflow_node_id, workflow_node_decl_order
+    node_options = base_options
+    if node_init_vars:
+        merged = dict(base_options.init_vars or {})
+        merged.update(node_init_vars)
+        node_options = replace(node_options, init_vars=merged)
+
+    if viz_config is not None:
+        base_overrides = node_options.overrides
+        if base_overrides is None:
+            raise ScalimWorkflowConfigError(
+                _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG,
+                path="run_workflow.overrides.viz_config",
+            )  # pragma: no cover  # pragma: allow-no-cover invariant: viz_config requires overrides
+        base_overrides = replace(
+            base_overrides,
+            viz_config=viz_config,
+        )
+        node_options = replace(node_options, overrides=base_overrides)
+
+    if run_patches_by_id is not None:
+        patch = run_patches_by_id.get(str(workflow_node_id))
+        if patch is not None:
+            node_options = _apply_workflow_run_patch(node_options, patch)
+
+    merged_overrides = _merge_node_overrides(
+        node_options.overrides,
+        workflow_resources_override=workflow_resources_override,
+    )
+    if merged_overrides is not node_options.overrides:
+        node_options = replace(node_options, overrides=merged_overrides)
+
+    if managed_output_ids:
+        node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
+
+    return compile_demand(str(demand_path), options=node_options)
+
+
+def _build_demand_run_result_impl(
+    core: ExecutionResult,
+    *,
+    compilation: _CompilationLike,
+    demand_yaml_path: str,
+    workflow_exec_id: str,
+    workflow_node_id: str,
+) -> object:
+    _ = workflow_exec_id, workflow_node_id
+    return RunResult(core, config=compilation.config, yaml_path=str(demand_yaml_path), sink=None)
 
 
 def run_workflow(  # noqa: PLR0913
@@ -421,42 +484,19 @@ def run_workflow(  # noqa: PLR0913
         managed_output_ids: Optional[FrozenSet[str]],
         viz_config: Optional["VizObserverConfig"],
     ) -> _CompilationLike:
-        _ = workflow_exec_id, workflow_node_id, workflow_node_decl_order
-        node_options = base_options
-        if node_init_vars:
-            merged = dict(base_options.init_vars or {})
-            merged.update(node_init_vars)
-            node_options = replace(node_options, init_vars=merged)
-
-        if viz_config is not None:
-            base_overrides = node_options.overrides
-            if base_overrides is None:
-                raise ScalimWorkflowConfigError(
-                    _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG,
-                    path="run_workflow.overrides.viz_config",
-                )  # pragma: no cover  # pragma: allow-no-cover invariant: viz_config requires overrides
-            base_overrides = replace(
-                base_overrides,
-                viz_config=viz_config,
-            )
-            node_options = replace(node_options, overrides=base_overrides)
-
-        if run_patches_by_id is not None:
-            patch = run_patches_by_id.get(str(workflow_node_id))
-            if patch is not None:
-                node_options = _apply_workflow_run_patch(node_options, patch)
-
-        merged_overrides = _merge_node_overrides(
-            node_options.overrides,
+        return _compile_demand_node_impl(
+            demand_path,
+            workflow_exec_id=workflow_exec_id,
+            workflow_node_id=workflow_node_id,
+            workflow_node_decl_order=workflow_node_decl_order,
+            node_init_vars=node_init_vars,
+            managed_output_ids=managed_output_ids,
+            viz_config=viz_config,
+            base_options=base_options,
             workflow_resources_override=workflow_resources_override,
+            run_patches_by_id=run_patches_by_id,
+            compile_demand=compile_demand,
         )
-        if merged_overrides is not node_options.overrides:
-            node_options = replace(node_options, overrides=merged_overrides)
-
-        if managed_output_ids:
-            node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
-
-        return compile_demand(str(demand_path), options=node_options)
 
     def _build_demand_run_result(
         core: ExecutionResult,
@@ -466,8 +506,13 @@ def run_workflow(  # noqa: PLR0913
         workflow_exec_id: str,
         workflow_node_id: str,
     ) -> object:
-        _ = workflow_exec_id, workflow_node_id
-        return RunResult(core, config=compilation.config, yaml_path=str(demand_yaml_path), sink=None)
+        return _build_demand_run_result_impl(
+            core,
+            compilation=compilation,
+            demand_yaml_path=demand_yaml_path,
+            workflow_exec_id=workflow_exec_id,
+            workflow_node_id=workflow_node_id,
+        )
 
     # 5) 执行 `workflow` `IR`(框架层)
     return _run_workflow_ir(
