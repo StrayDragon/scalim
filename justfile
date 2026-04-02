@@ -36,6 +36,7 @@ _frontend-check DIR LABEL:
         exit 0
     fi
     pnpm -C "$dir" install --frozen-lockfile
+    pnpm -C "$dir" audit --audit-level high
     pnpm -C "$dir" lint
     pnpm -C "$dir" build
 
