@@ -98,14 +98,19 @@ scalim-cli yaml-dsl validate /path/to/config.yaml
 
 ## LSP/IDE 集成
 
-本仓库不交付 VSCode 扩展或 LSP server 的发行产物,但会提供:
+本仓库不交付 VSCode 扩展,但会提供:
 
 - `scalim_yaml_dsl_lsp.core` 作为可复用的 editor/tooling 语义层 API(不调用 CLI)
+- `scalim-yaml-dsl-lsp serve`：可运行的 YAML DSL LSP server 启动入口（stdio）
 - `scalim.yaml` 的 project discovery/kind override 配置口径
 - `demand.gen.json` / `workflow.gen.json` schema 资源(供 `redhat.vscode-yaml` 绑定)
+
+多编辑器接入与排障指南见：[YAML DSL LSP/IDE 集成](lsp/index.md)
 
 相关规范(SSOT):
 
 - `openspec/specs/yaml-dsl-editor-project-discovery/spec.md`
+- `openspec/specs/yaml-dsl-lsp-serve/spec.md`
 - `openspec/specs/yaml-dsl-lsp-server/spec.md`
+- `openspec/specs/yaml-dsl-lsp-code-actions/spec.md`
 - `openspec/specs/yaml-dsl-vscode-extension/spec.md`

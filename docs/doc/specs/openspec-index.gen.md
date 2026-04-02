@@ -456,6 +456,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-code-actions/spec.md)
 - Summary: 定义 YAML DSL LSP 的 Quick Fix（`textDocument/codeAction` + `workspace/executeCommand`）能力集合与安全约束，确保： - actions 由 shared core 的 diagnostics/discovery 驱动（避免在 server 层复制 DSL 语义） - edits 可撤销、可审计（通过 `WorkspaceEdit`） - 纯静态无副作用（不得执行用户代码） - edits 仅作用于 workspace 内文件（越界/不可写时降级为 explain-only）
 
+### `yaml-dsl-lsp-editor-integration-guides`
+- Title: yaml-dsl-lsp-editor-integration-guides Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-editor-integration-guides/spec.md)
+- Summary: 提供一套可复制、可审计、可排障的多编辑器接入指南，降低 YAML DSL LSP server 在 Neovim / Zed / JetBrains 等生态中的接入成本，并明确 schema 与 LSP 的职责边界。
+
 ### `yaml-dsl-lsp-notebooks-regression`
 - Title: yaml-dsl-lsp-notebooks-regression Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-notebooks-regression/spec.md)
