@@ -975,7 +975,18 @@ def _load_demands(
     demand_cfg_by_run_id: Dict[str, DemandConfig] = {}
     for node_id, yaml_path in demand_yaml_paths_by_run_id.items():
         try:
-            cfg = loader.load(str(yaml_path), template_vars=template_vars, allowed_yaml_roots=allowed_yaml_roots)
+            # `Workflow IR` 编译阶段只需要需求结构信息, 例如资源 / 输出 / 连线.
+            # `validate_unique_field_names` 属于运行期诊断策略:
+            # - 全局值来自 `run_workflow(..., demand_diagnostics=...)`
+            # - 单节点覆盖来自 `run_patches_by_id[*].demand_diagnostics`
+            # 阶段 1 预加载时, 最终策略还没有完成合并. 如果这里继续保持默认 `True`,
+            # 重复显示名校验会在运行期策略生效前抢跑, 从而把工作流错误地卡死在编译阶段.
+            cfg = loader.load(
+                str(yaml_path),
+                template_vars=template_vars,
+                allowed_yaml_roots=allowed_yaml_roots,
+                validate_unique_field_names=False,
+            )
         except Exception as exc:
             msg = "Failed to load demand YAML for workflow compile: run_id={!r}, demand_path={!r}: {}".format(
                 str(node_id),

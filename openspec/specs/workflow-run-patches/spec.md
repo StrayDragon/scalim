@@ -20,6 +20,18 @@ TBD - created by archiving change c61-workflow-run-patches-by-id. Update Purpose
 - **THEN** run `A` 的 effective `batch_size` MUST 为 `5000`
 - **AND** run `B` 的 effective `batch_size` MUST 为 `2000`
 
+### Requirement: per-run demand diagnostics overrides MUST survive workflow compile preloading
+
+当 `run_workflow(...)` 提供 `run_patches_by_id[*].demand_diagnostics` 时，系统 MUST 保证这些 per-run diagnostics override 不会被 workflow compile 阶段的 demand 预加载抢跑绕过。
+
+#### Scenario: per-run duplicate-name suppression applies after workflow compile
+- **GIVEN** workflow 中 run `A` 引用的 demand YAML 含有 duplicate effective field display names
+- **AND** 调用方传入 `run_patches_by_id={"A": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))}`
+- **WHEN** 系统执行 `run_workflow(...)`
+- **THEN** workflow compile 阶段 MUST 成功完成 demand 预加载
+- **AND** run `A` 的后续 demand compile MUST 使用该 per-run override
+- **AND** 系统 MUST NOT 因阶段 1 的默认 duplicate-name 校验提前失败
+
 ### Requirement: run_patches_by_id values MUST be typed patches (dict patches are not supported)
 
 `run_patches_by_id` 的 values MUST 为系统提供的 typed patch 对象(例如 `WorkflowRunPatch`),并且 MUST NOT 接受 YAML-shaped 的 `dict` 作为 patch payload。
@@ -113,4 +125,3 @@ per-run patch MUST 提供对 `components` 的显式策略选择,至少包含:
 **Note:** 当 per-run patch 选择“禁用 overrides”(例如 `overrides=None`)时,workflow `resources` overlay 仍 MUST 生效;这不会被视为“恢复到无资源”的信号。
 
 **Note:** `run_patches_by_id` 仅作用于 demand runs,不作用于 workflow 内部派生节点(例如 `__wf__write.*`). 因此,per-run patch 不是“为每个 demand 单独改 workflow-managed book export 路径”的入口;此类共享资源配置应通过 workflow YAML `workflow.resources` 与全局 `run_workflow(..., overrides=RunOverrides(resources=...))` 管理。
-

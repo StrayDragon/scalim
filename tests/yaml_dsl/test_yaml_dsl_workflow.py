@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, cast
 
 import pytest
 
+from scalim.dsl.by_yaml import DemandDiagnosticsOverride
+from scalim.dsl.by_yaml import DemandDiagnosticsPolicy
 from scalim.dsl.by_yaml import RunOverrides
 from scalim.dsl.by_yaml import FileResourceOverride
 from scalim.dsl.by_yaml import OutputExtrasOverride
@@ -437,6 +439,44 @@ outputs:
             output_path=str(output_path),
             fields_list=json.dumps([str(x) for x in field_ids]),
         )
+        .lstrip(),
+    )
+
+
+def _write_duplicate_header_demand_yaml(tmp_path: Path, *, file_name: str, output_path: Path) -> Path:
+    return _write_text(
+        tmp_path / file_name,
+        (
+            """
+name: duplicate_headers
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id:
+      extract: id
+      name: Dup
+    value:
+      extract: value
+      name: Dup
+
+sources: {{}}
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: "{output_path}"
+
+outputs:
+  - name: detail
+    to:
+      file: detail_csv
+    fields: [id, value]
+"""
+        )
+        .format(output_path=str(output_path))
         .lstrip(),
     )
 
@@ -3998,6 +4038,61 @@ def test_workflow_excel_output_collision_precheck_reports_demand_yaml_load_failu
     cfg = load_workflow_config(str(wf))
     with pytest.raises(ScalimWorkflowConfigError, match="Failed to load demand YAML for workflow compile"):
         _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+
+
+def test_compile_workflow_ir_skips_runtime_duplicate_name_validation(tmp_path: Path) -> None:
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=tmp_path / "detail.csv")
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "dup", "demand": "dup.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    cfg = load_workflow_config(str(wf))
+    workflow_ir = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+
+    assert any(node.node_id == "dup" for node in workflow_ir.nodes)
+
+
+def test_run_workflow_demand_diagnostics_can_disable_duplicate_name_validation(tmp_path: Path) -> None:
+    output_path = tmp_path / "detail.csv"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "dup", "demand": "dup.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+    )
+
+    assert not result.errors()
+    assert output_path.exists()
+
+
+def test_run_workflow_run_patch_can_disable_duplicate_name_validation(tmp_path: Path) -> None:
+    output_path = tmp_path / "detail.csv"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "dup", "demand": "dup.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        run_patches_by_id={"dup": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
+    )
+
+    assert not result.errors()
+    assert output_path.exists()
 
 
 def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) -> None:

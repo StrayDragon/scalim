@@ -47,6 +47,17 @@ workflow MUST 包含:
 - **WHEN** 运行 schema-only 校验
 - **THEN** 校验 MUST 通过
 
+### Requirement: workflow demand preloading MUST stay structural
+
+workflow IR 编译阶段对 `workflow.runs[*].demand` 的预加载 MUST 仅服务于结构分析（例如 outputs/resources/dependency wiring），MUST NOT 在该阶段执行依赖 runtime diagnostics policy 的 demand 诊断。
+
+#### Scenario: workflow IR compile accepts duplicate display names until runtime compile
+- **GIVEN** 某个 workflow run 引用的 demand YAML 可以成功解析结构信息
+- **AND** 该 demand 仅会在 `validate_unique_field_names=True` 时因 duplicate effective field display names 失败
+- **WHEN** 系统执行 `compile_workflow_ir(...)`
+- **THEN** workflow IR compile MUST 成功返回 demand-derived 结构信息
+- **AND** 后续是否报 duplicate-name 错误 MUST 由 runtime demand compile 阶段决定
+
 ### Requirement: Runs execute demand YAML via existing compilation pipeline
 系统 MUST 对每个 run 的 `demand` 路径加载并编译 demand YAML,并复用现有 demand 执行链路运行得到结果。
 系统 MUST 以 workflow 文件所在目录作为相对路径基准。
@@ -262,4 +273,3 @@ workflow 同时 MUST 发出最小集合的 workflow-level 事件:
 #### Scenario: output_staging passes schema validation
 - **WHEN** workflow YAML 声明 `workflow.options.output_staging` 且字段类型合法
 - **THEN** schema-only 校验 MUST 通过
-

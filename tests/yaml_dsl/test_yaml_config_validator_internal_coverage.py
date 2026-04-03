@@ -87,3 +87,13 @@ def test_validator_validate_resource_output_paths_covers_init_var_errors_and_con
 
 def test_output_item_requires_unique_effective_display_names_rejects_non_mapping() -> None:
     assert validator_mod._output_item_requires_unique_effective_display_names({}, "nope") is False  # noqa: SLF001
+
+
+def test_output_item_requires_unique_effective_display_names_rejects_invalid_destination_combo() -> None:
+    assert (
+        validator_mod._output_item_requires_unique_effective_display_names(  # noqa: SLF001
+            {},
+            {"to": {"file": "detail_csv", "book": "report"}},
+        )
+        is False
+    )

@@ -21,6 +21,53 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _write_duplicate_headers_workflow_fixture(tmp: Path) -> Path:
+    demand_path = tmp / "duplicate_headers.demand.yaml"
+    workflow_path = tmp / "duplicate_headers.workflow.yaml"
+    output_path = tmp / "duplicate_headers.csv"
+
+    _write_text(
+        demand_path,
+        """\
+name: public_api_duplicate_headers
+
+main_source:
+  source_id: items
+  loader: "scalim_misc.examples.public_api._fixtures:load_items"
+  fields:
+    item_id: {extract: item_id, name: Dup}
+    dim_id: {extract: dim_id, name: Dup}
+
+sources: {}
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: "%s"
+
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    fields: [item_id, dim_id]
+"""
+        % str(output_path),
+    )
+    _write_text(
+        workflow_path,
+        """\
+workflow:
+  runs:
+    - id: dup
+      demand: duplicate_headers.demand.yaml
+  options:
+    max_concurrency: 1
+    failure_policy: primary_only
+""",
+    )
+    return workflow_path
+
+
 def _touch_public_all(module: Any) -> int:
     declared_all = getattr(module, "__all__", ())
     for name in declared_all:
@@ -78,6 +125,7 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
         tmp = Path(tmpdir)
         demand_path = tmp / "demand.yaml"
         workflow_path = tmp / "workflow.yaml"
+        duplicate_workflow_path = _write_duplicate_headers_workflow_fixture(tmp)
 
         demand_yaml = """\
 name: public_api_minimal_demand
@@ -170,8 +218,28 @@ workflow:
         workflow_batch_sizes = dict(workflow_batch_size_observer.batch_size_by_workflow_node_id)
         preload_calls = get_preload_counter_calls()
         errors = wf.errors()
+        duplicate_global = api.run_workflow(
+            str(duplicate_workflow_path),
+            allowed_modules=_ALLOWED_MODULES,
+            demand_diagnostics=api.DemandDiagnosticsPolicy(validate_unique_field_names=False),
+        )
+        duplicate_patch = api.run_workflow(
+            str(duplicate_workflow_path),
+            allowed_modules=_ALLOWED_MODULES,
+            run_patches_by_id={
+                "dup": workflow_types_api.WorkflowRunPatch(
+                    demand_diagnostics=api.DemandDiagnosticsOverride(validate_unique_field_names=False)
+                )
+            },
+        )
+        duplicate_global_errors = duplicate_global.errors()
+        duplicate_patch_errors = duplicate_patch.errors()
+        duplicate_output_exists = (tmp / "duplicate_headers.csv").exists()
         passed = bool(
             not errors
+            and not duplicate_global_errors
+            and not duplicate_patch_errors
+            and duplicate_output_exists
             and preload_calls == 1
             and len(wf.outcomes) == _EXPECTED_WORKFLOW_RUNS
             and [o.run_id for o in wf.outcomes] == ["r1", "r2"]
@@ -179,15 +247,27 @@ workflow:
             and workflow_batch_sizes.get("r2") == 2
             and rows[0].get("item_id") == 1
         )
-        summary = "rows={} workflow_outcomes={} preload_calls={} batch_sizes={} errors={}".format(
+        summary = "rows={} workflow_outcomes={} preload_calls={} batch_sizes={} errors={} duplicate_global_errors={} duplicate_patch_errors={}".format(
             len(rows),
             len(wf.outcomes),
             preload_calls,
             workflow_batch_sizes,
             len(errors),
+            len(duplicate_global_errors),
+            len(duplicate_patch_errors),
         )
         if errors:
             summary = summary + "\nfirst_error: {} {}".format(errors[0].exc_type, errors[0].message)
+        if duplicate_global_errors:
+            summary = summary + "\nduplicate_global_first_error: {} {}".format(
+                duplicate_global_errors[0].exc_type,
+                duplicate_global_errors[0].message,
+            )
+        if duplicate_patch_errors:
+            summary = summary + "\nduplicate_patch_first_error: {} {}".format(
+                duplicate_patch_errors[0].exc_type,
+                duplicate_patch_errors[0].message,
+            )
 
         details: Dict[str, Any] = {
             "rows": len(rows),
@@ -196,6 +276,11 @@ workflow:
             "workflow_batch_sizes": workflow_batch_sizes,
             "preload_calls": preload_calls,
             "errors": errors,
+            "duplicate_global_outcomes": duplicate_global.outcomes,
+            "duplicate_global_errors": duplicate_global_errors,
+            "duplicate_patch_outcomes": duplicate_patch.outcomes,
+            "duplicate_patch_errors": duplicate_patch_errors,
+            "duplicate_output_exists": duplicate_output_exists,
             "touched_public_all": all_touched,
             "tools": {"base_module_path": base_module_path, "output_fields": tools_output_config.get("output_fields")},
         }
