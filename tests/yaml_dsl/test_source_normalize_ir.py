@@ -64,6 +64,28 @@ def test_source_normalize_index_by_key_rejects_none_key_value() -> None:
         _ = normalize.apply([{"id": None}], source_id="s1")
 
 
+def test_source_normalize_index_by_key_on_none_skip_skips_row_and_sets_stats() -> None:
+    normalize = SourceNormalizeIr(kind="index_by_key", key_field="id", on_none="skip")
+    result = normalize.apply(
+        [
+            {"id": 1, "v": "a"},
+            {"id": None, "v": "x"},
+            {"id": 2, "v": "b"},
+        ],
+        source_id="s1",
+    )
+    assert result[1]["v"] == "a"
+    assert result[2]["v"] == "b"
+    assert None not in result
+    assert getattr(result, "skipped_none_rows") == 1
+
+
+def test_source_normalize_index_by_key_rejects_invalid_on_none() -> None:
+    normalize = SourceNormalizeIr(kind="index_by_key", key_field="id", on_none="bad")
+    with pytest.raises(ValueError, match="invalid on_none"):
+        _ = normalize.apply([], source_id="s1")
+
+
 def test_source_normalize_index_by_key_rejects_invalid_on_conflict() -> None:
     normalize = SourceNormalizeIr(kind="index_by_key", key_field="id", on_conflict="bad")
     with pytest.raises(ValueError, match="invalid on_conflict"):

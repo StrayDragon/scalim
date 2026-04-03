@@ -208,25 +208,6 @@
           }
         ]
       ]
-    },
-    "validate_unique_field_names": {
-      "type": "boolean",
-      "description": "预检查: 字段有效展示名全局唯一(默认 true)",
-      "markdownDescription": "预检查: 字段有效展示名(`effective display name`)全局唯一.\n\n- 默认启用: 未声明时等价 `true`\n- 有效展示名定义:\n  - 若 `field.name` 非空: 使用 `name`\n  - 否则回退为 `field_id`\n- 仅当 `effective outputs` 会输出表头且 `header_fields_output_by: name` 时触发\n  - file: `write.include_header: true` 且 `write.header_fields_output_by: name`\n  - book: 该 output 会输出表头,且 `write.header_fields_output_by: name`\n- 显式设置为 `false` 可关闭该检查(不推荐长期使用)",
-      "default": true,
-      "examples": [
-        true,
-        false
-      ]
-    },
-    "include_full_error_message": {
-      "type": "boolean",
-      "description": "包含完整错误信息(可能包含敏感信息;默认 false)",
-      "markdownDescription": "包含完整错误信息(可能包含敏感信息;默认 false).",
-      "default": false,
-      "examples": [
-        false
-      ]
     }
   },
   "definitions": {
@@ -488,6 +469,19 @@
               "markdownDescription": "duplicate key 冲突策略.\n\n- `error`: 报错(默认)\n- `first`: 保留第一条\n- `last`: 保留最后一条",
               "examples": [
                 "error"
+              ]
+            },
+            "on_none": {
+              "type": "string",
+              "enum": [
+                "raise",
+                "skip"
+              ],
+              "default": "raise",
+              "description": "key_field is None 策略(raise/skip; index_by_key)",
+              "markdownDescription": "`key_field is None` 策略.\n\n- 仅 `kind: index_by_key` 使用\n- `raise`: fail-fast(默认)\n- `skip`: 跳过 key_field 为 None 的行",
+              "examples": [
+                "raise"
               ]
             },
             "on_empty": {
@@ -819,6 +813,11 @@
                       },
                       {
                         "required": [
+                          "on_none"
+                        ]
+                      },
+                      {
+                        "required": [
                           "on_missing"
                         ]
                       },
@@ -861,6 +860,11 @@
                       },
                       {
                         "required": [
+                          "on_none"
+                        ]
+                      },
+                      {
+                        "required": [
                           "on_empty"
                         ]
                       },
@@ -894,6 +898,11 @@
                       {
                         "required": [
                           "on_conflict"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "on_none"
                         ]
                       },
                       {

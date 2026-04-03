@@ -24,6 +24,8 @@ from .runtime.contracts import (
     BookExportXlsxOverride,
     BookResourceOverride,
     BookWriteDefaultsOverride,
+    DemandDiagnosticsOverride,
+    DemandDiagnosticsPolicy,
     FileResourceOverride,
     ResourcesOverride,
     RunOptions,
@@ -250,6 +252,45 @@ def _validate_run_patches_by_id(
     return typed
 
 
+def _apply_workflow_run_patch_demand_diagnostics(base: RunOptions, patch: WorkflowRunPatch) -> RunOptions:
+    demand_diagnostics = patch.demand_diagnostics
+    if isinstance(demand_diagnostics, UnsetType):
+        return base
+    if demand_diagnostics is None:
+        return replace(base, demand_diagnostics=None)
+
+    if not isinstance(demand_diagnostics, DemandDiagnosticsOverride):
+        msg = "WorkflowRunPatch.demand_diagnostics must be a DemandDiagnosticsOverride or None"
+        raise TypeError(msg)
+    if isinstance(demand_diagnostics.include_full_error_message, UnsetType) and isinstance(
+        demand_diagnostics.validate_unique_field_names, UnsetType
+    ):
+        return base
+
+    base_policy = base.demand_diagnostics
+    base_include_full = False if base_policy is None else bool(base_policy.include_full_error_message)
+    base_validate_unique = True if base_policy is None else bool(base_policy.validate_unique_field_names)
+
+    include_full_error_message = (
+        base_include_full
+        if isinstance(demand_diagnostics.include_full_error_message, UnsetType)
+        else bool(demand_diagnostics.include_full_error_message)
+    )
+    validate_unique_field_names = (
+        base_validate_unique
+        if isinstance(demand_diagnostics.validate_unique_field_names, UnsetType)
+        else bool(demand_diagnostics.validate_unique_field_names)
+    )
+
+    return replace(
+        base,
+        demand_diagnostics=DemandDiagnosticsPolicy(
+            include_full_error_message=include_full_error_message,
+            validate_unique_field_names=validate_unique_field_names,
+        ),
+    )
+
+
 def _apply_workflow_run_patch(base: RunOptions, patch: WorkflowRunPatch) -> RunOptions:
     next_options = base
 
@@ -260,6 +301,8 @@ def _apply_workflow_run_patch(base: RunOptions, patch: WorkflowRunPatch) -> RunO
     demand_failure_policy = patch.demand_failure_policy
     if not isinstance(demand_failure_policy, UnsetType):
         next_options = replace(next_options, demand_failure_policy=demand_failure_policy)
+
+    next_options = _apply_workflow_run_patch_demand_diagnostics(next_options, patch)
 
     guardrails = patch.guardrails
     if not isinstance(guardrails, UnsetType):
@@ -399,6 +442,7 @@ def run_workflow(  # noqa: PLR0913
     batch_size: Union[Optional[int], UnsetType] = UNSET,
     run_patches_by_id: Optional[Mapping[str, WorkflowRunPatch]] = None,
     demand_failure_policy: Optional[str] = None,
+    demand_diagnostics: Optional[DemandDiagnosticsPolicy] = None,
     workflow_resources_wait: Optional["WorkflowResourcesWaitOptions"] = None,
     workflow_output_staging: Optional["WorkflowOutputStagingOptions"] = None,
     parallel_mode: ParallelMode = "seq",
@@ -457,6 +501,7 @@ def run_workflow(  # noqa: PLR0913
         loader_retry=loader_retry,
         batch_size=batch_size,
         demand_failure_policy=demand_failure_policy,
+        demand_diagnostics=demand_diagnostics,
         parallel_mode=parallel_mode,
         max_workers=int(max_workers),
         key_normalization=key_normalization,

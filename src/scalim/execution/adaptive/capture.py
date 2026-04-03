@@ -62,6 +62,7 @@ class HookCaptureManager(HookManager):
         cache_scope: Optional[str] = None,
         lookup_key_count: Optional[int] = None,
         field_keys: Optional[List[str]] = None,
+        skipped_none_rows: Optional[int] = None,
     ) -> None:
         if not self._has_hooks:
             return
@@ -86,6 +87,7 @@ class HookCaptureManager(HookManager):
             cache_status=cache_status,
             cache_scope=cache_scope,
             lookup_key_count=lookup_key_count,
+            skipped_none_rows=skipped_none_rows,
             field_keys=field_keys,
         )
         self._recorded_events.append(HookRecordedEvent(event_type=EVENT_LOADER_CALL, payload=event))

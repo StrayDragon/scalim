@@ -98,3 +98,50 @@ def test_schema_rejects_import_only_output_target_shape() -> None:
 
     with pytest.raises(jsonschema.exceptions.ValidationError):
         jsonschema.Draft7Validator(schema).validate(data)
+
+
+def test_schema_validate_accepts_normalize_on_none_skip_for_index_by_key() -> None:
+    schema = build_demand_schema()
+    data = {
+        "name": "demo",
+        "main_source": {
+            "source_id": "orders",
+            "loader": "tests.fixtures.mock_loaders.mock_loader",
+        },
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.mock_loaders.mock_loader",
+                "key": "order_id",
+                "normalize": {
+                    "kind": "index_by_key",
+                    "key_field": "order_id",
+                    "on_none": "skip",
+                },
+            }
+        },
+    }
+    jsonschema.Draft7Validator(schema).validate(data)
+
+
+def test_schema_validate_rejects_normalize_on_none_for_non_index_by_key() -> None:
+    schema = build_demand_schema()
+    data = {
+        "name": "demo",
+        "main_source": {
+            "source_id": "orders",
+            "loader": "tests.fixtures.mock_loaders.mock_loader",
+        },
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.mock_loaders.mock_loader",
+                "key": "order_id",
+                "normalize": {
+                    "kind": "project_fields",
+                    "fields": {"id": {"from_key": True}},
+                    "on_none": "skip",
+                },
+            }
+        },
+    }
+    with pytest.raises(jsonschema.exceptions.ValidationError):
+        jsonschema.Draft7Validator(schema).validate(data)

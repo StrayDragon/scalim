@@ -186,6 +186,7 @@ class ParserSourcesMixin:
         kind = str(norm_dict.get(NORMALIZE_KEYS["kind"], "")).strip()
         key_field = str(norm_dict.get(NORMALIZE_KEYS["key_field"], "")).strip()
         on_conflict = str(norm_dict.get(NORMALIZE_KEYS["on_conflict"], "error")).strip() or "error"
+        on_none = str(norm_dict.get(NORMALIZE_KEYS["on_none"], "raise")).strip() or "raise"
 
         on_empty = None
         if NORMALIZE_KEYS["on_empty"] in norm_dict:
@@ -206,6 +207,7 @@ class ParserSourcesMixin:
             kind=kind,
             key_field=key_field,
             on_conflict=on_conflict,
+            on_none=on_none,
             on_empty=on_empty,
             on_missing=on_missing,
             fields=fields_by_name,

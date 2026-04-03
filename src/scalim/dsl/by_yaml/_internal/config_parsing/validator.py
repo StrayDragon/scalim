@@ -361,6 +361,24 @@ class ConfigValidator(ValidatorFieldsMixin):
             + "scalim.dsl.by_yaml.run/compile(..., loader_retry=LoaderRetryPoliciesSpec(...))."
         )
 
+        validate_unique_field_names_msg = (
+            "YAML key 'validate_unique_field_names' was moved out of demand YAML mainline (runtime policy boundary). "
+        )
+        validate_unique_field_names_msg = (
+            validate_unique_field_names_msg
+            + "Hint: configure demand diagnostics via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False))."
+        )
+
+        include_full_error_message_msg = (
+            "YAML key 'include_full_error_message' was moved out of demand YAML mainline (runtime policy boundary). "
+        )
+        include_full_error_message_msg = (
+            include_full_error_message_msg
+            + "Hint: configure demand diagnostics via runtime entrypoints: "
+            + "scalim.dsl.by_yaml.run/compile(..., demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True))."
+        )
+
         removed: Tuple[Tuple[str, str], ...] = (
             (
                 "guardrails",
@@ -377,6 +395,14 @@ class ConfigValidator(ValidatorFieldsMixin):
             (
                 "retry",
                 retry_msg,
+            ),
+            (
+                "validate_unique_field_names",
+                validate_unique_field_names_msg,
+            ),
+            (
+                "include_full_error_message",
+                include_full_error_message_msg,
             ),
         )
 
@@ -472,6 +498,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         *,
         strict_unknown_fields: bool = False,
         enable_jsonschema_validation: bool = False,
+        validate_unique_field_names: bool = True,
     ) -> ValidationReport:
         errors: List[ValidationIssue] = []
         config = self._warn_and_strip_legacy_observability(config, errors)
@@ -492,7 +519,12 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._validate_outputs_detail_requires_fields_or_from(raw.data, errors)
         self._validate_removed_output_container(raw.data, errors)
         self._validate_resource_output_paths(raw.data, errors)
-        self._validate_unique_effective_field_display_names(raw, errors, main_source_id=main_source_id)
+        self._validate_unique_effective_field_display_names(
+            raw,
+            errors,
+            main_source_id=main_source_id,
+            validate_unique_field_names=bool(validate_unique_field_names),
+        )
 
         if enable_jsonschema_validation:
             self._validate_with_jsonschema(raw.data, errors, filter_additional_properties=strict_unknown_fields)
@@ -506,9 +538,9 @@ class ConfigValidator(ValidatorFieldsMixin):
         errors: List[ValidationIssue],
         *,
         main_source_id: str,
+        validate_unique_field_names: bool,
     ) -> None:
-        validate_raw = raw.data.get(DEMAND_KEYS["validate_unique_field_names"])
-        if validate_raw is False:
+        if not bool(validate_unique_field_names):
             return
 
         outputs_raw: object = raw.data.get(DEMAND_KEYS["outputs"])
@@ -524,7 +556,7 @@ class ConfigValidator(ValidatorFieldsMixin):
             return
 
         msg = format_duplicate_effective_field_display_names_message(duplicates)
-        self._add_error(errors, msg, path=DEMAND_KEYS["validate_unique_field_names"])
+        self._add_error(errors, msg, path=DEMAND_KEYS["outputs"])
 
     def _validate_outputs_detail_requires_fields_or_from(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
         outputs_raw: object = config.get(DEMAND_KEYS["outputs"])

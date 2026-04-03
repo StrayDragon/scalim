@@ -266,6 +266,11 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             msg = "sources.{}.normalize.on_conflict must be one of: error/first/last".format(source_id)
             raise ScalimConversionError(msg)
 
+        on_none = str(norm.on_none or "raise").strip() or "raise"
+        if on_none not in {"raise", "skip"}:
+            msg = "sources.{}.normalize.on_none must be one of: raise/skip".format(source_id)
+            raise ScalimConversionError(msg)
+
         if isinstance(source_config.key, tuple):
             msg = "sources.{}.normalize.kind=index_by_key does not support composite key yet".format(source_id)
             raise ScalimConversionError(msg)
@@ -283,7 +288,13 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         else:
             key_field = declared_key
 
-        return SourceNormalizeIr(kind="index_by_key", key_field=key_field, on_conflict=on_conflict, call_by=call_by_fn)
+        return SourceNormalizeIr(
+            kind="index_by_key",
+            key_field=key_field,
+            on_conflict=on_conflict,
+            on_none=on_none,
+            call_by=call_by_fn,
+        )
 
     def _convert_source_normalize_take_first(
         self,

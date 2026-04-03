@@ -187,12 +187,12 @@
 
 ### 9) Outputs failure policy（多输出失败策略）
 
-- `failure_policy`（demand 多输出失败策略：all_fail/primary_only）
+- `demand_failure_policy`（demand 多输出失败策略：all_fail/primary_only；通过 runtime entrypoints 配置）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_all_fail.yaml`
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch070_yaml_dsl_output_failure_policy.py`
-- `include_full_error_message`（错误信息是否包含全文）
+- `demand_diagnostics.include_full_error_message`（错误信息是否包含全文；通过 runtime entrypoints 配置）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_full.yaml`
   - 断言点（章节）：

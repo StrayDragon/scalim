@@ -9,7 +9,7 @@
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union, cast
 
 from ...vendor.dataclassesx import dataclass
-from .runtime.contracts import UNSET, RunOverrides, UnsetType
+from .runtime.contracts import UNSET, DemandDiagnosticsOverride, RunOverrides, UnsetType
 from .workflow_config import (
     ScalimWorkflowConfigError,
     WorkflowCachePoolBudget,
@@ -83,6 +83,7 @@ class WorkflowRunPatch:
     guardrails: Union[Optional["GuardrailsPolicy"], UnsetType] = UNSET
     loader_retry: Union[Optional["LoaderRetryPoliciesSpec"], UnsetType] = UNSET
     demand_failure_policy: Union[Optional[str], UnsetType] = UNSET
+    demand_diagnostics: Union[Optional[DemandDiagnosticsOverride], UnsetType] = UNSET
 
 
 __all__ = (

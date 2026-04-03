@@ -31,12 +31,10 @@ outputs:
       include_header: true
     fields: [ticket_id, priority, resolve_minutes]
 
-  # 故意作为“非主输出”来演示 `failure_policy` + `include_full_error_message`.
+  # 故意作为“非主输出”来演示 `failure_policy` + `demand_diagnostics.include_full_error_message`.
   # 运行时,我们会把 `out_path_secondary_workbook` 传成一个 *目录* 来触发可预期失败.
   - name: secondary_debug_workbook
     to:
       book: secondary_debug
       sheet: Debug
     fields: [ticket_id, priority, resolve_minutes]
-
-include_full_error_message: false

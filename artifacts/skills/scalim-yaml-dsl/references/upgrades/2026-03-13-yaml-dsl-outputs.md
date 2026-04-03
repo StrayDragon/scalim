@@ -7,8 +7,10 @@
 - demand YAML 顶层新增 `outputs`(有序列表): 支持同一次运行写入同一 workbook 的多 sheet
 - `outputs.*.where`: 安全表达式分发过滤(编译期静态分析依赖字段并注入 required fields)
 - `outputs.*.aggregate`: 派生汇总输出(同一次运行内产出汇总 sheet)
-- 顶层 `meta` / `audit`: 一键开启对拍友好产物
-- 顶层 `failure_policy` / `include_full_error_message`: 对齐 composed outputs 失败策略与错误信息脱敏
+- `meta` / `audit`: 已迁出 YAML 主线(属于 runtime output extras),通过 `RunOverrides.output_extras` 启用
+- demand `failure_policy` / `include_full_error_message`: 已迁出 YAML 主线(属于 runtime policy boundary),通过 runtime entrypoints 参数配置:
+  - `demand_failure_policy=...`
+  - `demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=...)`
 
 OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 - `openspec/changes/archive/2026-03-13-yaml-dsl-outputs/`

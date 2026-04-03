@@ -152,6 +152,26 @@ def test_validator_rejects_normalize_on_conflict_invalid() -> None:
     _assert_validation_errors(config, "normalize.on_conflict must be one of")
 
 
+def test_validator_rejects_normalize_on_none_for_non_index_by_key() -> None:
+    errors = _validate_normalize_raw({"kind": "take_first", "on_none": "skip"})
+    assert any("normalize.on_none is only supported for normalize.kind=index_by_key" in issue.message for issue in errors)
+
+
+def test_validator_rejects_normalize_on_none_invalid() -> None:
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.fixtures.source_normalize_loaders:load_orders_main"},
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
+                "key": "order_id",
+                "normalize": {"kind": "index_by_key", "key_field": "order_id", "on_none": "bad"},
+            }
+        },
+    }
+    _assert_validation_errors(config, "normalize.on_none must be one of: raise/skip")
+
+
 def test_run_applies_normalize_index_by_key_before_extract(tmp_path: Path) -> None:
     loaders.reset_call_counts()
     yaml_path = _write_yaml(
@@ -189,6 +209,45 @@ sources:
     assert by_order_id[101]["recommend_score"] == 0.9
     assert by_order_id[102]["recommend_score"] == 0.7
     assert loaders.CALL_COUNTS["recommends"] >= 1
+
+
+def test_run_normalize_index_by_key_on_none_skip(tmp_path: Path) -> None:
+    loaders.reset_call_counts()
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: normalize_skip_none
+main_source:
+  source_id: orders
+  loader: tests.fixtures.source_normalize_loaders:load_orders_main
+  fields:
+    order_id:
+      extract: order_id
+
+sources:
+  recommends:
+    loader: tests.fixtures.source_normalize_loaders:load_recommends_list_with_none_key
+    key: order_id
+    normalize:
+      kind: index_by_key
+      on_none: skip
+    fields:
+      recommend_score:
+        extract: payload.score
+        relation:
+          steps:
+            - from: orders.order_id
+              to: recommends.order_id
+""",
+    )
+
+    sink = InMemoryRowSink()
+    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]), sink=sink)
+
+    rows = sink.get_data()
+    by_order_id = {row["order_id"]: row for row in rows}
+    assert by_order_id[101]["recommend_score"] == 0.9
+    assert by_order_id[102]["recommend_score"] == 0.7
 
 
 def test_run_preload_forever_caches_normalized_mapping(tmp_path: Path) -> None:
@@ -371,6 +430,22 @@ def test_converter_rejects_invalid_normalize_on_conflict() -> None:
         _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
 
 
+def test_converter_rejects_invalid_normalize_on_none() -> None:
+    from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
+    from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
+    from scalim.dsl.by_yaml.schema_dsl.models import NormalizeConfig, SourceConfig
+
+    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    source_config = SourceConfig(
+        source_id="s1",
+        loader="tests.fixtures.mock_loaders.mock_loader",
+        key="id",
+        normalize=NormalizeConfig(kind="index_by_key", key_field="id", on_none="bad"),
+    )
+    with pytest.raises(ScalimConversionError, match="normalize\\.on_none must be one of"):
+        _ = converter._convert_source_normalize(source_config)  # type: ignore[attr-defined]
+
+
 def test_converter_rejects_normalize_for_composite_key() -> None:
     from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
     from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
@@ -447,6 +522,7 @@ def test_validator_sources_normalize_take_first_and_project_fields_branch_covera
             "kind": "project_fields",
             "key_field": "id",
             "on_conflict": "error",
+            "on_none": "skip",
             "on_empty": "miss",
             "steps": [],
             "on_missing": "bad",
@@ -470,6 +546,7 @@ def test_validator_sources_normalize_map_values_branch_coverage() -> None:
             "kind": "map_values",
             "key_field": "id",
             "on_conflict": "error",
+            "on_none": "skip",
             "on_empty": "miss",
             "on_missing": "error",
             "fields": {},

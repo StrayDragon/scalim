@@ -1,6 +1,7 @@
+import contextlib
 import time
 from collections.abc import Mapping
-from typing import Hashable, List, Optional, Set
+from typing import Hashable, List, Optional, Set, cast
 from typing import Mapping as TypingMapping
 
 from ....events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
@@ -9,7 +10,7 @@ from ....spec.ir import FieldIr, SourceIr
 from ....spec.ir._helpers import call_loader_with_binding, coerce_loader_result_mapping
 from ....spec.ir.binding import BindingIr, LoaderCallContextIr
 from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping
-from ....vendor.compact.typing_extensionsx import TypeGuard, override
+from ....vendor.compact.typing_extensionsx import Protocol, TypeGuard, override
 from ...context import BatchContext
 from ...loader_retry import CALLSITE_LOAD, call_with_loader_retry
 from ..guardrails import build_loader_result_guardrail_payload, fail_guardrail
@@ -23,6 +24,10 @@ from ._internal.loader_guardrails import (
 )
 from ._internal.sentinels import MISSING
 from .base import OperatorExecutor
+
+
+class _LoaderResultWithNormalizeStats(Protocol):
+    skipped_none_rows: int
 
 
 def _is_mapping(value: object) -> TypeGuard[TypingMapping[object, object]]:
@@ -268,7 +273,18 @@ class LoadOperatorExecutor(OperatorExecutor):
             result_obj = source.normalize.apply(result_raw, source_id=source.source_id)
 
         call_kwargs = self._build_loader_call_kwargs(runtime, binding, loader_context)
-        runtime.instrumentation.emit_loader_call(source.source_id, call_kwargs, result_obj, loader_duration)
+        skipped_none_rows: Optional[int] = None
+        with contextlib.suppress(AttributeError):
+            skipped_none_rows = cast(
+                "_LoaderResultWithNormalizeStats", result_obj
+            ).skipped_none_rows  # pragma: allow-cast normalize stats payload
+        runtime.instrumentation.emit_loader_call(
+            source.source_id,
+            call_kwargs,
+            result_obj,
+            loader_duration,
+            skipped_none_rows=skipped_none_rows,
+        )
         self._maybe_emit_loader_slim(runtime, loader_name=source.source_id, result=result_obj, field_keys=field_keys)
 
         guardrails = runtime.guardrails

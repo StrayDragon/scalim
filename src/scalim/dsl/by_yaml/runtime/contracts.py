@@ -322,6 +322,51 @@ class OutputsDefaultsOverride:
 
 
 @dataclass(frozen=True)
+class DemandDiagnosticsPolicy:
+    """`demand` 诊断/治理策略(运行期注入).
+
+    说明:
+    - 该策略从 `demand` YAML 主线迁出,避免被复制粘贴到业务 YAML 造成治理失控.
+    - 仅能通过 `Python/CLI` 的运行入口(`runtime entrypoints`)装配(例如 `scalim.dsl.by_yaml.run/compile`).
+    """
+
+    include_full_error_message: bool = False
+    validate_unique_field_names: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.include_full_error_message, bool):
+            msg = "DemandDiagnosticsPolicy.include_full_error_message must be a boolean"
+            raise TypeError(msg)
+        if not isinstance(self.validate_unique_field_names, bool):
+            msg = "DemandDiagnosticsPolicy.validate_unique_field_names must be a boolean"
+            raise TypeError(msg)
+
+
+@dataclass(frozen=True)
+class DemandDiagnosticsOverride:
+    """`DemandDiagnosticsPolicy` 的字段级补丁(用于 `workflow` 的 `per-run` 覆盖).
+
+    三态约定:
+    - `UNSET`: 继承/不覆盖
+    - `bool`: 显式覆盖
+    """
+
+    include_full_error_message: Union[bool, UnsetType] = UNSET
+    validate_unique_field_names: Union[bool, UnsetType] = UNSET
+
+    def __post_init__(self) -> None:
+        include_full = self.include_full_error_message
+        if not isinstance(include_full, UnsetType) and not isinstance(include_full, bool):
+            msg = "DemandDiagnosticsOverride.include_full_error_message must be a boolean or UNSET"
+            raise TypeError(msg)
+
+        validate_unique = self.validate_unique_field_names
+        if not isinstance(validate_unique, UnsetType) and not isinstance(validate_unique, bool):
+            msg = "DemandDiagnosticsOverride.validate_unique_field_names must be a boolean or UNSET"
+            raise TypeError(msg)
+
+
+@dataclass(frozen=True)
 class RunOptions:
     allowed_modules: FrozenSet[str]
     """允许被引用/导入的模块白名单(用于安全解析)."""
@@ -358,6 +403,9 @@ class RunOptions:
 
     demand_failure_policy: Optional[str] = None
     """可选:覆盖 `demand` 多输出失败策略(`None` 表示不覆盖)."""
+
+    demand_diagnostics: Optional["DemandDiagnosticsPolicy"] = None
+    """可选:`demand` 诊断/治理策略(从 YAML 主线迁出,通过运行入口参数装配)."""
 
     parallel_mode: ParallelMode = "seq"
     """并行模式(`seq` 或 `adaptive`)."""
@@ -472,6 +520,8 @@ class RunResult:
 __all__ = (
     "UNSET",
     "Compilation",
+    "DemandDiagnosticsOverride",
+    "DemandDiagnosticsPolicy",
     "ResolverTrustedMode",
     "RunOptions",
     "RunOverrides",

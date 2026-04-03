@@ -74,6 +74,7 @@ class YamlDemandLoader(
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
         allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
+        validate_unique_field_names: bool = True,
         scalim_yaml_override: Optional[Union[str, Path]] = None,
         project_root_override: Optional[Union[str, Path]] = None,
     ) -> DemandConfig:
@@ -161,6 +162,7 @@ class YamlDemandLoader(
                 raw_demand.data,
                 strict_unknown_fields=True,
                 enable_jsonschema_validation=True,
+                validate_unique_field_names=bool(validate_unique_field_names),
             )
             errors = [
                 envelope_from_validation_issue(
@@ -203,6 +205,7 @@ class YamlDemandLoader(
         template_vars: Optional[Mapping[str, object]] = None,
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
+        validate_unique_field_names: bool = True,
     ) -> DemandConfig:
         text = maybe_precompile_yaml_text(
             yaml_string,
@@ -241,6 +244,7 @@ class YamlDemandLoader(
                 raw_demand.data,
                 strict_unknown_fields=True,
                 enable_jsonschema_validation=True,
+                validate_unique_field_names=bool(validate_unique_field_names),
             )
             errors = [
                 envelope_from_validation_issue(
@@ -283,6 +287,26 @@ class YamlDemandLoader(
     def _parse_config(self, raw: RawDemand) -> DemandConfig:
         name = str(raw.data.get(DEMAND_KEYS["name"], ""))
         description = str(raw.data.get(DEMAND_KEYS["description"], ""))
+
+        removed_runtime_policy_keys = [
+            key
+            for key in (
+                "include_full_error_message",
+                "validate_unique_field_names",
+            )
+            if key in raw.data
+        ]
+        if removed_runtime_policy_keys:
+            msg = "YAML key(s) {} were moved out of demand YAML mainline (runtime policy boundary). ".format(
+                ", ".join(sorted(removed_runtime_policy_keys)),
+            )
+            msg = (
+                msg
+                + "Hint: configure demand diagnostics via runtime entrypoints: "
+                + "scalim.dsl.by_yaml.run/compile(..., demand_diagnostics=DemandDiagnosticsPolicy(...))."
+            )
+            raise ValueError(msg)
+
         batch_size = DEFAULT_BATCH_SIZE
         retry = None
         main_source = self._parse_main_source(raw)
@@ -302,18 +326,11 @@ class YamlDemandLoader(
         main_source = self._with_main_source_fields(main_source, parsed_fields.main_source_fields)
         sources = self._with_source_fields(sources, parsed_fields.source_fields_by_source)
 
-        validate_unique_raw = raw.data.get(DEMAND_KEYS["validate_unique_field_names"])
-        if validate_unique_raw is None:
-            validate_unique_field_names = True
-        elif isinstance(validate_unique_raw, bool):
-            validate_unique_field_names = bool(validate_unique_raw)
-        else:
-            msg = "validate_unique_field_names must be a boolean"
-            raise TypeError(msg)
+        validate_unique_field_names = True
 
         failure_policy = "all_fail"
 
-        include_full_error_message = bool(raw.data.get(DEMAND_KEYS["include_full_error_message"], False))
+        include_full_error_message = False
         meta = None
         audit = None
         guardrails = None

@@ -10,6 +10,7 @@ from ....schema_dsl.constants import (
     NORMALIZE_ON_CONFLICT_ENUM,
     NORMALIZE_ON_EMPTY_ENUM,
     NORMALIZE_ON_MISSING_ENUM,
+    NORMALIZE_ON_NONE_ENUM,
     SOURCE_ID_STRING_SCHEMA,
 )
 from ..field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
@@ -545,15 +546,24 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 )
 
         on_conflict_raw = norm_dict.get(_F.NORMALIZE_ON_CONFLICT)
-        if on_conflict_raw is None:
-            return
-        on_conflict = str(on_conflict_raw).strip()
-        if on_conflict not in set(NORMALIZE_ON_CONFLICT_ENUM):
-            self._add_error(
-                errors,
-                "sources.{} normalize.on_conflict must be one of: error/first/last".format(source_id),
-                path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
-            )
+        if on_conflict_raw is not None:
+            on_conflict = str(on_conflict_raw).strip()
+            if on_conflict not in set(NORMALIZE_ON_CONFLICT_ENUM):
+                self._add_error(
+                    errors,
+                    "sources.{} normalize.on_conflict must be one of: error/first/last".format(source_id),
+                    path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
+                )
+
+        on_none_raw = norm_dict.get(_F.NORMALIZE_ON_NONE)
+        if on_none_raw is not None:
+            on_none = str(on_none_raw).strip()
+            if on_none not in set(NORMALIZE_ON_NONE_ENUM):
+                self._add_error(
+                    errors,
+                    "sources.{} normalize.on_none must be one of: raise/skip".format(source_id),
+                    path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
+                )
 
     def _validate_normalize_take_first(
         self,
@@ -574,6 +584,12 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 errors,
                 "sources.{} normalize.kind=take_first does not support normalize.on_conflict".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
+            )
+        if _F.NORMALIZE_ON_NONE in norm_dict:
+            self._add_error(
+                errors,
+                "sources.{} normalize.on_none is only supported for normalize.kind=index_by_key".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
             )
         if _F.NORMALIZE_ON_MISSING in norm_dict:
             self._add_error(
@@ -624,6 +640,12 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 errors,
                 "sources.{} normalize.kind=project_fields does not support normalize.on_conflict".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
+            )
+        if _F.NORMALIZE_ON_NONE in norm_dict:
+            self._add_error(
+                errors,
+                "sources.{} normalize.on_none is only supported for normalize.kind=index_by_key".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
             )
         if _F.NORMALIZE_ON_EMPTY in norm_dict:
             self._add_error(
@@ -678,6 +700,12 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 errors,
                 "sources.{} normalize.kind=map_values does not support normalize.on_conflict".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
+            )
+        if _F.NORMALIZE_ON_NONE in norm_dict:
+            self._add_error(
+                errors,
+                "sources.{} normalize.on_none is only supported for normalize.kind=index_by_key".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
             )
         if _F.NORMALIZE_ON_EMPTY in norm_dict:
             self._add_error(

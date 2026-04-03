@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import run as run_yaml
+from scalim.dsl.by_yaml import DemandDiagnosticsPolicy, run as run_yaml
 from scalim.execution.output_composition import OutputTargetStats
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -159,6 +159,7 @@ def run_yaml_dsl_output_failure_policy(
                     str(yaml_full_path),
                     allowed_modules=_ALLOWED_MODULES,
                     demand_failure_policy="primary_only",
+                    demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True),
                     batch_size=2,
                     init_vars=init_vars_full,
                     allowed_yaml_roots=allowed_yaml_roots,
@@ -276,18 +277,18 @@ def _(mo):
 
         平台同学：能不能在运行入口侧声明“失败策略”,并在 YAML 里声明“错误信息是否脱敏”,并且在 CI 里确定性对拍？
 
-        ## 本章覆盖的能力
-
-        - runtime `demand_failure_policy`: `all_fail` / `primary_only`
-        - `include_full_error_message`: `false`(默认脱敏) / `true`(包含全文)
-        - `imports` + **scoped** `$import`：在 `main_source.*` / `resources.*` 复用 base 片段(输出 `outputs.*` 不支持 `$import`)
+	        ## 本章覆盖的能力
+	
+	        - runtime `demand_failure_policy`: `all_fail` / `primary_only`
+	        - runtime `demand_diagnostics.include_full_error_message`: `false`(默认脱敏) / `true`(包含全文)
+	        - `imports` + **scoped** `$import`：在 `main_source.*` / `resources.*` 复用 base 片段(输出 `outputs.*` 不支持 `$import`)
 
         ## 对拍点（deterministic）
 
-        - `primary_only`：次输出写失败时,主输出仍然成功,且 stats 记录该输出已被禁用
-        - `all_fail`：次输出写失败时,整体必须失败
-        - `include_full_error_message=false`：错误信息以 `sha256=...` 形式脱敏
-        - `include_full_error_message=true`：错误信息包含全文
+	        - `primary_only`：次输出写失败时,主输出仍然成功,且 stats 记录该输出已被禁用
+	        - `all_fail`：次输出写失败时,整体必须失败
+	        - `demand_diagnostics.include_full_error_message=false`：错误信息以 `sha256=...` 形式脱敏
+	        - `demand_diagnostics.include_full_error_message=true`：错误信息包含全文
 
         SSOT:
         - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch070_yaml_dsl_output_failure_policy.py::run_yaml_dsl_output_failure_policy`

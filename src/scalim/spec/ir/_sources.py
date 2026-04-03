@@ -126,6 +126,9 @@ class SourceNormalizeIr:
     on_conflict: str = "error"
     """`duplicate key` 冲突策略(`error`/`first`/`last`)."""
 
+    on_none: str = "raise"
+    """`key_field is None` 策略(`raise`/`skip`;仅 `index_by_key`)."""
+
     on_empty: str = "miss"
     """空列表策略(`miss`/`null`/`error`)."""
 
@@ -149,6 +152,7 @@ class SourceNormalizeIr:
                 source_id=source_id,
                 key_field=self.key_field,
                 on_conflict=self.on_conflict,
+                on_none=self.on_none,
             )
         elif self.kind == "take_first":
             normalized = _normalize_take_first(
@@ -289,27 +293,50 @@ def _looks_like_call_by_argument_mismatch(exc: TypeError) -> bool:
     return any(token in msg for token in _CALL_BY_MISMATCH_TOKENS)
 
 
+class _IndexByKeyNormalizedMapping(dict):  # pyright: ignore[reportMissingTypeArgument]
+    skipped_none_rows: int
+
+
 def _normalize_index_by_key(
     result: object,
     *,
     source_id: str,
     key_field: str,
     on_conflict: str,
+    on_none: str,
 ) -> LoaderResultMapping:
     # 若 `loader` 已返回 `mapping`,则直接透传.
     if isinstance(result, Mapping):
         return cast("LoaderResultMapping", result)  # pragma: allow-cast normalize.index_by_key mapping passthrough
+
+    if on_none not in {"raise", "skip"}:
+        msg = "Source '{}' normalize.index_by_key has invalid on_none '{}' (config: sources.{}.normalize.on_none)".format(
+            source_id,
+            on_none,
+            source_id,
+        )
+        raise ValueError(msg)
 
     if not _is_sequence(result):
         msg = "Source '{}' normalize.index_by_key expected loader result list[row], got '{}'".format(source_id, type(result).__name__)
         raise TypeError(msg)
 
     indexed: LoaderResultMap = {}
+    indexed_stats: Optional[_IndexByKeyNormalizedMapping] = None
+    skipped_none_rows = 0
+    if on_none == "skip":
+        indexed_stats = _IndexByKeyNormalizedMapping()
+        indexed = cast("LoaderResultMap", cast("object", indexed_stats))  # pragma: allow-cast dict subclass as LoaderResultMap
     for idx, item in enumerate(result):
         row = _normalize_index_by_key_require_row(item, source_id=source_id, idx=idx)
-        key = _normalize_index_by_key_extract_key(row, source_id=source_id, key_field=key_field, idx=idx)
-        _normalize_index_by_key_insert(indexed, key=key, row=row, source_id=source_id, on_conflict=on_conflict)
+        key = _normalize_index_by_key_extract_key(row, source_id=source_id, key_field=key_field, idx=idx, on_none=on_none)
+        if key is None:
+            skipped_none_rows += 1
+            continue
+        _normalize_index_by_key_insert(indexed, key=key, row=row, source_id=source_id, on_conflict=on_conflict, idx=idx)
 
+    if indexed_stats is not None:
+        indexed_stats.skipped_none_rows = int(skipped_none_rows)
     return indexed
 
 
@@ -536,20 +563,33 @@ def _normalize_index_by_key_extract_key(
     source_id: str,
     key_field: str,
     idx: int,
-) -> Hashable:
+    on_none: str,
+) -> Optional[Hashable]:
+    config_key_field = "sources.{}.normalize.key_field".format(source_id)
+    config_on_none = "sources.{}.normalize.on_none".format(source_id)
     if key_field not in row:
-        msg = "Source '{}' normalize.index_by_key missing key_field '{}' at index {}".format(source_id, key_field, idx)
+        msg = "Source '{}' normalize.index_by_key missing key_field '{}' at row index {} (config: {})".format(
+            source_id,
+            key_field,
+            idx,
+            config_key_field,
+        )
         raise KeyError(msg)
     key = row.get(key_field)
     if key is None:
-        msg = "Source '{}' normalize.index_by_key key_field '{}' is None at index {}".format(source_id, key_field, idx)
+        if on_none == "skip":
+            return None
+        msg = (
+            "Source '{}' normalize.index_by_key key_field '{}' is None at row index {} (config: {}). To skip None keys, set {}: skip"
+        ).format(source_id, key_field, idx, config_key_field, config_on_none)
         raise ValueError(msg)
     if not isinstance(key, Hashable):
-        msg = "Source '{}' normalize.index_by_key key_field '{}' must be hashable, got '{}' at index {}".format(
+        msg = "Source '{}' normalize.index_by_key key_field '{}' must be hashable, got '{}' at row index {} (config: {})".format(
             source_id,
             key_field,
             type(key).__name__,
             idx,
+            config_key_field,
         )
         raise TypeError(msg)
     return key
@@ -562,6 +602,7 @@ def _normalize_index_by_key_insert(
     row: "Mapping[str, object]",
     source_id: str,
     on_conflict: str,
+    idx: int,
 ) -> None:
     if key not in indexed:
         indexed[key] = row
@@ -572,9 +613,12 @@ def _normalize_index_by_key_insert(
         indexed[key] = row
         return
     if on_conflict != "error":
-        msg = "Source '{}' normalize.index_by_key has invalid on_conflict '{}'".format(source_id, on_conflict)
+        config_on_conflict = "sources.{}.normalize.on_conflict".format(source_id)
+        msg = "Source '{}' normalize.index_by_key has invalid on_conflict '{}' (config: {})".format(
+            source_id, on_conflict, config_on_conflict
+        )
         raise ValueError(msg)
-    msg = "Source '{}' normalize.index_by_key duplicate key '{}'".format(source_id, key)
+    msg = "Source '{}' normalize.index_by_key duplicate key '{}' at row index {}".format(source_id, key, idx)
     raise ValueError(msg)
 
 

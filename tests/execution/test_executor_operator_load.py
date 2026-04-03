@@ -1,7 +1,7 @@
 """Executor operator tests: load."""
 
 from scalim.execution.context import BatchContext
-from scalim.events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
+from scalim.events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM, Event
 from scalim.execution.executor.operators.load import LoadOperatorExecutor
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
@@ -9,6 +9,7 @@ from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from scalim.spec.ir import FieldIr
 from scalim.spec.ir import LookupStepIr
 from scalim.spec.ir import KeyIr, SourceIr, SourceNormalizeIr
+from scalim.hooks import BaseHook
 
 from tests.fixtures.executor_operator_fixtures import (
     _Order,
@@ -186,6 +187,52 @@ def test_load_operator_applies_source_normalize_index_by_key() -> None:
 
     assert context.get_field_value("amount", 1) == 7
     assert context.get_field_value("amount", 2) == 9
+
+
+def test_load_operator_emits_loader_call_skipped_none_rows_for_index_by_key_on_none_skip() -> None:
+    class _CaptureLoaderCallHook(BaseHook):
+        event_types = {EVENT_LOADER_CALL}
+
+        def __init__(self) -> None:
+            self.events = []
+
+        def on_event(self, event: Event) -> None:  # type: ignore[override]
+            self.events.append(event)
+
+    def _loader():  # type: ignore[no-untyped-def]
+        return [
+            {"order_id": 1, "amount": 7},
+            {"order_id": None, "amount": 0},
+            {"order_id": 2, "amount": 9},
+        ]
+
+    hook = _CaptureLoaderCallHook()
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable=_loader),
+        normalize=SourceNormalizeIr(kind="index_by_key", key_field="order_id", on_none="skip"),
+    )
+    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
+    runtime = _make_runtime(plan, _make_main_source())
+    runtime.instrumentation.register(hook)
+    context = BatchContext()
+
+    operator = LoadOperatorIr(
+        operator_id="load_orders",
+        operator_type=OperatorType.LOAD.value,
+        source=source,
+        field_keys=("amount",),
+        is_primary=True,
+    )
+
+    LoadOperatorExecutor().execute(operator, context, [1, 2], runtime)
+
+    assert context.get_field_value("amount", 1) == 7
+    assert context.get_field_value("amount", 2) == 9
+    assert hook.events and hook.events[-1].event_type == EVENT_LOADER_CALL
+    assert hook.events[-1].payload.skipped_none_rows == 1
 
 
 def test_load_operator_object_missing_attribute_returns_none() -> None:

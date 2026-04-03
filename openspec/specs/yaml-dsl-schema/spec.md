@@ -152,27 +152,6 @@
 - **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
 - **THEN** `definitions.output_write.properties.header_fields_output_by.default` MUST 等于 `name`
 
-### Requirement: schema exposes a switch for unique effective field display names
-系统 MUST 在 schema 中暴露一个 YAML authoring 侧开关,用于控制“字段有效展示名(effective display name)全局唯一”的预检查策略。
-
-该开关 MUST:
-- 位于顶层;
-- 名称为 `validate_unique_field_names`(boolean);
-- 默认语义为启用(未声明时等价 `true`);
-- hover 文案 MUST 解释“有效展示名”的定义: `field.name` 非空则取 `name`,否则回退为 `field_id`。
-- hover 文案 MUST 说明该预检查在统一 target model 下的触发条件:
-  - file: `write.include_header: true` 且 `write.header_fields_output_by: name`
-  - book: 该 output 会输出表头且 `write.header_fields_output_by: name`
-
-#### Scenario: schema 生成结果包含顶层校验开关
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
-- **THEN** schema MUST 暴露 `properties.validate_unique_field_names`
-
-#### Scenario: schema hover reflects unified header trigger rules
-- **WHEN** 生成 `demand.gen.json`
-- **THEN** `properties.validate_unique_field_names.markdownDescription` MUST 不再引用 `container`
-- **AND** MUST 说明统一 `write.header_fields_output_by` 触发规则
-
 ### Requirement: schema hover 提供常见错误与迁移提示
 系统 MUST 在 YAML DSL JSON Schema 的关键字段上提供可读且简短的常见错误/迁移提示,以提升编辑器 LSP 体验并减少试错成本:
 
@@ -557,3 +536,50 @@ Schema MUST 为 retry policy 字段提供:
 #### Scenario: workflow schema rejects legacy resources
 - **WHEN** 执行 workflow schema-only 校验且出现 legacy workflow resource groups(workbooks/csvs/sheetbooks)
 - **THEN** 校验 MUST 失败
+
+### Requirement: schema MUST NOT expose include_full_error_message
+`include_full_error_message` 属于 runtime policy(可能包含敏感信息),系统 MUST 不再将其作为 demand YAML stable authoring 字段暴露在 schema 中。
+
+#### Scenario: schema no longer exposes include_full_error_message
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **THEN** schema MUST NOT 暴露 `properties.include_full_error_message`
+
+### Requirement: schema/validator restrict `normalize.on_none` to `index_by_key`
+
+系统 MUST 在生成的 YAML DSL JSON Schema 与运行时 validate 中对 `sources.*.normalize.on_none` 提供受控扩展,并满足:
+
+- `sources.*.normalize.on_none` MUST 为 `raise|skip`
+- 仅当 `sources.*.normalize.kind=index_by_key` 时允许出现 `on_none`
+- 当 `sources.*.normalize.kind` 为其它值且出现 `on_none` 时,系统 MUST 拒绝该配置(不得静默忽略)
+
+#### Scenario: schema validate accepts `on_none=skip` for `index_by_key`
+- **WHEN** demand YAML 配置包含:
+  ```yaml
+  sources:
+    orders:
+      kind: lookup
+      loader: {call_by: mypkg.load_orders}
+      normalize:
+        kind: index_by_key
+        key_field: order_id
+        on_none: skip
+  ```
+- **THEN** schema-only 校验 MUST 通过
+
+#### Scenario: schema validate rejects `on_none` for non-`index_by_key`
+- **WHEN** demand YAML 配置包含:
+  ```yaml
+  sources:
+    orders:
+      kind: lookup
+      loader: {call_by: mypkg.load_orders}
+      normalize:
+        kind: project_fields
+        on_none: skip
+  ```
+- **THEN** schema-only 校验 MUST 失败并指出字段路径
+
+#### Scenario: runtime validate rejects `on_none` for non-`index_by_key`
+- **WHEN** 用户配置 `sources.orders.normalize.kind=project_fields` 且包含 `sources.orders.normalize.on_none=skip`
+- **THEN** 运行时 validate MUST fail-fast 并明确指出 `on_none` 仅对 `index_by_key` 有效
+

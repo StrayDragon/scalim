@@ -96,6 +96,9 @@ class LoaderCallEvent:
     lookup_key_count: Optional[int] = None
     """本次调用的查找键数量(可选)."""
 
+    skipped_none_rows: Optional[int] = None
+    """可选: `normalize.on_none=skip` 时跳过的 `key_field is None` 行数."""
+
     field_keys: Optional[List[str]] = None
     """加载器关联字段键列表(可选)."""
 

@@ -37,6 +37,7 @@ class _FieldNames:
     NORMALIZE_KIND: str = NORMALIZE_KEYS["kind"]
     NORMALIZE_KEY_FIELD: str = NORMALIZE_KEYS["key_field"]
     NORMALIZE_ON_CONFLICT: str = NORMALIZE_KEYS["on_conflict"]
+    NORMALIZE_ON_NONE: str = NORMALIZE_KEYS["on_none"]
     NORMALIZE_ON_EMPTY: str = NORMALIZE_KEYS["on_empty"]
     NORMALIZE_ON_MISSING: str = NORMALIZE_KEYS["on_missing"]
     NORMALIZE_FIELDS: str = NORMALIZE_KEYS["fields"]

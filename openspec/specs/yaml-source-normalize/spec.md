@@ -4,17 +4,24 @@
 TBD - created by archiving change yaml-source-normalize. Update Purpose after archive.
 ## Requirements
 ### Requirement: lookup sources support declarative whole-result `normalize`
+
 系统 SHALL 支持在 lookup source 上声明 `normalize`,用于在字段读取前对 loader 的整个返回值做一次 whole-result normalization。
 
 系统 MUST 至少支持:
 - `kind: index_by_key`
 - `on_conflict: error|first|last`(默认 `error`)
+- `on_none: raise|skip`(默认 `raise`,仅对 `index_by_key` 有意义)
 - `key_field: <field_name>`（可选,仅对 `index_by_key` 有意义）
 
 当 `normalize.kind=index_by_key` 时:
 - 若 `normalize.key_field` 为非空字符串,系统 MUST 使用其作为 effective `key_field`,并且 MUST 校验 `normalize.key_field == sources.<id>.key`（避免语义漂移）
 - 若 `normalize.key_field` 缺失或为空字符串,系统 MUST 将 effective `key_field` 推导为 `sources.<id>.key`
 - 若 `sources.<id>.key` 为复合键(tuple/list),系统 MUST fail-fast（`index_by_key` 仍不支持 composite key）
+- 若任一 row 缺失 effective `key_field`,系统 MUST fail-fast
+- 若任一 row 的 effective `key_field` 值为 `None`:
+  - 若 `normalize.on_none` 缺失或为 `raise`,系统 MUST fail-fast
+  - 若 `normalize.on_none=skip`,系统 MUST 跳过该 row
+- 若任一 row 的 effective `key_field` 值非 hashable,系统 MUST fail-fast
 
 `index_by_key` 的语义 MUST 为:
 - 输入: `list[row]`
@@ -34,6 +41,43 @@ TBD - created by archiving change yaml-source-normalize. Update Purpose after ar
 - **THEN** 系统 MUST 将其归一化为:
   ```python
   {101: {"order_id": 101, "score": 0.9}, 102: {"order_id": 102, "score": 0.7}}
+  ```
+
+#### Scenario: `on_none` 缺省(或 `raise`)遇到 `None` key fail-fast
+- **WHEN** source 配置为:
+  ```yaml
+  key: order_id
+  normalize:
+    kind: index_by_key
+  ```
+- **AND** loader 返回:
+  ```python
+  [{"order_id": 101, "score": 0.9}, {"order_id": None, "score": 0.0}]
+  ```
+- **THEN** 归一化 MUST 失败并指出 `order_id` 不允许为 `None`
+
+#### Scenario: `on_none=skip` 跳过 `key_field is None` 的 row
+- **WHEN** source 配置为:
+  ```yaml
+  key: order_id
+  normalize:
+    kind: index_by_key
+    on_none: skip
+  ```
+- **AND** loader 返回:
+  ```python
+  [
+    {"order_id": 101, "score": 0.9},
+    {"order_id": None, "score": 0.0},
+    {"order_id": 102, "score": 0.7},
+  ]
+  ```
+- **THEN** 系统 MUST 将其归一化为:
+  ```python
+  {
+    101: {"order_id": 101, "score": 0.9},
+    102: {"order_id": 102, "score": 0.7},
+  }
   ```
 
 #### Scenario: `index_by_key` 显式指定 `key_field` 与 `key` 一致仍可工作
@@ -128,3 +172,4 @@ TBD - created by archiving change yaml-source-normalize. Update Purpose after ar
 #### Scenario: `normalize.call_by` 返回非 Mapping 被拒绝
 - **WHEN** `normalize.call_by` 返回非 `Mapping` 值
 - **THEN** 归一化 MUST 失败并指出 contract 违反
+

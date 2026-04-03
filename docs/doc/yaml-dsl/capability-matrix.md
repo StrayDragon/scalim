@@ -76,8 +76,8 @@
 | `outputs.*.aggregate` | `DerivedOutputTargetSpec.derived`(group_by) | 当前 YAML 只暴露 `group_by+metrics` 这一类派生汇总 | 更复杂派生输出装配走 Python-only `OutputCompositionSpec` |
 | `outputs.*.from` | 输出继承(字段/容器) | 不继承 where/aggregate | - |
 | `meta` / `audit`（已迁出） | `OutputCompositionSpec.meta_sheet/audit_sheet` | 不再属于 YAML 主线;通过 `RunOverrides.output_extras` 配置(需要 workbook 上下文;workflow 模式不支持显式 path) | `run(..., overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)))` |
-| `failure_policy` | `OutputCompositionSpec.failure_policy` | `all_fail/primary_only` | - |
-| `include_full_error_message` | `OutputCompositionSpec.include_full_error_message` | 可能包含敏感信息;默认 false | 在 CI/公开环境保持 false |
+| `failure_policy`（已迁出） | `OutputCompositionSpec.failure_policy` | `all_fail/primary_only` | `run(..., demand_failure_policy=\"all_fail\"|\"primary_only\")` |
+| `include_full_error_message`（已迁出） | `OutputCompositionSpec.include_full_error_message` | 可能包含敏感信息;默认 false | `run(..., demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True))` |
 
 ## 5) Demand YAML:护栏(guardrails)
 

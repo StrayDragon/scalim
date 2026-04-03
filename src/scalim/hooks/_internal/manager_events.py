@@ -132,6 +132,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         cache_scope: Optional[str] = None,
         lookup_key_count: Optional[int] = None,
         field_keys: Optional[List[str]] = None,
+        skipped_none_rows: Optional[int] = None,
     ) -> None:
         manager = self._manager()
         handler_pairs = self._get_typed_handler_pairs(EVENT_LOADER_CALL)
@@ -155,6 +156,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             cache_status=cache_status,
             cache_scope=cache_scope,
             lookup_key_count=lookup_key_count,
+            skipped_none_rows=skipped_none_rows,
             field_keys=field_keys,
         )
         self._dispatch(handler_pairs, event)

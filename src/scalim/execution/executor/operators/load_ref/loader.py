@@ -1,7 +1,8 @@
+import contextlib
 import logging
 import time
 from collections.abc import Mapping
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 
 from .....events import EVENT_LOADER_CALL
 from .....spec.ir import LookupStepIr
@@ -10,6 +11,7 @@ from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
 from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData
 from .....utils.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
+from .....vendor.compact.typing_extensionsx import Protocol
 from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
 from ...runtime.runtime import ExecutionRuntime, LoadRefCacheEntry
@@ -17,6 +19,10 @@ from .context import LoadRefExecutionContext
 
 # 模块级日志记录器
 _logger = logging.getLogger(__name__.rsplit(".", 1)[0])
+
+
+class _LoaderResultWithNormalizeStats(Protocol):
+    skipped_none_rows: int
 
 
 def build_ref_loader_context(
@@ -43,7 +49,7 @@ def _trigger_ref_loader_call(
     source_id: str,
     binding: Optional[BindingIr],
     loader_context: LoaderCallContextIr,
-    result: LoaderResultMapping,
+    result: object,
     duration: float,
     *,
     cache_enabled: bool,
@@ -56,6 +62,12 @@ def _trigger_ref_loader_call(
     call_kwargs: LoaderCallKwargs = {}
     if binding:
         _, call_kwargs = binding.build_params(loader_context)
+    result_obj: object = result
+    skipped_none_rows: Optional[int] = None
+    with contextlib.suppress(AttributeError):
+        skipped_none_rows = cast(
+            "_LoaderResultWithNormalizeStats", result_obj
+        ).skipped_none_rows  # pragma: allow-cast normalize stats payload
     runtime.instrumentation.emit_loader_call(
         loader_name=source_id,
         params=call_kwargs,
@@ -66,6 +78,7 @@ def _trigger_ref_loader_call(
         cache_scope="batch" if cache_enabled else None,
         lookup_key_count=lookup_key_count,
         field_keys=list(event_field_keys),
+        skipped_none_rows=skipped_none_rows,
     )
 
 

@@ -6,6 +6,7 @@ import pytest
 from scalim.dsl.by_yaml import (
     BookResourceOverride,
     BookWriteDefaultsOverride,
+    DemandDiagnosticsPolicy,
     FileResourceOverride,
     OutputOverride,
     OutputExtrasOverride,
@@ -482,7 +483,6 @@ def test_validate_unique_field_names_can_be_disabled(tmp_path: Path) -> None:
         tmp_path,
         """
 name: overlay_unique_names_disabled
-validate_unique_field_names: false
 main_source:
   source_id: orders
   loader: tests.fixtures.mock_loaders.mock_loader
@@ -504,7 +504,12 @@ resources:
 """,
     )
 
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    compilation = compile(
+        str(yaml_path),
+        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+    )
+    assert compilation.config.validate_unique_field_names is False
     assert compilation.request.output_composition is not None
 
 
@@ -706,5 +711,5 @@ def test_loader_parse_config_rejects_invalid_validate_unique_field_names_type() 
             "outputs": [],
         }
     )
-    with pytest.raises(TypeError, match=r"validate_unique_field_names must be a boolean"):
+    with pytest.raises(ValueError, match=r"validate_unique_field_names.*moved out of demand YAML mainline"):
         loader._parse_config(raw)  # type: ignore[attr-defined]

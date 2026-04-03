@@ -20,3 +20,12 @@ def load_recommends_list():
         {"order_id": 101, "payload": {"score": 0.9}},
         {"order_id": 102, "payload": {"score": 0.7}},
     ]
+
+
+def load_recommends_list_with_none_key():
+    CALL_COUNTS["recommends"] += 1
+    return [
+        {"order_id": 101, "payload": {"score": 0.9}},
+        {"order_id": None, "payload": {"score": 0.0}},
+        {"order_id": 102, "payload": {"score": 0.7}},
+    ]

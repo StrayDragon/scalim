@@ -177,6 +177,7 @@ BIND_CACHE_MODE_ENUM = ["none", "batch"]
 VALUE_CAST_ENUM = ["auto", "int", "str", "decimal"]
 NORMALIZE_KIND_ENUM = ["index_by_key", "take_first", "project_fields", "map_values"]
 NORMALIZE_ON_CONFLICT_ENUM = ["error", "first", "last"]
+NORMALIZE_ON_NONE_ENUM = ["raise", "skip"]
 NORMALIZE_ON_EMPTY_ENUM = ["miss", "null", "error"]
 NORMALIZE_ON_MISSING_ENUM = ["error", "null"]
 
@@ -451,6 +452,19 @@ NORMALIZE_SCHEMA = {
             "markdownDescription": "duplicate key 冲突策略.\n\n- `error`: 报错(默认)\n- `first`: 保留第一条\n- `last`: 保留最后一条",
             "examples": ["error"],
         },
+        "on_none": {
+            "type": "string",
+            "enum": NORMALIZE_ON_NONE_ENUM,
+            "default": "raise",
+            "description": "key_field is None 策略(raise/skip; index_by_key)",
+            "markdownDescription": (
+                "`key_field is None` 策略.\n\n"
+                "- 仅 `kind: index_by_key` 使用\n"
+                "- `raise`: fail-fast(默认)\n"
+                "- `skip`: 跳过 key_field 为 None 的行"
+            ),
+            "examples": ["raise"],
+        },
         "on_empty": {
             "type": "string",
             "enum": NORMALIZE_ON_EMPTY_ENUM,
@@ -501,6 +515,7 @@ NORMALIZE_SCHEMA = {
                         "anyOf": [
                             {"required": ["key_field"]},
                             {"required": ["on_conflict"]},
+                            {"required": ["on_none"]},
                             {"required": ["on_missing"]},
                             {"required": ["fields"]},
                             {"required": ["steps"]},
@@ -514,6 +529,7 @@ NORMALIZE_SCHEMA = {
                         "anyOf": [
                             {"required": ["key_field"]},
                             {"required": ["on_conflict"]},
+                            {"required": ["on_none"]},
                             {"required": ["on_empty"]},
                             {"required": ["steps"]},
                         ]
@@ -526,6 +542,7 @@ NORMALIZE_SCHEMA = {
                         "anyOf": [
                             {"required": ["key_field"]},
                             {"required": ["on_conflict"]},
+                            {"required": ["on_none"]},
                             {"required": ["on_empty"]},
                             {"required": ["on_missing"]},
                             {"required": ["fields"]},
@@ -646,8 +663,6 @@ DEMAND_SCHEMA_PROPERTIES_ORDER = [
     "relations",
     "resources",
     "outputs",
-    "validate_unique_field_names",
-    "include_full_error_message",
 ]
 FIELD_DERIVED_CONDITIONS = [
     {

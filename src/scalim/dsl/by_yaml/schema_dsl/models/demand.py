@@ -145,24 +145,9 @@ class DemandConfig:
 
     validate_unique_field_names: bool = dataclass_field(
         default=True,
-        metadata=schema_meta(
-            desc="预检查: 字段有效展示名全局唯一(默认 true)",
-            md=(
-                "预检查: 字段有效展示名(`effective display name`)全局唯一.\n\n"
-                "- 默认启用: 未声明时等价 `true`\n"
-                "- 有效展示名定义:\n"
-                "  - 若 `field.name` 非空: 使用 `name`\n"
-                "  - 否则回退为 `field_id`\n"
-                "- 仅当 `effective outputs` 会输出表头且 `header_fields_output_by: name` 时触发\n"
-                "  - file: `write.include_header: true` 且 `write.header_fields_output_by: name`\n"
-                "  - book: 该 output 会输出表头,且 `write.header_fields_output_by: name`\n"
-                "- 显式设置为 `false` 可关闭该检查(不推荐长期使用)"
-            ),
-            default=True,
-            examples=[True, False],
-        ),
+        metadata=schema_omit(),
     )
-    """预检查:字段有效展示名(`effective display name`)全局唯一."""
+    """运行期预检查:字段有效展示名(`effective display name`)全局唯一(从 `YAML` 主线迁出)."""
 
     failure_policy: str = dataclass_field(
         default="all_fail",
@@ -172,14 +157,9 @@ class DemandConfig:
 
     include_full_error_message: bool = dataclass_field(
         default=False,
-        metadata=schema_meta(
-            desc="包含完整错误信息(可能包含敏感信息;默认 false)",
-            md="包含完整错误信息(可能包含敏感信息;默认 false).",
-            default=False,
-            examples=[False],
-        ),
+        metadata=schema_omit(),
     )
-    """是否包含完整错误信息."""
+    """运行期诊断策略:是否包含完整错误信息(可能包含敏感信息;从 `YAML` 主线迁出)."""
 
     meta: Optional[OutputExtraSheetConfig] = dataclass_field(
         default=None,

@@ -220,6 +220,9 @@ class NormalizeConfig:
     on_conflict: str = dataclass_field(default=DEFAULT_NORMALIZE_ON_CONFLICT)
     """`duplicate key` 冲突策略."""
 
+    on_none: str = dataclass_field(default="raise")
+    """`key_field is None` 策略(仅 `index_by_key` 有意义)."""
+
     on_empty: Optional[str] = dataclass_field(default=None)
     """空列表策略(仅 `take_first`)."""
 

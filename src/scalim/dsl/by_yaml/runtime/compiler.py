@@ -204,6 +204,14 @@ def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: Run
             raise ValueError(msg)
         next_config = replace(next_config, failure_policy=str(normalized))
 
+    demand_diagnostics = options.demand_diagnostics
+    if demand_diagnostics is not None:
+        next_config = replace(
+            next_config,
+            include_full_error_message=bool(demand_diagnostics.include_full_error_message),
+            validate_unique_field_names=bool(demand_diagnostics.validate_unique_field_names),
+        )
+
     return next_config
 
 
@@ -529,6 +537,7 @@ def load_config(
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Sequence[str]] = None,
+    validate_unique_field_names: bool = True,
 ) -> DemandConfig:
     loader = YamlDemandLoader()
     return loader.load(
@@ -537,6 +546,7 @@ def load_config(
         template_sandbox=template_sandbox,
         rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
+        validate_unique_field_names=bool(validate_unique_field_names),
     )
 
 
@@ -1125,12 +1135,16 @@ def compile(  # noqa: A001
     options: RunOptions,
 ) -> Compilation:
     validate_allowlist(allowed_modules=options.allowed_modules, allowed_functions=options.allowed_functions)
+    validate_unique_field_names = True
+    if options.demand_diagnostics is not None:
+        validate_unique_field_names = bool(options.demand_diagnostics.validate_unique_field_names)
     config = load_config(
         yaml_path,
         template_vars=options.template_vars,
         template_sandbox=options.template_sandbox,
         rendered_yaml_max_len=options.rendered_yaml_max_len,
         allowed_yaml_roots=options.allowed_yaml_roots,
+        validate_unique_field_names=validate_unique_field_names,
     )
     config = _apply_demand_runtime_policy_overrides(config, options=options)
     base_module_path = None
