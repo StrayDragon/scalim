@@ -149,7 +149,7 @@ def _is_capability_token(tok: str) -> bool:
         return False
     if not _CAPABILITY_TOKEN_RE.fullmatch(lower):
         return False
-    # OpenSpec capabilities 多为 kebab-case；避免把它们当成 “YAML authoring surface token”。
+    # `OpenSpec` 的 `capability` 多为 `kebab-case`；避免把它们当成 `YAML` 编写面 `token`。
     if lower.startswith(("yaml-dsl-", "yaml-source-", "openspec-", "docs-", "output-", "lsp-", "frontend-", "cli-", "qa-")):
         return True
     return False
@@ -488,7 +488,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             return False
         if "[*]" in t or "$" in t:
             return True
-        # 常见 YAML key（snake_case）也属于 authoring surface。
+        # 常见的 `YAML` 键（`snake_case`）也属于编写面 `token`。
         if "_" in t and re.fullmatch(r"[a-z_][a-z0-9_]*", t):
             return True
         if any(
@@ -597,7 +597,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
 
-        # demand runtime flags 迁出 YAML：提案中明确了 fail-fast 与迁移方向，直接抽成一条高密度升级指令。
+        # `demand` 运行期开关迁出 `YAML`：提案中明确了 `fail-fast` 与迁移方向，直接抽成一条高密度升级指令。
         if (
             "demand" in cleaned.lower()
             and "include_full_error_message" in cleaned
@@ -917,7 +917,7 @@ def _render_notes(
             filtered.append(item)
         breaking_uniq = filtered
 
-    # 若已有“组合升级指令”，则移除对应的单项移除提示，避免 Breaking 刷屏。
+    # 若已有“组合升级指令”，则移除对应的单项移除提示，避免 `Breaking` 刷屏。
     if any("include_full_error_message" in it and "validate_unique_field_names" in it for it in breaking_uniq):
         breaking_uniq = [
             it

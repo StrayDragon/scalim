@@ -1710,7 +1710,17 @@ def derive_cache_pool_consumers(
         keys: Set[Tuple[str, str]] = set()
         demand_path = node.demand_path if isinstance(node, WorkflowNodeIr) else None
         if demand_path is not None:
-            config = loader.load(str(demand_path), template_vars=template_vars, allowed_yaml_roots=allowed_yaml_roots)
+            # `validate_unique_field_names` 属于运行期的 `demand_diagnostics` 策略:
+            # - 全局来自 `run_workflow(..., demand_diagnostics=...)`
+            # - 单节点覆盖来自 `run_patches_by_id[*].demand_diagnostics`
+            # `derive_cache_pool_consumers()` 运行在 `workflow` 的编译/预加载阶段,这里只需要源/缓存的结构信息,
+            # 必须避免该校验在此阶段被默认启用而“抢跑”导致 `fail-fast`。
+            config = loader.load(
+                str(demand_path),
+                template_vars=template_vars,
+                allowed_yaml_roots=allowed_yaml_roots,
+                validate_unique_field_names=False,
+            )
             for source_id, source in config.sources.items():
                 if str(source.cache_mode or "") != "preload_forever":
                     continue

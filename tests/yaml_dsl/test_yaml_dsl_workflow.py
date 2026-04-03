@@ -11,6 +11,7 @@ from scalim.dsl.by_yaml import RunOverrides
 from scalim.dsl.by_yaml import FileResourceOverride
 from scalim.dsl.by_yaml import OutputExtrasOverride
 from scalim.dsl.by_yaml import ResourcesOverride
+from scalim.dsl.by_yaml import RunResult
 from scalim.dsl.by_yaml import run_workflow
 from scalim.dsl.by_yaml.runtime import compiler as by_yaml_compiler_mod
 from scalim.dsl.by_yaml.workflow_types import ComponentsExtend, ComponentsReplace, WorkflowRunPatch
@@ -4055,6 +4056,36 @@ def test_compile_workflow_ir_skips_runtime_duplicate_name_validation(tmp_path: P
     assert any(node.node_id == "dup" for node in workflow_ir.nodes)
 
 
+def test_derive_cache_pool_consumers_skips_runtime_duplicate_name_validation(tmp_path: Path) -> None:
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=tmp_path / "dup.csv")
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "dup", "demand": "dup.yaml"}, {"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+        cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
+    )
+
+    cfg = load_workflow_config(str(wf))
+    workflow_ir = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+    logical_keys_by_node_id, consumers_by_logical_key = workflow_compile_mod.derive_cache_pool_consumers(
+        workflow_ir,
+        template_vars=None,
+        allowed_yaml_roots=None,
+    )
+
+    assert logical_keys_by_node_id["dup"] == frozenset()
+    assert logical_keys_by_node_id["ok"] == frozenset({("preload_forever", "preload")})
+    assert consumers_by_logical_key[("preload_forever", "preload")] == frozenset(["ok"])
+
+
 def test_run_workflow_demand_diagnostics_can_disable_duplicate_name_validation(tmp_path: Path) -> None:
     output_path = tmp_path / "detail.csv"
     _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
@@ -4073,6 +4104,279 @@ def test_run_workflow_demand_diagnostics_can_disable_duplicate_name_validation(t
 
     assert not result.errors()
     assert output_path.exists()
+
+
+def test_run_workflow_run_patch_demand_diagnostics_isolated_per_run_in_multi_demand_workflow(tmp_path: Path) -> None:
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    for run_id, out_path in [("a", a_out), ("b", b_out)]:
+        file_id = "{}_detail_csv".format(run_id)
+        _ = _write_text(
+            tmp_path / "{}.yaml".format(run_id),
+            (
+                """
+name: duplicate_headers_{run_id}
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id:
+      extract: id
+      name: Dup
+    value:
+      extract: value
+      name: Dup
+
+sources: {{}}
+
+resources:
+  files:
+    {file_id}:
+      kind: csv_file
+      path: "{output_path}"
+
+outputs:
+  - name: detail
+    to:
+      file: {file_id}
+    fields: [id, value]
+"""
+            )
+            .format(
+                run_id=str(run_id),
+                file_id=str(file_id),
+                output_path=str(out_path),
+            )
+            .lstrip(),
+        )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
+    )
+
+    a_outcome = next(o for o in result.outcomes if o.run_id == "a")
+    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
+
+    assert a_outcome.error is None
+    assert a_outcome.result is not None
+    a_result = a_outcome.result
+    assert isinstance(a_result, RunResult)
+    assert a_result.config.validate_unique_field_names is False
+    assert a_out.exists()
+
+    assert b_outcome.result is None
+    assert b_outcome.error is not None
+    assert b_outcome.error.exc_type in {"ScalimYamlValidationError", "ValueError", "ScalimWorkflowRunFailedError", "RuntimeError"}
+    assert not b_out.exists()
+
+
+def test_run_workflow_global_demand_diagnostics_applies_to_all_runs_in_multi_demand_workflow(tmp_path: Path) -> None:
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    for run_id, out_path in [("a", a_out), ("b", b_out)]:
+        file_id = "{}_detail_csv".format(run_id)
+        _ = _write_text(
+            tmp_path / "{}.yaml".format(run_id),
+            (
+                """
+name: duplicate_headers_{run_id}
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id:
+      extract: id
+      name: Dup
+    value:
+      extract: value
+      name: Dup
+
+sources: {{}}
+
+resources:
+  files:
+    {file_id}:
+      kind: csv_file
+      path: "{output_path}"
+
+outputs:
+  - name: detail
+    to:
+      file: {file_id}
+    fields: [id, value]
+"""
+            )
+            .format(
+                run_id=str(run_id),
+                file_id=str(file_id),
+                output_path=str(out_path),
+            )
+            .lstrip(),
+        )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+    )
+
+    assert not result.errors()
+
+    a_outcome = next(o for o in result.outcomes if o.run_id == "a")
+    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
+
+    assert a_outcome.error is None
+    assert b_outcome.error is None
+    assert a_outcome.result is not None
+    assert b_outcome.result is not None
+
+    a_result = a_outcome.result
+    b_result = b_outcome.result
+    assert isinstance(a_result, RunResult)
+    assert isinstance(b_result, RunResult)
+    assert a_result.config.validate_unique_field_names is False
+    assert b_result.config.validate_unique_field_names is False
+    assert a_out.exists()
+    assert b_out.exists()
+
+
+def test_run_workflow_run_patch_demand_diagnostics_none_disables_global_policy_for_one_run(tmp_path: Path) -> None:
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    for run_id, out_path in [("a", a_out), ("b", b_out)]:
+        file_id = "{}_detail_csv".format(run_id)
+        _ = _write_text(
+            tmp_path / "{}.yaml".format(run_id),
+            (
+                """
+name: duplicate_headers_{run_id}
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id:
+      extract: id
+      name: Dup
+    value:
+      extract: value
+      name: Dup
+
+sources: {{}}
+
+resources:
+  files:
+    {file_id}:
+      kind: csv_file
+      path: "{output_path}"
+
+outputs:
+  - name: detail
+    to:
+      file: {file_id}
+    fields: [id, value]
+"""
+            )
+            .format(
+                run_id=str(run_id),
+                file_id=str(file_id),
+                output_path=str(out_path),
+            )
+            .lstrip(),
+        )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+        run_patches_by_id={"b": WorkflowRunPatch(demand_diagnostics=None)},
+    )
+
+    a_outcome = next(o for o in result.outcomes if o.run_id == "a")
+    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
+
+    assert a_outcome.error is None
+    assert a_outcome.result is not None
+    assert a_out.exists()
+    a_result = a_outcome.result
+    assert isinstance(a_result, RunResult)
+    assert a_result.config.validate_unique_field_names is False
+
+    assert b_outcome.result is None
+    assert b_outcome.error is not None
+    assert b_outcome.error.exc_type in {"ScalimYamlValidationError", "ValueError", "ScalimWorkflowRunFailedError", "RuntimeError"}
+    assert not b_out.exists()
+
+
+def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_error_message(tmp_path: Path) -> None:
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=a_out,
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=b_out,
+        field_ids=["id", "value"],
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    result = run_workflow(
+        str(wf),
+        allowed_modules=_ALLOWED_MODULES,
+        run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(include_full_error_message=True))},
+    )
+    assert not result.errors()
+
+    a_outcome = next(o for o in result.outcomes if o.run_id == "a")
+    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
+
+    assert a_outcome.result is not None
+    assert b_outcome.result is not None
+
+    a_result = a_outcome.result
+    b_result = b_outcome.result
+    assert isinstance(a_result, RunResult)
+    assert isinstance(b_result, RunResult)
+    assert a_result.config.include_full_error_message is True
+    assert b_result.config.include_full_error_message is False
 
 
 def test_run_workflow_run_patch_can_disable_duplicate_name_validation(tmp_path: Path) -> None:
