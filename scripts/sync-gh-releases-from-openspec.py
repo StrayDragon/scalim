@@ -14,6 +14,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 
 _TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+_CAPABILITY_TOKEN_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+$")
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,21 @@ def _clean_inline_markers(s: str) -> str:
     return out
 
 
+def _is_capability_token(tok: str) -> bool:
+    t = tok.strip()
+    lower = t.lower()
+    if not t or " " in t:
+        return False
+    if "." in t or "$" in t or "[*]" in t:
+        return False
+    if not _CAPABILITY_TOKEN_RE.fullmatch(lower):
+        return False
+    # OpenSpec capabilities 多为 kebab-case；避免把它们当成 “YAML authoring surface token”。
+    if lower.startswith(("yaml-dsl-", "yaml-source-", "openspec-", "docs-", "output-", "lsp-", "frontend-", "cli-", "qa-")):
+        return True
+    return False
+
+
 def _score_highlight(text: str) -> int:
     s = text
     lower = s.lower()
@@ -149,8 +165,9 @@ def _score_highlight(text: str) -> int:
         score += 3
     if "支持" in s:
         score += 1
+    # `Highlights` 优先保留用户会“立刻感知”的破坏性变更；否则容易被“同步文档/示例”等条目抢走。
     if "BREAKING" in s or "breaking" in lower or "破坏性" in s:
-        score += 2
+        score += 6
     # 更偏向“作者/用户可感知”的说明，而不是内部实现口径。
     if "yaml" in lower or "YAML" in s:
         score += 1
@@ -264,6 +281,19 @@ def _example_priority(change_id: str) -> int:
 
 def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
     cid = change_id.lower()
+    if "on-none" in cid or "on_none" in cid:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "sources:",
+            "  orders:",
+            '    loader: {call_by: "mypkg.load_orders"}',
+            "    normalize: {kind: index_by_key, key_field: order_id, on_none: skip}",
+            "fields:",
+            "  order_score:",
+            "    from: sources.orders",
+            "    lookup_key: order_id",
+            "    extract: score",
+        ]
     if "books-resources" in cid or "io-books-resources" in cid:
         return [
             "# 示例为提案语义示意（不保证可直接运行）",
@@ -443,6 +473,8 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     def _tok_is_surface(tok: str) -> bool:
         t = tok.strip()
         lower = t.lower()
+        if _is_capability_token(t):
+            return False
         # 过滤文件路径/源码文件/生成物路径等非 `YAML` 编写面 `token`。
         if "/" in t or "\\" in t:
             return False
@@ -455,6 +487,9 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if lower.startswith("overrides.") or lower.startswith("runoverrides"):
             return False
         if "[*]" in t or "$" in t:
+            return True
+        # 常见 YAML key（snake_case）也属于 authoring surface。
+        if "_" in t and re.fullmatch(r"[a-z_][a-z0-9_]*", t):
             return True
         if any(
             k in lower
@@ -561,6 +596,18 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     instructions: List[str] = []
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
+
+        # demand runtime flags 迁出 YAML：提案中明确了 fail-fast 与迁移方向，直接抽成一条高密度升级指令。
+        if (
+            "demand" in cleaned.lower()
+            and "include_full_error_message" in cleaned
+            and "validate_unique_field_names" in cleaned
+            and ("不再允许" in cleaned or "fail-fast" in cleaned.lower() or "迁移" in cleaned)
+        ):
+            instructions.append(
+                "`demand` YAML：删除顶层 `include_full_error_message` / `validate_unique_field_names`；改为通过 Python/CLI 运行入口参数 `demand_diagnostics` 配置（旧写法会 fail-fast）。"
+            )
+            continue
 
         # 工作流等待器默认超时策略：优先抽成可执行的升级指令（避免落到“按提案升级”的低信息量兜底）。
         if "max_wait_s" in cleaned and "`workflow.options.resources_wait`" in proposal_text:
@@ -843,10 +890,8 @@ def _render_notes(
         # 按你的约束：只放“需要改 `YAML`/旧写法跑不起来”的点；因此仅从 `YAML` 相关 `archived changes` 抽取。
         if ch.is_yaml:
             breaking_items.extend(list(ch.breaking_instructions))
-    # 若存在更明确的迁移点，则丢弃“按提案升级：...”这类低信息量兜底项。
-    better = [b for b in breaking_items if not b.startswith("按提案升级：")]
-    if better:
-        breaking_items = better
+    # 丢弃“按提案升级：...”这类低信息量兜底项（不满足“你要改什么”的要求）。
+    breaking_items = [b for b in breaking_items if not b.startswith("按提案升级：")]
 
     # 去重：保持顺序。
     seen: Set[str] = set()
@@ -871,6 +916,14 @@ def _render_notes(
                 continue
             filtered.append(item)
         breaking_uniq = filtered
+
+    # 若已有“组合升级指令”，则移除对应的单项移除提示，避免 Breaking 刷屏。
+    if any("include_full_error_message" in it and "validate_unique_field_names" in it for it in breaking_uniq):
+        breaking_uniq = [
+            it
+            for it in breaking_uniq
+            if not (it.startswith("不要再用 `include_full_error_message`") or it.startswith("不要再用 `validate_unique_field_names`"))
+        ]
 
     if not breaking_uniq:
         if new_changes:
