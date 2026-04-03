@@ -306,6 +306,10 @@ is-docker-available:
 type-check-core-tight:
     uv {{ UV_OPTIONS }} run basedpyright $(uv {{ UV_OPTIONS }} run scripts/toml-get.py --file pyproject.toml --key tool.basedpyright.strict --format shell-words)
 
+# 检查: packages/scalim-yaml-dsl-lsp 类型检查 (Python 3.10+)
+type-check-packages-yaml-dsl-lsp:
+    uv {{ UV_OPTIONS }} run basedpyright -p packages/scalim-yaml-dsl-lsp packages/scalim-yaml-dsl-lsp/src --level error
+
 # 检查: 格式化&Lint (只检查;不改文件)
 lint: type-check type-check-core-tight
     uv {{ UV_OPTIONS }} run ruff format --check .
@@ -677,7 +681,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 

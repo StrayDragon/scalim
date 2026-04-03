@@ -254,6 +254,7 @@ ignore = [
     "src/scalim/vendor/dataclassesx/_backport.py",
     "src/scalim/vendor/yamlx/**/*.py",
 ]
+extraPaths = ["./src/scalim/vendor/yamlx"]
 defineConstant = { DEBUG = true }
 pythonVersion = "3.6"
 pythonPlatform = "Linux"

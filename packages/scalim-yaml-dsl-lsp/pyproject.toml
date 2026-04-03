@@ -27,3 +27,21 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 sources = ["src"]
+
+[tool.basedpyright]
+# NOTE: keep vendored `src/scalim/vendor/yamlx/ruamel` pristine.
+#
+# `scalim.vendor.yamlx.ruamel.yaml` is a vendored copy of `ruamel.yaml`, and its `__init__.py`
+# relies on absolute imports like `from ruamel.yaml.main import *` plus runtime `sys.modules`
+# aliasing to stay self-contained.
+#
+# Static type-check cannot execute the aliasing, so we add `extraPaths` to help `basedpyright`
+# resolve `ruamel.*` imports to the vendored tree during analysis.
+extraPaths = ["../../src/scalim/vendor/yamlx"]
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+
+# Keep warnings focused on actionable issues for this package (align with repo-root policy).
+reportDeprecated = false
+reportAny = false
+reportExplicitAny = false

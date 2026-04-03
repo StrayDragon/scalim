@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from scalim.vendor.yamlx.ruamel.yaml import YAML
 
@@ -20,8 +20,8 @@ class YamlCursorExtractionResult:
     range: Optional[EditorRange] = None
     warnings: Tuple[str, ...] = ()
 
-    def as_dict(self) -> dict:
-        payload: dict = {
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
             "yaml_path": str(self.yaml_path or ""),
             "reference": str(self.reference or ""),
         }
@@ -177,14 +177,20 @@ def _extract_from_scalar_value(
     return cursor_result
 
 
-def _scalar_content_bounds(node: object, lines: List[str]) -> Optional[Tuple[int, int, int]]:
+def _scalar_content_bounds(node: object, lines: List[str]) -> Optional[Tuple[int, int, int]]:  # noqa: PLR0911
     start_mark = getattr(node, "start_mark", None)
     end_mark = getattr(node, "end_mark", None)
     start_line0 = getattr(start_mark, "line", None)
     start_col0 = getattr(start_mark, "column", None)
     end_line0 = getattr(end_mark, "line", None)
     end_col0 = getattr(end_mark, "column", None)
-    if not all(isinstance(x, int) for x in [start_line0, start_col0, end_line0, end_col0]):
+    if not isinstance(start_line0, int):
+        return None
+    if not isinstance(start_col0, int):
+        return None
+    if not isinstance(end_line0, int):
+        return None
+    if not isinstance(end_col0, int):
         return None
     if int(start_line0) != int(end_line0):
         return None
