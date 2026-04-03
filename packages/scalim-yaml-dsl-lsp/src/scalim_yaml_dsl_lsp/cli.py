@@ -17,7 +17,7 @@ except Exception:  # noqa: BLE001
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="scalim-yaml-dsl-lsp")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command")
 
     serve_parser = subparsers.add_parser("serve", help="Start YAML DSL LSP server (default: stdio).")
     serve_parser.add_argument("--tcp", action="store_true", help="Start server in TCP mode (debug-only).")
@@ -35,11 +35,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     dump_parser.add_argument("--json", action="store_true", help="Print JSON payload to stdout.")
 
     args = parser.parse_args(list(argv) if argv is not None else None)
+    command: str = str(getattr(args, "command", "") or "")
+    if not command:
+        parser.print_help(sys.stderr)
+        return 2
 
-    if args.command == "dump-discovery":
+    if command == "dump-discovery":
         return _cmd_dump_discovery(args.yaml_path, as_json=bool(args.json))
 
-    if args.command == "serve":
+    if command == "serve":
         return _cmd_serve(
             tcp=bool(args.tcp),
             host=str(args.host),
@@ -48,13 +52,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             log_level=str(args.log_level or "INFO"),
         )
 
-    parser.error("未知命令")
+    parser.print_help(sys.stderr)
     return 2
 
 
 def _configure_logging(*, log_file: str, log_level: str) -> None:
     level = getattr(logging, str(log_level or "INFO").upper(), logging.INFO)
-    handlers = []
+    handlers: list[logging.Handler] = []
     if log_file:
         handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
     else:

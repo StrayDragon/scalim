@@ -726,42 +726,47 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
 ) -> Optional[str]:
     yaml_rt = _yaml_rt()
     try:
-        loaded = yaml_rt.load(str(raw_text or "")) or {}
+        loaded_obj: Any = yaml_rt.load(str(raw_text or "")) or {}
     except Exception:  # noqa: BLE001
         return None
-    if not isinstance(loaded, dict):
+    if not isinstance(loaded_obj, dict):
         return None
+    loaded: Any = loaded_obj
 
-    yaml_dsl = loaded.get("yaml_dsl")
-    if yaml_dsl is None:
-        yaml_dsl = {}
-        loaded["yaml_dsl"] = yaml_dsl
-    if not isinstance(yaml_dsl, dict):
+    yaml_dsl_obj = loaded.get("yaml_dsl")
+    if yaml_dsl_obj is None:
+        yaml_dsl_obj = {}
+        loaded["yaml_dsl"] = yaml_dsl_obj
+    if not isinstance(yaml_dsl_obj, dict):
         return None
+    yaml_dsl: Any = yaml_dsl_obj
 
     if import_allowed_roots_to_add:
-        roots = yaml_dsl.get("import_allowed_roots")
-        if roots is None:
-            roots = []
-            yaml_dsl["import_allowed_roots"] = roots
-        if not isinstance(roots, list):
+        roots_obj = yaml_dsl.get("import_allowed_roots")
+        if roots_obj is None:
+            roots_obj = []
+            yaml_dsl["import_allowed_roots"] = roots_obj
+        if not isinstance(roots_obj, list):
             return None
-        _extend_unique(roots, import_allowed_roots_to_add)
+        import_allowed_roots: List[Any] = roots_obj
+        _extend_unique(import_allowed_roots, import_allowed_roots_to_add)
 
     if python_roots_to_add:
-        editor = yaml_dsl.get("editor")
-        if editor is None:
-            editor = {}
-            yaml_dsl["editor"] = editor
-        if not isinstance(editor, dict):
+        editor_obj = yaml_dsl.get("editor")
+        if editor_obj is None:
+            editor_obj = {}
+            yaml_dsl["editor"] = editor_obj
+        if not isinstance(editor_obj, dict):
             return None
-        roots = editor.get("python_roots")
-        if roots is None:
-            roots = []
-            editor["python_roots"] = roots
-        if not isinstance(roots, list):
+        editor: Any = editor_obj
+        roots_obj = editor.get("python_roots")
+        if roots_obj is None:
+            roots_obj = []
+            editor["python_roots"] = roots_obj
+        if not isinstance(roots_obj, list):
             return None
-        _extend_unique(roots, python_roots_to_add)
+        python_roots: List[Any] = roots_obj
+        _extend_unique(python_roots, python_roots_to_add)
 
     buf = StringIO()
     yaml_rt.dump(loaded, buf)

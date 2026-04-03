@@ -45,3 +45,6 @@ pythonPlatform = "Linux"
 reportDeprecated = false
 reportAny = false
 reportExplicitAny = false
+reportUnusedCallResult = false
+reportUnusedFunction = false
+reportUnknownVariableType = false
