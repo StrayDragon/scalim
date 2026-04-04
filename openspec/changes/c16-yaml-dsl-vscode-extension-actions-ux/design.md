@@ -8,6 +8,8 @@
 
 这些能力大多属于 extension 的 glue/UX 层，不应在 server 侧实现。
 
+本变更仅针对扩展工程 `extras/vscode-scalim/` 的 UX/glue 增量（扩展源代码长期固定在 `extras/`）。
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -59,4 +61,3 @@
 ## Open Questions
 
 - 是否需要在 VSCode UI 中展示更详细的 discovery 表格（后置，可能需要 WebView）？
-

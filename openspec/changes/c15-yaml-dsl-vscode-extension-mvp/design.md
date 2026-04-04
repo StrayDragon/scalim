@@ -27,25 +27,31 @@
 
 1) **扩展工程位置与构建方式**
 
-在 design 阶段确定扩展工程放置位置（示例）：
-
-- `frontend/vscode-extension/`（与其它前端资产同域）
-- 或 `packages/scalim-yaml-dsl-vscode-extension/`（作为可发布包）
-
-MVP 以“可本地运行与调试”为主，发布与签名后置。
+- MVP 工程固定在 `extras/vscode-scalim/`（已由 `yo code` 初始化：TypeScript + esbuild + pnpm）。
+- 扩展源代码 **长期固定** 在 `extras/vscode-scalim/`（不迁移到 `packages/` 或 `frontend/`）。
+- MVP 以“可本地运行与调试”为主；发布/签名/marketplace 后置，但不影响源码目录位置。
 
 2) **server provisioning：pinned 发行物 + venv**
 
-- pinned 发行物默认建议：`scalim-yaml-dsl-lsp[server]`
-- venv 存放于 `globalStorageUri`
+- pinned 发行物使用 `scalim-yaml-dsl-lsp[server]==<pinned_version>`（默认 pinned 为当前已验证版本；允许通过扩展配置覆盖）。
+  - 当前建议默认值：`scalim-yaml-dsl-lsp[server]==0.7.5`（与仓库 `packages/scalim-yaml-dsl-lsp/pyproject.toml` 对齐）
+- venv 存放于 `globalStorageUri`（单机复用；workspace 之间共享）
 - provisioning 失败时必须提示（并不影响用户继续用 YAML 基础编辑能力）
+- Python 解释器要求 >=3.10；当无法找到/版本不足时，必须输出可诊断提示（包含探测到的 python 路径与版本）
 
 3) **schema 协作：不替换 redhat.vscode-yaml**
 
-扩展通过配置 `yaml.schemas` 将：
+扩展通过配置工作区 `yaml.schemas` 与 `redhat.vscode-yaml` 协作（扩展不替换 YAML schema 插件）：
 
-- demand schema 绑定到 demand YAML（按 discovery 分类）
-- workflow schema 绑定到 workflow YAML
+- schema 绝对路径从 pinned venv 内解析（避免与 server 版本漂移）：
+  - `scalim-cli yaml-dsl schema path --type scalim_yaml`
+  - `scalim-cli yaml-dsl schema path --type demand`
+  - `scalim-cli yaml-dsl schema path --type workflow`
+- MVP 先采用稳定、可解释的 glob 绑定（后续再增强为更贴近 discovery 的动态绑定）：
+  - scalim.yaml schema → `scalim.yaml`
+  - demand schema → `demand/**/*.y*ml`
+  - workflow schema → `workflow/**/*.y*ml`
+- 写入配置时必须 **idempotent merge**（保留用户已有 `yaml.schemas` 映射；只增补 scalim 相关项）
 
 ## Risks / Trade-offs
 
@@ -55,9 +61,3 @@ MVP 以“可本地运行与调试”为主，发布与签名后置。
 ## Migration Plan
 
 - MVP 先支持本地安装与开发；后续再考虑 marketplace 发布与自动更新策略。
-
-## Open Questions
-
-- pinned 版本来源：跟随仓库版本、还是由扩展配置项指定？
-- server 启动命令：优先使用 console_script，还是 `python -m ...`？
-

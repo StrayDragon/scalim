@@ -26,8 +26,7 @@ VSCode 是 YAML 编辑与 LSP 消费最常见的入口。仅交付 server 并不
 ## Impact
 
 - 影响代码/资产：
-  - `frontend/` 或 `packages/` 下新增 VSCode extension 工程（具体位置在 design 决定）
+  - `extras/vscode-scalim/` 下新增 VSCode extension 工程（扩展源代码长期固定在 `extras/`，不迁移到 `packages/`/`frontend/`）
   - `openspec/specs/yaml-dsl-vscode-extension/spec.md`：补齐 Purpose，并补充 MVP 范围与场景
 - 依赖/运行时：
   - extension provisioning 需要目标机器具备 Python 3.10+（用于创建 venv 并安装 server 包）
-

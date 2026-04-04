@@ -29,8 +29,7 @@
 ## Impact
 
 - 影响代码/资产：
-  - VSCode extension 工程：新增 commands、状态栏展示、actions glue code
+  - `extras/vscode-scalim/`：新增 commands、状态栏展示、actions glue code
   - `openspec/specs/yaml-dsl-vscode-extension/spec.md`：扩展 requirements（actions/诊断/排障）
 - 依赖关系：
   - 需要 server 侧已具备标准 LSP code actions（依赖 `yaml-dsl-lsp-server-code-actions`）
-

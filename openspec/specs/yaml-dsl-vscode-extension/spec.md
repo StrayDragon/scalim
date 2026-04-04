@@ -1,7 +1,10 @@
 # yaml-dsl-vscode-extension Specification
 
 ## Purpose
-TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
+为 VSCode 用户提供 YAML DSL 的默认入口：在扩展侧负责 LSP server provisioning / lifecycle / 诊断输出，
+并与 `redhat.vscode-yaml` 协作完成 schema 绑定，从而实现“开箱即用 + 可排障”的编辑体验。
+
+本仓库的扩展源代码固定在 `extras/vscode-scalim/`（不迁移到 `packages/`/`frontend/`；发布/签名策略不影响源码目录位置）。
 ## Requirements
 ### Requirement: VSCode extension MUST cooperate with redhat.vscode-yaml for schema binding
 系统 MUST 定义 VSCode 扩展 v1 行为,以与 `redhat.vscode-yaml` 协同提供结构(schema) + 语义(LSP)体验:
@@ -19,6 +22,7 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 
 - 扩展 MUST 在 `globalStorageUri` 下维护隔离的 Python venv
 - 扩展 MUST 以 pinned 版本安装 LSP server 包,并支持升级/回滚
+- extension provisioning MUST 依赖 Python >=3.10；当缺失或版本不足时，MUST 给出可诊断提示（不得静默失败）
 - server 启动失败时,扩展 MUST 以可诊断提示告知用户,且不得阻塞编辑器的基础 YAML 体验
 
 #### Scenario: extension provisions and starts the server
@@ -37,4 +41,3 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 - **GIVEN** 用户修改了 `scalim.yaml` 中与 discovery 相关的配置
 - **WHEN** 扩展检测到配置变化
 - **THEN** schema mapping 与 LSP 行为 MUST 按新配置更新
-

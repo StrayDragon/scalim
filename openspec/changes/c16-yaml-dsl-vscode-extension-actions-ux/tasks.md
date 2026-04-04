@@ -1,3 +1,5 @@
+本变更的所有实现与验证默认发生在扩展工程 `extras/vscode-scalim/`。
+
 ## 1. Quick Fix 映射
 
 - [ ] 1.1 将 server 的 `codeAction` 映射为 VSCode Quick Fix（保持语义来源于 server）
@@ -20,4 +22,3 @@
 
 - [ ] 4.1 手动验证：缺失 `scalim.yaml` 时能通过 Quick Fix 创建并生效（diagnostics 改善）
 - [ ] 4.2 运行 `just openspec-check` 确认 OpenSpec 工件结构与 schema 校验通过
-

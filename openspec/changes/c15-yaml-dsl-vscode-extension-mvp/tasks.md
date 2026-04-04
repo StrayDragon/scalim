@@ -1,27 +1,29 @@
 ## 1. 工程脚手架与基础配置
 
-- [ ] 1.1 确定扩展工程目录位置与构建方式（TypeScript + VSCode Extension API）
-- [ ] 1.2 定义 activation events（匹配 YAML DSL 文件或命令触发）与输出日志通道
+- [ ] 1.1 扩展工程固定在 `extras/vscode-scalim/`（pnpm + esbuild）；补齐 `package.json` 的 contributes/activationEvents
+- [ ] 1.2 输出日志通道：`Scalim YAML DSL`（OutputChannel），并把 provisioning / server 启动 / crash 信息写入
+- [ ] 1.3 提供 `fixtures/`（最小 `scalim.yaml` + demand/workflow 示例 YAML），用于手动验证
 
 ## 2. Schema 协作（redhat.vscode-yaml）
 
-- [ ] 2.1 读取/推导 demand/workflow 文件匹配规则（基于 project discovery）
-- [ ] 2.2 配置 `yaml.schemas` 绑定 demand/workflow schema（不替换 YAML 插件）
+- [ ] 2.1 通过 pinned venv 内的 `scalim-cli yaml-dsl schema path --type ...` 解析 schema 绝对路径（scalim_yaml/demand/workflow）
+- [ ] 2.2 以 **idempotent merge** 方式写入工作区 `yaml.schemas`（scalim.yaml / demand/**/*.y*ml / workflow/**/*.y*ml）；缺少 `redhat.vscode-yaml` 时降级并提示安装
+- [ ] 2.3（可选）提供开关禁用自动 schema 绑定（避免改动工作区 settings）
 
 ## 3. Venv provisioning（pinned）
 
-- [ ] 3.1 在 `globalStorageUri` 创建/复用 venv
-- [ ] 3.2 安装 pinned server 发行物（默认 `scalim-yaml-dsl-lsp[server]`）；失败时输出可诊断信息
-- [ ] 3.3 提供最小重装/修复路径（例如命令：Reinstall server）
+- [ ] 3.1 探测 Python >=3.10（支持配置覆盖 python 路径）；失败时输出可诊断提示
+- [ ] 3.2 在 `globalStorageUri` 创建/复用 venv（单机复用）；写入 meta（python 路径/版本、pinned pip spec）
+- [ ] 3.3 安装 pinned server 发行物（默认 `scalim-yaml-dsl-lsp[server]==0.7.5`）；失败时输出 pip 命令与 stderr 摘要
+- [ ] 3.4 命令：Reinstall server（重建 venv + 重新安装 pinned）
 
 ## 4. LSP server lifecycle
 
-- [ ] 4.1 以 stdio 启动 server（遵循 `yaml-dsl-lsp-serve`）
-- [ ] 4.2 管理生命周期：启动、崩溃提示、重启命令（MVP 最小）
-- [ ] 4.3 输出 diagnostics：当前 venv 路径、server 版本、discovery 摘要
+- [ ] 4.1 使用 stdio 启动 server（遵循 `yaml-dsl-lsp-serve`；优先 `<venv>/bin/scalim-yaml-dsl-lsp serve`）
+- [ ] 4.2 管理生命周期：启动、崩溃提示、最小 restart 命令
+- [ ] 4.3 输出 diagnostics：venv 路径、python 版本、server 版本、对当前活动 YAML 的 discovery 摘要（`scalim-yaml-dsl-lsp dump-discovery ... --json`）
 
 ## 5. 验证
 
-- [ ] 5.1 本地开发安装验证：打开 fixtures YAML 能看到 schema + LSP diagnostics
+- [ ] 5.1 本地开发安装验证：F5 启动 Extension Host，打开 `fixtures/` 内 YAML，能看到 schema + LSP diagnostics；日志可定位到具体 workspace
 - [ ] 5.2 运行 `just openspec-check` 确认 OpenSpec 工件结构与 schema 校验通过
-
