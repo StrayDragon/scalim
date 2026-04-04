@@ -70,12 +70,60 @@
 
 但本阶段先不锁死具体目录与命令，只把验收要求写清楚，避免过早绑定实现细节。
 
+### 5. 明确 workflow 生命周期与 boundary 插入点(SSOT)
+
+本类问题之所以容易“修成 workaround”，根因在于生命周期分层不够显式，导致 runtime-only diagnostics 可能被“借道”到更早阶段触发。
+因此 checklist 需要把 workflow 的真实生命周期当作 SSOT 写清楚，并在每层明确允许/禁止的动作。
+
+建议以 `run_workflow()` 的真实执行路径为准，按以下层次理解并做验收映射：
+
+- **Authoring / validate 层(可选入口)**: `scalim-cli yaml-dsl validate --yaml-type workflow` 会校验 workflow YAML 并逐个校验 demand YAML；该入口没有 effective runtime policy 合并概念，应在文档里明确其语义与限制(是否允许参数化 policy 见 Open Questions)。
+  - 入口：`src/scalim/cli/yaml_dsl.py:_run_validate()`。
+- **Workflow compile / preload 层(结构预加载)**: `run_workflow()` 会先加载并编译 workflow YAML -> workflow IR，并在该阶段“预加载 demand YAML 结构信息”。
+  - 入口：`src/scalim/dsl/by_yaml/workflow_entrypoints.py:run_workflow()` -> `compile_workflow_ir(...)`。
+  - 注意：该阶段必须禁止消费 runtime-only diagnostics(例如 `validate_unique_field_names`)；当前已通过 `YamlDemandLoader.load(..., validate_unique_field_names=False)` 显式避免抢跑：
+    - `_load_demands()`：`src/scalim/dsl/by_yaml/workflow_compile.py:_load_demands()`。
+    - `derive_cache_pool_consumers()`：`src/scalim/dsl/by_yaml/workflow_compile.py:derive_cache_pool_consumers()`。
+- **Runtime policy merge 层(effective options)**: 仍在 `run_workflow()` 内部，会把全局 options、`run_patches_by_id`、以及 workflow-level resources overlay 合并成每个 run 的 effective runtime policy。
+  - 入口：`src/scalim/dsl/by_yaml/workflow_entrypoints.py:_apply_workflow_run_patch(...)`、`_merge_node_overrides(...)`。
+- **Engine execute 层(lazy compile + run)**: workflow 引擎会在 node ready 时才 compile 单个 demand(并在该阶段解析 `$ctx`、合并 per-run init_vars)，因此任何依赖 `$ctx`/init_vars 的检查都不能作为“全局 preflight”。
+  - 入口：`src/scalim/workflow/execute.py:run_workflow_ir()`。
+
+### 6. 对“可推理”的 runtime-only diagnostics 引入 policy-aware preflight(fail-fast)
+
+这次 bug 的用户体感问题之一是：workflow 引擎采用 lazy compile-demand，导致某些“本应属于编译期”的错误会在执行/调度到具体节点时才出现。
+对于能在不依赖 `$ctx`/init_vars/外部运行态的前提下推导的 diagnostics，建议引入一个统一的 preflight：在进入引擎前基于每个 run 的 effective policy 进行校验，并 **fail-fast 直接 raise，使整个 workflow 失败**。
+
+该策略的关键是：
+
+- **不破坏 boundary**：compile/preload 阶段仍不得消费 runtime-only policy；preflight 必须发生在 runtime policy merge 之后、engine execute 之前。
+- **口径必须与 runtime compile 一致**：preflight 的判定输入应遵循 “YAML -> overrides -> effective config” 的顺序，避免误报/漏报。
+  - 例如 `validate_unique_field_names` 是否需要触发，不仅取决于字段 display name 是否重复，还取决于 effective outputs 是否会用 `header_fields_output_by=name` 写 header，以及在 workbook append 模式下 `header_policy` 是否为 `never`。
+- **fail-fast**：遇到第一个 run 的第一个触发错误，立即 raise；不做跨 run 聚合报告(实现简单、维护成本低)。
+
+首批 preflight 只建议覆盖一个具体对象：`DemandDiagnosticsPolicy.validate_unique_field_names`。
+
+### 7. preflight 采用“小框架”(context + check registry)，避免散落 if/flag
+
+为了长期可维护(避免未来新增 runtime-only policy 后再次出现“漏了某个入口”的回归)，preflight 不应以“在某处手动传 False / 某处加一个 if”方式扩散。
+建议将其抽象为一层小框架：
+
+- `WorkflowPreflightContext`：包含 workflow path/config/IR、预加载的 `DemandConfig`(保证不抢跑 diagnostics)、以及可生成 per-run effective options 的必要信息(base options、`run_patches_by_id`、workflow resources overlay)。
+- `WorkflowPreflightCheck`：每个 check 具备
+  - `is_triggered(...)`：快速判定是否需要检查(短路)；
+  - `run(...)`：执行检查并在失败时 raise。
+- `preflight_checks: List[WorkflowPreflightCheck]`：集中注册，形成“runtime-only diagnostics 可推理子集”的显式清单。
+
+该框架的一个硬性边界约束是：check 必须可在不解析 `$ctx`、不依赖 init_vars 的前提下完成；否则只能保留在 per-node runtime compile 阶段。
+
 ## Risks / Trade-offs
 
 - [风险] checklist 写得过泛，后续无法落地。 -> 缓解：要求每条规范都映射到明确测试层与至少一个候选入口。
 - [风险] notebook gate 变多后运行时间上升。 -> 缓解：文档里明确 smoke gate 必须保持最小 fixture、最小 oracle。
 - [风险] 把所有运行参数都塞进同一框架，范围失控。 -> 缓解：首批仅覆盖“已迁出 YAML 主线”的 runtime-only policy。
 - [风险] review 只停留在文档，不进入实施。 -> 缓解：`tasks.md` 预先拆出可逐步落地的任务序列。
+- [风险] preflight 过度扩张，开始依赖 `$ctx`/init_vars/外部运行态。 -> 缓解：框架层面规定“可推理子集”原则；不满足的检查仅保留在 per-node runtime compile。
+- [风险] preflight 引入额外的 YAML load/解析开销。 -> 缓解：仅在“存在被启用的可推理 preflight 配置”时触发；并尽量复用 compile/preload 阶段已加载的 `DemandConfig`。
 
 ## Migration Plan
 
@@ -91,3 +139,5 @@
 - 首批 checklist 的权威承载 spec 是否只挂在 `testing-quality`，还是还需要在具体 capability spec 中逐条挂靠？
 - notebook/public API smoke 最终是继续挂在现有 suite 中，还是抽成更明确的 boundary suite？
 - 是否需要新增一个 repo-level review checklist 文档，作为 PR 审查模板的一部分？
+- 哪些 runtime-only diagnostics 属于“可推理子集”，可以纳入 workflow preflight？首批只覆盖 `validate_unique_field_names`，其它候选应先列清单再逐步纳入，避免范围失控。
+- `scalim-cli yaml-dsl validate`(workflow validate) 是否需要支持“带 runtime policy 参数”的 policy-aware validate，还是继续保持 authoring-only 的默认校验语义？

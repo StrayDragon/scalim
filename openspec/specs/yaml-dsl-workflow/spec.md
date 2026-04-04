@@ -56,7 +56,7 @@ workflow IR 编译阶段对 `workflow.runs[*].demand` 的预加载 MUST 仅服�
 - **AND** 该 demand 仅会在 `validate_unique_field_names=True` 时因 duplicate effective field display names 失败
 - **WHEN** 系统执行 `compile_workflow_ir(...)`
 - **THEN** workflow IR compile MUST 成功返回 demand-derived 结构信息
-- **AND** 后续是否报 duplicate-name 错误 MUST 由 runtime demand compile 阶段决定
+- **AND** 后续是否报 duplicate-name 错误 MUST 由具备 effective runtime policy 的边界决定（例如 workflow preflight 或 demand runtime compile）
 
 ### Requirement: Runs execute demand YAML via existing compilation pipeline
 系统 MUST 对每个 run 的 `demand` 路径加载并编译 demand YAML,并复用现有 demand 执行链路运行得到结果。
@@ -81,6 +81,20 @@ workflow IR 编译阶段对 `workflow.runs[*].demand` 的预加载 MUST 仅服�
 - **WHEN** `failure_policy=primary_only` 且某个 run 失败
 - **THEN** workflow MUST 继续执行后续 runs
 - **AND** workflow 返回值 MUST 包含失败 run 的可检查错误信息(至少包含 run id 与 demand 路径)
+
+### Requirement: workflow preflight errors MUST be treated as workflow config/compile errors (independent of failure_policy)
+当某个诊断被定义为 workflow preflight（engine 启动前）失败时,系统 MUST 直接 raise 并中止整个 workflow,且 MUST NOT 继续调度其它 runs（`failure_policy` 不适用）:
+
+- 系统 MUST 直接 raise 并中止整个 workflow
+- 系统 MUST NOT 将该失败视为“某个 run 的可恢复失败”并继续调度其它 runs
+- `failure_policy` MUST 不影响 preflight 的失败语义
+
+#### Scenario: primary_only does not continue on preflight failure
+- **GIVEN** workflow.options.failure_policy=primary_only
+- **AND** preflight 发现某个 run 存在 duplicate effective field display names 且触发 `validate_unique_field_names`
+- **WHEN** 用户调用 `run_workflow(...)`
+- **THEN** 系统 MUST 直接 raise 并中止整个 workflow
+- **AND** workflow MUST NOT 执行任何 run
 
 ### Requirement: max_concurrency limits parallel runs deterministically
 系统 MUST 支持 `max_concurrency` 控制 runs 粒度并发上限,并确保返回结果顺序与 `workflow.runs` 声明顺序一致。
