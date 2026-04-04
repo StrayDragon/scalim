@@ -29,3 +29,6 @@ MVP goals:
      - `Scalim YAML DSL: Restart server`
      - `Scalim YAML DSL: Reinstall server (rebuild venv)`
      - `Scalim YAML DSL: Show diagnostics`
+     - `Scalim YAML DSL: Open logs`
+     - `Scalim YAML DSL: Show discovery summary`
+     - `Scalim YAML DSL: Open/Create scalim.yaml`

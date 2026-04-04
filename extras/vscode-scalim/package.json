@@ -13,7 +13,10 @@
     "workspaceContains:scalim.yaml",
     "onCommand:scalim.yamlDsl.restartServer",
     "onCommand:scalim.yamlDsl.reinstallServer",
-    "onCommand:scalim.yamlDsl.showDiagnostics"
+    "onCommand:scalim.yamlDsl.showDiagnostics",
+    "onCommand:scalim.yamlDsl.openLogs",
+    "onCommand:scalim.yamlDsl.showDiscoverySummary",
+    "onCommand:scalim.yamlDsl.openOrCreateScalimYaml"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -29,6 +32,18 @@
       {
         "command": "scalim.yamlDsl.showDiagnostics",
         "title": "Scalim YAML DSL: Show diagnostics"
+      },
+      {
+        "command": "scalim.yamlDsl.openLogs",
+        "title": "Scalim YAML DSL: Open logs"
+      },
+      {
+        "command": "scalim.yamlDsl.showDiscoverySummary",
+        "title": "Scalim YAML DSL: Show discovery summary"
+      },
+      {
+        "command": "scalim.yamlDsl.openOrCreateScalimYaml",
+        "title": "Scalim YAML DSL: Open/Create scalim.yaml"
       }
     ],
     "configuration": {
