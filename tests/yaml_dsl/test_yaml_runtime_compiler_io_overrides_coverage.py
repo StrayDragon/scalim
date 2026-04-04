@@ -3,6 +3,7 @@ import os
 import pytest
 
 from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
+from scalim.dsl.by_yaml.runtime import effective_outputs as effective_outputs_mod
 from scalim.dsl.by_yaml.runtime.contracts import (
     BookBudgetOverride,
     BookExportXlsxOverride,
@@ -228,7 +229,14 @@ def test_runtime_compiler_output_requires_unique_effective_field_display_names_c
         write=OutputWriteConfig(header_fields_output_by="name"),
         fields=("order_id",),
     )
-    assert compiler_mod._output_requires_unique_effective_field_display_names(DemandConfig(), out_cfg) is False  # noqa: SLF001
+    assert (
+        effective_outputs_mod.output_target_requires_unique_effective_field_display_names(
+            DemandConfig(),
+            out_cfg,
+            resources_override=None,
+        )
+        is False
+    )
 
 
 def test_runtime_compiler_overlay_book_write_defaults_override_invalid_enum_cover_branches() -> None:

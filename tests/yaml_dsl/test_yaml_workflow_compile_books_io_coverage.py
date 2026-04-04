@@ -882,7 +882,7 @@ def test_workflow_compile_compile_workflow_ir_overrides_mapping_parsing_cover_br
             overrides={"resources": {}, "outputs_defaults": {}, "outputs": []},  # type: ignore[arg-type]
         )
 
-    workflow_ir = workflow_compile_mod.compile_workflow_ir(  # noqa: SLF001
+    compilation = workflow_compile_mod.compile_workflow_ir(  # noqa: SLF001
         wf_obj,
         workflow_yaml_path=str(tmp_path / "wf.yaml"),
         path_aliases=None,
@@ -891,4 +891,5 @@ def test_workflow_compile_compile_workflow_ir_overrides_mapping_parsing_cover_br
         init_vars=None,
         overrides=RunOverrides(),
     )
-    assert workflow_ir.resources == ()
+    assert compilation.workflow_ir.resources == ()
+    assert compilation.demand_configs_by_run_id == {}

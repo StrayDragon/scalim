@@ -1,15 +1,15 @@
 from pathlib import Path
 
-import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
 from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.by_yaml.runtime import effective_outputs as effective_outputs_mod
 from scalim.dsl.by_yaml.schema_dsl.models import (
-    BOOK_KEYS,
-    BOOK_WRITE_DEFAULTS_KEYS,
-    DEMAND_KEYS,
     OUTPUT_TARGET_KEYS,
     OUTPUT_TO_KEYS,
     OUTPUT_WRITE_KEYS,
-    RESOURCES_KEYS,
+    OutputTargetConfig,
+    OutputToConfig,
+    OutputWriteConfig,
 )
 
 
@@ -79,27 +79,34 @@ def test_validator_sources_skip_import_and_cover_key_edge_cases() -> None:
 
 
 def test_output_item_requires_unique_effective_display_names_sheet_mode_reads_include_header() -> None:
-    config = {
-        DEMAND_KEYS["resources"]: {
-            RESOURCES_KEYS["books"]: {
-                "report": {
-                    BOOK_KEYS["write_defaults"]: {
-                        BOOK_WRITE_DEFAULTS_KEYS["mode"]: "sheet",
-                    }
-                }
-            }
-        }
-    }
-    output_item = {
-        OUTPUT_TARGET_KEYS["to"]: {
-            OUTPUT_TO_KEYS["book"]: "report",
-        },
-        OUTPUT_TARGET_KEYS["write"]: {
-            OUTPUT_WRITE_KEYS["header_fields_output_by"]: "name",
-            OUTPUT_WRITE_KEYS["include_header"]: True,
-        },
-    }
-    assert validator_module._output_item_requires_unique_effective_display_names(config, output_item) is True
+    loader = YamlDemandLoader()
+    config = loader.load_string(
+        """
+name: validator_unique_sheet_mode
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id: {extract: order_id}
+sources: {}
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./out.xlsx
+      write_defaults:
+        mode: sheet
+""",
+    )
+    out_cfg = OutputTargetConfig(
+        name="detail",
+        to=OutputToConfig(book="report", sheet="S"),
+        write=OutputWriteConfig(header_fields_output_by="name", include_header=True),
+        fields=("order_id",),
+    )
+    assert (
+        effective_outputs_mod.output_target_requires_unique_effective_field_display_names(config, out_cfg, resources_override=None) is True
+    )
 
 
 def test_validator_strips_removed_output_write_workbook_fields_keeps_remaining_keys() -> None:

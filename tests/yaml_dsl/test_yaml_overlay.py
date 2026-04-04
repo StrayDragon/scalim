@@ -437,12 +437,12 @@ resources:
 """,
     )
 
-    with pytest.raises(ScalimYamlValidationError) as excinfo:
+    with pytest.raises(ValueError, match=r"Duplicate effective field display names detected") as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
-    assert any("Duplicate effective field display names" in env.message for env in excinfo.value.errors)
-    assert any("'ID'" in env.message for env in excinfo.value.errors)
-    assert any("main_source.fields.order_id" in env.message for env in excinfo.value.errors)
-    assert any("main_source.fields.amount" in env.message for env in excinfo.value.errors)
+    msg = str(excinfo.value)
+    assert "'ID'" in msg
+    assert "order_id" in msg
+    assert "amount" in msg
 
 
 def test_validate_unique_field_names_rejects_duplicates_for_books_by_default(tmp_path: Path) -> None:
@@ -473,9 +473,12 @@ outputs:
 """,
     )
 
-    with pytest.raises(ScalimYamlValidationError) as excinfo:
+    with pytest.raises(ValueError, match=r"Duplicate effective field display names detected") as excinfo:
         _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
-    assert any("Duplicate effective field display names" in env.message for env in excinfo.value.errors)
+    msg = str(excinfo.value)
+    assert "'ID'" in msg
+    assert "order_id" in msg
+    assert "amount" in msg
 
 
 def test_validate_unique_field_names_can_be_disabled(tmp_path: Path) -> None:

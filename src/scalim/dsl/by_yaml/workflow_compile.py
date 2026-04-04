@@ -29,8 +29,9 @@ from ...spec.ir._workflow import (
     WorkflowResourcesWaitOptionsIr,
     WriteSheetNodeIr,
 )
-from ...vendor.dataclassesx import replace
+from ...vendor.dataclassesx import dataclass, replace
 from ._internal.config_parsing.loader import YamlDemandLoader
+from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .runtime.contracts import (
     BookResourceOverride,
     FileResourceOverride,
@@ -78,6 +79,13 @@ from .workflow_config._models import (
     WorkflowResourcesWaitDiagnosticsOptions,
     WorkflowResourcesWaitOptions,
 )
+
+
+@dataclass(frozen=True)
+class WorkflowCompileResult:
+    workflow_ir: WorkflowIr
+    demand_configs_by_run_id: Dict[str, DemandConfig]
+
 
 _INTERNAL_NODE_ID_PREFIX = "__wf__"
 
@@ -969,23 +977,20 @@ def _load_demands(
     demand_yaml_paths_by_run_id: Mapping[str, str],
     *,
     template_vars: Optional[Mapping[str, object]],
+    template_sandbox: str,
+    rendered_yaml_max_len: int,
     allowed_yaml_roots: Optional[Tuple[str, ...]],
 ) -> Dict[str, DemandConfig]:
     loader = YamlDemandLoader()
     demand_cfg_by_run_id: Dict[str, DemandConfig] = {}
     for node_id, yaml_path in demand_yaml_paths_by_run_id.items():
         try:
-            # `Workflow IR` 编译阶段只需要需求结构信息, 例如资源 / 输出 / 连线.
-            # `validate_unique_field_names` 属于运行期诊断策略:
-            # - 全局值来自 `run_workflow(..., demand_diagnostics=...)`
-            # - 单节点覆盖来自 `run_patches_by_id[*].demand_diagnostics`
-            # 阶段 1 预加载时, 最终策略还没有完成合并. 如果这里继续保持默认 `True`,
-            # 重复显示名校验会在运行期策略生效前抢跑, 从而把工作流错误地卡死在编译阶段.
             cfg = loader.load(
                 str(yaml_path),
                 template_vars=template_vars,
+                template_sandbox=template_sandbox,
+                rendered_yaml_max_len=rendered_yaml_max_len,
                 allowed_yaml_roots=allowed_yaml_roots,
-                validate_unique_field_names=False,
             )
         except Exception as exc:
             msg = "Failed to load demand YAML for workflow compile: run_id={!r}, demand_path={!r}: {}".format(
@@ -1596,12 +1601,14 @@ def compile_workflow_ir(
     workflow_yaml_path: str,
     path_aliases: Optional[Mapping[str, str]],
     template_vars: Optional[Mapping[str, object]] = None,
+    template_sandbox: str = "safe",
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     init_vars: Optional[Dict[str, object]] = None,
     overrides: Optional[object] = None,
     workflow_resources_wait: Optional[WorkflowResourcesWaitOptions] = None,
     workflow_output_staging: Optional[WorkflowOutputStagingOptions] = None,
-) -> WorkflowIr:
+) -> WorkflowCompileResult:
     """将工作流配置编译为工作流 `IR`.
 
     说明:
@@ -1636,6 +1643,8 @@ def compile_workflow_ir(
     demand_cfg_by_run_id = _load_demands(
         demand_yaml_paths_by_run_id,
         template_vars=template_vars,
+        template_sandbox=template_sandbox,
+        rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
     )
     demand_cfg_by_run_id = _apply_overrides_output_extras(demand_cfg_by_run_id, overrides=overrides_typed)
@@ -1680,27 +1689,28 @@ def compile_workflow_ir(
 
     artifacts = WorkflowArtifactsIr(slots_by_node_id=slots_by_node_id)
     resources_sorted = sorted(resources, key=lambda r: (str(r.resource_type), str(r.resource_id)))
-    return WorkflowIr(
+    workflow_ir = WorkflowIr(
         nodes=tuple(nodes),
         edges=tuple(edges),
         options=workflow_options,
         resources=tuple(resources_sorted),
         artifacts=artifacts,
     )
+    return WorkflowCompileResult(
+        workflow_ir=workflow_ir,
+        demand_configs_by_run_id=demand_cfg_by_run_id,
+    )
 
 
 def derive_cache_pool_consumers(
     workflow_ir: WorkflowIr,
     *,
-    template_vars: Optional[Mapping[str, object]],
-    allowed_yaml_roots: Optional[Tuple[str, ...]],
+    demand_configs_by_run_id: Mapping[str, DemandConfig],
 ) -> Tuple[Dict[str, FrozenSet[Tuple[str, str]]], Dict[Tuple[str, str], FrozenSet[str]]]:
     """基于 `workflow IR` + `demand YAML` 推导缓存消费者集合上界.
 
     `v0`: 仅覆盖 `cache_mode=preload_forever` 的 `sources`,按 `(kind, source_id)` 聚合.
     """
-
-    loader = YamlDemandLoader()
 
     logical_keys_by_node_id: Dict[str, FrozenSet[Tuple[str, str]]] = {}
     consumers_by_logical_key: Dict[Tuple[str, str], Set[str]] = {}
@@ -1708,19 +1718,8 @@ def derive_cache_pool_consumers(
     for node in workflow_ir.nodes:
         node_id = str(node.node_id)
         keys: Set[Tuple[str, str]] = set()
-        demand_path = node.demand_path if isinstance(node, WorkflowNodeIr) else None
-        if demand_path is not None:
-            # `validate_unique_field_names` 属于运行期的 `demand_diagnostics` 策略:
-            # - 全局来自 `run_workflow(..., demand_diagnostics=...)`
-            # - 单节点覆盖来自 `run_patches_by_id[*].demand_diagnostics`
-            # `derive_cache_pool_consumers()` 运行在 `workflow` 的编译/预加载阶段,这里只需要源/缓存的结构信息,
-            # 必须避免该校验在此阶段被默认启用而“抢跑”导致 `fail-fast`。
-            config = loader.load(
-                str(demand_path),
-                template_vars=template_vars,
-                allowed_yaml_roots=allowed_yaml_roots,
-                validate_unique_field_names=False,
-            )
+        config = demand_configs_by_run_id.get(node_id) if isinstance(node, WorkflowNodeIr) else None
+        if config is not None:
             for source_id, source in config.sources.items():
                 if str(source.cache_mode or "") != "preload_forever":
                     continue

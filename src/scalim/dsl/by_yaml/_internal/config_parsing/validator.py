@@ -8,24 +8,18 @@ from .....vendor.compact.importlibx import import_module
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import asdict, dataclass
 from .....vendor.dataclassesx import field as dataclass_field
-from ...diagnostics import format_duplicate_effective_field_display_names_message
 from ...init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
-from ...schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER, DEMAND_FIELDS_KEY, FIELD_KIND_DERIVED
 from ...schema_dsl.models import (
     BOOK_KEYS,
-    BOOK_WRITE_DEFAULTS_KEYS,
     DEMAND_KEYS,
     OUTPUT_TARGET_KEYS,
-    OUTPUT_TO_KEYS,
-    OUTPUT_WRITE_KEYS,
     RESOURCES_KEYS,
 )
-from ...schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
 from .error_envelope import ScalimYamlValidationError
 from .errors import ScalimConfigValidationError
 from .imports import contains_import_syntax
 from .jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
-from .models import FieldDef, FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
+from .models import FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
 from .validators.fields import ValidatorFieldsMixin
@@ -58,111 +52,6 @@ HAS_JSONSCHEMA: bool = _has_jsonschema
 _VALIDATOR_LOGGER = get_logger("schema")
 
 __all__ = ()
-
-
-def _field_def_path(field_def: FieldDef, *, main_source_id: str) -> str:
-    if str(field_def.kind) == FIELD_KIND_DERIVED:
-        return "{}.{}".format(DEMAND_FIELDS_KEY, field_def.field_id)
-    if field_def.source_id and str(field_def.source_id) != str(main_source_id):
-        return "sources.{}.fields.{}".format(field_def.source_id, field_def.field_id)
-    return "main_source.fields.{}".format(field_def.field_id)
-
-
-def _normalized_opt_str(value: object) -> str:
-    return str(value).strip() if isinstance(value, str) else ""
-
-
-def _raw_output_book_write_value(config: Dict[str, Any], *, book_id: str, key: str, default: str) -> str:
-    resources_raw = config.get(DEMAND_KEYS["resources"])
-    if not isinstance(resources_raw, dict):
-        return default
-    books_raw = cast("Any", resources_raw).get(RESOURCES_KEYS["books"])
-    if not isinstance(books_raw, dict):
-        return default
-    book_raw = cast("Any", books_raw).get(book_id)
-    if not isinstance(book_raw, dict):
-        return default
-    write_defaults_raw = cast("Any", book_raw).get(BOOK_KEYS["write_defaults"])
-    if not isinstance(write_defaults_raw, dict):
-        return default
-    value = _normalized_opt_str(cast("Any", write_defaults_raw).get(key))
-    return value or default
-
-
-def _output_item_requires_unique_effective_display_names(  # noqa: C901, PLR0911
-    config: Dict[str, Any], output_item: object
-) -> bool:
-    if not isinstance(output_item, dict):
-        return False
-    out_dict = cast("Dict[str, Any]", output_item)  # pragma: allow-cast yaml mapping typed narrowing
-    to_raw = out_dict.get(OUTPUT_TARGET_KEYS["to"])
-    if not isinstance(to_raw, dict):
-        return False
-    to_dict = cast("Dict[str, Any]", to_raw)  # pragma: allow-cast yaml mapping typed narrowing
-
-    file_id = _normalized_opt_str(to_dict.get(OUTPUT_TO_KEYS["file"]))
-    book_id = _normalized_opt_str(to_dict.get(OUTPUT_TO_KEYS["book"]))
-    if bool(file_id) == bool(book_id):
-        return False
-
-    write_raw = out_dict.get(OUTPUT_TARGET_KEYS["write"])
-    write_dict = cast("Optional[Dict[str, Any]]", write_raw if isinstance(write_raw, dict) else None)
-
-    header_by = str(DEFAULT_OUTPUT_HEADER_BY).strip().lower()
-    if write_dict is not None:
-        header_by_raw = write_dict.get(OUTPUT_WRITE_KEYS["header_fields_output_by"])
-        if isinstance(header_by_raw, str) and header_by_raw.strip():
-            header_by = header_by_raw.strip().lower()
-    if header_by != "name":
-        return False
-
-    if file_id:
-        include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
-        if write_dict is not None:
-            include_header_raw = write_dict.get(OUTPUT_WRITE_KEYS["include_header"])
-            if isinstance(include_header_raw, bool):
-                include_header = bool(include_header_raw)
-        return bool(include_header)
-
-    effective_mode = _raw_output_book_write_value(
-        config,
-        book_id=book_id,
-        key=BOOK_WRITE_DEFAULTS_KEYS["mode"],
-        default=DEFAULT_BOOK_WRITE_MODE,
-    )
-    effective_mode = effective_mode.strip().lower()
-
-    if effective_mode == "append":
-        header_policy = _raw_output_book_write_value(
-            config,
-            book_id=book_id,
-            key=BOOK_WRITE_DEFAULTS_KEYS["header_policy"],
-            default=DEFAULT_BOOK_WRITE_HEADER_POLICY,
-        )
-        return header_policy.strip().lower() != "never"
-
-    include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
-    if isinstance(write_raw, dict):
-        include_header_raw = cast("Dict[str, Any]", write_raw).get(OUTPUT_WRITE_KEYS["include_header"])
-        if isinstance(include_header_raw, bool):
-            include_header = bool(include_header_raw)
-    return bool(include_header)
-
-
-def _outputs_require_unique_effective_display_names(config: Dict[str, Any], outputs: List[object]) -> bool:
-    return any(_output_item_requires_unique_effective_display_names(config, item) for item in outputs)
-
-
-def _collect_duplicate_effective_display_names(field_def_index: FieldDefIndex, *, main_source_id: str) -> Dict[str, List[str]]:
-    by_effective: Dict[str, List[str]] = {}
-
-    for fd in field_def_index.field_defs:
-        name_raw = fd.data.get("name")
-        name = name_raw.strip() if isinstance(name_raw, str) else ""
-        effective = name or str(fd.field_id)
-        by_effective.setdefault(effective, []).append(_field_def_path(fd, main_source_id=main_source_id))
-
-    return {name: paths for name, paths in by_effective.items() if len(paths) > 1}
 
 
 def _is_list(value: object) -> TypeGuard[List[object]]:
@@ -498,7 +387,6 @@ class ConfigValidator(ValidatorFieldsMixin):
         *,
         strict_unknown_fields: bool = False,
         enable_jsonschema_validation: bool = False,
-        validate_unique_field_names: bool = True,
     ) -> ValidationReport:
         errors: List[ValidationIssue] = []
         config = self._warn_and_strip_legacy_observability(config, errors)
@@ -519,44 +407,12 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._validate_outputs_detail_requires_fields_or_from(raw.data, errors)
         self._validate_removed_output_container(raw.data, errors)
         self._validate_resource_output_paths(raw.data, errors)
-        self._validate_unique_effective_field_display_names(
-            raw,
-            errors,
-            main_source_id=main_source_id,
-            validate_unique_field_names=bool(validate_unique_field_names),
-        )
 
         if enable_jsonschema_validation:
             self._validate_with_jsonschema(raw.data, errors, filter_additional_properties=strict_unknown_fields)
         self._validate_unknown_fields(raw.data, errors, strict=strict_unknown_fields)
 
         return ValidationReport(issues=errors)
-
-    def _validate_unique_effective_field_display_names(
-        self,
-        raw: RawDemand,
-        errors: List[ValidationIssue],
-        *,
-        main_source_id: str,
-        validate_unique_field_names: bool,
-    ) -> None:
-        if not bool(validate_unique_field_names):
-            return
-
-        outputs_raw: object = raw.data.get(DEMAND_KEYS["outputs"])
-        if not _is_list(outputs_raw):
-            return
-        outputs = outputs_raw
-        if not _outputs_require_unique_effective_display_names(raw.data, outputs):
-            return
-
-        field_def_index = collect_field_defs(raw, main_source_id=main_source_id)
-        duplicates = _collect_duplicate_effective_display_names(field_def_index, main_source_id=main_source_id)
-        if not duplicates:
-            return
-
-        msg = format_duplicate_effective_field_display_names_message(duplicates)
-        self._add_error(errors, msg, path=DEMAND_KEYS["outputs"])
 
     def _validate_outputs_detail_requires_fields_or_from(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
         outputs_raw: object = config.get(DEMAND_KEYS["outputs"])

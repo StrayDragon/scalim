@@ -21,11 +21,7 @@ from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML
 from ..diagnostics import format_duplicate_effective_field_display_names_message
 from ..init_var_nodes import parse_init_var_mapping_node
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
-from ..schema_dsl.constants import (
-    DEFAULT_OUTPUT_ENCODING,
-    DEFAULT_OUTPUT_HEADER_BY,
-    DEFAULT_OUTPUT_INCLUDE_HEADER,
-)
+from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
@@ -73,6 +69,7 @@ from .contracts import (
     UnsetType,
 )
 from .conversion import ConfigToIRConverter
+from .effective_outputs import outputs_require_unique_effective_field_display_names
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimResolverError
 from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
@@ -382,54 +379,10 @@ def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915
     return tuple(parsed)
 
 
-def _output_requires_unique_effective_field_display_names(  # noqa: C901
-    config: DemandConfig, output: OutputTargetConfig
-) -> bool:
-    to_cfg = output.to
-    if to_cfg is None:
-        return False
-
-    write_cfg = output.write
-    header_by = str(DEFAULT_OUTPUT_HEADER_BY)
-    if write_cfg is not None and write_cfg.header_fields_output_by is not None:
-        header_by = str(write_cfg.header_fields_output_by)
-    if header_by != "name":
-        return False
-
-    file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
-    if file_id:
-        include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
-        if write_cfg is not None and write_cfg.include_header is not None:
-            include_header = bool(write_cfg.include_header)
-        return bool(include_header)
-
-    book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
-    if not book_id:
-        return False
-
-    book = None
-    if config.resources is not None:
-        book = config.resources.books.get(book_id)
-
-    mode = DEFAULT_BOOK_WRITE_MODE
-    header_policy = DEFAULT_BOOK_WRITE_HEADER_POLICY
-    if book is not None and book.write_defaults is not None:
-        mode = str(book.write_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
-        header_policy = str(book.write_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY)
-
-    if mode == "append":
-        return header_policy != "never"
-
-    include_header = DEFAULT_OUTPUT_INCLUDE_HEADER
-    if write_cfg is not None and write_cfg.include_header is not None:
-        include_header = bool(write_cfg.include_header)
-    return bool(include_header)
-
-
 def _should_validate_unique_effective_field_display_names(config: DemandConfig, outputs: Tuple[OutputTargetConfig, ...]) -> bool:
     if not bool(config.validate_unique_field_names):
         return False
-    return any(_output_requires_unique_effective_field_display_names(config, t) for t in outputs)
+    return outputs_require_unique_effective_field_display_names(config, outputs=outputs, resources_override=None)
 
 
 def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
@@ -537,7 +490,6 @@ def load_config(
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Sequence[str]] = None,
-    validate_unique_field_names: bool = True,
 ) -> DemandConfig:
     loader = YamlDemandLoader()
     return loader.load(
@@ -546,7 +498,6 @@ def load_config(
         template_sandbox=template_sandbox,
         rendered_yaml_max_len=rendered_yaml_max_len,
         allowed_yaml_roots=allowed_yaml_roots,
-        validate_unique_field_names=bool(validate_unique_field_names),
     )
 
 
@@ -1135,30 +1086,12 @@ def compile(  # noqa: A001
     options: RunOptions,
 ) -> Compilation:
     validate_allowlist(allowed_modules=options.allowed_modules, allowed_functions=options.allowed_functions)
-    validate_unique_field_names = True
-    if options.demand_diagnostics is not None:
-        validate_unique_field_names = bool(options.demand_diagnostics.validate_unique_field_names)
-
-    # 说明:
-    # - YAML 层校验只能看到原始 YAML 的 `outputs/resources`.
-    # - 当运行期 `overrides` 替换 `outputs` 或覆盖输入输出资源 `resources` 时,有效的 `outputs/resources` 语义可能不同,
-    #   此时在 YAML 层做该预检查会出现误报/漏报.
-    # - 主线(无 `overrides`)保留 YAML 层错误;覆盖流程依赖运行期编译器按有效 `outputs` 口径做校验.
-    validate_unique_field_names_yaml_precheck = validate_unique_field_names
-    overrides = options.overrides
-    if (
-        validate_unique_field_names_yaml_precheck
-        and overrides is not None
-        and (overrides.outputs is not None or overrides.outputs_defaults is not None or overrides.resources is not None)
-    ):
-        validate_unique_field_names_yaml_precheck = False
     config = load_config(
         yaml_path,
         template_vars=options.template_vars,
         template_sandbox=options.template_sandbox,
         rendered_yaml_max_len=options.rendered_yaml_max_len,
         allowed_yaml_roots=options.allowed_yaml_roots,
-        validate_unique_field_names=validate_unique_field_names_yaml_precheck,
     )
     config = _apply_demand_runtime_policy_overrides(config, options=options)
     base_module_path = None

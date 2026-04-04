@@ -346,6 +346,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-observability-bridge/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
 
+### `workflow-preflight-runtime-only-diagnostics`
+- Title: workflow-preflight-runtime-only-diagnostics Specification
+- Source: [spec.md](#code=openspec/specs/workflow-preflight-runtime-only-diagnostics/spec.md)
+- Summary: **状态: ✅ 已实现** 为 `run_workflow(...)` 增加一个 engine 执行前的 preflight 阶段,用于运行一组“runtime-only 但可推理”的诊断（v1 仅覆盖 `validate_unique_field_names`）,并以 fail-fast 的方式把错误提前暴露为 workflow compile/config error。
+
 ### `workflow-replay-bundle`
 - Title: workflow-replay-bundle Specification
 - Source: [spec.md](#code=openspec/specs/workflow-replay-bundle/spec.md)
@@ -534,12 +539,17 @@ Sources:
 ### `yaml-dsl-vscode-extension`
 - Title: yaml-dsl-vscode-extension Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-vscode-extension/spec.md)
-- Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
+- Summary: 为 VSCode 用户提供 YAML DSL 的默认入口：在扩展侧负责 LSP server provisioning / lifecycle / 诊断输出， 并与 `redhat.vscode-yaml` 协作完成 schema 绑定，从而实现“开箱即用 + 可排障”的编辑体验。 本仓库的扩展源代码固定在 `extras/vscode-scalim/`（不迁移到 `packages/`/`frontend/`；发布/签名策略不影响源码目录位置）。
 
 ### `yaml-dsl-workflow`
 - Title: yaml-dsl-workflow Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow/spec.md)
 - Summary: **状态: ✅ 已实现** 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).
+
+### `yaml-dsl-workflow-lifecycle-pipeline`
+- Title: yaml-dsl-workflow-lifecycle-pipeline Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow-lifecycle-pipeline/spec.md)
+- Summary: TBD - created by archiving change c0-yaml-dsl-workflow-lifecycle-pipeline. Update Purpose after archive.
 
 ### `yaml-dsl-workflow-validate`
 - Title: yaml-dsl-workflow-validate Specification

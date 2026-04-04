@@ -4042,6 +4042,57 @@ def test_workflow_excel_output_collision_precheck_reports_demand_yaml_load_failu
         _ = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
 
 
+def test_compile_workflow_ir_enforces_rendered_yaml_max_len_during_structural_preload(tmp_path: Path) -> None:
+    _ = _write_text(
+        tmp_path / "demand.yaml",
+        (
+            """
+name: "{{ big }}"
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id: {extract: id}
+
+sources: {}
+"""
+        ).lstrip(),
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "demand.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+    cfg = load_workflow_config(str(wf))
+
+    with pytest.raises(ScalimWorkflowConfigError, match="渲染后的 YAML 文本超出上限"):
+        _ = workflow_compile_mod.compile_workflow_ir(
+            cfg,
+            workflow_yaml_path=str(wf),
+            path_aliases=None,
+            template_vars={"big": "x" * 300},
+            rendered_yaml_max_len=200,
+        )
+
+
+def test_workflow_structural_preload_does_not_import_runtime_compiler() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    workflow_compile_text = (repo_root / "src/scalim/dsl/by_yaml/workflow_compile.py").read_text(encoding="utf-8")
+    loader_text = (repo_root / "src/scalim/dsl/by_yaml/_internal/config_parsing/loader.py").read_text(encoding="utf-8")
+
+    for needle in (
+        "from scalim.dsl.by_yaml.runtime import compiler",
+        "from .runtime import compiler",
+        "from ..runtime import compiler",
+        "import scalim.dsl.by_yaml.runtime.compiler",
+        "import scalim.dsl.by_yaml.runtime.compiler as",
+    ):
+        assert needle not in workflow_compile_text
+        assert needle not in loader_text
+
+
 def test_compile_workflow_ir_skips_runtime_duplicate_name_validation(tmp_path: Path) -> None:
     _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=tmp_path / "detail.csv")
     wf = _write_workflow_yaml(
@@ -4052,7 +4103,8 @@ def test_compile_workflow_ir_skips_runtime_duplicate_name_validation(tmp_path: P
     )
 
     cfg = load_workflow_config(str(wf))
-    workflow_ir = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+    compilation = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+    workflow_ir = compilation.workflow_ir
 
     assert any(node.node_id == "dup" for node in workflow_ir.nodes)
 
@@ -4075,11 +4127,11 @@ def test_derive_cache_pool_consumers_skips_runtime_duplicate_name_validation(tmp
     )
 
     cfg = load_workflow_config(str(wf))
-    workflow_ir = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+    compilation = workflow_compile_mod.compile_workflow_ir(cfg, workflow_yaml_path=str(wf), path_aliases=None)
+    workflow_ir = compilation.workflow_ir
     logical_keys_by_node_id, consumers_by_logical_key = workflow_compile_mod.derive_cache_pool_consumers(
         workflow_ir,
-        template_vars=None,
-        allowed_yaml_roots=None,
+        demand_configs_by_run_id=compilation.demand_configs_by_run_id,
     )
 
     assert logical_keys_by_node_id["dup"] == frozenset()
@@ -4333,6 +4385,197 @@ def test_run_workflow_preflight_duplicate_names_fail_before_engine(tmp_path: Pat
     assert not output_path.exists()
 
 
+def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_and_returns_effective_options(tmp_path: Path) -> None:
+    a_out = tmp_path / "a_detail.csv"
+    b_out = tmp_path / "b_detail.csv"
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=a_out,
+        field_ids=["id", "value"],
+    )
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=b_out,
+        field_ids=["id", "value"],
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+
+    base_options = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES, batch_size=1000)
+    lifecycle = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(
+        str(wf),
+        base_options=base_options,
+        path_aliases=None,
+        run_patches_by_id={"b": WorkflowRunPatch(batch_size=123)},
+        workflow_resources_wait=None,
+        workflow_output_staging=None,
+    )
+
+    assert set(lifecycle.preload.demand_configs_by_run_id) == {"a", "b"}
+    assert lifecycle.effective.options_by_run_id["a"].batch_size == 1000
+    assert lifecycle.effective.options_by_run_id["b"].batch_size == 123
+
+    assert not a_out.exists()
+    assert not b_out.exists()
+
+
+def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=tmp_path / "a_detail.csv",
+        field_ids=["id", "value"],
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+
+    original_compile = workflow_entrypoints_mod.compile_workflow_ir
+
+    def _compile_drop_preload_results(*args: Any, **kwargs: Any) -> workflow_compile_mod.WorkflowCompileResult:
+        compilation = original_compile(*args, **kwargs)
+        return workflow_compile_mod.WorkflowCompileResult(workflow_ir=compilation.workflow_ir, demand_configs_by_run_id={})
+
+    monkeypatch.setattr(workflow_entrypoints_mod, "compile_workflow_ir", _compile_drop_preload_results)
+
+    base_options = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES)
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Missing workflow structural preload result for run_id"):
+        _ = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(
+            str(wf),
+            base_options=base_options,
+            path_aliases=None,
+            run_patches_by_id=None,
+            workflow_resources_wait=None,
+            workflow_output_staging=None,
+        )
+
+
+def test_run_workflow_runtime_compile_rejects_unknown_run_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=tmp_path / "a_detail.csv",
+        field_ids=["id", "value"],
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+
+    original = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight
+
+    def _lifecycle_missing_options(*args: Any, **kwargs: Any) -> workflow_entrypoints_mod.WorkflowLifecyclePreflightResult:
+        lifecycle = original(*args, **kwargs)
+        bad_options = dict(lifecycle.effective.options_by_run_id)
+        _ = bad_options.pop("a")
+        bad_effective = workflow_entrypoints_mod.WorkflowLifecycleEffectiveMergeResult(
+            workflow_yaml_path=lifecycle.effective.workflow_yaml_path,
+            workflow_ir=lifecycle.effective.workflow_ir,
+            runs=lifecycle.effective.runs,
+            options_by_run_id=bad_options,
+            run_patches_by_id=lifecycle.effective.run_patches_by_id,
+            bundle_viz_base_config=lifecycle.effective.bundle_viz_base_config,
+        )
+        return workflow_entrypoints_mod.WorkflowLifecyclePreflightResult(
+            parse=lifecycle.parse,
+            preload=lifecycle.preload,
+            effective=bad_effective,
+        )
+
+    monkeypatch.setattr(workflow_entrypoints_mod, "run_workflow_lifecycle_until_preflight", _lifecycle_missing_options)
+
+    def _run_ir_fn(*args: Any, **kwargs: Any) -> object:
+        _ = args, kwargs
+        raise AssertionError("engine should not be called when runtime compile fails")
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Unknown workflow run id in runtime compile: 'a'"):
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            run_ir_fn=_run_ir_fn,
+        )
+
+
+def test_run_workflow_bundle_viz_requires_overrides_in_runtime_compile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_path=tmp_path / "a_detail.csv",
+        field_ids=["id", "value"],
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+    from scalim.ob.presets.viz import VizObserverConfig
+
+    original = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight
+
+    def _lifecycle_drop_overrides(*args: Any, **kwargs: Any) -> workflow_entrypoints_mod.WorkflowLifecyclePreflightResult:
+        lifecycle = original(*args, **kwargs)
+        bad_options = dict(lifecycle.effective.options_by_run_id)
+        bad_options["a"] = workflow_entrypoints_mod.replace(bad_options["a"], overrides=None)
+        bad_effective = workflow_entrypoints_mod.WorkflowLifecycleEffectiveMergeResult(
+            workflow_yaml_path=lifecycle.effective.workflow_yaml_path,
+            workflow_ir=lifecycle.effective.workflow_ir,
+            runs=lifecycle.effective.runs,
+            options_by_run_id=bad_options,
+            run_patches_by_id=lifecycle.effective.run_patches_by_id,
+            bundle_viz_base_config=lifecycle.effective.bundle_viz_base_config,
+        )
+        return workflow_entrypoints_mod.WorkflowLifecyclePreflightResult(
+            parse=lifecycle.parse,
+            preload=lifecycle.preload,
+            effective=bad_effective,
+        )
+
+    monkeypatch.setattr(workflow_entrypoints_mod, "run_workflow_lifecycle_until_preflight", _lifecycle_drop_overrides)
+
+    overrides = RunOverrides(viz_config=VizObserverConfig(output_dir=str(tmp_path / "viz")))
+    with pytest.raises(ScalimWorkflowConfigError, match=r"workflow bundle viz requires"):
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=overrides,
+        )
+
+
 def test_run_workflow_preflight_uses_effective_overrides_outputs_header_policy(tmp_path: Path) -> None:
     output_path = tmp_path / "detail.csv"
     _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
@@ -4363,6 +4606,73 @@ def test_run_workflow_preflight_uses_effective_overrides_outputs_header_policy(t
     )
     assert not result.errors()
     assert output_path.exists()
+
+
+def test_run_workflow_preflight_outputs_override_can_enable_duplicate_name_trigger(tmp_path: Path) -> None:
+    output_path = tmp_path / "detail.csv"
+    _ = _write_text(
+        tmp_path / "dup.yaml",
+        (
+            """
+name: duplicate_headers
+
+main_source:
+  source_id: main
+  loader: "tests.fixtures.workflow_loaders:load_table_a_fast"
+  fields:
+    id:
+      extract: id
+      name: Dup
+    value:
+      extract: value
+      name: Dup
+
+sources: {{}}
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: "{output_path}"
+
+outputs:
+  - name: detail
+    to:
+      file: detail_csv
+    fields: [id, value]
+    write:
+      header_fields_output_by: field_id
+"""
+        )
+        .format(output_path=str(output_path))
+        .lstrip(),
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "dup", "demand": "dup.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    overrides = RunOverrides(
+        outputs=(
+            OutputOverride(
+                name="detail",
+                fields=("id", "value"),
+                to=OutputToOverride(file="detail_csv"),
+                write=OutputWriteOverride(header_fields_output_by="name"),
+            ),
+        )
+    )
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='dup'"):
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=overrides,
+        )
+
+    assert not output_path.exists()
 
 
 def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_error_message(tmp_path: Path) -> None:

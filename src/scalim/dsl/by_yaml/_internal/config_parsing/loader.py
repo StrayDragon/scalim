@@ -74,7 +74,6 @@ class YamlDemandLoader(
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
         allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
-        validate_unique_field_names: bool = True,
         scalim_yaml_override: Optional[Union[str, Path]] = None,
         project_root_override: Optional[Union[str, Path]] = None,
     ) -> DemandConfig:
@@ -162,7 +161,6 @@ class YamlDemandLoader(
                 raw_demand.data,
                 strict_unknown_fields=True,
                 enable_jsonschema_validation=True,
-                validate_unique_field_names=bool(validate_unique_field_names),
             )
             errors = [
                 envelope_from_validation_issue(
@@ -205,7 +203,6 @@ class YamlDemandLoader(
         template_vars: Optional[Mapping[str, object]] = None,
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-        validate_unique_field_names: bool = True,
     ) -> DemandConfig:
         text = maybe_precompile_yaml_text(
             yaml_string,
@@ -244,7 +241,6 @@ class YamlDemandLoader(
                 raw_demand.data,
                 strict_unknown_fields=True,
                 enable_jsonschema_validation=True,
-                validate_unique_field_names=bool(validate_unique_field_names),
             )
             errors = [
                 envelope_from_validation_issue(
