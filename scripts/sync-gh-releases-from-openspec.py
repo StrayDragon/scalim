@@ -926,10 +926,7 @@ def _render_notes(
         ]
 
     if not breaking_uniq:
-        if new_changes:
-            breaking_uniq = ["无（本版本 archived 提案未声明不兼容/迁移点）。"]
-        else:
-            breaking_uniq = ["无（该 tag 未包含 archived OpenSpec 提案，无法从提案文本抽取迁移点）。"]
+        breaking_uniq = ["无（没有需要改 YAML 的点）。"]
 
     # 优先展示“你要改成什么”的迁移指令，其次再是“不要再用”的移除提示。
     if len(breaking_uniq) > 1:
