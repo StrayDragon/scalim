@@ -1138,13 +1138,27 @@ def compile(  # noqa: A001
     validate_unique_field_names = True
     if options.demand_diagnostics is not None:
         validate_unique_field_names = bool(options.demand_diagnostics.validate_unique_field_names)
+
+    # 说明:
+    # - YAML 层校验只能看到原始 YAML 的 `outputs/resources`.
+    # - 当运行期 `overrides` 替换 `outputs` 或覆盖输入输出资源 `resources` 时,有效的 `outputs/resources` 语义可能不同,
+    #   此时在 YAML 层做该预检查会出现误报/漏报.
+    # - 主线(无 `overrides`)保留 YAML 层错误;覆盖流程依赖运行期编译器按有效 `outputs` 口径做校验.
+    validate_unique_field_names_yaml_precheck = validate_unique_field_names
+    overrides = options.overrides
+    if (
+        validate_unique_field_names_yaml_precheck
+        and overrides is not None
+        and (overrides.outputs is not None or overrides.outputs_defaults is not None or overrides.resources is not None)
+    ):
+        validate_unique_field_names_yaml_precheck = False
     config = load_config(
         yaml_path,
         template_vars=options.template_vars,
         template_sandbox=options.template_sandbox,
         rendered_yaml_max_len=options.rendered_yaml_max_len,
         allowed_yaml_roots=options.allowed_yaml_roots,
-        validate_unique_field_names=validate_unique_field_names,
+        validate_unique_field_names=validate_unique_field_names_yaml_precheck,
     )
     config = _apply_demand_runtime_policy_overrides(config, options=options)
     base_module_path = None

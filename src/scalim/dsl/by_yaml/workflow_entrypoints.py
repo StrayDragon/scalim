@@ -9,6 +9,7 @@
 from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 from ...execution.run_ir import ExecutionResult
+from ...spec.ir._workflow import WorkflowIr, WorkflowNodeIr
 from ...typedefs import KeyNormalizationMode, ParallelMode
 from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import replace
@@ -37,6 +38,7 @@ from .schema_dsl.models import BookConfig, DemandConfig, FileConfig, ResourcesCo
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
 from .workflow_load import load_workflow_config_from_path
+from .workflow_preflight import WORKFLOW_PREFLIGHT_CHECKS, WorkflowPreflightContext, WorkflowPreflightRun, run_workflow_preflight
 from .workflow_types import ComponentsExtend, ComponentsInherit, ComponentsReplace, WorkflowRunPatch
 
 _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = "workflow bundle viz requires run_workflow(..., overrides=RunOverrides(viz_config=...))"
@@ -430,6 +432,53 @@ def _build_demand_run_result_impl(
     return RunResult(core, config=compilation.config, yaml_path=str(demand_yaml_path), sink=None)
 
 
+def _run_workflow_preflight_or_raise(
+    workflow_path: str,
+    workflow_ir: WorkflowIr,
+    *,
+    base_options: RunOptions,
+    workflow_resources_override: Optional[ResourcesOverride],
+    run_patches_by_id: Optional[Mapping[str, WorkflowRunPatch]],
+) -> None:
+    preflight_runs: List[WorkflowPreflightRun] = []
+    for node in workflow_ir.nodes:
+        if not isinstance(node, WorkflowNodeIr):
+            continue
+
+        node_options = base_options
+        if node.init_vars:
+            merged = dict(base_options.init_vars or {})
+            merged.update(dict(node.init_vars))
+            node_options = replace(node_options, init_vars=merged)
+
+        if run_patches_by_id is not None:
+            patch = run_patches_by_id.get(str(node.node_id))
+            if patch is not None:
+                node_options = _apply_workflow_run_patch(node_options, patch)
+
+        merged_overrides = _merge_node_overrides(
+            node_options.overrides,
+            workflow_resources_override=workflow_resources_override,
+        )
+        if merged_overrides is not node_options.overrides:
+            node_options = replace(node_options, overrides=merged_overrides)
+
+        preflight_runs.append(
+            WorkflowPreflightRun(
+                run_id=str(node.node_id),
+                demand_path=str(node.demand_path),
+                decl_order=int(node.decl_order),
+                options=node_options,
+            )
+        )
+
+    run_workflow_preflight(
+        WorkflowPreflightContext(workflow_yaml_path=str(workflow_path)),
+        runs=preflight_runs,
+        checks=WORKFLOW_PREFLIGHT_CHECKS,
+    )
+
+
 def run_workflow(  # noqa: PLR0913
     workflow_yaml_path: str,
     *,
@@ -514,6 +563,15 @@ def run_workflow(  # noqa: PLR0913
     workflow_resources_override = _workflow_resources_override(wf)
     run_ids = frozenset(run.id for run in wf.runs)
     run_patches_by_id = _validate_run_patches_by_id(run_patches_by_id, known_run_ids=run_ids)
+
+    # 4.5) `workflow` 预检查(`preflight`):运行期但可推理的诊断;快速失败
+    _run_workflow_preflight_or_raise(
+        str(workflow_path),
+        workflow_ir,
+        base_options=base_options,
+        workflow_resources_override=workflow_resources_override,
+        run_patches_by_id=run_patches_by_id,
+    )
 
     if compile_demand_yaml_fn is None:
         compile_demand_yaml_fn = _compile_demand_default

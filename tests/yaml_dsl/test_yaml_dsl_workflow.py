@@ -7,6 +7,7 @@ import pytest
 
 from scalim.dsl.by_yaml import DemandDiagnosticsOverride
 from scalim.dsl.by_yaml import DemandDiagnosticsPolicy
+from scalim.dsl.by_yaml import OutputOverride, OutputToOverride, OutputWriteOverride
 from scalim.dsl.by_yaml import RunOverrides
 from scalim.dsl.by_yaml import FileResourceOverride
 from scalim.dsl.by_yaml import OutputExtrasOverride
@@ -4157,25 +4158,14 @@ outputs:
         failure_policy="primary_only",
     )
 
-    result = run_workflow(
-        str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
-    )
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='b'"):
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
+        )
 
-    a_outcome = next(o for o in result.outcomes if o.run_id == "a")
-    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
-
-    assert a_outcome.error is None
-    assert a_outcome.result is not None
-    a_result = a_outcome.result
-    assert isinstance(a_result, RunResult)
-    assert a_result.config.validate_unique_field_names is False
-    assert a_out.exists()
-
-    assert b_outcome.result is None
-    assert b_outcome.error is not None
-    assert b_outcome.error.exc_type in {"ScalimYamlValidationError", "ValueError", "ScalimWorkflowRunFailedError", "RuntimeError"}
+    assert not a_out.exists()
     assert not b_out.exists()
 
 
@@ -4307,27 +4297,72 @@ outputs:
         failure_policy="primary_only",
     )
 
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='b'"):
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+            run_patches_by_id={"b": WorkflowRunPatch(demand_diagnostics=None)},
+        )
+
+    assert not a_out.exists()
+    assert not b_out.exists()
+
+
+def test_run_workflow_preflight_duplicate_names_fail_before_engine(tmp_path: Path) -> None:
+    output_path = tmp_path / "detail.csv"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "dup", "demand": "dup.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    def _run_ir_fn(*args: Any, **kwargs: Any) -> object:
+        _ = args, kwargs
+        raise AssertionError("engine should not be called when preflight fails")
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='dup'"):
+        _ = run_workflow(
+            str(wf),
+            allowed_modules=_ALLOWED_MODULES,
+            run_ir_fn=_run_ir_fn,
+        )
+
+    assert not output_path.exists()
+
+
+def test_run_workflow_preflight_uses_effective_overrides_outputs_header_policy(tmp_path: Path) -> None:
+    output_path = tmp_path / "detail.csv"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "dup", "demand": "dup.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    # overrides.outputs replaces YAML outputs; force header_fields_output_by=field_id so duplicate display-name
+    # diagnostics MUST NOT be triggered (effective outputs semantics).
+    overrides = RunOverrides(
+        outputs=(
+            OutputOverride(
+                name="detail",
+                fields=("id", "value"),
+                to=OutputToOverride(file="detail_csv"),
+                write=OutputWriteOverride(header_fields_output_by="field_id"),
+            ),
+        )
+    )
+
     result = run_workflow(
         str(wf),
         allowed_modules=_ALLOWED_MODULES,
-        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
-        run_patches_by_id={"b": WorkflowRunPatch(demand_diagnostics=None)},
+        overrides=overrides,
     )
-
-    a_outcome = next(o for o in result.outcomes if o.run_id == "a")
-    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
-
-    assert a_outcome.error is None
-    assert a_outcome.result is not None
-    assert a_out.exists()
-    a_result = a_outcome.result
-    assert isinstance(a_result, RunResult)
-    assert a_result.config.validate_unique_field_names is False
-
-    assert b_outcome.result is None
-    assert b_outcome.error is not None
-    assert b_outcome.error.exc_type in {"ScalimYamlValidationError", "ValueError", "ScalimWorkflowRunFailedError", "RuntimeError"}
-    assert not b_out.exists()
+    assert not result.errors()
+    assert output_path.exists()
 
 
 def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_error_message(tmp_path: Path) -> None:
