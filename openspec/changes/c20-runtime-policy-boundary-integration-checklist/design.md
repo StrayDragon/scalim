@@ -12,6 +12,15 @@
 
 本 change 目标不是立即实现新的测试，而是先把 review 文档和验收口径整理清楚，避免后续补测试时又落回“想到一个补一个”的局部修修补补。
 
+## 当前落地状态(截至 2026-04-04)
+
+- 已抽取并实现一个独立变更：`c21-workflow-preflight-runtime-only-diagnostics`（已归档）。
+- 已在 `run_workflow(...)` 中落地一个 policy-aware `preflight` 阶段，并以 `fail-fast + 直接 raise` 的语义处理预检查失败（独立于 `failure_policy`）。
+- 已把关键边界语义同步到主规范：
+  - `openspec/specs/yaml-dsl-workflow/spec.md`（workflow 生命周期 + preflight 失败语义）
+  - `openspec/specs/yaml-dsl-runtime-policy-boundary/spec.md`（runtime policy boundary + “不得在 preload 阶段抢跑”）
+  - `openspec/specs/workflow-preflight-runtime-only-diagnostics/spec.md`（preflight 能力本身）
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -21,7 +30,7 @@
 - 输出可 review 的后续任务拆解，供之后逐步实施。
 
 **Non-Goals:**
-- 本 change 不直接新增任何测试、gate 或 CI 实现。
+- 本 change 自身不直接新增任何测试、gate 或 CI 实现；需要落地时应拆分为独立 change（例如已完成的 `c21`）。
 - 不在此阶段调整已有 `just qa` 结构或 benchmark 组织方式。
 - 不重新设计 YAML 主线 / runtime policy 的语义边界，只做验证体系收敛。
 
@@ -33,9 +42,13 @@
 
 - **Schema / parse 层**: 迁出的字段仍写在 YAML 时必须 fail-fast，并给 migration guidance。
 - **Compile / preload 层**: 只允许消费结构信息，不允许消费 runtime-only policy。
-- **Runtime compile 层**: effective global policy 开始生效。
-- **Workflow per-run 层**: `run_patches_by_id` 的 override 在具备 run context 后开始生效。
+- **Runtime policy merge 层**: 在 workflow 入口内形成 per-run effective `RunOptions`（合并 overrides + run patches + workflow resources overlay）。
+- **Workflow preflight 层**: 在 engine 调度前运行“runtime-only 但可推理”的诊断（fail-fast + 直接 raise）。
+- **Runtime compile 层**: per-run demand compile/build_request 期间消费 effective runtime policy（包含需要 `$ctx`/init_vars 的逻辑）。
+- **Workflow per-run patch 层**: `run_patches_by_id` 的 override 仅在 runtime policy merge 边界之后才生效（不得在 preload 阶段抢跑）。
 - **User-entry 层**: notebook / public API / integration smoke 证明真实入口没有绕过上述分层。
+
+补充说明：这里把 `workflow preflight` 作为一个单独层次，是为了让“可推理子集”有一个统一的、可控的最早生效边界；否则很容易在 workflow lazy compile 里反复出现“延迟到执行才报错”的用户体验问题。
 
 ### 2. 首批纳入 checklist 的对象必须是“已迁出 YAML 主线”的 policy
 
@@ -116,6 +129,34 @@
 
 该框架的一个硬性边界约束是：check 必须可在不解析 `$ctx`、不依赖 init_vars 的前提下完成；否则只能保留在 per-node runtime compile 阶段。
 
+### 8. “可推理子集”清单(SSOT)必须显式列出,并控制扩张
+
+为了避免 scope creep，本类 preflight check 必须以“显式清单”管理（registry 即 SSOT），并遵循以下约束：
+
+- **可推理**：不依赖 `$ctx`、不依赖 init_vars、也不依赖外部运行态（例如输出文件是否已存在、sheet 是否已存在）。
+- **口径一致**：必须按 “YAML → overrides → per-run patch → effective outputs/resources” 的口径判断触发条件，避免误报/漏报。
+- **最小化**：只覆盖 runtime-only 且用户体验明显受益（否则就留在 runtime compile，不要强行前移）。
+
+v1（已在 `c21` 落地）：
+- `validate_unique_field_names`：当 effective outputs 会写 `header_fields_output_by=name` 的 header 时，拒绝 duplicate effective field display names。
+
+候选（仅列清单，后续若要落地必须单开 change 并补齐测试）：
+- `loader_retry` 纯配置一致性：例如 `enabled=true` 时必须提供 `should_retry`（不依赖 demand YAML）。
+- `batch_size` 纯配置一致性：例如 `batch_size` 为负数/零时 fail-fast（不依赖 demand YAML）。
+- `guardrails` 纯配置一致性：例如互斥项/缺省项的可读错误（不依赖 demand YAML）。
+
+说明：上述候选属于“run options 自身的不变量校验”，原则上可以在 workflow 入口更早失败；是否纳入 preflight 框架还是入口直校验,以“可维护 + 不引入重复校验点”为准。
+
+### 9. `scalim-cli yaml-dsl validate` 的口径: 保持 authoring-only,不做 policy-aware 参数化
+
+结论：
+- `scalim-cli yaml-dsl validate --yaml-type workflow` 保持 authoring-only（schema/parse + 结构校验）语义。
+- 该入口不引入“runtime policy 参数化”（不接入 overrides / run patches / effective merge），因此不会运行 workflow preflight。
+
+原因：
+- CLI validate 若引入 policy-aware 参数化，必然需要一套新的、强类型的 overrides/run-patches 表达与解析；这属于独立产品面与 UX 设计问题，应该单开 change 收敛，而不是在 checklist 里顺手加开口子。
+- workflow 的最早 policy-aware 诊断边界已由 `run_workflow(...)` 的 preflight 覆盖；用户在真实入口运行时能够 fail-fast 拿到清晰错误信息。
+
 ## Risks / Trade-offs
 
 - [风险] checklist 写得过泛，后续无法落地。 -> 缓解：要求每条规范都映射到明确测试层与至少一个候选入口。
@@ -134,10 +175,7 @@
 3. 将 notebook/public API smoke 明确成固定 gate。
 4. 再把 checklist 扩展到其它 runtime-only policy。
 
-## Open Questions
+## Next Proposals (TBD, 不在本 change 落地)
 
-- 首批 checklist 的权威承载 spec 是否只挂在 `testing-quality`，还是还需要在具体 capability spec 中逐条挂靠？
-- notebook/public API smoke 最终是继续挂在现有 suite 中，还是抽成更明确的 boundary suite？
-- 是否需要新增一个 repo-level review checklist 文档，作为 PR 审查模板的一部分？
-- 哪些 runtime-only diagnostics 属于“可推理子集”，可以纳入 workflow preflight？首批只覆盖 `validate_unique_field_names`，其它候选应先列清单再逐步纳入，避免范围失控。
-- `scalim-cli yaml-dsl validate`(workflow validate) 是否需要支持“带 runtime policy 参数”的 policy-aware validate，还是继续保持 authoring-only 的默认校验语义？
+- 若要把更多 diagnostics 前移到 preflight：应为每个候选单开 change，并提供一份明确的“触发条件/口径/失败语义/测试覆盖”设计与验证。
+- 若要提供 policy-aware CLI validate：建议新增一个独立入口（例如 `scalim-cli yaml-dsl workflow preflight` 或等价命令），避免污染 authoring-only validate 的稳定预期。
