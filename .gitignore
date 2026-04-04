@@ -287,3 +287,15 @@ openspec/sanitize_rules.local.yaml
 
 # vendors clib
 !src/scalim/vendor/yamlx/**/*.so
+
+# VS Code extension workspace (extras/vscode-scalim)
+extras/vscode-scalim/node_modules/
+extras/vscode-scalim/dist/
+extras/vscode-scalim/out/
+extras/vscode-scalim/.vscode-test/
+extras/vscode-scalim/*.vsix
+
+# Keep extension scaffolding tracked (override global ignores)
+!extras/vscode-scalim/.npmrc
+!extras/vscode-scalim/.vscode/
+!extras/vscode-scalim/.vscode/**
