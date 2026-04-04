@@ -1,15 +1,26 @@
-import * as assert from 'assert';
+import * as assert from "assert";
 
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
-import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+import { mergeYamlSchemas } from "../internal/yamlSchemas";
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+suite("yaml.schemas merge", () => {
+	test("adds scalim mappings without touching existing keys", () => {
+		const existing = {
+			"http://example.com/schema": ["a.yaml"],
+		};
+		const merged = mergeYamlSchemas(existing, {
+			"/abs/scalim.json": ["scalim.yaml"],
+		});
+		assert.deepStrictEqual(merged["http://example.com/schema"], ["a.yaml"]);
+		assert.deepStrictEqual(merged["/abs/scalim.json"], ["scalim.yaml"]);
+	});
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	test("is idempotent and merges patterns", () => {
+		const existing = {
+			"/abs/scalim.json": ["scalim.yaml"],
+		};
+		const merged = mergeYamlSchemas(existing, {
+			"/abs/scalim.json": ["scalim.yaml", "demand/**/*.y*ml"],
+		});
+		assert.deepStrictEqual(merged["/abs/scalim.json"], ["scalim.yaml", "demand/**/*.y*ml"]);
 	});
 });

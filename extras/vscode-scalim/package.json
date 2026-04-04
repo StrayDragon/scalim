@@ -1,7 +1,7 @@
 {
   "name": "vscode-scalim",
-  "displayName": "vscode-scalim",
-  "description": "enhance scalim framework DX",
+  "displayName": "Scalim YAML DSL",
+  "description": "YAML DSL schema + LSP integration for scalim",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.105.1"
@@ -9,15 +9,48 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:scalim.yaml",
+    "onCommand:scalim.yamlDsl.restartServer",
+    "onCommand:scalim.yamlDsl.reinstallServer",
+    "onCommand:scalim.yamlDsl.showDiagnostics"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "vscode-scalim.helloWorld",
-        "title": "Hello World"
+        "command": "scalim.yamlDsl.restartServer",
+        "title": "Scalim YAML DSL: Restart server"
+      },
+      {
+        "command": "scalim.yamlDsl.reinstallServer",
+        "title": "Scalim YAML DSL: Reinstall server (rebuild venv)"
+      },
+      {
+        "command": "scalim.yamlDsl.showDiagnostics",
+        "title": "Scalim YAML DSL: Show diagnostics"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Scalim YAML DSL",
+      "properties": {
+        "scalim.yamlDsl.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to python (>=3.10) used to provision the LSP server venv. Leave empty to auto-detect."
+        },
+        "scalim.yamlDsl.pinnedServerSpec": {
+          "type": "string",
+          "default": "scalim-yaml-dsl-lsp[server]==0.7.5",
+          "description": "Pinned pip requirement used to provision the YAML DSL LSP server."
+        },
+        "scalim.yamlDsl.autoSchemaBinding": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically update workspace yaml.schemas mapping (requires redhat.vscode-yaml)."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
@@ -32,6 +65,9 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vscode-test"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/vscode": "^1.105.1",

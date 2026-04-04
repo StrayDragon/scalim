@@ -1,0 +1,5 @@
+workflow:
+  runs:
+    - id: demo
+      demand: ../demand/demo.yaml
+

@@ -1,0 +1,13 @@
+name: demo_demand
+description: Demo demand YAML for VSCode extension manual verification.
+
+main_source:
+  source_id: demo
+  loader: "demo:load_rows"
+  fields:
+    id:
+      extract: id
+      name: ID
+
+sources: {}
+
