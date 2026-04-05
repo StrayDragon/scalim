@@ -61,6 +61,33 @@
 - **WHEN** 用户触发 go-to-definition
 - **THEN** 系统 MUST 返回 `load_orders` 定义所在文件与范围
 
+### Requirement: Go to Definition MUST support `$import` references statically
+系统 MUST 为 demand YAML 中的 `$import` 引用提供 go-to-definition，且解析 MUST 为静态解析（不执行用户代码，不 shell-out CLI）：
+
+- `$import` 引用格式 MUST 支持 `<alias>(.<segment>)*`
+- 系统 MUST 基于当前文档顶层 `imports` 映射解析 `<alias>` 对应的 fragment 来源
+- 系统 MUST 支持 `scalim.yaml` 中的 `import_aliases` 重写 imports 路径解析（与 runtime imports 解析一致）
+- 若 `$import` 引用可解析为 fragment YAML 文件与目标 mapping 位置，系统 MUST 返回该位置的 `Location`
+- 解析失败 MUST 返回空结果且给出可诊断 warnings（不得 crash）
+
+#### Scenario: go-to-definition jumps from `$import` to fragment mapping key
+- **GIVEN** demand YAML 顶层声明 `imports: {fragments: ./ecommerce_report_fragments.yaml}`
+- **AND** 某 mapping 内声明 `$import: fragments.report_book`
+- **WHEN** 用户在 `$import` 引用字符串内触发 go-to-definition
+- **THEN** 系统 MUST 跳转到 `ecommerce_report_fragments.yaml` 中 `report_book:` 对应的 key 位置
+
+#### Scenario: unknown `$import` alias yields empty result
+- **GIVEN** demand YAML 未声明 `imports.fragments`
+- **WHEN** `$import: fragments.report_book`
+- **THEN** go-to-definition MUST 返回空结果
+- **AND** MUST 提供可诊断 warnings 提示 unknown alias
+
+#### Scenario: fragment path escapes allowed roots yields empty result
+- **GIVEN** `imports.fragments` 指向的 fragment 文件解析后越界（不在 allowed roots 内）
+- **WHEN** 用户触发 go-to-definition
+- **THEN** go-to-definition MUST 返回空结果
+- **AND** MUST 提供可诊断 warnings 提示 path escapes allowed roots
+
 ### Requirement: Hover MUST provide docstring for resolvable Python references and degrade gracefully
 系统 MUST 为 Python 引用字段提供 hover（docstring），且失败时 MUST 降级为“空结果 + warnings”（不得 crash）：
 
@@ -78,6 +105,18 @@
 - **AND** YAML 中某字段引用 `.loaders:load_orders`
 - **WHEN** 用户触发 hover
 - **THEN** 若可解析,系统 MUST 返回 `load_orders` 的 docstring
+
+### Requirement: Hover MUST explain resolvable `$import` references and degrade gracefully
+系统 MUST 为 `$import` 引用提供 hover，并满足：
+
+- 若 `$import` 引用可解析，hover MUST 返回 PlainText（至少包含解析后的 fragment 来源文件路径与 ref logical path）
+- 若引用不可解析，hover MUST 返回空结果并提供可诊断 warnings（不得 crash）
+
+#### Scenario: hover returns resolved fragment source path
+- **GIVEN** demand YAML 顶层声明 `imports.fragments: ./ecommerce_report_fragments.yaml`
+- **AND** 某 mapping 内声明 `$import: fragments.report_book`
+- **WHEN** 用户对 `$import` 引用触发 hover
+- **THEN** 系统 MUST 返回包含 fragment 真实文件路径的 hover 文本
 
 ### Requirement: Completion MUST provide minimal symbol completions within Python reference strings
 系统 MUST 为 Python 引用字段提供最小 completion,并满足：
