@@ -9,8 +9,15 @@
   "categories": [
     "Other"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StrayDragon/scalim",
+    "directory": "extras/vscode-scalim"
+  },
+  "license": "MIT",
   "activationEvents": [
-    "workspaceContains:scalim.yaml",
+    "onLanguage:yaml",
+    "workspaceContains:**/scalim.yaml",
     "onCommand:scalim.yamlDsl.restartServer",
     "onCommand:scalim.yamlDsl.reinstallServer",
     "onCommand:scalim.yamlDsl.showDiagnostics",
@@ -49,6 +56,17 @@
     "configuration": {
       "title": "Scalim YAML DSL",
       "properties": {
+        "scalim.yamlDsl.envMode": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["pinnedVenv", "workspaceVenv", "auto"],
+          "description": "Server environment mode. workspaceVenv: reuse an existing workspace venv (for scalim development). auto: try workspaceVenv first (if valid), then try PATH (e.g. uv tool install). pinnedVenv: manage an isolated pinned venv under globalStorageUri (requires explicit reinstall action to install)."
+        },
+        "scalim.yamlDsl.workspaceVenvPath": {
+          "type": "string",
+          "default": ".venv",
+          "description": "Path to the workspace virtual environment (used when envMode=workspaceVenv/auto). Can be absolute or relative to the workspace folder."
+        },
         "scalim.yamlDsl.pythonPath": {
           "type": "string",
           "default": "",

@@ -8,13 +8,16 @@ import {
 	type LanguageClientOptions,
 	type ServerOptions,
 	State,
-	TransportKind,
 } from "vscode-languageclient/node";
 
 import { runCommand } from "./internal/exec";
 import { mergeYamlSchemas } from "./internal/yamlSchemas";
 
 const DEFAULT_PINNED_SERVER_SPEC = "scalim-yaml-dsl-lsp[server]==0.7.5";
+const DEFAULT_ENV_MODE = "auto";
+const DEFAULT_WORKSPACE_VENV_PATH = ".venv";
+
+type EnvMode = "pinnedVenv" | "workspaceVenv" | "auto";
 
 type Semver = {
 	major: number;
@@ -23,6 +26,7 @@ type Semver = {
 };
 
 type ProvisionedEnv = {
+	kind: "pinnedVenv" | "workspaceVenv" | "path";
 	pinnedServerSpec: string;
 	pythonPath: string;
 	pythonVersion: string;
@@ -45,6 +49,7 @@ let startMutex: Promise<void> | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
 let lastStartError: string | undefined;
 let lastProjectRoot: string | undefined;
+let autoStartAttempted = false;
 
 function ensureStatusBar(context: vscode.ExtensionContext): vscode.StatusBarItem {
 	if (statusBarItem) {
@@ -86,6 +91,7 @@ function setStatusBarState(
 		`status=${status}`,
 		`serverVersion=${version}`,
 		`projectRoot=${projectRoot}`,
+		env ? `envKind=${env.kind}` : undefined,
 		env ? `venvPath=${env.venvPath}` : "venvPath=<unknown>",
 		lastStartError ? `lastStartError=${lastStartError}` : undefined,
 	]
@@ -161,15 +167,21 @@ function friendlyActionTitle(title: string, commandId: string | undefined): stri
 }
 
 function getExtensionConfig(): {
+	envMode: EnvMode;
+	workspaceVenvPath: string;
 	pythonPathOverride?: string;
 	pinnedServerSpec: string;
 	autoSchemaBinding: boolean;
 } {
 	const cfg = vscode.workspace.getConfiguration("scalim.yamlDsl");
+	const envModeRaw = (cfg.get<string>("envMode") || "").trim() || DEFAULT_ENV_MODE;
+	const envMode: EnvMode =
+		envModeRaw === "workspaceVenv" || envModeRaw === "auto" || envModeRaw === "pinnedVenv" ? envModeRaw : "pinnedVenv";
+	const workspaceVenvPath = (cfg.get<string>("workspaceVenvPath") || "").trim() || DEFAULT_WORKSPACE_VENV_PATH;
 	const pythonPathOverride = (cfg.get<string>("pythonPath") || "").trim() || undefined;
 	const pinnedServerSpec = (cfg.get<string>("pinnedServerSpec") || "").trim() || DEFAULT_PINNED_SERVER_SPEC;
 	const autoSchemaBinding = cfg.get<boolean>("autoSchemaBinding", true);
-	return { pythonPathOverride, pinnedServerSpec, autoSchemaBinding };
+	return { envMode, workspaceVenvPath, pythonPathOverride, pinnedServerSpec, autoSchemaBinding };
 }
 
 async function detectPython(
@@ -203,11 +215,167 @@ async function detectPython(
 	return undefined;
 }
 
+function resolveWorkspaceRoot(): string | undefined {
+	return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+const YAML_DSL_SCHEMA_MARKERS = ["demand.gen.json", "workflow.gen.json", "scalim_yaml.gen.json"] as const;
+
+function documentPreviewText(document: vscode.TextDocument, maxLines = 200): string {
+	const endLine = Math.min(document.lineCount, Math.max(1, maxLines));
+	const endPos = new vscode.Position(endLine, 0);
+	return document.getText(new vscode.Range(new vscode.Position(0, 0), endPos));
+}
+
+function isLikelyScalimYamlDslDocument(document: vscode.TextDocument): boolean {
+	if (document.languageId !== "yaml") {
+		return false;
+	}
+
+	if (document.uri.scheme === "file") {
+		const fsPath = document.uri.fsPath;
+		if (path.basename(fsPath) === "scalim.yaml") {
+			return false;
+		}
+		if (fsPath.split(path.sep).includes(".tmp")) {
+			return false;
+		}
+	}
+
+	const text = documentPreviewText(document);
+	if (!text.trim()) {
+		return false;
+	}
+
+	if (YAML_DSL_SCHEMA_MARKERS.some((marker) => text.includes(marker))) {
+		return true;
+	}
+	if (text.includes("$import") || text.includes("$init_var")) {
+		return true;
+	}
+	if (/^\s*(main_source|workflow|imports|loader|call_by)\s*:/m.test(text)) {
+		return true;
+	}
+	return false;
+}
+
+function guessYamlDslKindFromText(text: string): "demand" | "workflow" {
+	if (text.includes("workflow.gen.json") || /^\s*workflow\s*:/m.test(text)) {
+		return "workflow";
+	}
+	return "demand";
+}
+
+function resolveWorkspaceVenvPath(workspaceRoot: string, configuredVenvPath: string): string {
+	const raw = configuredVenvPath.trim() || DEFAULT_WORKSPACE_VENV_PATH;
+	if (path.isAbsolute(raw)) {
+		return raw;
+	}
+	return path.join(workspaceRoot, raw);
+}
+
+async function resolvePathEnv(output: vscode.OutputChannel): Promise<ProvisionedEnv | undefined> {
+	const scalimYamlDslLspPath = "scalim-yaml-dsl-lsp";
+	const lspHelp = await runCommand(scalimYamlDslLspPath, ["--help"]);
+	if (lspHelp.exitCode !== 0) {
+		output.appendLine("[path] scalim-yaml-dsl-lsp not found in PATH.");
+		return undefined;
+	}
+
+	const scalimCliPath = "scalim-cli";
+	const cliHelp = await runCommand(scalimCliPath, ["--help"]);
+	if (cliHelp.exitCode !== 0) {
+		output.appendLine("[path] scalim-cli not found in PATH; schema binding will be skipped.");
+	}
+
+	output.appendLine(`[path] Using PATH commands: ${scalimYamlDslLspPath} / ${scalimCliPath}`);
+
+	return {
+		kind: "path",
+		pinnedServerSpec: "<PATH>",
+		pythonPath: "<PATH>",
+		pythonVersion: "<unknown>",
+		venvPath: "<PATH>",
+		venvPythonPath: "<unknown>",
+		scalimCliPath,
+		scalimYamlDslLspPath,
+		serverPackageVersion: undefined,
+	};
+}
+
+async function resolveWorkspaceVenvEnv(
+	output: vscode.OutputChannel,
+	workspaceRoot: string,
+	configuredVenvPath: string,
+): Promise<ProvisionedEnv | undefined> {
+	const venvPath = resolveWorkspaceVenvPath(workspaceRoot, configuredVenvPath);
+	if (!fs.existsSync(venvPath)) {
+		output.appendLine(`[workspace] workspaceVenvPath not found: ${venvPath}`);
+		return undefined;
+	}
+
+	const venvPythonPath =
+		findVenvExecutable(venvPath, "python") ??
+		findVenvExecutable(venvPath, "python3") ??
+		path.join(getVenvScriptsDir(venvPath), isWindows() ? "python.exe" : "python");
+	if (!fs.existsSync(venvPythonPath)) {
+		output.appendLine(`[workspace] Missing python in workspace venv: ${venvPythonPath}`);
+		return undefined;
+	}
+
+	const pythonVersionResult = await runCommand(venvPythonPath, ["-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))"]);
+	const pythonVersionRaw = (pythonVersionResult.stdout || pythonVersionResult.stderr).trim();
+	const pythonVersion = parseSemver(pythonVersionRaw);
+	if (!pythonVersion) {
+		output.appendLine(`[workspace] Unable to parse python version from: ${JSON.stringify(pythonVersionRaw)}`);
+		return undefined;
+	}
+	if (!satisfiesPython310(pythonVersion)) {
+		output.appendLine(`[workspace] Python version too old (need >=3.10): ${pythonVersion.major}.${pythonVersion.minor}.${pythonVersion.patch}`);
+		return undefined;
+	}
+
+	const scalimCliPath = findVenvExecutable(venvPath, "scalim-cli");
+	const scalimYamlDslLspPath = findVenvExecutable(venvPath, "scalim-yaml-dsl-lsp");
+	if (!scalimCliPath || !scalimYamlDslLspPath) {
+		output.appendLine(`[workspace] Missing expected executables in workspace venv scripts dir: ${getVenvScriptsDir(venvPath)}`);
+		output.appendLine(`[workspace] scalim-cli: ${scalimCliPath ?? "<missing>"}`);
+		output.appendLine(`[workspace] scalim-yaml-dsl-lsp: ${scalimYamlDslLspPath ?? "<missing>"}`);
+		return undefined;
+	}
+
+	const showResult = await runCommand(venvPythonPath, ["-m", "pip", "show", "scalim-yaml-dsl-lsp"], { cwd: workspaceRoot });
+	const serverPackageVersion = showResult.stdout
+		.split(/\r?\n/g)
+		.map((line) => line.trim())
+		.find((line) => line.toLowerCase().startsWith("version:"))
+		?.split(":", 2)[1]
+		?.trim();
+
+	output.appendLine(`[workspace] Using workspace venv: ${venvPath}`);
+	output.appendLine(`[workspace] python=${venvPythonPath} version=${pythonVersionRaw}`);
+	output.appendLine(`[workspace] scalim-cli=${scalimCliPath}`);
+	output.appendLine(`[workspace] scalim-yaml-dsl-lsp=${scalimYamlDslLspPath}`);
+
+	return {
+		kind: "workspaceVenv",
+		pinnedServerSpec: "<workspaceVenv>",
+		pythonPath: venvPythonPath,
+		pythonVersion: pythonVersionRaw,
+		venvPath,
+		venvPythonPath,
+		scalimCliPath,
+		scalimYamlDslLspPath,
+		serverPackageVersion,
+	};
+}
+
 async function ensureVenv(
 	context: vscode.ExtensionContext,
 	output: vscode.OutputChannel,
 	pythonPath: string,
 	pinnedServerSpec: string,
+	allowInstall: boolean,
 ): Promise<ProvisionedEnv> {
 	const storagePath = context.globalStorageUri.fsPath;
 	const venvPath = path.join(storagePath, "scalim-yaml-dsl-lsp-venv");
@@ -221,6 +389,10 @@ async function ensureVenv(
 		path.join(getVenvScriptsDir(venvPath), isWindows() ? "python.exe" : "python");
 
 	const needCreate = !fs.existsSync(venvPythonPath);
+	if (needCreate && !allowInstall) {
+		output.appendLine("[venv] pinned venv missing; install is disabled (need explicit user action).");
+		throw new Error("Pinned venv is not provisioned");
+	}
 	if (needCreate) {
 		output.appendLine(`[venv] Creating venv at ${venvPath}`);
 		const result = await runCommand(pythonPath, ["-m", "venv", venvPath], { cwd: storagePath });
@@ -233,14 +405,40 @@ async function ensureVenv(
 		output.appendLine(`[venv] Reusing venv at ${venvPath}`);
 	}
 
-	const installArgs = ["-m", "pip", "install", "--upgrade", pinnedServerSpec];
-	output.appendLine(`[pip] Installing pinned server: ${pinnedServerSpec}`);
-	output.appendLine(`[pip] Command: ${venvPythonPath} ${installArgs.join(" ")}`);
-	const installResult = await runCommand(venvPythonPath, installArgs, { cwd: storagePath });
-	if (installResult.exitCode !== 0) {
-		output.appendLine(`[pip] Install failed (exit=${installResult.exitCode})`);
-		output.appendLine(installResult.stderr.trim());
-		throw new Error("Failed to install pinned server");
+	let needInstall = true;
+	if (!needCreate && fs.existsSync(metaPath)) {
+		try {
+			const raw = await fsp.readFile(metaPath, "utf8");
+			const meta = JSON.parse(raw) as unknown;
+			if (typeof meta === "object" && meta !== null) {
+				const pythonPathMeta = String((meta as Record<string, unknown>)["pythonPath"] ?? "");
+				const pinnedServerSpecMeta = String((meta as Record<string, unknown>)["pinnedServerSpec"] ?? "");
+				if (pythonPathMeta === pythonPath && pinnedServerSpecMeta === pinnedServerSpec) {
+					needInstall = false;
+				}
+			}
+		} catch (e) {
+			output.appendLine(`[venv] Failed to read/parse meta; will reinstall pinned server. err=${String(e)}`);
+		}
+	}
+
+	if (needInstall && !allowInstall) {
+		output.appendLine("[pip] pinned server not installed or meta mismatch; install is disabled (need explicit user action).");
+		throw new Error("Pinned server is not provisioned");
+	}
+
+	if (needInstall) {
+		const installArgs = ["-m", "pip", "install", "--upgrade", pinnedServerSpec];
+		output.appendLine(`[pip] Installing pinned server: ${pinnedServerSpec}`);
+		output.appendLine(`[pip] Command: ${venvPythonPath} ${installArgs.join(" ")}`);
+		const installResult = await runCommand(venvPythonPath, installArgs, { cwd: storagePath });
+		if (installResult.exitCode !== 0) {
+			output.appendLine(`[pip] Install failed (exit=${installResult.exitCode})`);
+			output.appendLine(installResult.stderr.trim());
+			throw new Error("Failed to install pinned server");
+		}
+	} else {
+		output.appendLine(`[pip] Reusing pinned server install: ${pinnedServerSpec}`);
 	}
 
 	const showResult = await runCommand(venvPythonPath, ["-m", "pip", "show", "scalim-yaml-dsl-lsp"], { cwd: storagePath });
@@ -271,6 +469,7 @@ async function ensureVenv(
 	await fsp.writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n", "utf8");
 
 	return {
+		kind: "pinnedVenv",
 		pinnedServerSpec,
 		pythonPath,
 		pythonVersion: pythonVersionRaw,
@@ -339,6 +538,44 @@ async function maybeBindSchemas(
 	output.appendLine("[schema] Updated workspace yaml.schemas (idempotent merge).");
 }
 
+async function maybeBindSchemaForDocument(
+	output: vscode.OutputChannel,
+	schemaPaths: { scalimYaml: string; demand: string; workflow: string },
+	document: vscode.TextDocument,
+): Promise<void> {
+	if (document.uri.scheme !== "file") {
+		return;
+	}
+
+	const yamlExt = vscode.extensions.getExtension("redhat.vscode-yaml");
+	if (!yamlExt) {
+		return;
+	}
+
+	const preview = documentPreviewText(document);
+	const kind = guessYamlDslKindFromText(preview);
+	const schemaPath = kind === "workflow" ? schemaPaths.workflow : schemaPaths.demand;
+
+	const workspaceRoot = resolveWorkspaceRoot();
+	let matcher = document.uri.fsPath;
+	if (workspaceRoot) {
+		const rel = path.relative(workspaceRoot, document.uri.fsPath);
+		if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+			matcher = rel;
+		}
+	}
+	matcher = matcher.split(path.sep).join("/");
+
+	const config = vscode.workspace.getConfiguration();
+	const existing = config.get<unknown>("yaml.schemas");
+	const merged = mergeYamlSchemas(existing, {
+		[schemaPath]: [matcher],
+	});
+
+	await config.update("yaml.schemas", merged, vscode.ConfigurationTarget.Workspace);
+	output.appendLine(`[schema] Bound ${kind} schema to ${matcher}`);
+}
+
 async function dumpDiscovery(
 	output: vscode.OutputChannel,
 	env: ProvisionedEnv,
@@ -377,6 +614,27 @@ async function dumpDiscovery(
 	}
 }
 
+async function dumpDiscoveryFromServer(
+	output: vscode.OutputChannel,
+	documentUri: string,
+): Promise<unknown | undefined> {
+	try {
+		const payload = (await vscode.commands.executeCommand("scalim.dumpDiscovery", documentUri)) as unknown;
+		if (typeof payload === "object" && payload !== null) {
+			const projectRoot = (payload as Record<string, unknown>)["project_root"];
+			if (typeof projectRoot === "string" && projectRoot.trim()) {
+				lastProjectRoot = projectRoot.trim();
+			}
+		}
+		output.appendLine(`[diag] lsp dumpDiscovery(${documentUri}) = ${JSON.stringify(payload, null, 2)}`);
+		return payload;
+	} catch (e) {
+		output.appendLine("[diag] lsp dumpDiscovery failed.");
+		output.appendLine(String(e));
+		return undefined;
+	}
+}
+
 async function stopClient(output: vscode.OutputChannel): Promise<void> {
 	if (!currentClient) {
 		return;
@@ -403,7 +661,6 @@ async function startClient(
 	const serverOptions: ServerOptions = {
 		command: env.scalimYamlDslLspPath,
 		args: ["serve"],
-		transport: TransportKind.stdio,
 		options: {
 			cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
 		},
@@ -462,13 +719,13 @@ async function startClient(
 							if (choice === "Open logs") {
 								output.show(true);
 							}
-							if (choice === "Restart server") {
-								void restartServer(context, output, /*reinstall*/ false);
-							}
-							if (choice === "Reinstall server") {
-								void restartServer(context, output, /*reinstall*/ true);
-							}
-						});
+								if (choice === "Restart server") {
+									void restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
+								}
+								if (choice === "Reinstall server") {
+									void restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
+								}
+							});
 					return undefined;
 				}
 			},
@@ -497,13 +754,13 @@ async function startClient(
 					if (choice === "Open logs") {
 						output.show(true);
 					}
-					if (choice === "Restart server") {
-						void restartServer(context, output, /*reinstall*/ false);
-					}
-					if (choice === "Reinstall server") {
-						void restartServer(context, output, /*reinstall*/ true);
-					}
-				});
+						if (choice === "Restart server") {
+							void restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
+						}
+						if (choice === "Reinstall server") {
+							void restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
+						}
+					});
 			}
 		}),
 	);
@@ -526,10 +783,10 @@ async function startClient(
 			if (choice === "Open logs") {
 				output.show(true);
 			}
-			if (choice === "Reinstall server") {
-				void restartServer(context, output, /*reinstall*/ true);
-			}
-		});
+				if (choice === "Reinstall server") {
+					void restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
+				}
+			});
 	}
 }
 
@@ -537,9 +794,10 @@ async function restartServer(
 	context: vscode.ExtensionContext,
 	output: vscode.OutputChannel,
 	reinstall: boolean,
+	allowInstall: boolean,
 ): Promise<void> {
 	const run = async (): Promise<void> => {
-		const { pythonPathOverride, pinnedServerSpec, autoSchemaBinding } = getExtensionConfig();
+		const { envMode, workspaceVenvPath, pythonPathOverride, pinnedServerSpec, autoSchemaBinding } = getExtensionConfig();
 		lastStartError = undefined;
 		setStatusBarState(context, "starting", currentEnv);
 
@@ -556,31 +814,107 @@ async function restartServer(
 				}
 			}
 
-			const py = await detectPython(output, pythonPathOverride);
-			if (!py) {
+			const workspaceRoot = resolveWorkspaceRoot();
+			let env: ProvisionedEnv | undefined;
+
+			if (envMode === "workspaceVenv" && !workspaceRoot) {
 				setStatusBarState(context, "stopped", currentEnv);
-				void vscode.window.showErrorMessage(
-					"Scalim YAML DSL requires Python >=3.10. Configure scalim.yamlDsl.pythonPath or install python3.",
-					"Open logs",
-				).then((choice) => {
+				void vscode.window.showErrorMessage("Scalim YAML DSL: no workspace folder is open (required for envMode=workspaceVenv).", "Open logs").then((choice) => {
 					if (choice === "Open logs") {
 						output.show(true);
 					}
 				});
-				output.appendLine("[python] No suitable python found.");
 				return;
 			}
 
-			const env = await ensureVenv(context, output, py.pythonPath, pinnedServerSpec);
+			if ((envMode === "workspaceVenv" || envMode === "auto") && workspaceRoot) {
+				env = await resolveWorkspaceVenvEnv(output, workspaceRoot, workspaceVenvPath);
+				if (!env) {
+					if (envMode === "workspaceVenv") {
+						setStatusBarState(context, "stopped", currentEnv);
+						void vscode.window.showErrorMessage(
+							"Scalim YAML DSL: workspace venv is not usable. Configure scalim.yamlDsl.workspaceVenvPath or switch envMode.",
+							"Open logs",
+						).then((choice) => {
+							if (choice === "Open logs") {
+								output.show(true);
+							}
+						});
+						return;
+					}
+					output.appendLine("[workspace] envMode=auto but workspace venv not usable; trying PATH next.");
+				}
+			}
+
+			if (!env && envMode === "auto") {
+				env = await resolvePathEnv(output);
+			}
+
+			if (!env && envMode === "pinnedVenv") {
+				const py = await detectPython(output, pythonPathOverride);
+				if (!py) {
+					setStatusBarState(context, "stopped", currentEnv);
+					void vscode.window.showErrorMessage(
+						"Scalim YAML DSL requires Python >=3.10. Configure scalim.yamlDsl.pythonPath or install python3.",
+						"Open logs",
+					).then((choice) => {
+						if (choice === "Open logs") {
+							output.show(true);
+						}
+					});
+					output.appendLine("[python] No suitable python found.");
+					return;
+				}
+
+				env = await ensureVenv(context, output, py.pythonPath, pinnedServerSpec, allowInstall);
+			}
+
+			if (!env) {
+				setStatusBarState(context, "stopped", currentEnv);
+
+				const installCmd = `uv tool install "${pinnedServerSpec}"`;
+				output.appendLine("[env] No usable server environment found.");
+				output.appendLine(`[env] Install (recommended): ${installCmd}`);
+
+				void vscode.window
+					.showErrorMessage(
+						"Scalim YAML DSL: LSP server not found. Install it first (recommended: uv tool).",
+						"Open terminal",
+						"Copy install command",
+						"Open logs",
+					)
+					.then(async (choice) => {
+						if (choice === "Open logs") {
+							output.show(true);
+							return;
+						}
+						if (choice === "Copy install command") {
+							await vscode.env.clipboard.writeText(installCmd);
+							void vscode.window.showInformationMessage("Scalim YAML DSL: install command copied to clipboard.");
+							return;
+						}
+						if (choice === "Open terminal") {
+							const term = vscode.window.createTerminal("Scalim YAML DSL");
+							term.show(true);
+							term.sendText(installCmd, false);
+						}
+					});
+				return;
+			}
+
 			currentEnv = env;
 
-			const schemaPaths = await resolveSchemaPaths(output, env.scalimCliPath);
-			env.schemaPaths = schemaPaths;
+			try {
+				const schemaPaths = await resolveSchemaPaths(output, env.scalimCliPath);
+				env.schemaPaths = schemaPaths;
 
-			if (autoSchemaBinding) {
-				await maybeBindSchemas(output, schemaPaths);
-			} else {
-				output.appendLine("[schema] autoSchemaBinding=false; skipping workspace yaml.schemas update.");
+				if (autoSchemaBinding) {
+					await maybeBindSchemas(output, schemaPaths);
+				} else {
+					output.appendLine("[schema] autoSchemaBinding=false; skipping workspace yaml.schemas update.");
+				}
+			} catch (e) {
+				output.appendLine(`[schema] Skipping schema binding. err=${String(e)}`);
 			}
 
 			await startClient(context, output, env);
@@ -595,10 +929,10 @@ async function restartServer(
 					if (choice === "Open logs") {
 						output.show(true);
 					}
-					if (choice === "Reinstall server") {
-						void restartServer(context, output, /*reinstall*/ true);
-					}
-				});
+						if (choice === "Reinstall server") {
+							void restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
+						}
+					});
 		}
 	};
 
@@ -621,7 +955,7 @@ async function ensureProvisionedEnv(
 		return currentEnv;
 	}
 	output.appendLine("[env] No provisioned environment yet; provisioning first.");
-	await restartServer(context, output, /*reinstall*/ false);
+	await restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
 	return currentEnv;
 }
 
@@ -637,8 +971,8 @@ function getDiscoveryString(payload: unknown, key: string): string | undefined {
 }
 
 async function openOrCreateScalimYaml(context: vscode.ExtensionContext, output: vscode.OutputChannel): Promise<void> {
-	const env = await ensureProvisionedEnv(context, output);
-	if (!env) {
+	const _env = await ensureProvisionedEnv(context, output);
+	if (!_env) {
 		return;
 	}
 
@@ -648,7 +982,8 @@ async function openOrCreateScalimYaml(context: vscode.ExtensionContext, output: 
 		return;
 	}
 
-	const payload = await dumpDiscovery(output, env);
+	const documentUri = editor.document.uri.toString();
+	const payload = await dumpDiscoveryFromServer(output, documentUri);
 	const scalimYamlPath = getDiscoveryString(payload, "scalim_yaml_path");
 	if (scalimYamlPath) {
 		const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(scalimYamlPath));
@@ -664,7 +999,7 @@ async function openOrCreateScalimYaml(context: vscode.ExtensionContext, output: 
 
 	output.appendLine("[cmd] scalim.yaml missing; executing server command scalim.yaml.createMinimal");
 	try {
-		await vscode.commands.executeCommand("scalim.yaml.createMinimal", editor.document.uri.toString());
+		await vscode.commands.executeCommand("scalim.yaml.createMinimal", documentUri);
 	} catch (e) {
 		output.appendLine("[cmd] Failed to execute scalim.yaml.createMinimal");
 		output.appendLine(String(e));
@@ -673,6 +1008,14 @@ async function openOrCreateScalimYaml(context: vscode.ExtensionContext, output: 
 				output.show(true);
 			}
 		});
+		return;
+	}
+
+	const payloadAfter = await dumpDiscoveryFromServer(output, documentUri);
+	const scalimYamlPathAfter = getDiscoveryString(payloadAfter, "scalim_yaml_path");
+	if (scalimYamlPathAfter) {
+		const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(scalimYamlPathAfter));
+		await vscode.window.showTextDocument(doc);
 		return;
 	}
 
@@ -690,6 +1033,49 @@ async function openOrCreateScalimYaml(context: vscode.ExtensionContext, output: 
 	await vscode.window.showTextDocument(doc);
 }
 
+function clientState(): State | undefined {
+	return currentClient?.state;
+}
+
+function clientIsRunningOrStarting(): boolean {
+	const state = clientState();
+	return state === State.Running || state === State.Starting;
+}
+
+async function maybeAutostartForDocument(
+	context: vscode.ExtensionContext,
+	output: vscode.OutputChannel,
+	document: vscode.TextDocument | undefined,
+): Promise<void> {
+	if (!document) {
+		return;
+	}
+	if (!isLikelyScalimYamlDslDocument(document)) {
+		return;
+	}
+
+	// Even when the LSP is already running, bind schema for files outside conventional globs.
+	const cfg = getExtensionConfig();
+	if (cfg.autoSchemaBinding && currentEnv?.schemaPaths) {
+		void maybeBindSchemaForDocument(output, currentEnv.schemaPaths, document);
+	}
+
+	if (clientIsRunningOrStarting() || startMutex) {
+		return;
+	}
+	if (autoStartAttempted && !currentClient) {
+		return;
+	}
+
+	autoStartAttempted = true;
+	output.appendLine(`[auto] Detected Scalim YAML DSL document: ${document.uri.toString()}`);
+	await restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
+
+	if (cfg.autoSchemaBinding && currentEnv?.schemaPaths) {
+		await maybeBindSchemaForDocument(output, currentEnv.schemaPaths, document);
+	}
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	const output = vscode.window.createOutputChannel("Scalim YAML DSL");
 	context.subscriptions.push(output);
@@ -700,12 +1086,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("scalim.yamlDsl.restartServer", async () => {
-			await restartServer(context, output, /*reinstall*/ false);
+			await restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
 		}),
 	);
 	context.subscriptions.push(
 		vscode.commands.registerCommand("scalim.yamlDsl.reinstallServer", async () => {
-			await restartServer(context, output, /*reinstall*/ true);
+			await restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
 		}),
 	);
 	context.subscriptions.push(
@@ -717,6 +1103,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			output.appendLine(
 				[
 					"[diag] Environment:",
+					`  envKind=${env.kind}`,
 					`  venvPath=${env.venvPath}`,
 					`  pythonPath=${env.pythonPath}`,
 					`  pythonVersion=${env.pythonVersion}`,
@@ -757,8 +1144,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		}),
 	);
 
-	// Best-effort auto-start. Failures should be diagnosable and must not break YAML editing.
-	void restartServer(context, output, /*reinstall*/ false);
+	context.subscriptions.push(
+		vscode.window.onDidChangeActiveTextEditor((editor) => {
+			void maybeAutostartForDocument(context, output, editor?.document);
+		}),
+	);
+	context.subscriptions.push(
+		vscode.workspace.onDidOpenTextDocument((document) => {
+			void maybeAutostartForDocument(context, output, document);
+		}),
+	);
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeTextDocument((event) => {
+			void maybeAutostartForDocument(context, output, event.document);
+		}),
+	);
+
+	// Best-effort auto-start: only trigger when the workspace actually contains a likely YAML DSL document.
+	void maybeAutostartForDocument(context, output, vscode.window.activeTextEditor?.document);
+	for (const document of vscode.workspace.textDocuments) {
+		void maybeAutostartForDocument(context, output, document);
+	}
 }
 
 export async function deactivate(): Promise<void> {

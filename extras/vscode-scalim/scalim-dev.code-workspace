@@ -1,0 +1,12 @@
+{
+  "folders": [
+    {
+      "path": "../.."
+    }
+  ],
+  "settings": {
+    "scalim.yamlDsl.envMode": "workspaceVenv",
+    "scalim.yamlDsl.workspaceVenvPath": ".venv",
+    "scalim.yamlDsl.autoSchemaBinding": false
+  }
+}

@@ -53,7 +53,7 @@ excel = [
     "openpyxl>=3.1.5;python_version>='3.8'",
 ]
 yaml-dsl-lsp = [
-    "scalim-yaml-dsl-lsp",
+    "scalim-yaml-dsl-lsp[server]",
 ]
 
 [project.scripts]

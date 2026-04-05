@@ -1,5 +1,6 @@
 import ast
 import json
+import re
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from importlib.machinery import PathFinder
@@ -53,6 +54,8 @@ _YAML_DSL_KIND_CHOICES: Tuple[str, ...] = (
 
 _SEVERITY_ERROR = "error"
 _SEVERITY_WARNING = "warning"
+
+_SCALIM_YAML_FILENAME = "scalim.yaml"
 
 
 @dataclass(frozen=True)
@@ -181,6 +184,7 @@ def discover_yaml_dsl_editor_project(
     *,
     scalim_yaml_override: Optional[Union[str, Path]] = None,
     project_root_override: Optional[Union[str, Path]] = None,
+    workspace_root_override: Optional[Union[str, Path]] = None,
 ) -> YamlDslEditorProjectDiscovery:
     """执行 `YAML` `DSL` 编辑器项目发现逻辑.
 
@@ -191,17 +195,85 @@ def discover_yaml_dsl_editor_project(
     - `allowed_yaml_roots`
     """
     entry_path = Path(str(yaml_path)).expanduser().resolve(strict=False)
-    cfg = load_yaml_dsl_project_config(
+    workspace_root = _resolve_workspace_root_override(workspace_root_override)
+    cfg = _load_yaml_dsl_project_config_for_editor(
         entry_path,
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
+        workspace_root=workspace_root,
     )
-    return _discover_yaml_dsl_editor_project_from_project_config(entry_path, cfg)
+    return _discover_yaml_dsl_editor_project_from_project_config(entry_path, cfg, workspace_root=workspace_root)
+
+
+def _resolve_workspace_root_override(raw: Optional[Union[str, Path]]) -> Optional[Path]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        resolved = Path(text).expanduser().resolve(strict=False)
+    except Exception:  # noqa: BLE001
+        return None
+    if not resolved.exists() or not resolved.is_dir():
+        return None
+    return resolved
+
+
+def _is_within_dir(path: Path, root: Path) -> bool:
+    try:
+        _ = path.resolve(strict=False).relative_to(root.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
+
+
+def _locate_scalim_yaml_bounded(*, start_dir: Path, stop_dir: Path) -> Optional[Path]:
+    current = start_dir.resolve(strict=False)
+    stop = stop_dir.resolve(strict=False)
+    if current != stop and not _is_within_dir(current, stop):
+        return None
+
+    while True:
+        candidate = current / _SCALIM_YAML_FILENAME
+        if candidate.exists() and candidate.is_file():
+            return candidate.resolve(strict=False)
+        if current == stop:
+            return None
+        parent = current.parent
+        if parent == current:
+            return None
+        current = parent
+
+
+def _load_yaml_dsl_project_config_for_editor(
+    entry_path: Path,
+    *,
+    scalim_yaml_override: Optional[Union[str, Path]],
+    project_root_override: Optional[Union[str, Path]],
+    workspace_root: Optional[Path],
+) -> Optional[YamlDslProjectConfig]:
+    if scalim_yaml_override is not None or project_root_override is not None:
+        return load_yaml_dsl_project_config(
+            entry_path,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=project_root_override,
+        )
+
+    if workspace_root is not None and _is_within_dir(entry_path, workspace_root):
+        scalim_yaml_path = _locate_scalim_yaml_bounded(start_dir=entry_path.parent, stop_dir=workspace_root)
+        if scalim_yaml_path is None:
+            return None
+        return load_yaml_dsl_project_config(entry_path, scalim_yaml_override=scalim_yaml_path)
+
+    return load_yaml_dsl_project_config(entry_path)
 
 
 def _discover_yaml_dsl_editor_project_from_project_config(
     entry_path: Path,
     cfg: Optional[YamlDslProjectConfig],
+    *,
+    workspace_root: Optional[Path],
 ) -> YamlDslEditorProjectDiscovery:
     entry_dir = entry_path.parent
     project_root = entry_dir
@@ -215,6 +287,10 @@ def _discover_yaml_dsl_editor_project_from_project_config(
         raw_allowed_roots = cfg.import_allowed_roots
         if cfg.editor is not None and cfg.editor.python_roots:
             raw_python_roots = cfg.editor.python_roots
+    elif workspace_root is not None and _is_within_dir(entry_path, workspace_root):
+        project_root = workspace_root
+        raw_allowed_roots = (workspace_root,)
+        raw_python_roots = _infer_default_python_roots(workspace_root)
 
     allowed_yaml_roots = normalize_allowed_yaml_roots(raw_allowed_roots, default_root=entry_dir)
     python_roots = _normalize_python_roots(raw_python_roots, default_root=project_root)
@@ -227,19 +303,80 @@ def _discover_yaml_dsl_editor_project_from_project_config(
     )
 
 
+_YAML_DSL_SCHEMA_MARKERS: Tuple[str, ...] = (
+    "demand.gen.json",
+    "workflow.gen.json",
+    "scalim_yaml.gen.json",
+)
+
+_YAML_DSL_KEY_HINT_RE = re.compile(r"(?m)^\s*(main_source|workflow|imports|loader|call_by)\s*:")
+_YAML_DSL_DOLLAR_HINT_RE = re.compile(r"\$(import|init_var)\b")
+_YAML_DSL_TOPLEVEL_HINT_KEYS = {
+    "main_source",
+    "workflow",
+    "imports",
+    "sources",
+    "relations",
+    "outputs",
+    "loader",
+    "call_by",
+}
+
+
+def is_probably_yaml_dsl_document(yaml_path: Optional[Union[str, Path]], yaml_text: str) -> bool:
+    """Best-effort heuristic to decide whether a YAML file looks like Scalim YAML DSL.
+
+    This is used to avoid polluting unrelated YAML files with scalim diagnostics/features.
+    """
+    try:
+        path = Path(str(yaml_path)).expanduser().resolve(strict=False) if yaml_path is not None else None
+    except Exception:  # noqa: BLE001
+        path = None
+
+    if path is not None:
+        if path.name == _SCALIM_YAML_FILENAME:
+            return False
+        # Skip ephemeral generated folders by default.
+        if ".tmp" in path.parts:
+            return False
+
+    text = str(yaml_text or "")
+    if not text.strip():
+        return False
+
+    if any(marker in text for marker in _YAML_DSL_SCHEMA_MARKERS):
+        return True
+    if _YAML_DSL_DOLLAR_HINT_RE.search(text) is not None:
+        return True
+
+    try:
+        loaded = yaml.safe_load(text)
+    except Exception:  # noqa: BLE001
+        return bool(_YAML_DSL_KEY_HINT_RE.search(text))
+
+    if isinstance(loaded, dict):
+        loaded_dict = cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
+        return bool(_YAML_DSL_TOPLEVEL_HINT_KEYS.intersection(loaded_dict))
+
+    return False
+
+
 def classify_yaml_dsl_kind(
     yaml_path: Union[str, Path],
     yaml_text: str,
     *,
     scalim_yaml_override: Optional[Union[str, Path]] = None,
     project_root_override: Optional[Union[str, Path]] = None,
+    workspace_root_override: Optional[Union[str, Path]] = None,
 ) -> str:
     """对单个 `YAML` 文件执行类型分类(`demand`/`workflow`)."""
     path = Path(str(yaml_path)).expanduser().resolve(strict=False)
-    cfg = load_yaml_dsl_project_config(
+    workspace_root = _resolve_workspace_root_override(workspace_root_override)
+    cfg = _load_yaml_dsl_project_config_for_editor(
         path,
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
+        workspace_root=workspace_root,
     )
     kind = _classify_yaml_kind_from_overrides(path, cfg)
     if kind:
@@ -253,18 +390,21 @@ def collect_yaml_dsl_editor_diagnostics(
     yaml_text: Optional[str] = None,
     scalim_yaml_override: Optional[Union[str, Path]] = None,
     project_root_override: Optional[Union[str, Path]] = None,
+    workspace_root_override: Optional[Union[str, Path]] = None,
 ) -> YamlDslEditorDiagnosticsResult:
     """收集编辑器/`LSP` 侧 `diagnostics`(不调用 `CLI`)."""
     path = Path(str(yaml_path)).expanduser().resolve(strict=False)
     if yaml_text is None:
         yaml_text = path.read_text(encoding="utf-8")
 
-    cfg = load_yaml_dsl_project_config(
+    workspace_root = _resolve_workspace_root_override(workspace_root_override)
+    cfg = _load_yaml_dsl_project_config_for_editor(
         path,
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
+        workspace_root=workspace_root,
     )
-    discovery = _discover_yaml_dsl_editor_project_from_project_config(path, cfg)
+    discovery = _discover_yaml_dsl_editor_project_from_project_config(path, cfg, workspace_root=workspace_root)
 
     yaml_kind = _classify_yaml_kind_from_overrides(path, cfg) or _classify_yaml_kind_by_heuristic(yaml_text)
 
@@ -294,6 +434,7 @@ def resolve_python_definition(
     reference: str,
     *,
     python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]] = None,
 ) -> PythonDefinitionResult:
     """静态解析 `Python` 引用并返回定义位置(不执行用户代码)."""
     warnings: List[str] = []
@@ -311,14 +452,118 @@ def resolve_python_definition(
         warnings.append(str(exc))
         return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
 
-    if parsed.module_path.startswith("."):
-        warnings.append("相对模块路径引用暂不支持 go-to-definition: {}".format(parsed.module_path))
+    module_path = _normalize_python_module_path(
+        parsed.module_path,
+        python_roots=python_roots,
+        anchor_path=anchor_path,
+        warnings=warnings,
+    )
+    if not module_path:
         return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
+
+    parsed = ParsedReference(
+        reference=parsed.reference,
+        module_path=module_path,
+        attr_path=parsed.attr_path,
+        style=parsed.style,
+    )
 
     location = _resolve_python_definition_location(parsed, python_roots=python_roots, warnings=warnings)
     if location is None:
         return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
     return PythonDefinitionResult(locations=(location,), warnings=tuple(warnings))
+
+
+def _normalize_python_module_path(
+    module_path: str,
+    *,
+    python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]],
+    warnings: List[str],
+) -> str:
+    raw_module_path = str(module_path or "").strip()
+    if not raw_module_path:
+        warnings.append("无法解析 module_path")
+        return ""
+
+    if not raw_module_path.startswith("."):
+        return raw_module_path
+
+    if anchor_path is None:
+        warnings.append("相对模块引用 '{}' 需要 anchor_path 才能解析".format(raw_module_path))
+        return ""
+
+    roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
+    base = _derive_base_module_path_from_anchor(anchor_path, roots=roots, warnings=warnings)
+    if base is None:
+        return ""
+
+    dot_count = 0
+    for ch in raw_module_path:
+        if ch != ".":
+            break
+        dot_count += 1
+
+    rest = raw_module_path[dot_count:]
+    base_parts = [p for p in str(base).split(".") if p] if base else []
+    up_levels = dot_count - 1
+    if up_levels > len(base_parts):
+        warnings.append("相对模块引用 '{}' 超出了根包范围(`base_module_path='{}'`)".format(raw_module_path, base))
+        return ""
+
+    prefix_parts = base_parts[: len(base_parts) - up_levels] if up_levels else base_parts
+    rest_parts = [p for p in rest.split(".") if p]
+    absolute_parts = prefix_parts + rest_parts
+    if not absolute_parts:
+        warnings.append("相对模块引用 '{}' 解析为空模块路径".format(raw_module_path))
+        return ""
+    return ".".join(absolute_parts)
+
+
+def _derive_base_module_path_from_anchor(
+    anchor_path: Union[str, Path],
+    *,
+    roots: Sequence[Path],
+    warnings: List[str],
+) -> Optional[str]:
+    try:
+        yaml_dir = Path(str(anchor_path)).expanduser().resolve(strict=False).parent
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("无法解析 anchor_path: {}: {}".format(type(exc).__name__, exc))
+        return None
+
+    candidates: List[Tuple[Tuple[str, ...], Path]] = []
+    for root in roots:
+        try:
+            if yaml_dir != root and root not in yaml_dir.parents:
+                continue
+            rel_path = yaml_dir.relative_to(root)
+        except Exception:  # noqa: BLE001
+            continue
+
+        if rel_path == Path():
+            candidates.append(((), root))
+            continue
+
+        parts = tuple(p for p in rel_path.parts if p and p != ".")
+        if not parts:
+            candidates.append(((), root))
+            continue
+
+        if any(not p.isidentifier() for p in parts):
+            continue
+
+        candidates.append((parts, root))
+
+    if not candidates:
+        warnings.append(
+            "无法推导相对模块引用的 base_module_path: yaml_dir='{}' 不在任何 python_roots 下. "
+            "修复: 补充 `yaml_dsl.editor.python_roots` 或改用绝对模块引用.".format(str(yaml_dir))
+        )
+        return None
+
+    parts, _root = min(candidates, key=lambda item: (len(item[0]), -len(item[1].parts), str(item[1])))
+    return ".".join(parts)
 
 
 def _resolve_python_definition_location(
@@ -360,10 +605,11 @@ def hover_python_reference(
     reference: str,
     *,
     python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]] = None,
 ) -> PythonHoverResult:
     """返回 `Python` 引用的 `docstring`(若可解析)."""
     warnings: List[str] = []
-    result = resolve_python_definition(reference, python_roots=python_roots)
+    result = resolve_python_definition(reference, python_roots=python_roots, anchor_path=anchor_path)
     if result.warnings:
         warnings.extend(list(result.warnings))
     if not result.locations:
@@ -396,22 +642,32 @@ def complete_python_reference(
     reference: str,
     *,
     python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]] = None,
 ) -> PythonCompletionResult:
     """在 `Python` 引用字符串内提供最小 `completion`."""
     raw = str(reference or "")
     warnings: List[str] = []
 
-    module_path, attr_prefix, style = _split_reference_for_completion(raw)
-    if not module_path:
+    module_path_raw, attr_prefix, style = _split_reference_for_completion(raw)
+    if not module_path_raw:
         return PythonCompletionResult(items=(), warnings=("无法解析 module_path",))
 
+    module_path_resolved = _normalize_python_module_path(
+        module_path_raw,
+        python_roots=python_roots,
+        anchor_path=anchor_path,
+        warnings=warnings,
+    )
+    if not module_path_resolved:
+        return PythonCompletionResult(items=(), warnings=tuple(warnings))
+
     roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
-    spec = _find_spec(module_path, roots=roots)
+    spec = _find_spec(module_path_resolved, roots=roots)
     origin = None
     if spec is not None:
         origin = spec.origin
     if not isinstance(origin, str) or not origin or origin in ("built-in", "frozen"):
-        warnings.append("无法定位模块文件: {}".format(module_path))
+        warnings.append("无法定位模块文件: {}".format(module_path_resolved))
         return PythonCompletionResult(items=(), warnings=tuple(warnings))
 
     file_path = Path(origin).expanduser().resolve(strict=False)
@@ -423,9 +679,9 @@ def complete_python_reference(
 
     matched = sorted([name for name in symbols if name.startswith(attr_prefix or "")])
     if style == "class":
-        items = tuple(["{}:{}".format(module_path, name) for name in matched])
+        items = tuple(["{}:{}".format(module_path_raw, name) for name in matched])
     else:
-        items = tuple(["{}.{}".format(module_path, name) for name in matched])
+        items = tuple(["{}.{}".format(module_path_raw, name) for name in matched])
     return PythonCompletionResult(items=items, warnings=tuple(warnings))
 
 
@@ -452,6 +708,37 @@ def _normalize_python_roots(
             continue
         seen[key] = None
         unique.append(p)
+    return tuple(unique)
+
+
+def _infer_default_python_roots(project_root: Path) -> Tuple[Path, ...]:
+    roots: List[Path] = []
+
+    src_dir = project_root / "src"
+    if src_dir.exists() and src_dir.is_dir():
+        roots.append(src_dir)
+
+    packages_dir = project_root / "packages"
+    if packages_dir.exists() and packages_dir.is_dir():
+        try:
+            for candidate in sorted(packages_dir.glob("*/src")):
+                if candidate.exists() and candidate.is_dir():
+                    roots.append(candidate)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Include project_root itself as a fallback sys.path entry:
+    # - supports monorepos / ad-hoc modules (e.g. notebooks/)
+    roots.append(project_root)
+
+    seen: Dict[str, None] = {}
+    unique: List[Path] = []
+    for root in roots:
+        key = str(root)
+        if key in seen:
+            continue
+        seen[key] = None
+        unique.append(root)
     return tuple(unique)
 
 

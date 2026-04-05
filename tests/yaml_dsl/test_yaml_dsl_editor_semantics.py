@@ -31,6 +31,31 @@ def test_discovery_zero_config_falls_back_to_entry_dir(tmp_path: Path) -> None:
     assert discovery.allowed_yaml_roots == (tmp_path,)
 
 
+def test_discovery_workspace_root_override_infers_project_root_and_roots(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    demand_dir = repo / "anywhere" / "dsl"
+    _ = _write(demand_dir / "demand.yaml", "name: demo\nmain_source: {source_id: x, loader: pkg.mod:fn}\n")
+    (repo / "src").mkdir(parents=True)
+
+    discovery = editor_semantics.discover_yaml_dsl_editor_project(demand_dir / "demand.yaml", workspace_root_override=repo)
+    assert discovery.scalim_yaml_path is None
+    assert discovery.project_root == repo
+    assert discovery.python_roots[0] == repo / "src"
+    assert repo in discovery.python_roots
+    assert set(discovery.allowed_yaml_roots) == {repo, demand_dir}
+
+
+def test_discovery_workspace_root_override_does_not_escape_boundary(tmp_path: Path) -> None:
+    outer = tmp_path / "outer"
+    inner = outer / "inner"
+    _ = _write(outer / "scalim.yaml", "yaml_dsl:\n  import_allowed_roots: [./x]\n")
+    yaml_path = _write(inner / "demand.yaml", "name: demo\nsources: {}\n")
+
+    discovery = editor_semantics.discover_yaml_dsl_editor_project(yaml_path, workspace_root_override=inner)
+    assert discovery.scalim_yaml_path is None
+    assert discovery.project_root == inner
+
+
 def test_legacy_editor_semantics_import_path_is_removed() -> None:
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("scalim.dsl.by_yaml.editor_semantics")
@@ -88,6 +113,17 @@ def test_classify_yaml_kind_override_wins(tmp_path: Path) -> None:
         )
         == editor_semantics.YAML_DSL_KIND_WORKFLOW
     )
+
+
+def test_is_probably_yaml_dsl_document_heuristics(tmp_path: Path) -> None:
+    any_yaml = tmp_path / "x.yaml"
+
+    assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "foo: 1\n") is False
+    assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "name: demo\nmain_source: {}\n") is True
+    assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "workflow: {}\n") is True
+    assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "x: {$init_var: order_ids}\n") is True
+
+    assert editor_semantics.is_probably_yaml_dsl_document(tmp_path / "scalim.yaml", "yaml_dsl: {}\n") is False
 
 
 def test_collect_demand_diagnostics_has_error_warning_and_range(tmp_path: Path) -> None:
@@ -249,6 +285,74 @@ def test_resolve_python_definition_and_hover_and_completion(tmp_path: Path) -> N
 
     comp2 = editor_semantics.complete_python_reference("pkg.mod.f", python_roots=[tmp_path])
     assert "pkg.mod.foo" in comp2.items
+
+
+def test_resolve_python_definition_supports_relative_module_reference_with_anchor_path(tmp_path: Path) -> None:
+    py_root = tmp_path / "py"
+    report_dir = py_root / "myapp" / "reports"
+    _write(report_dir / "__init__.py", "")
+    _write(
+        report_dir / "loaders.py",
+        textwrap.dedent(
+            """\
+            def load_orders():
+                \"\"\"load orders doc\"\"\"
+                return 1
+            """
+        ),
+    )
+    anchor_yaml = _write(report_dir / "report.yaml", "name: demo\nsources: {}\n")
+
+    definition = editor_semantics.resolve_python_definition(".loaders:load_orders", python_roots=[py_root], anchor_path=anchor_yaml)
+    assert definition.locations and definition.locations[0].file_path.endswith("myapp/reports/loaders.py")
+
+    hover = editor_semantics.hover_python_reference(".loaders:load_orders", python_roots=[py_root], anchor_path=anchor_yaml)
+    assert hover.text.strip() == "load orders doc"
+
+    comp = editor_semantics.complete_python_reference(".loaders:", python_roots=[py_root], anchor_path=anchor_yaml)
+    assert ".loaders:load_orders" in comp.items
+
+
+def test_resolve_python_definition_supports_parent_relative_module_reference(tmp_path: Path) -> None:
+    py_root = tmp_path / "py"
+    base_dir = py_root / "myapp" / "reports"
+    nested_dir = base_dir / "subpkg"
+    _write(base_dir / "__init__.py", "")
+    _write(nested_dir / "__init__.py", "")
+    _write(
+        base_dir / "loaders.py",
+        "def load_orders():\n    return 1\n",
+    )
+    anchor_yaml = _write(nested_dir / "report.yaml", "name: demo\nsources: {}\n")
+
+    definition = editor_semantics.resolve_python_definition("..loaders:load_orders", python_roots=[py_root], anchor_path=anchor_yaml)
+    assert definition.locations and definition.locations[0].file_path.endswith("myapp/reports/loaders.py")
+
+
+def test_relative_module_reference_degrades_when_anchor_outside_python_roots(tmp_path: Path) -> None:
+    py_root = tmp_path / "py"
+    py_root.mkdir(parents=True, exist_ok=True)
+    anchor_yaml = _write(tmp_path / "report.yaml", "name: demo\nsources: {}\n")
+    result = editor_semantics.resolve_python_definition(".loaders:load_orders", python_roots=[py_root], anchor_path=anchor_yaml)
+    assert result.locations == ()
+    assert any("base_module_path" in w for w in result.warnings)
+
+
+def test_relative_module_reference_prefers_deepest_python_root(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    src_root = repo / "src"
+    report_dir = src_root / "myapp" / "reports"
+    _write(report_dir / "__init__.py", "")
+    _write(report_dir / "loaders.py", "def load_orders():\n    return 1\n")
+    anchor_yaml = _write(report_dir / "report.yaml", "name: demo\nsources: {}\n")
+
+    result = editor_semantics.resolve_python_definition(
+        ".loaders:load_orders",
+        python_roots=[repo, src_root],
+        anchor_path=anchor_yaml,
+    )
+    assert result.locations
+    assert result.locations[0].module_path == "myapp.reports.loaders"
 
 
 @pytest.mark.parametrize(

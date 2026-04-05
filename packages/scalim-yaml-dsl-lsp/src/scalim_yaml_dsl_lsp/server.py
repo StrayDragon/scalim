@@ -20,6 +20,7 @@ from .core import (
     discover_yaml_dsl_editor_project,
     extract_yaml_dsl_python_reference_by_cursor,
     hover_python_reference,
+    is_probably_yaml_dsl_document,
     resolve_python_definition,
 )
 from .cursor_extraction import YamlCursorExtractionResult
@@ -52,7 +53,7 @@ class _DocumentState:
 def create_server() -> LanguageServer:
     server = LanguageServer(
         "scalim-yaml-dsl-lsp",
-        "0.7.1",
+        "0.7.5",
         text_document_sync_kind=types.TextDocumentSyncKind.Full,
     )
     state: Dict[str, _DocumentState] = {}
@@ -99,14 +100,15 @@ def _handle_definition(
 ) -> Optional[List[types.Location]]:
     uri = str(params.text_document.uri)
     doc_state = state.get(uri)
-    if doc_state is None:
+    if doc_state is None or doc_state.report is None:
         return None
+    anchor_path = _uri_to_path(uri)
 
     extraction = _safe_extract_reference_for_lsp(doc_state.text, params.position, uri=uri, op="definition")
     if not extraction.reference:
         return None
 
-    result = _safe_resolve_python_definition(extraction, python_roots=doc_state.python_roots, uri=uri)
+    result = _safe_resolve_python_definition(extraction, python_roots=doc_state.python_roots, anchor_path=anchor_path, uri=uri)
     if result is None:
         return None
 
@@ -152,10 +154,11 @@ def _safe_resolve_python_definition(
     extraction: YamlCursorExtractionResult,
     *,
     python_roots: Tuple[Path, ...],
+    anchor_path: Optional[Path],
     uri: str,
 ) -> Optional[PythonDefinitionResult]:
     try:
-        result = resolve_python_definition(extraction.reference, python_roots=list(python_roots))
+        result = resolve_python_definition(extraction.reference, python_roots=list(python_roots), anchor_path=anchor_path)
     except Exception as exc:  # noqa: BLE001
         _LOG.exception(
             "定义跳转解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
@@ -175,8 +178,9 @@ def _register_hover_feature(server: LanguageServer, state: Dict[str, _DocumentSt
     async def hover(_ls: LanguageServer, params: types.HoverParams) -> Optional[types.Hover]:
         uri = str(params.text_document.uri)
         doc_state = state.get(uri)
-        if doc_state is None:
+        if doc_state is None or doc_state.report is None:
             return None
+        anchor_path = _uri_to_path(uri)
 
         try:
             extraction = _extract_reference_for_lsp(doc_state.text, params.position)
@@ -194,7 +198,7 @@ def _register_hover_feature(server: LanguageServer, state: Dict[str, _DocumentSt
             return None
 
         try:
-            result = hover_python_reference(extraction.reference, python_roots=list(doc_state.python_roots))
+            result = hover_python_reference(extraction.reference, python_roots=list(doc_state.python_roots), anchor_path=anchor_path)
         except Exception as exc:  # noqa: BLE001
             _LOG.exception(
                 "悬浮提示(`hover`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
@@ -216,8 +220,9 @@ def _register_completion_feature(server: LanguageServer, state: Dict[str, _Docum
     async def completion(_ls: LanguageServer, params: types.CompletionParams) -> types.CompletionList:
         uri = str(params.text_document.uri)
         doc_state = state.get(uri)
-        if doc_state is None:
+        if doc_state is None or doc_state.report is None:
             return types.CompletionList(is_incomplete=False, items=[])
+        anchor_path = _uri_to_path(uri)
 
         try:
             extraction = _extract_reference_for_lsp(doc_state.text, params.position)
@@ -235,7 +240,7 @@ def _register_completion_feature(server: LanguageServer, state: Dict[str, _Docum
             return types.CompletionList(is_incomplete=False, items=[])
 
         try:
-            result = complete_python_reference(extraction.reference, python_roots=list(doc_state.python_roots))
+            result = complete_python_reference(extraction.reference, python_roots=list(doc_state.python_roots), anchor_path=anchor_path)
         except Exception as exc:  # noqa: BLE001
             _LOG.exception(
                 "补全(`completion`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
@@ -263,9 +268,9 @@ def _register_code_actions(server: LanguageServer, state: Dict[str, _DocumentSta
         return _handle_code_actions(ls, params, state=state)
 
     @server.command(_COMMAND_DUMP_DISCOVERY)
-    def dump_discovery(_ls: LanguageServer, *args: Any) -> Dict[str, Any]:
+    def dump_discovery(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
         document_uri = str(args[0]) if args else ""
-        return _dump_discovery_payload(document_uri)
+        return _dump_discovery_payload(ls, document_uri)
 
     @server.command(_COMMAND_CREATE_MINIMAL_SCALIM_YAML)
     async def create_minimal_scalim_yaml(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
@@ -301,6 +306,7 @@ def _handle_code_actions(
     doc_state = state.get(uri)
     if doc_state is None or doc_state.report is None:
         return []
+    anchor_path = _uri_to_path(uri)
 
     report = doc_state.report
     actions: List[types.CodeAction] = []
@@ -376,7 +382,7 @@ def _handle_code_actions(
 
     extraction = _safe_extract_reference_for_lsp(doc_state.text, params.range.start, uri=uri, op="codeAction")
     if extraction.reference:
-        result = _safe_resolve_python_definition(extraction, python_roots=doc_state.python_roots, uri=uri)
+        result = _safe_resolve_python_definition(extraction, python_roots=doc_state.python_roots, anchor_path=anchor_path, uri=uri)
         if result is not None and not result.locations and result.warnings:
             actions.append(
                 types.CodeAction(
@@ -391,9 +397,7 @@ def _handle_code_actions(
             )
 
     return actions
-
-
-def _dump_discovery_payload(document_uri: str) -> Dict[str, Any]:
+def _dump_discovery_payload(ls: LanguageServer, document_uri: str) -> Dict[str, Any]:
     path = _uri_to_path(str(document_uri or ""))
     if path is None:
         return {
@@ -403,8 +407,9 @@ def _dump_discovery_payload(document_uri: str) -> Dict[str, Any]:
             "allowed_yaml_roots": [],
             "error": "仅支持 file:// URI",
         }
+    workspace_root = _workspace_root_path(ls)
     try:
-        discovery = discover_yaml_dsl_editor_project(path)
+        discovery = discover_yaml_dsl_editor_project(path, workspace_root_override=workspace_root)
     except Exception as exc:  # noqa: BLE001
         return {
             "project_root": str(path.parent),
@@ -428,10 +433,11 @@ def _cmd_explain_resolution_failure(
 ) -> Dict[str, Any]:
     uri = str(document_uri or "")
     doc_state = state.get(uri)
-    if doc_state is None:
+    if doc_state is None or doc_state.report is None:
         return {"ok": False, "kind": "explain_only", "message": "文档未打开或未同步 `state`", "hints": [uri]}
+    anchor_path = _uri_to_path(uri)
     try:
-        result = resolve_python_definition(str(reference or ""), python_roots=list(doc_state.python_roots))
+        result = resolve_python_definition(str(reference or ""), python_roots=list(doc_state.python_roots), anchor_path=anchor_path)
     except Exception as exc:  # noqa: BLE001
         _LOG.exception("解释 `Python` 引用解析失败 `uri`=%s: %s: %s", uri, type(exc).__name__, exc)
         return {
@@ -829,7 +835,8 @@ def _update_state_and_publish_diagnostics(
             return
 
     yaml_path = _uri_to_path(uri)
-    diagnostics, report = _compute_diagnostics_and_report(yaml_path=yaml_path, yaml_text=str(yaml_text))
+    workspace_root = _workspace_root_path(ls)
+    diagnostics, report = _compute_diagnostics_and_report(yaml_path=yaml_path, yaml_text=str(yaml_text), workspace_root=workspace_root)
     python_roots = tuple(report.discovery.python_roots) if report is not None else ()
     state[uri] = _DocumentState(text=str(yaml_text), report=report, python_roots=python_roots)
     ls.text_document_publish_diagnostics(types.PublishDiagnosticsParams(uri=uri, diagnostics=diagnostics))
@@ -839,11 +846,14 @@ def _compute_diagnostics_and_report(
     *,
     yaml_path: Optional[Path],
     yaml_text: str,
+    workspace_root: Optional[Path],
 ) -> Tuple[List[types.Diagnostic], Optional[YamlDslEditorDiagnosticsResult]]:
     if yaml_path is None:
         return [], None
+    if not is_probably_yaml_dsl_document(yaml_path, yaml_text):
+        return [], None
     try:
-        report = collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+        report = collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text, workspace_root_override=workspace_root)
     except Exception as exc:  # noqa: BLE001
         _LOG.exception("诊断计算失败 `path`=%s: %s: %s", yaml_path, type(exc).__name__, exc)
         return [], None
