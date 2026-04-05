@@ -83,7 +83,7 @@ From the repo root:
 
 ```bash
 cd extras/vscode-scalim
-just vsix
+just package-vsix
 ```
 
 Output: `extras/vscode-scalim/vscode-scalim.vsix`

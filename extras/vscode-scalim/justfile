@@ -4,7 +4,7 @@ set shell := ["bash", "-lc"]
 #
 # Usage:
 #   cd extras/vscode-scalim
-#   just vsix
+#   just package-vsix
 #
 # Notes:
 # - The generated `*.vsix` is gitignored by repo root `.gitignore`.
@@ -14,16 +14,6 @@ set shell := ["bash", "-lc"]
 default:
     @just --list
 
-
-install:
-    pnpm install --frozen-lockfile
-
-
-build:
-    pnpm run package
-
-
-vsix out="vscode-scalim.vsix":
+package-vsix out="vscode-scalim.vsix":
     pnpm run package
     pnpm -s dlx @vscode/vsce package --no-dependencies --out {{out}}
-
