@@ -397,6 +397,8 @@ def _handle_code_actions(
             )
 
     return actions
+
+
 def _dump_discovery_payload(ls: LanguageServer, document_uri: str) -> Dict[str, Any]:
     path = _uri_to_path(str(document_uri or ""))
     if path is None:

@@ -1,10 +1,9 @@
 def load_orders():
-    """Demo loader for relative-module go-to-definition.
+    """相对模块 `go-to-definition` 演示用加载器.
 
-    Note:
-      - This is a notebooks fixture module.
-      - The YAML DSL LSP resolves definitions statically via filesystem + AST.
-      - This function is not executed by the LSP server.
+    说明:
+      - 这是 `notebooks/` 下的演示模块.
+      - `YAML DSL LSP` 通过 `filesystem` + `AST` 静态解析定义位置.
+      - `LSP` 不会执行该函数.
     """
     return []
-

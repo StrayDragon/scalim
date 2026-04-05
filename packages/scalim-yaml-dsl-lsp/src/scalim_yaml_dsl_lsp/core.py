@@ -314,53 +314,69 @@ _YAML_DSL_FALLBACK_HINT_RE = re.compile(r"(?m)^\s*(loader|call_by)\s*:")
 _YAML_DSL_DOLLAR_HINT_RE = re.compile(r"\$(import|init_var)\b")
 
 
+def _try_resolve_yaml_path(raw: Optional[Union[str, Path]]) -> Optional[Path]:
+    if raw is None:
+        return None
+    try:
+        return Path(str(raw)).expanduser().resolve(strict=False)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _is_yaml_dsl_path_excluded(path: Optional[Path]) -> bool:
+    if path is None:
+        return False
+    if path.name == _SCALIM_YAML_FILENAME:
+        return True
+    # Skip ephemeral generated folders by default.
+    return ".tmp" in path.parts
+
+
+def _has_yaml_dsl_text_hints(text: str) -> bool:
+    if any(marker in text for marker in _YAML_DSL_SCHEMA_MARKERS):
+        return True
+    if _YAML_DSL_DOLLAR_HINT_RE.search(text) is not None:
+        return True
+    return _YAML_DSL_FALLBACK_HINT_RE.search(text) is not None
+
+
+def _try_load_yaml_mapping(text: str) -> Optional[Dict[str, Any]]:
+    try:
+        loaded = yaml.safe_load(text)
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(loaded, dict):
+        return None
+    return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
+
+
 def is_probably_yaml_dsl_document(yaml_path: Optional[Union[str, Path]], yaml_text: str) -> bool:
     """Best-effort heuristic to decide whether a YAML file looks like Scalim YAML DSL.
 
     This is used to avoid polluting unrelated YAML files with scalim diagnostics/features.
     """
-    try:
-        path = Path(str(yaml_path)).expanduser().resolve(strict=False) if yaml_path is not None else None
-    except Exception:  # noqa: BLE001
-        path = None
-
-    if path is not None:
-        if path.name == _SCALIM_YAML_FILENAME:
-            return False
-        # Skip ephemeral generated folders by default.
-        if ".tmp" in path.parts:
-            return False
+    path = _try_resolve_yaml_path(yaml_path)
+    if _is_yaml_dsl_path_excluded(path):
+        return False
 
     text = str(yaml_text or "")
     if not text.strip():
         return False
 
-    if any(marker in text for marker in _YAML_DSL_SCHEMA_MARKERS):
-        return True
-    if _YAML_DSL_DOLLAR_HINT_RE.search(text) is not None:
-        return True
-    if _YAML_DSL_FALLBACK_HINT_RE.search(text) is not None:
+    if _has_yaml_dsl_text_hints(text):
         return True
 
-    try:
-        loaded = yaml.safe_load(text)
-    except Exception:  # noqa: BLE001
+    loaded_dict = _try_load_yaml_mapping(text)
+    if loaded_dict is None:
         return False
 
-    if isinstance(loaded, dict):
-        loaded_dict = cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
-        required_kind = _classify_yaml_kind_by_required_keys_loaded(loaded_dict)
-        if required_kind:
-            return True
+    required_kind = _classify_yaml_kind_by_required_keys_loaded(loaded_dict)
+    if required_kind:
+        return True
 
-        # Permissive fallback for in-progress demand drafts that only contain `imports` + `name`.
-        imports_obj = loaded_dict.get("imports")
-        if isinstance(imports_obj, dict) and "name" in loaded_dict:
-            return True
-
-        return False
-
-    return False
+    # Permissive fallback for in-progress demand drafts that only contain `imports` + `name`.
+    imports_obj = loaded_dict.get("imports")
+    return isinstance(imports_obj, dict) and "name" in loaded_dict
 
 
 def classify_yaml_dsl_kind(
@@ -491,42 +507,32 @@ def _normalize_python_module_path(
     warnings: List[str],
 ) -> str:
     raw_module_path = str(module_path or "").strip()
+    result = ""
     if not raw_module_path:
         warnings.append("无法解析 module_path")
-        return ""
-
-    if not raw_module_path.startswith("."):
-        return raw_module_path
-
-    if anchor_path is None:
+    elif not raw_module_path.startswith("."):
+        result = raw_module_path
+    elif anchor_path is None:
         warnings.append("相对模块引用 '{}' 需要 anchor_path 才能解析".format(raw_module_path))
-        return ""
-
-    roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
-    base = _derive_base_module_path_from_anchor(anchor_path, roots=roots, warnings=warnings)
-    if base is None:
-        return ""
-
-    dot_count = 0
-    for ch in raw_module_path:
-        if ch != ".":
-            break
-        dot_count += 1
-
-    rest = raw_module_path[dot_count:]
-    base_parts = [p for p in str(base).split(".") if p] if base else []
-    up_levels = dot_count - 1
-    if up_levels > len(base_parts):
-        warnings.append("相对模块引用 '{}' 超出了根包范围(`base_module_path='{}'`)".format(raw_module_path, base))
-        return ""
-
-    prefix_parts = base_parts[: len(base_parts) - up_levels] if up_levels else base_parts
-    rest_parts = [p for p in rest.split(".") if p]
-    absolute_parts = prefix_parts + rest_parts
-    if not absolute_parts:
-        warnings.append("相对模块引用 '{}' 解析为空模块路径".format(raw_module_path))
-        return ""
-    return ".".join(absolute_parts)
+    else:
+        roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
+        base = _derive_base_module_path_from_anchor(anchor_path, roots=roots, warnings=warnings)
+        if base is not None:
+            dot_count = len(raw_module_path) - len(raw_module_path.lstrip("."))
+            rest = raw_module_path[dot_count:]
+            base_parts = [p for p in str(base).split(".") if p] if base else []
+            up_levels = dot_count - 1
+            if up_levels > len(base_parts):
+                warnings.append("相对模块引用 '{}' 超出了根包范围(`base_module_path='{}'`)".format(raw_module_path, base))
+            else:
+                prefix_parts = base_parts[: len(base_parts) - up_levels] if up_levels else base_parts
+                rest_parts = [p for p in rest.split(".") if p]
+                absolute_parts = prefix_parts + rest_parts
+                if not absolute_parts:
+                    warnings.append("相对模块引用 '{}' 解析为空模块路径".format(raw_module_path))
+                else:
+                    result = ".".join(absolute_parts)
+    return result
 
 
 def _derive_base_module_path_from_anchor(
@@ -542,27 +548,32 @@ def _derive_base_module_path_from_anchor(
         return None
 
     candidates: List[Tuple[Tuple[str, ...], Path]] = []
+    yaml_dir_resolved = yaml_dir.resolve(strict=False)
     for root in roots:
+        root_resolved = root.resolve(strict=False)
+        if yaml_dir_resolved != root_resolved and root_resolved not in yaml_dir_resolved.parents:
+            continue
+
         try:
-            if yaml_dir != root and root not in yaml_dir.parents:
-                continue
-            rel_path = yaml_dir.relative_to(root)
-        except Exception:  # noqa: BLE001
+            rel_path: Optional[Path] = yaml_dir_resolved.relative_to(root_resolved)
+        except ValueError:
+            rel_path = None
+        if rel_path is None:
             continue
 
         if rel_path == Path():
-            candidates.append(((), root))
+            candidates.append(((), root_resolved))
             continue
 
         parts = tuple(p for p in rel_path.parts if p and p != ".")
         if not parts:
-            candidates.append(((), root))
+            candidates.append(((), root_resolved))
             continue
 
         if any(not p.isidentifier() for p in parts):
             continue
 
-        candidates.append((parts, root))
+        candidates.append((parts, root_resolved))
 
     if not candidates:
         warnings.append(
@@ -730,11 +741,12 @@ def _infer_default_python_roots(project_root: Path) -> Tuple[Path, ...]:
     packages_dir = project_root / "packages"
     if packages_dir.exists() and packages_dir.is_dir():
         try:
-            for candidate in sorted(packages_dir.glob("*/src")):
-                if candidate.exists() and candidate.is_dir():
-                    roots.append(candidate)
+            candidates = sorted(packages_dir.glob("*/src"))
         except Exception:  # noqa: BLE001
-            pass
+            candidates = []
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_dir():
+                roots.append(candidate)
 
     # Include project_root itself as a fallback sys.path entry:
     # - supports monorepos / ad-hoc modules (e.g. notebooks/)
