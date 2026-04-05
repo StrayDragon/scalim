@@ -221,13 +221,13 @@ def _position_in_slice(position: EditorPosition, *, line: int, start_col0: int, 
     if int(position.line) != int(line):
         return False
     cursor_col0 = int(position.column) - 1
-    return int(start_col0) <= cursor_col0 < int(end_col0)
+    return int(start_col0) <= cursor_col0 <= int(end_col0)
 
 
 def _position_in_range(position: EditorPosition, rng: EditorRange) -> bool:
     if int(position.line) != int(rng.start.line) or int(position.line) != int(rng.end.line):
         return False
-    return int(rng.start.column) <= int(position.column) < int(rng.end.column)
+    return int(rng.start.column) <= int(position.column) <= int(rng.end.column)
 
 
 def _extract_reference_and_range(

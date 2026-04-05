@@ -100,3 +100,20 @@ def test_cursor_extraction_degrades_on_yaml_parse_error() -> None:
     assert result.reference == ""
     assert result.range is None
     assert result.warnings
+
+
+def test_cursor_extraction_loader_allows_cursor_at_end_of_reference() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source:
+          source_id: orders
+          loader: "pkg.mod:fn"
+        sources: {}
+        """
+    )
+    reference = "pkg.mod:fn"
+    end_pos = _pos(yaml_text, reference, offset=len(reference))
+    result = editor_semantics.extract_yaml_dsl_python_reference_by_cursor(yaml_text, end_pos)
+    assert result.yaml_path == "main_source.loader"
+    assert result.reference == reference

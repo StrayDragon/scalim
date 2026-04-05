@@ -711,6 +711,202 @@ def complete_python_reference(
     return PythonCompletionResult(items=items, warnings=tuple(warnings))
 
 
+def complete_python_module_segment(
+    prefix_module_path: str,
+    *,
+    segment_prefix: str,
+    python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]] = None,
+) -> PythonCompletionResult:
+    """提供 module path 的 segment 补全.
+
+    例:
+    - prefix_module_path="pkg" + segment_prefix="mo" -> ["mod", "more"]
+    - prefix_module_path="" + segment_prefix="pkg" -> ["pkg"]
+    """
+    warnings: List[str] = []
+    prefix_raw = str(prefix_module_path or "").strip()
+    seg_prefix = str(segment_prefix or "")
+    search_locations = _python_module_search_locations(
+        prefix_raw,
+        python_roots=python_roots,
+        anchor_path=anchor_path,
+        warnings=warnings,
+    )
+
+    names: Dict[str, None] = {}
+    for base in search_locations:
+        for name in _iter_python_module_child_names(base):
+            if name.startswith(seg_prefix):
+                names[name] = None
+
+    return PythonCompletionResult(items=tuple(sorted(names)), warnings=tuple(warnings))
+
+
+def complete_python_attr_path_segment(
+    module_path: str,
+    *,
+    attr_path_prefix: str,
+    python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]] = None,
+) -> PythonCompletionResult:
+    """提供 `module_path + attr_path` 的补全(支持 class 内符号)."""
+    raw_module_path = str(module_path or "").strip()
+    warnings: List[str] = []
+    if not raw_module_path:
+        return PythonCompletionResult(items=(), warnings=("无法解析 module_path",))
+
+    parsed = _split_attr_path_prefix(str(attr_path_prefix or ""))
+    if parsed is None:
+        return PythonCompletionResult(items=(), warnings=tuple(warnings))
+    base_parts, seg_prefix = parsed
+
+    tree = _resolve_module_ast(raw_module_path, python_roots=python_roots, anchor_path=anchor_path, warnings=warnings)
+    if tree is None:
+        return PythonCompletionResult(items=(), warnings=tuple(warnings))
+
+    current_symbols: Dict[str, ast.AST] = _index_module_symbols(tree)
+    for part in base_parts:
+        node = current_symbols.get(part)
+        if node is None:
+            return PythonCompletionResult(items=(), warnings=tuple(warnings))
+        if not isinstance(node, ast.ClassDef):
+            return PythonCompletionResult(items=(), warnings=tuple(warnings))
+        current_symbols = _index_class_symbols(node)
+
+    matched = sorted([name for name in current_symbols if name.startswith(seg_prefix)])
+    return PythonCompletionResult(items=tuple(matched), warnings=tuple(warnings))
+
+
+def _safe_path(raw: object) -> Optional[Path]:
+    try:
+        return Path(str(raw)).expanduser().resolve(strict=False)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _python_module_search_locations(
+    prefix_module_path: str,
+    *,
+    python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]],
+    warnings: List[str],
+) -> Tuple[Path, ...]:
+    roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
+    prefix = str(prefix_module_path or "").strip()
+    if not prefix:
+        return roots
+
+    resolved_prefix = _normalize_python_module_path(
+        prefix,
+        python_roots=python_roots,
+        anchor_path=anchor_path,
+        warnings=warnings,
+    )
+    if not resolved_prefix:
+        return ()
+
+    spec = _find_spec(resolved_prefix, roots=roots)
+    locs = getattr(spec, "submodule_search_locations", None) if spec is not None else None
+    if not locs:
+        warnings.append("无法定位模块包路径: {}".format(resolved_prefix))
+        return ()
+
+    out: List[Path] = []
+    for loc in list(locs):
+        p = _safe_path(loc)
+        if p is None or not p.exists() or not p.is_dir():
+            continue
+        out.append(p)
+    return tuple(out)
+
+
+def _looks_like_package_dir(path: Path) -> bool:
+    try:
+        if (path / "__init__.py").exists():
+            return True
+    except OSError:
+        return False
+
+    try:
+        return any(path.glob("*.py")) or any(path.glob("*.pyi"))
+    except OSError:
+        return False
+
+
+def _iter_python_module_child_names(base: Path) -> Iterable[str]:
+    if not base.exists() or not base.is_dir():
+        return ()
+    try:
+        children = list(base.iterdir())
+    except OSError:
+        return ()
+
+    for child in children:
+        name = str(child.name)
+        if not name or name.startswith("."):
+            continue
+
+        if child.is_file():
+            suffix = str(child.suffix)
+            if suffix not in (".py", ".pyi"):
+                continue
+            stem = str(child.stem)
+            if stem and stem != "__init__" and stem.isidentifier():
+                yield stem
+            continue
+
+        if child.is_dir() and name.isidentifier() and _looks_like_package_dir(child):
+            yield name
+
+
+def _split_attr_path_prefix(prefix_full: str) -> Optional[Tuple[Tuple[str, ...], str]]:
+    parts = [p.strip() for p in str(prefix_full or "").split(".")]
+    if not parts:
+        return ((), "")
+    if any(p == "" for p in parts[:-1]):
+        return None
+    base_parts = tuple([p for p in parts[:-1] if p])
+    seg_prefix = str(parts[-1] or "")
+    return base_parts, seg_prefix
+
+
+def _resolve_module_ast(
+    raw_module_path: str,
+    *,
+    python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]],
+    warnings: List[str],
+) -> Optional[ast.Module]:
+    module_path_resolved = _normalize_python_module_path(
+        str(raw_module_path or ""),
+        python_roots=python_roots,
+        anchor_path=anchor_path,
+        warnings=warnings,
+    )
+    if not module_path_resolved:
+        return None
+
+    roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
+    spec = _find_spec(module_path_resolved, roots=roots)
+    origin = spec.origin if spec is not None else None
+    if not isinstance(origin, str) or not origin or origin in ("built-in", "frozen"):
+        warnings.append("无法定位模块文件: {}".format(module_path_resolved))
+        return None
+
+    file_path = Path(origin).expanduser().resolve(strict=False)
+    if not file_path.exists() or not file_path.is_file():
+        warnings.append("模块文件不存在: {}".format(file_path))
+        return None
+
+    try:
+        text = file_path.read_text(encoding="utf-8")
+        return ast.parse(text)
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("completion 解析失败: {}: {}".format(type(exc).__name__, exc))
+        return None
+
+
 def _normalize_python_roots(
     raw_roots: Optional[Iterable[Union[str, Path]]],
     *,

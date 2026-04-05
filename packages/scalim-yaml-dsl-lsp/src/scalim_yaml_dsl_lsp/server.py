@@ -16,7 +16,8 @@ from .core import (
     PythonDefinitionResult,
     YamlDslEditorDiagnosticsResult,
     collect_yaml_dsl_editor_diagnostics,
-    complete_python_reference,
+    complete_python_attr_path_segment,
+    complete_python_module_segment,
     discover_yaml_dsl_editor_project,
     extract_yaml_dsl_python_reference_by_cursor,
     hover_python_reference,
@@ -48,6 +49,17 @@ class _DocumentState:
     text: str
     report: Optional[YamlDslEditorDiagnosticsResult]
     python_roots: Tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class _ReferenceCompletionContext:
+    kind: str
+    module_path: str
+    prefix_module_path: str
+    segment_prefix: str
+    attr_path_prefix: str
+    replace_start_offset: int
+    replace_end_offset: int
 
 
 def create_server() -> LanguageServer:
@@ -215,51 +227,212 @@ def _register_hover_feature(server: LanguageServer, state: Dict[str, _DocumentSt
         return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
 
 
-def _register_completion_feature(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:
-    @server.feature(types.TEXT_DOCUMENT_COMPLETION)
-    async def completion(_ls: LanguageServer, params: types.CompletionParams) -> types.CompletionList:
-        uri = str(params.text_document.uri)
-        doc_state = state.get(uri)
-        if doc_state is None or doc_state.report is None:
-            return types.CompletionList(is_incomplete=False, items=[])
-        anchor_path = _uri_to_path(uri)
+def _cursor_offset_for_completion(position: types.Position, extraction_range: EditorRange, *, reference_len: int) -> Optional[int]:
+    cursor_col1 = int(position.character) + 1
+    if cursor_col1 < int(extraction_range.start.column) or cursor_col1 > int(extraction_range.end.column):
+        return None
+    cursor_offset = int(cursor_col1) - int(extraction_range.start.column)
+    if cursor_offset < 0:
+        return None
+    return min(int(cursor_offset), int(reference_len))
 
-        try:
-            extraction = _extract_reference_for_lsp(doc_state.text, params.position)
-        except Exception as exc:  # noqa: BLE001
-            _LOG.exception("补全(`completion`) 光标抽取失败 `uri`=%s: %s: %s", uri, type(exc).__name__, exc)
-            return types.CompletionList(is_incomplete=False, items=[])
-        if extraction.warnings:
-            _LOG.debug(
-                "补全(`completion`) 光标抽取警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
-                uri,
-                extraction.yaml_path,
-                list(extraction.warnings),
-            )
-        if not extraction.reference:
-            return types.CompletionList(is_incomplete=False, items=[])
 
-        try:
-            result = complete_python_reference(extraction.reference, python_roots=list(doc_state.python_roots), anchor_path=anchor_path)
-        except Exception as exc:  # noqa: BLE001
-            _LOG.exception(
-                "补全(`completion`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
-                uri,
-                extraction.yaml_path,
-                type(exc).__name__,
-                exc,
-            )
-            return types.CompletionList(is_incomplete=False, items=[])
+def _completion_segment_bounds(text: str, offset: int) -> Tuple[int, int]:
+    o = max(0, min(int(offset), len(text)))
+    start = text.rfind(".", 0, o)
+    start = start + 1 if start != -1 else 0
+    end = text.find(".", o)
+    end = end if end != -1 else len(text)
+    return int(start), int(end)
+
+
+def _strip_trailing_separator(prefix_slice: str) -> str:
+    prefix = str(prefix_slice or "")
+    if prefix.endswith(".") and set(prefix) != {"."}:
+        return prefix[:-1]
+    return prefix
+
+
+def _completion_context_colon(reference: str, cursor_offset: int) -> _ReferenceCompletionContext:
+    colon_idx = reference.find(":")
+    module_text = reference[:colon_idx]
+    attr_start = colon_idx + 1
+    if cursor_offset <= colon_idx:
+        seg_start, seg_end = _completion_segment_bounds(module_text, cursor_offset)
+        prefix_slice = module_text[:seg_start]
+        return _ReferenceCompletionContext(
+            kind="module",
+            module_path=module_text,
+            prefix_module_path=_strip_trailing_separator(prefix_slice),
+            segment_prefix=module_text[seg_start:cursor_offset],
+            attr_path_prefix="",
+            replace_start_offset=seg_start,
+            replace_end_offset=seg_end,
+        )
+
+    attr_text = reference[attr_start:]
+    attr_cursor = cursor_offset - attr_start
+    seg_start, seg_end = _completion_segment_bounds(attr_text, attr_cursor)
+    return _ReferenceCompletionContext(
+        kind="attr",
+        module_path=module_text,
+        prefix_module_path="",
+        segment_prefix="",
+        attr_path_prefix=attr_text[:attr_cursor],
+        replace_start_offset=attr_start + seg_start,
+        replace_end_offset=attr_start + seg_end,
+    )
+
+
+def _completion_context_dotted(reference: str, cursor_offset: int) -> _ReferenceCompletionContext:
+    dot_idx = reference.rfind(".")
+    if dot_idx == -1:
+        seg_start, seg_end = _completion_segment_bounds(reference, cursor_offset)
+        prefix_slice = reference[:seg_start]
+        return _ReferenceCompletionContext(
+            kind="module",
+            module_path=reference,
+            prefix_module_path=_strip_trailing_separator(prefix_slice),
+            segment_prefix=reference[seg_start:cursor_offset],
+            attr_path_prefix="",
+            replace_start_offset=seg_start,
+            replace_end_offset=seg_end,
+        )
+
+    module_text = reference[:dot_idx]
+    attr_start = dot_idx + 1
+    if cursor_offset <= dot_idx:
+        module_cursor = min(int(cursor_offset), len(module_text))
+        seg_start, seg_end = _completion_segment_bounds(module_text, module_cursor)
+        prefix_slice = module_text[:seg_start]
+        return _ReferenceCompletionContext(
+            kind="module",
+            module_path=module_text,
+            prefix_module_path=_strip_trailing_separator(prefix_slice),
+            segment_prefix=module_text[seg_start:module_cursor],
+            attr_path_prefix="",
+            replace_start_offset=seg_start,
+            replace_end_offset=seg_end,
+        )
+
+    attr_text = reference[attr_start:]
+    attr_cursor = cursor_offset - attr_start
+    seg_start, seg_end = _completion_segment_bounds(attr_text, attr_cursor)
+    return _ReferenceCompletionContext(
+        kind="attr",
+        module_path=module_text,
+        prefix_module_path="",
+        segment_prefix="",
+        attr_path_prefix=attr_text[:attr_cursor],
+        replace_start_offset=attr_start + seg_start,
+        replace_end_offset=attr_start + seg_end,
+    )
+
+
+def _completion_context(reference: str, cursor_offset: int) -> Optional[_ReferenceCompletionContext]:
+    raw = str(reference or "")
+    cursor = max(0, min(int(cursor_offset), len(raw)))
+    if ":" in raw:
+        return _completion_context_colon(raw, cursor)
+    if not raw:
+        return None
+    return _completion_context_dotted(raw, cursor)
+
+
+def _lsp_range_for_reference_offsets(extraction_range: EditorRange, start_offset: int, end_offset: int) -> types.Range:
+    line0 = int(extraction_range.start.line) - 1
+    col0_base = int(extraction_range.start.column) - 1
+    start_char0 = col0_base + int(start_offset)
+    end_char0 = col0_base + int(end_offset)
+    return types.Range(
+        start=types.Position(line=line0, character=int(start_char0)),
+        end=types.Position(line=line0, character=int(end_char0)),
+    )
+
+
+def _completion_items_for_context(
+    ctx: _ReferenceCompletionContext,
+    *,
+    extraction_range: EditorRange,
+    python_roots: Tuple[Path, ...],
+    anchor_path: Optional[Path],
+    uri: str,
+    yaml_path: str,
+) -> List[types.CompletionItem]:
+    replace_range = _lsp_range_for_reference_offsets(extraction_range, ctx.replace_start_offset, ctx.replace_end_offset)
+    if ctx.kind == "module":
+        result = complete_python_module_segment(
+            ctx.prefix_module_path,
+            segment_prefix=ctx.segment_prefix,
+            python_roots=list(python_roots),
+            anchor_path=anchor_path,
+        )
         if result.warnings:
-            _LOG.info(
-                "补全(`completion`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
-                uri,
-                extraction.yaml_path,
-                list(result.warnings),
-            )
+            _LOG.info("补全(`completion`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, yaml_path, list(result.warnings))
 
-        items = [types.CompletionItem(label=str(item)) for item in result.items]
-        return types.CompletionList(is_incomplete=False, items=items)
+        return [
+            types.CompletionItem(
+                label=str(name),
+                kind=types.CompletionItemKind.Module,
+                text_edit=types.TextEdit(range=replace_range, new_text=str(name)),
+            )
+            for name in result.items
+        ]
+
+    result = complete_python_attr_path_segment(
+        ctx.module_path,
+        attr_path_prefix=ctx.attr_path_prefix,
+        python_roots=list(python_roots),
+        anchor_path=anchor_path,
+    )
+    if result.warnings:
+        _LOG.info("补全(`completion`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, yaml_path, list(result.warnings))
+
+    return [
+        types.CompletionItem(
+            label=str(name),
+            kind=types.CompletionItemKind.Function,
+            text_edit=types.TextEdit(range=replace_range, new_text=str(name)),
+        )
+        for name in result.items
+    ]
+
+
+def _handle_completion(params: types.CompletionParams, *, state: Dict[str, _DocumentState]) -> types.CompletionList:
+    uri = str(params.text_document.uri)
+    doc_state = state.get(uri)
+    if doc_state is None or doc_state.report is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+    anchor_path = _uri_to_path(uri)
+
+    extraction = _safe_extract_reference_for_lsp(doc_state.text, params.position, uri=uri, op="completion")
+    if not extraction.reference or extraction.range is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    reference = str(extraction.reference)
+    cursor_offset = _cursor_offset_for_completion(params.position, extraction.range, reference_len=len(reference))
+    if cursor_offset is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    ctx = _completion_context(reference, cursor_offset)
+    if ctx is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    items = _completion_items_for_context(
+        ctx,
+        extraction_range=extraction.range,
+        python_roots=doc_state.python_roots,
+        anchor_path=anchor_path,
+        uri=uri,
+        yaml_path=extraction.yaml_path,
+    )
+    return types.CompletionList(is_incomplete=False, items=items)
+
+
+def _register_completion_feature(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:
+    @server.feature(types.TEXT_DOCUMENT_COMPLETION, types.CompletionOptions(trigger_characters=[".", ":"]))
+    async def completion(_ls: LanguageServer, params: types.CompletionParams) -> types.CompletionList:
+        return _handle_completion(params, state=state)
 
 
 def _register_code_actions(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:

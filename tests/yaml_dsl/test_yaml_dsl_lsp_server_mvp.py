@@ -102,6 +102,91 @@ def test_lsp_server_publishes_diagnostics_and_resolves_definition(tmp_path) -> N
         client.shutdown()
 
 
+def test_lsp_server_completes_module_and_symbol_segments(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    pkg_dir = workspace / "scalim_misc" / "demo_big_data_report"
+    pkg_dir.mkdir(parents=True)
+    (workspace / "scalim_misc" / "__init__.py").write_text("", encoding="utf-8")
+    (pkg_dir / "__init__.py").write_text("", encoding="utf-8")
+    (pkg_dir / "loaders.py").write_text(
+        "\n".join(
+            [
+                "def load_payment_methods() -> int:",
+                "    return 1",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = 'payment_methods:\n  loader: "scalim_misc.demo_big_data_report.loaders:load_payment_meth"\n'
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        line0 = yaml_text.splitlines()[1]
+        module_cursor_char = int(line0.index("demo_big_data_report")) + len("demo_big_data_re")
+        module_completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": 1, "character": module_cursor_char},
+            },
+        )
+        module_resp = client.recv_until(lambda msg: msg.get("id") == module_completion_id, timeout=10.0)
+        assert "error" not in module_resp
+        module_items = module_resp.get("result", {}).get("items", [])
+        module_labels = {item.get("label") for item in module_items}
+        assert "demo_big_data_report" in module_labels
+
+        attr_cursor_char = int(line0.index("load_payment_meth")) + len("load_payment_meth")
+        attr_completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": 1, "character": attr_cursor_char},
+            },
+        )
+        attr_resp = client.recv_until(lambda msg: msg.get("id") == attr_completion_id, timeout=10.0)
+        assert "error" not in attr_resp
+        attr_items = attr_resp.get("result", {}).get("items", [])
+        attr_labels = {item.get("label") for item in attr_items}
+        assert "load_payment_methods" in attr_labels
+    finally:
+        client.shutdown()
+
+
 def _start_lsp_server_process(workspace: Path) -> subprocess.Popen[bytes]:
     code = "from scalim_yaml_dsl_lsp.cli import main; raise SystemExit(main(['serve', '--log-level', 'ERROR']))"
     env = dict(os.environ)
