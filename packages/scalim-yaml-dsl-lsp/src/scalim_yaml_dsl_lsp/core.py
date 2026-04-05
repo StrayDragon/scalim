@@ -288,6 +288,12 @@ def _discover_yaml_dsl_editor_project_from_project_config(
         raw_allowed_roots = cfg.import_allowed_roots
         if cfg.editor is not None and cfg.editor.python_roots:
             raw_python_roots = cfg.editor.python_roots
+        elif workspace_root is not None and _is_within_dir(entry_path, workspace_root):
+            # `scalim.yaml` is present but does not declare `yaml_dsl.editor.python_roots`.
+            # For editor features (go-to-definition/hover/completion), prefer a 0-config experience:
+            # infer a monorepo-friendly set of python roots from the workspace root, while
+            # still including `project_root` to keep relative-module references stable.
+            raw_python_roots = (*_infer_default_python_roots(workspace_root), project_root)
     elif workspace_root is not None and _is_within_dir(entry_path, workspace_root):
         project_root = workspace_root
         raw_allowed_roots = (workspace_root,)

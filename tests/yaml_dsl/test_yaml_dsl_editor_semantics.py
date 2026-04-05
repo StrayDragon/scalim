@@ -85,6 +85,31 @@ def test_discovery_nearest_wins_scalim_yaml_and_editor_python_roots(tmp_path: Pa
     assert set(discovery.allowed_yaml_roots) == {entry_dir, sub / "allowed"}
 
 
+def test_discovery_scalim_yaml_without_editor_python_roots_still_infers_from_workspace_root(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    dsl_dir = repo / "dsl"
+    pkg_src = repo / "packages" / "demo-pkg" / "src" / "demo_pkg"
+
+    _ = _write(dsl_dir / "scalim.yaml", "yaml_dsl:\n  import_allowed_roots: [.]\n")
+    yaml_path = _write(dsl_dir / "demand.yaml", "name: demo\nmain_source: {source_id: x, loader: demo_pkg.mod:fn}\n")
+
+    _ = _write(pkg_src / "__init__.py", "")
+    mod_path = _write(pkg_src / "mod.py", "def fn():\n    return 1\n")
+
+    discovery = editor_semantics.discover_yaml_dsl_editor_project(yaml_path, workspace_root_override=repo)
+    assert discovery.scalim_yaml_path == dsl_dir / "scalim.yaml"
+    assert discovery.project_root == dsl_dir
+    assert repo / "packages" / "demo-pkg" / "src" in discovery.python_roots
+    assert dsl_dir in discovery.python_roots
+
+    result = editor_semantics.resolve_python_definition(
+        "demo_pkg.mod:fn",
+        python_roots=list(discovery.python_roots),
+        anchor_path=yaml_path,
+    )
+    assert result.locations and Path(result.locations[0].file_path) == mod_path
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
