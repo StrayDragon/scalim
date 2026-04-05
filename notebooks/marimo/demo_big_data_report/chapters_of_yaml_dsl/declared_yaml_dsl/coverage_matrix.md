@@ -51,6 +51,7 @@
 
 - `main_source.loader` / `sources.*.loader`（安全引用 + allowlist）
   - YAML: 各场景 demand YAML（见上）
+  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/relative_module_demo/relative_module_demo.yaml`（相对模块引用：`.registry:load_orders`；用于编辑器 `go-to-definition` 演示）
   - Loader impl:
     - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/loaders.py`
     - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ads_scenario.py`

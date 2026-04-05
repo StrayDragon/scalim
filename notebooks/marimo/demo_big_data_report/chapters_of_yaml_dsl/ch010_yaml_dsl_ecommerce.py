@@ -155,6 +155,12 @@ def _(mo):
         - oracle：`scalim_misc.demo_big_data_report.verification.verify_scalim_output`
         - Gate：`just examples`
 
+        ## 编辑器体验（YAML DSL LSP）
+
+        - 相对模块 loader 引用演示：`chapters_of_yaml_dsl/declared_yaml_dsl/relative_module_demo/relative_module_demo.yaml`
+        - 在该文件中将光标放到 `loader: ".registry:load_orders"` 上触发 `go-to-definition`，
+          应能跳转到同目录 `registry.py` 中的 `load_orders` 定义
+
         SSOT:
         - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch010_yaml_dsl_ecommerce.py::run_yaml_dsl_ecommerce`
         """
