@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+
+# Demo: relative python module reference for go-to-definition.
+# The `loader` value starts with `.` and is resolved relative to this YAML's directory.
+
+name: demo_big_data_report_relative_module_demo
+description: |
+  演示: YAML DSL loader 支持相对模块引用（前导 `.`）.
+
+  在 VSCode 中打开本文件,将光标放到 `.registry:load_orders` 上触发 go-to-definition,
+  应能跳转到同目录下 `registry.py` 中的 `load_orders` 定义。
+
+main_source:
+  source_id: orders
+  loader: ".registry:load_orders"
+  fields:
+    order_id: {extract: order_id, name: 订单ID}
+
