@@ -76,3 +76,14 @@ If none match, the server will not start automatically (you can still use `Scali
      - `Scalim YAML DSL: Open logs`
      - `Scalim YAML DSL: Show discovery summary`
      - `Scalim YAML DSL: Open/Create scalim.yaml`
+
+## Build VSIX (dev)
+
+From the repo root:
+
+```bash
+cd extras/vscode-scalim
+just vsix
+```
+
+Output: `extras/vscode-scalim/vscode-scalim.vsix`

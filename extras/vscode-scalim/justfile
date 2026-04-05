@@ -1,0 +1,29 @@
+set shell := ["bash", "-lc"]
+
+# VSCode extension helper tasks (developer-only).
+#
+# Usage:
+#   cd extras/vscode-scalim
+#   just vsix
+#
+# Notes:
+# - The generated `*.vsix` is gitignored by repo root `.gitignore`.
+# - We use `pnpm dlx @vscode/vsce` to avoid requiring a global `vsce` install.
+
+
+default:
+    @just --list
+
+
+install:
+    pnpm install --frozen-lockfile
+
+
+build:
+    pnpm run package
+
+
+vsix out="vscode-scalim.vsix":
+    pnpm run package
+    pnpm -s dlx @vscode/vsce package --no-dependencies --out {{out}}
+

@@ -12,3 +12,10 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+
+# Dev-only helpers
+justfile
+pnpm-lock.yaml
+pnpm-workspace.yaml
+scalim-dev.code-workspace
+fixtures/**
