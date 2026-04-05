@@ -15,7 +15,7 @@
 ## 3. 文档与手动验收
 
 - [x] 3.1 更新 VSCode/LSP 集成文档：说明 `$import` 可跳转/hover；解释“编辑器 schema 不展开 imports”的现实边界与本次修复策略（schema 需对 `$import` 形态友好）
-- [ ] 3.2 手动验收：VSCode 打开 `notebooks/.../declared_yaml_dsl/ecommerce_report.yaml`
+- [x] 3.2 手动验收：VSCode 打开 `notebooks/.../declared_yaml_dsl/ecommerce_report.yaml`
   - `$import: fragments.report_book` 可跳转到 `ecommerce_report_fragments.yaml` 的目标 mapping
   - 不再出现 schema 的 `Missing property budget` 假阳性红线
 
