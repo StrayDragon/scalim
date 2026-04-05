@@ -9,6 +9,8 @@ __all__ = ()
 
 _MIN_QUOTED_TOKEN_LEN = 2
 _RETRY_SHOULD_RETRY_PATH_MIN_LEN = 2
+_IMPORT_LIST_PATH_MIN_LEN = 2
+_IMPORT_KEY = "$import"
 
 
 @dataclass(frozen=True)
@@ -44,6 +46,34 @@ def extract_yaml_dsl_python_reference_by_cursor(
     - v1 只覆盖单行 scalar string (`loader`/`call_by`/`retry.should_retry`)
     """
 
+    return _extract_yaml_dsl_reference_by_cursor(
+        yaml_text,
+        position,
+        allowed_kinds=("loader", "call_by", "retry.should_retry"),
+    )
+
+
+def extract_yaml_dsl_import_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """基于 `yaml_text + position` 抽取 YAML DSL 内的 `$import` 引用字段.
+
+    约束:
+    - 仅做静态解析,无副作用
+    - 失败时降级为“空结果 + warnings”,不得 crash
+    - v1 覆盖 `$import: <ref>` 与 `$import: [<ref>, ...]` 形态
+    """
+
+    return _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=(_IMPORT_KEY,))
+
+
+def _extract_yaml_dsl_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+    *,
+    allowed_kinds: Tuple[str, ...],
+) -> YamlCursorExtractionResult:
     warnings: List[str] = []
 
     try:
@@ -59,7 +89,7 @@ def extract_yaml_dsl_python_reference_by_cursor(
     lines = yaml_text.splitlines()
 
     try:
-        result = _extract_from_node(root, lines=lines, path=[], position=position, warnings=warnings)
+        result = _extract_from_node(root, lines=lines, path=[], position=position, warnings=warnings, allowed_kinds=allowed_kinds)
     except Exception as exc:  # noqa: BLE001
         warnings.append("cursor extraction failed: {}: {}".format(type(exc).__name__, exc))
         return YamlCursorExtractionResult(warnings=tuple(warnings))
@@ -87,8 +117,20 @@ def _extract_from_node(
     path: List[str],
     position: EditorPosition,
     warnings: List[str],
+    allowed_kinds: Tuple[str, ...],
 ) -> Optional[YamlCursorExtractionResult]:
     node_id = str(getattr(node, "id", ""))
+
+    if node_id == "scalar":
+        yaml_path = ".".join(path)
+        return _extract_from_scalar_value(
+            node,
+            lines=lines,
+            yaml_path=yaml_path,
+            path=path,
+            position=position,
+            allowed_kinds=allowed_kinds,
+        )
 
     if node_id == "mapping":
         for key_node, value_node in cast_value(node):
@@ -97,24 +139,13 @@ def _extract_from_node(
                 continue
             key_path = [*path, key]
 
-            value_id = str(getattr(value_node, "id", ""))
-            if value_id == "scalar":
-                scalar_result = _extract_from_scalar_value(
-                    value_node,
-                    lines=lines,
-                    yaml_path=".".join(key_path),
-                    path=key_path,
-                    position=position,
-                )
-                if scalar_result is not None:
-                    return scalar_result
-
             nested = _extract_from_node(
                 value_node,
                 lines=lines,
                 path=key_path,
                 position=position,
                 warnings=warnings,
+                allowed_kinds=allowed_kinds,
             )
             if nested is not None:
                 return nested
@@ -129,6 +160,7 @@ def _extract_from_node(
                 path=idx_path,
                 position=position,
                 warnings=warnings,
+                allowed_kinds=allowed_kinds,
             )
             if nested is not None:
                 return nested
@@ -148,8 +180,9 @@ def _extract_from_scalar_value(
     yaml_path: str,
     path: List[str],
     position: EditorPosition,
+    allowed_kinds: Tuple[str, ...],
 ) -> Optional[YamlCursorExtractionResult]:
-    if not _is_supported_reference_path(path):
+    if not _is_supported_reference_path(path, allowed_kinds=allowed_kinds):
         return None
 
     reference_raw = str(getattr(node, "value", "") or "")
@@ -291,10 +324,15 @@ def _reference_kind(path: List[str]) -> str:
     leaf = str(path[-1])
     if leaf in ("loader", "call_by"):
         return leaf
+    if leaf == _IMPORT_KEY:
+        return _IMPORT_KEY
+    if len(path) >= _IMPORT_LIST_PATH_MIN_LEN and str(path[-2]) == _IMPORT_KEY:
+        return _IMPORT_KEY
     if len(path) >= _RETRY_SHOULD_RETRY_PATH_MIN_LEN and str(path[-2]) == "retry" and leaf == "should_retry":
         return "retry.should_retry"
     return ""
 
 
-def _is_supported_reference_path(path: List[str]) -> bool:
-    return bool(_reference_kind(path))
+def _is_supported_reference_path(path: List[str], *, allowed_kinds: Tuple[str, ...]) -> bool:
+    kind = _reference_kind(path)
+    return bool(kind and kind in allowed_kinds)

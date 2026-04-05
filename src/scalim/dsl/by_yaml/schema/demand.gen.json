@@ -2011,6 +2011,9 @@
       "allOf": [
         {
           "if": {
+            "required": [
+              "kind"
+            ],
             "properties": {
               "kind": {
                 "const": "xlsx_file"
@@ -2033,6 +2036,9 @@
         },
         {
           "if": {
+            "required": [
+              "kind"
+            ],
             "properties": {
               "kind": {
                 "const": "xlsx_memory"

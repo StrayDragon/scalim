@@ -10,6 +10,7 @@
 
 - 语义 diagnostics（对齐 `scalim` library 语义,不依赖 shell-out CLI）
 - `loader`/`call_by` 等 Python 引用的跳转（definition）/悬浮（hover）/补全（completion）
+- `$import` 引用跳转（definition）/悬浮（hover）：从 `$import: <alias>.<path>` 跳到 fragment YAML 的目标 mapping key
 - Quick Fix（code actions）:
   - 缺失 `scalim.yaml` 时可一键创建最小配置
   - imports 越界时可一键补 `yaml_dsl.import_allowed_roots`
@@ -24,6 +25,17 @@ YAML schema 插件负责结构校验/补全,本 LSP server **不替代** schema 
 - JetBrains: YAML plugin（配合 `$schema` modeline）
 
 推荐组合：**schema 插件提供结构体验 + YAML DSL LSP 提供语义体验**。
+
+### 关于 `$import` 与编辑器 schema 的边界
+
+- 运行时（`scalim` library / `scalim-cli`）会在校验前展开 `imports` + `$import`，因此能看到 fragment 中声明的字段（例如 `kind`）。
+- 编辑器侧的 YAML schema 校验（例如 VSCode 的 `redhat.vscode-yaml`）**不会展开 `$import`**，因此主 YAML 中形如 `{ $import: ..., ... }` 的 mapping 在校验时通常“看不到 fragment 字段”。
+
+为了避免由此导致的假阳性红线（典型：`kind` 缺失时误触发 `if/then` 分支，误报 `Missing property budget`），本仓库的 schema 生成策略要求：
+
+- 所有基于 `kind` 的 `if/then` 分支，在 `if` 中同时声明 `required: ["kind"]`，确保 `kind` 缺失时不会触发 then。
+
+这让 schema 对 `$import` 形态更友好；真正的语义校验仍由 YAML DSL LSP diagnostics / CLI 在 imports expansion 后兜底。
 
 ## 统一约定（所有编辑器通用）
 
@@ -81,4 +93,3 @@ scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 - [Zed](zed.md)
 - [JetBrains](jetbrains.md)
 - [Troubleshooting](troubleshooting.md)
-

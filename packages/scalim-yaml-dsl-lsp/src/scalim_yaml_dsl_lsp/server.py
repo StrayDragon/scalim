@@ -15,14 +15,19 @@ from scalim.vendor.yamlx.ruamel.yaml import YAML
 from .core import (
     PythonDefinitionResult,
     YamlDslEditorDiagnosticsResult,
+    YamlImportDefinitionResult,
+    YamlImportHoverResult,
     collect_yaml_dsl_editor_diagnostics,
     complete_python_attr_path_segment,
     complete_python_module_segment,
     discover_yaml_dsl_editor_project,
+    extract_yaml_dsl_import_reference_by_cursor,
     extract_yaml_dsl_python_reference_by_cursor,
     hover_python_reference,
+    hover_yaml_import_reference,
     is_probably_yaml_dsl_document,
     resolve_python_definition,
+    resolve_yaml_import_definition,
 )
 from .cursor_extraction import YamlCursorExtractionResult
 from .editor_types import EditorPosition, EditorRange
@@ -116,16 +121,75 @@ def _handle_definition(
         return None
     anchor_path = _uri_to_path(uri)
 
-    extraction = _safe_extract_reference_for_lsp(doc_state.text, params.position, uri=uri, op="definition")
-    if not extraction.reference:
+    handled, locations = _try_handle_python_definition(
+        doc_state,
+        position=params.position,
+        anchor_path=anchor_path,
+        uri=uri,
+    )
+    if handled:
+        return locations
+
+    if anchor_path is None:
         return None
+    return _handle_yaml_import_definition(
+        doc_state,
+        position=params.position,
+        anchor_path=anchor_path,
+        uri=uri,
+    )
+
+
+def _try_handle_python_definition(
+    doc_state: _DocumentState,
+    *,
+    position: types.Position,
+    anchor_path: Optional[Path],
+    uri: str,
+) -> Tuple[bool, Optional[List[types.Location]]]:
+    extraction = _safe_extract_reference_for_lsp(doc_state.text, position, uri=uri, op="definition")
+    if not extraction.reference:
+        return False, None
 
     result = _safe_resolve_python_definition(extraction, python_roots=doc_state.python_roots, anchor_path=anchor_path, uri=uri)
     if result is None:
-        return None
+        return True, None
 
     locations: List[types.Location] = []
     for loc in result.locations:
+        location = _location_from_definition_location(loc.file_path, loc.range)
+        if location is not None:
+            locations.append(location)
+    return True, locations or None
+
+
+def _handle_yaml_import_definition(
+    doc_state: _DocumentState,
+    *,
+    position: types.Position,
+    anchor_path: Path,
+    uri: str,
+) -> Optional[List[types.Location]]:
+    if doc_state.report is None:
+        return None
+    import_extraction = _safe_extract_import_reference_for_lsp(doc_state.text, position, uri=uri, op="definition")
+    if not import_extraction.reference:
+        return None
+
+    import_result = _safe_resolve_yaml_import_definition(
+        import_extraction,
+        anchor_yaml_text=doc_state.text,
+        anchor_yaml_path=anchor_path,
+        allowed_yaml_roots=doc_state.report.discovery.allowed_yaml_roots,
+        scalim_yaml_override=doc_state.report.discovery.scalim_yaml_path,
+        project_root_override=doc_state.report.discovery.project_root,
+        uri=uri,
+    )
+    if import_result is None:
+        return None
+
+    locations: List[types.Location] = []
+    for loc in import_result.locations:
         location = _location_from_definition_location(loc.file_path, loc.range)
         if location is not None:
             locations.append(location)
@@ -185,46 +249,178 @@ def _safe_resolve_python_definition(
     return result
 
 
+def _safe_extract_import_reference_for_lsp(
+    yaml_text: str,
+    position: types.Position,
+    *,
+    uri: str,
+    op: str,
+) -> YamlCursorExtractionResult:
+    try:
+        extraction = _extract_import_reference_for_lsp(yaml_text, position)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("%s(`$import`) 光标抽取失败 `uri`=%s: %s: %s", op, uri, type(exc).__name__, exc)
+        return YamlCursorExtractionResult(warnings=("{}(`$import`) 光标抽取失败".format(op),))
+    if extraction.warnings:
+        _LOG.debug(
+            "%s(`$import`) 光标抽取警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            op,
+            uri,
+            extraction.yaml_path,
+            list(extraction.warnings),
+        )
+    return extraction
+
+
+def _safe_resolve_yaml_import_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    anchor_yaml_text: str,
+    anchor_yaml_path: Path,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Path],
+    project_root_override: Path,
+    uri: str,
+) -> Optional[YamlImportDefinitionResult]:
+    try:
+        result = resolve_yaml_import_definition(
+            extraction.reference,
+            anchor_yaml_text=anchor_yaml_text,
+            anchor_yaml_path=anchor_yaml_path,
+            allowed_yaml_roots=allowed_yaml_roots,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=project_root_override,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "定义跳转(`$import`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info("定义跳转(`$import`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings))
+    return result
+
+
 def _register_hover_feature(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:
     @server.feature(types.TEXT_DOCUMENT_HOVER)
     async def hover(_ls: LanguageServer, params: types.HoverParams) -> Optional[types.Hover]:
-        uri = str(params.text_document.uri)
-        doc_state = state.get(uri)
-        if doc_state is None or doc_state.report is None:
-            return None
-        anchor_path = _uri_to_path(uri)
+        return _handle_hover(params, state=state)
 
-        try:
-            extraction = _extract_reference_for_lsp(doc_state.text, params.position)
-        except Exception as exc:  # noqa: BLE001
-            _LOG.exception("悬浮提示(`hover`) 光标抽取失败 `uri`=%s: %s: %s", uri, type(exc).__name__, exc)
-            return None
-        if extraction.warnings:
-            _LOG.debug(
-                "悬浮提示(`hover`) 光标抽取警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
-                uri,
-                extraction.yaml_path,
-                list(extraction.warnings),
-            )
-        if not extraction.reference:
-            return None
 
-        try:
-            result = hover_python_reference(extraction.reference, python_roots=list(doc_state.python_roots), anchor_path=anchor_path)
-        except Exception as exc:  # noqa: BLE001
-            _LOG.exception(
-                "悬浮提示(`hover`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
-                uri,
-                extraction.yaml_path,
-                type(exc).__name__,
-                exc,
-            )
-            return None
-        if result.warnings:
-            _LOG.info("悬浮提示(`hover`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings))
-        if not result.text.strip():
-            return None
-        return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
+def _handle_hover(params: types.HoverParams, *, state: Dict[str, _DocumentState]) -> Optional[types.Hover]:
+    uri = str(params.text_document.uri)
+    doc_state = state.get(uri)
+    if doc_state is None or doc_state.report is None:
+        return None
+    anchor_path = _uri_to_path(uri)
+
+    extraction = _safe_extract_reference_for_lsp(doc_state.text, params.position, uri=uri, op="悬浮提示(`hover`)")
+    if extraction.reference:
+        return _hover_python_extraction(extraction, python_roots=doc_state.python_roots, anchor_path=anchor_path, uri=uri)
+
+    if anchor_path is None:
+        return None
+    import_extraction = _safe_extract_import_reference_for_lsp(doc_state.text, params.position, uri=uri, op="悬浮提示(`hover`)")
+    if not import_extraction.reference:
+        return None
+
+    return _hover_yaml_import_extraction(
+        import_extraction,
+        anchor_yaml_text=doc_state.text,
+        anchor_yaml_path=anchor_path,
+        allowed_yaml_roots=doc_state.report.discovery.allowed_yaml_roots,
+        scalim_yaml_override=doc_state.report.discovery.scalim_yaml_path,
+        project_root_override=doc_state.report.discovery.project_root,
+        uri=uri,
+    )
+
+
+def _hover_python_extraction(
+    extraction: YamlCursorExtractionResult,
+    *,
+    python_roots: Tuple[Path, ...],
+    anchor_path: Optional[Path],
+    uri: str,
+) -> Optional[types.Hover]:
+    try:
+        result = hover_python_reference(extraction.reference, python_roots=list(python_roots), anchor_path=anchor_path)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "悬浮提示(`hover`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info("悬浮提示(`hover`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings))
+    if not result.text.strip():
+        return None
+    return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
+
+
+def _hover_yaml_import_extraction(
+    extraction: YamlCursorExtractionResult,
+    *,
+    anchor_yaml_text: str,
+    anchor_yaml_path: Path,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Path],
+    project_root_override: Path,
+    uri: str,
+) -> Optional[types.Hover]:
+    import_result = _safe_hover_yaml_import_reference(
+        extraction,
+        anchor_yaml_text=anchor_yaml_text,
+        anchor_yaml_path=anchor_yaml_path,
+        allowed_yaml_roots=allowed_yaml_roots,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+        uri=uri,
+    )
+    if import_result is None or not import_result.text.strip():
+        return None
+    return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(import_result.text)))
+
+
+def _safe_hover_yaml_import_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    anchor_yaml_text: str,
+    anchor_yaml_path: Path,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Path],
+    project_root_override: Path,
+    uri: str,
+) -> Optional[YamlImportHoverResult]:
+    try:
+        result = hover_yaml_import_reference(
+            extraction.reference,
+            anchor_yaml_text=anchor_yaml_text,
+            anchor_yaml_path=anchor_yaml_path,
+            allowed_yaml_roots=allowed_yaml_roots,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=project_root_override,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "悬浮提示(`hover`, `$import`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info(
+            "悬浮提示(`hover`, `$import`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings)
+        )
+    return result
 
 
 def _cursor_offset_for_completion(position: types.Position, extraction_range: EditorRange, *, reference_len: int) -> Optional[int]:
@@ -1052,6 +1248,11 @@ def _compute_diagnostics_and_report(
 def _extract_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
     editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
     return extract_yaml_dsl_python_reference_by_cursor(yaml_text, editor_pos)
+
+
+def _extract_import_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
+    editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
+    return extract_yaml_dsl_import_reference_by_cursor(yaml_text, editor_pos)
 
 
 def _to_lsp_range(rng: EditorRange) -> types.Range:

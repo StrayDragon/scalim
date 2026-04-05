@@ -181,7 +181,7 @@ class BookConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
         {
-            "if": {"properties": {"kind": {"const": "xlsx_file"}}},
+            "if": {"required": ["kind"], "properties": {"kind": {"const": "xlsx_file"}}},
             "then": {
                 "required": ["path"],
                 "properties": {
@@ -191,7 +191,7 @@ class BookConfig:
             },
         },
         {
-            "if": {"properties": {"kind": {"const": "xlsx_memory"}}},
+            "if": {"required": ["kind"], "properties": {"kind": {"const": "xlsx_memory"}}},
             "then": {
                 "required": ["budget"],
                 "properties": {
