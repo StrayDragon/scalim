@@ -3,6 +3,7 @@ import json
 import re
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from functools import lru_cache
 from importlib.machinery import PathFinder
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
@@ -309,18 +310,8 @@ _YAML_DSL_SCHEMA_MARKERS: Tuple[str, ...] = (
     "scalim_yaml.gen.json",
 )
 
-_YAML_DSL_KEY_HINT_RE = re.compile(r"(?m)^\s*(main_source|workflow|imports|loader|call_by)\s*:")
+_YAML_DSL_FALLBACK_HINT_RE = re.compile(r"(?m)^\s*(loader|call_by)\s*:")
 _YAML_DSL_DOLLAR_HINT_RE = re.compile(r"\$(import|init_var)\b")
-_YAML_DSL_TOPLEVEL_HINT_KEYS = {
-    "main_source",
-    "workflow",
-    "imports",
-    "sources",
-    "relations",
-    "outputs",
-    "loader",
-    "call_by",
-}
 
 
 def is_probably_yaml_dsl_document(yaml_path: Optional[Union[str, Path]], yaml_text: str) -> bool:
@@ -348,15 +339,26 @@ def is_probably_yaml_dsl_document(yaml_path: Optional[Union[str, Path]], yaml_te
         return True
     if _YAML_DSL_DOLLAR_HINT_RE.search(text) is not None:
         return True
+    if _YAML_DSL_FALLBACK_HINT_RE.search(text) is not None:
+        return True
 
     try:
         loaded = yaml.safe_load(text)
     except Exception:  # noqa: BLE001
-        return bool(_YAML_DSL_KEY_HINT_RE.search(text))
+        return False
 
     if isinstance(loaded, dict):
         loaded_dict = cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
-        return bool(_YAML_DSL_TOPLEVEL_HINT_KEYS.intersection(loaded_dict))
+        required_kind = _classify_yaml_kind_by_required_keys_loaded(loaded_dict)
+        if required_kind:
+            return True
+
+        # Permissive fallback for in-progress demand drafts that only contain `imports` + `name`.
+        imports_obj = loaded_dict.get("imports")
+        if isinstance(imports_obj, dict) and "name" in loaded_dict:
+            return True
+
+        return False
 
     return False
 
@@ -379,6 +381,9 @@ def classify_yaml_dsl_kind(
         workspace_root=workspace_root,
     )
     kind = _classify_yaml_kind_from_overrides(path, cfg)
+    if kind:
+        return kind
+    kind = _classify_yaml_kind_by_required_keys(yaml_text)
     if kind:
         return kind
     return _classify_yaml_kind_by_heuristic(yaml_text)
@@ -406,7 +411,11 @@ def collect_yaml_dsl_editor_diagnostics(
     )
     discovery = _discover_yaml_dsl_editor_project_from_project_config(path, cfg, workspace_root=workspace_root)
 
-    yaml_kind = _classify_yaml_kind_from_overrides(path, cfg) or _classify_yaml_kind_by_heuristic(yaml_text)
+    yaml_kind = (
+        _classify_yaml_kind_from_overrides(path, cfg)
+        or _classify_yaml_kind_by_required_keys(yaml_text)
+        or _classify_yaml_kind_by_heuristic(yaml_text)
+    )
 
     if yaml_kind == YAML_DSL_KIND_WORKFLOW:
         errors, warnings = _collect_workflow_diagnostics(yaml_text, yaml_path=path)
@@ -777,6 +786,65 @@ def _schema_dir() -> Path:
 def _load_json_schema(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return cast("Dict[str, Any]", json.load(f))  # pragma: allow-cast json schema typed boundary
+
+
+_SCHEMA_REQUIRED_FILENAMES: Dict[str, str] = {
+    YAML_DSL_KIND_DEMAND: "demand.gen.json",
+    YAML_DSL_KIND_WORKFLOW: "workflow.gen.json",
+}
+
+
+@lru_cache(maxsize=None)
+def _schema_required_keys(kind: str) -> Tuple[str, ...]:
+    filename = _SCHEMA_REQUIRED_FILENAMES.get(str(kind))
+    if not filename:
+        return ()
+
+    try:
+        schema = _load_json_schema(_schema_dir() / filename)
+    except Exception:  # noqa: BLE001
+        return ()
+
+    raw_required = schema.get("required")
+    if not isinstance(raw_required, list):
+        return ()
+
+    keys: List[str] = []
+    seen: Dict[str, None] = {}
+    for item in raw_required:
+        if not isinstance(item, str):
+            continue
+        key = item.strip()
+        if not key or key in seen:
+            continue
+        keys.append(key)
+        seen[key] = None
+    return tuple(keys)
+
+
+def _classify_yaml_kind_by_required_keys_loaded(loaded: Dict[str, Any]) -> str:
+    required_workflow = _schema_required_keys(YAML_DSL_KIND_WORKFLOW)
+    if required_workflow and all(key in loaded for key in required_workflow):
+        wf = loaded.get("workflow")
+        if isinstance(wf, dict):
+            return YAML_DSL_KIND_WORKFLOW
+
+    required_demand = _schema_required_keys(YAML_DSL_KIND_DEMAND)
+    if required_demand and all(key in loaded for key in required_demand):
+        return YAML_DSL_KIND_DEMAND
+
+    return ""
+
+
+def _classify_yaml_kind_by_required_keys(yaml_text: str) -> str:
+    try:
+        loaded = yaml.safe_load(str(yaml_text or ""))
+    except Exception:  # noqa: BLE001
+        return ""
+    if isinstance(loaded, dict):
+        loaded_dict = cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
+        return _classify_yaml_kind_by_required_keys_loaded(loaded_dict)
+    return ""
 
 
 def _collect_demand_diagnostics(

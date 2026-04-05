@@ -91,6 +91,8 @@ def test_discovery_nearest_wins_scalim_yaml_and_editor_python_roots(tmp_path: Pa
         ("workflow: {}\n", editor_semantics.YAML_DSL_KIND_WORKFLOW),
         ("workflow: 1\n", editor_semantics.YAML_DSL_KIND_DEMAND),
         ("workflow: [\n", editor_semantics.YAML_DSL_KIND_DEMAND),
+        ("name: demo\nmain_source: {}\n", editor_semantics.YAML_DSL_KIND_DEMAND),
+        ("loader: pkg.mod:fn\n", editor_semantics.YAML_DSL_KIND_DEMAND),
     ],
 )
 def test_classify_yaml_kind_heuristic(text: str, expected: str, tmp_path: Path) -> None:
@@ -122,8 +124,20 @@ def test_is_probably_yaml_dsl_document_heuristics(tmp_path: Path) -> None:
     assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "name: demo\nmain_source: {}\n") is True
     assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "workflow: {}\n") is True
     assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "x: {$init_var: order_ids}\n") is True
+    assert editor_semantics.is_probably_yaml_dsl_document(any_yaml, "sources:\n  s:\n    loader: pkg.mod:fn\n") is True
 
     assert editor_semantics.is_probably_yaml_dsl_document(tmp_path / "scalim.yaml", "yaml_dsl: {}\n") is False
+
+
+def test_schema_required_keys_are_loaded_from_gen_schema() -> None:
+    editor_semantics._schema_required_keys.cache_clear()
+    assert set(editor_semantics._schema_required_keys(editor_semantics.YAML_DSL_KIND_DEMAND)) == {"name", "main_source"}
+    assert set(editor_semantics._schema_required_keys(editor_semantics.YAML_DSL_KIND_WORKFLOW)) == {"workflow"}
+
+
+def test_schema_required_keys_degrade_for_unknown_kind() -> None:
+    editor_semantics._schema_required_keys.cache_clear()
+    assert editor_semantics._schema_required_keys("unknown-kind") == ()
 
 
 def test_collect_demand_diagnostics_has_error_warning_and_range(tmp_path: Path) -> None:

@@ -40,6 +40,10 @@ type ProvisionedEnv = {
 		demand: string;
 		workflow: string;
 	};
+	schemaRequiredKeys?: {
+		demand: string[];
+		workflow: string[];
+	};
 };
 
 let currentClient: LanguageClient | undefined;
@@ -221,6 +225,51 @@ function resolveWorkspaceRoot(): string | undefined {
 
 const YAML_DSL_SCHEMA_MARKERS = ["demand.gen.json", "workflow.gen.json", "scalim_yaml.gen.json"] as const;
 
+function escapeRegExp(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasRequiredKeys(text: string, requiredKeys: readonly string[]): boolean {
+	return requiredKeys.every((key) => new RegExp(`^\\s*${escapeRegExp(key)}\\s*:`, "m").test(text));
+}
+
+function hasWorkflowMapping(text: string): boolean {
+	const lines = text.split(/\r?\n/);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (!/^\s*workflow\s*:/.test(line)) {
+			continue;
+		}
+
+		const rest = line.replace(/^\s*workflow\s*:/, "").trim();
+		if (rest.startsWith("{")) {
+			return true;
+		}
+		if (rest.startsWith("[")) {
+			return false;
+		}
+		if (rest) {
+			return false;
+		}
+
+		for (let j = i + 1; j < lines.length; j++) {
+			const next = lines[j];
+			const trimmed = next.trim();
+			if (!trimmed || trimmed.startsWith("#")) {
+				continue;
+			}
+			if (trimmed.startsWith("-")) {
+				return false;
+			}
+			return trimmed.includes(":");
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 function documentPreviewText(document: vscode.TextDocument, maxLines = 200): string {
 	const endLine = Math.min(document.lineCount, Math.max(1, maxLines));
 	const endPos = new vscode.Position(endLine, 0);
@@ -253,14 +302,36 @@ function isLikelyScalimYamlDslDocument(document: vscode.TextDocument): boolean {
 	if (text.includes("$import") || text.includes("$init_var")) {
 		return true;
 	}
-	if (/^\s*(main_source|workflow|imports|loader|call_by)\s*:/m.test(text)) {
+	if (/^\s*(loader|call_by)\s*:/m.test(text)) {
+		return true;
+	}
+	if (/^imports\s*:/m.test(text) && /^name\s*:/m.test(text)) {
+		return true;
+	}
+	if (hasWorkflowMapping(text)) {
+		return true;
+	}
+	if (hasRequiredKeys(text, ["name", "main_source"])) {
 		return true;
 	}
 	return false;
 }
 
-function guessYamlDslKindFromText(text: string): "demand" | "workflow" {
-	if (text.includes("workflow.gen.json") || /^\s*workflow\s*:/m.test(text)) {
+function guessYamlDslKindFromText(
+	text: string,
+	schemaRequiredKeys?: { demand: readonly string[]; workflow: readonly string[] },
+): "demand" | "workflow" {
+	const workflowRequired = schemaRequiredKeys?.workflow ?? ["workflow"];
+	const demandRequired = schemaRequiredKeys?.demand ?? ["name", "main_source"];
+
+	if (hasRequiredKeys(text, workflowRequired) && hasWorkflowMapping(text)) {
+		return "workflow";
+	}
+	if (hasRequiredKeys(text, demandRequired)) {
+		return "demand";
+	}
+
+	if (text.includes("workflow.gen.json")) {
 		return "workflow";
 	}
 	return "demand";
@@ -542,6 +613,7 @@ async function maybeBindSchemaForDocument(
 	output: vscode.OutputChannel,
 	schemaPaths: { scalimYaml: string; demand: string; workflow: string },
 	document: vscode.TextDocument,
+	schemaRequiredKeys?: { demand: readonly string[]; workflow: readonly string[] },
 ): Promise<void> {
 	if (document.uri.scheme !== "file") {
 		return;
@@ -553,7 +625,7 @@ async function maybeBindSchemaForDocument(
 	}
 
 	const preview = documentPreviewText(document);
-	const kind = guessYamlDslKindFromText(preview);
+	const kind = guessYamlDslKindFromText(preview, schemaRequiredKeys);
 	const schemaPath = kind === "workflow" ? schemaPaths.workflow : schemaPaths.demand;
 
 	const workspaceRoot = resolveWorkspaceRoot();
@@ -574,6 +646,49 @@ async function maybeBindSchemaForDocument(
 
 	await config.update("yaml.schemas", merged, vscode.ConfigurationTarget.Workspace);
 	output.appendLine(`[schema] Bound ${kind} schema to ${matcher}`);
+}
+
+const schemaRequiredKeysCache = new Map<string, string[]>();
+
+async function readSchemaRequiredKeys(
+	output: vscode.OutputChannel,
+	schemaPath: string,
+): Promise<string[] | undefined> {
+	const cached = schemaRequiredKeysCache.get(schemaPath);
+	if (cached) {
+		return cached;
+	}
+
+	try {
+		const raw = await fsp.readFile(schemaPath, "utf8");
+		const payload = JSON.parse(raw) as unknown;
+		if (typeof payload !== "object" || payload === null) {
+			return undefined;
+		}
+		const required = (payload as Record<string, unknown>)["required"];
+		if (!Array.isArray(required)) {
+			return undefined;
+		}
+		const keys = required.filter((item): item is string => typeof item === "string").map((key) => key.trim()).filter(Boolean);
+		schemaRequiredKeysCache.set(schemaPath, keys);
+		return keys;
+	} catch (e) {
+		output.appendLine(`[schema] Failed to read required keys from schema: ${schemaPath}`);
+		output.appendLine(String(e));
+		return undefined;
+	}
+}
+
+async function resolveSchemaRequiredKeys(
+	output: vscode.OutputChannel,
+	schemaPaths: { demand: string; workflow: string },
+): Promise<{ demand: string[]; workflow: string[] } | undefined> {
+	const demand = await readSchemaRequiredKeys(output, schemaPaths.demand);
+	const workflow = await readSchemaRequiredKeys(output, schemaPaths.workflow);
+	if (!demand || !workflow) {
+		return undefined;
+	}
+	return { demand, workflow };
 }
 
 async function dumpDiscovery(
@@ -907,6 +1022,10 @@ async function restartServer(
 			try {
 				const schemaPaths = await resolveSchemaPaths(output, env.scalimCliPath);
 				env.schemaPaths = schemaPaths;
+				env.schemaRequiredKeys = await resolveSchemaRequiredKeys(output, {
+					demand: schemaPaths.demand,
+					workflow: schemaPaths.workflow,
+				});
 
 				if (autoSchemaBinding) {
 					await maybeBindSchemas(output, schemaPaths);
@@ -1057,7 +1176,7 @@ async function maybeAutostartForDocument(
 	// Even when the LSP is already running, bind schema for files outside conventional globs.
 	const cfg = getExtensionConfig();
 	if (cfg.autoSchemaBinding && currentEnv?.schemaPaths) {
-		void maybeBindSchemaForDocument(output, currentEnv.schemaPaths, document);
+		void maybeBindSchemaForDocument(output, currentEnv.schemaPaths, document, currentEnv.schemaRequiredKeys);
 	}
 
 	if (clientIsRunningOrStarting() || startMutex) {
@@ -1072,7 +1191,7 @@ async function maybeAutostartForDocument(
 	await restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
 
 	if (cfg.autoSchemaBinding && currentEnv?.schemaPaths) {
-		await maybeBindSchemaForDocument(output, currentEnv.schemaPaths, document);
+		await maybeBindSchemaForDocument(output, currentEnv.schemaPaths, document, currentEnv.schemaRequiredKeys);
 	}
 }
 
