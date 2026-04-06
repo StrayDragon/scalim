@@ -672,6 +672,22 @@ check-export-api-must-tuple:
 check-user-material-import-boundaries:
     uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check
 
+# 检查: 主包导入图无环 + 禁止函数内导入
+check-import-graph:
+    uv {{ UV_OPTIONS }} run python scripts/check-import-graph.py --check
+
+# 检查: workflow layering gate (workflow 不得依赖 dsl; by_yaml/runtime 不得包含 workflow_*.py)
+check-workflow-layering:
+    uv {{ UV_OPTIONS }} run python scripts/check-workflow-layering.py --check
+
+# 检查: tests domain suites gate (目录结构 + tests.* 字符串引用边界)
+check-tests-domain-suites:
+    uv {{ UV_OPTIONS }} run python scripts/check-tests-domain-suites.py --check
+
+# 检查: monkeypatch policy gate (禁止 patch private name / patch global import)
+check-monkeypatch-policy:
+    uv {{ UV_OPTIONS }} run python scripts/check-monkeypatch-policy.py --check
+
 # 报告: `object` 类型标注基线
 report-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py
@@ -681,7 +697,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
 
 alias quick-qa-only-py := quick-check-only-py
 
