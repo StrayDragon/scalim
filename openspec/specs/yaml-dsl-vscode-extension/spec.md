@@ -12,6 +12,7 @@
 - 扩展 MUST 不替换 `redhat.vscode-yaml`,而是通过工作区 `yaml.schemas` 绑定 Scalim demand/workflow schema
 - schema 绑定 MUST 使用 `scalim` 包内置的 `demand.gen.json`/`workflow.gen.json`(或等价可发布资源)
 - 当 project discovery 能识别 YAML 类型时,扩展 SHOULD 仅对匹配的文件绑定对应 schema
+- project discovery 的类型判定 SHOULD 以 schema(required) 为 SSOT,并与 LSP server 的判定保持一致（避免 schema 与语义边界漂移）
 
 #### Scenario: schema mapping is configured for demand YAML
 - **WHEN** 用户在 VSCode 打开一个被识别为 demand 的 YAML
@@ -57,4 +58,3 @@
 - **WHEN** 用户在 VSCode 中选择 Quick Fix
 - **THEN** extension MUST 执行对应 command 并应用 `WorkspaceEdit`
 - **AND** 用户 MUST 能在日志中看到可诊断信息（包含 discovery 摘要）
-

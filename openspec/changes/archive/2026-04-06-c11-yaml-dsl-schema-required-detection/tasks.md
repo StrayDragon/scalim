@@ -18,7 +18,7 @@
 
 - [x] 3.1 扩展在 schemaPaths 可用时读取 schema(required) 并用于单文件 kind 推断（demand/workflow）；schemaPaths 不可用时保持现有启发式 fallback
 - [x] 3.2 复核自动启用逻辑：优先 required 命中；未命中时仅在出现 DSL 专属语法特征时才尝试自动启动 LSP（避免 `workflow:` 这种泛化 key 造成误触发）
-- [ ] 3.3 手工验收：打开 `notebooks/.../ecommerce_report.yaml` 能自动启动并支持 go-to-definition；打开非 DSL YAML 不出现 scalim diagnostics/Quick Fix
+- [x] 3.3 手工验收：打开 `notebooks/.../ecommerce_report.yaml` 能自动启动并支持 go-to-definition；打开非 DSL YAML 不出现 scalim diagnostics/Quick Fix
 
 ## 4. Spec/工件校验（无生成物修改）
 
