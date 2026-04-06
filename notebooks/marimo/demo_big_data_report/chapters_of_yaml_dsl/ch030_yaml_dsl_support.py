@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, GuardrailsRelationsPolicy
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.row_gap import RowGapObserver
@@ -84,11 +84,13 @@ def run_yaml_dsl_support(
         try:
             compilation = compile_yaml(
                 str(yaml_path),
-                allowed_modules=_ALLOWED_MODULES,
-                components=[guardrail_capture, row_gap_observer],
-                init_vars=init_vars,
-                guardrails=guardrails_policy,
-                batch_size=None,
+                options=RunOptions(
+                    allowed_modules=_ALLOWED_MODULES,
+                    components=[guardrail_capture, row_gap_observer],
+                    init_vars=init_vars,
+                    guardrails=guardrails_policy,
+                    batch_size=None,
+                ),
             )
             core = run_ir(compilation.demand_ir, compilation.request)
         except Exception as exc:  # noqa: BLE001

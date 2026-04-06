@@ -14,6 +14,7 @@ from scalim.dsl.by_yaml import (
     OutputWriteOverride,
     ResourcesOverride,
     UNSET,
+    RunOptions,
     RunOverrides,
     compile,
 )
@@ -60,7 +61,13 @@ sources: {}
         header_fields_output_by="name",
     )
 
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
+    compilation = compile(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            overrides=overrides,
+        ),
+    )
     request = compilation.request
     assert request.output_composition is not None
     assert len(request.output_composition.targets) == 1
@@ -210,7 +217,13 @@ sources: {}
 
     with pytest.raises(exc_type, match=match):
         overrides = make_overrides()
-        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
+        _ = compile(
+            str(yaml_path),
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+                overrides=overrides,
+            ),
+        )
 
 
 def test_compile_overrides_outputs_supports_init_var_path(tmp_path: Path) -> None:
@@ -230,11 +243,13 @@ sources: {}
     output_path = str(tmp_path / "out.csv")
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-        init_vars={"out_path": output_path},
-        overrides=RunOverrides(
-            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path={"$init_var": "out_path"})}),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            init_vars={"out_path": output_path},
+            overrides=RunOverrides(
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path={"$init_var": "out_path"})}),
+            ),
         ),
     )
 
@@ -259,10 +274,12 @@ sources: {}
     output_path = tmp_path / "out.csv"
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-        overrides=RunOverrides(
-            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=output_path)}),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            overrides=RunOverrides(
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=output_path)}),
+            ),
         ),
     )
 
@@ -286,11 +303,13 @@ sources: {}
 
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-        overrides=RunOverrides(
-            output_extras=OutputExtrasOverride(meta=True),
-            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            overrides=RunOverrides(
+                output_extras=OutputExtrasOverride(meta=True),
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
+            ),
         ),
     )
 
@@ -316,17 +335,19 @@ sources: {}
     with pytest.raises(ValueError, match=r"Duplicate effective field display names detected"):
         _ = compile(
             str(yaml_path),
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            overrides=RunOverrides(
-                outputs=(
-                    OutputOverride(
-                        name="detail",
-                        fields=("order_id", "amount"),
-                        to=OutputToOverride(file="detail_csv"),
-                        write=OutputWriteOverride(header_fields_output_by="name"),
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+                overrides=RunOverrides(
+                    outputs=(
+                        OutputOverride(
+                            name="detail",
+                            fields=("order_id", "amount"),
+                            to=OutputToOverride(file="detail_csv"),
+                            write=OutputWriteOverride(header_fields_output_by="name"),
+                        ),
                     ),
+                    resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
                 ),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
             ),
         )
 
@@ -438,7 +459,7 @@ resources:
     )
 
     with pytest.raises(ValueError, match=r"Duplicate effective field display names detected") as excinfo:
-        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
     msg = str(excinfo.value)
     assert "'ID'" in msg
     assert "order_id" in msg
@@ -474,7 +495,7 @@ outputs:
     )
 
     with pytest.raises(ValueError, match=r"Duplicate effective field display names detected") as excinfo:
-        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
     msg = str(excinfo.value)
     assert "'ID'" in msg
     assert "order_id" in msg
@@ -509,8 +530,10 @@ resources:
 
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+        ),
     )
     assert compilation.config.validate_unique_field_names is False
     assert compilation.request.output_composition is not None
@@ -537,7 +560,13 @@ sources: {}
     )
     overrides = RunOverrides(viz_config=viz_config)
 
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
+    compilation = compile(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            overrides=overrides,
+        ),
+    )
     assert compilation.request.observability is not None
     assert compilation.request.observability.viz_config is viz_config
 
@@ -564,7 +593,7 @@ observability:
     )
 
     caplog.set_level(logging.WARNING)
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
     assert compilation.request.observability is None
     assert any("Legacy YAML key 'observability' is no longer supported" in str(r.message) for r in caplog.records)
 
@@ -594,7 +623,13 @@ observability:
     )
     overrides = RunOverrides(viz_config=viz_config)
 
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]), overrides=overrides)
+    compilation = compile(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            overrides=overrides,
+        ),
+    )
     assert compilation.request.observability is not None
     assert compilation.request.observability.viz_config is viz_config
 
@@ -616,7 +651,7 @@ sources: {}
     )
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
-        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
 
     assert any(env.path == "batch_size" for env in excinfo.value.errors)
 
@@ -638,8 +673,10 @@ sources: {}
 
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-        batch_size=256,
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            batch_size=256,
+        ),
     )
     config = compilation.config
     request = compilation.request
@@ -666,8 +703,10 @@ sources: {}
     with pytest.raises(TypeError, match=r"batch_size must be an integer >= 1 or None"):
         _ = compile(
             str(yaml_path),
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            batch_size=True,  # type: ignore[arg-type] intentional runtime boundary test
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+                batch_size=True,  # type: ignore[arg-type] intentional runtime boundary test
+            ),
         )
 
 
@@ -689,8 +728,10 @@ sources: {}
     with pytest.raises(ValueError, match=r"batch_size must be >= 1"):
         _ = compile(
             str(yaml_path),
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            batch_size=0,
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+                batch_size=0,
+            ),
         )
 
 

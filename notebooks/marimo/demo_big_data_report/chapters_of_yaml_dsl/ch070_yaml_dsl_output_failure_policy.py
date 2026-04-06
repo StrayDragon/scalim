@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import DemandDiagnosticsPolicy, run as run_yaml
+from scalim.dsl.by_yaml import DemandDiagnosticsPolicy, RunOptions, run as run_yaml
 from scalim.execution.output_composition import OutputTargetStats
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -105,11 +105,13 @@ def run_yaml_dsl_output_failure_policy(
             try:
                 redacted_result = run_yaml(
                     str(yaml_redacted_path),
-                    allowed_modules=_ALLOWED_MODULES,
-                    demand_failure_policy="primary_only",
-                    batch_size=2,
-                    init_vars=init_vars_redacted,
-                    allowed_yaml_roots=allowed_yaml_roots,
+                    options=RunOptions(
+                        allowed_modules=_ALLOWED_MODULES,
+                        demand_failure_policy="primary_only",
+                        batch_size=2,
+                        init_vars=init_vars_redacted,
+                        allowed_yaml_roots=allowed_yaml_roots,
+                    ),
                 )
             except Exception as exc:  # noqa: BLE001
                 return ExampleResult(
@@ -157,12 +159,14 @@ def run_yaml_dsl_output_failure_policy(
             try:
                 full_result = run_yaml(
                     str(yaml_full_path),
-                    allowed_modules=_ALLOWED_MODULES,
-                    demand_failure_policy="primary_only",
-                    demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True),
-                    batch_size=2,
-                    init_vars=init_vars_full,
-                    allowed_yaml_roots=allowed_yaml_roots,
+                    options=RunOptions(
+                        allowed_modules=_ALLOWED_MODULES,
+                        demand_failure_policy="primary_only",
+                        demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True),
+                        batch_size=2,
+                        init_vars=init_vars_full,
+                        allowed_yaml_roots=allowed_yaml_roots,
+                    ),
                 )
             except Exception as exc:  # noqa: BLE001
                 return ExampleResult(
@@ -208,11 +212,13 @@ def run_yaml_dsl_output_failure_policy(
             try:
                 _ = run_yaml(
                     str(yaml_all_fail_path),
-                    allowed_modules=_ALLOWED_MODULES,
-                    demand_failure_policy="all_fail",
-                    batch_size=2,
-                    init_vars=init_vars_all_fail,
-                    allowed_yaml_roots=allowed_yaml_roots,
+                    options=RunOptions(
+                        allowed_modules=_ALLOWED_MODULES,
+                        demand_failure_policy="all_fail",
+                        batch_size=2,
+                        init_vars=init_vars_all_fail,
+                        allowed_yaml_roots=allowed_yaml_roots,
+                    ),
                 )
                 all_fail_summary = "unexpected: all_fail run succeeded"
             except Exception as exc:  # noqa: BLE001

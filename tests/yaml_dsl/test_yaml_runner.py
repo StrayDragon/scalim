@@ -10,6 +10,7 @@ from scalim.dsl.by_yaml import (
     OutputToOverride,
     OutputWriteOverride,
     ResourcesOverride,
+    RunOptions,
     RunOverrides,
     RunResult,
     run,
@@ -117,12 +118,14 @@ def test_run_outputs_and_returns_data(
     sink = sink_factory() if sink_factory is not None else None
     result = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(
-            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+            ),
+            sink=sink,
         ),
-        sink=sink,
     )
 
     assert result.total_rows > 0
@@ -143,17 +146,19 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
     fields = ["order_id"]
     result = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(
-            outputs=(
-                OutputOverride(
-                    name="detail",
-                    fields=tuple(fields),
-                    to=OutputToOverride(file="detail_csv"),
-                    write=OutputWriteOverride(header_fields_output_by="name"),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=tuple(fields),
+                        to=OutputToOverride(file="detail_csv"),
+                        write=OutputWriteOverride(header_fields_output_by="name"),
+                    ),
                 ),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
             ),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
     )
 
@@ -187,17 +192,19 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
 
     _ = run(
         str(_demo_yaml_path()),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(
-            outputs=(
-                OutputOverride(
-                    name="detail",
-                    fields=("order_id", "amount"),
-                    to=OutputToOverride(book="report", sheet="明细"),
-                    write=write_override,
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("order_id", "amount"),
+                        to=OutputToOverride(book="report", sheet="明细"),
+                        write=write_override,
+                    ),
                 ),
+                resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path=str(output_path))}),
             ),
-            resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path=str(output_path))}),
         ),
     )
 
@@ -213,8 +220,10 @@ def test_run_in_memory_sink_without_output_path_returns_data(example_model, tmp_
 
     result = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        sink=sink,
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            sink=sink,
+        ),
     )
 
     assert result.output_path is None
@@ -229,12 +238,14 @@ def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None
 
     result = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(
-            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+            ),
+            components=[hook],
         ),
-        components=[hook],
     )
 
     assert hook.pipeline_started is True
@@ -258,11 +269,13 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
     observer = _CaptureObserver()
     _ = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        components=[observer],
-        overrides=RunOverrides(
-            outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            components=[observer],
+            overrides=RunOverrides(
+                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+            ),
         ),
     )
 
@@ -275,8 +288,10 @@ def test_run_raises_typeerror_on_invalid_component(example_model, tmp_path: Path
     with pytest.raises(TypeError, match=r"Invalid component at index 0"):
         _ = run(
             str(yaml_path),
-            allowed_modules=_ALLOWED_MODULES,
-            components=[object()],  # type: ignore[list-item]
+            options=RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                components=[object()],  # type: ignore[list-item]
+            ),
         )
 
 
@@ -285,7 +300,7 @@ def test_run_uses_config_output_path(example_model, tmp_path: Path) -> None:
 
     result = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
+        options=RunOptions(allowed_modules=_ALLOWED_MODULES),
     )
 
     assert result.output_path == str(tmp_path / "order_report_custom.csv")

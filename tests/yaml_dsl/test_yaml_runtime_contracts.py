@@ -4,7 +4,7 @@ from typing import List
 import pytest
 
 from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
@@ -143,7 +143,7 @@ class TestAllowlistRequired:
     def test_run_requires_allowlist(self, tmp_path: Path) -> None:
         yaml_path = _write_simple_yaml(tmp_path, "test.loader")
         with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
-            run(str(yaml_path), allowed_modules=frozenset())
+            run(str(yaml_path), options=RunOptions(allowed_modules=frozenset()))
 
     def test_converter_requires_allowlist_by_default(self) -> None:
         with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
@@ -188,7 +188,8 @@ sources: {}
     )
     def test_run_with_allowlist_passes_check(self, tmp_path: Path, allow_kwargs: dict) -> None:
         yaml_path = _write_simple_yaml(tmp_path, "tests.fixtures.mock_loaders.mock_loader")
-        result = run(str(yaml_path), **allow_kwargs)
+        options = RunOptions(**allow_kwargs)
+        result = run(str(yaml_path), options=options)
         assert result.total_rows == 0
 
 

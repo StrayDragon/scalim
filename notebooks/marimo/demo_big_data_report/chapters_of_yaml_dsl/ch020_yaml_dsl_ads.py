@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.by_yaml import run as run_yaml
+from scalim.dsl.by_yaml import RunOptions, run as run_yaml
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario import (
     get_ads_creatives_retry_counter_calls,
@@ -61,20 +61,22 @@ def run_yaml_dsl_ads(
         try:
             run_result = run_yaml(
                 str(yaml_path),
-                allowed_modules=_ALLOWED_MODULES,
-                init_vars=init_vars,
-                batch_size=10,
-                loader_retry=LoaderRetryPoliciesSpec(
-                    default=LoaderRetryPolicySpec(
-                        enabled=True,
-                        should_retry=should_retry_ads_transient,
-                        max_attempts=2,
-                        max_elapsed_seconds=2,
-                        backoff="fixed",
-                        base_delay_seconds=0,
-                        max_delay_seconds=0,
-                        jitter=False,
-                    )
+                options=RunOptions(
+                    allowed_modules=_ALLOWED_MODULES,
+                    init_vars=init_vars,
+                    batch_size=10,
+                    loader_retry=LoaderRetryPoliciesSpec(
+                        default=LoaderRetryPolicySpec(
+                            enabled=True,
+                            should_retry=should_retry_ads_transient,
+                            max_attempts=2,
+                            max_elapsed_seconds=2,
+                            backoff="fixed",
+                            base_delay_seconds=0,
+                            max_delay_seconds=0,
+                            jitter=False,
+                        )
+                    ),
                 ),
             )
         except Exception as exc:  # noqa: BLE001

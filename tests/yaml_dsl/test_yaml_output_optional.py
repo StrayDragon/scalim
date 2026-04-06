@@ -1,5 +1,5 @@
 from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml import RunOverrides, compile
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, compile
 
 
 def test_loader_allows_missing_output() -> None:
@@ -40,8 +40,10 @@ sources: {}
     out_path = tmp_path / "out.csv"
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures"]),
-        overrides=RunOverrides.csv_file(output_path=out_path, fields=("order_id",), output_name="detail", file_id="detail_csv"),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures"]),
+            overrides=RunOverrides.csv_file(output_path=out_path, fields=("order_id",), output_name="detail", file_id="detail_csv"),
+        ),
     )
 
     assert compilation.config.outputs == ()

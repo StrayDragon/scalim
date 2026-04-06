@@ -168,7 +168,14 @@ workflow:
         tools_output_config = tools_api.load_output_config(str(demand_path))
         base_module_path = tools_api.derive_base_module_path(str(demand_path), sys_path=[str(tmp)], cwd=str(tmp))
 
-        compilation: api.Compilation = api.compile(str(demand_path), allowed_modules=_ALLOWED_MODULES, init_vars=init_vars, batch_size=2)
+        compilation: api.Compilation = api.compile(
+            str(demand_path),
+            options=api.RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                init_vars=init_vars,
+                batch_size=2,
+            ),
+        )
         if not compilation.demand_ir.fields:
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -186,11 +193,13 @@ workflow:
         )
         run_result: api.RunResult = api.run(
             str(demand_path),
-            allowed_modules=_ALLOWED_MODULES,
-            sink=sink,
-            overrides=overrides,
-            init_vars=init_vars,
-            batch_size=2,
+            options=api.RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                sink=sink,
+                overrides=overrides,
+                init_vars=init_vars,
+                batch_size=2,
+            ),
         )
         rows = sink.get_data()
         if not rows:

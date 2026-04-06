@@ -3,7 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 from textwrap import dedent
 
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from tests.support.yaml_fixtures import make_yaml_config
 
 
@@ -80,7 +80,7 @@ outputs:
     yaml_path = tmp_path / "demo.demand.yaml"
     yaml_path.write_text(yaml_content, encoding="utf-8")
 
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures"]))
+    _ = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
     assert out_path.exists()
 

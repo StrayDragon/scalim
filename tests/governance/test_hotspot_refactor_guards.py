@@ -1,6 +1,6 @@
 import textwrap
 
-from scalim.dsl.by_yaml import RunOverrides, compile, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, compile, run
 from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
@@ -10,6 +10,7 @@ from scalim.ob.presets.viz import VizObserver, VizObserverConfig
 
 
 def test_hotspot_public_imports_remain_available() -> None:
+    assert RunOptions is not None
     assert RunOverrides is not None
     assert run is not None
     assert ConfigToIRConverter is not None
@@ -41,5 +42,5 @@ def test_external_consumer_style_yaml_compile_stays_supported(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    compilation = compile(str(demand), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    compilation = compile(str(demand), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
     assert compilation is not None

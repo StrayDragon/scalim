@@ -26,6 +26,12 @@ uv run scalim-cli yaml-dsl validate --type workflow path/to/workflow.yaml
 uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml
 ```
 
+3) workflow run(执行 workflow;需 allowlist):
+
+```bash
+uv run scalim-cli yaml-dsl workflow run path/to/workflow.yaml --allowed-module myapp.loaders
+```
+
 本地编辑时,推荐直接批量写入 schema modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):
 
 - 批量写入/更新 `$schema` 头部(默认同时写 Red Hat + JetBrains 两种 modeline; 用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`

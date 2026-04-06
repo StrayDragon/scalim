@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
 from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 
 
@@ -88,7 +88,10 @@ workflow:
     )
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
-        _ = compile_yaml(str(demand_path.resolve()), allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+        _ = compile_yaml(
+            str(demand_path.resolve()),
+            options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])),
+        )
     expected = _sort_errors([env.as_dict() for env in excinfo.value.errors])
 
     assert yaml_dsl_cli._run_validate(_demand_args(demand_path)) == 1

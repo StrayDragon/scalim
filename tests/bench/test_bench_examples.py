@@ -15,7 +15,7 @@ from scalim_misc.demo_big_data_report.shared import (
 )
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
 from scalim.execution import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.memory import MemoryOptimizationObserver
@@ -269,9 +269,11 @@ def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
     def _run_yaml() -> None:
         run(
             str(yaml_path),
-            allowed_modules=allowed_modules,
-            overrides=RunOverrides.csv_file(output_path=output_path, fields=TARGET_FIELDS_BASIC, output_name="detail"),
-            init_vars={"order_ids": []},
+            options=RunOptions(
+                allowed_modules=allowed_modules,
+                overrides=RunOverrides.csv_file(output_path=output_path, fields=TARGET_FIELDS_BASIC, output_name="detail"),
+                init_vars={"order_ids": []},
+            ),
         )
 
     runner = BenchmarkRunner(benchmark)

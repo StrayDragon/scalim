@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import FrozenSet, List, Optional
 
-from scalim.dsl.by_yaml.runtime.entrypoints import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
 from scalim.planning.builder import PlanBuilder
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
@@ -72,7 +72,7 @@ def main(argv: List[str]) -> int:
             file=sys.stderr,
         )
         return 0
-    compilation = compile_yaml(yaml_path, allowed_modules=allowed_modules)
+    compilation = compile_yaml(yaml_path, options=RunOptions(allowed_modules=allowed_modules))
     plan = PlanBuilder(compilation.demand_ir).build(targets=list(targets))
 
     schedule_plan = plan.to_viz_schedule_plan()

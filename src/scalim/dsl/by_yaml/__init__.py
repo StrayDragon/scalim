@@ -25,6 +25,7 @@ from .runtime.contracts import (
     OutputWriteOverride,
     ResolverTrustedMode,
     ResourcesOverride,
+    RunOptions,
     RunOverrides,
     RunResult,
 )
@@ -35,13 +36,13 @@ if TYPE_CHECKING:
     from .workflow_entrypoints import run_workflow as run_workflow
 else:
 
-    def compile(*args: Any, **kwargs: Any) -> Compilation:  # noqa: A001
+    def compile(yaml_path: str, *, options: RunOptions) -> Compilation:  # noqa: A001
         entrypoints = import_module("scalim.dsl.by_yaml.runtime.entrypoints")
-        return entrypoints.compile(*args, **kwargs)
+        return entrypoints.compile(yaml_path, options=options)
 
-    def run(*args: Any, **kwargs: Any) -> RunResult:
+    def run(yaml_path: str, *, options: RunOptions) -> RunResult:
         entrypoints = import_module("scalim.dsl.by_yaml.runtime.entrypoints")
-        return entrypoints.run(*args, **kwargs)
+        return entrypoints.run(yaml_path, options=options)
 
     def run_workflow(*args: Any, **kwargs: Any) -> Any:
         entrypoints = import_module("scalim.dsl.by_yaml.workflow_entrypoints")
@@ -67,6 +68,7 @@ __all__ = (
     "OutputsDefaultsOverride",
     "ResolverTrustedMode",
     "ResourcesOverride",
+    "RunOptions",
     "RunOverrides",
     "RunResult",
     "compile",

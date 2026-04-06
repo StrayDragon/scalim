@@ -1,11 +1,10 @@
 import pytest
 
-from scalim.dsl.by_yaml import OutputExtraSheetOverride, OutputExtrasOverride, RunOverrides, compile
+from scalim.dsl.by_yaml import OutputExtraSheetOverride, OutputExtrasOverride, RunOptions, RunOverrides, compile
 from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.by_yaml._internal.config_parsing.models import RawDemand
 from scalim.dsl.by_yaml._internal.config_parsing.yaml_load import ScalimYamlValidationError
 from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
-from scalim.dsl.by_yaml.runtime.contracts import RunOptions
 from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig
 
 
@@ -97,12 +96,14 @@ outputs:
 
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-        overrides=RunOverrides(
-            output_extras=OutputExtrasOverride(
-                meta=True,
-                audit=OutputExtraSheetOverride(sheet="__audit__"),
-            )
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            overrides=RunOverrides(
+                output_extras=OutputExtrasOverride(
+                    meta=True,
+                    audit=OutputExtraSheetOverride(sheet="__audit__"),
+                )
+            ),
         ),
     )
     assert compilation.request.output_composition is not None

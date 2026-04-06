@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import GuardrailCaptureObserver
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -51,11 +51,13 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
         try:
             compilation = compile_yaml(
                 str(yaml_path),
-                allowed_modules=_ALLOWED_MODULES,
-                components=[guardrail_capture],
-                batch_size=2,
-                guardrails=guardrails,
-                init_vars=init_vars,
+                options=RunOptions(
+                    allowed_modules=_ALLOWED_MODULES,
+                    components=[guardrail_capture],
+                    batch_size=2,
+                    guardrails=guardrails,
+                    init_vars=init_vars,
+                ),
             )
             core = run_ir(compilation.demand_ir, compilation.request)
         except Exception as exc:  # noqa: BLE001

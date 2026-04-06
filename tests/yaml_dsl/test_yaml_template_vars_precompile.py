@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.by_yaml import compile, run_workflow
+from scalim.dsl.by_yaml import RunOptions, compile, run_workflow
 from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml._internal.config_parsing.template_precompile import maybe_precompile_yaml_text
 from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config
@@ -34,8 +34,10 @@ outputs:
 
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures"]),
-        template_vars={"output_path": "./output/report.xlsx"},
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures"]),
+            template_vars={"output_path": "./output/report.xlsx"},
+        ),
     )
     assert compilation.config.resources.files["detail_csv"].path == "./output/report.xlsx"
 
@@ -66,7 +68,7 @@ outputs:
         encoding="utf-8",
     )
 
-    compilation = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures"]))
+    compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
     assert compilation.config.resources.files["detail_csv"].path == "{{ output_path }}"
 
 
@@ -99,7 +101,13 @@ sources:
         encoding="utf-8",
     )
 
-    compilation = compile(str(demand), allowed_modules=frozenset(["tests.fixtures"]), template_vars={"chunk_size": 10})
+    compilation = compile(
+        str(demand),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures"]),
+            template_vars={"chunk_size": 10},
+        ),
+    )
     assert compilation.config.sources["customers"].lookup_chunk_size == 10
 
 
@@ -130,7 +138,13 @@ outputs:
     )
 
     with pytest.raises(ValueError) as exc_info:
-        _ = compile(str(yaml_path), allowed_modules=frozenset(["tests.fixtures"]), template_vars={})
+        _ = compile(
+            str(yaml_path),
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures"]),
+                template_vars={},
+            ),
+        )
     assert "missing" in str(exc_info.value)
     assert "demand.yaml" in str(exc_info.value)
 
@@ -165,7 +179,13 @@ sources:
     )
 
     with pytest.raises(ScalimYamlValidationError) as exc_info:
-        _ = compile(str(demand), allowed_modules=frozenset(["tests.fixtures"]), template_vars={})
+        _ = compile(
+            str(demand),
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures"]),
+                template_vars={},
+            ),
+        )
     msg = "\n".join(env.message for env in exc_info.value.errors)
     assert "missing" in msg
     assert "import trace" in msg
@@ -316,6 +336,33 @@ def test_template_sandbox_legacy_allows_method_calls_and_warns(caplog) -> None:
     assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
 
 
+def test_template_sandbox_safe_whitespace_is_normalized_by_public_compile_api(tmp_path) -> None:
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+outputs: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    compilation = compile(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures"]),
+            template_sandbox=" safe ",
+        ),
+    )
+    assert compilation.config.name == "demo"
+
+
 def test_template_sandbox_legacy_is_rejected_by_public_compile_api(tmp_path) -> None:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(
@@ -345,9 +392,11 @@ outputs:
     with pytest.raises(ValueError) as exc_info:
         _ = compile(
             str(yaml_path),
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"output_path": "  ./out.csv  "},
-            template_sandbox="legacy",
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures"]),
+                template_vars={"output_path": "  ./out.csv  "},
+                template_sandbox="legacy",
+            ),
         )
     msg = str(exc_info.value)
     assert "仅允许" in msg and "safe" in msg
@@ -524,9 +573,11 @@ pad: "{{ big }}"
     with pytest.raises(ValueError) as exc_info:
         _ = compile(
             str(yaml_path),
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"big": big},
-            rendered_yaml_max_len=50,
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures"]),
+                template_vars={"big": big},
+                rendered_yaml_max_len=50,
+            ),
         )
     msg = str(exc_info.value)
     assert "kind=demand" in msg
@@ -598,9 +649,11 @@ outputs: []
     with pytest.raises(ScalimYamlValidationError) as exc_info:
         _ = compile(
             str(demand),
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"big": big},
-            rendered_yaml_max_len=250,
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures"]),
+                template_vars={"big": big},
+                rendered_yaml_max_len=250,
+            ),
         )
     msg = "\n".join(env.message for env in exc_info.value.errors)
     assert "kind=fragment" in msg

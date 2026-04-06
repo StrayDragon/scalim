@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.by_yaml._internal.config_parsing.field_extract import (
     ScalimFieldExtractCompileError,
@@ -175,8 +175,10 @@ sources:
     sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.field_extract_loaders"]),
-        sink=sink,
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.field_extract_loaders"]),
+            sink=sink,
+        ),
     )
     rows = sink.get_data()
     by_order_id = {row["order_id"]: row for row in rows}

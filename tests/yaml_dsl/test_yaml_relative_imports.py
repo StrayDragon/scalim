@@ -3,11 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
 from scalim.dsl.by_yaml._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
 from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.by_yaml.runtime.contracts import RunOptions
 from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
 from scalim.dsl.by_yaml.runtime import compiler as compiler_module
 from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver, derive_base_module_path
@@ -190,7 +189,7 @@ def test_compile_raises_clear_error_when_relative_reference_cannot_derive_base_m
     with pytest.raises(ScalimResolverError, match="无法根据 `yaml_path="):
         compile_yaml(
             str(yaml_path),
-            allowed_modules=frozenset(["relpkg"]),
+            options=RunOptions(allowed_modules=frozenset(["relpkg"])),
         )
 
 
@@ -199,7 +198,7 @@ def test_compile_accepts_relative_and_absolute_loader_refs(monkeypatch: pytest.M
     monkeypatch.syspath_prepend(str(tmp_path))
     _purge_modules("relpkg")
 
-    _ = compile_yaml(str(yaml_path), allowed_modules=frozenset(["relpkg"]))
+    _ = compile_yaml(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["relpkg"])))
 
     abs_yaml_path = tmp_path / "relpkg/sub/abs.yaml"
     _write_text(
@@ -217,7 +216,7 @@ def test_compile_accepts_relative_and_absolute_loader_refs(monkeypatch: pytest.M
             ]
         ),
     )
-    _ = compile_yaml(str(abs_yaml_path), allowed_modules=frozenset(["relpkg"]))
+    _ = compile_yaml(str(abs_yaml_path), options=RunOptions(allowed_modules=frozenset(["relpkg"])))
 
 
 def test_config_validator_and_call_by_parser_accept_relative_references() -> None:

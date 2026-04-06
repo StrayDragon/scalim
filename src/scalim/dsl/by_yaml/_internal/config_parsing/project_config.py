@@ -29,6 +29,18 @@ class YamlDslEditorConfig:
 
 
 @dataclass(frozen=True)
+class YamlDslRunnerConfig:
+    """`CLI` 运行器的项目级默认值,配置路径: `scalim.yaml yaml_dsl.runner`."""
+
+    allowed_modules: Tuple[str, ...] = ()
+    allowed_functions: Tuple[str, ...] = ()
+    allowed_yaml_roots: Tuple[Path, ...] = ()
+    template_sandbox: Optional[str] = None
+    parallel_mode: Optional[str] = None
+    max_workers: Optional[int] = None
+
+
+@dataclass(frozen=True)
 class YamlDslProjectConfig:
     """`scalim.yaml` 解析结果(仅承载 `YAML DSL` 相关配置)."""
 
@@ -37,6 +49,7 @@ class YamlDslProjectConfig:
     import_aliases: Mapping[str, Path]
     import_allowed_roots: Tuple[Path, ...]
     editor: Optional[YamlDslEditorConfig] = None
+    runner: Optional[YamlDslRunnerConfig] = None
 
 
 def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
@@ -218,12 +231,138 @@ def _parse_editor_config(yaml_dsl_dict: Dict[str, Any], *, project_root: Path, s
     return YamlDslEditorConfig(python_roots=python_roots, kind_overrides=kind_overrides)
 
 
+_TEMPLATE_SANDBOX_CHOICES: Tuple[str, ...] = ("safe", "legacy")
+_PARALLEL_MODE_CHOICES: Tuple[str, ...] = ("seq", "adaptive")
+
+
+def _parse_runner_config(  # noqa: C901, PLR0912, PLR0915
+    yaml_dsl_dict: Dict[str, Any], *, project_root: Path, scalim_yaml_path: Path
+) -> Optional[YamlDslRunnerConfig]:
+    raw_runner = yaml_dsl_dict.get("runner")
+    if raw_runner is None:
+        return None
+    if not isinstance(raw_runner, dict):
+        msg = "scalim.yaml yaml_dsl.runner must be a mapping: path='{}'".format(str(scalim_yaml_path))
+        raise TypeError(msg)
+
+    runner_dict = cast("Dict[str, Any]", raw_runner)  # pragma: allow-cast yaml mapping typed narrowing
+
+    unknown = sorted(
+        {str(k) for k in runner_dict}
+        - {"allowed_modules", "allowed_functions", "allowed_yaml_roots", "template_sandbox", "parallel_mode", "max_workers"}
+    )
+    if unknown:
+        msg = "scalim.yaml yaml_dsl.runner has unknown keys: {}: path='{}'".format(", ".join(unknown), str(scalim_yaml_path))
+        raise TypeError(msg)
+
+    raw_modules = runner_dict.get("allowed_modules")
+    if raw_modules is None:
+        allowed_modules = ()
+    else:
+        if not _is_list(raw_modules):
+            msg = "scalim.yaml yaml_dsl.runner.allowed_modules must be a list: path='{}'".format(str(scalim_yaml_path))
+            raise TypeError(msg)
+        modules: List[str] = []
+        for idx, raw_item in enumerate(raw_modules):
+            item = str(raw_item or "").strip() if isinstance(raw_item, str) else ""
+            if not item:
+                msg = "scalim.yaml yaml_dsl.runner.allowed_modules[{}] must be a non-empty string: path='{}'".format(
+                    int(idx),
+                    str(scalim_yaml_path),
+                )
+                raise TypeError(msg)
+            modules.append(item)
+        allowed_modules = tuple(modules)
+
+    raw_functions = runner_dict.get("allowed_functions")
+    if raw_functions is None:
+        allowed_functions = ()
+    else:
+        if not _is_list(raw_functions):
+            msg = "scalim.yaml yaml_dsl.runner.allowed_functions must be a list: path='{}'".format(str(scalim_yaml_path))
+            raise TypeError(msg)
+        functions: List[str] = []
+        for idx, raw_item in enumerate(raw_functions):
+            item = str(raw_item or "").strip() if isinstance(raw_item, str) else ""
+            if not item:
+                msg = "scalim.yaml yaml_dsl.runner.allowed_functions[{}] must be a non-empty string: path='{}'".format(
+                    int(idx),
+                    str(scalim_yaml_path),
+                )
+                raise TypeError(msg)
+            functions.append(item)
+        allowed_functions = tuple(functions)
+
+    raw_roots = runner_dict.get("allowed_yaml_roots")
+    if raw_roots is None:
+        allowed_yaml_roots = ()
+    else:
+        if not _is_list(raw_roots):
+            msg = "scalim.yaml yaml_dsl.runner.allowed_yaml_roots must be a list: path='{}'".format(str(scalim_yaml_path))
+            raise TypeError(msg)
+        resolved_roots: List[Path] = []
+        for idx, raw_root in enumerate(raw_roots):
+            resolved_roots.append(
+                _resolve_dir(raw_root, base_dir=project_root, context_label="yaml_dsl.runner.allowed_yaml_roots[{}]".format(idx))
+            )
+        allowed_yaml_roots = tuple(resolved_roots)
+
+    raw_template_sandbox = runner_dict.get("template_sandbox")
+    if raw_template_sandbox is None:
+        template_sandbox = None
+    else:
+        if not isinstance(raw_template_sandbox, str):
+            msg = "scalim.yaml yaml_dsl.runner.template_sandbox must be a string: path='{}'".format(str(scalim_yaml_path))
+            raise TypeError(msg)
+        template_sandbox = str(raw_template_sandbox or "").strip() or None
+        if template_sandbox is not None:
+            template_sandbox = template_sandbox.lower()
+            if template_sandbox not in _TEMPLATE_SANDBOX_CHOICES:
+                allowed = ", ".join(_TEMPLATE_SANDBOX_CHOICES)
+                msg = "scalim.yaml yaml_dsl.runner.template_sandbox must be one of {}: path='{}'".format(allowed, str(scalim_yaml_path))
+                raise ValueError(msg)
+
+    raw_parallel_mode = runner_dict.get("parallel_mode")
+    if raw_parallel_mode is None:
+        parallel_mode = None
+    else:
+        if not isinstance(raw_parallel_mode, str):
+            msg = "scalim.yaml yaml_dsl.runner.parallel_mode must be a string: path='{}'".format(str(scalim_yaml_path))
+            raise TypeError(msg)
+        parallel_mode = str(raw_parallel_mode or "").strip() or None
+        if parallel_mode is not None:
+            parallel_mode = parallel_mode.lower()
+            if parallel_mode not in _PARALLEL_MODE_CHOICES:
+                allowed = ", ".join(_PARALLEL_MODE_CHOICES)
+                msg = "scalim.yaml yaml_dsl.runner.parallel_mode must be one of {}: path='{}'".format(allowed, str(scalim_yaml_path))
+                raise ValueError(msg)
+
+    raw_max_workers = runner_dict.get("max_workers")
+    if raw_max_workers is None:
+        max_workers = None
+    else:
+        if not isinstance(raw_max_workers, int) or isinstance(raw_max_workers, bool):
+            msg = "scalim.yaml yaml_dsl.runner.max_workers must be an integer: path='{}'".format(str(scalim_yaml_path))
+            raise TypeError(msg)
+        max_workers = int(raw_max_workers)
+
+    return YamlDslRunnerConfig(
+        allowed_modules=allowed_modules,
+        allowed_functions=allowed_functions,
+        allowed_yaml_roots=allowed_yaml_roots,
+        template_sandbox=template_sandbox,
+        parallel_mode=parallel_mode,
+        max_workers=max_workers,
+    )
+
+
 def _parse_yaml_dsl_section(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -> YamlDslProjectConfig:
     project_root = scalim_yaml_path.parent
     yaml_dsl_dict = _parse_yaml_dsl_dict(raw, scalim_yaml_path=scalim_yaml_path)
     import_aliases = _parse_import_aliases(yaml_dsl_dict, project_root=project_root, scalim_yaml_path=scalim_yaml_path)
     roots = _parse_import_allowed_roots(yaml_dsl_dict, project_root=project_root, scalim_yaml_path=scalim_yaml_path)
     editor = _parse_editor_config(yaml_dsl_dict, project_root=project_root, scalim_yaml_path=scalim_yaml_path)
+    runner = _parse_runner_config(yaml_dsl_dict, project_root=project_root, scalim_yaml_path=scalim_yaml_path)
 
     return YamlDslProjectConfig(
         scalim_yaml_path=scalim_yaml_path,
@@ -231,6 +370,7 @@ def _parse_yaml_dsl_section(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -
         import_aliases=import_aliases,
         import_allowed_roots=roots,
         editor=editor,
+        runner=runner,
     )
 
 

@@ -128,7 +128,7 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim_misc.demo_big_data_report.loaders import load_orders
 
 repo_root = Path(".").resolve()
@@ -146,9 +146,11 @@ out_path = tmp_root / "ecommerce_rank_score_report.output.csv"
 
 _ = run(
     str(yaml_path),
-    allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
-    batch_size=10,
-    init_vars={"out_path_rank": str(out_path)},
+    options=RunOptions(
+        allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
+        batch_size=10,
+        init_vars={"out_path_rank": str(out_path)},
+    ),
 )
 
 with out_path.open("r", encoding="utf-8", newline="") as handle:

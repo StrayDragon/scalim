@@ -116,12 +116,14 @@ Python:
 
 ```python
 from datetime import datetime
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    init_vars={"end_dt": datetime(2024, 1, 31)},
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        init_vars={"end_dt": datetime(2024, 1, 31)},
+    ),
 )
 ```
 
@@ -135,4 +137,4 @@ result = run(
 - `Legacy YAML syntax is not supported: 'sources.<id>.bind'` / `...to_bind...`
   - 修复: 按错误中的示例把绑定迁移到 `sources.<id>.params` 的 `$keys/$rows` 指令节点
 - `Missing init var: <name> (path=...)`
-  - 修复: `run(..., init_vars={...})` 补齐该 key,或把 YAML 中的占位符改为普通字面值
+  - 修复: `run(..., options=RunOptions(init_vars={...}))` 补齐该 key,或把 YAML 中的占位符改为普通字面值

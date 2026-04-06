@@ -5,9 +5,12 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
+from ..dsl.by_yaml import RunOptions, run_workflow
+from ..dsl.by_yaml import run as run_demand
 from ..dsl.by_yaml._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from ..dsl.by_yaml._internal.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from ..dsl.by_yaml._internal.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
+from ..dsl.by_yaml._internal.config_parsing.project_config import YamlDslRunnerConfig, load_yaml_dsl_project_config
 from ..dsl.by_yaml._internal.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
 from ..dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
 from ..dsl.by_yaml._internal.config_parsing.validators.issues import ValidationIssue
@@ -104,6 +107,18 @@ def register(subparsers: Any) -> None:
     parser = subparsers.add_parser("yaml-dsl", help="YAML DSL utilities")
     _set_help_default(parser)
     yaml_subparsers = parser.add_subparsers(dest="yaml_dsl_command")
+
+    run_parser = yaml_subparsers.add_parser("run", help="Run a demand YAML")
+    _add_runner_args(run_parser, workflow_mode=False)
+    run_parser.set_defaults(func=_run_run)
+
+    workflow_parser = yaml_subparsers.add_parser("workflow", help="Workflow utilities")
+    _set_help_default(workflow_parser)
+    workflow_subparsers = workflow_parser.add_subparsers(dest="yaml_dsl_workflow_command")
+
+    workflow_run_parser = workflow_subparsers.add_parser("run", help="Run a workflow YAML")
+    _add_runner_args(workflow_run_parser, workflow_mode=True)
+    workflow_run_parser.set_defaults(func=_run_workflow_run)
 
     validate_parser = yaml_subparsers.add_parser("validate", help="Validate YAML DSL via internal validator")
     _add_validate_args(validate_parser)
@@ -220,6 +235,80 @@ def _add_upsert_lsp_comment_args(parser: argparse.ArgumentParser) -> None:
         default=yaml_dsl_lsp.DEFAULT_COMMENT_STYLE,
         help="Schema modeline 风格: all/jetbrains/redhat",
     )
+
+
+def _add_runner_args(parser: argparse.ArgumentParser, *, workflow_mode: bool) -> None:
+    _ = parser.add_argument("yaml_file", type=Path, help="YAML 文件路径")
+    _ = parser.add_argument(
+        "--init-vars-json",
+        dest="init_vars_json",
+        type=Path,
+        default=None,
+        help="可选: init_vars JSON 文件路径(JSON object mapping)",
+    )
+    _ = parser.add_argument(
+        "--template-vars-json",
+        dest="template_vars_json",
+        type=Path,
+        default=None,
+        help="可选: template_vars JSON 文件路径(JSON object mapping)",
+    )
+    _ = parser.add_argument(
+        "--allowed-module",
+        dest="allowed_modules",
+        type=str,
+        action="append",
+        default=[],
+        help="允许导入/引用的模块白名单(可重复)",
+    )
+    _ = parser.add_argument(
+        "--allowed-function",
+        dest="allowed_functions",
+        type=str,
+        action="append",
+        default=[],
+        help="允许导入/引用的函数白名单(可重复,格式 pkg.mod:fn 或 pkg.mod.fn)",
+    )
+    _ = parser.add_argument(
+        "--allowed-yaml-root",
+        dest="allowed_yaml_roots",
+        type=Path,
+        action="append",
+        default=[],
+        help="允许读取 YAML 的根目录(可重复);默认仅允许入口 YAML 所在目录",
+    )
+    _ = parser.add_argument(
+        "--template-sandbox",
+        dest="template_sandbox",
+        type=str,
+        choices=["safe", "legacy"],
+        default=None,
+        help="可选:模板 sandbox 模式(默认 safe)",
+    )
+    _ = parser.add_argument(
+        "--parallel-mode",
+        dest="parallel_mode",
+        type=str,
+        choices=["seq", "adaptive"],
+        default=None,
+        help="可选:并行模式(默认 seq)",
+    )
+    _ = parser.add_argument(
+        "--max-workers",
+        dest="max_workers",
+        type=int,
+        default=None,
+        help="可选:最大并发工作数(默认 0 自动)",
+    )
+    if workflow_mode:
+        _ = parser.add_argument(
+            "--path-alias",
+            dest="path_aliases",
+            type=str,
+            action="append",
+            default=[],
+            help="可选:workflow demand 路径别名,格式 <alias>=<path> (可重复)",
+        )
 
 
 def _default_schema_path() -> Path:
@@ -657,6 +746,334 @@ def _parse_path_aliases(raw_values: Iterable[str]) -> Tuple[Optional[Dict[str, s
             return None, "Invalid --path-alias value: {!r} (path must be non-empty)".format(item)
         output[alias] = base
     return output, None
+
+
+def _load_json_mapping_file(path: Path, *, label: str) -> Dict[str, object]:
+    json_path = path.expanduser().resolve(strict=False)
+    if not json_path.exists():
+        msg = "{} 文件不存在: {}".format(str(label or "JSON"), str(json_path))
+        raise ValueError(msg)
+    if not json_path.is_file():
+        msg = "{} 不是文件: {}".format(str(label or "JSON"), str(json_path))
+        raise ValueError(msg)
+
+    try:
+        text = json_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        safe_type = safe_error_type(exc)
+        safe_msg = safe_error_message(exc) or ""
+        msg = "{} 文件读取失败: {}: {}: {}".format(str(label or "JSON"), str(json_path), safe_type, safe_msg)
+        raise ValueError(msg) from exc
+
+    try:
+        loaded = json.loads(text)
+    except Exception as exc:
+        safe_msg = safe_error_message(exc) or ""
+        msg = "{} 必须是有效 JSON: {}: {}".format(str(label or "JSON"), str(json_path), safe_msg)
+        raise ValueError(msg) from exc
+
+    if not isinstance(loaded, dict):
+        msg = "{} 必须是 JSON mapping(object): {}: got {}".format(str(label or "JSON"), str(json_path), type(loaded).__name__)
+        raise TypeError(msg)
+
+    out: Dict[str, object] = {}
+    loaded_dict = cast("Dict[object, object]", loaded)  # pragma: allow-cast json.loads unknown mapping typed narrowing
+    for raw_key, raw_value in loaded_dict.items():
+        key = str(raw_key or "").strip() if isinstance(raw_key, str) else ""
+        if not key:
+            msg = "{} keys must be non-empty strings: {}: key={!r}".format(str(label or "JSON"), str(json_path), raw_key)
+            raise TypeError(msg)
+        out[key] = raw_value
+    return out
+
+
+def _normalize_non_empty_str_list(values: Iterable[object], *, label: str) -> List[str]:
+    out: List[str] = []
+    for raw in values:
+        if raw is None:
+            continue
+        item = str(raw).strip()
+        if not item:
+            msg = "{} values must be non-empty strings".format(str(label or "values"))
+            raise ValueError(msg)
+        out.append(item)
+    return out
+
+
+def _allowed_yaml_roots_to_options_payload(values: Sequence[Path]) -> Optional[Tuple[str, ...]]:
+    if not values:
+        return None
+    roots: List[str] = []
+    for raw_root in values:
+        root = raw_root.expanduser().resolve(strict=False)
+        roots.append(str(root))
+    return tuple(roots)
+
+
+def _fail_missing_allowlist(*, yaml_path: Path, scalim_yaml_path: Optional[Path]) -> None:
+    help_lines = [
+        "缺少 allowlist: 必须提供 `--allowed-module/--allowed-function` 或在 `scalim.yaml` 配置默认值.",
+        "示例: scalim-cli yaml-dsl run {} --allowed-module myapp.loaders".format(yaml_path),
+        "配置: scalim.yaml -> yaml_dsl.runner.allowed_modules / yaml_dsl.runner.allowed_functions",
+    ]
+    if scalim_yaml_path is not None:
+        help_lines.insert(1, "发现 scalim.yaml: {}".format(str(scalim_yaml_path)))
+    _write_line_stderr("错误: {}".format("\n".join(help_lines)))
+
+
+def _load_project_runner_defaults(yaml_path: Path) -> Tuple[Optional[YamlDslRunnerConfig], Optional[Path], Optional[str]]:
+    """通过 `nearest-wins` 规则加载项目级 `scalim.yaml`,用于 `CLI` 运行器默认值.
+
+    返回 `(runner_config, scalim_yaml_path, error_message)`:
+    - `runner_config`: `scalim.yaml yaml_dsl.runner` 段落(可选)
+    - `scalim_yaml_path`: 发现的 `scalim.yaml` 路径(可选)
+    - `error_message`: 读取/解析失败时的可读错误(可选)
+    """
+    try:
+        project_cfg = load_yaml_dsl_project_config(yaml_path)
+    except Exception as exc:  # noqa: BLE001
+        safe_type = safe_error_type(exc)
+        safe_msg = safe_error_message(exc) or ""
+        msg = "加载 scalim.yaml 失败: {}: {}".format(safe_type, safe_msg)
+        return None, None, msg
+
+    if project_cfg is None:
+        return None, None, None
+
+    return project_cfg.runner, project_cfg.scalim_yaml_path, None
+
+
+def _run_run(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
+    args_dict = vars(args)
+    yaml_path = cast("Path", args_dict.get("yaml_file")).expanduser().resolve(strict=False)  # pragma: allow-cast argparse Path extraction
+    if not yaml_path.exists():
+        _write_line_stderr("错误: YAML 文件不存在: {}".format(yaml_path))
+        return 1
+    if not yaml_path.is_file():
+        _write_line_stderr("错误: 不是文件: {}".format(yaml_path))
+        return 1
+
+    runner_defaults, scalim_yaml_path, cfg_error = _load_project_runner_defaults(yaml_path)
+    if cfg_error is not None:
+        _write_line_stderr("错误: {}".format(cfg_error))
+        return 1
+
+    try:
+        init_vars = None
+        init_json_path = args_dict.get("init_vars_json")
+        if init_json_path is not None:
+            init_vars = _load_json_mapping_file(
+                cast("Path", init_json_path),  # pragma: allow-cast argparse Path extraction
+                label="--init-vars-json",
+            )
+
+        template_vars = None
+        template_json_path = args_dict.get("template_vars_json")
+        if template_json_path is not None:
+            template_vars = _load_json_mapping_file(
+                cast("Path", template_json_path),  # pragma: allow-cast argparse Path extraction
+                label="--template-vars-json",
+            )
+
+        allowed_modules_cli = _normalize_non_empty_str_list(args_dict.get("allowed_modules", []) or [], label="--allowed-module")
+        allowed_functions_cli = _normalize_non_empty_str_list(args_dict.get("allowed_functions", []) or [], label="--allowed-function")
+    except (TypeError, ValueError) as exc:
+        _write_line_stderr("错误: {}".format(str(exc)))
+        return 1
+
+    allowed_modules_default = list(runner_defaults.allowed_modules) if runner_defaults is not None else []
+    allowed_functions_default = list(runner_defaults.allowed_functions) if runner_defaults is not None else []
+    allowed_yaml_roots_default = list(runner_defaults.allowed_yaml_roots) if runner_defaults is not None else []
+    template_sandbox_default = None if runner_defaults is None else runner_defaults.template_sandbox
+    parallel_mode_default = None if runner_defaults is None else runner_defaults.parallel_mode
+    max_workers_default = None if runner_defaults is None else runner_defaults.max_workers
+
+    allowed_modules = allowed_modules_cli or allowed_modules_default
+    allowed_functions = allowed_functions_cli or allowed_functions_default
+
+    allowed_yaml_roots_cli = cast(
+        "List[Path]", args_dict.get("allowed_yaml_roots", []) or []
+    )  # pragma: allow-cast argparse Path list extraction
+    allowed_yaml_roots = allowed_yaml_roots_cli or allowed_yaml_roots_default
+
+    template_sandbox_cli = cast("Optional[str]", args_dict.get("template_sandbox"))  # pragma: allow-cast argparse str option extraction
+    template_sandbox = (template_sandbox_cli or template_sandbox_default or "safe").strip() or "safe"
+
+    parallel_mode_cli = cast("Optional[str]", args_dict.get("parallel_mode"))  # pragma: allow-cast argparse str option extraction
+    parallel_mode = (parallel_mode_cli or parallel_mode_default or "seq").strip() or "seq"
+
+    max_workers_cli = cast("Optional[int]", args_dict.get("max_workers"))  # pragma: allow-cast argparse int option extraction
+    if max_workers_cli is not None:
+        max_workers_int = int(max_workers_cli)
+    elif max_workers_default is not None:
+        max_workers_int = int(max_workers_default)
+    else:
+        max_workers_int = 0
+
+    allowed_modules_set = frozenset(allowed_modules)
+    allowed_functions_set = frozenset(allowed_functions)
+
+    allowed_functions_payload = allowed_functions_set or None
+
+    if not allowed_modules_set and not allowed_functions_payload:
+        _fail_missing_allowlist(yaml_path=yaml_path, scalim_yaml_path=scalim_yaml_path)
+        return 1
+
+    allowed_yaml_roots_payload = _allowed_yaml_roots_to_options_payload(allowed_yaml_roots)
+
+    options = RunOptions(
+        allowed_modules=allowed_modules_set,
+        allowed_functions=allowed_functions_payload,
+        init_vars=init_vars,
+        template_vars=template_vars,
+        template_sandbox=str(template_sandbox or "").strip() or "safe",
+        parallel_mode=cast("Any", str(parallel_mode or "").strip() or "seq"),  # pragma: allow-cast ParallelMode is Literal
+        max_workers=int(max_workers_int),
+        allowed_yaml_roots=allowed_yaml_roots_payload,
+    )
+
+    try:
+        result = run_demand(str(yaml_path), options=options)
+    except Exception as exc:  # noqa: BLE001
+        safe_type = safe_error_type(exc)
+        safe_msg = safe_error_message(exc) or ""
+        _write_line_stderr("错误: run failed: {}: {}".format(safe_type, safe_msg))
+        return 1
+
+    _write_line("OK {}".format(str(yaml_path)))
+    if scalim_yaml_path is not None:
+        _write_line("scalim.yaml: {}".format(str(scalim_yaml_path)))
+    _write_line("total_rows: {}".format(int(result.total_rows)))
+    _write_line("duration_s: {:.6f}".format(float(result.duration)))
+    _write_line("output_path: {}".format(str(result.output_path) if result.output_path else "(none)"))
+    outputs = result.config.outputs
+    if not outputs:
+        _write_line("")
+        _write_line("NOTE: 当前 YAML 未声明 outputs,因此不会落盘.")
+        _write_line("help: 补齐 YAML 顶层 `outputs/resources` 或使用 Python `RunOverrides.*` 注入 outputs.")
+    return 0
+
+
+def _run_workflow_run(args: argparse.Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
+    args_dict = vars(args)
+    yaml_path = cast("Path", args_dict.get("yaml_file")).expanduser().resolve(strict=False)  # pragma: allow-cast argparse Path extraction
+    if not yaml_path.exists():
+        _write_line_stderr("错误: YAML 文件不存在: {}".format(yaml_path))
+        return 1
+    if not yaml_path.is_file():
+        _write_line_stderr("错误: 不是文件: {}".format(yaml_path))
+        return 1
+
+    runner_defaults, scalim_yaml_path, cfg_error = _load_project_runner_defaults(yaml_path)
+    if cfg_error is not None:
+        _write_line_stderr("错误: {}".format(cfg_error))
+        return 1
+
+    raw_aliases = list(args_dict.get("path_aliases", []) or [])
+    path_aliases, alias_error = _parse_path_aliases(raw_aliases)
+    if alias_error is not None:
+        _write_line_stderr("错误: {}".format(alias_error))
+        return 1
+
+    try:
+        init_vars = None
+        init_json_path = args_dict.get("init_vars_json")
+        if init_json_path is not None:
+            init_vars = _load_json_mapping_file(
+                cast("Path", init_json_path),  # pragma: allow-cast argparse Path extraction
+                label="--init-vars-json",
+            )
+
+        template_vars = None
+        template_json_path = args_dict.get("template_vars_json")
+        if template_json_path is not None:
+            template_vars = _load_json_mapping_file(
+                cast("Path", template_json_path),  # pragma: allow-cast argparse Path extraction
+                label="--template-vars-json",
+            )
+
+        allowed_modules_cli = _normalize_non_empty_str_list(args_dict.get("allowed_modules", []) or [], label="--allowed-module")
+        allowed_functions_cli = _normalize_non_empty_str_list(args_dict.get("allowed_functions", []) or [], label="--allowed-function")
+    except (TypeError, ValueError) as exc:
+        _write_line_stderr("错误: {}".format(str(exc)))
+        return 1
+
+    allowed_modules_default = list(runner_defaults.allowed_modules) if runner_defaults is not None else []
+    allowed_functions_default = list(runner_defaults.allowed_functions) if runner_defaults is not None else []
+    allowed_yaml_roots_default = list(runner_defaults.allowed_yaml_roots) if runner_defaults is not None else []
+    template_sandbox_default = None if runner_defaults is None else runner_defaults.template_sandbox
+    parallel_mode_default = None if runner_defaults is None else runner_defaults.parallel_mode
+    max_workers_default = None if runner_defaults is None else runner_defaults.max_workers
+
+    allowed_modules = allowed_modules_cli or allowed_modules_default
+    allowed_functions = allowed_functions_cli or allowed_functions_default
+
+    allowed_yaml_roots_cli = cast(
+        "List[Path]", args_dict.get("allowed_yaml_roots", []) or []
+    )  # pragma: allow-cast argparse Path list extraction
+    allowed_yaml_roots = allowed_yaml_roots_cli or allowed_yaml_roots_default
+
+    template_sandbox_cli = cast("Optional[str]", args_dict.get("template_sandbox"))  # pragma: allow-cast argparse str option extraction
+    template_sandbox = (template_sandbox_cli or template_sandbox_default or "safe").strip() or "safe"
+
+    parallel_mode_cli = cast("Optional[str]", args_dict.get("parallel_mode"))  # pragma: allow-cast argparse str option extraction
+    parallel_mode = (parallel_mode_cli or parallel_mode_default or "seq").strip() or "seq"
+
+    max_workers_cli = cast("Optional[int]", args_dict.get("max_workers"))  # pragma: allow-cast argparse int option extraction
+    if max_workers_cli is not None:
+        max_workers_int = int(max_workers_cli)
+    elif max_workers_default is not None:
+        max_workers_int = int(max_workers_default)
+    else:
+        max_workers_int = 0
+
+    allowed_modules_set = frozenset(allowed_modules)
+    allowed_functions_set = frozenset(allowed_functions)
+
+    allowed_functions_payload = allowed_functions_set or None
+
+    if not allowed_modules_set and not allowed_functions_payload:
+        _fail_missing_allowlist(yaml_path=yaml_path, scalim_yaml_path=scalim_yaml_path)
+        return 1
+
+    allowed_yaml_roots_payload = _allowed_yaml_roots_to_options_payload(allowed_yaml_roots)
+
+    try:
+        result = run_workflow(
+            str(yaml_path),
+            allowed_modules=allowed_modules_set,
+            allowed_functions=allowed_functions_payload,
+            init_vars=init_vars,
+            template_vars=template_vars,
+            template_sandbox=str(template_sandbox or "").strip() or "safe",
+            parallel_mode=cast("Any", str(parallel_mode or "").strip() or "seq"),  # pragma: allow-cast ParallelMode is Literal
+            max_workers=int(max_workers_int),
+            allowed_yaml_roots=allowed_yaml_roots_payload,
+            path_aliases=path_aliases,
+        )
+    except Exception as exc:  # noqa: BLE001
+        safe_type = safe_error_type(exc)
+        safe_msg = safe_error_message(exc) or ""
+        _write_line_stderr("错误: workflow run failed: {}: {}".format(safe_type, safe_msg))
+        return 1
+
+    errors = []
+    try:
+        errors = result.errors()
+    except Exception:  # noqa: BLE001
+        errors = []
+
+    if errors:
+        _write_line_stderr("错误: workflow run returned {} errors".format(len(errors)))
+        for err in errors[:5]:
+            _write_line_stderr(" - {}: {}".format(err.run_id, err.message))
+        return 1
+
+    _write_line("OK {}".format(str(yaml_path)))
+    if scalim_yaml_path is not None:
+        _write_line("scalim.yaml: {}".format(str(scalim_yaml_path)))
+    _write_line("runs: {}".format(len(result.outcomes)))
+    return 0
 
 
 def _extract_demand_book_ids(yaml_data: Optional[Dict[str, Any]]) -> Set[str]:

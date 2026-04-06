@@ -411,6 +411,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-builtin-callables/spec.md)
 - Summary: 为 `YAML DSL` 中的 loader/call_by/... 等 Python 可调用对象引用点提供一套 **稳定、受控、无需扩大 allowlist** 的内置 callable 引用语法,避免下游依赖 `scalim.*` 内部模块路径。
 
+### `yaml-dsl-cli-runner`
+- Title: yaml-dsl-cli-runner Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-runner/spec.md)
+- Summary: TBD - created by archiving change c22-yaml-dsl-cli-runner-and-api-convergence. Update Purpose after archive.
+
 ### `yaml-dsl-cli-validation`
 - Title: yaml-dsl-cli-validation Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-validation/spec.md)

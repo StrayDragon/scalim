@@ -89,6 +89,112 @@
       },
       "additionalProperties": false
     },
+    "scalim_yaml_yaml_dsl_runner": {
+      "type": "object",
+      "properties": {
+        "allowed_modules": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "可选: CLI runner 默认 allowlist modules",
+          "markdownDescription": "CLI runner 默认 allowlist modules.\n\n- 仅用于提供默认值(减少重复 flags)\n- allowlist 为空仍会 fail-fast(不弱化安全边界)\n- 可被 CLI flags 覆盖",
+          "default": [],
+          "examples": [
+            [
+              "myapp.loaders"
+            ]
+          ]
+        },
+        "allowed_functions": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "可选: CLI runner 默认 allowlist functions",
+          "markdownDescription": "CLI runner 默认 allowlist functions.\n\n- 仅用于提供默认值(减少重复 flags)\n- 可被 CLI flags 覆盖",
+          "default": [],
+          "examples": [
+            [
+              "myapp.loaders:load_orders"
+            ]
+          ]
+        },
+        "allowed_yaml_roots": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "可选: 允许读取 YAML 的根目录列表(相对 scalim.yaml 所在目录)",
+          "markdownDescription": "允许读取 YAML 的根目录列表(相对 `scalim.yaml` 所在目录).",
+          "default": [],
+          "examples": [
+            [
+              "./shared_yaml"
+            ]
+          ]
+        },
+        "template_sandbox": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "可选:模板 sandbox 默认值",
+          "markdownDescription": "模板 sandbox 默认值.\n\n- 允许值: `safe` / `legacy`",
+          "enum": [
+            "safe",
+            "legacy"
+          ],
+          "default": null,
+          "examples": [
+            "safe"
+          ]
+        },
+        "parallel_mode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "可选:并行模式默认值",
+          "markdownDescription": "并行模式默认值.\n\n- 允许值: `seq` / `adaptive`",
+          "enum": [
+            "seq",
+            "adaptive"
+          ],
+          "default": null,
+          "examples": [
+            "seq"
+          ]
+        },
+        "max_workers": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "可选:最大并发工作数默认值(0 自动)",
+          "markdownDescription": "最大并发工作数默认值.\n\n- `0` 表示自动",
+          "minimum": 0,
+          "default": null,
+          "examples": [
+            0,
+            8
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "scalim_yaml_yaml_dsl": {
       "type": "object",
       "properties": {
@@ -143,6 +249,19 @@
           ],
           "description": "可选: editor/LSP project discovery 配置",
           "markdownDescription": "editor/LSP project discovery 配置(可选).",
+          "default": null
+        },
+        "runner": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/scalim_yaml_yaml_dsl_runner"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "可选: CLI runner 默认值(yaml_dsl.runner.*)",
+          "markdownDescription": "CLI runner 默认值(可选).\n\n- 用于 `scalim-cli yaml-dsl run` / `workflow run`",
           "default": null
         }
       },

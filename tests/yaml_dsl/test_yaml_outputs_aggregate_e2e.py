@@ -2,7 +2,7 @@ import csv
 from decimal import Decimal
 from pathlib import Path
 
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 
 
 def _read_csv_rows(path: Path) -> "list[dict[str, str]]":
@@ -58,7 +58,7 @@ outputs:
         encoding="utf-8",
     )
 
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures"]))
+    _ = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
     assert detail_path.exists()
     assert summary_path.exists()
@@ -112,7 +112,7 @@ outputs:
         encoding="utf-8",
     )
 
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures"]))
+    _ = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
     assert summary_path.exists()
     assert _read_csv_header(summary_path) == ["排名", "客户", "订单量", "GMV"]

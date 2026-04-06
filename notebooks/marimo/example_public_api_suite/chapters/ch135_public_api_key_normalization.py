@@ -71,20 +71,24 @@ sources:
         sink_raw = InMemoryRowSink()
         _ = api.run(
             str(demand_path),
-            allowed_modules=_ALLOWED_MODULES,
-            sink=sink_raw,
-            key_normalization="raw",
-            batch_size=10,
+            options=api.RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                sink=sink_raw,
+                key_normalization="raw",
+                batch_size=10,
+            ),
         )
         raw_rows = sink_raw.get_data()
 
         sink_norm = InMemoryRowSink()
         _ = api.run(
             str(demand_path),
-            allowed_modules=_ALLOWED_MODULES,
-            sink=sink_norm,
-            key_normalization="auto_str",
-            batch_size=10,
+            options=api.RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                sink=sink_norm,
+                key_normalization="auto_str",
+                batch_size=10,
+            ),
         )
         norm_rows = sink_norm.get_data()
 

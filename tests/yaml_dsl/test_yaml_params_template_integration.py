@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.sinks import InMemoryRowSink
 
 import tests.fixtures.params_template_loaders as loaders
@@ -48,7 +48,13 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]), sink=sink)
+    _ = run(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
+            sink=sink,
+        ),
+    )
 
     assert loaders.CALL_COUNTS.get("customers_by_keys") == 1
     call_kwargs = loaders.CALL_KWARGS["customers_by_keys"][0]
@@ -87,7 +93,13 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]), sink=sink)
+    _ = run(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
+            sink=sink,
+        ),
+    )
 
     assert loaders.CALL_COUNTS.get("customers_static") == 1
     call_kwargs = loaders.CALL_KWARGS["customers_static"][0]
@@ -139,7 +151,13 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]), sink=sink)
+    _ = run(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
+            sink=sink,
+        ),
+    )
 
     assert loaders.CALL_COUNTS.get("customers_by_rows") == expected_calls
     for call_kwargs in loaders.CALL_KWARGS.get("customers_by_rows", []):
@@ -180,7 +198,13 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]), sink=sink)
+    _ = run(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
+            sink=sink,
+        ),
+    )
 
     assert loaders.CALL_COUNTS.get("preload_refdata") == 1
     call_kwargs = loaders.CALL_KWARGS["preload_refdata"][0]
@@ -208,9 +232,11 @@ main_source:
     sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-        sink=sink,
-        init_vars={"end_dt": end_dt},
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
+            sink=sink,
+            init_vars={"end_dt": end_dt},
+        ),
     )
 
     assert loaders.CALL_COUNTS.get("orders") == 1
@@ -252,9 +278,11 @@ sources:
     sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-        sink=sink,
-        init_vars={"group_by": "level"},
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
+            sink=sink,
+            init_vars={"group_by": "level"},
+        ),
     )
 
     assert loaders.CALL_COUNTS.get("customers_static") == 1

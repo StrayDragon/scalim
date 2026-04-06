@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
@@ -246,13 +246,15 @@ def main(argv: List[str]) -> int:
         parallel_mode = _parallel_mode_for_scenario(scenario)
         result = run(
             yaml_path,
-            allowed_modules=allowed_modules,
-            overrides=RunOverrides(
-                viz_config=viz_config,
+            options=RunOptions(
+                allowed_modules=allowed_modules,
+                overrides=RunOverrides(
+                    viz_config=viz_config,
+                ),
+                parallel_mode=parallel_mode,
+                max_workers=int(args.max_workers or 0),
+                init_vars={"order_ids": []},
             ),
-            parallel_mode=parallel_mode,
-            max_workers=int(args.max_workers or 0),
-            init_vars={"order_ids": []},
         )
 
         try:

@@ -55,14 +55,16 @@ main_source:
 而不是把路径写死在 YAML 里(更易复用/更易对拍):
 
 ```python
-from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides.csv_file(
-        output_path="./output/minimal_order_report.csv",
-        fields=["order_id"],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        overrides=RunOverrides.csv_file(
+            output_path="./output/minimal_order_report.csv",
+            fields=["order_id"],
+        ),
     ),
 )
 ```
@@ -152,24 +154,47 @@ scalim-cli yaml-dsl validate config.yaml
 
 更多 CLI 子命令与参数说明以 `scalim-cli yaml-dsl --help` / `scalim-cli yaml-dsl validate --help` 为准.
 
+运行 demand/workflow YAML(需 allowlist):
+
+```bash
+# 运行 demand YAML
+scalim-cli yaml-dsl run config.yaml --allowed-module myapp.loaders
+
+# 运行 workflow YAML
+scalim-cli yaml-dsl workflow run workflow.yaml --allowed-module myapp.loaders
+```
+
+如果你不希望每次都重复写 `--allowed-module/--allowed-function`,可以在项目根添加 `scalim.yaml` 作为默认值来源:
+
+```yaml
+# scalim.yaml
+yaml_dsl:
+  runner:
+    allowed_modules: ["myapp.loaders"]
+```
+
 **Python 代码调用**:
 
 ```python
-from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
 
 # 加载并执行 YAML 配置(安全:需要 allowlist)
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+    ),
 )
 
 # 常见用法: YAML 不声明 outputs,由 Python 调用侧 RunOverrides 指定单输出编排(推荐)
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides.csv_file(
-        output_path="./output/order_report.csv",
-        fields=["order_id"],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        overrides=RunOverrides.csv_file(
+            output_path="./output/order_report.csv",
+            fields=["order_id"],
+        ),
     ),
 )
 ```
@@ -209,14 +234,17 @@ resources:
 
 ```python
 from datetime import datetime
+from scalim.dsl.by_yaml import RunOptions, run
 
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    init_vars={
-        "end_dt": datetime(2024, 1, 31),
-        "output_path": "./output/report.csv",
-    },
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        init_vars={
+            "end_dt": datetime(2024, 1, 31),
+            "output_path": "./output/report.csv",
+        },
+    ),
 )
 ```
 
@@ -370,7 +398,7 @@ _templates:
 注意:
 
 - `batch_size`/`retry`/`guardrails`/demand `failure_policy` 已迁出 YAML 主线(运行期策略边界);请在 Python runtime entrypoints 中配置:
-  - `scalim.dsl.by_yaml.run/compile(..., batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)`
+  - `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))`
 
 ### 3.2 主数据源配置 (main_source)
 
@@ -923,20 +951,22 @@ CLI 校验入口 `scalim-cli yaml-dsl validate ...` 会在 validate 阶段发出
 #### 3.7.1 日志(logging)
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
 
 run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[PrettyLoggingObserver()],  # 或 LoggingObserver()
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[PrettyLoggingObserver()],  # 或 LoggingObserver()
+    ),
 )
 ```
 
 #### 3.7.2 性能(performance)
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver, PerformanceThresholds
 
 perf = PerformanceObserver(
@@ -952,15 +982,17 @@ perf = PerformanceObserver(
 
 run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[perf],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[perf],
+    ),
 )
 ```
 
 #### 3.7.3 关联(relations)
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 
 relations = RelationObserver(
@@ -975,28 +1007,32 @@ relations = RelationObserver(
 
 run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[relations],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[relations],
+    ),
 )
 ```
 
 #### 3.7.4 可视化(viz)
 
 ```python
-from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
 
 run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(
-        viz_config=VizObserverConfig(
-            output_dir="./output",
-            trace_enabled=False,
-            payload_policy="summary",
-            run_name="order_report",
-            env="production",
-        )
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        overrides=RunOverrides(
+            viz_config=VizObserverConfig(
+                output_dir="./output",
+                trace_enabled=False,
+                payload_policy="summary",
+                run_name="order_report",
+                env="production",
+            )
+        ),
     ),
 )
 ```
@@ -1009,42 +1045,48 @@ run(
 #### 3.7.5 执行追踪(trace)
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 
 trace = ExecutionTraceObserver()
 _ = run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[trace],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[trace],
+    ),
 )
 ```
 
 #### 3.7.6 行缺口统计(row_gap)
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.row_gap import RowGapObserver
 
 row_gap = RowGapObserver(primary_loader_name="tickets", data_loader_names=["customers", "agents"], sample_limit=3)
 _ = run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[row_gap],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[row_gap],
+    ),
 )
 ```
 
 #### 3.7.7 内存优化统计(memory_opt)
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 
 mem = MemoryOptimizationObserver(auto_report=True, max_fields=20)
 _ = run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[mem],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[mem],
+    ),
 )
 ```
 
@@ -1268,29 +1310,33 @@ outputs:
 如需输出 meta/audit extra sheets,请在 Python 运行入口配置 runtime output extras:
 
 ```python
-from scalim.dsl.by_yaml import OutputExtrasOverride, RunOverrides, run
+from scalim.dsl.by_yaml import OutputExtrasOverride, RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)),
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)),
+    ),
 )
 ```
 
 #### 4.5.2 示例: Python 运行期覆盖 outputs(动态选字段/路径/sheet)
 
 ```python
-from scalim.dsl.by_yaml import RunOverrides, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides.xlsx_file_single_sheet(
-        output_path="./output/report.xlsx",
-        fields=["order_id", "amount", "profit"],
-        sheet="明细",
-        book_id="report",
-        write_lock=True,
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        overrides=RunOverrides.xlsx_file_single_sheet(
+            output_path="./output/report.xlsx",
+            fields=["order_id", "amount", "profit"],
+            sheet="明细",
+            book_id="report",
+            write_lock=True,
+        ),
     ),
 )
 ```
@@ -1408,7 +1454,7 @@ resources:
 
 运行提示:
 
-- `batch_size` 已迁出 YAML 主线;调用侧通过 `run/compile(..., batch_size=3)` 设置.
+- `batch_size` 已迁出 YAML 主线;调用侧通过 `run/compile(..., options=RunOptions(batch_size=3))` 设置.
 
 ### 5.2 示例2: 电商报表(多级关联、复合键、派生字段)
 
@@ -1576,17 +1622,19 @@ resources:
 可观测性(可选)请通过 runtime entrypoints 装配(示例):
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 
 _ = run(
     "path/to/ecommerce_report.yaml",
-    allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
-    components=[
-        PerformanceObserver(PerformanceConfig(metrics={"duration", "memory", "cpu"})),
-        RelationObserver(RelationConfig(sampling_rate=0.05, report_format="json", output_path="./output/relations_report.json")),
-    ],
+    options=RunOptions(
+        allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
+        components=[
+            PerformanceObserver(PerformanceConfig(metrics={"duration", "memory", "cpu"})),
+            RelationObserver(RelationConfig(sampling_rate=0.05, report_format="json", output_path="./output/relations_report.json")),
+        ],
+    ),
 )
 ```
 
@@ -1663,13 +1711,19 @@ sources:
 **1. 合理设置 batch_size(运行期策略,通过 runtime entrypoint 配置)**:
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 
 # 小数据集或低内存环境
-run("path/to/report.yaml", allowed_modules=frozenset(["myapp"]), batch_size=500)
+run(
+    "path/to/report.yaml",
+    options=RunOptions(allowed_modules=frozenset(["myapp"]), batch_size=500),
+)
 
 # 大数据集或高内存环境
-run("path/to/report.yaml", allowed_modules=frozenset(["myapp"]), batch_size=2000)
+run(
+    "path/to/report.yaml",
+    options=RunOptions(allowed_modules=frozenset(["myapp"]), batch_size=2000),
+)
 ```
 
 **2. 使用缓存**:
@@ -1747,22 +1801,27 @@ def load_orders(*, api_key=None, **kwargs):
 YAML 中的 `loader` / `call_by` 允许引用 Python 可调用对象,属于动态执行边界.在生产/低信任输入场景 MUST 使用 allowlist 限制可解析的引用:
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 
 # 模块级 allowlist(允许该模块及其子模块)
 run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+    ),
 )
 
 # 函数级 allowlist(更精确,推荐)
 run(
     "path/to/config.yaml",
-    allowed_functions=frozenset(
-        [
-            "myapp.loaders:load_orders",
-            "myapp.loaders:load_customers",
-        ]
+    options=RunOptions(
+        allowed_modules=frozenset(),
+        allowed_functions=frozenset(
+            [
+                "myapp.loaders:load_orders",
+                "myapp.loaders:load_customers",
+            ]
+        ),
     ),
 )
 ```
@@ -1793,12 +1852,14 @@ main_source:
 - 旧代码如果绕过官方 facade 直接调用内部编译器/转换器,建议迁移到 `scalim.dsl.by_yaml.compile/run`,并显式配置 allowlist:
 
 ```python
-from scalim.dsl.by_yaml import compile
+from scalim.dsl.by_yaml import RunOptions, compile
 
 # 推荐:显式 allowlist(安全默认)
 _ = compile(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+    ),
 )
 ```
 
@@ -1842,7 +1903,7 @@ compute limits 等更细粒度安全配置属于内部实现细节;如确需自�
 **A**: 通过 runtime entrypoints 装配 `RelationObserver`:
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 
 relations = RelationObserver(
@@ -1857,8 +1918,10 @@ relations = RelationObserver(
 
 _ = run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[relations],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[relations],
+    ),
 )
 ```
 
@@ -1947,9 +2010,12 @@ sources:
 1. **减小 batch_size**:
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 
-run("path/to/report.yaml", allowed_modules=frozenset(["myapp"]), batch_size=500)  # 默认 1000
+run(
+    "path/to/report.yaml",
+    options=RunOptions(allowed_modules=frozenset(["myapp"]), batch_size=500),  # 默认 1000
+)
 ```
 
 2. **使用文件资源绑定 CSV 输出**:
@@ -1979,14 +2045,16 @@ sources:
 4. **启用内存优化统计**:
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 
 mem = MemoryOptimizationObserver(auto_report=True)
 _ = run(
     "path/to/report.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[mem],
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[mem],
+    ),
 )
 ```
 
@@ -2021,8 +2089,12 @@ scalim-cli yaml-dsl validate --json config.yaml
 
 ```python
 # 或在代码中(编译时会自动校验;需配置 allowlist)
-from scalim.dsl.by_yaml import compile
-_ = compile("config.yaml", allowed_modules=frozenset(["myapp.loaders"]))
+from scalim.dsl.by_yaml import RunOptions, compile
+
+_ = compile(
+    "config.yaml",
+    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"])),
+)
 ```
 
 ### Q9: 支持哪些输出格式？
@@ -2051,7 +2123,7 @@ outputs:
 **A**:
 
 ```python
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.hooks.base import BaseHook
 
 
@@ -2063,8 +2135,10 @@ class _MyHook(BaseHook):
 # 执行配置
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[_MyHook()],  # (可选) 附加自定义 hook/observer 组件
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        components=[_MyHook()],  # (可选) 附加自定义 hook/observer 组件
+    ),
 )
 
 # 访问结果
@@ -2084,11 +2158,15 @@ print(f"输出路径: {result.output_path}")
 - 当启用 `template_vars` 时,系统会对“渲染后的 YAML 文本”施加长度上限 `rendered_yaml_max_len`(默认 `1048576`)：同时覆盖 demand/workflow 与 imports fragments,并在 YAML parse 前 fail-fast；超限错误只回显 `rendered_len/max_len` 与位置,不会回显渲染正文。
 
 ```python
+from scalim.dsl.by_yaml import RunOptions, run
+
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    template_vars={"output_path": "./out/report.csv"},
-    rendered_yaml_max_len=2_000_000,  # (可选)按需调大
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        template_vars={"output_path": "./out/report.csv"},
+        rendered_yaml_max_len=2_000_000,  # (可选)按需调大
+    ),
 )
 ```
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import DemandDiagnosticsOverride, DemandDiagnosticsPolicy, compile
+from scalim.dsl.by_yaml import DemandDiagnosticsOverride, DemandDiagnosticsPolicy, RunOptions, compile
 from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.mock_loaders"])
@@ -25,7 +25,7 @@ sources: {}
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
-        _ = compile(str(yaml_path), allowed_modules=_ALLOWED_MODULES)
+        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=_ALLOWED_MODULES))
 
     assert any(env.path == "validate_unique_field_names" for env in excinfo.value.errors)
     assert any("demand_diagnostics=DemandDiagnosticsPolicy" in env.message for env in excinfo.value.errors)
@@ -48,7 +48,7 @@ sources: {}
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
-        _ = compile(str(yaml_path), allowed_modules=_ALLOWED_MODULES)
+        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=_ALLOWED_MODULES))
 
     assert any(env.path == "include_full_error_message" for env in excinfo.value.errors)
     assert any("demand_diagnostics=DemandDiagnosticsPolicy" in env.message for env in excinfo.value.errors)
@@ -76,15 +76,17 @@ outputs:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
-    compilation = compile(str(yaml_path), allowed_modules=_ALLOWED_MODULES)
+    compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=_ALLOWED_MODULES))
     assert compilation.request.output_composition is not None
     assert compilation.config.include_full_error_message is False
     assert compilation.request.output_composition.include_full_error_message is False
 
     compilation_full = compile(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True),
+        ),
     )
     assert compilation_full.request.output_composition is not None
     assert compilation_full.config.include_full_error_message is True

@@ -101,15 +101,12 @@ def _(mo, yaml_path):
 @app.cell
 def _(yaml_path):
     # region SCALIM-SKILL:example-full:constraints
-    from scalim.dsl.by_yaml import compile
+    from scalim.dsl.by_yaml import RunOptions, compile
 
     _loaders_module = "scalim_misc.demo_big_data_report.loaders"
 
     try:
-        compilation = compile(
-            str(yaml_path),
-            allowed_modules=frozenset([_loaders_module]),
-        )
+        compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset([_loaders_module])))
         print("✅ `compile()` 校验/加载通过!")
         validation_passed = True
         demand_config = compilation.config
@@ -182,7 +179,7 @@ def _(mo):
 @app.cell
 def _(Path, yaml_path):
     # region SCALIM-SKILL:example-full:run-yaml
-    from scalim.dsl.by_yaml import run
+    from scalim.dsl.by_yaml import RunOptions, run
     from scalim.sinks import InMemoryRowSink
 
     # 注意: `run()` 需要 `allowlist` 配置
@@ -193,9 +190,11 @@ def _(Path, yaml_path):
         _init_vars = {"order_ids": []}
         result = run(
             str(yaml_path),
-            allowed_modules=frozenset([_loaders_module]),
-            sink=sink,
-            init_vars=_init_vars,
+            options=RunOptions(
+                allowed_modules=frozenset([_loaders_module]),
+                sink=sink,
+                init_vars=_init_vars,
+            ),
         )
         print("✅ `run()` 执行成功!")
         print("   总行数:", result.total_rows)

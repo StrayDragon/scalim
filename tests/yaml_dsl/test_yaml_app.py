@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from scalim.vendor.yamlx import yaml
 
-from scalim.dsl.by_yaml import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride, RunOverrides, run
+from scalim.dsl.by_yaml import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride, RunOptions, RunOverrides, run
 from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.by_yaml.runtime.introspection import load_output_config, resolve_required_field_ids
 from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
@@ -176,18 +176,20 @@ def test_run_writes_output(tmp_path: Path) -> None:
 
     result = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(
-            outputs=(
-                OutputOverride(
-                    name="detail",
-                    fields=("order_id",),
-                    to=OutputToOverride(file="detail_csv"),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            sink=sink,
+            overrides=RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("order_id",),
+                        to=OutputToOverride(file="detail_csv"),
+                    ),
                 ),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
             ),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
-        sink=sink,
     )
 
     assert output_path.exists()
@@ -212,17 +214,19 @@ def test_run_with_performance_observability(tmp_path: Path) -> None:
 
     result = run(
         str(yaml_path),
-        allowed_modules=_ALLOWED_MODULES,
-        components=[perf_observer],
-        overrides=RunOverrides(
-            outputs=(
-                OutputOverride(
-                    name="detail",
-                    fields=("order_id",),
-                    to=OutputToOverride(file="detail_csv"),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            components=[perf_observer],
+            overrides=RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("order_id",),
+                        to=OutputToOverride(file="detail_csv"),
+                    ),
                 ),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
             ),
-            resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
         ),
     )
 

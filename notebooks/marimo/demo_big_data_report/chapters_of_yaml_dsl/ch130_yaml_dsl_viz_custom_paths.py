@@ -6,8 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.by_yaml import compile as compile_yaml
-from scalim.dsl.by_yaml import RunOverrides
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -59,10 +58,12 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
         try:
             compilation = compile_yaml(
                 str(yaml_path),
-                allowed_modules=_ALLOWED_MODULES,
-                batch_size=2,
-                init_vars=init_vars,
-                overrides=overrides,
+                options=RunOptions(
+                    allowed_modules=_ALLOWED_MODULES,
+                    batch_size=2,
+                    init_vars=init_vars,
+                    overrides=overrides,
+                ),
             )
             core = run_ir(compilation.demand_ir, compilation.request)
         except Exception as exc:  # noqa: BLE001

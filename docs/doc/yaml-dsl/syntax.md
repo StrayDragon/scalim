@@ -58,7 +58,7 @@ outputs: []             # 可选: 多输出编排(有序列表)
 - `field_id` 必须全局唯一(不再支持 `source.field_id` 消歧).
 - YAML 主线已不再支持 `observability.*`(legacy key 会 warning + ignore);请在 runtime entrypoints 使用 `components=[...]` / `overrides=RunOverrides(viz_config=...)` 配置观测.
 - `batch_size`/`retry`/`guardrails`/demand `failure_policy`/`include_full_error_message`/`validate_unique_field_names` 属于 runtime policy boundary,不再允许出现在 YAML 主线;请在 runtime entrypoints 配置:
-  - `scalim.dsl.by_yaml.run/compile(..., batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...))`
+  - `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...)))`
 
 ## 3. YAML 复用: anchors、alias、`_templates`
 
@@ -192,7 +192,7 @@ YAML 里引用 Python 可调用对象的地方主要有两类:
 - Python 引用仍受 allowlist 约束
 - `^<id>` 的解析与执行 **不要求**把其目标模块加入 allowlist(unknown id 会 fail-fast 并提示一份保守的可用 id 列表)
 - `<id>` 为可定制的词表 key,推荐使用 `/` 分段表示命名空间(例如 `workflow/book_sheet_rows`)
-- 默认词表仅提供少量 Scalim 内置 id(保守暴露);下游可在 `run/compile(..., builtin_callables=...)` 中注入/扩展词表
+- 默认词表仅提供少量 Scalim 内置 id(保守暴露);下游可在 `run/compile(..., options=RunOptions(builtin_callables=...))` 中注入/扩展词表
 
 示例(loader):
 
@@ -285,7 +285,7 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 辅助配置:
 
 - `demand_failure_policy` / `demand_diagnostics` 属于 runtime policy boundary,已从 YAML 主线迁出;请在运行入口配置:
-  - `scalim.dsl.by_yaml.run/compile(..., demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...))`
+  - `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...)))`
 - `meta/audit` 属于 runtime output extras,已从 YAML 主线迁出;请在运行入口通过 `RunOverrides.output_extras` 启用
 
 一个最小示例:
@@ -323,12 +323,14 @@ outputs:
 如需输出 meta/audit extra sheets,请在 Python 运行入口配置:
 
 ```python
-from scalim.dsl.by_yaml import OutputExtrasOverride, RunOverrides, run
+from scalim.dsl.by_yaml import OutputExtrasOverride, RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)),
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)),
+    ),
 )
 ```
 

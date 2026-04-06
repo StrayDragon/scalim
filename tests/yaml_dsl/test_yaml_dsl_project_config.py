@@ -351,3 +351,96 @@ def test_project_config_yaml_dsl_editor_parses_python_roots_and_kind_overrides(t
     assert cfg.editor is not None
     assert cfg.editor.python_roots == (tmp_path / "py",)
     assert [(o.glob, o.kind) for o in cfg.editor.kind_overrides] == [("wf/*.yaml", "workflow")]
+
+
+def test_project_config_yaml_dsl_runner_empty_mapping_loads_defaults(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  runner: {}\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert cfg is not None
+    assert cfg.runner is not None
+    assert cfg.runner.allowed_modules == ()
+    assert cfg.runner.allowed_functions == ()
+    assert cfg.runner.allowed_yaml_roots == ()
+    assert cfg.runner.template_sandbox is None
+    assert cfg.runner.parallel_mode is None
+    assert cfg.runner.max_workers is None
+
+
+def test_project_config_yaml_dsl_runner_parses_all_fields(tmp_path: Path) -> None:
+    (tmp_path / "shared").mkdir(parents=True)
+    (tmp_path / "scalim.yaml").write_text(
+        (
+            """
+yaml_dsl:
+  runner:
+    allowed_modules:
+      - tests.fixtures
+    allowed_functions:
+      - tests.fixtures.mock_loaders:mock_loader
+    allowed_yaml_roots:
+      - ./shared
+    template_sandbox: legacy
+    parallel_mode: adaptive
+    max_workers: 3
+"""
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert cfg is not None
+    assert cfg.runner is not None
+    assert cfg.runner.allowed_modules == ("tests.fixtures",)
+    assert cfg.runner.allowed_functions == ("tests.fixtures.mock_loaders:mock_loader",)
+    assert cfg.runner.allowed_yaml_roots == (tmp_path / "shared",)
+    assert cfg.runner.template_sandbox == "legacy"
+    assert cfg.runner.parallel_mode == "adaptive"
+    assert cfg.runner.max_workers == 3
+
+
+@pytest.mark.parametrize(
+    ("yaml_text", "exc_type", "expected_substring"),
+    [
+        ("yaml_dsl:\n  runner: 1\n", TypeError, "yaml_dsl.runner must be a mapping"),
+        ("yaml_dsl:\n  runner:\n    extra: 1\n", TypeError, "yaml_dsl.runner has unknown keys"),
+        ("yaml_dsl:\n  runner:\n    allowed_modules: x\n", TypeError, "yaml_dsl.runner.allowed_modules must be a list"),
+        ("yaml_dsl:\n  runner:\n    allowed_modules: ['']\n", TypeError, "yaml_dsl.runner.allowed_modules[0]"),
+        ("yaml_dsl:\n  runner:\n    allowed_functions: x\n", TypeError, "yaml_dsl.runner.allowed_functions must be a list"),
+        ("yaml_dsl:\n  runner:\n    allowed_functions: ['']\n", TypeError, "yaml_dsl.runner.allowed_functions[0]"),
+        ("yaml_dsl:\n  runner:\n    allowed_yaml_roots: ./\n", TypeError, "yaml_dsl.runner.allowed_yaml_roots must be a list"),
+        ("yaml_dsl:\n  runner:\n    template_sandbox: 1\n", TypeError, "yaml_dsl.runner.template_sandbox must be a string"),
+        ("yaml_dsl:\n  runner:\n    template_sandbox: other\n", ValueError, "yaml_dsl.runner.template_sandbox must be one of"),
+        ("yaml_dsl:\n  runner:\n    parallel_mode: 1\n", TypeError, "yaml_dsl.runner.parallel_mode must be a string"),
+        ("yaml_dsl:\n  runner:\n    parallel_mode: other\n", ValueError, "yaml_dsl.runner.parallel_mode must be one of"),
+        ("yaml_dsl:\n  runner:\n    max_workers: x\n", TypeError, "yaml_dsl.runner.max_workers must be an integer"),
+    ],
+    ids=[
+        "runner-not-mapping",
+        "unknown-keys",
+        "allowed-modules-not-list",
+        "allowed-modules-empty-item",
+        "allowed-functions-not-list",
+        "allowed-functions-empty-item",
+        "allowed-yaml-roots-not-list",
+        "template-sandbox-not-str",
+        "template-sandbox-invalid-choice",
+        "parallel-mode-not-str",
+        "parallel-mode-invalid-choice",
+        "max-workers-not-int",
+    ],
+)
+def test_project_config_yaml_dsl_runner_rejects_invalid_configs(
+    tmp_path: Path,
+    yaml_text: str,
+    exc_type: object,
+    expected_substring: str,
+) -> None:
+    (tmp_path / "scalim.yaml").write_text(yaml_text, encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(exc_type) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert expected_substring in str(excinfo.value)

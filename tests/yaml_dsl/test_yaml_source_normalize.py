@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.dsl.by_yaml._internal.config_parsing.parsers.sources import ParserSourcesMixin
 from scalim.dsl.by_yaml._internal.config_parsing.validators.sources import ValidatorSourcesMixin
 from scalim.sinks import InMemoryRowSink
@@ -202,7 +202,13 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]), sink=sink)
+    _ = run(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
+            sink=sink,
+        ),
+    )
 
     rows = sink.get_data()
     by_order_id = {row["order_id"]: row for row in rows}
@@ -242,7 +248,13 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]), sink=sink)
+    _ = run(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
+            sink=sink,
+        ),
+    )
 
     rows = sink.get_data()
     by_order_id = {row["order_id"]: row for row in rows}
@@ -281,7 +293,13 @@ sources:
     )
 
     sink = InMemoryRowSink()
-    _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]), sink=sink)
+    _ = run(
+        str(yaml_path),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
+            sink=sink,
+        ),
+    )
 
     rows = sink.get_data()
     by_order_id = {row["order_id"]: row for row in rows}
@@ -324,7 +342,13 @@ sources:
 
     sink = InMemoryRowSink()
     with pytest.raises(ScalimConversionError, match=r"normalize\.call_by.*allowed_modules"):
-        _ = run(str(yaml_path), allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]), sink=sink)
+        _ = run(
+            str(yaml_path),
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
+                sink=sink,
+            ),
+        )
 
 
 def test_run_rejects_normalize_call_by_return_non_mapping(tmp_path: Path) -> None:
@@ -361,8 +385,10 @@ sources:
     with pytest.raises(TypeError, match=r"must return Mapping.*sources\.recommends\.normalize\.call_by"):
         _ = run(
             str(yaml_path),
-            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders", "tests.fixtures.source_normalize_call_by"]),
-            sink=sink,
+            options=RunOptions(
+                allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders", "tests.fixtures.source_normalize_call_by"]),
+                sink=sink,
+            ),
         )
 
 

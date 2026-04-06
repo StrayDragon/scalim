@@ -388,6 +388,10 @@ class SchemaBuilder:
                 types_mod.ScalimYamlEditorConfig,
                 allow_import=False,
             ),
+            "scalim_yaml_yaml_dsl_runner": self._build_definition(
+                types_mod.ScalimYamlYamlDslRunnerConfig,
+                allow_import=False,
+            ),
             "scalim_yaml_yaml_dsl": self._build_definition(
                 types_mod.ScalimYamlYamlDslConfig,
                 allow_import=False,

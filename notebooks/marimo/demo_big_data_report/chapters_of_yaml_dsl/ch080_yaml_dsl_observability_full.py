@@ -5,8 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import compile as compile_yaml
-from scalim.dsl.by_yaml import RunOverrides
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.ob.presets.logs import LoggingObserver
@@ -86,11 +85,13 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
         try:
             compilation = compile_yaml(
                 str(yaml_path),
-                allowed_modules=_ALLOWED_MODULES,
-                components=components,
-                batch_size=2,
-                init_vars=init_vars,
-                overrides=overrides,
+                options=RunOptions(
+                    allowed_modules=_ALLOWED_MODULES,
+                    components=components,
+                    batch_size=2,
+                    init_vars=init_vars,
+                    overrides=overrides,
+                ),
             )
             trace_observer = _find_first_instance(compilation.request.components, ExecutionTraceObserver)
             memory_opt_observer = _find_first_instance(compilation.request.components, MemoryOptimizationObserver)

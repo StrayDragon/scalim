@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import compile
+from scalim.dsl.by_yaml import RunOptions, compile
 from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
 from scalim.execution.guardrails import GuardrailsPolicy
 
@@ -57,7 +57,9 @@ def test_runtime_guardrails_injection_sets_request_guardrails(tmp_path: Path) ->
     guardrails = GuardrailsPolicy(enabled=True, mode="quiet")
     compilation = compile(
         str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-        guardrails=guardrails,
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            guardrails=guardrails,
+        ),
     )
     assert compilation.request.guardrails == guardrails

@@ -5,7 +5,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Dict
 
-from scalim.dsl.by_yaml import run
+from scalim.dsl.by_yaml import RunOptions, run
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim.sinks import InMemoryRowSink
 from scalim_misc.demo_big_data_report.by_yaml_dsl import loader_retry_demo_mod as demo_mod
@@ -40,7 +40,13 @@ def run_loader_retry() -> ExampleResult:
         sink_no_retry = InMemoryRowSink()
         no_retry_ok = False
         try:
-            _ = run(str(demand_path), allowed_modules=allowed_modules, sink=sink_no_retry)
+            _ = run(
+                str(demand_path),
+                options=RunOptions(
+                    allowed_modules=allowed_modules,
+                    sink=sink_no_retry,
+                ),
+            )
         except demo_mod.TransientError:
             no_retry_ok = True
 
@@ -61,9 +67,11 @@ def run_loader_retry() -> ExampleResult:
         )
         _ = run(
             str(demand_path),
-            allowed_modules=allowed_modules,
-            sink=sink_with_retry,
-            loader_retry=injected_retry,
+            options=RunOptions(
+                allowed_modules=allowed_modules,
+                sink=sink_with_retry,
+                loader_retry=injected_retry,
+            ),
         )
         expected_call_count = 2
         with_retry_ok = sink_with_retry.get_data() == [{"order_id": 1}] and demo_mod.get_call_count() == expected_call_count

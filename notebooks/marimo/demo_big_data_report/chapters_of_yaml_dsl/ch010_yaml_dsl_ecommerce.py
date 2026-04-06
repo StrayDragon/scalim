@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
 from scalim.dsl.by_yaml import run as run_yaml
 from scalim.sinks import InMemoryRowSink
 from scalim.typedefs import RowData
@@ -48,8 +48,10 @@ def run_yaml_dsl_ecommerce(
         try:
             compilation = compile_yaml(
                 str(yaml_path),
-                allowed_modules=allowed_modules,
-                init_vars=init_vars,
+                options=RunOptions(
+                    allowed_modules=allowed_modules,
+                    init_vars=init_vars,
+                ),
             )
         except Exception as exc:
             summary = "compile failed: {}".format(exc)
@@ -68,9 +70,11 @@ def run_yaml_dsl_ecommerce(
         start = time.time()
         result = run_yaml(
             str(yaml_path),
-            allowed_modules=allowed_modules,
-            sink=sink,
-            init_vars=init_vars,
+            options=RunOptions(
+                allowed_modules=allowed_modules,
+                sink=sink,
+                init_vars=init_vars,
+            ),
         )
         elapsed = time.time() - start
 

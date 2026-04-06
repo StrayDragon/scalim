@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.by_yaml import compile as compile_yaml
+from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle import verify_ecommerce_rank_score_csv_rows
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -53,9 +53,11 @@ def run_yaml_dsl_row_number_score_by_rank(
             try:
                 compilation = compile_yaml(
                     str(yaml_path),
-                    allowed_modules=_ALLOWED_MODULES,
-                    batch_size=10,
-                    init_vars=init_vars,
+                    options=RunOptions(
+                        allowed_modules=_ALLOWED_MODULES,
+                        batch_size=10,
+                        init_vars=init_vars,
+                    ),
                 )
                 core = run_ir(compilation.demand_ir, compilation.request)
             except Exception as exc:  # noqa: BLE001
