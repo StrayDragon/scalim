@@ -18,6 +18,7 @@ from .....secure_compute_contracts import (
 )
 from .....vendor.compact.typing_extensionsx import override
 from .....vendor.dataclassesx import dataclass
+from ...runtime._internal.conversion_lookup import cast_decimal
 
 _PY38_PLUS = sys.version_info >= (3, 8)
 
@@ -158,8 +159,6 @@ def redacted_audit_callback(expression: str, field_values: Dict[str, Any], resul
 
 
 def _safe_decimal_helper(value: Any) -> Optional[Decimal]:
-    from ...runtime._internal.conversion_lookup import cast_decimal  # noqa: PLC0415
-
     return cast_decimal(value)
 
 

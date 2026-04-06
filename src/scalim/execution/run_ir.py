@@ -18,8 +18,10 @@ from ..sinks import (
     BaseSink,
     ColumnBatch,
     ColumnCSVSink,
+    ColumnExcelSink,
     ColumnValues,
     CSVSink,
+    ExcelSink,
     IColumnSink,
     InMemoryCsv,
     IRowSink,
@@ -34,6 +36,7 @@ from .adaptive.capture import HookCaptureManager, HookRecordedEvent
 from .contracts import ExecutionRequest, ExecutionResult, ObservabilitySpec
 from .engine import ScalimEngine
 from .key_normalization import normalize_key_normalization
+from .output_composition import build_output_composition, required_demand_fields
 from .output_contracts import ExportLayout, OutputSpec
 
 if TYPE_CHECKING:
@@ -327,8 +330,6 @@ def _create_file_sink(output: OutputSpec, layout: ExportLayout) -> Optional[ISin
         )
 
     if fmt == "excel":
-        from ..sinks import ColumnExcelSink, ExcelSink  # noqa: PLC0415
-
         if output.streaming:
             return ExcelSink(
                 output_path=str(output.path),
@@ -434,8 +435,6 @@ def _collect_workflow_managed_output_export_headers(
 def _build_execution_plan(demand_ir: DemandIr, request: ExecutionRequest) -> ExecutionPlan:
     plan_targets: List[str] = list(request.export_layout.field_ids)
     if request.output_composition is not None:
-        from .output_composition import required_demand_fields  # noqa: PLC0415
-
         plan_targets = list(required_demand_fields(request.output_composition))
     return PlanBuilder(demand_ir).build(targets=plan_targets)
 
@@ -612,8 +611,6 @@ def _assemble_outputs(
             managed_artifact_plans=None,
             composition_router=None,
         )
-
-    from .output_composition import build_output_composition  # noqa: PLC0415
 
     # 构建一个与 `engine` 共享订阅者的 `InstrumentationHub`,用于输出级事件(每个输出目标结束统计).
     instrumentation = InstrumentationHub(hook_manager=hook_manager, observer_manager=observer_manager)

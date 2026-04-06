@@ -1,8 +1,5 @@
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Union, cast
-
-if TYPE_CHECKING:
-    from .validator import ConfigValidator
+from typing import IO, Any, Dict, Mapping, Optional, Sequence, Union, cast
 
 from ....._internal.loggingx import get_logger, prefix
 from ...init_var_nodes import parse_init_var_mapping_node
@@ -44,6 +41,7 @@ from .parsers.fields import ParserFieldsMixin
 from .parsers.outputs import ParserOutputsMixin
 from .parsers.utils import mapping_or_none
 from .template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN, maybe_precompile_yaml_text
+from .validator import ConfigValidator
 from .yaml_load import envelope_from_validation_issue, error_loc_for_yaml_path, load_yaml_mapping_text
 
 __all__ = ()
@@ -51,9 +49,7 @@ __all__ = ()
 _LOADER_LOGGER = get_logger("yaml_dsl")
 
 
-def _create_validator() -> "ConfigValidator":
-    from .validator import ConfigValidator  # noqa: PLC0415
-
+def _create_validator() -> ConfigValidator:
     return ConfigValidator()
 
 
@@ -61,7 +57,7 @@ class YamlDemandLoader(
     ParserFieldsMixin,
     ParserOutputsMixin,
 ):
-    _validator: Optional["ConfigValidator"]
+    _validator: Optional[ConfigValidator]
 
     def __init__(self) -> None:
         self._validator = None

@@ -12,7 +12,7 @@ from ..events import EVENT_OUTPUT_TARGET_END
 from ..events._events import OutputTargetEndEvent
 from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
-from ..sinks import BaseRowSink, CSVSink, ExcelWorkbookSink, IRowSink
+from ..sinks import BaseRowSink, CSVSink, ExcelSink, ExcelWorkbookSink, IRowSink
 from ..typedefs import KeyNormalizationMode, RowData
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
@@ -442,8 +442,6 @@ def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
 
 
 def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink:
-    from ..sinks import ExcelSink  # noqa: PLC0415
-
     field_names = list(layout.field_ids)
     header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
     sheet_name = str(output.sheet_name) if output.sheet_name else "Sheet1"
@@ -942,8 +940,6 @@ def _get_or_create_excel_workbook_sink(
     *,
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
 ) -> "ExcelWorkbookSink":
-    from ..sinks import ExcelWorkbookSink  # noqa: PLC0415
-
     path = str(output.path)
     wb = workbook_by_path.get(path)
     if wb is None:

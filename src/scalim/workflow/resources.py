@@ -7,6 +7,7 @@
 
 from typing import FrozenSet, Iterator, Mapping, Optional, Tuple
 
+from ..sinks.rows import InMemoryRows
 from .resources_base import ScalimWorkflowWriteError
 from .resources_csv import WorkflowCsvInput, WorkflowCsvResourceMixin
 from .resources_sheetbook import SheetBookDef, WorkflowSheetBookResourceMixin
@@ -34,8 +35,6 @@ class WorkflowResourceManager(
 
     @staticmethod
     def _require_csv_input(input_tabular: WorkflowTabularInput) -> WorkflowCsvInput:
-        from ..sinks.rows import InMemoryRows  # noqa: PLC0415
-
         if isinstance(input_tabular, InMemoryRows):
             msg = "xlsx_file books only accept CSV-equivalent artifacts"
             raise ScalimWorkflowWriteError(msg)
