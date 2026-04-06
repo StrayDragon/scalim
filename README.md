@@ -16,25 +16,40 @@
 - 可以用 Python 编写需求
 
 ```python
-DemandIr(
-  source=SourceIr(name=”orders”, loader=load_orders),
-  fields=[
-    FieldIr(name=”order_id”, source_field=”order_id”),
-    FieldIr(name=”total_amount”, source_field=”amount”,
-      derive=lambda x: sum(x)),
-  ],
-  relations=[
-    RelationIr(
-      name=”payment”,
-      source_key=”pay_id”,
-      target=SourceIr(name=”payments”, loader=load_payments),
-      target_key=”id”,
-      bindings=[
-        BindingIr(field=”method”, target_field=”payment_method”)
-      ]
-    )
-  ]
+from scalim.execution import ScalimEngine
+from scalim.planning import PlanBuilder
+from scalim.sinks import InMemoryRowSink
+from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr
+
+
+def load_orders(**_kwargs):
+    raise NotImplementedError
+
+
+orders = MainSourceIr(source_id="orders", loader=load_orders)
+
+demand = DemandIr.from_irs(
+    sources=[],
+    main_source=orders,
+    fields=(
+        FieldIr(field_id="order_id", name="订单ID", source=orders),
+        FieldIr(field_id="amount", name="金额", source=orders),
+        DerivedFieldIr(
+            field_id="amount_x2",
+            name="金额*2",
+            dependencies=("amount",),
+            calculator=lambda amount: amount * 2,
+        ),
+    ),
+    name="orders_report",
 )
+
+plan = PlanBuilder(demand).build()
+engine = ScalimEngine(demand=demand, plan=plan, batch_size=1000, parallel_mode="seq")
+
+sink = InMemoryRowSink()
+engine.run(sink=sink)
+rows = sink.get_data()
 ```
 
 - 也可以用 YAML DSL 配置需求
@@ -44,7 +59,7 @@ name: orders_report
 
 main_source:
   source_id: orders
-  loader: load_orders
+  loader: "myapp.loaders:load_orders"
   fields:
     order_id:
       name: 订单ID
@@ -59,7 +74,7 @@ main_source:
 
 sources:
   payments:
-    loader: load_payments
+    loader: "myapp.loaders:load_payments"
     key: id
     params:
       ids: {$keys: {as: set}}
@@ -78,12 +93,19 @@ relations:
 fields:
   total_amount:
     name: 总金额
-    compute: "sum(amount)"
+    compute: "amount * 2"
 
 outputs:
   - name: detail
-    container: {type: csv, path: ./output/orders_report.csv, header_fields_output_by: name}
+    to: {file: detail_csv}
+    write: {header_fields_output_by: name}
     fields: [order_id, method, total_amount]
+
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./output/orders_report.csv
 ```
 
 ## 快速上手
@@ -117,7 +139,7 @@ just notebook
   - ExecutionTraceObserver:完整执行链路追踪
 - **运行时防护机制**: 内置 Guardrails 系统,提供策略模式错误处理(quiet / fast_fail),可自定义 Loader 级别的错误策略,实现细粒度容错控制
 - **低内存模式**: 内置字段剪枝、字段释放和行级释放,尽量只保留当前批次真正还要用的数据,减少上下文占用(内存占用)
-- **多种编写方式**: 支持直接用 `Python` 描述计算逻辑,也支持用 `YAML DSL` 写配置, 配套可视化编辑器, `json schema` 校验和 `CLI` 工具, 写配置时更容易补全、检查和落地
+- **多种编写方式**: 支持直接用 `Python` 描述计算逻辑,也支持用 `YAML DSL` 写配置,配套 JSON Schema 补全/校验 + `scalim-cli` 语义校验 + LSP/IDE 集成,写配置时更容易补全、检查和落地
 - **多种写入支持**: 支持批量执行、流式输出和行式/列式 sink,方便在吞吐、内存和输出形式之间做取舍
 - **方便集成AI开发环境**: 支持 [agent skill](./artifacts/skills/) 集成
 - **可视化在线工具**: 有可视化在线工具做回放和排查,执行计划、事件流和 trace 都能接起来看
