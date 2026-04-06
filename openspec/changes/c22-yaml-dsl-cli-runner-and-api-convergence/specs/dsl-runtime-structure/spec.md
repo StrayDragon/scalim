@@ -29,11 +29,7 @@
 - `allowed_modules` / `allowed_functions`
 - `allowed_yaml_roots`
 
-系统 MUST 破坏性移除 by_yaml facade 的 Python-only 输出注入扩展点:
-- `run/compile` 不再接受 `output_composition=...`
-- `RunOptions` 不再暴露 `output_composition` 字段
-
-execution 层内部仍会使用编译产物 `OutputCompositionSpec` 表达 composed outputs,但该对象不再作为 by_yaml facade 的可注入扩展点。
+系统 MUST 保持多输出组合能力为“受控 authoring surface”：由 YAML `outputs/resources` 与 `RunOverrides` 的受控覆盖项表达；官方 facade 不新增 `output_composition` 之类的通用注入面，避免公共 API 膨胀。
 
 #### Scenario: public facade remains behavior-complete for supported extension seams
 - **WHEN** 调用方通过 `IMPL_ROOT.dsl.by_yaml.run(..., options=RunOptions(...))` 或 `compile(..., options=RunOptions(...))` 使用上述受控扩展点

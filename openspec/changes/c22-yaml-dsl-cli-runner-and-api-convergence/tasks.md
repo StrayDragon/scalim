@@ -3,8 +3,10 @@
 - [ ] 1.1 在 `src/scalim/cli/yaml_dsl.py` 增加 `yaml-dsl run` 子命令（参数解析 + 退出码约定 + 最小日志输出）
 - [ ] 1.2 在 `src/scalim/cli/yaml_dsl.py` 增加 `yaml-dsl workflow run` 子命令（复用 `scalim.dsl.by_yaml.run_workflow`）
 - [ ] 1.3 支持 `--init-vars-json`（JSON mapping → `init_vars`）并在缺失/类型不合法时 fail-fast 给出可操作错误
+- [ ] 1.3.1 支持 `--template-vars-json`（JSON mapping → `template_vars`）并在缺失/类型不合法时 fail-fast 给出可操作错误
 - [ ] 1.4 支持 `--allowed-module/--allowed-function`（可重复）并保持 allowlist 为空时 fail-fast（不引入隐式 trusted 模式）
 - [ ] 1.5 支持 `--allowed-yaml-root`（可重复）并透传到 by_yaml runtime（与 validate 保持一致口径）
+- [ ] 1.6 当 YAML 未声明 `outputs` 时仍允许运行（不落盘,只输出执行摘要并提示如何补齐 outputs/使用 Python `RunOverrides.*`）
 
 ## 2. `scalim.yaml` runner defaults（schema + discovery + 合并规则）
 
@@ -18,7 +20,7 @@
 ## 3. Python API 收敛（options-object 唯一入口，breaking）
 
 - [ ] 3.1 将 `src/scalim/dsl/by_yaml/runtime/entrypoints.py` 的 `run/compile` 收敛为 `options: RunOptions` 形态
-- [ ] 3.2 新增 `src/scalim/dsl/by_yaml/legacy_entrypoints.py`（或等价内部模块）保留旧长签名入口供过渡/内部回归使用（不纳入推荐导入）
+- [ ] 3.2 仓库内所有调用点一步到位升级到新入口（不保留旧长签名兼容层）
 - [ ] 3.3 更新 `src/scalim/dsl/by_yaml/__init__.py` 的门面导出（`__all__`）：
   - [ ] 3.3.1 导出 `RunOptions`
   - [ ] 3.3.2 保持 `RunOverrides/Compilation/RunResult/run/compile/run_workflow` 等稳定符号仍可导入

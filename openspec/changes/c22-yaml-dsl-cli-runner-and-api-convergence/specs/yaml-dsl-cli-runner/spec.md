@@ -13,6 +13,13 @@
 - **THEN** CLI MUST 以退出码 0 结束
 - **AND** MUST 在声明的输出路径生成对应文件
 
+#### Scenario: run demand YAML without outputs (summary-only)
+- **GIVEN** 一个 demand YAML 未声明 `outputs`（因此不会写出任何文件）
+- **WHEN** 用户执行 `scalim-cli yaml-dsl run demand.yaml` 并提供必要的运行期参数（例如 allowlist）
+- **THEN** CLI MUST 以退出码 0 结束（当运行成功时）
+- **AND** CLI MUST 输出可操作的执行摘要（例如 total_rows/duration 等）
+- **AND** CLI MUST 提示“当前未声明 outputs,因此不会落盘”,并指向补齐 outputs 或使用 Python `RunOverrides.*` 的方式
+
 ### Requirement: CLI runner MUST enforce allowlist (no implicit trust)
 CLI runner MUST 保持与当前运行时一致的安全边界：
 
@@ -34,6 +41,15 @@ CLI runner MUST 支持通过 JSON 文件注入 `init_vars`（mapping），并将
 - **WHEN** 用户执行 `scalim-cli yaml-dsl run demand.yaml --init-vars-json vars.json`
 - **THEN** CLI MUST 将 `vars.json` 解析为 mapping 并传递给 runtime
 - **AND** 运行应成功解析该 `init_var` 并按注入的路径写出
+
+### Requirement: CLI runner MUST support `template_vars` injection via JSON
+CLI runner MUST 支持通过 JSON 文件注入 `template_vars`（mapping），并将其传递给 by_yaml runtime 的 template precompile 阶段。
+
+#### Scenario: template_vars are applied before YAML parsing
+- **GIVEN** demand YAML 包含 `{{ ... }}` 模板片段
+- **WHEN** 用户执行 `scalim-cli yaml-dsl run demand.yaml --template-vars-json vars.json`
+- **THEN** CLI MUST 将 `vars.json` 解析为 mapping 并传递给 runtime
+- **AND** 运行应成功渲染并继续后续的 imports/校验/编译/执行流程
 
 ### Requirement: `scalim-cli yaml-dsl workflow run` MUST run a workflow YAML file
 系统 MUST 提供 CLI 子命令 `scalim-cli yaml-dsl workflow run <workflow.yaml>` 用于运行 workflow YAML 文件。

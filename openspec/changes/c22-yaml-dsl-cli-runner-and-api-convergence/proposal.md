@@ -11,9 +11,10 @@
   - `scalim-cli yaml-dsl run <demand.yaml>`: 运行单个 demand YAML
   - `scalim-cli yaml-dsl workflow run <workflow.yaml>`: 运行 workflow YAML
   - 支持从 `scalim.yaml` 读取项目级默认值(例如 allowlist、allowed_yaml_roots、template_sandbox 等),并允许 CLI flags 覆盖
+  - YAML 未声明 `outputs` 时也允许运行（不落盘,仅输出执行摘要并提示补齐 outputs 的方式）
 - 收敛 **Python 运行入口**（API 可演进）:
-  - 引入/强化“单对象参数”入口: `run/compile(..., options=RunOptions)`（或等价门面）,避免继续扩大函数签名
-  - 保留少量 `RunOverrides.*` 工厂方法作为常用场景的直觉入口(例如 csv/xlsx 单输出编排)
+  - 一步到位收敛为“单对象参数”唯一入口: `run/compile(..., options=RunOptions)`（breaking）,避免继续扩大函数签名
+  - 保留少量 `RunOverrides.*` 工厂方法作为常用场景的直觉入口(例如 csv/xlsx 单输出编排);不在 CLI v1 发明新的通用覆写 DSL
 - 文档与示例对齐（以代码实现为准）:
   - 文档/示例更新以当前实现为事实来源(避免以旧 spec/旧文档反推实现)
   - 注意生成物治理: `*.gen.*` 与 `BEGIN/END AUTOGEN` 区块不手改,走对应生成入口
