@@ -25,8 +25,8 @@
 
 - `yaml_dsl.import_aliases`
 - `yaml_dsl.import_allowed_roots`
-- `yaml_dsl.editor.python_roots`
-- `yaml_dsl.editor.kind_overrides`
+- `yaml_dsl.lsp.python_roots`
+- `yaml_dsl.lsp.kind_overrides`
 
 并对关键类型做 schema-level fail-fast（在编辑器侧即可提示）。
 
@@ -35,7 +35,7 @@
 - **THEN** schema-only 校验 MUST 失败并指向 `yaml_dsl.import_aliases`
 
 #### Scenario: kind_overrides.kind is constrained
-- **WHEN** 用户配置 `yaml_dsl.editor.kind_overrides[0].kind: other`
+- **WHEN** 用户配置 `yaml_dsl.lsp.kind_overrides[0].kind: other`
 - **THEN** schema-only 校验 MUST 失败
 - **AND** 错误信息 MUST 指出允许值仅为 `demand|workflow`
 
@@ -51,34 +51,9 @@
 - **WHEN** 执行仓库 QA/drift gate（例如 schema generation 测试）
 - **THEN** gate MUST fail-fast 并提示需要运行 `just gen-yaml-dsl-schema`
 
-### Requirement: `scalim.yaml` schema MUST cover `yaml_dsl.runner` defaults for CLI runner
-系统 MUST 扩展 `scalim.yaml` schema 以覆盖 CLI runner 所需的项目级默认值配置面（可选）：
+### Requirement: `scalim.yaml` schema MUST reject runtime runner config
+系统 MUST 将 `scalim.yaml` 的 `yaml_dsl` 段落限制为 imports + LSP/discovery 配置面，并且 MUST 拒绝任何 runtime runner defaults 配置（例如 `yaml_dsl.runner`）。
 
-- `yaml_dsl.runner.allowed_modules`
-- `yaml_dsl.runner.allowed_functions`
-- `yaml_dsl.runner.allowed_yaml_roots`
-- `yaml_dsl.runner.template_sandbox`
-- `yaml_dsl.runner.parallel_mode`
-- `yaml_dsl.runner.max_workers`
-
-这些字段 MUST 保持为可选（不改变 `scalim.yaml` 的可选性与 nearest-wins discovery 语义），其目的仅为减少 CLI/Python 运行时重复传参并提升可复现性。
-
-#### Scenario: schema-only validation rejects invalid runner types
-- **WHEN** 用户将 `yaml_dsl.runner.allowed_modules` 写成非 list（例如 string/int）
-- **THEN** schema-only 校验 MUST 失败并指向 `yaml_dsl.runner.allowed_modules`
-
-#### Scenario: schema constrains template_sandbox choices
-- **WHEN** 用户配置 `yaml_dsl.runner.template_sandbox: other`
-- **THEN** schema-only 校验 MUST 失败
-- **AND** 错误信息 MUST 指出允许值为实现支持的集合（例如 `safe|legacy`）
-
-### Requirement: runner defaults MUST NOT weaken allowlist semantics
-系统 MUST 确保 `yaml_dsl.runner` 的默认值配置不会弱化 allowlist 语义：若项目配置提供了 `yaml_dsl.runner.allowed_modules/allowed_functions`，该配置仅用于“提供默认 allowlist 值”。
-
-系统 MUST 保持 allowlist 为空时 fail-fast 的语义；项目配置 MUST NOT 被解释为“允许任意 import”或“跳过 allowlist 检查”。
-
-#### Scenario: empty allowlist still fails fast
-- **GIVEN** `scalim.yaml` 存在但未配置 `yaml_dsl.runner.allowed_modules/allowed_functions`
-- **WHEN** 调用方尝试通过 CLI runner 运行 demand/workflow YAML
-- **THEN** 系统 MUST fail-fast 并提示如何配置 allowlist
-
+#### Scenario: yaml_dsl.runner is rejected
+- **WHEN** 用户在 `scalim.yaml` 中配置 `yaml_dsl.runner.allowed_modules`
+- **THEN** schema-only 校验 MUST 失败并指向 `yaml_dsl.runner`

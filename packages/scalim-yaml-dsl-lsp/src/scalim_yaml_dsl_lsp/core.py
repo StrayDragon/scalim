@@ -340,10 +340,10 @@ def _discover_yaml_dsl_editor_project_from_project_config(
         project_root = cfg.project_root
         scalim_yaml_path = cfg.scalim_yaml_path
         raw_allowed_roots = cfg.import_allowed_roots
-        if cfg.editor is not None and cfg.editor.python_roots:
-            raw_python_roots = cfg.editor.python_roots
+        if cfg.lsp is not None and cfg.lsp.python_roots:
+            raw_python_roots = cfg.lsp.python_roots
         elif workspace_root is not None and _is_within_dir(entry_path, workspace_root):
-            # `scalim.yaml` is present but does not declare `yaml_dsl.editor.python_roots`.
+            # `scalim.yaml` is present but does not declare `yaml_dsl.lsp.python_roots`.
             # For editor features (go-to-definition/hover/completion), prefer a 0-config experience:
             # infer a monorepo-friendly set of python roots from the workspace root, while
             # still including `project_root` to keep relative-module references stable.
@@ -1163,7 +1163,7 @@ def _derive_base_module_path_from_anchor(
     if not candidates:
         warnings.append(
             "无法推导相对模块引用的 base_module_path: yaml_dir='{}' 不在任何 python_roots 下. "
-            "修复: 补充 `yaml_dsl.editor.python_roots` 或改用绝对模块引用.".format(str(yaml_dir))
+            "修复: 补充 `yaml_dsl.lsp.python_roots` 或改用绝对模块引用.".format(str(yaml_dir))
         )
         return None
 
@@ -1545,7 +1545,7 @@ def _infer_default_python_roots(project_root: Path) -> Tuple[Path, ...]:
 
 
 def _classify_yaml_kind_from_overrides(path: Path, cfg: Optional[YamlDslProjectConfig]) -> str:
-    if cfg is None or cfg.editor is None or not cfg.editor.kind_overrides:
+    if cfg is None or cfg.lsp is None or not cfg.lsp.kind_overrides:
         return ""
     rel = ""
     try:
@@ -1554,7 +1554,7 @@ def _classify_yaml_kind_from_overrides(path: Path, cfg: Optional[YamlDslProjectC
         rel = ""
     if not rel:
         return ""
-    for item in cfg.editor.kind_overrides:
+    for item in cfg.lsp.kind_overrides:
         if fnmatch(rel, str(item.glob)):
             return str(item.kind)
     return ""

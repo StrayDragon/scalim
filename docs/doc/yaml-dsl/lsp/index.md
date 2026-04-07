@@ -14,7 +14,7 @@
 - Quick Fix（code actions）:
   - 缺失 `scalim.yaml` 时可一键创建最小配置
   - imports 越界时可一键补 `yaml_dsl.import_allowed_roots`
-  - `python_roots` 缺失时可一键补 `yaml_dsl.editor.python_roots`
+  - `python_roots` 缺失时可一键补 `yaml_dsl.lsp.python_roots`
 
 ## 你不会得到什么（schema 负责）
 

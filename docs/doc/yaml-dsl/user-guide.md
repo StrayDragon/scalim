@@ -154,29 +154,14 @@ scalim-cli yaml-dsl validate config.yaml
 
 更多 CLI 子命令与参数说明以 `scalim-cli yaml-dsl --help` / `scalim-cli yaml-dsl validate --help` 为准.
 
-运行 demand/workflow YAML(需 allowlist):
+运行入口统一为 **Python API**(安全:需 allowlist)。`scalim-cli yaml-dsl` 只提供校验/Schema/LSP header 工具,不提供运行子命令。
 
-```bash
-# 运行 demand YAML
-scalim-cli yaml-dsl run config.yaml --allowed-module myapp.loaders
-
-# 运行 workflow YAML
-scalim-cli yaml-dsl workflow run workflow.yaml --allowed-module myapp.loaders
-```
-
-如果你不希望每次都重复写 `--allowed-module/--allowed-function`,可以在项目根添加 `scalim.yaml` 作为默认值来源:
-
-```yaml
-# scalim.yaml
-yaml_dsl:
-  runner:
-    allowed_modules: ["myapp.loaders"]
-```
+`scalim.yaml` 仅用于 imports 与 LSP project discovery 等“工程配置”,不作为运行参数默认值来源。
 
 **Python 代码调用**:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run, run_workflow
 
 # 加载并执行 YAML 配置(安全:需要 allowlist)
 result = run(
@@ -184,6 +169,12 @@ result = run(
     options=RunOptions(
         allowed_modules=frozenset(["myapp.loaders"]),
     ),
+)
+
+# workflow YAML 执行入口
+workflow_result = run_workflow(
+    "path/to/workflow.yaml",
+    allowed_modules=frozenset(["myapp.loaders"]),
 )
 
 # 常见用法: YAML 不声明 outputs,由 Python 调用侧 RunOverrides 指定单输出编排(推荐)

@@ -228,7 +228,7 @@ def test_project_config_import_aliases_rejects_outside_project_root(tmp_path: Pa
 def test_project_config_editor_python_roots_rejects_outside_project_root(tmp_path: Path) -> None:
     outside = tmp_path.parent / "outside_py"
     outside.mkdir(parents=True, exist_ok=True)
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    python_roots: ['../outside_py']\n", encoding="utf-8")
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    python_roots: ['../outside_py']\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(ValueError) as excinfo:
@@ -254,57 +254,57 @@ def test_project_config_project_root_override_must_contain_scalim_yaml(tmp_path:
     assert "does not contain scalim.yaml" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_must_be_mapping(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor: 1\n", encoding="utf-8")
+def test_project_config_yaml_dsl_lsp_must_be_mapping(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp: 1\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "yaml_dsl.editor must be a mapping" in str(excinfo.value)
+    assert "yaml_dsl.lsp must be a mapping" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_allows_empty_mapping(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor: {}\n", encoding="utf-8")
+def test_project_config_yaml_dsl_lsp_allows_empty_mapping(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp: {}\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     cfg = project_config_mod.load_yaml_dsl_project_config(demand)
     assert cfg is not None
-    assert cfg.editor is not None
-    assert cfg.editor.python_roots == ()
-    assert cfg.editor.kind_overrides == ()
+    assert cfg.lsp is not None
+    assert cfg.lsp.python_roots == ()
+    assert cfg.lsp.kind_overrides == ()
 
 
-def test_project_config_yaml_dsl_editor_python_roots_must_be_list(tmp_path: Path) -> None:
+def test_project_config_yaml_dsl_lsp_python_roots_must_be_list(tmp_path: Path) -> None:
     (tmp_path / "py").mkdir(parents=True)
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    python_roots: ./py\n", encoding="utf-8")
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    python_roots: ./py\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "yaml_dsl.editor.python_roots must be a list" in str(excinfo.value)
+    assert "yaml_dsl.lsp.python_roots must be a list" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_kind_overrides_must_be_list(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    kind_overrides: {}\n", encoding="utf-8")
+def test_project_config_yaml_dsl_lsp_kind_overrides_must_be_list(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    kind_overrides: {}\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "yaml_dsl.editor.kind_overrides must be a list" in str(excinfo.value)
+    assert "yaml_dsl.lsp.kind_overrides must be a list" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_kind_overrides_item_must_be_mapping(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor:\n    kind_overrides: [1]\n", encoding="utf-8")
+def test_project_config_yaml_dsl_lsp_kind_overrides_item_must_be_mapping(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    kind_overrides: [1]\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "yaml_dsl.editor.kind_overrides[0] must be a mapping" in str(excinfo.value)
+    assert "yaml_dsl.lsp.kind_overrides[0] must be a mapping" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_kind_overrides_rejects_unknown_keys(tmp_path: Path) -> None:
+def test_project_config_yaml_dsl_lsp_kind_overrides_rejects_unknown_keys(tmp_path: Path) -> None:
     (tmp_path / "scalim.yaml").write_text(
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n        extra: 1\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n        extra: 1\n",
         encoding="utf-8",
     )
     demand = tmp_path / "demand.yaml"
@@ -314,9 +314,9 @@ def test_project_config_yaml_dsl_editor_kind_overrides_rejects_unknown_keys(tmp_
     assert "has unknown keys" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_kind_overrides_glob_must_be_non_empty(tmp_path: Path) -> None:
+def test_project_config_yaml_dsl_lsp_kind_overrides_glob_must_be_non_empty(tmp_path: Path) -> None:
     (tmp_path / "scalim.yaml").write_text(
-        'yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: ""\n        kind: workflow\n',
+        'yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: ""\n        kind: workflow\n',
         encoding="utf-8",
     )
     demand = tmp_path / "demand.yaml"
@@ -326,9 +326,9 @@ def test_project_config_yaml_dsl_editor_kind_overrides_glob_must_be_non_empty(tm
     assert ".glob must be a non-empty string" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_kind_overrides_rejects_invalid_kind(tmp_path: Path) -> None:
+def test_project_config_yaml_dsl_lsp_kind_overrides_rejects_invalid_kind(tmp_path: Path) -> None:
     (tmp_path / "scalim.yaml").write_text(
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: nope\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: nope\n",
         encoding="utf-8",
     )
     demand = tmp_path / "demand.yaml"
@@ -338,109 +338,52 @@ def test_project_config_yaml_dsl_editor_kind_overrides_rejects_invalid_kind(tmp_
     assert "must be one of demand, workflow" in str(excinfo.value)
 
 
-def test_project_config_yaml_dsl_editor_parses_python_roots_and_kind_overrides(tmp_path: Path) -> None:
+def test_project_config_yaml_dsl_lsp_parses_python_roots_and_kind_overrides(tmp_path: Path) -> None:
     (tmp_path / "py").mkdir(parents=True)
     (tmp_path / "scalim.yaml").write_text(
-        "yaml_dsl:\n  editor:\n    python_roots:\n      - ./py\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        "yaml_dsl:\n  lsp:\n    python_roots:\n      - ./py\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
         encoding="utf-8",
     )
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     cfg = project_config_mod.load_yaml_dsl_project_config(demand)
     assert cfg is not None
-    assert cfg.editor is not None
-    assert cfg.editor.python_roots == (tmp_path / "py",)
-    assert [(o.glob, o.kind) for o in cfg.editor.kind_overrides] == [("wf/*.yaml", "workflow")]
+    assert cfg.lsp is not None
+    assert cfg.lsp.python_roots == (tmp_path / "py",)
+    assert [(o.glob, o.kind) for o in cfg.lsp.kind_overrides] == [("wf/*.yaml", "workflow")]
 
 
-def test_project_config_yaml_dsl_runner_empty_mapping_loads_defaults(tmp_path: Path) -> None:
+def test_project_config_yaml_dsl_rejects_unknown_keys(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  extra: 1\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "yaml_dsl has unknown keys: extra" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_rejects_legacy_editor_key(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  editor: {}\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "yaml_dsl has unknown keys: editor" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_rejects_legacy_runner_key(tmp_path: Path) -> None:
     (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  runner: {}\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
-    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert cfg is not None
-    assert cfg.runner is not None
-    assert cfg.runner.allowed_modules == ()
-    assert cfg.runner.allowed_functions == ()
-    assert cfg.runner.allowed_yaml_roots == ()
-    assert cfg.runner.template_sandbox is None
-    assert cfg.runner.parallel_mode is None
-    assert cfg.runner.max_workers is None
-
-
-def test_project_config_yaml_dsl_runner_parses_all_fields(tmp_path: Path) -> None:
-    (tmp_path / "shared").mkdir(parents=True)
-    (tmp_path / "scalim.yaml").write_text(
-        (
-            """
-yaml_dsl:
-  runner:
-    allowed_modules:
-      - tests.fixtures
-    allowed_functions:
-      - tests.fixtures.mock_loaders:mock_loader
-    allowed_yaml_roots:
-      - ./shared
-    template_sandbox: legacy
-    parallel_mode: adaptive
-    max_workers: 3
-"""
-        ).lstrip(),
-        encoding="utf-8",
-    )
-    demand = tmp_path / "demand.yaml"
-    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
-    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert cfg is not None
-    assert cfg.runner is not None
-    assert cfg.runner.allowed_modules == ("tests.fixtures",)
-    assert cfg.runner.allowed_functions == ("tests.fixtures.mock_loaders:mock_loader",)
-    assert cfg.runner.allowed_yaml_roots == (tmp_path / "shared",)
-    assert cfg.runner.template_sandbox == "legacy"
-    assert cfg.runner.parallel_mode == "adaptive"
-    assert cfg.runner.max_workers == 3
-
-
-@pytest.mark.parametrize(
-    ("yaml_text", "exc_type", "expected_substring"),
-    [
-        ("yaml_dsl:\n  runner: 1\n", TypeError, "yaml_dsl.runner must be a mapping"),
-        ("yaml_dsl:\n  runner:\n    extra: 1\n", TypeError, "yaml_dsl.runner has unknown keys"),
-        ("yaml_dsl:\n  runner:\n    allowed_modules: x\n", TypeError, "yaml_dsl.runner.allowed_modules must be a list"),
-        ("yaml_dsl:\n  runner:\n    allowed_modules: ['']\n", TypeError, "yaml_dsl.runner.allowed_modules[0]"),
-        ("yaml_dsl:\n  runner:\n    allowed_functions: x\n", TypeError, "yaml_dsl.runner.allowed_functions must be a list"),
-        ("yaml_dsl:\n  runner:\n    allowed_functions: ['']\n", TypeError, "yaml_dsl.runner.allowed_functions[0]"),
-        ("yaml_dsl:\n  runner:\n    allowed_yaml_roots: ./\n", TypeError, "yaml_dsl.runner.allowed_yaml_roots must be a list"),
-        ("yaml_dsl:\n  runner:\n    template_sandbox: 1\n", TypeError, "yaml_dsl.runner.template_sandbox must be a string"),
-        ("yaml_dsl:\n  runner:\n    template_sandbox: other\n", ValueError, "yaml_dsl.runner.template_sandbox must be one of"),
-        ("yaml_dsl:\n  runner:\n    parallel_mode: 1\n", TypeError, "yaml_dsl.runner.parallel_mode must be a string"),
-        ("yaml_dsl:\n  runner:\n    parallel_mode: other\n", ValueError, "yaml_dsl.runner.parallel_mode must be one of"),
-        ("yaml_dsl:\n  runner:\n    max_workers: x\n", TypeError, "yaml_dsl.runner.max_workers must be an integer"),
-    ],
-    ids=[
-        "runner-not-mapping",
-        "unknown-keys",
-        "allowed-modules-not-list",
-        "allowed-modules-empty-item",
-        "allowed-functions-not-list",
-        "allowed-functions-empty-item",
-        "allowed-yaml-roots-not-list",
-        "template-sandbox-not-str",
-        "template-sandbox-invalid-choice",
-        "parallel-mode-not-str",
-        "parallel-mode-invalid-choice",
-        "max-workers-not-int",
-    ],
-)
-def test_project_config_yaml_dsl_runner_rejects_invalid_configs(
-    tmp_path: Path,
-    yaml_text: str,
-    exc_type: object,
-    expected_substring: str,
-) -> None:
-    (tmp_path / "scalim.yaml").write_text(yaml_text, encoding="utf-8")
-    demand = tmp_path / "demand.yaml"
-    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
-    with pytest.raises(exc_type) as excinfo:
+    with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert expected_substring in str(excinfo.value)
+    assert "yaml_dsl has unknown keys: runner" in str(excinfo.value)
+
+
+def test_project_config_yaml_dsl_lsp_rejects_unknown_keys(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    extra: 1\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "yaml_dsl.lsp has unknown keys" in str(excinfo.value)

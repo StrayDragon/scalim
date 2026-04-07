@@ -73,8 +73,6 @@ def build_yaml_dsl_command_docs() -> List[Dict[str, Any]]:
     yaml_dsl_cli.register(root_subparsers)
 
     command_tokens = [
-        ("yaml-dsl", "run"),
-        ("yaml-dsl", "workflow", "run"),
         ("yaml-dsl", "validate"),
         ("yaml-dsl", "schema", "validate"),
         ("yaml-dsl", "schema", "show"),

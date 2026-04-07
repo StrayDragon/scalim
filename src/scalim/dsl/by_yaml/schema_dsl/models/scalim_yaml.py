@@ -6,91 +6,8 @@ from ..constants import schema_meta
 
 
 @dataclass(frozen=True)
-class ScalimYamlYamlDslRunnerConfig:
-    SCHEMA_NAME: ClassVar[str] = "scalim_yaml_yaml_dsl_runner"
-    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-
-    allowed_modules: Tuple[str, ...] = dataclass_field(
-        default_factory=tuple,
-        metadata=schema_meta(
-            desc="可选: CLI runner 默认 allowlist modules",
-            md=(
-                "CLI runner 默认 allowlist modules.\n\n"
-                "- 仅用于提供默认值(减少重复 flags)\n"
-                "- allowlist 为空仍会 fail-fast(不弱化安全边界)\n"
-                "- 可被 CLI flags 覆盖"
-            ),
-            type=["array", "null"],
-            items={"type": "string", "minLength": 1},
-            default=[],
-            examples=[["myapp.loaders"]],
-        ),
-    )
-
-    allowed_functions: Tuple[str, ...] = dataclass_field(
-        default_factory=tuple,
-        metadata=schema_meta(
-            desc="可选: CLI runner 默认 allowlist functions",
-            md=("CLI runner 默认 allowlist functions.\n\n- 仅用于提供默认值(减少重复 flags)\n- 可被 CLI flags 覆盖"),
-            type=["array", "null"],
-            items={"type": "string", "minLength": 1},
-            default=[],
-            examples=[["myapp.loaders:load_orders"]],
-        ),
-    )
-
-    allowed_yaml_roots: Tuple[str, ...] = dataclass_field(
-        default_factory=tuple,
-        metadata=schema_meta(
-            desc="可选: 允许读取 YAML 的根目录列表(相对 scalim.yaml 所在目录)",
-            md="允许读取 YAML 的根目录列表(相对 `scalim.yaml` 所在目录).",
-            type=["array", "null"],
-            items={"type": "string", "minLength": 1},
-            default=[],
-            examples=[["./shared_yaml"]],
-        ),
-    )
-
-    template_sandbox: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            desc="可选:模板 sandbox 默认值",
-            md="模板 sandbox 默认值.\n\n- 允许值: `safe` / `legacy`",
-            type=["string", "null"],
-            choices=["safe", "legacy"],
-            default=None,
-            examples=["safe"],
-        ),
-    )
-
-    parallel_mode: Optional[str] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            desc="可选:并行模式默认值",
-            md="并行模式默认值.\n\n- 允许值: `seq` / `adaptive`",
-            type=["string", "null"],
-            choices=["seq", "adaptive"],
-            default=None,
-            examples=["seq"],
-        ),
-    )
-
-    max_workers: Optional[int] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            desc="可选:最大并发工作数默认值(0 自动)",
-            md="最大并发工作数默认值.\n\n- `0` 表示自动",
-            type=["integer", "null"],
-            minimum=0,
-            default=None,
-            examples=[0, 8],
-        ),
-    )
-
-
-@dataclass(frozen=True)
-class ScalimYamlEditorKindOverrideConfig:
-    SCHEMA_NAME: ClassVar[str] = "scalim_yaml_editor_kind_override"
+class ScalimYamlLspKindOverrideConfig:
+    SCHEMA_NAME: ClassVar[str] = "scalim_yaml_lsp_kind_override"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("glob", "kind")
 
@@ -116,8 +33,8 @@ class ScalimYamlEditorKindOverrideConfig:
 
 
 @dataclass(frozen=True)
-class ScalimYamlEditorConfig:
-    SCHEMA_NAME: ClassVar[str] = "scalim_yaml_editor"
+class ScalimYamlLspConfig:
+    SCHEMA_NAME: ClassVar[str] = "scalim_yaml_lsp"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
     python_roots: Tuple[str, ...] = dataclass_field(
@@ -132,7 +49,7 @@ class ScalimYamlEditorConfig:
         ),
     )
 
-    kind_overrides: Tuple[ScalimYamlEditorKindOverrideConfig, ...] = dataclass_field(
+    kind_overrides: Tuple[ScalimYamlLspKindOverrideConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
             desc="可选: 按文件路径覆盖 YAML 类型(demand/workflow), glob 相对 project root",
@@ -179,32 +96,17 @@ class ScalimYamlYamlDslConfig:
         ),
     )
 
-    editor: Optional[ScalimYamlEditorConfig] = dataclass_field(
+    lsp: Optional[ScalimYamlLspConfig] = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
                 "oneOf": [
-                    {"$ref": "#/definitions/scalim_yaml_editor"},
+                    {"$ref": "#/definitions/scalim_yaml_lsp"},
                     {"type": "null"},
                 ]
             },
-            desc="可选: editor/LSP project discovery 配置",
-            md="editor/LSP project discovery 配置(可选).",
-            default=None,
-        ),
-    )
-
-    runner: Optional[ScalimYamlYamlDslRunnerConfig] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema={
-                "oneOf": [
-                    {"$ref": "#/definitions/scalim_yaml_yaml_dsl_runner"},
-                    {"type": "null"},
-                ]
-            },
-            desc="可选: CLI runner 默认值(yaml_dsl.runner.*)",
-            md="CLI runner 默认值(可选).\n\n- 用于 `scalim-cli yaml-dsl run` / `workflow run`",
+            desc="可选: LSP project discovery 配置",
+            md="LSP project discovery 配置(可选).",
             default=None,
         ),
     )

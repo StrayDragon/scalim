@@ -98,8 +98,6 @@ def render_yaml_dsl_cli_reference_markdown(
             "### Repo",
             "- `uv run {cli} yaml-dsl validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uv run {cli} yaml-dsl validate --type workflow <workflow.yaml>`".format(cli=_project_constants.CLI_NAME),
-            "- `uv run {cli} yaml-dsl run <demand.yaml> --allowed-module myapp.loaders`".format(cli=_project_constants.CLI_NAME),
-            "- `uv run {cli} yaml-dsl workflow run <workflow.yaml> --allowed-module myapp.loaders`".format(cli=_project_constants.CLI_NAME),
             "- `uv run {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uv run {cli} yaml-dsl schema validate --schema {workflow_schema} <workflow.yaml>`".format(
                 cli=_project_constants.CLI_NAME,
@@ -120,14 +118,6 @@ def render_yaml_dsl_cli_reference_markdown(
                 cli=_project_constants.CLI_NAME,
             ),
             '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate --type workflow <workflow.yaml>`'.format(
-                dist=_project_constants.DIST_NAME,
-                cli=_project_constants.CLI_NAME,
-            ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl run <demand.yaml> --allowed-module myapp.loaders`'.format(
-                dist=_project_constants.DIST_NAME,
-                cli=_project_constants.CLI_NAME,
-            ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl workflow run <workflow.yaml> --allowed-module myapp.loaders`'.format(
                 dist=_project_constants.DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
@@ -229,12 +219,6 @@ def render_yaml_dsl_workflow_cli_min_commands_markdown() -> str:
         ),
         "```",
         "",
-        "3) workflow run(执行 workflow;需 allowlist):",
-        "",
-        "```bash",
-        "uv run {cli} yaml-dsl workflow run path/to/workflow.yaml --allowed-module myapp.loaders".format(cli=_project_constants.CLI_NAME),
-        "```",
-        "",
         "本地编辑时,推荐直接批量写入 schema modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):",
         "",
         (
@@ -256,16 +240,10 @@ def render_yaml_dsl_cli_min_commands_markdown(*, placeholder_prefix: str = "path
         "- demand YAML 仓库内语义校验(内置 validator): `uv run {cli} yaml-dsl validate {p}/demand.yaml`".format(
             cli=_project_constants.CLI_NAME, p=placeholder_prefix
         ),
-        "- demand YAML 运行(需 allowlist): `uv run {cli} yaml-dsl run {p}/demand.yaml --allowed-module myapp.loaders`".format(
-            cli=_project_constants.CLI_NAME, p=placeholder_prefix
-        ),
         (
             "- workflow YAML 仓库内 full validate(静态/编译期;递归校验引用的 demands;不执行 workflow): "
             "`uv run {cli} yaml-dsl validate --type workflow {p}/workflow.yaml`"
         ).format(cli=_project_constants.CLI_NAME, p=placeholder_prefix),
-        "- workflow YAML 运行(需 allowlist): `uv run {cli} yaml-dsl workflow run {p}/workflow.yaml --allowed-module myapp.loaders`".format(
-            cli=_project_constants.CLI_NAME, p=placeholder_prefix
-        ),
         "  - 若 workflow demand 路径使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析",
         "- demand YAML 仓库内 schema-only(更快): `uv run {cli} yaml-dsl schema validate {p}/demand.yaml`".format(
             cli=_project_constants.CLI_NAME, p=placeholder_prefix
@@ -324,17 +302,11 @@ def render_yaml_dsl_skill_cli_min_commands_markdown() -> str:
     workflow_schema_path = _path_to_posix(WORKFLOW_SCHEMA_REL)
     lines = [
         "- demand YAML 仓库内完整校验: `uv run {cli} yaml-dsl validate <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
-        "- demand YAML 运行(需 allowlist): `uv run {cli} yaml-dsl run <demand.yaml> --allowed-module myapp.loaders`".format(
-            cli=_project_constants.CLI_NAME
-        ),
         "- demand YAML 仓库内 schema 校验: `uv run {cli} yaml-dsl schema validate <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
         (
             "- workflow YAML 仓库内完整校验(静态/编译期;递归校验引用的 demands;不执行 workflow): "
             "`uv run {cli} yaml-dsl validate --type workflow <workflow.yaml>`"
         ).format(cli=_project_constants.CLI_NAME),
-        "- workflow YAML 运行(需 allowlist): `uv run {cli} yaml-dsl workflow run <workflow.yaml> --allowed-module myapp.loaders`".format(
-            cli=_project_constants.CLI_NAME
-        ),
         (
             "- workflow YAML 仓库内 schema 校验(结构/unknown-fields; 必须显式 schema 路径): "
             "`uv run {cli} yaml-dsl schema validate --schema {schema} <workflow.yaml>`"
@@ -365,6 +337,24 @@ def render_yaml_dsl_skill_cli_min_commands_markdown() -> str:
         "- workflow YAML 同理: `uv run {cli} yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`".format(
             cli=_project_constants.CLI_NAME
         ),
+        "",
+        "运行入口已迁出 CLI,统一使用 Python API(需 allowlist):",
+        "",
+        "```python",
+        "from scalim.dsl.by_yaml import RunOptions, run, run_workflow",
+        "",
+        "run(",
+        '    "path/to/demand.yaml",',
+        "    options=RunOptions(",
+        '        allowed_modules=frozenset(["myapp.loaders"]),',
+        "    ),",
+        ")",
+        "",
+        "run_workflow(",
+        '    "path/to/workflow.yaml",',
+        '    allowed_modules=frozenset(["myapp.loaders"]),',
+        ")",
+        "```",
         "",
         "```yaml",
         "# yaml-language-server: $schema=.../demand.gen.json",

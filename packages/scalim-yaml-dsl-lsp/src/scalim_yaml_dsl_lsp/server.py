@@ -727,7 +727,7 @@ def _handle_code_actions(
         missing_py_roots_display = ", ".join(["`{}`".format(p) for p in missing_py_roots])
         actions.append(
             types.CodeAction(
-                title="修复: 将 `{}` 加入 `yaml_dsl.editor.python_roots` (最小)".format(missing_py_roots[0]),
+                title="修复: 将 `{}` 加入 `yaml_dsl.lsp.python_roots` (最小)".format(missing_py_roots[0]),
                 kind=types.CodeActionKind.QuickFix,
                 is_preferred=not bool(import_dir_rel),
                 command=types.Command(
@@ -739,7 +739,7 @@ def _handle_code_actions(
         )
         actions.append(
             types.CodeAction(
-                title="修复: 将 {} 加入 `yaml_dsl.editor.python_roots` (宽松)".format(missing_py_roots_display),
+                title="修复: 将 {} 加入 `yaml_dsl.lsp.python_roots` (宽松)".format(missing_py_roots_display),
                 kind=types.CodeActionKind.QuickFix,
                 command=types.Command(
                     title="修复 python_roots (宽松)",
@@ -1080,7 +1080,7 @@ def _render_scalim_yaml_content(*, import_allowed_roots: Sequence[str], python_r
         for root in import_allowed_roots:
             lines.append("    - {}".format(str(root)))
     if python_roots:
-        lines.append("  editor:")
+        lines.append("  lsp:")
         lines.append("    python_roots:")
         for root in python_roots:
             lines.append("      - {}".format(str(root)))
@@ -1129,17 +1129,17 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
         _extend_unique(import_allowed_roots, import_allowed_roots_to_add)
 
     if python_roots_to_add:
-        editor_obj = yaml_dsl.get("editor")
-        if editor_obj is None:
-            editor_obj = {}
-            yaml_dsl["editor"] = editor_obj
-        if not isinstance(editor_obj, dict):
+        lsp_obj = yaml_dsl.get("lsp")
+        if lsp_obj is None:
+            lsp_obj = {}
+            yaml_dsl["lsp"] = lsp_obj
+        if not isinstance(lsp_obj, dict):
             return None
-        editor: Any = editor_obj
-        roots_obj = editor.get("python_roots")
+        lsp: Any = lsp_obj
+        roots_obj = lsp.get("python_roots")
         if roots_obj is None:
             roots_obj = []
-            editor["python_roots"] = roots_obj
+            lsp["python_roots"] = roots_obj
         if not isinstance(roots_obj, list):
             return None
         python_roots: List[Any] = roots_obj

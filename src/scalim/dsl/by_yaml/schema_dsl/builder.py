@@ -380,16 +380,12 @@ class SchemaBuilder:
         types_mod = self._types
 
         definitions: Dict[str, Any] = {
-            "scalim_yaml_editor_kind_override": self._build_definition(
-                types_mod.ScalimYamlEditorKindOverrideConfig,
+            "scalim_yaml_lsp_kind_override": self._build_definition(
+                types_mod.ScalimYamlLspKindOverrideConfig,
                 allow_import=False,
             ),
-            "scalim_yaml_editor": self._build_definition(
-                types_mod.ScalimYamlEditorConfig,
-                allow_import=False,
-            ),
-            "scalim_yaml_yaml_dsl_runner": self._build_definition(
-                types_mod.ScalimYamlYamlDslRunnerConfig,
+            "scalim_yaml_lsp": self._build_definition(
+                types_mod.ScalimYamlLspConfig,
                 allow_import=False,
             ),
             "scalim_yaml_yaml_dsl": self._build_definition(

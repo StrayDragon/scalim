@@ -10,6 +10,11 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 - 当未找到 `scalim.yaml` 时,系统 MUST 以入口 YAML 所在目录作为默认 project root
 - discovery 输出 MUST 明确返回: `project_root`、`scalim_yaml_path`(可为空)、`python_roots` 与 `allowed_yaml_roots`
 
+当发现的 `scalim.yaml` 存在时，系统 MUST 从中读取以下可选配置（作为 discovery 的输入）：
+
+- `yaml_dsl.import_allowed_roots` / `yaml_dsl.import_aliases`（用于 imports 的 allow roots 扩展与路径重写）
+- `yaml_dsl.lsp.python_roots`（用于静态解析 Python 引用的搜索根；相对 `scalim.yaml` 所在目录）
+
 #### Scenario: nearest-wins discovery finds the closest scalim.yaml
 - **GIVEN** 某工作区存在多层级 `scalim.yaml`
 - **WHEN** 编辑器对某个子目录内的 YAML 执行 discovery
@@ -19,6 +24,7 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 系统 MUST 为编辑器提供稳定的 YAML 类型分类(demand/workflow),并用于选择 diagnostics/schema 语义边界:
 
 - 系统 MUST 允许通过项目配置显式覆盖 YAML 的类型（例如按 glob 或按目录规则）
+  - 该覆盖配置 MUST 位于 `scalim.yaml yaml_dsl.lsp.kind_overrides`
 - 若无显式覆盖,系统 MUST 使用 schema(required) 作为 SSOT 信号并保持确定性：
   - 当 YAML 根 mapping 满足 workflow schema 顶层 required（包含键 `workflow`），且其值为 mapping 时,该文件 MUST 被分类为 workflow
   - 否则当 YAML 根 mapping 同时包含键 `name` 与 `main_source`（demand schema 顶层 required）时,该文件 MUST 被分类为 demand
@@ -33,3 +39,8 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 - **GIVEN** 某 YAML 根节点包含 `name: ...` 与 `main_source: ...`
 - **WHEN** 编辑器执行类型分类
 - **THEN** 该文件 MUST 被分类为 demand
+
+#### Scenario: kind_overrides force classification by glob
+- **GIVEN** `scalim.yaml` 配置了 `yaml_dsl.lsp.kind_overrides=[{glob: \"workflow/*.yaml\", kind: \"workflow\"}]`
+- **WHEN** 编辑器对匹配该 glob 的 YAML 执行类型分类
+- **THEN** 该文件 MUST 被分类为 workflow

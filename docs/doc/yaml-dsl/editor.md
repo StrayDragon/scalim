@@ -22,12 +22,12 @@
 - 从入口 YAML 所在目录向上查找最近的 `scalim.yaml`
 - 若未找到,则以入口 YAML 所在目录作为默认 `project root`
 
-### `scalim.yaml` 的 editor 配置
+### `scalim.yaml` 的 LSP 配置
 
 ```yaml
 # scalim.yaml
 yaml_dsl:
-  editor:
+  lsp:
     # 可选: 用于静态解析 Python 引用的搜索根(相对 scalim.yaml 所在目录)
     python_roots:
       - .

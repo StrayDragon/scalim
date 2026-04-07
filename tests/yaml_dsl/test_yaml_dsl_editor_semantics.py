@@ -67,14 +67,14 @@ def test_discovery_nearest_wins_scalim_yaml_and_editor_python_roots(tmp_path: Pa
     entry_dir = sub / "wf"
     _ = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    python_roots: [./py]\n",
+        "yaml_dsl:\n  lsp:\n    python_roots: [./py]\n",
     )
 
     (sub / "py").mkdir(parents=True)
     (sub / "allowed").mkdir(parents=True)
     _ = _write(
         sub / "scalim.yaml",
-        "yaml_dsl:\n  import_allowed_roots: [./allowed]\n  editor:\n    python_roots: [./py]\n",
+        "yaml_dsl:\n  import_allowed_roots: [./allowed]\n  lsp:\n    python_roots: [./py]\n",
     )
 
     yaml_path = _write(entry_dir / "demand.yaml", "name: demo\nsources: {}\n")
@@ -130,7 +130,7 @@ def test_classify_yaml_kind_override_wins(tmp_path: Path) -> None:
     wf_dir = repo / "wf"
     _ = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
     )
     yaml_path = _write(wf_dir / "x.yaml", "name: demo\nsources: {}\n")
     assert (
@@ -220,7 +220,7 @@ def test_workflow_diagnostics_reports_schema_issue_and_unknown_fields(tmp_path: 
     wf_dir = repo / "wf"
     _ = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
     )
     yaml_text = "workflow: []\nbad: 1\n"
     yaml_path = _write(wf_dir / "x.yaml", yaml_text)
@@ -235,7 +235,7 @@ def test_workflow_diagnostics_warns_when_jsonschema_missing(tmp_path: Path, monk
     wf_dir = repo / "wf"
     _ = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
     )
     yaml_text = "workflow: []\nbad: 1\n"
     yaml_path = _write(wf_dir / "x.yaml", yaml_text)
@@ -249,7 +249,7 @@ def test_workflow_diagnostics_parse_error_is_captured(tmp_path: Path) -> None:
     wf_dir = repo / "wf"
     _ = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
     )
     yaml_text = "workflow: [\n"
     yaml_path = _write(wf_dir / "x.yaml", yaml_text)
@@ -262,7 +262,7 @@ def test_workflow_diagnostics_handles_jsonschema_collector_errors(tmp_path: Path
     wf_dir = repo / "wf"
     _ = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
     )
     yaml_text = "workflow: {}\nbad: 1\n"
     yaml_path = _write(wf_dir / "x.yaml", yaml_text)
@@ -546,7 +546,7 @@ def test_classify_yaml_kind_override_outside_project_root_falls_back_to_heuristi
     repo = tmp_path / "repo"
     scalim_yaml = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: demand\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: demand\n",
     )
     outside = _write(tmp_path / "outside.yaml", "workflow: {}\n")
     kind = editor_semantics.classify_yaml_dsl_kind(outside, outside.read_text(encoding="utf-8"), scalim_yaml_override=scalim_yaml)
@@ -557,7 +557,7 @@ def test_classify_yaml_kind_override_no_match_falls_back_to_heuristic(tmp_path: 
     repo = tmp_path / "repo"
     scalim_yaml = _write(
         repo / "scalim.yaml",
-        "yaml_dsl:\n  editor:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
     )
     yaml_path = _write(repo / "demand.yaml", "name: demo\nsources: {}\n")
     kind = editor_semantics.classify_yaml_dsl_kind(yaml_path, yaml_path.read_text(encoding="utf-8"), scalim_yaml_override=scalim_yaml)

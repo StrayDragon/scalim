@@ -683,7 +683,7 @@ SCALIM_YAML_SCHEMA_META = {
         "Scalim 项目级配置文件 `scalim.yaml` 定义 Schema.\n\n"
         "- `scalim.yaml` 本身是可选配置(支持 zero-config fallback)\n"
         "- schema 仅描述单个文件的结构,不改变 nearest-wins project discovery 语义\n"
-        "- v1 聚焦 `yaml_dsl.*` 配置面(imports/editor/LSP project discovery)"
+        "- v1 聚焦 `yaml_dsl.*` 配置面(imports/lsp project discovery)"
     ),
 }
 

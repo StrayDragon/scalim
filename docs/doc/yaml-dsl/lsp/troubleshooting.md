@@ -36,7 +36,7 @@ scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 yaml_dsl:
   import_allowed_roots:
     - .
-  editor:
+  lsp:
     python_roots:
       - src
 ```
@@ -66,7 +66,7 @@ yaml_dsl:
 - 检查 `python_roots` 是否覆盖你的模块根（常见为 `src`）
 - 确认引用语法为 `module:attr` 或 `module.attr`
 - 若 client 支持 code actions,可尝试：
-  - “Add yaml_dsl.editor.python_roots”（最小/宽松）
+  - “Add yaml_dsl.lsp.python_roots”（最小/宽松）
   - “Explain resolution failure”（仅解释,不改写引用字符串）
 
 ## 3) 日志获取
@@ -83,4 +83,3 @@ scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.
 - YAML DSL LSP 负责语义 diagnostics + Python 引用跳转/hover/补全（以及 actions）
 
 当你看到“结构字段缺失/类型不对”这类错误,优先看 schema 插件；当你看到“imports 越界 / Python 引用不可解析”这类错误,优先看 YAML DSL LSP。
-
