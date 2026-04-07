@@ -1,3 +1,16 @@
 yaml_dsl:
+  # <!-- BEGIN AUTOGEN:yaml_dsl.import_roots -->
   import_roots:
+    # <!-- BEGIN AUTOGEN:yaml_dsl.import_roots[*] -->
     - path: .
+      alias: "@"
+    # <!-- END AUTOGEN:yaml_dsl.import_roots[*] -->
+  # <!-- END AUTOGEN:yaml_dsl.import_roots -->
+
+  lsp:
+    python_roots: [.]
+    kind_overrides:
+      # <!-- BEGIN AUTOGEN:yaml_dsl.lsp.kind_overrides[*] -->
+      - glob: workflow/*.yaml
+        kind: workflow
+      # <!-- END AUTOGEN:yaml_dsl.lsp.kind_overrides[*] -->

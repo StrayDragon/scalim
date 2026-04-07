@@ -12,16 +12,16 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "需求配置名称",
-      "markdownDescription": "需求配置名称.\n\n- 必填, 用于标识当前配置",
+      "description": "需求配置名称.",
+      "markdownDescription": "#### name\n\n需求配置名称.\n\n- 必填, 用于标识当前配置\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n\n##### 例子\n```yaml\norder_report\n```",
       "examples": [
         "order_report"
       ]
     },
     "imports": {
       "type": "object",
-      "description": "片段文件导入别名映射(编译期展开)",
-      "markdownDescription": "片段文件导入别名映射.\n\n- key: alias\n- value: 片段文件路径(字符串)\n- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n  - `./x.yaml` / `x.yaml`\n  - `x/y.yaml`(子目录)\n  - `../x.yaml`(父目录)\n- 支持(编辑器侧放宽,运行时校验为准):\n  - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)\n  - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)\n- 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等",
+      "description": "片段文件导入别名映射.",
+      "markdownDescription": "#### imports\n\n片段文件导入别名映射.\n\n- key: alias\n- value: 片段文件路径(字符串)\n- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n  - `./x.yaml` / `x.yaml`\n  - `x/y.yaml`(子目录)\n  - `../x.yaml`(父目录)\n- 支持(编辑器侧放宽,运行时校验为准):\n  - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)\n  - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)\n- 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n- additionalProperties: string\n- propertyNames: configured\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\n{}\n```",
       "propertyNames": {
         "type": "string",
         "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
@@ -33,18 +33,18 @@
     },
     "_templates": {
       "type": "object",
-      "description": "YAML anchor 模板集合(_templates), 供 fields/relations 复用",
-      "markdownDescription": "YAML anchor 模板集合.\n\n- 仅用于 YAML 复用(anchors)\n- 常用于 `fields` / `relations`",
+      "description": "YAML anchor 模板集合.",
+      "markdownDescription": "#### _templates\n\nYAML anchor 模板集合.\n- 仅用于 YAML 复用(anchors)\n- 常用于 `fields` / `relations`",
       "additionalProperties": true
     },
     "description": {
       "type": "string",
-      "description": "配置描述",
-      "markdownDescription": "配置描述(可选)."
+      "description": "配置描述(可选).",
+      "markdownDescription": "#### description\n\n配置描述(可选)."
     },
     "main_source": {
-      "description": "主数据源配置(必填: source_id/loader, 可选 params/order_by)",
-      "markdownDescription": "主数据源配置.\n\n- 必填: `source_id`, `loader`\n- `source_id` 不能出现在 `sources` 中\n- `fields` 仅允许源字段(禁止 `compute`)\n- `order_by` 控制批次内写入顺序(字符串列表,`-` 前缀表示 desc)",
+      "description": "主数据源配置.",
+      "markdownDescription": "#### main_source\n\n主数据源配置.\n- 必填: `source_id`, `loader`\n- 或仅 `$import`(展开后再校验必填字段)",
       "allOf": [
         {
           "$ref": "#/definitions/main_source"
@@ -67,8 +67,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### sources.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -78,8 +78,8 @@
           ]
         }
       },
-      "description": "数据源配置映射, key 为 source_id",
-      "markdownDescription": "数据源配置映射, key 为 `source_id`.\n\n- 每个 source 必填: `loader`, `key`\n- 不允许包含 `main_source.source_id`\n- `fields` 仅允许源字段(禁止 `compute`)",
+      "description": "数据源配置映射, key 为 `source_id`.",
+      "markdownDescription": "#### sources\n\n数据源配置映射, key 为 `source_id`.\n- 每个 source 必填: `loader`, `key`\n- 不允许包含 `main_source.source_id`",
       "propertyNames": {
         "anyOf": [
           {
@@ -100,8 +100,8 @@
     },
     "fields": {
       "type": "object",
-      "description": "字段配置映射, key 为 field_id; 仅用于派生字段",
-      "markdownDescription": "字段配置映射(仅用于派生字段).\n\n- 必须包含 `compute` 或 `call_by`\n- 不能与源字段同名(避免 source/derived 重名)\n- 支持 YAML anchor 复用",
+      "description": "字段配置映射(仅用于派生字段).",
+      "markdownDescription": "#### fields\n\n字段配置映射(仅用于派生字段).\n- 必须包含 `compute` 或 `call_by`\n- 不能与源字段同名(避免 source/derived 重名)",
       "properties": {
         "$import": {
           "oneOf": [
@@ -116,8 +116,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### fields.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -160,8 +160,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### relations.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -171,15 +171,15 @@
           ]
         }
       },
-      "description": "命名关联关系映射(steps 模板),供字段通过 string ref/alias 复用",
-      "markdownDescription": "命名关联关系映射(steps 模板).\n\n- 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用\n- string ref: `relation: <relation_id>` 引用 `relations.<relation_id>`\n- alias 复用: `relation: *<anchor>` (YAML anchor)\n- steps 必须是等值关联链, 参考 `relation.steps`",
+      "description": "命名关联关系映射(steps 模板).",
+      "markdownDescription": "#### relations\n\n命名关联关系映射(steps 模板).\n- 供 `fields.*.relation` 通过 string ref 或 YAML alias 复用\n- string ref: `relation: <relation_id>` 引用 `relations.<relation_id>`",
       "additionalProperties": {
         "$ref": "#/definitions/relation"
       }
     },
     "resources": {
-      "description": "可选:IO 资源声明(resources.*)",
-      "markdownDescription": "可选:IO 资源声明.\n\n- 稳定入口: `resources.books` / `resources.files`",
+      "description": "可选:IO 资源声明.",
+      "markdownDescription": "#### resources\n\n可选:IO 资源声明.\n- 稳定入口: `resources.books` / `resources.files`",
       "allOf": [
         {
           "$ref": "#/definitions/resources"
@@ -191,8 +191,8 @@
       "items": {
         "$ref": "#/definitions/output_target"
       },
-      "description": "输出目标列表(多 sheet 分发 + 派生汇总; 可选)",
-      "markdownDescription": "输出目标列表(有序; 可选).\n\n- 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体)\n- 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs`\n- 通过 `where` 分发到不同 sheet\n- 通过 `aggregate` 声明派生汇总输出\n- 通过 `from` 复用字段集合与容器配置\n- 不再支持旧写法: 顶层 `output:`",
+      "description": "输出目标列表(有序; 可选).",
+      "markdownDescription": "#### outputs\n\n输出目标列表(有序; 可选).\n- 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体)\n- 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs`",
       "minItems": 0,
       "examples": [
         [
@@ -217,13 +217,13 @@
         "source_id": {
           "type": "string",
           "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "主数据源的 source_id",
-          "markdownDescription": "主数据源的 `source_id`.\n\n- 必填\n- 不能与 `sources` 的 key 重复"
+          "description": "主数据源的 `source_id`.",
+          "markdownDescription": "#### main_source.source_id\n\n主数据源的 `source_id`.\n\n- 必填\n- 不能与 `sources` 的 key 重复\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- 类型: string\n- pattern: `^[a-zA-Z_][a-zA-Z0-9_]*$`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\ndemo\n```"
         },
         "loader": {
           "type": "string",
-          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
-          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`",
+          "description": "Python 可调用对象引用.",
+          "markdownDescription": "#### main_source.loader\n\nPython 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nmyapp.loaders:load_orders\n```\n```yaml\n^workflow/book_sheet_rows\n```",
           "minLength": 1,
           "examples": [
             "myapp.loaders:load_orders",
@@ -246,8 +246,8 @@
                   "minItems": 1
                 }
               ],
-              "description": "$import 引用(支持 string 或 string list)",
-              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+              "description": "$import 引用.",
+              "markdownDescription": "#### main_source.fields.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
               "examples": [
                 "common.sources",
                 [
@@ -257,8 +257,8 @@
               ]
             }
           },
-          "description": "主数据源字段配置映射, key 为 field_id",
-          "markdownDescription": "主数据源字段配置映射.\n\n- 仅允许源字段(禁止 `compute`)\n- `source` 可省略或必须等于 `main_source.source_id`\n- 支持 YAML anchor 复用",
+          "description": "主数据源字段配置映射.",
+          "markdownDescription": "#### main_source.fields\n\n主数据源字段配置映射.\n- 仅允许源字段(禁止 `compute`)\n- `source` 可省略或必须等于 `main_source.source_id`",
           "additionalProperties": {
             "$ref": "#/definitions/source_field_inline"
           },
@@ -280,8 +280,8 @@
                   "minItems": 1
                 }
               ],
-              "description": "$import 引用(支持 string 或 string list)",
-              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+              "description": "$import 引用.",
+              "markdownDescription": "#### main_source.params.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
               "examples": [
                 "common.sources",
                 [
@@ -291,8 +291,8 @@
               ]
             }
           },
-          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)",
-          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$init_var: <name>}` 指令节点(编译期解析为调用方提供的 `init_vars[<name>]`)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$init_var: <name>}` 指令节点(单键映射;inline/block 等价;编译期解析为 `init_vars[<name>]`)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 预加载阶段会复用同一份编译后的 `sources.<id>.params` 模板并透传 kwargs\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `{$runtime: <name>}` 指令节点已不支持,请改用 `{$init_var: <name>}`\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$init_var: <name>}`",
+          "description": "调用 loader 时透传的 kwargs 模板.",
+          "markdownDescription": "#### main_source.params\n\n调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$init_var: <name>}` 指令节点(编译期解析为调用方提供的 `init_vars[<name>]`)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$init_var: <name>}` 指令节点(单键映射;inline/block 等价;编译期解析为 `init_vars[<name>]`)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 预加载阶段会复用同一份编译后的 `sources.<id>.params` 模板并透传 kwargs\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `{$runtime: <name>}` 指令节点已不支持,请改用 `{$init_var: <name>}`\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$init_var: <name>}`\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n- additionalProperties: object\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\n{}\n```",
           "additionalProperties": {}
         },
         "order_by": {
@@ -300,8 +300,8 @@
           "items": {
             "type": "string"
           },
-          "description": "主数据源批次内排序字段列表(仅主数据源字段)",
-          "markdownDescription": "主数据源批次内排序字段列表.\n\n- 每项为字段 id, 前缀 `-` 表示 desc\n- 未配置时保持 loader 原始顺序\n- 仅允许主数据源字段"
+          "description": "主数据源批次内排序字段列表.",
+          "markdownDescription": "#### main_source.order_by\n\n主数据源批次内排序字段列表.\n- 每项为字段 id, 前缀 `-` 表示 desc\n- 未配置时保持 loader 原始顺序"
         },
         "$import": {
           "oneOf": [
@@ -316,8 +316,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### main_source.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -347,8 +347,8 @@
       "properties": {
         "loader": {
           "type": "string",
-          "description": "Python 可调用对象引用(支持绝对/相对模块引用;支持点式/类式;支持内置 ^<id>)",
-          "markdownDescription": "Python 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`",
+          "description": "Python 可调用对象引用.",
+          "markdownDescription": "#### sources.*.loader\n\nPython 可调用对象引用.\n\n绝对引用:\n- 点式引用: `module.path.function`\n- 类式引用: `module.path:ClassName` / `module.path:obj.method`\n\n内置引用:\n- `^<id>`: 受控词表(vocabulary)中的 builtin callable 快捷方式(plain string;不要求把目标模块加入 allowlist)\n\n相对引用:\n- 以 `.` / `..` 开头的模块路径,相对 YAML 文件所在目录对应的模块路径\n- 运行期会先归一化为绝对引用,再做 allowlist 校验\n\n示例:\n- `.loaders:load_orders`\n- `.loaders.load_orders`\n- `^workflow/book_sheet_rows`\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nmyapp.loaders:load_orders\n```\n```yaml\n^workflow/book_sheet_rows\n```",
           "minLength": 1,
           "examples": [
             "myapp.loaders:load_orders",
@@ -374,8 +374,8 @@
               "minItems": 1
             }
           ],
-          "description": "该 source loader 返回映射的 key 字段(支持复合键 tuple)",
-          "markdownDescription": "该 source loader 返回映射的 key 字段.\n\n- 单字段: `key: order_id`\n- 复合键: `key: [region_id, institution_id]`",
+          "description": "该 source loader 返回映射的 key 字段.",
+          "markdownDescription": "#### sources.*.key\n\n该 source loader 返回映射的 key 字段.\n\n- 单字段: `key: order_id`\n- 复合键: `key: [region_id, institution_id]`\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\norder_id\n```\n```yaml\n- region_id\n- institution_id\n```",
           "examples": [
             "order_id",
             [
@@ -398,20 +398,21 @@
                 "str",
                 "sep_first"
               ],
-              "description": "转换名称(auto/int/str/sep_first)",
-              "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+              "description": "转换名称.",
+              "markdownDescription": "#### sources.*.lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
               "examples": [
                 "auto"
               ]
             },
             "sep": {
               "type": "string",
-              "description": "sep_first 的分隔符(默认 ,)"
+              "description": "sep_first 的分隔符(默认 ,)",
+              "markdownDescription": "#### sources.*.lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
             }
           },
           "additionalProperties": false,
-          "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
-          "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
+          "description": "归一化 lookup key 的转换.",
+          "markdownDescription": "#### sources.*.lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
         },
         "lookup_chunk_size": {
           "oneOf": [
@@ -423,8 +424,8 @@
               "type": "null"
             }
           ],
-          "description": "keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)",
-          "markdownDescription": "keys 模式 lookup_keys 分片大小.\n\n- `0` / `null` 表示不分片"
+          "description": "keys 模式 lookup_keys 分片大小.",
+          "markdownDescription": "#### sources.*.lookup_chunk_size\n\nkeys 模式 lookup_keys 分片大小.\n- `0` / `null` 表示不分片"
         },
         "normalize": {
           "type": "object",
@@ -440,8 +441,8 @@
                 "project_fields",
                 "map_values"
               ],
-              "description": "normalize 预置类型",
-              "markdownDescription": "normalize 预置类型.\n\n- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射\n- `take_first`: 将 `mapping[key -> list[row]]` 归一化为 `mapping[key -> row]`(空列表由 `on_empty` 决定)\n- `project_fields`: 对 `mapping[key -> row]` 的 row value 做投影/重命名(支持 int-key path,可注入 `from_key`)\n- `map_values`: 对 `mapping` 的 values 批量应用 normalize steps(例如 take_first + project_fields)\n\n注意:\n- 顶层 `list[row]` 场景请用 `index_by_key`(通过 `on_conflict` 定义冲突策略)\n- `call_by` 为受控扩展点: whole-result `Mapping -> Mapping`(受 allowlist 约束)",
+              "description": "normalize 预置类型.",
+              "markdownDescription": "#### sources.*.normalize.kind\n\nnormalize 预置类型.\n\n- `index_by_key`: 将 `list[row]` 归一化为 `key -> row` 映射\n- `take_first`: 将 `mapping[key -> list[row]]` 归一化为 `mapping[key -> row]`(空列表由 `on_empty` 决定)\n- `project_fields`: 对 `mapping[key -> row]` 的 row value 做投影/重命名(支持 int-key path,可注入 `from_key`)\n- `map_values`: 对 `mapping` 的 values 批量应用 normalize steps(例如 take_first + project_fields)\n\n注意:\n- 顶层 `list[row]` 场景请用 `index_by_key`(通过 `on_conflict` 定义冲突策略)\n- `call_by` 为受控扩展点: whole-result `Mapping -> Mapping`(受 allowlist 约束)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `index_by_key`, `take_first`, `project_fields`, `map_values`\n\n##### 例子\n```yaml\nindex_by_key\n```\n```yaml\ntake_first\n```\n```yaml\nproject_fields\n```\n```yaml\nmap_values\n```",
               "examples": [
                 "index_by_key",
                 "take_first",
@@ -451,8 +452,8 @@
             },
             "key_field": {
               "type": "string",
-              "description": "用于建立索引的 row 字段名(index_by_key, 可选)",
-              "markdownDescription": "用于建立索引的 row 字段名.\n\n- 仅 `kind: index_by_key` 使用\n- 可选: 省略/空字符串时默认取 `sources.<id>.key`\n- 若显式填写,必须等于 `sources.<id>.key`",
+              "description": "用于建立索引的 row 字段名.",
+              "markdownDescription": "#### sources.*.normalize.key_field\n\n用于建立索引的 row 字段名.\n\n- 仅 `kind: index_by_key` 使用\n- 可选: 省略/空字符串时默认取 `sources.<id>.key`\n- 若显式填写,必须等于 `sources.<id>.key`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n\n##### 例子\n```yaml\norder_id\n```",
               "examples": [
                 "order_id"
               ]
@@ -465,8 +466,8 @@
                 "last"
               ],
               "default": "error",
-              "description": "duplicate key 冲突策略(error/first/last)",
-              "markdownDescription": "duplicate key 冲突策略.\n\n- `error`: 报错(默认)\n- `first`: 保留第一条\n- `last`: 保留最后一条",
+              "description": "duplicate key 冲突策略.",
+              "markdownDescription": "#### sources.*.normalize.on_conflict\n\nduplicate key 冲突策略.\n\n- `error`: 报错(默认)\n- `first`: 保留第一条\n- `last`: 保留最后一条\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `first`, `last`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
               "examples": [
                 "error"
               ]
@@ -478,8 +479,8 @@
                 "skip"
               ],
               "default": "raise",
-              "description": "key_field is None 策略(raise/skip; index_by_key)",
-              "markdownDescription": "`key_field is None` 策略.\n\n- 仅 `kind: index_by_key` 使用\n- `raise`: fail-fast(默认)\n- `skip`: 跳过 key_field 为 None 的行",
+              "description": "`key_field is None` 策略.",
+              "markdownDescription": "#### sources.*.normalize.on_none\n\n`key_field is None` 策略.\n\n- 仅 `kind: index_by_key` 使用\n- `raise`: fail-fast(默认)\n- `skip`: 跳过 key_field 为 None 的行\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `raise`, `skip`\n- 默认值: `raise`\n\n##### 例子\n```yaml\nraise\n```",
               "examples": [
                 "raise"
               ]
@@ -492,8 +493,8 @@
                 "error"
               ],
               "default": "miss",
-              "description": "空列表策略(miss/null/error)",
-              "markdownDescription": "空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错",
+              "description": "空列表策略.",
+              "markdownDescription": "#### sources.*.normalize.on_empty\n\n空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `miss`, `null`, `error`\n- 默认值: `miss`\n\n##### 例子\n```yaml\nmiss\n```",
               "examples": [
                 "miss"
               ]
@@ -505,8 +506,8 @@
                 "null"
               ],
               "default": "error",
-              "description": "缺失路径策略(error/null)",
-              "markdownDescription": "缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`",
+              "description": "缺失路径策略.",
+              "markdownDescription": "#### sources.*.normalize.on_missing\n\n缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `null`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
               "examples": [
                 "error"
               ]
@@ -514,8 +515,8 @@
             "fields": {
               "type": "object",
               "minProperties": 1,
-              "description": "投影字段映射(key 为输出字段名)",
-              "markdownDescription": "投影字段映射.\n\n- key: 输出字段名(天然完成 rename)\n- value: 投影规则(`from_key` 或 `extract` 二选一)\n- `extract` 支持 int-key path(例如 `\"[1].x\"`)",
+              "description": "#### sources.*.normalize.fields",
+              "markdownDescription": "#### sources.*.normalize.steps[*].fields\n\n#### sources.*.normalize.fields\n投影字段映射.\n- key: 输出字段名(天然完成 rename)",
               "propertyNames": {
                 "type": "string",
                 "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
@@ -525,8 +526,8 @@
                 "properties": {
                   "from_key": {
                     "type": "boolean",
-                    "description": "将 lookup key 写入该字段",
-                    "markdownDescription": "将 lookup key(外层 mapping 的 key)写入该字段.\n\n- true: 注入\n- false: 不注入",
+                    "description": "#### sources.*.normalize.fields.*.from_key",
+                    "markdownDescription": "#### sources.*.normalize.steps[*].fields.*.from_key\n\n#### sources.*.normalize.fields.*.from_key\n\n将 lookup key(外层 mapping 的 key)写入该字段.\n\n- true: 注入\n- false: 不注入\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n\n##### 例子\n```yaml\ntrue\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n\n##### 例子\n```yaml\ntrue\n```",
                     "examples": [
                       true
                     ]
@@ -534,8 +535,8 @@
                   "extract": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "从当前 row value 提取字段值的路径表达式",
-                    "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式.\n\n- 语法与字段级 `extract` 一致: dot + bracket path\n- 支持 int-key: `\"[1].x\"`(表示 key=1,不是数组下标)\n- 缺失/路径不匹配时为 missing(由 `on_missing` 决定)",
+                    "description": "#### sources.*.normalize.fields.*.extract",
+                    "markdownDescription": "#### sources.*.normalize.steps[*].fields.*.extract\n\n#### sources.*.normalize.fields.*.extract\n\n从当前 key 对应的 row value 中提取字段值的路径表达式.\n\n- 语法与字段级 `extract` 一致: dot + bracket path\n- 支持 int-key: `\"[1].x\"`(表示 key=1,不是数组下标)\n- 缺失/路径不匹配时为 missing(由 `on_missing` 决定)\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nreview_status\n```\n```yaml\n'[1].clearn_reason_level'\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nreview_status\n```\n```yaml\n'[1].clearn_reason_level'\n```",
                     "examples": [
                       "review_status",
                       "[1].clearn_reason_level"
@@ -585,8 +586,8 @@
                       "take_first",
                       "project_fields"
                     ],
-                    "description": "normalize step 类型(take_first/project_fields)",
-                    "markdownDescription": "normalize step 类型.\n\n- `take_first`\n- `project_fields`",
+                    "description": "normalize step 类型.",
+                    "markdownDescription": "#### sources.*.normalize.steps[*].kind\n\nnormalize step 类型.\n\n- `take_first`: 把当前 value 视为 list/tuple 并取第一项(可配 `on_empty`)\n- `project_fields`: 在当前 value 上做字段投影/rename(必填 `fields`; 可配 `on_missing`)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `take_first`, `project_fields`\n\n##### 例子\n```yaml\ntake_first\n```",
                     "examples": [
                       "take_first"
                     ]
@@ -599,8 +600,8 @@
                       "error"
                     ],
                     "default": "miss",
-                    "description": "空列表策略(miss/null/error)",
-                    "markdownDescription": "空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错",
+                    "description": "空列表策略.",
+                    "markdownDescription": "#### sources.*.normalize.steps[*].on_empty\n\n空列表策略.\n\n- `miss`: 该 key 视为 lookup miss(从结果映射中移除)\n- `null`: 写入 `None`\n- `error`: 抛错\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `miss`, `null`, `error`\n- 默认值: `miss`\n\n##### 例子\n```yaml\nmiss\n```",
                     "examples": [
                       "miss"
                     ]
@@ -612,8 +613,8 @@
                       "null"
                     ],
                     "default": "error",
-                    "description": "缺失路径策略(error/null)",
-                    "markdownDescription": "缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`",
+                    "description": "缺失路径策略.",
+                    "markdownDescription": "#### sources.*.normalize.steps[*].on_missing\n\n缺失路径策略.\n\n- `error`: 抛错(默认)\n- `null`: 缺失则填 `None`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `null`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
                     "examples": [
                       "error"
                     ]
@@ -621,8 +622,8 @@
                   "fields": {
                     "type": "object",
                     "minProperties": 1,
-                    "description": "投影字段映射(key 为输出字段名)",
-                    "markdownDescription": "投影字段映射.\n\n- key: 输出字段名(天然完成 rename)\n- value: 投影规则(`from_key` 或 `extract` 二选一)\n- `extract` 支持 int-key path(例如 `\"[1].x\"`)",
+                    "description": "#### sources.*.normalize.fields",
+                    "markdownDescription": "#### sources.*.normalize.steps[*].fields\n\n#### sources.*.normalize.fields\n投影字段映射.\n- key: 输出字段名(天然完成 rename)",
                     "propertyNames": {
                       "type": "string",
                       "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
@@ -632,8 +633,8 @@
                       "properties": {
                         "from_key": {
                           "type": "boolean",
-                          "description": "将 lookup key 写入该字段",
-                          "markdownDescription": "将 lookup key(外层 mapping 的 key)写入该字段.\n\n- true: 注入\n- false: 不注入",
+                          "description": "#### sources.*.normalize.fields.*.from_key",
+                          "markdownDescription": "#### sources.*.normalize.steps[*].fields.*.from_key\n\n#### sources.*.normalize.fields.*.from_key\n\n将 lookup key(外层 mapping 的 key)写入该字段.\n\n- true: 注入\n- false: 不注入\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n\n##### 例子\n```yaml\ntrue\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n\n##### 例子\n```yaml\ntrue\n```",
                           "examples": [
                             true
                           ]
@@ -641,8 +642,8 @@
                         "extract": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "从当前 row value 提取字段值的路径表达式",
-                          "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式.\n\n- 语法与字段级 `extract` 一致: dot + bracket path\n- 支持 int-key: `\"[1].x\"`(表示 key=1,不是数组下标)\n- 缺失/路径不匹配时为 missing(由 `on_missing` 决定)",
+                          "description": "#### sources.*.normalize.fields.*.extract",
+                          "markdownDescription": "#### sources.*.normalize.steps[*].fields.*.extract\n\n#### sources.*.normalize.fields.*.extract\n\n从当前 key 对应的 row value 中提取字段值的路径表达式.\n\n- 语法与字段级 `extract` 一致: dot + bracket path\n- 支持 int-key: `\"[1].x\"`(表示 key=1,不是数组下标)\n- 缺失/路径不匹配时为 missing(由 `on_missing` 决定)\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nreview_status\n```\n```yaml\n'[1].clearn_reason_level'\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nreview_status\n```\n```yaml\n'[1].clearn_reason_level'\n```",
                           "examples": [
                             "review_status",
                             "[1].clearn_reason_level"
@@ -736,13 +737,13 @@
                 ]
               },
               "minItems": 1,
-              "description": "按顺序执行的 normalize steps",
-              "markdownDescription": "按顺序执行的 normalize steps.\n\n- 对每个 `(key, value)` 依次执行"
+              "description": "按顺序执行的 normalize steps.",
+              "markdownDescription": "#### sources.*.normalize.steps\n\n按顺序执行的 normalize steps.\n- 对每个 `(key, value)` 依次执行"
             },
             "call_by": {
               "type": "string",
-              "description": "Normalize 受控扩展点(安全引用,由 allowlist 约束)",
-              "markdownDescription": "Normalize 受控扩展点(可选).\n\n- 形式与 `loader` 引用一致,支持:\n  - Python 引用(绝对/相对)\n  - 内置引用: `^<id>`\n- Python 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n- `^<id>` 为内置白名单,无需把 `scalim.*` 加入 allowlist\n- 固定 contract: 输入与输出均为 `Mapping`\n\n建议签名:\n- `fn(result, ctx) -> Mapping`\n  - `ctx.source_id`\n  - `ctx.kind`\n  - `ctx.config_path`",
+              "description": "Normalize 受控扩展点(可选).",
+              "markdownDescription": "#### sources.*.normalize.call_by\n\nNormalize 受控扩展点(可选).\n\n- 形式与 `loader` 引用一致,支持:\n  - Python 引用(绝对/相对)\n  - 内置引用: `^<id>`\n- Python 相对引用会在运行期先归一化为绝对引用,再做 allowlist 校验\n- `^<id>` 为内置白名单,无需把 `scalim.*` 加入 allowlist\n- 固定 contract: 输入与输出均为 `Mapping`\n\n建议签名:\n- `fn(result, ctx) -> Mapping`\n  - `ctx.source_id`\n  - `ctx.kind`\n  - `ctx.config_path`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n\n##### 例子\n```yaml\nmyapp.normalizes:normalize_source_x\n```",
               "examples": [
                 "myapp.normalizes:normalize_source_x"
               ]
@@ -926,13 +927,13 @@
               ]
             }
           ],
-          "description": "源代码级整体结果 `normalize`(在字段级 `extract` 之前对 `loader` 整体返回值整形)",
-          "markdownDescription": "`normalize` 是源代码级的整体结果整形.\n\n- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n- 执行时机: 在字段级 `extract` 之前\n- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n`index_by_key` 默认行为:\n- `key_field` 可省略/为空字符串,缺省时取 `sources.<id>.key`(仅单字段 key)\n- 若显式填写 `key_field`,仍要求其与 `sources.<id>.key` 一致\n\n示例:\n```yaml\nnormalize:\n  kind: index_by_key\n  on_conflict: error\n```\n\n输入/输出形状:\n- 输入: `[{order_id: 101, ...}, ...]`\n- 输出: `{101: {order_id: 101, ...}, ...}`\n\n注意:\n- 若只是 `row` 内字段嵌套取值,请使用字段级 `extract`"
+          "description": "`normalize` 是源代码级的整体结果整形.",
+          "markdownDescription": "#### sources.*.normalize\n\n`normalize` 是源代码级的整体结果整形.\n\n- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n- 执行时机: 在字段级 `extract` 之前\n- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n`index_by_key` 默认行为:\n- `key_field` 可省略/为空字符串,缺省时取 `sources.<id>.key`(仅单字段 key)\n- 若显式填写 `key_field`,仍要求其与 `sources.<id>.key` 一致\n\n示例:\n```yaml\nnormalize:\n  kind: index_by_key\n  on_conflict: error\n```\n\n输入/输出形状:\n- 输入: `[{order_id: 101, ...}, ...]`\n- 输出: `{101: {order_id: 101, ...}, ...}`\n\n注意:\n- 若只是 `row` 内字段嵌套取值,请使用字段级 `extract`\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n- additionalProperties: false\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\nkind: index_by_key\n```"
         },
         "cache_mode": {
           "type": "string",
-          "description": "缓存模式:none=不缓存,preload_forever=预加载永久缓存",
-          "markdownDescription": "缓存模式.\n\n- `none`: 不缓存\n- `preload_forever`: 预加载并长期缓存\n- 设为 `preload_forever` 时,预加载阶段会执行一次 loader 并将结果缓存\n- 预加载阶段同样会复用编译后的 `sources.<id>.params` kwargs 模板(禁用 `$keys/$rows`)\n- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`",
+          "description": "缓存模式.",
+          "markdownDescription": "#### sources.*.cache_mode\n\n缓存模式.\n\n- `none`: 不缓存\n- `preload_forever`: 预加载并长期缓存\n- 设为 `preload_forever` 时,预加载阶段会执行一次 loader 并将结果缓存\n- 预加载阶段同样会复用编译后的 `sources.<id>.params` kwargs 模板(禁用 `$keys/$rows`)\n- `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `none`, `preload_forever`\n- 默认值: `none`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\nnone\n```",
           "enum": [
             "none",
             "preload_forever"
@@ -955,8 +956,8 @@
                   "minItems": 1
                 }
               ],
-              "description": "$import 引用(支持 string 或 string list)",
-              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+              "description": "$import 引用.",
+              "markdownDescription": "#### sources.*.fields.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
               "examples": [
                 "common.sources",
                 [
@@ -966,8 +967,8 @@
               ]
             }
           },
-          "description": "数据源字段配置映射, key 为 field_id",
-          "markdownDescription": "数据源字段配置映射.\n\n- 仅允许源字段(禁止 `compute`)\n- `source` 可省略或必须等于当前 `source_id`\n- 支持 YAML anchor 复用",
+          "description": "数据源字段配置映射.",
+          "markdownDescription": "#### sources.*.fields\n\n数据源字段配置映射.\n- 仅允许源字段(禁止 `compute`)\n- `source` 可省略或必须等于当前 `source_id`",
           "additionalProperties": {
             "$ref": "#/definitions/source_field_inline"
           },
@@ -989,8 +990,8 @@
                   "minItems": 1
                 }
               ],
-              "description": "$import 引用(支持 string 或 string list)",
-              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+              "description": "$import 引用.",
+              "markdownDescription": "#### sources.*.params.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
               "examples": [
                 "common.sources",
                 [
@@ -1000,8 +1001,8 @@
               ]
             }
           },
-          "description": "调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)",
-          "markdownDescription": "调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$init_var: <name>}` 指令节点(编译期解析为调用方提供的 `init_vars[<name>]`)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$init_var: <name>}` 指令节点(单键映射;inline/block 等价;编译期解析为 `init_vars[<name>]`)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 预加载阶段会复用同一份编译后的 `sources.<id>.params` 模板并透传 kwargs\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `{$runtime: <name>}` 指令节点已不支持,请改用 `{$init_var: <name>}`\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$init_var: <name>}`",
+          "description": "调用 loader 时透传的 kwargs 模板.",
+          "markdownDescription": "#### sources.*.params\n\n调用 loader 时透传的 kwargs 模板.\n\n- `main_source.params`: 直接以 kwargs 传给 main source loader\n  - 仅允许静态值与 `{$init_var: <name>}` 指令节点(编译期解析为调用方提供的 `init_vars[<name>]`)\n  - 禁止 `$keys/$rows`\n- `sources.<id>.params`: loader kwargs 模板(在 ref loader 与 preload 阶段复用)\n  - 支持 `{$init_var: <name>}` 指令节点(单键映射;inline/block 等价;编译期解析为 `init_vars[<name>]`)\n  - `$keys`: 注入 lookup keys(支持 nested/list 位置)\n    - 形式: `{$keys: {as: set|list}}`(默认 set)\n    - composite key 注入为 tuple 元素\n  - `$rows`: 注入 batch rows(支持 nested/list 位置)\n    - 形式: `{$rows: {cache_mode: batch|none}}`(默认 batch)\n    - 注意: `$rows` 会触发 rows barrier(该层 LoadRef 串行执行)\n    - 注意: `cache_mode: batch` 会启用批次内复用(减少同 relation 多字段的重复调用);大 batch 下构造 `batch_rows` 可能较重\n    - 内存提示: 系统不会将完整 `batch_rows` 快照存入长生命周期缓存(避免驻留放大)\n      若 loader 有副作用或依赖可变 `batch_rows`,请用 `cache_mode: none`\n- `cache_mode: preload_forever` 的 source:\n  - 预加载阶段会复用同一份编译后的 `sources.<id>.params` 模板并透传 kwargs\n  - 禁止 `$keys/$rows`\n\n迁移:\n- legacy `bind` / `to_bind` 已移除,请改用 `params` 模板中的 `$keys/$rows` 指令节点\n- legacy `{$runtime: <name>}` 指令节点已不支持,请改用 `{$init_var: <name>}`\n- legacy `$runtime.<name>` 字符串占位符已移除,请改用 `{$init_var: <name>}`\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n- additionalProperties: object\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\n{}\n```",
           "additionalProperties": {}
         },
         "$import": {
@@ -1017,8 +1018,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### sources.*.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -1049,14 +1050,14 @@
         "source": {
           "type": "string",
           "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "字段来源的 source_id (例: source: orders)",
-          "markdownDescription": "字段来源的 `source_id`.\n\n- 在 `main_source.fields` / `sources.<id>.fields` 中可省略\n- 若显式提供, 必须与容器 `source_id` 一致"
+          "description": "字段来源的 `source_id`.",
+          "markdownDescription": "#### fields.*.source\n\n字段来源的 `source_id`.\n\n- 在 `main_source.fields` / `sources.<id>.fields` 中可省略\n- 若显式提供, 必须与容器 `source_id` 一致\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- pattern: `^[a-zA-Z_][a-zA-Z0-9_]*$`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\ndemo\n```"
         },
         "extract": {
           "type": "string",
           "minLength": 1,
           "description": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).",
-          "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).\n\n语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):\n- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)\n- dot: `a.b.c`\n- int-key: `\"[1].clearn_reason_level\"` (表示 key=1,不是 list index)\n- 字面量 string key: `'[\"a.b\"].x'` (用于 key 本身包含点号等特殊字符)\n\n注意:\n- 不做 `\"1\"` ↔ `1` 的隐式转换(避免歧义)\n- 不支持数组/列表下标语义: `[1]` 永远表示 “key=1”\n- 缺失/路径不匹配时返回 `None`\n\n示例(含嵌套取值):\n\n```yaml\nmain_source:\n  fields:\n    # 顶层同名 key: extract 可省略\n    review_status:\n      name: 审核状态\n\n    # int-key nested dict: role_id 是 int(例如 1/2)\n    customer_clearn_reason_level:\n      name: 客户净利原因等级\n      extract: \"[1].clearn_reason_level\"\n\n    # dotted literal key: row 的 key 就叫 \"a.b\"\n    dotted_literal_key_value:\n      extract: '[\"a.b\"].x'\n```\n\n示例(给定 loader 返回值,extract 提取后的输出长什么样):\n\n```python\nresult = {\n  1: {1: {\"clearn_reason_level\": 2}, 2: {\"clearn_reason_level\": 1}, \"review_status\": 0},\n}\n```\n\n字段:\n\n```yaml\nsources:\n  clearn_reasons:\n    fields:\n      customer_level:\n        extract: \"[1].clearn_reason_level\"\n      operation_level:\n        extract: \"[2].clearn_reason_level\"\n      review_status:\n        extract: review_status\n```\n\n对 `lookup_key=1` 的 row value:\n- `customer_level` → `2`\n- `operation_level` → `1`\n- `review_status` → `0`\n\n最终输出行片段:\n\n```python\n{\"customer_level\": 2, \"operation_level\": 1, \"review_status\": 0}\n```\n\n补充边界:\n- 如果中间段是 list/tuple, `\"[1]\"` 也不会当作下标(会返回 `None`)\n- 如果同时存在 key `\"1\"` 与 `1`,需要用 `extract: '[\"1\"].x'` 与 `extract: \"[1].x\"` 明确区分\n",
+          "markdownDescription": "#### fields.*.extract\n\n从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).\n\n语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):\n- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)\n- dot: `a.b.c`\n- int-key: `\"[1].clearn_reason_level\"` (表示 key=1,不是 list index)\n- 字面量 string key: `'[\"a.b\"].x'` (用于 key 本身包含点号等特殊字符)\n\n注意:\n- 不做 `\"1\"` ↔ `1` 的隐式转换(避免歧义)\n- 不支持数组/列表下标语义: `[1]` 永远表示 “key=1”\n- 缺失/路径不匹配时返回 `None`\n\n示例(含嵌套取值):\n\n```yaml\nmain_source:\n  fields:\n    # 顶层同名 key: extract 可省略\n    review_status:\n      name: 审核状态\n\n    # int-key nested dict: role_id 是 int(例如 1/2)\n    customer_clearn_reason_level:\n      name: 客户净利原因等级\n      extract: \"[1].clearn_reason_level\"\n\n    # dotted literal key: row 的 key 就叫 \"a.b\"\n    dotted_literal_key_value:\n      extract: '[\"a.b\"].x'\n```\n\n示例(给定 loader 返回值,extract 提取后的输出长什么样):\n\n```python\nresult = {\n  1: {1: {\"clearn_reason_level\": 2}, 2: {\"clearn_reason_level\": 1}, \"review_status\": 0},\n}\n```\n\n字段:\n\n```yaml\nsources:\n  clearn_reasons:\n    fields:\n      customer_level:\n        extract: \"[1].clearn_reason_level\"\n      operation_level:\n        extract: \"[2].clearn_reason_level\"\n      review_status:\n        extract: review_status\n```\n\n对 `lookup_key=1` 的 row value:\n- `customer_level` → `2`\n- `operation_level` → `1`\n- `review_status` → `0`\n\n最终输出行片段:\n\n```python\n{\"customer_level\": 2, \"operation_level\": 1, \"review_status\": 0}\n```\n\n补充边界:\n- 如果中间段是 list/tuple, `\"[1]\"` 也不会当作下标(会返回 `None`)\n- 如果同时存在 key `\"1\"` 与 `1`,需要用 `extract: '[\"1\"].x'` 与 `extract: \"[1].x\"` 明确区分\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nreview_status\n```\n```yaml\nCustomerMark.clearn_reason_level\n```\n```yaml\n'[1].clearn_reason_level'\n```\n```yaml\n'[\"a.b\"].x'\n```",
           "examples": [
             "review_status",
             "CustomerMark.clearn_reason_level",
@@ -1066,8 +1067,8 @@
         },
         "name": {
           "type": "string",
-          "description": "字段显示名称",
-          "markdownDescription": "字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头"
+          "description": "字段显示名称.",
+          "markdownDescription": "#### fields.*.name\n\n字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\ndemo\n```"
         },
         "relation": {
           "oneOf": [
@@ -1111,8 +1112,8 @@
                             "minItems": 1
                           }
                         ],
-                        "description": "上游字段(等值条件左侧),格式 source.field; 多字段用列表",
-                        "markdownDescription": "上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                        "description": "上游字段(等值条件左侧).",
+                        "markdownDescription": "#### fields.*.relation.steps[*].from\n\n上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\norders.customer_id\n```\n```yaml\n- orders.region_id\n- orders.institution_id\n```",
                         "examples": [
                           "orders.customer_id",
                           [
@@ -1140,8 +1141,8 @@
                             "minItems": 1
                           }
                         ],
-                        "description": "下游字段(等值条件右侧/lookup key),格式 source.field; 多字段用列表",
-                        "markdownDescription": "下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                        "description": "下游字段(等值条件右侧/lookup key).",
+                        "markdownDescription": "#### fields.*.relation.steps[*].to\n\n下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\ncustomers.customer_id\n```\n```yaml\n- regions.region_id\n- mappings.institution_id\n```",
                         "examples": [
                           "customers.customer_id",
                           [
@@ -1164,27 +1165,28 @@
                               "str",
                               "sep_first"
                             ],
-                            "description": "转换名称(auto/int/str/sep_first)",
-                            "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+                            "description": "转换名称.",
+                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
                             "examples": [
                               "auto"
                             ]
                           },
                           "sep": {
                             "type": "string",
-                            "description": "sep_first 的分隔符(默认 ,)"
+                            "description": "sep_first 的分隔符(默认 ,)",
+                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
                           }
                         },
                         "additionalProperties": false,
-                        "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
-                        "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
+                        "description": "归一化 lookup key 的转换.",
+                        "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
                       }
                     },
                     "additionalProperties": false
                   },
                   "minItems": 1,
-                  "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
-                  "markdownDescription": "按顺序定义等值关联链(from == to).\n\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)\n- 列表用于复合键, 长度需一致\n- 链路必须连续: steps[n].from 的 source = steps[n-1].to 的 source"
+                  "description": "按顺序定义等值关联链(from == to).",
+                  "markdownDescription": "#### fields.*.relation.steps\n\n按顺序定义等值关联链(from == to).\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)"
                 }
               },
               "additionalProperties": false,
@@ -1193,12 +1195,12 @@
             }
           ],
           "description": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)",
-          "markdownDescription": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)"
+          "markdownDescription": "#### fields.*.relation\n\n关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\ndemo\n```"
         },
         "value_cast": {
           "type": "string",
-          "description": "字段值转换(仅源字段),用于写入上下文/输出前的类型调整",
-          "markdownDescription": "字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str\n- `decimal`: 转为 Decimal",
+          "description": "字段值转换(仅源字段).",
+          "markdownDescription": "#### fields.*.value_cast\n\n字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str\n- `decimal`: 转为 Decimal\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `auto`, `int`, `str`, `decimal`\n\n##### 例子\n```yaml\ndecimal\n```",
           "enum": [
             "auto",
             "int",
@@ -1222,8 +1224,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### fields.*.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -1257,14 +1259,14 @@
         "source": {
           "type": "string",
           "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "字段来源的 source_id (例: source: orders)",
-          "markdownDescription": "字段来源的 `source_id`.\n\n- 在 `main_source.fields` / `sources.<id>.fields` 中可省略\n- 若显式提供, 必须与容器 `source_id` 一致"
+          "description": "字段来源的 `source_id`.",
+          "markdownDescription": "#### fields.*.source\n\n字段来源的 `source_id`.\n\n- 在 `main_source.fields` / `sources.<id>.fields` 中可省略\n- 若显式提供, 必须与容器 `source_id` 一致\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- pattern: `^[a-zA-Z_][a-zA-Z0-9_]*$`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\ndemo\n```"
         },
         "extract": {
           "type": "string",
           "minLength": 1,
           "description": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).",
-          "markdownDescription": "从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).\n\n语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):\n- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)\n- dot: `a.b.c`\n- int-key: `\"[1].clearn_reason_level\"` (表示 key=1,不是 list index)\n- 字面量 string key: `'[\"a.b\"].x'` (用于 key 本身包含点号等特殊字符)\n\n注意:\n- 不做 `\"1\"` ↔ `1` 的隐式转换(避免歧义)\n- 不支持数组/列表下标语义: `[1]` 永远表示 “key=1”\n- 缺失/路径不匹配时返回 `None`\n\n示例(含嵌套取值):\n\n```yaml\nmain_source:\n  fields:\n    # 顶层同名 key: extract 可省略\n    review_status:\n      name: 审核状态\n\n    # int-key nested dict: role_id 是 int(例如 1/2)\n    customer_clearn_reason_level:\n      name: 客户净利原因等级\n      extract: \"[1].clearn_reason_level\"\n\n    # dotted literal key: row 的 key 就叫 \"a.b\"\n    dotted_literal_key_value:\n      extract: '[\"a.b\"].x'\n```\n\n示例(给定 loader 返回值,extract 提取后的输出长什么样):\n\n```python\nresult = {\n  1: {1: {\"clearn_reason_level\": 2}, 2: {\"clearn_reason_level\": 1}, \"review_status\": 0},\n}\n```\n\n字段:\n\n```yaml\nsources:\n  clearn_reasons:\n    fields:\n      customer_level:\n        extract: \"[1].clearn_reason_level\"\n      operation_level:\n        extract: \"[2].clearn_reason_level\"\n      review_status:\n        extract: review_status\n```\n\n对 `lookup_key=1` 的 row value:\n- `customer_level` → `2`\n- `operation_level` → `1`\n- `review_status` → `0`\n\n最终输出行片段:\n\n```python\n{\"customer_level\": 2, \"operation_level\": 1, \"review_status\": 0}\n```\n\n补充边界:\n- 如果中间段是 list/tuple, `\"[1]\"` 也不会当作下标(会返回 `None`)\n- 如果同时存在 key `\"1\"` 与 `1`,需要用 `extract: '[\"1\"].x'` 与 `extract: \"[1].x\"` 明确区分\n",
+          "markdownDescription": "#### fields.*.extract\n\n从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).\n\n语法: dot + bracket path(建议写成字符串,避免 YAML 歧义):\n- `extract` 省略时,等价于 `extract: <field_id>`(顶层同名 key)\n- dot: `a.b.c`\n- int-key: `\"[1].clearn_reason_level\"` (表示 key=1,不是 list index)\n- 字面量 string key: `'[\"a.b\"].x'` (用于 key 本身包含点号等特殊字符)\n\n注意:\n- 不做 `\"1\"` ↔ `1` 的隐式转换(避免歧义)\n- 不支持数组/列表下标语义: `[1]` 永远表示 “key=1”\n- 缺失/路径不匹配时返回 `None`\n\n示例(含嵌套取值):\n\n```yaml\nmain_source:\n  fields:\n    # 顶层同名 key: extract 可省略\n    review_status:\n      name: 审核状态\n\n    # int-key nested dict: role_id 是 int(例如 1/2)\n    customer_clearn_reason_level:\n      name: 客户净利原因等级\n      extract: \"[1].clearn_reason_level\"\n\n    # dotted literal key: row 的 key 就叫 \"a.b\"\n    dotted_literal_key_value:\n      extract: '[\"a.b\"].x'\n```\n\n示例(给定 loader 返回值,extract 提取后的输出长什么样):\n\n```python\nresult = {\n  1: {1: {\"clearn_reason_level\": 2}, 2: {\"clearn_reason_level\": 1}, \"review_status\": 0},\n}\n```\n\n字段:\n\n```yaml\nsources:\n  clearn_reasons:\n    fields:\n      customer_level:\n        extract: \"[1].clearn_reason_level\"\n      operation_level:\n        extract: \"[2].clearn_reason_level\"\n      review_status:\n        extract: review_status\n```\n\n对 `lookup_key=1` 的 row value:\n- `customer_level` → `2`\n- `operation_level` → `1`\n- `review_status` → `0`\n\n最终输出行片段:\n\n```python\n{\"customer_level\": 2, \"operation_level\": 1, \"review_status\": 0}\n```\n\n补充边界:\n- 如果中间段是 list/tuple, `\"[1]\"` 也不会当作下标(会返回 `None`)\n- 如果同时存在 key `\"1\"` 与 `1`,需要用 `extract: '[\"1\"].x'` 与 `extract: \"[1].x\"` 明确区分\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nreview_status\n```\n```yaml\nCustomerMark.clearn_reason_level\n```\n```yaml\n'[1].clearn_reason_level'\n```\n```yaml\n'[\"a.b\"].x'\n```",
           "examples": [
             "review_status",
             "CustomerMark.clearn_reason_level",
@@ -1274,8 +1276,8 @@
         },
         "name": {
           "type": "string",
-          "description": "字段显示名称",
-          "markdownDescription": "字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头"
+          "description": "字段显示名称.",
+          "markdownDescription": "#### fields.*.name\n\n字段显示名称.\n\n- `output.header_fields_output_by: name` 时作为表头\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\ndemo\n```"
         },
         "relation": {
           "oneOf": [
@@ -1319,8 +1321,8 @@
                             "minItems": 1
                           }
                         ],
-                        "description": "上游字段(等值条件左侧),格式 source.field; 多字段用列表",
-                        "markdownDescription": "上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                        "description": "上游字段(等值条件左侧).",
+                        "markdownDescription": "#### fields.*.relation.steps[*].from\n\n上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\norders.customer_id\n```\n```yaml\n- orders.region_id\n- orders.institution_id\n```",
                         "examples": [
                           "orders.customer_id",
                           [
@@ -1348,8 +1350,8 @@
                             "minItems": 1
                           }
                         ],
-                        "description": "下游字段(等值条件右侧/lookup key),格式 source.field; 多字段用列表",
-                        "markdownDescription": "下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                        "description": "下游字段(等值条件右侧/lookup key).",
+                        "markdownDescription": "#### fields.*.relation.steps[*].to\n\n下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\ncustomers.customer_id\n```\n```yaml\n- regions.region_id\n- mappings.institution_id\n```",
                         "examples": [
                           "customers.customer_id",
                           [
@@ -1372,27 +1374,28 @@
                               "str",
                               "sep_first"
                             ],
-                            "description": "转换名称(auto/int/str/sep_first)",
-                            "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+                            "description": "转换名称.",
+                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
                             "examples": [
                               "auto"
                             ]
                           },
                           "sep": {
                             "type": "string",
-                            "description": "sep_first 的分隔符(默认 ,)"
+                            "description": "sep_first 的分隔符(默认 ,)",
+                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
                           }
                         },
                         "additionalProperties": false,
-                        "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
-                        "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
+                        "description": "归一化 lookup key 的转换.",
+                        "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
                       }
                     },
                     "additionalProperties": false
                   },
                   "minItems": 1,
-                  "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
-                  "markdownDescription": "按顺序定义等值关联链(from == to).\n\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)\n- 列表用于复合键, 长度需一致\n- 链路必须连续: steps[n].from 的 source = steps[n-1].to 的 source"
+                  "description": "按顺序定义等值关联链(from == to).",
+                  "markdownDescription": "#### fields.*.relation.steps\n\n按顺序定义等值关联链(from == to).\n- `from`/`to` 支持 `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),或 `sources.<id>.key` 中声明的 key 字段(不允许写 loader data_key)"
                 }
               },
               "additionalProperties": false,
@@ -1401,12 +1404,12 @@
             }
           ],
           "description": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)",
-          "markdownDescription": "关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)"
+          "markdownDescription": "#### fields.*.relation\n\n关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\ndemo\n```"
         },
         "value_cast": {
           "type": "string",
-          "description": "字段值转换(仅源字段),用于写入上下文/输出前的类型调整",
-          "markdownDescription": "字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str\n- `decimal`: 转为 Decimal",
+          "description": "字段值转换(仅源字段).",
+          "markdownDescription": "#### fields.*.value_cast\n\n字段值转换(仅源字段).\n\n- `auto`: 自动转换\n- `int`: 转为 int\n- `str`: 转为 str\n- `decimal`: 转为 Decimal\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `auto`, `int`, `str`, `decimal`\n\n##### 例子\n```yaml\ndecimal\n```",
           "enum": [
             "auto",
             "int",
@@ -1419,16 +1422,16 @@
         },
         "compute": {
           "type": "string",
-          "description": "派生字段计算表达式(使用 field_id 作为变量名)",
-          "markdownDescription": "派生字段计算表达式(与 `call_by` 互斥).\n\n- 使用 `field_id` 作为变量名\n- 必填, 不能为空",
+          "description": "派生字段计算表达式(与 `call_by` 互斥).",
+          "markdownDescription": "#### fields.*.compute\n\n派生字段计算表达式(与 `call_by` 互斥).\n\n- 使用 `field_id` 作为变量名\n- 必填, 不能为空\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n\n##### 例子\n```yaml\nrevenue - cost\n```",
           "examples": [
             "revenue - cost"
           ]
         },
         "call_by": {
           "type": "string",
-          "description": "派生字段函数调用(函数引用 + 参数列表),与 compute 互斥",
-          "markdownDescription": "派生字段函数调用(与 `compute` 互斥).\n\n- 语法: `reference(args...)`\n- `reference` 形式与 `loader` 引用一致,支持:\n  - Python 引用(绝对/相对)\n  - 内置引用: `^<id>`\n- Python 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- `^<id>` 为受控词表(vocabulary)中的 builtin callable 引用,无需把目标模块加入 allowlist\n- 支持位置参数与 kwargs\n- Python 字面量: `1`/`1.5`/`'ok'`/`True`/`False`/`None`\n- 上下文引用: `$ctx` 或 `$ctx.<attr>`\n- 可用 ctx 属性: `row_id`/`batch_num`/`field_id`/`deps`/`values`",
+          "description": "派生字段函数调用(与 `compute` 互斥).",
+          "markdownDescription": "#### fields.*.call_by\n\n派生字段函数调用(与 `compute` 互斥).\n\n- 语法: `reference(args...)`\n- `reference` 形式与 `loader` 引用一致,支持:\n  - Python 引用(绝对/相对)\n  - 内置引用: `^<id>`\n- Python 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- `^<id>` 为受控词表(vocabulary)中的 builtin callable 引用,无需把目标模块加入 allowlist\n- 支持位置参数与 kwargs\n- Python 字面量: `1`/`1.5`/`'ok'`/`True`/`False`/`None`\n- 上下文引用: `$ctx` 或 `$ctx.<attr>`\n- 可用 ctx 属性: `row_id`/`batch_num`/`field_id`/`deps`/`values`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n\n##### 例子\n```yaml\nmyapp.enums:get_status_text(status)\n```\n```yaml\nmyapp.enums:get_status_text(status=status, ctx=$ctx)\n```\n```yaml\n.helpers:to_text(status)\n```\n```yaml\n^workflow/book_sheet_rows(ref)\n```",
           "examples": [
             "myapp.enums:get_status_text(status)",
             "myapp.enums:get_status_text(status=status, ctx=$ctx)",
@@ -1449,8 +1452,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### fields.*.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -1518,8 +1521,8 @@
                     "minItems": 1
                   }
                 ],
-                "description": "上游字段(等值条件左侧),格式 source.field; 多字段用列表",
-                "markdownDescription": "上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                "description": "上游字段(等值条件左侧).",
+                "markdownDescription": "#### relations.*.steps[*].from\n\n上游字段(等值条件左侧).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `to` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\norders.customer_id\n```\n```yaml\n- orders.region_id\n- orders.institution_id\n```",
                 "examples": [
                   "orders.customer_id",
                   [
@@ -1547,8 +1550,8 @@
                     "minItems": 1
                   }
                 ],
-                "description": "下游字段(等值条件右侧/lookup key),格式 source.field; 多字段用列表",
-                "markdownDescription": "下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)",
+                "description": "下游字段(等值条件右侧/lookup key).",
+                "markdownDescription": "#### relations.*.steps[*].to\n\n下游字段(等值条件右侧/lookup key).\n\n- `source.field` 或列表\n- `field` 必须是字段的 `field_id`(YAML key),不允许写 loader data_key\n- 列表用于复合键, 长度需与 `from` 对齐\n- 同一侧必须来自同一 source\n\n常见错误:\n- ❌ 写 data_key: `products.category_id`\n- ✅ 写 field_id: `products.product_category_id` (schema 会映射到 data_key)\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\ncustomers.customer_id\n```\n```yaml\n- regions.region_id\n- mappings.institution_id\n```",
                 "examples": [
                   "customers.customer_id",
                   [
@@ -1571,27 +1574,28 @@
                       "str",
                       "sep_first"
                     ],
-                    "description": "转换名称(auto/int/str/sep_first)",
-                    "markdownDescription": "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化",
+                    "description": "转换名称.",
+                    "markdownDescription": "#### relations.*.steps[*].lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
                     "examples": [
                       "auto"
                     ]
                   },
                   "sep": {
                     "type": "string",
-                    "description": "sep_first 的分隔符(默认 ,)"
+                    "description": "sep_first 的分隔符(默认 ,)",
+                    "markdownDescription": "#### relations.*.steps[*].lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
                   }
                 },
                 "additionalProperties": false,
-                "description": "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}",
-                "markdownDescription": "归一化 lookup key 的转换.\n\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize"
+                "description": "归一化 lookup key 的转换.",
+                "markdownDescription": "#### relations.*.steps[*].lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
               }
             },
             "additionalProperties": false
           },
           "minItems": 1,
           "description": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])",
-          "markdownDescription": "按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])"
+          "markdownDescription": "#### relations.*.steps\n\n按顺序定义等值关联链(from == to),系统不会重排 steps, 表示从 main_source 出发沿链路到达当前字段 source (例: steps: [{from: orders.customer_id, to: customers.customer_id}])"
         },
         "$import": {
           "oneOf": [
@@ -1606,8 +1610,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### relations.*.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -1636,8 +1640,8 @@
       "properties": {
         "max_sheets": {
           "type": "integer",
-          "description": "sheet 数量预算(>=1)",
-          "markdownDescription": "sheet 数量预算(>=1).",
+          "description": "sheet 数量预算(>=1).",
+          "markdownDescription": "#### resources.books.*.budget.max_sheets\n\nsheet 数量预算(>=1).",
           "minimum": 1,
           "examples": [
             64
@@ -1645,8 +1649,8 @@
         },
         "max_total_cells": {
           "type": "integer",
-          "description": "总 cell 数预算(>=1)",
-          "markdownDescription": "总 cell 数预算(>=1).",
+          "description": "总 cell 数预算(>=1).",
+          "markdownDescription": "#### resources.books.*.budget.max_total_cells\n\n总 cell 数预算(>=1).",
           "minimum": 1,
           "examples": [
             1000000
@@ -1665,8 +1669,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.books.*.budget.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -1707,7 +1711,8 @@
                 "$init_var": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                  "markdownDescription": "#### resources.books.*.export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -1724,12 +1729,12 @@
               "$init_var": "output_path"
             }
           ],
-          "markdownDescription": "导出 xlsx 的输出路径(字符串或 {$init_var: <name>})"
+          "markdownDescription": "#### resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
         },
         "write_lock": {
           "type": "boolean",
-          "description": "写锁(导出时;默认 false)",
-          "markdownDescription": "写锁(导出时;默认 false).",
+          "description": "写锁(导出时;默认 false).",
+          "markdownDescription": "#### resources.books.*.export_xlsx.write_lock\n\n写锁(导出时;默认 false).",
           "default": false,
           "examples": [
             false
@@ -1737,8 +1742,8 @@
         },
         "allow_formulas": {
           "type": "boolean",
-          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false)",
-          "markdownDescription": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### resources.books.*.export_xlsx.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "default": false,
           "examples": [
             false
@@ -1757,8 +1762,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.books.*.export_xlsx.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -1787,8 +1792,8 @@
       "properties": {
         "mode": {
           "type": "string",
-          "description": "写入语义(sheet/append)",
-          "markdownDescription": "写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet",
+          "description": "写入语义.",
+          "markdownDescription": "#### resources.books.*.write_defaults.mode\n\n写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `sheet`, `append`\n- 默认值: `append`\n\n##### 例子\n```yaml\nappend\n```",
           "enum": [
             "sheet",
             "append"
@@ -1800,8 +1805,8 @@
         },
         "align_by": {
           "type": "string",
-          "description": "字段对齐策略(field_id/header;仅 append 生效)",
-          "markdownDescription": "字段对齐策略(仅 `mode=append` 生效).\n\n- `field_id`: 按 field_id 对齐(忽略 header 名)\n- `header`: 按 header 名对齐(严格匹配)",
+          "description": "字段对齐策略(仅 `mode=append` 生效).",
+          "markdownDescription": "#### resources.books.*.write_defaults.align_by\n\n字段对齐策略(仅 `mode=append` 生效).\n\n- `field_id`: 按 field_id 对齐(忽略 header 名)\n- `header`: 按 header 名对齐(严格匹配)\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `field_id`, `header`\n- 默认值: `field_id`\n\n##### 例子\n```yaml\nfield_id\n```",
           "enum": [
             "field_id",
             "header"
@@ -1813,8 +1818,8 @@
         },
         "header_policy": {
           "type": "string",
-          "description": "表头策略(once/always/never;仅 append 生效)",
-          "markdownDescription": "表头策略(仅 `mode=append` 生效).\n\n- `once`: 只在第一段输出表头\n- `always`: 每段都输出表头\n- `never`: 不输出表头",
+          "description": "表头策略(仅 `mode=append` 生效).",
+          "markdownDescription": "#### resources.books.*.write_defaults.header_policy\n\n表头策略(仅 `mode=append` 生效).\n\n- `once`: 只在第一段输出表头\n- `always`: 每段都输出表头\n- `never`: 不输出表头\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `once`, `always`, `never`\n- 默认值: `once`\n\n##### 例子\n```yaml\nonce\n```",
           "enum": [
             "once",
             "always",
@@ -1827,8 +1832,8 @@
         },
         "on_mismatch": {
           "type": "string",
-          "description": "字段不匹配策略(error/warn/skip;仅 append 生效)",
-          "markdownDescription": "字段不匹配策略(仅 `mode=append` 生效).\n\n- `error`: 失败\n- `warn`: 告警并继续\n- `skip`: 跳过该段写入",
+          "description": "字段不匹配策略(仅 `mode=append` 生效).",
+          "markdownDescription": "#### resources.books.*.write_defaults.on_mismatch\n\n字段不匹配策略(仅 `mode=append` 生效).\n\n- `error`: 失败\n- `warn`: 告警并继续\n- `skip`: 跳过该段写入\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `warn`, `skip`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
           "enum": [
             "error",
             "warn",
@@ -1841,8 +1846,8 @@
         },
         "on_conflict": {
           "type": "string",
-          "description": "sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)",
-          "markdownDescription": "sheet 冲突策略(仅 `mode=sheet` 生效).\n\n- `error`: 失败\n- `overwrite`: 覆盖\n- `skip`: 跳过",
+          "description": "sheet 冲突策略(仅 `mode=sheet` 生效).",
+          "markdownDescription": "#### resources.books.*.write_defaults.on_conflict\n\nsheet 冲突策略(仅 `mode=sheet` 生效).\n\n- `error`: 失败\n- `overwrite`: 覆盖\n- `skip`: 跳过\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `overwrite`, `skip`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
           "enum": [
             "error",
             "overwrite",
@@ -1866,8 +1871,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.books.*.write_defaults.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -1884,8 +1889,8 @@
       "properties": {
         "kind": {
           "type": "string",
-          "description": "book kind(xlsx_file/xlsx_memory)",
-          "markdownDescription": "book kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)",
+          "description": "book kind.",
+          "markdownDescription": "#### resources.books.*.kind\n\nbook kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- 类型: string\n- 取值: `xlsx_file`, `xlsx_memory`\n\n##### 例子\n```yaml\nxlsx_file\n```",
           "enum": [
             "xlsx_file",
             "xlsx_memory"
@@ -1907,7 +1912,8 @@
                 "$init_var": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                  "markdownDescription": "#### resources.books.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -1924,11 +1930,11 @@
               "$init_var": "output_path"
             }
           ],
-          "markdownDescription": "xlsx_file: 输出路径(字符串或 {$init_var: <name>})"
+          "markdownDescription": "#### resources.books.*.path\n\nxlsx_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
         },
         "budget": {
           "description": "xlsx_memory: 预算配置(必填)",
-          "markdownDescription": "xlsx_memory: 预算配置(必填)",
+          "markdownDescription": "#### resources.books.*.budget\n\nxlsx_memory: 预算配置(必填)\n- 或仅 `$import`(展开后再校验必填字段)",
           "allOf": [
             {
               "$ref": "#/definitions/book_budget"
@@ -1937,7 +1943,7 @@
         },
         "export_xlsx": {
           "description": "xlsx_memory: 可选导出配置",
-          "markdownDescription": "xlsx_memory: 可选导出配置",
+          "markdownDescription": "#### resources.books.*.export_xlsx\n\nxlsx_memory: 可选导出配置\n- 或仅 `$import`(展开后再校验必填字段)",
           "allOf": [
             {
               "$ref": "#/definitions/book_export_xlsx"
@@ -1946,8 +1952,8 @@
         },
         "allow_formulas": {
           "type": "boolean",
-          "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)",
-          "markdownDescription": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### resources.books.*.allow_formulas\n\nxlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "default": false,
           "examples": [
             false
@@ -1955,8 +1961,8 @@
         },
         "write_lock": {
           "type": "boolean",
-          "description": "xlsx_file: 写锁(默认 false)",
-          "markdownDescription": "xlsx_file: 写锁(默认 false).",
+          "description": "xlsx_file: 写锁(默认 false).",
+          "markdownDescription": "#### resources.books.*.write_lock\n\nxlsx_file: 写锁(默认 false).",
           "default": false,
           "examples": [
             false
@@ -1964,7 +1970,7 @@
         },
         "write_defaults": {
           "description": "可选:默认写入语义与冲突策略",
-          "markdownDescription": "可选:默认写入语义与冲突策略",
+          "markdownDescription": "#### resources.books.*.write_defaults\n\n可选:默认写入语义与冲突策略",
           "allOf": [
             {
               "$ref": "#/definitions/book_write_defaults"
@@ -1984,8 +1990,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.books.*.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -2069,8 +2075,8 @@
       "properties": {
         "kind": {
           "type": "string",
-          "description": "file kind(csv_file)",
-          "markdownDescription": "file kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件",
+          "description": "file kind.",
+          "markdownDescription": "#### resources.files.*.kind\n\nfile kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- 类型: string\n- 取值: `csv_file`\n\n##### 例子\n```yaml\ncsv_file\n```",
           "enum": [
             "csv_file"
           ],
@@ -2091,7 +2097,8 @@
                 "$init_var": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                  "markdownDescription": "#### resources.files.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -2108,12 +2115,12 @@
               "$init_var": "output_path"
             }
           ],
-          "markdownDescription": "csv_file: 输出路径(字符串或 {$init_var: <name>})"
+          "markdownDescription": "#### resources.files.*.path\n\ncsv_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
         },
         "encoding": {
           "type": "string",
-          "description": "csv_file: 文件编码(默认 utf-8)",
-          "markdownDescription": "csv_file: 文件编码(默认 `utf-8`).",
+          "description": "csv_file: 文件编码(默认 `utf-8`).",
+          "markdownDescription": "#### resources.files.*.encoding\n\ncsv_file: 文件编码(默认 `utf-8`).",
           "default": "utf-8",
           "examples": [
             "utf-8"
@@ -2132,8 +2139,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.files.*.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -2177,8 +2184,8 @@
                   "minItems": 1
                 }
               ],
-              "description": "$import 引用(支持 string 或 string list)",
-              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+              "description": "$import 引用.",
+              "markdownDescription": "#### resources.books.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
               "examples": [
                 "common.sources",
                 [
@@ -2188,8 +2195,8 @@
               ]
             }
           },
-          "description": "books 资源映射(Excel book; key 为 book_id)",
-          "markdownDescription": "books 资源映射(Excel book; key 为 `book_id`).\n\n- 对外稳定术语: `book`\n- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs[*].to.book` 引用该 mapping 的 key",
+          "description": "books 资源映射(Excel book; key 为 `book_id`).",
+          "markdownDescription": "#### resources.books\n\nbooks 资源映射(Excel book; key 为 `book_id`).\n- 对外稳定术语: `book`\n- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)",
           "additionalProperties": {
             "$ref": "#/definitions/book"
           },
@@ -2211,8 +2218,8 @@
                   "minItems": 1
                 }
               ],
-              "description": "$import 引用(支持 string 或 string list)",
-              "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+              "description": "$import 引用.",
+              "markdownDescription": "#### resources.files.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
               "examples": [
                 "common.sources",
                 [
@@ -2222,8 +2229,8 @@
               ]
             }
           },
-          "description": "files 资源映射(文件输出资源; key 为 file_id)",
-          "markdownDescription": "files 资源映射(文件输出资源; key 为 `file_id`).\n\n- v1 稳定支持: `kind=csv_file`\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs[*].to.file` 引用该 mapping 的 key",
+          "description": "files 资源映射(文件输出资源; key 为 `file_id`).",
+          "markdownDescription": "#### resources.files\n\nfiles 资源映射(文件输出资源; key 为 `file_id`).\n- v1 稳定支持: `kind=csv_file`\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录",
           "additionalProperties": {
             "$ref": "#/definitions/file"
           },
@@ -2242,8 +2249,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -2291,8 +2298,8 @@
               }
             ]
           },
-          "description": "分组字段列表",
-          "markdownDescription": "分组字段列表(`field_id` 列表; 支持 YAML alias).\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\ngroup_by: [cs_id, cs_name]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    cs_id: &cs_id {extract: cs_id}\noutputs:\n  - name: by_cs\n    aggregate:\n      group_by:\n        - *cs_id\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n- `group_by` 引用的是输入行字段(`field_id`),来自 `where` 过滤后的行流\n- 每个唯一的 group key 组合会产生 1 行聚合输出\n- `partition_by`(排名分区)要求为 `group_by` 子集,用于保证聚合输出可解释性",
+          "description": "分组字段列表(`field_id` 列表; 支持 YAML alias).",
+          "markdownDescription": "#### outputs[*].aggregate.group_by\n\n分组字段列表(`field_id` 列表; 支持 YAML alias).\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\ngroup_by: [cs_id, cs_name]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    cs_id: &cs_id {extract: cs_id}\noutputs:\n  - name: by_cs\n    aggregate:\n      group_by:\n        - *cs_id\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n- `group_by` 引用的是输入行字段(`field_id`),来自 `where` 过滤后的行流\n- 每个唯一的 group key 组合会产生 1 行聚合输出\n- `partition_by`(排名分区)要求为 `group_by` 子集,用于保证聚合输出可解释性\n\n##### 字段约束\n- 必填: 是\n- 类型: array\n- minItems: `1`\n\n##### 例子\n```yaml\n- cs_id\n- cs_name\n```",
           "examples": [
             [
               "cs_id",
@@ -2321,8 +2328,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2345,15 +2352,15 @@
                             "type": "object"
                           }
                         ],
-                        "description": "可选:输入字段(field_id);提供时统计非空值个数",
-                        "markdownDescription": "可选:输入字段(`field_id`);提供时统计非空值个数.",
+                        "description": "可选:输入字段(`field_id`);提供时统计非空值个数.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.count.field\n\n可选:输入字段(`field_id`);提供时统计非空值个数.\n\n##### 字段约束\n- 必填: 否\n- anyOf\n\n##### 例子\n```yaml\norder_id\n```",
                         "examples": [
                           "order_id"
                         ]
                       }
                     },
-                    "description": "count: 行数(或非空值数)",
-                    "markdownDescription": "行数/计数指标.\n\n- `count: {}`: 统计组内行数\n- `count: {field: <field_id>}`: 统计组内该字段非空值个数\n\n执行阶段: 聚合指标(先于排名/派生字段).",
+                    "description": "行数/计数指标.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.count\n\n行数/计数指标.\n- `count: {}`: 统计组内行数\n- `count: {field: <field_id>}`: 统计组内该字段非空值个数",
                     "examples": [
                       {},
                       {
@@ -2373,8 +2380,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2400,15 +2407,15 @@
                             "type": "object"
                           }
                         ],
-                        "description": "输入字段(field_id)",
-                        "markdownDescription": "输入字段(`field_id`).",
+                        "description": "输入字段(`field_id`).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.sum.field\n\n输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\namount_yuan\n```",
                         "examples": [
                           "amount_yuan"
                         ]
                       }
                     },
-                    "description": "sum: 数值求和",
-                    "markdownDescription": "数值求和指标.\n\n- 跳过 `None`\n- 对非数值输入尽量做安全转换(失败则跳过)\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "description": "数值求和指标.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.sum\n\n数值求和指标.\n\n- 跳过 `None`\n- 对非数值输入尽量做安全转换(失败则跳过)\n\n参数:\n- `field`: 输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- additionalProperties: false\n\n##### 例子\n```yaml\nfield: amount_yuan\n```",
                     "examples": [
                       {
                         "field": "amount_yuan"
@@ -2427,8 +2434,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2454,15 +2461,15 @@
                             "type": "object"
                           }
                         ],
-                        "description": "输入字段(field_id)",
-                        "markdownDescription": "输入字段(`field_id`).",
+                        "description": "输入字段(`field_id`).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.min.field\n\n输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\namount_yuan\n```",
                         "examples": [
                           "amount_yuan"
                         ]
                       }
                     },
-                    "description": "min: 最小值",
-                    "markdownDescription": "最小值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "description": "最小值指标.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.min\n\n最小值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- additionalProperties: false\n\n##### 例子\n```yaml\nfield: amount_yuan\n```",
                     "examples": [
                       {
                         "field": "amount_yuan"
@@ -2481,8 +2488,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2508,15 +2515,15 @@
                             "type": "object"
                           }
                         ],
-                        "description": "输入字段(field_id)",
-                        "markdownDescription": "输入字段(`field_id`).",
+                        "description": "输入字段(`field_id`).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.max.field\n\n输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\namount_yuan\n```",
                         "examples": [
                           "amount_yuan"
                         ]
                       }
                     },
-                    "description": "max: 最大值",
-                    "markdownDescription": "最大值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "description": "最大值指标.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.max\n\n最大值指标.\n\n参数:\n- `field`: 输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- additionalProperties: false\n\n##### 例子\n```yaml\nfield: amount_yuan\n```",
                     "examples": [
                       {
                         "field": "amount_yuan"
@@ -2535,8 +2542,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2562,15 +2569,15 @@
                             "type": "object"
                           }
                         ],
-                        "description": "输入字段(field_id)",
-                        "markdownDescription": "输入字段(`field_id`).",
+                        "description": "输入字段(`field_id`).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.count_true.field\n\n输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\nis_paid\n```",
                         "examples": [
                           "is_paid"
                         ]
                       }
                     },
-                    "description": "count_true: 统计 truthy 行数",
-                    "markdownDescription": "统计组内某字段为 truthy 的行数.\n\n参数:\n- `field`: 输入字段(`field_id`).",
+                    "description": "统计组内某字段为 truthy 的行数.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.count_true\n\n统计组内某字段为 truthy 的行数.\n\n参数:\n- `field`: 输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- additionalProperties: false\n\n##### 例子\n```yaml\nfield: is_paid\n```",
                     "examples": [
                       {
                         "field": "is_paid"
@@ -2589,8 +2596,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2617,15 +2624,15 @@
                             "type": "object"
                           }
                         ],
-                        "description": "输入字段(field_id)",
-                        "markdownDescription": "输入字段(`field_id`).",
+                        "description": "输入字段(`field_id`).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.count_true_gte.field\n\n输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\namount_yuan\n```",
                         "examples": [
                           "amount_yuan"
                         ]
                       },
                       "threshold": {
-                        "description": "阈值(>= threshold 为 true)",
-                        "markdownDescription": "阈值(>= threshold 为 true).",
+                        "description": "阈值(>= threshold 为 true).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.count_true_gte.threshold\n\n阈值(>= threshold 为 true).",
                         "examples": [
                           0,
                           100,
@@ -2633,8 +2640,8 @@
                         ]
                       }
                     },
-                    "description": "count_true_gte: 统计数值 >= 阈值的行数",
-                    "markdownDescription": "统计组内某字段数值 >= 阈值的行数.\n\n参数:\n- `field`: 输入字段(`field_id`).\n- `threshold`: 阈值.",
+                    "description": "统计组内某字段数值 >= 阈值的行数.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.count_true_gte\n\n统计组内某字段数值 >= 阈值的行数.\n\n参数:\n- `field`: 输入字段(`field_id`).\n- `threshold`: 阈值.\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- additionalProperties: false\n\n##### 例子\n```yaml\nfield: amount_yuan\nthreshold: 100\n```",
                     "examples": [
                       {
                         "field": "amount_yuan",
@@ -2654,8 +2661,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2700,8 +2707,8 @@
                             "type": "object"
                           }
                         ],
-                        "description": "输入字段(field_id)",
-                        "markdownDescription": "输入字段(`field_id`).",
+                        "description": "输入字段(`field_id`).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.count_distinct.field\n\n输入字段(`field_id`).\n\n##### 字段约束\n- 必填: 否\n- anyOf\n\n##### 例子\n```yaml\nuser_id\n```",
                         "examples": [
                           "user_id"
                         ]
@@ -2739,8 +2746,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "复合去重键(字段列表)",
-                        "markdownDescription": "复合去重键(`field_id` 列表).",
+                        "description": "复合去重键(`field_id` 列表).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.count_distinct.fields\n\n复合去重键(`field_id` 列表).",
                         "examples": [
                           [
                             "user_id",
@@ -2749,8 +2756,8 @@
                         ]
                       }
                     },
-                    "description": "count_distinct: 去重计数",
-                    "markdownDescription": "去重计数指标.\n\n- 支持单字段去重: `field`\n- 支持复合键去重: `fields`\n- 去重护栏由 `max_distinct`/`distinct_on_overflow` 控制\n\n约束:\n- 必须且只能提供 `field` 或 `fields` 之一.",
+                    "description": "去重计数指标.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.count_distinct\n\n去重计数指标.\n- 支持单字段去重: `field`\n- 支持复合键去重: `fields`",
                     "examples": [
                       {
                         "field": "user_id"
@@ -2775,8 +2782,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2802,8 +2809,8 @@
                             "type": "object"
                           }
                         ],
-                        "description": "用于排序的字段(引用 group_by 或 aggregate.fields 任意字段,含派生字段)",
-                        "markdownDescription": "用于排序的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
+                        "description": "用于排序的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.by\n\n用于排序的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\nsum_amount\n```",
                         "examples": [
                           "sum_amount"
                         ]
@@ -2841,8 +2848,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:排名分区字段列表(必须是 group_by 子集)",
-                        "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "description": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.partition_by\n\n可选:排名分区字段列表(必须是 `group_by` 子集).",
                         "examples": [
                           [
                             "region_id"
@@ -2856,8 +2863,8 @@
                           "desc"
                         ],
                         "default": "desc",
-                        "description": "排序方向(asc/desc)",
-                        "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+                        "description": "排序方向.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
                         "examples": [
                           "desc"
                         ]
@@ -2895,8 +2902,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
-                        "markdownDescription": "可选:稳定排序字段列表.\n\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "description": "可选:稳定排序字段列表.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.order_by\n\n可选:稳定排序字段列表.\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
                         "examples": [
                           [
                             "sum_amount",
@@ -2908,8 +2915,8 @@
                         "type": "integer",
                         "minimum": 0,
                         "default": 0,
-                        "description": "可选:每个分区保留前 K 个(0 表示不限制)",
-                        "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "description": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).",
                         "examples": [
                           0,
                           100
@@ -2922,15 +2929,15 @@
                           "rows"
                         ],
                         "default": "rank",
-                        "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
-                        "markdownDescription": "top_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`",
+                        "description": "top_k 模式.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
                         "examples": [
                           "rank"
                         ]
                       }
                     },
-                    "description": "row_number: 连续序号(不合并并列)",
-                    "markdownDescription": "连续序号(1..N),不合并并列.\n\n- `by`: 用于排序(并列不合并)\n- `partition_by`: 分区内重置序号(必须是 `group_by` 子集)\n\n执行阶段: 排名字段(在聚合指标之后).",
+                    "description": "连续序号(1..N),不合并并列.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number\n\n连续序号(1..N),不合并并列.\n- `by`: 用于排序(并列不合并)\n- `partition_by`: 分区内重置序号(必须是 `group_by` 子集)",
                     "examples": [
                       {
                         "by": "sum_amount",
@@ -2950,8 +2957,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -2977,8 +2984,8 @@
                             "type": "object"
                           }
                         ],
-                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或 aggregate.fields 任意字段,含派生字段)",
-                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
+                        "description": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.by\n\n用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\nsum_amount\n```",
                         "examples": [
                           "sum_amount"
                         ]
@@ -3016,8 +3023,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:排名分区字段列表(必须是 group_by 子集)",
-                        "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "description": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.partition_by\n\n可选:排名分区字段列表(必须是 `group_by` 子集).",
                         "examples": [
                           [
                             "region_id"
@@ -3031,8 +3038,8 @@
                           "desc"
                         ],
                         "default": "desc",
-                        "description": "排序方向(asc/desc)",
-                        "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+                        "description": "排序方向.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
                         "examples": [
                           "desc"
                         ]
@@ -3070,8 +3077,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
-                        "markdownDescription": "可选:稳定排序字段列表.\n\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "description": "可选:稳定排序字段列表.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.order_by\n\n可选:稳定排序字段列表.\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
                         "examples": [
                           [
                             "sum_amount",
@@ -3083,8 +3090,8 @@
                         "type": "integer",
                         "minimum": 0,
                         "default": 0,
-                        "description": "可选:每个分区保留前 K 个(0 表示不限制)",
-                        "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "description": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).",
                         "examples": [
                           0,
                           100
@@ -3097,15 +3104,15 @@
                           "rows"
                         ],
                         "default": "rank",
-                        "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
-                        "markdownDescription": "top_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`",
+                        "description": "top_k 模式.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
                         "examples": [
                           "rank"
                         ]
                       }
                     },
-                    "description": "rank: SQL rank(并列共享名次,后续跳号)",
-                    "markdownDescription": "SQL `rank` 语义: (1,1,3...).\n\n- 并列判断只由 `by` 的值决定(不要用 `order_by` 打散并列)\n- `order_by` 仅用于输出稳定排序与 `top_k_mode=rows` 的确定性 tie-break\n\n执行阶段: 排名字段(在聚合指标之后).",
+                    "description": "SQL `rank` 语义: (1,1,3...).",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.rank\n\nSQL `rank` 语义: (1,1,3...).\n- 并列判断只由 `by` 的值决定(不要用 `order_by` 打散并列)\n- `order_by` 仅用于输出稳定排序与 `top_k_mode=rows` 的确定性 tie-break",
                     "examples": [
                       {
                         "by": "sum_amount",
@@ -3125,8 +3132,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3152,8 +3159,8 @@
                             "type": "object"
                           }
                         ],
-                        "description": "用于计算 rank 值与并列判断的字段(引用 group_by 或 aggregate.fields 任意字段,含派生字段)",
-                        "markdownDescription": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
+                        "description": "用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.by\n\n用于计算 rank 值与并列判断的字段(引用 `group_by` 或 `aggregate.fields` 任意字段,含派生字段).\n\n##### 字段约束\n- 必填: 是\n- anyOf\n\n##### 例子\n```yaml\nsum_amount\n```",
                         "examples": [
                           "sum_amount"
                         ]
@@ -3191,8 +3198,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:排名分区字段列表(必须是 group_by 子集)",
-                        "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "description": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.partition_by\n\n可选:排名分区字段列表(必须是 `group_by` 子集).",
                         "examples": [
                           [
                             "region_id"
@@ -3206,8 +3213,8 @@
                           "desc"
                         ],
                         "default": "desc",
-                        "description": "排序方向(asc/desc)",
-                        "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+                        "description": "排序方向.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
                         "examples": [
                           "desc"
                         ]
@@ -3245,8 +3252,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
-                        "markdownDescription": "可选:稳定排序字段列表.\n\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "description": "可选:稳定排序字段列表.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order_by\n\n可选:稳定排序字段列表.\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
                         "examples": [
                           [
                             "sum_amount",
@@ -3258,8 +3265,8 @@
                         "type": "integer",
                         "minimum": 0,
                         "default": 0,
-                        "description": "可选:每个分区保留前 K 个(0 表示不限制)",
-                        "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "description": "可选:每个分区保留前 K 个(0 表示不限制).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).",
                         "examples": [
                           0,
                           100
@@ -3272,15 +3279,15 @@
                           "rows"
                         ],
                         "default": "rank",
-                        "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
-                        "markdownDescription": "top_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`",
+                        "description": "top_k 模式.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
                         "examples": [
                           "rank"
                         ]
                       }
                     },
-                    "description": "dense_rank: SQL dense_rank(并列共享名次,后续不跳号)",
-                    "markdownDescription": "SQL `dense_rank` 语义: (1,1,2...).\n\n- 并列判断只由 `by` 的值决定(不要用 `order_by` 打散并列)\n- `order_by` 仅用于输出稳定排序与 `top_k_mode=rows` 的确定性 tie-break\n\n执行阶段: 排名字段(在聚合指标之后).",
+                    "description": "SQL `dense_rank` 语义: (1,1,2...).",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank\n\nSQL `dense_rank` 语义: (1,1,2...).\n- 并列判断只由 `by` 的值决定(不要用 `order_by` 打散并列)\n- `order_by` 仅用于输出稳定排序与 `top_k_mode=rows` 的确定性 tie-break",
                     "examples": [
                       {
                         "by": "sum_amount",
@@ -3300,8 +3307,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3324,29 +3331,29 @@
                             "type": "object"
                           }
                         ],
-                        "description": "可选:引用的排名字段(out_field_id);缺省为 'rank'",
-                        "markdownDescription": "可选:引用的排名字段(out_field_id);缺省为 `rank`.",
+                        "description": "可选:引用的排名字段(out_field_id);缺省为 `rank`.",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.score_by_rank.rank_field\n\n可选:引用的排名字段(out_field_id);缺省为 `rank`.\n\n##### 字段约束\n- 必填: 否\n- anyOf\n\n##### 例子\n```yaml\nrank\n```",
                         "examples": [
                           "rank"
                         ]
                       },
                       "base": {
-                        "description": "可选:基础分数(base)",
-                        "markdownDescription": "可选:基础分数(base).",
+                        "description": "可选:基础分数(base).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.score_by_rank.base\n\n可选:基础分数(base).",
                         "examples": [
                           100
                         ]
                       },
                       "step": {
-                        "description": "可选:每名次衰减(step)",
-                        "markdownDescription": "可选:每名次衰减(step).",
+                        "description": "可选:每名次衰减(step).",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.score_by_rank.step\n\n可选:每名次衰减(step).",
                         "examples": [
                           3
                         ]
                       }
                     },
-                    "description": "score_by_rank: 基于 rank 计算 score",
-                    "markdownDescription": "基于排名字段计算 score(聚合后派生字段).\n\n默认公式:\n- `score = base - (rank - 1) * step`\n\n参数:\n- `rank_field`: 引用的排名字段(out_field_id),缺省为 `rank`\n- `base`: 基础分数(缺省 0)\n- `step`: 每名次衰减(缺省 1)\n\n执行语义: 聚合后派生字段 DAG 的一个节点(按依赖驱动在 finalize 阶段计算).",
+                    "description": "基于排名字段计算 score(聚合后派生字段).",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.score_by_rank\n\n基于排名字段计算 score(聚合后派生字段).\n\n默认公式:\n- `score = base - (rank - 1) * step`\n\n参数:\n- `rank_field`: 引用的排名字段(out_field_id),缺省为 `rank`\n- `base`: 基础分数(缺省 0)\n- `step`: 每名次衰减(缺省 1)\n\n执行语义: 聚合后派生字段 DAG 的一个节点(按依赖驱动在 finalize 阶段计算).\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- additionalProperties: false\n\n##### 例子\n```yaml\nbase: 100\nrank_field: rank\nstep: 3\n```",
                     "examples": [
                       {
                         "rank_field": "rank",
@@ -3367,8 +3374,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3378,8 +3385,8 @@
                   "call_by": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "call_by: 聚合后派生字段的 hotfix 口子(安全引用;支持 ^<id>)",
-                    "markdownDescription": "聚合后派生字段的 hotfix 口子.\n\n- Python 引用仍受 allowlist 约束; `^<id>` 为受控词表(vocabulary)中的 builtin callable 引用,无需把目标模块加入 allowlist\n\n- 与 `compute` 一样属于聚合后派生字段,会与 rank/其它派生字段一起组成 DAG\n- 只可引用聚合输出行内字段: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 不可引用明细行字段(聚合前状态不可用)\n- 若存在循环依赖,编译期会报错并给出依赖链路\n\n示例:\n```yaml\nscore: {call_by: \"pkg.mod:fn(rank=rank, base=100, step=3)\"}\n```",
+                    "description": "聚合后派生字段的 hotfix 口子.",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.call_by\n\n聚合后派生字段的 hotfix 口子.\n\n- Python 引用仍受 allowlist 约束; `^<id>` 为受控词表(vocabulary)中的 builtin callable 引用,无需把目标模块加入 allowlist\n\n- 与 `compute` 一样属于聚合后派生字段,会与 rank/其它派生字段一起组成 DAG\n- 只可引用聚合输出行内字段: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 不可引用明细行字段(聚合前状态不可用)\n- 若存在循环依赖,编译期会报错并给出依赖链路\n\n示例:\n```yaml\nscore: {call_by: \"pkg.mod:fn(rank=rank, base=100, step=3)\"}\n```\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\npkg.mod:fn(rank=rank, base=100, step=3)\n```",
                     "examples": [
                       "pkg.mod:fn(rank=rank, base=100, step=3)"
                     ]
@@ -3396,8 +3403,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "可选:表头显示名(仅对 aggregate 字段生效)",
-                    "markdownDescription": "可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id",
+                    "description": "#### outputs[*].aggregate.fields.*.name",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n#### outputs[*].aggregate.fields.*.name\n\n可选:表头显示名.\n\n- 仅对 `outputs.*.aggregate.fields.*` 的字段生效\n- 仅在当前输出的 `header_fields_output_by: name` 时输出该 name\n- 允许重复 name(用于复刻重复表头合同)\n- 缺省/为空时回退为 out_field_id\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n订单量\n```\n```yaml\n积分\n```\n```yaml\n排名\n```",
                     "examples": [
                       "订单量",
                       "积分",
@@ -3407,8 +3414,8 @@
                   "compute": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "compute: 聚合后派生字段安全表达式(推荐)",
-                    "markdownDescription": "安全表达式派生字段(推荐).\n\n- 语法与 `fields.*.compute` / `where` 一致\n- 变量名为聚合输出行字段 ID: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 会参与 aggregate DAG: 按依赖驱动计算; 循环依赖会在编译期报错\n- 适合 ratio/求和/加权等简单派生; 复杂逻辑可用 `call_by`(仍受 allowlist 约束)",
+                    "description": "安全表达式派生字段(推荐).",
+                    "markdownDescription": "#### outputs[*].aggregate.fields.*.compute\n\n安全表达式派生字段(推荐).\n\n- 语法与 `fields.*.compute` / `where` 一致\n- 变量名为聚合输出行字段 ID: `group_by` + `aggregate.fields` 中声明的字段(含派生字段)\n- 会参与 aggregate DAG: 按依赖驱动计算; 循环依赖会在编译期报错\n- 适合 ratio/求和/加权等简单派生; 复杂逻辑可用 `call_by`(仍受 allowlist 约束)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nsum_a / sum_b\n```\n```yaml\nscore1 + score2\n```",
                     "examples": [
                       "sum_a / sum_b",
                       "score1 + score2"
@@ -3418,13 +3425,13 @@
               }
             ]
           },
-          "description": "聚合输出字段映射(key 为 out_field_id)",
-          "markdownDescription": "聚合输出字段映射(key 为 out_field_id).\n\n- map key 是输出字段 ID\n- map value 是“该字段如何产生”的声明,必须且只能选择一个 producer key\n- producer key 分三类:\n  1) 聚合指标函数(例如 `count`/`sum`/`count_distinct`)\n  2) 排名函数(例如 `row_number`/`rank`/`dense_rank`)\n  3) 聚合后派生字段(例如 `compute`/`score_by_rank`/`call_by`)\n\n执行顺序/语义(依赖驱动 DAG):\n- `rank` + 聚合后派生字段统一视为同一套 DAG,在 finalize 阶段按拓扑序执行\n- 引用范围: `group_by` + `aggregate.fields` 任意 out_field_id(含派生字段)\n- 系统会在编译期构建依赖图,检测循环依赖并给出依赖链路\n- `top_k/sort` 会在计算完所有 rank 字段及其上游依赖后执行; 其余派生字段可在过滤后计算\n\n边界:\n- 不可引用明细行字段(除 `group_by`);聚合前中间状态不会被保留"
+          "description": "聚合输出字段映射(key 为 out_field_id).",
+          "markdownDescription": "#### outputs[*].aggregate.fields\n\n聚合输出字段映射(key 为 out_field_id).\n\n- map key 是输出字段 ID\n- map value 是“该字段如何产生”的声明,必须且只能选择一个 producer key\n- producer key 分三类:\n  1) 聚合指标函数(例如 `count`/`sum`/`count_distinct`)\n  2) 排名函数(例如 `row_number`/`rank`/`dense_rank`)\n  3) 聚合后派生字段(例如 `compute`/`score_by_rank`/`call_by`)\n\n执行顺序/语义(依赖驱动 DAG):\n- `rank` + 聚合后派生字段统一视为同一套 DAG,在 finalize 阶段按拓扑序执行\n- 引用范围: `group_by` + `aggregate.fields` 任意 out_field_id(含派生字段)\n- 系统会在编译期构建依赖图,检测循环依赖并给出依赖链路\n- `top_k/sort` 会在计算完所有 rank 字段及其上游依赖后执行; 其余派生字段可在过滤后计算\n\n边界:\n- 不可引用明细行字段(除 `group_by`);聚合前中间状态不会被保留\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- minProperties: `1`\n- additionalProperties: object\n- propertyNames: configured\n\n##### 例子\n```yaml\n      fields:\n        order_cnt: {count: {}}\n        sum_final_amount: {sum: {field: final_amount}}\n\n        # 并列排名: (1,1,2...) —— 用于 `score_by_rank` 口径。\n        rank:\n          dense_rank:\n            by: sum_final_amount\n            partition_by: [region_id]\n            order: desc\n            # 注意: 当前实现对 `order_by` 使用统一方向(`order`),因此这里 product_category_id 也是 `desc`。\n            order_by: [sum_final_amount, product_category_id]\n\n        # 连续序号: (1..N) —— 用于“强制 Top2 固定两行”(top_k_mode=rows)。\n        row_no:\n          row_number:\n            by: sum_final_amount\n            partition_by: [region_id]\n            order: desc\n            order_by: [sum_final_amount, product_category_id]\n            top_k: 2\n            top_k_mode: rows\n\n        # 积分: 100,97,94... (按 rank 衰减)\n        score:\n          score_by_rank:\n            rank_field: rank\n            base: 100\n            step: 3\n```"
         },
         "max_groups": {
           "type": "integer",
-          "description": "max_groups 护栏(0 表示不限制)",
-          "markdownDescription": "max_groups 护栏(0 表示不限制).",
+          "description": "max_groups 护栏(0 表示不限制).",
+          "markdownDescription": "#### outputs[*].aggregate.max_groups\n\nmax_groups 护栏(0 表示不限制).",
           "minimum": 0,
           "default": 0,
           "examples": [
@@ -3434,8 +3441,8 @@
         },
         "max_distinct": {
           "type": "integer",
-          "description": "max_distinct 护栏(0 表示不限制)",
-          "markdownDescription": "max_distinct 护栏(0 表示不限制).",
+          "description": "max_distinct 护栏(0 表示不限制).",
+          "markdownDescription": "#### outputs[*].aggregate.max_distinct\n\nmax_distinct 护栏(0 表示不限制).",
           "minimum": 0,
           "default": 0,
           "examples": [
@@ -3445,8 +3452,8 @@
         },
         "distinct_on_overflow": {
           "type": "string",
-          "description": "distinct 护栏溢出策略(error/truncate)",
-          "markdownDescription": "distinct 护栏溢出策略.\n\n- `error`: 失败\n- `truncate`: 截断并继续",
+          "description": "distinct 护栏溢出策略.",
+          "markdownDescription": "#### outputs[*].aggregate.distinct_on_overflow\n\ndistinct 护栏溢出策略.\n\n- `error`: 失败\n- `truncate`: 截断并继续\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `truncate`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
           "enum": [
             "error",
             "truncate"
@@ -3473,7 +3480,7 @@
           "examples": [
             "detail_csv"
           ],
-          "markdownDescription": "可选:目标 file_id"
+          "markdownDescription": "#### outputs[*].to.file\n\n可选:目标 file_id"
         },
         "book": {
           "type": "string",
@@ -3482,7 +3489,7 @@
           "examples": [
             "report"
           ],
-          "markdownDescription": "可选:目标 book_id"
+          "markdownDescription": "#### outputs[*].to.book\n\n可选:目标 book_id"
         },
         "sheet": {
           "type": "string",
@@ -3492,7 +3499,7 @@
             "metrics",
             "Summary"
           ],
-          "markdownDescription": "可选:目标 sheet 名称"
+          "markdownDescription": "#### outputs[*].to.sheet\n\n可选:目标 sheet 名称"
         }
       },
       "additionalProperties": false
@@ -3503,8 +3510,8 @@
         "include_header": {
           "type": "boolean",
           "default": true,
-          "description": "可选:是否输出表头(默认 true)",
-          "markdownDescription": "可选:是否输出表头.\n\n- file 输出: 缺省等价 `true`\n- book + `resources.books.*.write_defaults.mode=sheet`: 缺省等价 `true`\n- book + `resources.books.*.write_defaults.mode=append`: 不允许显式声明;请改用 `resources.books.*.write_defaults.header_policy`",
+          "description": "可选:是否输出表头.",
+          "markdownDescription": "#### outputs[*].write.include_header\n\n可选:是否输出表头.\n\n- file 输出: 缺省等价 `true`\n- book + `resources.books.*.write_defaults.mode=sheet`: 缺省等价 `true`\n- book + `resources.books.*.write_defaults.mode=append`: 不允许显式声明;请改用 `resources.books.*.write_defaults.header_policy`\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n- 默认值: `True`\n\n##### 例子\n```yaml\ntrue\n```\n```yaml\nfalse\n```",
           "examples": [
             true,
             false
@@ -3517,11 +3524,11 @@
             "name"
           ],
           "default": "name",
-          "description": "可选:表头字段名来源(field_id/name;默认 name)",
+          "description": "可选:表头字段名来源.",
+          "markdownDescription": "#### outputs[*].write.header_fields_output_by\n\n可选:表头字段名来源.\n\n- `field_id`: 使用字段 ID(更稳定,不依赖 `fields.*.name`)\n- `name`: 使用字段显示名(`fields.*.name`; 默认)\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `field_id`, `name`\n- 默认值: `name`\n\n##### 例子\n```yaml\nname\n```",
           "examples": [
             "name"
-          ],
-          "markdownDescription": "可选:表头字段名来源(field_id/name;默认 name)"
+          ]
         }
       },
       "additionalProperties": false
@@ -3533,7 +3540,7 @@
           "type": "string",
           "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
           "description": "输出名称(name)",
-          "markdownDescription": "输出名称(name)",
+          "markdownDescription": "#### outputs[*].name\n\n输出名称(name)",
           "examples": [
             "detail",
             "direct_detail",
@@ -3543,15 +3550,15 @@
         "from": {
           "type": "string",
           "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-          "description": "可选:继承来源输出(name)",
-          "markdownDescription": "可选:继承来源输出(name).\n\n- 继承字段集合与 `to/write` 配置\n- 不继承 where/aggregate",
+          "description": "可选:继承来源输出(name).",
+          "markdownDescription": "#### outputs[*].from\n\n可选:继承来源输出(name).\n\n- 继承字段集合与 `to/write` 配置\n- 不继承 where/aggregate\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- pattern: `^[a-zA-Z_][a-zA-Z0-9_]*$`\n\n##### 例子\n```yaml\ndetail\n```",
           "examples": [
             "detail"
           ]
         },
         "to": {
-          "description": "可选:输出目标绑定(to: file/book/sheet)",
-          "markdownDescription": "可选:输出目标绑定.\n\n- `to.file`: 绑定到 `resources.files.<file_id>`\n- `to.book` / `to.sheet`: 绑定到 `resources.books.<book_id>`",
+          "description": "可选:输出目标绑定.",
+          "markdownDescription": "#### outputs[*].to\n\n可选:输出目标绑定.\n- `to.file`: 绑定到 `resources.files.<file_id>`\n- `to.book` / `to.sheet`: 绑定到 `resources.books.<book_id>`",
           "allOf": [
             {
               "$ref": "#/definitions/output_to"
@@ -3559,8 +3566,8 @@
           ]
         },
         "write": {
-          "description": "可选:写入策略覆盖(write)",
-          "markdownDescription": "可选:写入策略覆盖.\n\n- 通用字段: `include_header`, `header_fields_output_by`\n- book 专属字段覆盖 `resources.books.*.write_defaults`",
+          "description": "可选:写入策略覆盖.",
+          "markdownDescription": "#### outputs[*].write\n\n可选:写入策略覆盖.\n- 通用字段: `include_header`, `header_fields_output_by`\n- book 专属字段覆盖 `resources.books.*.write_defaults`",
           "allOf": [
             {
               "$ref": "#/definitions/output_write"
@@ -3600,8 +3607,8 @@
             ]
           },
           "minItems": 1,
-          "description": "输出字段顺序(field_id/out_field_id 列表; 支持 YAML alias)",
-          "markdownDescription": "输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    to: {file: detail_csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n\nresources:\n  files:\n    detail_csv:\n      kind: csv_file\n      path: ./out.csv\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.",
+          "description": "输出字段顺序(`field_id/out_field_id` 列表).",
+          "markdownDescription": "#### outputs[*].fields\n\n输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    to: {file: detail_csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n\nresources:\n  files:\n    detail_csv:\n      kind: csv_file\n      path: ./out.csv\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.\n\n##### 字段约束\n- 必填: 否\n- 类型: array\n- minItems: `1`\n\n##### 例子\n```yaml\n- order_id\n- user_id\n```",
           "examples": [
             [
               "order_id",
@@ -3611,15 +3618,15 @@
         },
         "where": {
           "type": "string",
-          "description": "可选:过滤表达式(安全表达式)",
-          "markdownDescription": "可选:行级过滤谓词(安全表达式),等价 SQL `WHERE`.\n\n执行阶段:\n- 明细输出: 写出前对每行执行,命中才写入该 output\n- 聚合输出: `group_by` 之前对每行执行,只有命中的行参与聚合\n\n变量来源:\n- 表达式可引用当前行的字段值,来自 demand 的 `fields.<field_id>`(包含 relation/derived 后的字段)\n- 系统会在编译期静态提取表达式依赖字段并注入 required fields\n- 只保证表达式引用到的字段会被准备;未引用字段可能为 `None`\n\n限制:\n- 仅支持受限表达式(禁止任意 import)\n- `where` 是按行过滤/路由,不是“是否启用 sheet/output”的开关;该能力应由未来独立字段提供(例如 `enabled_if`)\n- `where` 不能引用聚合后输出字段(例如 `aggregate.fields.*` 产生的指标/排名/派生字段)",
+          "description": "可选:行级过滤谓词(安全表达式),等价 SQL `WHERE`.",
+          "markdownDescription": "#### outputs[*].where\n\n可选:行级过滤谓词(安全表达式),等价 SQL `WHERE`.\n\n执行阶段:\n- 明细输出: 写出前对每行执行,命中才写入该 output\n- 聚合输出: `group_by` 之前对每行执行,只有命中的行参与聚合\n\n变量来源:\n- 表达式可引用当前行的字段值,来自 demand 的 `fields.<field_id>`(包含 relation/derived 后的字段)\n- 系统会在编译期静态提取表达式依赖字段并注入 required fields\n- 只保证表达式引用到的字段会被准备;未引用字段可能为 `None`\n\n限制:\n- 仅支持受限表达式(禁止任意 import)\n- `where` 是按行过滤/路由,不是“是否启用 sheet/output”的开关;该能力应由未来独立字段提供(例如 `enabled_if`)\n- `where` 不能引用聚合后输出字段(例如 `aggregate.fields.*` 产生的指标/排名/派生字段)\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n\n##### 例子\n```yaml\nchannel == 'direct'\n```",
           "examples": [
             "channel == 'direct'"
           ]
         },
         "aggregate": {
           "description": "可选:派生汇总配置(声明后视为 derived output)",
-          "markdownDescription": "可选:派生汇总配置(声明后视为 derived output)",
+          "markdownDescription": "#### outputs[*].aggregate\n\n可选:派生汇总配置(声明后视为 derived output)",
           "allOf": [
             {
               "$ref": "#/definitions/output_aggregate"
@@ -3661,8 +3668,8 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "可选:工作簿路径(缺省使用 primary workbook)",
-          "markdownDescription": "可选:工作簿路径(缺省使用 primary workbook).",
+          "description": "可选:工作簿路径(缺省使用 primary workbook).",
+          "markdownDescription": "#### output_extra_sheet.path\n\n可选:工作簿路径(缺省使用 primary workbook).",
           "examples": [
             "./output/report.xlsx"
           ]
@@ -3670,8 +3677,8 @@
         "sheet": {
           "type": "string",
           "minLength": 1,
-          "description": "sheet 名称",
-          "markdownDescription": "sheet 名称.",
+          "description": "sheet 名称.",
+          "markdownDescription": "#### output_extra_sheet.sheet\n\nsheet 名称.",
           "examples": [
             "__meta__",
             "__audit__"
@@ -3679,16 +3686,16 @@
         },
         "allow_formulas": {
           "type": "boolean",
-          "description": "可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置)",
-          "markdownDescription": "可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置).",
+          "description": "可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置).",
+          "markdownDescription": "#### output_extra_sheet.allow_formulas\n\n可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置).",
           "examples": [
             false
           ]
         },
         "write_lock": {
           "type": "boolean",
-          "description": "可选:写锁(缺省使用 primary workbook 的容器配置)",
-          "markdownDescription": "可选:写锁(缺省使用 primary workbook 的容器配置).",
+          "description": "可选:写锁(缺省使用 primary workbook 的容器配置).",
+          "markdownDescription": "#### output_extra_sheet.write_lock\n\n可选:写锁(缺省使用 primary workbook 的容器配置).",
           "examples": [
             true
           ]
@@ -3701,8 +3708,8 @@
       "properties": {
         "validate_result": {
           "type": "boolean",
-          "description": "校验 loader 返回结构(契约校验)",
-          "markdownDescription": "校验 loader 返回结构(契约校验).\n\n- 启用时,契约违规始终 fast_fail(即使 mode=quiet)",
+          "description": "校验 loader 返回结构(契约校验).",
+          "markdownDescription": "#### guardrails_loader.validate_result\n\n校验 loader 返回结构(契约校验).\n\n- 启用时,契约违规始终 fast_fail(即使 mode=quiet)\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n- 默认值: `False`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\nfalse\n```",
           "default": false
         },
         "required_fields": {
@@ -3717,13 +3724,13 @@
               }
             ]
           },
-          "description": "关键字段列表(缺失/None 触发护栏;支持 field_id 字符串或 YAML alias)",
-          "markdownDescription": "关键字段列表.\n\n- 缺失/None 触发护栏\n- 为空表示不启用缺失检查\n- 每项支持 `field_id` 字符串或 YAML alias(指向已定义字段对象)\n- YAML merge(`<<`) 会生成新对象并丢失 alias 身份; merge 产物请用字符串 field_id"
+          "description": "关键字段列表.",
+          "markdownDescription": "#### guardrails_loader.required_fields\n\n关键字段列表.\n- 缺失/None 触发护栏\n- 为空表示不启用缺失检查"
         },
         "on_transform_error": {
           "type": "string",
-          "description": "字段转换异常策略(可选;默认继承 mode)",
-          "markdownDescription": "字段转换异常策略.\n\n- 作用于 extractor/value_cast/value_formatter/transform 等异常\n- 为空则继承 guardrails.mode",
+          "description": "字段转换异常策略.",
+          "markdownDescription": "#### guardrails_loader.on_transform_error\n\n字段转换异常策略.\n\n- 为空: 继承 `guardrails.mode`\n- `quiet`: 不抛异常,但 best-effort 记录错误事件\n- `fast_fail`: 首次触发即失败并终止 pipeline\n\n作用范围:\n- extractor/value_cast/value_formatter/transform 等异常\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `quiet`, `fast_fail`\n\n##### 例子\n```yaml\nfast_fail\n```",
           "enum": [
             "quiet",
             "fast_fail"
@@ -3745,8 +3752,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### guardrails_loader.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -3763,15 +3770,15 @@
       "properties": {
         "null_key_max_rate": {
           "type": "number",
-          "description": "关联 null_key 最大比例(0.0-1.0;未设置则不启用)",
-          "markdownDescription": "关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
+          "description": "关联 null_key 最大比例.",
+          "markdownDescription": "#### guardrails_relations.null_key_max_rate\n\n关联 null_key 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效\n\n##### 字段约束\n- 必填: 否\n- 类型: number\n- minimum: `0.0`\n- maximum: `1.0`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\n0.0\n```",
           "minimum": 0.0,
           "maximum": 1.0
         },
         "type_error_max_rate": {
           "type": "number",
-          "description": "关联 type_error 最大比例(0.0-1.0;未设置则不启用)",
-          "markdownDescription": "关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效",
+          "description": "关联 type_error 最大比例.",
+          "markdownDescription": "#### guardrails_relations.type_error_max_rate\n\n关联 type_error 最大比例.\n\n- 未设置则不启用阈值护栏\n- 默认对全部关联 lookup step 生效\n\n##### 字段约束\n- 必填: 否\n- 类型: number\n- minimum: `0.0`\n- maximum: `1.0`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\n0.0\n```",
           "minimum": 0.0,
           "maximum": 1.0
         },
@@ -3788,8 +3795,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### guardrails_relations.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -3806,8 +3813,8 @@
       "properties": {
         "on_error": {
           "type": "string",
-          "description": "派生字段 compute 异常策略(可选;默认继承 mode)",
-          "markdownDescription": "派生字段 compute 异常策略.\n\n- 为空则继承 guardrails.mode",
+          "description": "派生字段 compute 异常策略.",
+          "markdownDescription": "#### guardrails_compute.on_error\n\n派生字段 compute 异常策略.\n\n- 为空: 继承 `guardrails.mode`\n- `quiet`: 不抛异常,但 best-effort 记录错误事件\n- `fast_fail`: 首次触发即失败并终止 pipeline\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `quiet`, `fast_fail`\n\n##### 例子\n```yaml\nfast_fail\n```",
           "enum": [
             "quiet",
             "fast_fail"
@@ -3829,8 +3836,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### guardrails_compute.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -3847,14 +3854,14 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "启用运行时护栏(默认关闭)",
-          "markdownDescription": "启用运行时护栏.\n\n- 默认关闭(不改变现有行为)\n- 显式 enabled=true 才生效",
+          "description": "启用运行时护栏.",
+          "markdownDescription": "#### guardrails.enabled\n\n启用运行时护栏.\n\n- 默认关闭(不改变现有行为)\n- 显式 enabled=true 才生效\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n- 默认值: `False`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\nfalse\n```",
           "default": false
         },
         "mode": {
           "type": "string",
-          "description": "护栏模式(quiet/fast_fail)",
-          "markdownDescription": "护栏模式.\n\n- `quiet`: 不抛异常,但 best-effort 记录错误事件\n- `fast_fail`: 首次触发即失败并终止 pipeline",
+          "description": "护栏模式.",
+          "markdownDescription": "#### guardrails.mode\n\n护栏模式.\n\n- `quiet`: 不抛异常,但 best-effort 记录错误事件\n- `fast_fail`: 首次触发即失败并终止 pipeline\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `quiet`, `fast_fail`\n- 默认值: `fast_fail`\n\n##### 例子\n```yaml\nfast_fail\n```",
           "enum": [
             "quiet",
             "fast_fail"
@@ -3865,13 +3872,19 @@
           ]
         },
         "loader": {
-          "$ref": "#/definitions/guardrails_loader"
+          "$ref": "#/definitions/guardrails_loader",
+          "description": "guardrails.loader",
+          "markdownDescription": "#### guardrails.loader\n\nguardrails.loader"
         },
         "relations": {
-          "$ref": "#/definitions/guardrails_relations"
+          "$ref": "#/definitions/guardrails_relations",
+          "description": "guardrails.relations",
+          "markdownDescription": "#### guardrails.relations\n\nguardrails.relations"
         },
         "compute": {
-          "$ref": "#/definitions/guardrails_compute"
+          "$ref": "#/definitions/guardrails_compute",
+          "description": "guardrails.compute",
+          "markdownDescription": "#### guardrails.compute\n\nguardrails.compute"
         },
         "$import": {
           "oneOf": [
@@ -3886,8 +3899,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### guardrails.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -3904,14 +3917,14 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Loader retry 策略(可选;默认关闭)",
-          "markdownDescription": "Loader retry 策略.\n\n- 默认关闭: `enabled: false`\n- 启用后会对 loader 调用的瞬态错误做有限重试\n- 需要提供 `should_retry` 回调(安全引用),用于决定是否重试\n- 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5\n\n\n注意:\n- 当 enabled=true 时需要提供 `should_retry`\n- 若未提供 `should_retry`, 仅当 driver 注入提供回调时才允许启用",
+          "description": "Loader retry 策略.",
+          "markdownDescription": "#### loader_retry.enabled\n\nLoader retry 策略.\n\n- 默认关闭: `enabled: false`\n- 启用后会对 loader 调用的瞬态错误做有限重试\n- 需要提供 `should_retry` 回调(安全引用),用于决定是否重试\n- 受硬上限保护: max_attempts<=5, max_elapsed_seconds<=20, max_delay_seconds<=5\n\n\n注意:\n- 当 enabled=true 时需要提供 `should_retry`\n- 若未提供 `should_retry`, 仅当 driver 注入提供回调时才允许启用\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n- 默认值: `False`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\nfalse\n```",
           "default": false
         },
         "should_retry": {
           "type": "string",
-          "description": "重试判定回调引用(安全引用,由 allowlist 约束)",
-          "markdownDescription": "重试判定回调引用.\n\n- 形式与 `loader` 引用一致:\n  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- 签名: `should_retry(exc, ctx) -> bool`",
+          "description": "重试判定回调引用.",
+          "markdownDescription": "#### loader_retry.should_retry\n\n重试判定回调引用.\n\n- 形式与 `loader` 引用一致:\n  - 绝对引用: `module.path.function` / `module.path:function` / `module.path:obj.method`\n  - 相对引用: 以 `.` / `..` 开头的 module path(相对 YAML 文件所在目录)\n- 相对引用会在运行期先归一化为绝对引用,并继续受 allowlist(allowed_modules/allowed_functions) 约束\n- 签名: `should_retry(exc, ctx) -> bool`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\nmyapp.retry:should_retry_db\n```\n```yaml\n.retry:should_retry_db\n```",
           "minLength": 1,
           "examples": [
             "myapp.retry:should_retry_db",
@@ -3920,8 +3933,8 @@
         },
         "max_attempts": {
           "type": "integer",
-          "description": "最大尝试次数(含首次)",
-          "markdownDescription": "最大尝试次数(含首次调用).\n\n- 受硬上限保护: <= 5",
+          "description": "最大尝试次数(含首次调用).",
+          "markdownDescription": "#### loader_retry.max_attempts\n\n最大尝试次数(含首次调用).\n\n- 受硬上限保护: <= 5\n\n##### 字段约束\n- 必填: 否\n- 类型: integer\n- 默认值: `3`\n- minimum: `1`\n- maximum: `5`\n\n##### 例子\n```yaml\n3\n```",
           "minimum": 1,
           "maximum": 5,
           "default": 3,
@@ -3931,8 +3944,8 @@
         },
         "max_elapsed_seconds": {
           "type": "number",
-          "description": "最大累计耗时(秒,包含 sleep)",
-          "markdownDescription": "最大累计耗时(秒,包含 sleep).\n\n- 受硬上限保护: <= 20",
+          "description": "最大累计耗时(秒,包含 sleep).",
+          "markdownDescription": "#### loader_retry.max_elapsed_seconds\n\n最大累计耗时(秒,包含 sleep).\n\n- 受硬上限保护: <= 20\n\n##### 字段约束\n- 必填: 否\n- 类型: number\n- 默认值: `10.0`\n- minimum: `1e-06`\n- maximum: `20.0`\n\n##### 例子\n```yaml\n10.0\n```",
           "minimum": 1e-06,
           "maximum": 20.0,
           "default": 10.0,
@@ -3942,8 +3955,8 @@
         },
         "backoff": {
           "type": "string",
-          "description": "退避策略(fixed/exponential)",
-          "markdownDescription": "退避策略.\n\n- `fixed`: 固定等待\n- `exponential`: 指数退避",
+          "description": "退避策略.",
+          "markdownDescription": "#### loader_retry.backoff\n\n退避策略.\n\n- `fixed`: 固定等待\n- `exponential`: 指数退避\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `fixed`, `exponential`\n- 默认值: `exponential`\n\n##### 例子\n```yaml\nexponential\n```",
           "enum": [
             "fixed",
             "exponential"
@@ -3955,8 +3968,8 @@
         },
         "base_delay_seconds": {
           "type": "number",
-          "description": "基础等待时间(秒)",
-          "markdownDescription": "基础等待时间(秒).\n\n- fixed: 每次等待 base_delay\n- exponential: base_delay * 2**(attempt-1)",
+          "description": "基础等待时间(秒).",
+          "markdownDescription": "#### loader_retry.base_delay_seconds\n\n基础等待时间(秒).\n\n- fixed: 每次等待 base_delay\n- exponential: base_delay * 2**(attempt-1)\n\n##### 字段约束\n- 必填: 否\n- 类型: number\n- 默认值: `0.2`\n- minimum: `0.0`\n\n##### 例子\n```yaml\n0.2\n```",
           "minimum": 0.0,
           "default": 0.2,
           "examples": [
@@ -3965,8 +3978,8 @@
         },
         "max_delay_seconds": {
           "type": "number",
-          "description": "最大单次等待时间(秒)",
-          "markdownDescription": "最大单次等待时间(秒).\n\n- 受硬上限保护: <= 5",
+          "description": "最大单次等待时间(秒).",
+          "markdownDescription": "#### loader_retry.max_delay_seconds\n\n最大单次等待时间(秒).\n\n- 受硬上限保护: <= 5\n\n##### 字段约束\n- 必填: 否\n- 类型: number\n- 默认值: `2.0`\n- minimum: `0.0`\n- maximum: `5.0`\n\n##### 例子\n```yaml\n2.0\n```",
           "minimum": 0.0,
           "maximum": 5.0,
           "default": 2.0,
@@ -3976,8 +3989,8 @@
         },
         "jitter": {
           "type": "boolean",
-          "description": "启用 jitter(随机扰动)",
-          "markdownDescription": "启用 jitter(随机扰动),避免重试风暴.\n\n- true: 在 [0, delay] 区间内随机\n- false: 精确使用 delay",
+          "description": "启用 jitter(随机扰动),避免重试风暴.",
+          "markdownDescription": "#### loader_retry.jitter\n\n启用 jitter(随机扰动),避免重试风暴.\n\n- true: 在 [0, delay] 区间内随机\n- false: 精确使用 delay\n\n##### 字段约束\n- 必填: 否\n- 类型: boolean\n- 默认值: `True`\n\n##### 例子\n```yaml\ntrue\n```",
           "default": true,
           "examples": [
             true
@@ -3996,8 +4009,8 @@
               "minItems": 1
             }
           ],
-          "description": "$import 引用(支持 string 或 string list)",
-          "markdownDescription": "$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准",
+          "description": "$import 引用.",
+          "markdownDescription": "#### loader_retry.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [

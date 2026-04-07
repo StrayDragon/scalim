@@ -43,7 +43,14 @@ class GuardrailsLoaderConfig:
         default=None,
         metadata=schema_meta(
             desc="字段转换异常策略(可选;默认继承 mode)",
-            md="字段转换异常策略.\n\n- 作用于 extractor/value_cast/value_formatter/transform 等异常\n- 为空则继承 guardrails.mode",
+            md=(
+                "字段转换异常策略.\n\n"
+                "- 为空: 继承 `guardrails.mode`\n"
+                "- `quiet`: 不抛异常,但 best-effort 记录错误事件\n"
+                "- `fast_fail`: 首次触发即失败并终止 pipeline\n\n"
+                "作用范围:\n"
+                "- extractor/value_cast/value_formatter/transform 等异常"
+            ),
             choices=GUARDRAILS_MODE_ENUM,
             examples=["fast_fail"],
         ),
@@ -94,7 +101,12 @@ class GuardrailsComputeConfig:
         default=None,
         metadata=schema_meta(
             desc="派生字段 compute 异常策略(可选;默认继承 mode)",
-            md="派生字段 compute 异常策略.\n\n- 为空则继承 guardrails.mode",
+            md=(
+                "派生字段 compute 异常策略.\n\n"
+                "- 为空: 继承 `guardrails.mode`\n"
+                "- `quiet`: 不抛异常,但 best-effort 记录错误事件\n"
+                "- `fast_fail`: 首次触发即失败并终止 pipeline"
+            ),
             choices=GUARDRAILS_MODE_ENUM,
             examples=["fast_fail"],
         ),

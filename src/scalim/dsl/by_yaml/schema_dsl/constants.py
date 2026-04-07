@@ -372,7 +372,11 @@ _NORMALIZE_STEP_SCHEMA = {
             "type": "string",
             "enum": _NORMALIZE_STEP_KIND_ENUM,
             "description": "normalize step 类型(take_first/project_fields)",
-            "markdownDescription": "normalize step 类型.\n\n- `take_first`\n- `project_fields`",
+            "markdownDescription": (
+                "normalize step 类型.\n\n"
+                "- `take_first`: 把当前 value 视为 list/tuple 并取第一项(可配 `on_empty`)\n"
+                "- `project_fields`: 在当前 value 上做字段投影/rename(必填 `fields`; 可配 `on_missing`)"
+            ),
             "examples": ["take_first"],
         },
         "on_empty": {

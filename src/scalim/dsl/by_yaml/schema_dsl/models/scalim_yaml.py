@@ -25,7 +25,11 @@ class ScalimYamlLspKindOverrideConfig:
         default="",
         metadata=schema_meta(
             desc="YAML 类型覆盖(demand/workflow)",
-            md="YAML 类型覆盖.\n\n- 允许值: `demand` / `workflow`",
+            md=(
+                "YAML 类型覆盖.\n\n"
+                "- `demand`: 按 demand YAML 对待(使用 demand schema/语义)\n"
+                "- `workflow`: 按 workflow YAML 对待(使用 workflow schema/语义)"
+            ),
             choices=["demand", "workflow"],
             examples=["workflow"],
         ),

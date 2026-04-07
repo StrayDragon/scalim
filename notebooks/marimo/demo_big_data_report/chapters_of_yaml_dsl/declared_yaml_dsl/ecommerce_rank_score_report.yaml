@@ -50,8 +50,10 @@ outputs:
     write:
       header_fields_output_by: field_id
       include_header: true
+    # <!-- BEGIN AUTOGEN:outputs[*].aggregate -->
     aggregate:
       group_by: [region_id, product_category_id]
+      # <!-- BEGIN AUTOGEN:outputs[*].aggregate.fields -->
       fields:
         order_cnt: {count: {}}
         sum_final_amount: {sum: {field: final_amount}}
@@ -81,3 +83,5 @@ outputs:
             rank_field: rank
             base: 100
             step: 3
+      # <!-- END AUTOGEN:outputs[*].aggregate.fields -->
+    # <!-- END AUTOGEN:outputs[*].aggregate -->

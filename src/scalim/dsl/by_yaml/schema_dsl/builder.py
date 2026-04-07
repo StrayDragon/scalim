@@ -9,9 +9,34 @@ from ....vendor.dataclassesx import fields as dataclass_fields
 from . import constants as schema_constants
 from . import models as schema_models
 from .constants import SCHEMA_META_KEY
+from .doc_standardizer import standardize_schema_docs
 
 _IMPORT_KEY = "$import"
 _IMPORTS_KEY = "imports"
+_SCHEMA_DOC_FIXTURE_RELATIVE_PATHS: Tuple[str, ...] = (
+    "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml",
+    "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_fixture_cache_pool_pin.yaml",
+    "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/scalim.yaml",
+)
+
+
+def _resolve_schema_doc_fixture_paths() -> List[str]:
+    """用于编辑器悬停提示的 `JSON Schema` 示例样例(仅生成期使用).
+
+    说明:
+    - 在仓库内生成时,这些文件可作为示例片段来源.
+    - 若在安装包环境(缺少 `notebooks/` 目录)调用生成脚本,则自动降级为不启用片段示例.
+    """
+
+    # 本文件在仓库中的位置: `src/scalim/dsl/by_yaml/schema_dsl/builder.py`
+    repo_root = Path(__file__).resolve().parents[5]
+    resolved: List[str] = []
+    for rel in _SCHEMA_DOC_FIXTURE_RELATIVE_PATHS:
+        path = repo_root / rel
+        if not path.exists():
+            continue
+        resolved.append(str(path))
+    return resolved
 
 
 def _build_default_types_module() -> Any:
@@ -134,7 +159,7 @@ class SchemaBuilder:
         )  # pragma: allow-dynattr metadata: schema meta
         if additional_props is not None:
             schema["additionalProperties"] = bool(additional_props)
-        return schema
+        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def build_workflow_schema(self) -> Dict[str, Any]:
         types_mod = self._types
@@ -146,7 +171,7 @@ class SchemaBuilder:
                     "type": "string",
                     "enum": ["preload_forever"],
                     "description": "pin kind(v0 仅允许 preload_forever)",
-                    "markdownDescription": "pin kind(v0 仅允许 `preload_forever`).",
+                    "markdownDescription": "pin kind.\n\n- `preload_forever`: pin 该 `(kind, source_id)` 的缓存(避免被 refcount/LRU 逐出)",
                 },
                 "source_id": {
                     "type": "string",
@@ -166,13 +191,22 @@ class SchemaBuilder:
                     "type": "string",
                     "enum": ["error", "separate", "warn"],
                     "description": "signature 冲突策略(error/separate/warn)",
-                    "markdownDescription": "signature 冲突策略(`error`/`separate`/`warn`).",
+                    "markdownDescription": (
+                        "signature 冲突策略.\n\n"
+                        "- `error`: 发现同一 `(kind, source_id)` 的 signature 不一致时直接失败\n"
+                        "- `warn`: 允许冲突并继续(会发出 warning 事件,并附带 diff 摘要)\n"
+                        "- `separate`: 允许冲突并继续(作为独立 entry 共存;当前实现与 warn 等价,仍会发 warning)"
+                    ),
                 },
                 "release_policy": {
                     "type": "string",
                     "enum": ["dag_refcount", "workflow_end"],
                     "description": "释放策略(dag_refcount/workflow_end)",
-                    "markdownDescription": "释放策略(`dag_refcount`/`workflow_end`).",
+                    "markdownDescription": (
+                        "释放策略.\n\n"
+                        "- `dag_refcount`: 当某 `(kind, source_id)` 的剩余 consumer=0 时释放(类似 DAG 引用计数)\n"
+                        "- `workflow_end`: 直到 workflow 结束才释放(占用更久,但可能减少重复加载)"
+                    ),
                 },
                 "budget": {
                     "type": "object",
@@ -188,7 +222,11 @@ class SchemaBuilder:
                             "type": "string",
                             "enum": ["fail_fast", "evict_lru"],
                             "description": "超限策略(fail_fast/evict_lru)",
-                            "markdownDescription": "超限策略(`fail_fast`/`evict_lru`).",
+                            "markdownDescription": (
+                                "超限策略.\n\n"
+                                "- `fail_fast`: 超限即失败\n"
+                                "- `evict_lru`: 逐出 LRU 的 idle entry(仅逐出 refcount=0 且非 pin); 若无可逐出项则失败"
+                            ),
                         },
                     },
                     "additionalProperties": False,
@@ -374,7 +412,7 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
         self._assert_schema_does_not_expose_import_key(schema, path="$")
-        return schema
+        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def build_scalim_yaml_schema(self) -> Dict[str, Any]:
         types_mod = self._types
@@ -412,7 +450,7 @@ class SchemaBuilder:
         }
         if "markdownDescription" in types_mod.SCALIM_YAML_SCHEMA_META:
             schema["markdownDescription"] = types_mod.SCALIM_YAML_SCHEMA_META["markdownDescription"]
-        return schema
+        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def _import_ref_schema(self) -> Dict[str, Any]:
         return {

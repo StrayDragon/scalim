@@ -28,14 +28,14 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "description": "run 标识(非空且唯一)",
-                "markdownDescription": "run 标识(非空且唯一)."
+                "description": "run 标识(非空且唯一).",
+                "markdownDescription": "#### workflow.runs[*].id\n\nrun 标识(非空且唯一)."
               },
               "demand": {
                 "type": "string",
                 "minLength": 1,
-                "description": "demand YAML 路径(字符串)",
-                "markdownDescription": "demand YAML 路径(字符串).\n\n- 相对路径以 workflow 文件所在目录为基准\n- 可通过 Python 入口注入 path_aliases 解析 `@/...` 或 `ALIAS:/...`"
+                "description": "demand YAML 路径(字符串).",
+                "markdownDescription": "#### workflow.runs[*].demand\n\ndemand YAML 路径(字符串).\n\n- 相对路径以 workflow 文件所在目录为基准\n- 可通过 Python 入口注入 path_aliases 解析 `@/...` 或 `ALIAS:/...`\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- minLength: `1`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\nx\n```"
               },
               "depends_on": {
                 "type": "array",
@@ -44,8 +44,8 @@
                   "minLength": 1
                 },
                 "default": [],
-                "description": "显式依赖 run.id 列表(可选)",
-                "markdownDescription": "显式依赖 `run.id` 列表(可选)."
+                "description": "显式依赖 `run.id` 列表(可选).",
+                "markdownDescription": "#### workflow.runs[*].depends_on\n\n显式依赖 `run.id` 列表(可选)."
               },
               "main_rows_from": {
                 "oneOf": [
@@ -58,8 +58,8 @@
                       "run": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "上游 run.id(作为本 run 的 main_rows 输入)",
-                        "markdownDescription": "上游 `run.id`(producer)."
+                        "description": "上游 `run.id`(producer).",
+                        "markdownDescription": "#### workflow.runs[*].main_rows_from.run\n\n上游 `run.id`(producer)."
                       }
                     },
                     "additionalProperties": false
@@ -69,8 +69,8 @@
                   }
                 ],
                 "default": null,
-                "description": "可选:将上游 typed rows 作为本 run 的 main_rows 输入",
-                "markdownDescription": "可选:将上游 `InMemoryRows`(typed rows) 作为本 run 的 `main_rows` 输入.\n\n- MUST 显式声明 `depends_on` 该上游 run\n- producer 仅在被引用时才会启用 typed rows 捕获"
+                "description": "可选:将上游 `InMemoryRows`(typed rows) 作为本 run 的 `main_rows` 输入.",
+                "markdownDescription": "#### workflow.runs[*].main_rows_from\n\n可选:将上游 `InMemoryRows`(typed rows) 作为本 run 的 `main_rows` 输入.\n- MUST 显式声明 `depends_on` 该上游 run\n- producer 仅在被引用时才会启用 typed rows 捕获"
               },
               "init_vars": {
                 "oneOf": [
@@ -87,12 +87,14 @@
                   }
                 ],
                 "default": null,
-                "description": "demand compile-time init_vars(可选,支持 $ctx 指令)",
-                "markdownDescription": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令)."
+                "description": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令).",
+                "markdownDescription": "#### workflow.runs[*].init_vars\n\ndemand compile-time `init_vars`(可选,支持 `$ctx` 指令)."
               }
             },
             "additionalProperties": false
-          }
+          },
+          "description": "workflow.runs",
+          "markdownDescription": "#### workflow.runs\n\nworkflow.runs"
         },
         "options": {
           "type": "object",
@@ -101,8 +103,8 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "description": "runs 粒度并发上限(>=1)",
-              "markdownDescription": "runs 粒度并发上限(>=1)."
+              "description": "runs 粒度并发上限(>=1).",
+              "markdownDescription": "#### workflow.options.max_concurrency\n\nruns 粒度并发上限(>=1)."
             },
             "failure_policy": {
               "type": "string",
@@ -111,8 +113,8 @@
                 "primary_only"
               ],
               "default": "all_fail",
-              "description": "失败策略(all_fail/primary_only)",
-              "markdownDescription": "失败策略.\n\n- `all_fail`: 任一 run 失败即失败\n- `primary_only`: 失败 run 被跳过但 workflow 继续"
+              "description": "失败策略.",
+              "markdownDescription": "#### workflow.options.failure_policy\n\n失败策略.\n\n- `all_fail`: 任一 run 失败即失败\n- `primary_only`: 失败 run 被跳过但 workflow 继续\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `all_fail`, `primary_only`\n- 默认值: `all_fail`\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\nall_fail\n```"
             },
             "cache_pool": {
               "oneOf": [
@@ -131,8 +133,8 @@
                         "separate",
                         "warn"
                       ],
-                      "description": "signature 冲突策略(error/separate/warn)",
-                      "markdownDescription": "signature 冲突策略(`error`/`separate`/`warn`)."
+                      "description": "signature 冲突策略.",
+                      "markdownDescription": "#### workflow.options.cache_pool.conflict_policy\n\nsignature 冲突策略.\n\n- `error`: 发现同一 `(kind, source_id)` 的 signature 不一致时直接失败\n- `warn`: 允许冲突并继续(会发出 warning 事件,并附带 diff 摘要)\n- `separate`: 允许冲突并继续(作为独立 entry 共存;当前实现与 warn 等价,仍会发 warning)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `error`, `separate`, `warn`\n\n##### 例子\n```yaml\n    cache_pool:\n      conflict_policy: error\n      release_policy: dag_refcount\n      budget:\n        max_entries: 16\n        over_budget_policy: fail_fast\n      pin:\n        - kind: preload_forever\n          source_id: preload_counter\n```"
                     },
                     "release_policy": {
                       "type": "string",
@@ -140,8 +142,8 @@
                         "dag_refcount",
                         "workflow_end"
                       ],
-                      "description": "释放策略(dag_refcount/workflow_end)",
-                      "markdownDescription": "释放策略(`dag_refcount`/`workflow_end`)."
+                      "description": "释放策略.",
+                      "markdownDescription": "#### workflow.options.cache_pool.release_policy\n\n释放策略.\n\n- `dag_refcount`: 当某 `(kind, source_id)` 的剩余 consumer=0 时释放(类似 DAG 引用计数)\n- `workflow_end`: 直到 workflow 结束才释放(占用更久,但可能减少重复加载)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `dag_refcount`, `workflow_end`\n\n##### 例子\n```yaml\n    cache_pool:\n      conflict_policy: error\n      release_policy: dag_refcount\n      budget:\n        max_entries: 16\n        over_budget_policy: fail_fast\n      pin:\n        - kind: preload_forever\n          source_id: preload_counter\n```"
                     },
                     "budget": {
                       "type": "object",
@@ -153,8 +155,8 @@
                         "max_entries": {
                           "type": "integer",
                           "minimum": 1,
-                          "description": "cache pool entry 数量预算(>=1)",
-                          "markdownDescription": "cache pool entry 数量预算(>=1)."
+                          "description": "cache pool entry 数量预算(>=1).",
+                          "markdownDescription": "#### workflow.options.cache_pool.budget.max_entries\n\ncache pool entry 数量预算(>=1)."
                         },
                         "over_budget_policy": {
                           "type": "string",
@@ -162,11 +164,13 @@
                             "fail_fast",
                             "evict_lru"
                           ],
-                          "description": "超限策略(fail_fast/evict_lru)",
-                          "markdownDescription": "超限策略(`fail_fast`/`evict_lru`)."
+                          "description": "超限策略.",
+                          "markdownDescription": "#### workflow.options.cache_pool.budget.over_budget_policy\n\n超限策略.\n\n- `fail_fast`: 超限即失败\n- `evict_lru`: 逐出 LRU 的 idle entry(仅逐出 refcount=0 且非 pin); 若无可逐出项则失败\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `fail_fast`, `evict_lru`\n\n##### 例子\n```yaml\n    cache_pool:\n      conflict_policy: error\n      release_policy: dag_refcount\n      budget:\n        max_entries: 16\n        over_budget_policy: fail_fast\n      pin:\n        - kind: preload_forever\n          source_id: preload_counter\n```"
                         }
                       },
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "workflow.options.cache_pool.budget",
+                      "markdownDescription": "#### workflow.options.cache_pool.budget\n\nworkflow.options.cache_pool.budget"
                     },
                     "pin": {
                       "type": "array",
@@ -182,21 +186,21 @@
                             "enum": [
                               "preload_forever"
                             ],
-                            "description": "pin kind(v0 仅允许 preload_forever)",
-                            "markdownDescription": "pin kind(v0 仅允许 `preload_forever`)."
+                            "description": "pin kind.",
+                            "markdownDescription": "#### workflow.options.cache_pool.pin[*].kind\n\npin kind.\n\n- `preload_forever`: pin 该 `(kind, source_id)` 的缓存(避免被 refcount/LRU 逐出)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `preload_forever`\n\n##### 例子\n```yaml\n    cache_pool:\n      conflict_policy: error\n      release_policy: dag_refcount\n      budget:\n        max_entries: 16\n        over_budget_policy: fail_fast\n      pin:\n        - kind: preload_forever\n          source_id: preload_counter\n```"
                           },
                           "source_id": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "pin 的 source_id",
-                            "markdownDescription": "pin 的 `source_id`."
+                            "description": "pin 的 `source_id`.",
+                            "markdownDescription": "#### workflow.options.cache_pool.pin[*].source_id\n\npin 的 `source_id`."
                           }
                         },
                         "additionalProperties": false
                       },
                       "default": [],
-                      "description": "pin 列表(可选)",
-                      "markdownDescription": "pin 列表(可选)."
+                      "description": "pin 列表(可选).",
+                      "markdownDescription": "#### workflow.options.cache_pool.pin\n\npin 列表(可选)."
                     }
                   },
                   "additionalProperties": false
@@ -206,8 +210,8 @@
                 }
               ],
               "default": null,
-              "description": "workflow-scope cache pool 配置(可选)",
-              "markdownDescription": "workflow-scope cache pool 配置(可选)."
+              "description": "workflow-scope cache pool 配置(可选).",
+              "markdownDescription": "#### workflow.options.cache_pool\n\nworkflow-scope cache pool 配置(可选)."
             },
             "ctx": {
               "oneOf": [
@@ -218,15 +222,15 @@
                       "type": "integer",
                       "minimum": 1,
                       "default": 65536,
-                      "description": "ctx 单 key 最大字节数(>=1)",
-                      "markdownDescription": "ctx 单 key 最大字节数(>=1)."
+                      "description": "ctx 单 key 最大字节数(>=1).",
+                      "markdownDescription": "#### workflow.options.ctx.max_value_bytes\n\nctx 单 key 最大字节数(>=1)."
                     },
                     "max_bytes": {
                       "type": "integer",
                       "minimum": 1,
                       "default": 1048576,
-                      "description": "ctx 总量最大字节数(>=1)",
-                      "markdownDescription": "ctx 总量最大字节数(>=1)."
+                      "description": "ctx 总量最大字节数(>=1).",
+                      "markdownDescription": "#### workflow.options.ctx.max_bytes\n\nctx 总量最大字节数(>=1)."
                     }
                   },
                   "additionalProperties": false
@@ -236,11 +240,13 @@
                 }
               ],
               "default": null,
-              "description": "workflow-level ctx 护栏配置(可选)",
-              "markdownDescription": "workflow-level ctx 护栏配置(可选)."
+              "description": "workflow-level ctx 护栏配置(可选).",
+              "markdownDescription": "#### workflow.options.ctx\n\nworkflow-level ctx 护栏配置(可选)."
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "workflow.options",
+          "markdownDescription": "#### workflow.options\n\nworkflow.options"
         },
         "resources": {
           "allOf": [
@@ -249,11 +255,13 @@
             }
           ],
           "default": {},
-          "description": "workflow-scope shared IO resources",
-          "markdownDescription": "workflow-scope shared IO resources.\n\n- stable surface: `workflow.resources.books` / `workflow.resources.files`"
+          "description": "workflow-scope shared IO resources.",
+          "markdownDescription": "#### workflow.resources\n\nworkflow-scope shared IO resources.\n- stable surface: `workflow.resources.books` / `workflow.resources.files`"
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "workflow",
+      "markdownDescription": "#### workflow\n\nworkflow"
     }
   },
   "definitions": {
@@ -262,8 +270,8 @@
       "properties": {
         "max_sheets": {
           "type": "integer",
-          "description": "sheet 数量预算(>=1)",
-          "markdownDescription": "sheet 数量预算(>=1).",
+          "description": "sheet 数量预算(>=1).",
+          "markdownDescription": "#### workflow.resources.books.*.budget.max_sheets\n\nsheet 数量预算(>=1).",
           "minimum": 1,
           "examples": [
             64
@@ -271,8 +279,8 @@
         },
         "max_total_cells": {
           "type": "integer",
-          "description": "总 cell 数预算(>=1)",
-          "markdownDescription": "总 cell 数预算(>=1).",
+          "description": "总 cell 数预算(>=1).",
+          "markdownDescription": "#### workflow.resources.books.*.budget.max_total_cells\n\n总 cell 数预算(>=1).",
           "minimum": 1,
           "examples": [
             1000000
@@ -301,7 +309,8 @@
                 "$init_var": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                  "markdownDescription": "#### workflow.resources.books.*.export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -318,12 +327,12 @@
               "$init_var": "output_path"
             }
           ],
-          "markdownDescription": "导出 xlsx 的输出路径(字符串或 {$init_var: <name>})"
+          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
         },
         "write_lock": {
           "type": "boolean",
-          "description": "写锁(导出时;默认 false)",
-          "markdownDescription": "写锁(导出时;默认 false).",
+          "description": "写锁(导出时;默认 false).",
+          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.write_lock\n\n写锁(导出时;默认 false).",
           "default": false,
           "examples": [
             false
@@ -331,8 +340,8 @@
         },
         "allow_formulas": {
           "type": "boolean",
-          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false)",
-          "markdownDescription": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "default": false,
           "examples": [
             false
@@ -349,8 +358,8 @@
       "properties": {
         "mode": {
           "type": "string",
-          "description": "写入语义(sheet/append)",
-          "markdownDescription": "写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet",
+          "description": "写入语义.",
+          "markdownDescription": "#### workflow.resources.books.*.write_defaults.mode\n\n写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `sheet`, `append`\n- 默认值: `append`\n\n##### 例子\n```yaml\nappend\n```",
           "enum": [
             "sheet",
             "append"
@@ -362,8 +371,8 @@
         },
         "align_by": {
           "type": "string",
-          "description": "字段对齐策略(field_id/header;仅 append 生效)",
-          "markdownDescription": "字段对齐策略(仅 `mode=append` 生效).\n\n- `field_id`: 按 field_id 对齐(忽略 header 名)\n- `header`: 按 header 名对齐(严格匹配)",
+          "description": "字段对齐策略(仅 `mode=append` 生效).",
+          "markdownDescription": "#### workflow.resources.books.*.write_defaults.align_by\n\n字段对齐策略(仅 `mode=append` 生效).\n\n- `field_id`: 按 field_id 对齐(忽略 header 名)\n- `header`: 按 header 名对齐(严格匹配)\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `field_id`, `header`\n- 默认值: `field_id`\n\n##### 例子\n```yaml\nfield_id\n```",
           "enum": [
             "field_id",
             "header"
@@ -375,8 +384,8 @@
         },
         "header_policy": {
           "type": "string",
-          "description": "表头策略(once/always/never;仅 append 生效)",
-          "markdownDescription": "表头策略(仅 `mode=append` 生效).\n\n- `once`: 只在第一段输出表头\n- `always`: 每段都输出表头\n- `never`: 不输出表头",
+          "description": "表头策略(仅 `mode=append` 生效).",
+          "markdownDescription": "#### workflow.resources.books.*.write_defaults.header_policy\n\n表头策略(仅 `mode=append` 生效).\n\n- `once`: 只在第一段输出表头\n- `always`: 每段都输出表头\n- `never`: 不输出表头\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `once`, `always`, `never`\n- 默认值: `once`\n\n##### 例子\n```yaml\nonce\n```",
           "enum": [
             "once",
             "always",
@@ -389,8 +398,8 @@
         },
         "on_mismatch": {
           "type": "string",
-          "description": "字段不匹配策略(error/warn/skip;仅 append 生效)",
-          "markdownDescription": "字段不匹配策略(仅 `mode=append` 生效).\n\n- `error`: 失败\n- `warn`: 告警并继续\n- `skip`: 跳过该段写入",
+          "description": "字段不匹配策略(仅 `mode=append` 生效).",
+          "markdownDescription": "#### workflow.resources.books.*.write_defaults.on_mismatch\n\n字段不匹配策略(仅 `mode=append` 生效).\n\n- `error`: 失败\n- `warn`: 告警并继续\n- `skip`: 跳过该段写入\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `warn`, `skip`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
           "enum": [
             "error",
             "warn",
@@ -403,8 +412,8 @@
         },
         "on_conflict": {
           "type": "string",
-          "description": "sheet 冲突策略(error/overwrite/skip;仅 sheet 生效)",
-          "markdownDescription": "sheet 冲突策略(仅 `mode=sheet` 生效).\n\n- `error`: 失败\n- `overwrite`: 覆盖\n- `skip`: 跳过",
+          "description": "sheet 冲突策略(仅 `mode=sheet` 生效).",
+          "markdownDescription": "#### workflow.resources.books.*.write_defaults.on_conflict\n\nsheet 冲突策略(仅 `mode=sheet` 生效).\n\n- `error`: 失败\n- `overwrite`: 覆盖\n- `skip`: 跳过\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `overwrite`, `skip`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
           "enum": [
             "error",
             "overwrite",
@@ -423,8 +432,8 @@
       "properties": {
         "kind": {
           "type": "string",
-          "description": "book kind(xlsx_file/xlsx_memory)",
-          "markdownDescription": "book kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)",
+          "description": "book kind.",
+          "markdownDescription": "#### workflow.resources.books.*.kind\n\nbook kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `xlsx_file`, `xlsx_memory`\n\n##### 例子\n```yaml\nxlsx_file\n```",
           "enum": [
             "xlsx_file",
             "xlsx_memory"
@@ -446,7 +455,8 @@
                 "$init_var": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                  "markdownDescription": "#### workflow.resources.books.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -463,11 +473,11 @@
               "$init_var": "output_path"
             }
           ],
-          "markdownDescription": "xlsx_file: 输出路径(字符串或 {$init_var: <name>})"
+          "markdownDescription": "#### workflow.resources.books.*.path\n\nxlsx_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
         },
         "budget": {
           "description": "xlsx_memory: 预算配置(必填)",
-          "markdownDescription": "xlsx_memory: 预算配置(必填)",
+          "markdownDescription": "#### workflow.resources.books.*.budget\n\nxlsx_memory: 预算配置(必填)",
           "allOf": [
             {
               "$ref": "#/definitions/book_budget"
@@ -476,7 +486,7 @@
         },
         "export_xlsx": {
           "description": "xlsx_memory: 可选导出配置",
-          "markdownDescription": "xlsx_memory: 可选导出配置",
+          "markdownDescription": "#### workflow.resources.books.*.export_xlsx\n\nxlsx_memory: 可选导出配置",
           "allOf": [
             {
               "$ref": "#/definitions/book_export_xlsx"
@@ -485,8 +495,8 @@
         },
         "allow_formulas": {
           "type": "boolean",
-          "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)",
-          "markdownDescription": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### workflow.resources.books.*.allow_formulas\n\nxlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "default": false,
           "examples": [
             false
@@ -494,8 +504,8 @@
         },
         "write_lock": {
           "type": "boolean",
-          "description": "xlsx_file: 写锁(默认 false)",
-          "markdownDescription": "xlsx_file: 写锁(默认 false).",
+          "description": "xlsx_file: 写锁(默认 false).",
+          "markdownDescription": "#### workflow.resources.books.*.write_lock\n\nxlsx_file: 写锁(默认 false).",
           "default": false,
           "examples": [
             false
@@ -503,7 +513,7 @@
         },
         "write_defaults": {
           "description": "可选:默认写入语义与冲突策略",
-          "markdownDescription": "可选:默认写入语义与冲突策略",
+          "markdownDescription": "#### workflow.resources.books.*.write_defaults\n\n可选:默认写入语义与冲突策略",
           "allOf": [
             {
               "$ref": "#/definitions/book_write_defaults"
@@ -576,8 +586,8 @@
       "properties": {
         "kind": {
           "type": "string",
-          "description": "file kind(csv_file)",
-          "markdownDescription": "file kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件",
+          "description": "file kind.",
+          "markdownDescription": "#### workflow.resources.files.*.kind\n\nfile kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `csv_file`\n\n##### 例子\n```yaml\ncsv_file\n```",
           "enum": [
             "csv_file"
           ],
@@ -598,7 +608,8 @@
                 "$init_var": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])"
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                  "markdownDescription": "#### workflow.resources.files.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -615,12 +626,12 @@
               "$init_var": "output_path"
             }
           ],
-          "markdownDescription": "csv_file: 输出路径(字符串或 {$init_var: <name>})"
+          "markdownDescription": "#### workflow.resources.files.*.path\n\ncsv_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
         },
         "encoding": {
           "type": "string",
-          "description": "csv_file: 文件编码(默认 utf-8)",
-          "markdownDescription": "csv_file: 文件编码(默认 `utf-8`).",
+          "description": "csv_file: 文件编码(默认 `utf-8`).",
+          "markdownDescription": "#### workflow.resources.files.*.encoding\n\ncsv_file: 文件编码(默认 `utf-8`).",
           "default": "utf-8",
           "examples": [
             "utf-8"
@@ -638,8 +649,8 @@
       "properties": {
         "books": {
           "type": "object",
-          "description": "books 资源映射(Excel book; key 为 book_id)",
-          "markdownDescription": "books 资源映射(Excel book; key 为 `book_id`).\n\n- 对外稳定术语: `book`\n- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs[*].to.book` 引用该 mapping 的 key",
+          "description": "books 资源映射(Excel book; key 为 `book_id`).",
+          "markdownDescription": "#### workflow.resources.books\n\nbooks 资源映射(Excel book; key 为 `book_id`).\n- 对外稳定术语: `book`\n- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)",
           "additionalProperties": {
             "$ref": "#/definitions/book"
           },
@@ -647,8 +658,8 @@
         },
         "files": {
           "type": "object",
-          "description": "files 资源映射(文件输出资源; key 为 file_id)",
-          "markdownDescription": "files 资源映射(文件输出资源; key 为 `file_id`).\n\n- v1 稳定支持: `kind=csv_file`\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n- `outputs[*].to.file` 引用该 mapping 的 key",
+          "description": "files 资源映射(文件输出资源; key 为 `file_id`).",
+          "markdownDescription": "#### workflow.resources.files\n\nfiles 资源映射(文件输出资源; key 为 `file_id`).\n- v1 稳定支持: `kind=csv_file`\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录",
           "additionalProperties": {
             "$ref": "#/definitions/file"
           },

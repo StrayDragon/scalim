@@ -129,6 +129,11 @@ class OutputWriteConfig:
         metadata=schema_meta(
             schema={"type": "string", "enum": list(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM), "default": DEFAULT_OUTPUT_HEADER_BY},
             desc="可选:表头字段名来源(field_id/name;默认 name)",
+            md=(
+                "可选:表头字段名来源.\n\n"
+                "- `field_id`: 使用字段 ID(更稳定,不依赖 `fields.*.name`)\n"
+                "- `name`: 使用字段显示名(`fields.*.name`; 默认)"
+            ),
             examples=["name"],
             default=DEFAULT_OUTPUT_HEADER_BY,
         ),
