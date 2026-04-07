@@ -745,12 +745,18 @@ def _extract_imports_mapping(yaml_text: str, *, warnings: List[str]) -> Dict[str
         return {}
 
     out: Dict[str, str] = {}
-    for key, value in cast("Dict[str, Any]", raw_imports).items():  # pragma: allow-cast yaml mapping typed narrowing
-        if not isinstance(key, str) or not key.strip():
+    for key, value in cast("Dict[Any, Any]", raw_imports).items():  # pragma: allow-cast yaml mapping typed narrowing
+        if not isinstance(key, str):
             continue
-        if not isinstance(value, str) or not value.strip():
+        stripped_key = key.strip()
+        if not stripped_key:
             continue
-        out[str(key).strip()] = str(value).strip()
+        if not isinstance(value, str):
+            continue
+        stripped_value = value.strip()
+        if not stripped_value:
+            continue
+        out[stripped_key] = stripped_value
     return out
 
 
@@ -1148,8 +1154,8 @@ def _derive_base_module_path_from_anchor(
 
     if not candidates:
         warnings.append(
-            "无法推导相对模块引用的 base_module_path: yaml_dir='{}' 不在任何 python_roots 下. "
-            "修复: 补充 `yaml_dsl.lsp.python_roots` 或改用绝对模块引用.".format(str(yaml_dir))
+            "无法推导相对模块引用的 base_module_path: yaml_dir='{}' 不在任何 python_roots 下. ".format(str(yaml_dir))
+            + "修复: 补充 `yaml_dsl.lsp.python_roots` 或改用绝对模块引用."
         )
         return None
 

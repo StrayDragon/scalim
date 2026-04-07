@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 from urllib.parse import unquote, urlparse
 
 from lsprotocol import types
@@ -1138,7 +1138,8 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
         for item in import_roots:
             if not isinstance(item, dict):
                 return None
-            raw_path = item.get("path") if item else None
+            item_dict = cast("Dict[str, Any]", item)
+            raw_path = item_dict.get("path")
             if not isinstance(raw_path, str) or not raw_path.strip():
                 continue
             existing_paths[_normalize_rel_path_text(str(raw_path))] = None
