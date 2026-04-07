@@ -326,6 +326,114 @@ def test_resolve_python_definition_and_hover_and_completion(tmp_path: Path) -> N
     assert "pkg.mod.foo" in comp2.items
 
 
+def test_resolve_python_definition_object_method_infers_class_method_and_returns_fallback(tmp_path: Path) -> None:
+    pkg = tmp_path / "pkg"
+    _write(pkg / "__init__.py", "")
+    _write(
+        pkg / "mod.py",
+        textwrap.dedent(
+            """\
+            class Klass:
+                def a_method(self):
+                    \"\"\"a_method doc\"\"\"
+                    return []
+
+            some_ref = Klass()
+            """
+        ),
+    )
+
+    result = editor_semantics.resolve_python_definition("pkg.mod:some_ref.a_method", python_roots=[tmp_path])
+    assert len(result.locations) >= 2
+    assert result.locations[0].symbol_path == "Klass.a_method"
+    assert result.locations[1].symbol_path == "some_ref"
+
+    hover = editor_semantics.hover_python_reference("pkg.mod:some_ref.a_method", python_roots=[tmp_path])
+    assert hover.text.strip() == "a_method doc"
+
+
+def test_resolve_python_definition_object_method_follows_imported_class(tmp_path: Path) -> None:
+    pkg = tmp_path / "pkg"
+    _write(pkg / "__init__.py", "")
+    _write(
+        pkg / "other.py",
+        textwrap.dedent(
+            """\
+            class Klass:
+                def a_method(self):
+                    return 1
+            """
+        ),
+    )
+    _write(
+        pkg / "mod.py",
+        textwrap.dedent(
+            """\
+            from pkg.other import Klass
+
+            some_ref = Klass()
+            """
+        ),
+    )
+
+    result = editor_semantics.resolve_python_definition("pkg.mod:some_ref.a_method", python_roots=[tmp_path])
+    assert len(result.locations) >= 2
+    assert result.locations[0].file_path.endswith("pkg/other.py")
+    assert result.locations[0].symbol_path == "Klass.a_method"
+    assert result.locations[1].file_path.endswith("pkg/mod.py")
+    assert result.locations[1].symbol_path == "some_ref"
+
+
+def test_resolve_python_definition_object_method_follows_imported_object_single_hop(tmp_path: Path) -> None:
+    pkg = tmp_path / "pkg"
+    _write(pkg / "__init__.py", "")
+    _write(
+        pkg / "other.py",
+        textwrap.dedent(
+            """\
+            class Klass:
+                def a_method(self):
+                    return 1
+
+            some_ref = Klass()
+            """
+        ),
+    )
+    _write(
+        pkg / "mod.py",
+        "from pkg.other import some_ref\n",
+    )
+
+    result = editor_semantics.resolve_python_definition("pkg.mod:some_ref.a_method", python_roots=[tmp_path])
+    assert len(result.locations) >= 3
+    assert result.locations[0].file_path.endswith("pkg/other.py")
+    assert result.locations[0].symbol_path == "Klass.a_method"
+    assert result.locations[1].file_path.endswith("pkg/mod.py")
+    assert result.locations[1].symbol_path == "some_ref"
+    assert result.locations[2].file_path.endswith("pkg/other.py")
+    assert result.locations[2].symbol_path == "some_ref"
+
+
+def test_resolve_python_definition_object_method_degrades_when_class_cannot_be_inferred(tmp_path: Path) -> None:
+    pkg = tmp_path / "pkg"
+    _write(pkg / "__init__.py", "")
+    _write(
+        pkg / "mod.py",
+        textwrap.dedent(
+            """\
+            def factory():
+                return object()
+
+            some_ref = factory()
+            """
+        ),
+    )
+
+    result = editor_semantics.resolve_python_definition("pkg.mod:some_ref.a_method", python_roots=[tmp_path])
+    assert result.locations and result.locations[0].symbol_path == "some_ref"
+    assert any("无法静态推断" in w for w in result.warnings)
+
+
 def test_resolve_python_definition_supports_relative_module_reference_with_anchor_path(tmp_path: Path) -> None:
     py_root = tmp_path / "py"
     report_dir = py_root / "myapp" / "reports"

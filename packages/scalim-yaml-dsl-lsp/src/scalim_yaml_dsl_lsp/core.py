@@ -6,7 +6,7 @@ from fnmatch import fnmatch
 from functools import lru_cache
 from importlib.machinery import PathFinder
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 
 try:
     import jsonschema as _jsonschema  # type: ignore[import-not-found]
@@ -553,10 +553,12 @@ def resolve_python_definition(
         style=parsed.style,
     )
 
-    location = _resolve_python_definition_location(parsed, python_roots=python_roots, warnings=warnings)
-    if location is None:
+    locations = _resolve_python_definition_locations(parsed, python_roots=python_roots, warnings=warnings)
+    if not locations:
+        if any(("模块语法解析失败" in w or "读取模块文件失败" in w) for w in warnings) and not any("无法解析符号定义" in w for w in warnings):
+            warnings.append("无法解析符号定义: {}".format(parsed.reference))
         return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
-    return PythonDefinitionResult(locations=(location,), warnings=tuple(warnings))
+    return PythonDefinitionResult(locations=locations, warnings=tuple(warnings))
 
 
 def resolve_yaml_import_definition(
@@ -1171,39 +1173,516 @@ def _derive_base_module_path_from_anchor(
     return ".".join(parts)
 
 
-def _resolve_python_definition_location(
+@dataclass(frozen=True)
+class _ModuleBinding:
+    kind: str
+    node: ast.AST
+    import_module: Optional[str] = None
+    import_name: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class _ResolvedClassDef:
+    module_path: str
+    file_path: Path
+    node: ast.ClassDef
+
+
+def _resolve_python_definition_locations(
     parsed: ParsedReference,
     *,
     python_roots: Sequence[Union[str, Path]],
     warnings: List[str],
-) -> Optional[PythonDefinitionLocation]:
+) -> Tuple[PythonDefinitionLocation, ...]:
     roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
-    spec = _find_spec(parsed.module_path, roots=roots)
+    out = _resolve_locations_for_module_attr_path(
+        parsed.module_path,
+        parsed.attr_path,
+        roots=roots,
+        warnings=warnings,
+        max_obj_import_hops=1,
+        max_class_import_hops=1,
+        visited=set(),
+    )
+    return tuple(out)
+
+
+def _resolve_locations_for_module_attr_path(  # noqa: PLR0913
+    module_path: str,
+    attr_path: Tuple[str, ...],
+    *,
+    roots: Sequence[Path],
+    warnings: List[str],
+    max_obj_import_hops: int,
+    max_class_import_hops: int,
+    visited: Set[str],
+) -> List[PythonDefinitionLocation]:
+    if not module_path:
+        return []
+
+    if module_path in visited:
+        warnings.append("import 跟随遇到循环依赖: {}".format(module_path))
+        return []
+
+    visited.add(module_path)
+    try:
+        file_path = _resolve_module_file_path(module_path, roots=roots, warnings=warnings)
+        if file_path is None:
+            return []
+
+        tree, tree_warning = _load_module_ast(file_path)
+        if tree_warning:
+            warnings.append(tree_warning)
+        if tree is None:
+            return []
+
+        return _resolve_locations_for_attr_path_in_module_tree(
+            tree,
+            file_path=file_path,
+            module_path=module_path,
+            attr_path=attr_path,
+            roots=roots,
+            warnings=warnings,
+            max_obj_import_hops=max_obj_import_hops,
+            max_class_import_hops=max_class_import_hops,
+            visited=visited,
+        )
+    finally:
+        visited.remove(module_path)
+
+
+def _resolve_locations_for_attr_path_in_module_tree(  # noqa: PLR0913,PLR0911,PLR0912
+    tree: ast.Module,
+    *,
+    file_path: Path,
+    module_path: str,
+    attr_path: Tuple[str, ...],
+    roots: Sequence[Path],
+    warnings: List[str],
+    max_obj_import_hops: int,
+    max_class_import_hops: int,
+    visited: Set[str],
+) -> List[PythonDefinitionLocation]:
+    if not attr_path:
+        return []
+
+    bindings = _index_module_bindings(tree, module_path=module_path, file_path=file_path)
+    head = attr_path[0]
+    tail = attr_path[1:]
+    binding = bindings.get(head)
+    if binding is None:
+        warnings.append("无法解析符号定义: {}".format("{}.{}".format(module_path, ".".join(attr_path))))
+        return []
+
+    fallback = _definition_location_from_node(
+        file_path=str(file_path),
+        module_path=module_path,
+        symbol_path=head,
+        node=binding.node,
+    )
+
+    if not tail:
+        return [fallback]
+
+    if binding.kind == "class":
+        node = _find_symbol_in_module(tree, attr_path)
+        if node is None:
+            warnings.append("无法解析符号定义: {}".format("{}.{}".format(module_path, ".".join(attr_path))))
+            return []
+        return [
+            _definition_location_from_node(
+                file_path=str(file_path),
+                module_path=module_path,
+                symbol_path=".".join(attr_path),
+                node=node,
+            )
+        ]
+
+    if binding.kind in ("assign", "ann_assign"):
+        if len(tail) != 1:
+            warnings.append("obj.method 解析仅支持单段属性: {}".format(".".join(attr_path)))
+            return [fallback]
+
+        resolved_class = _infer_assignment_class_def(
+            binding.node,
+            bindings=bindings,
+            module_path=module_path,
+            file_path=file_path,
+            roots=roots,
+            warnings=warnings,
+            max_class_import_hops=max_class_import_hops,
+            visited=visited,
+        )
+        if resolved_class is None:
+            warnings.append("无法静态推断 obj 的 class: {}".format(head))
+            return [fallback]
+
+        method_name = tail[0]
+        method_node = _index_class_symbols(resolved_class.node).get(method_name)
+        if isinstance(method_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            primary = _definition_location_from_node(
+                file_path=str(resolved_class.file_path),
+                module_path=resolved_class.module_path,
+                symbol_path="{}.{}".format(resolved_class.node.name, method_name),
+                node=method_node,
+            )
+            return [primary, fallback]
+
+        warnings.append(
+            "在 class '{}' 中未找到方法 '{}' (可能为继承/动态注入): {}".format(resolved_class.node.name, method_name, ".".join(attr_path))
+        )
+        class_loc = _definition_location_from_node(
+            file_path=str(resolved_class.file_path),
+            module_path=resolved_class.module_path,
+            symbol_path=str(resolved_class.node.name),
+            node=resolved_class.node,
+        )
+        return [class_loc, fallback]
+
+    if binding.kind == "import_from":
+        if binding.import_module is None or binding.import_name is None:
+            warnings.append("import 解析失败: {}".format(head))
+            return [fallback]
+        if max_obj_import_hops <= 0:
+            warnings.append("import 跟随超出限制(仅允许单跳): {}".format(head))
+            return [fallback]
+
+        remote_attr_path = (binding.import_name,) + tail
+        remote_locs = _resolve_locations_for_module_attr_path(
+            binding.import_module,
+            remote_attr_path,
+            roots=roots,
+            warnings=warnings,
+            max_obj_import_hops=max_obj_import_hops - 1,
+            max_class_import_hops=max_class_import_hops,
+            visited=visited,
+        )
+        if not remote_locs:
+            warnings.append("import 跟随后仍无法解析符号定义: {}".format(head))
+            return [fallback]
+        return [remote_locs[0], fallback] + remote_locs[1:]
+
+    if binding.kind == "import_module":
+        if binding.import_module is None:
+            warnings.append("import 解析失败: {}".format(head))
+            return [fallback]
+        if max_class_import_hops <= 0:
+            warnings.append("import 跟随超出限制: {}".format(head))
+            return [fallback]
+        remote_locs = _resolve_locations_for_module_attr_path(
+            binding.import_module,
+            tail,
+            roots=roots,
+            warnings=warnings,
+            max_obj_import_hops=max_obj_import_hops,
+            max_class_import_hops=max_class_import_hops - 1,
+            visited=visited,
+        )
+        if not remote_locs:
+            warnings.append("import 跟随后仍无法解析符号定义: {}".format(head))
+            return [fallback]
+        return [remote_locs[0], fallback] + remote_locs[1:]
+
+    return [fallback]
+
+
+def _definition_location_from_node(
+    *,
+    file_path: str,
+    module_path: str,
+    symbol_path: str,
+    node: ast.AST,
+) -> PythonDefinitionLocation:
+    return PythonDefinitionLocation(
+        file_path=str(file_path),
+        range=_node_range(node),
+        module_path=str(module_path),
+        symbol_path=str(symbol_path),
+    )
+
+
+def _resolve_module_file_path(
+    module_path: str,
+    *,
+    roots: Sequence[Path],
+    warnings: List[str],
+) -> Optional[Path]:
+    spec = _find_spec(str(module_path), roots=list(roots))
     origin = None
     if spec is not None:
         origin = spec.origin
     if not isinstance(origin, str) or not origin or origin in ("built-in", "frozen"):
-        warnings.append("无法定位模块文件: {}".format(parsed.module_path))
+        warnings.append("无法定位模块文件: {}".format(module_path))
         return None
 
     file_path = Path(origin).expanduser().resolve(strict=False)
     if not file_path.exists() or not file_path.is_file():
         warnings.append("模块文件不存在: {}".format(file_path))
         return None
+    return file_path
 
-    node, tree_warning = _resolve_attr_path_node(file_path, parsed)
-    if tree_warning:
-        warnings.append(tree_warning)
-    if node is None:
-        warnings.append("无法解析符号定义: {}".format(parsed.reference))
+
+def _load_module_ast(file_path: Path) -> Tuple[Optional[ast.Module], str]:
+    try:
+        text = file_path.read_text(encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        return None, "读取模块文件失败: {}: {}".format(type(exc).__name__, exc)
+
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as exc:
+        return None, "模块语法解析失败: {}: {}".format(type(exc).__name__, exc)
+    return tree, ""
+
+
+def _index_module_bindings(  # noqa: C901
+    tree: ast.Module,
+    *,
+    module_path: str,
+    file_path: Path,
+) -> Dict[str, _ModuleBinding]:
+    out: Dict[str, _ModuleBinding] = {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            out[str(node.name)] = _ModuleBinding(kind="def", node=node)
+            continue
+        if isinstance(node, ast.ClassDef):
+            out[str(node.name)] = _ModuleBinding(kind="class", node=node)
+            continue
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    out[str(target.id)] = _ModuleBinding(kind="assign", node=node)
+            continue
+        if isinstance(node, ast.AnnAssign):
+            target = node.target
+            if isinstance(target, ast.Name):
+                out[str(target.id)] = _ModuleBinding(kind="ann_assign", node=node)
+            continue
+        if isinstance(node, ast.ImportFrom):
+            import_module = _resolve_import_from_module_path(module_path, file_path=file_path, node=node)
+            if not import_module:
+                continue
+            for alias in node.names:
+                bound_name = alias.asname or alias.name
+                out[str(bound_name)] = _ModuleBinding(
+                    kind="import_from",
+                    node=node,
+                    import_module=str(import_module),
+                    import_name=str(alias.name),
+                )
+            continue
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                bound_name = alias.asname or alias.name.split(".", 1)[0]
+                bound_module = alias.name if alias.asname else alias.name.split(".", 1)[0]
+                out[str(bound_name)] = _ModuleBinding(
+                    kind="import_module",
+                    node=node,
+                    import_module=str(bound_module),
+                )
+            continue
+    return out
+
+
+def _resolve_import_from_module_path(
+    current_module_path: str,
+    *,
+    file_path: Path,
+    node: ast.ImportFrom,
+) -> Optional[str]:
+    mod = getattr(node, "module", None)
+    level = getattr(node, "level", 0)
+    if not isinstance(level, int) or level < 0:
+        level = 0
+    mod_str = str(mod) if isinstance(mod, str) else ""
+
+    if level == 0:
+        return mod_str or None
+
+    parts = [p for p in str(current_module_path or "").split(".") if p]
+    is_package = file_path.name == "__init__.py"
+    base_parts = parts if is_package else parts[:-1]
+
+    up = level - 1
+    if up > len(base_parts):
+        return None
+    prefix = base_parts[: len(base_parts) - up] if up else base_parts
+    if mod_str:
+        prefix.extend([p for p in mod_str.split(".") if p])
+    return ".".join(prefix) if prefix else None
+
+
+def _infer_assignment_class_def(  # noqa: PLR0913
+    node: ast.AST,
+    *,
+    bindings: Dict[str, _ModuleBinding],
+    module_path: str,
+    file_path: Path,
+    roots: Sequence[Path],
+    warnings: List[str],
+    max_class_import_hops: int,
+    visited: Set[str],
+) -> Optional[_ResolvedClassDef]:
+    annotation_expr: Optional[ast.AST] = None
+    value_expr: Optional[ast.AST] = None
+    if isinstance(node, ast.AnnAssign):
+        annotation_expr = node.annotation
+        value_expr = node.value
+    elif isinstance(node, ast.Assign):
+        value_expr = node.value
+
+    if annotation_expr is not None:
+        segments = _expr_to_qualname_segments(annotation_expr)
+        if segments:
+            resolved = _resolve_class_def_from_qualname(
+                segments,
+                bindings=bindings,
+                module_path=module_path,
+                file_path=file_path,
+                roots=roots,
+                warnings=warnings,
+                max_class_import_hops=max_class_import_hops,
+                visited=visited,
+            )
+            if resolved is not None:
+                return resolved
+
+    if isinstance(value_expr, ast.Call):
+        segments = _expr_to_qualname_segments(value_expr.func)
+    else:
+        segments = _expr_to_qualname_segments(value_expr) if value_expr is not None else None
+    if not segments:
+        return None
+    return _resolve_class_def_from_qualname(
+        segments,
+        bindings=bindings,
+        module_path=module_path,
+        file_path=file_path,
+        roots=roots,
+        warnings=warnings,
+        max_class_import_hops=max_class_import_hops,
+        visited=visited,
+    )
+
+
+def _expr_to_qualname_segments(expr: Optional[ast.AST]) -> Optional[Tuple[str, ...]]:
+    if expr is None:
+        return None
+    if isinstance(expr, ast.Name):
+        return (str(expr.id),)
+    if isinstance(expr, ast.Attribute):
+        parts: List[str] = []
+        current: Optional[ast.AST] = expr
+        while isinstance(current, ast.Attribute):
+            parts.append(str(current.attr))
+            current = current.value
+        if isinstance(current, ast.Name):
+            parts.append(str(current.id))
+        else:
+            return None
+        return tuple(reversed(parts))
+    return None
+
+
+def _resolve_class_def_from_qualname(  # noqa: PLR0913
+    segments: Tuple[str, ...],
+    *,
+    bindings: Dict[str, _ModuleBinding],
+    module_path: str,
+    file_path: Path,
+    roots: Sequence[Path],
+    warnings: List[str],
+    max_class_import_hops: int,
+    visited: Set[str],
+) -> Optional[_ResolvedClassDef]:
+    if not segments:
         return None
 
-    return PythonDefinitionLocation(
-        file_path=str(file_path),
-        range=_node_range(node),
-        module_path=str(parsed.module_path),
-        symbol_path=".".join(parsed.attr_path),
-    )
+    head = segments[0]
+    tail = segments[1:]
+    binding = bindings.get(head)
+    if binding is None:
+        return None
+
+    if not tail:
+        if binding.kind == "class" and isinstance(binding.node, ast.ClassDef):
+            return _ResolvedClassDef(module_path=module_path, file_path=file_path, node=binding.node)
+        if binding.kind == "import_from" and binding.import_module and binding.import_name:
+            if max_class_import_hops <= 0:
+                return None
+            return _resolve_class_def_in_module(
+                binding.import_module,
+                class_name=binding.import_name,
+                roots=roots,
+                warnings=warnings,
+                max_class_import_hops=max_class_import_hops - 1,
+                visited=visited,
+            )
+        return None
+
+    if binding.kind == "import_module" and binding.import_module:
+        if max_class_import_hops <= 0:
+            return None
+        target_module = binding.import_module
+        if len(tail) > 1:
+            target_module = "{}.{}".format(target_module, ".".join(tail[:-1]))
+        class_name = tail[-1]
+        return _resolve_class_def_in_module(
+            target_module,
+            class_name=class_name,
+            roots=roots,
+            warnings=warnings,
+            max_class_import_hops=max_class_import_hops - 1,
+            visited=visited,
+        )
+
+    if binding.kind == "import_from" and binding.import_module and binding.import_name:
+        if max_class_import_hops <= 0:
+            return None
+        target_module = "{}.{}".format(binding.import_module, binding.import_name)
+        if len(tail) > 1:
+            target_module = "{}.{}".format(target_module, ".".join(tail[:-1]))
+        class_name = tail[-1]
+        return _resolve_class_def_in_module(
+            target_module,
+            class_name=class_name,
+            roots=roots,
+            warnings=warnings,
+            max_class_import_hops=max_class_import_hops - 1,
+            visited=visited,
+        )
+
+    return None
+
+
+def _resolve_class_def_in_module(
+    module_path: str,
+    *,
+    class_name: str,
+    roots: Sequence[Path],
+    warnings: List[str],
+    max_class_import_hops: int,
+    visited: Set[str],
+) -> Optional[_ResolvedClassDef]:
+    _ = max_class_import_hops  # reserved for future recursive extensions
+    if module_path in visited:
+        return None
+    file_path = _resolve_module_file_path(module_path, roots=roots, warnings=warnings)
+    if file_path is None:
+        return None
+
+    tree, tree_warning = _load_module_ast(file_path)
+    if tree_warning:
+        warnings.append(tree_warning)
+    if tree is None:
+        return None
+
+    bindings = _index_module_bindings(tree, module_path=module_path, file_path=file_path)
+    binding = bindings.get(str(class_name))
+    if binding is None or binding.kind != "class" or not isinstance(binding.node, ast.ClassDef):
+        return None
+    return _ResolvedClassDef(module_path=str(module_path), file_path=file_path, node=binding.node)
 
 
 def hover_python_reference(
@@ -1229,13 +1708,12 @@ def hover_python_reference(
         warnings.append("hover 解析失败: {}: {}".format(type(exc).__name__, exc))
         return PythonHoverResult(text="", warnings=tuple(warnings))
 
-    try:
-        parsed = parse_python_reference(reference)
-    except ScalimReferenceSyntaxError as exc:
-        warnings.append(str(exc))
+    symbol_path = str(loc.symbol_path or "").strip()
+    target_attr_path: Tuple[str, ...] = tuple([p for p in symbol_path.split(".") if p]) if symbol_path else ()
+    if not target_attr_path:
         return PythonHoverResult(text="", warnings=tuple(warnings))
 
-    node = _find_symbol_in_module(tree, parsed.attr_path)
+    node = _find_symbol_in_module(tree, target_attr_path)
     if node is None:
         return PythonHoverResult(text="", warnings=tuple(warnings))
 

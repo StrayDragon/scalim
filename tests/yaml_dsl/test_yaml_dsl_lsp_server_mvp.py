@@ -102,6 +102,81 @@ def test_lsp_server_publishes_diagnostics_and_resolves_definition(tmp_path) -> N
         client.shutdown()
 
 
+def test_lsp_server_definition_returns_multiple_locations_for_object_method(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    module_path = workspace / "mymod.py"
+    module_path.write_text(
+        "\n".join(
+            [
+                "class Klass:",
+                "    def a_method(self) -> int:",
+                "        return 1",
+                "",
+                "some_ref = Klass()",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "loader: mymod:some_ref.a_method\n"
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        line0 = yaml_text.splitlines()[0]
+        cursor_char = int(line0.index("some_ref")) + 1
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": 0, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert len(locations) >= 2
+        assert locations[0].get("uri") == module_path.as_uri()
+        assert locations[0].get("range", {}).get("start", {}).get("line") == 1  # def a_method
+        assert locations[1].get("uri") == module_path.as_uri()
+    finally:
+        client.shutdown()
+
+
 def test_lsp_server_completes_module_and_symbol_segments(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
