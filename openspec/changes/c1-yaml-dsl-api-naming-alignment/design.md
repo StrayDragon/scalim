@@ -101,4 +101,7 @@
 ## Open Questions
 
 - `WorkflowRunOptionsPatch` 的字段命名是否需要进一步与 `RunOptions` 对齐（例如 `demand_failure_policy` 是否应更名为 `failure_policy`，或保持现状以避免与 workflow failure_policy 混淆）？
+> 保持现状以避免与 workflow failure_policy 混淆
+
 - `by_yaml` 路径是否完全移除，还是保留为 internal-only alias（不写入任何用户材料与 spec），用于降低内部目录迁移成本？
+> 完全移除 被 yaml_dsl 替代 你可以考虑用 ast-grep 相关skill 批量重构处理 然后用 rg 搜索并选择性替换 并给出升级文档在 artifacts/skills/scalim-yaml-dsl/references/upgrades

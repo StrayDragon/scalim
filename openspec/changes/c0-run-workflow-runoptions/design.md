@@ -119,3 +119,4 @@ workflow 会对每个 demand run 执行一次 `run_ir(...)`，并在每次执行
 ## Open Questions
 
 - `sink_factory` 的最佳落点：放入 `WorkflowRunPatch`（per-run）还是 workflow-scope 的新 options 对象？（本次不实现，仅作为后续演进点记录）
+> 我认为是 `WorkflowRunPatch` 只是我们先 fast-failed 这次先不处理 等我们之后标准化api后再说
