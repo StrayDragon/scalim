@@ -134,8 +134,11 @@ def _clean_inline_markers(s: str) -> str:
     out = re.sub(r"\s+", " ", out)
     out = re.sub(r"^-\s+", "", out)
     out = re.sub(r"^\*\*BREAKING\*\*:\s*", "", out, flags=re.I)
+    out = re.sub(r"^\*\*BREAKING\*\*：\s*", "", out, flags=re.I)
     out = re.sub(r"^\*\*NON-BREAKING\*\*:\s*", "", out, flags=re.I)
+    out = re.sub(r"^\*\*NON-BREAKING\*\*：\s*", "", out, flags=re.I)
     out = re.sub(r"^BREAKING:\s*", "", out, flags=re.I)
+    out = re.sub(r"^BREAKING：\s*", "", out, flags=re.I)
     out = out.strip()
     return out
 
@@ -156,17 +159,26 @@ def _is_capability_token(tok: str) -> bool:
 
 
 def _score_highlight(text: str) -> int:
-    s = text
+    # 评分时也做一次轻量清洗，避免 `**BREAKING**:` 之类的 marker 影响规则（例如“移除/删除”检测）。
+    raw = text
+    s = _clean_inline_markers(text)
     lower = s.lower()
+    raw_lower = raw.lower()
     score = 0
     if "non-goals" in lower or "non goals" in lower or "non-goal" in lower or "非目标" in s or "不做" in s or "明确不做" in s:
         score -= 50
     if "新增" in s or "引入" in s or "扩展" in s or "增加" in s or "new" in lower:
         score += 3
+    if "统一" in s or "收敛" in s or "单一" in s or "单入口" in s:
+        score += 2
+    # 对 `Highlights` 来说，“只写移除/删除”信息密度通常不如“引入/统一/收敛”的主线变化；
+    # 破坏性细节留给 `Breaking / Upgrade` 段。
+    if s.strip().startswith(("移除", "删除", "弃用", "废弃")):
+        score -= 4
     if "支持" in s:
         score += 1
     # `Highlights` 优先保留用户会“立刻感知”的破坏性变更；否则容易被“同步文档/示例”等条目抢走。
-    if "BREAKING" in s or "breaking" in lower or "破坏性" in s:
+    if "BREAKING" in raw or "breaking" in raw_lower or "破坏性" in raw:
         score += 6
     # 更偏向“作者/用户可感知”的说明，而不是内部实现口径。
     if "yaml" in lower or "YAML" in s:
@@ -210,7 +222,7 @@ def _choose_highlight(what_changes_lines: List[str]) -> str:
         head = block[0].strip()
         score = _score_highlight(blob)
         if head.endswith(":") or head.endswith("："):
-            score -= 4
+            score -= 2
         # 同分时偏向更靠前的条目。
         return score, -blocks.index(block)
 
@@ -221,7 +233,10 @@ def _choose_highlight(what_changes_lines: List[str]) -> str:
         tail = _clean_inline_markers(best[1])
         tail = re.sub(r"^-\s+", "", tail)
         if tail:
-            return "{}（例如：{}）".format(head, tail.rstrip("。"))
+            tail = tail.rstrip("。")
+            if "例如" in tail or "比如" in tail:
+                return "{}（{}）".format(head, tail)
+            return "{}（例如：{}）".format(head, tail)
     return head
 
 
@@ -268,7 +283,8 @@ def _example_priority(change_id: str) -> int:
         or "runtime-vars" in cid
     ):
         return 3
-    if "imports" in cid or "relative-import" in cid:
+    # imports（YAML `$import`/`imports`/project config 等 authoring surface）
+    if "imports" in cid or "import" in cid or "relative-import" in cid:
         return 4
     if "outputs" in cid or "aggregate" in cid or "derived-outputs" in cid:
         return 5
@@ -281,6 +297,19 @@ def _example_priority(change_id: str) -> int:
 
 def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
     cid = change_id.lower()
+    if "import_roots" in cid or "import-roots" in cid:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "yaml_dsl:",
+            "  import_roots:",
+            "    - root: ./demand_fragments",
+            "      alias: frags",
+            "    - root: ./src",
+            "      alias: app",
+            "  # 旧字段 import_aliases / import_allowed_roots 已移除",
+            "  # 未显式指定 allowed_yaml_roots 时默认由 import_roots 推导",
+            "  # 调用侧仍可用 allowed_yaml_roots 覆写/收紧",
+        ]
     if "on-none" in cid or "on_none" in cid:
         return [
             "# 示例为提案语义示意（不保证可直接运行）",
@@ -473,6 +502,9 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     def _tok_is_surface(tok: str) -> bool:
         t = tok.strip()
         lower = t.lower()
+        # `scalim.yaml` 的 project config key path（`yaml_dsl.*`）也是作者可感知的编写面。
+        if "yaml_dsl." in lower:
+            return True
         if _is_capability_token(t):
             return False
         # 过滤文件路径/源码文件/生成物路径等非 `YAML` 编写面 `token`。
@@ -597,6 +629,33 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
 
+        # `scalim.yaml` imports 单入口：优先输出一条“旧字段 -> 新字段”的升级指令，避免 `Breaking` 段刷屏。
+        if (
+            "yaml_dsl.import_roots" in proposal_text
+            and ("yaml_dsl.import_aliases" in cleaned or "import_aliases" in cleaned)
+            and ("yaml_dsl.import_allowed_roots" in cleaned or "import_allowed_roots" in cleaned)
+            and ("移除" in cleaned or "删除" in cleaned or "弃用" in cleaned or "废弃" in cleaned)
+        ):
+            instructions.append("把 `yaml_dsl.import_aliases` / `yaml_dsl.import_allowed_roots` 迁移为 `yaml_dsl.import_roots`。")
+            continue
+
+        # `scalim.yaml yaml_dsl.runner` 移除：把“删除 YAML 配置 + CLI 不再执行”合并成一条升级指令。
+        if "yaml_dsl.runner" in cleaned and ("移除" in cleaned or "删除" in cleaned or "已移除" in cleaned):
+            if "scalim-cli yaml-dsl run" in proposal_text.lower() or "scalim-cli yaml-dsl workflow run" in proposal_text.lower():
+                instructions.append(
+                    "不要再用 `yaml_dsl.runner`；运行期策略改为 Python `RunOptions`，并且不再支持 `scalim-cli yaml-dsl run` / `scalim-cli yaml-dsl workflow run`。"
+                )
+            else:
+                instructions.append("不要再用 `yaml_dsl.runner`；运行期策略改为 Python `RunOptions`。")
+            continue
+
+        # CLI 执行入口移除：提案常用 backticks 包含空格，无法按 token 规则抽取；这里补一条直白升级指令。
+        if ("scalim-cli yaml-dsl run" in cleaned.lower() or "scalim-cli yaml-dsl workflow run" in cleaned.lower()) and (
+            "yaml_dsl.runner" not in proposal_text
+        ):
+            instructions.append("不要再用 `scalim-cli yaml-dsl run` / `scalim-cli yaml-dsl workflow run`（已移除）。")
+            continue
+
         # `demand` 运行期开关迁出 `YAML`：提案中明确了 `fail-fast` 与迁移方向，直接抽成一条高密度升级指令。
         if (
             "demand" in cleaned.lower()
@@ -659,32 +718,37 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         match = re.search(r"`([^`]+)`\s*(?:指令节点)?(?:更名为|重命名为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
-            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
-            continue
+            if _tok_is_surface(old):
+                instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+                continue
 
         match = re.search(r"将\s+.*?`([^`]+)`\s+.*?(?:更名为|重命名为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
-            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
-            continue
+            if _tok_is_surface(old):
+                instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+                continue
 
         match = re.search(r"`([^`]+)`.*(?:升级为|改为|改成|替换为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
-            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
-            continue
+            if _tok_is_surface(old):
+                instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+                continue
 
         match = re.search(r"(?:由|从)\s*`([^`]+)`\s*(?:更新为|改为|改成|替换为|迁移为|升级为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
-            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
-            continue
+            if _tok_is_surface(old):
+                instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+                continue
 
         match = re.search(r"`([^`]+)`\s*(?:更新为|改为|改成|替换为|迁移为|升级为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
-            instructions.append("把 `{}` 改为 `{}`。".format(old, new))
-            continue
+            if _tok_is_surface(old):
+                instructions.append("把 `{}` 改为 `{}`。".format(old, new))
+                continue
 
         if "--strict" in cleaned and "yaml-dsl validate" in cleaned:
             instructions.append("不要再用 `yaml-dsl validate --strict`；直接用 `yaml-dsl validate`（默认严格）。")
@@ -795,8 +859,11 @@ def _score_change(change: _Change) -> int:
         score += 90
     if "refactor" in cid or "core" in cid:
         score += 50
-    if "breaking" in change.proposal_text.lower() or change.has_breaking:
-        score += 40
+    # Highlights 里优先把破坏性升级点顶上来，否则容易被“编辑器/文档/卫生”类变更挤掉。
+    if change.has_breaking:
+        score += 250
+    elif "breaking" in change.proposal_text.lower():
+        score += 120
     if "skill" in cid:
         score -= 30
     if "preproposal" in cid:
@@ -953,7 +1020,8 @@ def _render_notes(
 
     if include_example:
         yaml_candidates = [c for c in new_changes if c.is_yaml and c.example_priority < 99]
-        yaml_candidates.sort(key=lambda c: (c.example_priority, c.change_id))
+        # 同一优先级下优先选择带破坏性迁移点的变更，避免示例落到纯“编辑器能力”导致不贴题。
+        yaml_candidates.sort(key=lambda c: (c.example_priority, not c.has_breaking, c.change_id))
         if yaml_candidates:
             chosen = yaml_candidates[0]
             snippet_lines = _render_example_snippet(chosen.change_id, chosen.example_priority)
