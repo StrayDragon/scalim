@@ -7,8 +7,8 @@
 ??? note "维护提示"
     - 本页是“能力边界/映射表”,当新增 YAML key、调整编译链路或扩展 IR/执行请求时,应同步更新
     - 代码入口:
-      - 编译产物: `src/scalim/dsl/by_yaml/runtime/contracts.py` (`Compilation`)
-      - 编译器: `src/scalim/dsl/by_yaml/runtime/compiler.py` (`compile_ir`/`build_request`)
+      - 编译产物: `src/scalim/dsl/yaml_dsl/runtime/contracts.py` (`Compilation`)
+      - 编译器: `src/scalim/dsl/yaml_dsl/runtime/compiler.py` (`compile_ir`/`build_request`)
       - IR: `src/scalim/spec/ir/` (例如 `src/scalim/spec/ir/demand.py`, `src/scalim/spec/ir/fields.py`, `src/scalim/spec/ir/sources.py`)
 
 本仓库的 YAML DSL 编译后会同时产出三层对象:
@@ -25,7 +25,7 @@
 |---|---|---|---|
 | `name` | `DemandConfig.name` → `DemandIr.name` | 仅标识用途 | - |
 | `description` | `DemandConfig.description` | 当前不进入 IR/执行(用于文档/阅读) | - |
-| `batch_size`（已迁出） | `ExecutionRequest.batch_size` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(batch_size=...))` 配置 |
+| `batch_size`（已迁出） | `ExecutionRequest.batch_size` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(batch_size=...))` 配置 |
 | `_templates` | 仅作为 YAML anchors 容器(不直接编译) | 只用于 YAML 复用;不会被运行时读取 | 使用 `&anchor/*alias` 复用 `retry/fields/relations/...` |
 | `imports` | 编译期展开(片段导入) | 仅支持相对 `.yaml/.yml` 文件路径或 `scalim://<preset_id>`;默认相对入口 YAML 目录解析且受 `allow-roots` 限制(可用 CLI `--allowed-yaml-root` 或 `scalim.yaml yaml_dsl.import_roots` 扩展) | 仅靠 YAML anchors 复用(单文件)或显式复制片段 |
 | `$import` | 编译期展开(在 mapping 内引用 imports alias) | 仅在“文件路径入口”可用;纯文本入口无法解析文件; **scope 仅限稳定 authoring surfaces**(`main_source/sources/fields/relations/resources`),不允许顶层 `(root)` 与 `outputs.*`/workflow/runtime policy/output extras | 使用 YAML anchors/merge(单文件)或 workflow/Python 拼装 |
@@ -37,7 +37,7 @@
 | `main_source.source_id` | `DemandIr.main_source.source_id` | 必填;不可与 `sources` key 冲突 | - |
 | `main_source.loader` | `DemandIr.main_source.loader` | 必须通过 allowlist 解析(安全边界) | 用 `allowed_modules/allowed_functions` 放行 |
 | `main_source.params` | `DemandIr.main_source.params` | 仅允许静态值 + `{$init_var: <name>}`;禁止 `$keys/$rows` | 把动态输入放 `init_vars` 里,并在调用 `run/compile` 时传入 |
-| `main_source.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(loader_retry=...))` 配置 |
+| `main_source.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(loader_retry=...))` 配置 |
 | `main_source.order_by` | `MainSourceIr.order_by` | 仅批次内写入顺序;每项支持 `-field` 表示 desc | 若需要更复杂排序,在 loader 内排序 |
 | `main_source.fields.*` | `FieldIr` (source=main) | 仅源字段;禁止 `compute/call_by` | 复杂派生逻辑放 `fields.*`(derived) |
 | `sources.*.loader` | `SourceIr.loader_spec` | 必须通过 allowlist 解析(安全边界) | - |
@@ -46,7 +46,7 @@
 | `sources.*.lookup_chunk_size` | `SourceIr.lookup_chunk_size` | 仅 keys 模式有效;`0/None` 表示不分片 | - |
 | `sources.*.normalize` | `SourceIr.normalize` (`SourceNormalizeIr`) | 仅提供受控 kind + 可选 `call_by` 扩展点 | 若需要任意 reshape,放到 loader 中处理 |
 | `sources.*.cache_mode` | `SourceIr.cache_mode` | 目前仅 `none/preload_forever` | 更细粒度缓存策略需 Python 层扩展 |
-| `sources.*.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(loader_retry=...))` 配置 |
+| `sources.*.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(loader_retry=...))` 配置 |
 | `sources.*.params` | `SourceIr.bind` (由 params template 推导) | legacy `bind/to_bind` 已移除;用 `$keys/$rows` 指令节点表达 | 需要特殊调用协议时,用自定义 loader 或 Python-only `BindingIr` |
 | `sources.*.fields.*` | `FieldIr` (source=that source) | 仅源字段;禁止 `compute/call_by` | 复杂派生逻辑放 `fields.*`(derived) |
 
@@ -83,13 +83,13 @@
 
 | YAML key | 编译到(主要影响) | 限制/边界 | 替代方案 |
 |---|---|---|---|
-| `guardrails`（已迁出） | `ExecutionRequest.guardrails` (`GuardrailsPolicy`) | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(guardrails=...))` 配置 |
+| `guardrails`（已迁出） | `ExecutionRequest.guardrails` (`GuardrailsPolicy`) | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(guardrails=...))` 配置 |
 
 ## 6) 当前“不在 YAML 里”的常用能力(需要 Python/CLI 参数)
 
 | 能力 | 对应对象 | 为什么不在 YAML | 推荐用法 |
 |---|---|---|---|
-| allowlist | `SecurePythonReferenceResolver` | 安全边界(运行环境/组织策略差异大) | `scalim.dsl.by_yaml.run(..., options=RunOptions(allowed_modules=..., allowed_functions=...))` 或 CLI flags |
+| allowlist | `SecurePythonReferenceResolver` | 安全边界(运行环境/组织策略差异大) | `scalim.dsl.yaml_dsl.run(..., options=RunOptions(allowed_modules=..., allowed_functions=...))` 或 CLI flags |
 | `init_vars` | `RunOptions.init_vars` | 运行时输入,不应写死在共享 YAML | `run(..., options=RunOptions(init_vars={...}))` |
 | 并行模式/并发数 | `ExecutionRequest.parallel_mode/max_workers` | 与环境/资源相关,容易导致不可复现 | `run(..., options=RunOptions(parallel_mode=\"seq|adaptive\", max_workers=...))` |
 | 自定义 sink | `ExecutionRequest.sink` | sink 往往是运行环境能力(文件系统/内存/对象存储) | `run(..., options=RunOptions(sink=InMemoryRowSink()))` 等 |

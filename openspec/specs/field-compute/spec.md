@@ -12,9 +12,9 @@
 - 支持派生字段依赖计算(如收入-成本)
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/security.py` (`SecureComputeEngine`)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/parsers/fields.py` (infer derived deps; reject explicit `depends_on`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/conversion.py` (derived IR build + constant compute detection)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/security.py` (`SecureComputeEngine`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/parsers/fields.py` (infer derived deps; reject explicit `depends_on`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (derived IR build + constant compute detection)
 - `src/IMPL_ROOT/execution/executor/operators/compute/executor.py` (compute execution)
 - `src/IMPL_ROOT/execution/executor/operators/compute/errors.py` (compute error/guardrails)
 - `src/IMPL_ROOT/utils/converters.py` (`value_cast:auto` helpers)

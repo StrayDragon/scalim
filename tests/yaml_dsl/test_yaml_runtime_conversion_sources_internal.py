@@ -1,6 +1,6 @@
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig
 
 
 def test_conversion_sources_resolve_required_field_ids_is_noop() -> None:

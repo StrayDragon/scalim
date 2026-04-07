@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import GuardrailCaptureObserver
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult

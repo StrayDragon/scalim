@@ -12,7 +12,7 @@
 - `src/IMPL_ROOT/ob/manager.py` (`ObserverManager`)
 - `src/IMPL_ROOT/ob/hub.py` (`InstrumentationHub`)
 - `src/IMPL_ROOT/ob/components.py` (`split_components`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/compiler.py` (`build_request` 处理 `components`/`RunOverrides.viz_config`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/compiler.py` (`build_request` 处理 `components`/`RunOverrides.viz_config`)
 - `src/IMPL_ROOT/execution/run_ir.py` (由 `ExecutionRequest.observability.viz_config` 物化 `VizObserver`)
 ## Requirements
 ### Requirement: 观测事件契约集中

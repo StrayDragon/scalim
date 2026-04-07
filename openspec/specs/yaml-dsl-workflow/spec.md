@@ -20,10 +20,10 @@
 
 系统 MUST 允许面向用户的 workflow 官方用法通过以下路径表达：
 
-- `scalim.dsl.by_yaml.run_workflow`
-- `scalim.dsl.by_yaml.workflow`
-- `scalim.dsl.by_yaml.workflow_types`
-- `scalim.dsl.by_yaml.workflow_paths`
+- `scalim.dsl.yaml_dsl.run_workflow`
+- `scalim.dsl.yaml_dsl.workflow`
+- `scalim.dsl.yaml_dsl.workflow_types`
+- `scalim.dsl.yaml_dsl.workflow_paths`
 
 系统 MUST NOT 再把 workflow 的内部实现路径写成官方用户导入路径。
 
@@ -196,13 +196,13 @@ NOTE: cache pool 的语义(冲突策略/生命周期/预算/可观测性)由 `wo
 ### Requirement: workflow entrypoints MUST be importable under Python 3.6
 系统 MUST 保证在 Python 3.6 + `typing-extensions==4.1.1` 的最小依赖环境中, workflow 入口实现模块可被导入:
 
-- `scalim.dsl.by_yaml.workflow_entrypoints`
+- `scalim.dsl.yaml_dsl.workflow_entrypoints`
 
 系统 MUST 确保该 import 不依赖 `openpyxl`/`pandas` 等可选依赖。
 
 #### Scenario: workflow_entrypoints imports in a minimal Py3.6 environment
 - **GIVEN** 仅安装了 `PyYAML` 与 `typing-extensions==4.1.1` 的 Python 3.6 环境
-- **WHEN** 执行 `python -c "from scalim.dsl.by_yaml import workflow_entrypoints"`
+- **WHEN** 执行 `python -c "from scalim.dsl.yaml_dsl import workflow_entrypoints"`
 - **THEN** import MUST 成功
 
 #### Scenario: optional dependencies remain optional for core imports

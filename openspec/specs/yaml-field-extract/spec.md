@@ -8,9 +8,9 @@
 一些业务 loader 的返回值不是扁平 dict,而是嵌套 dict 或对象结构,甚至包含 int key(例如 `row[1]` / `row[2]` 的角色维度)。如果 DSL 只支持顶层 flat getter,用户将被迫引入薄 wrapper 先拍平结果,导致语义漂移与维护成本增加。
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/field_extract.py` (`compile_field_extract`)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validators/_internal/validator_fields_source.py` (extract 校验与 legacy `field` 拒绝)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/_internal/conversion_sources.py` (extract → IR segments 编译)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/field_extract.py` (`compile_field_extract`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validators/_internal/validator_fields_source.py` (extract 校验与 legacy `field` 拒绝)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/_internal/conversion_sources.py` (extract → IR segments 编译)
 - `src/IMPL_ROOT/spec/ir/fields.py` (`FieldIr.extract_expr` / `FieldIr.extract_segments`)
 - `src/IMPL_ROOT/execution/executor/helpers/field_access.py` (`extract_field_segments`)
 - `src/IMPL_ROOT/execution/executor/operators/load.py` / `load_ref/flow.py` (执行期字段读取)

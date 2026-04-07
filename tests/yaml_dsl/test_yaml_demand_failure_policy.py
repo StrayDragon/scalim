@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, compile
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.mock_loaders"])
 

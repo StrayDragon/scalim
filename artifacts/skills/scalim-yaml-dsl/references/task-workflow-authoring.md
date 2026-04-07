@@ -113,7 +113,7 @@ uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>
 2) schema-only 校验(结构/unknown-fields;仓库内建议显式指定 schema 路径):
 
 ```bash
-uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>
 ```
 
 编辑器补全/hover 建议:

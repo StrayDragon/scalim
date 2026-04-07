@@ -1,7 +1,7 @@
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.models import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.models import (
     AliasIndex,
     FieldDef,
     RawDemand,
@@ -10,13 +10,13 @@ from scalim.dsl.by_yaml._internal.config_parsing.models import (
     _collect_main_source_fields,
     _collect_source_fields,
 )
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.schema_dsl.constants import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl.schema_dsl.constants import (
     DEFAULT_BATCH_SIZE,
     FIELD_KIND_DERIVED,
     FIELD_KIND_SOURCE,
 )
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     DERIVED_FIELD_KEYS,
     MAIN_SOURCE_KEYS,
 )
@@ -202,7 +202,7 @@ def test_infer_derived_dependencies_rejects_depends_on() -> None:
 
 
 def test_constant_compute_expression_syntax_error_returns_false() -> None:
-    from scalim.dsl.by_yaml._internal.config_parsing.security import is_constant_compute_expression
+    from scalim.dsl.yaml_dsl._internal.config_parsing.security import is_constant_compute_expression
 
     assert is_constant_compute_expression("1 +") is False
 

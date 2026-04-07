@@ -1,4 +1,4 @@
-import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
+import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_module
 
 
 def test_build_aggregate_field_index_returns_empty_when_fields_not_dict() -> None:

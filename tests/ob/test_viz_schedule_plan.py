@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scalim.dsl.by_yaml import RunOptions, compile
+from scalim.dsl.yaml_dsl import RunOptions, compile
 from scalim.planning import PlanBuilder
 from scalim.planning.viz_schedule import _build_layers, _build_ref_deps
 

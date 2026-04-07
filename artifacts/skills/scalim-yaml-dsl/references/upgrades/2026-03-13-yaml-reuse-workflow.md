@@ -5,7 +5,7 @@
 本批次聚焦 YAML DSL 的“复用与编排”能力:
 
 - demand YAML 新增跨文件复用: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开;仅稳定 authoring surfaces)
-- 新增 workflow YAML + Python 入口 `scalim.dsl.by_yaml.run_workflow(...)` 编排多个 demand
+- 新增 workflow YAML + Python 入口 `scalim.dsl.yaml_dsl.run_workflow(...)` 编排多个 demand
 - workflow 可选启用 `cache_pool`: 跨 nodes 共享 `cache_mode: preload_forever` 的预加载结果,并通过 signature + 冲突策略治理复用边界（`share_preload_cache` 已移除）
 
 OpenSpec 归档变更（含 proposal/design/spec/tasks）:

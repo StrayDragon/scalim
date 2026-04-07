@@ -1,7 +1,7 @@
 import jsonschema
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing import jsonschema_issues as issues_mod
+from scalim.dsl.yaml_dsl._internal.config_parsing import jsonschema_issues as issues_mod
 
 
 def test_collect_jsonschema_validation_issues_filters_additional_properties_and_sorts() -> None:

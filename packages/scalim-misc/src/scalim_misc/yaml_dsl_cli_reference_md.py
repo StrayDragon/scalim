@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
 
-DEMAND_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
-WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
+DEMAND_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
+WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
 CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
 
 DOCS_CLI_MIN_COMMANDS_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-cli-min-commands -->"
@@ -169,7 +169,7 @@ def render_yaml_dsl_cli_reference_markdown(
             ),
             (
                 '- Python fallback: `python -c "import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), '
-                "'dsl/by_yaml/schema/demand.gen.json'))\"`"
+                "'dsl/yaml_dsl/schema/demand.gen.json'))\"`"
             ),
             "- 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.",
             "```yaml",
@@ -341,7 +341,7 @@ def render_yaml_dsl_skill_cli_min_commands_markdown() -> str:
         "运行入口已迁出 CLI,统一使用 Python API(需 allowlist):",
         "",
         "```python",
-        "from scalim.dsl.by_yaml import RunOptions, run, run_workflow",
+        "from scalim.dsl.yaml_dsl import RunOptions, run, run_workflow",
         "",
         "run(",
         '    "path/to/demand.yaml",',

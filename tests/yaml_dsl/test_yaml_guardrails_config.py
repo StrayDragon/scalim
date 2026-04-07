@@ -1,9 +1,9 @@
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 
 
 def _base_config() -> dict:

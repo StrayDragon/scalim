@@ -7,12 +7,12 @@
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/cli/yaml_dsl.py` (cli validate/schema validate/show/path + linter-style output + location indexing)
 - `src/IMPL_ROOT/cli/yaml_dsl_lsp.py` (upsert-lsp-comment)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validator.py` (`ConfigValidator` + strict unknown fields + `ConfigValidationError`)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/unknown_fields.py` (unknown field detection + suggestions)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validators/issues.py` (`ValidationIssue` + `MAX_VALIDATION_ERROR_LINES`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (`ConfigValidator` + strict unknown fields + `ConfigValidationError`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/unknown_fields.py` (unknown field detection + suggestions)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validators/issues.py` (`ValidationIssue` + `MAX_VALIDATION_ERROR_LINES`)
 - `tests/test_yaml_dsl_cli_output.py` (CLI output regression tests)
 - `tests/test_yaml_dsl_lsp_comment.py` (upsert-lsp-comment regression tests)
-- `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` (schema input for schema-only validation and unknown-field checks)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` (schema input for schema-only validation and unknown-field checks)
 
 ## Implementation Notes (Current Behavior)
 - `PROJECT_CLI_NAME yaml-dsl validate` 走内部语义 validator(`ConfigValidator.validate_report(...)`)并输出 linter 风格诊断(含 `path:line[:column]`);当 `jsonschema` 可用时会执行 JSONSchema 校验补充结构/类型诊断,不可用/异常时以 warning 形式提示并继续.
@@ -266,7 +266,7 @@
 
 解析规则:
 - `--type` 默认值为 `demand`
-- `--schema-path` 默认值为内置 schema 目录的本地绝对路径(即 `src/IMPL_ROOT/dsl/by_yaml/schema/` 在包内的实际路径)
+- `--schema-path` 默认值为内置 schema 目录的本地绝对路径(即 `src/IMPL_ROOT/dsl/yaml_dsl/schema/` 在包内的实际路径)
 - `--schema-path` 允许是 base URL/base 目录,也允许是完整 schema URL/文件路径
 - 若 `--schema-path` 以 `.json` 结尾,系统 MUST 将其视为完整 schema 引用并直接使用
 - 否则系统 MUST 将其视为 base,并拼接 `/<type>.gen.json` 生成最终引用

@@ -41,7 +41,7 @@ workflow structural preload 会解析 demand YAML，因此系统 MUST 复用与 
 
 #### Scenario: per-run patches can disable inferable diagnostics before preflight
 - **GIVEN** workflow run A 的 demand fields 存在 duplicate effective field display names
-- **AND** `run_patches_by_id["A"].demand_diagnostics.validate_unique_field_names=false`
+- **AND** `run_options_patches_by_run_id["A"].demand_diagnostics.validate_unique_field_names=false`
 - **WHEN** 系统执行到 preflight 阶段
 - **THEN** 系统 MUST 将该 run 的 effective policy 视为关闭
 - **AND** 系统 MUST NOT 因该诊断在 preflight 阶段失败
@@ -85,4 +85,3 @@ workflow structural preload 会解析 demand YAML，因此系统 MUST 复用与 
 - **GIVEN** 同一份 demand 结构与同一份 effective outputs/resources
 - **WHEN** 系统在 preflight 与 runtime compile 两个边界分别判断是否触发某个 inferable check
 - **THEN** 两处的触发判定 MUST 一致（不得出现一处触发而另一处不触发的 drift）
-

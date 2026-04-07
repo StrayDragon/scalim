@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
 # region SCALIM-SKILL:example-full:yaml
 
 name: ecommerce_order_report

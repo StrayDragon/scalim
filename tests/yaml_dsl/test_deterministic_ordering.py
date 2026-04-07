@@ -8,10 +8,10 @@ from typing import Any
 
 import pytest
 
-from scalim.dsl.by_yaml.params_template import ScalimParamsTemplateRenderError, compile_params_template
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
-from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
+from scalim.dsl.yaml_dsl.params_template import ScalimParamsTemplateRenderError, compile_params_template
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.schema_dsl.models import LookupCastConfig
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import LoaderCallContextIr, BindingIr, _is_valid_binding_key, _restore_bindings, build_stable_lookup_key_list
 from scalim.spec.ir import DemandIr
@@ -130,7 +130,7 @@ print(json.dumps({"field_order": plan.field_order, "compute_fields": compute_fie
 def test_keys_list_is_hashseed_stable() -> None:
     snippet = """
 import json
-from scalim.dsl.by_yaml.params_template import compile_params_template
+from scalim.dsl.yaml_dsl.params_template import compile_params_template
 from scalim.spec.ir.binding import LoaderCallContextIr
 
 template = compile_params_template({"ids": {"$keys": {"as": "list"}}}, path="sources.s1.params", resolve_runtime=False)

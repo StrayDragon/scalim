@@ -10,14 +10,14 @@ from tests.support.pathing import repo_root as _repo_root
 
 
 def test_public_reexports_importable() -> None:
-    from scalim.dsl import by_yaml
-    from scalim.dsl.by_yaml import RunOverrides, compile, run
+    from scalim.dsl import yaml_dsl
+    from scalim.dsl.yaml_dsl import RunOverrides, compile, run
     from scalim.execution import ScalimEngine
     from scalim.ob import Observability
     from scalim.planning import PlanBuilder
     from scalim.spec.ir import DemandIr
 
-    _ = by_yaml
+    _ = yaml_dsl
     _ = DemandIr
     _ = PlanBuilder
     _ = RunOverrides
@@ -32,7 +32,7 @@ def test_public_reexports_importable() -> None:
     [
         "import scalim",
         "import scalim.dsl",
-        "import scalim.dsl.by_yaml",
+        "import scalim.dsl.yaml_dsl",
     ],
     ids=["import-scalim", "import-dsl", "import-by-yaml"],
 )

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from scalim.dsl.by_yaml._internal.config_parsing.unknown_fields import find_unknown_fields
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl._internal.config_parsing.unknown_fields import find_unknown_fields
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 
 
 def test_find_unknown_fields_reports_paths_and_suggestions() -> None:

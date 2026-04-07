@@ -1,6 +1,6 @@
 from typing import List
 
-from scalim.dsl.by_yaml.schema_dsl.builder import SchemaBuilder
+from scalim.dsl.yaml_dsl.schema_dsl.builder import SchemaBuilder
 
 
 def test_schema_builder_schema_for_type_list_hits_container_branch() -> None:

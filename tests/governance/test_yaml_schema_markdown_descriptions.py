@@ -4,14 +4,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, cast
 
-from scalim.dsl.by_yaml.schema_dsl.builder import load_schema
+from scalim.dsl.yaml_dsl.schema_dsl.builder import load_schema
 from scalim.vendor.yamlx import yaml as vendored_yaml
 from tests.support.pathing import repo_root as _repo_root
 
 
 def _schema_path(name: str) -> Path:
     repo_root = _repo_root()
-    return repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema" / name
+    return repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / name
 
 
 def _is_dict(value: Any) -> bool:
@@ -172,7 +172,7 @@ def test_fixture_snippet_extractor_supports_nesting_and_is_yaml_parseable() -> N
     )
     scalim_yaml = repo_root / "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/scalim.yaml"
 
-    from scalim.dsl.by_yaml.schema_dsl.doc_standardizer import _extract_snippets_from_fixture
+    from scalim.dsl.yaml_dsl.schema_dsl.doc_standardizer import _extract_snippets_from_fixture
 
     all_snippets: Dict[str, str] = {}
     for fixture in (ecommerce, workflow, scalim_yaml):
@@ -204,10 +204,10 @@ def test_runtime_import_graph_does_not_pull_doc_standardizer() -> None:
     script = (
         "import sys; "
         "sys.path.insert(0, {!r}); "
-        "import scalim.dsl.by_yaml.runtime.compiler as _c; "
-        "import scalim.dsl.by_yaml._internal.config_parsing.loader as _l; "
+        "import scalim.dsl.yaml_dsl.runtime.compiler as _c; "
+        "import scalim.dsl.yaml_dsl._internal.config_parsing.loader as _l; "
         "import sys as _sys; "
-        "print('scalim.dsl.by_yaml.schema_dsl.doc_standardizer' in _sys.modules)"
+        "print('scalim.dsl.yaml_dsl.schema_dsl.doc_standardizer' in _sys.modules)"
     ).format(str(repo_root / "src"))
 
     out = subprocess.check_output([sys.executable, "-c", script], text=True).strip()

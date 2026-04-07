@@ -1,13 +1,13 @@
 import pytest
 
-import scalim.dsl.by_yaml.params_template as params_tmpl
-from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, MainSourceConfig, SourceConfig
+import scalim.dsl.yaml_dsl.params_template as params_tmpl
+from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, MainSourceConfig, SourceConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
 
 

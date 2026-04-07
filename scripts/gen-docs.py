@@ -9,8 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
-from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
-from scalim.dsl.by_yaml.schema_dsl.doc_texts import SOURCE_FIELD_EXTRACT_MD
+from scalim.dsl.yaml_dsl.schema_dsl import constants as yaml_schema_constants
+from scalim.dsl.yaml_dsl.schema_dsl.doc_texts import SOURCE_FIELD_EXTRACT_MD
 from scalim_misc.cli_docs import build_yaml_dsl_command_docs
 from scalim_misc.markdown_inject import InjectBlockSpec, replace_markdown_injected_block
 from scalim_misc.yaml_dsl_cli_reference_md import (
@@ -183,10 +183,10 @@ def _schema_kind(schema: Dict[str, Any]) -> str:
 
 
 def _render_yaml_schema_reference(repo_root: Path) -> str:
-    schema_rel = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
+    schema_rel = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
     schema_path = repo_root / schema_rel
     schema = _load_json(schema_path)
-    workflow_schema_rel = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
+    workflow_schema_rel = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
     workflow_schema_path = repo_root / workflow_schema_rel
     workflow_schema = _load_json(workflow_schema_path)
 

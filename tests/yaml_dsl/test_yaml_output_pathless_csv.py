@@ -1,8 +1,8 @@
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, compile
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml.runtime.output_path_resolve import resolve_output_container_path
+from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl.runtime.output_path_resolve import resolve_output_container_path
 
 
 def test_compile_pathless_csv_output_fails_fast_with_workflow_managed_hint(tmp_path) -> None:

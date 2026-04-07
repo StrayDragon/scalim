@@ -7,8 +7,8 @@
 
 基准（SSOT）：
 
-- Demand schema: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
-- Workflow schema: `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
+- Demand schema: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`
+- Workflow schema: `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
 - 语法索引（generated）：`artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md`
 
 约定：

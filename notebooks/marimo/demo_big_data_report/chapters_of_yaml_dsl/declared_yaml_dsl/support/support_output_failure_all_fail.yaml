@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
 
 name: demo_big_data_report_support_output_failure_all_fail
 description: |

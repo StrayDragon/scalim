@@ -23,7 +23,7 @@ uv run scalim-cli yaml-dsl validate --type workflow path/to/workflow.yaml
 2) schema-only 校验(结构/unknown-fields;依赖 `workflow.gen.json`):
 
 ```bash
-uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json path/to/workflow.yaml
 ```
 
 本地编辑时,推荐直接批量写入 schema modeline(同 demand YAML 的做法一致,只是在 `--type` 上改为 `workflow`):
@@ -92,12 +92,12 @@ workflow 的共享输出资源(book/csv/sheetbook)在并发模式下会用 joina
 示例(Python):
 
 ```python
-from scalim.dsl.by_yaml import run_workflow
-from scalim.dsl.by_yaml.workflow_types import WorkflowResourcesWaitDiagnosticsOptions, WorkflowResourcesWaitOptions
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowResourcesWaitDiagnosticsOptions, WorkflowResourcesWaitOptions
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp"]),
+    options=RunOptions(allowed_modules=frozenset(["myapp"])),
     workflow_resources_wait=WorkflowResourcesWaitOptions(
         max_wait_s=600.0,
         diagnostics=WorkflowResourcesWaitDiagnosticsOptions(
@@ -133,12 +133,12 @@ workflow 的共享输出(例如 `workflow.resources.books` 导出的 `.xlsx` / �
 示例(Python):
 
 ```python
-from scalim.dsl.by_yaml import run_workflow
-from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp"]),
+    options=RunOptions(allowed_modules=frozenset(["myapp"])),
     workflow_output_staging=WorkflowOutputStagingOptions(
         dir_name=".scalim-staging",
         keep_on_success=False,
@@ -329,11 +329,11 @@ outputs:
 当前暂不扩展 workflow runner CLI; 先用 Python 入口:
 
 ```python
-from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
 
 result = run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
+    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"])),
     path_aliases={"@": "/abs/project_root"},
 )
 
@@ -344,7 +344,7 @@ for outcome in result.outcomes:
         print("OK:", outcome.run_id, outcome.result.total_rows)
 ```
 
-### 7.1) `run_patches_by_id`: per-run runtime policy(按 run id 注入差异化运行策略)
+### 7.1) `run_options_patches_by_run_id`: per-run runtime policy(按 run id 注入差异化运行策略)
 
 当 workflow DAG 中存在多个 runs 时,真实生产场景往往需要“不同 run 使用不同运行策略”:
 
@@ -352,25 +352,24 @@ for outcome in result.outcomes:
 - `components`: 仅对某个 run 追加调试 observer/hook(不污染整张图)
 - `guardrails/loader_retry/overrides`: 对特定 run 单独加强或关闭
 
-使用方式:在 Python 入口 `run_workflow(..., run_patches_by_id=...)` 中按 `workflow.runs[*].id` 提供 patch:
+使用方式:在 Python 入口 `run_workflow(..., run_options_patches_by_run_id=...)` 中按 `workflow.runs[*].id` 提供 patch:
 
 - key: `workflow.runs[*].id`(字符串)
-- value: **typed** 的 `WorkflowRunPatch`(不支持 dict 形状 patch)
-- patch 优先级高于 `run_workflow(...)` 的全局参数
+- value: **typed** 的 `WorkflowRunOptionsPatch`(不支持 dict 形状 patch)
+- patch 优先级高于 `run_workflow(..., options=RunOptions(...))` 的全局 knobs
 - omission / `UNSET` 表示继承;`None` 在支持的字段上表示显式禁用
 
 示例 1: per-run `batch_size` 覆盖全局默认
 
 ```python
-from scalim.dsl.by_yaml import run_workflow
-from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    batch_size=2000,  # 全局默认
-    run_patches_by_id={
-        "d10_paid_orders": WorkflowRunPatch(batch_size=5000),  # 仅该 run 用更大 batch
+    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"]), batch_size=2000),  # 全局默认
+    run_options_patches_by_run_id={
+        "d10_paid_orders": WorkflowRunOptionsPatch(batch_size=5000),  # 仅该 run 用更大 batch
     },
 )
 ```
@@ -378,15 +377,14 @@ run_workflow(
 示例 2: 仅对某个 run 追加一个调试组件(append,保序)
 
 ```python
-from scalim.dsl.by_yaml import run_workflow
-from scalim.dsl.by_yaml.workflow_types import ComponentsExtend, WorkflowRunPatch
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import ComponentsExtend, WorkflowRunOptionsPatch
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    components=[my_prod_observer],
-    run_patches_by_id={
-        "d70_summary_ranking": WorkflowRunPatch(
+    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"]), components=[my_prod_observer]),
+    run_options_patches_by_run_id={
+        "d70_summary_ranking": WorkflowRunOptionsPatch(
             components=ComponentsExtend([my_debug_observer]),
         ),
     },
@@ -396,15 +394,14 @@ run_workflow(
 示例 3: 对单个 run 显式禁用全局 `batch_size`(该 run 不分批)
 
 ```python
-from scalim.dsl.by_yaml import run_workflow
-from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    batch_size=2000,
-    run_patches_by_id={
-        "d20_registered_users": WorkflowRunPatch(batch_size=None),
+    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"]), batch_size=2000),
+    run_options_patches_by_run_id={
+        "d20_registered_users": WorkflowRunOptionsPatch(batch_size=None),
     },
 )
 ```
@@ -412,8 +409,8 @@ run_workflow(
 常见错误与诊断:
 
 - unknown run id: fail-fast 并列出当前 workflow 的合法 ids
-- dict patch payload: `run_patches_by_id={"A": {"batch_size": 5000}}` 会报错;请改为 `WorkflowRunPatch(batch_size=5000)`
-- 安全边界(`allowed_modules/allowed_functions/resolver_trusted_mode`)不允许在 per-run patch 中覆盖;只能通过 `run_workflow(...)` 全局参数提供
+- dict patch payload: `run_options_patches_by_run_id={"A": {"batch_size": 5000}}` 会报错;请改为 `WorkflowRunOptionsPatch(batch_size=5000)`
+- 安全边界(`allowed_modules/allowed_functions/resolver_trusted_mode`)不允许在 per-run patch 中覆盖;只能通过 `run_workflow(..., options=RunOptions(...))` 的全局 `options` 提供
 
 失败策略:
 

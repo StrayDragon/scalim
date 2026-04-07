@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
 
 name: demo_big_data_report_workflow_shared_workbooks
 description: |
@@ -11,7 +11,7 @@ description: |
 
 # NOTE: `batch_size` moved out of YAML runtime policy boundary.
 # Pass via workflow runtime entrypoints, e.g. `run_workflow(..., options=RunOptions(batch_size=30))`.
-# If different runs need different runtime policies, use `run_workflow(..., run_patches_by_id={"<run_id>": WorkflowRunPatch(batch_size=...)})`.
+# If different runs need different runtime policies, use `run_workflow(..., run_options_patches_by_run_id={"<run_id>": WorkflowRunOptionsPatch(batch_size=...)})`.
 
 main_source:
   source_id: orders

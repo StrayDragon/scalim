@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run_workflow
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (

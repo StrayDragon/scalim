@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml._internal.config_parsing import imports as imports_mod
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.imports import ScalimYamlImportExpansionError, load_and_expand_imports
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.validator import validate_yaml_text
+from scalim.dsl.yaml_dsl._internal.config_parsing import imports as imports_mod
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.imports import ScalimYamlImportExpansionError, load_and_expand_imports
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import validate_yaml_text
 
 
 def _args(path: Path, *, json_output: bool) -> argparse.Namespace:
@@ -701,7 +701,7 @@ workflow:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    workflow_schema = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
+    workflow_schema = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
     args = _args(workflow_path, json_output=True)
     args.schema = workflow_schema
 

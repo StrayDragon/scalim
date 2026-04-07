@@ -15,7 +15,7 @@
 
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/_internal/loggingx.py` (统一 logger 命名空间、前缀、`k=v` 追加字段、context 绑定;导入时安装 `NullHandler`)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validator.py` (`jsonschema` 不可用/不兼容时的 warning 统一输出)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (`jsonschema` 不可用/不兼容时的 warning 统一输出)
 - `src/IMPL_ROOT/execution/output_composition.py` (派生输出护栏 warnings 的统一输出)
 - `src/IMPL_ROOT/ob/presets/performance.py` (性能阈值 warnings 的统一输出)
 ## Requirements
@@ -76,4 +76,3 @@
 #### Scenario: print usage in runtime fails fast
 - **WHEN** 在 `src/scalim/` 的 runtime 路径中出现 `print(...)`
 - **THEN** gate MUST fail-fast 并提示迁移到结构化 logger
-

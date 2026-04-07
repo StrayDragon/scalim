@@ -6,7 +6,7 @@
 - 无意引入可选依赖(例如 `pandas`/`rich`/`openpyxl`/`jsonschema`)的导入副作用
 
 对外推荐入口(优先使用):
-- `scalim.dsl.by_yaml`: `YAML` `DSL` 官方入口
+- `scalim.dsl.yaml_dsl`: `YAML` `DSL` 官方入口
 - `scalim.spec.ir`: `IR` 类型官方入口
 - `scalim.planning`: 规划层入口
 - `scalim.execution`: 执行层入口

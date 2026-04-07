@@ -2,7 +2,7 @@ import csv
 from decimal import Decimal
 from pathlib import Path
 
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 
 
 def _read_csv_rows(path: Path) -> "list[dict[str, str]]":

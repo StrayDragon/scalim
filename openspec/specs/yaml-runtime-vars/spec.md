@@ -2,7 +2,7 @@
 
 **状态: ✅ 已实现**
 ## Purpose
-为 by_yaml runtime 提供编译期的运行期变量注入入口: 调用方通过 `runtime_vars` 注入任意 Python 对象,并在 `main_source.params` / `sources.<id>.params` 的 kwargs 模板中用 `{$runtime: <name>}` 指令节点引用,由 adapter 在编译期解析并透传给 loader.
+为 yaml_dsl runtime 提供编译期的运行期变量注入入口: 调用方通过 `runtime_vars` 注入任意 Python 对象,并在 `main_source.params` / `sources.<id>.params` 的 kwargs 模板中用 `{$runtime: <name>}` 指令节点引用,由 adapter 在编译期解析并透传给 loader.
 
 ## Context
 YAML DSL 配置常需要把“运行期参数”(例如 end_dt、用户过滤列表、环境开关等)注入到 loader kwargs 中.若无统一入口,调用方需要额外的 runtime wrapper 来拼装参数并调用 `run/compile`,导致重复的 glue code 与迁移成本.
@@ -10,14 +10,14 @@ YAML DSL 配置常需要把“运行期参数”(例如 end_dt、用户过滤列
 同时,`cache_mode: preload_forever` 的预加载路径必须与常规 loader 调用保持一致的参数语义,避免 preload/ref-load 两套 params 逻辑漂移.
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/entrypoints.py` (`run`, `compile`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/contracts.py` (`RunOptions.runtime_vars`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/compiler.py` (`compile_ir(..., runtime_vars=...)`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/_internal/conversion_sources.py` (compile-time runtime directive resolve + shared template render)
-- `src/IMPL_ROOT/dsl/by_yaml/params_template.py` (`$runtime` directive resolve + opaque literal nodes)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/entrypoints.py` (`run`, `compile`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/contracts.py` (`RunOptions.runtime_vars`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/compiler.py` (`compile_ir(..., runtime_vars=...)`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/_internal/conversion_sources.py` (compile-time runtime directive resolve + shared template render)
+- `src/IMPL_ROOT/dsl/yaml_dsl/params_template.py` (`$runtime` directive resolve + opaque literal nodes)
 ## Requirements
-### Requirement: by_yaml runtime accepts `runtime_vars` for loader params injection
-系统 SHALL 允许 by_yaml `run/compile` 接收可选的 `init_vars: Dict[str, object]`,用于在编译期将初始化变量注入到 loader 参数模板中.
+### Requirement: yaml_dsl runtime accepts `runtime_vars` for loader params injection
+系统 SHALL 允许 yaml_dsl `run/compile` 接收可选的 `init_vars: Dict[str, object]`,用于在编译期将初始化变量注入到 loader 参数模板中.
 
 #### Scenario: run 注入 init_vars
 - **WHEN** 调用方执行 `run(..., init_vars={"end_dt": <datetime>})`

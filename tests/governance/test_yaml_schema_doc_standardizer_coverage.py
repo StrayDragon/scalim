@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 import pytest
 
-from scalim.dsl.by_yaml.schema_dsl import builder as schema_builder
-from scalim.dsl.by_yaml.schema_dsl import doc_standardizer as ds
+from scalim.dsl.yaml_dsl.schema_dsl import builder as schema_builder
+from scalim.dsl.yaml_dsl.schema_dsl import doc_standardizer as ds
 
 
 def test_schema_doc_fixture_paths_skip_missing_files() -> None:

@@ -1,9 +1,9 @@
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, compile, run_workflow
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.template_precompile import maybe_precompile_yaml_text
-from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config
+from scalim.dsl.yaml_dsl import RunOptions, compile, run_workflow
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.template_precompile import maybe_precompile_yaml_text
+from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config
 
 
 def test_template_vars_precompile_supports_unquoted_placeholders_in_demand_yaml(tmp_path) -> None:
@@ -328,7 +328,7 @@ def test_template_sandbox_common_substitutions_still_work() -> None:
 
 
 def test_template_sandbox_legacy_allows_method_calls_and_warns(caplog) -> None:
-    caplog.set_level("WARNING", logger="scalim.dsl.by_yaml.template_vars")
+    caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.template_vars")
     yaml_text = "x: {{ s.strip() }}\n"
 
     rendered = maybe_precompile_yaml_text(
@@ -411,9 +411,9 @@ outputs:
 
 
 def test_template_sandbox_legacy_is_available_via_unsafe_compile_entrypoint(tmp_path, caplog) -> None:
-    from scalim.dsl.by_yaml.runtime.unsafe_entrypoints import unsafe_compile
+    from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_compile
 
-    caplog.set_level("WARNING", logger="scalim.dsl.by_yaml.template_vars")
+    caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.template_vars")
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(
         """
@@ -450,7 +450,7 @@ outputs:
 
 
 def test_template_sandbox_invalid_value_is_rejected_by_unsafe_entrypoints(tmp_path) -> None:
-    from scalim.dsl.by_yaml.runtime.unsafe_entrypoints import unsafe_compile
+    from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_compile
 
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(
@@ -477,9 +477,9 @@ outputs: []
 
 
 def test_template_sandbox_legacy_is_available_via_unsafe_run_entrypoint(tmp_path, caplog) -> None:
-    from scalim.dsl.by_yaml.runtime.unsafe_entrypoints import unsafe_run
+    from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_run
 
-    caplog.set_level("WARNING", logger="scalim.dsl.by_yaml.template_vars")
+    caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.template_vars")
     yaml_path = tmp_path / "demand.yaml"
     out = tmp_path / "out.csv"
     yaml_path.write_text(

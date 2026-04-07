@@ -2,11 +2,11 @@ import copy
 
 import pytest
 
-import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError, ScalimResolverError
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
-from scalim.dsl.by_yaml.schema_dsl.models import (
+import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_module
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError, ScalimResolverError
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     DemandConfig,
     InlineRelationConfig,
     MainSourceConfig,
@@ -15,8 +15,8 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     SourceConfig,
     SourceFieldConfig,
 )
-from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
+from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
 from scalim.spec.ir import FieldIr
 
 _ORDER_LOADER = "scalim_misc.example_report_ir:DAL.paged_get_order_list"

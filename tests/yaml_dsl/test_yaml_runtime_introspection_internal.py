@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from scalim.dsl.by_yaml.runtime import introspection as runtime_introspection
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, OutputAggregateConfig, OutputAggregateFieldConfig, OutputTargetConfig
+from scalim.dsl.yaml_dsl.runtime import introspection as runtime_introspection
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, OutputAggregateConfig, OutputAggregateFieldConfig, OutputTargetConfig
 from scalim.ob.presets.viz import VizObserver
 
 

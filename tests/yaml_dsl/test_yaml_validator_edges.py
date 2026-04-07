@@ -1,7 +1,7 @@
 import pytest
 
-import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
-from scalim.dsl.by_yaml._internal.config_parsing.models import AliasIndex, FieldDef, RawDemand
+import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_module
+from scalim.dsl.yaml_dsl._internal.config_parsing.models import AliasIndex, FieldDef, RawDemand
 
 
 class _WeirdStr(str):

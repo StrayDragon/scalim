@@ -3,11 +3,11 @@ from typing import List
 
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml import RunOptions, run
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
-from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimAllowlistRequiredError
+from scalim.dsl.yaml_dsl.schema_dsl.builder import build_demand_schema
 from scalim.sinks import CSVSink, ColumnCSVSink
 
 
@@ -150,7 +150,7 @@ class TestAllowlistRequired:
             _ = ConfigToIRConverter()
 
     def test_converter_rejects_resolver_without_allowlist(self) -> None:
-        from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
+        from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
 
         with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
             _ = ConfigToIRConverter(resolver=SecurePythonReferenceResolver())

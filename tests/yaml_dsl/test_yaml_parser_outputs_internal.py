@@ -1,11 +1,11 @@
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.models import AliasIndex, FieldDef, FieldDefIndex, RawDemand
-from scalim.dsl.by_yaml._internal.config_parsing.parsers.outputs import _resolve_output_targets_from_inheritance
-from scalim.dsl.by_yaml._internal.config_parsing.security import SecureComputeEngine
-from scalim.dsl.by_yaml.init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.models import AliasIndex, FieldDef, FieldDefIndex, RawDemand
+from scalim.dsl.yaml_dsl._internal.config_parsing.parsers.outputs import _resolve_output_targets_from_inheritance
+from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine
+from scalim.dsl.yaml_dsl.init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     OutputAggregateConfig,
     OutputAggregateFieldConfig,
     OutputTargetConfig,

@@ -1,5 +1,5 @@
-from scalim.dsl.by_yaml._internal.config_parsing.effective_yaml import dump_effective_demand_yaml, load_effective_demand_yaml
-from scalim.dsl.by_yaml._internal.config_parsing.imports import ScalimYamlImportExpansionError
+from scalim.dsl.yaml_dsl._internal.config_parsing.effective_yaml import dump_effective_demand_yaml, load_effective_demand_yaml
+from scalim.dsl.yaml_dsl._internal.config_parsing.imports import ScalimYamlImportExpansionError
 
 
 def test_effective_yaml_renders_and_dumps_without_import_syntax(tmp_path) -> None:

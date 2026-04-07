@@ -1,9 +1,9 @@
 import pytest
 
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
 from scalim.spec.ir import DerivedFieldIr, FieldIr
 
 
@@ -180,7 +180,7 @@ def test_converter_rejects_invalid_order_by_entry() -> None:
 
 
 def test_source_id_format_validation_valid() -> None:
-    from scalim.dsl.by_yaml.runtime.conversion import _validate_source_id
+    from scalim.dsl.yaml_dsl.runtime.conversion import _validate_source_id
 
     _validate_source_id("orders", "test")
     _validate_source_id("orders_2024", "test")
@@ -189,7 +189,7 @@ def test_source_id_format_validation_valid() -> None:
 
 
 def test_source_id_format_validation_invalid() -> None:
-    from scalim.dsl.by_yaml.runtime.conversion import _validate_source_id
+    from scalim.dsl.yaml_dsl.runtime.conversion import _validate_source_id
 
     for source_id in ("123-invalid", "order-id", ""):
         with pytest.raises(ScalimConversionError, match="source_id.*must match pattern"):

@@ -19,7 +19,7 @@ uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>
 2) schema-only 校验(结构/unknown-fields;依赖 `workflow.gen.json`):
 
 ```bash
-uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>
 ```
 
 更强诊断:
@@ -28,8 +28,8 @@ uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schem
 uv run scalim-cli yaml-dsl validate --type workflow --verbose <workflow.yaml>
 uv run scalim-cli yaml-dsl validate --type workflow --json <workflow.yaml>
 
-uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json --verbose <workflow.yaml>
-uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json --json <workflow.yaml>
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json --verbose <workflow.yaml>
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json --json <workflow.yaml>
 ```
 
 本地编辑器补全/hover:
@@ -50,7 +50,7 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style al
 3. validate 过了但 workflow 仍失败时,用 Python 入口跑一次,定位运行期的 fail-fast 校验(例如 cycle、ctx 越界、输出路径冲突等)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
 
 run_workflow(
     "path/to/workflow.yaml",
@@ -82,7 +82,7 @@ run_workflow(
 
 修复:
 
-- 加 `--schema src/scalim/dsl/by_yaml/schema/workflow.gen.json`
+- 加 `--schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
 
 ### 3) `depends_on` 引用不存在的 run id 或形成 cycle
 
@@ -94,7 +94,7 @@ run_workflow(
 
 - 确保 `depends_on` 里每个 id 都存在于 `workflow.runs[*].id`
 - 如果有环,按业务语义拆开或改写依赖方向
-- 如果你在 Python 入口使用了 `run_workflow(..., run_patches_by_id=...)`,也必须保证 `run_patches_by_id` 的 keys 都是合法的 `workflow.runs[*].id`(否则同样会 fail-fast 并列出已知 ids)。
+- 如果你在 Python 入口使用了 `run_workflow(..., run_options_patches_by_run_id=...)`,也必须保证 `run_options_patches_by_run_id` 的 keys 都是合法的 `workflow.runs[*].id`(否则同样会 fail-fast 并列出已知 ids)。
 
 ### 4) `$ctx` 引用越界(不在 deps 可见范围)
 

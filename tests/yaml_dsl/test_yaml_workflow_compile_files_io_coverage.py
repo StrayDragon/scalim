@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride
-from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
-from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowOptions, WorkflowRun
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride
+from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
+from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowOptions, WorkflowRun
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     DemandConfig,
     FileConfig,
     OutputTargetConfig,

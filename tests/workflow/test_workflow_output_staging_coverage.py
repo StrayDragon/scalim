@@ -33,7 +33,7 @@ def _read_csv(path: Path) -> list[list[str]]:
 
 
 def test_load_workflow_config_from_mapping_output_staging_defaults_are_present() -> None:
-    from scalim.dsl.by_yaml.workflow import load_workflow_config_from_mapping
+    from scalim.dsl.yaml_dsl.workflow import load_workflow_config_from_mapping
 
     cfg = load_workflow_config_from_mapping(_base_root())
     assert cfg.options.output_staging.dir_name == ".scalim-staging"
@@ -42,7 +42,7 @@ def test_load_workflow_config_from_mapping_output_staging_defaults_are_present()
 
 
 def test_load_workflow_config_from_mapping_rejects_output_staging_key() -> None:
-    from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config_from_mapping
+    from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config_from_mapping
 
     root = _base_root()
     root.setdefault("workflow", {}).setdefault("options", {})["output_staging"] = {"dir_name": ".staging"}
@@ -61,15 +61,15 @@ def test_load_workflow_config_from_mapping_rejects_output_staging_key() -> None:
     ],
 )
 def test_normalize_workflow_output_staging_override_rejects_wrong_type(raw: object, exc_type: type[Exception], match: str) -> None:
-    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+    from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 
     with pytest.raises(exc_type, match=match):
         _ = workflow_compile_mod._normalize_workflow_output_staging_override(raw)  # noqa: SLF001
 
 
 def test_normalize_workflow_output_staging_override_rejects_empty_dir_name() -> None:
-    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
-    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+    from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions
 
     with pytest.raises(ValueError, match=r"workflow_output_staging\.dir_name must be a non-empty string"):
         _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
@@ -79,8 +79,8 @@ def test_normalize_workflow_output_staging_override_rejects_empty_dir_name() -> 
 
 @pytest.mark.parametrize("dir_name", [".", "..", "a/b", "a\\\\b"])
 def test_normalize_workflow_output_staging_override_rejects_unsafe_dir_name(dir_name: str) -> None:
-    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
-    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+    from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions
 
     with pytest.raises(ValueError, match=r"workflow_output_staging\.dir_name must be a simple directory name"):
         _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
@@ -89,8 +89,8 @@ def test_normalize_workflow_output_staging_override_rejects_unsafe_dir_name(dir_
 
 
 def test_normalize_workflow_output_staging_override_rejects_non_bool_keep_on_success() -> None:
-    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
-    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+    from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions
 
     with pytest.raises(TypeError, match=r"workflow_output_staging\.keep_on_success must be a bool"):
         _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
@@ -102,8 +102,8 @@ def test_normalize_workflow_output_staging_override_rejects_non_bool_keep_on_suc
 
 
 def test_normalize_workflow_output_staging_override_rejects_non_bool_keep_on_failure() -> None:
-    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
-    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+    from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions
 
     with pytest.raises(TypeError, match=r"workflow_output_staging\.keep_on_failure must be a bool"):
         _ = workflow_compile_mod._normalize_workflow_output_staging_override(  # noqa: SLF001
@@ -115,9 +115,9 @@ def test_normalize_workflow_output_staging_override_rejects_non_bool_keep_on_fai
 
 
 def test_output_staging_flows_from_runtime_to_ir_to_runtime(tmp_path: Path) -> None:
-    from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
-    from scalim.dsl.by_yaml.workflow import load_workflow_config_from_mapping
-    from scalim.dsl.by_yaml.workflow_types import WorkflowOutputStagingOptions
+    from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
+    from scalim.dsl.yaml_dsl.workflow import load_workflow_config_from_mapping
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr
     from scalim.workflow import execute as workflow_execute_mod
 

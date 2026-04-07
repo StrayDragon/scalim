@@ -5,7 +5,7 @@
 `artifacts/skills/scalim-yaml-dsl/references/generated/`.
 
 生成内容分层如下:
-- 语法目录: `src/scalim/dsl/by_yaml/schema/demand.gen.json` 与 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 为语法真相
+- 语法目录: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json` 与 `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json` 为语法真相
 - CLI/LSP 参考: `src/scalim/cli/yaml_dsl.py` 为唯一命令真相
 - 规范摘要: `openspec/specs/` 中相关 spec 作为维护来源,自动摘录 requirement 索引
 - canonical example: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
@@ -35,14 +35,14 @@ from scalim_misc.yaml_dsl_cli_reference_md import (
 
 from scalim import _project_constants
 from scalim.cli import yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml._internal.config_parsing.imports import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.imports import (
     ScalimYamlImportExpansionError,
     contains_import_syntax,
     expand_imports_inplace,
 )
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.by_yaml.runtime.builtin_callables import list_public_builtin_callable_ids
-from scalim.dsl.by_yaml.schema_dsl import constants as yaml_schema_constants
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl.runtime.builtin_callables import list_public_builtin_callable_ids
+from scalim.dsl.yaml_dsl.schema_dsl import constants as yaml_schema_constants
 
 try:
     import jsonschema
@@ -83,8 +83,8 @@ CLI_LSP_REFERENCE_REL = GENERATED_ROOT_REL / "cli-lsp-reference.gen.md"
 CANONICAL_EXAMPLE_OUTPUT_REL = GENERATED_ROOT_REL / "example-full" / "ecommerce_report.gen.yaml"
 UPGRADES_NOTES_REL = GENERATED_ROOT_REL / "yaml-dsl-upgrades.gen.md"
 
-SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
-WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
+SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
+WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
 CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
 CANONICAL_EXAMPLE_SOURCE_REL = (
     Path("notebooks") / "marimo" / "demo_big_data_report" / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_report.yaml"
@@ -558,7 +558,7 @@ def render_syntax_catalog(
             "demand_schema": path_to_posix(SCHEMA_REL),
             "workflow_schema": path_to_posix(WORKFLOW_SCHEMA_REL),
             "canonical_example": path_to_posix(CANONICAL_EXAMPLE_OUTPUT_REL),
-            "validator": "src/scalim/dsl/by_yaml/config_parsing/validator.py",
+            "validator": "src/scalim/dsl/yaml_dsl/_internal/config_parsing/validator.py",
         },
         "builtin_callables": builtin_ids_rendered,
         "demand_top_fields": demand_top_fields,
@@ -579,7 +579,7 @@ def render_syntax_catalog(
             "workflow.resources.books",
         ],
         "workflow_validation": [
-            "Repo schema-only: uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>",
+            "Repo schema-only: uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>",
             "LSP header: # yaml-language-server: $schema=.../workflow.gen.json OR # $schema: .../workflow.gen.json (use yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>)",
         ],
     }
@@ -623,7 +623,7 @@ def render_workflow_syntax_catalog(workflow_schema: Dict[str, Any]) -> List[str]
         "- `workflow.resources.books` (optional; shared Excel book outputs)",
         "",
         "### Validation",
-        "- Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`",
+        "- Repo schema-only: `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>`",
         "- LSP header: `# yaml-language-server: $schema=.../workflow.gen.json` 或 `# $schema: .../workflow.gen.json` (推荐用 `yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`)",
         "",
     ]

@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult

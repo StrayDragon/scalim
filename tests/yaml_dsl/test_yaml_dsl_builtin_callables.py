@@ -1,11 +1,15 @@
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.call_by import parse_call_by
-from scalim.dsl.by_yaml.reference_syntax import is_valid_callable_reference
-from scalim.dsl.by_yaml.runtime.builtin_callables import is_builtin_callable_reference, list_builtin_callable_ids, parse_builtin_callable_id
-from scalim.dsl.by_yaml.runtime.compiler import create_reference_resolver
-from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
-from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
+from scalim.dsl.yaml_dsl._internal.config_parsing.call_by import parse_call_by
+from scalim.dsl.yaml_dsl.reference_syntax import is_valid_callable_reference
+from scalim.dsl.yaml_dsl.runtime.builtin_callables import (
+    is_builtin_callable_reference,
+    list_builtin_callable_ids,
+    parse_builtin_callable_id,
+)
+from scalim.dsl.yaml_dsl.runtime.compiler import create_reference_resolver
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
+from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
 from scalim.workflow.loaders import book_sheet_rows
 from tests.fixtures.call_by_fns import echo
 

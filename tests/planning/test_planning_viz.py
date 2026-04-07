@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.runtime.introspection import build_viz_observer
-from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
+from scalim.dsl.yaml_dsl.runtime.introspection import build_viz_observer
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimAllowlistRequiredError
 from scalim.events._events import DiagnosticWarningEvent, ErrorEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.ob.observability import Observability
 from scalim.ob.presets.viz import VizObserver, VizObserverConfig

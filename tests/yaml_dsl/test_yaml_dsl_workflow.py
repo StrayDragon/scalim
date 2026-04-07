@@ -5,19 +5,19 @@ from typing import Any, Dict, List, Optional, cast
 
 import pytest
 
-from scalim.dsl.by_yaml import DemandDiagnosticsOverride
-from scalim.dsl.by_yaml import DemandDiagnosticsPolicy
-from scalim.dsl.by_yaml import OutputOverride, OutputToOverride, OutputWriteOverride
-from scalim.dsl.by_yaml import RunOverrides
-from scalim.dsl.by_yaml import FileResourceOverride
-from scalim.dsl.by_yaml import OutputExtrasOverride
-from scalim.dsl.by_yaml import ResourcesOverride
-from scalim.dsl.by_yaml import RunResult
-from scalim.dsl.by_yaml import RunOptions
-from scalim.dsl.by_yaml import run_workflow
-from scalim.dsl.by_yaml.runtime import compiler as by_yaml_compiler_mod
-from scalim.dsl.by_yaml.workflow_types import ComponentsExtend, ComponentsReplace, WorkflowRunPatch
-from scalim.dsl.by_yaml import workflow_compile as workflow_compile_mod
+from scalim.dsl.yaml_dsl import DemandDiagnosticsOverride
+from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy
+from scalim.dsl.yaml_dsl import OutputOverride, OutputToOverride, OutputWriteOverride
+from scalim.dsl.yaml_dsl import RunOverrides
+from scalim.dsl.yaml_dsl import FileResourceOverride
+from scalim.dsl.yaml_dsl import OutputExtrasOverride
+from scalim.dsl.yaml_dsl import ResourcesOverride
+from scalim.dsl.yaml_dsl import RunResult
+from scalim.dsl.yaml_dsl import RunOptions
+from scalim.dsl.yaml_dsl import run_workflow
+from scalim.dsl.yaml_dsl.runtime import compiler as by_yaml_compiler_mod
+from scalim.dsl.yaml_dsl.workflow_types import ComponentsExtend, ComponentsReplace, WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 from scalim.exceptions import ScalimInternalError
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.workflow import loaders as workflow_loaders_mod
@@ -41,7 +41,7 @@ from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
 from scalim.execution.guardrails import GuardrailsPolicy
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec
-from scalim.dsl.by_yaml.workflow import (
+from scalim.dsl.yaml_dsl.workflow import (
     ScalimWorkflowConfigError,
     load_workflow_config,
     load_workflow_config_from_mapping,
@@ -949,7 +949,7 @@ def test_run_workflow_rejects_sink_in_base_options(tmp_path: Path) -> None:
         _ = run_workflow(str(wf), options=_run_options(sink=InMemoryRowSink()))
 
 
-def test_run_workflow_run_patches_by_id_batch_size_overrides_global(tmp_path: Path) -> None:
+def test_run_workflow_run_options_patches_by_run_id_batch_size_overrides_global(tmp_path: Path) -> None:
     _ = _write_demand_yaml(
         tmp_path,
         file_name="a.yaml",
@@ -980,7 +980,7 @@ def test_run_workflow_run_patches_by_id_batch_size_overrides_global(tmp_path: Pa
     result = run_workflow(
         str(wf),
         options=_run_options(batch_size=2000),
-        run_patches_by_id={"a": WorkflowRunPatch(batch_size=5000)},
+        run_options_patches_by_run_id={"a": WorkflowRunOptionsPatch(batch_size=5000)},
         compile_demand_yaml_fn=_compile_with_capture,
     )
     assert not result.errors()
@@ -988,7 +988,7 @@ def test_run_workflow_run_patches_by_id_batch_size_overrides_global(tmp_path: Pa
     assert seen_batch_size_by_name["b.yaml"] == 2000
 
 
-def test_run_workflow_run_patches_by_id_rejects_unknown_id(tmp_path: Path) -> None:
+def test_run_workflow_run_options_patches_by_run_id_rejects_unknown_id(tmp_path: Path) -> None:
     _ = _write_demand_yaml(
         tmp_path,
         file_name="ok.yaml",
@@ -1007,13 +1007,13 @@ def test_run_workflow_run_patches_by_id_rejects_unknown_id(tmp_path: Path) -> No
         _ = run_workflow(
             str(wf),
             options=_run_options(),
-            run_patches_by_id={"nope": WorkflowRunPatch(batch_size=5000)},
+            run_options_patches_by_run_id={"nope": WorkflowRunOptionsPatch(batch_size=5000)},
         )
     assert "nope" in str(excinfo.value)
     assert "ok" in str(excinfo.value)
 
 
-def test_run_workflow_run_patches_by_id_rejects_dict_patch_payload(tmp_path: Path) -> None:
+def test_run_workflow_run_options_patches_by_run_id_rejects_dict_patch_payload(tmp_path: Path) -> None:
     _ = _write_demand_yaml(
         tmp_path,
         file_name="ok.yaml",
@@ -1032,11 +1032,11 @@ def test_run_workflow_run_patches_by_id_rejects_dict_patch_payload(tmp_path: Pat
         _ = run_workflow(  # type: ignore[arg-type] intentional runtime boundary test
             str(wf),
             options=_run_options(),
-            run_patches_by_id={"ok": {"batch_size": 5000}},
+            run_options_patches_by_run_id={"ok": {"batch_size": 5000}},
         )
 
 
-def test_run_workflow_run_patches_by_id_components_extend_and_replace(tmp_path: Path) -> None:
+def test_run_workflow_run_options_patches_by_run_id_components_extend_and_replace(tmp_path: Path) -> None:
     _ = _write_demand_yaml(
         tmp_path,
         file_name="a.yaml",
@@ -1070,9 +1070,9 @@ def test_run_workflow_run_patches_by_id_components_extend_and_replace(tmp_path: 
     result = run_workflow(
         str(wf),
         options=_run_options(components=[base]),
-        run_patches_by_id={
-            "a": WorkflowRunPatch(components=ComponentsExtend([extra])),
-            "b": WorkflowRunPatch(components=ComponentsReplace(())),
+        run_options_patches_by_run_id={
+            "a": WorkflowRunOptionsPatch(components=ComponentsExtend([extra])),
+            "b": WorkflowRunOptionsPatch(components=ComponentsReplace(())),
         },
         compile_demand_yaml_fn=_compile_with_capture,
     )
@@ -1088,56 +1088,58 @@ def test_components_replace_normalizes_iterable_items_to_tuple() -> None:
     assert patch.items == (r,)
 
 
-def test_validate_run_patches_by_id_rejects_non_str_key() -> None:
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+def test_validate_run_options_patches_by_run_id_rejects_non_str_key() -> None:
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
     with pytest.raises(TypeError, match=r"keys must be workflow run ids"):
-        _ = workflow_entrypoints_mod._validate_run_patches_by_id(  # type: ignore[arg-type] intentional runtime boundary test
-            {1: WorkflowRunPatch(batch_size=5000)},
+        _ = workflow_entrypoints_mod._validate_run_options_patches_by_run_id(  # type: ignore[arg-type] intentional runtime boundary test
+            {1: WorkflowRunOptionsPatch(batch_size=5000)},
             known_run_ids=frozenset(["ok"]),
         )
 
 
-def test_validate_run_patches_by_id_rejects_non_patch_payload() -> None:
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+def test_validate_run_options_patches_by_run_id_rejects_non_patch_payload() -> None:
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
-    with pytest.raises(TypeError, match=r"must be a WorkflowRunPatch"):
-        _ = workflow_entrypoints_mod._validate_run_patches_by_id(
+    with pytest.raises(TypeError, match=r"must be a WorkflowRunOptionsPatch"):
+        _ = workflow_entrypoints_mod._validate_run_options_patches_by_run_id(
             {"ok": object()},  # type: ignore[arg-type] intentional runtime boundary test
             known_run_ids=frozenset(["ok"]),
         )
 
 
-def test_apply_workflow_run_patch_applies_demand_failure_policy_guardrails_loader_retry() -> None:
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+def test_apply_workflow_run_options_patch_applies_demand_failure_policy_guardrails_loader_retry() -> None:
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
     base = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES, demand_failure_policy="global")
     guardrails = GuardrailsPolicy(enabled=True)
     loader_retry = LoaderRetryPoliciesSpec()
-    patch = WorkflowRunPatch(
+    patch = WorkflowRunOptionsPatch(
         demand_failure_policy="patch",
         guardrails=guardrails,
         loader_retry=loader_retry,
     )
 
-    next_options = workflow_entrypoints_mod._apply_workflow_run_patch(base, patch)
+    next_options = workflow_entrypoints_mod._apply_workflow_run_options_patch(base, patch)
     assert next_options.demand_failure_policy == "patch"
     assert next_options.guardrails == guardrails
     assert next_options.loader_retry == loader_retry
 
 
-def test_apply_workflow_run_patch_rejects_unknown_components_patch() -> None:
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+def test_apply_workflow_run_options_patch_rejects_unknown_components_patch() -> None:
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
     base = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES)
-    with pytest.raises(TypeError, match=r"WorkflowRunPatch\.components must be"):
-        _ = workflow_entrypoints_mod._apply_workflow_run_patch(
+    with pytest.raises(TypeError, match=r"WorkflowRunOptionsPatch\.components must be"):
+        _ = workflow_entrypoints_mod._apply_workflow_run_options_patch(
             base,
-            WorkflowRunPatch(components=object()),  # type: ignore[arg-type] intentional runtime boundary test
+            WorkflowRunOptionsPatch(components=object()),  # type: ignore[arg-type] intentional runtime boundary test
         )
 
 
-def test_run_workflow_run_patches_by_id_overrides_precedence_over_workflow_resources_and_global_overrides(tmp_path: Path) -> None:
+def test_run_workflow_run_options_patches_by_run_id_overrides_precedence_over_workflow_resources_and_global_overrides(
+    tmp_path: Path,
+) -> None:
     _ = _write_text(
         tmp_path / "a.yaml",
         (
@@ -1212,8 +1214,8 @@ outputs:
     )
 
     patch_detail_a_path = tmp_path / "patch_detail_a.csv"
-    run_patches_by_id = {
-        "a": WorkflowRunPatch(
+    run_options_patches_by_run_id = {
+        "a": WorkflowRunOptionsPatch(
             overrides=RunOverrides(
                 resources=ResourcesOverride(
                     files={
@@ -1227,7 +1229,7 @@ outputs:
     result = run_workflow(
         str(wf),
         options=_run_options(overrides=overrides),
-        run_patches_by_id=run_patches_by_id,
+        run_options_patches_by_run_id=run_options_patches_by_run_id,
     )
     assert not result.errors()
 
@@ -2218,7 +2220,7 @@ def test_workflow_schema_validation() -> None:
     jsonschema = pytest.importorskip("jsonschema")
     yaml = pytest.importorskip("yaml")
 
-    from scalim.dsl.by_yaml.schema_dsl.builder import build_workflow_schema
+    from scalim.dsl.yaml_dsl.schema_dsl.builder import build_workflow_schema
 
     schema = build_workflow_schema()
     ok = yaml.safe_load(
@@ -4101,15 +4103,15 @@ sources: {}
 
 def test_workflow_structural_preload_does_not_import_runtime_compiler() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    workflow_compile_text = (repo_root / "src/scalim/dsl/by_yaml/workflow_compile.py").read_text(encoding="utf-8")
-    loader_text = (repo_root / "src/scalim/dsl/by_yaml/_internal/config_parsing/loader.py").read_text(encoding="utf-8")
+    workflow_compile_text = (repo_root / "src/scalim/dsl/yaml_dsl/workflow_compile.py").read_text(encoding="utf-8")
+    loader_text = (repo_root / "src/scalim/dsl/yaml_dsl/_internal/config_parsing/loader.py").read_text(encoding="utf-8")
 
     for needle in (
-        "from scalim.dsl.by_yaml.runtime import compiler",
+        "from scalim.dsl.yaml_dsl.runtime import compiler",
         "from .runtime import compiler",
         "from ..runtime import compiler",
-        "import scalim.dsl.by_yaml.runtime.compiler",
-        "import scalim.dsl.by_yaml.runtime.compiler as",
+        "import scalim.dsl.yaml_dsl.runtime.compiler",
+        "import scalim.dsl.yaml_dsl.runtime.compiler as",
     ):
         assert needle not in workflow_compile_text
         assert needle not in loader_text
@@ -4235,7 +4237,9 @@ outputs:
         _ = run_workflow(
             str(wf),
             options=_run_options(),
-            run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
+            run_options_patches_by_run_id={
+                "a": WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
+            },
         )
 
     assert not a_out.exists()
@@ -4373,7 +4377,7 @@ outputs:
         _ = run_workflow(
             str(wf),
             options=_run_options(demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
-            run_patches_by_id={"b": WorkflowRunPatch(demand_diagnostics=None)},
+            run_options_patches_by_run_id={"b": WorkflowRunOptionsPatch(demand_diagnostics=None)},
         )
 
     assert not a_out.exists()
@@ -4432,14 +4436,14 @@ def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_an
         failure_policy="primary_only",
     )
 
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
     base_options = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES, batch_size=1000)
     lifecycle = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(
         str(wf),
         base_options=base_options,
         path_aliases=None,
-        run_patches_by_id={"b": WorkflowRunPatch(batch_size=123)},
+        run_options_patches_by_run_id={"b": WorkflowRunOptionsPatch(batch_size=123)},
         workflow_resources_wait=None,
         workflow_output_staging=None,
     )
@@ -4469,7 +4473,7 @@ def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(
         failure_policy="primary_only",
     )
 
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
     original_compile = workflow_entrypoints_mod.compile_workflow_ir
 
@@ -4485,7 +4489,7 @@ def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(
             str(wf),
             base_options=base_options,
             path_aliases=None,
-            run_patches_by_id=None,
+            run_options_patches_by_run_id=None,
             workflow_resources_wait=None,
             workflow_output_staging=None,
         )
@@ -4508,7 +4512,7 @@ def test_run_workflow_runtime_compile_rejects_unknown_run_id(tmp_path: Path, mon
         failure_policy="primary_only",
     )
 
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
     original = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight
 
@@ -4521,7 +4525,7 @@ def test_run_workflow_runtime_compile_rejects_unknown_run_id(tmp_path: Path, mon
             workflow_ir=lifecycle.effective.workflow_ir,
             runs=lifecycle.effective.runs,
             options_by_run_id=bad_options,
-            run_patches_by_id=lifecycle.effective.run_patches_by_id,
+            run_options_patches_by_run_id=lifecycle.effective.run_options_patches_by_run_id,
             bundle_viz_base_config=lifecycle.effective.bundle_viz_base_config,
         )
         return workflow_entrypoints_mod.WorkflowLifecyclePreflightResult(
@@ -4561,7 +4565,7 @@ def test_run_workflow_bundle_viz_requires_overrides_in_runtime_compile(tmp_path:
         failure_policy="primary_only",
     )
 
-    from scalim.dsl.by_yaml import workflow_entrypoints as workflow_entrypoints_mod
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
     from scalim.ob.presets.viz import VizObserverConfig
 
     original = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight
@@ -4575,7 +4579,7 @@ def test_run_workflow_bundle_viz_requires_overrides_in_runtime_compile(tmp_path:
             workflow_ir=lifecycle.effective.workflow_ir,
             runs=lifecycle.effective.runs,
             options_by_run_id=bad_options,
-            run_patches_by_id=lifecycle.effective.run_patches_by_id,
+            run_options_patches_by_run_id=lifecycle.effective.run_options_patches_by_run_id,
             bundle_viz_base_config=lifecycle.effective.bundle_viz_base_config,
         )
         return workflow_entrypoints_mod.WorkflowLifecyclePreflightResult(
@@ -4722,7 +4726,9 @@ def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_err
     result = run_workflow(
         str(wf),
         options=_run_options(),
-        run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(include_full_error_message=True))},
+        run_options_patches_by_run_id={
+            "a": WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride(include_full_error_message=True))
+        },
     )
     assert not result.errors()
 
@@ -4753,7 +4759,9 @@ def test_run_workflow_run_patch_can_disable_duplicate_name_validation(tmp_path: 
     result = run_workflow(
         str(wf),
         options=_run_options(),
-        run_patches_by_id={"dup": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
+        run_options_patches_by_run_id={
+            "dup": WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
+        },
     )
 
     assert not result.errors()

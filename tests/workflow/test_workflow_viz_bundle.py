@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run_workflow
-from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run_workflow
+from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError
 from scalim.ob.presets.viz import VizObserverConfig
 
 

@@ -1,6 +1,6 @@
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     DemandConfig,
     MainSourceConfig,
     RelationConfig,

@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle import verify_ecommerce_rank_score_csv_rows
 from scalim_misc.demo_big_data_report.cases import build_test_config_small

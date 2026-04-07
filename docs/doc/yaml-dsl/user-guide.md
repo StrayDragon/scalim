@@ -55,7 +55,7 @@ main_source:
 而不是把路径写死在 YAML 里(更易复用/更易对拍):
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
@@ -161,7 +161,7 @@ scalim-cli yaml-dsl validate config.yaml
 **Python 代码调用**:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run, run_workflow
 
 # 加载并执行 YAML 配置(安全:需要 allowlist)
 result = run(
@@ -174,7 +174,7 @@ result = run(
 # workflow YAML 执行入口
 workflow_result = run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
+    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"])),
 )
 
 # 常见用法: YAML 不声明 outputs,由 Python 调用侧 RunOverrides 指定单输出编排(推荐)
@@ -225,7 +225,7 @@ resources:
 
 ```python
 from datetime import datetime
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 
 result = run(
     "path/to/config.yaml",
@@ -389,7 +389,7 @@ _templates:
 注意:
 
 - `batch_size`/`retry`/`guardrails`/demand `failure_policy` 已迁出 YAML 主线(运行期策略边界);请在 Python runtime entrypoints 中配置:
-  - `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))`
+  - `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))`
 
 ### 3.2 主数据源配置 (main_source)
 
@@ -942,7 +942,7 @@ CLI 校验入口 `scalim-cli yaml-dsl validate ...` 会在 validate 阶段发出
 #### 3.7.1 日志(logging)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
 
 run(
@@ -957,7 +957,7 @@ run(
 #### 3.7.2 性能(performance)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver, PerformanceThresholds
 
 perf = PerformanceObserver(
@@ -983,7 +983,7 @@ run(
 #### 3.7.3 关联(relations)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 
 relations = RelationObserver(
@@ -1008,7 +1008,7 @@ run(
 #### 3.7.4 可视化(viz)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
 
 run(
@@ -1036,7 +1036,7 @@ run(
 #### 3.7.5 执行追踪(trace)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 
 trace = ExecutionTraceObserver()
@@ -1052,7 +1052,7 @@ _ = run(
 #### 3.7.6 行缺口统计(row_gap)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.row_gap import RowGapObserver
 
 row_gap = RowGapObserver(primary_loader_name="tickets", data_loader_names=["customers", "agents"], sample_limit=3)
@@ -1068,7 +1068,7 @@ _ = run(
 #### 3.7.7 内存优化统计(memory_opt)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 
 mem = MemoryOptimizationObserver(auto_report=True, max_fields=20)
@@ -1301,7 +1301,7 @@ outputs:
 如需输出 meta/audit extra sheets,请在 Python 运行入口配置 runtime output extras:
 
 ```python
-from scalim.dsl.by_yaml import OutputExtrasOverride, RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import OutputExtrasOverride, RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
@@ -1315,7 +1315,7 @@ result = run(
 #### 4.5.2 示例: Python 运行期覆盖 outputs(动态选字段/路径/sheet)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",
@@ -1332,23 +1332,23 @@ result = run(
 )
 ```
 
-### 4.6 下游集成工具(稳定入口): `scalim.dsl.by_yaml.tools`
+### 4.6 下游集成工具(稳定入口): `scalim.dsl.yaml_dsl.tools`
 
 下游在做集成时,常见还需要一些“工具/自省”能力(例如读取输出字段配置、推导相对引用的基准模块路径).这类能力请优先使用稳定工具面:
 
-- `scalim.dsl.by_yaml.tools.load_output_config(yaml_path)`
+- `scalim.dsl.yaml_dsl.tools.load_output_config(yaml_path)`
   - 返回 `dict`(运行期)且至少包含 keys: `params` / `field_name_mapping` / `output_fields` / `outputs`
-- `scalim.dsl.by_yaml.tools.derive_base_module_path(yaml_path, sys_path=..., cwd=...)`
+- `scalim.dsl.yaml_dsl.tools.derive_base_module_path(yaml_path, sys_path=..., cwd=...)`
   - 根据 `yaml_path + sys.path` 推导相对引用的 `base_module_path`
 
 迁移提示:
 
-- 若你之前直接从 YAML DSL 的内部实现子包(例如 `runtime` 子包)导入这些 helper,请统一迁移到 `scalim.dsl.by_yaml.tools`
+- 若你之前直接从 YAML DSL 的内部实现子包(例如 `runtime` 子包)导入这些 helper,请统一迁移到 `scalim.dsl.yaml_dsl.tools`
 
 最小示例:
 
 ```python
-from scalim.dsl.by_yaml.tools import derive_base_module_path, load_output_config
+from scalim.dsl.yaml_dsl.tools import derive_base_module_path, load_output_config
 
 cfg = load_output_config("path/to/config.yaml")
 base_module_path = derive_base_module_path("path/to/config.yaml")
@@ -1613,7 +1613,7 @@ resources:
 可观测性(可选)请通过 runtime entrypoints 装配(示例):
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 
@@ -1702,7 +1702,7 @@ sources:
 **1. 合理设置 batch_size(运行期策略,通过 runtime entrypoint 配置)**:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 
 # 小数据集或低内存环境
 run(
@@ -1792,7 +1792,7 @@ def load_orders(*, api_key=None, **kwargs):
 YAML 中的 `loader` / `call_by` 允许引用 Python 可调用对象,属于动态执行边界.在生产/低信任输入场景 MUST 使用 allowlist 限制可解析的引用:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 
 # 模块级 allowlist(允许该模块及其子模块)
 run(
@@ -1840,10 +1840,10 @@ main_source:
 
 **高级用法(迁移提示)**:
 
-- 旧代码如果绕过官方 facade 直接调用内部编译器/转换器,建议迁移到 `scalim.dsl.by_yaml.compile/run`,并显式配置 allowlist:
+- 旧代码如果绕过官方 facade 直接调用内部编译器/转换器,建议迁移到 `scalim.dsl.yaml_dsl.compile/run`,并显式配置 allowlist:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, compile
+from scalim.dsl.yaml_dsl import RunOptions, compile
 
 # 推荐:显式 allowlist(安全默认)
 _ = compile(
@@ -1875,7 +1875,7 @@ fields:
 
 compute limits 等更细粒度安全配置属于内部实现细节;如确需自定义,请以 OpenSpec 与源码为准:
 
-- `src/scalim/dsl/by_yaml/config_parsing/security.py`
+- `src/scalim/dsl/yaml_dsl/_internal/config_parsing/security.py`
 
 常见报错关键字(触发上限时会出现在错误信息中):
 `max_expression_len` / `max_ast_nodes` / `max_ast_depth` / `max_literal_string_len` / `max_collection_literal_len` / `max_repeat` / `max_range_len`
@@ -1894,7 +1894,7 @@ compute limits 等更细粒度安全配置属于内部实现细节;如确需自�
 **A**: 通过 runtime entrypoints 装配 `RelationObserver`:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 
 relations = RelationObserver(
@@ -2001,7 +2001,7 @@ sources:
 1. **减小 batch_size**:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 
 run(
     "path/to/report.yaml",
@@ -2036,7 +2036,7 @@ sources:
 4. **启用内存优化统计**:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 
 mem = MemoryOptimizationObserver(auto_report=True)
@@ -2054,7 +2054,7 @@ _ = run(
 **A**:
 
 - 查看/导出 schema: `scalim-cli yaml-dsl schema show` / `scalim-cli yaml-dsl schema path`
-- 更新仓库内 schema 生成物: `just gen-yaml-dsl-schema` (并提交 `src/scalim/dsl/by_yaml/schema/demand.gen.json`)
+- 更新仓库内 schema 生成物: `just gen-yaml-dsl-schema` (并提交 `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`)
 
 ### Q8: 如何验证配置文件？
 
@@ -2080,7 +2080,7 @@ scalim-cli yaml-dsl validate --json config.yaml
 
 ```python
 # 或在代码中(编译时会自动校验;需配置 allowlist)
-from scalim.dsl.by_yaml import RunOptions, compile
+from scalim.dsl.yaml_dsl import RunOptions, compile
 
 _ = compile(
     "config.yaml",
@@ -2114,7 +2114,7 @@ outputs:
 **A**:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.hooks.base import BaseHook
 
 
@@ -2149,7 +2149,7 @@ print(f"输出路径: {result.output_path}")
 - 当启用 `template_vars` 时,系统会对“渲染后的 YAML 文本”施加长度上限 `rendered_yaml_max_len`(默认 `1048576`)：同时覆盖 demand/workflow 与 imports fragments,并在 YAML parse 前 fail-fast；超限错误只回显 `rendered_len/max_len` 与位置,不会回显渲染正文。
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 
 result = run(
     "path/to/config.yaml",

@@ -3,7 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 from textwrap import dedent
 
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from tests.support.yaml_fixtures import make_yaml_config
 
 

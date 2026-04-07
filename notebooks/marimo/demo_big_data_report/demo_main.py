@@ -101,7 +101,7 @@ def _(mo, yaml_path):
 @app.cell
 def _(yaml_path):
     # region SCALIM-SKILL:example-full:constraints
-    from scalim.dsl.by_yaml import RunOptions, compile
+    from scalim.dsl.yaml_dsl import RunOptions, compile
 
     _loaders_module = "scalim_misc.demo_big_data_report.loaders"
 
@@ -179,7 +179,7 @@ def _(mo):
 @app.cell
 def _(Path, yaml_path):
     # region SCALIM-SKILL:example-full:run-yaml
-    from scalim.dsl.by_yaml import RunOptions, run
+    from scalim.dsl.yaml_dsl import RunOptions, run
     from scalim.sinks import InMemoryRowSink
 
     # 注意: `run()` 需要 `allowlist` 配置

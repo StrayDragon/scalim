@@ -33,7 +33,7 @@ TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update
 - 覆盖该能力点的 YAML 文件路径
 - 覆盖该能力点的章节/对拍断言入口
 
-该矩阵 MUST 以 `src/scalim/dsl/by_yaml/schema/demand.gen.json` 与 `workflow.gen.json` 为唯一基准。
+该矩阵 MUST 以 `src/scalim/dsl/yaml_dsl/schema/demand.gen.json` 与 `workflow.gen.json` 为唯一基准。
 
 #### Scenario: coverage matrix 文件存在
 - **WHEN** 维护者检查 `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/`

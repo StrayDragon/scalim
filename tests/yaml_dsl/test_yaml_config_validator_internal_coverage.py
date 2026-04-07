@@ -1,8 +1,8 @@
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.runtime import effective_outputs as effective_outputs_mod
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig, OutputWriteConfig
-from scalim.dsl.by_yaml.schema_dsl.output_enums import DEFAULT_BOOK_WRITE_MODE
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig, OutputWriteConfig
+from scalim.dsl.yaml_dsl.schema_dsl.output_enums import DEFAULT_BOOK_WRITE_MODE
 
 
 def test_effective_book_write_mode_returns_default_when_book_missing() -> None:

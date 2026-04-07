@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 import scalim.cli.yaml_dsl as yaml_dsl
-import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_mod
+import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_mod
 
 
 def _write_yaml(path: Path) -> None:

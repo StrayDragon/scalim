@@ -3,7 +3,7 @@ import marimo
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from scalim.dsl.by_yaml import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
     ECommerceConfig,

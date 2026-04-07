@@ -5,7 +5,7 @@ from typing import Iterator, List
 import pytest
 
 import scalim_yaml_dsl_lsp.core as editor_semantics
-from scalim.dsl.by_yaml._internal.config_parsing.yaml_load import load_yaml_mapping_text
+from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import load_yaml_mapping_text
 
 _NOTEBOOK_FIXTURES_ROOT = Path("notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl")
 

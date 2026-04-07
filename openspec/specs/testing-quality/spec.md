@@ -257,10 +257,10 @@ pytest MAY 为门禁脚本提供单元测试,但 MUST NOT 把完整门禁逻辑�
 
 ### Requirement: YAML DSL schema drift 质量门禁
 项目 MUST 提供 `just schema-drift-check` 作为质量门禁的一部分,用于检测 YAML DSL JSON Schema 生成物是否与生成器保持一致且为 canonical 文本形式.
-该命令 MUST 在 drift 存在时失败并提示开发者提交更新后的 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`.
+该命令 MUST 在 drift 存在时失败并提示开发者提交更新后的 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`.
 
 #### Scenario: drift 检测失败并给出提示
-- **GIVEN** 开发者修改了 `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/` 中的 schema 元数据但未提交生成物
+- **GIVEN** 开发者修改了 `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/` 中的 schema 元数据但未提交生成物
 - **WHEN** 运行 `just schema-drift-check`
 - **THEN** 命令 MUST 失败并提示运行 `just gen-yaml-dsl-schema` 并提交 `demand.gen.json`
 
@@ -345,7 +345,7 @@ pytest MAY 为门禁脚本提供单元测试,但 MUST NOT 把完整门禁逻辑�
 系统 MUST 在 `py36-typingext-check`（docker 的 Python 3.6 + `typing-extensions==4.1.1` 隔离环境）中执行以下门禁:
 
 - 对 `src/scalim/` 执行 `compileall`
-- 对关键入口与 workflow 实现模块执行 import smoke test（至少覆盖 `scalim.dsl.by_yaml.workflow_entrypoints`）
+- 对关键入口与 workflow 实现模块执行 import smoke test（至少覆盖 `scalim.dsl.yaml_dsl.workflow_entrypoints`）
 
 该门禁 MUST 能在 “import 时炸（例如注解求值不兼容）” 的场景下 fail-fast。
 
@@ -356,7 +356,7 @@ pytest MAY 为门禁脚本提供单元测试,但 MUST NOT 把完整门禁逻辑�
 ### Requirement: 稳定公开入口模块 `__all__` 必须被 examples gate 100% 覆盖
 系统 MUST 将以下稳定公开入口模块的 `__all__` 视为“面向框架用户的公开 API 覆盖清单”，并在 `notebooks/marimo/` 下的 **独立 public API suite** 中提供 deterministic 的最小可运行示例以覆盖其全部导出符号：
 
-- `scalim.dsl.by_yaml`
+- `scalim.dsl.yaml_dsl`
 - `scalim.spec.ir`
 - `scalim.planning`
 - `scalim.execution`
@@ -388,7 +388,7 @@ pytest MAY 为门禁脚本提供单元测试,但 MUST NOT 把完整门禁逻辑�
 系统 MUST 在 `demo_big_data_report` 主线中提供至少一个 deterministic 的 workflow YAML 示例,并将其纳入 `just examples` 的对拍回归范围。
 
 该 workflow 示例 MUST 至少覆盖:
-- `scalim.dsl.by_yaml.run_workflow(...)` 的运行入口
+- `scalim.dsl.yaml_dsl.run_workflow(...)` 的运行入口
 - 启用 `workflow.options.cache_pool` 的共享 `preload_forever` 行为(需可对拍/可断言)
 
 #### Scenario: workflow 示例在 examples gate 中通过
@@ -478,4 +478,3 @@ pytest MAY 提供对这些脚本门禁的单元测试（例如 `tests/governance
 #### Scenario: scripts/check-* gates run before pytest
 - **WHEN** 开发者运行 `just qa` 或直接运行某个 `scripts/check-*.py --check`
 - **THEN** 静态门禁 MUST 在不运行 pytest 的情况下完成检查并 fail-fast
-

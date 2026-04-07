@@ -7,7 +7,7 @@ import jsonschema
 import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
-from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
+from scalim.dsl.yaml_dsl.schema_dsl.builder import build_demand_schema
 
 
 def _args(path: Path) -> argparse.Namespace:

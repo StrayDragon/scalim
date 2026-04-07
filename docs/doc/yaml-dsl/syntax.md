@@ -58,7 +58,7 @@ outputs: []             # 可选: 多输出编排(有序列表)
 - `field_id` 必须全局唯一(不再支持 `source.field_id` 消歧).
 - YAML 主线已不再支持 `observability.*`(legacy key 会 warning + ignore);请在 runtime entrypoints 使用 `components=[...]` / `overrides=RunOverrides(viz_config=...)` 配置观测.
 - `batch_size`/`retry`/`guardrails`/demand `failure_policy`/`include_full_error_message`/`validate_unique_field_names` 属于 runtime policy boundary,不再允许出现在 YAML 主线;请在 runtime entrypoints 配置:
-  - `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...)))`
+  - `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...)))`
 
 ## 3. YAML 复用: anchors、alias、`_templates`
 
@@ -121,7 +121,7 @@ outputs: []             # 可选: 多输出编排(有序列表)
 - `scalim.yaml` 是可选配置:
   - 未提供时仍可使用 YAML DSL(仅缺少 imports 目录别名/allowed roots/editor overrides 等“项目级增强”)
   - 大型仓库允许存在多层 `scalim.yaml` 作为子项目隔离: nearest-wins(从入口 YAML 所在目录向上找最近的那份)
-- **仅文件路径入口支持**: `scalim.dsl.by_yaml.run/compile(yaml_path)` / `scalim-cli yaml-dsl validate <file.yaml>` 等会先展开再校验;纯文本入口会 fail-fast 并提示改用文件路径入口
+- **仅文件路径入口支持**: `scalim.dsl.yaml_dsl.run/compile(yaml_path)` / `scalim-cli yaml-dsl validate <file.yaml>` 等会先展开再校验;纯文本入口会 fail-fast 并提示改用文件路径入口
 
 一个最小示例:
 
@@ -287,7 +287,7 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 辅助配置:
 
 - `demand_failure_policy` / `demand_diagnostics` 属于 runtime policy boundary,已从 YAML 主线迁出;请在运行入口配置:
-  - `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...)))`
+  - `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(demand_failure_policy=..., demand_diagnostics=DemandDiagnosticsPolicy(...)))`
 - `meta/audit` 属于 runtime output extras,已从 YAML 主线迁出;请在运行入口通过 `RunOverrides.output_extras` 启用
 
 一个最小示例:
@@ -325,7 +325,7 @@ outputs:
 如需输出 meta/audit extra sheets,请在 Python 运行入口配置:
 
 ```python
-from scalim.dsl.by_yaml import OutputExtrasOverride, RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import OutputExtrasOverride, RunOptions, RunOverrides, run
 
 result = run(
     "path/to/config.yaml",

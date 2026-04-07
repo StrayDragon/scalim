@@ -25,16 +25,16 @@
 - **WHEN** 审阅者检查约束声明
 - **THEN** 文档明确对外行为不变、禁止 `__init__.py` re-export 且保持 Python 3.6 兼容
 
-### Requirement: by_yaml 提案/任务规范
-by_yaml 的重构提案 SHALL 给出 Phase 0~Phase 3 的分阶段计划,明确 safe refactor 与 needs review 边界与回滚策略.
-by_yaml 的任务/需求 SHALL 以“一个任务/一个需求”为单位,边界清晰且具备可验证验收条件.
+### Requirement: yaml_dsl 提案/任务规范
+yaml_dsl 的重构提案 SHALL 给出 Phase 0~Phase 3 的分阶段计划,明确 safe refactor 与 needs review 边界与回滚策略.
+yaml_dsl 的任务/需求 SHALL 以“一个任务/一个需求”为单位,边界清晰且具备可验证验收条件.
 
 #### Scenario: 分阶段计划可核验
 - **WHEN** 审阅者检查提案
 - **THEN** 每个阶段包含目标、涉及模块、风险、回滚策略与验收标准
 
-### Requirement: by_yaml 兼容性与不变性约束
-by_yaml 的 loader 与 validator SHALL 使用同一 Raw 适配层归一化 YAML 结构;schema 生成结果由元数据驱动并允许更新基线文件.
+### Requirement: yaml_dsl 兼容性与不变性约束
+yaml_dsl 的 loader 与 validator SHALL 使用同一 Raw 适配层归一化 YAML 结构;schema 生成结果由元数据驱动并允许更新基线文件.
 `output.fields` 解析规则(包含 alias/override/歧义报错)、YAML anchor/alias 对象身份语义、resolver allowlist 行为、派生字段 compute 校验与依赖推导均默认保持不变;若某变更需要修改其中任一项,该变更 MUST 在对应 capability 的规范增量中明确新行为并给出兼容性/迁移说明.
 对外入口函数签名与返回结构 SHALL 默认保持兼容;内部允许提供简化执行门面.
 当确需破坏性变更时(例如移除/重命名对外参数),该变更 MUST 在 `proposal.md` 的 **What Changes** 中以 **BREAKING** 显式标注,并在 `design.md` 与 `tasks.md` 中提供可执行的迁移路径(包含受影响调用点范围与替代 API).

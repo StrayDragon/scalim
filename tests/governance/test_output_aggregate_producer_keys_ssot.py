@@ -2,11 +2,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.parsers import outputs as outputs_parser
-from scalim.dsl.by_yaml.runtime import introspection as introspection_mod
-from scalim.dsl.by_yaml.runtime import output_composition_yaml as oc_yaml
-from scalim.dsl.by_yaml.schema_dsl.models import outputs as schema_outputs
-from scalim.dsl.by_yaml.schema_dsl.output_enums import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.parsers import outputs as outputs_parser
+from scalim.dsl.yaml_dsl.runtime import introspection as introspection_mod
+from scalim.dsl.yaml_dsl.runtime import output_composition_yaml as oc_yaml
+from scalim.dsl.yaml_dsl.schema_dsl.models import outputs as schema_outputs
+from scalim.dsl.yaml_dsl.schema_dsl.output_enums import (
     AGG_METRIC_PRODUCER_KEYS,
     AGG_POST_PRODUCER_KEYS,
     AGG_RANK_PRODUCER_KEYS,

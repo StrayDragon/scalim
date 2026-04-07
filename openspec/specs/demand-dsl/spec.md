@@ -16,11 +16,11 @@
 
 核心概念:Demand(需求)、Source(数据源)、Field(字段)、Relation(关系).
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/entrypoints.py` (`run`, `compile`)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/loader.py` (`YamlDemandLoader`)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validator.py` (`ConfigValidator`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/conversion.py` (`ConfigToIRConverter`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/compiler.py` (YAML → execution request)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/entrypoints.py` (`run`, `compile`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/loader.py` (`YamlDemandLoader`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (`ConfigValidator`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (`ConfigToIRConverter`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/compiler.py` (YAML → execution request)
 ## Requirements
 ### Requirement: 顶层结构与 IR 转换规则
 系统 SHALL 在加载 YAML 时解析 `name`、`main_source`、`sources`、`fields`,并可选解析 `relations`、`output` 与 `guardrails`.

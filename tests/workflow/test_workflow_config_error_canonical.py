@@ -4,8 +4,8 @@ import pytest
 
 
 def test_workflow_config_error_is_single_canonical_type() -> None:
-    from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError as FromDslWorkflow
-    from scalim.dsl.by_yaml.workflow_types import ScalimWorkflowConfigError as FromDslTypes
+    from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError as FromDslWorkflow
+    from scalim.dsl.yaml_dsl.workflow_types import ScalimWorkflowConfigError as FromDslTypes
     from scalim.workflow.errors import ScalimWorkflowConfigError as FromWorkflow
 
     assert FromWorkflow is FromDslWorkflow
@@ -13,7 +13,7 @@ def test_workflow_config_error_is_single_canonical_type() -> None:
 
 
 def test_workflow_config_error_message_is_consistent_across_entrypoints() -> None:
-    from scalim.dsl.by_yaml.workflow_config import load_workflow_config_from_mapping, validate_workflow_yaml_text_json
+    from scalim.dsl.yaml_dsl.workflow_config import load_workflow_config_from_mapping, validate_workflow_yaml_text_json
     from scalim.workflow.errors import ScalimWorkflowConfigError
 
     root = {"name": "demo"}
@@ -31,7 +31,7 @@ def test_workflow_config_error_message_is_consistent_in_cli_validate(tmp_path, c
     from argparse import Namespace
 
     from scalim.cli import yaml_dsl as cli_mod
-    from scalim.dsl.by_yaml.workflow_config import load_workflow_config_from_mapping
+    from scalim.dsl.yaml_dsl.workflow_config import load_workflow_config_from_mapping
     from scalim.workflow.errors import ScalimWorkflowConfigError
 
     wf_path = tmp_path / "workflow.yaml"

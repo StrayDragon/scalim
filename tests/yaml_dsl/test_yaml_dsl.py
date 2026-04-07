@@ -1,8 +1,8 @@
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.security import SecureComputeEngine, ScalimSecurityError
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine, ScalimSecurityError
 from tests.support.yaml_fixtures import make_yaml_config
 
 

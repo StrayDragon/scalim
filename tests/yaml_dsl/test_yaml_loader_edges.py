@@ -2,8 +2,8 @@ import io
 
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 
 
 def _assert_load_string_errors(yaml_content: str, *expected_messages: str) -> None:

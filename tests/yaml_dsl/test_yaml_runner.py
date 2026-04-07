@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import (
+from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
     FileResourceOverride,
     OutputOverride,
@@ -17,7 +17,7 @@ from scalim.dsl.by_yaml import (
 )
 from scalim.execution.run_ir import ExecutionResult, export_layout_from_demand_ir
 from scalim.planning import PlanBuilder
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig
 from scalim.events import EVENT_PIPELINE_START
 from scalim.events._events import BatchEndEvent, BatchStartEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.hooks import BaseHook

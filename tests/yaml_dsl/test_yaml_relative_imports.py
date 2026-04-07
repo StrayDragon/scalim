@@ -3,14 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
-from scalim.dsl.by_yaml._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
-from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
-from scalim.dsl.by_yaml.runtime import compiler as compiler_module
-from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver, derive_base_module_path
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, DerivedFieldConfig, LoaderRetryConfig, MainSourceConfig, SourceConfig
+from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
+from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
+from scalim.dsl.yaml_dsl.runtime import compiler as compiler_module
+from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver, derive_base_module_path
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, DerivedFieldConfig, LoaderRetryConfig, MainSourceConfig, SourceConfig
 
 
 def _write_text(path: Path, content: str) -> None:

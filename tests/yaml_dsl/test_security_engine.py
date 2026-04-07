@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Tuple
 
 import pytest
 
-import scalim.dsl.by_yaml._internal.config_parsing.security as security
+import scalim.dsl.yaml_dsl._internal.config_parsing.security as security
 from scalim.secure_compute_contracts import is_secure_compute_calculator
-from scalim.dsl.by_yaml._internal.config_parsing.security import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.security import (
     ScalimComputeExpressionError,
     SecureComputeEngine,
     SecureComputeCalculator,
@@ -305,7 +305,7 @@ def test_default_audit_callback_logs(caplog) -> None:
     engine = SecureComputeEngine(audit_callback=default_audit_callback)
     calc = engine.compile("a * 2", ("a",))
 
-    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.by_yaml.security"):
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
         calc(a=10)
 
     assert any(security.EVAL_AUDIT_LOG_PREFIX in record.getMessage() for record in caplog.records)
@@ -315,7 +315,7 @@ def test_redacted_audit_callback_logs_only_hash_and_field_names(caplog) -> None:
     engine = SecureComputeEngine(audit_callback=redacted_audit_callback)
     calc = engine.compile("a * 2", ("a",))
 
-    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.by_yaml.security"):
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
         calc(a=10)
 
     messages = [record.getMessage() for record in caplog.records]

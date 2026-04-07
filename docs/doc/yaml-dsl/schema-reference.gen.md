@@ -1,8 +1,8 @@
 <!--
 本文件由 `just gen-docs` (scripts/gen-docs.py) 自动生成,请勿手动修改.
 Sources:
-- `src/scalim/dsl/by_yaml/schema/demand.gen.json`
-- `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
+- `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`
+- `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
 - Schema generator: `just gen-yaml-dsl-schema`
 -->
 # YAML Schema 参考(生成)

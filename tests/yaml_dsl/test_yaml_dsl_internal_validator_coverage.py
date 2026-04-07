@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.runtime import effective_outputs as effective_outputs_mod
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     OUTPUT_TARGET_KEYS,
     OUTPUT_TO_KEYS,
     OUTPUT_WRITE_KEYS,
@@ -15,7 +15,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
 
 def _validator() -> ConfigValidator:
     repo_root = Path(__file__).resolve().parents[2]
-    schema_path = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
+    schema_path = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
     return ConfigValidator(schema_path=str(schema_path))
 
 

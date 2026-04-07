@@ -1,4 +1,4 @@
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
 

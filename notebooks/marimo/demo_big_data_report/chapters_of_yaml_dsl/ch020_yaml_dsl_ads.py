@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.by_yaml import RunOptions, run as run_yaml
+from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario import (
     get_ads_creatives_retry_counter_calls,

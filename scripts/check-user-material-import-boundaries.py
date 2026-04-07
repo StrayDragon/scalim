@@ -49,9 +49,9 @@ _INTERNAL_TOKEN_SUGGESTIONS: Mapping[str, str] = {
     "scalim.vendor.literich": "`scalim.vendor.literich` 已移除;请勿在 docs/skills/notebooks 中引用该模块.",
     "unsafe_entrypoints": "请勿在用户材料中引用内部/不安全入口;优先使用稳定的 facade 入口.",
     # 内部实现路径(常见误用)
-    "scalim.dsl.by_yaml.config_parsing.": "请勿导入内部实现;优先使用 `scalim.dsl.by_yaml` 或其稳定子模块.",
-    "scalim.dsl.by_yaml.runtime.": "请勿导入内部实现;优先使用 `scalim.dsl.by_yaml` 或其稳定子模块.",
-    "scalim.dsl.by_yaml.schema_dsl.": "请勿导入内部实现;优先使用 `scalim.dsl.by_yaml` 或其稳定子模块.",
+    "scalim.dsl.yaml_dsl._internal.": "请勿导入内部实现;优先使用 `scalim.dsl.yaml_dsl` 或其稳定子模块.",
+    "scalim.dsl.yaml_dsl.runtime.": "请勿导入内部实现;优先使用 `scalim.dsl.yaml_dsl` 或其稳定子模块.",
+    "scalim.dsl.yaml_dsl.schema_dsl.": "请勿导入内部实现;优先使用 `scalim.dsl.yaml_dsl` 或其稳定子模块.",
     "scalim.events._": "请勿导入内部实现;优先使用 `scalim.events`.",
     "scalim.sinks._internal.": "请勿导入内部实现;优先使用 `scalim.sinks`.",
 }
@@ -104,7 +104,7 @@ def _scan_file(
                         token=token,
                         line=stripped,
                         suggestion=str(suggestion or "").strip()
-                        or "请移除内部/不安全 token; 优先使用更上层的 facade 模块导入(例如 `scalim.dsl.by_yaml`/`scalim.events`/`scalim.sinks`).",
+                        or "请移除内部/不安全 token; 优先使用更上层的 facade 模块导入(例如 `scalim.dsl.yaml_dsl`/`scalim.events`/`scalim.sinks`).",
                     )
                 )
 
@@ -122,7 +122,7 @@ def _scan_file(
         parts = [p for p in module_name.split(".") if p]
         internal_parts = [p for p in parts[1:] if p.startswith("_")]
         if "_internal" in parts or internal_parts:
-            hint = "请勿导入内部实现;优先从更上层的 facade 模块导入(例如 `scalim.dsl.by_yaml`/`scalim.events`/`scalim.sinks`)."
+            hint = "请勿导入内部实现;优先从更上层的 facade 模块导入(例如 `scalim.dsl.yaml_dsl`/`scalim.events`/`scalim.sinks`)."
             hits.append(
                 Hit(
                     relpath=rel,
@@ -175,9 +175,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("", file=sys.stderr)
         print("迁移建议:", file=sys.stderr)
         print(
-            "- 禁止把 `internal/unsafe` 路径写进教程/示例(尤其是 `dsl.by_yaml.runtime.*`/`events._*`/`sinks._internal.*`).", file=sys.stderr
+            "- 禁止把 `internal/unsafe` 路径写进教程/示例(尤其是 `dsl.yaml_dsl.runtime.*`/`events._*`/`sinks._internal.*`).",
+            file=sys.stderr,
         )
-        print("- 优先使用更上层的门面模块导入(例如 `scalim.dsl.by_yaml`/`scalim.events`/`scalim.sinks`).", file=sys.stderr)
+        print("- 优先使用更上层的门面模块导入(例如 `scalim.dsl.yaml_dsl`/`scalim.events`/`scalim.sinks`).", file=sys.stderr)
         return 1
 
     print("[通过] 用户材料导入边界检查通过")

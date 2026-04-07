@@ -6,7 +6,7 @@
 定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/workflow_entrypoints.py` (workflow runner + workflow-level 事件)
+- `src/IMPL_ROOT/dsl/yaml_dsl/workflow_entrypoints.py` (workflow runner + workflow-level 事件)
 - `src/IMPL_ROOT/execution/run_ir.py` (按需注入事件 meta)
 - `src/IMPL_ROOT/ob/manager.py` (`ObserverManager` meta 合并)
 - `src/IMPL_ROOT/ob/hub.py` (`InstrumentationHub`)
@@ -68,4 +68,3 @@
 - **GIVEN** 后续变更新增 workflow-level cache acquire/release 事件
 - **WHEN** workflow 并发执行并触发这些事件
 - **THEN** observer/hook MUST 能通过 `workflow_exec_id` / `workflow_node_id` 将这些事件 join 回同一个 workflow DAG 视图
-

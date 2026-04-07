@@ -3,7 +3,7 @@
 检查 `workflow` 分层治理约束:
 
 - `src/scalim/workflow/**` MUST NOT `import`/动态 `import` `scalim.dsl.*`
-- `src/scalim/dsl/by_yaml/runtime/**` MUST NOT 包含 `workflow_*.py`
+- `src/scalim/dsl/yaml_dsl/runtime/**` MUST NOT 包含 `workflow_*.py`
 
 该脚本是静态门禁:只依赖文件系统与 AST,不执行运行时模块的 `import`.
 
@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = Path(str(args.root)).resolve()
 
     workflow_root = repo_root / "src" / "scalim" / "workflow"
-    runtime_root = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "runtime"
+    runtime_root = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "runtime"
 
     if not workflow_root.is_dir():
         print("[错误] 未找到工作流目录: {}".format(workflow_root), file=sys.stderr)
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("  - {}".format(v), file=sys.stderr)
 
         if workflow_runtime_files:
-            print("- `by_yaml/runtime` 下不得包含 `workflow_*.py`:", file=sys.stderr)
+            print("- `yaml_dsl/runtime` 下不得包含 `workflow_*.py`:", file=sys.stderr)
             for rel in workflow_runtime_files:
                 print("  - {}".format(rel), file=sys.stderr)
 

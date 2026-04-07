@@ -9,7 +9,7 @@ def _repo_root() -> Path:
 
 
 def _load_demand_schema() -> dict:
-    path = _repo_root() / "src" / "scalim" / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
+    path = _repo_root() / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 

@@ -15,7 +15,7 @@ from scalim_misc.demo_big_data_report.shared import (
 )
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
 from scalim.execution import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.memory import MemoryOptimizationObserver

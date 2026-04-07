@@ -1,9 +1,9 @@
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.parsers.outputs import ParserOutputsMixin
-from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.parsers.outputs import ParserOutputsMixin
+from scalim.dsl.yaml_dsl.schema_dsl.models import OutputTargetConfig
 
 
 def _load(yaml_content: str):

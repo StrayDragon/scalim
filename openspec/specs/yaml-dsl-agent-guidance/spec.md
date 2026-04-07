@@ -252,7 +252,7 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 
 #### Scenario: workflow schema-only 校验指引
 - **WHEN** 用户请求校验 workflow YAML
-- **THEN** skill 必须提供 `uv run PROJECT_CLI_NAME yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>` 形式的命令
+- **THEN** skill 必须提供 `uv run PROJECT_CLI_NAME yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>` 形式的命令
 - **THEN** 不得建议直接使用 demand schema 或省略 `--schema`
 
 #### Scenario: workflow LSP modeline 指引
@@ -262,4 +262,3 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 - **THEN** 并给出 schema header 示例,至少包含两种格式之一,或同时包含两种格式（当选择 `all` 时）:
   - `# yaml-language-server: $schema=.../workflow.gen.json`
   - `# $schema: .../workflow.gen.json`
-

@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, run_workflow
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.ob.observer import Observer
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr

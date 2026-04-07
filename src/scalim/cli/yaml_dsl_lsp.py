@@ -27,7 +27,7 @@ DEFAULT_COMMENT_STYLE = COMMENT_STYLE_ALL
 
 
 def schema_dir() -> Path:
-    return Path(__file__).resolve().parents[1] / "dsl" / "by_yaml" / "schema"
+    return Path(__file__).resolve().parents[1] / "dsl" / "yaml_dsl" / "schema"
 
 
 DEFAULT_SCHEMA_PATH = str(schema_dir())

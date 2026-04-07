@@ -18,7 +18,7 @@ _HOTSPOT_LIMITS: Dict[str, int] = {
     "src/scalim/workflow/execute.py": 1920,
     "src/scalim/execution/output_composition.py": 1377,
     # 试点拆分模块: 保持低于通用阈值.
-    "src/scalim/dsl/by_yaml/workflow_config/_parse.py": 1000,
+    "src/scalim/dsl/yaml_dsl/workflow_config/_parse.py": 1000,
 }
 
 

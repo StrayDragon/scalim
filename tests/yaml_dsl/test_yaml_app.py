@@ -3,10 +3,10 @@ from pathlib import Path
 import pytest
 from scalim.vendor.yamlx import yaml
 
-from scalim.dsl.by_yaml import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride, RunOptions, RunOverrides, run
-from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
-from scalim.dsl.by_yaml.runtime.introspection import load_output_config, resolve_required_field_ids
-from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.yaml_dsl import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride, RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimAllowlistRequiredError
+from scalim.dsl.yaml_dsl.runtime.introspection import load_output_config, resolve_required_field_ids
+from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.sinks import InMemoryRowSink
 from tests.support.pathing import fixtures_dir

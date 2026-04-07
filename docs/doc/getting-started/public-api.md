@@ -17,11 +17,11 @@
 
 | 模块 | 说明 | 常见场景 |
 | --- | --- | --- |
-| `scalim.dsl.by_yaml` | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
-| `scalim.dsl.by_yaml.tools` | YAML DSL 辅助工具(输出配置/路径推导) | 工具链集成/排错 |
-| `scalim.dsl.by_yaml.workflow` | workflow 配置(稳定导入路径) | 解析/校验 workflow YAML |
-| `scalim.dsl.by_yaml.workflow_types` | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
-| `scalim.dsl.by_yaml.workflow_paths` | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
+| `scalim.dsl.yaml_dsl` | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
+| `scalim.dsl.yaml_dsl.tools` | YAML DSL 辅助工具(输出配置/路径推导) | 工具链集成/排错 |
+| `scalim.dsl.yaml_dsl.workflow` | workflow 配置(稳定导入路径) | 解析/校验 workflow YAML |
+| `scalim.dsl.yaml_dsl.workflow_types` | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
+| `scalim.dsl.yaml_dsl.workflow_paths` | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
 | `scalim.spec.ir` | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
 | `scalim.planning` | 规划层入口 | 规划/编排/可视化分析 |
@@ -34,19 +34,19 @@
 最常见的“只关心导入”的用法:
 
 ```python
-from scalim.dsl.by_yaml import RunOverrides, compile, run, run_workflow
+from scalim.dsl.yaml_dsl import RunOverrides, compile, run, run_workflow
 ```
 
 需要工具链能力(例如输出配置/基准路径推导)时:
 
 ```python
-from scalim.dsl.by_yaml.tools import derive_base_module_path, load_output_config
+from scalim.dsl.yaml_dsl.tools import derive_base_module_path, load_output_config
 ```
 
 需要 workflow 配置类型/校验能力时:
 
 ```python
-from scalim.dsl.by_yaml.workflow import WorkflowConfig, load_workflow_config
+from scalim.dsl.yaml_dsl.workflow import WorkflowConfig, load_workflow_config
 ```
 
 需要 IR(中间表示)类型时,推荐“模块导入”减少符号级耦合:
@@ -79,7 +79,7 @@ from scalim.sinks.rows import InMemoryRows, InMemoryRowsSink
 如果你确实需要依赖它们,建议:
 
 - pin 版本 + 自己维护回归(尤其是导出面较大的模块)
-- 优先通过更上层的稳定入口间接使用(例如优先用 `scalim.dsl.by_yaml.*`)
+- 优先通过更上层的稳定入口间接使用(例如优先用 `scalim.dsl.yaml_dsl.*`)
 
 常见的 Tier 2 模块(非穷举):
 
@@ -119,7 +119,7 @@ just qa
 理由(摘要):
 
 - 优点:Tier 1 入口清晰,有 `__all__` 白名单 + gate,回归成本低
-- 优点:YAML DSL 运行入口(`scalim.dsl.by_yaml`)与 workflow/IR 的稳定导入路径已明确拆出
+- 优点:YAML DSL 运行入口(`scalim.dsl.yaml_dsl`)与 workflow/IR 的稳定导入路径已明确拆出
 - 代价:仍有部分 Tier 2 模块导出面偏大/偏“平铺”,但它们不在 curated 白名单内；若需依赖建议自行 pin 版本并维护回归
 
 导出规模不在文档里维护数值快照:以 `__all__` 治理规则 + 示例覆盖为准。

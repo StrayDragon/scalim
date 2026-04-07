@@ -41,7 +41,7 @@ TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update 
 - **AND** 错误信息 MUST 提示通过 `just gen-docs` / `just gen-agent-skill` 修复
 
 ### Requirement: docs schema reference MUST include demand and workflow schemas
-系统 MUST 以 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` 与 `src/IMPL_ROOT/dsl/by_yaml/schema/workflow.gen.json` 为 schema 字段集合真相，并在 docs-site 的 schema reference 页中同时呈现 demand/workflow 两套字段参考（Top-Level Fields + Definitions）。
+系统 MUST 以 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` 与 `src/IMPL_ROOT/dsl/yaml_dsl/schema/workflow.gen.json` 为 schema 字段集合真相，并在 docs-site 的 schema reference 页中同时呈现 demand/workflow 两套字段参考（Top-Level Fields + Definitions）。
 
 #### Scenario: schema reference contains workflow fields
 - **WHEN** 维护者运行 `just gen-docs`
@@ -57,4 +57,3 @@ TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update 
 #### Scenario: QA fails when a required marker is missing
 - **WHEN** 任一目标文件缺少 `BEGIN/END AUTOGEN:*` marker
 - **THEN** `just qa` MUST 失败并提示补齐 marker 与运行生成入口
-

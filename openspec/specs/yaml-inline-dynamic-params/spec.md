@@ -14,9 +14,9 @@
 本 spec 通过限制指令集合与 fail-fast 校验,在不引入任意 Python builder 的前提下提供 declarative 的 nested 注入能力.
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/params_template.py` (typed template IR + compile/render)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validators/sources.py` (directives 语义校验与 path 定位)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/_internal/conversion_sources.py` (template -> BindingIr 元数据/params_builder)
+- `src/IMPL_ROOT/dsl/yaml_dsl/params_template.py` (typed template IR + compile/render)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validators/sources.py` (directives 语义校验与 path 定位)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/_internal/conversion_sources.py` (template -> BindingIr 元数据/params_builder)
 - `src/IMPL_ROOT/execution/executor/operators/load_ref/loader.py` (`rows` barrier 与 cache_mode 语义)
 - `src/IMPL_ROOT/utils/relation_signature.py` (relation signature / 复用语义)
 - `src/IMPL_ROOT/spec/ir/binding/__init__.py` (`build_stable_lookup_key_list`)
@@ -120,4 +120,3 @@
 #### Scenario: 同时出现 `$keys` 与 `$rows` fail-fast
 - **WHEN** 同一模板中同时出现 `$keys` 与 `$rows`
 - **THEN** 编译或校验 MUST 失败并报告冲突位置
-

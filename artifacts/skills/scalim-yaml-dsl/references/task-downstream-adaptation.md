@@ -69,7 +69,7 @@ uv run scalim-cli yaml-dsl validate <file.yaml>
 
 ```bash
 uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>
-uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>
+uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>
 ```
 
 ## 交付(报告)建议格式

@@ -6,7 +6,7 @@ from typing import Iterable, List
 import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl
-from scalim.dsl.by_yaml._internal.config_parsing.yaml_load import load_yaml_mapping_text
+from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import load_yaml_mapping_text
 from scalim.vendor.yamlx import yaml as pyyaml
 
 

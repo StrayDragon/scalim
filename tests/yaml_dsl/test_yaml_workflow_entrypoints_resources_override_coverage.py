@@ -1,4 +1,4 @@
-from scalim.dsl.by_yaml import (
+from scalim.dsl.yaml_dsl import (
     BookBudgetOverride,
     BookExportXlsxOverride,
     BookWriteDefaultsOverride,
@@ -7,8 +7,8 @@ from scalim.dsl.by_yaml import (
     ResourcesOverride,
     RunOverrides,
 )
-from scalim.dsl.by_yaml import workflow_entrypoints as entrypoints_mod
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl import workflow_entrypoints as entrypoints_mod
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
@@ -16,7 +16,7 @@ from scalim.dsl.by_yaml.schema_dsl.models import (
     FileConfig,
     ResourcesConfig,
 )
-from scalim.dsl.by_yaml.workflow import WorkflowConfig, WorkflowOptions
+from scalim.dsl.yaml_dsl.workflow import WorkflowConfig, WorkflowOptions
 
 
 def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> None:

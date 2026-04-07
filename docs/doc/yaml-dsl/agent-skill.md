@@ -49,7 +49,7 @@
 - workflow YAML 仓库内 full validate(静态/编译期;递归校验引用的 demands;不执行 workflow): `uv run scalim-cli yaml-dsl validate --type workflow path/to/workflow.yaml`
   - 若 workflow demand 路径使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析
 - demand YAML 仓库内 schema-only(更快): `uv run scalim-cli yaml-dsl schema validate path/to/demand.yaml`
-- workflow YAML schema-only(需显式 workflow schema): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json path/to/workflow.yaml`
+- workflow YAML schema-only(需显式 workflow schema): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json path/to/workflow.yaml`
 - 仓库外语义校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate path/to/config.yaml`
 - 仓库外 schema-only: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate path/to/config.yaml`
 - 查询 schema 路径(仓库内): `uv run scalim-cli yaml-dsl schema path`

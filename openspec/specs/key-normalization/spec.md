@@ -14,7 +14,7 @@
 
 该开关 MUST 可在以下入口启用并最终落到 execution core 的运行期上下文(例如 `ExecutionRequest`/runtime context):
 
-- by_yaml `run/compile`(RunOptions)
+- yaml_dsl `run/compile`(RunOptions)
 - workflow `run_workflow`(入口参数)
 - IR/Python-only(直接构造 `ExecutionRequest`)
 
@@ -208,4 +208,3 @@
 - **WHEN** 系统在 adaptive 下创建 per-task 子运行时并执行 `LoadRef(keys)`
 - **THEN** 子运行时 MUST 使用与父运行时相同的 `key_normalization` 值
 - **AND** 任何依赖 key_normalization 的命中/告警语义 MUST 与 `seq` 等价
-

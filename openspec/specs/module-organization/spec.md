@@ -5,8 +5,8 @@
 定义 `src/IMPL_ROOT/` 的模块边界、入口最小化与兼容约束,避免将内部实现路径误用为公共 API,并保持 Python 3.6 运行时可用性.
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/`
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/`
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/`
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/`
 - `src/IMPL_ROOT/execution/`
 - `src/IMPL_ROOT/planning/`
 - `src/IMPL_ROOT/vendor/README.md`
@@ -35,14 +35,14 @@
 - **THEN** 变更 MUST 通过显式白名单体现
 - **AND** 公共表面 gate MUST 能对新增或删除导出做出确定性回归提示
 
-### Requirement: by_yaml 解析与 runtime 模块保持子包化
-系统 MUST 保持 by_yaml 的解析与 runtime 为显式子包结构:
-- `config_parsing` 采用 package 形态,并保留 `loader.py`/`validator.py` 作为稳定入口;
+### Requirement: yaml_dsl 解析与 runtime 模块保持子包化
+系统 MUST 保持 yaml_dsl 的解析与 runtime 为显式子包结构:
+- `_internal.config_parsing` 采用 package 形态,并保留 `loader.py`/`validator.py` 作为稳定入口;
 - 解析与校验实现应放在 `parsers/` 与 `validators/` 子包;
-- `runtime` 采用子模块组织(如 `entrypoints.py`、`contracts.py`、`introspection.py`),并通过 `IMPL_ROOT.dsl.by_yaml.runtime` 提供稳定入口.
+- `runtime` 采用子模块组织(如 `entrypoints.py`、`contracts.py`、`introspection.py`),并通过 `IMPL_ROOT.dsl.yaml_dsl.runtime` 提供稳定入口.
 
-#### Scenario: by_yaml 入口可稳定导入
-- **WHEN** 导入 `IMPL_ROOT.dsl.by_yaml.config_parsing.loader`、`IMPL_ROOT.dsl.by_yaml.config_parsing.validator`、`IMPL_ROOT.dsl.by_yaml.runtime`
+#### Scenario: yaml_dsl 入口可稳定导入
+- **WHEN** 导入 `IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.loader`、`IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.validator`、`IMPL_ROOT.dsl.yaml_dsl.runtime`
 - **THEN** 导入 MUST 成功且行为与现有实现一致
 
 ### Requirement: execution/planning 实现按子模块拆分且入口最小化
@@ -68,7 +68,7 @@
 
 ### Requirement: 核心热点模块必须按职责拆分并保持稳定入口
 系统 MUST 对核心热点实现采用职责分层的子模块组织,避免单文件持续聚合多种职责.至少以下热点路径 MUST 被视为持续治理对象:
-- `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/models`
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/models`
 - `src/IMPL_ROOT/execution/adaptive`
 - `src/IMPL_ROOT/ob/presets`
 - `src/IMPL_ROOT/hooks`
@@ -112,7 +112,7 @@
 - **AND** MUST 不出现 `hooks/ob -> dsl 专有配置` 的直接依赖
 
 ### Requirement: workflow framework MUST NOT import DSL modules
-系统 MUST 保持核心层级依赖方向可审计且单向；workflow runtime/framework 层 MUST NOT 反向依赖 DSL 层实现符号（例如 `IMPL_ROOT.dsl.by_yaml` 及其子模块）。
+系统 MUST 保持核心层级依赖方向可审计且单向；workflow runtime/framework 层 MUST NOT 反向依赖 DSL 层实现符号（例如 `IMPL_ROOT.dsl.yaml_dsl` 及其子模块）。
 
 该约束 MUST 由可独立运行的自动化门禁守护（例如 `uv run scripts/check-workflow-layering.py --check`）,并在 `just qa` 的 fail-fast 阶段执行（pytest 之前）.
 
@@ -152,7 +152,7 @@
 系统 MUST 提供自动化检查(脚本或 CI 任务)以阻止该类命名回归.
 
 #### Scenario: 历史冲突模块不回归
-- **WHEN** 审阅 by_yaml runtime 与 observability presets 的模块命名
+- **WHEN** 审阅 yaml_dsl runtime 与 observability presets 的模块命名
 - **THEN** 不应存在与 stdlib 高冲突且语义含混的模块命名
 
 #### Scenario: stdlib 同名检查可用
@@ -170,8 +170,8 @@
 
 ### Requirement: 已确认热点模块必须按职责拆分并保持稳定入口
 系统 MUST 将以下路径视为本轮一次性重构的确认热点,并要求其内部实现按职责拆分:
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validators/fields.py`
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/conversion.py`
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validators/fields.py`
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py`
 - `src/IMPL_ROOT/hooks/base.py`
 - `src/IMPL_ROOT/ob/manager.py`
 - `src/IMPL_ROOT/ob/presets/viz.py`
@@ -225,12 +225,11 @@
 - **WHEN** 开发者运行导入图门禁脚本（例如 `uv run scripts/check-import-graph.py --check`）
 - **THEN** 若主包存在函数内导入,门禁 MUST 失败并输出文件路径与行号
 
-### Requirement: by_yaml runtime MUST NOT contain workflow runtime modules
-系统 MUST 保持 `src/IMPL_ROOT/dsl/by_yaml/runtime/**` 不包含 workflow runtime 语义模块（例如 `workflow_*.py`）,以避免把 workflow 层实现符号误放入 DSL runtime 子包.
+### Requirement: yaml_dsl runtime MUST NOT contain workflow runtime modules
+系统 MUST 保持 `src/IMPL_ROOT/dsl/yaml_dsl/runtime/**` 不包含 workflow runtime 语义模块（例如 `workflow_*.py`）,以避免把 workflow 层实现符号误放入 DSL runtime 子包.
 
 该约束 MUST 由可独立运行的静态门禁守护,并在 `just qa` 的 fail-fast 阶段执行（例如 `uv run scripts/check-workflow-layering.py --check`）。
 
-#### Scenario: workflow_* modules are rejected under by_yaml runtime
+#### Scenario: workflow_* modules are rejected under yaml_dsl runtime
 - **WHEN** 维护者运行 workflow layering 的静态门禁
-- **THEN** 若 `src/IMPL_ROOT/dsl/by_yaml/runtime/**` 下出现 `workflow_*.py`,门禁 MUST 失败并输出违规路径列表
-
+- **THEN** 若 `src/IMPL_ROOT/dsl/yaml_dsl/runtime/**` 下出现 `workflow_*.py`,门禁 MUST 失败并输出违规路径列表

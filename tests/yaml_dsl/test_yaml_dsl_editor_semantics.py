@@ -58,7 +58,7 @@ def test_discovery_workspace_root_override_does_not_escape_boundary(tmp_path: Pa
 
 def test_legacy_editor_semantics_import_path_is_removed() -> None:
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("scalim.dsl.by_yaml.editor_semantics")
+        importlib.import_module("scalim.dsl.yaml_dsl.editor_semantics")
 
 
 def test_discovery_nearest_wins_scalim_yaml_and_editor_python_roots(tmp_path: Path) -> None:

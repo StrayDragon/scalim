@@ -47,7 +47,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
      - `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
      - 若 `workflow.runs[*].demand` 使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析(可重复)
    - workflow YAML schema-only 校验(结构/unknown-fields;仓库内建议显式指定 schema):
-     - `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
+     - `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>`
    - 编辑器补全/hover:
      - `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 7) 运行期验证: 用 Python 入口跑一次最小 workflow,验证 DAG/ctx/resources/writes 的运行期 fail-fast 行为是否符合预期

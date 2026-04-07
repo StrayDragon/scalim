@@ -6,9 +6,9 @@
 提供用于 review/debug/对拍的**库侧 API**,将“作者写的 demand YAML”渲染为 effective YAML(展开后的单文件等价配置),避免 imports/template 复用在 review 时变成黑盒。
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/effective_yaml.py` (effective YAML loads/dumps API)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/imports.py` (imports/$import expansion)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/template_precompile.py` (LiteJinja2 template precompile)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/effective_yaml.py` (effective YAML loads/dumps API)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/imports.py` (imports/$import expansion)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/template_precompile.py` (LiteJinja2 template precompile)
 
 ## Requirements
 
@@ -40,4 +40,3 @@
 - **WHEN** 调用方执行 `load_effective_demand_yaml(demand.yaml)`
 - **THEN** MUST 失败(抛出异常)
 - **AND** 错误信息 MUST 包含可诊断内容(至少包含 import trace 与 logical path)
-

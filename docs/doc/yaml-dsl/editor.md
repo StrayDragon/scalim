@@ -48,9 +48,9 @@ yaml_dsl:
 
 YAML DSL / `scalim.yaml` 的 canonical schema 生成物在:
 
-- `src/scalim/dsl/by_yaml/schema/scalim_yaml.gen.json` (`scalim.yaml`)
-- `src/scalim/dsl/by_yaml/schema/demand.gen.json`
-- `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
+- `src/scalim/dsl/yaml_dsl/schema/scalim_yaml.gen.json` (`scalim.yaml`)
+- `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`
+- `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
 
 刷新生成物:
 
@@ -68,12 +68,12 @@ scalim-cli yaml-dsl schema path --type scalim_yaml
 
 ```yaml
 # scalim.yaml
-# $schema: /ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/scalim_yaml.gen.json
+# $schema: /ABS/PATH/TO/src/scalim/dsl/yaml_dsl/schema/scalim_yaml.gen.json
 ```
 
 ```yaml
 # demand/workflow YAML
-# $schema: /ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/workflow.gen.json
+# $schema: /ABS/PATH/TO/src/scalim/dsl/yaml_dsl/schema/workflow.gen.json
 ```
 
 在 VSCode / `redhat.vscode-yaml` 中通过 settings 绑定 schema(示例):
@@ -81,9 +81,9 @@ scalim-cli yaml-dsl schema path --type scalim_yaml
 ```json
 {
   "yaml.schemas": {
-    "/ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/scalim_yaml.gen.json": "scalim.yaml",
-    "/ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/demand.gen.json": "demand/**/*.y*ml",
-    "/ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/workflow.gen.json": "workflow/**/*.y*ml"
+    "/ABS/PATH/TO/src/scalim/dsl/yaml_dsl/schema/scalim_yaml.gen.json": "scalim.yaml",
+    "/ABS/PATH/TO/src/scalim/dsl/yaml_dsl/schema/demand.gen.json": "demand/**/*.y*ml",
+    "/ABS/PATH/TO/src/scalim/dsl/yaml_dsl/schema/workflow.gen.json": "workflow/**/*.y*ml"
   }
 }
 ```

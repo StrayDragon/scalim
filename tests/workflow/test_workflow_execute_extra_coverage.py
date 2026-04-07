@@ -40,8 +40,8 @@ def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
 
 
 def test_run_workflow_ir_works_without_build_demand_run_result_fn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
 
@@ -559,8 +559,8 @@ def test_workflow_artifacts_directory_get_optional_variants() -> None:
 
 
 def test_workflow_write_consumer_counts_missing_is_best_effort(tmp_path: Path) -> None:
-    from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
@@ -660,8 +660,8 @@ resources:
 
 
 def test_workflow_negative_write_consumer_count_is_reported(tmp_path: Path) -> None:
-    from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
@@ -763,8 +763,8 @@ resources:
 
 
 def test_workflow_write_consumer_count_decrements_for_multiple_write_nodes(tmp_path: Path) -> None:
-    from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.sinks import InMemoryRowSink
 
 import tests.fixtures.params_template_loaders as loaders

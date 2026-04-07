@@ -95,7 +95,7 @@ engine.run()
 YAML 主线不再承载 `observability.*`(legacy key 会 warning + ignore).如需为 demand/workflow 输出 viz,请在运行入口侧显式启用:
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
 
 run(
@@ -140,17 +140,19 @@ run(
 启用方式(建议只配置 `output_dir`,不要显式指定 `output_path`/`snapshot_path`/`trace_path`,因为 bundle 需要创建多个 run 子目录):
 
 ```python
-from scalim.dsl.by_yaml import RunOverrides, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run_workflow
 from scalim.ob.presets.viz import VizObserverConfig
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
-    overrides=RunOverrides(
-        viz_config=VizObserverConfig(
-            output_dir="/path/to/run-root",
-            trace_enabled=False,
-            payload_policy="summary",
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+        overrides=RunOverrides(
+            viz_config=VizObserverConfig(
+                output_dir="/path/to/run-root",
+                trace_enabled=False,
+                payload_policy="summary",
+            ),
         ),
     ),
 )
@@ -193,7 +195,7 @@ workflow scope 的 node id / event node_ref 命名空间:
 ## 5. 从 YAML 构建 VizObserver(便捷方式)
 
 ```python
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
 
 _ = run(

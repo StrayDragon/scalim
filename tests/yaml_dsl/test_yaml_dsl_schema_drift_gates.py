@@ -50,7 +50,7 @@ def _load_schema(path: Path) -> object:
 
 
 def test_yaml_dsl_schema_numeric_constraints_are_typed() -> None:
-    schema_dir = _repo_root() / "src" / "scalim" / "dsl" / "by_yaml" / "schema"
+    schema_dir = _repo_root() / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema"
     schemas = [
         schema_dir / "demand.gen.json",
         schema_dir / "workflow.gen.json",
@@ -66,7 +66,7 @@ def test_yaml_dsl_schema_numeric_constraints_are_typed() -> None:
 
 
 def test_workflow_schema_does_not_expose_import_syntax() -> None:
-    schema_dir = _repo_root() / "src" / "scalim" / "dsl" / "by_yaml" / "schema"
+    schema_dir = _repo_root() / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema"
     workflow_schema = _load_schema(schema_dir / "workflow.gen.json")
 
     assert _contains_key(workflow_schema, "$import") is False

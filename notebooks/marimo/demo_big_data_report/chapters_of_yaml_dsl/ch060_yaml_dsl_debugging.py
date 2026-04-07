@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"

@@ -4,8 +4,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
-from scalim.dsl.by_yaml import run as run_yaml
+from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import run as run_yaml
 from scalim.sinks import InMemoryRowSink
 from scalim.typedefs import RowData
 from scalim_misc.demo_big_data_report.cases import build_test_config_small

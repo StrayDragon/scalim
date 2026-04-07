@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.schema_dsl.builder import build_demand_schema
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl.schema_dsl.builder import build_demand_schema
 
 
 def _load_ok(yaml_text: str) -> None:

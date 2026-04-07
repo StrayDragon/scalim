@@ -2,15 +2,15 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.security import SecureComputeEngine
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_str
-from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_decimal
-from scalim.dsl.by_yaml.schema_dsl.models import LookupCastConfig
+from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_str
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_decimal
+from scalim.dsl.yaml_dsl.schema_dsl.models import LookupCastConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
 from tests.support.yaml_fixtures import make_yaml_config
 

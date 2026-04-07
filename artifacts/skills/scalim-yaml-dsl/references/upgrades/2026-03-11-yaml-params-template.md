@@ -116,7 +116,7 @@ Python:
 
 ```python
 from datetime import datetime
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 
 result = run(
     "path/to/config.yaml",

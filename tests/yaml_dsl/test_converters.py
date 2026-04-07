@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_int
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_int
 from scalim.typedefs import SourceSpecIrCacheMode
 from scalim._internal.utils.converters import (
     get_seps_values_first_int,

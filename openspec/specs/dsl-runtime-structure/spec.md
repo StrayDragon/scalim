@@ -32,17 +32,6 @@ by_yaml runtime 同时 MUST NOT 承载 workflow 的执行编排；workflow runti
 - **WHEN** 调用方通过 workflow 的稳定入口运行 workflow YAML
 - **THEN** workflow 的调度执行与资源/ctx/事件桥接 MUST 由 framework 层实现,而不是 by_yaml/runtime
 
-### Requirement: `IMPL_ROOT.dsl.by_yaml` MUST be the preferred public facade
-
-系统 MUST 将 `IMPL_ROOT.dsl.by_yaml` 作为 YAML DSL 的首选公开 facade，用于承载用户最常见且受支持的运行入口与运行期契约。
-
-系统可以保留 `runtime` 子模块作为实现分层和内部组合边界，但这些路径 MUST NOT 再作为面向普通用户的首选公开入口被文档、skills 或 examples 推荐。
-
-#### Scenario: public guidance prefers facade over runtime internals
-- **WHEN** 用户查阅 YAML DSL 的官方导入示例
-- **THEN** 示例 MUST 优先使用 `IMPL_ROOT.dsl.by_yaml`
-- **AND** 不得把 `IMPL_ROOT.dsl.by_yaml.runtime.entrypoints`、`runtime.contracts` 或 `runtime.introspection` 作为默认推荐入口
-
 ### Requirement: official facade MUST preserve current extension seams
 
 在公共表面收敛过程中，系统 MUST 保持当前已确认的受控扩展点继续可经由官方 facade 使用，而不是通过删减能力来完成“收敛”。
@@ -129,22 +118,6 @@ adapter MUST 在 `DemandConfig -> DemandIr` 转换前完成 `{$init_var: <name>}
 #### Scenario: execution 不依赖 YAML result 类型
 - **WHEN** 另一个 DSL 已产出 `DemandIr` 并调用 execution 统一入口
 - **THEN** 它应获得同一个 `ExecutionResult` 结构,不需要依赖 YAML wrapper/result 类型
-
-### Requirement: YAML DSL 官方入口为 `IMPL_ROOT.dsl.by_yaml`
-系统 MUST 提供 `IMPL_ROOT.dsl.by_yaml` 作为 YAML DSL 的官方入口(导入路径),用于承载调用方最常用的稳定接口.
-
-该官方入口 MUST 以“受控 re-export”方式提供最小 facade,并 MUST 导出以下符号:
-- 运行入口: `run` / `compile` / `run_workflow`
-- 运行期契约: `UNSET`、`ResolverTrustedMode`、`RunOptions`、`RunOverrides`、`Compilation`、`RunResult`
-
-该官方入口 MUST 保持精简:
-- MUST NOT 通过包根 re-export `schema_dsl`、`config_parsing` 等大域对象或内部实现细节.
-- MUST 通过显式 `__all__` 白名单限制导出面,避免公共 API 膨胀.
-
-#### Scenario: 调用方可通过 IMPL_ROOT.dsl.by_yaml 导入运行入口与 options/overrides 契约
-- **WHEN** 调用方执行 `from IMPL_ROOT.dsl.by_yaml import run, compile`
-- **AND** 调用方执行 `from IMPL_ROOT.dsl.by_yaml import RunOptions, RunOverrides, ResolverTrustedMode`
-- **THEN** 导入 MUST 成功且行为与现有实现一致
 
 ### Requirement: runtime 子包化且入口明确
 系统 MUST 将 by_yaml runtime 从 legacy 单文件模块 `src/IMPL_ROOT/dsl/by_yaml/runtime.py`(已移除)拆为 `src/IMPL_ROOT/dsl/by_yaml/runtime/` 子包,并提供明确且可维护的入口模块(例如 `entrypoints`/`contracts`/`introspection`).
@@ -374,4 +347,26 @@ by_yaml runtime compiler MUST 将 YAML/RunOptions 的 `batch_size` 编译为 `Ex
 - **WHEN** 调用方执行 `run_workflow("path/to/workflow.yaml", options=options)`
 - **THEN** 系统 MUST 使用该 `RunOptions` 作为每个 demand run 的 base options
 - **AND** 后续 per-run patches(若提供) MUST 在该 base options 上应用
+
+### Requirement: `IMPL_ROOT.dsl.yaml_dsl` MUST be the preferred public facade
+系统 MUST 将 `IMPL_ROOT.dsl.yaml_dsl` 作为 YAML DSL 的首选公开 facade，用于承载用户最常见且受支持的运行入口与运行期契约。
+
+系统可以保留 `by_yaml` 作为内部实现包，但用户材料 MUST NOT 再推荐该路径。
+
+#### Scenario: public guidance prefers yaml_dsl facade over internals
+- **WHEN** 用户查阅 YAML DSL 的官方导入示例
+- **THEN** 示例 MUST 优先使用 `IMPL_ROOT.dsl.yaml_dsl`
+- **AND** 不得把 `IMPL_ROOT.dsl.yaml_dsl.runtime.*` 或旧的 `IMPL_ROOT.dsl.by_yaml.*` 写成默认推荐入口
+
+### Requirement: YAML DSL 官方入口为 `IMPL_ROOT.dsl.yaml_dsl`
+系统 MUST 提供 `IMPL_ROOT.dsl.yaml_dsl` 作为 YAML DSL 的官方入口(导入路径),用于承载调用方最常用的稳定接口.
+
+该官方入口 MUST 以“受控 re-export”方式提供最小 facade,并 MUST 导出以下符号:
+- 运行入口: `run` / `compile` / `run_workflow`
+- 运行期契约: `UNSET`、`ResolverTrustedMode`、`RunOptions`、`RunOverrides`、`Compilation`、`RunResult`
+
+#### Scenario: caller can import facade entrypoints and contracts from yaml_dsl
+- **WHEN** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl import run, compile, run_workflow`
+- **AND** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl import RunOptions, RunOverrides, ResolverTrustedMode`
+- **THEN** 导入 MUST 成功且行为与实现一致
 

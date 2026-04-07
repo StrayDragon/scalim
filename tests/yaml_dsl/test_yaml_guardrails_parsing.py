@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOptions, compile
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.execution.guardrails import GuardrailsPolicy
 
 

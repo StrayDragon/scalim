@@ -19,7 +19,7 @@ PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅
 - `src/IMPL_ROOT/execution/pipeline/base/pipeline.py` (column write slim + streaming mode)
 - `src/IMPL_ROOT/execution/executor/operators/write.py` / `src/IMPL_ROOT/execution/executor/operators/release.py` (FieldSlimEvent emission)
 - `src/IMPL_ROOT/execution/executor/operators/load.py` (LoaderSlimEvent emission)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/conversion.py` (YAML → DemandIr: required fields closure + field conversion pruning)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (YAML → DemandIr: required fields closure + field conversion pruning)
 
 ## Requirements
 ### Requirement: 依赖剪枝与计划元数据

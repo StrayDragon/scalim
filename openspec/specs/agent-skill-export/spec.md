@@ -151,7 +151,7 @@
 
 至少 MUST 满足:
 
-- 生成器 MUST 将 `src/scalim/dsl/by_yaml/schema/workflow.gen.json` 视为 workflow YAML 的 canonical schema 输入,并将其纳入校验/回归输入集.
+- 生成器 MUST 将 `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json` 视为 workflow YAML 的 canonical schema 输入,并将其纳入校验/回归输入集.
 - `references/syntax-catalog.gen.md` MUST 包含 workflow YAML 的语法索引,至少覆盖:
   - `workflow.runs[*]` 的关键字段: `id`、`demand`、`depends_on`、`init_vars`、`main_rows_from`
   - `workflow.options` 的关键字段: `max_concurrency`、`failure_policy`、`cache_pool`、`ctx`

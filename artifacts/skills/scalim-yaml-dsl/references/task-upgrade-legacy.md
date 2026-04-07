@@ -68,6 +68,9 @@
   - SSOT: `references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md`
   - OpenSpec: `openspec/changes/archive/2026-04-07-c41-yaml-dsl-import-roots-registry/`
   - Spec: `openspec/specs/yaml-dsl-project-config-schema/spec.md`
+- 2026-04-08: yaml-dsl-api-naming-alignment
+  - SSOT: `references/upgrades/2026-04-08-yaml-dsl-api-naming-alignment.md`
+  - OpenSpec: `openspec/changes/archive/2026-04-07-c1-yaml-dsl-api-naming-alignment/`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

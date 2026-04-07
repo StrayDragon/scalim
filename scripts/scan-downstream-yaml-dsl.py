@@ -32,7 +32,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 DEFAULT_LIST_REL = Path(".tmp") / "known-outer-paths-using-this-package.txt"
 DEFAULT_OUTPUT_DIR_REL = Path(".tmp") / "output" / "downstream-yaml-dsl-scan"
 
-WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "by_yaml" / "schema" / "workflow.gen.json"
+WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
 
 _CANDIDATE_TOPLEVEL_RE = re.compile(r"(?m)^(main_source|sources|fields|relations|outputs|output|workflow):")
 _WORKFLOW_RE = re.compile(r"(?m)^workflow:")

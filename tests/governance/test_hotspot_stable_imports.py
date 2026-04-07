@@ -1,8 +1,8 @@
 import pickle
 
-from scalim.dsl.by_yaml import RunOverrides, run
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
-from scalim.dsl.by_yaml.runtime.introspection import load_output_config
+from scalim.dsl.yaml_dsl import RunOverrides, run
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter, LookupCastRegistry
+from scalim.dsl.yaml_dsl.runtime.introspection import load_output_config
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler, resolve_adaptive_max_workers
 from scalim.hooks import BaseHook, HookManager, IExecutionHook
 from scalim.ob.manager import ScalimObserverCaptureOverflowError, ObserverManager

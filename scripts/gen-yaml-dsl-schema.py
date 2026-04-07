@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-from scalim.dsl.by_yaml.schema_dsl.builder import write_demand_schema, write_scalim_yaml_schema, write_workflow_schema
+from scalim.dsl.yaml_dsl.schema_dsl.builder import write_demand_schema, write_scalim_yaml_schema, write_workflow_schema
 
 
 def _read_text(path: Path) -> str:
@@ -38,7 +38,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     args = p.parse_args(list(argv) if argv is not None else None)
 
     repo_root = Path(__file__).resolve().parents[1]
-    schema_dir = repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema"
+    schema_dir = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema"
     demand_path = schema_dir / "demand.gen.json"
     workflow_path = schema_dir / "workflow.gen.json"
     scalim_yaml_path = schema_dir / "scalim_yaml.gen.json"

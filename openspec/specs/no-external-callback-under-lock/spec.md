@@ -13,7 +13,7 @@
 本变更的参考实现**至少**覆盖以下两个组件（其它组件可在后续变更中逐步纳入）：
 
 - `WorkflowCachePool`（`src/scalim/execution/workflow_cache_pool.py`）
-- `WorkflowResourceManager`（`src/scalim/dsl/by_yaml/runtime/workflow_resources.py`）
+- `WorkflowResourceManager`（`src/scalim/workflow/resources.py`）
 ## Requirements
 ### Requirement: instrumentation emit MUST NOT run under internal locks
 当组件在内部使用互斥锁保护状态时（例如 cache pools、workflow resources 等），系统 MUST 禁止在持锁期间执行：
@@ -41,4 +41,3 @@
 - **GIVEN** workflow 并发执行且 emit 在锁外
 - **WHEN** 同一个 observer 可能被多个线程触发
 - **THEN** 系统 MUST 通过序列化/回放避免并发回调
-

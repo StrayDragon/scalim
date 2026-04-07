@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 

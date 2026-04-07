@@ -2,9 +2,9 @@ import json
 import threading
 from pathlib import Path
 
-from scalim.dsl.by_yaml import RunOptions
-from scalim.dsl.by_yaml import run_workflow as run_workflow_public
-from scalim.dsl.by_yaml.workflow_entrypoints import run_workflow as run_workflow_stable
+from scalim.dsl.yaml_dsl import RunOptions
+from scalim.dsl.yaml_dsl import run_workflow as run_workflow_public
+from scalim.dsl.yaml_dsl.workflow_entrypoints import run_workflow as run_workflow_stable
 
 
 def _write_demand_yaml(tmp_path: Path, *, file_name: str, name: str, output_path: Path) -> Path:

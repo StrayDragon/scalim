@@ -3,8 +3,8 @@ from typing import FrozenSet
 
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
     BookWriteDefaultsOverride,
     DemandDiagnosticsPolicy,
@@ -16,10 +16,10 @@ from scalim.dsl.by_yaml import (
     ResourcesOverride,
     RunOverrides,
 )
-from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-from scalim.dsl.by_yaml.runtime import effective_outputs as effective_outputs_mod
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig, OutputWriteConfig
-from scalim.dsl.by_yaml import workflow_preflight as preflight_mod
+from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig, OutputWriteConfig
+from scalim.dsl.yaml_dsl import workflow_preflight as preflight_mod
 
 
 def test_workflow_preflight_run_workflow_preflight_orders_and_dispatches() -> None:

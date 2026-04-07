@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from scalim.dsl.by_yaml.schema_dsl import constants as yaml_constants
-from scalim.dsl.by_yaml.schema_dsl.builder import (
+from scalim.dsl.yaml_dsl.schema_dsl import constants as yaml_constants
+from scalim.dsl.yaml_dsl.schema_dsl.builder import (
     SchemaBuilder,
     build_demand_schema,
     build_scalim_yaml_schema,
@@ -18,14 +18,14 @@ from scalim.dsl.by_yaml.schema_dsl.builder import (
     write_scalim_yaml_schema,
     write_workflow_schema,
 )
-from scalim.dsl.by_yaml.schema_dsl.models import LOOKUP_CAST_KEYS
-from scalim.dsl.by_yaml.schema_dsl import doc_texts as yaml_doc_texts
+from scalim.dsl.yaml_dsl.schema_dsl.models import LOOKUP_CAST_KEYS
+from scalim.dsl.yaml_dsl.schema_dsl import doc_texts as yaml_doc_texts
 from tests.support.pathing import repo_root as _repo_root
 
 
 def _schema_path(name: str) -> Path:
     repo_root = _repo_root()
-    return repo_root / "src" / "scalim" / "dsl" / "by_yaml" / "schema" / name
+    return repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / name
 
 
 def test_generator_matches_generated_file() -> None:
@@ -68,7 +68,7 @@ def test_generated_scalim_yaml_schema_has_comment() -> None:
 
 
 def test_by_yaml_schema_package_is_importable() -> None:
-    from scalim.dsl.by_yaml import schema as schema_pkg
+    from scalim.dsl.yaml_dsl import schema as schema_pkg
 
     assert getattr(schema_pkg, "__all__", None) == ()
 

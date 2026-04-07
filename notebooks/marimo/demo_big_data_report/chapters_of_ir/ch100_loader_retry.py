@@ -5,7 +5,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Dict
 
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim.sinks import InMemoryRowSink
 from scalim_misc.demo_big_data_report.by_yaml_dsl import loader_retry_demo_mod as demo_mod

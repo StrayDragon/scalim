@@ -27,13 +27,13 @@ def test_workflow_layering_check_fails_on_dsl_import(tmp_path, capsys) -> None:
     module = _load_script_module()
 
     _write(tmp_path / "src/scalim/workflow/__init__.py", "")
-    _write(tmp_path / "src/scalim/workflow/execute.py", "import scalim.dsl.by_yaml\n")
+    _write(tmp_path / "src/scalim/workflow/execute.py", "import scalim.dsl.yaml_dsl\n")
 
     return_code = module.main(["--root", str(tmp_path), "--check"])
     captured = capsys.readouterr()
 
     assert return_code == 1
-    assert "import 'scalim.dsl.by_yaml'" in captured.err
+    assert "import 'scalim.dsl.yaml_dsl'" in captured.err
 
 
 def test_workflow_layering_check_fails_on_dynamic_import(tmp_path, capsys) -> None:
@@ -45,7 +45,7 @@ def test_workflow_layering_check_fails_on_dynamic_import(tmp_path, capsys) -> No
         "\n".join(
             [
                 "import importlib",
-                "importlib.import_module('scalim.dsl.by_yaml')",
+                "importlib.import_module('scalim.dsl.yaml_dsl')",
                 "",
             ]
         ),
@@ -58,11 +58,11 @@ def test_workflow_layering_check_fails_on_dynamic_import(tmp_path, capsys) -> No
     assert "dynamic import" in captured.err
 
 
-def test_workflow_layering_check_fails_on_workflow_runtime_module_in_by_yaml_runtime(tmp_path, capsys) -> None:
+def test_workflow_layering_check_fails_on_workflow_runtime_module_in_yaml_dsl_runtime(tmp_path, capsys) -> None:
     module = _load_script_module()
 
     _write(tmp_path / "src/scalim/workflow/__init__.py", "")
-    _write(tmp_path / "src/scalim/dsl/by_yaml/runtime/workflow_bad.py", "# sentinel\n")
+    _write(tmp_path / "src/scalim/dsl/yaml_dsl/runtime/workflow_bad.py", "# sentinel\n")
 
     return_code = module.main(["--root", str(tmp_path), "--check"])
     captured = capsys.readouterr()
@@ -76,7 +76,7 @@ def test_workflow_layering_check_passes(tmp_path, capsys) -> None:
 
     _write(tmp_path / "src/scalim/workflow/__init__.py", "")
     _write(tmp_path / "src/scalim/workflow/execute.py", "import scalim.workflow\n")
-    _write(tmp_path / "src/scalim/dsl/by_yaml/runtime/entrypoints.py", "# ok\n")
+    _write(tmp_path / "src/scalim/dsl/yaml_dsl/runtime/entrypoints.py", "# ok\n")
 
     return_code = module.main(["--root", str(tmp_path), "--check"])
     captured = capsys.readouterr()

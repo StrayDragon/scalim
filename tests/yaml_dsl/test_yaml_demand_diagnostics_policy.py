@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import DemandDiagnosticsOverride, DemandDiagnosticsPolicy, RunOptions, compile
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl import DemandDiagnosticsOverride, DemandDiagnosticsPolicy, RunOptions, compile
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.mock_loaders"])
 
@@ -113,60 +113,60 @@ def test_demand_diagnostics_override_rejects_invalid_validate_unique_field_names
         _ = DemandDiagnosticsOverride(validate_unique_field_names="false")  # type: ignore[arg-type]
 
 
-def test_workflow_run_patch_demand_diagnostics_none_disables_policy() -> None:
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-    from scalim.dsl.by_yaml.workflow_entrypoints import _apply_workflow_run_patch_demand_diagnostics
-    from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+def test_workflow_run_options_patch_demand_diagnostics_none_disables_policy() -> None:
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.workflow_entrypoints import _apply_workflow_run_options_patch_demand_diagnostics
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
 
     base = RunOptions(
         allowed_modules=_ALLOWED_MODULES,
         demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True, validate_unique_field_names=False),
     )
-    patch = WorkflowRunPatch(demand_diagnostics=None)
+    patch = WorkflowRunOptionsPatch(demand_diagnostics=None)
 
-    next_options = _apply_workflow_run_patch_demand_diagnostics(base, patch)
+    next_options = _apply_workflow_run_options_patch_demand_diagnostics(base, patch)
     assert next_options.demand_diagnostics is None
 
 
-def test_workflow_run_patch_demand_diagnostics_invalid_type_rejected() -> None:
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-    from scalim.dsl.by_yaml.workflow_entrypoints import _apply_workflow_run_patch_demand_diagnostics
-    from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+def test_workflow_run_options_patch_demand_diagnostics_invalid_type_rejected() -> None:
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.workflow_entrypoints import _apply_workflow_run_options_patch_demand_diagnostics
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
 
     base = RunOptions(allowed_modules=_ALLOWED_MODULES)
-    patch = WorkflowRunPatch(demand_diagnostics="bad")  # type: ignore[arg-type]
+    patch = WorkflowRunOptionsPatch(demand_diagnostics="bad")  # type: ignore[arg-type]
 
-    with pytest.raises(TypeError, match=r"WorkflowRunPatch\.demand_diagnostics must be a DemandDiagnosticsOverride or None"):
-        _ = _apply_workflow_run_patch_demand_diagnostics(base, patch)
+    with pytest.raises(TypeError, match=r"WorkflowRunOptionsPatch\.demand_diagnostics must be a DemandDiagnosticsOverride or None"):
+        _ = _apply_workflow_run_options_patch_demand_diagnostics(base, patch)
 
 
-def test_workflow_run_patch_demand_diagnostics_all_unset_is_noop() -> None:
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-    from scalim.dsl.by_yaml.workflow_entrypoints import _apply_workflow_run_patch_demand_diagnostics
-    from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+def test_workflow_run_options_patch_demand_diagnostics_all_unset_is_noop() -> None:
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.workflow_entrypoints import _apply_workflow_run_options_patch_demand_diagnostics
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
 
     base = RunOptions(
         allowed_modules=_ALLOWED_MODULES,
         demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True, validate_unique_field_names=False),
     )
-    patch = WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride())
+    patch = WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride())
 
-    next_options = _apply_workflow_run_patch_demand_diagnostics(base, patch)
+    next_options = _apply_workflow_run_options_patch_demand_diagnostics(base, patch)
     assert next_options is base
 
 
-def test_workflow_run_patch_demand_diagnostics_merges_fields_with_unset_inheritance() -> None:
-    from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-    from scalim.dsl.by_yaml.workflow_entrypoints import _apply_workflow_run_patch_demand_diagnostics
-    from scalim.dsl.by_yaml.workflow_types import WorkflowRunPatch
+def test_workflow_run_options_patch_demand_diagnostics_merges_fields_with_unset_inheritance() -> None:
+    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.workflow_entrypoints import _apply_workflow_run_options_patch_demand_diagnostics
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
 
     base = RunOptions(
         allowed_modules=_ALLOWED_MODULES,
         demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True, validate_unique_field_names=True),
     )
-    patch = WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
+    patch = WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
 
-    next_options = _apply_workflow_run_patch_demand_diagnostics(base, patch)
+    next_options = _apply_workflow_run_options_patch_demand_diagnostics(base, patch)
     assert next_options.demand_diagnostics is not None
     assert next_options.demand_diagnostics.include_full_error_message is True
     assert next_options.demand_diagnostics.validate_unique_field_names is False

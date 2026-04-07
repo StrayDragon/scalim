@@ -2,12 +2,12 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
-from scalim.dsl.by_yaml.runtime._internal.conversion_lookup import cast_int
-from scalim.dsl.by_yaml.runtime._internal.conversion_sources import _ensure_field_value, _resolve_call_by_ctx_attr
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_int
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_sources import _ensure_field_value, _resolve_call_by_ctx_attr
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     DemandConfig,
     DerivedFieldConfig,
     LookupCastConfig,

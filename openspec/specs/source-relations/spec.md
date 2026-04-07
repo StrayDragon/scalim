@@ -18,7 +18,7 @@
 - `src/IMPL_ROOT/spec/ir/sources.py` (`KeyIr.cast`)
 - `src/IMPL_ROOT/utils/converters.py` (`auto_normalize_key` + cast helpers)
 - `src/IMPL_ROOT/execution/executor/operators/load_ref/loader.py` (lookup execution + chunking)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/conversion.py` (YAML → relation IR compilation)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (YAML → relation IR compilation)
 - `src/IMPL_ROOT/planning/loader_ordering/deps.py` / `src/IMPL_ROOT/planning/loader_ordering/sequences.py`
 - `src/IMPL_ROOT/utils/relation_diagnostics.py`
 ## Requirements

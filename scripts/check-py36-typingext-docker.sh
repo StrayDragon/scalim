@@ -128,7 +128,7 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from scalim.dsl.by_yaml import RunOptions, run
+from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim_misc.demo_big_data_report.loaders import load_orders
 
 repo_root = Path(".").resolve()

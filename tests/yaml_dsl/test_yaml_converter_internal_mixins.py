@@ -1,8 +1,8 @@
 import pytest
 
-from scalim.dsl.by_yaml.runtime._internal.conversion_relations import ConfigToIRConversionRelationMixin
-from scalim.dsl.by_yaml.runtime._internal.conversion_sources import ConfigToIRConversionSourceMixin
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_relations import ConfigToIRConversionRelationMixin
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_sources import ConfigToIRConversionSourceMixin
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
 
 
 @pytest.mark.parametrize(

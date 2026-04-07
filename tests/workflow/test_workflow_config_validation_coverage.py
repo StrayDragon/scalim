@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import pytest
 
-from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError, load_workflow_config, load_workflow_config_from_mapping
+from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config, load_workflow_config_from_mapping
 
 
 def _base_root() -> Dict[str, Any]:

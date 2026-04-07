@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, Optional, Set
 
-from scalim.dsl import by_yaml as api
+from scalim.dsl import yaml_dsl as api
 from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import get_preload_counter_calls, reset_preload_counter_calls
@@ -76,10 +76,10 @@ def _touch_public_all(module: Any) -> int:
 
 
 def run_public_api_dsl_by_yaml() -> ExampleResult:
-    from scalim.dsl.by_yaml import tools as tools_api
-    from scalim.dsl.by_yaml import workflow as workflow_api
-    from scalim.dsl.by_yaml import workflow_paths as workflow_paths_api
-    from scalim.dsl.by_yaml import workflow_types as workflow_types_api
+    from scalim.dsl.yaml_dsl import tools as tools_api
+    from scalim.dsl.yaml_dsl import workflow as workflow_api
+    from scalim.dsl.yaml_dsl import workflow_paths as workflow_paths_api
+    from scalim.dsl.yaml_dsl import workflow_types as workflow_types_api
     from scalim.events import EVENT_PIPELINE_START, WORKFLOW_NODE_ID_META_KEY
     from scalim.ob.observer import Observer
     from scalim.spec import ir as spec_ir_api
@@ -222,8 +222,8 @@ workflow:
                 init_vars=init_vars,
                 batch_size=2,
             ),
-            run_patches_by_id={
-                "r1": workflow_types_api.WorkflowRunPatch(batch_size=5),
+            run_options_patches_by_run_id={
+                "r1": workflow_types_api.WorkflowRunOptionsPatch(batch_size=5),
             },
         )
         workflow_batch_sizes = dict(workflow_batch_size_observer.batch_size_by_workflow_node_id)
@@ -239,8 +239,8 @@ workflow:
         duplicate_patch = api.run_workflow(
             str(duplicate_workflow_path),
             options=api.RunOptions(allowed_modules=_ALLOWED_MODULES),
-            run_patches_by_id={
-                "dup": workflow_types_api.WorkflowRunPatch(
+            run_options_patches_by_run_id={
+                "dup": workflow_types_api.WorkflowRunOptionsPatch(
                     demand_diagnostics=api.DemandDiagnosticsOverride(validate_unique_field_names=False)
                 )
             },

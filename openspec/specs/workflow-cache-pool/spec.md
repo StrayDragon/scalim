@@ -7,9 +7,9 @@
 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/workflow.py` (workflow options 解析 + cache_pool 语义校验)
-- `src/IMPL_ROOT/dsl/by_yaml/schema/workflow.gen.json` (workflow schema)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/workflow_entrypoints.py` (`run_workflow` 创建/关闭 cache pool + node done 生命周期钩子)
+- `src/IMPL_ROOT/dsl/yaml_dsl/workflow.py` (workflow options 解析 + cache_pool 语义校验)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema/workflow.gen.json` (workflow schema)
+- `src/IMPL_ROOT/dsl/yaml_dsl/workflow_entrypoints.py` (`run_workflow` 创建/关闭 cache pool + node done 生命周期钩子)
 - `src/IMPL_ROOT/execution/workflow_cache_pool.py` (cache pool 实现: signature/budget/refcount/pin/事件)
 - `src/IMPL_ROOT/execution/pipeline/base/pipeline.py` (preload_forever 优先走 cache_pool.get_or_load)
 - `src/IMPL_ROOT/events/events.py` + `src/IMPL_ROOT/events/catalog.py` (workflow cache 事件定义/注册)

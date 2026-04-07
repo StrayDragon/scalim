@@ -1,7 +1,7 @@
 import pytest
 
-from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
 
 
 @pytest.mark.parametrize(

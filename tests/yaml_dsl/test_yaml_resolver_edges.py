@@ -3,9 +3,9 @@ import math
 
 import pytest
 
-from scalim.dsl.by_yaml.runtime.errors import ScalimResolverError
-from scalim.dsl.by_yaml.runtime.allowlist_policy import ResolverTrustedMode
-from scalim.dsl.by_yaml.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
+from scalim.dsl.yaml_dsl.runtime.allowlist_policy import ResolverTrustedMode
+from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
 
 
 def test_resolver_rejects_invalid_dotted_reference() -> None:
@@ -53,7 +53,7 @@ def test_resolver_rejects_wildcard_modules_by_default() -> None:
 
 
 def test_resolver_trusted_mode_allows_wildcard_modules_and_warns(caplog, monkeypatch) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.dsl.by_yaml.resolver")
+    caplog.set_level(logging.WARNING, logger="scalim.dsl.yaml_dsl.resolver")
     monkeypatch.setenv("SCALIM_ALLOW_TRUSTED_ALL_MODULES", "1")
     resolver = PythonReferenceResolver(
         allowed_modules=frozenset(["*"]),

@@ -29,7 +29,7 @@ JetBrains YAML plugin 负责结构校验/补全；YAML DSL LSP 负责语义能�
 建议在 YAML 文件头写入 `$schema` modeline（示例）：
 
 ```yaml
-# $schema: /ABS/PATH/TO/src/scalim/dsl/by_yaml/schema/demand.gen.json
+# $schema: /ABS/PATH/TO/src/scalim/dsl/yaml_dsl/schema/demand.gen.json
 ```
 
 > 提示：仓库内提供了批量写入/更新 modeline 的 CLI（见 `docs/doc/yaml-dsl/cli-reference.gen.md` 的 `yaml-dsl upsert-lsp-comment`）。

@@ -49,7 +49,7 @@ notebooks 本体是交互式 demo,但同时也是 **确定性回归入口** 的 
 当某段文档内容需要与实现保持强同步(但不适合把整页都生成)时,推荐把片段沉淀在“所有者模块”的 `doc_texts.py` 中,
 并通过 injected block 注入到站内手工页:
 
-- 例: YAML DSL 的片段 SSOT: `src/scalim/dsl/by_yaml/schema_dsl/doc_texts.py`
+- 例: YAML DSL 的片段 SSOT: `src/scalim/dsl/yaml_dsl/schema_dsl/doc_texts.py`
 - 例: 注入目标页: `docs/doc/yaml-dsl/user-guide.md` 中的 `AUTOGEN:*` 区块
 - 生成入口: `scripts/gen-docs.py` (统一入口: `just gen-docs`)
 

@@ -1,6 +1,6 @@
 import pytest
 
-import scalim.dsl.by_yaml._internal.config_parsing.validator as validator_module
+import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_module
 
 
 def _base_config() -> dict:

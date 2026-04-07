@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import FrozenSet, List
 
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, run_workflow
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run_workflow
 from scalim.ob.presets._internal.viz_config import normalize_output_dir
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.notebook_support.pathing import demo_big_data_report_workflow_yaml_path

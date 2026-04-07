@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml.runtime.contracts import RunOptions
-from scalim.dsl.by_yaml.runtime.errors import ScalimAllowlistRequiredError
-from scalim.dsl.by_yaml.runtime.stages import (
+from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimAllowlistRequiredError
+from scalim.dsl.yaml_dsl.runtime.stages import (
     ScalimStageAllowlistMismatchError,
     stage_create_context,
     stage_compile_demand_ir,

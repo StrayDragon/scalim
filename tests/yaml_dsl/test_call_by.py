@@ -1,15 +1,15 @@
 import pytest
 
-import scalim.dsl.by_yaml._internal.config_parsing.call_by as call_by_module
-from scalim.dsl.by_yaml._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
-from scalim.dsl.by_yaml._internal.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
+import scalim.dsl.yaml_dsl._internal.config_parsing.call_by as call_by_module
+from scalim.dsl.yaml_dsl._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
+from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from decimal import Decimal
 
-from scalim.dsl.by_yaml.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.by_yaml.runtime.errors import ScalimConversionError
-from scalim.dsl.by_yaml.runtime.references import SecurePythonReferenceResolver
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceFieldConfig
+from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceFieldConfig
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime

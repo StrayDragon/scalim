@@ -5,8 +5,8 @@
 ## Canonical Sources
 - CLI implementation: `src/scalim/cli/yaml_dsl.py`
 - Project identity constants: `src/scalim/_project_constants.py`
-- Demand schema file: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
-- Workflow schema file: `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
+- Demand schema file: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`
+- Workflow schema file: `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
 - Canonical example: `references/generated/example-full/ecommerce_report.gen.yaml`
 
 ## Command Variants
@@ -14,7 +14,7 @@
 - `uv run scalim-cli yaml-dsl validate <file.yaml>`
 - `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
 - `uv run scalim-cli yaml-dsl schema validate <file.yaml>`
-- `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/by_yaml/schema/workflow.gen.json <workflow.yaml>`
+- `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>`
 - `uv run scalim-cli yaml-dsl schema show`
 - `uv run scalim-cli yaml-dsl schema path`
 - `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
@@ -36,14 +36,14 @@
 - `yaml-dsl schema validate`: 使用 JSON Schema,更适合 schema-only 校验、编辑器/LSP 对齐与 unknown-field strict 收敛.
 
 ## LSP / Schema Header
-- Repo schema path: `src/scalim/dsl/by_yaml/schema/demand.gen.json`
-- Workflow schema path: `src/scalim/dsl/by_yaml/schema/workflow.gen.json`
+- Repo schema path: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`
+- Workflow schema path: `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
 - Canonical example: 故意不写 schema 头(`# $schema: ...`),避免把本机路径固化进共享 YAML.
 - 批量写入/更新头部(默认同时写 Red Hat + JetBrains modeline; 可用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
 - Workflow modeline: `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 - Repo query: `uv run scalim-cli yaml-dsl schema path`
 - External query: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
-- Python fallback: `python -c "import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/by_yaml/schema/demand.gen.json'))"`
+- Python fallback: `python -c "import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/yaml_dsl/schema/demand.gen.json'))"`
 - 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.
 ```yaml
 # yaml-language-server: $schema=.../demand.gen.json

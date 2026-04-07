@@ -1,5 +1,5 @@
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, compile
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, compile
 
 
 def test_loader_allows_missing_output() -> None:

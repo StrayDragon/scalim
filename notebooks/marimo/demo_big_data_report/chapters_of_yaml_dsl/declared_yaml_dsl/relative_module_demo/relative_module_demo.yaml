@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../../../../src/scalim/dsl/by_yaml/schema/demand.gen.json
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
 
 # Demo: relative python module reference for go-to-definition.
 # The `loader` value starts with `.` and is resolved relative to this YAML's directory.

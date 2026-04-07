@@ -2,7 +2,7 @@
 
 说明:
 - `scalim.workflow` 不能依赖 `scalim.dsl`,因此此处定义 `workflow` 运行期使用的错误类型.
-- `DSL` 适配层(`scalim.dsl.by_yaml.workflow_entrypoints`) 可以在必要时将该错误包装为 `DSL` 层的 `ScalimWorkflowConfigError`.
+- `DSL` 适配层(`scalim.dsl.yaml_dsl.workflow_entrypoints`) 可以在必要时将该错误包装为 `DSL` 层的 `ScalimWorkflowConfigError`.
 """
 
 from ..exceptions import ScalimWorkflowError

@@ -51,7 +51,7 @@
 - **THEN** 必须通过公开接口完成判断,不得读取 resolver/policy 的私有字段
 
 ### Requirement: components/subscribers 装配入口必须显式校验
-系统 MUST 在组件列表装配入口(例如 by_yaml runtime 的 `components`/`subscribers`、或 `InstrumentationHub.register`)对每个组件做显式校验:
+系统 MUST 在组件列表装配入口(例如 yaml_dsl runtime 的 `components`/`subscribers`、或 `InstrumentationHub.register`)对每个组件做显式校验:
 - `Observer` 组件走 observer 注册路径
 - `IExecutionHook` 组件走 hook 注册路径
 - 其它对象 MUST 抛出 `TypeError` 并包含组件 index/type 与期望类型

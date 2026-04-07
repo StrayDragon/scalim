@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import DemandDiagnosticsPolicy, RunOptions, run as run_yaml
+from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy, RunOptions, run as run_yaml
 from scalim.execution.output_composition import OutputTargetStats
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 

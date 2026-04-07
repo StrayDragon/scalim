@@ -8,8 +8,8 @@
 
 说明：
 
-- demand YAML 执行入口：`scalim.dsl.by_yaml.run(..., options=RunOptions(...))`
-- workflow YAML 执行入口：`scalim.dsl.by_yaml.run_workflow(..., options=RunOptions(...), ...)`
+- demand YAML 执行入口：`scalim.dsl.yaml_dsl.run(..., options=RunOptions(...))`
+- workflow YAML 执行入口：`scalim.dsl.yaml_dsl.run_workflow(..., options=RunOptions(...), ...)`
 
 #### Scenario: yaml-dsl help does not list run commands
 - **WHEN** 用户执行 `scalim-cli yaml-dsl --help`

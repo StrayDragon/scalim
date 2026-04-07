@@ -676,7 +676,7 @@ check-user-material-import-boundaries:
 check-import-graph:
     uv {{ UV_OPTIONS }} run python scripts/check-import-graph.py --check
 
-# 检查: workflow layering gate (workflow 不得依赖 dsl; by_yaml/runtime 不得包含 workflow_*.py)
+# 检查: workflow layering gate (workflow 不得依赖 dsl; yaml_dsl/runtime 不得包含 workflow_*.py)
 check-workflow-layering:
     uv {{ UV_OPTIONS }} run python scripts/check-workflow-layering.py --check
 

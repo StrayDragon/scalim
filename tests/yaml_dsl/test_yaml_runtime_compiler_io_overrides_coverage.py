@@ -2,9 +2,9 @@ import os
 
 import pytest
 
-from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
-from scalim.dsl.by_yaml.runtime import effective_outputs as effective_outputs_mod
-from scalim.dsl.by_yaml.runtime.contracts import (
+from scalim.dsl.yaml_dsl.runtime import compiler as compiler_mod
+from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
+from scalim.dsl.yaml_dsl.runtime.contracts import (
     BookBudgetOverride,
     BookExportXlsxOverride,
     BookResourceOverride,
@@ -19,7 +19,7 @@ from scalim.dsl.by_yaml.runtime.contracts import (
     RunOptions,
     RunOverrides,
 )
-from scalim.dsl.by_yaml.schema_dsl.models import (
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,

@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml._internal.config_parsing import imports as imports_mod
-from scalim.dsl.by_yaml._internal.config_parsing import presets as presets_mod
-from scalim.dsl.by_yaml._internal.config_parsing import project_config as project_config_mod
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing import imports as imports_mod
+from scalim.dsl.yaml_dsl._internal.config_parsing import presets as presets_mod
+from scalim.dsl.yaml_dsl._internal.config_parsing import project_config as project_config_mod
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 
 
 def test_parse_scalim_preset_uri_rejects_non_scalim_scheme() -> None:

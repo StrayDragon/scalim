@@ -11,12 +11,12 @@
 约束：
 
 - schema MUST 采用 JSON Schema Draft-07（与现有 `demand.gen.json` / `workflow.gen.json` 对齐）
-- schema 生成物 MUST 位于 `src/IMPL_ROOT/dsl/by_yaml/schema/` 下（与现有 schema 同目录）
+- schema 生成物 MUST 位于 `src/IMPL_ROOT/dsl/yaml_dsl/schema/` 下（与现有 schema 同目录）
 - schema 生成物 MUST 包含 `$comment` 且明确其生成入口（避免误手改）
 
 #### Scenario: schema artifact is present and references the generator
 - **WHEN** 维护者在仓库内执行 `just gen-yaml-dsl-schema`
-- **THEN** `src/IMPL_ROOT/dsl/by_yaml/schema/` 下 MUST 产出 `scalim.yaml` 的 schema 生成物（文件名按实现约定）
+- **THEN** `src/IMPL_ROOT/dsl/yaml_dsl/schema/` 下 MUST 产出 `scalim.yaml` 的 schema 生成物（文件名按实现约定）
 - **AND** 该 schema MUST 包含 `$schema: http://json-schema.org/draft-07/schema#`
 - **AND** MUST 包含 `$comment` 指向 schema 生成脚本/入口
 
@@ -41,7 +41,7 @@
 ### Requirement: Schema generation MUST reuse the existing YAML DSL schema pipeline and be drift-gated
 系统 MUST 将 `scalim.yaml` schema 纳入现有 YAML DSL schema 生成管线与漂移门禁中：
 
-- SSOT MUST 位于 `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/**`（不得手写独立 JSON schema 作为 SSOT）
+- SSOT MUST 位于 `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/**`（不得手写独立 JSON schema 作为 SSOT）
 - 生成入口 MUST 复用 `scripts/gen-yaml-dsl-schema.py`（由 `just gen-yaml-dsl-schema` 调用）
 - 仓库 MUST 提供 drift gate（测试/脚本）确保生成结果与已提交生成物一致
 

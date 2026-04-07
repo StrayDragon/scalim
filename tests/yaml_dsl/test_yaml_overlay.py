@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from scalim.dsl.by_yaml import (
+from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
     BookWriteDefaultsOverride,
     DemandDiagnosticsPolicy,
@@ -18,7 +18,7 @@ from scalim.dsl.by_yaml import (
     RunOverrides,
     compile,
 )
-from scalim.dsl.by_yaml._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -353,9 +353,9 @@ sources: {}
 
 
 def test_should_validate_unique_field_names_skips_field_id_headers() -> None:
-    from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-    from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
-    from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig, OutputToConfig, OutputWriteConfig
+    from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.yaml_dsl.runtime import compiler as compiler_mod
+    from scalim.dsl.yaml_dsl.schema_dsl.models import OutputTargetConfig, OutputToConfig, OutputWriteConfig
 
     loader = YamlDemandLoader()
     config = loader.load_string(
@@ -398,9 +398,9 @@ resources:
 
 
 def test_should_validate_unique_field_names_includes_books_outputs() -> None:
-    from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-    from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
-    from scalim.dsl.by_yaml.schema_dsl.models import OutputTargetConfig, OutputToConfig
+    from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.yaml_dsl.runtime import compiler as compiler_mod
+    from scalim.dsl.yaml_dsl.schema_dsl.models import OutputTargetConfig, OutputToConfig
 
     loader = YamlDemandLoader()
     config = loader.load_string(
@@ -736,8 +736,8 @@ sources: {}
 
 
 def test_loader_parse_config_rejects_invalid_validate_unique_field_names_type() -> None:
-    from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-    from scalim.dsl.by_yaml._internal.config_parsing.models import RawDemand
+    from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+    from scalim.dsl.yaml_dsl._internal.config_parsing.models import RawDemand
 
     loader = YamlDemandLoader()
     raw = RawDemand.from_raw(

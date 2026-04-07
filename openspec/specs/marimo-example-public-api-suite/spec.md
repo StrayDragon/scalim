@@ -33,7 +33,7 @@ TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update
 
 该 suite 至少 MUST 覆盖：
 
-- `scalim.dsl.by_yaml` 的 facade imports
+- `scalim.dsl.yaml_dsl` 的 facade imports
 - workflow 辅助公开模块（`workflow` / `workflow_types` / `workflow_paths`）
 - `scalim.spec.ir`
 

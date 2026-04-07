@@ -5,21 +5,21 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
-from ..dsl.by_yaml._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
-from ..dsl.by_yaml._internal.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
-from ..dsl.by_yaml._internal.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
-from ..dsl.by_yaml._internal.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
-from ..dsl.by_yaml._internal.config_parsing.validator import ConfigValidator
-from ..dsl.by_yaml._internal.config_parsing.validators.issues import ValidationIssue
-from ..dsl.by_yaml._internal.config_parsing.yaml_load import (
+from ..dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
+from ..dsl.yaml_dsl._internal.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
+from ..dsl.yaml_dsl._internal.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
+from ..dsl.yaml_dsl._internal.config_parsing.unknown_fields import UnknownFieldIssue, find_unknown_fields
+from ..dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
+from ..dsl.yaml_dsl._internal.config_parsing.validators.issues import ValidationIssue
+from ..dsl.yaml_dsl._internal.config_parsing.yaml_load import (
     YamlLocationIndex,
     envelope_from_validation_issue,
     error_loc_for_yaml_path,
     load_yaml_mapping_text,
 )
-from ..dsl.by_yaml.workflow_config import load_workflow_config_from_mapping
-from ..dsl.by_yaml.workflow_paths import resolve_workflow_demand_path
-from ..dsl.by_yaml.workflow_types import ScalimWorkflowConfigError
+from ..dsl.yaml_dsl.workflow_config import load_workflow_config_from_mapping
+from ..dsl.yaml_dsl.workflow_paths import resolve_workflow_demand_path
+from ..dsl.yaml_dsl.workflow_types import ScalimWorkflowConfigError
 from ..exceptions import safe_error_message, safe_error_type
 from ..vendor.compact.importlibx import import_module
 from ..vendor.dataclassesx import dataclass, field
@@ -223,7 +223,7 @@ def _add_upsert_lsp_comment_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _default_schema_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "dsl" / "by_yaml" / "schema" / "demand.gen.json"
+    return Path(__file__).resolve().parents[1] / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
 
 
 def _resolve_schema_path(arg: Optional[Path]) -> Path:
@@ -238,7 +238,7 @@ def _schema_path_for_schema_type(schema_type: str) -> Path:
     if not _SCHEMA_TYPE_PATTERN.match(schema_type):
         msg = "Invalid schema type: {}".format(schema_type)
         raise ValueError(msg)
-    return Path(__file__).resolve().parents[1] / "dsl" / "by_yaml" / "schema" / "{}.gen.json".format(schema_type)
+    return Path(__file__).resolve().parents[1] / "dsl" / "yaml_dsl" / "schema" / "{}.gen.json".format(schema_type)
 
 
 def _load_json_schema(schema_path: Path) -> Dict[str, Any]:

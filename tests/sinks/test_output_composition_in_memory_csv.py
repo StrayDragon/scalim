@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from scalim.dsl.by_yaml.runtime.compiler import compile as compile_demand
-from scalim.dsl.by_yaml.runtime.contracts import RunOptions
+from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand
+from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
 from scalim.execution.run_ir import run_ir
 
 

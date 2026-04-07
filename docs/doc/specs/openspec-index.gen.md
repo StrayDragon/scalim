@@ -579,7 +579,7 @@ Sources:
 ### `yaml-runtime-vars`
 - Title: yaml-runtime-vars Specification
 - Source: [spec.md](#code=openspec/specs/yaml-runtime-vars/spec.md)
-- Summary: **状态: ✅ 已实现** 为 by_yaml runtime 提供编译期的运行期变量注入入口: 调用方通过 `runtime_vars` 注入任意 Python 对象,并在 `main_source.params` / `sources.<id>.params` 的 kwargs 模板中用 `{$runtime: <name>}` 指令节点引用,由 adapter 在编译期解析并透传给 loader.
+- Summary: **状态: ✅ 已实现** 为 yaml_dsl runtime 提供编译期的运行期变量注入入口: 调用方通过 `runtime_vars` 注入任意 Python 对象,并在 `main_source.params` / `sources.<id>.params` 的 kwargs 模板中用 `{$runtime: <name>}` 指令节点引用,由 adapter 在编译期解析并透传给 loader.
 
 ### `yaml-source-normalize`
 - Title: yaml-source-normalize Specification

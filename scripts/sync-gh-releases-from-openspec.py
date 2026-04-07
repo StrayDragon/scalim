@@ -189,7 +189,7 @@ def _score_highlight(text: str) -> int:
         score += 2
     if "导入路径" in s or "_internal" in s or "modulenotfounderror" in lower or "内部实现" in s:
         score -= 3
-    if "runoverrides" in lower or "overrides." in lower or "by_yaml runtime" in lower:
+    if "runoverrides" in lower or "overrides." in lower or "by_yaml runtime" in lower or "yaml_dsl runtime" in lower:
         score -= 2
     if "重构" in s or "refactor" in lower:
         score += 2

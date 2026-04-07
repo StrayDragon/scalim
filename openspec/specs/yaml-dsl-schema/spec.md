@@ -4,39 +4,39 @@
 ## Purpose
 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/models/__init__.py` (schema meta dataclasses)
-- `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/constants.py` (enum/hover fragments)
-- `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/builder.py` (schema builder + writer)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/models/__init__.py` (schema meta dataclasses)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/constants.py` (enum/hover fragments)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py` (schema builder + writer)
 - `scripts/gen-yaml-dsl-schema.py` (single generation entrypoint)
-- `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` (generated artifact)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` (generated artifact)
 - `tests/test_yaml_schema_generation.py` (drift guard)
-- `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validator.py` (runtime strict validation)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (runtime strict validation)
 ## Implementation Notes (Current Behavior)
 本节描述 **实际代码链路**,用于避免“规范/实现”理解偏差.
 
 ### Generation Pipeline (as implemented)
 - **Schema 元数据来源**:
-  - `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/models/__init__.py` 定义 dataclass + `_schema_meta(...)` 元数据
-  - `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/constants.py` 提供枚举/描述/默认值/基础 schema 片段
-  - `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/builder.py` 默认通过轻量 adapter 统一访问 models/constants(不再保留 `schema_dsl/types.py` 聚合模块)
+  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/models/__init__.py` 定义 dataclass + `_schema_meta(...)` 元数据
+  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/constants.py` 提供枚举/描述/默认值/基础 schema 片段
+  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py` 默认通过轻量 adapter 统一访问 models/constants(不再保留 `schema_dsl/types.py` 聚合模块)
 - **Schema 构建器**:
-  - `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/builder.py::SchemaBuilder.build_demand_schema()`
+  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py::SchemaBuilder.build_demand_schema()`
   - 关键实际行为:
     - 顶层 `properties` 由 `DemandConfig` + `DEMAND_SCHEMA_PROPERTIES_ORDER` 构造
     - `fields` 顶层使用自定义描述与 `FIELD_DERIVED_CONDITIONS` 约束
     - `source_field` + `derived_field` 通过 `_build_field_definition()` 合并
     - 生成 schema 包含 `$comment`,值为“自动生成, 请勿手动修改...”
 - **输出写入**:
-  - `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/builder.py::write_demand_schema()` 使用 `json.dump(..., ensure_ascii=False, indent=2, sort_keys=False)` 写出
+  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py::write_demand_schema()` 使用 `json.dump(..., ensure_ascii=False, indent=2, sort_keys=False)` 写出
 - **命令入口**:
   - `scripts/gen-yaml-dsl-schema.py` 是唯一生成入口
-  - `just gen-yaml-dsl-schema` 调用该脚本,输出到 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+  - `just gen-yaml-dsl-schema` 调用该脚本,输出到 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **一致性验证**:
   - `tests/test_yaml_schema_generation.py` 校验生成结果与 `demand.gen.json` 一致,并要求存在 `$comment`
 
 ### Schema vs. Runtime Validation
 - `demand.gen.json` 用于 **编辑器提示 / schema-only 校验**(例如 `PROJECT_CLI_NAME yaml-dsl schema validate`).
-- 运行时严格校验由 `src/IMPL_ROOT/dsl/by_yaml/config_parsing/validator.py` 执行,可能比 schema 更严格(例如 schema 对 `fields` 允许额外键,但严格校验会报告未知字段).
+- 运行时严格校验由 `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` 执行,可能比 schema 更严格(例如 schema 对 `fields` 允许额外键,但严格校验会报告未知字段).
 ## Requirements
 ### Requirement: enums and defaults MUST be sourced from schema_dsl SSOT
 
@@ -52,7 +52,7 @@
 - **THEN** 一致性自检 MUST fail-fast 并指出不一致字段
 
 ### Requirement: schema 元数据生成与 hover 指引
-系统 SHALL 使用 `src/IMPL_ROOT/dsl/by_yaml/schema_dsl/` 的元数据(见 `constants.py` 与 `models/__init__.py`)生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` 并将其视为唯一 canonical schema.
+系统 SHALL 使用 `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/` 的元数据(见 `constants.py` 与 `models/__init__.py`)生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` 并将其视为唯一 canonical schema.
 - schema 顶层不包含 `dsl_version`
 - schema 顶层仅保留 `relations`(排除 `relations_sql_like`/`relations_graph`)
 - `relations.steps.from/to` 支持 `source.field` 字符串或同源字符串列表
@@ -102,7 +102,7 @@
 - 当把 demand YAML 当作“需求本体模板”复用时,推荐在 Python 调用侧使用 `overrides.outputs` 运行期指定输出编排。
 
 #### Scenario: schema 中包含 outputs 可选与 overrides.outputs 提示
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** `properties.outputs.markdownDescription` MUST 提及 `outputs` 可选
 - **AND** `properties.outputs.markdownDescription` MUST 提及 `overrides.outputs` 的推荐用法
 
@@ -115,7 +115,7 @@
 - MUST NOT 再接受 `outputs[*].container`
 
 #### Scenario: schema exposes resources.files and to.file
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** schema MUST 暴露 `definitions.file` / `definitions.output_to.properties.file`
 - **AND** 顶层 `resources` MUST 支持 `files`
 
@@ -149,7 +149,7 @@
 - `resources.books.write_defaults` MUST NOT 暴露 `header_fields_output_by`
 
 #### Scenario: schema default for header_fields_output_by is name
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** `definitions.output_write.properties.header_fields_output_by.default` MUST 等于 `name`
 
 ### Requirement: schema hover 提供常见错误与迁移提示
@@ -175,7 +175,7 @@
 - `$keys/$rows` 仅在 ref loader 上下文可用,main_source/preload 禁止
 
 #### Scenario: params hover 包含 `$keys/$rows` 示例
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** `main_source.params` 与 `sources.*.params` 的 `markdownDescription` MUST 包含 `$keys/$rows` 指令节点说明与示例片段
 
 ### Requirement: `params` hover documents `{$runtime: <name>}` and preload params behavior
@@ -210,7 +210,7 @@ Schema 生成器 MUST 在 `main_source.params` 与 `sources.*.params` 的 hover/
 - 相对引用解析后仍受 allowlist(`allowed_modules`/`allowed_functions`)约束
 
 #### Scenario: loader hover 提示包含相对引用示例
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** `main_source.loader` 的 `markdownDescription` MUST 包含至少一个相对引用示例(例如 `.loaders:load_orders`)
 
 ### Requirement: 字段声明位置与 compute 约束
@@ -234,7 +234,7 @@ schema 示例 MUST 至少包含:
 - `extract: review_status`
 
 #### Scenario: schema hover 包含 current-row-relative 说明
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** 源字段定义中的 `extract` MUST 具备 `description` 或 `markdownDescription`
 - **AND** 其文案 MUST 明确说明 `extract` 不是相对整个 loader-result mapping 解析
 
@@ -245,7 +245,7 @@ schema 示例 MUST 至少包含:
 - 若出现历史 `field: ...`,应按迁移错误处理并提示改为 `extract: ...`
 
 #### Scenario: schema 不再暴露 `field`
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** 源字段定义 MUST NOT 包含可用的 `field` 属性(应通过 schema/validator 拒绝)
 
 ### Requirement: relation steps-only 约束
@@ -347,7 +347,7 @@ Schema SHALL 对派生字段声明 `compute` 与 `call_by` 做互斥约束(oneOf
 系统 MUST 在生成 YAML DSL JSON Schema 时保留 `_schema_meta(...)` 中除 `schema` 之外的 meta 信息(例如 `desc`/`md`/`examples` 等),以避免 LSP hover 缺失.
 
 #### Scenario: main_source.order_by hover 可见
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** `definitions.main_source.properties.order_by` MUST 包含 `description` 或 `markdownDescription`(至少其一)以支持编辑器 hover
 
 ### Requirement: schema 明确 batch_size 的 null-or-int 语义
@@ -413,7 +413,7 @@ Schema MUST 为 retry policy 字段提供:
 - `normalize.kind=index_by_key` 的输入输出形状示例
 
 #### Scenario: schema hover 包含 `index_by_key` 形状示例
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** `sources.*.normalize` 的文案 MUST 展示 `list[row] -> key -> row` 的示例
 - **AND** MUST 明确说明该能力不是字段级提取
 
@@ -421,7 +421,7 @@ Schema MUST 为 retry policy 字段提供:
 系统 MUST NOT 在 `main_source` schema 中暴露 `normalize` 字段。
 
 #### Scenario: `main_source` schema 无 `normalize`
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** `definitions.main_source.properties` MUST NOT 包含 `normalize`
 
 ### Requirement: `outputs.*.fields` 支持 YAML alias 条目
@@ -500,7 +500,7 @@ Schema MUST 为 retry policy 字段提供:
 - object MUST `additionalProperties=false`
 
 #### Scenario: schema validate accepts string or init_var object for book paths
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json` 与 `workflow.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` 与 `workflow.gen.json`
 - **THEN** book 的 `path`/`export_xlsx.path` 字段 MUST 通过 `oneOf` 接受 string 或 `{$init_var: <name>}` object
 
 ### Requirement: kind-based `if/then` constraints MUST NOT trigger when `kind` is missing
@@ -560,7 +560,7 @@ Schema MUST 为 retry policy 字段提供:
 `include_full_error_message` 属于 runtime policy(可能包含敏感信息),系统 MUST 不再将其作为 demand YAML stable authoring 字段暴露在 schema 中。
 
 #### Scenario: schema no longer exposes include_full_error_message
-- **WHEN** 生成 `src/IMPL_ROOT/dsl/by_yaml/schema/demand.gen.json`
+- **WHEN** 生成 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
 - **THEN** schema MUST NOT 暴露 `properties.include_full_error_message`
 
 ### Requirement: schema/validator restrict `normalize.on_none` to `index_by_key`

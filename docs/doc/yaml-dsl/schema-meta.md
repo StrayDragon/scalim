@@ -14,8 +14,8 @@
     - meta 展开逻辑变更(影响 hover/choices/examples 等)
 
     代码入口:
-    - meta payload: `src/scalim/dsl/by_yaml/schema_dsl/constants.py::_schema_meta`
-    - meta 展开: `src/scalim/dsl/by_yaml/schema_dsl/builder.py::SchemaBuilder._expand_meta`
+    - meta payload: `src/scalim/dsl/yaml_dsl/schema_dsl/constants.py::_schema_meta`
+    - meta 展开: `src/scalim/dsl/yaml_dsl/schema_dsl/builder.py::SchemaBuilder._expand_meta`
 
 ## 1) `_schema_meta` 是什么
 
@@ -88,7 +88,7 @@
 from dataclasses import dataclass, field
 
 # `_schema_meta` 是内部 helper,见:
-# - `src/scalim/dsl/by_yaml/schema_dsl/constants.py::_schema_meta`
+# - `src/scalim/dsl/yaml_dsl/schema_dsl/constants.py::_schema_meta`
 
 
 @dataclass(frozen=True)
@@ -109,7 +109,7 @@ class Demo:
 from dataclasses import dataclass, field
 
 # `_schema_meta` 是内部 helper,见:
-# - `src/scalim/dsl/by_yaml/schema_dsl/constants.py::_schema_meta`
+# - `src/scalim/dsl/yaml_dsl/schema_dsl/constants.py::_schema_meta`
 
 
 @dataclass(frozen=True)
@@ -125,7 +125,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 # `_schema_meta` 是内部 helper,见:
-# - `src/scalim/dsl/by_yaml/schema_dsl/constants.py::_schema_meta`
+# - `src/scalim/dsl/yaml_dsl/schema_dsl/constants.py::_schema_meta`
 
 
 @dataclass(frozen=True)

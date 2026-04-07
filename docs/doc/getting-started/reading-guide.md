@@ -9,7 +9,7 @@
 ## 0. 目录索引(快速定位)
 
 - 运行时代码: `src/scalim/`
-  - YAML DSL: `src/scalim/dsl/by_yaml/` (`config_parsing/`, `schema_dsl/`, `runtime/`)
+  - YAML DSL: `src/scalim/dsl/yaml_dsl/` (`config_parsing/`, `schema_dsl/`, `runtime/`)
   - IR/types: `src/scalim/spec/`
   - 规划层: `src/scalim/planning/`
   - 执行层: `src/scalim/execution/`
@@ -44,22 +44,22 @@
 
 建议从这个入口开始读:
 
-- [`src/scalim/dsl/by_yaml/runtime/entrypoints.py::run`](#code=src/scalim/dsl/by_yaml/runtime/entrypoints.py::run)
+- [`src/scalim/dsl/yaml_dsl/runtime/entrypoints.py::run`](#code=src/scalim/dsl/yaml_dsl/runtime/entrypoints.py::run)
 
 顺着调用链往下看,基本是这几段:
 
 1. **读取与校验**
-   - schema/语义校验: [`src/scalim/dsl/by_yaml/config_parsing/`](#code=src/scalim/dsl/by_yaml/config_parsing/)
+   - schema/语义校验: [`src/scalim/dsl/yaml_dsl/_internal/config_parsing/`](#code=src/scalim/dsl/yaml_dsl/_internal/config_parsing/)
    - CLI 入口: [`src/scalim/cli/yaml_dsl.py`](#code=src/scalim/cli/yaml_dsl.py)
 2. **配置 → IR**
-   - 编译入口: [`src/scalim/dsl/by_yaml/runtime/compiler.py`](#code=src/scalim/dsl/by_yaml/runtime/compiler.py)
-   - 结构模型(schema 生成用): [`src/scalim/dsl/by_yaml/schema_dsl/models/`](#code=src/scalim/dsl/by_yaml/schema_dsl/models/)
+   - 编译入口: [`src/scalim/dsl/yaml_dsl/runtime/compiler.py`](#code=src/scalim/dsl/yaml_dsl/runtime/compiler.py)
+   - 结构模型(schema 生成用): [`src/scalim/dsl/yaml_dsl/schema_dsl/models/`](#code=src/scalim/dsl/yaml_dsl/schema_dsl/models/)
 3. **IR → plan → 执行**
    - 执行编排: [`src/scalim/execution/run_ir.py::run_ir`](#code=src/scalim/execution/run_ir.py::run_ir)
    - 规划层: [`src/scalim/planning/`](#code=src/scalim/planning/)(`PlanBuilder`, `ExecutionPlan`)
    - 引擎与流水线: [`src/scalim/execution/engine.py`](#code=src/scalim/execution/engine.py), [`src/scalim/execution/pipeline/`](#code=src/scalim/execution/pipeline/)
 
-如果你在找“某个 YAML 字段最终影响了哪里”,通常会在 by_yaml 的 **converter / compiler** 阶段把配置翻译成 `DemandIr`/`SourceIr`/`FieldIr`,再进入规划与执行.
+如果你在找“某个 YAML 字段最终影响了哪里”,通常会在 yaml_dsl 的 **converter / compiler** 阶段把配置翻译成 `DemandIr`/`SourceIr`/`FieldIr`,再进入规划与执行.
 
 ### 2.2 直接从 IR / Engine 跑起来
 

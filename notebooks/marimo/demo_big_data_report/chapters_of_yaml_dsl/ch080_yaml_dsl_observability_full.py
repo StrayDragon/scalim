@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.ob.presets.logs import LoggingObserver

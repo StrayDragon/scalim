@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.by_yaml import RunOptions, RunOverrides, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult

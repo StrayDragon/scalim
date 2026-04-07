@@ -1,11 +1,11 @@
 import pytest
 
-from scalim.dsl.by_yaml import OutputExtraSheetOverride, OutputExtrasOverride, RunOptions, RunOverrides, compile
-from scalim.dsl.by_yaml._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.by_yaml._internal.config_parsing.models import RawDemand
-from scalim.dsl.by_yaml._internal.config_parsing.yaml_load import ScalimYamlValidationError
-from scalim.dsl.by_yaml.runtime import compiler as compiler_mod
-from scalim.dsl.by_yaml.schema_dsl.models import DemandConfig
+from scalim.dsl.yaml_dsl import OutputExtraSheetOverride, OutputExtrasOverride, RunOptions, RunOverrides, compile
+from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.models import RawDemand
+from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl.runtime import compiler as compiler_mod
+from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig
 
 
 def test_loader_parse_config_ignores_failure_policy_key() -> None:

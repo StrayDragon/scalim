@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.by_yaml import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, GuardrailsRelationsPolicy
 from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.row_gap import RowGapObserver
