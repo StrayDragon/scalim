@@ -6,7 +6,7 @@ compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.1.1"
+  generatedBy: "1.2.0"
 ---
 
 在实验性工作流中归档已完成的变更.
@@ -63,7 +63,7 @@ metadata:
    - 若需要同步:"现在同步(推荐)"、"不同步直接归档"
    - 若已同步:"立即归档"、"仍要同步"、"取消"
 
-   如果用户选择同步,执行 /opsx:sync 逻辑(使用 openspec-sync-specs skill).无论选择如何,继续归档.
+   如果用户选择同步,使用 Task 工具(subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>").无论选择如何,继续归档.
 
 5. **执行归档**
 
