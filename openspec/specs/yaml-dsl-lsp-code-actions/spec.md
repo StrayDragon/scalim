@@ -43,7 +43,7 @@ actions MUST 满足：
 v1 command id（不区分 client）至少包含：
 
 - `scalim.yaml.createMinimal`：`[document_uri]`
-- `scalim.yaml.addImportAllowedRoots`：`[document_uri, mode]`，其中 `mode` 为 `minimal|wide`
+- `scalim.yaml.addImportRoots`：`[document_uri, mode]`，其中 `mode` 为 `minimal|wide`
 - `scalim.yaml.addPythonRoots`：`[document_uri, mode]`，其中 `mode` 为 `minimal|wide`
 - `scalim.python.explainResolutionFailure`：`[document_uri, reference]`
 

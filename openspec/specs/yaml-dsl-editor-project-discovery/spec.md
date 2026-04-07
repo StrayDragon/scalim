@@ -12,7 +12,7 @@ TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archiv
 
 当发现的 `scalim.yaml` 存在时，系统 MUST 从中读取以下可选配置（作为 discovery 的输入）：
 
-- `yaml_dsl.import_allowed_roots` / `yaml_dsl.import_aliases`（用于 imports 的 allow roots 扩展与路径重写）
+- `yaml_dsl.import_roots`（用于 imports 的 alias 重写与默认 allow-roots 扩展）
 - `yaml_dsl.lsp.python_roots`（用于静态解析 Python 引用的搜索根；相对 `scalim.yaml` 所在目录）
 
 #### Scenario: nearest-wins discovery finds the closest scalim.yaml

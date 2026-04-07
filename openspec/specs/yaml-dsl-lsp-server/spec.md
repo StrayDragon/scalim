@@ -97,7 +97,7 @@
 
 - `$import` 引用格式 MUST 支持 `<alias>(.<segment>)*`
 - 系统 MUST 基于当前文档顶层 `imports` 映射解析 `<alias>` 对应的 fragment 来源
-- 系统 MUST 支持 `scalim.yaml` 中的 `import_aliases` 重写 imports 路径解析（与 runtime imports 解析一致）
+- 系统 MUST 支持 `scalim.yaml` 中的 `import_roots` 重写 imports 路径解析（与 runtime imports 解析一致）
 - 若 `$import` 引用可解析为 fragment YAML 文件与目标 mapping 位置，系统 MUST 返回该位置的 `Location`
 - 解析失败 MUST 返回空结果且给出可诊断 warnings（不得 crash）
 
