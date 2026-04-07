@@ -64,6 +64,10 @@
   - SSOT: `references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md`
   - OpenSpec: `openspec/changes/archive/2026-03-18-c20-workflow-dag-context-passing/`
   - Spec: `openspec/specs/yaml-dsl-workflow/spec.md`
+- 2026-04-07: yaml-dsl-import-roots-registry
+  - SSOT: `references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md`
+  - OpenSpec: `openspec/changes/archive/2026-04-07-c41-yaml-dsl-import-roots-registry/`
+  - Spec: `openspec/specs/yaml-dsl-project-config-schema/spec.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

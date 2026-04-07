@@ -115,8 +115,9 @@ outputs: []             # 可选: 多输出编排(有序列表)
 - 路径解析与安全边界(读文件的允许范围):
   - 默认仅允许读取“入口 YAML 所在目录”下的片段文件
   - CLI 可通过 `--allowed-yaml-root <dir>` 扩展允许根目录(可重复)
-  - 也可在入口 YAML 所在目录向上查找最近的 `scalim.yaml`,并使用其中的 `yaml_dsl.import_allowed_roots` / `yaml_dsl.import_aliases` 扩展允许范围
-    - `import_aliases` 提供“目录别名”,允许在 `imports.*` 中写 `<dir_alias>:/path/to/fragment.yaml` 指定解析基准目录
+  - 也可在入口 YAML 所在目录向上查找最近的 `scalim.yaml`,并使用其中的 `yaml_dsl.import_roots` 做两件事:
+    - 扩展 imports 默认 allow-roots(允许跨目录读取 fragments)
+    - 提供“目录别名”(alias),允许在 `imports.*` 中写 `@/path/to/fragment.yaml` 或 `<dir_alias>:/path/to/fragment.yaml` 指定解析基准目录
 - `scalim.yaml` 是可选配置:
   - 未提供时仍可使用 YAML DSL(仅缺少 imports 目录别名/allowed roots/editor overrides 等“项目级增强”)
   - 大型仓库允许存在多层 `scalim.yaml` 作为子项目隔离: nearest-wins(从入口 YAML 所在目录向上找最近的那份)
@@ -153,10 +154,9 @@ resources:
 ```yaml
 # scalim.yaml
 yaml_dsl:
-  import_aliases:
-    shared: ./shared_yaml
-  import_allowed_roots:
-    - ./shared_yaml
+  import_roots:
+    - path: ./shared_yaml
+      alias: shared
 
 # demand.yaml
 imports:
@@ -168,6 +168,8 @@ sources:
     loader: "myapp.loaders:load_x"
     key: id
 ```
+
+从旧写法升级的迁移清单见: [YAML DSL 升级指南](upgrades/index.md)。
 
 ## 4. 引用 Python: loader / call_by
 

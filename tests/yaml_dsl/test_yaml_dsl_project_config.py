@@ -24,8 +24,8 @@ def test_apply_import_aliases_skips_empty_and_returns_none_for_no_match(tmp_path
     cfg = project_config_mod.YamlDslProjectConfig(
         scalim_yaml_path=tmp_path / "scalim.yaml",
         project_root=tmp_path,
+        import_roots=(),
         import_aliases={"": tmp_path, "COMMON": tmp_path},
-        import_allowed_roots=(),
     )
     assert imports_mod._apply_import_aliases("not-match.yaml", project_config=cfg) is None  # noqa: SLF001
 
@@ -34,8 +34,8 @@ def test_apply_import_aliases_supports_non_at_prefix_syntax(tmp_path: Path) -> N
     cfg = project_config_mod.YamlDslProjectConfig(
         scalim_yaml_path=tmp_path / "scalim.yaml",
         project_root=tmp_path,
+        import_roots=(),
         import_aliases={"COMMON": tmp_path},
-        import_allowed_roots=(),
     )
     remainder, base_dir = imports_mod._apply_import_aliases("COMMON:/x.yaml", project_config=cfg)  # noqa: SLF001
     assert remainder == "x.yaml"
@@ -122,8 +122,8 @@ def test_project_config_empty_scalim_yaml_loads_empty_config(tmp_path: Path) -> 
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     cfg = project_config_mod.load_yaml_dsl_project_config(demand)
     assert cfg is not None
+    assert cfg.import_roots == ()
     assert cfg.import_aliases == {}
-    assert cfg.import_allowed_roots == ()
 
 
 def test_project_config_scalim_yaml_must_be_mapping(tmp_path: Path) -> None:
@@ -158,26 +158,41 @@ def test_project_config_yaml_dsl_must_be_mapping(tmp_path: Path) -> None:
     assert "yaml_dsl must be a mapping" in str(excinfo.value)
 
 
-def test_project_config_import_aliases_must_be_mapping(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_aliases: []\n", encoding="utf-8")
+def test_project_config_import_roots_must_be_list(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_roots: {}\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "import_aliases must be a mapping" in str(excinfo.value)
+    assert "import_roots must be a list" in str(excinfo.value)
 
 
-def test_project_config_import_aliases_keys_must_be_non_empty_strings(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_aliases:\n    1: ./\n", encoding="utf-8")
+def test_project_config_import_roots_item_must_be_mapping(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_roots: [1]\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "keys must be non-empty strings" in str(excinfo.value)
+    assert "yaml_dsl.import_roots[0] must be a mapping" in str(excinfo.value)
 
 
-def test_project_config_import_aliases_dir_must_be_non_empty(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text('yaml_dsl:\n  import_aliases: {"@": ""}\n', encoding="utf-8")
+def test_project_config_import_roots_rejects_unknown_keys(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  import_roots:\n    - path: ./\n      alias: '@'\n      extra: 1\n",
+        encoding="utf-8",
+    )
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "has unknown keys" in str(excinfo.value)
+
+
+def test_project_config_import_roots_path_must_be_non_empty(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  import_roots:\n    - path: ''\n",
+        encoding="utf-8",
+    )
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
@@ -185,8 +200,11 @@ def test_project_config_import_aliases_dir_must_be_non_empty(tmp_path: Path) -> 
     assert "must be a non-empty directory path" in str(excinfo.value)
 
 
-def test_project_config_import_aliases_dir_must_exist_and_be_dir(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text('yaml_dsl:\n  import_aliases: {"@": "./missing"}\n', encoding="utf-8")
+def test_project_config_import_roots_path_must_exist_and_be_dir(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  import_roots:\n    - path: ./missing\n",
+        encoding="utf-8",
+    )
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(ValueError) as excinfo:
@@ -194,35 +212,52 @@ def test_project_config_import_aliases_dir_must_exist_and_be_dir(tmp_path: Path)
     assert "must be an existing directory" in str(excinfo.value)
 
 
-def test_project_config_import_allowed_roots_must_be_list(tmp_path: Path) -> None:
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_allowed_roots: ./\n", encoding="utf-8")
+def test_project_config_import_roots_rejects_outside_project_root(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside"
+    outside.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_roots: [{path: '../outside'}]\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(ValueError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "must stay within project_root" in str(excinfo.value)
+
+
+def test_project_config_import_roots_alias_must_be_non_empty_string(tmp_path: Path) -> None:
+    (tmp_path / "x").mkdir(parents=True)
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_roots: [{path: './x', alias: ''}]\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(TypeError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "import_allowed_roots must be a list" in str(excinfo.value)
+    assert ".alias must be a non-empty string" in str(excinfo.value)
 
 
-def test_project_config_import_allowed_roots_rejects_outside_project_root(tmp_path: Path) -> None:
-    outside = tmp_path.parent / "outside"
-    outside.mkdir(parents=True, exist_ok=True)
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_allowed_roots: ['../outside']\n", encoding="utf-8")
+def test_project_config_import_roots_alias_is_unique(tmp_path: Path) -> None:
+    (tmp_path / "a").mkdir(parents=True)
+    (tmp_path / "b").mkdir(parents=True)
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  import_roots:\n    - {path: ./a, alias: x}\n    - {path: ./b, alias: x}\n",
+        encoding="utf-8",
+    )
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(ValueError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "must stay within project_root" in str(excinfo.value)
+    assert "alias must be unique" in str(excinfo.value)
 
 
-def test_project_config_import_aliases_rejects_outside_project_root(tmp_path: Path) -> None:
-    outside = tmp_path.parent / "outside2"
-    outside.mkdir(parents=True, exist_ok=True)
-    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  import_aliases: {'@': '../outside2'}\n", encoding="utf-8")
+def test_project_config_import_roots_alias_must_match_pattern(tmp_path: Path) -> None:
+    (tmp_path / "a").mkdir(parents=True)
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  import_roots:\n    - {path: ./a, alias: 'a-b'}\n",
+        encoding="utf-8",
+    )
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(ValueError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "must stay within project_root" in str(excinfo.value)
+    assert ".alias must be '@' or match" in str(excinfo.value)
 
 
 def test_project_config_editor_python_roots_rejects_outside_project_root(tmp_path: Path) -> None:

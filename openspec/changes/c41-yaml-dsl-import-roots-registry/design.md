@@ -129,4 +129,5 @@ yaml_dsl:
 ## Open Questions
 
 - `import_roots` 是否需要支持 mapping shorthand（例如 `{alias: path}`）？本次不做,避免再引入“双口径”。
+> 明确不支持
 

@@ -339,7 +339,7 @@ def _discover_yaml_dsl_editor_project_from_project_config(
     if cfg is not None:
         project_root = cfg.project_root
         scalim_yaml_path = cfg.scalim_yaml_path
-        raw_allowed_roots = cfg.import_allowed_roots
+        raw_allowed_roots = tuple(item.path for item in cfg.import_roots)
         if cfg.lsp is not None and cfg.lsp.python_roots:
             raw_python_roots = cfg.lsp.python_roots
         elif workspace_root is not None and _is_within_dir(entry_path, workspace_root):
@@ -555,7 +555,9 @@ def resolve_python_definition(
 
     locations = _resolve_python_definition_locations(parsed, python_roots=python_roots, warnings=warnings)
     if not locations:
-        if any(("模块语法解析失败" in w or "读取模块文件失败" in w) for w in warnings) and not any("无法解析符号定义" in w for w in warnings):
+        if any(("模块语法解析失败" in w or "读取模块文件失败" in w) for w in warnings) and not any(
+            "无法解析符号定义" in w for w in warnings
+        ):
             warnings.append("无法解析符号定义: {}".format(parsed.reference))
         return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
     return PythonDefinitionResult(locations=locations, warnings=tuple(warnings))
@@ -761,8 +763,7 @@ def _compute_allowed_yaml_roots_for_imports(
 ) -> Tuple[Path, ...]:
     extras: List[Path] = list(discovery_allowed_roots)
     if project_config is not None:
-        extras.extend(list(project_config.import_aliases.values()))
-        extras.extend(list(project_config.import_allowed_roots))
+        extras.extend([item.path for item in project_config.import_roots])
     try:
         return normalize_allowed_yaml_roots(extras, default_root=base_dir)
     except Exception as exc:  # noqa: BLE001
@@ -913,7 +914,6 @@ def _resolve_import_source_file(
         resolve_base_dir=resolve_base_dir,
         resolved_path=resolved_path,
         allowed_yaml_roots=roots,
-        project_config=project_config,
         warnings=warnings,
     ):
         return None
@@ -961,7 +961,6 @@ def _validate_import_resolved_path(
     resolve_base_dir: Path,
     resolved_path: Path,
     allowed_yaml_roots: Sequence[Path],
-    project_config: Optional[YamlDslProjectConfig],
     warnings: List[str],
 ) -> bool:
     try:
@@ -971,21 +970,6 @@ def _validate_import_resolved_path(
             resolved_path=resolved_path,
             allowed_yaml_roots=allowed_yaml_roots,
             context_label="imports.{}".format(alias),
-        )
-    except Exception as exc:  # noqa: BLE001
-        warnings.append(str(exc))
-        return False
-
-    if project_config is None or not project_config.import_allowed_roots:
-        return True
-
-    try:
-        validate_resolved_yaml_path_within_roots(
-            raw_path=raw_path,
-            base_dir=project_config.project_root,
-            resolved_path=resolved_path,
-            allowed_yaml_roots=project_config.import_allowed_roots,
-            context_label="imports.{}(import_allowed_roots)".format(alias),
         )
     except Exception as exc:  # noqa: BLE001
         warnings.append(str(exc))
@@ -1207,7 +1191,7 @@ def _resolve_python_definition_locations(
     return tuple(out)
 
 
-def _resolve_locations_for_module_attr_path(  # noqa: PLR0913
+def _resolve_locations_for_module_attr_path(
     module_path: str,
     attr_path: Tuple[str, ...],
     *,
@@ -1251,7 +1235,7 @@ def _resolve_locations_for_module_attr_path(  # noqa: PLR0913
         visited.remove(module_path)
 
 
-def _resolve_locations_for_attr_path_in_module_tree(  # noqa: PLR0913,PLR0911,PLR0912
+def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR0912
     tree: ast.Module,
     *,
     file_path: Path,
@@ -1347,7 +1331,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: PLR0913,PLR0911,PL
             warnings.append("import 跟随超出限制(仅允许单跳): {}".format(head))
             return [fallback]
 
-        remote_attr_path = (binding.import_name,) + tail
+        remote_attr_path = (binding.import_name, *tail)
         remote_locs = _resolve_locations_for_module_attr_path(
             binding.import_module,
             remote_attr_path,
@@ -1360,7 +1344,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: PLR0913,PLR0911,PL
         if not remote_locs:
             warnings.append("import 跟随后仍无法解析符号定义: {}".format(head))
             return [fallback]
-        return [remote_locs[0], fallback] + remote_locs[1:]
+        return [remote_locs[0], fallback, *remote_locs[1:]]
 
     if binding.kind == "import_module":
         if binding.import_module is None:
@@ -1381,7 +1365,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: PLR0913,PLR0911,PL
         if not remote_locs:
             warnings.append("import 跟随后仍无法解析符号定义: {}".format(head))
             return [fallback]
-        return [remote_locs[0], fallback] + remote_locs[1:]
+        return [remote_locs[0], fallback, *remote_locs[1:]]
 
     return [fallback]
 
@@ -1435,7 +1419,7 @@ def _load_module_ast(file_path: Path) -> Tuple[Optional[ast.Module], str]:
     return tree, ""
 
 
-def _index_module_bindings(  # noqa: C901
+def _index_module_bindings(  # noqa: C901,PLR0912
     tree: ast.Module,
     *,
     module_path: str,
@@ -1513,7 +1497,7 @@ def _resolve_import_from_module_path(
     return ".".join(prefix) if prefix else None
 
 
-def _infer_assignment_class_def(  # noqa: PLR0913
+def _infer_assignment_class_def(
     node: ast.AST,
     *,
     bindings: Dict[str, _ModuleBinding],
@@ -1585,7 +1569,7 @@ def _expr_to_qualname_segments(expr: Optional[ast.AST]) -> Optional[Tuple[str, .
     return None
 
 
-def _resolve_class_def_from_qualname(  # noqa: PLR0913
+def _resolve_class_def_from_qualname(  # noqa: C901,PLR0911
     segments: Tuple[str, ...],
     *,
     bindings: Dict[str, _ModuleBinding],
@@ -1605,7 +1589,8 @@ def _resolve_class_def_from_qualname(  # noqa: PLR0913
     if binding is None:
         return None
 
-    if not tail:
+    tail_parts = list(tail)
+    if not tail_parts:
         if binding.kind == "class" and isinstance(binding.node, ast.ClassDef):
             return _ResolvedClassDef(module_path=module_path, file_path=file_path, node=binding.node)
         if binding.kind == "import_from" and binding.import_module and binding.import_name:
@@ -1625,9 +1610,9 @@ def _resolve_class_def_from_qualname(  # noqa: PLR0913
         if max_class_import_hops <= 0:
             return None
         target_module = binding.import_module
-        if len(tail) > 1:
-            target_module = "{}.{}".format(target_module, ".".join(tail[:-1]))
-        class_name = tail[-1]
+        if len(tail_parts) > 1:
+            target_module = "{}.{}".format(target_module, ".".join(tail_parts[:-1]))
+        class_name = tail_parts[-1]
         return _resolve_class_def_in_module(
             target_module,
             class_name=class_name,
@@ -1641,9 +1626,9 @@ def _resolve_class_def_from_qualname(  # noqa: PLR0913
         if max_class_import_hops <= 0:
             return None
         target_module = "{}.{}".format(binding.import_module, binding.import_name)
-        if len(tail) > 1:
-            target_module = "{}.{}".format(target_module, ".".join(tail[:-1]))
-        class_name = tail[-1]
+        if len(tail_parts) > 1:
+            target_module = "{}.{}".format(target_module, ".".join(tail_parts[:-1]))
+        class_name = tail_parts[-1]
         return _resolve_class_def_in_module(
             target_module,
             class_name=class_name,

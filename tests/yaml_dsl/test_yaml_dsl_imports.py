@@ -226,8 +226,9 @@ def test_imports_scalim_yaml_alias_allows_reserved_prefix(tmp_path: Path) -> Non
     scalim_yaml.write_text(
         """
 yaml_dsl:
-  import_aliases:
-    "@": "./"
+  import_roots:
+    - path: "./"
+      alias: "@"
 """.lstrip(),
         encoding="utf-8",
     )
@@ -261,7 +262,7 @@ main_source:
     assert expanded["main_source"]["params"]["y"] == 2
 
 
-def test_imports_scalim_yaml_import_allowed_roots_rejects_outside(tmp_path: Path) -> None:
+def test_imports_scalim_yaml_import_roots_rejects_outside_and_can_allow_cross_dir(tmp_path: Path) -> None:
     allowed = tmp_path / "allowed"
     allowed.mkdir(parents=True)
     outside = tmp_path / "outside"
@@ -279,16 +280,18 @@ demo:
     scalim_yaml.write_text(
         """
 yaml_dsl:
-  import_allowed_roots:
-    - ./allowed
+  import_roots:
+    - path: ./allowed
 """.lstrip(),
         encoding="utf-8",
     )
-    demand = tmp_path / "demand.yaml"
+    reports = tmp_path / "reports"
+    reports.mkdir(parents=True)
+    demand = reports / "demand.yaml"
     demand.write_text(
         """
 imports:
-  f: ./outside/common.yaml
+  f: ../outside/common.yaml
 main_source:
   params:
     $import: f.demo
@@ -300,8 +303,18 @@ main_source:
         _ = load_and_expand_imports(demand)
     msg = str(excinfo.value)
     assert "YAML path escapes allowed roots" in msg
-    assert "import_allowed_roots" in msg
     assert str(common.resolve(strict=False)) in msg
+
+    scalim_yaml.write_text(
+        """
+yaml_dsl:
+  import_roots:
+    - path: ./outside
+""".lstrip(),
+        encoding="utf-8",
+    )
+    expanded = load_and_expand_imports(demand)
+    assert expanded["main_source"]["params"]["x"] == 1
 
 
 def test_imports_scalim_yaml_override_disables_upward_search(tmp_path: Path) -> None:
@@ -314,8 +327,9 @@ def test_imports_scalim_yaml_override_disables_upward_search(tmp_path: Path) -> 
     outer_scalim_yaml.write_text(
         """
 yaml_dsl:
-  import_aliases:
-    "@": "./outer"
+  import_roots:
+    - path: ./outer
+      alias: "@"
 """.lstrip(),
         encoding="utf-8",
     )
@@ -330,8 +344,9 @@ yaml_dsl:
     (project_root / "scalim.yaml").write_text(
         """
 yaml_dsl:
-  import_aliases:
-    "@": "./inner"
+  import_roots:
+    - path: ./inner
+      alias: "@"
 """.lstrip(),
         encoding="utf-8",
     )
@@ -618,6 +633,41 @@ sources:
 
     assert yaml_dsl_cli._run_validate(_args(demand, json_output=True)) == 0
     assert yaml_dsl_cli._run_schema_validate(_args(demand, json_output=True)) == 0
+
+
+def test_cli_validate_uses_scalim_yaml_import_roots_by_default(tmp_path: Path) -> None:
+    shared = tmp_path / "shared"
+    shared.mkdir(parents=True)
+    (shared / "common.yaml").write_text("demo:\n  x: 1\n", encoding="utf-8")
+
+    (tmp_path / "scalim.yaml").write_text(
+        "yaml_dsl:\n  import_roots:\n    - {path: ./shared}\n",
+        encoding="utf-8",
+    )
+
+    reports = tmp_path / "reports"
+    reports.mkdir(parents=True)
+    demand = reports / "demand.yaml"
+    demand.write_text(
+        """
+name: demo
+
+imports:
+  f: ../shared/common.yaml
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id: {}
+  params:
+    $import: f.demo
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    args = _args(demand, json_output=True)
+    args.allowed_yaml_roots = None
+    assert yaml_dsl_cli._run_validate(args) == 0
 
 
 def test_cli_schema_validate_does_not_expand_imports_for_workflow_schema(tmp_path, capsys) -> None:

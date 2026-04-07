@@ -414,7 +414,7 @@ Sources:
 ### `yaml-dsl-cli-runner`
 - Title: yaml-dsl-cli-runner Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-runner/spec.md)
-- Summary: TBD - created by archiving change c22-yaml-dsl-cli-runner-and-api-convergence. Update Purpose after archive.
+- Summary: 定义 `scalim-cli yaml-dsl` 的命令边界：CLI 仅承载 authoring/tooling（schema/validate/editor integration），执行入口统一收敛为 Python API。
 
 ### `yaml-dsl-cli-validation`
 - Title: yaml-dsl-cli-validation Specification

@@ -35,12 +35,13 @@ def test_lsp_code_action_create_minimal_scalim_yaml(tmp_path) -> None:
         assert (workspace / "scalim.yaml").exists()
         content = (workspace / "scalim.yaml").read_text(encoding="utf-8")
         assert "yaml_dsl:" in content
-        assert "import_allowed_roots" in content
+        assert "import_roots" in content
+        assert "alias" in content
     finally:
         client.shutdown()
 
 
-def test_lsp_code_action_add_import_allowed_roots_minimal(tmp_path) -> None:
+def test_lsp_code_action_add_import_roots_minimal(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     (workspace / "demo").mkdir()
@@ -62,8 +63,8 @@ def test_lsp_code_action_add_import_allowed_roots_minimal(tmp_path) -> None:
         "\n".join(
             [
                 "yaml_dsl:",
-                "  import_allowed_roots:",
-                "    - demo",
+                "  import_roots:",
+                "    - path: demo",
                 "",
             ]
         ),
@@ -81,7 +82,7 @@ def test_lsp_code_action_add_import_allowed_roots_minimal(tmp_path) -> None:
         _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
 
         actions = client.code_actions(uri=yaml_path.as_uri(), line=0, character=0)
-        fix_action = _find_code_action(actions, command="scalim.yaml.addImportAllowedRoots", arg_contains="minimal")
+        fix_action = _find_code_action(actions, command="scalim.yaml.addImportRoots", arg_contains="minimal")
         assert fix_action is not None
 
         client.execute_command(fix_action["command"]["command"], fix_action["command"].get("arguments") or [])

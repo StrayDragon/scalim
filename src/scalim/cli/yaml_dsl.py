@@ -177,7 +177,7 @@ def _add_validate_args(parser: argparse.ArgumentParser) -> None:
         dest="allowed_yaml_roots",
         type=Path,
         action="append",
-        default=[],
+        default=None,
         help="允许读取 YAML 的根目录(可重复);默认仅允许入口 YAML 所在目录",
     )
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
@@ -922,7 +922,8 @@ def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0
     if alias_error is not None:
         _emit_error(alias_error, json_output=bool(args.json), yaml_path=yaml_path, schema_path=schema_path, mode="validate")
         return 1
-    allowed_yaml_roots = list(args_dict.get("allowed_yaml_roots", []) or [])
+    raw_allowed_yaml_roots = args_dict.get("allowed_yaml_roots")
+    allowed_yaml_roots = list(raw_allowed_yaml_roots) if raw_allowed_yaml_roots else None
 
     if not schema_path.exists():
         _emit_error(

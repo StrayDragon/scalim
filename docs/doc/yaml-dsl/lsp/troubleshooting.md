@@ -34,8 +34,9 @@ scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 
 ```yaml
 yaml_dsl:
-  import_allowed_roots:
-    - .
+  import_roots:
+    - path: .
+      alias: "@"
   lsp:
     python_roots:
       - src
@@ -50,8 +51,8 @@ yaml_dsl:
 处理：
 
 - 优先使用 code action 一键补全：
-  - 最小修复：补充单个缺失目录到 `yaml_dsl.import_allowed_roots`
-  - 宽松修复：将 `.` 加入 `yaml_dsl.import_allowed_roots`
+  - 最小修复：补充单个缺失目录到 `yaml_dsl.import_roots`（添加 `- {path: <dir>}`）
+  - 宽松修复：将 `.` 加入 `yaml_dsl.import_roots`（添加 `- {path: .}`）
 - 或手工编辑 `scalim.yaml` 对齐 `allowed_yaml_roots`
 
 ### 2.3 Python 引用跳转不工作（definition/hover/completion）

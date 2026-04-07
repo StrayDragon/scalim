@@ -1,4 +1,3 @@
 yaml_dsl:
-  import_allowed_roots:
-    - .
-
+  import_roots:
+    - path: .

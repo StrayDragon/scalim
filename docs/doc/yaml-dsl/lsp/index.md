@@ -13,7 +13,7 @@
 - `$import` 引用跳转（definition）/悬浮（hover）：从 `$import: <alias>.<path>` 跳到 fragment YAML 的目标 mapping key
 - Quick Fix（code actions）:
   - 缺失 `scalim.yaml` 时可一键创建最小配置
-  - imports 越界时可一键补 `yaml_dsl.import_allowed_roots`
+  - imports 越界时可一键补 `yaml_dsl.import_roots`
   - `python_roots` 缺失时可一键补 `yaml_dsl.lsp.python_roots`
 
 ## 你不会得到什么（schema 负责）

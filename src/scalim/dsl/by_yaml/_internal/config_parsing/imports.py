@@ -221,14 +221,6 @@ def _parse_import_source(
         allowed_yaml_roots=allowed_yaml_roots,
         context_label="imports.{}".format(str(alias)),
     )
-    if project_config is not None and project_config.import_allowed_roots:
-        validate_resolved_yaml_path_within_roots(
-            raw_path=raw_path,
-            base_dir=project_config.project_root,
-            resolved_path=resolved,
-            allowed_yaml_roots=project_config.import_allowed_roots,
-            context_label="imports.{}(import_allowed_roots)".format(str(alias)),
-        )
     return ImportSource(kind="file", key=str(resolved), path=resolved)
 
 
@@ -478,7 +470,8 @@ def _compute_allowed_yaml_roots(
 
     规则:
     - 若调用方显式提供 `allowed_yaml_roots`,则以调用方为准(并强制包含入口 `YAML` 的目录).
-    - 若未显式提供,则允许 `scalim.yaml` 通过 `import_aliases`/`import_allowed_roots` 显式扩展允许范围.
+      - 此时仍会读取 `scalim.yaml` 的 `import_roots` 用于“别名重写”,但不会隐式扩展调用侧的允许根目录.
+    - 若未显式提供,则允许通过 `scalim.yaml yaml_dsl.import_roots[*].path` 扩展默认允许根目录.
     """
     base_dir = entry_yaml_path.resolve(strict=False).parent
     if allowed_yaml_roots is not None:
@@ -486,8 +479,7 @@ def _compute_allowed_yaml_roots(
 
     extras: List[Path] = []
     if project_config is not None:
-        extras = list(project_config.import_aliases.values())
-        extras.extend(project_config.import_allowed_roots)
+        extras = [item.path for item in project_config.import_roots]
     return normalize_allowed_yaml_roots(extras, default_root=base_dir)
 
 

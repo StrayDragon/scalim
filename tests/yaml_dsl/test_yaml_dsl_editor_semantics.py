@@ -48,7 +48,7 @@ def test_discovery_workspace_root_override_infers_project_root_and_roots(tmp_pat
 def test_discovery_workspace_root_override_does_not_escape_boundary(tmp_path: Path) -> None:
     outer = tmp_path / "outer"
     inner = outer / "inner"
-    _ = _write(outer / "scalim.yaml", "yaml_dsl:\n  import_allowed_roots: [./x]\n")
+    _ = _write(outer / "scalim.yaml", "yaml_dsl:\n  import_roots: []\n")
     yaml_path = _write(inner / "demand.yaml", "name: demo\nsources: {}\n")
 
     discovery = editor_semantics.discover_yaml_dsl_editor_project(yaml_path, workspace_root_override=inner)
@@ -74,7 +74,7 @@ def test_discovery_nearest_wins_scalim_yaml_and_editor_python_roots(tmp_path: Pa
     (sub / "allowed").mkdir(parents=True)
     _ = _write(
         sub / "scalim.yaml",
-        "yaml_dsl:\n  import_allowed_roots: [./allowed]\n  lsp:\n    python_roots: [./py]\n",
+        "yaml_dsl:\n  import_roots: [{path: ./allowed}]\n  lsp:\n    python_roots: [./py]\n",
     )
 
     yaml_path = _write(entry_dir / "demand.yaml", "name: demo\nsources: {}\n")
@@ -90,7 +90,7 @@ def test_discovery_scalim_yaml_without_editor_python_roots_still_infers_from_wor
     dsl_dir = repo / "dsl"
     pkg_src = repo / "packages" / "demo-pkg" / "src" / "demo_pkg"
 
-    _ = _write(dsl_dir / "scalim.yaml", "yaml_dsl:\n  import_allowed_roots: [.]\n")
+    _ = _write(dsl_dir / "scalim.yaml", "yaml_dsl:\n  import_roots: [{path: .}]\n")
     yaml_path = _write(dsl_dir / "demand.yaml", "name: demo\nmain_source: {source_id: x, loader: demo_pkg.mod:fn}\n")
 
     _ = _write(pkg_src / "__init__.py", "")

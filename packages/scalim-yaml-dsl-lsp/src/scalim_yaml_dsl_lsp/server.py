@@ -38,7 +38,7 @@ _LOG = logging.getLogger(__name__)
 
 _COMMAND_DUMP_DISCOVERY = "scalim.dumpDiscovery"
 _COMMAND_CREATE_MINIMAL_SCALIM_YAML = "scalim.yaml.createMinimal"
-_COMMAND_ADD_IMPORT_ALLOWED_ROOTS = "scalim.yaml.addImportAllowedRoots"
+_COMMAND_ADD_IMPORT_ROOTS = "scalim.yaml.addImportRoots"
 _COMMAND_ADD_PYTHON_ROOTS = "scalim.yaml.addPythonRoots"
 _COMMAND_EXPLAIN_RESOLUTION_FAILURE = "scalim.python.explainResolutionFailure"
 
@@ -646,11 +646,11 @@ def _register_code_actions(server: LanguageServer, state: Dict[str, _DocumentSta
         document_uri = str(args[0]) if args else ""
         return await _cmd_create_minimal_scalim_yaml(ls, document_uri, state=state)
 
-    @server.command(_COMMAND_ADD_IMPORT_ALLOWED_ROOTS)
-    async def add_import_allowed_roots(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
+    @server.command(_COMMAND_ADD_IMPORT_ROOTS)
+    async def add_import_roots(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
         document_uri = str(args[0]) if args else ""
         mode = str(args[1]) if len(args) > 1 else ""
-        return await _cmd_add_import_allowed_roots(ls, document_uri, mode, state=state)
+        return await _cmd_add_import_roots(ls, document_uri, mode, state=state)
 
     @server.command(_COMMAND_ADD_PYTHON_ROOTS)
     async def add_python_roots(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
@@ -699,23 +699,23 @@ def _handle_code_actions(
     if import_dir_rel:
         actions.append(
             types.CodeAction(
-                title="修复: 将 `{}` 加入 `yaml_dsl.import_allowed_roots` (最小)".format(import_dir_rel),
+                title="修复: 将 `{}` 注册到 `yaml_dsl.import_roots` (最小)".format(import_dir_rel),
                 kind=types.CodeActionKind.QuickFix,
                 is_preferred=True,
                 command=types.Command(
-                    title="修复 import_allowed_roots (最小)",
-                    command=_COMMAND_ADD_IMPORT_ALLOWED_ROOTS,
+                    title="修复 import_roots (最小)",
+                    command=_COMMAND_ADD_IMPORT_ROOTS,
                     arguments=[uri, _MODE_MINIMAL],
                 ),
             )
         )
         actions.append(
             types.CodeAction(
-                title="修复: 将 `.` 加入 `yaml_dsl.import_allowed_roots` (宽松)",
+                title="修复: 将 `.` 注册到 `yaml_dsl.import_roots` (宽松)",
                 kind=types.CodeActionKind.QuickFix,
                 command=types.Command(
-                    title="修复 import_allowed_roots (宽松)",
-                    command=_COMMAND_ADD_IMPORT_ALLOWED_ROOTS,
+                    title="修复 import_roots (宽松)",
+                    command=_COMMAND_ADD_IMPORT_ROOTS,
                     arguments=[uri, _MODE_WIDE],
                 ),
             )
@@ -857,7 +857,7 @@ async def _cmd_create_minimal_scalim_yaml(  # noqa: PLR0911
 
     python_roots = _infer_python_roots_candidates(project_root)
     content = _render_scalim_yaml_content(
-        import_allowed_roots=["."],
+        import_roots=[{"path": ".", "alias": "@"}],
         python_roots=[python_roots[0]] if python_roots else [],
     )
     edit = _workspace_edit_create_file_with_text(scalim_yaml_path, content)
@@ -880,7 +880,7 @@ async def _cmd_create_minimal_scalim_yaml(  # noqa: PLR0911
     }
 
 
-async def _cmd_add_import_allowed_roots(  # noqa: C901, PLR0911
+async def _cmd_add_import_roots(  # noqa: C901, PLR0911
     ls: LanguageServer,
     document_uri: str,
     mode: str,
@@ -911,14 +911,14 @@ async def _cmd_add_import_allowed_roots(  # noqa: C901, PLR0911
 
     mode_text = str(mode or "")
     if mode_text == _MODE_MINIMAL:
-        roots_to_add = [minimal_root]
+        root_paths_to_add = [minimal_root]
     elif mode_text == _MODE_WIDE:
-        roots_to_add = ["."]
+        root_paths_to_add = ["."]
     else:
         return {"ok": False, "kind": "explain_only", "message": "未知 mode: {}".format(mode_text), "hints": []}
     new_text = _update_scalim_yaml_text(
         scalim_yaml_path.read_text(encoding="utf-8"),
-        import_allowed_roots_to_add=roots_to_add,
+        import_root_paths_to_add=root_paths_to_add,
         python_roots_to_add=(),
     )
     if new_text is None:
@@ -926,9 +926,9 @@ async def _cmd_add_import_allowed_roots(  # noqa: C901, PLR0911
 
     edit = _workspace_edit_replace_entire_file(scalim_yaml_path, new_text)
     try:
-        result = await ls.workspace_apply_edit_async(types.ApplyWorkspaceEditParams(edit=edit, label="更新 import_allowed_roots"))
+        result = await ls.workspace_apply_edit_async(types.ApplyWorkspaceEditParams(edit=edit, label="更新 import_roots"))
     except Exception as exc:  # noqa: BLE001
-        _LOG.exception("更新 import_allowed_roots 失败: %s: %s", type(exc).__name__, exc)
+        _LOG.exception("更新 import_roots 失败: %s: %s", type(exc).__name__, exc)
         return {
             "ok": False,
             "kind": "explain_only",
@@ -983,7 +983,7 @@ async def _cmd_add_python_roots(  # noqa: C901, PLR0911
         return {"ok": False, "kind": "explain_only", "message": "未知 mode: {}".format(mode_text), "hints": []}
     new_text = _update_scalim_yaml_text(
         scalim_yaml_path.read_text(encoding="utf-8"),
-        import_allowed_roots_to_add=(),
+        import_root_paths_to_add=(),
         python_roots_to_add=roots_to_add,
     )
     if new_text is None:
@@ -1073,12 +1073,19 @@ def _missing_roots(project_root: Path, existing: Sequence[Path], candidates: Seq
     return missing
 
 
-def _render_scalim_yaml_content(*, import_allowed_roots: Sequence[str], python_roots: Sequence[str]) -> str:
+def _render_scalim_yaml_content(*, import_roots: Sequence[Dict[str, str]], python_roots: Sequence[str]) -> str:
     lines: List[str] = ["yaml_dsl:"]
-    if import_allowed_roots:
-        lines.append("  import_allowed_roots:")
-        for root in import_allowed_roots:
-            lines.append("    - {}".format(str(root)))
+    if import_roots:
+        lines.append("  import_roots:")
+        for root in import_roots:
+            path = str(root.get("path") or "").strip()
+            if not path:
+                continue
+            lines.append("    - path: {}".format(path))
+            alias = root.get("alias")
+            alias_text = str(alias or "").strip() if alias is not None else ""
+            if alias_text:
+                lines.append("      alias: {}".format(alias_text))
     if python_roots:
         lines.append("  lsp:")
         lines.append("    python_roots:")
@@ -1098,7 +1105,7 @@ def _yaml_rt() -> YAML:
 def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
     raw_text: str,
     *,
-    import_allowed_roots_to_add: Sequence[str],
+    import_root_paths_to_add: Sequence[str],
     python_roots_to_add: Sequence[str],
 ) -> Optional[str]:
     yaml_rt = _yaml_rt()
@@ -1118,15 +1125,30 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
         return None
     yaml_dsl: Any = yaml_dsl_obj
 
-    if import_allowed_roots_to_add:
-        roots_obj = yaml_dsl.get("import_allowed_roots")
+    if import_root_paths_to_add:
+        roots_obj = yaml_dsl.get("import_roots")
         if roots_obj is None:
             roots_obj = []
-            yaml_dsl["import_allowed_roots"] = roots_obj
+            yaml_dsl["import_roots"] = roots_obj
         if not isinstance(roots_obj, list):
             return None
-        import_allowed_roots: List[Any] = roots_obj
-        _extend_unique(import_allowed_roots, import_allowed_roots_to_add)
+        import_roots: List[Any] = roots_obj
+
+        existing_paths: Dict[str, None] = {}
+        for item in import_roots:
+            if not isinstance(item, dict):
+                return None
+            raw_path = item.get("path") if item else None
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                continue
+            existing_paths[_normalize_rel_path_text(str(raw_path))] = None
+
+        for raw in import_root_paths_to_add:
+            normalized = _normalize_rel_path_text(raw)
+            if normalized in existing_paths:
+                continue
+            import_roots.append({"path": normalized})
+            existing_paths[normalized] = None
 
     if python_roots_to_add:
         lsp_obj = yaml_dsl.get("lsp")
@@ -1161,6 +1183,11 @@ def _extend_unique(seq: List[Any], values: Sequence[str]) -> None:
             continue
         seq.append(v)
         existing.add(v)
+
+
+def _normalize_rel_path_text(raw: str) -> str:
+    text = str(raw or "").strip()
+    return text.strip("/") or "."
 
 
 def _workspace_edit_create_file_with_text(path: Path, content: str) -> types.WorkspaceEdit:

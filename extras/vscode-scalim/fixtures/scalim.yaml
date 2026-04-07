@@ -1,5 +1,4 @@
 yaml_dsl:
-  import_allowed_roots:
-    - demand
-    - workflow
-
+  import_roots:
+    - path: demand
+    - path: workflow

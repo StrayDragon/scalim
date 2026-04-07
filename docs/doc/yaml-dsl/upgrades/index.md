@@ -25,4 +25,5 @@
 - [2026-03-14: yaml-dsl-output-fields-alias](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md)
 - [2026-03-16: yaml-dsl-outputs-aggregate-fields](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md)
 - [2026-03-18: yaml-workflow-dag-ctx-resources](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md)
+- [2026-04-07: yaml-dsl-import-roots-registry](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->
