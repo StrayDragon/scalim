@@ -3,7 +3,7 @@ import marimo
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml import RunOptions, run_workflow
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
     ECommerceConfig,
@@ -38,8 +38,10 @@ def run_workflow_yaml(
         try:
             result = run_workflow(
                 str(workflow_yaml_path),
-                allowed_modules=allowed_modules,
-                init_vars={"order_ids": []},
+                options=RunOptions(
+                    allowed_modules=allowed_modules,
+                    init_vars={"order_ids": []},
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)

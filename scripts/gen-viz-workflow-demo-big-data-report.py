@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Dict, FrozenSet, List
 
-from scalim.dsl.by_yaml import RunOverrides, run_workflow
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run_workflow
 from scalim.ob.presets._internal.viz_config import normalize_output_dir
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.notebook_support.pathing import demo_big_data_report_workflow_demo_yaml_path
@@ -128,20 +128,22 @@ def main(argv: List[str]) -> int:
 
     result = run_workflow(
         str(workflow_yaml_path),
-        allowed_modules=allowed_modules,
-        init_vars={"order_ids": []},
-        path_aliases={"@": str(REPO_ROOT)},
-        overrides=RunOverrides(
-            viz_config=VizObserverConfig(
-                output_dir=str(out_root),
-                trace_enabled=False,
-                payload_policy="summary",
-                sample_size=5,
-                append=False,
-                run_name="demo_big_data_report/workflow_demo_big_data_report",
-                env="demo",
+        options=RunOptions(
+            allowed_modules=allowed_modules,
+            init_vars={"order_ids": []},
+            overrides=RunOverrides(
+                viz_config=VizObserverConfig(
+                    output_dir=str(out_root),
+                    trace_enabled=False,
+                    payload_policy="summary",
+                    sample_size=5,
+                    append=False,
+                    run_name="demo_big_data_report/workflow_demo_big_data_report",
+                    env="demo",
+                ),
             ),
         ),
+        path_aliases={"@": str(REPO_ROOT)},
     )
 
     # 对成功的子运行补写 `viz_schedule_plan.json`(可选;用于可视化计划视角).

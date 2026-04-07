@@ -239,7 +239,13 @@ workflow:
     cfg = load_workflow_config(str(wf), template_vars={"max_concurrency": 3})
     assert cfg.options.max_concurrency == 3
 
-    result = run_workflow(str(wf), allowed_modules=frozenset(["tests.fixtures"]), template_vars={"max_concurrency": 3})
+    result = run_workflow(
+        str(wf),
+        options=RunOptions(
+            allowed_modules=frozenset(["tests.fixtures"]),
+            template_vars={"max_concurrency": 3},
+        ),
+    )
     assert result.errors() == []
 
 

@@ -13,6 +13,7 @@ from scalim.dsl.by_yaml import FileResourceOverride
 from scalim.dsl.by_yaml import OutputExtrasOverride
 from scalim.dsl.by_yaml import ResourcesOverride
 from scalim.dsl.by_yaml import RunResult
+from scalim.dsl.by_yaml import RunOptions
 from scalim.dsl.by_yaml import run_workflow
 from scalim.dsl.by_yaml.runtime import compiler as by_yaml_compiler_mod
 from scalim.dsl.by_yaml.workflow_types import ComponentsExtend, ComponentsReplace, WorkflowRunPatch
@@ -52,6 +53,10 @@ from tests.fixtures import workflow_loaders
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])
 _ALLOWED_MODULES_WITH_SHEETBOOK = frozenset(["tests.fixtures.workflow_loaders", "scalim.workflow.loaders"])
+
+
+def _run_options(*, allowed_modules=_ALLOWED_MODULES, **kwargs):  # type: ignore[no-untyped-def] test helper
+    return RunOptions(allowed_modules=allowed_modules, **kwargs)
 
 
 class _WorkflowEventRecorder(Observer):
@@ -894,7 +899,7 @@ def test_run_workflow_primary_only_collects_errors(tmp_path: Path) -> None:
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert [o.run_id for o in result.outcomes] == ["ok", "bad"]
     assert result.outcomes[0].result is not None
     assert result.outcomes[0].error is None
@@ -919,8 +924,29 @@ def test_run_workflow_accepts_overrides_default_unset(tmp_path: Path) -> None:
         failure_policy="all_fail",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, overrides=RunOverrides())
+    result = run_workflow(str(wf), options=_run_options(overrides=RunOverrides()))
     assert [o.run_id for o in result.outcomes] == ["ok"]
+
+
+def test_run_workflow_rejects_sink_in_base_options(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    from scalim.sinks import InMemoryRowSink
+
+    with pytest.raises(TypeError, match=r"sink"):
+        _ = run_workflow(str(wf), options=_run_options(sink=InMemoryRowSink()))
 
 
 def test_run_workflow_run_patches_by_id_batch_size_overrides_global(tmp_path: Path) -> None:
@@ -953,8 +979,7 @@ def test_run_workflow_run_patches_by_id_batch_size_overrides_global(tmp_path: Pa
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        batch_size=2000,
+        options=_run_options(batch_size=2000),
         run_patches_by_id={"a": WorkflowRunPatch(batch_size=5000)},
         compile_demand_yaml_fn=_compile_with_capture,
     )
@@ -981,7 +1006,7 @@ def test_run_workflow_run_patches_by_id_rejects_unknown_id(tmp_path: Path) -> No
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
+            options=_run_options(),
             run_patches_by_id={"nope": WorkflowRunPatch(batch_size=5000)},
         )
     assert "nope" in str(excinfo.value)
@@ -1006,7 +1031,7 @@ def test_run_workflow_run_patches_by_id_rejects_dict_patch_payload(tmp_path: Pat
     with pytest.raises(TypeError, match=r"dict patches are not supported"):
         _ = run_workflow(  # type: ignore[arg-type] intentional runtime boundary test
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
+            options=_run_options(),
             run_patches_by_id={"ok": {"batch_size": 5000}},
         )
 
@@ -1044,8 +1069,7 @@ def test_run_workflow_run_patches_by_id_components_extend_and_replace(tmp_path: 
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        components=[base],
+        options=_run_options(components=[base]),
         run_patches_by_id={
             "a": WorkflowRunPatch(components=ComponentsExtend([extra])),
             "b": WorkflowRunPatch(components=ComponentsReplace(())),
@@ -1202,8 +1226,7 @@ outputs:
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=overrides,
+        options=_run_options(overrides=overrides),
         run_patches_by_id=run_patches_by_id,
     )
     assert not result.errors()
@@ -1232,7 +1255,7 @@ def test_run_workflow_all_fail_raises(tmp_path: Path) -> None:
     )
 
     with pytest.raises(Exception) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
     assert "run_id=bad" in str(excinfo.value)
 
@@ -1259,7 +1282,7 @@ def test_workflow_outcomes_are_in_declared_order(tmp_path: Path) -> None:
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert [o.run_id for o in result.outcomes] == ["slow", "fast"]
 
 
@@ -1289,7 +1312,7 @@ def test_workflow_dag_respects_depends_on_under_concurrency(tmp_path: Path) -> N
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert [o.run_id for o in result.outcomes] == ["a", "b"]
 
     start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
@@ -1352,7 +1375,7 @@ def test_workflow_concurrency_does_not_call_components_concurrently_by_default(t
                 self._in_call.release()
 
     probe = _ConcurrentCallProbe()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[probe])
+    result = run_workflow(str(wf), options=_run_options(components=[probe]))
     assert not result.errors()
     assert int(probe.seen) > 0
     assert int(probe.concurrent_calls) == 0
@@ -1403,7 +1426,7 @@ params:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
 
     start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
@@ -1446,7 +1469,7 @@ def test_workflow_ctx_ref_outside_depends_on_closure_fails_fast(tmp_path: Path) 
     )
 
     with pytest.raises(ScalimWorkflowConfigError, match="declare depends_on"):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
 
 def test_workflow_ctx_ref_node_self_fails_fast(tmp_path: Path) -> None:
@@ -1473,7 +1496,7 @@ def test_workflow_ctx_ref_node_self_fails_fast(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ScalimWorkflowConfigError, match="node=self"):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
 
 def test_workflow_ctx_ref_unknown_node_fails_fast(tmp_path: Path) -> None:
@@ -1509,7 +1532,7 @@ def test_workflow_ctx_ref_unknown_node_fails_fast(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ScalimWorkflowConfigError, match="Unknown ctx node"):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
 
 def test_workflow_ctx_guardrails_fail_fast(tmp_path: Path) -> None:
@@ -1530,7 +1553,7 @@ def test_workflow_ctx_guardrails_fail_fast(tmp_path: Path) -> None:
         ctx={"max_value_bytes": 1, "max_bytes": 10},
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert result.errors()
     assert result.outcomes[0].error is not None
     assert result.outcomes[0].error.exc_type == "ScalimWorkflowConfigError"
@@ -1566,7 +1589,7 @@ def test_workflow_primary_only_cancels_downstream_when_dep_fails(tmp_path: Path)
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert [o.run_id for o in result.outcomes] == ["bad", "down"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[1].result is None
@@ -1602,7 +1625,7 @@ def test_workflow_observability_bridge_injects_meta_and_emits_workflow_events(tm
     )
 
     recorder = _WorkflowEventRecorder()
-    _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
 
     workflow_start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
     workflow_end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
@@ -1653,7 +1676,7 @@ def test_workflow_observability_bridge_emits_cancelled_reason_for_all_fail(tmp_p
 
     recorder = _WorkflowEventRecorder()
     with pytest.raises(Exception):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+        _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
 
     cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
@@ -1701,7 +1724,7 @@ def test_workflow_all_fail_skips_already_cancelled_nodes_on_late_terminal(tmp_pa
 
     recorder = _WorkflowEventRecorder()
     with pytest.raises(Exception):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+        _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
 
     cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
@@ -1739,7 +1762,7 @@ def test_workflow_all_fail_compile_error_marks_end_and_cancels_pending(tmp_path:
 
     recorder = _WorkflowEventRecorder()
     with pytest.raises(Exception) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+        _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert "run_id=bad" in str(excinfo.value)
 
     ended = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
@@ -1805,7 +1828,7 @@ def test_workflow_observability_bridge_registers_hooks(tmp_path: Path) -> None:
                 self.events.append(event)
 
     hook = _HookRecorder()
-    _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[hook])
+    _ = run_workflow(str(wf), options=_run_options(components=[hook]))
     assert any(e.event_type == EVENT_WORKFLOW_NODE_START for e in hook.events)
 
 
@@ -1835,7 +1858,7 @@ def test_cache_pool_reuses_preload_forever_across_runs(tmp_path: Path) -> None:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
@@ -1879,7 +1902,7 @@ def test_cache_pool_conflict_policy_error_fails_fast(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
     msg = str(excinfo.value)
     assert "cache_pool signature conflict" in msg and "diff=" in msg
@@ -1913,7 +1936,7 @@ def test_cache_pool_conflict_policy_separate_runs_and_warns(tmp_path: Path) -> N
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 2
 
@@ -1963,7 +1986,7 @@ params:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder], init_vars={"token": 1})
+    result = run_workflow(str(wf), options=_run_options(components=[recorder], init_vars={"token": 1}))
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
@@ -2018,7 +2041,7 @@ relations:
     )
 
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
     assert "lookup_cast" in str(excinfo.value)
 
 
@@ -2055,7 +2078,7 @@ def test_cache_pool_budget_evict_lru_evicts_idle_entry(tmp_path: Path) -> None:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 2
 
@@ -2095,7 +2118,7 @@ def test_cache_pool_budget_fail_fast_raises(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
     assert "over budget" in str(excinfo.value).lower()
     assert workflow_loaders.preload_calls() == 1
 
@@ -2131,7 +2154,7 @@ def test_cache_pool_pin_keeps_entry_until_workflow_end(tmp_path: Path) -> None:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
@@ -2163,7 +2186,7 @@ def test_cache_pool_calls_node_done_on_compile_error_and_cancelled_dependents(tm
         failure_policy="primary_only",
         cache_pool=_cache_pool_config(conflict_policy="warn", release_policy="dag_refcount", max_entries=10),
     )
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert [o.run_id for o in result.outcomes] == ["bad", "ok"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[1].error is not None
@@ -2185,7 +2208,7 @@ def test_cache_pool_calls_node_done_on_runtime_error(tmp_path: Path) -> None:
         failure_policy="primary_only",
         cache_pool=_cache_pool_config(conflict_policy="warn", release_policy="dag_refcount", max_entries=10),
     )
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert [o.run_id for o in result.outcomes] == ["bad"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[0].error.exc_type == "ValueError"
@@ -2848,7 +2871,7 @@ def test_load_workflow_config_from_mapping_rejects_self_depends_on() -> None:
 def test_run_workflow_requires_workflow_path(tmp_path: Path) -> None:
     _ = tmp_path
     with pytest.raises(ScalimWorkflowConfigError):
-        _ = run_workflow("", allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow("", options=_run_options())
 
 
 def test_run_workflow_primary_only_submits_pending_after_failure(tmp_path: Path) -> None:
@@ -2883,7 +2906,7 @@ def test_run_workflow_primary_only_submits_pending_after_failure(tmp_path: Path)
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert [o.run_id for o in result.outcomes] == ["bad", "ok1", "ok2"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[1].result is not None
@@ -2915,7 +2938,7 @@ def test_run_workflow_all_fail_cancels_pending_queue(tmp_path: Path) -> None:
     )
 
     with pytest.raises(Exception) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
     assert "run_id=bad" in str(excinfo.value)
 
 
@@ -3152,7 +3175,7 @@ relations:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
@@ -3231,7 +3254,7 @@ def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: 
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert workbook_path.exists()
     assert not Path(str(workbook_path) + ".scalim.lock").exists()
@@ -3302,7 +3325,7 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert export_path.exists()
     assert not Path(str(export_path) + ".scalim.lock").exists()
@@ -3377,7 +3400,7 @@ outputs:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
     assert export_path.exists()
     assert _read_xlsx_sheetnames(export_path) == ["Metrics", "Detail"]
@@ -3442,7 +3465,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK)
+    result = run_workflow(str(wf), options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK))
     assert not result.errors()
     assert _read_csv_rows(consume_out) == [
         ["id", "value"],
@@ -3468,7 +3491,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    bad = run_workflow(str(wf_bad), allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK)
+    bad = run_workflow(str(wf_bad), options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK))
     errs = {e.run_id: e for e in bad.errors()}
     assert "c" in errs
     assert "declare depends_on" in errs["c"].message
@@ -3540,7 +3563,7 @@ outputs:
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK)
+    result = run_workflow(str(wf), options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK))
     assert not result.errors()
     assert _read_csv_rows(consume_out) == [
         ["id", "value"],
@@ -3652,7 +3675,7 @@ outputs:
     )
 
     allowed_modules = frozenset(["tests.fixtures.workflow_loaders", "tests.fixtures.call_by_fns", "scalim.workflow.loaders"])
-    result = run_workflow(str(wf), allowed_modules=allowed_modules)
+    result = run_workflow(str(wf), options=_run_options(allowed_modules=allowed_modules))
     assert not result.errors()
     assert _read_csv_rows(consume_out) == [
         ["order_count_type", "amount_type", "paid_type", "code", "raw_text"],
@@ -3709,7 +3732,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_sheets = run_workflow(str(wf_max_sheets), allowed_modules=_ALLOWED_MODULES)
+    result_sheets = run_workflow(str(wf_max_sheets), options=_run_options())
     assert result_sheets.errors()
     assert not export_path.exists()
     assert not Path(str(export_path) + ".scalim.lock").exists()
@@ -3730,7 +3753,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    result_cells = run_workflow(str(wf_max_cells), allowed_modules=_ALLOWED_MODULES)
+    result_cells = run_workflow(str(wf_max_cells), options=_run_options())
     assert result_cells.errors()
     assert not export_path2.exists()
     assert not Path(str(export_path2) + ".scalim.lock").exists()
@@ -3761,7 +3784,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_failed = run_workflow(str(wf_failed), allowed_modules=_ALLOWED_MODULES)
+    result_failed = run_workflow(str(wf_failed), options=_run_options())
     assert result_failed.errors()
     assert not export_path3.exists()
     assert not Path(str(export_path3) + ".scalim.lock").exists()
@@ -3803,7 +3826,7 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError, match="Excel output path collision"):
-        _ = run_workflow(str(wf_collision), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf_collision), options=_run_options())
 
     reserved_export = tmp_path / "reserved.xlsx"
     _ = _write_table_demand_yaml_with_book_output(
@@ -3843,7 +3866,7 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError, match="Excel output path collision"):
-        _ = run_workflow(str(wf_reserved), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf_reserved), options=_run_options())
 
 
 def test_workflow_excel_output_collision_precheck_allows_dynamic_init_var_paths(tmp_path: Path) -> None:
@@ -3886,7 +3909,7 @@ def test_workflow_excel_output_collision_precheck_allows_dynamic_init_var_paths(
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, init_vars={"a_path": str(a_path), "b_path": str(b_path)})
+    result = run_workflow(str(wf), options=_run_options(init_vars={"a_path": str(a_path), "b_path": str(b_path)}))
     assert not result.errors()
     assert a_path.exists()
     assert b_path.exists()
@@ -3932,7 +3955,7 @@ def test_workflow_excel_output_collision_precheck_rejects_dynamic_init_var_colli
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, init_vars={"a_path": str(out_path), "b_path": str(out_path)})
+        _ = run_workflow(str(wf), options=_run_options(init_vars={"a_path": str(out_path), "b_path": str(out_path)}))
     msg = str(excinfo.value)
     assert "Excel output path collision" in msg
     assert str(out_path.expanduser().resolve(strict=False)) in msg
@@ -3981,7 +4004,7 @@ def test_workflow_excel_output_reserved_paths_check_uses_resolved_dynamic_init_v
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, init_vars={"reserved_path": str(reserved_export)})
+        _ = run_workflow(str(wf), options=_run_options(init_vars={"reserved_path": str(reserved_export)}))
     msg = str(excinfo.value)
     assert "Excel output path collision" in msg
     assert str(reserved_export.expanduser().resolve(strict=False)) in msg
@@ -4022,8 +4045,7 @@ outputs:
     )
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)),
+        options=_run_options(overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True))),
     )
     assert not result.errors()
     assert workbook_path.exists()
@@ -4151,8 +4173,7 @@ def test_run_workflow_demand_diagnostics_can_disable_duplicate_name_validation(t
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+        options=_run_options(demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
     )
 
     assert not result.errors()
@@ -4213,7 +4234,7 @@ outputs:
     with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='b'"):
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
+            options=_run_options(),
             run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
         )
 
@@ -4274,8 +4295,7 @@ outputs:
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+        options=_run_options(demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
     )
 
     assert not result.errors()
@@ -4352,8 +4372,7 @@ outputs:
     with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='b'"):
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
-            demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
+            options=_run_options(demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
             run_patches_by_id={"b": WorkflowRunPatch(demand_diagnostics=None)},
         )
 
@@ -4378,7 +4397,7 @@ def test_run_workflow_preflight_duplicate_names_fail_before_engine(tmp_path: Pat
     with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='dup'"):
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
+            options=_run_options(),
             run_ir_fn=_run_ir_fn,
         )
 
@@ -4520,7 +4539,7 @@ def test_run_workflow_runtime_compile_rejects_unknown_run_id(tmp_path: Path, mon
     with pytest.raises(ScalimWorkflowConfigError, match=r"Unknown workflow run id in runtime compile: 'a'"):
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
+            options=_run_options(),
             run_ir_fn=_run_ir_fn,
         )
 
@@ -4571,8 +4590,7 @@ def test_run_workflow_bundle_viz_requires_overrides_in_runtime_compile(tmp_path:
     with pytest.raises(ScalimWorkflowConfigError, match=r"workflow bundle viz requires"):
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
-            overrides=overrides,
+            options=_run_options(overrides=overrides),
         )
 
 
@@ -4601,8 +4619,7 @@ def test_run_workflow_preflight_uses_effective_overrides_outputs_header_policy(t
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=overrides,
+        options=_run_options(overrides=overrides),
     )
     assert not result.errors()
     assert output_path.exists()
@@ -4668,8 +4685,7 @@ outputs:
     with pytest.raises(ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='dup'"):
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
-            overrides=overrides,
+            options=_run_options(overrides=overrides),
         )
 
     assert not output_path.exists()
@@ -4705,7 +4721,7 @@ def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_err
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
+        options=_run_options(),
         run_patches_by_id={"a": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(include_full_error_message=True))},
     )
     assert not result.errors()
@@ -4736,7 +4752,7 @@ def test_run_workflow_run_patch_can_disable_duplicate_name_validation(tmp_path: 
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
+        options=_run_options(),
         run_patches_by_id={"dup": WorkflowRunPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))},
     )
 
@@ -4794,7 +4810,7 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
             failure_policy="primary_only",
         )
 
-        result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        result = run_workflow(str(wf), options=_run_options())
         assert not result.errors()
         assert export_path.exists()
         assert _read_xlsx_sheetnames(export_path) == ["S"]
@@ -4889,7 +4905,7 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         )
 
         recorder = _WorkflowEventRecorder()
-        result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+        result = run_workflow(str(wf), options=_run_options(components=[recorder]))
         assert not result.errors()
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
@@ -5001,7 +5017,7 @@ def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
             failure_policy="primary_only",
         )
 
-        result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        result = run_workflow(str(wf), options=_run_options())
         assert not result.errors()
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
@@ -5088,7 +5104,7 @@ def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Pat
         )
 
         recorder = _WorkflowEventRecorder()
-        result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+        result = run_workflow(str(wf), options=_run_options(components=[recorder]))
         assert not result.errors()
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
@@ -5131,7 +5147,7 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES, components=[recorder])
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert result.errors()
     assert not workbook_path.exists()
     assert not Path(str(workbook_path) + ".scalim.lock").exists()
@@ -5183,7 +5199,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_err = run_workflow(str(wf_err), allowed_modules=_ALLOWED_MODULES)
+    result_err = run_workflow(str(wf_err), options=_run_options())
     assert result_err.errors()
     assert not workbook_err.exists()
 
@@ -5207,7 +5223,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_over = run_workflow(str(wf_over), allowed_modules=_ALLOWED_MODULES)
+    result_over = run_workflow(str(wf_over), options=_run_options())
     assert not result_over.errors()
     assert workbook_over.exists()
     assert _read_xlsx_rows(workbook_over, "S")[-1] == ["b2", "B2"]
@@ -5232,7 +5248,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_skip = run_workflow(str(wf_skip), allowed_modules=_ALLOWED_MODULES)
+    result_skip = run_workflow(str(wf_skip), options=_run_options())
     assert not result_skip.errors()
     assert workbook_skip.exists()
     assert _read_xlsx_rows(workbook_skip, "S")[-1] == ["a2", "A2"]
@@ -5270,7 +5286,7 @@ def test_workflow_shared_output_lock_file_does_not_block_workbook_write(tmp_path
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert not result.errors()
     assert workbook_path.exists()
     assert lock_path.exists()
@@ -5310,7 +5326,7 @@ resources:
     )
 
     with pytest.raises(ScalimWorkflowConfigError, match="YAML DSL validation failed"):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
 
 def test_workflow_managed_temp_outputs_does_not_require_pathless_csv_authoring_and_cleans_up(tmp_path: Path) -> None:
@@ -5334,7 +5350,7 @@ def test_workflow_managed_temp_outputs_does_not_require_pathless_csv_authoring_a
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert not result.errors()
     assert workbook_path.exists()
     assert _read_xlsx_rows(workbook_path, "S")[-1] == ["a2", "A2"]
@@ -5373,7 +5389,7 @@ def test_workflow_main_rows_from_wires_upstream_typed_rows_into_downstream_main_
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert not result.errors()
     assert _read_csv_rows(b_out) == [
         ["id", "value"],
@@ -5450,7 +5466,7 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert not result.errors()
     assert _read_csv_rows(b_out) == [
         ["id", "value"],
@@ -5528,7 +5544,7 @@ def test_workflow_main_rows_from_rejects_non_in_memory_rows_artifact(tmp_path: P
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    result = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+    result = run_workflow(str(wf), options=_run_options())
     assert result.errors()
     b_outcome = next(o for o in result.outcomes if o.run_id == "b")
     assert b_outcome.error is not None
@@ -5739,7 +5755,7 @@ outputs:
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError, match=r"outputs\.0\.to must declare exactly one of to\.file or to\.book"):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
 
 def test_workflow_derived_write_nodes_fail_fast_on_missing_book_resource(tmp_path: Path) -> None:
@@ -5761,7 +5777,7 @@ def test_workflow_derived_write_nodes_fail_fast_on_missing_book_resource(tmp_pat
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError, match="Missing book resource id"):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
 
 
 def test_workflow_shared_book_commit_failure_raises_workflow_config_error(tmp_path: Path) -> None:
@@ -5797,6 +5813,6 @@ def test_workflow_shared_book_commit_failure_raises_workflow_config_error(tmp_pa
         failure_policy="primary_only",
     )
     with pytest.raises(ScalimWorkflowConfigError, match="workflow.resources"):
-        _ = run_workflow(str(wf), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf), options=_run_options())
     assert workbook_dir.exists()
     assert not lock_path.exists()

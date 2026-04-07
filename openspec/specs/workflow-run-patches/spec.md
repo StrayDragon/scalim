@@ -11,12 +11,12 @@ TBD - created by archiving change c61-workflow-run-patches-by-id. Update Purpose
 
 - `run_patches_by_id` 的 key MUST 等于 `workflow.runs[*].id`
 - patch 仅作用于对应的 demand run,不作用于 workflow 内部派生节点(例如 write/append 等)
-- per-run patch 的优先级 MUST 高于 `run_workflow(...)` 的全局 runtime knobs
+- per-run patch 的优先级 MUST 高于 `run_workflow(..., options=RunOptions(...))` 提供的全局 runtime knobs
 
 #### Scenario: per-run batch_size overrides the global batch_size
 
 - **WHEN** workflow 定义两个 runs: `A` 与 `B`
-- **AND** 调用 `run_workflow(..., batch_size=2000, run_patches_by_id={"A": WorkflowRunPatch(batch_size=5000)})`
+- **AND** 调用 `run_workflow(..., options=RunOptions(..., batch_size=2000), run_patches_by_id={"A": WorkflowRunPatch(batch_size=5000)})`
 - **THEN** run `A` 的 effective `batch_size` MUST 为 `5000`
 - **AND** run `B` 的 effective `batch_size` MUST 为 `2000`
 
@@ -125,3 +125,4 @@ per-run patch MUST 提供对 `components` 的显式策略选择,至少包含:
 **Note:** 当 per-run patch 选择“禁用 overrides”(例如 `overrides=None`)时,workflow `resources` overlay 仍 MUST 生效;这不会被视为“恢复到无资源”的信号。
 
 **Note:** `run_patches_by_id` 仅作用于 demand runs,不作用于 workflow 内部派生节点(例如 `__wf__write.*`). 因此,per-run patch 不是“为每个 demand 单独改 workflow-managed book export 路径”的入口;此类共享资源配置应通过 workflow YAML `workflow.resources` 与全局 `run_workflow(..., overrides=RunOverrides(resources=...))` 管理。
+

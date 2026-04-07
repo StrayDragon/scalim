@@ -1,27 +1,7 @@
-from ....execution.key_normalization import normalize_key_normalization
 from ....execution.run_ir import run_ir
-from ....vendor.dataclassesx import replace
-from .._public_template_sandbox import validate_public_template_sandbox
 from .compiler import compile as _compile
 from .contracts import Compilation, RunOptions, RunResult
-
-
-def _normalize_public_run_options(options: RunOptions) -> RunOptions:
-    template_sandbox = validate_public_template_sandbox(options.template_sandbox)
-    key_normalization = normalize_key_normalization(options.key_normalization)
-    max_workers = int(options.max_workers)
-    if (
-        template_sandbox == options.template_sandbox
-        and key_normalization == options.key_normalization
-        and max_workers == options.max_workers
-    ):
-        return options
-    return replace(
-        options,
-        template_sandbox=template_sandbox,
-        key_normalization=key_normalization,
-        max_workers=max_workers,
-    )
+from .normalize import normalize_public_run_options
 
 
 def run(
@@ -44,7 +24,7 @@ def run(
       会被跳过;若仍需保留,请为 `meta.path` / `audit.path` 提供独立 `workbook` 路径.
     - 输出数据的保留完全由 `options.sink`(例如 `InMemoryRowSink`)决定,而不是由布尔开关控制.
     """
-    options = _normalize_public_run_options(options)
+    options = normalize_public_run_options(options)
     compilation = _compile(yaml_path, options=options)
     core = run_ir(compilation.demand_ir, compilation.request)
     return RunResult(core, config=compilation.config, yaml_path=yaml_path, sink=options.sink)
@@ -55,7 +35,7 @@ def compile(  # noqa: A001
     *,
     options: RunOptions,
 ) -> Compilation:
-    options = _normalize_public_run_options(options)
+    options = normalize_public_run_options(options)
     return _compile(yaml_path, options=options)
 
 

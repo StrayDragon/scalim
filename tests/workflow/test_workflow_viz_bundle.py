@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.by_yaml import RunOverrides, run_workflow
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run_workflow
 from scalim.dsl.by_yaml.workflow import ScalimWorkflowConfigError
 from scalim.ob.presets.viz import VizObserverConfig
 
@@ -107,8 +107,10 @@ def test_workflow_viz_bundle_exports_linked_runs(tmp_path: Path) -> None:
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(out_dir))),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(out_dir))),
+        ),
     )
 
     # Workflow continues (failure_policy=primary_only), but the missing node is recorded as an error.
@@ -147,8 +149,10 @@ def test_workflow_viz_bundle_rejects_explicit_paths(tmp_path: Path) -> None:
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
-            overrides=RunOverrides(viz_config=VizObserverConfig(output_path=str(tmp_path / "viz_events.jsonl"))),
+            options=RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                overrides=RunOverrides(viz_config=VizObserverConfig(output_path=str(tmp_path / "viz_events.jsonl"))),
+            ),
         )
 
     assert exc_info.value.path == "run_workflow.overrides.viz_config"
@@ -161,8 +165,10 @@ def test_workflow_viz_bundle_requires_output_dir_or_default(tmp_path: Path) -> N
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = run_workflow(
             str(wf),
-            allowed_modules=_ALLOWED_MODULES,
-            overrides=RunOverrides(viz_config=VizObserverConfig()),
+            options=RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                overrides=RunOverrides(viz_config=VizObserverConfig()),
+            ),
         )
 
     assert exc_info.value.path == "run_workflow.overrides.viz_config"
@@ -199,8 +205,10 @@ workflow:
 
     result = run_workflow(
         str(wf),
-        allowed_modules=_ALLOWED_MODULES,
-        overrides=RunOverrides(viz_config=VizObserverConfig(use_default_output_dir=True)),
+        options=RunOptions(
+            allowed_modules=_ALLOWED_MODULES,
+            overrides=RunOverrides(viz_config=VizObserverConfig(use_default_output_dir=True)),
+        ),
     )
     assert not result.errors()
 

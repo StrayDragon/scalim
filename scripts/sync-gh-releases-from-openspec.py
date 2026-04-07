@@ -159,7 +159,7 @@ def _is_capability_token(tok: str) -> bool:
 
 
 def _score_highlight(text: str) -> int:
-    # 评分时也做一次轻量清洗，避免 `**BREAKING**:` 之类的 marker 影响规则（例如“移除/删除”检测）。
+    # 评分时也做一次轻量清洗，避免 `**BREAKING**:` 之类的标记影响规则（例如“移除/删除”检测）。
     raw = text
     s = _clean_inline_markers(text)
     lower = s.lower()
@@ -283,7 +283,7 @@ def _example_priority(change_id: str) -> int:
         or "runtime-vars" in cid
     ):
         return 3
-    # imports（YAML `$import`/`imports`/project config 等 authoring surface）
+    # `imports`（YAML `$import`/`imports`/项目配置等编写面）
     if "imports" in cid or "import" in cid or "relative-import" in cid:
         return 4
     if "outputs" in cid or "aggregate" in cid or "derived-outputs" in cid:
@@ -502,7 +502,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     def _tok_is_surface(tok: str) -> bool:
         t = tok.strip()
         lower = t.lower()
-        # `scalim.yaml` 的 project config key path（`yaml_dsl.*`）也是作者可感知的编写面。
+        # `scalim.yaml` 的项目配置键路径（`yaml_dsl.*`）也是作者可感知的编写面。
         if "yaml_dsl." in lower:
             return True
         if _is_capability_token(t):
@@ -629,7 +629,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
 
-        # `scalim.yaml` imports 单入口：优先输出一条“旧字段 -> 新字段”的升级指令，避免 `Breaking` 段刷屏。
+        # `scalim.yaml` `imports` 单入口：优先输出一条“旧字段 -> 新字段”的升级指令，避免 `Breaking` 段刷屏。
         if (
             "yaml_dsl.import_roots" in proposal_text
             and ("yaml_dsl.import_aliases" in cleaned or "import_aliases" in cleaned)
@@ -649,7 +649,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
                 instructions.append("不要再用 `yaml_dsl.runner`；运行期策略改为 Python `RunOptions`。")
             continue
 
-        # CLI 执行入口移除：提案常用 backticks 包含空格，无法按 token 规则抽取；这里补一条直白升级指令。
+        # `CLI` 执行入口移除：提案常用反引号包含空格，无法按 `token` 规则抽取；这里补一条直白升级指令。
         if ("scalim-cli yaml-dsl run" in cleaned.lower() or "scalim-cli yaml-dsl workflow run" in cleaned.lower()) and (
             "yaml_dsl.runner" not in proposal_text
         ):
@@ -859,7 +859,7 @@ def _score_change(change: _Change) -> int:
         score += 90
     if "refactor" in cid or "core" in cid:
         score += 50
-    # Highlights 里优先把破坏性升级点顶上来，否则容易被“编辑器/文档/卫生”类变更挤掉。
+    # `Highlights` 里优先把破坏性升级点顶上来，否则容易被“编辑器/文档/卫生”类变更挤掉。
     if change.has_breaking:
         score += 250
     elif "breaking" in change.proposal_text.lower():

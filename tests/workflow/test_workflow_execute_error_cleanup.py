@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml import RunOptions, run_workflow
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.ob.observer import Observer
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
@@ -115,4 +115,4 @@ def test_prepare_workflow_run_closes_cache_pool_and_observers_on_error(tmp_path:
     monkeypatch.setattr(workflow_execute_mod, "WorkflowResourceManager", _boom)
 
     with pytest.raises(RuntimeError, match="boom"):
-        _ = run_workflow(str(wf_path), allowed_modules=_ALLOWED_MODULES)
+        _ = run_workflow(str(wf_path), options=RunOptions(allowed_modules=_ALLOWED_MODULES))

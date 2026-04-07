@@ -72,7 +72,7 @@ resources:
 
 - `batch_size`/`loader_retry`/`guardrails`/demand `failure_policy` 已迁出 YAML 主线(运行期策略边界);请在 runtime entrypoints 中配置:
   - `scalim.dsl.by_yaml.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))`
-  - `scalim.dsl.by_yaml.run_workflow(..., batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)`
+  - `scalim.dsl.by_yaml.run_workflow(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))`
 - workflow 下如需“不同 run 使用不同运行期策略”,请在调用侧使用 `run_workflow(..., run_patches_by_id=...)` 按 `workflow.runs[*].id` 注入 `WorkflowRunPatch`(不支持 dict patch)。
 
 ## 关键规则

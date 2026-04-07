@@ -50,11 +50,13 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style al
 3. validate 过了但 workflow 仍失败时,用 Python 入口跑一次,定位运行期的 fail-fast 校验(例如 cycle、ctx 越界、输出路径冲突等)
 
 ```python
-from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml import RunOptions, run_workflow
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+    ),
 )
 ```
 

@@ -6,21 +6,17 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
 from ...execution.run_ir import ExecutionResult
 from ...spec.ir._workflow import WorkflowIr, WorkflowNodeIr
-from ...typedefs import KeyNormalizationMode, ParallelMode
 from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import dataclass, replace
 from ...workflow.execute import ScalimWorkflowRunFailedError
 from ...workflow.execute import run_workflow_ir as _run_workflow_ir
 from ...workflow.report import WorkflowResult
-from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
-from ._public_template_sandbox import validate_public_template_sandbox
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import (
-    UNSET,
     BookBudgetOverride,
     BookExportXlsxOverride,
     BookResourceOverride,
@@ -34,6 +30,7 @@ from .runtime.contracts import (
     RunResult,
     UnsetType,
 )
+from .runtime.normalize import normalize_public_run_options
 from .schema_dsl.models import BookConfig, DemandConfig, FileConfig, ResourcesConfig
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
@@ -41,7 +38,9 @@ from .workflow_load import load_workflow_config_from_path
 from .workflow_preflight import WORKFLOW_PREFLIGHT_CHECKS, WorkflowPreflightContext, WorkflowPreflightRun, run_workflow_preflight
 from .workflow_types import ComponentsExtend, ComponentsInherit, ComponentsReplace, WorkflowRunPatch
 
-_WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = "workflow bundle viz requires run_workflow(..., overrides=RunOverrides(viz_config=...))"
+_WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = (
+    "workflow bundle viz requires run_workflow(..., options=RunOptions(overrides=RunOverrides(viz_config=...)))"
+)
 
 
 def _merge_book_budget_overrides(
@@ -333,10 +332,6 @@ def _apply_workflow_run_patch(base: RunOptions, patch: WorkflowRunPatch) -> RunO
 
 
 if TYPE_CHECKING:
-    from ...execution.guardrails import GuardrailsPolicy
-    from ...execution.loader_retry import LoaderRetryPoliciesSpec
-    from ...hooks import IExecutionHook
-    from ...ob.observer import Observer
     from ...ob.presets.viz import VizObserverConfig
     from .workflow_config._models import WorkflowOutputStagingOptions, WorkflowResourcesWaitOptions
 
@@ -347,7 +342,7 @@ class _CompilationLike(Protocol):
 
 
 def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Optional["VizObserverConfig"]:
-    # 工作流 `bundle` 可视化: 通过 `run_workflow(..., overrides=RunOverrides(viz_config=...))` 显式启用.
+    # 工作流 `bundle` 可视化: 通过 `run_workflow(..., options=RunOptions(overrides=RunOverrides(viz_config=...)))` 显式启用.
     if overrides is None:
         return None
     viz_config = overrides.viz_config
@@ -420,6 +415,18 @@ class WorkflowLifecyclePreflightResult:
     parse: WorkflowLifecycleParseResult
     preload: WorkflowLifecyclePreloadResult
     effective: WorkflowLifecycleEffectiveMergeResult
+
+
+def _normalize_and_validate_workflow_base_options(options: RunOptions) -> RunOptions:
+    base_options = normalize_public_run_options(options)
+    if base_options.sink is not None:
+        msg = (
+            "run_workflow(..., options=RunOptions(sink=...)) is not supported. "
+            "Workflow executes multiple demand runs and closes sinks per-run, so a single shared sink instance would be unsafe. "
+            "Migration: set RunOptions(sink=None). (Per-run sinks may be added via a future sink_factory; not in this release.)"
+        )
+        raise TypeError(msg)
+    return base_options
 
 
 def run_workflow_lifecycle_until_preflight(
@@ -553,54 +560,18 @@ def run_workflow_lifecycle_until_preflight(
     return WorkflowLifecyclePreflightResult(parse=parse, preload=preload, effective=effective)
 
 
-def run_workflow(  # noqa: PLR0913
+def run_workflow(
     workflow_yaml_path: str,
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]] = None,
-    components: Optional[List[Union["Observer", "IExecutionHook"]]] = None,
-    overrides: Optional[RunOverrides] = None,
-    guardrails: Optional["GuardrailsPolicy"] = None,
-    loader_retry: Optional["LoaderRetryPoliciesSpec"] = None,
-    batch_size: Union[Optional[int], UnsetType] = UNSET,
+    options: RunOptions,
     run_patches_by_id: Optional[Mapping[str, WorkflowRunPatch]] = None,
-    demand_failure_policy: Optional[str] = None,
-    demand_diagnostics: Optional[DemandDiagnosticsPolicy] = None,
     workflow_resources_wait: Optional["WorkflowResourcesWaitOptions"] = None,
     workflow_output_staging: Optional["WorkflowOutputStagingOptions"] = None,
-    parallel_mode: ParallelMode = "seq",
-    max_workers: int = 0,
-    key_normalization: KeyNormalizationMode = "raw",
-    init_vars: Optional[Dict[str, object]] = None,
-    template_vars: Optional[Mapping[str, object]] = None,
-    template_sandbox: str = "safe",
-    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-    allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     path_aliases: Optional[Mapping[str, str]] = None,
     run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
     compile_demand_yaml_fn: Optional[Callable[..., _CompilationLike]] = None,
 ) -> WorkflowResult:
-    template_sandbox = validate_public_template_sandbox(template_sandbox)
-    base_options = RunOptions(
-        allowed_modules=allowed_modules,
-        allowed_functions=allowed_functions,
-        components=components,
-        sink=None,
-        overrides=overrides,
-        guardrails=guardrails,
-        loader_retry=loader_retry,
-        batch_size=batch_size,
-        demand_failure_policy=demand_failure_policy,
-        demand_diagnostics=demand_diagnostics,
-        parallel_mode=parallel_mode,
-        max_workers=int(max_workers),
-        key_normalization=key_normalization,
-        init_vars=init_vars,
-        template_vars=template_vars,
-        template_sandbox=template_sandbox,
-        rendered_yaml_max_len=rendered_yaml_max_len,
-        allowed_yaml_roots=allowed_yaml_roots,
-    )
+    base_options = _normalize_and_validate_workflow_base_options(options)
     lifecycle = run_workflow_lifecycle_until_preflight(
         workflow_yaml_path,
         base_options=base_options,
@@ -696,7 +667,7 @@ def run_workflow(  # noqa: PLR0913
         compile_demand_fn=_compile_demand_node,
         build_demand_run_result_fn=_build_demand_run_result,
         run_ir_fn=run_ir_fn,
-        components=components,
+        components=base_options.components,
         bundle_viz_base_config=bundle_viz_base_config,
         cache_pool_logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
         cache_pool_consumers_by_logical_key=cache_pool_consumers_by_logical_key,

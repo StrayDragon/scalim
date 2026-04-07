@@ -7,7 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml import RunOptions, run_workflow
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
     ECommerceConfig,
@@ -107,11 +107,13 @@ def run_workflow_demo_big_data_report(
                 try:
                     result = run_workflow(
                         str(wf_copy),
-                        allowed_modules=allowed_modules,
-                        init_vars={"order_ids": []},
-                        batch_size=30,
+                        options=RunOptions(
+                            allowed_modules=allowed_modules,
+                            init_vars={"order_ids": []},
+                            batch_size=30,
+                            allowed_yaml_roots=(str(repo_root),),
+                        ),
                         path_aliases={"@": str(repo_root)},
-                        allowed_yaml_roots=(str(repo_root),),
                     )
                 finally:
                     os.chdir(prev_cwd)

@@ -10,14 +10,14 @@ TBD - created by archiving change c5-yaml-template-vars-precompile. Update Purpo
 
 #### Scenario: demand YAML supports unquoted placeholders
 - **GIVEN** demand YAML 文本包含 `outputs.0.container.path: {{ output_path }}` 形式的未加引号占位符
-- **WHEN** 调用方执行 `compile(..., template_vars={"output_path": "./output/report.xlsx"})`
+- **WHEN** 调用方执行 `compile(..., options=RunOptions(..., template_vars={"output_path": "./output/report.xlsx"}))`
 - **THEN** 系统 MUST 先完成模板渲染再进行 YAML parse
 - **AND** YAML parse MUST 成功
 - **AND** 编译后的输出路径 MUST 等于 `"./output/report.xlsx"`
 
 #### Scenario: workflow YAML fields can be templated
 - **GIVEN** workflow YAML 文本包含 `workflow.options.max_concurrency: {{ max_concurrency }}`
-- **WHEN** 调用方执行 `run_workflow(..., template_vars={"max_concurrency": 3})`
+- **WHEN** 调用方执行 `run_workflow(..., options=RunOptions(..., template_vars={"max_concurrency": 3}))`
 - **THEN** workflow 配置加载 MUST 先完成模板渲染再进行 YAML parse
 - **AND** 编译后的 `max_concurrency` MUST 等于 `3`
 
@@ -77,3 +77,4 @@ TBD - created by archiving change c5-yaml-template-vars-precompile. Update Purpo
 - **WHEN** 调用方执行 `compile/run`
 - **THEN** 系统 MUST fail-fast
 - **AND** 错误信息 MUST 包含 fragment 路径(或等价 import trace)
+

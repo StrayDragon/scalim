@@ -215,11 +215,13 @@ workflow:
         workflow_batch_size_observer = _WorkflowBatchSizeObserver()
         wf = api.run_workflow(
             str(workflow_path),
-            allowed_modules=_ALLOWED_MODULES,
-            components=[workflow_batch_size_observer],
-            max_workers=0,
-            init_vars=init_vars,
-            batch_size=2,
+            options=api.RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                components=[workflow_batch_size_observer],
+                max_workers=0,
+                init_vars=init_vars,
+                batch_size=2,
+            ),
             run_patches_by_id={
                 "r1": workflow_types_api.WorkflowRunPatch(batch_size=5),
             },
@@ -229,12 +231,14 @@ workflow:
         errors = wf.errors()
         duplicate_global = api.run_workflow(
             str(duplicate_workflow_path),
-            allowed_modules=_ALLOWED_MODULES,
-            demand_diagnostics=api.DemandDiagnosticsPolicy(validate_unique_field_names=False),
+            options=api.RunOptions(
+                allowed_modules=_ALLOWED_MODULES,
+                demand_diagnostics=api.DemandDiagnosticsPolicy(validate_unique_field_names=False),
+            ),
         )
         duplicate_patch = api.run_workflow(
             str(duplicate_workflow_path),
-            allowed_modules=_ALLOWED_MODULES,
+            options=api.RunOptions(allowed_modules=_ALLOWED_MODULES),
             run_patches_by_id={
                 "dup": workflow_types_api.WorkflowRunPatch(
                     demand_diagnostics=api.DemandDiagnosticsOverride(validate_unique_field_names=False)

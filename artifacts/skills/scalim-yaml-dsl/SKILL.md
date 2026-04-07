@@ -50,7 +50,9 @@ run(
 
 run_workflow(
     "path/to/workflow.yaml",
-    allowed_modules=frozenset(["myapp.loaders"]),
+    options=RunOptions(
+        allowed_modules=frozenset(["myapp.loaders"]),
+    ),
 )
 ```
 

@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import RunOverrides, run_workflow
+from scalim.dsl.by_yaml import RunOptions, RunOverrides, run_workflow
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
@@ -83,9 +83,11 @@ def run_workflow_cache_pool_pin(
             # 1) 基线: 没有 `pin` -> 引用计数归零时会触发 `refcount_zero` 淘汰
             _ = run_workflow(
                 str(workflow_yaml_no_pin),
-                allowed_modules=_ALLOWED_MODULES,
-                init_vars={"order_ids": []},
-                overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_no_pin))),
+                options=RunOptions(
+                    allowed_modules=_ALLOWED_MODULES,
+                    init_vars={"order_ids": []},
+                    overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_no_pin))),
+                ),
             )
             events_no_pin = _read_jsonl(_workflow_events_path(viz_no_pin))
             reasons_no_pin, releases_no_pin = _extract_cache_signals(events_no_pin)
@@ -93,9 +95,11 @@ def run_workflow_cache_pool_pin(
             # 2) 启用 `pin`: 引用计数归零时不淘汰,仅在 `workflow_end` 统一释放
             _ = run_workflow(
                 str(workflow_yaml_pin),
-                allowed_modules=_ALLOWED_MODULES,
-                init_vars={"order_ids": []},
-                overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_pin))),
+                options=RunOptions(
+                    allowed_modules=_ALLOWED_MODULES,
+                    init_vars={"order_ids": []},
+                    overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_pin))),
+                ),
             )
             events_pin = _read_jsonl(_workflow_events_path(viz_pin))
             reasons_pin, releases_pin = _extract_cache_signals(events_pin)

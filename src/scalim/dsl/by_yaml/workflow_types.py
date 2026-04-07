@@ -35,7 +35,7 @@ WorkflowComponent = Union["Observer", "IExecutionHook"]
 
 @dataclass(frozen=True)
 class ComponentsInherit:
-    """继承 `run_workflow(..., components=...)` 的全局 `components` 列表用于本次运行."""
+    """继承 `run_workflow(..., options=RunOptions(components=[...]))` 的全局 `components` 列表用于本次运行."""
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,7 @@ class WorkflowRunPatch:
     """用于 `run_workflow(..., run_patches_by_id=...)` 的单节点运行期补丁.
 
     三态约定:
-    - `UNSET`: 继承 `run_workflow(...)` 的全局值
+    - `UNSET`: 继承 `run_workflow(..., options=RunOptions(...))` 的全局值
     - `None`: 显式禁用/清空(当字段支持时)
     - 非 `None`: 显式覆盖
     """

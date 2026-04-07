@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from scalim.dsl.by_yaml import run_workflow
+from scalim.dsl.by_yaml import RunOptions, run_workflow
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -67,11 +67,13 @@ def run_workflow_shared_workbooks(
             try:
                 wf_result = run_workflow(
                     str(wf_copy),
-                    allowed_modules=allowed_modules,
-                    batch_size=30,
-                    init_vars={"order_ids": []},
+                    options=RunOptions(
+                        allowed_modules=allowed_modules,
+                        batch_size=30,
+                        init_vars={"order_ids": []},
+                        allowed_yaml_roots=(str(repo_root),),
+                    ),
                     path_aliases={"@": str(repo_root)},
-                    allowed_yaml_roots=(str(repo_root),),
                 )
             except Exception as exc:  # noqa: BLE001
                 summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)
