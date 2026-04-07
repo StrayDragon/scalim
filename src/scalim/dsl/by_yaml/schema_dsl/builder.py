@@ -418,6 +418,10 @@ class SchemaBuilder:
         types_mod = self._types
 
         definitions: Dict[str, Any] = {
+            "scalim_yaml_import_root": self._build_definition(
+                types_mod.ScalimYamlImportRootConfig,
+                allow_import=False,
+            ),
             "scalim_yaml_lsp_kind_override": self._build_definition(
                 types_mod.ScalimYamlLspKindOverrideConfig,
                 allow_import=False,

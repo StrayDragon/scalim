@@ -13,6 +13,38 @@
     }
   ],
   "definitions": {
+    "scalim_yaml_import_root": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "imports roots 注册表条目中的目录路径(相对 `scalim.yaml` 所在目录).",
+          "markdownDescription": "#### yaml_dsl.import_roots[*].path\n\nimports roots 注册表条目中的目录路径(相对 `scalim.yaml` 所在目录).\n\n该路径用于两类用途:\n- 当调用侧未显式提供 `allowed_yaml_roots` 时,作为 imports 默认 allow-roots 的扩展输入\n- 当条目配置了 `alias` 时,作为 `imports.*` 的路径解析基准目录\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- minLength: `1`\n\n##### 例子\n```yaml\n./fragments\n```",
+          "minLength": 1,
+          "examples": [
+            "./fragments"
+          ]
+        },
+        "alias": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "可选: imports 路径别名.",
+          "markdownDescription": "#### yaml_dsl.import_roots[*].alias\n\n可选: imports 路径别名.\n\n- 当 alias 为 `@` 时,允许在 `imports.*` 中使用 `@/x.yaml`\n- 其他 alias 允许使用 `<alias>:/x.yaml`\n\n##### 字段约束\n- 必填: 否\n- 类型: string | null\n- 默认值: `None`\n- minLength: `1`\n\n##### 例子\n```yaml\nfragments\n```\n```yaml\n'@'\n```",
+          "minLength": 1,
+          "default": null,
+          "examples": [
+            "fragments",
+            "@"
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
     "scalim_yaml_lsp_kind_override": {
       "type": "object",
       "properties": {

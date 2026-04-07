@@ -65,6 +65,7 @@ from .resources import (
 )
 from .scalim_yaml import (
     ScalimYamlConfig,
+    ScalimYamlImportRootConfig,
     ScalimYamlLspConfig,
     ScalimYamlLspKindOverrideConfig,
     ScalimYamlYamlDslConfig,
@@ -143,6 +144,7 @@ __all__ = (
     "RelationStepConfig",
     "ResourcesConfig",
     "ScalimYamlConfig",
+    "ScalimYamlImportRootConfig",
     "ScalimYamlLspConfig",
     "ScalimYamlLspKindOverrideConfig",
     "ScalimYamlYamlDslConfig",
