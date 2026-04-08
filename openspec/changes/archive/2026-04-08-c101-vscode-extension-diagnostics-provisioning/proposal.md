@@ -9,6 +9,16 @@ VSCode 扩展（`extras/vscode-scalim/`）是用户接触 YAML DSL 编辑体验�
 
 补充现状（对齐当前代码基线）：扩展已具备 OutputChannel、Status Bar、基础 provisioning（pinned venv/workspace venv/PATH）、以及 discovery dump / 打开或创建 `scalim.yaml` 的入口。本文档后续内容更偏向“把缺口补齐并固化为可复用 UX”，而不是从零开始。
 
+## What Changes
+
+本变更聚焦在 VSCode 扩展侧补齐“可观测 + 可诊断 + 可引导配置”的闭环能力：
+
+- 统一日志入口（OutputChannel）并补齐 server log 文件打开命令
+- 新增可复制的 Diagnostic Bundle（不包含 YAML 正文）
+- 强化 Status Bar：外显 server/discovery 状态，并提供 Quick Pick 菜单入口
+- 新增 Doctor（预检）与 Setup Wizard（引导式 provisioning）
+- `scalim.yaml` 生命周期：nearest 打开/创建 + 文件监听 + 重启提示（可配置自动重启）
+
 ## Principles
 
 - 语义 SSOT 在 server / shared core；extension **不复制** YAML DSL 规则，只做 orchestration 与 UX。

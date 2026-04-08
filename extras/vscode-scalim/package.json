@@ -20,37 +20,62 @@
     "workspaceContains:**/scalim.yaml",
     "onCommand:scalim.yamlDsl.restartServer",
     "onCommand:scalim.yamlDsl.reinstallServer",
+    "onCommand:scalim.yamlDsl.openStatusMenu",
     "onCommand:scalim.yamlDsl.showDiagnostics",
     "onCommand:scalim.yamlDsl.openLogs",
+    "onCommand:scalim.yamlDsl.openServerLogFile",
+    "onCommand:scalim.yamlDsl.copyDiagnosticBundle",
     "onCommand:scalim.yamlDsl.showDiscoverySummary",
-    "onCommand:scalim.yamlDsl.openOrCreateScalimYaml"
+    "onCommand:scalim.yamlDsl.openOrCreateScalimYaml",
+    "onCommand:scalim.yamlDsl.doctor",
+    "onCommand:scalim.yamlDsl.setupWizard"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "scalim.yamlDsl.restartServer",
-        "title": "Scalim YAML DSL: Restart server"
+        "title": "Scalim: Restart Server"
       },
       {
         "command": "scalim.yamlDsl.reinstallServer",
-        "title": "Scalim YAML DSL: Reinstall server (rebuild venv)"
+        "title": "Scalim: Reinstall Server (rebuild venv)"
+      },
+      {
+        "command": "scalim.yamlDsl.openStatusMenu",
+        "title": "Scalim: Open Menu"
       },
       {
         "command": "scalim.yamlDsl.showDiagnostics",
-        "title": "Scalim YAML DSL: Show diagnostics"
+        "title": "Scalim: Show Diagnostics (debug)"
       },
       {
         "command": "scalim.yamlDsl.openLogs",
-        "title": "Scalim YAML DSL: Open logs"
+        "title": "Scalim: Open Logs"
+      },
+      {
+        "command": "scalim.yamlDsl.openServerLogFile",
+        "title": "Scalim: Open Server Log File"
+      },
+      {
+        "command": "scalim.yamlDsl.copyDiagnosticBundle",
+        "title": "Scalim: Copy Diagnostic Bundle"
       },
       {
         "command": "scalim.yamlDsl.showDiscoverySummary",
-        "title": "Scalim YAML DSL: Show discovery summary"
+        "title": "Scalim: Show Discovery Summary"
       },
       {
         "command": "scalim.yamlDsl.openOrCreateScalimYaml",
-        "title": "Scalim YAML DSL: Open/Create scalim.yaml"
+        "title": "Scalim: Open scalim.yaml"
+      },
+      {
+        "command": "scalim.yamlDsl.doctor",
+        "title": "Scalim: Doctor"
+      },
+      {
+        "command": "scalim.yamlDsl.setupWizard",
+        "title": "Scalim: Setup Wizard"
       }
     ],
     "configuration": {
@@ -59,8 +84,8 @@
         "scalim.yamlDsl.envMode": {
           "type": "string",
           "default": "auto",
-          "enum": ["pinnedVenv", "workspaceVenv", "auto"],
-          "description": "Server environment mode. workspaceVenv: reuse an existing workspace venv (for scalim development). auto: try workspaceVenv first (if valid), then try PATH (e.g. uv tool install). pinnedVenv: manage an isolated pinned venv under globalStorageUri (requires explicit reinstall action to install)."
+          "enum": ["pinnedVenv", "workspaceVenv", "auto", "path"],
+          "description": "Server environment mode. workspaceVenv: reuse an existing workspace venv. path: use scalim-yaml-dsl-lsp from PATH. auto: try workspaceVenv first (if valid), then try PATH. pinnedVenv: manage an isolated pinned venv under globalStorageUri (requires explicit user action to install)."
         },
         "scalim.yamlDsl.workspaceVenvPath": {
           "type": "string",
@@ -80,13 +105,19 @@
         "scalim.yamlDsl.autoSchemaBinding": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically update workspace yaml.schemas mapping (requires redhat.vscode-yaml)."
+          "description": "Offer to update workspace yaml.schemas mapping (requires redhat.vscode-yaml). Always asks for confirmation before writing workspace settings."
+        },
+        "scalim.yamlDsl.autoRestartOnScalimYamlChange": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically restart the LSP server when scalim.yaml is created/changed/deleted. When false, the extension will prompt you."
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
+    "build": "pnpm run check-types && node esbuild.js --production",
     "compile": "pnpm run check-types && pnpm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
