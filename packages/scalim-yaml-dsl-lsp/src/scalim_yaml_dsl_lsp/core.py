@@ -1,7 +1,7 @@
 import ast
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import lru_cache
 from importlib.machinery import PathFinder
@@ -28,6 +28,8 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.jsonschema_issues import (
     ScalimJsonSchemaCollectorError,
     collect_jsonschema_validation_issues,
 )
+from scalim.dsl.yaml_dsl._internal.config_parsing.models import FieldDef, FieldDefIndex, RawDemand, collect_field_defs
+from scalim.dsl.yaml_dsl._internal.config_parsing.parsers.outputs import ParserOutputsMixin
 from scalim.dsl.yaml_dsl._internal.config_parsing.presets import load_scalim_preset_yaml_text
 from scalim.dsl.yaml_dsl._internal.config_parsing.project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
 from scalim.dsl.yaml_dsl._internal.config_parsing.unknown_fields import find_unknown_fields
@@ -49,13 +51,16 @@ from scalim.dsl.yaml_dsl.runtime.builtin_callables import (
     list_public_builtin_callable_python_references,
 )
 from scalim.vendor.yamlx import yaml
+from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 from .cache import load_yaml_mapping_cached, parse_python_ast_cached
 from .cursor_extraction import (
     YamlCursorExtractionResult,
     extract_yaml_dsl_entity_reference_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
+    extract_yaml_dsl_output_field_reference_by_cursor,
     extract_yaml_dsl_python_reference_by_cursor,
+    extract_yaml_dsl_yaml_alias_reference_by_cursor,
 )
 from .editor_types import EditorPosition, EditorRange
 
@@ -3928,6 +3933,690 @@ def _list_module_symbols(file_path: Path) -> Tuple[Tuple[str, ...], str]:
     return tuple(sorted(symbols.keys())), ""
 
 
+@dataclass(frozen=True)
+class YamlDslFieldInfo:
+    field_id: str
+    kind: str
+    source_id: str = ""
+    summary: str = ""
+    detail: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "field_id": str(self.field_id),
+            "kind": str(self.kind),
+            "source_id": str(self.source_id or ""),
+            "summary": str(self.summary or ""),
+            "detail": str(self.detail or ""),
+        }
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslFieldDefinitionLocation:
+    file_path: str
+    range: Optional[EditorRange]
+    field_id: str
+    kind: str
+    source_id: str = ""
+    yaml_path: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "file_path": str(self.file_path),
+            "field_id": str(self.field_id),
+            "kind": str(self.kind),
+            "source_id": str(self.source_id or ""),
+            "yaml_path": str(self.yaml_path or ""),
+        }
+        if self.range is not None:
+            payload["range"] = self.range.as_dict()
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslFieldDefinitionResult:
+    locations: Tuple[YamlDslFieldDefinitionLocation, ...] = ()
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "locations": [loc.as_dict() for loc in self.locations],
+        }
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslOutputFieldHoverResult:
+    text: str = ""
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"text": str(self.text)}
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslYamlAliasDefinitionResult:
+    range: Optional[EditorRange] = None
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if self.range is not None:
+            payload["range"] = self.range.as_dict()
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEditorEffectiveView:
+    """Editor/LSP 侧的 effective expansion 视图(静态,无副作用).
+
+    说明:
+    - 输入为打开文档的内存态 YAML 文本。
+    - demand YAML 可选展开 imports/$import (受 allowed roots 约束)。
+    - 产物用于 outputs[*].fields / YAML alias 等导航与补全。
+    """
+
+    yaml_kind: str
+    field_ids: Tuple[str, ...] = ()
+    field_infos_by_id: Dict[str, Tuple[YamlDslFieldInfo, ...]] = field(default_factory=dict)
+    field_definitions_by_id: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = field(default_factory=dict)
+    outputs_effective_fields_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
+    yaml_anchor_ranges: Dict[str, EditorRange] = field(default_factory=dict)
+    yaml_anchor_expansions: Dict[str, Tuple[str, ...]] = field(default_factory=dict)
+    import_fragment_files: Tuple[str, ...] = ()
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "yaml_kind": str(self.yaml_kind or ""),
+            "field_ids": list(self.field_ids),
+            "field_infos_by_id": {k: [i.as_dict() for i in v] for k, v in self.field_infos_by_id.items()},
+            "field_definitions_by_id": {k: [loc.as_dict() for loc in v] for k, v in self.field_definitions_by_id.items()},
+            "outputs_effective_fields_by_output_index": {str(k): list(v) for k, v in self.outputs_effective_fields_by_output_index.items()},
+            "yaml_anchor_ranges": {k: v.as_dict() for k, v in self.yaml_anchor_ranges.items()},
+            "yaml_anchor_expansions": {k: list(v) for k, v in self.yaml_anchor_expansions.items()},
+            "import_fragment_files": list(self.import_fragment_files),
+        }
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+class _EditorOutputsFieldResolver(ParserOutputsMixin):
+    def resolve_field_ids_from_value(
+        self,
+        value: object,
+        *,
+        field_def_index: FieldDefIndex,
+        context_label: str,
+        warnings: List[str],
+    ) -> List[str]:
+        out: List[str] = []
+        try:
+            flattened = self._walk_output_field_items(value, field_path="")
+        except Exception as exc:  # noqa: BLE001
+            warnings.append("{} flatten failed: {}: {}".format(context_label, type(exc).__name__, exc))
+            return out
+
+        for field_path, item in flattened:
+            try:
+                fid = self._resolve_field_ref(
+                    item,
+                    path="{}.{}".format(context_label, field_path) if field_path else str(context_label),
+                    field_def_index=field_def_index,
+                )
+            except Exception as exc:  # noqa: BLE001
+                warnings.append("{} resolve failed: {}: {}".format(context_label, type(exc).__name__, exc))
+                continue
+            if fid:
+                out.append(str(fid))
+        return out
+
+    def resolve_outputs_effective_fields(
+        self,
+        raw: Dict[str, Any],
+        *,
+        field_def_index: FieldDefIndex,
+        warnings: List[str],
+    ) -> Dict[int, Tuple[str, ...]]:
+        outputs = raw.get("outputs")
+        if not isinstance(outputs, list):
+            return {}
+
+        out: Dict[int, Tuple[str, ...]] = {}
+        for idx, spec in enumerate(outputs):
+            if not isinstance(spec, dict):
+                continue
+            fields_raw = spec.get("fields")
+            if fields_raw is None:
+                continue
+
+            items: List[str] = []
+            for field_path, item in self._walk_output_field_items(fields_raw, field_path=""):
+                try:
+                    fid = self._resolve_output_field_ref(
+                        item,
+                        outputs_key="outputs",
+                        output_idx=int(idx),
+                        field_path=str(field_path),
+                        field_def_index=field_def_index,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    warnings.append("outputs.{}.fields.{}: {}: {}".format(int(idx), str(field_path), type(exc).__name__, exc))
+                    continue
+                if fid:
+                    items.append(str(fid))
+            out[int(idx)] = tuple(items)
+        return out
+
+
+def _load_yaml_mapping_text_for_effective_view(
+    yaml_text: str,
+    *,
+    yaml_path: Path,
+    warnings: List[str],
+) -> Tuple[Optional[Dict[str, Any]], Dict[str, Tuple[int, int]]]:
+    try:
+        loaded, locations, _lines = load_yaml_mapping_text(
+            str(yaml_text or ""),
+            source_path=str(yaml_path),
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
+        msg = exc.errors[0].message if exc.errors else str(exc)
+        warnings.append("YAML parse failed: {}".format(msg))
+        return None, {}
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        return None, {}
+
+    if not isinstance(loaded, dict):
+        warnings.append("YAML root must be a mapping")
+        return None, {}
+
+    return cast("Dict[str, Any]", loaded), cast("Dict[str, Tuple[int, int]]", locations)  # pragma: allow-cast yaml mapping typed narrowing
+
+
+def _effective_project_root_override_for_imports(
+    *,
+    scalim_yaml_override: Optional[Union[str, Path]],
+    project_root_override: Optional[Union[str, Path]],
+) -> Optional[Union[str, Path]]:
+    if project_root_override is None:
+        return None
+    if scalim_yaml_override is not None:
+        return project_root_override
+
+    # `project_root_override` in runtime config parsing requires `scalim.yaml` to exist at that root.
+    # For editor discovery, `project_root` can be inferred even when `scalim.yaml` is absent.
+    try:
+        root = Path(str(project_root_override)).expanduser().resolve(strict=False)
+    except Exception:  # noqa: BLE001
+        return None
+
+    scalim_yaml_candidate = root / _SCALIM_YAML_FILENAME
+    if not scalim_yaml_candidate.exists() or not scalim_yaml_candidate.is_file():
+        return None
+    return project_root_override
+
+
+def _maybe_expand_imports_inplace_for_effective_view(
+    raw: Dict[str, Any],
+    *,
+    yaml_path: Path,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Union[str, Path]],
+    project_root_override: Optional[Union[str, Path]],
+    import_cache: Dict[str, Dict[str, Any]],
+    warnings: List[str],
+) -> bool:
+    if not contains_import_syntax(raw):
+        return True
+
+    try:
+        _ = expand_imports_inplace(
+            raw,
+            yaml_path=yaml_path,
+            cache=import_cache,
+            allowed_yaml_roots=list(allowed_yaml_roots),
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=project_root_override,
+        )
+    except ScalimYamlImportExpansionError as exc:
+        warnings.append("imports expansion failed: {}".format(str(exc)))
+        return False
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("imports expansion failed unexpectedly: {}: {}".format(type(exc).__name__, exc))
+        return False
+
+    return True
+
+
+def _collect_field_defs_for_effective_view(
+    raw: Dict[str, Any],
+    *,
+    warnings: List[str],
+) -> Tuple[Optional[FieldDefIndex], str]:
+    main_source_id = ""
+    main_source = raw.get("main_source")
+    if isinstance(main_source, dict):
+        main_source_id = str(main_source.get("source_id") or "").strip()
+
+    try:
+        field_def_index = collect_field_defs(RawDemand.from_raw(raw), main_source_id=main_source_id)
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("collect_field_defs failed: {}: {}".format(type(exc).__name__, exc))
+        return None, main_source_id
+    return field_def_index, main_source_id
+
+
+def build_yaml_dsl_editor_effective_view(
+    yaml_text: str,
+    *,
+    yaml_path: Union[str, Path],
+    yaml_kind: str,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
+) -> YamlDslEditorEffectiveView:
+    """构建 editor 侧 effective view (静态 + 可诊断降级).
+
+    约束:
+    - 输入以打开文档的内存态文本为准
+    - 失败时返回空结果 + warnings,不得 crash
+    """
+    warnings: List[str] = []
+    yaml_path_resolved = Path(str(yaml_path)).expanduser().resolve(strict=False)
+
+    yaml_anchor_ranges, yaml_anchor_values = _safe_collect_yaml_anchors_rt(yaml_text, warnings=warnings)
+
+    if str(yaml_kind or "") != YAML_DSL_KIND_DEMAND:
+        return YamlDslEditorEffectiveView(
+            yaml_kind=str(yaml_kind or ""),
+            yaml_anchor_ranges=yaml_anchor_ranges,
+            warnings=tuple(warnings),
+        )
+
+    raw, locations = _load_yaml_mapping_text_for_effective_view(yaml_text, yaml_path=yaml_path_resolved, warnings=warnings)
+    if raw is None:
+        return YamlDslEditorEffectiveView(
+            yaml_kind=YAML_DSL_KIND_DEMAND,
+            yaml_anchor_ranges=yaml_anchor_ranges,
+            warnings=tuple(warnings),
+        )
+
+    import_cache: Dict[str, Dict[str, Any]] = {}
+    effective_project_root_override = _effective_project_root_override_for_imports(
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+    )
+    if not _maybe_expand_imports_inplace_for_effective_view(
+        raw,
+        yaml_path=yaml_path_resolved,
+        allowed_yaml_roots=allowed_yaml_roots,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=effective_project_root_override,
+        import_cache=import_cache,
+        warnings=warnings,
+    ):
+        return YamlDslEditorEffectiveView(
+            yaml_kind=YAML_DSL_KIND_DEMAND,
+            yaml_anchor_ranges=yaml_anchor_ranges,
+            warnings=tuple(warnings),
+        )
+
+    field_def_index, main_source_id = _collect_field_defs_for_effective_view(raw, warnings=warnings)
+    if field_def_index is None:
+        return YamlDslEditorEffectiveView(
+            yaml_kind=YAML_DSL_KIND_DEMAND,
+            yaml_anchor_ranges=yaml_anchor_ranges,
+            warnings=tuple(warnings),
+        )
+
+    field_ids = tuple(sorted(field_def_index.defs_by_id.keys()))
+    field_infos_by_id = _build_field_infos_by_id(field_def_index)
+
+    resolver = _EditorOutputsFieldResolver()
+    outputs_effective = resolver.resolve_outputs_effective_fields(raw, field_def_index=field_def_index, warnings=warnings)
+
+    anchor_expansions = _build_yaml_anchor_expansions(
+        yaml_anchor_values,
+        field_def_index=field_def_index,
+        resolver=resolver,
+        warnings=warnings,
+    )
+
+    definitions_by_id: Dict[str, List[YamlDslFieldDefinitionLocation]] = {}
+    _append_field_definitions_from_locations(
+        definitions_by_id,
+        field_def_index=field_def_index,
+        locations=locations,
+        file_path=str(yaml_path_resolved),
+        main_source_id=main_source_id,
+    )
+
+    import_fragment_files = _iter_file_import_cache_paths(import_cache)
+    for fragment_file in import_fragment_files:
+        fragment_path = Path(fragment_file)
+        _append_field_definitions_from_yaml_file(
+            definitions_by_id,
+            fragment_path,
+        )
+
+    definitions_final: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
+
+    return YamlDslEditorEffectiveView(
+        yaml_kind=YAML_DSL_KIND_DEMAND,
+        field_ids=field_ids,
+        field_infos_by_id=field_infos_by_id,
+        field_definitions_by_id=definitions_final,
+        outputs_effective_fields_by_output_index=outputs_effective,
+        yaml_anchor_ranges=yaml_anchor_ranges,
+        yaml_anchor_expansions=anchor_expansions,
+        import_fragment_files=tuple(import_fragment_files),
+        warnings=tuple(warnings),
+    )
+
+
+def _build_field_infos_by_id(field_def_index: FieldDefIndex) -> Dict[str, Tuple[YamlDslFieldInfo, ...]]:
+    infos: Dict[str, List[YamlDslFieldInfo]] = {}
+    for field_def in list(field_def_index.field_defs):
+        info = YamlDslFieldInfo(
+            field_id=str(field_def.field_id),
+            kind=str(field_def.kind),
+            source_id=str(field_def.source_id or ""),
+            summary=_field_summary(field_def.data),
+            detail=_field_detail(field_def.data),
+        )
+        infos.setdefault(str(field_def.field_id), []).append(info)
+    return {k: tuple(v) for k, v in infos.items()}
+
+
+def _append_field_definitions_from_locations(
+    out: Dict[str, List[YamlDslFieldDefinitionLocation]],
+    *,
+    field_def_index: FieldDefIndex,
+    locations: Dict[str, Tuple[int, int]],
+    file_path: str,
+    main_source_id: str,
+) -> None:
+    for field_def in list(field_def_index.field_defs):
+        for yaml_path in _candidate_yaml_paths_for_field_def(field_def, main_source_id=main_source_id):
+            rng = _range_for_yaml_key_path(yaml_path, key_text=str(field_def.field_id), locations=locations)
+            if rng is None:
+                continue
+            loc = YamlDslFieldDefinitionLocation(
+                file_path=str(file_path),
+                range=rng,
+                field_id=str(field_def.field_id),
+                kind=str(field_def.kind),
+                source_id=str(field_def.source_id or ""),
+                yaml_path=str(yaml_path),
+            )
+            out.setdefault(str(field_def.field_id), []).append(loc)
+
+
+def _append_field_definitions_from_yaml_file(
+    out: Dict[str, List[YamlDslFieldDefinitionLocation]],
+    fragment_yaml_path: Path,
+) -> None:
+    try:
+        loaded, locations, _lines = load_yaml_mapping_cached(fragment_yaml_path)
+    except Exception:  # noqa: BLE001
+        return
+    if not isinstance(loaded, dict):
+        return
+    raw = cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml fragment mapping typed narrowing
+
+    main_source_id = ""
+    main_source = raw.get("main_source")
+    if isinstance(main_source, dict):
+        main_source_id = str(main_source.get("source_id") or "").strip()
+
+    try:
+        field_def_index = collect_field_defs(RawDemand.from_raw(raw), main_source_id=main_source_id)
+    except Exception:  # noqa: BLE001
+        return
+
+    _append_field_definitions_from_locations(
+        out,
+        field_def_index=field_def_index,
+        locations=locations,
+        file_path=str(fragment_yaml_path),
+        main_source_id=main_source_id,
+    )
+
+
+def _candidate_yaml_paths_for_field_def(field_def: FieldDef, *, main_source_id: str) -> Tuple[str, ...]:
+    fid = str(field_def.field_id)
+    kind = str(field_def.kind)
+    source_id = str(field_def.source_id or "")
+
+    if kind == "derived":
+        return ("fields.{}".format(fid),)
+
+    if kind != "source":
+        return ()
+
+    candidates: List[str] = []
+    if main_source_id and source_id and source_id == main_source_id:
+        candidates.append("main_source.fields.{}".format(fid))
+    if source_id:
+        candidates.append("sources.{}.fields.{}".format(source_id, fid))
+    return tuple(candidates)
+
+
+def _iter_file_import_cache_paths(cache: Dict[str, Dict[str, Any]]) -> List[str]:
+    files: List[str] = []
+    for key in sorted(cache.keys()):
+        if not key:
+            continue
+        if key.startswith("scalim://"):
+            continue
+        p = Path(str(key)).expanduser().resolve(strict=False)
+        if not p.exists() or not p.is_file():
+            continue
+        files.append(str(p))
+    return files
+
+
+def _iter_ruamel_objects(root: object) -> Iterable[object]:
+    stack: List[object] = [root]
+    visited: Set[int] = set()
+    while stack:
+        obj = stack.pop()
+        if obj is None:
+            continue
+        obj_id = id(obj)
+        if obj_id in visited:
+            continue
+        visited.add(obj_id)
+        yield obj
+
+        if isinstance(obj, dict):
+            stack.extend(cast("Any", obj).values())  # pragma: allow-cast ruamel commented mapping typed narrowing
+        elif isinstance(obj, list):
+            stack.extend(cast("Any", obj))  # pragma: allow-cast ruamel commented seq typed narrowing
+
+
+def _anchor_range_for_ruamel_obj(obj: object, anchor_name: str, *, lines: Sequence[str]) -> Optional[EditorRange]:
+    lc = getattr(obj, "lc", None)
+    line0 = getattr(lc, "line", None)
+    col0 = getattr(lc, "col", None)
+    if not isinstance(line0, int) or not (0 <= int(line0) < len(lines)):
+        return None
+    line_text = str(lines[int(line0)])
+
+    token = "&{}".format(anchor_name)
+    col: Optional[int] = None
+    if isinstance(col0, int) and 0 <= int(col0) < len(line_text) and line_text[int(col0) : int(col0) + len(token)] == token:
+        col = int(col0)
+    else:
+        found = line_text.find(token)
+        if found != -1:
+            col = int(found)
+
+    if col is None:
+        return None
+
+    start = EditorPosition(line=int(line0) + 1, column=int(col) + 1)
+    end = EditorPosition(line=int(line0) + 1, column=int(col) + 1 + len(token))
+    return EditorRange(start=start, end=end)
+
+
+def _safe_collect_yaml_anchors_rt(yaml_text: str, *, warnings: List[str]) -> Tuple[Dict[str, EditorRange], Dict[str, object]]:
+    """用 ruamel `rt` loader 收集 `&anchor` 的范围与绑定值."""
+    out_ranges: Dict[str, EditorRange] = {}
+    out_values: Dict[str, object] = {}
+    try:
+        yaml_rt = YAML(typ="rt")
+        yaml_rt.version = (1, 2)  # pyright: ignore[reportAttributeAccessIssue]  # pragma: allow-dynattr ruamel config
+        data = yaml_rt.load(str(yaml_text or ""))
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("anchor scan failed: {}: {}".format(type(exc).__name__, exc))
+        return out_ranges, out_values
+
+    lines = str(yaml_text or "").splitlines()
+
+    for obj in _iter_ruamel_objects(data):
+        anchor = getattr(obj, "anchor", None)
+        anchor_name = getattr(anchor, "value", None)
+        if not isinstance(anchor_name, str) or not anchor_name.strip():
+            continue
+
+        name = str(anchor_name).strip()
+        out_values.setdefault(name, obj)
+        if name in out_ranges:
+            continue
+
+        rng = _anchor_range_for_ruamel_obj(obj, name, lines=lines)
+        if rng is not None:
+            out_ranges[name] = rng
+
+    return out_ranges, out_values
+
+
+def _build_yaml_anchor_expansions(
+    anchors: Dict[str, object],
+    *,
+    field_def_index: FieldDefIndex,
+    resolver: _EditorOutputsFieldResolver,
+    warnings: List[str],
+) -> Dict[str, Tuple[str, ...]]:
+    out: Dict[str, Tuple[str, ...]] = {}
+    for name in sorted(anchors.keys()):
+        value = anchors.get(name)
+        if value is None:
+            continue
+        field_ids = resolver.resolve_field_ids_from_value(
+            value,
+            field_def_index=field_def_index,
+            context_label="&{}".format(name),
+            warnings=warnings,
+        )
+        out[str(name)] = tuple(field_ids)
+    return out
+
+
+def complete_yaml_dsl_output_field_id(prefix: str, *, view: YamlDslEditorEffectiveView) -> YamlDslSugarCompletionResult:
+    """为 `outputs[*].fields` 的 field_id 提供 completion."""
+    raw_prefix = str(prefix or "")
+    items: List[YamlDslSugarCompletionItem] = []
+    for fid in view.field_ids:
+        if raw_prefix and not str(fid).startswith(raw_prefix):
+            continue
+        detail = ""
+        infos = view.field_infos_by_id.get(str(fid))
+        if infos:
+            for info in infos:
+                if info.summary:
+                    detail = str(info.summary)
+                    break
+        items.append(YamlDslSugarCompletionItem(label=str(fid), insert_text=str(fid), detail=detail))
+    return YamlDslSugarCompletionResult(items=tuple(items), warnings=())
+
+
+def resolve_yaml_dsl_output_field_definition(field_id: str, *, view: YamlDslEditorEffectiveView) -> YamlDslFieldDefinitionResult:
+    fid = str(field_id or "").strip()
+    if not fid:
+        return YamlDslFieldDefinitionResult()
+    locations = view.field_definitions_by_id.get(fid) or ()
+    return YamlDslFieldDefinitionResult(locations=tuple(locations), warnings=())
+
+
+def hover_yaml_dsl_output_field_id(field_id: str, *, view: YamlDslEditorEffectiveView) -> YamlDslOutputFieldHoverResult:
+    warnings: List[str] = []
+    fid = str(field_id or "").strip()
+    if not fid:
+        return YamlDslOutputFieldHoverResult(text="", warnings=())
+
+    infos = view.field_infos_by_id.get(fid) or ()
+    if not infos:
+        return YamlDslOutputFieldHoverResult(text="", warnings=())
+
+    defs = view.field_definitions_by_id.get(fid) or ()
+
+    lines: List[str] = ["Field: {}".format(fid)]
+    if defs:
+        lines.append("definitions: {}".format(len(defs)))
+
+    # Keep output stable and compact.
+    max_infos = 3
+    for info in infos[:max_infos]:
+        label = str(info.kind)
+        if info.source_id:
+            label = "{} ({})".format(label, str(info.source_id))
+        parts: List[str] = [label]
+        if info.summary:
+            parts.append(str(info.summary))
+        lines.append("- {}".format(" | ".join(parts)))
+
+    if len(infos) > max_infos:
+        lines.append("- ...")
+
+    return YamlDslOutputFieldHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings))
+
+
+def resolve_yaml_dsl_yaml_alias_definition(alias_name: str, *, view: YamlDslEditorEffectiveView) -> YamlDslYamlAliasDefinitionResult:
+    warnings: List[str] = []
+    name = str(alias_name or "").strip()
+    if not name:
+        return YamlDslYamlAliasDefinitionResult(range=None, warnings=())
+    rng = view.yaml_anchor_ranges.get(name)
+    if rng is None:
+        warnings.append("Unknown YAML anchor: &{}".format(name))
+    return YamlDslYamlAliasDefinitionResult(range=rng, warnings=tuple(warnings))
+
+
+def hover_yaml_dsl_yaml_alias(alias_name: str, *, view: YamlDslEditorEffectiveView) -> YamlDslSugarHoverResult:
+    warnings: List[str] = []
+    name = str(alias_name or "").strip()
+    if not name:
+        return YamlDslSugarHoverResult(text="", warnings=())
+
+    lines: List[str] = ["YAML alias: *{}".format(name)]
+    if name in view.yaml_anchor_ranges:
+        lines.append("anchor: &{}".format(name))
+    else:
+        warnings.append("Unknown YAML anchor: &{}".format(name))
+
+    expanded = list(view.yaml_anchor_expansions.get(name) or ())
+    if expanded:
+        lines.append("expanded fields: {}".format(len(expanded)))
+        preview = ", ".join([str(x) for x in expanded[:10]])
+        lines.append("preview: {}".format(preview))
+
+    return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings))
+
+
 __all__ = (
     "YAML_DSL_KIND_DEMAND",
     "YAML_DSL_KIND_WORKFLOW",
@@ -3940,6 +4629,7 @@ __all__ = (
     "PythonHoverResult",
     "YamlCursorExtractionResult",
     "YamlDslEditorDiagnosticsResult",
+    "YamlDslEditorEffectiveView",
     "YamlDslEditorProjectDiscovery",
     "YamlDslEntityCompletionItem",
     "YamlDslEntityCompletionResult",
@@ -3949,22 +4639,35 @@ __all__ = (
     "YamlDslEntityHintDiagnostic",
     "YamlDslEntityHoverResult",
     "YamlDslEntityIndex",
+    "YamlDslFieldDefinitionLocation",
+    "YamlDslFieldDefinitionResult",
+    "YamlDslFieldInfo",
+    "YamlDslOutputFieldHoverResult",
+    "YamlDslYamlAliasDefinitionResult",
     "YamlImportDefinitionLocation",
     "YamlImportDefinitionResult",
     "YamlImportHoverResult",
+    "build_yaml_dsl_editor_effective_view",
     "build_yaml_dsl_entity_index",
     "classify_yaml_dsl_kind",
     "collect_yaml_dsl_editor_diagnostics",
     "complete_python_reference",
     "complete_yaml_dsl_entity_reference",
+    "complete_yaml_dsl_output_field_id",
     "discover_yaml_dsl_editor_project",
     "extract_yaml_dsl_entity_reference_by_cursor",
     "extract_yaml_dsl_import_reference_by_cursor",
+    "extract_yaml_dsl_output_field_reference_by_cursor",
     "extract_yaml_dsl_python_reference_by_cursor",
+    "extract_yaml_dsl_yaml_alias_reference_by_cursor",
     "hover_python_reference",
     "hover_yaml_dsl_entity_reference",
+    "hover_yaml_dsl_output_field_id",
+    "hover_yaml_dsl_yaml_alias",
     "hover_yaml_import_reference",
     "resolve_python_definition",
     "resolve_yaml_dsl_entity_definition",
+    "resolve_yaml_dsl_output_field_definition",
+    "resolve_yaml_dsl_yaml_alias_definition",
     "resolve_yaml_import_definition",
 )

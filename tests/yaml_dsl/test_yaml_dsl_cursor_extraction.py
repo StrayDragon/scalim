@@ -117,3 +117,80 @@ def test_cursor_extraction_loader_allows_cursor_at_end_of_reference() -> None:
     result = editor_semantics.extract_yaml_dsl_python_reference_by_cursor(yaml_text, end_pos)
     assert result.yaml_path == "main_source.loader"
     assert result.reference == reference
+
+
+def test_cursor_extraction_outputs_fields_scalar_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source:
+          source_id: orders
+          loader: tests.fixtures.mock_loaders.mock_loader
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            fields:
+              - a
+        """
+    )
+    pos = _pos(yaml_text, "- a", offset=2)
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + 1),
+    )
+    result = editor_semantics.extract_yaml_dsl_output_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "output_field_id"
+    assert result.yaml_path == "outputs.0.fields.0"
+    assert result.reference == "a"
+    assert result.range == expected_range
+    assert result.value == "a"
+    assert result.value_range == expected_range
+
+
+def test_cursor_extraction_outputs_fields_nested_list_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            fields:
+              - [a, b]
+        """
+    )
+    pos = _pos(yaml_text, "[a, b]", offset=4)
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + 1),
+    )
+    result = editor_semantics.extract_yaml_dsl_output_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "output_field_id"
+    assert result.yaml_path == "outputs.0.fields.0.1"
+    assert result.reference == "b"
+    assert result.range == expected_range
+
+
+def test_cursor_extraction_yaml_alias_token_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        detail_fields: &detail_fields [a, b]
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            fields:
+              - *detail_fields
+        """
+    )
+    pos = _pos(yaml_text, "*detail_fields", offset=2)
+    result = editor_semantics.extract_yaml_dsl_yaml_alias_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "yaml_alias"
+    assert result.reference == "detail_fields"
+    assert result.range == _range_for(yaml_text, "*detail_fields")
+    assert result.value == "*detail_fields"
+    assert result.value_range == _range_for(yaml_text, "*detail_fields")

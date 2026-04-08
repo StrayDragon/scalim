@@ -580,6 +580,278 @@ def test_lsp_server_builtin_callable_definition_hover_and_completion(tmp_path) -
         client.shutdown()
 
 
+def test_lsp_server_outputs_fields_definition_and_hover_same_file(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields:",
+            "    a: {name: A}",
+            "sources: {}",
+            "fields:",
+            "  b:",
+            '    compute: "1"',
+            "outputs:",
+            "  - name: out",
+            "    to: {file: out.xlsx}",
+            "    fields:",
+            "      - a",
+            "      - b",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        out_fields_line = next(idx for idx, line in enumerate(lines) if line.strip() == "- b")
+        cursor_char = int(lines[out_fields_line].index("b"))
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": out_fields_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert any(loc.get("uri") == yaml_path.as_uri() for loc in locations)
+
+        hover_id = client.send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": out_fields_line, "character": cursor_char},
+            },
+        )
+        hover_resp = client.recv_until(lambda msg: msg.get("id") == hover_id, timeout=10.0)
+        assert "error" not in hover_resp
+        hover = hover_resp.get("result") or {}
+        value = (hover.get("contents") or {}).get("value") if isinstance(hover, dict) else ""
+        assert isinstance(value, str)
+        assert "Field:" in value
+        assert "b" in value
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_outputs_fields_imported_field_definition_jumps_to_fragment(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    fragment_path = workspace / "frag.yaml"
+    fragment_text = "\n".join(
+        [
+            "fields:",
+            "  b:",
+            '    compute: "1"',
+            "",
+        ]
+    )
+    fragment_path.write_text(fragment_text, encoding="utf-8")
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "imports:",
+            "  frags: ./frag.yaml",
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields: {a: {}}",
+            "sources: {}",
+            "fields:",
+            "  $import: frags.fields",
+            "outputs:",
+            "  - name: out",
+            "    to: {file: out.xlsx}",
+            "    fields:",
+            "      - a",
+            "      - b",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        out_fields_line = next(idx for idx, line in enumerate(lines) if line.strip() == "- b")
+        cursor_char = int(lines[out_fields_line].index("b"))
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": out_fields_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert any(loc.get("uri") == fragment_path.as_uri() for loc in locations)
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_outputs_fields_yaml_alias_definition_and_hover(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "detail_fields: &detail_fields [a, b]",
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields: {a: {}, b: {}}",
+            "sources: {}",
+            "outputs:",
+            "  - name: out",
+            "    to: {file: out.xlsx}",
+            "    fields:",
+            "      - *detail_fields",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        alias_line = next(idx for idx, line in enumerate(lines) if "*detail_fields" in line)
+        cursor_char = int(lines[alias_line].index("detail_fields")) + 2
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": alias_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert any(loc.get("uri") == yaml_path.as_uri() for loc in locations)
+
+        hover_id = client.send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": alias_line, "character": cursor_char},
+            },
+        )
+        hover_resp = client.recv_until(lambda msg: msg.get("id") == hover_id, timeout=10.0)
+        assert "error" not in hover_resp
+        hover = hover_resp.get("result") or {}
+        value = (hover.get("contents") or {}).get("value") if isinstance(hover, dict) else ""
+        assert isinstance(value, str)
+        assert "YAML alias:" in value
+        assert "preview:" in value
+        assert "a" in value
+        assert "b" in value
+    finally:
+        client.shutdown()
+
+
 def test_lsp_server_imports_path_definition_completion_and_preset_definition(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

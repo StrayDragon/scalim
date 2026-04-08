@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -19,6 +20,7 @@ _RELATION_STEP_SCALAR_PATH_MIN_LEN = 3
 _RELATION_STEP_LIST_PATH_MIN_LEN = 4
 _WORKFLOW_PATH_PREFIX_MIN_LEN = 2
 _WORKFLOW_RUN_REF_PATH_MIN_LEN = 5
+_OUTPUTS_FIELDS_PATH_MIN_LEN = 4
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,77 @@ def extract_yaml_dsl_import_path_reference_by_cursor(
         value_range=base.range,
         warnings=base.warnings,
     )
+
+
+def extract_yaml_dsl_output_field_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """基于 `yaml_text + position` 抽取 YAML DSL `outputs[*].fields` 内的字段引用.
+
+    约束:
+    - 仅做静态解析,无副作用
+    - 失败时降级为“空结果 + warnings”,不得 crash
+    - v1 仅覆盖单行 scalar string (不覆盖 `*alias` token)
+    """
+
+    base = _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=("output_field_id",))
+    if not base.reference or base.range is None:
+        return base
+    return YamlCursorExtractionResult(
+        yaml_path=base.yaml_path,
+        kind="output_field_id",
+        reference=base.reference,
+        range=base.range,
+        value=str(base.reference),
+        value_range=base.range,
+        warnings=base.warnings,
+    )
+
+
+def extract_yaml_dsl_yaml_alias_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """基于 `yaml_text + position` 抽取 YAML alias token `*name`(仅用于 editor 导航/解释).
+
+    说明:
+    - YAML parser 会把 `*alias` 解析为引用节点,通常无法保留 alias token 的源码 range。
+    - editor 侧仅依赖文本扫描定位 token range,并在 core 中做 anchor 定位与解释.
+    """
+    warnings: List[str] = []
+    lines = str(yaml_text or "").splitlines()
+    line_idx0 = int(position.line) - 1
+    if not (0 <= line_idx0 < len(lines)):
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+    line_text = str(lines[line_idx0])
+    cursor_col0 = int(position.column) - 1
+    if not (0 <= cursor_col0 <= len(line_text)):
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    # Match `*alias_name` on the current line and choose the match under cursor.
+    matches = list(re.finditer(r"\*[A-Za-z_][A-Za-z0-9_]*", line_text))
+    for m in matches:
+        start0, end0 = m.start(), m.end()
+        if not (int(start0) <= cursor_col0 <= int(end0)):
+            continue
+        token = m.group(0)
+        alias_name = token[1:]
+        rng = EditorRange(
+            start=EditorPosition(line=int(position.line), column=int(start0) + 1),
+            end=EditorPosition(line=int(position.line), column=int(end0) + 1),
+        )
+        return YamlCursorExtractionResult(
+            yaml_path="",
+            kind="yaml_alias",
+            reference=str(alias_name),
+            range=rng,
+            value=str(token),
+            value_range=rng,
+            warnings=tuple(warnings),
+        )
+
+    return YamlCursorExtractionResult(warnings=tuple(warnings))
 
 
 def extract_yaml_dsl_entity_reference_by_cursor(
@@ -653,7 +726,15 @@ def _reference_kind(path: List[str]) -> str:
         kind = "imports_path"
     else:
         leaf = str(path[-1])
-        if leaf in ("loader", "call_by"):
+        if (
+            len(path) >= _OUTPUTS_FIELDS_PATH_MIN_LEN
+            and str(path[0]) == "outputs"
+            and _is_int_str(str(path[1]))
+            and str(path[2]) == "fields"
+            and _is_int_str(str(path[-1]))
+        ):
+            kind = "output_field_id"
+        elif leaf in ("loader", "call_by"):
             kind = leaf
         elif leaf == _IMPORT_KEY or (len(path) >= _IMPORT_LIST_PATH_MIN_LEN and str(path[-2]) == _IMPORT_KEY):
             kind = _IMPORT_KEY

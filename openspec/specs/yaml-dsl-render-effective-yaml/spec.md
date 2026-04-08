@@ -9,9 +9,7 @@
 - `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/effective_yaml.py` (effective YAML loads/dumps API)
 - `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/imports.py` (imports/$import expansion)
 - `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/template_precompile.py` (LiteJinja2 template precompile)
-
 ## Requirements
-
 ### Requirement: Library MUST render effective demand YAML by expanding template_vars and imports
 系统 MUST 提供一个用于 review/debug/对拍的**库侧 API**,将“作者写的 demand YAML”渲染为 effective YAML(展开后的单文件等价配置)。
 
@@ -40,3 +38,17 @@
 - **WHEN** 调用方执行 `load_effective_demand_yaml(demand.yaml)`
 - **THEN** MUST 失败(抛出异常)
 - **AND** 错误信息 MUST 包含可诊断内容(至少包含 import trace 与 logical path)
+
+### Requirement: editor effective expansion MUST support outputs.fields flatten and YAML aliases
+
+为支撑 editor 侧导航与补全,系统 MUST 提供静态的 effective expansion 视图,至少覆盖:
+
+- YAML anchors/aliases 与 merge key 的展开（对当前打开文档以内存态文本为准）
+- `outputs[*].fields` 的 nested list flatten 规则（与运行时/validator 口径一致）
+
+#### Scenario: outputs.fields alias is expanded for navigation
+- **GIVEN** YAML 使用 anchor 定义字段列表 `detail_fields: &detail_fields [a, b]`
+- **AND** `outputs[0].fields` 使用 alias 引用 `- *detail_fields`
+- **WHEN** editor 侧请求 outputs.fields 的 completion/definition
+- **THEN** effective expansion MUST 将该 outputs.fields 视为展开后的有效列表（至少包含 `a`、`b`）
+
