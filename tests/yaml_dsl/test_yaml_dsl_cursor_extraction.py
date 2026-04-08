@@ -194,3 +194,81 @@ def test_cursor_extraction_yaml_alias_token_is_supported() -> None:
     assert result.range == _range_for(yaml_text, "*detail_fields")
     assert result.value == "*detail_fields"
     assert result.value_range == _range_for(yaml_text, "*detail_fields")
+
+
+def test_cursor_extraction_expression_token_in_fields_compute_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}}}
+        sources: {}
+        fields:
+          sum:
+            compute: "a + 1"
+        outputs: []
+        """
+    )
+    pos = _pos(yaml_text, 'compute: "a + 1"', offset=len('compute: "') + 0)
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + 1),
+    )
+    result = editor_semantics.extract_yaml_dsl_expression_token_by_cursor(yaml_text, pos)
+    assert result.kind == "expression_fields_compute"
+    assert result.yaml_path == "fields.sum.compute"
+    assert result.reference == "a"
+    assert result.range == expected_range
+    assert result.value == "a"
+    assert result.value_range == expected_range
+
+
+def test_cursor_extraction_expression_token_in_outputs_where_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}, b: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            where: "a and b"
+        """
+    )
+    pos = _pos(yaml_text, 'where: "a and b"', offset=len('where: "a and ') + 0)
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + 1),
+    )
+    result = editor_semantics.extract_yaml_dsl_expression_token_by_cursor(yaml_text, pos)
+    assert result.kind == "expression_outputs_where"
+    assert result.yaml_path == "outputs.0.where"
+    assert result.reference == "b"
+    assert result.range == expected_range
+
+
+def test_cursor_extraction_expression_token_in_outputs_aggregate_compute_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by: [a]
+              fields:
+                cnt:
+                  compute: "a + cnt"
+        """
+    )
+    pos = _pos(yaml_text, 'compute: "a + cnt"', offset=len('compute: "a + ') + 0)
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + len("cnt")),
+    )
+    result = editor_semantics.extract_yaml_dsl_expression_token_by_cursor(yaml_text, pos)
+    assert result.kind == "expression_outputs_aggregate_compute"
+    assert result.yaml_path == "outputs.0.aggregate.fields.cnt.compute"
+    assert result.reference == "cnt"
+    assert result.range == expected_range

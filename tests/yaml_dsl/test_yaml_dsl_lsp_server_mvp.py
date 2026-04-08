@@ -852,6 +852,337 @@ def test_lsp_server_outputs_fields_yaml_alias_definition_and_hover(tmp_path) -> 
         client.shutdown()
 
 
+def test_lsp_server_expression_compute_definition_and_hover(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields:",
+            "    a: {name: A}",
+            "sources: {}",
+            "fields:",
+            "  sum:",
+            '    compute: "a + 1"',
+            "outputs: []",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        expr_line = next(idx for idx, line in enumerate(lines) if 'compute: "a + 1"' in line)
+        cursor_char = int(lines[expr_line].index('"a + 1"')) + 1
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": expr_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert any(loc.get("uri") == yaml_path.as_uri() for loc in locations)
+
+        expected_def_line = next(idx for idx, line in enumerate(lines) if line.strip() == "a: {name: A}")
+        assert any(
+            loc.get("uri") == yaml_path.as_uri() and (loc.get("range") or {}).get("start", {}).get("line") == expected_def_line
+            for loc in locations
+        )
+
+        hover_id = client.send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": expr_line, "character": cursor_char},
+            },
+        )
+        hover_resp = client.recv_until(lambda msg: msg.get("id") == hover_id, timeout=10.0)
+        assert "error" not in hover_resp
+        hover = hover_resp.get("result") or {}
+        value = (hover.get("contents") or {}).get("value") if isinstance(hover, dict) else ""
+        assert isinstance(value, str)
+        assert "Field:" in value
+        assert "scope:" in value
+        assert "fields.*.compute" in value
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_expression_definition_returns_multiple_locations_for_ambiguous_field_id(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields:",
+            "    a: {name: A}",
+            "sources: {}",
+            "fields:",
+            "  a:",
+            '    compute: "1"',
+            "  sum:",
+            '    compute: "a + 1"',
+            "outputs: []",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        expr_line = next(idx for idx, line in enumerate(lines) if line.strip() == 'compute: "a + 1"')
+        cursor_char = int(lines[expr_line].index('"a + 1"')) + 1
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": expr_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert len(locations) >= 2
+
+        main_a_line = next(idx for idx, line in enumerate(lines) if line.strip() == "a: {name: A}")
+        derived_a_line = next(idx for idx, line in enumerate(lines) if line.strip() == "a:")
+        got_lines = {
+            (loc.get("range") or {}).get("start", {}).get("line")
+            for loc in locations
+            if isinstance(loc, dict) and loc.get("uri") == yaml_path.as_uri()
+        }
+        assert main_a_line in got_lines
+        assert derived_a_line in got_lines
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_expression_definition_returns_empty_for_unknown_token(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}}}",
+            "sources: {}",
+            "fields:",
+            "  sum:",
+            '    compute: "unknown + 1"',
+            "outputs: []",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        expr_line = next(idx for idx, line in enumerate(lines) if 'compute: "unknown + 1"' in line)
+        cursor_char = int(lines[expr_line].index('"unknown + 1"')) + 1
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": expr_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+
+        locations = definition_resp.get("result") or []
+        assert locations == []
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_expression_completion_in_aggregate_scope_is_restricted(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields: {a: {}, b: {}}",
+            "sources: {}",
+            "fields:",
+            "  c:",
+            '    compute: "a + 1"',
+            "outputs:",
+            "  - name: out",
+            "    to: {file: out.xlsx}",
+            "    aggregate:",
+            "      group_by: [a]",
+            "      fields:",
+            "        cnt:",
+            '          compute: "a + cnt"',
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        expr_line = next(idx for idx, line in enumerate(lines) if line.strip() == 'compute: "a + cnt"')
+        cursor_char = int(lines[expr_line].index('"a + cnt"')) + 1
+
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": expr_line, "character": cursor_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+
+        result = completion_resp.get("result") or {}
+        items = result.get("items") if isinstance(result, dict) else result
+        assert isinstance(items, list)
+        labels = {item.get("label") for item in items if isinstance(item, dict)}
+        assert "a" in labels
+        assert "cnt" in labels
+        assert "b" not in labels
+        assert "c" not in labels
+    finally:
+        client.shutdown()
+
+
 def test_lsp_server_imports_path_definition_completion_and_preset_definition(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

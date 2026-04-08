@@ -32,6 +32,7 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.models import FieldDef, FieldD
 from scalim.dsl.yaml_dsl._internal.config_parsing.parsers.outputs import ParserOutputsMixin
 from scalim.dsl.yaml_dsl._internal.config_parsing.presets import load_scalim_preset_yaml_text
 from scalim.dsl.yaml_dsl._internal.config_parsing.project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
+from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine
 from scalim.dsl.yaml_dsl._internal.config_parsing.unknown_fields import find_unknown_fields
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
@@ -57,6 +58,7 @@ from .cache import load_yaml_mapping_cached, parse_python_ast_cached
 from .cursor_extraction import (
     YamlCursorExtractionResult,
     extract_yaml_dsl_entity_reference_by_cursor,
+    extract_yaml_dsl_expression_token_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
     extract_yaml_dsl_output_field_reference_by_cursor,
     extract_yaml_dsl_python_reference_by_cursor,
@@ -4050,6 +4052,39 @@ class YamlDslEditorEffectiveView:
         return payload
 
 
+@dataclass(frozen=True)
+class YamlDslExpressionScopeIndex:
+    """表达式( compute/where )内字段引用的 scope/definition 索引(同文件,静态,无副作用)."""
+
+    yaml_kind: str
+    file_path: str
+    field_ids: Tuple[str, ...] = ()
+    field_infos_by_id: Dict[str, Tuple[YamlDslFieldInfo, ...]] = field(default_factory=dict)
+    field_definitions_by_id: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = field(default_factory=dict)
+    outputs_effective_fields_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
+    aggregate_group_by_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
+    aggregate_out_field_ids_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
+    aggregate_out_field_ranges_by_output_index: Dict[int, Dict[str, EditorRange]] = field(default_factory=dict)
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "yaml_kind": str(self.yaml_kind or ""),
+            "file_path": str(self.file_path or ""),
+            "field_ids": list(self.field_ids),
+            "outputs_effective_fields_by_output_index": {str(k): list(v) for k, v in self.outputs_effective_fields_by_output_index.items()},
+            "aggregate_group_by_by_output_index": {str(k): list(v) for k, v in self.aggregate_group_by_by_output_index.items()},
+            "aggregate_out_field_ids_by_output_index": {str(k): list(v) for k, v in self.aggregate_out_field_ids_by_output_index.items()},
+            "aggregate_out_field_ranges_by_output_index": {
+                str(output_index): {fid: rng.as_dict() for fid, rng in ranges.items()}
+                for output_index, ranges in self.aggregate_out_field_ranges_by_output_index.items()
+            },
+        }
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
 class _EditorOutputsFieldResolver(ParserOutputsMixin):
     def resolve_field_ids_from_value(
         self,
@@ -4326,6 +4361,162 @@ def build_yaml_dsl_editor_effective_view(
     )
 
 
+def build_yaml_dsl_expression_scope_index(
+    yaml_text: str,
+    *,
+    yaml_path: Union[str, Path],
+    yaml_kind: str,
+) -> YamlDslExpressionScopeIndex:
+    """构建表达式 scope 索引(同文件,静态 + 可诊断降级).
+
+    约束:
+    - 输入以打开文档的内存态文本为准
+    - 不执行用户代码,不求值表达式
+    - 失败时返回空结果 + warnings,不得 crash
+    """
+
+    warnings: List[str] = []
+    yaml_path_resolved = Path(str(yaml_path)).expanduser().resolve(strict=False)
+
+    if str(yaml_kind or "") != YAML_DSL_KIND_DEMAND:
+        return YamlDslExpressionScopeIndex(
+            yaml_kind=str(yaml_kind or ""),
+            file_path=str(yaml_path_resolved),
+            warnings=tuple(warnings),
+        )
+
+    raw, locations = _load_yaml_mapping_text_for_effective_view(yaml_text, yaml_path=yaml_path_resolved, warnings=warnings)
+    if raw is None:
+        return YamlDslExpressionScopeIndex(
+            yaml_kind=YAML_DSL_KIND_DEMAND,
+            file_path=str(yaml_path_resolved),
+            warnings=tuple(warnings),
+        )
+
+    field_def_index, main_source_id = _collect_field_defs_for_effective_view(raw, warnings=warnings)
+    if field_def_index is None:
+        return YamlDslExpressionScopeIndex(
+            yaml_kind=YAML_DSL_KIND_DEMAND,
+            file_path=str(yaml_path_resolved),
+            warnings=tuple(warnings),
+        )
+
+    field_ids = tuple(sorted(field_def_index.defs_by_id.keys()))
+    field_infos_by_id = _build_field_infos_by_id(field_def_index)
+
+    definitions_by_id: Dict[str, List[YamlDslFieldDefinitionLocation]] = {}
+    _append_field_definitions_from_locations(
+        definitions_by_id,
+        field_def_index=field_def_index,
+        locations=locations,
+        file_path=str(yaml_path_resolved),
+        main_source_id=main_source_id,
+    )
+    definitions_final: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
+
+    resolver = _EditorOutputsFieldResolver()
+    outputs_effective = resolver.resolve_outputs_effective_fields(raw, field_def_index=field_def_index, warnings=warnings)
+
+    group_by_by_output_index, out_field_ids_by_output_index, out_field_ranges_by_output_index = (
+        _collect_output_aggregate_scope_for_expression_index(raw, locations=locations)
+    )
+
+    return YamlDslExpressionScopeIndex(
+        yaml_kind=YAML_DSL_KIND_DEMAND,
+        file_path=str(yaml_path_resolved),
+        field_ids=field_ids,
+        field_infos_by_id=field_infos_by_id,
+        field_definitions_by_id=definitions_final,
+        outputs_effective_fields_by_output_index=outputs_effective,
+        aggregate_group_by_by_output_index=group_by_by_output_index,
+        aggregate_out_field_ids_by_output_index=out_field_ids_by_output_index,
+        aggregate_out_field_ranges_by_output_index=out_field_ranges_by_output_index,
+        warnings=tuple(warnings),
+    )
+
+
+def _collect_output_aggregate_scope_for_expression_index(
+    raw: Dict[str, Any],
+    *,
+    locations: Dict[str, Tuple[int, int]],
+) -> Tuple[Dict[int, Tuple[str, ...]], Dict[int, Tuple[str, ...]], Dict[int, Dict[str, EditorRange]]]:
+    group_by_by_output_index: Dict[int, Tuple[str, ...]] = {}
+    out_field_ids_by_output_index: Dict[int, Tuple[str, ...]] = {}
+    out_field_ranges_by_output_index: Dict[int, Dict[str, EditorRange]] = {}
+
+    outputs_obj = raw.get("outputs")
+    if not isinstance(outputs_obj, list):
+        return group_by_by_output_index, out_field_ids_by_output_index, out_field_ranges_by_output_index
+
+    for output_index, out in enumerate(list(outputs_obj)):
+        agg = _output_aggregate_mapping(out)
+        if agg is None:
+            continue
+
+        group_by = _output_aggregate_group_by_ids(agg)
+        if group_by:
+            group_by_by_output_index[int(output_index)] = group_by
+
+        out_field_ids, ranges = _output_aggregate_out_field_ids_and_ranges(int(output_index), agg, locations=locations)
+        if out_field_ids:
+            out_field_ids_by_output_index[int(output_index)] = out_field_ids
+        if ranges:
+            out_field_ranges_by_output_index[int(output_index)] = ranges
+
+    return group_by_by_output_index, out_field_ids_by_output_index, out_field_ranges_by_output_index
+
+
+def _output_aggregate_mapping(output: object) -> Optional[Dict[str, Any]]:
+    if not isinstance(output, dict):
+        return None
+    agg_obj = output.get("aggregate")
+    if not isinstance(agg_obj, dict):
+        return None
+    return cast("Dict[str, Any]", agg_obj)  # pragma: allow-cast raw yaml typed narrowing
+
+
+def _output_aggregate_group_by_ids(aggregate: Dict[str, Any]) -> Tuple[str, ...]:
+    group_by_raw = aggregate.get("group_by")
+    values: List[str] = []
+    if isinstance(group_by_raw, str):
+        values.append(str(group_by_raw))
+    elif isinstance(group_by_raw, list):
+        for item in group_by_raw:
+            if isinstance(item, str):
+                values.append(str(item))
+    cleaned = [str(v).strip() for v in values if str(v).strip()]
+    return tuple(cleaned)
+
+
+def _output_aggregate_out_field_ids_and_ranges(
+    output_index: int,
+    aggregate: Dict[str, Any],
+    *,
+    locations: Dict[str, Tuple[int, int]],
+) -> Tuple[Tuple[str, ...], Dict[str, EditorRange]]:
+    fields_obj = aggregate.get("fields")
+    if not isinstance(fields_obj, dict):
+        return (), {}
+    fields: Dict[str, Any] = cast("Dict[str, Any]", fields_obj)  # pragma: allow-cast raw yaml typed narrowing
+
+    out_field_ids: List[str] = []
+    ranges: Dict[str, EditorRange] = {}
+    for out_field_id in list(fields.keys()):
+        if not isinstance(out_field_id, str):
+            continue
+        fid = str(out_field_id).strip()
+        if not fid:
+            continue
+        out_field_ids.append(fid)
+
+        yaml_path = "outputs.{}.aggregate.fields.{}".format(int(output_index), fid)
+        rng = _range_for_yaml_key_path(yaml_path, key_text=fid, locations=locations)
+        if rng is not None:
+            ranges[fid] = rng
+
+    return tuple(out_field_ids), ranges
+
+
 def _build_field_infos_by_id(field_def_index: FieldDefIndex) -> Dict[str, Tuple[YamlDslFieldInfo, ...]]:
     infos: Dict[str, List[YamlDslFieldInfo]] = {}
     for field_def in list(field_def_index.field_defs):
@@ -4526,6 +4717,294 @@ def _build_yaml_anchor_expansions(
     return out
 
 
+def _output_index_from_expression_yaml_path(yaml_path: str) -> Optional[int]:
+    parts = str(yaml_path or "").split(".")
+    min_parts = 2
+    if len(parts) < min_parts or str(parts[0]) != "outputs":
+        return None
+    try:
+        return int(parts[1])
+    except ValueError:
+        return None
+
+
+def _dedupe_keep_order(values: Sequence[str]) -> Tuple[str, ...]:
+    out: List[str] = []
+    seen: Set[str] = set()
+    for raw in values:
+        v = str(raw or "").strip()
+        if not v or v in seen:
+            continue
+        out.append(v)
+        seen.add(v)
+    return tuple(out)
+
+
+def _expression_completion_candidates(
+    kind: str,
+    *,
+    output_index: Optional[int],
+    scope_index: YamlDslExpressionScopeIndex,
+) -> Optional[Tuple[Tuple[str, ...], Tuple[str, ...]]]:
+    if kind == "expression_fields_compute":
+        return tuple(scope_index.field_ids), ()
+
+    if kind == "expression_outputs_where":
+        preferred: Tuple[str, ...] = ()
+        if output_index is not None:
+            preferred = scope_index.outputs_effective_fields_by_output_index.get(int(output_index)) or ()
+        return tuple(scope_index.field_ids), preferred
+
+    if kind == "expression_outputs_aggregate_compute":
+        if output_index is None:
+            return None
+        group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
+        agg_fields = scope_index.aggregate_out_field_ids_by_output_index.get(int(output_index)) or ()
+        candidates = _dedupe_keep_order([*group_by, *agg_fields])
+        return candidates, tuple(group_by)
+
+    return None
+
+
+def _order_expression_completion_candidates(
+    candidates: Sequence[str],
+    preferred: Sequence[str],
+    *,
+    prefix: str,
+) -> List[str]:
+    preferred_set = {str(fid) for fid in preferred}
+    ordered: List[str] = []
+    for fid in preferred:
+        if fid in ordered:
+            continue
+        if fid and (not prefix or str(fid).startswith(prefix)) and fid in candidates:
+            ordered.append(str(fid))
+    remaining = [fid for fid in candidates if fid not in preferred_set and (not prefix or str(fid).startswith(prefix))]
+    ordered.extend(sorted(remaining))
+    return ordered
+
+
+def _expression_completion_detail(
+    field_id: str,
+    *,
+    kind: str,
+    output_index: Optional[int],
+    scope_index: YamlDslExpressionScopeIndex,
+) -> str:
+    detail = ""
+    infos = scope_index.field_infos_by_id.get(str(field_id))
+    if infos:
+        for info in infos:
+            if info.summary:
+                detail = str(info.summary)
+                break
+
+    if kind == "expression_outputs_aggregate_compute" and output_index is not None:
+        agg_fields = scope_index.aggregate_out_field_ids_by_output_index.get(int(output_index)) or ()
+        if field_id in agg_fields:
+            return detail or "聚合字段"
+
+    return detail
+
+
+def _append_expression_builtin_completion_items(items: List[YamlDslSugarCompletionItem], *, prefix: str) -> None:
+    existing = {item.label for item in items}
+    for name in sorted(SecureComputeEngine.SAFE_BUILTINS):
+        if prefix and not str(name).startswith(prefix):
+            continue
+        if str(name) in existing:
+            continue
+        items.append(YamlDslSugarCompletionItem(label=str(name), insert_text=str(name), detail="内置函数"))
+
+
+def complete_yaml_dsl_expression_field_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    scope_index: YamlDslExpressionScopeIndex,
+) -> YamlDslSugarCompletionResult:
+    """为 compute/where 表达式中的字段引用提供 completion."""
+
+    kind = str(extraction.kind or "")
+    prefix = str(extraction.reference or "")
+    if not kind:
+        return YamlDslSugarCompletionResult(items=(), warnings=())
+
+    output_index = _output_index_from_expression_yaml_path(str(extraction.yaml_path or ""))
+    inputs = _expression_completion_candidates(kind, output_index=output_index, scope_index=scope_index)
+    if inputs is None:
+        return YamlDslSugarCompletionResult(items=(), warnings=())
+    candidates, preferred = inputs
+    ordered = _order_expression_completion_candidates(candidates, preferred, prefix=prefix)
+
+    items: List[YamlDslSugarCompletionItem] = []
+    for fid in ordered:
+        detail = _expression_completion_detail(str(fid), kind=kind, output_index=output_index, scope_index=scope_index)
+        items.append(YamlDslSugarCompletionItem(label=str(fid), insert_text=str(fid), detail=detail))
+
+    _append_expression_builtin_completion_items(items, prefix=prefix)
+    return YamlDslSugarCompletionResult(items=tuple(items), warnings=())
+
+
+def resolve_yaml_dsl_expression_field_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    scope_index: YamlDslExpressionScopeIndex,
+) -> YamlDslFieldDefinitionResult:
+    warnings: List[str] = []
+    token = str(extraction.reference or "").strip()
+    if not token:
+        return YamlDslFieldDefinitionResult(locations=(), warnings=())
+
+    kind = str(extraction.kind or "")
+    if kind == "expression_outputs_aggregate_compute":
+        output_index = _output_index_from_expression_yaml_path(str(extraction.yaml_path or ""))
+        if output_index is None:
+            return YamlDslFieldDefinitionResult(locations=(), warnings=())
+
+        group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
+        agg_ranges = scope_index.aggregate_out_field_ranges_by_output_index.get(int(output_index)) or {}
+        if token in agg_ranges:
+            rng = agg_ranges.get(token)
+            if rng is None:
+                return YamlDslFieldDefinitionResult(locations=(), warnings=())
+            yaml_path = "outputs.{}.aggregate.fields.{}".format(int(output_index), token)
+            loc = YamlDslFieldDefinitionLocation(
+                file_path=str(scope_index.file_path),
+                range=rng,
+                field_id=str(token),
+                kind="output_aggregate_field",
+                source_id="",
+                yaml_path=yaml_path,
+            )
+            return YamlDslFieldDefinitionResult(locations=(loc,), warnings=tuple(warnings))
+
+        if token not in group_by:
+            return YamlDslFieldDefinitionResult(locations=(), warnings=tuple(warnings))
+
+    locations = scope_index.field_definitions_by_id.get(token) or ()
+    return YamlDslFieldDefinitionResult(locations=tuple(locations), warnings=tuple(warnings))
+
+
+def hover_yaml_dsl_expression_field_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    scope_index: YamlDslExpressionScopeIndex,
+) -> YamlDslSugarHoverResult:
+    token = str(extraction.reference or "").strip()
+    if not token:
+        return YamlDslSugarHoverResult(text="", warnings=())
+
+    kind = str(extraction.kind or "")
+    output_index = _output_index_from_expression_yaml_path(str(extraction.yaml_path or ""))
+
+    handled, aggregate_hover = _try_hover_expression_aggregate_token(
+        token,
+        kind=kind,
+        output_index=output_index,
+        scope_index=scope_index,
+    )
+    if handled:
+        return aggregate_hover or YamlDslSugarHoverResult(text="", warnings=())
+
+    return _hover_expression_field_token(
+        token,
+        kind=kind,
+        output_index=output_index,
+        scope_index=scope_index,
+    )
+
+
+def _try_hover_expression_aggregate_token(
+    token: str,
+    *,
+    kind: str,
+    output_index: Optional[int],
+    scope_index: YamlDslExpressionScopeIndex,
+) -> Tuple[bool, Optional[YamlDslSugarHoverResult]]:
+    if kind != "expression_outputs_aggregate_compute" or output_index is None:
+        return False, None
+
+    group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
+    agg_ids = scope_index.aggregate_out_field_ids_by_output_index.get(int(output_index)) or ()
+
+    if token in agg_ids:
+        lines = [
+            "Aggregate field: {}".format(token),
+            "scope: outputs[{}].aggregate.fields.*.compute".format(int(output_index)),
+            "allowed: group_by({}) + aggregate.fields({})".format(len(group_by), len(agg_ids)),
+        ]
+        return True, YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=())
+
+    if token not in group_by:
+        return True, YamlDslSugarHoverResult(text="", warnings=())
+
+    return False, None
+
+
+def _hover_expression_field_token(
+    token: str,
+    *,
+    kind: str,
+    output_index: Optional[int],
+    scope_index: YamlDslExpressionScopeIndex,
+) -> YamlDslSugarHoverResult:
+    infos = scope_index.field_infos_by_id.get(token) or ()
+    if not infos:
+        return YamlDslSugarHoverResult(text="", warnings=())
+
+    defs = scope_index.field_definitions_by_id.get(token) or ()
+    lines: List[str] = ["Field: {}".format(token)]
+    if defs:
+        lines.append("definitions: {}".format(len(defs)))
+
+    max_infos = 3
+    for info in infos[:max_infos]:
+        label = str(info.kind)
+        if info.source_id:
+            label = "{} ({})".format(label, str(info.source_id))
+        parts: List[str] = [label]
+        if info.summary:
+            parts.append(str(info.summary))
+        lines.append("- {}".format(" | ".join(parts)))
+    if len(infos) > max_infos:
+        lines.append("- ...")
+
+    scope_line = _expression_scope_explain_line(kind, output_index=output_index, scope_index=scope_index)
+    if scope_line:
+        lines.append(scope_line)
+
+    return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=())
+
+
+def _expression_scope_explain_line(
+    kind: str,
+    *,
+    output_index: Optional[int],
+    scope_index: YamlDslExpressionScopeIndex,
+) -> str:
+    if kind == "expression_fields_compute":
+        return "scope: fields.*.compute (all fields: {})".format(len(scope_index.field_ids))
+
+    if kind == "expression_outputs_where" and output_index is not None:
+        preferred = scope_index.outputs_effective_fields_by_output_index.get(int(output_index)) or ()
+        return "scope: outputs[{}].where (all fields: {}; preferred by outputs.fields: {})".format(
+            int(output_index),
+            len(scope_index.field_ids),
+            len(preferred),
+        )
+
+    if kind == "expression_outputs_aggregate_compute" and output_index is not None:
+        group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
+        agg_ids = scope_index.aggregate_out_field_ids_by_output_index.get(int(output_index)) or ()
+        return "scope: outputs[{}].aggregate.fields.*.compute (group_by: {}; aggregate.fields: {})".format(
+            int(output_index),
+            len(group_by),
+            len(agg_ids),
+        )
+
+    return ""
+
+
 def complete_yaml_dsl_output_field_id(prefix: str, *, view: YamlDslEditorEffectiveView) -> YamlDslSugarCompletionResult:
     """为 `outputs[*].fields` 的 field_id 提供 completion."""
     raw_prefix = str(prefix or "")
@@ -4639,6 +5118,7 @@ __all__ = (
     "YamlDslEntityHintDiagnostic",
     "YamlDslEntityHoverResult",
     "YamlDslEntityIndex",
+    "YamlDslExpressionScopeIndex",
     "YamlDslFieldDefinitionLocation",
     "YamlDslFieldDefinitionResult",
     "YamlDslFieldInfo",
@@ -4649,24 +5129,29 @@ __all__ = (
     "YamlImportHoverResult",
     "build_yaml_dsl_editor_effective_view",
     "build_yaml_dsl_entity_index",
+    "build_yaml_dsl_expression_scope_index",
     "classify_yaml_dsl_kind",
     "collect_yaml_dsl_editor_diagnostics",
     "complete_python_reference",
     "complete_yaml_dsl_entity_reference",
+    "complete_yaml_dsl_expression_field_reference",
     "complete_yaml_dsl_output_field_id",
     "discover_yaml_dsl_editor_project",
     "extract_yaml_dsl_entity_reference_by_cursor",
+    "extract_yaml_dsl_expression_token_by_cursor",
     "extract_yaml_dsl_import_reference_by_cursor",
     "extract_yaml_dsl_output_field_reference_by_cursor",
     "extract_yaml_dsl_python_reference_by_cursor",
     "extract_yaml_dsl_yaml_alias_reference_by_cursor",
     "hover_python_reference",
     "hover_yaml_dsl_entity_reference",
+    "hover_yaml_dsl_expression_field_reference",
     "hover_yaml_dsl_output_field_id",
     "hover_yaml_dsl_yaml_alias",
     "hover_yaml_import_reference",
     "resolve_python_definition",
     "resolve_yaml_dsl_entity_definition",
+    "resolve_yaml_dsl_expression_field_definition",
     "resolve_yaml_dsl_output_field_definition",
     "resolve_yaml_dsl_yaml_alias_definition",
     "resolve_yaml_import_definition",

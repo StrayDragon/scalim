@@ -21,6 +21,10 @@ _RELATION_STEP_LIST_PATH_MIN_LEN = 4
 _WORKFLOW_PATH_PREFIX_MIN_LEN = 2
 _WORKFLOW_RUN_REF_PATH_MIN_LEN = 5
 _OUTPUTS_FIELDS_PATH_MIN_LEN = 4
+_EXPR_FIELDS_COMPUTE_PATH_MIN_LEN = 3
+_EXPR_OUTPUTS_WHERE_PATH_MIN_LEN = 3
+_EXPR_OUTPUTS_AGGREGATE_COMPUTE_PATH_MIN_LEN = 6
+_EXPR_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 @dataclass(frozen=True)
@@ -180,6 +184,175 @@ def extract_yaml_dsl_yaml_alias_reference_by_cursor(
         )
 
     return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+
+def extract_yaml_dsl_expression_token_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """抽取 compute/where 等表达式 scalar 内的 identifier token.
+
+    约束:
+    - 仅做静态解析,无副作用
+    - 失败时降级为“空结果 + warnings”,不得 crash
+    - v1 仅覆盖单行 scalar,且仅返回 token 的精确 range
+    """
+
+    warnings: List[str] = []
+
+    try:
+        root = _compose_yaml_node(yaml_text)
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    if root is None:
+        warnings.append("YAML document is empty")
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    lines = yaml_text.splitlines()
+    try:
+        result = _extract_expression_token_from_node(root, lines=lines, path=[], position=position)
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("cursor extraction failed: {}: {}".format(type(exc).__name__, exc))
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    if result is None:
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+    return YamlCursorExtractionResult(
+        yaml_path=result.yaml_path,
+        kind=result.kind,
+        reference=result.reference,
+        range=result.range,
+        value=result.value,
+        value_range=result.value_range,
+        warnings=tuple(warnings) + tuple(result.warnings),
+    )
+
+
+def _extract_expression_token_from_node(
+    node: object,
+    *,
+    lines: List[str],
+    path: List[str],
+    position: EditorPosition,
+) -> Optional[YamlCursorExtractionResult]:
+    node_id = str(getattr(node, "id", ""))
+
+    if node_id == "scalar":
+        yaml_path = ".".join(path)
+        return _extract_from_expression_scalar_value(
+            node,
+            lines=lines,
+            yaml_path=yaml_path,
+            path=path,
+            position=position,
+        )
+
+    if node_id == "mapping":
+        for key_node, value_node in cast_value(node):
+            key = str(getattr(key_node, "value", ""))
+            if not key:
+                continue
+            key_path = [*path, key]
+            nested = _extract_expression_token_from_node(
+                value_node,
+                lines=lines,
+                path=key_path,
+                position=position,
+            )
+            if nested is not None:
+                return nested
+        return None
+
+    if node_id == "sequence":
+        for idx, item_node in enumerate(cast_value(node)):
+            idx_path = [*path, str(idx)]
+            nested = _extract_expression_token_from_node(
+                item_node,
+                lines=lines,
+                path=idx_path,
+                position=position,
+            )
+            if nested is not None:
+                return nested
+        return None
+
+    return None
+
+
+def _expression_kind_for_path(path: List[str]) -> str:
+    if len(path) >= _EXPR_FIELDS_COMPUTE_PATH_MIN_LEN and str(path[0]) == "fields" and str(path[-1]) == "compute":
+        return "expression_fields_compute"
+
+    if (
+        len(path) >= _EXPR_OUTPUTS_WHERE_PATH_MIN_LEN
+        and str(path[0]) == "outputs"
+        and _is_int_str(str(path[1]))
+        and str(path[-1]) == "where"
+    ):
+        return "expression_outputs_where"
+
+    if (
+        len(path) >= _EXPR_OUTPUTS_AGGREGATE_COMPUTE_PATH_MIN_LEN
+        and str(path[0]) == "outputs"
+        and _is_int_str(str(path[1]))
+        and str(path[2]) == "aggregate"
+        and str(path[3]) == "fields"
+        and str(path[-1]) == "compute"
+    ):
+        return "expression_outputs_aggregate_compute"
+
+    return ""
+
+
+def _extract_from_expression_scalar_value(
+    node: object,
+    *,
+    lines: List[str],
+    yaml_path: str,
+    path: List[str],
+    position: EditorPosition,
+) -> Optional[YamlCursorExtractionResult]:
+    kind = _expression_kind_for_path(path)
+    if not kind:
+        return None
+
+    bounds = _scalar_content_bounds(node, lines)
+    if bounds is None:
+        return None
+
+    line, content_start0, content_end0 = bounds
+    if not _position_in_slice(position, line=line, start_col0=content_start0, end_col0=content_end0):
+        return None
+
+    line_text = str(lines[int(line) - 1])
+    source_text = line_text[int(content_start0) : int(content_end0)]
+    cursor_col0 = int(position.column) - 1
+    cursor_offset = int(cursor_col0) - int(content_start0)
+    if not (0 <= cursor_offset <= len(source_text)):
+        return None
+
+    for m in _EXPR_IDENTIFIER_RE.finditer(source_text):
+        start0 = int(m.start())
+        end0 = int(m.end())
+        if not (start0 <= cursor_offset <= end0):
+            continue
+        token = m.group(0)
+        rng = EditorRange(
+            start=EditorPosition(line=int(line), column=int(content_start0) + int(start0) + 1),
+            end=EditorPosition(line=int(line), column=int(content_start0) + int(end0) + 1),
+        )
+        return YamlCursorExtractionResult(
+            yaml_path=yaml_path,
+            kind=kind,
+            reference=str(token),
+            range=rng,
+            value=str(token),
+            value_range=rng,
+        )
+
+    return None
 
 
 def extract_yaml_dsl_entity_reference_by_cursor(

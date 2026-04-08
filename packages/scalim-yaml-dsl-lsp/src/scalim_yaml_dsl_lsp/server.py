@@ -22,21 +22,25 @@ from .core import (
     YamlDslEntityCompletionResult,
     YamlDslEntityHintDiagnostic,
     YamlDslEntityIndex,
+    YamlDslExpressionScopeIndex,
     YamlDslImportPathDefinitionResult,
     YamlDslSugarCompletionResult,
     YamlImportDefinitionResult,
     YamlImportHoverResult,
     build_yaml_dsl_editor_effective_view,
     build_yaml_dsl_entity_index,
+    build_yaml_dsl_expression_scope_index,
     collect_yaml_dsl_editor_diagnostics,
     complete_python_attr_path_segment,
     complete_python_module_segment,
     complete_yaml_dsl_builtin_callable_reference,
     complete_yaml_dsl_entity_reference,
+    complete_yaml_dsl_expression_field_reference,
     complete_yaml_dsl_import_path_reference,
     complete_yaml_dsl_output_field_id,
     discover_yaml_dsl_editor_project,
     extract_yaml_dsl_entity_reference_by_cursor,
+    extract_yaml_dsl_expression_token_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
     extract_yaml_dsl_output_field_reference_by_cursor,
     extract_yaml_dsl_python_reference_by_cursor,
@@ -44,6 +48,7 @@ from .core import (
     hover_python_reference,
     hover_yaml_dsl_builtin_callable_reference,
     hover_yaml_dsl_entity_reference,
+    hover_yaml_dsl_expression_field_reference,
     hover_yaml_dsl_import_path_reference,
     hover_yaml_dsl_output_field_id,
     hover_yaml_dsl_yaml_alias,
@@ -52,6 +57,7 @@ from .core import (
     resolve_python_definition,
     resolve_yaml_dsl_builtin_callable_definition,
     resolve_yaml_dsl_entity_definition,
+    resolve_yaml_dsl_expression_field_definition,
     resolve_yaml_dsl_import_path_definition,
     resolve_yaml_dsl_output_field_definition,
     resolve_yaml_dsl_yaml_alias_definition,
@@ -92,6 +98,7 @@ class _DocumentState:
     hint_diagnostics: Tuple[types.Diagnostic, ...] = ()
     entity_index: Optional[YamlDslEntityIndex] = None
     effective_view: Optional[YamlDslEditorEffectiveView] = None
+    expression_scope_index: Optional[YamlDslExpressionScopeIndex] = None
 
 
 @dataclass(frozen=True)
@@ -208,6 +215,13 @@ async def _handle_definition(
 
     if locations is None and doc_state.effective_view is not None:
         locations = await _handle_yaml_dsl_output_field_definition(
+            doc_state,
+            position=params.position,
+            uri=uri,
+        )
+
+    if locations is None and doc_state.expression_scope_index is not None:
+        locations = await _handle_yaml_dsl_expression_field_definition(
             doc_state,
             position=params.position,
             uri=uri,
@@ -404,6 +418,47 @@ async def _handle_yaml_dsl_output_field_definition(
             exc,
         )
         return None
+
+    locations: List[types.Location] = []
+    for loc in result.locations:
+        location = _location_from_definition_location(loc.file_path, loc.range)
+        if location is not None:
+            locations.append(location)
+    return locations or None
+
+
+async def _handle_yaml_dsl_expression_field_definition(
+    doc_state: _DocumentState,
+    *,
+    position: types.Position,
+    uri: str,
+) -> Optional[List[types.Location]]:
+    scope_index = doc_state.expression_scope_index
+    if scope_index is None:
+        return None
+
+    extraction = _safe_extract_expression_token_for_lsp(doc_state.text, position, uri=uri, op="definition")
+    if not extraction.reference:
+        return None
+
+    try:
+        result = await asyncio.to_thread(
+            resolve_yaml_dsl_expression_field_definition,
+            extraction,
+            scope_index=scope_index,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "定义跳转(`expr`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+
+    if result.warnings:
+        _LOG.info("定义跳转(`expr`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings))
 
     locations: List[types.Location] = []
     for loc in result.locations:
@@ -617,6 +672,30 @@ def _safe_extract_output_field_reference_for_lsp(
             op,
             uri,
             extraction.yaml_path,
+            list(extraction.warnings),
+        )
+    return extraction
+
+
+def _safe_extract_expression_token_for_lsp(
+    yaml_text: str,
+    position: types.Position,
+    *,
+    uri: str,
+    op: str,
+) -> YamlCursorExtractionResult:
+    try:
+        extraction = _extract_expression_token_for_lsp(yaml_text, position)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("%s(`expr`) 光标抽取失败 `uri`=%s: %s: %s", op, uri, type(exc).__name__, exc)
+        return YamlCursorExtractionResult(warnings=("{}(`expr`) 光标抽取失败".format(op),))
+    if extraction.warnings:
+        _LOG.debug(
+            "%s(`expr`) 光标抽取警告 `uri`=%s `yaml_path`=%s `kind`=%s `warnings`=%s",
+            op,
+            uri,
+            extraction.yaml_path,
+            extraction.kind,
             list(extraction.warnings),
         )
     return extraction
@@ -855,21 +934,26 @@ async def _try_handle_effective_view_hover(
     *,
     uri: str,
 ) -> Optional[types.Hover]:
-    if doc_state.effective_view is None:
-        return None
     view = doc_state.effective_view
+    if view is not None:
+        alias_extraction = _safe_extract_yaml_alias_reference_for_lsp(doc_state.text, position, uri=uri, op="悬浮提示(`hover`)")
+        if alias_extraction.reference:
+            alias_hover = await _hover_yaml_alias_extraction(alias_extraction, view=view, uri=uri)
+            if alias_hover is not None:
+                return alias_hover
 
-    alias_extraction = _safe_extract_yaml_alias_reference_for_lsp(doc_state.text, position, uri=uri, op="悬浮提示(`hover`)")
-    if alias_extraction.reference:
-        alias_hover = await _hover_yaml_alias_extraction(alias_extraction, view=view, uri=uri)
-        if alias_hover is not None:
-            return alias_hover
+        output_field_extraction = _safe_extract_output_field_reference_for_lsp(doc_state.text, position, uri=uri, op="悬浮提示(`hover`)")
+        if output_field_extraction.reference:
+            out_hover = await _hover_output_field_extraction(output_field_extraction, view=view, uri=uri)
+            if out_hover is not None:
+                return out_hover
 
-    output_field_extraction = _safe_extract_output_field_reference_for_lsp(doc_state.text, position, uri=uri, op="悬浮提示(`hover`)")
-    if output_field_extraction.reference:
-        out_hover = await _hover_output_field_extraction(output_field_extraction, view=view, uri=uri)
-        if out_hover is not None:
-            return out_hover
+    if doc_state.expression_scope_index is not None:
+        expr_extraction = _safe_extract_expression_token_for_lsp(doc_state.text, position, uri=uri, op="悬浮提示(`hover`)")
+        if expr_extraction.reference:
+            expr_hover = await _hover_expression_field_extraction(expr_extraction, scope_index=doc_state.expression_scope_index, uri=uri)
+            if expr_hover is not None:
+                return expr_hover
 
     return None
 
@@ -1116,6 +1200,34 @@ async def _hover_output_field_extraction(
             extraction.yaml_path,
             list(result.warnings),
         )
+    if not str(result.text or "").strip():
+        return None
+    return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
+
+
+async def _hover_expression_field_extraction(
+    extraction: YamlCursorExtractionResult,
+    *,
+    scope_index: YamlDslExpressionScopeIndex,
+    uri: str,
+) -> Optional[types.Hover]:
+    try:
+        result = await asyncio.to_thread(
+            hover_yaml_dsl_expression_field_reference,
+            extraction,
+            scope_index=scope_index,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "悬浮提示(`hover`, `expr`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info("悬浮提示(`hover`, `expr`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings))
     if not str(result.text or "").strip():
         return None
     return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
@@ -1569,6 +1681,47 @@ async def _handle_yaml_dsl_output_field_completion(
     return types.CompletionList(is_incomplete=False, items=items)
 
 
+async def _handle_yaml_dsl_expression_field_completion(
+    params: types.CompletionParams,
+    *,
+    extraction: YamlCursorExtractionResult,
+    scope_index: YamlDslExpressionScopeIndex,
+    uri: str,
+) -> types.CompletionList:
+    if extraction.value_range is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    value = str(extraction.value or extraction.reference or "")
+    cursor_offset = _cursor_offset_for_completion(params.position, extraction.value_range, reference_len=len(value))
+    if cursor_offset is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+    prefix = value[:cursor_offset]
+
+    extraction_with_prefix = extraction
+    if prefix != str(extraction.reference or ""):
+        extraction_with_prefix = replace(extraction, reference=str(prefix), value=str(prefix))
+
+    try:
+        result = await asyncio.to_thread(
+            complete_yaml_dsl_expression_field_reference,
+            extraction_with_prefix,
+            scope_index=scope_index,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "补全(`completion`, `expr`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    replace_range = _to_lsp_range(extraction.value_range)
+    items = _lsp_completion_items_from_sugar_result(result, replace_range=replace_range)
+    return types.CompletionList(is_incomplete=False, items=items)
+
+
 async def _handle_yaml_dsl_entity_completion(
     ls: LanguageServer,
     params: types.CompletionParams,
@@ -1658,6 +1811,16 @@ async def _handle_completion(
                 params,
                 extraction=output_field_extraction,
                 view=doc_state.effective_view,
+                uri=uri,
+            )
+
+    if doc_state.expression_scope_index is not None:
+        expr_extraction = _safe_extract_expression_token_for_lsp(doc_state.text, params.position, uri=uri, op="completion")
+        if expr_extraction.reference and expr_extraction.value_range is not None:
+            return await _handle_yaml_dsl_expression_field_completion(
+                params,
+                extraction=expr_extraction,
+                scope_index=doc_state.expression_scope_index,
                 uri=uri,
             )
 
@@ -2734,13 +2897,14 @@ async def _update_state_and_publish_diagnostics(
                 hint_diagnostics=(),
                 entity_index=None,
                 effective_view=None,
+                expression_scope_index=None,
             )
             ls.text_document_publish_diagnostics(types.PublishDiagnosticsParams(uri=uri, diagnostics=[]))
             return
 
     yaml_path = _uri_to_path(uri)
     workspace_root = _workspace_root_path(ls)
-    diagnostics, report, entity_index, effective_view = await asyncio.to_thread(
+    diagnostics, report, entity_index, effective_view, expression_scope_index = await asyncio.to_thread(
         _compute_diagnostics_report_and_entity_index,
         yaml_path=yaml_path,
         yaml_text=str(yaml_text),
@@ -2757,6 +2921,7 @@ async def _update_state_and_publish_diagnostics(
         hint_diagnostics=(),
         entity_index=entity_index,
         effective_view=effective_view,
+        expression_scope_index=expression_scope_index,
     )
     ls.text_document_publish_diagnostics(types.PublishDiagnosticsParams(uri=uri, diagnostics=list(base_diagnostics)))
 
@@ -2767,17 +2932,21 @@ def _compute_diagnostics_report_and_entity_index(
     yaml_text: str,
     workspace_root: Optional[Path],
 ) -> Tuple[
-    List[types.Diagnostic], Optional[YamlDslEditorDiagnosticsResult], Optional[YamlDslEntityIndex], Optional[YamlDslEditorEffectiveView]
+    List[types.Diagnostic],
+    Optional[YamlDslEditorDiagnosticsResult],
+    Optional[YamlDslEntityIndex],
+    Optional[YamlDslEditorEffectiveView],
+    Optional[YamlDslExpressionScopeIndex],
 ]:
     if yaml_path is None:
-        return [], None, None, None
+        return [], None, None, None, None
     if not is_probably_yaml_dsl_document(yaml_path, yaml_text):
-        return [], None, None, None
+        return [], None, None, None, None
     try:
         report = collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text, workspace_root_override=workspace_root)
     except Exception as exc:  # noqa: BLE001
         _LOG.exception("诊断计算失败 `path`=%s: %s: %s", yaml_path, type(exc).__name__, exc)
-        return [], None, None, None
+        return [], None, None, None, None
 
     diagnostics: List[types.Diagnostic] = []
     for item in list(report.errors) + list(report.warnings):
@@ -2817,7 +2986,18 @@ def _compute_diagnostics_report_and_entity_index(
         _LOG.exception("`effective view` 构建失败 `path`=%s: %s: %s", yaml_path, type(exc).__name__, exc)
         effective_view = None
 
-    return diagnostics, report, entity_index, effective_view
+    expression_scope_index: Optional[YamlDslExpressionScopeIndex] = None
+    try:
+        expression_scope_index = build_yaml_dsl_expression_scope_index(
+            yaml_text,
+            yaml_path=yaml_path,
+            yaml_kind=str(report.yaml_kind or ""),
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("表达式作用域索引构建失败 `path`=%s: %s: %s", yaml_path, type(exc).__name__, exc)
+        expression_scope_index = None
+
+    return diagnostics, report, entity_index, effective_view, expression_scope_index
 
 
 def _extract_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
@@ -2843,6 +3023,11 @@ def _extract_entity_reference_for_lsp(yaml_text: str, position: types.Position) 
 def _extract_output_field_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
     editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
     return extract_yaml_dsl_output_field_reference_by_cursor(yaml_text, editor_pos)
+
+
+def _extract_expression_token_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
+    editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
+    return extract_yaml_dsl_expression_token_by_cursor(yaml_text, editor_pos)
 
 
 def _extract_yaml_alias_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
