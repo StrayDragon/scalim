@@ -9,6 +9,7 @@
   - MUST 至少接受 `result` 作为第一个位置参数（或 `*args` 覆盖该位置）
   - `ctx` MAY 以第二个位置参数或关键字参数形式被接受（例如 `fn(result, ctx)` / `fn(result, ctx=ctx)` / `fn(result, *, ctx)` / `fn(result, **kw)`）
 - 预检查失败 MUST fail-fast 作为配置/编译错误（不得延迟到运行期再失败）。
+- 当签名不可 introspect 时系统 MAY 跳过绑定校验,但仍 MUST 保持引用解析与可调用性校验；返回值 `Mapping` contract 仍由运行期检查兜底。
 
 #### Scenario: keyword-only result is rejected early
 - **GIVEN** `sources.s1.normalize.call_by: "pkg.mod:norm"`

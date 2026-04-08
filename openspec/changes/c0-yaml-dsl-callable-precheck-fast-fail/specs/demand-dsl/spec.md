@@ -9,6 +9,8 @@
 
 callable preflight MUST 覆盖所有可推理的 callable 误配（例如“参数绑定不匹配”/“固定 contract 不满足”）,并在失败时直接 fail-fast 抛出配置/编译错误。
 
+（包含但不限于: `call_by` 绑定错误、`compute` SAFE_FUNCTIONS 的可推理调用形态错误、`sources.*.normalize.call_by` / `retry.should_retry` 签名不匹配、以及 loader `params` kwargs keys 与签名不一致。）
+
 #### Scenario: preflight prevents silent compute swallowing
 - **GIVEN** 某派生字段 `call_by` 将位置参数传给 keyword-only 函数签名
 - **WHEN** 调用方执行 demand `compile/run`

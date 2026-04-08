@@ -29,3 +29,20 @@
 - **GIVEN** `call_by: "pkg.mod:fn(group_name)"` 且目标函数签名为 `fn(*, group_name)`
 - **WHEN** 系统执行 callable preflight
 - **THEN** 编译失败的错误信息 MUST 包含可照抄的改写建议 `fn(group_name=group_name)`
+
+### Requirement: loader params kwargs keys MUST be prechecked against loader signature when possible
+
+当 `main_source.params` / `sources.<id>.params` 声明了传给 loader 的 `kwargs` 模板时,系统 MUST 在编译期对 **kwargs keys** 做可推理的签名绑定预检查（当 `inspect.signature` 可用时）:
+
+- 系统 MUST 基于 `params` **top-level mapping keys**（无需渲染/无需执行）构造 placeholder `kwargs` 并执行 `signature.bind(**kwargs)` 校验。
+- 预检查 MUST 覆盖:
+  - 未知 keyword（`unexpected keyword argument`）
+  - 缺失必填参数（`missing a required argument`）
+- 预检查失败 MUST fail-fast 作为配置/编译错误（不得延迟到运行期 loader 调用才暴露）。
+- 当 `inspect.signature` 不可用时系统 MAY 跳过绑定校验,但仍 MUST 保持 loader 引用解析与可调用性校验。
+
+#### Scenario: loader params unknown keyword fails fast
+- **GIVEN** `sources.customers.loader: "pkg.mod:load_customers"` 且其签名为 `load_customers(ids, field_keys=None, *, is_ref_loader=False)`
+- **AND** `sources.customers.params: { bad_key: 1 }`
+- **WHEN** 系统编译 demand
+- **THEN** 编译 MUST fail-fast 并指出 `bad_key` 无法绑定到 loader 的签名

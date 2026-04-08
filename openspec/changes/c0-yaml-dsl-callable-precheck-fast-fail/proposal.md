@@ -11,12 +11,18 @@
 - **新增编译期 callable preflight**: 在 demand runtime compile（以及 workflow preflight）阶段,对所有用户可配置的 callable 引用点执行统一预检查:
   - 引用解析(resolver/allowlist/builtin vocabulary)是否可解析为 callable
   - 对存在“可静态确定的调用形态”的位置,做参数绑定校验（例如 `call_by: "ref(args...)"`）
-  - 对存在固定 contract 的位置,做签名/形状校验（例如 `normalize.call_by` / `should_retry`）
+  - 对存在固定 contract 的位置,做签名/形状校验（例如 `normalize.call_by` / `should_retry` / loader `params` kwargs keys）
 - **BREAKING**: 对于“参数绑定不匹配”的 callable,系统 MUST fail-fast 为编译期错误（不得继续执行并在运行期吞掉）。
   - 不再尝试把 `call_by: "fn(x)"` 自动解释为关键字参数调用；用户应显式改写为 `call_by: "fn(x=x)"`（或与函数签名一致的 kwargs 形态）。
-- **compute 调用预检查(可选扩展)**: 对 `compute` 表达式中出现的安全内置函数调用（`SecureComputeEngine.SAFE_FUNCTIONS`）做参数个数/形态的静态校验（当 `inspect.signature` 可用时）,避免运行期 `TypeError` 被 `compute` 侧护栏吞掉导致静默错误。
+- **compute 调用预检查**: 对 `compute` 表达式中出现的安全内置函数调用（`SecureComputeEngine.SAFE_FUNCTIONS`）做参数个数/形态的静态校验（当 `inspect.signature` 可用时）,避免运行期 `TypeError` 被 `compute` 侧护栏吞掉导致静默错误。
 - **诊断与错误生命周期收敛**: 将“callable 预检查失败”定义为配置/编译错误,与运行期 guardrails 的 quiet/fast_fail 策略解耦（guardrails 仅处理运行期数据/计算异常,不应吞掉可在编译期推理的配置错误）。
 - **示例与回归门禁**: 为关键场景补充 notebooks 例子与集成测试入口,确保未来修改不会回退为静默吞错。
+  - 策略: 好例子尽量融入现有的全面 YAML fixture；坏例子用独立 chapter 触发编译期 fast-fail。
+  - 计划新增/覆盖的回归 chapter（示例名;以 registry 实际 id 为准）:
+    - `yaml_dsl_compute_builtin_arity_mismatch`
+    - `yaml_dsl_normalize_call_by_signature_mismatch`
+    - `yaml_dsl_loader_params_signature_mismatch`
+    - `yaml_dsl_should_retry_signature_mismatch`
 
 ## Capabilities
 

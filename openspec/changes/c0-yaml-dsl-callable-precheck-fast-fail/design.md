@@ -3,6 +3,7 @@
 `YAML DSL` 的多个配置点允许用户提供 Python 可调用对象（通过安全引用 + allowlist / builtin vocabulary）:
 
 - `main_source.loader` / `sources.*.loader`
+- `main_source.params` / `sources.*.params`（传给 loader 的 kwargs 模板; keys 形态可在编译期推理）
 - `fields.*.call_by`（派生字段）
 - `outputs[*].aggregate.fields.*.call_by`（聚合后派生字段）
 - `sources.*.normalize.call_by`（whole-result normalize 扩展点）
@@ -112,14 +113,66 @@ callable preflight 需要 resolver/allowlist/builtin vocabulary 才能解析引�
   - `just openspec-check`（sanitize + `openspec validate --all --strict --no-interactive`）
   - `just qa`（lint/tests + drift checks）
 
+### Decision 6: loader `params` 的 preflight 仅校验 **top-level kwargs keys**
+
+`main_source.params` / `sources.<id>.params` 在执行期以 `loader_fn(**kwargs)` 形态调用（`YAML` 的 params template binding 不产生位置参数）。
+
+因此预检查策略为:
+
+- 仅使用 **top-level mapping keys** 构造 placeholder `kwargs` 做 `inspect.signature(loader_fn).bind(**kwargs)` 校验（当签名可 introspect 时）。
+- 不渲染 params template（不需要 `ctx.lookup_keys` / `ctx.batch_rows`）,也不执行 loader。
+- `params` 为空映射时跳过（允许 loader 0-arg 调用/或由其它 binding 注入参数）。
+- 当签名不可获取（`inspect.signature` 抛 `TypeError/ValueError`）时跳过绑定校验,但仍保留“引用解析必须成功”的边界。
+
+### Decision 7: `should_retry` 的 preflight 在 YAML compile 期完成,以避免运行期静默降级
+
+`LoaderRetryPolicy` 当前通过 `_safe_should_retry` 将回调异常（含签名 `TypeError`）吞掉并当作 `False` 处理,会把“误配”降级为“无重试”。
+
+因此当 retry 启用且回调可 introspect 时:
+
+- 在 build_request/编译阶段对 `should_retry(exc, ctx)` 做 `signature.bind(placeholder_exc, placeholder_ctx)` 校验。
+- 失败时直接抛出 compile/config error（不得等到第一次 loader 异常后才暴露）。
+- 诊断 location 以可定位为目标（例如 `loader_retry.default.should_retry` / `loader_retry.by_loader.<loader_id>.should_retry`）,不强依赖 YAML path（因为来源可能是 runtime injection）。
+
+### Decision 8: 诊断输出应“稳定可断言”,并显式覆盖 py3.6 兼容分支
+
+- 对于签名绑定类错误,诊断 MUST 包含:
+  - `location/path`（callsite + config path）
+  - callable reference（若来源为引用字符串）
+  - 签名文本（当可用）
+  - bind 失败原因摘要（`TypeError` message）
+  - 至少一个可照抄的改写 hint（如 keyword-only 的 `x=x`）
+- 实现必须兼容 `py3.6`:
+  - 使用 `getattr(inspect.Parameter, "POSITIONAL_ONLY", None)` 处理 positional-only kind
+  - 不引入 `inspect.Signature.bind_partial` 的新语义依赖（以 `bind` 为 SSOT）
+
 ## Risks / Trade-offs
 
 - [签名不可 introspect 导致漏检] → 预检查在 `inspect.signature` 失败时跳过绑定校验；缓解: 错误仍会在运行期暴露,并优先覆盖“用户自定义 Python 函数”这一主路径。
 - [compute builtin 在不同 Python 版本签名差异] → 仅对可 introspect 且行为稳定的函数做绑定校验；其余跳过；并用单元测试锁定关键用例（例如 `dec(x)`）。
-- [loader/params 预检查复杂] → 分阶段落地:
-  - v1 先覆盖 `call_by`/`aggregate call_by`/`compute builtin calls`
-  - v2 再覆盖 loader params 与 should_retry 等“无显式 args 但有固定 contract”的回调
+- [loader/params/normalize/should_retry 预检查覆盖面更大] → 以“仅校验形态/绑定/契约”为边界,避免引入运行期行为；并用 notebooks 端到端回归锁定关键链路.
 - [行为更严格带来“破坏性变更”] → 明确这是“修复静默错报表”的安全升级；通过错误信息提供可直接照抄的迁移建议,降低升级成本。
+
+## Notebooks / Regression Strategy
+
+原则:
+
+- **好例子融入全面 YAML fixture**: 尽量把“正确写法”融入已有的全面 YAML 样例（例如 `support/support_sla_report.yaml`）,让现有章节作为 good-path gate。
+  - 好处: 减少重复 YAML,同时确保“真实复杂需求”不会被 preflight 误伤。
+- **坏例子独立 chapter**: 用独立章节写入临时 YAML,仅覆盖“必须编译期 fast-fail”的错误形态（参考 `yaml_dsl_call_by_keyword_only`）。
+- **should_retry 端到端**: 因为 `should_retry` 来自 runtime injection,必须用独立章节覆盖：
+  - 坏签名 → 编译期失败（不能等到第一次 loader 异常才暴露）
+  - 好签名 → loader fail-once 后可 retry 成功（验证回调确实被执行并生效）
+
+建议把“新增预检查点”的 notebooks gate 映射成可回归的矩阵:
+
+| Surface | Good-path gate（尽量复用） | Bad fast-fail gate（新增 chapter） |
+|---|---|---|
+| 派生字段 `call_by` | `yaml_dsl_ecommerce`（`declared_yaml_dsl/ecommerce_report.yaml` 已包含 kwargs call_by） | `yaml_dsl_call_by_keyword_only`（已存在） |
+| `compute` SAFE_FUNCTIONS 调用 | `yaml_dsl_support` / `yaml_dsl_ecommerce`（多处 `Decimal(...)`/`round(...)`） | `yaml_dsl_compute_builtin_arity_mismatch`（例如 `len(x, y)`） |
+| `sources.*.normalize.call_by` | 将 `normalize.call_by` 融入 `support/support_sla_report.yaml` 的某个 `source`（保持输出不变,只做 identity normalize） | `yaml_dsl_normalize_call_by_signature_mismatch`（例如 `def norm(*, result): ...`） |
+| loader `params` kwargs keys | `yaml_dsl_support`（`sources.*.params` 已覆盖 `ids` / `field_keys` / kwonly） | `yaml_dsl_loader_params_signature_mismatch`（未知 kw / 缺失必填 kw） |
+| retry `should_retry(exc, ctx)` | `yaml_dsl_ads`（已验证 retry_calls==2） | `yaml_dsl_should_retry_signature_mismatch`（注入 kwonly/缺参 should_retry,要求 compile 期失败） |
 
 ## Migration Plan
 
@@ -127,9 +180,18 @@ callable preflight 需要 resolver/allowlist/builtin vocabulary 才能解析引�
    - 按错误提示把位置参数改写为关键字参数（例如 `fn(x)` → `fn(x=x)`）。
 2. 对 compute 表达式中误用内置函数的情况:
    - 按错误提示修正参数个数（例如 `dec(a, b)` 改为 `dec(a)`）。
-3. 在 notebooks 中提供“坏例子必须 fail-fast / 好例子可运行”的回归样例,并纳入集成测试。
+3. 对 `normalize.call_by` 的签名不匹配:
+   - 按错误提示调整函数签名以接受 `(result)` 或 `(result, ctx)`（或 `ctx` keyword-only 形态）。
+4. 对 `should_retry` 的签名不匹配:
+   - 按错误提示调整回调签名为 `should_retry(exc, ctx) -> bool`。
+5. 对 loader `params` 的签名不匹配:
+   - 修正 `params` 中的 kwargs keys,使其能绑定到 loader 的签名（例如移除未知 key 或补齐必填 key）。
+6. 在 notebooks 中提供“坏例子必须 fail-fast / 好例子可运行”的回归样例,并纳入集成测试。
 
 ## Open Questions
 
 - 是否需要新增一个更明确的异常类型（例如 `ScalimCallablePreflightError`）以便上层统一捕获并区分于一般 `ScalimConversionError`？
+> 需要
+
 - 是否需要在 CLI 中提供显式的 `yaml-dsl preflight`（要求用户提供 allowlist,仅做 resolve + precheck,不执行）以便 CI/IDE 更早发现问题？
+> 暂时不需要 当前 用户的 run 可以执行前立即fast-fail 就够用 , 避免引入新的命令导致难以维护, 但是可以足够拆分细致api留足空间以便之后可能做这个处理
