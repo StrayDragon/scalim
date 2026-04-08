@@ -10,6 +10,7 @@ __all__ = ()
 _MIN_QUOTED_TOKEN_LEN = 2
 _RETRY_SHOULD_RETRY_PATH_MIN_LEN = 2
 _IMPORT_LIST_PATH_MIN_LEN = 2
+_IMPORTS_PATH_MIN_LEN = 2
 _IMPORT_KEY = "$import"
 _FIELDS_REF_PATH_MIN_LEN = 3
 _RELATION_STEP_PARENT_PATH_MIN_LEN = 2
@@ -80,6 +81,32 @@ def extract_yaml_dsl_import_reference_by_cursor(
     """
 
     return _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=(_IMPORT_KEY,))
+
+
+def extract_yaml_dsl_import_path_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """基于 `yaml_text + position` 抽取 YAML DSL 顶层 `imports.*` 的 path 值.
+
+    约束:
+    - 仅做静态解析,无副作用
+    - 失败时降级为“空结果 + warnings”,不得 crash
+    - v1 仅覆盖单行 scalar string (`imports.<alias>: <path>`)
+    """
+
+    base = _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=("imports_path",))
+    if not base.reference or base.range is None:
+        return base
+    return YamlCursorExtractionResult(
+        yaml_path=base.yaml_path,
+        kind="imports_path",
+        reference=base.reference,
+        range=base.range,
+        value=str(base.reference),
+        value_range=base.range,
+        warnings=base.warnings,
+    )
 
 
 def extract_yaml_dsl_entity_reference_by_cursor(
@@ -620,16 +647,20 @@ def _parse_call_by_head(raw: str) -> Tuple[str, int, int]:
 def _reference_kind(path: List[str]) -> str:
     if not path:
         return ""
-    leaf = str(path[-1])
-    if leaf in ("loader", "call_by"):
-        return leaf
-    if leaf == _IMPORT_KEY:
-        return _IMPORT_KEY
-    if len(path) >= _IMPORT_LIST_PATH_MIN_LEN and str(path[-2]) == _IMPORT_KEY:
-        return _IMPORT_KEY
-    if len(path) >= _RETRY_SHOULD_RETRY_PATH_MIN_LEN and str(path[-2]) == "retry" and leaf == "should_retry":
-        return "retry.should_retry"
-    return ""
+
+    kind = ""
+    if len(path) >= _IMPORTS_PATH_MIN_LEN and str(path[0]) == "imports":
+        kind = "imports_path"
+    else:
+        leaf = str(path[-1])
+        if leaf in ("loader", "call_by"):
+            kind = leaf
+        elif leaf == _IMPORT_KEY or (len(path) >= _IMPORT_LIST_PATH_MIN_LEN and str(path[-2]) == _IMPORT_KEY):
+            kind = _IMPORT_KEY
+        elif len(path) >= _RETRY_SHOULD_RETRY_PATH_MIN_LEN and str(path[-2]) == "retry" and leaf == "should_retry":
+            kind = "retry.should_retry"
+
+    return kind
 
 
 def _is_supported_reference_path(path: List[str], *, allowed_kinds: Tuple[str, ...]) -> bool:

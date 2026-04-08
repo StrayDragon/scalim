@@ -92,6 +92,54 @@ def test_lsp_code_action_add_import_roots_minimal(tmp_path) -> None:
         client.shutdown()
 
 
+def test_lsp_code_action_add_import_root_alias_for_missing_alias(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "fragments").mkdir()
+    (workspace / "fragments" / "frag.yaml").write_text("x: 1\n", encoding="utf-8")
+
+    (workspace / "scalim.yaml").write_text(
+        "\n".join(
+            [
+                "yaml_dsl:",
+                "  import_roots:",
+                "    - path: .",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "imports:",
+            '  frag: "@/fragments/frag.yaml"',
+            "name: demo",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc, workspace)
+    try:
+        client.initialize(workspace)
+        client.did_open(uri=yaml_path.as_uri(), text=yaml_text)
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        actions = client.code_actions(uri=yaml_path.as_uri(), line=0, character=0)
+        fix_action = _find_code_action(actions, command="scalim.yaml.addImportRootAlias")
+        assert fix_action is not None
+
+        client.execute_command(fix_action["command"]["command"], fix_action["command"].get("arguments") or [])
+        content = (workspace / "scalim.yaml").read_text(encoding="utf-8")
+        assert "alias" in content
+        assert "@" in content
+    finally:
+        client.shutdown()
+
+
 def test_lsp_execute_command_dump_discovery_returns_json_payload(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

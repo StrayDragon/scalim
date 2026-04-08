@@ -28,6 +28,7 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.jsonschema_issues import (
     ScalimJsonSchemaCollectorError,
     collect_jsonschema_validation_issues,
 )
+from scalim.dsl.yaml_dsl._internal.config_parsing.presets import load_scalim_preset_yaml_text
 from scalim.dsl.yaml_dsl._internal.config_parsing.project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
 from scalim.dsl.yaml_dsl._internal.config_parsing.unknown_fields import find_unknown_fields
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
@@ -42,6 +43,10 @@ from scalim.dsl.yaml_dsl.reference_syntax import (
     ScalimReferenceSyntaxError,
     is_valid_builtin_callable_reference,
     parse_python_reference,
+)
+from scalim.dsl.yaml_dsl.runtime.builtin_callables import (
+    list_public_builtin_callable_ids,
+    list_public_builtin_callable_python_references,
 )
 from scalim.vendor.yamlx import yaml
 
@@ -265,6 +270,64 @@ class YamlImportHoverResult:
 
     def as_dict(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"text": str(self.text)}
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslSugarCompletionItem:
+    label: str
+    insert_text: str
+    detail: str = ""
+    is_snippet: bool = False
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "label": str(self.label),
+            "insert_text": str(self.insert_text),
+            "detail": str(self.detail or ""),
+            "is_snippet": bool(self.is_snippet),
+        }
+
+
+@dataclass(frozen=True)
+class YamlDslSugarCompletionResult:
+    items: Tuple[YamlDslSugarCompletionItem, ...] = ()
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"items": [item.as_dict() for item in self.items]}
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslSugarHoverResult:
+    text: str = ""
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"text": str(self.text)}
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslImportPathDefinitionResult:
+    kind: str = ""  # file|preset
+    file_path: str = ""
+    preset_id: str = ""
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "kind": str(self.kind or ""),
+            "file_path": str(self.file_path or ""),
+            "preset_id": str(self.preset_id or ""),
+        }
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
@@ -1453,6 +1516,418 @@ def resolve_python_definition(
 
     trace = ResolutionTrace(query=raw, steps=tuple(steps), locations=locations, warnings=tuple(warnings))
     return PythonDefinitionResult(locations=locations, warnings=tuple(warnings), trace=trace)
+
+
+def _scalim_editor_python_roots() -> Tuple[Path, ...]:
+    """为 editor 侧 builtin callables 提供可解析 scalim 自身源码的 roots.
+
+    说明:
+    - builtin callable 属于 scalim runtime 的保守词表,其 definition/hover 需要能跳到 scalim 源码,
+      即使 workspace 本身不包含 scalim 包源码(例如用户只安装了 scalim 依赖)。
+    - 这里仅用于静态定位符号定义,不执行用户代码。
+    """
+    raw = getattr(yaml_dsl, "__file__", None)
+    if not isinstance(raw, str) or not raw.strip():
+        return ()
+    try:
+        module_file = Path(raw).expanduser().resolve(strict=False)
+    except Exception:  # noqa: BLE001
+        return ()
+
+    pkg_dir: Optional[Path] = None
+    for parent in module_file.parents:
+        if parent.name == "scalim":
+            pkg_dir = parent
+            break
+    if pkg_dir is None:
+        return ()
+    root = pkg_dir.parent
+    if not root.exists() or not root.is_dir():
+        return ()
+    return (root,)
+
+
+def _dedupe_python_roots(raw: Sequence[Union[str, Path]]) -> Tuple[Path, ...]:
+    seen: Dict[str, None] = {}
+    out: List[Path] = []
+    for item in raw:
+        p: Optional[Path]
+        try:
+            p = Path(str(item)).expanduser().resolve(strict=False)
+        except Exception:  # noqa: BLE001
+            p = None
+        if p is None:
+            continue
+        key = str(p)
+        if key in seen:
+            continue
+        seen[key] = None
+        out.append(p)
+    return tuple(out)
+
+
+def complete_yaml_dsl_builtin_callable_reference(
+    reference_prefix: str,
+    *,
+    call_by: bool,
+) -> YamlDslSugarCompletionResult:
+    """为 `^<id>` builtin callable 提供 completion(保守词表)."""
+    warnings: List[str] = []
+    raw = str(reference_prefix or "")
+    if not raw.strip():
+        return YamlDslSugarCompletionResult(items=(), warnings=())
+
+    prefix = raw.lstrip()
+    if not prefix.startswith("^"):
+        return YamlDslSugarCompletionResult(items=(), warnings=())
+
+    id_prefix = prefix[1:]
+    ids = list_public_builtin_callable_ids()
+    python_refs = list_public_builtin_callable_python_references()
+
+    matched = [builtin_id for builtin_id in ids if builtin_id.startswith(id_prefix)]
+    if not matched and id_prefix:
+        warnings.append("Unknown builtin callable id prefix: {!r}".format(id_prefix))
+
+    items: List[YamlDslSugarCompletionItem] = []
+    for builtin_id in matched:
+        py_ref = python_refs.get(builtin_id, "")
+        detail = "python: {}".format(py_ref) if py_ref else ""
+        insert_text = "^{}".format(builtin_id)
+        is_snippet = False
+        if call_by:
+            insert_text = "^{}(${{1:arg}}=${{2:value}})".format(builtin_id)
+            is_snippet = True
+        items.append(
+            YamlDslSugarCompletionItem(
+                label=str(builtin_id),
+                insert_text=str(insert_text),
+                detail=detail,
+                is_snippet=is_snippet,
+            )
+        )
+
+    return YamlDslSugarCompletionResult(items=tuple(items), warnings=tuple(warnings))
+
+
+def resolve_yaml_dsl_builtin_callable_definition(
+    reference: str,
+    *,
+    python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]] = None,
+) -> PythonDefinitionResult:
+    """静态解析 builtin callable 引用并尽可能跳转到 scalim 源码实现."""
+    raw = str(reference or "").strip()
+    if not raw.startswith("^"):
+        return PythonDefinitionResult(locations=(), warnings=())
+    builtin_id = raw[1:]
+    python_refs = list_public_builtin_callable_python_references()
+    py_ref = python_refs.get(builtin_id, "")
+    if not py_ref:
+        msg = "Unknown builtin callable id: {!r}".format(builtin_id)
+        return PythonDefinitionResult(locations=(), warnings=(msg,))
+
+    combined = _dedupe_python_roots([*python_roots, *_scalim_editor_python_roots()])
+    return resolve_python_definition(py_ref, python_roots=combined, anchor_path=anchor_path)
+
+
+def hover_yaml_dsl_builtin_callable_reference(
+    reference: str,
+    *,
+    python_roots: Sequence[Union[str, Path]],
+    anchor_path: Optional[Union[str, Path]] = None,
+) -> YamlDslSugarHoverResult:
+    """返回 builtin callable 的 hover 文本(静态)."""
+    warnings: List[str] = []
+    raw = str(reference or "").strip()
+    if not raw.startswith("^"):
+        return YamlDslSugarHoverResult(text="", warnings=())
+    builtin_id = raw[1:]
+
+    python_refs = list_public_builtin_callable_python_references()
+    py_ref = python_refs.get(builtin_id, "")
+    if not py_ref:
+        warnings.append("Unknown builtin callable id: {!r}".format(builtin_id))
+
+    lines: List[str] = ["builtin: ^{}".format(builtin_id)]
+    if py_ref:
+        lines.append("python: {}".format(py_ref))
+
+        combined = _dedupe_python_roots([*python_roots, *_scalim_editor_python_roots()])
+        doc = hover_python_reference(py_ref, python_roots=combined, anchor_path=anchor_path)
+        if doc.warnings:
+            warnings.extend(list(doc.warnings))
+        doc_text = str(doc.text or "").strip()
+        if doc_text:
+            lines.append("")
+            lines.append(doc_text)
+
+    return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings))
+
+
+_IMPORT_ALIAS_TOKEN_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_]*)")
+
+
+def _split_import_path_alias_token(prefix: str) -> Tuple[str, str, str]:
+    """拆分 `@/x` / `ALIAS:/x` 的 token.
+
+    返回 `(alias, token, remainder)`; 不匹配返回空元组。
+    """
+    value = str(prefix or "")
+    if value.startswith("@/"):
+        return "@", "@/", value[2:]
+
+    if ":/" not in value:
+        return "", "", ""
+    head, _sep, tail = value.partition(":/")
+    if not head:
+        return "", "", ""
+    if _IMPORT_ALIAS_TOKEN_RE.fullmatch(head) is None:
+        return "", "", ""
+    return head, "{}:/".format(head), tail
+
+
+def _iter_yaml_files_in_dir(dir_path: Path, *, name_prefix: str) -> Iterable[Path]:
+    try:
+        items = list(dir_path.iterdir())
+    except Exception:  # noqa: BLE001
+        return ()
+    for item in items:
+        if not item.is_file():
+            continue
+        if item.suffix not in (".yaml", ".yml"):
+            continue
+        if name_prefix and not item.name.startswith(name_prefix):
+            continue
+        yield item
+
+
+def _is_within_any_dir(path: Path, roots: Sequence[Path]) -> bool:
+    resolved = path.resolve(strict=False)
+    for root in roots:
+        try:
+            _ = resolved.relative_to(root.resolve(strict=False))
+        except ValueError:
+            continue
+        return True
+    return False
+
+
+def _complete_yaml_files_under_dir(
+    raw_prefix: str,
+    *,
+    base_dir: Path,
+    token_prefix: str,
+    allowed_roots: Sequence[Path],
+    warnings: List[str],
+) -> List["YamlDslSugarCompletionItem"]:
+    dir_part, _sep, name_part = str(raw_prefix or "").rpartition("/")
+    search_dir = base_dir / dir_part if dir_part else base_dir
+    if not search_dir.exists() or not search_dir.is_dir():
+        return []
+    if not _is_within_any_dir(search_dir, allowed_roots):
+        warnings.append("Import path completion rejected (escapes allowed roots): {}".format(str(search_dir)))
+        return []
+
+    items: List[YamlDslSugarCompletionItem] = []
+    for f in _iter_yaml_files_in_dir(search_dir, name_prefix=name_part):
+        rel = f.relative_to(base_dir).as_posix()
+        insert_text = "{}{}".format(token_prefix, rel) if token_prefix else rel
+        items.append(YamlDslSugarCompletionItem(label=rel, insert_text=insert_text, detail=str(f)))
+    return items
+
+
+def _complete_yaml_dsl_import_path_alias_tokens(
+    raw_prefix: str, *, project_config: Optional[YamlDslProjectConfig]
+) -> List["YamlDslSugarCompletionItem"]:
+    if project_config is None:
+        return []
+    prefix = str(raw_prefix or "")
+    items: List[YamlDslSugarCompletionItem] = []
+    for alias in sorted(project_config.import_aliases):
+        token = "{}{}".format(alias, "/") if alias.startswith("@") else "{}{}".format(alias, ":/")
+        if prefix and not token.startswith(prefix):
+            continue
+        items.append(YamlDslSugarCompletionItem(label=token, insert_text=token, detail="import root alias"))
+    return items
+
+
+def _complete_yaml_dsl_import_path_starters(raw_prefix: str) -> List["YamlDslSugarCompletionItem"]:
+    prefix = str(raw_prefix or "")
+    out: List[YamlDslSugarCompletionItem] = []
+    for token in ("./", "../"):
+        if prefix and not token.startswith(prefix):
+            continue
+        out.append(YamlDslSugarCompletionItem(label=token, insert_text=token, detail="relative path"))
+    return out
+
+
+def _complete_yaml_dsl_import_path_files(
+    raw_prefix: str,
+    *,
+    anchor_dir: Path,
+    allowed_roots: Sequence[Path],
+    project_config: Optional[YamlDslProjectConfig],
+    warnings: List[str],
+) -> List["YamlDslSugarCompletionItem"]:
+    alias, token, remainder = _split_import_path_alias_token(raw_prefix)
+    if alias and project_config is not None:
+        base_dir = project_config.import_aliases.get(alias)
+        if base_dir is None:
+            warnings.append("Unknown import root alias: {!r}".format(alias))
+            return []
+        return _complete_yaml_files_under_dir(
+            remainder,
+            base_dir=base_dir,
+            token_prefix=token,
+            allowed_roots=allowed_roots,
+            warnings=warnings,
+        )
+
+    return _complete_yaml_files_under_dir(
+        raw_prefix,
+        base_dir=anchor_dir,
+        token_prefix="",
+        allowed_roots=allowed_roots,
+        warnings=warnings,
+    )
+
+
+def _dedupe_sugar_completion_items(items: Sequence["YamlDslSugarCompletionItem"]) -> Tuple["YamlDslSugarCompletionItem", ...]:
+    # Keep output stable.
+    unique: Dict[Tuple[str, str], None] = {}
+    deduped: List[YamlDslSugarCompletionItem] = []
+    for item in items:
+        key = (str(item.label), str(item.insert_text))
+        if key in unique:
+            continue
+        unique[key] = None
+        deduped.append(item)
+    return tuple(deduped)
+
+
+def complete_yaml_dsl_import_path_reference(
+    prefix: str,
+    *,
+    anchor_yaml_path: Union[str, Path],
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
+) -> YamlDslSugarCompletionResult:
+    """为 `imports.*` 的 path 值提供 completion(别名前缀 + 相对路径)."""
+    warnings: List[str] = []
+    raw_prefix = str(prefix or "")
+
+    anchor_path = Path(str(anchor_yaml_path)).expanduser().resolve(strict=False)
+    project_config = _safe_load_yaml_dsl_project_config(
+        anchor_path,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+        warnings=warnings,
+    )
+
+    roots = _compute_allowed_yaml_roots_for_imports(
+        base_dir=anchor_path.parent,
+        discovery_allowed_roots=allowed_yaml_roots,
+        project_config=project_config,
+        warnings=warnings,
+    )
+    items = [
+        *_complete_yaml_dsl_import_path_starters(raw_prefix),
+        *_complete_yaml_dsl_import_path_alias_tokens(raw_prefix, project_config=project_config),
+        *_complete_yaml_dsl_import_path_files(
+            raw_prefix,
+            anchor_dir=anchor_path.parent,
+            allowed_roots=roots,
+            project_config=project_config,
+            warnings=warnings,
+        ),
+    ]
+    return YamlDslSugarCompletionResult(items=_dedupe_sugar_completion_items(items), warnings=tuple(warnings))
+
+
+def resolve_yaml_dsl_import_path_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    anchor_yaml_path: Union[str, Path],
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
+) -> YamlDslImportPathDefinitionResult:
+    """解析 `imports.*` 的 path 值,返回 file 或 preset 信息."""
+    warnings: List[str] = []
+    raw_path = str(extraction.reference or "").strip()
+    if not raw_path:
+        return YamlDslImportPathDefinitionResult(kind="", warnings=("引用不能为空",))
+
+    if raw_path.startswith(_IMPORT_SCALIM_SCHEME_PREFIX):
+        preset_id = ""
+        try:
+            preset_id = _parse_scalim_preset_uri(raw_path)
+            _ = load_scalim_preset_yaml_text(preset_id)
+        except Exception as exc:  # noqa: BLE001
+            warnings.append("invalid preset: {}: {}".format(type(exc).__name__, exc))
+        return YamlDslImportPathDefinitionResult(kind="preset", preset_id=preset_id, warnings=tuple(warnings))
+
+    anchor_path = Path(str(anchor_yaml_path)).expanduser().resolve(strict=False)
+    project_config = _safe_load_yaml_dsl_project_config(
+        anchor_path,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+        warnings=warnings,
+    )
+
+    resolved = _resolve_import_source_file(
+        alias=str(extraction.yaml_path or "imports"),
+        raw_path=raw_path,
+        base_dir=anchor_path.parent,
+        allowed_yaml_roots=allowed_yaml_roots,
+        project_config=project_config,
+        warnings=warnings,
+    )
+    if resolved is None or resolved.path is None:
+        return YamlDslImportPathDefinitionResult(kind="", warnings=tuple(warnings))
+
+    return YamlDslImportPathDefinitionResult(kind="file", file_path=str(resolved.path), warnings=tuple(warnings))
+
+
+def hover_yaml_dsl_import_path_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    anchor_yaml_path: Union[str, Path],
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
+) -> YamlDslSugarHoverResult:
+    """返回 `imports.*` path 的 hover 文本."""
+    warnings: List[str] = []
+    raw_path = str(extraction.reference or "").strip()
+    if not raw_path:
+        return YamlDslSugarHoverResult(text="", warnings=("引用不能为空",))
+
+    title = str(extraction.yaml_path or "imports").strip() or "imports"
+    lines: List[str] = ["{}: {}".format(title, raw_path)]
+
+    definition = resolve_yaml_dsl_import_path_definition(
+        extraction,
+        anchor_yaml_path=anchor_yaml_path,
+        allowed_yaml_roots=allowed_yaml_roots,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+    )
+    if definition.warnings:
+        warnings.extend(list(definition.warnings))
+
+    if definition.kind == "file" and definition.file_path:
+        lines.append("resolved: {}".format(definition.file_path))
+        lines.append("allowed_roots: ok")
+    elif definition.kind == "preset" and definition.preset_id:
+        lines.append("preset_id: {}".format(definition.preset_id))
+        lines.append("readonly: true")
+    else:
+        lines.append("allowed_roots: unknown")
+
+    return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings))
 
 
 def resolve_yaml_import_definition(

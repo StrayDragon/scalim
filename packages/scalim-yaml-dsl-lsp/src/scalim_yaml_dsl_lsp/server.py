@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlparse
 from lsprotocol import types
 from pygls.lsp.server import LanguageServer
 
+from scalim.dsl.yaml_dsl._internal.config_parsing.presets import load_scalim_preset_yaml_text
 from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 from .core import (
@@ -20,26 +21,34 @@ from .core import (
     YamlDslEntityCompletionResult,
     YamlDslEntityHintDiagnostic,
     YamlDslEntityIndex,
+    YamlDslImportPathDefinitionResult,
+    YamlDslSugarCompletionResult,
     YamlImportDefinitionResult,
     YamlImportHoverResult,
     build_yaml_dsl_entity_index,
     collect_yaml_dsl_editor_diagnostics,
     complete_python_attr_path_segment,
     complete_python_module_segment,
+    complete_yaml_dsl_builtin_callable_reference,
     complete_yaml_dsl_entity_reference,
+    complete_yaml_dsl_import_path_reference,
     discover_yaml_dsl_editor_project,
     extract_yaml_dsl_entity_reference_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
     extract_yaml_dsl_python_reference_by_cursor,
     hover_python_reference,
+    hover_yaml_dsl_builtin_callable_reference,
     hover_yaml_dsl_entity_reference,
+    hover_yaml_dsl_import_path_reference,
     hover_yaml_import_reference,
     is_probably_yaml_dsl_document,
     resolve_python_definition,
+    resolve_yaml_dsl_builtin_callable_definition,
     resolve_yaml_dsl_entity_definition,
+    resolve_yaml_dsl_import_path_definition,
     resolve_yaml_import_definition,
 )
-from .cursor_extraction import YamlCursorExtractionResult
+from .cursor_extraction import YamlCursorExtractionResult, extract_yaml_dsl_import_path_reference_by_cursor
 from .editor_types import EditorPosition, EditorRange
 
 __all__ = ()
@@ -49,14 +58,19 @@ _LOG = logging.getLogger(__name__)
 _COMMAND_DUMP_DISCOVERY = "scalim.dumpDiscovery"
 _COMMAND_CREATE_MINIMAL_SCALIM_YAML = "scalim.yaml.createMinimal"
 _COMMAND_ADD_IMPORT_ROOTS = "scalim.yaml.addImportRoots"
+_COMMAND_ADD_IMPORT_ROOT_ALIAS = "scalim.yaml.addImportRootAlias"
 _COMMAND_ADD_PYTHON_ROOTS = "scalim.yaml.addPythonRoots"
 _COMMAND_EXPLAIN_RESOLUTION_FAILURE = "scalim.python.explainResolutionFailure"
+_COMMAND_PRESET_GET_TEXT = "scalim.preset.getText"
 
 _MODE_MINIMAL = "minimal"
 _MODE_WIDE = "wide"
 
 _IMPORT_ESCAPES_ALLOWED_ROOTS_MARKER = "YAML path escapes allowed roots:"
 _RESOLVED_PATH_RE = re.compile(r"resolved_path='([^']+)'")
+_IMPORT_RAW_PATH_RE = re.compile(r"raw='([^']+)'")
+_IMPORT_RESERVED_ALIAS_MARKER = "reserved alias prefixes are not allowed"
+_IMPORT_ALIAS_TOKEN_RE = re.compile(r"^(?:@/|([a-zA-Z_][a-zA-Z0-9_]*):/)")
 
 
 @dataclass(frozen=True)
@@ -147,6 +161,15 @@ async def _handle_definition(
     if anchor_path is None:
         return None
 
+    import_path_locations = await _handle_yaml_import_path_definition(
+        doc_state,
+        position=params.position,
+        anchor_path=anchor_path,
+        uri=uri,
+    )
+    if import_path_locations is not None:
+        return import_path_locations
+
     import_locations = await _handle_yaml_import_definition(
         doc_state,
         position=params.position,
@@ -177,12 +200,21 @@ async def _try_handle_python_definition(
     if not extraction.reference:
         return False, None
 
-    result = await _safe_resolve_python_definition(
-        extraction,
-        python_roots=doc_state.python_roots,
-        anchor_path=anchor_path,
-        uri=uri,
-    )
+    ref = str(extraction.reference or "")
+    if ref.lstrip().startswith("^"):
+        result = await _safe_resolve_yaml_dsl_builtin_callable_definition(
+            extraction,
+            python_roots=doc_state.python_roots,
+            anchor_path=anchor_path,
+            uri=uri,
+        )
+    else:
+        result = await _safe_resolve_python_definition(
+            extraction,
+            python_roots=doc_state.python_roots,
+            anchor_path=anchor_path,
+            uri=uri,
+        )
     if result is None:
         return True, None
 
@@ -224,6 +256,57 @@ async def _handle_yaml_import_definition(
         location = _location_from_definition_location(loc.file_path, loc.range)
         if location is not None:
             locations.append(location)
+    return locations or None
+
+
+_PRESET_VDOC_SCHEME = "scalim-preset"
+
+
+def _preset_virtual_uri(preset_id: str) -> str:
+    # Use an empty authority to keep the id as a simple path segment.
+    safe_id = str(preset_id or "").lstrip("/")
+    return "{}:///{}".format(_PRESET_VDOC_SCHEME, safe_id)
+
+
+async def _handle_yaml_import_path_definition(
+    doc_state: _DocumentState,
+    *,
+    position: types.Position,
+    anchor_path: Path,
+    uri: str,
+) -> Optional[List[types.Location]]:
+    if doc_state.report is None:
+        return None
+    extraction = _safe_extract_import_path_reference_for_lsp(doc_state.text, position, uri=uri, op="definition")
+    if not extraction.reference:
+        return None
+
+    result = await _safe_resolve_yaml_import_path_definition(
+        extraction,
+        anchor_yaml_path=anchor_path,
+        allowed_yaml_roots=doc_state.report.discovery.allowed_yaml_roots,
+        scalim_yaml_override=doc_state.report.discovery.scalim_yaml_path,
+        project_root_override=doc_state.report.discovery.project_root,
+        uri=uri,
+    )
+    if result is None:
+        return None
+    if result.warnings:
+        _LOG.info("定义跳转(`imports.*`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings))
+
+    locations: List[types.Location] = []
+    if result.kind == "file" and result.file_path:
+        location = _location_from_definition_location(result.file_path, None)
+        if location is not None:
+            locations.append(location)
+    elif result.kind == "preset" and result.preset_id:
+        locations.append(
+            types.Location(
+                uri=_preset_virtual_uri(result.preset_id),
+                range=types.Range(start=types.Position(0, 0), end=types.Position(0, 0)),
+            )
+        )
+
     return locations or None
 
 
@@ -339,6 +422,34 @@ async def _safe_resolve_python_definition(
     return result
 
 
+async def _safe_resolve_yaml_dsl_builtin_callable_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    python_roots: Tuple[Path, ...],
+    anchor_path: Optional[Path],
+    uri: str,
+) -> Optional[PythonDefinitionResult]:
+    try:
+        result = await asyncio.to_thread(
+            resolve_yaml_dsl_builtin_callable_definition,
+            extraction.reference,
+            python_roots=list(python_roots),
+            anchor_path=anchor_path,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "定义跳转解析失败(`builtin`) `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info("定义跳转(`builtin`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings))
+    return result
+
+
 def _safe_extract_import_reference_for_lsp(
     yaml_text: str,
     position: types.Position,
@@ -354,6 +465,29 @@ def _safe_extract_import_reference_for_lsp(
     if extraction.warnings:
         _LOG.debug(
             "%s(`$import`) 光标抽取警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            op,
+            uri,
+            extraction.yaml_path,
+            list(extraction.warnings),
+        )
+    return extraction
+
+
+def _safe_extract_import_path_reference_for_lsp(
+    yaml_text: str,
+    position: types.Position,
+    *,
+    uri: str,
+    op: str,
+) -> YamlCursorExtractionResult:
+    try:
+        extraction = _extract_import_path_reference_for_lsp(yaml_text, position)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("%s(`imports.*`) 光标抽取失败 `uri`=%s: %s: %s", op, uri, type(exc).__name__, exc)
+        return YamlCursorExtractionResult(warnings=("{}(`imports.*`) 光标抽取失败".format(op),))
+    if extraction.warnings:
+        _LOG.debug(
+            "%s(`imports.*`) 光标抽取警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
             op,
             uri,
             extraction.yaml_path,
@@ -476,6 +610,36 @@ async def _safe_resolve_yaml_import_definition(
     return result
 
 
+async def _safe_resolve_yaml_import_path_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    anchor_yaml_path: Path,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Path],
+    project_root_override: Path,
+    uri: str,
+) -> Optional[YamlDslImportPathDefinitionResult]:
+    try:
+        result = await asyncio.to_thread(
+            resolve_yaml_dsl_import_path_definition,
+            extraction,
+            anchor_yaml_path=anchor_yaml_path,
+            allowed_yaml_roots=allowed_yaml_roots,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=project_root_override,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "定义跳转(`imports.*`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    return result
+
+
 def _register_hover_feature(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:
     @server.feature(types.TEXT_DOCUMENT_HOVER)
     async def hover(_ls: LanguageServer, params: types.HoverParams) -> Optional[types.Hover]:
@@ -491,10 +655,36 @@ async def _handle_hover(ls: LanguageServer, params: types.HoverParams, *, state:
 
     extraction = _safe_extract_reference_for_lsp(doc_state.text, params.position, uri=uri, op="悬浮提示(`hover`)")
     if extraction.reference:
-        return await _hover_python_extraction(extraction, python_roots=doc_state.python_roots, anchor_path=anchor_path, uri=uri)
+        ref = str(extraction.reference or "")
+        if ref.lstrip().startswith("^"):
+            hover = await _hover_builtin_callable_extraction(
+                extraction,
+                python_roots=doc_state.python_roots,
+                anchor_path=anchor_path,
+                uri=uri,
+            )
+        else:
+            hover = await _hover_python_extraction(
+                extraction,
+                python_roots=doc_state.python_roots,
+                anchor_path=anchor_path,
+                uri=uri,
+            )
+        return hover
 
     if anchor_path is None:
         return None
+
+    import_path_extraction = _safe_extract_import_path_reference_for_lsp(doc_state.text, params.position, uri=uri, op="悬浮提示(`hover`)")
+    if import_path_extraction.reference:
+        return await _hover_yaml_import_path_extraction(
+            import_path_extraction,
+            anchor_yaml_path=anchor_path,
+            allowed_yaml_roots=doc_state.report.discovery.allowed_yaml_roots,
+            scalim_yaml_override=doc_state.report.discovery.scalim_yaml_path,
+            project_root_override=doc_state.report.discovery.project_root,
+            uri=uri,
+        )
     import_extraction = _safe_extract_import_reference_for_lsp(doc_state.text, params.position, uri=uri, op="悬浮提示(`hover`)")
     if not import_extraction.reference:
         return await _handle_yaml_dsl_entity_hover(
@@ -515,6 +705,41 @@ async def _handle_hover(ls: LanguageServer, params: types.HoverParams, *, state:
         project_root_override=doc_state.report.discovery.project_root,
         uri=uri,
     )
+
+
+async def _hover_builtin_callable_extraction(
+    extraction: YamlCursorExtractionResult,
+    *,
+    python_roots: Tuple[Path, ...],
+    anchor_path: Optional[Path],
+    uri: str,
+) -> Optional[types.Hover]:
+    try:
+        result = await asyncio.to_thread(
+            hover_yaml_dsl_builtin_callable_reference,
+            extraction.reference,
+            python_roots=list(python_roots),
+            anchor_path=anchor_path,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "悬浮提示(`hover`, `builtin`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info(
+            "悬浮提示(`hover`, `builtin`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(result.warnings),
+        )
+    if not str(result.text or "").strip():
+        return None
+    return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
 
 
 async def _hover_python_extraction(
@@ -569,6 +794,45 @@ async def _hover_yaml_import_extraction(
     if import_result is None or not import_result.text.strip():
         return None
     return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(import_result.text)))
+
+
+async def _hover_yaml_import_path_extraction(
+    extraction: YamlCursorExtractionResult,
+    *,
+    anchor_yaml_path: Path,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Path],
+    project_root_override: Path,
+    uri: str,
+) -> Optional[types.Hover]:
+    try:
+        result = await asyncio.to_thread(
+            hover_yaml_dsl_import_path_reference,
+            extraction,
+            anchor_yaml_path=anchor_yaml_path,
+            allowed_yaml_roots=allowed_yaml_roots,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=project_root_override,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "悬浮提示(`hover`, `imports.*`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info(
+            "悬浮提示(`hover`, `imports.*`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(result.warnings),
+        )
+    if not str(result.text or "").strip():
+        return None
+    return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
 
 
 async def _safe_hover_yaml_import_reference(
@@ -869,6 +1133,123 @@ def _lsp_completion_items_from_entity_result(
     return items
 
 
+def _completion_item_kind_for_sugar_item(label: str, insert_text: str, *, is_snippet: bool) -> types.CompletionItemKind:
+    if is_snippet:
+        return types.CompletionItemKind.Snippet
+    if str(insert_text).endswith((".yaml", ".yml")):
+        return types.CompletionItemKind.File
+    if str(label).endswith(("/", ":/")) or str(insert_text).endswith(("/", ":/")):
+        return types.CompletionItemKind.Folder
+    return types.CompletionItemKind.Value
+
+
+def _lsp_completion_items_from_sugar_result(
+    result: YamlDslSugarCompletionResult,
+    *,
+    replace_range: types.Range,
+) -> List[types.CompletionItem]:
+    items: List[types.CompletionItem] = []
+    for item in result.items:
+        completion = types.CompletionItem(
+            label=str(item.label),
+            kind=_completion_item_kind_for_sugar_item(str(item.label), str(item.insert_text), is_snippet=bool(item.is_snippet)),
+            detail=str(item.detail or ""),
+            text_edit=types.TextEdit(range=replace_range, new_text=str(item.insert_text)),
+        )
+        if item.is_snippet:
+            completion.insert_text_format = types.InsertTextFormat.Snippet
+        items.append(completion)
+    return items
+
+
+async def _handle_yaml_dsl_builtin_callable_completion(
+    params: types.CompletionParams,
+    *,
+    extraction: YamlCursorExtractionResult,
+    uri: str,
+) -> types.CompletionList:
+    if extraction.reference is None or extraction.range is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+    reference = str(extraction.reference)
+    cursor_offset = _cursor_offset_for_completion(params.position, extraction.range, reference_len=len(reference))
+    if cursor_offset is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    prefix = reference[:cursor_offset]
+    leaf = str(extraction.yaml_path or "").split(".")[-1]
+    call_by = leaf == "call_by"
+
+    try:
+        result = await asyncio.to_thread(complete_yaml_dsl_builtin_callable_reference, prefix, call_by=call_by)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "补全(`completion`, `builtin`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return types.CompletionList(is_incomplete=False, items=[])
+    if result.warnings:
+        _LOG.info(
+            "补全(`completion`, `builtin`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings)
+        )
+
+    replace_range = _to_lsp_range(extraction.range)
+    items = _lsp_completion_items_from_sugar_result(result, replace_range=replace_range)
+    return types.CompletionList(is_incomplete=False, items=items)
+
+
+async def _handle_yaml_dsl_import_path_completion(
+    params: types.CompletionParams,
+    *,
+    extraction: YamlCursorExtractionResult,
+    anchor_yaml_path: Path,
+    doc_state: _DocumentState,
+    uri: str,
+) -> types.CompletionList:
+    if doc_state.report is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+    if extraction.value_range is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    value = str(extraction.value or extraction.reference or "")
+    cursor_offset = _cursor_offset_for_completion(params.position, extraction.value_range, reference_len=len(value))
+    if cursor_offset is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    prefix = value[:cursor_offset]
+    try:
+        result = await asyncio.to_thread(
+            complete_yaml_dsl_import_path_reference,
+            prefix,
+            anchor_yaml_path=anchor_yaml_path,
+            allowed_yaml_roots=doc_state.report.discovery.allowed_yaml_roots,
+            scalim_yaml_override=doc_state.report.discovery.scalim_yaml_path,
+            project_root_override=doc_state.report.discovery.project_root,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "补全(`completion`, `imports.*`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return types.CompletionList(is_incomplete=False, items=[])
+    if result.warnings:
+        _LOG.info(
+            "补全(`completion`, `imports.*`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(result.warnings),
+        )
+
+    replace_range = _to_lsp_range(extraction.value_range)
+    items = _lsp_completion_items_from_sugar_result(result, replace_range=replace_range)
+    return types.CompletionList(is_incomplete=False, items=items)
+
+
 async def _handle_yaml_dsl_entity_completion(
     ls: LanguageServer,
     params: types.CompletionParams,
@@ -924,17 +1305,57 @@ async def _handle_completion(
     anchor_path = _uri_to_path(uri)
 
     extraction = _safe_extract_reference_for_lsp(doc_state.text, params.position, uri=uri, op="completion")
+    reference_completion = await _handle_reference_completion(
+        params,
+        extraction=extraction,
+        python_roots=doc_state.python_roots,
+        anchor_path=anchor_path,
+        uri=uri,
+    )
+    if reference_completion is not None:
+        return reference_completion
+
+    # imports.* path completion (separate from $import refs)
+    if anchor_path is not None:
+        import_path_extraction = _safe_extract_import_path_reference_for_lsp(doc_state.text, params.position, uri=uri, op="completion")
+        if import_path_extraction.reference and import_path_extraction.value_range is not None:
+            return await _handle_yaml_dsl_import_path_completion(
+                params,
+                extraction=import_path_extraction,
+                anchor_yaml_path=anchor_path,
+                doc_state=doc_state,
+                uri=uri,
+            )
+
+    return await _handle_yaml_dsl_entity_completion(
+        ls,
+        params,
+        doc_state=doc_state,
+        anchor_path=anchor_path,
+        uri=uri,
+        state=state,
+    )
+
+
+async def _handle_reference_completion(
+    params: types.CompletionParams,
+    *,
+    extraction: YamlCursorExtractionResult,
+    python_roots: Tuple[Path, ...],
+    anchor_path: Optional[Path],
+    uri: str,
+) -> Optional[types.CompletionList]:
     if not extraction.reference or extraction.range is None:
-        return await _handle_yaml_dsl_entity_completion(
-            ls,
-            params,
-            doc_state=doc_state,
-            anchor_path=anchor_path,
-            uri=uri,
-            state=state,
-        )
+        return None
 
     reference = str(extraction.reference)
+    if reference.lstrip().startswith("^"):
+        return await _handle_yaml_dsl_builtin_callable_completion(
+            params,
+            extraction=extraction,
+            uri=uri,
+        )
+
     cursor_offset = _cursor_offset_for_completion(params.position, extraction.range, reference_len=len(reference))
     if cursor_offset is None:
         return types.CompletionList(is_incomplete=False, items=[])
@@ -946,7 +1367,7 @@ async def _handle_completion(
     items = await _completion_items_for_context(
         ctx,
         extraction_range=extraction.range,
-        python_roots=doc_state.python_roots,
+        python_roots=python_roots,
         anchor_path=anchor_path,
         uri=uri,
         yaml_path=extraction.yaml_path,
@@ -1045,6 +1466,32 @@ class _FixImportRootsProvider:
         ]
 
 
+class _FixImportRootAliasProvider:
+    def can_fix(self, ctx: _QuickFixContext, diagnostic: types.Diagnostic) -> bool:
+        _ = diagnostic
+        if ctx.report.discovery.scalim_yaml_path is None:
+            return False
+        return bool(_first_import_missing_alias(ctx.report))
+
+    def provide(self, ctx: _QuickFixContext, diagnostic: types.Diagnostic) -> List[types.CodeAction]:
+        _ = diagnostic
+        alias = _first_import_missing_alias(ctx.report)
+        if not alias:
+            return []
+        return [
+            types.CodeAction(
+                title="修复: 将 alias `{}` 注册到 `yaml_dsl.import_roots`".format(alias),
+                kind=types.CodeActionKind.QuickFix,
+                is_preferred=not bool(_first_import_escape_dir_rel(ctx.report)),
+                command=types.Command(
+                    title="修复 import alias",
+                    command=_COMMAND_ADD_IMPORT_ROOT_ALIAS,
+                    arguments=[ctx.uri, alias],
+                ),
+            )
+        ]
+
+
 class _FixPythonRootsProvider:
     def can_fix(self, ctx: _QuickFixContext, diagnostic: types.Diagnostic) -> bool:
         _ = diagnostic
@@ -1118,6 +1565,7 @@ class _ExplainPythonResolutionFailureProvider:
 _QUICK_FIX_REGISTRY = _QuickFixRegistry()
 _QUICK_FIX_REGISTRY.register(_DIAG_CODE_MISSING_SCALIM_YAML, _CreateMinimalScalimYamlProvider())
 _QUICK_FIX_REGISTRY.register("yaml_import_expansion_error", _FixImportRootsProvider())
+_QUICK_FIX_REGISTRY.register("yaml_import_expansion_error", _FixImportRootAliasProvider())
 _QUICK_FIX_REGISTRY.register(_DIAG_CODE_MISSING_PYTHON_ROOTS, _FixPythonRootsProvider())
 _QUICK_FIX_REGISTRY.register(_DIAG_CODE_PYTHON_RESOLUTION_FAILED, _ExplainPythonResolutionFailureProvider())
 
@@ -1147,6 +1595,12 @@ def _register_code_actions(server: LanguageServer, state: Dict[str, _DocumentSta
         mode = str(args[1]) if len(args) > 1 else ""
         return await _cmd_add_import_roots(ls, document_uri, mode, state=state)
 
+    @server.command(_COMMAND_ADD_IMPORT_ROOT_ALIAS)
+    async def add_import_root_alias(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
+        document_uri = str(args[0]) if args else ""
+        alias = str(args[1]) if len(args) > 1 else ""
+        return await _cmd_add_import_root_alias(ls, document_uri, alias, state=state)
+
     @server.command(_COMMAND_ADD_PYTHON_ROOTS)
     async def add_python_roots(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
         document_uri = str(args[0]) if args else ""
@@ -1158,6 +1612,11 @@ def _register_code_actions(server: LanguageServer, state: Dict[str, _DocumentSta
         document_uri = str(args[0]) if args else ""
         reference = str(args[1]) if len(args) > 1 else ""
         return await _cmd_explain_resolution_failure(ls, document_uri, reference, state=state)
+
+    @server.command(_COMMAND_PRESET_GET_TEXT)
+    def preset_get_text(_ls: LanguageServer, *args: Any) -> Dict[str, Any]:
+        preset_id = str(args[0]) if args else ""
+        return _cmd_preset_get_text(preset_id)
 
 
 def _dedupe_code_actions(actions: Sequence[types.CodeAction]) -> List[types.CodeAction]:
@@ -1206,7 +1665,7 @@ def _synthetic_project_quick_fix_diagnostics(ctx: _QuickFixContext) -> List[type
         ]
 
     diags: List[types.Diagnostic] = []
-    if _first_import_escape_dir_rel(report):
+    if _has_import_expansion_error(report):
         diags.append(
             types.Diagnostic(
                 range=ctx.params.range,
@@ -1350,6 +1809,30 @@ def _dump_discovery_payload(ls: LanguageServer, document_uri: str) -> Dict[str, 
     if "scalim_yaml_path" not in payload:
         payload["scalim_yaml_path"] = None
     return payload
+
+
+def _cmd_preset_get_text(preset_id: str) -> Dict[str, Any]:
+    pid = str(preset_id or "").strip().lstrip("/")
+    if not pid:
+        return {"ok": False, "kind": "explain_only", "message": "preset_id 不能为空", "hints": []}
+    try:
+        content = load_scalim_preset_yaml_text(pid)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "kind": "explain_only",
+            "message": "加载 preset 失败: {}: {}".format(type(exc).__name__, exc),
+            "hints": [pid],
+        }
+
+    return {
+        "ok": True,
+        "kind": "preset_text",
+        "preset_id": pid,
+        "title": "scalim preset: {}".format(pid),
+        "languageId": "yaml",
+        "content": str(content or ""),
+    }
 
 
 async def _cmd_explain_resolution_failure(
@@ -1506,6 +1989,66 @@ async def _cmd_add_import_roots(  # noqa: C901, PLR0911
     }
 
 
+async def _cmd_add_import_root_alias(  # noqa: PLR0911
+    ls: LanguageServer,
+    document_uri: str,
+    alias: str,
+    *,
+    state: Dict[str, _DocumentState],
+) -> Dict[str, Any]:
+    uri = str(document_uri or "")
+    doc_state = state.get(uri)
+    if doc_state is None or doc_state.report is None:
+        return {"ok": False, "kind": "explain_only", "message": "文档未打开或未同步 diagnostics", "hints": [uri]}
+
+    report = doc_state.report
+    scalim_yaml_path = report.discovery.scalim_yaml_path
+    if scalim_yaml_path is None:
+        return {"ok": False, "kind": "explain_only", "message": "缺少 `scalim.yaml`,请先创建", "hints": []}
+
+    workspace_root = _workspace_root_path(ls)
+    if workspace_root is None:
+        return {"ok": False, "kind": "explain_only", "message": "无法确定 workspace root,拒绝写入", "hints": []}
+    if not _is_within_dir(scalim_yaml_path, workspace_root):
+        return {"ok": False, "kind": "explain_only", "message": "目标不在 workspace 内,拒绝写入", "hints": [str(scalim_yaml_path)]}
+    if not os.access(str(scalim_yaml_path), os.W_OK):
+        return {"ok": False, "kind": "explain_only", "message": "目标文件不可写,拒绝写入", "hints": [str(scalim_yaml_path)]}
+
+    alias_text = str(alias or "").strip()
+    if not alias_text:
+        return {"ok": False, "kind": "explain_only", "message": "alias 不能为空", "hints": []}
+    if alias_text != "@" and not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", alias_text):
+        return {"ok": False, "kind": "explain_only", "message": "alias 格式非法: {!r}".format(alias_text), "hints": []}
+
+    new_text = _update_scalim_yaml_text(
+        scalim_yaml_path.read_text(encoding="utf-8"),
+        import_root_paths_to_add=(),
+        python_roots_to_add=(),
+        import_root_aliases_to_add=((".", alias_text),),
+    )
+    if new_text is None:
+        return {"ok": False, "kind": "explain_only", "message": "无法解析/更新 `scalim.yaml`", "hints": [str(scalim_yaml_path)]}
+
+    edit = _workspace_edit_replace_entire_file(scalim_yaml_path, new_text)
+    try:
+        result = await ls.workspace_apply_edit_async(types.ApplyWorkspaceEditParams(edit=edit, label="更新 `import_roots` 的 `alias`"))
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("更新 `import_roots` 的 `alias` 失败: %s: %s", type(exc).__name__, exc)
+        return {
+            "ok": False,
+            "kind": "explain_only",
+            "message": "更新失败: {}: {}".format(type(exc).__name__, exc),
+            "hints": [str(scalim_yaml_path)],
+        }
+
+    return {
+        "ok": bool(result.applied),
+        "kind": "workspace_edit",
+        "applied": bool(result.applied),
+        "failure_reason": str(result.failure_reason or ""),
+    }
+
+
 async def _cmd_add_python_roots(  # noqa: C901, PLR0911
     ls: LanguageServer,
     document_uri: str,
@@ -1586,6 +2129,10 @@ def _is_within_dir(path: Path, root: Path) -> bool:
     return True
 
 
+def _has_import_expansion_error(report: YamlDslEditorDiagnosticsResult) -> bool:
+    return any(str(item.code) == "yaml_import_expansion_error" for item in list(report.errors) + list(report.warnings))
+
+
 def _first_import_escape_dir_rel(report: YamlDslEditorDiagnosticsResult) -> str:
     for item in list(report.errors) + list(report.warnings):
         if str(item.code) != "yaml_import_expansion_error":
@@ -1603,6 +2150,28 @@ def _first_import_escape_dir_rel(report: YamlDslEditorDiagnosticsResult) -> str:
             return ""
         rel_text = rel.as_posix().strip("/")
         return rel_text or "."
+    return ""
+
+
+def _first_import_missing_alias(report: YamlDslEditorDiagnosticsResult) -> str:
+    """尝试从 import expansion error 中推断缺失的 import root alias(例如 `@`/`COMMON`)."""
+    for item in list(report.errors) + list(report.warnings):
+        if str(item.code) != "yaml_import_expansion_error":
+            continue
+        msg = str(item.message or "")
+        if _IMPORT_RESERVED_ALIAS_MARKER not in msg:
+            continue
+        match = _IMPORT_RAW_PATH_RE.search(msg)
+        raw_path = match.group(1) if match is not None else ""
+        raw_path = str(raw_path or "")
+        if raw_path.startswith("@/"):
+            return "@"
+        token_match = _IMPORT_ALIAS_TOKEN_RE.match(raw_path)
+        if token_match is None:
+            continue
+        alias = token_match.group(1)
+        if isinstance(alias, str) and alias.strip():
+            return alias.strip()
     return ""
 
 
@@ -1647,7 +2216,8 @@ def _render_scalim_yaml_content(*, import_roots: Sequence[Dict[str, str]], pytho
             alias = root.get("alias")
             alias_text = str(alias or "").strip() if alias is not None else ""
             if alias_text:
-                lines.append("      alias: {}".format(alias_text))
+                # Always quote to keep YAML valid for special tokens like `@`.
+                lines.append('      alias: "{}"'.format(alias_text))
     if python_roots:
         lines.append("  lsp:")
         lines.append("    python_roots:")
@@ -1664,11 +2234,12 @@ def _yaml_rt() -> YAML:
     return yaml_rt
 
 
-def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
+def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912, PLR0915
     raw_text: str,
     *,
     import_root_paths_to_add: Sequence[str],
     python_roots_to_add: Sequence[str],
+    import_root_aliases_to_add: Sequence[Tuple[str, str]] = (),
 ) -> Optional[str]:
     yaml_rt = _yaml_rt()
     try:
@@ -1687,7 +2258,7 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
         return None
     yaml_dsl: Any = yaml_dsl_obj
 
-    if import_root_paths_to_add:
+    if import_root_paths_to_add or import_root_aliases_to_add:
         roots_obj = yaml_dsl.get("import_roots")
         if roots_obj is None:
             roots_obj = []
@@ -1696,7 +2267,8 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
             return None
         import_roots: List[Any] = roots_obj
 
-        existing_paths: Dict[str, None] = {}
+        existing_by_path: Dict[str, Dict[str, Any]] = {}
+        existing_aliases: Dict[str, None] = {}
         for item in import_roots:
             if not isinstance(item, dict):
                 return None
@@ -1704,14 +2276,41 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912
             raw_path = item_dict.get("path")
             if not isinstance(raw_path, str) or not raw_path.strip():
                 continue
-            existing_paths[_normalize_rel_path_text(str(raw_path))] = None
+            normalized = _normalize_rel_path_text(str(raw_path))
+            existing_by_path[normalized] = item_dict
+            raw_alias = item_dict.get("alias")
+            if isinstance(raw_alias, str) and raw_alias.strip():
+                existing_aliases[str(raw_alias).strip()] = None
 
         for raw in import_root_paths_to_add:
             normalized = _normalize_rel_path_text(raw)
-            if normalized in existing_paths:
+            if normalized in existing_by_path:
                 continue
             import_roots.append({"path": normalized})
-            existing_paths[normalized] = None
+            existing_by_path[normalized] = cast("Dict[str, Any]", import_roots[-1])
+
+        for raw_path, raw_alias in import_root_aliases_to_add:
+            normalized_path = _normalize_rel_path_text(raw_path)
+            alias = str(raw_alias or "").strip()
+            if not alias:
+                continue
+            if alias in existing_aliases:
+                continue
+
+            existing_item = existing_by_path.get(normalized_path)
+            if existing_item is not None:
+                existing_alias = existing_item.get("alias")
+                if not isinstance(existing_alias, str) or not existing_alias.strip():
+                    existing_item["alias"] = alias
+                else:
+                    # Path already has a different alias; append a new entry.
+                    import_roots.append({"path": normalized_path, "alias": alias})
+                    existing_by_path[normalized_path] = cast("Dict[str, Any]", import_roots[-1])
+            else:
+                import_roots.append({"path": normalized_path, "alias": alias})
+                existing_by_path[normalized_path] = cast("Dict[str, Any]", import_roots[-1])
+
+            existing_aliases[alias] = None
 
     if python_roots_to_add:
         lsp_obj = yaml_dsl.get("lsp")
@@ -1866,6 +2465,11 @@ def _extract_reference_for_lsp(yaml_text: str, position: types.Position) -> Yaml
 def _extract_import_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
     editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
     return extract_yaml_dsl_import_reference_by_cursor(yaml_text, editor_pos)
+
+
+def _extract_import_path_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
+    editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
+    return extract_yaml_dsl_import_path_reference_by_cursor(yaml_text, editor_pos)
 
 
 def _extract_entity_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:

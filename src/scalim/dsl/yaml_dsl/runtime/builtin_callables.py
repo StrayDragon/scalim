@@ -45,6 +45,24 @@ def list_public_builtin_callable_ids() -> Tuple[str, ...]:
     return tuple(sorted(_DEFAULT_PUBLIC_BUILTIN_CALLABLE_IDS))
 
 
+def list_public_builtin_callable_python_references() -> Dict[str, str]:
+    """返回编辑器侧可用的 `builtin callable` 映射(只读、保守词表).
+
+    返回:
+    - 键: `builtin callable id`(不含 `^`)
+    - 值: `Python reference`,形如 `pkg.module:func`
+
+    说明:
+    - 该映射仅用于编辑器/`LSP` 的 `hover`/`definition`,不影响运行时解析逻辑。
+    - 仅暴露对外公开的 `builtin ids`,避免把内部实现细节变成“可枚举的任意符号入口”。
+    """
+    refs: Dict[str, str] = {}
+    for builtin_id in list_public_builtin_callable_ids():
+        fn = _DEFAULT_BUILTIN_CALLABLES_BY_ID[builtin_id]
+        refs[builtin_id] = "{}:{}".format(fn.__module__, fn.__name__)
+    return refs
+
+
 def resolve_builtin_callable_reference(
     reference: str,
     *,
@@ -74,6 +92,7 @@ __all__ = (
     "is_builtin_callable_reference",
     "list_builtin_callable_ids",
     "list_public_builtin_callable_ids",
+    "list_public_builtin_callable_python_references",
     "parse_builtin_callable_id",
     "resolve_builtin_callable_reference",
 )

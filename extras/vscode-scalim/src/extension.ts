@@ -24,6 +24,8 @@ const DEFAULT_ENV_MODE = "auto";
 const DEFAULT_WORKSPACE_VENV_PATH = ".venv";
 const DEFAULT_AUTO_RESTART_ON_SCALIM_YAML_CHANGE = false;
 
+const PRESET_VDOC_SCHEME = "scalim-preset";
+
 type EnvMode = "pinnedVenv" | "workspaceVenv" | "auto" | "path";
 
 type ActiveDocumentKind = "demand" | "workflow" | "config";
@@ -367,6 +369,9 @@ function documentPreviewText(document: vscode.TextDocument, maxLines = 200): str
 
 function isLikelyScalimYamlDslDocument(document: vscode.TextDocument): boolean {
 	if (document.languageId !== "yaml") {
+		return false;
+	}
+	if (document.uri.scheme === PRESET_VDOC_SCHEME) {
 		return false;
 	}
 
@@ -2128,6 +2133,44 @@ async function handleScalimYamlChanged(context: vscode.ExtensionContext, output:
 	}
 }
 
+function registerPresetVirtualDocuments(context: vscode.ExtensionContext): void {
+	const provider: vscode.TextDocumentContentProvider = {
+		provideTextDocumentContent: async (uri) => {
+			const presetId = decodeURIComponent(uri.path.replace(/^\/+/, ""));
+			if (!presetId) {
+				return "# Invalid scalim preset uri (missing presetId)\n";
+			}
+			try {
+				const payload = (await vscode.commands.executeCommand("scalim.preset.getText", presetId)) as unknown;
+				if (payload && typeof payload === "object") {
+					const obj = payload as { ok?: boolean; content?: string; message?: string };
+					if (obj.ok && typeof obj.content === "string") {
+						return obj.content;
+					}
+					if (typeof obj.message === "string" && obj.message.trim()) {
+						return `# Failed to load preset: ${obj.message}\n`;
+					}
+				}
+				return "# Failed to load preset (unknown server response)\n";
+			} catch (err) {
+				return `# Failed to load preset: ${String(err)}\n`;
+			}
+		},
+	};
+
+	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(PRESET_VDOC_SCHEME, provider));
+	context.subscriptions.push(
+		vscode.workspace.onDidOpenTextDocument((document) => {
+			if (document.uri.scheme !== PRESET_VDOC_SCHEME) {
+				return;
+			}
+			if (document.languageId !== "yaml") {
+				void vscode.languages.setTextDocumentLanguage(document, "yaml");
+			}
+		}),
+	);
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	const output = vscode.window.createOutputChannel("Scalim YAML DSL");
 	context.subscriptions.push(output);
@@ -2244,6 +2287,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	watcher.onDidDelete(() => {
 		void handleScalimYamlChanged(context, output, "deleted");
 	});
+
+	registerPresetVirtualDocuments(context);
 
 	context.subscriptions.push(
 		vscode.window.onDidChangeActiveTextEditor((editor) => {

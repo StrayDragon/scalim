@@ -5,6 +5,7 @@ from scalim.dsl.yaml_dsl.reference_syntax import is_valid_callable_reference
 from scalim.dsl.yaml_dsl.runtime.builtin_callables import (
     is_builtin_callable_reference,
     list_builtin_callable_ids,
+    list_public_builtin_callable_python_references,
     parse_builtin_callable_id,
 )
 from scalim.dsl.yaml_dsl.runtime.compiler import create_reference_resolver
@@ -27,6 +28,11 @@ def test_is_builtin_callable_reference_smoke() -> None:
 
 def test_list_builtin_callable_ids_smoke() -> None:
     assert "workflow/book_sheet_rows" in list_builtin_callable_ids()
+
+
+def test_list_public_builtin_callable_python_references_smoke() -> None:
+    refs = list_public_builtin_callable_python_references()
+    assert refs["workflow/book_sheet_rows"] == "scalim.workflow.loaders:book_sheet_rows"
 
 
 def test_parse_call_by_accepts_builtin_reference() -> None:

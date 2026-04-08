@@ -482,6 +482,227 @@ def test_lsp_server_import_definition_path_escapes_allowed_roots_degrades_to_emp
         client.shutdown()
 
 
+def test_lsp_server_builtin_callable_definition_hover_and_completion(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: ^workflow/book_sheet_rows",
+            "  fields: {a: {}}",
+            "outputs: []",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        line_idx = next(i for i, line in enumerate(yaml_text.splitlines()) if "loader:" in line)
+        line_text = yaml_text.splitlines()[line_idx]
+        cursor_char = int(line_text.index("^workflow")) + len("^work")
+
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": line_idx, "character": cursor_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+        items = completion_resp.get("result", {}).get("items", [])
+        labels = {item.get("label") for item in items}
+        assert "workflow/book_sheet_rows" in labels
+
+        hover_id = client.send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": line_idx, "character": cursor_char},
+            },
+        )
+        hover_resp = client.recv_until(lambda msg: msg.get("id") == hover_id, timeout=10.0)
+        assert "error" not in hover_resp
+        hover = hover_resp.get("result") or {}
+        value = (hover.get("contents") or {}).get("value") if isinstance(hover, dict) else ""
+        assert isinstance(value, str)
+        assert "builtin:" in value
+        assert "workflow/book_sheet_rows" in value
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": line_idx, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+
+        import scalim.workflow.loaders as loaders
+
+        expected_uri = Path(str(loaders.__file__)).resolve().as_uri()
+        locations = definition_resp.get("result") or []
+        assert any(loc.get("uri") == expected_uri for loc in locations)
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_imports_path_definition_completion_and_preset_definition(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    fragments_dir = workspace / "fragments"
+    fragments_dir.mkdir()
+    fragment_path = fragments_dir / "common.yaml"
+    fragment_path.write_text("x: 1\n", encoding="utf-8")
+
+    (workspace / "scalim.yaml").write_text(
+        "\n".join(
+            [
+                "yaml_dsl:",
+                "  import_roots:",
+                "    - path: .",
+                '      alias: "@"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "imports:",
+            '  common: "@/fragments/common.yaml"',
+            "  preset: scalim://yaml-dsl/presets/common.yaml",
+            "name: demo",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        # imports.common path completion
+        import_line_idx = next(i for i, line in enumerate(yaml_text.splitlines()) if "common:" in line)
+        import_line = yaml_text.splitlines()[import_line_idx]
+        cursor_char = int(import_line.index("common.yaml")) + len("co")
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": import_line_idx, "character": cursor_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+        items = completion_resp.get("result", {}).get("items", [])
+        labels = {item.get("label") for item in items}
+        assert "fragments/common.yaml" in labels
+
+        # imports.common definition -> fragment file
+        cursor_char = int(import_line.index("fragments")) + 2
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": import_line_idx, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+        locations = definition_resp.get("result") or []
+        assert any(loc.get("uri") == fragment_path.as_uri() for loc in locations)
+
+        # imports.preset definition -> virtual document uri
+        preset_line_idx = next(i for i, line in enumerate(yaml_text.splitlines()) if "preset:" in line)
+        preset_line = yaml_text.splitlines()[preset_line_idx]
+        preset_char = int(preset_line.index("scalim://")) + 2
+        preset_def_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": preset_line_idx, "character": preset_char},
+            },
+        )
+        preset_def_resp = client.recv_until(lambda msg: msg.get("id") == preset_def_id, timeout=10.0)
+        assert "error" not in preset_def_resp
+        preset_locations = preset_def_resp.get("result") or []
+        assert any(str(loc.get("uri") or "").startswith("scalim-preset:///yaml-dsl/presets/") for loc in preset_locations)
+
+        # executeCommand -> preset text
+        cmd_id = client.send_request(
+            "workspace/executeCommand",
+            {"command": "scalim.preset.getText", "arguments": ["yaml-dsl/presets/common.yaml"]},
+        )
+        cmd_resp = client.recv_until(lambda msg: msg.get("id") == cmd_id, timeout=10.0)
+        assert "error" not in cmd_resp
+        payload = cmd_resp.get("result") or {}
+        assert payload.get("ok") is True
+        assert "demo:" in str(payload.get("content") or "")
+    finally:
+        client.shutdown()
+
+
 def test_lsp_server_yaml_entity_definition_hover_and_completion(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
