@@ -12,6 +12,7 @@ def test_demo_big_data_report_selected_chapters_pass() -> None:
             "workflow_yaml",
             "workflow_demo_big_data_report",
             "yaml_dsl_debugging",
+            "yaml_dsl_call_by_keyword_only",
         ]
     )
     results.extend(run_selected_ir_chapters(chapter_ids=["ch010_basics", "ch090_guardrails"]))

@@ -32,6 +32,7 @@ from ...schema_dsl.models import (
 )
 from ..errors import ScalimConversionError
 from ..references import PythonReferenceResolver
+from .call_by_signature import validate_call_by_signature
 from .conversion_bindings import ConfigToIRConversionBindingMixin
 from .conversion_lookup import CALL_BY_CTX_KEY, validate_source_id
 from .conversion_relations import ConfigToIRConversionRelationMixin
@@ -565,6 +566,16 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         except Exception as exc:
             msg = "Derived field '{}' failed to resolve call_by reference '{}': {}".format(field_id, parsed.reference, exc)
             raise ScalimConversionError(msg) from exc
+
+        try:
+            validate_call_by_signature(
+                location="派生字段 '{}'".format(field_id),
+                call_by=call_by,
+                parsed=parsed,
+                fn=fn,
+            )
+        except TypeError as exc:
+            raise ScalimConversionError(str(exc)) from exc
 
         def calculator(**field_values: RuntimeValue) -> FieldValue:
             args: List[RuntimeValue] = []

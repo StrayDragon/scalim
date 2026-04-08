@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime._internal.call_by_signature import validate_call_by_signature
 from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
 from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceFieldConfig
 from scalim.execution.context import BatchContext
@@ -27,6 +28,94 @@ def test_parse_call_by_extracts_reference_and_dependencies() -> None:
 
     dotted = parse_call_by("tests.fixtures.call_by_fns.echo(1)")
     assert dotted.reference == "tests.fixtures.call_by_fns.echo"
+
+
+def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
+    # NOTE: This is a pure helper unit test. We pass local callables to
+    # cover the signature-binding branches deterministically.
+
+    def _fn_kwonly(*, a):  # type: ignore[no-untyped-def]
+        return a
+
+    def _fn_positional(a):  # type: ignore[no-untyped-def]
+        return a
+
+    def _fn_kwargs_only(**_kw):  # type: ignore[no-untyped-def]
+        return None
+
+    def _fn_kwonly_kwargs(*, a, **_kw):  # type: ignore[no-untyped-def]
+        return a
+
+    # 1) `inspect.signature` unavailable (non-callable) -> no-op
+    validate_call_by_signature(
+        location="case1",
+        call_by="tests.fixtures.call_by_fns:echo()",
+        parsed=parse_call_by("tests.fixtures.call_by_fns:echo()"),
+        fn=object(),  # type: ignore[arg-type]
+    )
+
+    # 2) args empty -> hint is None (unexpected keyword)
+    with pytest.raises(TypeError, match="函数签名不匹配"):
+        validate_call_by_signature(
+            location="case2",
+            call_by="tests.fixtures.call_by_fns:echo(bad=1)",
+            parsed=parse_call_by("tests.fixtures.call_by_fns:echo(bad=1)"),
+            fn=_fn_kwonly,
+        )
+
+    # 3) signature accepts positional -> hint is None (too many positional args)
+    with pytest.raises(TypeError, match="函数签名不匹配"):
+        validate_call_by_signature(
+            location="case3",
+            call_by="tests.fixtures.call_by_fns:echo(a, b)",
+            parsed=parse_call_by("tests.fixtures.call_by_fns:echo(a, b)"),
+            fn=_fn_positional,
+        )
+
+    # 4) no positional, no kw-only (only **kwargs) -> hint is None
+    with pytest.raises(TypeError, match="函数签名不匹配"):
+        validate_call_by_signature(
+            location="case4",
+            call_by="tests.fixtures.call_by_fns:echo(a)",
+            parsed=parse_call_by("tests.fixtures.call_by_fns:echo(a)"),
+            fn=_fn_kwargs_only,
+        )
+
+    # 5) kw-only + kwargs present -> hint uses generic message
+    with pytest.raises(TypeError, match="请使用关键字传参"):
+        validate_call_by_signature(
+            location="case5",
+            call_by="tests.fixtures.call_by_fns:echo(a, extra=1)",
+            parsed=parse_call_by("tests.fixtures.call_by_fns:echo(a, extra=1)"),
+            fn=_fn_kwonly_kwargs,
+        )
+
+    # 6) kw-only but field name mismatched -> generic hint
+    with pytest.raises(TypeError, match="请使用关键字传参"):
+        validate_call_by_signature(
+            location="case6",
+            call_by="tests.fixtures.call_by_fns:echo(b)",
+            parsed=parse_call_by("tests.fixtures.call_by_fns:echo(b)"),
+            fn=_fn_kwonly,
+        )
+
+    # 7) kw-only and literal positional -> generic hint
+    with pytest.raises(TypeError, match="请使用关键字传参"):
+        validate_call_by_signature(
+            location="case7",
+            call_by="tests.fixtures.call_by_fns:echo(1)",
+            parsed=parse_call_by("tests.fixtures.call_by_fns:echo(1)"),
+            fn=_fn_kwonly,
+        )
+
+    # 8) kw-only and positional field matches -> rewrite hint
+    with pytest.raises(TypeError, match="可改写为:"):
+        validate_call_by_signature(
+            location="case8",
+            call_by="tests.fixtures.call_by_fns:echo(a)",
+            parsed=parse_call_by("tests.fixtures.call_by_fns:echo(a)"),
+            fn=_fn_kwonly,
+        )
 
 
 def test_parse_call_by_dedupes_dependencies() -> None:
@@ -304,6 +393,56 @@ def test_converter_compiles_call_by_and_ctx() -> None:
     # Use a minimal duck-typed ctx in this unit test.
     result = derived.compute(status=True, **{"$ctx": type("Ctx", (), ctx)()})
     assert result == "ok:1:2"
+
+
+def test_converter_rejects_call_by_positional_arg_for_keyword_only_param() -> None:
+    # `is_valid_group(*, group_name, **kw)` requires keyword-only `group_name`.
+    # Positional call_by args should fast-fail at compile-time (conversion), instead of being swallowed as a compute TypeError.
+    converter = ConfigToIRConverter(
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    config = DemandConfig(
+        name="demo",
+        main_source=MainSourceConfig(source_id="orders", loader="tests.fixtures.call_by_fns:dummy_main_loader"),
+        sources={},
+        source_fields={"group_name": SourceFieldConfig(field_id="group_name", source="orders", extract="group_name")},
+        derived_fields={
+            "ok": DerivedFieldConfig(
+                field_id="ok",
+                name="ok",
+                call_by="tests.fixtures.call_by_fns:is_valid_group(group_name)",
+                depends_on=("group_name",),
+            )
+        },
+    )
+
+    with pytest.raises(ScalimConversionError, match="函数签名不匹配"):
+        converter.convert(config)
+
+
+def test_converter_accepts_call_by_keyword_arg_for_keyword_only_param() -> None:
+    converter = ConfigToIRConverter(
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    config = DemandConfig(
+        name="demo",
+        main_source=MainSourceConfig(source_id="orders", loader="tests.fixtures.call_by_fns:dummy_main_loader"),
+        sources={},
+        source_fields={"group_name": SourceFieldConfig(field_id="group_name", source="orders", extract="group_name")},
+        derived_fields={
+            "ok": DerivedFieldConfig(
+                field_id="ok",
+                name="ok",
+                call_by="tests.fixtures.call_by_fns:is_valid_group(group_name=group_name)",
+                depends_on=("group_name",),
+            )
+        },
+    )
+
+    demand_ir = converter.convert(config)
+    derived = demand_ir.fields["ok"]
+    assert isinstance(derived, DerivedFieldIr)
+    assert derived.compute(group_name="vip", **{"$ctx": object()}) is True
 
 
 def test_converter_call_by_accepts_decimal_result() -> None:

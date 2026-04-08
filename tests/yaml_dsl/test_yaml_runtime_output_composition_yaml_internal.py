@@ -62,6 +62,16 @@ def _csv_config(path):  # type: ignore[no-untyped-def]
     )
 
 
+def test_compile_call_by_post_field_fast_fails_on_kwonly_signature_mismatch() -> None:
+    resolver = _tests_resolver()
+    with pytest.raises(ValueError, match="函数签名不匹配"):
+        oc_yaml._compile_call_by_post_field(  # noqa: SLF001
+            out_field_id="ok",
+            call_by="tests.fixtures.call_by_fns:is_valid_group(group_name)",
+            resolver=resolver,
+        )
+
+
 def test_export_layout_for_derived_field_id_header_has_no_header_names() -> None:
     demand_ir = _make_demand_ir(field_name_by_id={"a": "A"})
 

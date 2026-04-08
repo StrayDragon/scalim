@@ -26,6 +26,17 @@ def calc_risky_score(*, ticket_id: object) -> float:
     return 100 / (tid - 1001)
 
 
+def is_valid_group(*, group_name: object, **_kw: object) -> bool:
+    """演示: keyword-only 参数的 call_by 绑定.
+
+    该函数故意使用 `(*, group_name, **kw)` 签名,用于回归:
+    - YAML `call_by: "...:is_valid_group(group_name)"` 会被解析成位置参数,应在编译期 fast-fail
+    - 正确写法: `call_by: "...:is_valid_group(group_name=group_name)"`
+    """
+    text = str(group_name or "").strip()
+    return bool(text)
+
+
 # -----------------------------------------------------------------------------
 # Deterministic fixtures (loaders)
 # -----------------------------------------------------------------------------

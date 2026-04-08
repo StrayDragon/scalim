@@ -41,3 +41,7 @@ def type_name(value: Any) -> str:
 
 def decimal_from_value(value: Any) -> Decimal:
     return Decimal(str(value))
+
+
+def is_valid_group(*, group_name, **_kw):  # type: ignore[no-untyped-def]
+    return bool(str(group_name or "").strip())

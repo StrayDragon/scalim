@@ -1,9 +1,9 @@
 generated_by: scripts/gen-marimo-coverage.py
 summary:
-  ok: 35
-  total: 35
+  ok: 36
+  total: 36
 warnings[0	]:
-rows[35	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
+rows[36	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   hub	demo_big_data_report/demo_main.py	notebooks/marimo/demo_big_data_report/demo_main.py	null	just examples	null	true	null
   hub	example_public_api_suite/demo_main.py	notebooks/marimo/example_public_api_suite/demo_main.py	null	just examples	null	true	null
   fixture	canonical_yaml/demand	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml	null	just examples	null	true	"schema_ok: ../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json"
@@ -15,6 +15,7 @@ rows[35	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   chapter	demo_big_data_report/workflow_yaml	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch040_workflow_yaml.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch040_workflow_yaml.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/workflow_demo_big_data_report	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch050_workflow_demo_big_data_report.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch050_workflow_demo_big_data_report.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/yaml_dsl_debugging	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch060_yaml_dsl_debugging.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch060_yaml_dsl_debugging.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
+  chapter	demo_big_data_report/yaml_dsl_call_by_keyword_only	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch061_yaml_dsl_call_by_keyword_only.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch061_yaml_dsl_call_by_keyword_only.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/yaml_dsl_output_failure_policy	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch070_yaml_dsl_output_failure_policy.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch070_yaml_dsl_output_failure_policy.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/yaml_dsl_observability_full	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/workflow_shared_workbooks	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch090_workflow_shared_workbooks.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch090_workflow_shared_workbooks.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
