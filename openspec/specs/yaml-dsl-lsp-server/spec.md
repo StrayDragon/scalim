@@ -70,7 +70,9 @@
 - 定义定位 MUST 基于 project discovery 的 `python_roots` 与文件系统/AST 分析
 - 当引用为相对模块时，系统 MUST 基于文档 URI 推导 `yaml_path` 并交由 shared core 在 `yaml_path + python_roots` 上下文内完成规范化与解析
 - 对 `module:obj.method` 形态，系统 MUST 复用 shared core 的静态推断能力，尽可能把第一个 location 定位到真实实现（例如 `Klass.method`）
-- definition MUST 支持返回多个 locations，且顺序 MUST 稳定：真实实现优先，其后为对象定义/赋值等备选位置
+- definition MUST 支持返回多个 locations，且 MUST 稳定排序 + 去重：
+  - locations MUST 稳定排序：真实实现优先；同优先级按 path → line 排序
+  - locations MUST 去重：同 URI + 同 range 视为同一候选
 - 解析失败时 MUST 返回空结果且给出可诊断信息(不得 crash)
 
 #### Scenario: definition resolution locates a Python function

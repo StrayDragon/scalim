@@ -45,6 +45,7 @@ from scalim.dsl.yaml_dsl.reference_syntax import (
 )
 from scalim.vendor.yamlx import yaml
 
+from .cache import load_yaml_mapping_cached, parse_python_ast_cached
 from .cursor_extraction import (
     YamlCursorExtractionResult,
     extract_yaml_dsl_import_reference_by_cursor,
@@ -158,9 +159,50 @@ class PythonDefinitionLocation:
 
 
 @dataclass(frozen=True)
+class ResolutionStep:
+    action: str
+    input: str = ""
+    output: str = ""
+    rejected: bool = False
+    reason: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "action": str(self.action),
+            "input": str(self.input),
+        }
+        if self.output:
+            payload["output"] = str(self.output)
+        if self.rejected:
+            payload["rejected"] = True
+        if self.reason:
+            payload["reason"] = str(self.reason)
+        return payload
+
+
+@dataclass(frozen=True)
+class ResolutionTrace:
+    query: str
+    steps: Tuple[ResolutionStep, ...] = ()
+    locations: Tuple[PythonDefinitionLocation, ...] = ()
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "query": str(self.query),
+            "steps": [step.as_dict() for step in self.steps],
+            "locations": [loc.as_dict() for loc in self.locations],
+        }
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
 class PythonDefinitionResult:
     locations: Tuple[PythonDefinitionLocation, ...] = ()
     warnings: Tuple[str, ...] = ()
+    trace: Optional[ResolutionTrace] = None
 
     def as_dict(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
@@ -168,6 +210,8 @@ class PythonDefinitionResult:
         }
         if self.warnings:
             payload["warnings"] = list(self.warnings)
+        if self.trace is not None:
+            payload["trace"] = self.trace.as_dict()
         return payload
 
 
@@ -526,20 +570,38 @@ def resolve_python_definition(
 ) -> PythonDefinitionResult:
     """静态解析 `Python` 引用并返回定义位置(不执行用户代码)."""
     warnings: List[str] = []
+    steps: List[ResolutionStep] = []
     raw = str(reference or "").strip()
     if not raw:
-        return PythonDefinitionResult(locations=(), warnings=("引用不能为空",))
+        msg = "引用不能为空"
+        warnings.append(msg)
+        _trace_add_step(steps, action="validate_reference", input_text=str(reference or ""), rejected=True, reason=msg)
+        trace = ResolutionTrace(query=str(reference or ""), steps=tuple(steps), locations=(), warnings=tuple(warnings))
+        return PythonDefinitionResult(locations=(), warnings=tuple(warnings), trace=trace)
 
     if is_valid_builtin_callable_reference(raw):
-        warnings.append("builtin callable 引用不支持 go-to-definition")
-        return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
+        msg = "builtin callable 引用不支持 go-to-definition"
+        warnings.append(msg)
+        _trace_add_step(steps, action="validate_reference", input_text=raw, rejected=True, reason=msg)
+        trace = ResolutionTrace(query=raw, steps=tuple(steps), locations=(), warnings=tuple(warnings))
+        return PythonDefinitionResult(locations=(), warnings=tuple(warnings), trace=trace)
 
     try:
         parsed = parse_python_reference(raw)
     except ScalimReferenceSyntaxError as exc:
-        warnings.append(str(exc))
-        return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
+        msg = str(exc)
+        warnings.append(msg)
+        _trace_add_step(steps, action="parse_reference", input_text=raw, rejected=True, reason=msg)
+        trace = ResolutionTrace(query=raw, steps=tuple(steps), locations=(), warnings=tuple(warnings))
+        return PythonDefinitionResult(locations=(), warnings=tuple(warnings), trace=trace)
+    _trace_add_step(
+        steps,
+        action="parse_reference",
+        input_text=raw,
+        output="module_path='{}' attr_path='{}'".format(parsed.module_path, ".".join(parsed.attr_path)),
+    )
 
+    before_warnings = len(warnings)
     module_path = _normalize_python_module_path(
         parsed.module_path,
         python_roots=python_roots,
@@ -547,7 +609,11 @@ def resolve_python_definition(
         warnings=warnings,
     )
     if not module_path:
-        return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
+        reason = "; ".join(warnings[before_warnings:]) if len(warnings) > before_warnings else "无法解析 module_path"
+        _trace_add_step(steps, action="normalize_module_path", input_text=str(parsed.module_path), rejected=True, reason=reason)
+        trace = ResolutionTrace(query=raw, steps=tuple(steps), locations=(), warnings=tuple(warnings))
+        return PythonDefinitionResult(locations=(), warnings=tuple(warnings), trace=trace)
+    _trace_add_step(steps, action="normalize_module_path", input_text=str(parsed.module_path), output=str(module_path))
 
     parsed = ParsedReference(
         reference=parsed.reference,
@@ -556,14 +622,18 @@ def resolve_python_definition(
         style=parsed.style,
     )
 
-    locations = _resolve_python_definition_locations(parsed, python_roots=python_roots, warnings=warnings)
+    locations = _resolve_python_definition_locations(parsed, python_roots=python_roots, warnings=warnings, trace_steps=steps)
     if not locations:
         if any(("模块语法解析失败" in w or "读取模块文件失败" in w) for w in warnings) and not any(
             "无法解析符号定义" in w for w in warnings
         ):
             warnings.append("无法解析符号定义: {}".format(parsed.reference))
-        return PythonDefinitionResult(locations=(), warnings=tuple(warnings))
-    return PythonDefinitionResult(locations=locations, warnings=tuple(warnings))
+        _trace_add_step(steps, action="finalize_locations", input_text=str(parsed.reference), rejected=True, reason="no locations")
+        trace = ResolutionTrace(query=raw, steps=tuple(steps), locations=(), warnings=tuple(warnings))
+        return PythonDefinitionResult(locations=(), warnings=tuple(warnings), trace=trace)
+
+    trace = ResolutionTrace(query=raw, steps=tuple(steps), locations=locations, warnings=tuple(warnings))
+    return PythonDefinitionResult(locations=locations, warnings=tuple(warnings), trace=trace)
 
 
 def resolve_yaml_import_definition(
@@ -1018,8 +1088,7 @@ def _is_fragment_mapping_resolvable(
     warnings: List[str],
 ) -> bool:
     try:
-        text = fragment_yaml_path.read_text(encoding="utf-8")
-        loaded, _locations, _lines = load_yaml_mapping_text(text, source_path=str(fragment_yaml_path), detect_duplicate_keys=True)
+        loaded, _locations, _lines = load_yaml_mapping_cached(fragment_yaml_path)
     except ScalimYamlValidationError as exc:
         msg = exc.errors[0].message if exc.errors else str(exc)
         warnings.append("fragment YAML 解析失败: {}".format(msg))
@@ -1039,8 +1108,7 @@ def _locate_fragment_key_location(
     warnings: List[str],
 ) -> Optional[YamlImportDefinitionLocation]:
     try:
-        text = fragment_yaml_path.read_text(encoding="utf-8")
-        loaded, locations, _lines = load_yaml_mapping_text(text, source_path=str(fragment_yaml_path), detect_duplicate_keys=True)
+        loaded, locations, _lines = load_yaml_mapping_cached(fragment_yaml_path)
     except ScalimYamlValidationError as exc:
         msg = exc.errors[0].message if exc.errors else str(exc)
         warnings.append("fragment YAML 解析失败: {}".format(msg))
@@ -1181,14 +1249,102 @@ class _ResolvedClassDef:
     node: ast.ClassDef
 
 
+_P0_IMPL = 0
+_P1_BINDING = 1
+_P2_FALLBACK = 2
+
+
+@dataclass(frozen=True)
+class _LocationCandidate:
+    priority: int
+    location: PythonDefinitionLocation
+    label: str = ""
+
+
+def _trace_add_step(
+    trace_steps: Optional[List[ResolutionStep]],
+    *,
+    action: str,
+    input_text: str,
+    output: str = "",
+    rejected: bool = False,
+    reason: str = "",
+) -> None:
+    if trace_steps is None:
+        return
+    trace_steps.append(
+        ResolutionStep(
+            action=str(action),
+            input=str(input_text),
+            output=str(output or ""),
+            rejected=bool(rejected),
+            reason=str(reason or ""),
+        )
+    )
+
+
+def _candidate_from_node(
+    *,
+    priority: int,
+    file_path: str,
+    module_path: str,
+    symbol_path: str,
+    node: ast.AST,
+    label: str = "",
+) -> _LocationCandidate:
+    return _LocationCandidate(
+        priority=int(priority),
+        location=_definition_location_from_node(
+            file_path=file_path,
+            module_path=module_path,
+            symbol_path=symbol_path,
+            node=node,
+        ),
+        label=str(label or ""),
+    )
+
+
+def _candidate_sort_key(candidate: _LocationCandidate) -> Tuple[int, str, int, int]:
+    rng = candidate.location.range
+    start_line = int(rng.start.line) if rng is not None else 0
+    start_col = int(rng.start.column) if rng is not None else 0
+    return (int(candidate.priority), str(candidate.location.file_path), start_line, start_col)
+
+
+def _location_dedupe_key(location: PythonDefinitionLocation) -> Tuple[Any, ...]:
+    rng = location.range
+    if rng is None:
+        return (str(location.file_path), None, str(location.symbol_path or ""))
+    return (
+        str(location.file_path),
+        int(rng.start.line),
+        int(rng.start.column),
+        int(rng.end.line),
+        int(rng.end.column),
+    )
+
+
+def _finalize_location_candidates(candidates: Sequence[_LocationCandidate]) -> Tuple[PythonDefinitionLocation, ...]:
+    out: List[PythonDefinitionLocation] = []
+    seen: Set[Tuple[Any, ...]] = set()
+    for candidate in sorted(candidates, key=_candidate_sort_key):
+        key = _location_dedupe_key(candidate.location)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(candidate.location)
+    return tuple(out)
+
+
 def _resolve_python_definition_locations(
     parsed: ParsedReference,
     *,
     python_roots: Sequence[Union[str, Path]],
     warnings: List[str],
+    trace_steps: Optional[List[ResolutionStep]] = None,
 ) -> Tuple[PythonDefinitionLocation, ...]:
     roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
-    out = _resolve_locations_for_module_attr_path(
+    candidates = _resolve_locations_for_module_attr_path(
         parsed.module_path,
         parsed.attr_path,
         roots=roots,
@@ -1196,8 +1352,9 @@ def _resolve_python_definition_locations(
         max_obj_import_hops=1,
         max_class_import_hops=1,
         visited=set(),
+        trace_steps=trace_steps,
     )
-    return tuple(out)
+    return _finalize_location_candidates(candidates)
 
 
 def _resolve_locations_for_module_attr_path(
@@ -1209,23 +1366,37 @@ def _resolve_locations_for_module_attr_path(
     max_obj_import_hops: int,
     max_class_import_hops: int,
     visited: Set[str],
-) -> List[PythonDefinitionLocation]:
+    trace_steps: Optional[List[ResolutionStep]],
+) -> List[_LocationCandidate]:
     if not module_path:
         return []
 
     if module_path in visited:
-        warnings.append("import 跟随遇到循环依赖: {}".format(module_path))
+        msg = "import 跟随遇到循环依赖: {}".format(module_path)
+        warnings.append(msg)
+        _trace_add_step(trace_steps, action="follow_import", input_text=module_path, rejected=True, reason=msg)
         return []
 
     visited.add(module_path)
     try:
+        before_warnings = len(warnings)
         file_path = _resolve_module_file_path(module_path, roots=roots, warnings=warnings)
         if file_path is None:
+            reason = "; ".join(warnings[before_warnings:]) if len(warnings) > before_warnings else "无法定位模块文件"
+            _trace_add_step(trace_steps, action="resolve_module_file", input_text=module_path, rejected=True, reason=reason)
             return []
-
+        _trace_add_step(trace_steps, action="resolve_module_file", input_text=module_path, output=str(file_path))
         tree, tree_warning = _load_module_ast(file_path)
         if tree_warning:
             warnings.append(tree_warning)
+        _trace_add_step(
+            trace_steps,
+            action="load_module_ast",
+            input_text=str(file_path),
+            output="ok" if tree is not None else "",
+            rejected=tree is None,
+            reason=str(tree_warning or ""),
+        )
         if tree is None:
             return []
 
@@ -1239,12 +1410,13 @@ def _resolve_locations_for_module_attr_path(
             max_obj_import_hops=max_obj_import_hops,
             max_class_import_hops=max_class_import_hops,
             visited=visited,
+            trace_steps=trace_steps,
         )
     finally:
         visited.remove(module_path)
 
 
-def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR0912
+def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR0912,PLR0915
     tree: ast.Module,
     *,
     file_path: Path,
@@ -1255,7 +1427,8 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
     max_obj_import_hops: int,
     max_class_import_hops: int,
     visited: Set[str],
-) -> List[PythonDefinitionLocation]:
+    trace_steps: Optional[List[ResolutionStep]],
+) -> List[_LocationCandidate]:
     if not attr_path:
         return []
 
@@ -1264,14 +1437,25 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
     tail = attr_path[1:]
     binding = bindings.get(head)
     if binding is None:
-        warnings.append("无法解析符号定义: {}".format("{}.{}".format(module_path, ".".join(attr_path))))
+        msg = "无法解析符号定义: {}".format("{}.{}".format(module_path, ".".join(attr_path)))
+        warnings.append(msg)
+        _trace_add_step(trace_steps, action="resolve_binding", input_text=str(head), rejected=True, reason=msg)
         return []
 
-    fallback = _definition_location_from_node(
+    if binding.kind in ("def", "class"):
+        fallback_priority = _P0_IMPL
+    elif binding.kind in ("assign", "ann_assign", "import_from", "import_module"):
+        fallback_priority = _P1_BINDING
+    else:
+        fallback_priority = _P2_FALLBACK
+
+    fallback = _candidate_from_node(
+        priority=fallback_priority,
         file_path=str(file_path),
         module_path=module_path,
         symbol_path=head,
         node=binding.node,
+        label="fallback",
     )
 
     if not tail:
@@ -1280,14 +1464,18 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
     if binding.kind == "class":
         node = _find_symbol_in_module(tree, attr_path)
         if node is None:
-            warnings.append("无法解析符号定义: {}".format("{}.{}".format(module_path, ".".join(attr_path))))
+            msg = "无法解析符号定义: {}".format("{}.{}".format(module_path, ".".join(attr_path)))
+            warnings.append(msg)
+            _trace_add_step(trace_steps, action="find_attribute", input_text=".".join(attr_path), rejected=True, reason=msg)
             return []
         return [
-            _definition_location_from_node(
+            _candidate_from_node(
+                priority=_P0_IMPL,
                 file_path=str(file_path),
                 module_path=module_path,
                 symbol_path=".".join(attr_path),
                 node=node,
+                label="impl",
             )
         ]
 
@@ -1307,30 +1495,47 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
             visited=visited,
         )
         if resolved_class is None:
-            warnings.append("无法静态推断 obj 的 class: {}".format(head))
+            msg = "无法静态推断 obj 的 class: {}".format(head)
+            warnings.append(msg)
+            _trace_add_step(trace_steps, action="infer_assignment_class", input_text=str(head), rejected=True, reason=msg)
             return [fallback]
 
         method_name = tail[0]
         method_node = _index_class_symbols(resolved_class.node).get(method_name)
         if isinstance(method_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            primary = _definition_location_from_node(
-                file_path=str(resolved_class.file_path),
-                module_path=resolved_class.module_path,
-                symbol_path="{}.{}".format(resolved_class.node.name, method_name),
-                node=method_node,
-            )
-            return [primary, fallback]
+            return [
+                _candidate_from_node(
+                    priority=_P0_IMPL,
+                    file_path=str(resolved_class.file_path),
+                    module_path=resolved_class.module_path,
+                    symbol_path="{}.{}".format(resolved_class.node.name, method_name),
+                    node=method_node,
+                    label="impl",
+                ),
+                fallback,
+            ]
 
         warnings.append(
             "在 class '{}' 中未找到方法 '{}' (可能为继承/动态注入): {}".format(resolved_class.node.name, method_name, ".".join(attr_path))
         )
-        class_loc = _definition_location_from_node(
-            file_path=str(resolved_class.file_path),
-            module_path=resolved_class.module_path,
-            symbol_path=str(resolved_class.node.name),
-            node=resolved_class.node,
+        _trace_add_step(
+            trace_steps,
+            action="find_method",
+            input_text="{}.{}".format(resolved_class.node.name, method_name),
+            rejected=True,
+            reason="missing method (maybe inheritance/dynamic)",
         )
-        return [class_loc, fallback]
+        return [
+            _candidate_from_node(
+                priority=_P0_IMPL,
+                file_path=str(resolved_class.file_path),
+                module_path=resolved_class.module_path,
+                symbol_path=str(resolved_class.node.name),
+                node=resolved_class.node,
+                label="impl",
+            ),
+            fallback,
+        ]
 
     if binding.kind == "import_from":
         if binding.import_module is None or binding.import_name is None:
@@ -1349,11 +1554,14 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
             max_obj_import_hops=max_obj_import_hops - 1,
             max_class_import_hops=max_class_import_hops,
             visited=visited,
+            trace_steps=trace_steps,
         )
         if not remote_locs:
-            warnings.append("import 跟随后仍无法解析符号定义: {}".format(head))
+            msg = "import 跟随后仍无法解析符号定义: {}".format(head)
+            warnings.append(msg)
+            _trace_add_step(trace_steps, action="follow_import", input_text=str(head), rejected=True, reason=msg)
             return [fallback]
-        return [remote_locs[0], fallback, *remote_locs[1:]]
+        return [*remote_locs, fallback]
 
     if binding.kind == "import_module":
         if binding.import_module is None:
@@ -1370,11 +1578,14 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
             max_obj_import_hops=max_obj_import_hops,
             max_class_import_hops=max_class_import_hops - 1,
             visited=visited,
+            trace_steps=trace_steps,
         )
         if not remote_locs:
-            warnings.append("import 跟随后仍无法解析符号定义: {}".format(head))
+            msg = "import 跟随后仍无法解析符号定义: {}".format(head)
+            warnings.append(msg)
+            _trace_add_step(trace_steps, action="follow_import", input_text=str(head), rejected=True, reason=msg)
             return [fallback]
-        return [remote_locs[0], fallback, *remote_locs[1:]]
+        return [*remote_locs, fallback]
 
     return [fallback]
 
@@ -1417,14 +1628,11 @@ def _resolve_module_file_path(
 
 def _load_module_ast(file_path: Path) -> Tuple[Optional[ast.Module], str]:
     try:
-        text = file_path.read_text(encoding="utf-8")
-    except Exception as exc:  # noqa: BLE001
-        return None, "读取模块文件失败: {}: {}".format(type(exc).__name__, exc)
-
-    try:
-        tree = ast.parse(text)
+        tree = parse_python_ast_cached(file_path)
     except SyntaxError as exc:
         return None, "模块语法解析失败: {}: {}".format(type(exc).__name__, exc)
+    except Exception as exc:  # noqa: BLE001
+        return None, "读取模块文件失败: {}: {}".format(type(exc).__name__, exc)
     return tree, ""
 
 
@@ -1694,12 +1902,10 @@ def hover_python_reference(
         return PythonHoverResult(text="", warnings=tuple(warnings))
 
     loc = result.locations[0]
-    try:
-        path = Path(loc.file_path)
-        text = path.read_text(encoding="utf-8")
-        tree = ast.parse(text)
-    except Exception as exc:  # noqa: BLE001
-        warnings.append("hover 解析失败: {}: {}".format(type(exc).__name__, exc))
+    path = Path(loc.file_path)
+    tree, warn = _load_module_ast(path)
+    if tree is None:
+        warnings.append("hover 解析失败: {}".format(warn or "unknown error"))
         return PythonHoverResult(text="", warnings=tuple(warnings))
 
     symbol_path = str(loc.symbol_path or "").strip()
@@ -2421,8 +2627,7 @@ def _split_reference_for_completion(reference: str) -> Tuple[str, str, str]:
 
 def _list_module_symbols(file_path: Path) -> Tuple[Tuple[str, ...], str]:
     try:
-        text = file_path.read_text(encoding="utf-8")
-        tree = ast.parse(text)
+        tree = parse_python_ast_cached(file_path)
     except Exception as exc:  # noqa: BLE001
         return (), "completion 解析失败: {}: {}".format(type(exc).__name__, exc)
     symbols = _index_module_symbols(tree)

@@ -414,6 +414,24 @@ def test_resolve_python_definition_object_method_follows_imported_object_single_
     assert result.locations[2].symbol_path == "some_ref"
 
 
+def test_finalize_location_candidates_sorts_and_dedupes() -> None:
+    pos = editor_semantics.EditorPosition(line=1, column=1)
+    rng = editor_semantics.EditorRange(start=pos, end=editor_semantics.EditorPosition(line=1, column=2))
+
+    primary = PythonDefinitionLocation(file_path="c.py", range=rng, module_path="m", symbol_path="impl")
+    secondary_b = PythonDefinitionLocation(file_path="b.py", range=rng, module_path="m", symbol_path="b")
+    secondary_a = PythonDefinitionLocation(file_path="a.py", range=rng, module_path="m", symbol_path="a")
+
+    cands = [
+        editor_semantics._LocationCandidate(priority=editor_semantics._P1_BINDING, location=secondary_b),
+        editor_semantics._LocationCandidate(priority=editor_semantics._P1_BINDING, location=secondary_a),
+        editor_semantics._LocationCandidate(priority=editor_semantics._P0_IMPL, location=primary),
+        editor_semantics._LocationCandidate(priority=editor_semantics._P1_BINDING, location=secondary_a),
+    ]
+    out = editor_semantics._finalize_location_candidates(cands)  # type: ignore[attr-defined]
+    assert [loc.file_path for loc in out] == ["c.py", "a.py", "b.py"]
+
+
 def test_resolve_python_definition_object_method_degrades_when_class_cannot_be_inferred(tmp_path: Path) -> None:
     pkg = tmp_path / "pkg"
     _write(pkg / "__init__.py", "")
