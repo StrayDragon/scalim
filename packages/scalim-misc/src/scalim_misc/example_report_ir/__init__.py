@@ -330,11 +330,16 @@ class Dal:
             order_ids,
         )
 
-    def get_country_info_of_concrete_params(self, country_ids_set: Optional[Set[int]] = None) -> Dict[int, Dict[str, Any]]:
+    def get_country_info_of_concrete_params(
+        self,
+        country_ids_set: Optional[Set[int]] = None,
+        rows: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[int, Dict[str, Any]]:
         """获取国家信息.
 
         注意:参数名 `country_ids_set` 为该接口约定,框架不应做假设.
         """
+        _ = rows
         return data_loader.get_countries(country_ids_set)
 
 

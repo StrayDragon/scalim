@@ -49,6 +49,7 @@ from ..schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
     FILE_KINDS,
 )
+from ._internal.callable_preflight import validate_signature_accepts_any_candidate
 from .builtin_callables import parse_builtin_callable_id
 from .contracts import (
     BookBudgetOverride,
@@ -415,7 +416,12 @@ def _merge_retry_specs(base: LoaderRetryPolicySpec, override: Optional[LoaderRet
     )
 
 
-def _finalize_retry_policy(spec: LoaderRetryPolicySpec, *, base: Optional[LoaderRetryPolicy] = None) -> LoaderRetryPolicy:
+def _finalize_retry_policy(
+    spec: LoaderRetryPolicySpec,
+    *,
+    base: Optional[LoaderRetryPolicy] = None,
+    location: str,
+) -> LoaderRetryPolicy:
     base_policy = base or LoaderRetryPolicy.disabled()
     enabled = spec.enabled if spec.enabled is not None else base_policy.enabled
     should_retry = spec.should_retry if spec.should_retry is not None else base_policy.should_retry
@@ -429,6 +435,28 @@ def _finalize_retry_policy(spec: LoaderRetryPolicySpec, *, base: Optional[Loader
     if enabled and should_retry is None:
         msg = "loader_retry.enabled=true requires should_retry (provide via runtime injection)"
         raise ValueError(msg)
+
+    if enabled and should_retry is not None:
+        # 编译期签名预检查: 避免运行期 `_safe_should_retry` 将 `TypeError` 静默降级为 `False`.
+        placeholder_exc = object()
+        placeholder_ctx = object()
+        empty_kwargs: Dict[str, object] = {}
+        candidates = (("should_retry(exc, ctx)", (placeholder_exc, placeholder_ctx), empty_kwargs),)
+        ref = repr(should_retry)
+        try:
+            module = should_retry.__module__
+            name = should_retry.__name__
+        except AttributeError:
+            pass
+        else:
+            ref = "{}:{}".format(module, name)
+        validate_signature_accepts_any_candidate(
+            location="{}.should_retry".format(str(location)),
+            reference=ref,
+            fn=should_retry,
+            candidates=candidates,
+            hint="should_retry 必须支持位置参数调用形态 `should_retry(exc, ctx)` (当签名可 introspect 时)",
+        )
 
     return LoaderRetryPolicy(
         enabled=bool(enabled),
@@ -451,7 +479,7 @@ def _compile_loader_retry_policies(
         return None
     base_policy = LoaderRetryPolicy.disabled()
     global_spec = overrides.default or LoaderRetryPolicySpec()
-    global_policy = _finalize_retry_policy(global_spec, base=base_policy)
+    global_policy = _finalize_retry_policy(global_spec, base=base_policy, location="loader_retry.default")
 
     known_loaders = set(config.sources.keys())
     known_loaders.add(config.main_source.source_id)
@@ -466,14 +494,14 @@ def _compile_loader_retry_policies(
     main_source_id = config.main_source.source_id
     main_driver = overrides.by_loader.get(main_source_id)
     main_spec = _merge_retry_specs(global_spec, main_driver)
-    main_policy = _finalize_retry_policy(main_spec, base=base_policy)
+    main_policy = _finalize_retry_policy(main_spec, base=base_policy, location="loader_retry.by_loader.{}".format(main_source_id))
     if main_policy != global_policy:
         by_loader[main_source_id] = main_policy
 
     for source_id in config.sources:
         src_driver = overrides.by_loader.get(source_id)
         src_spec = _merge_retry_specs(global_spec, src_driver)
-        src_policy = _finalize_retry_policy(src_spec, base=base_policy)
+        src_policy = _finalize_retry_policy(src_spec, base=base_policy, location="loader_retry.by_loader.{}".format(source_id))
         if src_policy != global_policy:
             by_loader[source_id] = src_policy
 

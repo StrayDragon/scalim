@@ -81,6 +81,30 @@ def test_forbidden_call_patterns() -> None:
         engine.compile("data[0]", ("data",))
 
 
+def test_compute_builtin_call_arity_mismatch_fails_fast() -> None:
+    engine = SecureComputeEngine()
+
+    with pytest.raises(ScalimComputeExpressionError, match="调用形态不匹配"):
+        engine.compile("len(a, b)", ("a", "b"))
+
+    with pytest.raises(ScalimComputeExpressionError, match="调用形态不匹配"):
+        engine.compile("dec(a, b)", ("a", "b"))
+
+
+def test_expression_validator_skips_arity_preflight_when_function_map_missing_entry() -> None:
+    validator = security.ExpressionValidator(
+        allowed_names=set(),
+        allowed_functions=frozenset({"len"}),
+        safe_operators={},
+        safe_unary={},
+        safe_comparators={},
+        forbidden_names=frozenset(),
+        function_map={},
+    )
+    tree = ast.parse("len(1)", mode="eval")
+    validator.validate(tree.body)
+
+
 def test_method_calls_are_rejected_with_call_by_migration_hint() -> None:
     engine = SecureComputeEngine()
 

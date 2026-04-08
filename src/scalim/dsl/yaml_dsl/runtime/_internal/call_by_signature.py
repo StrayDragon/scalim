@@ -2,6 +2,10 @@ import inspect
 from typing import Any, Callable, List, Optional, Sequence, Set
 
 from ..._internal.config_parsing.call_by import CallByValue, ParsedCallBy
+from .callable_preflight import (
+    ScalimCallablePreflightError,
+    validate_signature_accepts_any_candidate,
+)
 
 
 def validate_call_by_signature(*, location: str, call_by: str, parsed: ParsedCallBy, fn: Callable[..., Any]) -> None:
@@ -14,24 +18,27 @@ def validate_call_by_signature(*, location: str, call_by: str, parsed: ParsedCal
     - 若 `inspect.signature` 无法获取 `fn` 的签名(少数内置/扩展可调用对象),则跳过校验以保持兼容.
     """
 
-    try:
-        sig = inspect.signature(fn)
-    except (TypeError, ValueError):
-        return
-
     placeholder = object()
     args = [placeholder for _ in (parsed.args or ())]
     kwargs = {str(k): placeholder for k, _v in (parsed.kwargs or ())}
 
+    candidates = ((str(call_by), tuple(args), kwargs),)
     try:
-        sig.bind(*args, **kwargs)
-    except TypeError as exc:
+        validate_signature_accepts_any_candidate(
+            location=location,
+            reference=str(parsed.reference),
+            fn=fn,
+            candidates=candidates,
+            hint=None,  # 提示信息在异常路径中再生成,保证诊断文本稳定
+            extra="call_by={!r}".format(str(call_by)),
+        )
+    except ScalimCallablePreflightError as exc:
+        sig = inspect.signature(fn)  # pragma: no cover  # pragma: allow-no-cover invariant: error implies signature available
         hint = _build_keyword_only_hint(parsed=parsed, sig=sig)
-        msg = "{} 的 `call_by` 参数与引用 {!r} 的函数签名不匹配: `{}` (签名: `{}`)".format(location, parsed.reference, str(exc), str(sig))
-        if hint:
-            msg = "{}. 建议: {}".format(msg, hint)
-        msg = "{} (`call_by`={!r})".format(msg, str(call_by))
-        raise TypeError(msg) from exc
+        if hint and "建议:" not in str(exc):
+            msg = "{}. 建议: {}".format(str(exc), hint)
+            raise ScalimCallablePreflightError(msg) from exc
+        raise
 
 
 def _build_keyword_only_hint(*, parsed: ParsedCallBy, sig: inspect.Signature) -> Optional[str]:
@@ -64,7 +71,10 @@ def _is_field_value(value: CallByValue) -> bool:
 def _signature_accepts_positional(sig: inspect.Signature) -> bool:
     params = list(sig.parameters.values())
 
-    positional_only = getattr(inspect.Parameter, "POSITIONAL_ONLY", None)
+    try:
+        positional_only = inspect.Parameter.POSITIONAL_ONLY
+    except AttributeError:
+        positional_only = None
 
     positional_kinds = [inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.VAR_POSITIONAL]
     if positional_only is not None:
@@ -89,4 +99,4 @@ def _kwonly_field_names(*, args: Sequence[CallByValue], kwonly_names: Set[str]) 
     return field_names or None
 
 
-__all__ = ("validate_call_by_signature",)
+__all__ = ()

@@ -195,6 +195,21 @@ class CompiledParamsTemplate:
             return False
         return not self.root.items
 
+    def top_level_mapping_string_keys(self) -> Tuple[str, ...]:
+        """返回顶层映射的字符串键 (若 `root` 不是映射则返回空).
+
+        用途:
+        - 编译期函数签名预检查: 仅基于顶层 `kwargs` 键做可推理校验 (不渲染模板).
+        """
+
+        if not isinstance(self.root, MappingNode):
+            return ()
+        keys: List[str] = []
+        for key, _node in self.root.items:
+            if isinstance(key, str):
+                keys.append(key)
+        return tuple(keys)
+
     def render_kwargs(self, ctx: LoaderCallContextIr, *, path: str) -> LoaderCallKwargs:
         rendered = self.root.render(ctx, path=path)
         if rendered is None:

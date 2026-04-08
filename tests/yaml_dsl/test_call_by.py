@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime._internal.callable_preflight import ScalimCallablePreflightError
 from scalim.dsl.yaml_dsl.runtime._internal.call_by_signature import validate_call_by_signature
 from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
 from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceFieldConfig
@@ -55,7 +56,7 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
     )
 
     # 2) args empty -> hint is None (unexpected keyword)
-    with pytest.raises(TypeError, match="函数签名不匹配"):
+    with pytest.raises(ScalimCallablePreflightError, match="函数签名不匹配"):
         validate_call_by_signature(
             location="case2",
             call_by="tests.fixtures.call_by_fns:echo(bad=1)",
@@ -64,7 +65,7 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
         )
 
     # 3) signature accepts positional -> hint is None (too many positional args)
-    with pytest.raises(TypeError, match="函数签名不匹配"):
+    with pytest.raises(ScalimCallablePreflightError, match="函数签名不匹配"):
         validate_call_by_signature(
             location="case3",
             call_by="tests.fixtures.call_by_fns:echo(a, b)",
@@ -73,7 +74,7 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
         )
 
     # 4) no positional, no kw-only (only **kwargs) -> hint is None
-    with pytest.raises(TypeError, match="函数签名不匹配"):
+    with pytest.raises(ScalimCallablePreflightError, match="函数签名不匹配"):
         validate_call_by_signature(
             location="case4",
             call_by="tests.fixtures.call_by_fns:echo(a)",
@@ -82,7 +83,7 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
         )
 
     # 5) kw-only + kwargs present -> hint uses generic message
-    with pytest.raises(TypeError, match="请使用关键字传参"):
+    with pytest.raises(ScalimCallablePreflightError, match="请使用关键字传参"):
         validate_call_by_signature(
             location="case5",
             call_by="tests.fixtures.call_by_fns:echo(a, extra=1)",
@@ -91,7 +92,7 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
         )
 
     # 6) kw-only but field name mismatched -> generic hint
-    with pytest.raises(TypeError, match="请使用关键字传参"):
+    with pytest.raises(ScalimCallablePreflightError, match="请使用关键字传参"):
         validate_call_by_signature(
             location="case6",
             call_by="tests.fixtures.call_by_fns:echo(b)",
@@ -100,7 +101,7 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
         )
 
     # 7) kw-only and literal positional -> generic hint
-    with pytest.raises(TypeError, match="请使用关键字传参"):
+    with pytest.raises(ScalimCallablePreflightError, match="请使用关键字传参"):
         validate_call_by_signature(
             location="case7",
             call_by="tests.fixtures.call_by_fns:echo(1)",
@@ -109,13 +110,26 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
         )
 
     # 8) kw-only and positional field matches -> rewrite hint
-    with pytest.raises(TypeError, match="可改写为:"):
+    with pytest.raises(ScalimCallablePreflightError, match="可改写为:"):
         validate_call_by_signature(
             location="case8",
             call_by="tests.fixtures.call_by_fns:echo(a)",
             parsed=parse_call_by("tests.fixtures.call_by_fns:echo(a)"),
             fn=_fn_kwonly,
         )
+
+
+def test_signature_accepts_positional_handles_py36_without_positional_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    import inspect
+
+    from scalim.dsl.yaml_dsl.runtime._internal.call_by_signature import _signature_accepts_positional
+
+    def _fn(a: object) -> object:
+        return a
+
+    sig = inspect.signature(_fn)
+    monkeypatch.delattr(inspect.Parameter, "POSITIONAL_ONLY", raising=False)
+    assert _signature_accepts_positional(sig) is True
 
 
 def test_parse_call_by_dedupes_dependencies() -> None:

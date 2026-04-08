@@ -1,5 +1,6 @@
 import ast
 import hashlib
+import inspect
 import logging
 import operator
 import sys
@@ -165,6 +166,7 @@ def _safe_decimal_helper(value: Any) -> Optional[Decimal]:
 class ExpressionValidator:
     _allowed_names: Set[str]
     _allowed_functions: FrozenSet[str]
+    _function_map: Dict[str, Callable[..., Any]]
     _safe_operators: Dict[Type[ast.operator], Callable[..., Any]]
     _safe_unary: Dict[Type[ast.unaryop], Callable[..., Any]]
     _safe_comparators: Dict[Type[ast.cmpop], Callable[..., bool]]
@@ -179,9 +181,11 @@ class ExpressionValidator:
         safe_unary: Dict[Type[ast.unaryop], Callable[..., Any]],
         safe_comparators: Dict[Type[ast.cmpop], Callable[..., bool]],
         forbidden_names: FrozenSet[str],
+        function_map: Optional[Dict[str, Callable[..., Any]]] = None,
     ) -> None:
         self._allowed_names = allowed_names
         self._allowed_functions = allowed_functions
+        self._function_map = dict(function_map) if function_map else {}
         self._safe_operators = safe_operators
         self._safe_unary = safe_unary
         self._safe_comparators = safe_comparators
@@ -286,6 +290,29 @@ class ExpressionValidator:
         if typed.keywords:
             msg = "Keyword arguments are not allowed in expressions"
             raise ScalimSecurityError(msg)
+
+        # `callable preflight`: 对可 `introspect` 的内置/自定义函数做 `argc` 预检查,避免运行期 `TypeError` 被 `guardrails` 吞掉.
+        fn = self._function_map.get(func_name)
+        if fn is None:
+            return
+        try:
+            sig = inspect.signature(fn)
+        except (TypeError, ValueError):
+            return
+        placeholder = object()
+        argc = len(typed.args)
+        try:
+            _ = sig.bind(*([placeholder] * argc))
+        except TypeError as exc:
+            msg = (
+                "compute callable preflight 失败: 调用形态不匹配 (ref={ref!r}, call=`{call}`, reason=`{reason}`, signature=`{signature}`)"
+            ).format(
+                ref=str(func_name),
+                call="{}(<{} args>)".format(str(func_name), int(argc)),
+                reason=str(exc),
+                signature=str(sig),
+            )
+            raise ScalimComputeExpressionError(msg) from exc
 
     def _validate_attribute_node(self, node: ast.AST) -> None:
         typed = cast("ast.Attribute", node)  # pragma: allow-cast ast handler dispatch typed narrowing
@@ -497,6 +524,10 @@ class SecureComputeEngine:
 
         self._enforce_ast_limits(tree)
 
+        function_map = dict(self.SAFE_FUNCTIONS)
+        if self._custom_functions:
+            function_map.update(self._custom_functions)
+
         validator = ExpressionValidator(
             allowed_names=set(dependencies),
             allowed_functions=self._allowed_functions,
@@ -504,6 +535,7 @@ class SecureComputeEngine:
             safe_unary=self.SAFE_UNARY_OPERATORS,
             safe_comparators=self.SAFE_COMPARATORS,
             forbidden_names=self.FORBIDDEN_NAMES,
+            function_map=function_map,
         )
         validator.validate(tree.body)
         return tree

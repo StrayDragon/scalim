@@ -37,6 +37,24 @@ def is_valid_group(*, group_name: object, **_kw: object) -> bool:
     return bool(text)
 
 
+def normalize_identity(result: Mapping[object, Mapping[str, Any]], ctx: object) -> Mapping[object, Mapping[str, Any]]:
+    """normalize.call_by 示例: identity normalize,用于 notebooks 回归门禁.
+
+    约束:
+    - MUST 接受 `(result, ctx)` 或等价形态
+    - MUST 返回 `Mapping`
+    """
+
+    _ = ctx
+    return result
+
+
+def normalize_kwonly_result(*, result: Mapping[object, Mapping[str, Any]]) -> Mapping[object, Mapping[str, Any]]:
+    """normalize.call_by 反例: keyword-only result(不接受任何位置参数),必须编译期 fail-fast."""
+
+    return result
+
+
 # -----------------------------------------------------------------------------
 # Deterministic fixtures (loaders)
 # -----------------------------------------------------------------------------

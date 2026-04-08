@@ -411,6 +411,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-builtin-callables/spec.md)
 - Summary: 为 `YAML DSL` 中的 loader/call_by/... 等 Python 可调用对象引用点提供一套 **稳定、受控、无需扩大 allowlist** 的内置 callable 引用语法,避免下游依赖 `scalim.*` 内部模块路径。
 
+### `yaml-dsl-callable-preflight`
+- Title: yaml-dsl-callable-preflight Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-callable-preflight/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 YAML DSL 在 demand compile / workflow preflight 阶段的 callable preflight: 在 resolver 安全边界就绪后,对用户可配置的 Python callable 执行“可推理的签名/形态/固定 contract”校验,并在失败时 fail-fast。
+
 ### `yaml-dsl-cli-runner`
 - Title: yaml-dsl-cli-runner Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-runner/spec.md)

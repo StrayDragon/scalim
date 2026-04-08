@@ -33,6 +33,10 @@ from ...schema_dsl.models import (
 from ..errors import ScalimConversionError
 from ..references import PythonReferenceResolver
 from .call_by_signature import validate_call_by_signature
+from .callable_preflight import (
+    validate_signature_accepts_any_candidate,
+    validate_signature_binds_kwargs_keys,
+)
 from .conversion_bindings import ConfigToIRConversionBindingMixin
 from .conversion_lookup import CALL_BY_CTX_KEY, validate_source_id
 from .conversion_relations import ConfigToIRConversionRelationMixin
@@ -138,6 +142,15 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         except ScalimParamsTemplateCompileError as exc:
             raise ScalimConversionError(str(exc)) from exc
 
+        # 编译期预检查: 仅基于顶层 `kwargs` 键做签名绑定校验(当签名可 `introspect` 时)。
+        validate_signature_binds_kwargs_keys(
+            location="main_source.params",
+            reference=str(config.loader),
+            fn=loader_fn,
+            kwargs_keys=template.top_level_mapping_string_keys(),
+            hint="main_source.params 的 kwargs keys 必须能绑定到 main_source.loader 的函数签名 (当可 introspect 时)",
+        )
+
         params: LoaderCallKwargs = {}
         if not template.is_empty_mapping():
             params = template.render_kwargs(_build_main_source_context(config.source_id), path="main_source.params")
@@ -187,6 +200,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         bind_ir = self._binding_from_params_template(
             source_config,
+            loader_fn=loader_fn,
             cache_mode=cache_mode,
         )
 
@@ -245,13 +259,32 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             msg = "sources.{}.normalize.call_by must not be empty".format(source_id)
             raise ScalimConversionError(msg)
         try:
-            return cast(  # pragma: allow-cast resolver callable typed narrowing
+            fn = cast(  # pragma: allow-cast resolver callable typed narrowing
                 "Callable[..., object]",
                 self._require_resolver().resolve(call_by_ref),
             )
         except Exception as exc:
             msg = "sources.{}.normalize.call_by failed to resolve reference '{}': {}".format(source_id, call_by_ref, str(exc))
             raise ScalimConversionError(msg) from exc
+
+        # `normalize.call_by` 固定约束: 至少接受 `result` 位置参数,可选 `ctx`.
+        placeholder_result = object()
+        placeholder_ctx = object()
+        empty_kwargs: Dict[str, object] = {}
+        candidates = (
+            ("normalize.call_by(result, ctx)", (placeholder_result, placeholder_ctx), empty_kwargs),
+            ("normalize.call_by(result, ctx=ctx)", (placeholder_result,), {"ctx": placeholder_ctx}),
+            ("normalize.call_by(result)", (placeholder_result,), empty_kwargs),
+        )
+        validate_signature_accepts_any_candidate(
+            location="sources.{}.normalize.call_by".format(source_id),
+            reference=call_by_ref,
+            fn=fn,
+            candidates=candidates,
+            hint="normalize.call_by 必须至少接受 1 个位置参数 `result`, 并可选接受 `ctx` (第二位置参数或关键字参数)",
+        )
+
+        return fn
 
     def _convert_source_normalize_index_by_key(
         self,
@@ -431,6 +464,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         self,
         source_config: SourceConfig,
         *,
+        loader_fn: "LoaderResultMapCallable",
         cache_mode: SourceSpecIrCacheMode,
     ) -> Optional["BindingIr"]:
         init_vars = self._init_vars
@@ -448,6 +482,15 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         if template.is_empty_mapping():
             return None
+
+        # 编译期预检查: 仅基于顶层 `kwargs` 键做签名绑定校验(当签名可 `introspect` 时)。
+        validate_signature_binds_kwargs_keys(
+            location="sources.{}.params".format(source_config.source_id),
+            reference=str(source_config.loader),
+            fn=loader_fn,
+            kwargs_keys=template.top_level_mapping_string_keys(),
+            hint="sources.*.params 的 kwargs keys 必须能绑定到 sources.*.loader 的函数签名 (当可 introspect 时)",
+        )
 
         return _binding_from_compiled_params_template(
             template,
@@ -567,15 +610,12 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             msg = "Derived field '{}' failed to resolve call_by reference '{}': {}".format(field_id, parsed.reference, exc)
             raise ScalimConversionError(msg) from exc
 
-        try:
-            validate_call_by_signature(
-                location="派生字段 '{}'".format(field_id),
-                call_by=call_by,
-                parsed=parsed,
-                fn=fn,
-            )
-        except TypeError as exc:
-            raise ScalimConversionError(str(exc)) from exc
+        validate_call_by_signature(
+            location="派生字段 '{}'".format(field_id),
+            call_by=call_by,
+            parsed=parsed,
+            fn=fn,
+        )
 
         def calculator(**field_values: RuntimeValue) -> FieldValue:
             args: List[RuntimeValue] = []

@@ -13,6 +13,10 @@ def test_demo_big_data_report_selected_chapters_pass() -> None:
             "workflow_demo_big_data_report",
             "yaml_dsl_debugging",
             "yaml_dsl_call_by_keyword_only",
+            "yaml_dsl_compute_builtin_arity_mismatch",
+            "yaml_dsl_normalize_call_by_signature_mismatch",
+            "yaml_dsl_loader_params_signature_mismatch",
+            "yaml_dsl_should_retry_signature_mismatch",
         ]
     )
     results.extend(run_selected_ir_chapters(chapter_ids=["ch010_basics", "ch090_guardrails"]))

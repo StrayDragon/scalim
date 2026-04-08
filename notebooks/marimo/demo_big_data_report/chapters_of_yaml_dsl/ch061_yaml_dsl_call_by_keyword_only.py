@@ -28,10 +28,10 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
 
 
 def run_yaml_dsl_call_by_keyword_only() -> ExampleResult:
-    """回归: call_by 位置参数不应“绕过” keyword-only 签名.
+    """回归: call_by 位置参数不应“绕过” `keyword-only` 签名.
 
     预期:
-    - `call_by: "...:is_valid_group(group_name)"` 必须在编译期 fast-fail
+    - `call_by: "...:is_valid_group(group_name)"` 必须在编译期 `fast-fail`
     - `call_by: "...:is_valid_group(group_name=group_name)"` 可正常运行
     """
 

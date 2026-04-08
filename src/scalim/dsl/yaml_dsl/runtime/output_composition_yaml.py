@@ -37,6 +37,7 @@ from ..schema_dsl.output_enums import AGG_POST_PRODUCER_KEYS as _POST_FUNC_KEYS
 from ..schema_dsl.output_enums import AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS
 from ..schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
 from ._internal.call_by_signature import validate_call_by_signature
+from ._internal.callable_preflight import ScalimCallablePreflightError
 from .output_path_resolve import resolve_yaml_relative_output_path
 from .references import SecurePythonReferenceResolver
 
@@ -155,7 +156,7 @@ def _compile_call_by_post_field(
             parsed=parsed,
             fn=fn,
         )
-    except TypeError as exc:
+    except ScalimCallablePreflightError as exc:
         raise ValueError(str(exc)) from exc
 
     deps = tuple(str(x) for x in (parsed.field_names or ()))
