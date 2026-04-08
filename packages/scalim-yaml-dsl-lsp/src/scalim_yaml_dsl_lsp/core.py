@@ -48,6 +48,7 @@ from scalim.vendor.yamlx import yaml
 from .cache import load_yaml_mapping_cached, parse_python_ast_cached
 from .cursor_extraction import (
     YamlCursorExtractionResult,
+    extract_yaml_dsl_entity_reference_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
     extract_yaml_dsl_python_reference_by_cursor,
 )
@@ -266,6 +267,168 @@ class YamlImportHoverResult:
         payload: Dict[str, Any] = {"text": str(self.text)}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEntityHintDiagnostic:
+    """实体引用解析失败时的 hint 级诊断(用于 LSP publishDiagnostics)."""
+
+    message: str
+    range: Optional[EditorRange] = None
+    code: str = "scalim_unknown_entity_id"
+    yaml_path: str = ""
+    kind: str = ""
+    entity_id: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "message": str(self.message),
+            "code": str(self.code),
+        }
+        if self.yaml_path:
+            payload["yaml_path"] = str(self.yaml_path)
+        if self.kind:
+            payload["kind"] = str(self.kind)
+        if self.entity_id:
+            payload["entity_id"] = str(self.entity_id)
+        if self.range is not None:
+            payload["range"] = self.range.as_dict()
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEntityDeclaration:
+    kind: str
+    entity_id: str
+    yaml_path: str
+    range: Optional[EditorRange]
+    summary: str = ""
+    detail: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "kind": str(self.kind),
+            "entity_id": str(self.entity_id),
+            "yaml_path": str(self.yaml_path),
+            "summary": str(self.summary or ""),
+            "detail": str(self.detail or ""),
+        }
+        if self.range is not None:
+            payload["range"] = self.range.as_dict()
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEntityIndex:
+    """单文件实体索引(仅基于 YAML 结构,不执行 Python)."""
+
+    sources: Dict[str, YamlDslEntityDeclaration]
+    relations: Dict[str, YamlDslEntityDeclaration]
+    outputs: Dict[str, YamlDslEntityDeclaration]
+    workflow_runs: Dict[str, YamlDslEntityDeclaration]
+    source_fields: Dict[Tuple[str, str], YamlDslEntityDeclaration]
+    derived_fields: Dict[str, YamlDslEntityDeclaration]
+    warnings: Tuple[str, ...] = ()
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "sources": {k: v.as_dict() for k, v in self.sources.items()},
+            "relations": {k: v.as_dict() for k, v in self.relations.items()},
+            "outputs": {k: v.as_dict() for k, v in self.outputs.items()},
+            "workflow_runs": {k: v.as_dict() for k, v in self.workflow_runs.items()},
+            "source_fields": {"{}.{}".format(k[0], k[1]): v.as_dict() for k, v in self.source_fields.items()},
+            "derived_fields": {k: v.as_dict() for k, v in self.derived_fields.items()},
+            "warnings": list(self.warnings) if self.warnings else [],
+        }
+
+
+@dataclass(frozen=True)
+class YamlDslEntityDefinitionLocation:
+    file_path: str
+    range: Optional[EditorRange]
+    entity_kind: str
+    entity_id: str
+    yaml_path: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "file_path": str(self.file_path),
+            "entity_kind": str(self.entity_kind),
+            "entity_id": str(self.entity_id),
+        }
+        if self.yaml_path:
+            payload["yaml_path"] = str(self.yaml_path)
+        if self.range is not None:
+            payload["range"] = self.range.as_dict()
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEntityDefinitionResult:
+    locations: Tuple[YamlDslEntityDefinitionLocation, ...] = ()
+    warnings: Tuple[str, ...] = ()
+    hint: Optional[YamlDslEntityHintDiagnostic] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "locations": [loc.as_dict() for loc in self.locations],
+        }
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        if self.hint is not None:
+            payload["hint"] = self.hint.as_dict()
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEntityHoverResult:
+    text: str = ""
+    warnings: Tuple[str, ...] = ()
+    hint: Optional[YamlDslEntityHintDiagnostic] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"text": str(self.text)}
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        if self.hint is not None:
+            payload["hint"] = self.hint.as_dict()
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEntityCompletionItem:
+    label: str
+    insert_text: str
+    detail: str = ""
+    is_snippet: bool = False
+    replace: str = "token"  # token|value
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "label": str(self.label),
+            "insert_text": str(self.insert_text),
+            "detail": str(self.detail or ""),
+            "is_snippet": bool(self.is_snippet),
+            "replace": str(self.replace or "token"),
+        }
+        return payload
+
+
+@dataclass(frozen=True)
+class YamlDslEntityCompletionResult:
+    items: Tuple[YamlDslEntityCompletionItem, ...] = ()
+    warnings: Tuple[str, ...] = ()
+    hint: Optional[YamlDslEntityHintDiagnostic] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "items": [item.as_dict() for item in self.items],
+        }
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        if self.hint is not None:
+            payload["hint"] = self.hint.as_dict()
         return payload
 
 
@@ -560,6 +723,662 @@ def collect_yaml_dsl_editor_diagnostics(
         errors=errors,
         warnings=warnings,
     )
+
+
+def build_yaml_dsl_entity_index(
+    yaml_text: str,
+    *,
+    yaml_kind: str,
+    source_path: str,
+) -> YamlDslEntityIndex:
+    """从单个 YAML 文档构建实体索引(单文件,静态,无副作用)."""
+    warnings: List[str] = []
+    store = _EntityIndexStore(
+        sources={},
+        relations={},
+        outputs={},
+        workflow_runs={},
+        source_fields={},
+        derived_fields={},
+    )
+
+    parsed = _load_yaml_mapping_for_entity_index(yaml_text, source_path=source_path, warnings=warnings)
+    if parsed is not None:
+        demand, locations = parsed
+        _index_main_source_entities(demand, locations, store)
+        _index_lookup_sources_entities(demand, locations, store)
+        _index_derived_fields_entities(demand, locations, store)
+        _index_relations_entities(demand, locations, store)
+        _index_outputs_entities(demand, locations, store)
+        _index_workflow_runs_entities(demand, locations, store)
+
+    if yaml_kind not in _YAML_DSL_KIND_CHOICES:
+        warnings.append("Unknown yaml_kind: {}".format(str(yaml_kind)))
+
+    return YamlDslEntityIndex(
+        sources=store.sources,
+        relations=store.relations,
+        outputs=store.outputs,
+        workflow_runs=store.workflow_runs,
+        source_fields=store.source_fields,
+        derived_fields=store.derived_fields,
+        warnings=tuple(warnings),
+    )
+
+
+@dataclass
+class _EntityIndexStore:
+    sources: Dict[str, YamlDslEntityDeclaration]
+    relations: Dict[str, YamlDslEntityDeclaration]
+    outputs: Dict[str, YamlDslEntityDeclaration]
+    workflow_runs: Dict[str, YamlDslEntityDeclaration]
+    source_fields: Dict[Tuple[str, str], YamlDslEntityDeclaration]
+    derived_fields: Dict[str, YamlDslEntityDeclaration]
+
+
+def _load_yaml_mapping_for_entity_index(
+    yaml_text: str,
+    *,
+    source_path: str,
+    warnings: List[str],
+) -> Optional[Tuple[Dict[str, Any], Dict[str, Tuple[int, int]]]]:
+    try:
+        loaded, locations, _lines = load_yaml_mapping_text(yaml_text, source_path=str(source_path))
+    except ScalimYamlValidationError as exc:
+        msg = exc.errors[0].message if exc.errors else str(exc)
+        warnings.append("YAML parse failed: {}".format(msg))
+        return None
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        return None
+    if not isinstance(loaded, dict):
+        warnings.append("YAML root must be a mapping")
+        return None
+    return loaded, locations
+
+
+def _index_main_source_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+    main_source = demand.get("main_source")
+    if not isinstance(main_source, dict):
+        return
+    main_source_id = _safe_str(main_source.get("source_id"))
+    if not main_source_id:
+        return
+    decl = _build_source_declaration(
+        main_source_id,
+        yaml_path="main_source.source_id",
+        range_key_text="source_id",
+        locations=locations,
+        spec=main_source,
+    )
+    if decl is not None:
+        store.sources[main_source_id] = decl
+    _index_source_fields(main_source_id, main_source.get("fields"), base_yaml_path="main_source.fields", locations=locations, store=store)
+
+
+def _index_lookup_sources_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+    sources_map = demand.get("sources")
+    if not isinstance(sources_map, dict):
+        return
+    for source_id, spec in sources_map.items():
+        sid = _safe_str(source_id)
+        if not sid:
+            continue
+        decl = _build_source_declaration(
+            sid,
+            yaml_path="sources.{}".format(sid),
+            range_key_text=sid,
+            locations=locations,
+            spec=spec,
+        )
+        if decl is not None:
+            store.sources[sid] = decl
+        fields_map = spec.get("fields") if isinstance(spec, dict) else None
+        _index_source_fields(sid, fields_map, base_yaml_path="sources.{}.fields".format(sid), locations=locations, store=store)
+
+
+def _index_source_fields(
+    source_id: str,
+    fields_map: object,
+    *,
+    base_yaml_path: str,
+    locations: Dict[str, Tuple[int, int]],
+    store: _EntityIndexStore,
+) -> None:
+    if not source_id or not isinstance(fields_map, dict):
+        return
+    for field_id, spec in fields_map.items():
+        fid = _safe_str(field_id)
+        if not fid:
+            continue
+        yaml_path = "{}.{}".format(base_yaml_path, fid)
+        rng = _range_for_yaml_key_path(yaml_path, key_text=fid, locations=locations)
+        store.source_fields[(source_id, fid)] = YamlDslEntityDeclaration(
+            kind="source_field",
+            entity_id=fid,
+            yaml_path=yaml_path,
+            range=rng,
+            summary=_field_summary(spec),
+            detail=_field_detail(spec),
+        )
+
+
+def _index_derived_fields_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+    derived_map = demand.get("fields")
+    if not isinstance(derived_map, dict):
+        return
+    for field_id, spec in derived_map.items():
+        fid = _safe_str(field_id)
+        if not fid:
+            continue
+        yaml_path = "fields.{}".format(fid)
+        rng = _range_for_yaml_key_path(yaml_path, key_text=fid, locations=locations)
+        store.derived_fields[fid] = YamlDslEntityDeclaration(
+            kind="derived_field",
+            entity_id=fid,
+            yaml_path=yaml_path,
+            range=rng,
+            summary=_field_summary(spec),
+            detail=_field_detail(spec),
+        )
+
+
+def _index_relations_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+    relations_map = demand.get("relations")
+    if not isinstance(relations_map, dict):
+        return
+    for rel_id, spec in relations_map.items():
+        rid = _safe_str(rel_id)
+        if not rid:
+            continue
+        yaml_path = "relations.{}".format(rid)
+        rng = _range_for_yaml_key_path(yaml_path, key_text=rid, locations=locations)
+        store.relations[rid] = YamlDslEntityDeclaration(
+            kind="relation",
+            entity_id=rid,
+            yaml_path=yaml_path,
+            range=rng,
+            summary=_relation_summary(spec),
+            detail=_relation_detail(spec),
+        )
+
+
+def _index_outputs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+    outputs_seq = demand.get("outputs")
+    if not isinstance(outputs_seq, list):
+        return
+    for idx, spec in enumerate(outputs_seq):
+        if not isinstance(spec, dict):
+            continue
+        name = _safe_str(spec.get("name"))
+        if not name:
+            continue
+        yaml_path = "outputs.{}.name".format(idx)
+        rng = _range_for_yaml_key_path(yaml_path, key_text="name", locations=locations)
+        store.outputs[name] = YamlDslEntityDeclaration(
+            kind="output",
+            entity_id=name,
+            yaml_path=yaml_path,
+            range=rng,
+            summary=_output_summary(spec),
+            detail=_output_detail(spec),
+        )
+
+
+def _index_workflow_runs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+    workflow = demand.get("workflow")
+    if not isinstance(workflow, dict):
+        return
+    runs = workflow.get("runs")
+    if not isinstance(runs, list):
+        return
+    for idx, spec in enumerate(runs):
+        if not isinstance(spec, dict):
+            continue
+        run_id = _safe_str(spec.get("id"))
+        if not run_id:
+            continue
+        yaml_path = "workflow.runs.{}.id".format(idx)
+        rng = _range_for_yaml_key_path(yaml_path, key_text="id", locations=locations)
+        store.workflow_runs[run_id] = YamlDslEntityDeclaration(
+            kind="workflow_run",
+            entity_id=run_id,
+            yaml_path=yaml_path,
+            range=rng,
+            summary=_workflow_run_summary(spec),
+            detail=_workflow_run_detail(spec),
+        )
+
+
+def resolve_yaml_dsl_entity_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    entity_index: YamlDslEntityIndex,
+    anchor_yaml_path: Union[str, Path],
+) -> YamlDslEntityDefinitionResult:
+    """解析实体引用并返回定义位置(同文件)."""
+    kind = str(getattr(extraction, "kind", "") or "").strip()
+    ref = str(extraction.reference or "").strip()
+    if not kind or not ref:
+        return YamlDslEntityDefinitionResult()
+
+    file_path = str(Path(str(anchor_yaml_path)).expanduser().resolve(strict=False))
+
+    if kind == "relation_step_field_id":
+        return _resolve_relation_step_field_definition(extraction, entity_index=entity_index, file_path=file_path)
+
+    kind_label, decl = _simple_decl_for_entity_reference(kind, ref, entity_index=entity_index)
+    if not kind_label:
+        return YamlDslEntityDefinitionResult(warnings=("Unknown extraction kind: {}".format(kind),))
+    if decl is None:
+        return YamlDslEntityDefinitionResult(hint=_unknown_hint(kind_label, ref, extraction))
+    return _definition_result_for_decl(decl, file_path=file_path)
+
+
+def _definition_result_for_decl(decl: YamlDslEntityDeclaration, *, file_path: str) -> YamlDslEntityDefinitionResult:
+    loc = YamlDslEntityDefinitionLocation(
+        file_path=str(file_path),
+        range=decl.range,
+        entity_kind=str(decl.kind),
+        entity_id=str(decl.entity_id),
+        yaml_path=str(decl.yaml_path),
+    )
+    return YamlDslEntityDefinitionResult(locations=(loc,))
+
+
+def _simple_decl_for_entity_reference(
+    kind: str,
+    ref: str,
+    *,
+    entity_index: YamlDslEntityIndex,
+) -> Tuple[str, Optional[YamlDslEntityDeclaration]]:
+    if kind in ("source_id", "relation_step_source_id"):
+        return "source id", entity_index.sources.get(ref)
+    if kind == "relation_id":
+        return "relation id", entity_index.relations.get(ref)
+    if kind == "output_name":
+        return "output name", entity_index.outputs.get(ref)
+    if kind == "workflow_run_id":
+        return "workflow run id", entity_index.workflow_runs.get(ref)
+    return "", None
+
+
+def _resolve_relation_step_field_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    entity_index: YamlDslEntityIndex,
+    file_path: str,
+) -> YamlDslEntityDefinitionResult:
+    source_id, field_id = _split_source_field_ref(extraction.value or "")
+    if not source_id:
+        return YamlDslEntityDefinitionResult(hint=_unknown_hint("source id", source_id, extraction))
+    if not field_id:
+        return YamlDslEntityDefinitionResult()
+
+    decl = entity_index.source_fields.get((source_id, field_id)) or entity_index.derived_fields.get(field_id)
+    if decl is None:
+        return YamlDslEntityDefinitionResult(hint=_unknown_hint("field id", field_id, extraction, extra="source={}".format(source_id)))
+    return _definition_result_for_decl(decl, file_path=file_path)
+
+
+def hover_yaml_dsl_entity_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    entity_index: YamlDslEntityIndex,
+) -> YamlDslEntityHoverResult:
+    kind = str(getattr(extraction, "kind", "") or "").strip()
+    ref = str(extraction.reference or "").strip()
+    if not kind or not ref:
+        return YamlDslEntityHoverResult(text="")
+
+    if kind == "relation_step_field_id":
+        return _hover_relation_step_field(extraction, entity_index=entity_index)
+
+    title, kind_label, decl = _simple_hover_decl_for_entity_reference(kind, ref, entity_index=entity_index)
+    if not title:
+        return YamlDslEntityHoverResult(text="")
+    if decl is None:
+        return YamlDslEntityHoverResult(text="", hint=_unknown_hint(kind_label, ref, extraction))
+    return YamlDslEntityHoverResult(text=_hover_card(title, decl))
+
+
+def _simple_hover_decl_for_entity_reference(
+    kind: str,
+    ref: str,
+    *,
+    entity_index: YamlDslEntityIndex,
+) -> Tuple[str, str, Optional[YamlDslEntityDeclaration]]:
+    if kind in ("source_id", "relation_step_source_id"):
+        return "Source", "source id", entity_index.sources.get(ref)
+    if kind == "relation_id":
+        return "Relation", "relation id", entity_index.relations.get(ref)
+    if kind == "output_name":
+        return "Output", "output name", entity_index.outputs.get(ref)
+    if kind == "workflow_run_id":
+        return "Workflow Run", "workflow run id", entity_index.workflow_runs.get(ref)
+    return "", "", None
+
+
+def _hover_relation_step_field(extraction: YamlCursorExtractionResult, *, entity_index: YamlDslEntityIndex) -> YamlDslEntityHoverResult:
+    source_id, field_id = _split_source_field_ref(extraction.value or "")
+    if not source_id or not field_id:
+        return YamlDslEntityHoverResult(text="")
+
+    decl = entity_index.source_fields.get((source_id, field_id)) or entity_index.derived_fields.get(field_id)
+    if decl is None:
+        return YamlDslEntityHoverResult(
+            text="",
+            hint=_unknown_hint("field id", field_id, extraction, extra="source={}".format(source_id)),
+        )
+
+    title = "Field ({})".format(source_id) if decl.kind == "source_field" else "Field"
+    return YamlDslEntityHoverResult(text=_hover_card(title, decl))
+
+
+def complete_yaml_dsl_entity_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    entity_index: YamlDslEntityIndex,
+) -> YamlDslEntityCompletionResult:
+    kind = str(getattr(extraction, "kind", "") or "").strip()
+    if not kind:
+        return YamlDslEntityCompletionResult(items=())
+
+    if kind == "relation_step_source_id":
+        return _complete_relation_step_source_id(entity_index=entity_index)
+
+    if kind == "relation_step_field_id":
+        return _complete_relation_step_field_id(extraction, entity_index=entity_index)
+
+    decls = _decls_for_simple_completion_kind(kind, entity_index=entity_index)
+    if decls is None:
+        return YamlDslEntityCompletionResult(items=(), warnings=("Unknown extraction kind: {}".format(kind),))
+
+    items = _completion_items_for_decls(sorted(decls, key=lambda d: d.entity_id), replace="token")
+    return YamlDslEntityCompletionResult(items=items)
+
+
+def _decls_for_simple_completion_kind(kind: str, *, entity_index: YamlDslEntityIndex) -> Optional[Sequence[YamlDslEntityDeclaration]]:
+    if kind == "source_id":
+        return list(entity_index.sources.values())
+    if kind == "relation_id":
+        return list(entity_index.relations.values())
+    if kind == "output_name":
+        return list(entity_index.outputs.values())
+    if kind == "workflow_run_id":
+        return list(entity_index.workflow_runs.values())
+    return None
+
+
+def _complete_relation_step_source_id(*, entity_index: YamlDslEntityIndex) -> YamlDslEntityCompletionResult:
+    decls = sorted(entity_index.sources.values(), key=lambda d: d.entity_id)
+    snippet = YamlDslEntityCompletionItem(
+        label="source_id.field_id",
+        insert_text="${1:source_id}.${2:field_id}",
+        detail="snippet",
+        is_snippet=True,
+        replace="value",
+    )
+    items = (snippet, *_completion_items_for_decls(decls, replace="token"))
+    return YamlDslEntityCompletionResult(items=items)
+
+
+def _complete_relation_step_field_id(
+    extraction: YamlCursorExtractionResult,
+    *,
+    entity_index: YamlDslEntityIndex,
+) -> YamlDslEntityCompletionResult:
+    source_id, _field_id = _split_source_field_ref(extraction.value or "")
+    if not source_id:
+        return YamlDslEntityCompletionResult(items=())
+    if source_id not in entity_index.sources:
+        return YamlDslEntityCompletionResult(items=(), hint=_unknown_hint("source id", source_id, extraction))
+
+    fields = [decl for (sid, _fid), decl in entity_index.source_fields.items() if sid == source_id]
+    fields_sorted = sorted(fields, key=lambda d: d.entity_id)
+    items = _completion_items_for_decls(fields_sorted, replace="token")
+    return YamlDslEntityCompletionResult(items=items)
+
+
+def _safe_str(raw: object) -> str:
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw.strip()
+    return str(raw).strip()
+
+
+def _range_for_yaml_key_path(
+    yaml_path: str,
+    *,
+    key_text: str,
+    locations: Dict[str, Tuple[int, int]],
+) -> Optional[EditorRange]:
+    loc = locations.get(str(yaml_path))
+    if loc is None:
+        return None
+    line, column = loc
+    end_col = int(column) + max(1, len(str(key_text)))
+    return EditorRange(
+        start=EditorPosition(line=int(line), column=int(column)),
+        end=EditorPosition(line=int(line), column=int(end_col)),
+    )
+
+
+def _build_source_declaration(
+    source_id: str,
+    *,
+    yaml_path: str,
+    range_key_text: str,
+    locations: Dict[str, Tuple[int, int]],
+    spec: object,
+) -> Optional[YamlDslEntityDeclaration]:
+    rng = _range_for_yaml_key_path(yaml_path, key_text=str(range_key_text), locations=locations)
+    loader = ""
+    key = ""
+    fields_cnt = 0
+    if isinstance(spec, dict):
+        loader = _safe_str(spec.get("loader"))
+        key_raw = spec.get("key")
+        if isinstance(key_raw, list):
+            key = "[" + ", ".join([_safe_str(k) for k in key_raw if _safe_str(k)]) + "]"
+        else:
+            key = _safe_str(key_raw)
+        fields_raw = spec.get("fields")
+        if isinstance(fields_raw, dict):
+            fields_cnt = len(fields_raw)
+
+    summary = "loader: {}".format(loader) if loader else ""
+    detail_lines: List[str] = ["id: {}".format(source_id)]
+    if loader:
+        detail_lines.append("loader: {}".format(loader))
+    if key:
+        detail_lines.append("key: {}".format(key))
+    if fields_cnt:
+        detail_lines.append("fields: {}".format(int(fields_cnt)))
+
+    return YamlDslEntityDeclaration(
+        kind="source",
+        entity_id=str(source_id),
+        yaml_path=str(yaml_path),
+        range=rng,
+        summary=summary,
+        detail="\n".join(detail_lines),
+    )
+
+
+def _field_summary(spec: object) -> str:
+    if isinstance(spec, dict):
+        name = _safe_str(spec.get("name"))
+        if name:
+            return "name: {}".format(name)
+    return ""
+
+
+def _field_detail(spec: object) -> str:
+    if isinstance(spec, dict):
+        name = _safe_str(spec.get("name"))
+        if name:
+            return "name: {}".format(name)
+    return ""
+
+
+def _relation_sources_involved(rel_spec: object) -> Tuple[str, ...]:
+    if not isinstance(rel_spec, dict):
+        return ()
+    steps = rel_spec.get("steps")
+    if not isinstance(steps, list):
+        return ()
+    names: Dict[str, None] = {}
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        for key in ("from", "to"):
+            val = step.get(key)
+            for src in _iter_source_ids_from_step_value(val):
+                if src:
+                    names[src] = None
+    return tuple(sorted(names.keys()))
+
+
+def _iter_source_ids_from_step_value(val: object) -> Iterable[str]:
+    if isinstance(val, str):
+        src, _field = _split_source_field_ref(val)
+        if src:
+            yield src
+        return
+    if isinstance(val, list):
+        for item in val:
+            if isinstance(item, str):
+                src, _field = _split_source_field_ref(item)
+                if src:
+                    yield src
+
+
+def _relation_summary(rel_spec: object) -> str:
+    if not isinstance(rel_spec, dict):
+        return ""
+    steps = rel_spec.get("steps")
+    step_cnt = len(steps) if isinstance(steps, list) else 0
+    sources = _relation_sources_involved(rel_spec)
+    if sources:
+        return "steps: {} | sources: {}".format(int(step_cnt), ", ".join(sources))
+    return "steps: {}".format(int(step_cnt))
+
+
+def _relation_detail(rel_spec: object) -> str:
+    if not isinstance(rel_spec, dict):
+        return ""
+    steps = rel_spec.get("steps")
+    step_cnt = len(steps) if isinstance(steps, list) else 0
+    sources = _relation_sources_involved(rel_spec)
+    lines = ["steps: {}".format(int(step_cnt))]
+    if sources:
+        lines.append("sources: {}".format(", ".join(sources)))
+    return "\n".join(lines)
+
+
+def _output_summary(out_spec: object) -> str:
+    if not isinstance(out_spec, dict):
+        return ""
+    parent = _safe_str(out_spec.get("from"))
+    if parent:
+        return "from: {}".format(parent)
+    return ""
+
+
+def _output_detail(out_spec: object) -> str:
+    if not isinstance(out_spec, dict):
+        return ""
+    lines: List[str] = []
+    parent = _safe_str(out_spec.get("from"))
+    if parent:
+        lines.append("from: {}".format(parent))
+    fields_raw = out_spec.get("fields")
+    if isinstance(fields_raw, list):
+        lines.append("fields: {}".format(len(fields_raw)))
+    if isinstance(out_spec.get("aggregate"), dict):
+        lines.append("aggregate: true")
+    return "\n".join(lines)
+
+
+def _workflow_run_summary(run_spec: object) -> str:
+    if not isinstance(run_spec, dict):
+        return ""
+    deps_raw = run_spec.get("depends_on")
+    if isinstance(deps_raw, list):
+        deps = [d for d in [_safe_str(x) for x in deps_raw] if d]
+        if deps:
+            return "depends_on: {}".format(", ".join(deps))
+    return ""
+
+
+def _workflow_run_detail(run_spec: object) -> str:
+    if not isinstance(run_spec, dict):
+        return ""
+    lines: List[str] = []
+    deps_raw = run_spec.get("depends_on")
+    if isinstance(deps_raw, list):
+        deps = [d for d in [_safe_str(x) for x in deps_raw] if d]
+        if deps:
+            lines.append("depends_on: {}".format(", ".join(deps)))
+    return "\n".join(lines)
+
+
+def _split_source_field_ref(text: str) -> Tuple[str, str]:
+    raw = _safe_str(text)
+    if not raw:
+        return "", ""
+    if "." not in raw:
+        return raw, ""
+    left, right = raw.split(".", 1)
+    return _safe_str(left), _safe_str(right)
+
+
+def _unknown_hint(
+    kind_label: str, entity_id: str, extraction: YamlCursorExtractionResult, *, extra: str = ""
+) -> YamlDslEntityHintDiagnostic:
+    suffix = " ({})".format(extra) if extra else ""
+    msg = "Unknown {}: {}{}".format(str(kind_label), str(entity_id), suffix)
+    return YamlDslEntityHintDiagnostic(
+        message=msg,
+        range=extraction.range,
+        yaml_path=str(extraction.yaml_path or ""),
+        kind=str(getattr(extraction, "kind", "") or ""),
+        entity_id=str(entity_id or ""),
+    )
+
+
+def _hover_card(title: str, decl: YamlDslEntityDeclaration) -> str:
+    lines = ["{}: {}".format(title, decl.entity_id)]
+    detail = str(decl.detail or "").strip()
+    if detail:
+        for ln in detail.splitlines():
+            # avoid duplicating "id:" line in Source card
+            if title == "Source" and ln.startswith("id:"):
+                continue
+            lines.append(str(ln))
+    return "\n".join(lines).strip()
+
+
+def _completion_items_for_decls(
+    decls: Sequence[YamlDslEntityDeclaration],
+    *,
+    replace: str,
+) -> Tuple[YamlDslEntityCompletionItem, ...]:
+    items: List[YamlDslEntityCompletionItem] = []
+    for decl in decls:
+        detail = str(decl.summary or "")
+        items.append(
+            YamlDslEntityCompletionItem(
+                label=str(decl.entity_id),
+                insert_text=str(decl.entity_id),
+                detail=detail,
+                is_snippet=False,
+                replace=str(replace or "token"),
+            )
+        )
+    return tuple(items)
 
 
 def resolve_python_definition(
@@ -2647,17 +3466,30 @@ __all__ = (
     "YamlCursorExtractionResult",
     "YamlDslEditorDiagnosticsResult",
     "YamlDslEditorProjectDiscovery",
+    "YamlDslEntityCompletionItem",
+    "YamlDslEntityCompletionResult",
+    "YamlDslEntityDeclaration",
+    "YamlDslEntityDefinitionLocation",
+    "YamlDslEntityDefinitionResult",
+    "YamlDslEntityHintDiagnostic",
+    "YamlDslEntityHoverResult",
+    "YamlDslEntityIndex",
     "YamlImportDefinitionLocation",
     "YamlImportDefinitionResult",
     "YamlImportHoverResult",
+    "build_yaml_dsl_entity_index",
     "classify_yaml_dsl_kind",
     "collect_yaml_dsl_editor_diagnostics",
     "complete_python_reference",
+    "complete_yaml_dsl_entity_reference",
     "discover_yaml_dsl_editor_project",
+    "extract_yaml_dsl_entity_reference_by_cursor",
     "extract_yaml_dsl_import_reference_by_cursor",
     "extract_yaml_dsl_python_reference_by_cursor",
     "hover_python_reference",
+    "hover_yaml_dsl_entity_reference",
     "hover_yaml_import_reference",
     "resolve_python_definition",
+    "resolve_yaml_dsl_entity_definition",
     "resolve_yaml_import_definition",
 )

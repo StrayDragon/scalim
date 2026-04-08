@@ -482,6 +482,283 @@ def test_lsp_server_import_definition_path_escapes_allowed_roots_degrades_to_emp
         client.shutdown()
 
 
+def test_lsp_server_yaml_entity_definition_hover_and_completion(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields:",
+            "    customer_id: {name: Customer ID}",
+            "sources:",
+            "  customers:",
+            "    loader: tests.fixtures.mock_loaders.mock_loader",
+            "    key: customer_id",
+            "    fields:",
+            "      customer_id: {name: Customer ID}",
+            "relations:",
+            "  orders_to_customers:",
+            "    steps:",
+            "      - from: orders.customer_id",
+            "        to: customers.customer_id",
+            "outputs: []",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        from_line = next(i for i, line in enumerate(lines) if "from:" in line)
+        from_text = lines[from_line]
+
+        # definition on source_id segment -> main_source.source_id key location
+        src_char = int(from_text.index("orders")) + 2
+        def_src_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": from_line, "character": src_char},
+            },
+        )
+        def_src_resp = client.recv_until(lambda msg: msg.get("id") == def_src_id, timeout=10.0)
+        assert "error" not in def_src_resp
+
+        locations = def_src_resp.get("result") or []
+        assert any(loc.get("uri") == yaml_path.as_uri() and loc.get("range", {}).get("start", {}).get("line") == 2 for loc in locations)
+
+        # definition on field_id segment -> main_source.fields.customer_id key location
+        field_char = int(from_text.index("customer_id")) + 2
+        def_field_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": from_line, "character": field_char},
+            },
+        )
+        def_field_resp = client.recv_until(lambda msg: msg.get("id") == def_field_id, timeout=10.0)
+        assert "error" not in def_field_resp
+        field_locations = def_field_resp.get("result") or []
+        assert any(
+            loc.get("uri") == yaml_path.as_uri() and loc.get("range", {}).get("start", {}).get("line") == 5 for loc in field_locations
+        )
+
+        # hover on source_id segment
+        hover_id = client.send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": from_line, "character": src_char},
+            },
+        )
+        hover_resp = client.recv_until(lambda msg: msg.get("id") == hover_id, timeout=10.0)
+        assert "error" not in hover_resp
+        hover = hover_resp.get("result") or {}
+        value = (hover.get("contents") or {}).get("value") if isinstance(hover, dict) else ""
+        assert isinstance(value, str)
+        assert "Source: orders" in value
+
+        # completion after dot -> field ids
+        from_line_text = lines[from_line]
+        dot_char = int(from_line_text.index("orders.")) + len("orders.")
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": from_line, "character": dot_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+        items = completion_resp.get("result", {}).get("items", [])
+        labels = {item.get("label") for item in items}
+        assert "customer_id" in labels
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_yaml_entity_unknown_id_publishes_hint_diagnostic(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields: {customer_id: {}}",
+            "sources: {}",
+            "relations:",
+            "  r1:",
+            "    steps:",
+            "      - from: not_exist.customer_id",
+            "        to: orders.customer_id",
+            "outputs: []",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        from_line = next(i for i, line in enumerate(lines) if "from:" in line)
+        from_text = lines[from_line]
+        cursor_char = int(from_text.index("not_exist")) + 2
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": from_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+        assert not definition_resp.get("result")
+
+        pub = client.recv_until(
+            lambda msg: (
+                msg.get("method") == "textDocument/publishDiagnostics"
+                and any(d.get("code") == "scalim_unknown_entity_id" for d in msg.get("params", {}).get("diagnostics", []))
+            ),
+            timeout=10.0,
+        )
+        diags = pub.get("params", {}).get("diagnostics", [])
+        assert any("Unknown source id" in str(d.get("message") or "") for d in diags)
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_yaml_entity_workflow_run_definition(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "workflow.yaml"
+    yaml_text = "\n".join(
+        [
+            "workflow:",
+            "  runs:",
+            "    - id: extract",
+            "      demand: x.yaml",
+            "    - id: transform",
+            "      depends_on: [extract]",
+            "      demand: y.yaml",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        depends_line = next(i for i, line in enumerate(yaml_text.splitlines()) if "depends_on:" in line)
+        depends_text = yaml_text.splitlines()[depends_line]
+        cursor_char = int(depends_text.index("extract")) + 2
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": depends_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+        locations = definition_resp.get("result") or []
+        assert any(loc.get("uri") == yaml_path.as_uri() and loc.get("range", {}).get("start", {}).get("line") == 2 for loc in locations)
+    finally:
+        client.shutdown()
+
+
 def _start_lsp_server_process(workspace: Path) -> subprocess.Popen[bytes]:
     code = "from scalim_yaml_dsl_lsp.cli import main; raise SystemExit(main(['serve', '--log-level', 'ERROR']))"
     env = dict(os.environ)
