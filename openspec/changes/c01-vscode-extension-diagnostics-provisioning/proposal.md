@@ -25,7 +25,7 @@ VSCode 扩展（`extras/vscode-scalim/`）是用户接触 YAML DSL 编辑体验�
 
 ## Non-Goals
 
-- 不引入新的语义 UI（Tree View / Virtual Documents 由 c44 负责）。
+- 不引入新的语义 UI（例如 Tree View / Virtual Documents）；本变更只做诊断/引导类 UX。
 - 不在 extension 侧复制 LSP 语义规则。
 - 不做 workspace-wide 全量索引或扫描。
 
@@ -52,8 +52,8 @@ VSCode 扩展（`extras/vscode-scalim/`）是用户接触 YAML DSL 编辑体验�
   - scalim.yaml 路径（找到 / 未找到）
   - python_roots 列表
   - allowed_yaml_roots 列表
-  - import_aliases 列表
-- 最近一次 resolution trace（来自 c40 的 ResolutionTrace，若 server 支持）
+  - `yaml_dsl.import_roots` 摘要（path + alias）
+- 最近一次 resolution trace（来自 `yaml-dsl-lsp-resolution-infra` 的 ResolutionTrace，若 server 支持）
 - Server 状态（Running / Stopped / Error）
 
 ### 2) Status Bar
@@ -172,7 +172,7 @@ VSCode 扩展（`extras/vscode-scalim/`）是用户接触 YAML DSL 编辑体验�
 ### 3) Doctor 检查项的扩展性
 
 - 当前 5 项覆盖最常见的 failure mode。
-- 后续可新增检查项（例如"c42 的 builtin 词表是否可加载"），但不应在首次迭代做太多。
+- 后续可新增检查项（例如"`yaml-dsl-lsp-sugar-support` 的 builtin 词表是否可加载"），但不应在首次迭代做太多。
 - 建议用简单的 check list 模式，每项独立、可单独跳过。
 
 ## Validation

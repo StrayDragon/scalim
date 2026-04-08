@@ -7,7 +7,7 @@ LSP server 当前已具备 diagnostics / hover / completion / definition 等基�
 3. **失败不可解释**：解析失败时用户只看到"无结果"，无法知道"试了哪些 roots、选中了哪个模块文件、为何 rejected"。排障成本高。
 4. **Quick Fix 模式不统一**：各 feature 各自实现 codeAction，没有统一的"诊断 → 修复建议"框架。
 
-本提案聚焦：**加固 LSP server 的解析基础设施**，为后续 feature（c42 语法糖、c43 实体导航）提供可靠底座。
+本提案聚焦：**加固 LSP server 的解析基础设施**，为后续 feature（`yaml-dsl-lsp-sugar-support` 语法糖、`yaml-dsl-entity-navigation` 实体导航）提供可靠底座。
 
 ## Goals
 
@@ -19,7 +19,7 @@ LSP server 当前已具备 diagnostics / hover / completion / definition 等基�
 
 ## Non-Goals
 
-- 不引入新的语义 feature（`^<id>` / alias / preset 由 c42 负责；YAML ID 导航由 c43 负责）。
+- 不引入新的语义 feature（`^<id>` / alias / preset 由 `yaml-dsl-lsp-sugar-support` 负责；YAML ID 导航由 `yaml-dsl-entity-navigation` 负责）。
 - 不引入 workspace-wide 全量索引（保持 on-demand 解析）。
 - 不改变 LSP 协议层（继续使用 pygls 标准 capability 注册）。
 
@@ -141,9 +141,9 @@ codeAction 分散在各 feature handler 中，没有统一的"诊断 → 修复"
 3) 每个 feature（Python ref、imports alias、preset 等）注册自己的 provider。
 4) 所有 `CodeAction` 的 edit/command 必须是 workspace-scoped 且可撤销。
 
-#### 与 c42 / c43 的关系
+#### 与 `yaml-dsl-lsp-sugar-support` / `yaml-dsl-entity-navigation` 的关系
 
-c42 的 "alias 未配置 → Quick Fix" 和 c43 的未来 Quick Fix 都注册为 provider 实例。本提案只提供框架，不注册具体 provider。
+`yaml-dsl-lsp-sugar-support` 的 "alias 未配置 → Quick Fix" 和 `yaml-dsl-entity-navigation` 的未来 Quick Fix 都注册为 provider 实例。本提案只提供框架，不注册具体 provider。
 
 ## Validation（fixture 覆盖）
 

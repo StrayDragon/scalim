@@ -1,6 +1,6 @@
 ## Why
 
-c41 补齐了 VSCode 扩展的"可观测与可排障"能力（日志、Status Bar、Doctor、Setup Wizard）。但在日常使用中，用户还需要更丰富的**可视化 UI**来理解 DSL 结构、查看解析结果、浏览可用修复：
+`vscode-extension-diagnostics-provisioning` 补齐了 VSCode 扩展的"可观测与可排障"能力（日志、Status Bar、Doctor、Setup Wizard）。但在日常使用中，用户还需要更丰富的**可视化 UI**来理解 DSL 结构、查看解析结果、浏览可用修复：
 
 1. **结构大纲缺失**：用户无法一览当前 YAML 文件的 sources / fields / relations 结构，只能手动滚动。
 2. **有效配置不可见**：imports 展开后的"最终 YAML"、Python 引用解析后的"归一化路径"等中间产物，用户无法直观查看。
@@ -17,7 +17,7 @@ c41 补齐了 VSCode 扩展的"可观测与可排障"能力（日志、Status Ba
 
 ## Non-Goals
 
-- 不引入新的 LSP 语义能力（实体导航由 c43 负责）。
+- 不引入新的 LSP 语义能力（实体导航由 `yaml-dsl-entity-navigation` 负责）。
 - 不在 extension 侧解析 YAML 语义（所有数据来自 LSP server 的标准能力或命令）。
 - 不做可编辑的 UI（所有面板都是只读展示）。
 - 不做 rename / refactor 的 UI（超出本提案范围）。
@@ -63,12 +63,12 @@ VSCode 侧边栏，Tab 名称 `ScALIM DSL`。
 
 #### 数据来源
 
-- **方式 A（推荐）**：复用 c43 的 `textDocument/documentSymbol` 返回的 symbols 作为 Tree View 数据源。
-- **方式 B（备选）**：如果 documentSymbol 的层级不足以展示详情（如 loader 类型、source 引用），新增一个 server command（例如 `scalim.getDocumentStructure`）返回更丰富的结构化数据。
+- **方式 A（推荐）**：复用 YAML language server 提供的 `textDocument/documentSymbol`（通用 YAML symbols）作为 Tree View 数据源。
+- **方式 B（备选）**：如果通用 documentSymbol 的层级不足以展示详情（如 loader 类型、source 引用），新增一个 server command（例如 `scalim.getDocumentStructure`）返回更丰富的结构化数据。
 
 #### Options & Trade-offs
 
-- 基于 documentSymbol 的方式实现简单且复用 c43，但信息量受限于 SymbolKind 和 SymbolInformation。
+- 基于 documentSymbol 的方式实现简单，但信息量受限于 SymbolKind 和 SymbolInformation。
 - 自定义 command 可以返回任意结构，但增加 server 侧代码。
 - 结论：优先用 documentSymbol；如果信息不足再追加 command。
 
@@ -95,9 +95,9 @@ VSCode 侧边栏，Tab 名称 `ScALIM DSL`。
 2) 打开一个只读 tab，展示：
    - 原始引用字符串
    - 归一化后的 module path
-   - 解析链路（来自 c40 的 ResolutionTrace 摘要）
+   - 解析链路（来自 `yaml-dsl-lsp-resolution-infra` 的 ResolutionTrace 摘要）
    - 候选 locations 列表（可点击跳转）
-3) 数据来源：c40 的 ResolutionTrace。
+3) 数据来源：`yaml-dsl-lsp-resolution-infra` 的 ResolutionTrace。
 
 #### 护栏
 
@@ -147,7 +147,7 @@ YAML 编辑器顶部（breadcrumb 区域下方或 status bar 第二段）。
 
 ### 1) Tree View 的数据来源
 
-- **documentSymbol（推荐）**：复用 c43 的输出，零额外 server 成本。
+- **documentSymbol（推荐）**：复用 YAML language server 的输出，零额外 server 成本。
 - **自定义 command**：更灵活但增加维护面。
 - 结论：优先 documentSymbol。
 
