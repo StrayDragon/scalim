@@ -43,6 +43,9 @@ YAML DSL 文件内部存在大量实体 ID 引用：`fields.*.source` 引用 `so
 3) 光标在 `<source_id>.<field_id>` 的 `<field_id>` 部分 → 跳到 fields 定义（如果 field_id 可解析到唯一 field）。
 4) 目标不存在 → 返回空 + Diagnostic（severity: hint）提示 "Unknown source/relation: <id>"。
 
+实现约束（Range 精度）：
+- 对 `source_id.field_id` 这类复合引用，cursor extraction 必须能在同一 scalar string 内返回子 token 的精确 range（否则无法正确区分 source/field 的 definition 目标）。
+
 #### 前置依赖
 
 依赖 c40 的多 Location 返回框架和 Resolution Trace。

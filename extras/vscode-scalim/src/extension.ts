@@ -19,6 +19,8 @@ const DEFAULT_WORKSPACE_VENV_PATH = ".venv";
 
 type EnvMode = "pinnedVenv" | "workspaceVenv" | "auto";
 
+type ActiveDocumentKind = "demand" | "workflow" | "config";
+
 type Semver = {
 	major: number;
 	minor: number;
@@ -54,6 +56,7 @@ let statusBarItem: vscode.StatusBarItem | undefined;
 let lastStartError: string | undefined;
 let lastProjectRoot: string | undefined;
 let autoStartAttempted = false;
+let lastActiveDocumentKind: ActiveDocumentKind | undefined;
 
 function ensureStatusBar(context: vscode.ExtensionContext): vscode.StatusBarItem {
 	if (statusBarItem) {
@@ -78,22 +81,23 @@ function setStatusBarState(
 ): void {
 	const item = ensureStatusBar(context);
 
-	const version = env?.serverPackageVersion ?? "<unknown>";
+	const kindLabel = lastActiveDocumentKind ? ` ${lastActiveDocumentKind}` : "";
 	const projectRoot = lastProjectRoot ?? "<unknown>";
 	const projectRootBase = projectRoot !== "<unknown>" ? path.basename(projectRoot) : "";
 
 	if (status === "starting") {
-		item.text = "$(sync~spin) Scalim YAML DSL";
+		item.text = `$(sync~spin) Scalim YAML DSL${kindLabel}`;
 	} else if (status === "running") {
-		item.text = `$(check) Scalim YAML DSL ${version}${projectRootBase ? ` · ${projectRootBase}` : ""}`;
+		item.text = `$(check) Scalim YAML DSL${kindLabel}${projectRootBase ? ` · ${projectRootBase}` : ""}`;
 	} else {
-		item.text = "$(error) Scalim YAML DSL stopped";
+		item.text = `$(error) Scalim YAML DSL${kindLabel} stopped`;
 	}
 
 	const tooltip = [
 		"Scalim YAML DSL",
 		`status=${status}`,
-		`serverVersion=${version}`,
+		`activeDocKind=${lastActiveDocumentKind ?? "<none>"}`,
+		`serverVersion=${env?.serverPackageVersion ?? "<unknown>"}`,
 		`projectRoot=${projectRoot}`,
 		env ? `envKind=${env.kind}` : undefined,
 		env ? `venvPath=${env.venvPath}` : "venvPath=<unknown>",
@@ -315,6 +319,43 @@ function isLikelyScalimYamlDslDocument(document: vscode.TextDocument): boolean {
 		return true;
 	}
 	return false;
+}
+
+function detectActiveDocumentKind(
+	document: vscode.TextDocument,
+	schemaRequiredKeys?: { demand: readonly string[]; workflow: readonly string[] },
+): ActiveDocumentKind | undefined {
+	if (document.languageId !== "yaml") {
+		return undefined;
+	}
+	if (document.uri.scheme === "file" && path.basename(document.uri.fsPath) === "scalim.yaml") {
+		return "config";
+	}
+	if (!isLikelyScalimYamlDslDocument(document)) {
+		return undefined;
+	}
+	const preview = documentPreviewText(document);
+	return guessYamlDslKindFromText(preview, schemaRequiredKeys);
+}
+
+function currentStatusBarState(): "starting" | "running" | "stopped" {
+	const state = clientState();
+	if (state === State.Running) {
+		return "running";
+	}
+	if (state === State.Starting || startMutex) {
+		return "starting";
+	}
+	return "stopped";
+}
+
+function updateActiveDocumentKindAndRefreshStatusBar(context: vscode.ExtensionContext, document: vscode.TextDocument): void {
+	const nextKind = detectActiveDocumentKind(document, currentEnv?.schemaRequiredKeys);
+	if (nextKind === lastActiveDocumentKind) {
+		return;
+	}
+	lastActiveDocumentKind = nextKind;
+	setStatusBarState(context, currentStatusBarState(), currentEnv);
 }
 
 function guessYamlDslKindFromText(
@@ -1169,6 +1210,7 @@ async function maybeAutostartForDocument(
 	if (!document) {
 		return;
 	}
+	updateActiveDocumentKindAndRefreshStatusBar(context, document);
 	if (!isLikelyScalimYamlDslDocument(document)) {
 		return;
 	}

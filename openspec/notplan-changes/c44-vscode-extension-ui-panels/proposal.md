@@ -103,6 +103,7 @@ VSCode 侧边栏，Tab 名称 `ScALIM DSL`。
 
 - 所有 virtual document 都是只读的（不支持编辑后回写）。
 - 不缓存（每次打开都从 server 获取最新数据）。
+- 与其它提案的 virtual documents（例如 sugar/preset 预览）应复用同一套 scheme/打开逻辑，避免出现多个并行的 URI scheme 与 provider（降低维护成本、减少用户困惑）。
 
 ### 3) Quick Fix 浏览面板
 

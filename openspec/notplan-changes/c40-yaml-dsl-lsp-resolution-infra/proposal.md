@@ -29,7 +29,11 @@ LSP server 当前已具备 diagnostics / hover / completion / definition 等基�
 
 #### 现状
 
-`textDocument/definition` 对 Python 引用返回单个 location（或空）。当静态推断产生多个候选时，只取第一个。
+shared core 已能在部分场景返回多个候选 location（例如 `module:obj.method` 会同时返回“推断到的真实实现”与“对象定义/赋值位置”的 fallback），server 侧也会透传多条 `Location`。
+
+但当前仍存在结构性缺口：
+- 缺少统一的“多候选排序/去重”规则（不同解析路径可能产出不一致的优先级与顺序）。
+- 对“可能产生多 location 的解析”缺少统一签名约定（部分入口仍可能降级为单点或 explain-only）。
 
 #### Expected Behavior
 
@@ -62,6 +66,10 @@ LSP server 当前已具备 diagnostics / hover / completion / definition 等基�
 3) 失效策略：每次访问前比较 mtime；mtime 变化则丢弃并重新解析。
 4) 容量上限：LRU，默认上限 128 个文件（可配置）。
 5) 不跨 LSP session 持久化（进程重启即清空）。
+
+补充约束（避免“未保存但编辑器已变更”的错乱）：
+- 对“当前打开的 anchor YAML 文本”，应优先使用 LSP 内存态（`didOpen/didChange` 同步的文本），不要依赖 mtime 缓存。
+- `(path_str, mtime_ns)` 缓存主要用于磁盘上的被引用文件（Python module、fragment YAML）。
 
 #### Options & Trade-offs
 
