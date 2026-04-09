@@ -3,7 +3,14 @@
 ## ADDED Requirements
 
 ### Requirement: Editor semantics core MUST extract field-id tokens from `call_by` kwargs value positions
-系统 MUST 扩展光标抽取能力，使其能在 `call_by` 的参数段（`(...)`）内识别 kwargs 的 `=` **右侧** field-id token，并用于 editor/LSP 语义能力：
+系统 MUST 扩展光标抽取能力，使其能在 `call_by` 的参数段（`(...)`）内识别 kwargs 的 `=` **右侧** field-id token，并用于 editor/LSP 语义能力。
+
+覆盖 callsite 至少包括：
+- `fields.*.call_by`
+- `outputs[*].aggregate.fields.*.call_by`
+- builtin callable：`call_by: "^<id>(...)"`（head 为 builtin id）
+
+抽取必须满足：
 
 - 抽取 MUST 仅对 `=` 右侧生效；`=` 左侧 kwargs 名称 MUST NOT 被当作 field-id
 - token 抽取 MUST 返回精确 range（仅覆盖 token 本身）
