@@ -8,7 +8,10 @@ yaml_dsl:
   # <!-- END AUTOGEN:yaml_dsl.import_roots -->
 
   lsp:
-    python_roots: [.]
+    python_roots:
+      - .
+      - ../../../../../src
+      - ../../../../../packages/scalim-misc/src
     kind_overrides:
       # <!-- BEGIN AUTOGEN:yaml_dsl.lsp.kind_overrides[*] -->
       - glob: workflow/*.yaml

@@ -260,15 +260,34 @@ def test_project_config_import_roots_alias_must_match_pattern(tmp_path: Path) ->
     assert ".alias must be '@' or match" in str(excinfo.value)
 
 
-def test_project_config_editor_python_roots_rejects_outside_project_root(tmp_path: Path) -> None:
+def test_project_config_editor_python_roots_allows_outside_project_root(tmp_path: Path) -> None:
     outside = tmp_path.parent / "outside_py"
     outside.mkdir(parents=True, exist_ok=True)
     (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    python_roots: ['../outside_py']\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert cfg is not None
+    assert cfg.lsp is not None
+    assert cfg.lsp.python_roots == (outside,)
+
+
+def test_project_config_editor_python_roots_rejects_empty_string(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    python_roots: ['']\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
+    with pytest.raises(TypeError) as excinfo:
+        _ = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert "must be a non-empty directory path" in str(excinfo.value)
+
+
+def test_project_config_editor_python_roots_rejects_missing_dir(tmp_path: Path) -> None:
+    (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    python_roots: ['../missing_py']\n", encoding="utf-8")
+    demand = tmp_path / "demand.yaml"
+    demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
     with pytest.raises(ValueError) as excinfo:
         _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "must stay within project_root" in str(excinfo.value)
+    assert "must be an existing directory" in str(excinfo.value)
 
 
 def test_project_config_scalim_yaml_override_must_exist_and_be_file(tmp_path: Path) -> None:

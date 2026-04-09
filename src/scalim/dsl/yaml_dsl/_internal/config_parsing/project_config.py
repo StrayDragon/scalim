@@ -102,6 +102,24 @@ def _resolve_dir(value: object, *, base_dir: Path, context_label: str) -> Path:
     return resolved
 
 
+def _resolve_dir_allow_external(value: object, *, base_dir: Path, context_label: str) -> Path:
+    raw = str(value or "")
+    if not raw.strip():
+        msg = "{} must be a non-empty directory path".format(str(context_label or "path"))
+        raise TypeError(msg)
+    resolved = (base_dir / raw).expanduser().resolve(strict=False)
+    if not resolved.exists() or not resolved.is_dir():
+        msg = "{} must be an existing directory: raw='{}' | resolved='{}' | exists={} | is_dir={}".format(
+            str(context_label or "path"),
+            raw,
+            str(resolved),
+            bool(resolved.exists()),
+            bool(resolved.is_dir()),
+        )
+        raise ValueError(msg)
+    return resolved
+
+
 def _parse_yaml_dsl_dict(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -> Dict[str, Any]:
     yaml_dsl = raw.get("yaml_dsl")
     if yaml_dsl is None:
@@ -177,7 +195,9 @@ def _parse_lsp_python_roots(lsp_dict: Dict[str, Any], *, project_root: Path, sca
 
     resolved_py_roots: List[Path] = []
     for idx, raw_root in enumerate(raw_python_roots):
-        resolved_py_roots.append(_resolve_dir(raw_root, base_dir=project_root, context_label="yaml_dsl.lsp.python_roots[{}]".format(idx)))
+        resolved_py_roots.append(
+            _resolve_dir_allow_external(raw_root, base_dir=project_root, context_label="yaml_dsl.lsp.python_roots[{}]".format(idx))
+        )
     return tuple(resolved_py_roots)
 
 
