@@ -261,7 +261,7 @@ def _extract_keyword(proposal_text: str, *, fallback_change_id: str) -> str:
     return "{}-{}".format(tokens[0], tokens[1])
 
 
-def _example_priority(change_id: str) -> int:
+def _example_priority(change_id: str, proposal_text: str) -> int:
     cid = change_id.lower()
     if "normalize" in cid:
         return 1
@@ -292,7 +292,93 @@ def _example_priority(change_id: str) -> int:
         return 6
     if "comment-style" in cid:
         return 7
+    # 回退：当 change_id 不带明确 token 时，用提案正文推断作者写法主题；避免错过 “YAML DSL 写法变化”
+    # 但 ID 命名偏实现细节的变更（例如 `...-callable-precheck-fast-fail` / `...-lsp-sugar-support`）。
+    lower = proposal_text.lower()
+    if "normalize.call_by" in lower or "normalize" in lower:
+        return 1
+    if "extract" in lower or "value_cast" in lower or "value-cast" in lower:
+        return 2
+    if (
+        "$init_var" in proposal_text
+        or "$runtime" in proposal_text
+        or "template_vars" in lower
+        or "template-vars" in lower
+        or "{{" in proposal_text
+    ):
+        return 3
+    if "imports" in lower or "$import" in proposal_text or "scalim://" in lower or "import_roots" in lower or "import-roots" in lower:
+        return 4
+    if "outputs" in lower or "aggregate" in lower or "group_by" in lower or "dedup_by" in lower:
+        return 5
+    if "output-fields-alias" in lower or "fields-alias" in lower:
+        return 6
+    if "comment" in lower or "注释" in proposal_text:
+        return 7
+    # `call_by`/callable 往往是用户要改写法的核心点（即便没有写进 change_id）。
+    if "call_by" in lower or "callable" in lower:
+        return 1
     return 99
+
+
+_CALL_BY_TOKEN_RE = re.compile(r"`call_by:\s*\"([^\"]+)\"`")
+
+
+def _render_call_by_upgrade_example(proposal_text: str) -> Optional[List[str]]:
+    # 目标：从提案里提炼出 “位置参数写法 -> 显式 kwargs 写法” 的最小示例（并明确这是语义示意）。
+    forms = [m.group(1).strip() for m in _CALL_BY_TOKEN_RE.finditer(proposal_text)]
+    if not forms:
+        return None
+
+    # 选一个同名函数的 pair：`fn(x)` + `fn(x=x)`。
+    # - `=` 作为关键字参数的稳定信号
+    # - 仅基于提案文本，不做代码推断
+    by_base: Dict[str, Dict[str, str]] = {}
+    for raw in forms:
+        val = raw.strip()
+        match = re.match(r"^([^\s()]+)\((.*)\)$", val)
+        if not match:
+            continue
+        base = match.group(1).strip()
+        args = match.group(2)
+        if not base:
+            continue
+        slot = "kw" if "=" in args else "pos"
+        by_base.setdefault(base, {})[slot] = val
+
+    chosen_old = None
+    chosen_new = None
+    for base in sorted(by_base.keys()):
+        pair = by_base[base]
+        if "pos" in pair and "kw" in pair:
+            chosen_old = pair["pos"]
+            chosen_new = pair["kw"]
+            break
+
+    if not chosen_old or not chosen_new:
+        return None
+
+    return [
+        "# 示例为提案语义示意（不保证可直接运行）",
+        "# 重点：call_by 参数绑定不匹配现在会在编译期 fail-fast",
+        "sources:",
+        "  demo:",
+        "    normalize:",
+        '      call_by: "{}"'.format(chosen_new),
+        '      # 旧写法：call_by: "{}" 将直接失败'.format(chosen_old),
+        "fields:",
+        "  demo_field:",
+        '    call_by: "{}"'.format(chosen_new),
+    ]
+
+
+def _render_example_snippet_for_change(change: _Change) -> Optional[List[str]]:
+    # 优先：从提案正文里直接提炼（避免纯模板“看起来像对但不贴题”）。
+    call_by = _render_call_by_upgrade_example(change.proposal_text)
+    if call_by:
+        return call_by
+    # 回退：用已知的主题模板。
+    return _render_example_snippet(change.change_id, change.example_priority)
 
 
 def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
@@ -502,6 +588,12 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     def _tok_is_surface(tok: str) -> bool:
         t = tok.strip()
         lower = t.lower()
+        # 兼容把 YAML 对写进反引号的写法：`call_by: "fn(x)"` / `fields.*.source: xxx`。
+        # 只取 key 部分做“编写面 token”判定，避免因为包含 value 导致漏判。
+        key_match = re.match(r"^([a-zA-Z0-9_.$\-\[\]*]+)\s*:", t)
+        if key_match:
+            t = key_match.group(1).strip()
+            lower = t.lower()
         # `scalim.yaml` 的项目配置键路径（`yaml_dsl.*`）也是作者可感知的编写面。
         if "yaml_dsl." in lower:
             return True
@@ -608,6 +700,11 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if "旧写法" in text and ("失败" in text or "fail-fast" in lower):
             return True
         if "直接失败" in text:
+            return True
+        # “旧写法不再自动解释/需要显式改写”也属于 upgrade 点（即使不出现“不再支持/迁移”等固定措辞）。
+        if "不再" in text and ("自动" in text or "隐式" in text) and ("改写" in text or "改为" in text or "改成" in text or "显式" in text):
+            return True
+        if "用户应" in text and ("改写" in text or "改为" in text or "改成" in text):
             return True
         return False
 
@@ -729,21 +826,21 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
                 instructions.append("把 `{}` 改为 `{}`。".format(old, new))
                 continue
 
-        match = re.search(r"`([^`]+)`.*(?:升级为|改为|改成|替换为)\s*`([^`]+)`", cleaned)
+        match = re.search(r"`([^`]+)`.*(?:升级为|改为|改成|替换为|改写为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
             if _tok_is_surface(old):
                 instructions.append("把 `{}` 改为 `{}`。".format(old, new))
                 continue
 
-        match = re.search(r"(?:由|从)\s*`([^`]+)`\s*(?:更新为|改为|改成|替换为|迁移为|升级为)\s*`([^`]+)`", cleaned)
+        match = re.search(r"(?:由|从)\s*`([^`]+)`\s*(?:更新为|改为|改成|替换为|改写为|迁移为|升级为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
             if _tok_is_surface(old):
                 instructions.append("把 `{}` 改为 `{}`。".format(old, new))
                 continue
 
-        match = re.search(r"`([^`]+)`\s*(?:更新为|改为|改成|替换为|迁移为|升级为)\s*`([^`]+)`", cleaned)
+        match = re.search(r"`([^`]+)`\s*(?:更新为|改为|改成|替换为|改写为|迁移为|升级为)\s*`([^`]+)`", cleaned)
         if match:
             old, new = match.group(1), match.group(2)
             if _tok_is_surface(old):
@@ -902,7 +999,7 @@ def _build_change(tag: str, change_id: str, *, root: Path) -> Optional[_Change]:
     highlight = _choose_highlight(_extract_section_lines(proposal_text, "What Changes"))
     breaking = _extract_breaking_instructions(proposal_text, change_id)
     has_breaking = len(breaking) > 0 and any("按提案升级：" not in b for b in breaking)
-    prio = _example_priority(change_id) if is_yaml else 99
+    prio = _example_priority(change_id, proposal_text) if is_yaml else 99
     return _Change(
         change_id=change_id,
         proposal_text=proposal_text,
@@ -1019,17 +1116,18 @@ def _render_notes(
         lines.append("- {}".format(normalized + "。"))
 
     if include_example:
-        yaml_candidates = [c for c in new_changes if c.is_yaml and c.example_priority < 99]
+        yaml_candidates = [c for c in new_changes if c.is_yaml]
         # 同一优先级下优先选择带破坏性迁移点的变更，避免示例落到纯“编辑器能力”导致不贴题。
         yaml_candidates.sort(key=lambda c: (c.example_priority, not c.has_breaking, c.change_id))
-        if yaml_candidates:
-            chosen = yaml_candidates[0]
-            snippet_lines = _render_example_snippet(chosen.change_id, chosen.example_priority)
-            if snippet_lines:
-                lines.append("## 新增/改动语法（示例）")
-                lines.append("```yaml")
-                lines.extend(snippet_lines)
-                lines.append("```")
+        for chosen in yaml_candidates:
+            snippet_lines = _render_example_snippet_for_change(chosen)
+            if not snippet_lines:
+                continue
+            lines.append("## 新增/改动语法（示例）")
+            lines.append("```yaml")
+            lines.extend(snippet_lines)
+            lines.append("```")
+            break
 
     lines.append("## Commits（节选）")
     max_commit_lines = 8
@@ -1151,7 +1249,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             changes.append(ch)
 
         has_yaml = any(c.is_yaml for c in changes)
-        include_example = has_yaml and any(c.example_priority < 99 for c in changes)
+        include_example = has_yaml
         highlight_max = 3
         breaking_max = 3
 
