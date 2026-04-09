@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Notebooks regression suite MUST cover aggregate field references
-系统 MUST 从 notebooks fixtures 中抽取 `outputs[*].aggregate` 相关的 field-id 引用，并对每个引用回归以下操作不得崩溃：
+系统 MUST 从 notebooks fixtures 中抽取 `outputs[*].aggregate` 相关的字段引用点（包括 group_by/metric field refs/rank refs/score_by_rank），并对每个引用回归以下操作不得崩溃：
 
 - completion（Ctrl+Space / 手动触发）
 - definition

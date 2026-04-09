@@ -12,9 +12,22 @@
 覆盖范围至少包括：
 
 - `outputs[*].aggregate.group_by[*]`
+- `outputs[*].aggregate.group_by[*][*]`（复合 key 内层 token）
 - `outputs[*].aggregate.fields.*.*.field`
 - `outputs[*].aggregate.fields.*.*.fields[*]`
-- `outputs[*].aggregate.fields.*.rank.*.by`
+- `outputs[*].aggregate.fields.*.(row_number|rank|dense_rank).by`
+- `outputs[*].aggregate.fields.*.(row_number|rank|dense_rank).partition_by[*]`
+- `outputs[*].aggregate.fields.*.(row_number|rank|dense_rank).order_by[*]`
+- `outputs[*].aggregate.fields.*.score_by_rank.rank_field`
+
+completion MUST 返回分层候选并稳定排序（按优先级从高到低）：
+1) `outputs[*].aggregate.fields` 的 out_field_id（mapping key）
+2) `outputs[*].aggregate.group_by` 的 field_id
+3) 全局可见 field_id（低优先 fallback；MUST 以 detail/label 明确标注来源，避免误导）
+
+definition MUST 支持多 locations，并满足稳定排序：
+- 若 token 命中 out_field_id，则该 out_field 的定义点 MUST 为第一个候选
+- 其余候选（如全局 field_id 定义）MUST 作为后续候选稳定排序+去重
 
 #### Scenario: completion works for empty aggregate group_by list item
 - **GIVEN** 某 demand YAML 存在 `outputs[*].aggregate.group_by` 且光标位于空 list item（例如 `- <cursor>`）
@@ -25,3 +38,10 @@
 - **GIVEN** 某 demand YAML 中存在 `aggregate.fields.*.*.field: some_field_id`
 - **WHEN** 用户对 `some_field_id` 触发 go-to-definition
 - **THEN** 系统 MUST 跳转到 `fields.some_field_id` 的声明位置（或 imports 展开后的真实声明位置）
+
+#### Scenario: rank.by resolves aggregate out_field_id first, then global field fallback
+- **GIVEN** 某 demand YAML 中存在 `outputs[0].aggregate.fields.sum_amount: {sum: {field: order_amount}}`
+- **AND** 存在 `outputs[0].aggregate.fields.rank: {dense_rank: {by: sum_amount, order: desc}}`
+- **WHEN** 用户对 `by: sum_amount` 的 `sum_amount` 触发 go-to-definition
+- **THEN** 系统 MUST 首选跳转到 `outputs[0].aggregate.fields.sum_amount` 的 key 位置
+- **AND** 系统 MAY 返回额外候选（例如同名全局 field 定义），但必须排在后面且稳定排序
