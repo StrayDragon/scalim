@@ -37,15 +37,22 @@ class _InflightCacheProducedNoValueError(_InflightCacheError):
 
 
 class _Inflight(Generic[_V]):
-    __slots__ = ("event", "exc", "value")
+    __slots__: Tuple[str, ...] = ("event", "exc", "value")
+
+    event: threading.Event
+    value: Optional[_V]
+    exc: Optional[BaseException]
 
     def __init__(self) -> None:
         self.event = threading.Event()
-        self.value: Optional[_V] = None
-        self.exc: Optional[BaseException] = None
+        self.value = None
+        self.exc = None
 
 
 class _LRUCache(Generic[_K, _V]):
+    maxsize: int
+    _lock: threading.Lock
+
     def __init__(self, *, maxsize: int) -> None:
         self.maxsize = max(0, int(maxsize))
         self._lock = threading.Lock()
@@ -69,7 +76,7 @@ class _LRUCache(Generic[_K, _V]):
 
             inflight = self._inflight.get(key)
             if inflight is None:
-                inflight = _Inflight()
+                inflight = _Inflight[_V]()
                 self._inflight[key] = inflight
                 is_owner = True
             else:

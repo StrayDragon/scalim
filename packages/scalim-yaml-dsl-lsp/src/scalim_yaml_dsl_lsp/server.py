@@ -1566,7 +1566,7 @@ async def _handle_yaml_dsl_builtin_callable_completion(
     extraction: YamlCursorExtractionResult,
     uri: str,
 ) -> types.CompletionList:
-    if extraction.reference is None or extraction.range is None:
+    if not extraction.reference or extraction.range is None:
         return types.CompletionList(is_incomplete=False, items=[])
     reference = str(extraction.reference)
     cursor_offset = _cursor_offset_for_completion(params.position, extraction.range, reference_len=len(reference))
@@ -2033,14 +2033,16 @@ class _ExplainPythonResolutionFailureProvider:
         data = getattr(diagnostic, "data", None)
         if not isinstance(data, dict):
             return False
-        ref = data.get("reference")
+        data_map = cast("Dict[str, object]", data)
+        ref = data_map.get("reference")
         return bool(str(ref or "").strip())
 
     def provide(self, ctx: _QuickFixContext, diagnostic: types.Diagnostic) -> List[types.CodeAction]:
         data = getattr(diagnostic, "data", None)
         reference = ""
         if isinstance(data, dict):
-            reference = str(data.get("reference") or "")
+            data_map = cast("Dict[str, object]", data)
+            reference = str(data_map.get("reference") or "")
 
         reference = str(reference or "").strip()
         if not reference:

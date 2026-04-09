@@ -861,15 +861,12 @@ def _load_yaml_mapping_for_entity_index(
     except Exception as exc:  # noqa: BLE001
         warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
         return None
-    if not isinstance(loaded, dict):
-        warnings.append("YAML root must be a mapping")
-        return None
     return loaded, locations
 
 
 def _index_main_source_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
-    main_source = demand.get("main_source")
-    if not isinstance(main_source, dict):
+    main_source = _as_yaml_mapping(demand.get("main_source"))
+    if main_source is None:
         return
     main_source_id = _safe_str(main_source.get("source_id"))
     if not main_source_id:
@@ -887,8 +884,8 @@ def _index_main_source_entities(demand: Dict[str, Any], locations: Dict[str, Tup
 
 
 def _index_lookup_sources_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
-    sources_map = demand.get("sources")
-    if not isinstance(sources_map, dict):
+    sources_map = _as_yaml_mapping(demand.get("sources"))
+    if sources_map is None:
         return
     for source_id, spec in sources_map.items():
         sid = _safe_str(source_id)
@@ -903,7 +900,8 @@ def _index_lookup_sources_entities(demand: Dict[str, Any], locations: Dict[str, 
         )
         if decl is not None:
             store.sources[sid] = decl
-        fields_map = spec.get("fields") if isinstance(spec, dict) else None
+        spec_map = _as_yaml_mapping(spec)
+        fields_map = spec_map.get("fields") if spec_map is not None else None
         _index_source_fields(sid, fields_map, base_yaml_path="sources.{}.fields".format(sid), locations=locations, store=store)
 
 
@@ -915,9 +913,10 @@ def _index_source_fields(
     locations: Dict[str, Tuple[int, int]],
     store: _EntityIndexStore,
 ) -> None:
-    if not source_id or not isinstance(fields_map, dict):
+    fields = _as_yaml_mapping(fields_map)
+    if not source_id or fields is None:
         return
-    for field_id, spec in fields_map.items():
+    for field_id, spec in fields.items():
         fid = _safe_str(field_id)
         if not fid:
             continue
@@ -934,8 +933,8 @@ def _index_source_fields(
 
 
 def _index_derived_fields_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
-    derived_map = demand.get("fields")
-    if not isinstance(derived_map, dict):
+    derived_map = _as_yaml_mapping(demand.get("fields"))
+    if derived_map is None:
         return
     for field_id, spec in derived_map.items():
         fid = _safe_str(field_id)
@@ -954,8 +953,8 @@ def _index_derived_fields_entities(demand: Dict[str, Any], locations: Dict[str, 
 
 
 def _index_relations_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
-    relations_map = demand.get("relations")
-    if not isinstance(relations_map, dict):
+    relations_map = _as_yaml_mapping(demand.get("relations"))
+    if relations_map is None:
         return
     for rel_id, spec in relations_map.items():
         rid = _safe_str(rel_id)
@@ -974,13 +973,14 @@ def _index_relations_entities(demand: Dict[str, Any], locations: Dict[str, Tuple
 
 
 def _index_outputs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
-    outputs_seq = demand.get("outputs")
-    if not isinstance(outputs_seq, list):
+    outputs_seq = _as_yaml_sequence(demand.get("outputs"))
+    if outputs_seq is None:
         return
     for idx, spec in enumerate(outputs_seq):
-        if not isinstance(spec, dict):
+        spec_map = _as_yaml_mapping(spec)
+        if spec_map is None:
             continue
-        name = _safe_str(spec.get("name"))
+        name = _safe_str(spec_map.get("name"))
         if not name:
             continue
         yaml_path = "outputs.{}.name".format(idx)
@@ -990,22 +990,23 @@ def _index_outputs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[i
             entity_id=name,
             yaml_path=yaml_path,
             range=rng,
-            summary=_output_summary(spec),
-            detail=_output_detail(spec),
+            summary=_output_summary(spec_map),
+            detail=_output_detail(spec_map),
         )
 
 
 def _index_workflow_runs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
-    workflow = demand.get("workflow")
-    if not isinstance(workflow, dict):
+    workflow = _as_yaml_mapping(demand.get("workflow"))
+    if workflow is None:
         return
-    runs = workflow.get("runs")
-    if not isinstance(runs, list):
+    runs = _as_yaml_sequence(workflow.get("runs"))
+    if runs is None:
         return
     for idx, spec in enumerate(runs):
-        if not isinstance(spec, dict):
+        spec_map = _as_yaml_mapping(spec)
+        if spec_map is None:
             continue
-        run_id = _safe_str(spec.get("id"))
+        run_id = _safe_str(spec_map.get("id"))
         if not run_id:
             continue
         yaml_path = "workflow.runs.{}.id".format(idx)
@@ -1015,8 +1016,8 @@ def _index_workflow_runs_entities(demand: Dict[str, Any], locations: Dict[str, T
             entity_id=run_id,
             yaml_path=yaml_path,
             range=rng,
-            summary=_workflow_run_summary(spec),
-            detail=_workflow_run_detail(spec),
+            summary=_workflow_run_summary(spec_map),
+            detail=_workflow_run_detail(spec_map),
         )
 
 
@@ -1218,6 +1219,24 @@ def _safe_str(raw: object) -> str:
     return str(raw).strip()
 
 
+def _as_yaml_mapping(value: object) -> Optional[Dict[str, Any]]:
+    """Narrow YAML raw nodes to `Dict[str, Any]` for editor-only static analysis.
+
+    NOTE: YAML DSL mappings are string-keyed by design. We cast after runtime `dict` check
+    to help `basedpyright` avoid `Unknown` types (which otherwise fan out quickly).
+    """
+
+    if not isinstance(value, dict):
+        return None
+    return cast("Dict[str, Any]", value)
+
+
+def _as_yaml_sequence(value: object) -> Optional[Sequence[object]]:
+    if not isinstance(value, list):
+        return None
+    return cast("Sequence[object]", value)
+
+
 def _range_for_yaml_key_path(
     yaml_path: str,
     *,
@@ -1247,15 +1266,22 @@ def _build_source_declaration(
     loader = ""
     key = ""
     fields_cnt = 0
-    if isinstance(spec, dict):
-        loader = _safe_str(spec.get("loader"))
-        key_raw = spec.get("key")
-        if isinstance(key_raw, list):
-            key = "[" + ", ".join([_safe_str(k) for k in key_raw if _safe_str(k)]) + "]"
+    spec_map = _as_yaml_mapping(spec)
+    if spec_map is not None:
+        loader = _safe_str(spec_map.get("loader"))
+        key_raw = spec_map.get("key")
+        key_seq = _as_yaml_sequence(key_raw)
+        if key_seq is not None:
+            key_items: List[str] = []
+            for item in key_seq:
+                cleaned = _safe_str(item)
+                if cleaned:
+                    key_items.append(cleaned)
+            key = "[" + ", ".join(key_items) + "]"
         else:
             key = _safe_str(key_raw)
-        fields_raw = spec.get("fields")
-        if isinstance(fields_raw, dict):
+        fields_raw = _as_yaml_mapping(spec_map.get("fields"))
+        if fields_raw is not None:
             fields_cnt = len(fields_raw)
 
     summary = "loader: {}".format(loader) if loader else ""
@@ -1278,33 +1304,37 @@ def _build_source_declaration(
 
 
 def _field_summary(spec: object) -> str:
-    if isinstance(spec, dict):
-        name = _safe_str(spec.get("name"))
+    spec_map = _as_yaml_mapping(spec)
+    if spec_map is not None:
+        name = _safe_str(spec_map.get("name"))
         if name:
             return "name: {}".format(name)
     return ""
 
 
 def _field_detail(spec: object) -> str:
-    if isinstance(spec, dict):
-        name = _safe_str(spec.get("name"))
+    spec_map = _as_yaml_mapping(spec)
+    if spec_map is not None:
+        name = _safe_str(spec_map.get("name"))
         if name:
             return "name: {}".format(name)
     return ""
 
 
 def _relation_sources_involved(rel_spec: object) -> Tuple[str, ...]:
-    if not isinstance(rel_spec, dict):
+    rel_map = _as_yaml_mapping(rel_spec)
+    if rel_map is None:
         return ()
-    steps = rel_spec.get("steps")
-    if not isinstance(steps, list):
+    steps = _as_yaml_sequence(rel_map.get("steps"))
+    if steps is None:
         return ()
     names: Dict[str, None] = {}
     for step in steps:
-        if not isinstance(step, dict):
+        step_map = _as_yaml_mapping(step)
+        if step_map is None:
             continue
         for key in ("from", "to"):
-            val = step.get(key)
+            val = step_map.get(key)
             for src in _iter_source_ids_from_step_value(val):
                 if src:
                     names[src] = None
@@ -1326,22 +1356,24 @@ def _iter_source_ids_from_step_value(val: object) -> Iterable[str]:
 
 
 def _relation_summary(rel_spec: object) -> str:
-    if not isinstance(rel_spec, dict):
+    rel_map = _as_yaml_mapping(rel_spec)
+    if rel_map is None:
         return ""
-    steps = rel_spec.get("steps")
-    step_cnt = len(steps) if isinstance(steps, list) else 0
-    sources = _relation_sources_involved(rel_spec)
+    steps = _as_yaml_sequence(rel_map.get("steps"))
+    step_cnt = len(steps) if steps is not None else 0
+    sources = _relation_sources_involved(rel_map)
     if sources:
         return "steps: {} | sources: {}".format(int(step_cnt), ", ".join(sources))
     return "steps: {}".format(int(step_cnt))
 
 
 def _relation_detail(rel_spec: object) -> str:
-    if not isinstance(rel_spec, dict):
+    rel_map = _as_yaml_mapping(rel_spec)
+    if rel_map is None:
         return ""
-    steps = rel_spec.get("steps")
-    step_cnt = len(steps) if isinstance(steps, list) else 0
-    sources = _relation_sources_involved(rel_spec)
+    steps = _as_yaml_sequence(rel_map.get("steps"))
+    step_cnt = len(steps) if steps is not None else 0
+    sources = _relation_sources_involved(rel_map)
     lines = ["steps: {}".format(int(step_cnt))]
     if sources:
         lines.append("sources: {}".format(", ".join(sources)))
@@ -1349,47 +1381,59 @@ def _relation_detail(rel_spec: object) -> str:
 
 
 def _output_summary(out_spec: object) -> str:
-    if not isinstance(out_spec, dict):
+    out_map = _as_yaml_mapping(out_spec)
+    if out_map is None:
         return ""
-    parent = _safe_str(out_spec.get("from"))
+    parent = _safe_str(out_map.get("from"))
     if parent:
         return "from: {}".format(parent)
     return ""
 
 
 def _output_detail(out_spec: object) -> str:
-    if not isinstance(out_spec, dict):
+    out_map = _as_yaml_mapping(out_spec)
+    if out_map is None:
         return ""
     lines: List[str] = []
-    parent = _safe_str(out_spec.get("from"))
+    parent = _safe_str(out_map.get("from"))
     if parent:
         lines.append("from: {}".format(parent))
-    fields_raw = out_spec.get("fields")
-    if isinstance(fields_raw, list):
+    fields_raw = _as_yaml_sequence(out_map.get("fields"))
+    if fields_raw is not None:
         lines.append("fields: {}".format(len(fields_raw)))
-    if isinstance(out_spec.get("aggregate"), dict):
+    if _as_yaml_mapping(out_map.get("aggregate")) is not None:
         lines.append("aggregate: true")
     return "\n".join(lines)
 
 
 def _workflow_run_summary(run_spec: object) -> str:
-    if not isinstance(run_spec, dict):
+    run_map = _as_yaml_mapping(run_spec)
+    if run_map is None:
         return ""
-    deps_raw = run_spec.get("depends_on")
-    if isinstance(deps_raw, list):
-        deps = [d for d in [_safe_str(x) for x in deps_raw] if d]
+    deps_raw = _as_yaml_sequence(run_map.get("depends_on"))
+    if deps_raw is not None:
+        deps: List[str] = []
+        for item in deps_raw:
+            cleaned = _safe_str(item)
+            if cleaned:
+                deps.append(cleaned)
         if deps:
             return "depends_on: {}".format(", ".join(deps))
     return ""
 
 
 def _workflow_run_detail(run_spec: object) -> str:
-    if not isinstance(run_spec, dict):
+    run_map = _as_yaml_mapping(run_spec)
+    if run_map is None:
         return ""
     lines: List[str] = []
-    deps_raw = run_spec.get("depends_on")
-    if isinstance(deps_raw, list):
-        deps = [d for d in [_safe_str(x) for x in deps_raw] if d]
+    deps_raw = _as_yaml_sequence(run_map.get("depends_on"))
+    if deps_raw is not None:
+        deps: List[str] = []
+        for item in deps_raw:
+            cleaned = _safe_str(item)
+            if cleaned:
+                deps.append(cleaned)
         if deps:
             lines.append("depends_on: {}".format(", ".join(deps)))
     return "\n".join(lines)
@@ -4122,15 +4166,16 @@ class _EditorOutputsFieldResolver(ParserOutputsMixin):
         field_def_index: FieldDefIndex,
         warnings: List[str],
     ) -> Dict[int, Tuple[str, ...]]:
-        outputs = raw.get("outputs")
-        if not isinstance(outputs, list):
+        outputs = _as_yaml_sequence(raw.get("outputs"))
+        if outputs is None:
             return {}
 
         out: Dict[int, Tuple[str, ...]] = {}
         for idx, spec in enumerate(outputs):
-            if not isinstance(spec, dict):
+            spec_map = _as_yaml_mapping(spec)
+            if spec_map is None:
                 continue
-            fields_raw = spec.get("fields")
+            fields_raw = spec_map.get("fields")
             if fields_raw is None:
                 continue
 
@@ -4172,12 +4217,7 @@ def _load_yaml_mapping_text_for_effective_view(
     except Exception as exc:  # noqa: BLE001
         warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
         return None, {}
-
-    if not isinstance(loaded, dict):
-        warnings.append("YAML root must be a mapping")
-        return None, {}
-
-    return cast("Dict[str, Any]", loaded), cast("Dict[str, Tuple[int, int]]", locations)  # pragma: allow-cast yaml mapping typed narrowing
+    return loaded, locations
 
 
 def _effective_project_root_override_for_imports(
@@ -4241,9 +4281,9 @@ def _collect_field_defs_for_effective_view(
     warnings: List[str],
 ) -> Tuple[Optional[FieldDefIndex], str]:
     main_source_id = ""
-    main_source = raw.get("main_source")
-    if isinstance(main_source, dict):
-        main_source_id = str(main_source.get("source_id") or "").strip()
+    main_source = _as_yaml_mapping(raw.get("main_source"))
+    if main_source is not None:
+        main_source_id = _safe_str(main_source.get("source_id"))
 
     try:
         field_def_index = collect_field_defs(RawDemand.from_raw(raw), main_source_id=main_source_id)
@@ -4444,11 +4484,11 @@ def _collect_output_aggregate_scope_for_expression_index(
     out_field_ids_by_output_index: Dict[int, Tuple[str, ...]] = {}
     out_field_ranges_by_output_index: Dict[int, Dict[str, EditorRange]] = {}
 
-    outputs_obj = raw.get("outputs")
-    if not isinstance(outputs_obj, list):
+    outputs_obj = _as_yaml_sequence(raw.get("outputs"))
+    if outputs_obj is None:
         return group_by_by_output_index, out_field_ids_by_output_index, out_field_ranges_by_output_index
 
-    for output_index, out in enumerate(list(outputs_obj)):
+    for output_index, out in enumerate(outputs_obj):
         agg = _output_aggregate_mapping(out)
         if agg is None:
             continue
@@ -4467,12 +4507,13 @@ def _collect_output_aggregate_scope_for_expression_index(
 
 
 def _output_aggregate_mapping(output: object) -> Optional[Dict[str, Any]]:
-    if not isinstance(output, dict):
+    output_map = _as_yaml_mapping(output)
+    if output_map is None:
         return None
-    agg_obj = output.get("aggregate")
-    if not isinstance(agg_obj, dict):
+    agg_obj = _as_yaml_mapping(output_map.get("aggregate"))
+    if agg_obj is None:
         return None
-    return cast("Dict[str, Any]", agg_obj)  # pragma: allow-cast raw yaml typed narrowing
+    return agg_obj
 
 
 def _output_aggregate_group_by_ids(aggregate: Dict[str, Any]) -> Tuple[str, ...]:
@@ -4494,16 +4535,13 @@ def _output_aggregate_out_field_ids_and_ranges(
     *,
     locations: Dict[str, Tuple[int, int]],
 ) -> Tuple[Tuple[str, ...], Dict[str, EditorRange]]:
-    fields_obj = aggregate.get("fields")
-    if not isinstance(fields_obj, dict):
+    fields = _as_yaml_mapping(aggregate.get("fields"))
+    if fields is None:
         return (), {}
-    fields: Dict[str, Any] = cast("Dict[str, Any]", fields_obj)  # pragma: allow-cast raw yaml typed narrowing
 
     out_field_ids: List[str] = []
     ranges: Dict[str, EditorRange] = {}
     for out_field_id in list(fields.keys()):
-        if not isinstance(out_field_id, str):
-            continue
         fid = str(out_field_id).strip()
         if not fid:
             continue
@@ -4563,14 +4601,12 @@ def _append_field_definitions_from_yaml_file(
         loaded, locations, _lines = load_yaml_mapping_cached(fragment_yaml_path)
     except Exception:  # noqa: BLE001
         return
-    if not isinstance(loaded, dict):
-        return
-    raw = cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml fragment mapping typed narrowing
+    raw = loaded
 
     main_source_id = ""
-    main_source = raw.get("main_source")
-    if isinstance(main_source, dict):
-        main_source_id = str(main_source.get("source_id") or "").strip()
+    main_source = _as_yaml_mapping(raw.get("main_source"))
+    if main_source is not None:
+        main_source_id = _safe_str(main_source.get("source_id"))
 
     try:
         field_def_index = collect_field_defs(RawDemand.from_raw(raw), main_source_id=main_source_id)
@@ -4669,7 +4705,7 @@ def _safe_collect_yaml_anchors_rt(yaml_text: str, *, warnings: List[str]) -> Tup
     out_values: Dict[str, object] = {}
     try:
         yaml_rt = YAML(typ="rt")
-        yaml_rt.version = (1, 2)  # pyright: ignore[reportAttributeAccessIssue]  # pragma: allow-dynattr ruamel config
+        yaml_rt.version = (1, 2)  # pragma: allow-dynattr ruamel config
         data = yaml_rt.load(str(yaml_text or ""))
     except Exception as exc:  # noqa: BLE001
         warnings.append("anchor scan failed: {}: {}".format(type(exc).__name__, exc))

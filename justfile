@@ -308,7 +308,7 @@ type-check-core-tight:
 
 # 检查: packages/scalim-yaml-dsl-lsp 类型检查 (Python 3.10+)
 type-check-packages-yaml-dsl-lsp:
-    uv {{ UV_OPTIONS }} run basedpyright -p packages/scalim-yaml-dsl-lsp packages/scalim-yaml-dsl-lsp/src --level error
+    uv {{ UV_OPTIONS }} run basedpyright -p packages/scalim-yaml-dsl-lsp packages/scalim-yaml-dsl-lsp/src
 
 # 检查: 格式化&Lint (只检查;不改文件)
 lint: type-check type-check-core-tight
