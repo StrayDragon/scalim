@@ -8,6 +8,7 @@ import {
 	type LanguageClientOptions,
 	type ServerOptions,
 	State,
+	Trace,
 } from "vscode-languageclient/node";
 
 import { runCommand } from "./internal/exec";
@@ -19,7 +20,7 @@ import {
 } from "./internal/diagnosticBundle";
 import { mergeYamlSchemas } from "./internal/yamlSchemas";
 
-const DEFAULT_PINNED_SERVER_SPEC = "scalim-yaml-dsl-lsp[server]==0.7.5";
+const DEFAULT_PINNED_SERVER_SPEC = "scalim-yaml-dsl-lsp[server]";
 const DEFAULT_ENV_MODE = "auto";
 const DEFAULT_WORKSPACE_VENV_PATH = ".venv";
 const DEFAULT_AUTO_RESTART_ON_SCALIM_YAML_CHANGE = false;
@@ -59,7 +60,7 @@ type ProvisionedEnv = {
 
 let currentClient: LanguageClient | undefined;
 let currentEnv: ProvisionedEnv | undefined;
-let expectedStop = false;
+const expectedStoppedClients = new WeakSet<LanguageClient>();
 let startMutex: Promise<void> | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
 let lastStartError: string | undefined;
@@ -72,7 +73,19 @@ let serverLogPath: string | undefined;
 let autoStartAttempted = false;
 let lastActiveDocumentKind: ActiveDocumentKind | undefined;
 
-type LogLevel = "INFO" | "WARN" | "ERROR";
+type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
+type ServerLogLevel = "DEBUG" | "INFO" | "WARNING" | "ERROR";
+type LspTraceLevel = "off" | "messages" | "verbose";
+
+const LOG_LEVEL_ORDER: Readonly<Record<LogLevel, number>> = Object.freeze({
+	DEBUG: 10,
+	INFO: 20,
+	WARN: 30,
+	ERROR: 40,
+});
+
+let extensionLogThreshold: LogLevel = "INFO";
+let lspTraceOutputChannel: vscode.OutputChannel | undefined;
 
 function getNowIso(): string {
 	return new Date().toISOString();
@@ -91,6 +104,9 @@ function log(level: LogLevel, message: string): void {
 	if (!outputChannelForLogs) {
 		return;
 	}
+	if (LOG_LEVEL_ORDER[level] < LOG_LEVEL_ORDER[extensionLogThreshold]) {
+		return;
+	}
 	const ts = getNowIso();
 	const prefix = `${ts} ${level} `;
 	const raw = String(message ?? "");
@@ -102,6 +118,10 @@ function log(level: LogLevel, message: string): void {
 	if (extensionLogPath) {
 		void appendLogLineToFile(extensionLogPath, formatted.join("\n"));
 	}
+}
+
+function logDebug(message: string): void {
+	log("DEBUG", message);
 }
 
 function logInfo(message: string): void {
@@ -117,6 +137,117 @@ function logError(message: string): void {
 }
 
 let outputChannelForLogs: vscode.OutputChannel | undefined;
+
+function ensureLspTraceOutputChannel(context: vscode.ExtensionContext): vscode.OutputChannel {
+	if (lspTraceOutputChannel) {
+		return lspTraceOutputChannel;
+	}
+	const channel = vscode.window.createOutputChannel("Scalim YAML DSL (LSP Trace)");
+	context.subscriptions.push(channel);
+	lspTraceOutputChannel = channel;
+	return channel;
+}
+
+function parseExtensionLogThreshold(raw: string | undefined): LogLevel {
+	const normalized = (raw || "").trim().toLowerCase();
+	if (normalized === "debug") {
+		return "DEBUG";
+	}
+	if (normalized === "warn" || normalized === "warning") {
+		return "WARN";
+	}
+	if (normalized === "error") {
+		return "ERROR";
+	}
+	return "INFO";
+}
+
+function parseServerLogLevel(raw: string | undefined): ServerLogLevel {
+	const normalized = (raw || "").trim().toLowerCase();
+	if (normalized === "debug") {
+		return "DEBUG";
+	}
+	if (normalized === "warning" || normalized === "warn") {
+		return "WARNING";
+	}
+	if (normalized === "error") {
+		return "ERROR";
+	}
+	return "INFO";
+}
+
+function parseLspTraceLevel(raw: string | undefined): LspTraceLevel {
+	const normalized = (raw || "").trim().toLowerCase();
+	if (normalized === "messages") {
+		return "messages";
+	}
+	if (normalized === "verbose") {
+		return "verbose";
+	}
+	return "off";
+}
+
+function lspTraceLevelToProtocolTrace(level: LspTraceLevel): Trace {
+	if (level === "messages") {
+		return Trace.Messages;
+	}
+	if (level === "verbose") {
+		return Trace.Verbose;
+	}
+	return Trace.Off;
+}
+
+function parsePackageVersionFromShowOutput(stdout: string): string | undefined {
+	return (
+		stdout
+			.split(/\r?\n/g)
+			.map((line) => line.trim())
+			.find((line) => line.toLowerCase().startsWith("version:"))
+			?.split(":", 2)[1]
+			?.trim() || undefined
+	);
+}
+
+async function probePythonPackageVersion(
+	pythonPath: string,
+	packageName: string,
+	options: { cwd: string },
+): Promise<string | undefined> {
+	const { cwd } = options;
+	// 1) uv (works even when venv has no pip)
+	const uvResult = await runCommand("uv", ["pip", "show", "--python", pythonPath, packageName], { cwd });
+	const uvVersion = parsePackageVersionFromShowOutput(uvResult.stdout);
+	if (uvResult.exitCode === 0 && uvVersion) {
+		return uvVersion;
+	}
+
+	// 2) stdlib importlib.metadata
+	const pyCode = [
+		"import sys",
+		"try:",
+		" import importlib.metadata as m",
+		"except Exception:",
+		" import importlib_metadata as m",
+		"try:",
+		` print(m.version(${JSON.stringify(packageName)}))`,
+		"except Exception:",
+		" sys.exit(1)",
+	].join("\n");
+	const metaResult = await runCommand(pythonPath, ["-c", pyCode], { cwd });
+	const metaVersion = (metaResult.stdout || metaResult.stderr).trim();
+	if (metaResult.exitCode === 0 && metaVersion) {
+		return metaVersion;
+	}
+
+	// 3) fallback: python -m pip show
+	const pipResult = await runCommand(pythonPath, ["-m", "pip", "show", packageName], { cwd });
+	const pipVersion = parsePackageVersionFromShowOutput(pipResult.stdout);
+	if (pipResult.exitCode === 0 && pipVersion) {
+		return pipVersion;
+	}
+
+	return undefined;
+}
 
 async function initializeLogFiles(context: vscode.ExtensionContext): Promise<void> {
 	const storagePath = context.globalStorageUri.fsPath;
@@ -261,6 +392,11 @@ function getExtensionConfig(): {
 	pinnedServerSpec: string;
 	autoSchemaBinding: boolean;
 	autoRestartOnScalimYamlChange: boolean;
+	serverDebounceMs: number;
+	autoRestartOnSettingsChange: boolean;
+	logLevel: LogLevel;
+	serverLogLevel: ServerLogLevel;
+	lspTrace: LspTraceLevel;
 } {
 	const cfg = vscode.workspace.getConfiguration("scalim.yamlDsl");
 	const envModeRaw = (cfg.get<string>("envMode") || "").trim() || DEFAULT_ENV_MODE;
@@ -276,7 +412,24 @@ function getExtensionConfig(): {
 		"autoRestartOnScalimYamlChange",
 		DEFAULT_AUTO_RESTART_ON_SCALIM_YAML_CHANGE,
 	);
-	return { envMode, workspaceVenvPath, pythonPathOverride, pinnedServerSpec, autoSchemaBinding, autoRestartOnScalimYamlChange };
+	const serverDebounceMs = cfg.get<number>("serverDebounceMs", 200);
+	const autoRestartOnSettingsChange = cfg.get<boolean>("autoRestartOnSettingsChange", false);
+	const logLevel = parseExtensionLogThreshold(cfg.get<string>("logLevel"));
+	const serverLogLevel = parseServerLogLevel(cfg.get<string>("serverLogLevel"));
+	const lspTrace = parseLspTraceLevel(cfg.get<string>("lspTrace"));
+	return {
+		envMode,
+		workspaceVenvPath,
+		pythonPathOverride,
+		pinnedServerSpec,
+		autoSchemaBinding,
+		autoRestartOnScalimYamlChange,
+		serverDebounceMs,
+		autoRestartOnSettingsChange,
+		logLevel,
+		serverLogLevel,
+		lspTrace,
+	};
 }
 
 async function detectPython(
@@ -546,13 +699,7 @@ async function resolveWorkspaceVenvEnv(
 		return undefined;
 	}
 
-	const showResult = await runCommand(venvPythonPath, ["-m", "pip", "show", "scalim-yaml-dsl-lsp"], { cwd: workspaceRoot });
-	const serverPackageVersion = showResult.stdout
-		.split(/\r?\n/g)
-		.map((line) => line.trim())
-		.find((line) => line.toLowerCase().startsWith("version:"))
-		?.split(":", 2)[1]
-		?.trim();
+	const serverPackageVersion = await probePythonPackageVersion(venvPythonPath, "scalim-yaml-dsl-lsp", { cwd: workspaceRoot });
 
 	logInfo(`[workspace] Using workspace venv: ${venvPath}`);
 	logInfo(`[workspace] python=${venvPythonPath} version=${pythonVersionRaw}`);
@@ -643,13 +790,7 @@ async function ensureVenv(
 		logInfo(`[pip] Reusing pinned server install: ${pinnedServerSpec}`);
 	}
 
-	const showResult = await runCommand(venvPythonPath, ["-m", "pip", "show", "scalim-yaml-dsl-lsp"], { cwd: storagePath });
-	const serverPackageVersion = showResult.stdout
-		.split(/\r?\n/g)
-		.map((line) => line.trim())
-		.find((line) => line.toLowerCase().startsWith("version:"))
-		?.split(":", 2)[1]
-		?.trim();
+	const serverPackageVersion = await probePythonPackageVersion(venvPythonPath, "scalim-yaml-dsl-lsp", { cwd: storagePath });
 
 	const scalimCliPath = findVenvExecutable(venvPath, "scalim-cli");
 	const scalimYamlDslLspPath = findVenvExecutable(venvPath, "scalim-yaml-dsl-lsp");
@@ -942,12 +1083,14 @@ async function stopClient(output: vscode.OutputChannel): Promise<void> {
 	if (!currentClient) {
 		return;
 	}
-	expectedStop = true;
+	const client = currentClient;
+	expectedStoppedClients.add(client);
 	try {
-		await currentClient.stop();
+		await client.stop();
 	} finally {
-		currentClient = undefined;
-		expectedStop = false;
+		if (currentClient === client) {
+			currentClient = undefined;
+		}
 		logInfo("[lsp] Client stopped.");
 	}
 }
@@ -961,17 +1104,24 @@ async function startClient(
 
 	setStatusBarState(context, "starting", env);
 
+	const cfg = getExtensionConfig();
+
 	const serverArgs: string[] = ["serve"];
 	if (serverLogPath) {
 		serverArgs.push("--log-file", serverLogPath);
 	}
-	serverArgs.push("--log-level", "INFO");
+	serverArgs.push("--log-level", cfg.serverLogLevel);
+	const serverDebounceMs = Number.isFinite(cfg.serverDebounceMs) ? Math.max(0, Math.min(5000, Math.round(cfg.serverDebounceMs))) : 200;
 
 	const serverOptions: ServerOptions = {
 		command: env.scalimYamlDslLspPath,
 		args: serverArgs,
 		options: {
 			cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+			env: {
+				...process.env,
+				SCALIM_YAML_DSL_LSP_DID_CHANGE_DEBOUNCE_MS: String(serverDebounceMs),
+			},
 		},
 	};
 
@@ -981,6 +1131,7 @@ async function startClient(
 			{ language: "yaml", scheme: "untitled" },
 		],
 		outputChannel: output,
+		traceOutputChannel: ensureLspTraceOutputChannel(context),
 		middleware: {
 			provideCodeActions: async (document, range, codeActionContext, token, next) => {
 				const items = await Promise.resolve(next(document, range, codeActionContext, token));
@@ -1058,7 +1209,7 @@ async function startClient(
 			if (event.newState === State.Stopped) {
 				setStatusBarState(context, "stopped", env);
 			}
-			if (event.newState === State.Stopped && !expectedStop) {
+			if (event.newState === State.Stopped && !expectedStoppedClients.has(client)) {
 				logError("[lsp] Server stopped unexpectedly. Use 'Scalim: Restart Server' to recover.");
 				void vscode.window.showErrorMessage(
 					"Scalim YAML DSL server stopped unexpectedly.",
@@ -1083,6 +1234,11 @@ async function startClient(
 	logInfo(`[lsp] Starting: ${env.scalimYamlDslLspPath} ${serverArgs.join(" ")}`);
 	try {
 		await client.start();
+		try {
+			await client.setTrace(lspTraceLevelToProtocolTrace(cfg.lspTrace));
+		} catch (e) {
+			logWarn(`[lsp] Failed to apply lspTrace=${cfg.lspTrace}: ${String(e)}`);
+		}
 		logInfo("[lsp] Ready.");
 		setStatusBarState(context, "running", env);
 	} catch (e) {
@@ -1621,7 +1777,17 @@ async function copyDiagnosticBundle(context: vscode.ExtensionContext, output: vs
 		}
 	}
 
-	const expectedVersion = extractPinnedVersion(cfg.pinnedServerSpec);
+	const configuredPinnedServerSpec = cfg.pinnedServerSpec;
+	const activeServerSpec = env?.pinnedServerSpec;
+	let expectedServerVersion: string | undefined;
+	if (env?.kind === "pinnedVenv") {
+		expectedServerVersion = extractPinnedVersion(activeServerSpec || "");
+		if (!expectedServerVersion) {
+			expectedServerVersion = "<latest>";
+		}
+	} else {
+		expectedServerVersion = "<n/a>";
+	}
 	let yamlSchemasBound: boolean | undefined;
 	let yamlSchemasStatus: string | undefined;
 
@@ -1643,8 +1809,9 @@ async function copyDiagnosticBundle(context: vscode.ExtensionContext, output: vs
 		vscodeVersion: vscode.version,
 		envKind: env?.kind,
 		envMode: cfg.envMode,
-		pinnedServerSpec: cfg.pinnedServerSpec,
-		expectedServerVersion: expectedVersion,
+		configuredPinnedServerSpec,
+		activeServerSpec,
+		expectedServerVersion,
 		serverPackageVersion: env?.serverPackageVersion,
 		pythonPath: env?.pythonPath,
 		pythonVersion: env?.pythonVersion,
@@ -1738,7 +1905,6 @@ async function runDoctor(context: vscode.ExtensionContext, output: vscode.Output
 	}
 
 	// 2) Server installed/version
-	const expectedVersion = extractPinnedVersion(cfg.pinnedServerSpec);
 	if (!currentEnv) {
 		checks.push({
 			id: "server",
@@ -1760,56 +1926,61 @@ async function runDoctor(context: vscode.ExtensionContext, output: vscode.Output
 				},
 			],
 		});
-	} else if (!currentEnv.serverPackageVersion) {
-		checks.push({
-			id: "server",
-			title: "LSP server installed",
-			ok: false,
-			message: "Unable to detect server package version.",
-			actions: [
-				{
-					title: "Reinstall server",
-					run: async () => {
-						await restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
-					},
-				},
-				{
-					title: "Setup Wizard",
-					run: async () => {
-						await setupWizard(context, output);
-					},
-				},
-			],
-		});
-	} else if (expectedVersion && currentEnv.serverPackageVersion !== expectedVersion) {
-		checks.push({
-			id: "server",
-			title: "LSP server version matches pinned spec",
-			ok: false,
-			message: `expected=${expectedVersion} actual=${currentEnv.serverPackageVersion}`,
-			actions: [
-				{
-					title: "Reinstall server",
-					run: async () => {
-						await restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
-					},
-				},
-				{
-					title: "Setup Wizard",
-					run: async () => {
-						await setupWizard(context, output);
-					},
-				},
-			],
-		});
 	} else {
-		checks.push({
-			id: "server",
-			title: "LSP server installed",
-			ok: true,
-			message: currentEnv.serverPackageVersion ?? "<unknown>",
-			actions: [],
-		});
+		const expectedVersion = currentEnv.kind === "pinnedVenv" ? extractPinnedVersion(currentEnv.pinnedServerSpec) : undefined;
+
+		if (currentEnv.kind === "pinnedVenv" && !currentEnv.serverPackageVersion) {
+			checks.push({
+				id: "server",
+				title: "LSP server installed",
+				ok: false,
+				message: "Unable to detect server package version.",
+				actions: [
+					{
+						title: "Reinstall server",
+						run: async () => {
+							await restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
+						},
+					},
+					{
+						title: "Setup Wizard",
+						run: async () => {
+							await setupWizard(context, output);
+						},
+					},
+				],
+			});
+			// continue
+		} else if (expectedVersion && currentEnv.serverPackageVersion !== expectedVersion) {
+			checks.push({
+				id: "server",
+				title: "LSP server version matches pinned spec",
+				ok: false,
+				message: `expected=${expectedVersion} actual=${currentEnv.serverPackageVersion}`,
+				actions: [
+					{
+						title: "Reinstall server",
+						run: async () => {
+							await restartServer(context, output, /*reinstall*/ true, /*allowInstall*/ true);
+						},
+					},
+					{
+						title: "Setup Wizard",
+						run: async () => {
+							await setupWizard(context, output);
+						},
+					},
+				],
+			});
+		} else {
+			checks.push({
+				id: "server",
+				title: "LSP server installed",
+				ok: true,
+				message: currentEnv.serverPackageVersion ?? "<unknown>",
+				actions: [],
+			});
+		}
 	}
 
 	// 3) scalim.yaml
@@ -2085,6 +2256,11 @@ async function setupWizard(context: vscode.ExtensionContext, output: vscode.Outp
 async function openStatusMenu(context: vscode.ExtensionContext, output: vscode.OutputChannel): Promise<void> {
 	const items: Array<{ label: string; description: string; run: () => Promise<void> }> = [
 		{ label: "Open Logs", description: "Show OutputChannel", run: async () => output.show(true) },
+		{
+			label: "Open LSP Trace Output",
+			description: "Show LSP wire trace channel (may contain YAML contents)",
+			run: async () => ensureLspTraceOutputChannel(context).show(true),
+		},
 		{ label: "Open Server Log File", description: "Open globalStorage/server.log", run: async () => await openServerLogFile(context) },
 		{ label: "Open Extension Log File", description: "Open globalStorage/extension.log", run: async () => await openExtensionLogFile(context) },
 		{ label: "Copy Diagnostic Bundle", description: "Copy a redacted report", run: async () => await copyDiagnosticBundle(context, output) },
@@ -2176,6 +2352,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(output);
 
 	outputChannelForLogs = output;
+	extensionLogThreshold = getExtensionConfig().logLevel;
 	await initializeLogFiles(context);
 
 	logInfo("[activate] Scalim YAML DSL extension activated.");
@@ -2288,6 +2465,58 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		void handleScalimYamlChanged(context, output, "deleted");
 	});
 
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration(async (event) => {
+			const affectsLogLevel = event.affectsConfiguration("scalim.yamlDsl.logLevel");
+			const affectsTrace = event.affectsConfiguration("scalim.yamlDsl.lspTrace");
+			const affectsRestart =
+				event.affectsConfiguration("scalim.yamlDsl.serverDebounceMs") ||
+				event.affectsConfiguration("scalim.yamlDsl.serverLogLevel");
+
+			if (affectsLogLevel) {
+				extensionLogThreshold = getExtensionConfig().logLevel;
+				logInfo(`[cfg] logLevel=${extensionLogThreshold}`);
+			}
+
+			if (affectsTrace && currentClient) {
+				const cfg = getExtensionConfig();
+				try {
+					await currentClient.setTrace(lspTraceLevelToProtocolTrace(cfg.lspTrace));
+					logInfo(`[cfg] lspTrace=${cfg.lspTrace}`);
+				} catch (e) {
+					logWarn(`[cfg] Failed to apply lspTrace: ${String(e)}`);
+				}
+			}
+
+			if (!affectsRestart) {
+				return;
+			}
+			if (!currentClient) {
+				return;
+			}
+
+			const cfg = getExtensionConfig();
+			const message = "Scalim: server settings changed. Restart LSP server to apply?";
+			if (cfg.autoRestartOnSettingsChange) {
+				logInfo("[watcher] autoRestartOnSettingsChange=true; restarting server.");
+				void restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
+				return;
+			}
+
+			const choice = await vscode.window.showInformationMessage(message, "Restart server", "Enable auto restart");
+			if (choice === "Restart server") {
+				await restartServer(context, output, /*reinstall*/ false, /*allowInstall*/ false);
+				return;
+			}
+			if (choice === "Enable auto restart") {
+				await vscode.workspace
+					.getConfiguration("scalim.yamlDsl")
+					.update("autoRestartOnSettingsChange", true, vscode.ConfigurationTarget.Workspace);
+				void vscode.window.showInformationMessage("Scalim: auto restart enabled for settings changes.");
+			}
+		}),
+	);
+
 	registerPresetVirtualDocuments(context);
 
 	context.subscriptions.push(
@@ -2315,12 +2544,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 export async function deactivate(): Promise<void> {
 	if (currentClient) {
-		expectedStop = true;
+		const client = currentClient;
+		expectedStoppedClients.add(client);
 		try {
-			await currentClient.stop();
+			await client.stop();
 		} finally {
 			currentClient = undefined;
-			expectedStop = false;
 		}
 	}
 }

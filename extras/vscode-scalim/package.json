@@ -99,7 +99,7 @@
         },
         "scalim.yamlDsl.pinnedServerSpec": {
           "type": "string",
-          "default": "scalim-yaml-dsl-lsp[server]==0.7.5",
+          "default": "scalim-yaml-dsl-lsp[server]",
           "description": "Pinned pip requirement used to provision the YAML DSL LSP server."
         },
         "scalim.yamlDsl.autoSchemaBinding": {
@@ -111,6 +111,34 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically restart the LSP server when scalim.yaml is created/changed/deleted. When false, the extension will prompt you."
+        },
+        "scalim.yamlDsl.serverDebounceMs": {
+          "type": "number",
+          "default": 200,
+          "description": "Debounce (ms) for diagnostics/effective-view recomputation after typing. Lower = faster updates but more CPU/typing lag."
+        },
+        "scalim.yamlDsl.autoRestartOnSettingsChange": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically restart the LSP server when certain scalim.yamlDsl settings change (e.g. serverDebounceMs)."
+        },
+        "scalim.yamlDsl.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": ["error", "warn", "info", "debug"],
+          "description": "Extension log verbosity (OutputChannel + extension.log)."
+        },
+        "scalim.yamlDsl.serverLogLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": ["error", "warning", "info", "debug"],
+          "description": "Server log verbosity written to server.log (passed as --log-level)."
+        },
+        "scalim.yamlDsl.lspTrace": {
+          "type": "string",
+          "default": "off",
+          "enum": ["off", "messages", "verbose"],
+          "description": "LSP wire trace (client-side). WARNING: this can include full YAML contents from didOpen/didChange, so keep it off unless you're debugging."
         }
       }
     }

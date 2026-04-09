@@ -18,7 +18,8 @@ export type DiagnosticBundleInput = {
 	vscodeVersion: string;
 	envKind?: string;
 	envMode?: string;
-	pinnedServerSpec?: string;
+	configuredPinnedServerSpec?: string;
+	activeServerSpec?: string;
 	expectedServerVersion?: string;
 	serverPackageVersion?: string;
 	pythonPath?: string;
@@ -121,7 +122,8 @@ export function renderDiagnosticBundle(input: DiagnosticBundleInput): string {
 	lines.push("Environment");
 	lines.push(`- envMode: ${fmt(input.envMode)}`);
 	lines.push(`- envKind: ${fmt(input.envKind)}`);
-	lines.push(`- pinnedServerSpec: ${fmt(input.pinnedServerSpec)}`);
+	lines.push(`- configuredPinnedServerSpec: ${fmt(input.configuredPinnedServerSpec)}`);
+	lines.push(`- activeServerSpec: ${fmt(input.activeServerSpec)}`);
 	lines.push(`- expectedServerVersion: ${fmt(input.expectedServerVersion)}`);
 	lines.push(`- serverPackageVersion: ${fmt(input.serverPackageVersion)}`);
 	lines.push(`- pythonPath: ${fmt(input.pythonPath)}`);
@@ -186,4 +188,3 @@ export function renderDiagnosticBundle(input: DiagnosticBundleInput): string {
 
 	return lines.join("\n");
 }
-
