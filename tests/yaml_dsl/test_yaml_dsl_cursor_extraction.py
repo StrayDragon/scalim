@@ -196,6 +196,197 @@ def test_cursor_extraction_outputs_fields_empty_scalar_is_supported_for_completi
     assert result.value_range is not None
 
 
+def test_cursor_extraction_outputs_aggregate_group_by_scalar_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}, b: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by: [a]
+              fields:
+                cnt: {count: {}}
+        """
+    )
+    pos = _pos(yaml_text, "group_by: [a]", offset=len("group_by: ["))
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + 1),
+    )
+    result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "aggregate_field_ref"
+    assert result.yaml_path == "outputs.0.aggregate.group_by.0"
+    assert result.reference == "a"
+    assert result.range == expected_range
+    assert result.value == "a"
+    assert result.value_range == expected_range
+
+
+def test_cursor_extraction_outputs_aggregate_group_by_composite_list_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}, b: {}, c: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by: [[a, b], c]
+              fields:
+                cnt: {count: {}}
+        """
+    )
+    pos = _pos(yaml_text, "[a, b]", offset=4)
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + 1),
+    )
+    result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "aggregate_field_ref"
+    assert result.yaml_path == "outputs.0.aggregate.group_by.0.1"
+    assert result.reference == "b"
+    assert result.range == expected_range
+
+
+def test_cursor_extraction_outputs_aggregate_group_by_empty_scalar_is_supported_for_completion() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}, b: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by:
+                - 
+              fields:
+                cnt: {count: {}}
+        """
+    )
+    needle = "        - "
+    pos = _pos(yaml_text, needle, offset=len(needle))
+    result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "aggregate_field_ref"
+    assert result.yaml_path == "outputs.0.aggregate.group_by.0"
+    assert result.reference == ""
+    assert result.range is not None
+    assert result.value_range is not None
+
+
+def test_cursor_extraction_outputs_aggregate_metric_field_ref_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {order_amount: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by: [order_amount]
+              fields:
+                sum_amount: {sum: {field: order_amount}}
+        """
+    )
+    pos = _pos(yaml_text, "sum_amount: {sum: {field: order_amount}}", offset=len("sum_amount: {sum: {field: "))
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + len("order_amount")),
+    )
+    result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "aggregate_field_ref"
+    assert result.yaml_path == "outputs.0.aggregate.fields.sum_amount.sum.field"
+    assert result.reference == "order_amount"
+    assert result.range == expected_range
+
+
+def test_cursor_extraction_outputs_aggregate_metric_fields_list_ref_is_supported() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {customer_id: {}, product_id: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by: [customer_id]
+              fields:
+                customer_product_cnt: {count_distinct: {fields: [customer_id, product_id]}}
+        """
+    )
+    pos = _pos(yaml_text, "fields: [customer_id, product_id]", offset=len("fields: [customer_id, "))
+    expected_range = editor_semantics.EditorRange(
+        start=pos,
+        end=editor_semantics.EditorPosition(line=pos.line, column=pos.column + len("product_id")),
+    )
+    result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "aggregate_field_ref"
+    assert result.yaml_path == "outputs.0.aggregate.fields.customer_product_cnt.count_distinct.fields.1"
+    assert result.reference == "product_id"
+    assert result.range == expected_range
+
+
+def test_cursor_extraction_outputs_aggregate_rank_refs_are_supported_and_do_not_mis_hit_other_by_keys() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {region_id: {}, product_id: {}, order_amount: {}}}
+        sources: {}
+        by: should_not_match
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by: [region_id]
+              fields:
+                sum_amount: {sum: {field: order_amount}}
+                rank:
+                  dense_rank:
+                    by: sum_amount
+                    partition_by: [region_id]
+                    order: desc
+                    order_by: [sum_amount, product_id]
+                score:
+                  score_by_rank:
+                    rank_field: rank
+        """
+    )
+    by_pos = _pos(yaml_text, "by: should_not_match", offset=len("by: "))
+    by_result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, by_pos)
+    assert by_result.kind == ""
+    assert by_result.range is None
+
+    rank_by_pos = _pos(yaml_text, "by: sum_amount", offset=len("by: "))
+    rank_by_result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, rank_by_pos)
+    assert rank_by_result.kind == "aggregate_field_ref"
+    assert rank_by_result.yaml_path == "outputs.0.aggregate.fields.rank.dense_rank.by"
+    assert rank_by_result.reference == "sum_amount"
+
+    partition_pos = _pos(yaml_text, "partition_by: [region_id]", offset=len("partition_by: ["))
+    partition_result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, partition_pos)
+    assert partition_result.kind == "aggregate_field_ref"
+    assert partition_result.yaml_path == "outputs.0.aggregate.fields.rank.dense_rank.partition_by.0"
+    assert partition_result.reference == "region_id"
+
+    order_by_pos = _pos(yaml_text, "order_by: [sum_amount, product_id]", offset=len("order_by: [sum_amount, "))
+    order_by_result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, order_by_pos)
+    assert order_by_result.kind == "aggregate_field_ref"
+    assert order_by_result.yaml_path == "outputs.0.aggregate.fields.rank.dense_rank.order_by.1"
+    assert order_by_result.reference == "product_id"
+
+    score_pos = _pos(yaml_text, "rank_field: rank", offset=len("rank_field: "))
+    score_result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, score_pos)
+    assert score_result.kind == "aggregate_field_ref"
+    assert score_result.yaml_path == "outputs.0.aggregate.fields.score.score_by_rank.rank_field"
+    assert score_result.reference == "rank"
+
+
 def test_cursor_extraction_yaml_import_ref_empty_scalar_is_supported_for_completion() -> None:
     yaml_text = textwrap.dedent(
         """\

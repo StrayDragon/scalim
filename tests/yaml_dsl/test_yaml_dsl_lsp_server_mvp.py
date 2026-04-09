@@ -1263,6 +1263,286 @@ def test_lsp_server_expression_completion_in_aggregate_scope_is_restricted(tmp_p
         client.shutdown()
 
 
+def test_lsp_server_aggregate_group_by_empty_list_item_completion_works(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields: {a: {}, b: {}}",
+            "sources: {}",
+            "outputs:",
+            "  - name: out",
+            "    to: {file: out.xlsx}",
+            "    aggregate:",
+            "      group_by:",
+            "        - ",
+            "      fields:",
+            "        cnt: {count: {}}",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        empty_item_line = next(idx for idx, line in enumerate(lines) if line.strip() == "-")
+        cursor_char = len(lines[empty_item_line])
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": empty_item_line, "character": cursor_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+
+        result = completion_resp.get("result") or {}
+        items = result.get("items") if isinstance(result, dict) else result
+        assert isinstance(items, list)
+        labels = {item.get("label") for item in items if isinstance(item, dict)}
+        assert "a" in labels
+        assert "cnt" in labels
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_aggregate_definition_orders_out_field_before_global_field(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields: {a: {}}",
+            "sources: {}",
+            "fields:",
+            "  sum_amount:",
+            '    compute: "a + 1"',
+            "outputs:",
+            "  - name: out",
+            "    to: {file: out.xlsx}",
+            "    aggregate:",
+            "      group_by: [a]",
+            "      fields:",
+            "        sum_amount: {sum: {field: a}}",
+            "        rank:",
+            "          dense_rank:",
+            "            by: sum_amount",
+            "            order: desc",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        by_line = next(idx for idx, line in enumerate(lines) if line.strip() == "by: sum_amount")
+        cursor_char = int(lines[by_line].index("sum_amount")) + 1
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": by_line, "character": cursor_char},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert len(locations) >= 2
+
+        out_field_line = next(idx for idx, line in enumerate(lines) if line.strip() == "sum_amount: {sum: {field: a}}")
+        global_field_line = next(idx for idx, line in enumerate(lines) if line.strip() == "sum_amount:")
+        assert locations[0].get("uri") == yaml_path.as_uri()
+        assert locations[0].get("range", {}).get("start", {}).get("line") == out_field_line
+        assert locations[1].get("uri") == yaml_path.as_uri()
+        assert locations[1].get("range", {}).get("start", {}).get("line") == global_field_line
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_aggregate_completion_definition_and_hover_work_for_ecommerce_report(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    repo_root = Path(__file__).resolve(strict=False).parents[2]
+    src_yaml = (
+        repo_root / "notebooks" / "marimo" / "demo_big_data_report" / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_report.yaml"
+    )
+    src_frag = (
+        repo_root
+        / "notebooks"
+        / "marimo"
+        / "demo_big_data_report"
+        / "chapters_of_yaml_dsl"
+        / "declared_yaml_dsl"
+        / "ecommerce_report_fragments.yaml"
+    )
+    assert src_yaml.exists()
+    assert src_frag.exists()
+
+    yaml_text = src_yaml.read_text(encoding="utf-8")
+    frag_text = src_frag.read_text(encoding="utf-8")
+    yaml_path = workspace / "ecommerce_report.yaml"
+    frag_path = workspace / "ecommerce_report_fragments.yaml"
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+    frag_path.write_text(frag_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        by_line = next(idx for idx, line in enumerate(lines) if line.strip() == "by: sum_order_amount")
+        token_char = int(lines[by_line].index("sum_order_amount"))
+
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": by_line, "character": token_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+        result = completion_resp.get("result") or {}
+        items = result.get("items") if isinstance(result, dict) else result
+        assert isinstance(items, list)
+        labels = {item.get("label") for item in items if isinstance(item, dict)}
+        assert "sum_order_amount" in labels
+        assert "region_name_display" in labels
+
+        sum_item = next(item for item in items if isinstance(item, dict) and item.get("label") == "sum_order_amount")
+        assert "out_field_id" in str(sum_item.get("detail") or "")
+
+        definition_id = client.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": by_line, "character": token_char + 1},
+            },
+        )
+        definition_resp = client.recv_until(lambda msg: msg.get("id") == definition_id, timeout=10.0)
+        assert "error" not in definition_resp
+        locations = definition_resp.get("result") or []
+        assert isinstance(locations, list)
+        assert locations
+
+        expected_def_line = max(
+            idx for idx, line in enumerate(lines) if idx < by_line and line.strip() == "sum_order_amount: {sum: {field: order_amount}}"
+        )
+        assert locations[0].get("uri") == yaml_path.as_uri()
+        assert locations[0].get("range", {}).get("start", {}).get("line") == expected_def_line
+
+        hover_id = client.send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": by_line, "character": token_char + 1},
+            },
+        )
+        hover_resp = client.recv_until(lambda msg: msg.get("id") == hover_id, timeout=10.0)
+        assert "error" not in hover_resp
+        hover = hover_resp.get("result") or {}
+        value = (hover.get("contents") or {}).get("value") or ""
+        assert "Aggregate out_field_id: sum_order_amount" in str(value)
+    finally:
+        client.shutdown()
+
+
 def test_lsp_server_imports_path_definition_completion_and_preset_definition(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

@@ -57,6 +57,7 @@ from scalim.vendor.yamlx.ruamel.yaml import YAML
 from .cache import load_yaml_mapping_cached, parse_python_ast_cached
 from .cursor_extraction import (
     YamlCursorExtractionResult,
+    extract_yaml_dsl_aggregate_field_reference_by_cursor,
     extract_yaml_dsl_entity_reference_by_cursor,
     extract_yaml_dsl_expression_token_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
@@ -926,6 +927,51 @@ def _ranges_for_yaml_key_value_identifiers(
     return out
 
 
+def _source_key_ids_from_spec_map(spec_map: Optional[Dict[str, Any]]) -> Tuple[str, ...]:
+    if spec_map is None:
+        return ()
+    key_spec = spec_map.get("key")
+    if isinstance(key_spec, list):
+        values: List[str] = []
+        for item in key_spec:
+            token = _safe_str(cast("object", item))
+            if not token:
+                continue
+            values.append(token)
+        return tuple(values)
+    raw = _safe_str(cast("object", key_spec))
+    return (raw,) if raw else ()
+
+
+def _index_source_key_fields(
+    store: "_EntityIndexStore",
+    *,
+    source_id: str,
+    key_ids: Sequence[str],
+    yaml_text: str,
+    locations: Dict[str, Tuple[int, int]],
+) -> None:
+    if not key_ids:
+        return
+
+    key_yaml_path = "sources.{}.key".format(str(source_id))
+    ranges = _ranges_for_yaml_key_value_identifiers(yaml_text, yaml_path=key_yaml_path, locations=locations)
+    fallback_range = _range_for_yaml_key_path(key_yaml_path, key_text="key", locations=locations)
+
+    for fid in key_ids:
+        token = str(fid or "").strip()
+        if not token:
+            continue
+        store.source_fields[(str(source_id), token)] = YamlDslEntityDeclaration(
+            kind="source_field",
+            entity_id=token,
+            yaml_path=key_yaml_path,
+            range=ranges.get(token) or fallback_range,
+            summary="Key field",
+            detail="Declared via sources.{}.key".format(str(source_id)),
+        )
+
+
 def _index_lookup_sources_entities(
     demand: Dict[str, Any],
     locations: Dict[str, Tuple[int, int]],
@@ -952,31 +998,14 @@ def _index_lookup_sources_entities(
         spec_map = _as_yaml_mapping(spec)
         # `sources.*.key` participates in relation.steps as a field_id, but it is not declared under sources.*.fields.
         # Index it as a navigable "source_field" so `customers.customer_id` won't be treated as unknown.
-        key_ids: List[str] = []
-        if spec_map is not None:
-            key_spec = spec_map.get("key")
-            if isinstance(key_spec, list):
-                key_ids = [str(item).strip() for item in key_spec if str(item).strip()]
-            else:
-                raw = _safe_str(key_spec)
-                if raw:
-                    key_ids = [raw]
-
-        if key_ids:
-            key_yaml_path = "sources.{}.key".format(sid)
-            ranges = _ranges_for_yaml_key_value_identifiers(yaml_text, yaml_path=key_yaml_path, locations=locations)
-            fallback_range = _range_for_yaml_key_path(key_yaml_path, key_text="key", locations=locations)
-            for fid in key_ids:
-                if not fid:
-                    continue
-                store.source_fields[(sid, fid)] = YamlDslEntityDeclaration(
-                    kind="source_field",
-                    entity_id=fid,
-                    yaml_path=key_yaml_path,
-                    range=ranges.get(fid) or fallback_range,
-                    summary="Key field",
-                    detail="Declared via sources.{}.key".format(sid),
-                )
+        key_ids = _source_key_ids_from_spec_map(spec_map)
+        _index_source_key_fields(
+            store,
+            source_id=sid,
+            key_ids=key_ids,
+            yaml_text=yaml_text,
+            locations=locations,
+        )
 
         fields_map = spec_map.get("fields") if spec_map is not None else None
         _index_source_fields(sid, fields_map, base_yaml_path="sources.{}.fields".format(sid), locations=locations, store=store)
@@ -2176,7 +2205,7 @@ def hover_yaml_import_reference(
     return YamlImportHoverResult(text=text, warnings=tuple(warnings))
 
 
-def complete_yaml_import_reference(
+def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
     prefix: str,
     *,
     anchor_yaml_text: str,
@@ -2280,7 +2309,7 @@ def complete_yaml_import_reference(
     if loaded is None:
         return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
 
-    remainder_parts = str(remainder or "").split(".") if remainder is not None else [""]
+    remainder_parts = str(remainder or "").split(".")
     base_segments = [seg for seg in remainder_parts[:-1] if str(seg or "").strip()]
     segment_prefix = str(remainder_parts[-1] or "")
 
@@ -2290,8 +2319,6 @@ def complete_yaml_import_reference(
 
     items: List[YamlDslSugarCompletionItem] = []
     for key in sorted(container):
-        if not isinstance(key, str):
-            continue
         k = key.strip()
         if not k:
             continue
@@ -4734,6 +4761,10 @@ def _output_aggregate_group_by_ids(aggregate: Dict[str, Any]) -> Tuple[str, ...]
         for item in group_by_raw:
             if isinstance(item, str):
                 values.append(str(item))
+            elif isinstance(item, list):
+                for inner in item:
+                    if isinstance(inner, str):
+                        values.append(str(inner))
     cleaned = [str(v).strip() for v in values if str(v).strip()]
     return tuple(cleaned)
 
@@ -5130,6 +5161,196 @@ def resolve_yaml_dsl_expression_field_definition(
     return YamlDslFieldDefinitionResult(locations=tuple(locations), warnings=tuple(warnings))
 
 
+def complete_yaml_dsl_aggregate_field_reference(  # noqa: C901
+    extraction: YamlCursorExtractionResult,
+    *,
+    view: YamlDslEditorEffectiveView,
+    scope_index: YamlDslExpressionScopeIndex,
+) -> YamlDslSugarCompletionResult:
+    """为 `outputs[*].aggregate` 内的字段引用提供 completion(分层候选 + 稳定排序)."""
+
+    warnings: List[str] = []
+
+    if str(extraction.kind or "") != "aggregate_field_ref":
+        warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    output_index = _output_index_from_expression_yaml_path(str(extraction.yaml_path or ""))
+    if output_index is None:
+        warnings.append("failed to infer output_index from yaml_path: {}".format(str(extraction.yaml_path or "")))
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    prefix = str(extraction.reference or "")
+    out_field_ids = scope_index.aggregate_out_field_ids_by_output_index.get(int(output_index)) or ()
+    group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
+    global_field_ids = getattr(view, "field_ids", ()) or ()
+
+    items: List[YamlDslSugarCompletionItem] = []
+    seen: Set[str] = set()
+
+    def _maybe_append(label: str, *, source: str) -> None:
+        fid = str(label or "").strip()
+        if not fid:
+            return
+        if prefix and not fid.startswith(prefix):
+            return
+        if fid in seen:
+            return
+
+        detail = str(source)
+        infos = view.field_infos_by_id.get(fid) or ()
+        for info in infos:
+            if info.summary:
+                detail = "{} | {}".format(detail, str(info.summary))
+                break
+
+        items.append(YamlDslSugarCompletionItem(label=fid, insert_text=fid, detail=detail))
+        seen.add(fid)
+
+    for fid in out_field_ids:
+        _maybe_append(fid, source="out_field_id (aggregate.fields)")
+
+    for fid in group_by:
+        _maybe_append(fid, source="group_by field_id")
+
+    for fid in global_field_ids:
+        _maybe_append(fid, source="global field_id (fallback)")
+
+    if not items:
+        warnings.append("no completion candidates for aggregate reference")
+
+    return YamlDslSugarCompletionResult(items=tuple(items), warnings=tuple(warnings))
+
+
+def resolve_yaml_dsl_aggregate_field_definition(  # noqa: C901
+    extraction: YamlCursorExtractionResult,
+    *,
+    view: YamlDslEditorEffectiveView,
+    scope_index: YamlDslExpressionScopeIndex,
+) -> YamlDslFieldDefinitionResult:
+    """为 `outputs[*].aggregate` 内的字段引用提供 definition(支持多 locations + 稳定排序)."""
+
+    warnings: List[str] = []
+
+    if str(extraction.kind or "") != "aggregate_field_ref":
+        warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
+        return YamlDslFieldDefinitionResult(locations=(), warnings=tuple(warnings))
+
+    token = str(extraction.reference or "").strip()
+    if not token:
+        return YamlDslFieldDefinitionResult(locations=(), warnings=())
+
+    output_index = _output_index_from_expression_yaml_path(str(extraction.yaml_path or ""))
+    if output_index is None:
+        warnings.append("failed to infer output_index from yaml_path: {}".format(str(extraction.yaml_path or "")))
+        return YamlDslFieldDefinitionResult(locations=(), warnings=tuple(warnings))
+
+    locations: List[YamlDslFieldDefinitionLocation] = []
+
+    agg_ranges = scope_index.aggregate_out_field_ranges_by_output_index.get(int(output_index)) or {}
+    if token in agg_ranges:
+        rng = agg_ranges.get(token)
+        if rng is None:
+            warnings.append("missing range for out_field_id: {}".format(token))
+        else:
+            yaml_path = "outputs.{}.aggregate.fields.{}".format(int(output_index), token)
+            locations.append(
+                YamlDslFieldDefinitionLocation(
+                    file_path=str(scope_index.file_path),
+                    range=rng,
+                    field_id=str(token),
+                    kind="output_aggregate_field",
+                    source_id="",
+                    yaml_path=yaml_path,
+                )
+            )
+
+    defs = list(view.field_definitions_by_id.get(token) or ())
+
+    def _range_sort_key(rng: Optional[EditorRange]) -> Tuple[int, int, int, int]:
+        if rng is None:
+            return (1 << 30, 1 << 30, 1 << 30, 1 << 30)
+        return (int(rng.start.line), int(rng.start.column), int(rng.end.line), int(rng.end.column))
+
+    defs.sort(key=lambda loc: (str(loc.file_path), *_range_sort_key(loc.range), str(loc.yaml_path)))
+
+    seen: Set[Tuple[str, int, int, int, int]] = set()
+
+    def _loc_key(loc: YamlDslFieldDefinitionLocation) -> Tuple[str, int, int, int, int]:
+        start_line, start_column, end_line, end_column = _range_sort_key(loc.range)
+        return (str(loc.file_path), int(start_line), int(start_column), int(end_line), int(end_column))
+
+    # Aggregate out_field definition MUST be the first candidate when present.
+    for loc in locations:
+        seen.add(_loc_key(loc))
+
+    for loc in defs:
+        key = _loc_key(loc)
+        if key in seen:
+            continue
+        locations.append(loc)
+        seen.add(key)
+
+    if not locations:
+        warnings.append("unresolved aggregate reference: {}".format(token))
+
+    return YamlDslFieldDefinitionResult(locations=tuple(locations), warnings=tuple(warnings))
+
+
+def hover_yaml_dsl_aggregate_field_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    view: YamlDslEditorEffectiveView,
+    scope_index: YamlDslExpressionScopeIndex,
+) -> YamlDslSugarHoverResult:
+    """为 `outputs[*].aggregate` 内的字段引用提供 hover(字段摘要 + 候选来源标注)."""
+
+    warnings: List[str] = []
+
+    if str(extraction.kind or "") != "aggregate_field_ref":
+        warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
+        return YamlDslSugarHoverResult(text="", warnings=tuple(warnings))
+
+    token = str(extraction.reference or "").strip()
+    if not token:
+        return YamlDslSugarHoverResult(text="", warnings=())
+
+    output_index = _output_index_from_expression_yaml_path(str(extraction.yaml_path or ""))
+    if output_index is None:
+        warnings.append("failed to infer output_index from yaml_path: {}".format(str(extraction.yaml_path or "")))
+        return YamlDslSugarHoverResult(text="", warnings=tuple(warnings))
+
+    out_field_ids = scope_index.aggregate_out_field_ids_by_output_index.get(int(output_index)) or ()
+    group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
+
+    if token in out_field_ids:
+        lines = [
+            "Aggregate out_field_id: {}".format(token),
+            "source: outputs[{}].aggregate.fields".format(int(output_index)),
+        ]
+
+        # If token also matches a global field_id, append a compact field summary.
+        maybe_field = hover_yaml_dsl_output_field_id(token, view=view)
+        if str(maybe_field.text or "").strip():
+            lines.append("")
+            lines.extend(str(maybe_field.text).splitlines())
+
+        return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings))
+
+    source_label = "global field_id (fallback)"
+    if token in group_by:
+        source_label = "group_by field_id"
+
+    base = hover_yaml_dsl_output_field_id(token, view=view)
+    if not str(base.text or "").strip():
+        warnings.append("unresolved aggregate reference: {}".format(token))
+        return YamlDslSugarHoverResult(text="", warnings=tuple(warnings))
+
+    lines = [str(line) for line in str(base.text).splitlines() if str(line).strip()]
+    lines.append("source: {}".format(source_label))
+    return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings) + tuple(base.warnings))
+
+
 def hover_yaml_dsl_expression_field_reference(
     extraction: YamlCursorExtractionResult,
     *,
@@ -5378,11 +5599,13 @@ __all__ = (
     "classify_yaml_dsl_kind",
     "collect_yaml_dsl_editor_diagnostics",
     "complete_python_reference",
-    "complete_yaml_import_reference",
+    "complete_yaml_dsl_aggregate_field_reference",
     "complete_yaml_dsl_entity_reference",
     "complete_yaml_dsl_expression_field_reference",
     "complete_yaml_dsl_output_field_id",
+    "complete_yaml_import_reference",
     "discover_yaml_dsl_editor_project",
+    "extract_yaml_dsl_aggregate_field_reference_by_cursor",
     "extract_yaml_dsl_entity_reference_by_cursor",
     "extract_yaml_dsl_expression_token_by_cursor",
     "extract_yaml_dsl_import_reference_by_cursor",
@@ -5390,12 +5613,14 @@ __all__ = (
     "extract_yaml_dsl_python_reference_by_cursor",
     "extract_yaml_dsl_yaml_alias_reference_by_cursor",
     "hover_python_reference",
+    "hover_yaml_dsl_aggregate_field_reference",
     "hover_yaml_dsl_entity_reference",
     "hover_yaml_dsl_expression_field_reference",
     "hover_yaml_dsl_output_field_id",
     "hover_yaml_dsl_yaml_alias",
     "hover_yaml_import_reference",
     "resolve_python_definition",
+    "resolve_yaml_dsl_aggregate_field_definition",
     "resolve_yaml_dsl_entity_definition",
     "resolve_yaml_dsl_expression_field_definition",
     "resolve_yaml_dsl_output_field_definition",

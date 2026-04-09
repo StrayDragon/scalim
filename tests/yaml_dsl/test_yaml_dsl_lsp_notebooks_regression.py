@@ -118,3 +118,146 @@ def test_notebooks_yaml_fixtures_python_reference_ops_do_not_crash(yaml_path: Pa
 
         completion = editor_semantics.complete_python_reference(reference, python_roots=python_roots)
         json.dumps(completion.as_dict())
+
+
+def _collect_aggregate_field_refs(node: object, *, path: List[str]) -> List[tuple]:
+    refs: List[tuple] = []
+
+    if isinstance(node, dict):
+        for key, value in node.items():
+            key_str = str(key)
+            next_path = [*path, key_str]
+
+            # group_by
+            if key_str == "group_by" and len(path) >= 3 and path[-1] == "aggregate" and path[-2].isdigit() and path[-3] == "outputs":
+                if isinstance(value, str) and value.strip():
+                    refs.append((".".join(next_path), value.strip()))
+                elif isinstance(value, list):
+                    for idx, item in enumerate(value):
+                        if isinstance(item, str) and item.strip():
+                            refs.append(("{}.{}".format(".".join(next_path), idx), item.strip()))
+                        elif isinstance(item, list):
+                            for j, inner in enumerate(item):
+                                if isinstance(inner, str) and inner.strip():
+                                    refs.append(("{}.{}.{}".format(".".join(next_path), idx, j), inner.strip()))
+
+            # aggregate.fields.*.*.field / fields[*] / rank refs / score_by_rank
+            if key_str == "fields" and len(path) >= 3 and path[-1] == "aggregate" and path[-2].isdigit() and path[-3] == "outputs":
+                if isinstance(value, dict):
+                    output_prefix = ".".join(next_path)  # outputs.<i>.aggregate.fields
+                    for out_field_id, metrics in value.items():
+                        if not isinstance(metrics, dict):
+                            continue
+                        out_id = str(out_field_id)
+                        for metric_kind, metric_cfg in metrics.items():
+                            kind = str(metric_kind)
+                            if not isinstance(metric_cfg, dict):
+                                continue
+
+                            # rank/row_number/dense_rank
+                            if kind in ("row_number", "rank", "dense_rank"):
+                                by_value = metric_cfg.get("by")
+                                if isinstance(by_value, str) and by_value.strip():
+                                    refs.append(("{}.{}.{}.by".format(output_prefix, out_id, kind), by_value.strip()))
+                                partition_by = metric_cfg.get("partition_by")
+                                if isinstance(partition_by, list):
+                                    for idx, v in enumerate(partition_by):
+                                        if isinstance(v, str) and v.strip():
+                                            refs.append(("{}.{}.{}.partition_by.{}".format(output_prefix, out_id, kind, idx), v.strip()))
+                                order_by = metric_cfg.get("order_by")
+                                if isinstance(order_by, list):
+                                    for idx, v in enumerate(order_by):
+                                        if isinstance(v, str) and v.strip():
+                                            refs.append(("{}.{}.{}.order_by.{}".format(output_prefix, out_id, kind, idx), v.strip()))
+                                continue
+
+                            # score_by_rank
+                            if kind == "score_by_rank":
+                                rank_field = metric_cfg.get("rank_field")
+                                if isinstance(rank_field, str) and rank_field.strip():
+                                    refs.append(("{}.{}.score_by_rank.rank_field".format(output_prefix, out_id), rank_field.strip()))
+                                continue
+
+                            field_value = metric_cfg.get("field")
+                            if isinstance(field_value, str) and field_value.strip():
+                                refs.append(("{}.{}.{}.field".format(output_prefix, out_id, kind), field_value.strip()))
+
+                            fields_value = metric_cfg.get("fields")
+                            if isinstance(fields_value, list):
+                                for idx, v in enumerate(fields_value):
+                                    if isinstance(v, str) and v.strip():
+                                        refs.append(("{}.{}.{}.fields.{}".format(output_prefix, out_id, kind, idx), v.strip()))
+
+            refs.extend(_collect_aggregate_field_refs(value, path=next_path))
+        return refs
+
+    if isinstance(node, list):
+        for idx, value in enumerate(node):
+            refs.extend(_collect_aggregate_field_refs(value, path=[*path, str(idx)]))
+        return refs
+
+    return refs
+
+
+def _assert_non_empty_or_warned(items: list, warnings: tuple, *, label: str, yaml_path: Path) -> None:
+    if items:
+        return
+    assert warnings, "empty result without warnings: {} {}".format(label, str(yaml_path))
+
+
+@pytest.mark.parametrize("yaml_path", _NOTEBOOK_YAML_FIXTURES, ids=lambda yaml_path: str(yaml_path))
+def test_notebooks_yaml_fixtures_aggregate_field_ops_do_not_crash(yaml_path: Path) -> None:
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+    yaml_data, _locations, _lines = load_yaml_mapping_text(
+        yaml_text,
+        source_path=str(yaml_path),
+        detect_duplicate_keys=True,
+    )
+
+    refs = _collect_aggregate_field_refs(yaml_data, path=[])
+    if not refs:
+        return
+
+    yaml_kind = editor_semantics.classify_yaml_dsl_kind(yaml_path, yaml_text)
+    view = editor_semantics.build_yaml_dsl_editor_effective_view(
+        yaml_text,
+        yaml_path=yaml_path,
+        yaml_kind=yaml_kind,
+        allowed_yaml_roots=[yaml_path.parent.resolve(strict=False)],
+    )
+    scope_index = editor_semantics.build_yaml_dsl_expression_scope_index(
+        yaml_text,
+        yaml_path=yaml_path,
+        yaml_kind=yaml_kind,
+    )
+
+    # completion: run once per unique yaml_path (empty prefix / Ctrl+Space style)
+    seen_paths = set()
+    for ref_path, _token in refs:
+        if ref_path in seen_paths:
+            continue
+        seen_paths.add(ref_path)
+        extraction = editor_semantics.YamlCursorExtractionResult(
+            yaml_path=str(ref_path),
+            kind="aggregate_field_ref",
+            reference="",
+        )
+        completion = editor_semantics.complete_yaml_dsl_aggregate_field_reference(extraction, view=view, scope_index=scope_index)
+        json.dumps(completion.as_dict())
+        _assert_non_empty_or_warned(list(completion.items), tuple(completion.warnings), label="completion", yaml_path=yaml_path)
+
+    for ref_path, token in refs:
+        extraction = editor_semantics.YamlCursorExtractionResult(
+            yaml_path=str(ref_path),
+            kind="aggregate_field_ref",
+            reference=str(token),
+        )
+
+        definition = editor_semantics.resolve_yaml_dsl_aggregate_field_definition(extraction, view=view, scope_index=scope_index)
+        json.dumps(definition.as_dict())
+        _assert_non_empty_or_warned(list(definition.locations), tuple(definition.warnings), label="definition", yaml_path=yaml_path)
+
+        hover = editor_semantics.hover_yaml_dsl_aggregate_field_reference(extraction, view=view, scope_index=scope_index)
+        json.dumps(hover.as_dict())
+        if not str(hover.text or "").strip():
+            assert hover.warnings, "empty hover without warnings: {}".format(str(yaml_path))

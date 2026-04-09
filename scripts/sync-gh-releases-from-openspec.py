@@ -292,7 +292,7 @@ def _example_priority(change_id: str, proposal_text: str) -> int:
         return 6
     if "comment-style" in cid:
         return 7
-    # 回退：当 change_id 不带明确 token 时，用提案正文推断作者写法主题；避免错过 “YAML DSL 写法变化”
+    # 回退：当 `change_id` 不带明确 `token` 时，用提案正文推断作者写法主题；避免错过 “YAML DSL 写法变化”
     # 但 ID 命名偏实现细节的变更（例如 `...-callable-precheck-fast-fail` / `...-lsp-sugar-support`）。
     lower = proposal_text.lower()
     if "normalize.call_by" in lower or "normalize" in lower:
@@ -315,7 +315,7 @@ def _example_priority(change_id: str, proposal_text: str) -> int:
         return 6
     if "comment" in lower or "注释" in proposal_text:
         return 7
-    # `call_by`/callable 往往是用户要改写法的核心点（即便没有写进 change_id）。
+    # `call_by`/`callable` 往往是用户要改写法的核心点（即便没有写进 `change_id`）。
     if "call_by" in lower or "callable" in lower:
         return 1
     return 99
@@ -325,12 +325,12 @@ _CALL_BY_TOKEN_RE = re.compile(r"`call_by:\s*\"([^\"]+)\"`")
 
 
 def _render_call_by_upgrade_example(proposal_text: str) -> Optional[List[str]]:
-    # 目标：从提案里提炼出 “位置参数写法 -> 显式 kwargs 写法” 的最小示例（并明确这是语义示意）。
+    # 目标：从提案里提炼出 “位置参数写法 -> 显式 `kwargs` 写法” 的最小示例（并明确这是语义示意）。
     forms = [m.group(1).strip() for m in _CALL_BY_TOKEN_RE.finditer(proposal_text)]
     if not forms:
         return None
 
-    # 选一个同名函数的 pair：`fn(x)` + `fn(x=x)`。
+    # 选一个同名函数的一对写法：`fn(x)` + `fn(x=x)`。
     # - `=` 作为关键字参数的稳定信号
     # - 仅基于提案文本，不做代码推断
     by_base: Dict[str, Dict[str, str]] = {}
@@ -589,7 +589,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         t = tok.strip()
         lower = t.lower()
         # 兼容把 YAML 对写进反引号的写法：`call_by: "fn(x)"` / `fields.*.source: xxx`。
-        # 只取 key 部分做“编写面 token”判定，避免因为包含 value 导致漏判。
+        # 只取 `key` 部分做“编写面 `token`”判定，避免因为包含 `value` 导致漏判。
         key_match = re.match(r"^([a-zA-Z0-9_.$\-\[\]*]+)\s*:", t)
         if key_match:
             t = key_match.group(1).strip()
@@ -701,7 +701,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             return True
         if "直接失败" in text:
             return True
-        # “旧写法不再自动解释/需要显式改写”也属于 upgrade 点（即使不出现“不再支持/迁移”等固定措辞）。
+        # “旧写法不再自动解释/需要显式改写”也属于 `upgrade` 点（即使不出现“不再支持/迁移”等固定措辞）。
         if "不再" in text and ("自动" in text or "隐式" in text) and ("改写" in text or "改为" in text or "改成" in text or "显式" in text):
             return True
         if "用户应" in text and ("改写" in text or "改为" in text or "改成" in text):

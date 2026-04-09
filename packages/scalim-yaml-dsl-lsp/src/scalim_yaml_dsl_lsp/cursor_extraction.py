@@ -21,6 +21,12 @@ _RELATION_STEP_LIST_PATH_MIN_LEN = 4
 _WORKFLOW_PATH_PREFIX_MIN_LEN = 2
 _WORKFLOW_RUN_REF_PATH_MIN_LEN = 5
 _OUTPUTS_FIELDS_PATH_MIN_LEN = 4
+_OUTPUTS_AGGREGATE_REF_PATH_MIN_LEN = 4
+_OUTPUTS_AGGREGATE_FIELDS_FIELD_PATH_MIN_LEN = 7
+_OUTPUTS_AGGREGATE_FIELDS_FIELDS_ITEM_PATH_MIN_LEN = 8
+_OUTPUTS_AGGREGATE_FIELDS_RANK_BY_PATH_MIN_LEN = 7
+_OUTPUTS_AGGREGATE_FIELDS_RANK_LIST_ITEM_PATH_MIN_LEN = 8
+_OUTPUTS_AGGREGATE_FIELDS_SCORE_BY_RANK_PATH_MIN_LEN = 7
 _EXPR_FIELDS_COMPUTE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_WHERE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_AGGREGATE_COMPUTE_PATH_MIN_LEN = 6
@@ -28,6 +34,7 @@ _EXPR_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _SIMPLE_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _IMPORTS_KEY_VALUE_LINE_RE = re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$")
 _DOLLAR_IMPORT_KEY_VALUE_LINE_RE = re.compile(r"^(\s*)\$import\s*:\s*(.*)$")
+_AGGREGATE_RANK_KINDS = ("row_number", "rank", "dense_rank")
 
 
 @dataclass(frozen=True)
@@ -186,7 +193,7 @@ def extract_yaml_dsl_import_path_reference_by_cursor(
     )
 
 
-def _fallback_extract_imports_path_value_by_cursor(
+def _fallback_extract_imports_path_value_by_cursor(  # noqa: PLR0911
     yaml_text: str,
     position: EditorPosition,
 ) -> Optional[YamlCursorExtractionResult]:
@@ -285,6 +292,39 @@ def extract_yaml_dsl_output_field_reference_by_cursor(
     return YamlCursorExtractionResult(
         yaml_path=base.yaml_path,
         kind="output_field_id",
+        reference=base.reference,
+        range=base.range,
+        value=str(base.reference or ""),
+        value_range=base.range,
+        warnings=base.warnings,
+    )
+
+
+def extract_yaml_dsl_aggregate_field_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """基于 `yaml_text + position` 抽取 YAML DSL `outputs[*].aggregate` 内的字段引用.
+
+    覆盖范围(至少):
+    - `outputs[*].aggregate.group_by[*]` / `group_by[*][*]`
+    - `outputs[*].aggregate.fields.*.*.field`
+    - `outputs[*].aggregate.fields.*.*.fields[*]`
+    - `outputs[*].aggregate.fields.*.(row_number|rank|dense_rank).by|partition_by[*]|order_by[*]`
+    - `outputs[*].aggregate.fields.*.score_by_rank.rank_field`
+
+    约束:
+    - 仅做静态解析,无副作用
+    - 失败时降级为“空结果 + warnings”,不得 crash
+    - 空 scalar / 空 list item 场景必须可用于 completion (Ctrl+Space)
+    """
+
+    base = _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=("aggregate_field_ref",))
+    if base.range is None:
+        return base
+    return YamlCursorExtractionResult(
+        yaml_path=base.yaml_path,
+        kind="aggregate_field_ref",
         reference=base.reference,
         range=base.range,
         value=str(base.reference or ""),
@@ -911,7 +951,7 @@ def cast_value(node: object) -> Any:
     return getattr(node, "value", [])
 
 
-def _extract_from_scalar_value(
+def _extract_from_scalar_value(  # noqa: PLR0911
     node: object,
     *,
     lines: List[str],
@@ -1017,9 +1057,7 @@ def _position_in_slice(position: EditorPosition, *, line: int, start_col0: int, 
         return True
     # Empty scalars often yield `start_col0 == end_col0` (single cursor slot),
     # but editors commonly place the cursor at end-of-line (`end_col0 + 1`).
-    if int(start_col0) == int(end_col0) and cursor_col0 == int(end_col0) + 1:
-        return True
-    return False
+    return int(start_col0) == int(end_col0) and cursor_col0 == int(end_col0) + 1
 
 
 def _position_in_range(position: EditorPosition, rng: EditorRange) -> bool:
@@ -1104,6 +1142,8 @@ def _reference_kind(path: List[str]) -> str:
             and _is_int_str(str(path[-1]))
         ):
             kind = "output_field_id"
+        elif _is_output_aggregate_field_ref_path(path):
+            kind = "aggregate_field_ref"
         elif leaf in ("loader", "call_by"):
             kind = leaf
         elif leaf == _IMPORT_KEY or (len(path) >= _IMPORT_LIST_PATH_MIN_LEN and str(path[-2]) == _IMPORT_KEY):
@@ -1112,6 +1152,75 @@ def _reference_kind(path: List[str]) -> str:
             kind = "retry.should_retry"
 
     return kind
+
+
+def _is_output_aggregate_field_ref_path(path: List[str]) -> bool:
+    """Returns True if `path` points to a scalar/list-item field reference under `outputs[*].aggregate`."""
+
+    if len(path) < _OUTPUTS_AGGREGATE_REF_PATH_MIN_LEN:
+        return False
+    if str(path[0]) != "outputs" or not _is_int_str(str(path[1])):
+        return False
+    if str(path[2]) != "aggregate":
+        return False
+
+    return bool(
+        _is_output_aggregate_group_by_ref_path(path)
+        or _is_output_aggregate_metric_field_ref_path(path)
+        or _is_output_aggregate_metric_fields_item_ref_path(path)
+        or _is_output_aggregate_rank_ref_path(path)
+        or _is_output_aggregate_score_by_rank_ref_path(path)
+    )
+
+
+def _is_output_aggregate_group_by_ref_path(path: List[str]) -> bool:
+    if str(path[3]) != "group_by":
+        return False
+    # group_by scalar (permissive) or list items (including composite key `group_by[*][*]`)
+    return str(path[-1]) == "group_by" or _is_int_str(str(path[-1]))
+
+
+def _is_output_aggregate_fields_ref_prefix(path: List[str]) -> bool:
+    return str(path[3]) == "fields"
+
+
+def _is_output_aggregate_metric_field_ref_path(path: List[str]) -> bool:
+    if not _is_output_aggregate_fields_ref_prefix(path):
+        return False
+    # outputs.<i>.aggregate.fields.<out_field_id>.<metric_kind>.field
+    return str(path[-1]) == "field" and len(path) >= _OUTPUTS_AGGREGATE_FIELDS_FIELD_PATH_MIN_LEN
+
+
+def _is_output_aggregate_metric_fields_item_ref_path(path: List[str]) -> bool:
+    if not _is_output_aggregate_fields_ref_prefix(path):
+        return False
+    # outputs.<i>.aggregate.fields.<out_field_id>.<metric_kind>.fields[*]
+    return _is_int_str(str(path[-1])) and len(path) >= _OUTPUTS_AGGREGATE_FIELDS_FIELDS_ITEM_PATH_MIN_LEN and str(path[-2]) == "fields"
+
+
+def _is_output_aggregate_rank_ref_path(path: List[str]) -> bool:
+    if not _is_output_aggregate_fields_ref_prefix(path):
+        return False
+
+    # outputs.<i>.aggregate.fields.<out_field_id>.<rank_kind>.by
+    if str(path[-1]) == "by" and len(path) >= _OUTPUTS_AGGREGATE_FIELDS_RANK_BY_PATH_MIN_LEN:
+        return str(path[-2]) in _AGGREGATE_RANK_KINDS
+
+    # outputs.<i>.aggregate.fields.<out_field_id>.<rank_kind>.(partition_by|order_by)[*]
+    if _is_int_str(str(path[-1])) and len(path) >= _OUTPUTS_AGGREGATE_FIELDS_RANK_LIST_ITEM_PATH_MIN_LEN:
+        return str(path[-3]) in _AGGREGATE_RANK_KINDS and str(path[-2]) in ("partition_by", "order_by")
+
+    return False
+
+
+def _is_output_aggregate_score_by_rank_ref_path(path: List[str]) -> bool:
+    if not _is_output_aggregate_fields_ref_prefix(path):
+        return False
+    return (
+        len(path) >= _OUTPUTS_AGGREGATE_FIELDS_SCORE_BY_RANK_PATH_MIN_LEN
+        and str(path[-1]) == "rank_field"
+        and str(path[-2]) == "score_by_rank"
+    )
 
 
 def _is_supported_reference_path(path: List[str], *, allowed_kinds: Tuple[str, ...]) -> bool:
