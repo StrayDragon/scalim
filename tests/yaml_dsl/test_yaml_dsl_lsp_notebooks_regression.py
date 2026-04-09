@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Iterator, List
 
@@ -44,6 +45,52 @@ def _call_by_head(raw: str) -> str:
     if "(" in prefix:
         prefix = prefix.split("(", 1)[0]
     return prefix.strip()
+
+
+_CALL_BY_KWARGS_VALUE_TOKEN_RE = re.compile("=\\s*([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def _call_by_kwargs_value_tokens(raw: str) -> List[str]:
+    text = str(raw or "")
+    if "(" not in text:
+        return []
+    args = text.split("(", 1)[1]
+    if ")" in args:
+        args = args.rsplit(")", 1)[0]
+    return [str(m.group(1)) for m in _CALL_BY_KWARGS_VALUE_TOKEN_RE.finditer(args)]
+
+
+def _is_call_by_kwargs_value_callsite(path: List[str]) -> bool:
+    if not path or str(path[-1]) != "call_by":
+        return False
+    if len(path) >= 3 and str(path[0]) == "fields":
+        return True
+    return (
+        len(path) >= 6 and str(path[0]) == "outputs" and str(path[1]).isdigit() and str(path[2]) == "aggregate" and str(path[3]) == "fields"
+    )
+
+
+def _collect_call_by_kwargs_value_field_refs(node: object, *, path: List[str]) -> List[tuple]:
+    refs: List[tuple] = []
+
+    if isinstance(node, dict):
+        for key, value in node.items():
+            key_str = str(key)
+            next_path = [*path, key_str]
+            if key_str == "call_by" and isinstance(value, str) and _is_call_by_kwargs_value_callsite(next_path):
+                yaml_path = ".".join(next_path)
+                for token in _call_by_kwargs_value_tokens(value):
+                    if str(token).strip():
+                        refs.append((yaml_path, str(token).strip()))
+            refs.extend(_collect_call_by_kwargs_value_field_refs(value, path=next_path))
+        return refs
+
+    if isinstance(node, list):
+        for idx, value in enumerate(node):
+            refs.extend(_collect_call_by_kwargs_value_field_refs(value, path=[*path, str(idx)]))
+        return refs
+
+    return refs
 
 
 def _collect_python_references(node: object, *, path: List[str]) -> List[str]:
@@ -258,6 +305,76 @@ def test_notebooks_yaml_fixtures_aggregate_field_ops_do_not_crash(yaml_path: Pat
         _assert_non_empty_or_warned(list(definition.locations), tuple(definition.warnings), label="definition", yaml_path=yaml_path)
 
         hover = editor_semantics.hover_yaml_dsl_aggregate_field_reference(extraction, view=view, scope_index=scope_index)
+        json.dumps(hover.as_dict())
+        if not str(hover.text or "").strip():
+            assert hover.warnings, "empty hover without warnings: {}".format(str(yaml_path))
+
+
+@pytest.mark.parametrize("yaml_path", _NOTEBOOK_YAML_FIXTURES, ids=lambda yaml_path: str(yaml_path))
+def test_notebooks_yaml_fixtures_call_by_kwargs_value_field_ops_do_not_crash(yaml_path: Path) -> None:
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+    yaml_data, _locations, _lines = load_yaml_mapping_text(
+        yaml_text,
+        source_path=str(yaml_path),
+        detect_duplicate_keys=True,
+    )
+
+    refs = _collect_call_by_kwargs_value_field_refs(yaml_data, path=[])
+    if not refs:
+        return
+
+    yaml_kind = editor_semantics.classify_yaml_dsl_kind(yaml_path, yaml_text)
+    view = editor_semantics.build_yaml_dsl_editor_effective_view(
+        yaml_text,
+        yaml_path=yaml_path,
+        yaml_kind=yaml_kind,
+        allowed_yaml_roots=[yaml_path.parent.resolve(strict=False)],
+    )
+    scope_index = editor_semantics.build_yaml_dsl_expression_scope_index(
+        yaml_text,
+        yaml_path=yaml_path,
+        yaml_kind=yaml_kind,
+    )
+
+    # completion: run once per unique yaml_path (empty prefix / Ctrl+Space style)
+    seen_paths = set()
+    for ref_path, _token in refs:
+        if ref_path in seen_paths:
+            continue
+        seen_paths.add(ref_path)
+        extraction = editor_semantics.YamlCursorExtractionResult(
+            yaml_path=str(ref_path),
+            kind="call_by_kwargs_value_field_ref",
+            reference="",
+        )
+        completion = editor_semantics.complete_yaml_dsl_call_by_kwargs_value_field_reference(
+            extraction,
+            view=view,
+            scope_index=scope_index,
+        )
+        json.dumps(completion.as_dict())
+        _assert_non_empty_or_warned(list(completion.items), tuple(completion.warnings), label="completion", yaml_path=yaml_path)
+
+    for ref_path, token in refs:
+        extraction = editor_semantics.YamlCursorExtractionResult(
+            yaml_path=str(ref_path),
+            kind="call_by_kwargs_value_field_ref",
+            reference=str(token),
+        )
+
+        definition = editor_semantics.resolve_yaml_dsl_call_by_kwargs_value_field_definition(
+            extraction,
+            view=view,
+            scope_index=scope_index,
+        )
+        json.dumps(definition.as_dict())
+        _assert_non_empty_or_warned(list(definition.locations), tuple(definition.warnings), label="definition", yaml_path=yaml_path)
+
+        hover = editor_semantics.hover_yaml_dsl_call_by_kwargs_value_field_reference(
+            extraction,
+            view=view,
+            scope_index=scope_index,
+        )
         json.dumps(hover.as_dict())
         if not str(hover.text or "").strip():
             assert hover.warnings, "empty hover without warnings: {}".format(str(yaml_path))

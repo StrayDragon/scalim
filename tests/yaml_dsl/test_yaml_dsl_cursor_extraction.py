@@ -69,6 +69,108 @@ def test_cursor_extraction_call_by_parses_head_and_range() -> None:
     assert result2.range is None
 
 
+def test_cursor_extraction_call_by_kwargs_value_extracts_rhs_field_id_and_ignores_lhs_name() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: scalim_misc.demo_big_data_report.loaders:load_orders}
+        sources: {}
+        fields:
+          profit:
+            call_by: "pkg.mod:fn(order_amount=order_amount)"
+        """
+    )
+    lhs_pos = _pos(yaml_text, "order_amount=order_amount", offset=2)
+    lhs = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, lhs_pos)
+    assert lhs.reference == ""
+    assert lhs.range is None
+
+    rhs_start = _pos(yaml_text, "order_amount=order_amount", offset=len("order_amount="))
+    rhs_pos = editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + 2)
+    rhs = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, rhs_pos)
+    assert rhs.kind == "call_by_kwargs_value_field_ref"
+    assert rhs.yaml_path == "fields.profit.call_by"
+    assert rhs.reference == "order_amount"
+    assert rhs.range == editor_semantics.EditorRange(
+        start=rhs_start,
+        end=editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + len("order_amount")),
+    )
+    assert rhs.value == "order_amount"
+    assert rhs.value_range == rhs.range
+
+
+def test_cursor_extraction_call_by_kwargs_value_supports_empty_value_for_completion() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: scalim_misc.demo_big_data_report.loaders:load_orders}
+        sources: {}
+        fields:
+          profit:
+            call_by: "pkg.mod:fn(order_amount=)"
+        """
+    )
+    pos = _pos(yaml_text, "order_amount=", offset=len("order_amount="))
+    result = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "call_by_kwargs_value_field_ref"
+    assert result.yaml_path == "fields.profit.call_by"
+    assert result.reference == ""
+    assert result.range == editor_semantics.EditorRange(start=pos, end=pos)
+    assert result.value_range == result.range
+
+
+def test_cursor_extraction_call_by_kwargs_value_supports_builtin_call_by_head() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: scalim_misc.demo_big_data_report.loaders:load_orders}
+        sources: {}
+        fields:
+          score:
+            call_by: "^score_by_rank(rank=rank, base=100, step=3)"
+        """
+    )
+    rhs_start = _pos(yaml_text, "rank=rank", offset=len("rank="))
+    rhs_pos = editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + 1)
+    result = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, rhs_pos)
+    assert result.kind == "call_by_kwargs_value_field_ref"
+    assert result.yaml_path == "fields.score.call_by"
+    assert result.reference == "rank"
+    assert result.range == editor_semantics.EditorRange(
+        start=rhs_start,
+        end=editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + len("rank")),
+    )
+
+
+def test_cursor_extraction_call_by_kwargs_value_supports_aggregate_callsite() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: scalim_misc.demo_big_data_report.loaders:load_orders, fields: {order_amount: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            aggregate:
+              group_by: [order_amount]
+              fields:
+                sum_amount: {sum: {field: order_amount}}
+                score:
+                  call_by: "^score_by_rank(rank=sum_amount, base=100, step=3)"
+        """
+    )
+    rhs_start = _pos(yaml_text, "rank=sum_amount", offset=len("rank="))
+    rhs_pos = editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + 2)
+    result = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, rhs_pos)
+    assert result.kind == "call_by_kwargs_value_field_ref"
+    assert result.yaml_path == "outputs.0.aggregate.fields.score.call_by"
+    assert result.reference == "sum_amount"
+    assert result.range == editor_semantics.EditorRange(
+        start=rhs_start,
+        end=editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + len("sum_amount")),
+    )
+
+
 def test_cursor_extraction_retry_should_retry_supports_nested_path() -> None:
     yaml_text = textwrap.dedent(
         """\

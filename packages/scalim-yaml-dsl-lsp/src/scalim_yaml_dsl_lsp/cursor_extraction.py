@@ -27,6 +27,8 @@ _OUTPUTS_AGGREGATE_FIELDS_FIELDS_ITEM_PATH_MIN_LEN = 8
 _OUTPUTS_AGGREGATE_FIELDS_RANK_BY_PATH_MIN_LEN = 7
 _OUTPUTS_AGGREGATE_FIELDS_RANK_LIST_ITEM_PATH_MIN_LEN = 8
 _OUTPUTS_AGGREGATE_FIELDS_SCORE_BY_RANK_PATH_MIN_LEN = 7
+_FIELDS_CALL_BY_PATH_MIN_LEN = 3
+_OUTPUTS_AGGREGATE_CALL_BY_PATH_MIN_LEN = 6
 _EXPR_FIELDS_COMPUTE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_WHERE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_AGGREGATE_COMPUTE_PATH_MIN_LEN = 6
@@ -331,6 +333,404 @@ def extract_yaml_dsl_aggregate_field_reference_by_cursor(
         value_range=base.range,
         warnings=base.warnings,
     )
+
+
+def extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """抽取 `call_by` 参数段中 kwargs `=` 右侧的 field-id token.
+
+    覆盖范围(至少):
+    - `fields.*.call_by`
+    - `outputs[*].aggregate.fields.*.call_by`
+    - builtin callable head: `call_by: "^<id>(...)"` (关注 kwargs RHS token,不改变 head 语义)
+
+    约束:
+    - 仅做静态解析,无副作用
+    - 仅对 `=` 右侧生效; `=` 左侧 kwargs 名称 MUST NOT 被当作 field-id
+    - token 抽取 MUST 返回精确 range(仅覆盖 token 本身)
+    - 当值为空(`x=` / `x= `)且用户触发 completion 时,必须提供稳定 value_range
+    - 失败时降级为空结果 + warnings,不得 crash
+    """
+
+    warnings: List[str] = []
+
+    try:
+        root = _compose_yaml_node(yaml_text)
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    if root is None:
+        warnings.append("YAML document is empty")
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    lines = str(yaml_text or "").splitlines()
+    try:
+        result = _extract_call_by_kwargs_value_token_from_node(
+            root,
+            lines=lines,
+            path=[],
+            position=position,
+            warnings=warnings,
+        )
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("cursor extraction failed: {}: {}".format(type(exc).__name__, exc))
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    if result is None:
+        return YamlCursorExtractionResult(warnings=tuple(warnings))
+
+    return YamlCursorExtractionResult(
+        yaml_path=result.yaml_path,
+        kind=result.kind,
+        reference=result.reference,
+        range=result.range,
+        value=result.value,
+        value_range=result.value_range,
+        warnings=tuple(warnings) + tuple(result.warnings),
+    )
+
+
+def _extract_call_by_kwargs_value_token_from_node(  # noqa: PLR0911
+    node: object,
+    *,
+    lines: List[str],
+    path: List[str],
+    position: EditorPosition,
+    warnings: List[str],
+) -> Optional[YamlCursorExtractionResult]:
+    node_id = str(getattr(node, "id", ""))
+
+    if node_id == "scalar":
+        if not _is_call_by_kwargs_value_callsite(path):
+            return None
+        yaml_path = ".".join(path)
+        return _extract_call_by_kwargs_value_token_from_scalar(
+            node,
+            lines=lines,
+            yaml_path=yaml_path,
+            position=position,
+            warnings=warnings,
+        )
+
+    if node_id == "mapping":
+        for key_node, value_node in cast_value(node):
+            key = str(getattr(key_node, "value", ""))
+            if not key:
+                continue
+            key_path = [*path, key]
+            nested = _extract_call_by_kwargs_value_token_from_node(
+                value_node,
+                lines=lines,
+                path=key_path,
+                position=position,
+                warnings=warnings,
+            )
+            if nested is not None:
+                return nested
+        return None
+
+    if node_id == "sequence":
+        for idx, item_node in enumerate(cast_value(node)):
+            idx_path = [*path, str(idx)]
+            nested = _extract_call_by_kwargs_value_token_from_node(
+                item_node,
+                lines=lines,
+                path=idx_path,
+                position=position,
+                warnings=warnings,
+            )
+            if nested is not None:
+                return nested
+        return None
+
+    return None
+
+
+def _is_call_by_kwargs_value_callsite(path: List[str]) -> bool:
+    if not path or str(path[-1]) != "call_by":
+        return False
+
+    if len(path) >= _FIELDS_CALL_BY_PATH_MIN_LEN and str(path[0]) == "fields":
+        return True
+
+    return (
+        len(path) >= _OUTPUTS_AGGREGATE_CALL_BY_PATH_MIN_LEN
+        and str(path[0]) == "outputs"
+        and _is_int_str(str(path[1]))
+        and str(path[2]) == "aggregate"
+        and str(path[3]) == "fields"
+    )
+
+
+def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911
+    node: object,
+    *,
+    lines: List[str],
+    yaml_path: str,
+    position: EditorPosition,
+    warnings: List[str],
+) -> Optional[YamlCursorExtractionResult]:
+    reference_raw = str(getattr(node, "value", "") or "")
+    bounds = _scalar_content_bounds(node, lines)
+    if bounds is None:
+        return None
+    line, content_start0, content_end0 = bounds
+
+    if not _position_in_slice(position, line=line, start_col0=content_start0, end_col0=content_end0):
+        return None
+
+    cursor_col0 = int(position.column) - 1
+    cursor_offset = int(cursor_col0) - int(content_start0)
+    if cursor_offset < 0 or cursor_offset > len(reference_raw):
+        return None
+
+    open_idx = str(reference_raw).find("(")
+    if open_idx == -1:
+        return None
+    if int(cursor_offset) <= int(open_idx):
+        # Cursor is in head ref; keep existing Python/builtin reference extraction behavior.
+        return None
+
+    close_idx = _find_matching_paren(reference_raw, open_idx)
+    if close_idx is None:
+        warnings.append("call_by missing closing ')': {}".format(str(yaml_path)))
+        close_idx = len(reference_raw)
+
+    if int(cursor_offset) > int(close_idx):
+        return None
+
+    args_start = int(open_idx) + 1
+    args_end = int(close_idx)
+
+    seg_start, seg_end = _call_by_top_level_segment_bounds(
+        reference_raw,
+        cursor_offset=cursor_offset,
+        start=args_start,
+        end=args_end,
+    )
+    if seg_start is None or seg_end is None:
+        return None
+
+    eq_pos = _call_by_top_level_equals(reference_raw, start=int(seg_start), end=int(seg_end))
+    if eq_pos is None:
+        return None
+    if int(cursor_offset) <= int(eq_pos):
+        # Cursor is on kwargs name (LHS) or `=` itself -> not a field-id extraction.
+        return None
+
+    rhs_start = int(eq_pos) + 1
+    rhs_start = _skip_inline_ws(reference_raw, rhs_start, end=int(seg_end))
+
+    match = _identifier_token_at(reference_raw, cursor_offset=cursor_offset, start=int(rhs_start), end=int(seg_end))
+    if match is not None:
+        token, token_start, token_end = match
+        rng = _range_for_offsets(line, content_start0, token_start, token_end)
+        return YamlCursorExtractionResult(
+            yaml_path=yaml_path,
+            kind="call_by_kwargs_value_field_ref",
+            reference=str(token),
+            range=rng,
+            value=str(token),
+            value_range=rng,
+            warnings=(),
+        )
+
+    # Empty value extraction for Ctrl+Space completion: `x=` / `x= <cursor>`.
+    if int(rhs_start) >= int(seg_end):
+        rng = EditorRange(start=position, end=position)
+        return YamlCursorExtractionResult(
+            yaml_path=yaml_path,
+            kind="call_by_kwargs_value_field_ref",
+            reference="",
+            range=rng,
+            value="",
+            value_range=rng,
+            warnings=(),
+        )
+
+    return None
+
+
+def _find_matching_paren(text: str, open_idx: int) -> Optional[int]:
+    depth = 0
+    in_str = False
+    quote = ""
+    escaped = False
+
+    i = int(open_idx)
+    while i < len(text):
+        ch = text[i]
+
+        if in_str:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                in_str = False
+                quote = ""
+            i += 1
+            continue
+
+        if ch in ("'", '"'):
+            in_str = True
+            quote = ch
+            i += 1
+            continue
+
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+
+        i += 1
+
+    return None
+
+
+def _call_by_top_level_segment_bounds(  # noqa: C901, PLR0912
+    text: str,
+    *,
+    cursor_offset: int,
+    start: int,
+    end: int,
+) -> Tuple[Optional[int], Optional[int]]:
+    in_str = False
+    quote = ""
+    escaped = False
+    paren_depth = 0
+    bracket_depth = 0
+    brace_depth = 0
+
+    seg_start = int(start)
+    seg_end = int(end)
+
+    i = int(start)
+    while i < int(end):
+        ch = text[i]
+
+        if in_str:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                in_str = False
+                quote = ""
+            i += 1
+            continue
+
+        if ch in ("'", '"'):
+            in_str = True
+            quote = ch
+            i += 1
+            continue
+
+        if ch == "(":
+            paren_depth += 1
+        elif ch == ")":
+            paren_depth = max(0, paren_depth - 1)
+        elif ch == "[":
+            bracket_depth += 1
+        elif ch == "]":
+            bracket_depth = max(0, bracket_depth - 1)
+        elif ch == "{":
+            brace_depth += 1
+        elif ch == "}":
+            brace_depth = max(0, brace_depth - 1)
+
+        if ch == "," and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+            if int(i) < int(cursor_offset):
+                seg_start = int(i) + 1
+            else:
+                seg_end = int(i)
+                break
+
+        i += 1
+
+    if seg_start > seg_end:
+        return None, None
+    return seg_start, seg_end
+
+
+def _call_by_top_level_equals(text: str, *, start: int, end: int) -> Optional[int]:  # noqa: C901, PLR0912
+    in_str = False
+    quote = ""
+    escaped = False
+    paren_depth = 0
+    bracket_depth = 0
+    brace_depth = 0
+
+    i = int(start)
+    while i < int(end):
+        ch = text[i]
+
+        if in_str:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                in_str = False
+                quote = ""
+            i += 1
+            continue
+
+        if ch in ("'", '"'):
+            in_str = True
+            quote = ch
+            i += 1
+            continue
+
+        if ch == "(":
+            paren_depth += 1
+        elif ch == ")":
+            paren_depth = max(0, paren_depth - 1)
+        elif ch == "[":
+            bracket_depth += 1
+        elif ch == "]":
+            bracket_depth = max(0, bracket_depth - 1)
+        elif ch == "{":
+            brace_depth += 1
+        elif ch == "}":
+            brace_depth = max(0, brace_depth - 1)
+
+        if ch == "=" and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+            return i
+
+        i += 1
+
+    return None
+
+
+def _skip_inline_ws(text: str, start: int, *, end: int) -> int:
+    i = int(start)
+    while i < int(end):
+        ch = text[i]
+        if ch not in (" ", "\t"):
+            break
+        i += 1
+    return i
+
+
+def _identifier_token_at(
+    text: str,
+    *,
+    cursor_offset: int,
+    start: int,
+    end: int,
+) -> Optional[Tuple[str, int, int]]:
+    for m in _EXPR_IDENTIFIER_RE.finditer(text, pos=int(start), endpos=int(end)):
+        if int(m.start()) <= int(cursor_offset) <= int(m.end()):
+            token = m.group(0)
+            if token:
+                return str(token), int(m.start()), int(m.end())
+    return None
 
 
 def extract_yaml_dsl_yaml_alias_reference_by_cursor(

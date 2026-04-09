@@ -58,6 +58,7 @@ from .cache import load_yaml_mapping_cached, parse_python_ast_cached
 from .cursor_extraction import (
     YamlCursorExtractionResult,
     extract_yaml_dsl_aggregate_field_reference_by_cursor,
+    extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor,
     extract_yaml_dsl_entity_reference_by_cursor,
     extract_yaml_dsl_expression_token_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
@@ -74,6 +75,8 @@ _YAML_DSL_KIND_CHOICES: Tuple[str, ...] = (
     YAML_DSL_KIND_DEMAND,
     YAML_DSL_KIND_WORKFLOW,
 )
+
+_OUTPUTS_AGGREGATE_CALL_BY_YAML_PATH_MIN_LEN = 6
 
 _SEVERITY_ERROR = "error"
 _SEVERITY_WARNING = "warning"
@@ -5351,6 +5354,135 @@ def hover_yaml_dsl_aggregate_field_reference(
     return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings) + tuple(base.warnings))
 
 
+def _is_aggregate_call_by_yaml_path(yaml_path: str) -> bool:
+    parts = str(yaml_path or "").split(".")
+    return bool(
+        len(parts) >= _OUTPUTS_AGGREGATE_CALL_BY_YAML_PATH_MIN_LEN
+        and str(parts[0]) == "outputs"
+        and str(parts[1]).isdigit()
+        and str(parts[2]) == "aggregate"
+        and str(parts[3]) == "fields"
+        and str(parts[-1]) == "call_by"
+    )
+
+
+def complete_yaml_dsl_call_by_kwargs_value_field_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    view: YamlDslEditorEffectiveView,
+    scope_index: Optional[YamlDslExpressionScopeIndex] = None,
+) -> YamlDslSugarCompletionResult:
+    """为 `call_by` kwargs `=` 右侧的 field-id token 提供 completion."""
+
+    warnings: List[str] = []
+
+    if str(extraction.kind or "") != "call_by_kwargs_value_field_ref":
+        warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    if _is_aggregate_call_by_yaml_path(str(extraction.yaml_path or "")) and scope_index is not None:
+        proxy = YamlCursorExtractionResult(
+            yaml_path=str(extraction.yaml_path or ""),
+            kind="aggregate_field_ref",
+            reference=str(extraction.reference or ""),
+        )
+        result = complete_yaml_dsl_aggregate_field_reference(proxy, view=view, scope_index=scope_index)
+        return YamlDslSugarCompletionResult(items=tuple(result.items), warnings=tuple(warnings) + tuple(result.warnings))
+
+    prefix = str(extraction.reference or "")
+    field_ids = sorted(getattr(view, "field_ids", ()) or ())
+
+    items: List[YamlDslSugarCompletionItem] = []
+    for field_id in field_ids:
+        fid = str(field_id or "").strip()
+        if not fid:
+            continue
+        if prefix and not fid.startswith(prefix):
+            continue
+
+        detail = ""
+        infos = view.field_infos_by_id.get(fid) or ()
+        for info in infos:
+            if info.summary:
+                detail = str(info.summary)
+                break
+        items.append(YamlDslSugarCompletionItem(label=fid, insert_text=fid, detail=detail))
+
+    if not items:
+        warnings.append("no completion candidates for call_by kwargs value")
+
+    return YamlDslSugarCompletionResult(items=tuple(items), warnings=tuple(warnings))
+
+
+def resolve_yaml_dsl_call_by_kwargs_value_field_definition(
+    extraction: YamlCursorExtractionResult,
+    *,
+    view: YamlDslEditorEffectiveView,
+    scope_index: Optional[YamlDslExpressionScopeIndex] = None,
+) -> YamlDslFieldDefinitionResult:
+    """为 `call_by` kwargs `=` 右侧的 field-id token 提供 definition."""
+
+    warnings: List[str] = []
+
+    if str(extraction.kind or "") != "call_by_kwargs_value_field_ref":
+        warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
+        return YamlDslFieldDefinitionResult(locations=(), warnings=tuple(warnings))
+
+    token = str(extraction.reference or "").strip()
+    if not token:
+        return YamlDslFieldDefinitionResult(locations=(), warnings=())
+
+    if _is_aggregate_call_by_yaml_path(str(extraction.yaml_path or "")) and scope_index is not None:
+        proxy = YamlCursorExtractionResult(
+            yaml_path=str(extraction.yaml_path or ""),
+            kind="aggregate_field_ref",
+            reference=str(token),
+        )
+        result = resolve_yaml_dsl_aggregate_field_definition(proxy, view=view, scope_index=scope_index)
+        return YamlDslFieldDefinitionResult(locations=tuple(result.locations), warnings=tuple(warnings) + tuple(result.warnings))
+
+    locations = view.field_definitions_by_id.get(token) or ()
+    if not locations:
+        warnings.append("unresolved call_by kwargs value: {}".format(token))
+
+    return YamlDslFieldDefinitionResult(locations=tuple(locations), warnings=tuple(warnings))
+
+
+def hover_yaml_dsl_call_by_kwargs_value_field_reference(
+    extraction: YamlCursorExtractionResult,
+    *,
+    view: YamlDslEditorEffectiveView,
+    scope_index: Optional[YamlDslExpressionScopeIndex] = None,
+) -> YamlDslSugarHoverResult:
+    """为 `call_by` kwargs `=` 右侧的 field-id token 提供 hover."""
+
+    warnings: List[str] = []
+
+    if str(extraction.kind or "") != "call_by_kwargs_value_field_ref":
+        warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
+        return YamlDslSugarHoverResult(text="", warnings=tuple(warnings))
+
+    token = str(extraction.reference or "").strip()
+    if not token:
+        return YamlDslSugarHoverResult(text="", warnings=())
+
+    if _is_aggregate_call_by_yaml_path(str(extraction.yaml_path or "")) and scope_index is not None:
+        proxy = YamlCursorExtractionResult(
+            yaml_path=str(extraction.yaml_path or ""),
+            kind="aggregate_field_ref",
+            reference=str(token),
+        )
+        result = hover_yaml_dsl_aggregate_field_reference(proxy, view=view, scope_index=scope_index)
+        return YamlDslSugarHoverResult(text=str(result.text or ""), warnings=tuple(warnings) + tuple(result.warnings))
+
+    base = hover_yaml_dsl_output_field_id(token, view=view)
+    if not str(base.text or "").strip():
+        warnings.append("unresolved call_by kwargs value: {}".format(token))
+        return YamlDslSugarHoverResult(text="", warnings=tuple(warnings))
+
+    return YamlDslSugarHoverResult(text=str(base.text or ""), warnings=tuple(warnings) + tuple(base.warnings))
+
+
 def hover_yaml_dsl_expression_field_reference(
     extraction: YamlCursorExtractionResult,
     *,
@@ -5600,12 +5732,14 @@ __all__ = (
     "collect_yaml_dsl_editor_diagnostics",
     "complete_python_reference",
     "complete_yaml_dsl_aggregate_field_reference",
+    "complete_yaml_dsl_call_by_kwargs_value_field_reference",
     "complete_yaml_dsl_entity_reference",
     "complete_yaml_dsl_expression_field_reference",
     "complete_yaml_dsl_output_field_id",
     "complete_yaml_import_reference",
     "discover_yaml_dsl_editor_project",
     "extract_yaml_dsl_aggregate_field_reference_by_cursor",
+    "extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor",
     "extract_yaml_dsl_entity_reference_by_cursor",
     "extract_yaml_dsl_expression_token_by_cursor",
     "extract_yaml_dsl_import_reference_by_cursor",
@@ -5614,6 +5748,7 @@ __all__ = (
     "extract_yaml_dsl_yaml_alias_reference_by_cursor",
     "hover_python_reference",
     "hover_yaml_dsl_aggregate_field_reference",
+    "hover_yaml_dsl_call_by_kwargs_value_field_reference",
     "hover_yaml_dsl_entity_reference",
     "hover_yaml_dsl_expression_field_reference",
     "hover_yaml_dsl_output_field_id",
@@ -5621,6 +5756,7 @@ __all__ = (
     "hover_yaml_import_reference",
     "resolve_python_definition",
     "resolve_yaml_dsl_aggregate_field_definition",
+    "resolve_yaml_dsl_call_by_kwargs_value_field_definition",
     "resolve_yaml_dsl_entity_definition",
     "resolve_yaml_dsl_expression_field_definition",
     "resolve_yaml_dsl_output_field_definition",

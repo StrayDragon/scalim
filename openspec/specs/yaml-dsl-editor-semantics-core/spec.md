@@ -131,6 +131,33 @@ TBD - created by archiving change c50-yaml-dsl-editor-semantics-lsp-core. Update
 - **THEN** MUST 返回空结果
 - **AND** MUST 提供至少一条 warning 用于排障
 
+### Requirement: Editor semantics core MUST extract field-id tokens from `call_by` kwargs value positions
+系统 MUST 扩展光标抽取能力，使其能在 `call_by` 的参数段（`(...)`）内识别 kwargs 的 `=` **右侧** field-id token，并用于 editor/LSP 语义能力。
+
+覆盖 callsite 至少包括：
+- `fields.*.call_by`
+- `outputs[*].aggregate.fields.*.call_by`
+- builtin callable：`call_by: "^<id>(...)"`（head 为 builtin id）
+
+抽取必须满足：
+
+- 抽取 MUST 仅对 `=` 右侧生效；`=` 左侧 kwargs 名称 MUST NOT 被当作 field-id
+- token 抽取 MUST 返回精确 range（仅覆盖 token 本身）
+- 当值为空（例如 `x=` 或 `x= `）且用户触发 completion 时，抽取结果 MUST 能提供稳定的 value_range（用于 completion）
+- 解析失败 MUST 降级为空结果 + warnings（不得抛出未捕获异常）
+
+#### Scenario: cursor on kwargs value token yields extracted field reference
+- **GIVEN** YAML 包含 `call_by: "pkg.mod:fn(x=a)"`
+- **WHEN** 光标位于 `a` 上并触发 hover/definition
+- **THEN** 抽取结果 MUST 将 token `a` 解析为字段引用
+- **AND** MUST 返回仅覆盖 `a` 的 range
+
+#### Scenario: cursor on kwargs name yields empty field extraction
+- **GIVEN** YAML 包含 `call_by: "pkg.mod:fn(x=a)"`
+- **WHEN** 光标位于 `x` 上并触发 hover/definition
+- **THEN** 系统 MUST NOT 将 `x` 解析为字段引用
+- **AND** MUST 返回空结果（允许包含 warnings）
+
 ### Requirement: expression identifier tokens MUST be resolvable to field definitions
 
 在 `compute`/`where` 等安全表达式字符串内,当光标位于某个 identifier token 上时,semantics core MUST 能静态解析该 token 并用于 editor 语义能力:
@@ -143,4 +170,3 @@ TBD - created by archiving change c50-yaml-dsl-editor-semantics-lsp-core. Update
 - **WHEN** 光标位于表达式中的 token `a` 上并触发 definition/hover
 - **THEN** token MUST 解析为对 `fields.a` 的引用
 - **AND** definition MUST 指向 `fields.a` 的声明位置
-

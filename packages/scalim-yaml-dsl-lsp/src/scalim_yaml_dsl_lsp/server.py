@@ -42,6 +42,7 @@ from .core import (
     complete_python_module_segment,
     complete_yaml_dsl_aggregate_field_reference,
     complete_yaml_dsl_builtin_callable_reference,
+    complete_yaml_dsl_call_by_kwargs_value_field_reference,
     complete_yaml_dsl_entity_reference,
     complete_yaml_dsl_expression_field_reference,
     complete_yaml_dsl_import_path_reference,
@@ -49,6 +50,7 @@ from .core import (
     complete_yaml_import_reference,
     discover_yaml_dsl_editor_project,
     extract_yaml_dsl_aggregate_field_reference_by_cursor,
+    extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor,
     extract_yaml_dsl_entity_reference_by_cursor,
     extract_yaml_dsl_expression_token_by_cursor,
     extract_yaml_dsl_import_reference_by_cursor,
@@ -58,6 +60,7 @@ from .core import (
     hover_python_reference,
     hover_yaml_dsl_aggregate_field_reference,
     hover_yaml_dsl_builtin_callable_reference,
+    hover_yaml_dsl_call_by_kwargs_value_field_reference,
     hover_yaml_dsl_entity_reference,
     hover_yaml_dsl_expression_field_reference,
     hover_yaml_dsl_import_path_reference,
@@ -68,6 +71,7 @@ from .core import (
     resolve_python_definition,
     resolve_yaml_dsl_aggregate_field_definition,
     resolve_yaml_dsl_builtin_callable_definition,
+    resolve_yaml_dsl_call_by_kwargs_value_field_definition,
     resolve_yaml_dsl_entity_definition,
     resolve_yaml_dsl_expression_field_definition,
     resolve_yaml_dsl_import_path_definition,
@@ -265,7 +269,7 @@ def _register_definition_feature(server: LanguageServer, state: Dict[str, _Docum
         return await _handle_definition(_ls, params, state=state)
 
 
-async def _handle_definition(
+async def _handle_definition(  # noqa: C901
     ls: LanguageServer,
     params: types.DefinitionParams,
     *,
@@ -313,6 +317,13 @@ async def _handle_definition(
 
     if locations is None and doc_state.effective_view is not None:
         locations = await _handle_yaml_dsl_output_field_definition(
+            doc_state,
+            position=params.position,
+            uri=uri,
+        )
+
+    if locations is None and doc_state.effective_view is not None:
+        locations = await _handle_yaml_dsl_call_by_kwargs_value_field_definition(
             doc_state,
             position=params.position,
             uri=uri,
@@ -523,6 +534,53 @@ async def _handle_yaml_dsl_output_field_definition(
             exc,
         )
         return None
+
+    locations: List[types.Location] = []
+    for loc in result.locations:
+        location = _location_from_definition_location(loc.file_path, loc.range)
+        if location is not None:
+            locations.append(location)
+    return locations or None
+
+
+async def _handle_yaml_dsl_call_by_kwargs_value_field_definition(
+    doc_state: _DocumentState,
+    *,
+    position: types.Position,
+    uri: str,
+) -> Optional[List[types.Location]]:
+    view = doc_state.effective_view
+    if view is None:
+        return None
+
+    extraction = _safe_extract_call_by_kwargs_value_field_reference_for_lsp(doc_state.text, position, uri=uri, op="definition")
+    if not extraction.reference:
+        return None
+
+    try:
+        result = await asyncio.to_thread(
+            resolve_yaml_dsl_call_by_kwargs_value_field_definition,
+            extraction,
+            view=view,
+            scope_index=doc_state.expression_scope_index,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "定义跳转(`call_by kwargs value`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+
+    if result.warnings:
+        _LOG.info(
+            "定义跳转(`call_by kwargs value`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(result.warnings),
+        )
 
     locations: List[types.Location] = []
     for loc in result.locations:
@@ -853,6 +911,30 @@ def _safe_extract_aggregate_field_reference_for_lsp(
     return extraction
 
 
+def _safe_extract_call_by_kwargs_value_field_reference_for_lsp(
+    yaml_text: str,
+    position: types.Position,
+    *,
+    uri: str,
+    op: str,
+) -> YamlCursorExtractionResult:
+    try:
+        extraction = _extract_call_by_kwargs_value_field_reference_for_lsp(yaml_text, position)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("%s(`call_by kwargs value`) 光标抽取失败 `uri`=%s: %s: %s", op, uri, type(exc).__name__, exc)
+        return YamlCursorExtractionResult(warnings=("{}(`call_by kwargs value`) 光标抽取失败".format(op),))
+    if extraction.warnings:
+        _LOG.debug(
+            "%s(`call_by kwargs value`) 光标抽取警告 `uri`=%s `yaml_path`=%s `kind`=%s `warnings`=%s",
+            op,
+            uri,
+            extraction.yaml_path,
+            extraction.kind,
+            list(extraction.warnings),
+        )
+    return extraction
+
+
 def _safe_extract_expression_token_for_lsp(
     yaml_text: str,
     position: types.Position,
@@ -1104,7 +1186,7 @@ async def _try_handle_yaml_import_path_hover(
     return True, hover
 
 
-async def _try_handle_effective_view_hover(  # noqa: C901
+async def _try_handle_effective_view_hover(  # noqa: C901, PLR0912
     doc_state: _DocumentState,
     position: types.Position,
     *,
@@ -1123,6 +1205,22 @@ async def _try_handle_effective_view_hover(  # noqa: C901
             out_hover = await _hover_output_field_extraction(output_field_extraction, view=view, uri=uri)
             if out_hover is not None:
                 return out_hover
+
+        call_by_value_extraction = _safe_extract_call_by_kwargs_value_field_reference_for_lsp(
+            doc_state.text,
+            position,
+            uri=uri,
+            op="悬浮提示(`hover`)",
+        )
+        if call_by_value_extraction.reference:
+            call_by_hover = await _hover_call_by_kwargs_value_field_extraction(
+                call_by_value_extraction,
+                view=view,
+                scope_index=doc_state.expression_scope_index,
+                uri=uri,
+            )
+            if call_by_hover is not None:
+                return call_by_hover
 
         if doc_state.expression_scope_index is not None:
             agg_extraction = _safe_extract_aggregate_field_reference_for_lsp(
@@ -1424,6 +1522,41 @@ async def _hover_aggregate_field_extraction(
     if result.warnings:
         _LOG.info(
             "悬浮提示(`hover`, `outputs.*.aggregate`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(result.warnings),
+        )
+    if not str(result.text or "").strip():
+        return None
+    return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.PlainText, value=str(result.text)))
+
+
+async def _hover_call_by_kwargs_value_field_extraction(
+    extraction: YamlCursorExtractionResult,
+    *,
+    view: YamlDslEditorEffectiveView,
+    scope_index: Optional[YamlDslExpressionScopeIndex],
+    uri: str,
+) -> Optional[types.Hover]:
+    try:
+        result = await asyncio.to_thread(
+            hover_yaml_dsl_call_by_kwargs_value_field_reference,
+            extraction,
+            view=view,
+            scope_index=scope_index,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "悬浮提示(`hover`, `call_by kwargs value`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+    if result.warnings:
+        _LOG.info(
+            "悬浮提示(`hover`, `call_by kwargs value`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
             uri,
             extraction.yaml_path,
             list(result.warnings),
@@ -2012,6 +2145,57 @@ async def _handle_yaml_dsl_aggregate_field_completion(
     return types.CompletionList(is_incomplete=False, items=items)
 
 
+async def _handle_yaml_dsl_call_by_kwargs_value_field_completion(
+    params: types.CompletionParams,
+    *,
+    extraction: YamlCursorExtractionResult,
+    view: YamlDslEditorEffectiveView,
+    scope_index: Optional[YamlDslExpressionScopeIndex],
+    uri: str,
+) -> types.CompletionList:
+    if extraction.value_range is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    value = str(extraction.value or extraction.reference or "")
+    cursor_offset = _cursor_offset_for_completion(params.position, extraction.value_range, reference_len=len(value))
+    if cursor_offset is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+    prefix = value[:cursor_offset]
+
+    extraction_with_prefix = extraction
+    if prefix != str(extraction.reference or ""):
+        extraction_with_prefix = replace(extraction, reference=str(prefix), value=str(prefix))
+
+    try:
+        result = await asyncio.to_thread(
+            complete_yaml_dsl_call_by_kwargs_value_field_reference,
+            extraction_with_prefix,
+            view=view,
+            scope_index=scope_index,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "补全(`completion`, `call_by kwargs value`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    if result.warnings:
+        _LOG.info(
+            "补全(`completion`, `call_by kwargs value`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(result.warnings),
+        )
+
+    replace_range = _to_lsp_range(extraction.value_range)
+    items = _lsp_completion_items_from_sugar_result(result, replace_range=replace_range)
+    return types.CompletionList(is_incomplete=False, items=items)
+
+
 async def _handle_yaml_dsl_expression_field_completion(
     params: types.CompletionParams,
     *,
@@ -2156,6 +2340,22 @@ async def _handle_completion(  # noqa: C901, PLR0911, PLR0912
                 params,
                 extraction=output_field_extraction,
                 view=doc_state.effective_view,
+                uri=uri,
+            )
+
+    if doc_state.effective_view is not None:
+        call_by_value_extraction = _safe_extract_call_by_kwargs_value_field_reference_for_lsp(
+            doc_state.text,
+            params.position,
+            uri=uri,
+            op="completion",
+        )
+        if call_by_value_extraction.kind == "call_by_kwargs_value_field_ref" and call_by_value_extraction.value_range is not None:
+            return await _handle_yaml_dsl_call_by_kwargs_value_field_completion(
+                params,
+                extraction=call_by_value_extraction,
+                view=doc_state.effective_view,
+                scope_index=doc_state.expression_scope_index,
                 uri=uri,
             )
 
@@ -3400,6 +3600,11 @@ def _extract_output_field_reference_for_lsp(yaml_text: str, position: types.Posi
 def _extract_aggregate_field_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
     editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
     return extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, editor_pos)
+
+
+def _extract_call_by_kwargs_value_field_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
+    editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
+    return extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, editor_pos)
 
 
 def _extract_expression_token_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
