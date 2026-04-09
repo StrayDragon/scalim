@@ -25,6 +25,9 @@ _EXPR_FIELDS_COMPUTE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_WHERE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_AGGREGATE_COMPUTE_PATH_MIN_LEN = 6
 _EXPR_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_SIMPLE_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_IMPORTS_KEY_VALUE_LINE_RE = re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$")
+_DOLLAR_IMPORT_KEY_VALUE_LINE_RE = re.compile(r"^(\s*)\$import\s*:\s*(.*)$")
 
 
 @dataclass(frozen=True)
@@ -86,7 +89,72 @@ def extract_yaml_dsl_import_reference_by_cursor(
     - v1 覆盖 `$import: <ref>` 与 `$import: [<ref>, ...]` 形态
     """
 
-    return _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=(_IMPORT_KEY,))
+    base = _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=(_IMPORT_KEY,))
+    if base.range is None:
+        fallback = _fallback_extract_import_ref_value_by_cursor(yaml_text, position)
+        if fallback is not None:
+            return fallback
+        return base
+    return YamlCursorExtractionResult(
+        yaml_path=base.yaml_path,
+        kind=_IMPORT_KEY,
+        reference=base.reference,
+        range=base.range,
+        value=str(base.reference or ""),
+        value_range=base.range,
+        warnings=base.warnings,
+    )
+
+
+def _fallback_extract_import_ref_value_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> Optional[YamlCursorExtractionResult]:
+    """Fallback for `$import: <empty>` where YAML parser marks null values on the next line.
+
+    Similar to imports.* fallback, but `$import` can appear anywhere (not only under `imports:`).
+    """
+
+    lines = str(yaml_text or "").splitlines()
+    line_idx0 = int(position.line) - 1
+    if not (0 <= line_idx0 < len(lines)):
+        return None
+    line_text = str(lines[line_idx0])
+    if not line_text.strip() or line_text.lstrip().startswith("#"):
+        return None
+
+    m = _DOLLAR_IMPORT_KEY_VALUE_LINE_RE.match(line_text)
+    if not m:
+        return None
+
+    cursor_col0 = int(position.column) - 1
+    value_start0 = int(m.start(2))
+    colon_idx0 = line_text.rfind(":", 0, int(value_start0))
+    if colon_idx0 == -1:
+        return None
+    after_colon0 = int(colon_idx0) + 1
+    if cursor_col0 < after_colon0:
+        return None
+
+    prefix = ""
+    if cursor_col0 >= value_start0:
+        prefix = str(line_text[int(value_start0) : int(cursor_col0)] or "")
+
+    rng = EditorRange(start=position, end=position)
+    if prefix.strip():
+        rng = EditorRange(
+            start=EditorPosition(line=int(position.line), column=int(value_start0) + 1),
+            end=EditorPosition(line=int(position.line), column=int(cursor_col0) + 1),
+        )
+
+    return YamlCursorExtractionResult(
+        yaml_path="$import",
+        kind=_IMPORT_KEY,
+        reference=str(prefix).strip(),
+        range=rng,
+        value=str(prefix).strip(),
+        value_range=rng,
+    )
 
 
 def extract_yaml_dsl_import_path_reference_by_cursor(
@@ -102,17 +170,101 @@ def extract_yaml_dsl_import_path_reference_by_cursor(
     """
 
     base = _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=("imports_path",))
-    if not base.reference or base.range is None:
+    if base.range is None:
+        fallback = _fallback_extract_imports_path_value_by_cursor(yaml_text, position)
+        if fallback is not None:
+            return fallback
         return base
     return YamlCursorExtractionResult(
         yaml_path=base.yaml_path,
         kind="imports_path",
         reference=base.reference,
         range=base.range,
-        value=str(base.reference),
+        value=str(base.reference or ""),
         value_range=base.range,
         warnings=base.warnings,
     )
+
+
+def _fallback_extract_imports_path_value_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> Optional[YamlCursorExtractionResult]:
+    """Fallback for `imports.*: <empty>` where YAML parser marks null values on the next line.
+
+    We do a conservative, line-based detection:
+    - cursor must be on a `key:` line under a `imports:` parent line
+    - produce a zero-length range at cursor for completion (Ctrl+Space)
+    """
+
+    lines = str(yaml_text or "").splitlines()
+    line_idx0 = int(position.line) - 1
+    if not (0 <= line_idx0 < len(lines)):
+        return None
+    line_text = str(lines[line_idx0])
+    if not line_text.strip() or line_text.lstrip().startswith("#"):
+        return None
+
+    m = _IMPORTS_KEY_VALUE_LINE_RE.match(line_text)
+    if not m:
+        return None
+    indent_text, key, _value_tail = m.group(1), m.group(2), m.group(3)
+    if not key or not _SIMPLE_KEY_RE.match(str(key)):
+        return None
+
+    indent = len(indent_text or "")
+    if not _is_under_imports_block(lines, line_idx0, indent):
+        return None
+
+    cursor_col0 = int(position.column) - 1
+    # `m.start(3)` points to the value tail after `:` + optional whitespace.
+    # For empty values, users may place cursor right after `:` (before trailing whitespace),
+    # so we accept cursor positions in the `:`-whitespace region as an empty prefix.
+    value_start0 = int(m.start(3))
+
+    colon_idx0 = line_text.find(":", int(m.end(2)))
+    if colon_idx0 == -1:
+        return None
+    after_colon0 = int(colon_idx0) + 1
+    if cursor_col0 < after_colon0:
+        return None
+
+    prefix = ""
+    if cursor_col0 >= value_start0:
+        prefix = str(line_text[int(value_start0) : int(cursor_col0)] or "")
+
+    rng = EditorRange(start=position, end=position)
+    if prefix.strip():
+        rng = EditorRange(
+            start=EditorPosition(line=int(position.line), column=int(value_start0) + 1),
+            end=EditorPosition(line=int(position.line), column=int(cursor_col0) + 1),
+        )
+
+    return YamlCursorExtractionResult(
+        yaml_path="imports.{}".format(str(key)),
+        kind="imports_path",
+        reference=str(prefix).strip(),
+        range=rng,
+        value=str(prefix).strip(),
+        value_range=rng,
+    )
+
+
+def _is_under_imports_block(lines: List[str], line_idx0: int, indent: int) -> bool:
+    """Returns True if the line at `line_idx0` is in a mapping directly under a parent `imports:` key."""
+    idx = int(line_idx0) - 1
+    while idx >= 0:
+        raw = str(lines[idx])
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            idx -= 1
+            continue
+        parent_indent = len(raw) - len(raw.lstrip(" "))
+        if int(parent_indent) >= int(indent):
+            idx -= 1
+            continue
+        return bool(stripped.startswith("imports:"))
+    return False
 
 
 def extract_yaml_dsl_output_field_reference_by_cursor(
@@ -128,14 +280,14 @@ def extract_yaml_dsl_output_field_reference_by_cursor(
     """
 
     base = _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=("output_field_id",))
-    if not base.reference or base.range is None:
+    if base.range is None:
         return base
     return YamlCursorExtractionResult(
         yaml_path=base.yaml_path,
         kind="output_field_id",
         reference=base.reference,
         range=base.range,
-        value=str(base.reference),
+        value=str(base.reference or ""),
         value_range=base.range,
         warnings=base.warnings,
     )
@@ -352,7 +504,21 @@ def _extract_from_expression_scalar_value(
             value_range=rng,
         )
 
-    return None
+    # Cursor is inside an expression scalar, but not on an identifier token.
+    # Still return a zero-length range so editor completion (Ctrl+Space) can work.
+    cursor_col1 = int(cursor_col0) + 1
+    empty_rng = EditorRange(
+        start=EditorPosition(line=int(line), column=int(cursor_col1)),
+        end=EditorPosition(line=int(line), column=int(cursor_col1)),
+    )
+    return YamlCursorExtractionResult(
+        yaml_path=yaml_path,
+        kind=kind,
+        reference="",
+        range=empty_rng,
+        value="",
+        value_range=empty_rng,
+    )
 
 
 def extract_yaml_dsl_entity_reference_by_cursor(
@@ -759,13 +925,25 @@ def _extract_from_scalar_value(
 
     reference_raw = str(getattr(node, "value", "") or "")
     bounds = _scalar_content_bounds(node, lines)
-    if not reference_raw.strip() or bounds is None:
+    if bounds is None:
         return None
 
     line, content_start0, content_end0 = bounds
 
     if not _position_in_slice(position, line=line, start_col0=content_start0, end_col0=content_end0):
-        return None
+        # Empty scalars often appear as a single slot (start == end) while editors
+        # allow cursor positions further to the right (trailing whitespace).
+        # Allow cursor in trailing whitespace for empty scalars (until a comment / non-space).
+        if int(content_start0) != int(content_end0) or int(position.line) != int(line):
+            return None
+        cursor_col0 = int(position.column) - 1
+        if cursor_col0 < int(content_end0):
+            return None
+        line_text = str(lines[int(line) - 1])
+        cursor_col0 = max(0, min(int(cursor_col0), len(line_text)))
+        tail = line_text[int(content_end0) : int(cursor_col0)]
+        if tail.strip():
+            return None
 
     cursor_result = _extract_reference_and_range(
         reference_raw,
@@ -778,6 +956,15 @@ def _extract_from_scalar_value(
         return None
 
     if not _position_in_range(position, cursor_result.range):
+        # For empty scalars, use the cursor position as a zero-length replacement range so
+        # completion can still work when cursor is placed at end-of-line.
+        if not str(cursor_result.reference or "").strip():
+            cursor_rng = EditorRange(start=position, end=position)
+            return YamlCursorExtractionResult(
+                yaml_path=yaml_path,
+                reference="",
+                range=cursor_rng,
+            )
         return None
     return cursor_result
 
@@ -826,7 +1013,13 @@ def _position_in_slice(position: EditorPosition, *, line: int, start_col0: int, 
     if int(position.line) != int(line):
         return False
     cursor_col0 = int(position.column) - 1
-    return int(start_col0) <= cursor_col0 <= int(end_col0)
+    if int(start_col0) <= cursor_col0 <= int(end_col0):
+        return True
+    # Empty scalars often yield `start_col0 == end_col0` (single cursor slot),
+    # but editors commonly place the cursor at end-of-line (`end_col0 + 1`).
+    if int(start_col0) == int(end_col0) and cursor_col0 == int(end_col0) + 1:
+        return True
+    return False
 
 
 def _position_in_range(position: EditorPosition, rng: EditorRange) -> bool:
@@ -856,7 +1049,11 @@ def _extract_reference_and_range(
 
     trimmed, start_offset, end_offset = _trim_value(raw_value)
     if not trimmed:
-        return None
+        return YamlCursorExtractionResult(
+            yaml_path=yaml_path,
+            reference="",
+            range=_range_for_offsets(line, content_start_col0, start_offset, end_offset),
+        )
     return YamlCursorExtractionResult(
         yaml_path=yaml_path,
         reference=trimmed,

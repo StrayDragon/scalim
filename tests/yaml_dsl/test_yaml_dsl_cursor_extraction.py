@@ -173,6 +173,53 @@ def test_cursor_extraction_outputs_fields_nested_list_is_supported() -> None:
     assert result.range == expected_range
 
 
+def test_cursor_extraction_outputs_fields_empty_scalar_is_supported_for_completion() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}}}
+        sources: {}
+        outputs:
+          - name: out
+            to: {file: out.xlsx}
+            fields:
+              - 
+        """
+    )
+    needle = "      - "
+    pos = _pos(yaml_text, needle, offset=len(needle))
+    result = editor_semantics.extract_yaml_dsl_output_field_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "output_field_id"
+    assert result.yaml_path == "outputs.0.fields.0"
+    assert result.reference == ""
+    assert result.range is not None
+    assert result.value_range is not None
+
+
+def test_cursor_extraction_yaml_import_ref_empty_scalar_is_supported_for_completion() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        imports:
+          fragments: ./frag.yaml
+        main_source:
+          source_id: orders
+          loader: tests.fixtures.mock_loaders.mock_loader
+          params:
+            $import:
+          order_by: [order_id]
+        sources: {}
+        outputs: []
+        """
+    )
+    pos = _pos(yaml_text, "$import:", offset=len("$import:"))
+    result = editor_semantics.extract_yaml_dsl_import_reference_by_cursor(yaml_text, pos)
+    assert result.kind == "$import"
+    assert result.reference == ""
+    assert result.range is not None
+    assert result.value_range is not None
+
+
 def test_cursor_extraction_yaml_alias_token_is_supported() -> None:
     yaml_text = textwrap.dedent(
         """\
@@ -220,6 +267,27 @@ def test_cursor_extraction_expression_token_in_fields_compute_is_supported() -> 
     assert result.range == expected_range
     assert result.value == "a"
     assert result.value_range == expected_range
+
+
+def test_cursor_extraction_expression_allows_empty_token_inside_expression_scalar() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: tests.fixtures.mock_loaders.mock_loader, fields: {a: {}}}
+        sources: {}
+        fields:
+          sum:
+            compute: "a + 1"
+        outputs: []
+        """
+    )
+    pos = _pos(yaml_text, 'compute: "a + 1"', offset=len('compute: "a ') + 0)
+    result = editor_semantics.extract_yaml_dsl_expression_token_by_cursor(yaml_text, pos)
+    assert result.kind == "expression_fields_compute"
+    assert result.yaml_path == "fields.sum.compute"
+    assert result.reference == ""
+    assert result.range is not None
+    assert result.value_range is not None
 
 
 def test_cursor_extraction_expression_token_in_outputs_where_is_supported() -> None:

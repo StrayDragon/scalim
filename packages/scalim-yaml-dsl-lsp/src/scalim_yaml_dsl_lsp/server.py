@@ -38,6 +38,7 @@ from .core import (
     complete_yaml_dsl_expression_field_reference,
     complete_yaml_dsl_import_path_reference,
     complete_yaml_dsl_output_field_id,
+    complete_yaml_import_reference,
     discover_yaml_dsl_editor_project,
     extract_yaml_dsl_entity_reference_by_cursor,
     extract_yaml_dsl_expression_token_by_cursor,
@@ -81,6 +82,26 @@ _COMMAND_PRESET_GET_TEXT = "scalim.preset.getText"
 _MODE_MINIMAL = "minimal"
 _MODE_WIDE = "wide"
 
+_DID_CHANGE_DEBOUNCE_ENV = "SCALIM_YAML_DSL_LSP_DID_CHANGE_DEBOUNCE_MS"
+
+
+def _read_did_change_debounce_secs() -> float:
+    raw = str(os.environ.get(_DID_CHANGE_DEBOUNCE_ENV, "")).strip()
+    if not raw:
+        return 0.2
+    try:
+        ms = float(raw)
+    except Exception:  # noqa: BLE001
+        return 0.2
+    if ms < 0:
+        ms = 0
+    if ms > 5000:
+        ms = 5000
+    return float(ms) / 1000.0
+
+
+_DID_CHANGE_DEBOUNCE_SECS = _read_did_change_debounce_secs()
+
 _IMPORT_ESCAPES_ALLOWED_ROOTS_MARKER = "YAML path escapes allowed roots:"
 _RESOLVED_PATH_RE = re.compile(r"resolved_path='([^']+)'")
 _IMPORT_RAW_PATH_RE = re.compile(r"raw='([^']+)'")
@@ -113,9 +134,22 @@ class _ReferenceCompletionContext:
 
 
 def create_server() -> LanguageServer:
+    server_version = "0.0.0"
+    try:
+        from importlib.metadata import version as _pkg_version  # type: ignore[import-not-found]
+
+        server_version = str(_pkg_version("scalim-yaml-dsl-lsp") or "").strip() or server_version
+    except Exception:  # noqa: BLE001
+        try:
+            from importlib_metadata import version as _pkg_version  # type: ignore[import-not-found]
+
+            server_version = str(_pkg_version("scalim-yaml-dsl-lsp") or "").strip() or server_version
+        except Exception:  # noqa: BLE001
+            server_version = server_version
+
     server = LanguageServer(
         "scalim-yaml-dsl-lsp",
-        "0.7.5",
+        server_version,
         text_document_sync_kind=types.TextDocumentSyncKind.Full,
     )
     state: Dict[str, _DocumentState] = {}
@@ -130,9 +164,45 @@ def create_server() -> LanguageServer:
 
 
 def _register_text_document_sync(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:
+    pending_updates: Dict[str, asyncio.Task[None]] = {}
+
+    def _cancel_pending(uri: str) -> None:
+        task = pending_updates.pop(str(uri), None)
+        if task is None:
+            return
+        if task.done():
+            return
+        task.cancel()
+
+    async def _schedule_update(
+        ls: LanguageServer,
+        uri: str,
+        *,
+        yaml_text: Optional[str],
+        version: int,
+        delay_secs: float,
+    ) -> None:
+        _cancel_pending(uri)
+
+        async def _run() -> None:
+            try:
+                await asyncio.sleep(float(delay_secs))
+                await _update_state_and_publish_diagnostics(
+                    ls,
+                    uri,
+                    state,
+                    yaml_text=yaml_text,
+                    version=int(version),
+                )
+            except asyncio.CancelledError:
+                return
+
+        pending_updates[str(uri)] = asyncio.create_task(_run())
+
     @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
     async def did_open(ls: LanguageServer, params: types.DidOpenTextDocumentParams) -> None:
         uri = str(params.text_document.uri)
+        _cancel_pending(uri)
         await _update_state_and_publish_diagnostics(
             ls,
             uri,
@@ -147,17 +217,37 @@ def _register_text_document_sync(server: LanguageServer, state: Dict[str, _Docum
         yaml_text = ""
         if params.content_changes:
             yaml_text = str(params.content_changes[-1].text or "")
-        await _update_state_and_publish_diagnostics(
+        next_text = yaml_text or ""
+        next_version = int(params.text_document.version or 0)
+
+        prev = state.get(uri)
+        if prev is None:
+            state[uri] = _DocumentState(
+                text=str(next_text),
+                version=int(next_version),
+                report=None,
+                python_roots=(),
+                base_diagnostics=(),
+                hint_diagnostics=(),
+                entity_index=None,
+                effective_view=None,
+                expression_scope_index=None,
+            )
+        else:
+            state[uri] = replace(prev, text=str(next_text), version=int(next_version))
+
+        await _schedule_update(
             ls,
             uri,
-            state,
-            yaml_text=yaml_text or None,
-            version=int(params.text_document.version or 0),
+            yaml_text=next_text or None,
+            version=next_version,
+            delay_secs=_DID_CHANGE_DEBOUNCE_SECS,
         )
 
     @server.feature(types.TEXT_DOCUMENT_DID_CLOSE)
     async def did_close(_ls: LanguageServer, params: types.DidCloseTextDocumentParams) -> None:
         uri = str(params.text_document.uri)
+        _cancel_pending(uri)
         state.pop(uri, None)
 
 
@@ -1552,6 +1642,7 @@ def _lsp_completion_items_from_sugar_result(
             label=str(item.label),
             kind=_completion_item_kind_for_sugar_item(str(item.label), str(item.insert_text), is_snippet=bool(item.is_snippet)),
             detail=str(item.detail or ""),
+            sort_text="0",
             text_edit=types.TextEdit(range=replace_range, new_text=str(item.insert_text)),
         )
         if item.is_snippet:
@@ -1591,6 +1682,57 @@ async def _handle_yaml_dsl_builtin_callable_completion(
     if result.warnings:
         _LOG.info(
             "补全(`completion`, `builtin`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s", uri, extraction.yaml_path, list(result.warnings)
+        )
+
+    replace_range = _to_lsp_range(extraction.range)
+    items = _lsp_completion_items_from_sugar_result(result, replace_range=replace_range)
+    return types.CompletionList(is_incomplete=False, items=items)
+
+
+async def _handle_yaml_import_completion(
+    params: types.CompletionParams,
+    *,
+    extraction: YamlCursorExtractionResult,
+    anchor_yaml_path: Path,
+    doc_state: _DocumentState,
+    uri: str,
+) -> types.CompletionList:
+    if doc_state.report is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+    if extraction.range is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    reference = str(extraction.reference or "")
+    cursor_offset = _cursor_offset_for_completion(params.position, extraction.range, reference_len=len(reference))
+    if cursor_offset is None:
+        return types.CompletionList(is_incomplete=False, items=[])
+
+    prefix = reference[:cursor_offset]
+    try:
+        result = await asyncio.to_thread(
+            complete_yaml_import_reference,
+            prefix,
+            anchor_yaml_text=doc_state.text,
+            anchor_yaml_path=anchor_yaml_path,
+            allowed_yaml_roots=doc_state.report.discovery.allowed_yaml_roots,
+            scalim_yaml_override=doc_state.report.discovery.scalim_yaml_path,
+            project_root_override=doc_state.report.discovery.project_root,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "补全(`completion`, `$import`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return types.CompletionList(is_incomplete=False, items=[])
+    if result.warnings:
+        _LOG.info(
+            "补全(`completion`, `$import`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(result.warnings),
         )
 
     replace_range = _to_lsp_range(extraction.range)
@@ -1787,10 +1929,24 @@ async def _handle_completion(
     if reference_completion is not None:
         return reference_completion
 
+    # $import ref completion
+    if anchor_path is not None and doc_state.report is not None:
+        import_extraction = _safe_extract_import_reference_for_lsp(doc_state.text, params.position, uri=uri, op="completion")
+        if import_extraction.range is not None:
+            import_completion = await _handle_yaml_import_completion(
+                params,
+                extraction=import_extraction,
+                anchor_yaml_path=anchor_path,
+                doc_state=doc_state,
+                uri=uri,
+            )
+            if import_completion.items:
+                return import_completion
+
     # imports.* path completion (separate from $import refs)
     if anchor_path is not None:
         import_path_extraction = _safe_extract_import_path_reference_for_lsp(doc_state.text, params.position, uri=uri, op="completion")
-        if import_path_extraction.reference and import_path_extraction.value_range is not None:
+        if import_path_extraction.kind == "imports_path" and import_path_extraction.value_range is not None:
             return await _handle_yaml_dsl_import_path_completion(
                 params,
                 extraction=import_path_extraction,
@@ -1806,7 +1962,7 @@ async def _handle_completion(
             uri=uri,
             op="completion",
         )
-        if output_field_extraction.reference and output_field_extraction.value_range is not None:
+        if output_field_extraction.kind == "output_field_id" and output_field_extraction.value_range is not None:
             return await _handle_yaml_dsl_output_field_completion(
                 params,
                 extraction=output_field_extraction,
@@ -1816,7 +1972,7 @@ async def _handle_completion(
 
     if doc_state.expression_scope_index is not None:
         expr_extraction = _safe_extract_expression_token_for_lsp(doc_state.text, params.position, uri=uri, op="completion")
-        if expr_extraction.reference and expr_extraction.value_range is not None:
+        if expr_extraction.kind and expr_extraction.value_range is not None:
             return await _handle_yaml_dsl_expression_field_completion(
                 params,
                 extraction=expr_extraction,
@@ -1873,7 +2029,7 @@ async def _handle_reference_completion(
 
 
 def _register_completion_feature(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:
-    @server.feature(types.TEXT_DOCUMENT_COMPLETION, types.CompletionOptions(trigger_characters=[".", ":"]))
+    @server.feature(types.TEXT_DOCUMENT_COMPLETION, types.CompletionOptions(trigger_characters=[".", ":", "/", "@", "^"]))
     async def completion(_ls: LanguageServer, params: types.CompletionParams) -> types.CompletionList:
         return await _handle_completion(_ls, params, state=state)
 
@@ -2884,6 +3040,11 @@ async def _update_state_and_publish_diagnostics(
     yaml_text: Optional[str],
     version: int,
 ) -> None:
+    current = state.get(uri)
+    if current is not None and int(current.version) != int(version):
+        # Stale update (a newer didChange already arrived).
+        return
+
     if yaml_text is None:
         try:
             text_doc = ls.workspace.get_text_document(uri)
@@ -2912,6 +3073,10 @@ async def _update_state_and_publish_diagnostics(
         yaml_text=str(yaml_text),
         workspace_root=workspace_root,
     )
+    current = state.get(uri)
+    if current is not None and int(current.version) != int(version):
+        # Another update landed while we were computing.
+        return
     python_roots = tuple(report.discovery.python_roots) if report is not None else ()
     base_diagnostics = tuple(diagnostics)
     state[uri] = _DocumentState(

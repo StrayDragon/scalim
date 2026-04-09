@@ -672,6 +672,86 @@ def test_lsp_server_outputs_fields_definition_and_hover_same_file(tmp_path) -> N
         client.shutdown()
 
 
+def test_lsp_server_outputs_fields_completion_empty_list_item(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  fields:",
+            "    a: {name: A}",
+            "sources: {}",
+            "fields:",
+            "  b:",
+            '    compute: "1"',
+            "outputs:",
+            "  - name: out",
+            "    to: {file: out.xlsx}",
+            "    fields:",
+            "      -  ",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        lines = yaml_text.splitlines()
+        empty_item_line = next(idx for idx, line in enumerate(lines) if line.strip() == "-")
+        cursor_char = len(lines[empty_item_line])
+
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": empty_item_line, "character": cursor_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+
+        result = completion_resp.get("result") or {}
+        items = result.get("items") if isinstance(result, dict) else result
+        assert isinstance(items, list)
+        labels = {item.get("label") for item in items if isinstance(item, dict)}
+        assert "a" in labels
+        assert "b" in labels
+    finally:
+        client.shutdown()
+
+
 def test_lsp_server_outputs_fields_imported_field_definition_jumps_to_fragment(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -1302,6 +1382,157 @@ def test_lsp_server_imports_path_definition_completion_and_preset_definition(tmp
         payload = cmd_resp.get("result") or {}
         assert payload.get("ok") is True
         assert "demo:" in str(payload.get("content") or "")
+
+        # imports.<alias> empty value completion (cursor right after `:`)
+        yaml_text_empty = "\n".join(
+            [
+                "imports:",
+                "  common: ",
+                "  preset: scalim://yaml-dsl/presets/common.yaml",
+                "name: demo",
+                "",
+            ]
+        )
+        client.send_notification(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": yaml_path.as_uri(), "version": 2},
+                "contentChanges": [{"text": yaml_text_empty}],
+            },
+        )
+
+        empty_common_line_idx = next(i for i, line in enumerate(yaml_text_empty.splitlines()) if "common:" in line)
+        empty_common_line = yaml_text_empty.splitlines()[empty_common_line_idx]
+        cursor_char = int(empty_common_line.index(":")) + 1  # right after `:`, before trailing whitespace
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": empty_common_line_idx, "character": cursor_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+        empty_items = completion_resp.get("result", {}).get("items", [])
+        empty_labels = {item.get("label") for item in empty_items}
+        assert "./" in empty_labels
+        assert "../" in empty_labels
+        assert "@/" in empty_labels
+    finally:
+        client.shutdown()
+
+
+def test_lsp_server_yaml_import_ref_completion_alias_and_fragment_keys(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    fragment_path = workspace / "frag.yaml"
+    fragment_path.write_text(
+        "\n".join(
+            [
+                "main_source_params:",
+                "  order_ids: []",
+                "fields:",
+                "  a: {compute: '1'}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = "\n".join(
+        [
+            "imports:",
+            "  fragments: ./frag.yaml",
+            "name: demo",
+            "main_source:",
+            "  source_id: orders",
+            "  loader: tests.fixtures.mock_loaders.mock_loader",
+            "  params:",
+            "    $import: ",
+            "sources: {}",
+            "fields: {}",
+            "outputs: []",
+            "",
+        ]
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    proc = _start_lsp_server_process(workspace)
+    client = _LspClient(proc)
+    try:
+        init_id = client.send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": workspace.as_uri(),
+                "capabilities": {},
+                "workspaceFolders": [{"uri": workspace.as_uri(), "name": "workspace"}],
+            },
+        )
+        init_resp = client.recv_until(lambda msg: msg.get("id") == init_id, timeout=10.0)
+        assert "error" not in init_resp
+
+        client.send_notification("initialized", {})
+        client.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": yaml_path.as_uri(),
+                    "languageId": "yaml",
+                    "version": 1,
+                    "text": yaml_text,
+                }
+            },
+        )
+        _ = client.recv_until(lambda msg: msg.get("method") == "textDocument/publishDiagnostics", timeout=10.0)
+
+        # $import empty value -> alias completion
+        lines = yaml_text.splitlines()
+        import_line_idx = next(idx for idx, line in enumerate(lines) if line.strip().startswith("$import:"))
+        import_line = lines[import_line_idx]
+        cursor_char = int(import_line.index(":")) + 1
+        completion_id = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": import_line_idx, "character": cursor_char},
+            },
+        )
+        completion_resp = client.recv_until(lambda msg: msg.get("id") == completion_id, timeout=10.0)
+        assert "error" not in completion_resp
+        items = completion_resp.get("result", {}).get("items", [])
+        labels = {item.get("label") for item in items}
+        assert "fragments." in labels
+
+        # $import fragments. -> fragment key completion
+        yaml_text2 = yaml_text.replace("    $import: ", "    $import: fragments.")
+        client.send_notification(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": yaml_path.as_uri(), "version": 2},
+                "contentChanges": [{"text": yaml_text2}],
+            },
+        )
+        lines2 = yaml_text2.splitlines()
+        import_line_idx2 = next(idx for idx, line in enumerate(lines2) if line.strip().startswith("$import:"))
+        import_line2 = lines2[import_line_idx2]
+        cursor_char2 = len(import_line2)
+
+        completion_id2 = client.send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": yaml_path.as_uri()},
+                "position": {"line": import_line_idx2, "character": cursor_char2},
+            },
+        )
+        completion_resp2 = client.recv_until(lambda msg: msg.get("id") == completion_id2, timeout=10.0)
+        assert "error" not in completion_resp2
+        items2 = completion_resp2.get("result", {}).get("items", [])
+        labels2 = {item.get("label") for item in items2}
+        assert "fragments.main_source_params" in labels2
+        assert "fragments.fields" in labels2
     finally:
         client.shutdown()
 

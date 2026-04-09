@@ -816,7 +816,7 @@ def build_yaml_dsl_entity_index(
     if parsed is not None:
         demand, locations = parsed
         _index_main_source_entities(demand, locations, store)
-        _index_lookup_sources_entities(demand, locations, store)
+        _index_lookup_sources_entities(demand, locations, store, yaml_text=yaml_text)
         _index_derived_fields_entities(demand, locations, store)
         _index_relations_entities(demand, locations, store)
         _index_outputs_entities(demand, locations, store)
@@ -883,7 +883,56 @@ def _index_main_source_entities(demand: Dict[str, Any], locations: Dict[str, Tup
     _index_source_fields(main_source_id, main_source.get("fields"), base_yaml_path="main_source.fields", locations=locations, store=store)
 
 
-def _index_lookup_sources_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _ranges_for_yaml_key_value_identifiers(
+    yaml_text: str,
+    *,
+    yaml_path: str,
+    locations: Dict[str, Tuple[int, int]],
+) -> Dict[str, EditorRange]:
+    """Best-effort: map identifiers found in a single-line scalar/list value to their source ranges.
+
+    Used for `sources.*.key` where the entity id lives in the *value* (not a mapping key).
+    """
+    loc = locations.get(str(yaml_path))
+    if loc is None:
+        return {}
+    line, column = loc
+    lines = str(yaml_text or "").splitlines()
+    line_idx0 = int(line) - 1
+    if not (0 <= line_idx0 < len(lines)):
+        return {}
+    line_text = str(lines[line_idx0])
+
+    start_col0 = int(column) - 1
+    colon_idx = line_text.find(":", max(0, start_col0))
+    if colon_idx == -1:
+        return {}
+
+    comment_idx = line_text.find("#", int(colon_idx) + 1)
+    end0 = int(comment_idx) if comment_idx != -1 else len(line_text)
+
+    out: Dict[str, EditorRange] = {}
+    for m in _IDENTIFIER_RE.finditer(line_text, pos=int(colon_idx) + 1, endpos=int(end0)):
+        token = m.group(0)
+        if not token:
+            continue
+        out[str(token)] = EditorRange(
+            start=EditorPosition(line=int(line), column=int(m.start()) + 1),
+            end=EditorPosition(line=int(line), column=int(m.end()) + 1),
+        )
+    return out
+
+
+def _index_lookup_sources_entities(
+    demand: Dict[str, Any],
+    locations: Dict[str, Tuple[int, int]],
+    store: _EntityIndexStore,
+    *,
+    yaml_text: str,
+) -> None:
     sources_map = _as_yaml_mapping(demand.get("sources"))
     if sources_map is None:
         return
@@ -901,6 +950,34 @@ def _index_lookup_sources_entities(demand: Dict[str, Any], locations: Dict[str, 
         if decl is not None:
             store.sources[sid] = decl
         spec_map = _as_yaml_mapping(spec)
+        # `sources.*.key` participates in relation.steps as a field_id, but it is not declared under sources.*.fields.
+        # Index it as a navigable "source_field" so `customers.customer_id` won't be treated as unknown.
+        key_ids: List[str] = []
+        if spec_map is not None:
+            key_spec = spec_map.get("key")
+            if isinstance(key_spec, list):
+                key_ids = [str(item).strip() for item in key_spec if str(item).strip()]
+            else:
+                raw = _safe_str(key_spec)
+                if raw:
+                    key_ids = [raw]
+
+        if key_ids:
+            key_yaml_path = "sources.{}.key".format(sid)
+            ranges = _ranges_for_yaml_key_value_identifiers(yaml_text, yaml_path=key_yaml_path, locations=locations)
+            fallback_range = _range_for_yaml_key_path(key_yaml_path, key_text="key", locations=locations)
+            for fid in key_ids:
+                if not fid:
+                    continue
+                store.source_fields[(sid, fid)] = YamlDslEntityDeclaration(
+                    kind="source_field",
+                    entity_id=fid,
+                    yaml_path=key_yaml_path,
+                    range=ranges.get(fid) or fallback_range,
+                    summary="Key field",
+                    detail="Declared via sources.{}.key".format(sid),
+                )
+
         fields_map = spec_map.get("fields") if spec_map is not None else None
         _index_source_fields(sid, fields_map, base_yaml_path="sources.{}.fields".format(sid), locations=locations, store=store)
 
@@ -2097,6 +2174,135 @@ def hover_yaml_import_reference(
                 )
 
     return YamlImportHoverResult(text=text, warnings=tuple(warnings))
+
+
+def complete_yaml_import_reference(
+    prefix: str,
+    *,
+    anchor_yaml_text: str,
+    anchor_yaml_path: Union[str, Path],
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
+) -> YamlDslSugarCompletionResult:
+    """为 `$import: <ref>` 提供 completion.
+
+    支持:
+    - alias completion: `<alias>.`
+    - fragment path completion: `<alias>.<seg>...`
+
+    约束:
+    - 仅静态读取 fragment YAML,不执行用户代码
+    - 解析失败时返回空 items + warnings,不得 crash
+    """
+
+    warnings: List[str] = []
+    raw_prefix = str(prefix or "")
+
+    imports = _extract_imports_mapping(anchor_yaml_text, warnings=warnings)
+    if not imports:
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    def _complete_aliases(alias_prefix: str) -> Tuple[YamlDslSugarCompletionItem, ...]:
+        items: List[YamlDslSugarCompletionItem] = []
+        for alias in sorted(imports):
+            token = "{}.".format(str(alias))
+            if alias_prefix and not token.startswith(alias_prefix):
+                continue
+            items.append(YamlDslSugarCompletionItem(label=token, insert_text=token, detail="import alias"))
+        return _dedupe_sugar_completion_items(items)
+
+    if "." not in raw_prefix:
+        return YamlDslSugarCompletionResult(items=_complete_aliases(raw_prefix), warnings=tuple(warnings))
+
+    alias, _dot, remainder = raw_prefix.partition(".")
+    if not alias:
+        return YamlDslSugarCompletionResult(items=_complete_aliases(raw_prefix), warnings=tuple(warnings))
+
+    raw_import_path = imports.get(str(alias))
+    if raw_import_path is None:
+        # Unknown alias -> still offer alias completion.
+        warnings.append("Unknown $import alias: '{}'".format(alias))
+        return YamlDslSugarCompletionResult(items=_complete_aliases(raw_prefix), warnings=tuple(warnings))
+
+    anchor_path = Path(str(anchor_yaml_path)).expanduser().resolve(strict=False)
+    project_config = _safe_load_yaml_dsl_project_config(
+        anchor_path,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+        warnings=warnings,
+    )
+
+    resolved_source = _resolve_import_source(
+        alias=str(alias),
+        raw_import_path=str(raw_import_path),
+        base_dir=anchor_path.parent,
+        allowed_yaml_roots=allowed_yaml_roots,
+        project_config=project_config,
+        warnings=warnings,
+    )
+    if resolved_source is None:
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    loaded: Optional[Dict[str, Any]] = None
+    fragment_detail = ""
+    if resolved_source.kind == "file" and resolved_source.path is not None:
+        try:
+            loaded, _locations, _lines = load_yaml_mapping_cached(resolved_source.path)
+            fragment_detail = str(resolved_source.path)
+        except ScalimYamlValidationError as exc:
+            msg = exc.errors[0].message if exc.errors else str(exc)
+            warnings.append("fragment YAML 解析失败: {}".format(msg))
+            loaded = None
+        except Exception as exc:  # noqa: BLE001
+            warnings.append("fragment YAML 解析失败: {}: {}".format(type(exc).__name__, exc))
+            loaded = None
+    elif resolved_source.kind == "preset" and resolved_source.preset_id:
+        try:
+            preset_text = load_scalim_preset_yaml_text(str(resolved_source.preset_id))
+            loaded, _locations, _lines = load_yaml_mapping_text(
+                str(preset_text or ""),
+                source_path="scalim://{}".format(str(resolved_source.preset_id)),
+                detect_duplicate_keys=True,
+            )
+            fragment_detail = "preset: {}".format(str(resolved_source.preset_id))
+        except ScalimYamlValidationError as exc:
+            msg = exc.errors[0].message if exc.errors else str(exc)
+            warnings.append("preset YAML 解析失败: {}".format(msg))
+            loaded = None
+        except Exception as exc:  # noqa: BLE001
+            warnings.append("preset YAML 解析失败: {}: {}".format(type(exc).__name__, exc))
+            loaded = None
+    else:
+        warnings.append("imports.{} is not a YAML file; completion is not supported".format(alias))
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    if loaded is None:
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    remainder_parts = str(remainder or "").split(".") if remainder is not None else [""]
+    base_segments = [seg for seg in remainder_parts[:-1] if str(seg or "").strip()]
+    segment_prefix = str(remainder_parts[-1] or "")
+
+    container = _select_mapping_fragment(loaded, segments=base_segments, ref=str(raw_prefix), warnings=warnings)
+    if container is None:
+        return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
+
+    items: List[YamlDslSugarCompletionItem] = []
+    for key in sorted(container):
+        if not isinstance(key, str):
+            continue
+        k = key.strip()
+        if not k:
+            continue
+        if segment_prefix and not k.startswith(segment_prefix):
+            continue
+
+        full_segments = [*base_segments, k]
+        new_ref = "{}.{}".format(str(alias), ".".join(full_segments))
+        items.append(YamlDslSugarCompletionItem(label=new_ref, insert_text=new_ref, detail=fragment_detail))
+
+    return YamlDslSugarCompletionResult(items=_dedupe_sugar_completion_items(items), warnings=tuple(warnings))
 
 
 @dataclass(frozen=True)
@@ -4333,7 +4539,7 @@ def build_yaml_dsl_editor_effective_view(
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
     )
-    if not _maybe_expand_imports_inplace_for_effective_view(
+    imports_expanded = _maybe_expand_imports_inplace_for_effective_view(
         raw,
         yaml_path=yaml_path_resolved,
         allowed_yaml_roots=allowed_yaml_roots,
@@ -4341,12 +4547,13 @@ def build_yaml_dsl_editor_effective_view(
         project_root_override=effective_project_root_override,
         import_cache=import_cache,
         warnings=warnings,
-    ):
-        return YamlDslEditorEffectiveView(
-            yaml_kind=YAML_DSL_KIND_DEMAND,
-            yaml_anchor_ranges=yaml_anchor_ranges,
-            warnings=tuple(warnings),
-        )
+    )
+    if not imports_expanded:
+        # Editor semantics should still be useful while the user is typing or when
+        # imports expansion fails (e.g. allowed-roots guardrail). Degrade gracefully:
+        # - continue collecting in-file field defs for completion/navigation
+        # - keep warnings, and keep `import_fragment_files` empty
+        pass
 
     field_def_index, main_source_id = _collect_field_defs_for_effective_view(raw, warnings=warnings)
     if field_def_index is None:
@@ -4378,13 +4585,15 @@ def build_yaml_dsl_editor_effective_view(
         main_source_id=main_source_id,
     )
 
-    import_fragment_files = _iter_file_import_cache_paths(import_cache)
-    for fragment_file in import_fragment_files:
-        fragment_path = Path(fragment_file)
-        _append_field_definitions_from_yaml_file(
-            definitions_by_id,
-            fragment_path,
-        )
+    import_fragment_files: Sequence[str] = ()
+    if imports_expanded:
+        import_fragment_files = _iter_file_import_cache_paths(import_cache)
+        for fragment_file in import_fragment_files:
+            fragment_path = Path(fragment_file)
+            _append_field_definitions_from_yaml_file(
+                definitions_by_id,
+                fragment_path,
+            )
 
     definitions_final: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
 
@@ -5169,6 +5378,7 @@ __all__ = (
     "classify_yaml_dsl_kind",
     "collect_yaml_dsl_editor_diagnostics",
     "complete_python_reference",
+    "complete_yaml_import_reference",
     "complete_yaml_dsl_entity_reference",
     "complete_yaml_dsl_expression_field_reference",
     "complete_yaml_dsl_output_field_id",
