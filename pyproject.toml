@@ -217,7 +217,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.pytest]
 [tool.pytest.ini_options]
-addopts = "-rs -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100 -p no:benchmark -m \"not bench\""
+addopts = "-rs -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-fail-under=99 -p no:benchmark -m \"not bench\""
 # asyncio_mode = "auto"
 # asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
@@ -238,6 +238,11 @@ omit = [
     "packages/scalim-misc/*",
     "packages/scalim-misc/**",
 ]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = true
 
 [tool.basedpyright]
 # include = ["src/scalim", "tests", "notebooks"]
