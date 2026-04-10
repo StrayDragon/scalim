@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "snapshot": [
+    {
+      "range": {
+        "end": {
+          "character": 16,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 1
+        }
+      },
+      "uri": "file://<WORKSPACE>/mymod.py"
+    },
+    {
+      "range": {
+        "end": {
+          "character": 18,
+          "line": 5
+        },
+        "start": {
+          "character": 0,
+          "line": 5
+        }
+      },
+      "uri": "file://<WORKSPACE>/mymod.py"
+    }
+  ]
+}

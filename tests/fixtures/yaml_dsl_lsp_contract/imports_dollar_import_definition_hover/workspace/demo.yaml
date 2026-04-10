@@ -1,0 +1,7 @@
+imports:
+  fragments: ./ecommerce_report_fragments.yaml
+resources:
+  books:
+    report:
+      $import: fragments.report_book
+

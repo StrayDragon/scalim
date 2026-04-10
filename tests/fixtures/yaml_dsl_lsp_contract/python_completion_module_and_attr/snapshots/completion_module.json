@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "snapshot": [
+    {
+      "detail": null,
+      "kind": 9,
+      "label": "subpkg",
+      "sortText": null
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+detail_fields: &detail_fields [a, b]
+name: demo
+main_source:
+  source_id: orders
+  loader: mymod:mock_loader
+  fields: {a: {}, b: {}}
+sources: {}
+outputs:
+  - name: out
+    to: {file: out.xlsx}
+    fields:
+      - *detail_fields
+

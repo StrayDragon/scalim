@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "diagnostics": [
+      {
+        "code": "yaml_validate_error",
+        "message": "'main_source' must be a dictionary",
+        "range": {
+          "end": {
+            "character": 1,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "Missing required field: 'main_source'",
+        "range": {
+          "end": {
+            "character": 1,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "Missing required field: 'name'",
+        "range": {
+          "end": {
+            "character": 1,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "Schema validation error: 'main_source' is a required property",
+        "range": {
+          "end": {
+            "character": 1,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "Schema validation error: 'name' is a required property",
+        "range": {
+          "end": {
+            "character": 1,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "Unknown field 'loader'",
+        "range": {
+          "end": {
+            "character": 1,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      }
+    ],
+    "uri": "file://<WORKSPACE>/demo.yaml"
+  }
+}

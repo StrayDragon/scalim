@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: YAML DSL LSP MUST have protocol-level contract tests as a refactor baseline
 

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "snapshot": [
+    {
+      "detail": "",
+      "kind": 12,
+      "label": "a",
+      "sortText": "0"
+    },
+    {
+      "detail": "",
+      "kind": 12,
+      "label": "b",
+      "sortText": "0"
+    }
+  ]
+}

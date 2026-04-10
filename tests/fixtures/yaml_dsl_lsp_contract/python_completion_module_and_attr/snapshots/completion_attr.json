@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "snapshot": [
+    {
+      "detail": null,
+      "kind": 3,
+      "label": "load_payment_methods",
+      "sortText": null
+    }
+  ]
+}

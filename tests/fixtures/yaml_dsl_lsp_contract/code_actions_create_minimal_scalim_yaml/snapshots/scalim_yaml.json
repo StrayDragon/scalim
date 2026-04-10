@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "content": "yaml_dsl:\n  import_roots:\n    - path: .\n      alias: \"@\"\n  lsp:\n    python_roots:\n      - src\n"
+  }
+}

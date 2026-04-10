@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "snapshot": [
+    {
+      "command": {
+        "arguments": [
+          "file://<WORKSPACE>/demo.yaml"
+        ],
+        "command": "scalim.yaml.createMinimal"
+      },
+      "edit": null,
+      "kind": "quickfix",
+      "title": "创建最小 `scalim.yaml`"
+    }
+  ]
+}

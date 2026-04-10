@@ -1,0 +1,18 @@
+imports:
+  frags: ./frag.yaml
+name: demo
+main_source:
+  source_id: orders
+  loader: mymod:mock_loader
+  fields: {a: {}}
+sources: {}
+fields:
+  $import: frags.fields
+outputs:
+  - name: out
+    to: {file: out.xlsx}
+    fields:
+      - a
+      - b
+      -
+

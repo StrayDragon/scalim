@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: YAML DSL LSP server MUST keep user-facing behavior stable via contract tests
 

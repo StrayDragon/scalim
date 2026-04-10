@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "snapshot": [
+    {
+      "detail": "python: scalim.workflow.loaders:book_sheet_rows",
+      "kind": 12,
+      "label": "workflow/book_sheet_rows",
+      "sortText": "0"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "contents": "YAML alias: *detail_fields\nanchor: &detail_fields\nexpanded fields: 2\npreview: a, b"
+  }
+}

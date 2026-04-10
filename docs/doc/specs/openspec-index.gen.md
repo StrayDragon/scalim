@@ -311,6 +311,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/streaming-output/spec.md)
 - Summary: **状态: ✅ 已实现** 支持 IRowSink 与 IColumnSink 的流式写入路径,定义 main source 行流、分批与 `row_id` 规则,并约束行式路径“行就绪即写出 + rows 绑定 release 屏障”语义.
 
+### `testing-behavior-contracts`
+- Title: testing-behavior-contracts Specification
+- Source: [spec.md](#code=openspec/specs/testing-behavior-contracts/spec.md)
+- Summary: TBD - created by archiving change c0-testing-behavior-first. Update Purpose after archive.
+
 ### `testing-quality`
 - Title: testing-quality Specification
 - Source: [spec.md](#code=openspec/specs/testing-quality/spec.md)

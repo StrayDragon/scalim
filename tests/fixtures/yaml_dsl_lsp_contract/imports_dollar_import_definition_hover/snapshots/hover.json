@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "contents": "$import fragments.report_book\nimports.fragments: ./ecommerce_report_fragments.yaml\nresolved: <WORKSPACE>/ecommerce_report_fragments.yaml\nfragment: report_book"
+  }
+}
